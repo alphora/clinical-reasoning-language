@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import { load } from "./test-harness.mjs";
 
-const { renderCelPane, reverseCelAnchors, formatNoteTimestamp } = await load("celPaneHtml.ts");
+const { renderCelPane, reverseCelAnchors, formatNoteTimestamp, REVIEW_ORDER } = await load("celPaneHtml.ts");
+const { REVIEW_STATES } = await load("medicalValidationStore.ts");
 // Use the REAL nodeKey (the same fn celPaneHtml + crlStructure call) so the gate-key format is proven, not assumed.
 const { nodeKey } = await import("@smile-digital-health/crl");
 
@@ -307,8 +308,51 @@ check("worklist state class: unreviewed / pending / pass / fail map to the right
 check("worklist state is keyed by caseId, NOT display name", () => {
   // statesByCaseId carries the NAME "A" as a key (a trap) — it must NOT be picked up; the frozen caseId "cA" has no entry.
   const out = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: { enabled: true, statesByCaseId: { A: "pass" } } });
-  assert.match(out.html, /cel-review-unreviewed/, "name-keyed state ignored → renders To do");
-  assert.ok(!out.html.includes("cel-review-pass"));
+  assert.match(out.html, /cel-review cel-review-unreviewed/, "name-keyed state ignored → the SELECT renders To do");
+  // scope to the row SELECT (`cel-review cel-review-pass`), not the bare token — the #214 filter chips legitimately carry
+  // `cel-filter-chip cel-review-pass` for the pass chip's color.
+  assert.ok(!out.html.includes("cel-review cel-review-pass"), "the row select is NOT pass (name-keyed state ignored)");
+});
+
+// ── #214 verdict filter ──
+check("#214 DRIFT GUARD: celPaneHtml's REVIEW_ORDER deep-equals the store's REVIEW_STATES (chips ↔ reset set can't desync)", () => {
+  assert.deepEqual([...REVIEW_ORDER], [...REVIEW_STATES], "the chip list + the host's 'all-active' reset set MUST be identical");
+});
+check("#214 filter: the chip row renders 4 native <button aria-pressed> with counts; absent filter ⇒ all active", () => {
+  const out = renderCelPane(result([sc("A", "pass"), sc("B", "fail")]), { A: "cA", B: "cB" }, { worklist: { enabled: true, statesByCaseId: { cA: "pass", cB: "fail" } } });
+  assert.match(out.html, /<div class="cel-filter-chips"/, "the chip row renders");
+  for (const st of ["unreviewed", "pending", "pass", "fail"])
+    assert.match(out.html, new RegExp(`<button type="button" class="cel-filter-chip cel-review-${st} cel-filter-on" data-worklist-filter="${st}" aria-pressed="true"`), `${st} chip active when no filter`);
+  assert.match(out.html, /data-worklist-filter="pass"[^>]*>Pass <span class="cel-filter-count">1<\/span>/, "pass count = 1");
+  assert.match(out.html, /data-worklist-filter="fail"[^>]*>Fail <span class="cel-filter-count">1<\/span>/, "fail count = 1");
+  assert.match(out.html, /data-worklist-filter="unreviewed"[^>]*title="Includes cases that are not reviewable"/, "the to-do chip notes it includes unreviewable cases");
+});
+check("#214 filter: {pass} shows ONLY pass rows (fail case skip-rendered, no anchor); the fail chip is aria-pressed=false", () => {
+  const out = renderCelPane(result([sc("A", "pass"), sc("B", "fail")]), { A: "cA", B: "cB" }, { worklist: { enabled: true, statesByCaseId: { cA: "pass", cB: "fail" }, filter: new Set(["pass"]) } });
+  assert.ok(out.anchors["cA"], "the pass case A is shown (anchor present)");
+  assert.ok(!out.anchors["cB"], "the fail case B is filtered out (NO anchor registered for a hidden row)");
+  assert.ok(/cel-name">A</.test(out.html) && !/cel-name">B</.test(out.html), "A visible, B hidden");
+  assert.match(out.html, /data-worklist-filter="fail" aria-pressed="false"/, "the fail chip reads inactive");
+});
+check("#214 filter: ABSOLUTE row numbers stay stable — row 1 filtered out, row 2 still renders as '2.'", () => {
+  const out = renderCelPane(result([sc("A", "pass"), sc("B", "fail")]), { A: "cA", B: "cB" }, { worklist: { enabled: true, statesByCaseId: { cA: "pass", cB: "fail" }, filter: new Set(["fail"]) } });
+  assert.match(out.html, /cel-rownum">2\.</, "the surviving row keeps its ABSOLUTE scenario number (2.)");
+  assert.ok(!/cel-rownum">1\.</.test(out.html), "row 1 (filtered) emits nothing");
+});
+check("#214 filter: empty filter (all off) → the 'no cases match' placeholder + the chips STAY interactive", () => {
+  const out = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: { enabled: true, statesByCaseId: { cA: "pass" }, filter: new Set() } });
+  assert.match(out.html, /No cases match the verdict filter/, "the empty-filter placeholder");
+  assert.match(out.html, /cel-filter-chips/, "the chips remain (else the user could never toggle one back on)");
+  assert.ok(!out.anchors["cA"], "no rows rendered");
+});
+check("#214 filter: an unreviewable (unfrozen) case filters as to-do (shown only when 'unreviewed' active)", () => {
+  const mk = (filter) => renderCelPane(result([sc("Unfrozen", "pass")]), {}, { worklist: { enabled: true, statesByCaseId: {}, filter } });
+  assert.match(mk(new Set(["unreviewed"])).html, /cel-review-disabled/, "the unreviewable row shows when to-do is active");
+  assert.ok(!/cel-review-disabled/.test(mk(new Set(["pass"])).html), "hidden when only pass active (it counts as to-do)");
+});
+check("#214 filter: cockpit (no worklist) render has NO chips — byte-unchanged", () => {
+  const out = renderCelPane(result([sc("A", "pass")]), { A: "cA" });
+  assert.ok(!out.html.includes("cel-filter-chips"), "no chip row outside worklist mode");
 });
 
 check("worklist: an UNFROZEN case → DISABLED select, NO data-worklist-select, the freeze tooltip", () => {

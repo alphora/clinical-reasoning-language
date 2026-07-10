@@ -65,6 +65,7 @@ import {
   loadSidecar,
   medicalValidationSidecarPath,
   renderProgressChrome,
+  REVIEW_STATES,
   reviewProgress,
   saveSidecar,
   setReviewState,
@@ -259,6 +260,19 @@ export function resolveProducedLeafKeys(
   return out;
 }
 
+/** #214 (PURE, unit-tested): should a selection auto-WIDEN the worklist verdict filter? True iff a NEW primary-cel case
+ *  (`nextCaseId` present + DIFFERENT from `prevCaseId` — so a same-selection re-dispatch doesn't re-widen and undo a
+ *  deliberate filter-off) whose `verdict` is NOT currently shown. When true the caller adds `verdict` to the filter + re-
+ *  renders the worklist BEFORE the reveal, so the selected case's row/anchor exist (else `highlightRows` clears the pane). */
+export function shouldWidenFilterForSelection(
+  prevCaseId: string | undefined,
+  nextCaseId: string | undefined,
+  verdict: ReviewState,
+  filter: ReadonlySet<ReviewState>,
+): boolean {
+  return nextCaseId !== undefined && nextCaseId !== prevCaseId && !filter.has(verdict);
+}
+
 export function registerCorrespondenceCockpit(context: vscode.ExtensionContext): void {
   // NOTE: crl.active is owned + gated (on workspace .crl/.cel content) by registerProvenancePanel — do NOT set it here.
   // An unconditional setContext at activation would surface both the provenance view and this navigator in EVERY window.
@@ -347,6 +361,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let editingNoteId: string | undefined;
   let mvSidecarPath: string | undefined;
   let worklistActions: Record<string, { caseId: string }> = {};
+  // #214: the worklist verdict FILTER — the set of verdicts whose rows are SHOWN. Session-only VIEW state (NOT persisted;
+  // reset to all-shown on every MV retarget alongside the drawer state), so policy A's filter can't hide policy B.
+  let worklistFilter: Set<ReviewState> = new Set(REVIEW_STATES);
   // #177 slice 3 — the questionnaire panel's focused-question cursor. DEFAULT `-1` = "no question focused" (the pane
   // shows "Question 0 of Y"; Next moves to question 1) — a case does NOT auto-focus its first question. RESET to -1 on a
   // real cel-case change. Declared HERE so slices 4 (the "this node" marker) + 5 (the prev/next sub-nav) build on it.
@@ -468,6 +485,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const prevCaseId = focusedCaseId(state); // #177 slice 3: capture the focused case BEFORE reduce (real-change detection)
     const { state: next, effects } = reduce(state, action);
     state = next;
+    // #214 AUTO-WIDEN: a NEW primary-cel selection of a case whose verdict is filtered OUT must not vanish from its OWN
+    // worklist (highlightRows posts clearHighlight on the missing anchor — the case would show everywhere BUT the worklist).
+    // Include that verdict + re-render the worklist BEFORE the reveal, so the case's row + anchor exist. GATED on a CHANGED
+    // caseId, so a same-selection re-dispatch (a filter toggle / verdict change re-drive) does NOT re-widen — that would undo
+    // a deliberate filter-off of the currently-selected case's verdict. A source/crl→cel multi-case reveal is NOT a primary
+    // cel selection, so it respects the filter (a partial highlight of the matching cases is the filter working as intended).
+    const nextCid = focusedCaseId(next);
+    if (mode === "medical-validation" && views.has("worklist") && nextCid !== undefined) {
+      const v: ReviewState = reviewByCaseId[nextCid] ?? "unreviewed";
+      if (shouldWidenFilterForSelection(prevCaseId, nextCid, v, worklistFilter)) {
+        worklistFilter.add(v);
+        renderPane("worklist"); // re-render with the widened filter so the selection's reveal (below) finds the case's anchor
+      }
+    }
     for (const e of effects) applyReveal(e);
     onNav.fire(undefined);
     reflectSelectionToTree();
@@ -1190,7 +1221,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // never touches the cel-pane-owned fact map. It OWNS `worklistActions` (the opaque-key → caseId map the verdict/notes
       // handlers resolve) — set ONLY here, so a read-only `cel` render can't clobber it.
       const r = scenarios
-        ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_`, caseKeyNumbers, showKeys, duplicateScenarioNames, worklist: { enabled: true, statesByCaseId: reviewByCaseId, policyLabel: currentCel ? basename(currentCel).replace(/\.(cel|crl)$/i, "") : undefined, notesByCaseId, openNotesCaseId, editingNoteId } })
+        ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_`, caseKeyNumbers, showKeys, duplicateScenarioNames, worklist: { enabled: true, statesByCaseId: reviewByCaseId, policyLabel: currentCel ? basename(currentCel).replace(/\.(cel|crl)$/i, "") : undefined, notesByCaseId, openNotesCaseId, editingNoteId, filter: worklistFilter } })
         : { html: '<p class="placeholder">No CEL.</p>', anchors: {}, reveals: {}, conceptToFactAnchors: {}, worklistActions: {} };
       v.anchors = r.anchors;
       v.reveals = r.reveals;
@@ -1330,7 +1361,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   function onWebviewMessage(
     pane: Pane,
-    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string },
+    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string; state?: string },
   ): void {
     const v = views.get(pane);
     if (!v) return;
@@ -1380,6 +1411,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       navigateQuestion(msg.dir); // #177 slice 5: the questionnaire pane's prev/next sub-nav — moves currentQuestionIndex
     } else if (msg.type === "worklistSet" && typeof msg.key === "string") {
       setWorklist(msg.key, msg.value); // #156 slice 4: a worklist dropdown change (MV mode) — host validates + persists it
+    } else if (msg.type === "worklistFilterToggle") {
+      toggleWorklistFilter(msg.state); // #214: toggle a verdict in/out of the worklist filter (host validates the state)
     } else if (msg.type === "notesToggle" && typeof msg.key === "string") {
       toggleNotes(msg.key); // #156 notes: open/close a case's right drawer
     } else if (msg.type === "notesClose") {
@@ -1625,6 +1658,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     editingNoteId = undefined;
     mvSidecarPath = undefined;
     worklistActions = {};
+    worklistFilter = new Set(REVIEW_STATES); // #214: reset the verdict filter to all-shown (a stale filter must not hide the next policy)
     currentQuestionIndex = -1; // #177 slice 3: drop the questionnaire sub-nav cursor (no question focused) with the MV state
     questionNodeIds = []; // #177 slice 4 (FIX 5): drop the focused-question id list too (symmetry/defense — renderEmpty leaves a stale list)
     unitNumber = new Map();
@@ -1745,6 +1779,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     editingNoteId = undefined;
     mvSidecarPath = undefined;
     worklistActions = {};
+    worklistFilter = new Set(REVIEW_STATES); // #214: reset the verdict filter to all-shown on retarget (policy A's filter must not hide policy B)
     if (mode !== "medical-validation" || !currentCel) return;
     const path = medicalValidationSidecarPath(currentCel);
     if (!path) return; // .cel not inside a discoverable policy src/ → no sidecar (worklist renders all-unreviewed)
@@ -1825,6 +1860,26 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     openNotesCaseId = undefined;
     editingNoteId = undefined;
     renderPane("worklist");
+  }
+
+  /** #214: toggle a verdict in/out of the worklist filter. Validates the posted state (untrusted webview string), flips its
+   *  membership, and re-renders the worklist. CLEARS the notes drawer ONLY when this toggle HIDES the open case (its verdict
+   *  is now filtered out) — else the drawer + its unsaved draft survive the re-render (the webview draft-preservation restores
+   *  into the still-present textarea). RE-DRIVES the current selection (like setWorklist, NOT toggleNotes — the reveal is
+   *  one-shot, so a bare re-render drops `.current`): a surviving selected row re-highlights; a now-hidden one clears
+   *  harmlessly (the dispatch auto-widen won't fire — the caseId is unchanged). */
+  function toggleWorklistFilter(state_: unknown): void {
+    if (mode !== "medical-validation" || !isReviewState(state_)) return; // trusted-input guard
+    if (worklistFilter.has(state_)) worklistFilter.delete(state_);
+    else worklistFilter.add(state_);
+    // Clear the drawer ONLY if the open case just became hidden (its verdict left the filter) — a visible open case keeps its
+    // draft. (openNotesCaseId is a reviewable caseId, so `reviewByCaseId[...] ?? "unreviewed"` is its verdict.)
+    if (openNotesCaseId !== undefined && !worklistFilter.has(reviewByCaseId[openNotesCaseId] ?? "unreviewed")) {
+      openNotesCaseId = undefined;
+      editingNoteId = undefined;
+    }
+    renderPane("worklist");
+    if (state.selection) dispatch({ type: "select", selection: state.selection }); // re-drive so a surviving selection re-highlights
   }
 
   /** True iff the posted noteId is a live note in the OPEN drawer's case — the trusted-input gate for edit/save/delete. */
@@ -2141,6 +2196,11 @@ function shellHtml(): string {
 .cel-case.cel-fail{border-left-color:var(--vscode-testing-iconFailed,#f14c4c)}
 .cel-case.cel-error{border-left-color:var(--vscode-testing-iconErrored,#e2b33e)}
 .cel-worklist-header{font-weight:bold;font-size:1.05em;padding:2px 0 6px;margin-bottom:6px;border-bottom:1px solid var(--vscode-panel-border,#454545);position:sticky;top:0;background:var(--vscode-editor-background);z-index:1}
+.cel-filter-chips{display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 6px;font-weight:normal;font-size:.85em}
+.cel-filter-chip{cursor:pointer;background:var(--vscode-dropdown-background);border:1px solid var(--vscode-dropdown-border,#3c3c3c);border-radius:10px;padding:1px 8px;font-size:inherit;opacity:.5}
+.cel-filter-chip.cel-filter-on{opacity:1;border-color:var(--vscode-focusBorder,#3794ff)}
+.cel-filter-chip:focus-visible{outline:1px solid var(--vscode-focusBorder,#3794ff);outline-offset:1px}
+.cel-filter-count{opacity:.7;font-variant-numeric:tabular-nums;margin-left:1px}
 .cel-name{font-weight:bold}.cel-subject{opacity:.7}
 .cel-review{margin-right:4px;font-size:.9em;vertical-align:middle;background:var(--vscode-dropdown-background);border:1px solid var(--vscode-dropdown-border,#3c3c3c);color:var(--vscode-dropdown-foreground)}
 .cel-review:focus-visible{outline:1px solid var(--vscode-focusBorder,#3794ff);outline-offset:1px}
@@ -2351,6 +2411,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // carries data-qnav, so guard on .disabled to make an edge click a no-op (the host clamps too, but skip the round-trip).
   `const qn=e.target.closest&&e.target.closest('[data-qnav]');` +
   `if(qn){e.preventDefault();e.stopPropagation();if(!qn.disabled)v.postMessage({type:'questionNav',dir:qn.getAttribute('data-qnav')});return;}` +
+  // #214: a verdict filter chip (native <button>, so Enter/Space fire a click for free). Intercepted BEFORE [data-reveal]
+  // ("controls first"); the chip lives in the worklist header (no reveal ancestor), so this just posts the toggle + returns.
+  `const wf=e.target.closest&&e.target.closest('[data-worklist-filter]');` +
+  `if(wf){e.preventDefault();e.stopPropagation();v.postMessage({type:'worklistFilterToggle',state:wf.getAttribute('data-worklist-filter')});return;}` +
   `const t=e.target.closest&&e.target.closest('[data-reveal]');` +
   `if(t)v.postMessage({type:'reveal',key:t.getAttribute('data-reveal')});});` +
   // #156 slice 4: the worklist dropdown's 'change' posts the opaque key + the chosen value; the host validates the value

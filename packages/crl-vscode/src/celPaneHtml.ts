@@ -71,7 +71,10 @@ const BADGE: Record<string, string> = { pass: "✓", fail: "✗", error: "⚠" }
 // (absence in the sidecar); Pending / Pass / Fail are the persisted verdicts. Each verdict paints its fired path on the tree
 // (#210: Pass→green, Fail→red, Pending→yellow — the tree paints with these SAME dropdown colors; To do→none. deriveReviewOverlay).
 const REVIEW_LABEL: Record<ReviewState, string> = { unreviewed: "To do", pending: "Pending", pass: "Pass", fail: "Fail" };
-const REVIEW_ORDER: readonly ReviewState[] = ["unreviewed", "pending", "pass", "fail"];
+// EXPORTED for a drift guard (#214): this MUST deep-equal the store's `REVIEW_STATES` — the chips iterate this, the host
+// resets the filter to `new Set(REVIEW_STATES)` (= "all chips active"), so a divergence silently desyncs the two. Kept as a
+// LOCAL const (not a runtime import of `REVIEW_STATES`) because celPaneHtml is deliberately fs-free.
+export const REVIEW_ORDER: readonly ReviewState[] = ["unreviewed", "pending", "pass", "fail"];
 
 /** Format a note's epoch-ms timestamp DETERMINISTICALLY in UTC (`YYYY-MM-DD HH:MM UTC`) — no locale/timezone, so this pure
  *  renderer stays machine-independent + unit-testable. (Local-time display, if ever wanted, would be a host-formatted string
@@ -94,6 +97,10 @@ export interface WorklistOpts {
   notesByCaseId?: Record<string, Note[]>;
   openNotesCaseId?: string;
   editingNoteId?: string;
+  /** #214: the ACTIVE verdict filter — the set of verdicts whose rows are SHOWN. A case whose verdict ∉ this set is
+   *  skip-rendered (its row + anchors omitted). Default = all four shown (the host passes all of REVIEW_STATES). The chip
+   *  row always renders (in worklist mode) so the user can toggle; an all-off filter shows the "no cases match" placeholder. */
+  filter?: ReadonlySet<ReviewState>;
 }
 
 export function renderCelPane(
@@ -112,12 +119,40 @@ export function renderCelPane(
   const showKeys = opts.showKeys ?? false;
   const duplicateNames = opts.duplicateScenarioNames ?? new Set<string>();
   const worklist = opts.worklist?.enabled ? opts.worklist : undefined; // undefined ⇒ cockpit path (byte-unchanged)
-  // Worklist header: the policy under validation, pinned at the top of the pane so the reviewer always knows WHICH
-  // policy this worklist belongs to. Worklist mode only (empty in cockpit) and only when a label was supplied.
+  // #214: ONE verdict resolver shared by the filter SKIP decision + the chip COUNTS (so they can never drift). An
+  // unfrozen/ambiguous case has no caseId → no persisted verdict → "unreviewed" (it displays a disabled "To do").
+  const reviewStateFor = (sc: (typeof result.scenarios)[number]): ReviewState => {
+    const cid = duplicateNames.has(sc.case.name) ? undefined : caseIdByName[sc.case.name];
+    return cid !== undefined ? (worklist?.statesByCaseId[cid] ?? "unreviewed") : "unreviewed";
+  };
+  // #214 filter chips: per-verdict counts over ALL cases (the to-do count INCLUDES unreviewable cases — they display To do).
+  const filterCounts: Record<ReviewState, number> = { unreviewed: 0, pending: 0, pass: 0, fail: 0 };
+  if (worklist) for (const sc of result.scenarios) filterCounts[reviewStateFor(sc)]++;
+  // #214 the chip row (worklist mode only) — native <button aria-pressed> toggles (keyboard + SR for free), iterating the
+  // LOCAL REVIEW_ORDER (celPaneHtml stays fs-free; never runtime-import REVIEW_STATES). `filter` absent ⇒ all active.
+  const filterChips = worklist
+    ? `<div class="cel-filter-chips" role="group" aria-label="Filter by review verdict">` +
+      REVIEW_ORDER.map((st) => {
+        // The to-do chip's count INCLUDES unreviewable cases (they display as To do) — surface that to screen readers via
+        // aria-label (a `title` alone isn't a reliable accessible description), plus a hover title for sighted users.
+        const note = st === "unreviewed" ? ", includes cases that are not reviewable" : "";
+        const aria = ` aria-label="${REVIEW_LABEL[st]}, ${filterCounts[st]} case${filterCounts[st] === 1 ? "" : "s"}${note}"`;
+        const title = st === "unreviewed" ? ' title="Includes cases that are not reviewable"' : "";
+        const active = !worklist.filter || worklist.filter.has(st);
+        return (
+          `<button type="button" class="cel-filter-chip cel-review-${st}${active ? " cel-filter-on" : ""}" ` +
+          `data-worklist-filter="${st}" aria-pressed="${active}"${aria}${title}>${REVIEW_LABEL[st]} ` +
+          `<span class="cel-filter-count">${filterCounts[st]}</span></button>`
+        );
+      }).join("") +
+      `</div>`
+    : "";
+  // Worklist header: the policy under validation, pinned at the top so the reviewer knows WHICH policy this is; the filter
+  // chip row sits below it. Worklist mode only (empty in cockpit).
   const worklistHeader =
     worklist && worklist.policyLabel
-      ? `<div class="cel-worklist-header" title="Policy under validation">${escapeHtml(worklist.policyLabel)}</div>`
-      : "";
+      ? `<div class="cel-worklist-header" title="Policy under validation">${escapeHtml(worklist.policyLabel)}</div>${filterChips}`
+      : filterChips;
   const anchors: Record<string, CelAnchor> = {};
   const reveals: Record<string, CelReveal> = {};
   const conceptToFactAnchors: Record<string, string[]> = {};
@@ -146,12 +181,17 @@ export function renderCelPane(
   // so it's captured during the loop and appended ONCE after all case blocks, not nested inside a row's div.
   let drawerHtml = "";
   let idx = 0;
+  let visibleRows = 0; // #214: rows actually emitted (after the verdict filter) — 0 with scenarios present → the empty-filter placeholder
   for (const sc of result.scenarios) {
     // FIX 1 (disc 160): an AMBIGUOUS-name case (its name shared by >1 case) must NOT be anchored to the frozen
     // caseIdByName[name] — clicking EITHER same-name block would otherwise select that ONE frozen caseId and apply
     // cross-pane `.current` highlights as if it were the frozen case (a mis-attribution). So treat it as un-revealable.
     const ambiguous = duplicateNames.has(sc.case.name);
     const caseId = ambiguous ? undefined : caseIdByName[sc.case.name]; // undefined → case un-revealable (no case anchor)
+    // #214: filtered out → ADVANCE idx (absolute row numbers + collision-free `cel${idx}` ids stay stable, Q5) then skip the
+    // ENTIRE row BEFORE any anchor/reveal/worklistActions registration (a hidden row has no DOM element to anchor).
+    if (worklist?.filter && !worklist.filter.has(reviewStateFor(sc))) { idx++; continue; }
+    visibleRows++;
     const id = `${prefix}cel${idx}`;
     const attrs = [`id="${escapeHtml(id)}"`, `class="cel-case cel-${sc.status}${ambiguous ? " cel-ambiguous" : ""}"`];
     if (caseId !== undefined) {
@@ -252,6 +292,9 @@ export function renderCelPane(
       `</div>`;
     idx++;
   }
+  // #214: every row filtered out (scenarios present, none visible) → a placeholder BELOW the still-interactive chip row
+  // (NOT the scenarios-empty early return, which has no chips — the user must be able to toggle a chip back on).
+  if (worklist && visibleRows === 0) html += `<p class="placeholder">No cases match the verdict filter.</p>`;
   html += drawerHtml; // pane-level right drawer (empty unless a case's notes drawer is open)
   return worklistActions ? { html, anchors, reveals, conceptToFactAnchors, worklistActions } : { html, anchors, reveals, conceptToFactAnchors };
 }

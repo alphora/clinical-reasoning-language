@@ -49,7 +49,7 @@ async function loadCockpit() {
   return require(out);
 }
 
-const { COCKPIT_WEBVIEW_SCRIPT: SCRIPT, leafMarkBuckets, leafBucketsFromQuestionnaire, resolveProducedLeafKeys } = await loadCockpit();
+const { COCKPIT_WEBVIEW_SCRIPT: SCRIPT, leafMarkBuckets, leafBucketsFromQuestionnaire, resolveProducedLeafKeys, shouldWidenFilterForSelection } = await loadCockpit();
 
 let pass = 0;
 const check = (label, fn) => {
@@ -554,6 +554,38 @@ check("Slice 1b: questionnaireFor routes the FOCUSED case to the memo, a NON-foc
   assert.ok(m, "questionnaireFor body");
   assert.ok(/state\.selection\.caseId === caseId/.test(m[1]), "gated on the FOCUSED selection's caseId");
   assert.ok(/\? buildFocusedQuestionnaire\(sv\) : buildQuestionnaireRaw\(sv\)/.test(m[1]), "focused → memo; non-focused → raw build (never poisons the focused memo slot)");
+});
+
+// ── #214 worklist verdict filter — HOST wiring source-locks (the handler/reset/auto-widen live outside the webview SCRIPT) ──
+check("#214 filter: toggleWorklistFilter validates via isReviewState, toggles, CLEARS the drawer, re-renders, re-drives selection", () => {
+  const m = COCKPIT_SRC.match(/function toggleWorklistFilter\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "toggleWorklistFilter body");
+  assert.ok(/!isReviewState\(state_\)/.test(m[1]), "validates the posted state against isReviewState (untrusted webview string)");
+  assert.ok(/worklistFilter\.has\(state_\)\) worklistFilter\.delete\(state_\)[\s\S]*worklistFilter\.add\(state_\)/.test(m[1]), "toggles membership (delete if present, else add)");
+  // clears the drawer ONLY when the open case just became hidden (its verdict left the filter) — else the draft survives.
+  assert.ok(/if \(openNotesCaseId !== undefined && !worklistFilter\.has\(reviewByCaseId\[openNotesCaseId\][\s\S]*openNotesCaseId = undefined/.test(m[1]), "clears the drawer only if the open case is now filtered out (draft-preserving otherwise)");
+  assert.ok(/renderPane\("worklist"\)/.test(m[1]), "re-renders the worklist");
+  assert.ok(/if \(state\.selection\) dispatch\(\{ type: "select"/.test(m[1]), "re-drives the selection (like setWorklist, NOT toggleNotes) so a surviving row re-highlights");
+});
+check("#214 filter: routed from a worklistFilterToggle message; reset to all-shown in BOTH MV resets", () => {
+  assert.ok(/msg\.type === "worklistFilterToggle"[\s\S]*toggleWorklistFilter\(msg\.state\)/.test(COCKPIT_SRC), "worklistFilterToggle → toggleWorklistFilter(msg.state)");
+  assert.equal((COCKPIT_SRC.match(/worklistFilter = new Set\(REVIEW_STATES\)/g) || []).length, 2, "worklistFilter reset to all-shown in resetToEmpty + loadReviewSidecar (so policy A's filter can't hide policy B)");
+});
+check("#214 filter: shouldWidenFilterForSelection (pure) — a NEW filtered case widens; same-case / not-filtered / no-case do NOT", () => {
+  const F = new Set(["fail"]); // only fail shown
+  assert.equal(shouldWidenFilterForSelection("cX", "cY", "pass", F), true, "a NEW case (cY≠cX) whose verdict is hidden → widen");
+  assert.equal(shouldWidenFilterForSelection("cY", "cY", "pass", F), false, "SAME case re-dispatch → NO widen (won't undo a deliberate filter-off)");
+  assert.equal(shouldWidenFilterForSelection("cX", "cY", "fail", F), false, "a NEW case whose verdict is already shown → no widen");
+  assert.equal(shouldWidenFilterForSelection("cX", undefined, "pass", F), false, "no primary-cel case → no widen");
+});
+check("#214 filter: dispatch widens via shouldWidenFilterForSelection + re-renders the worklist BEFORE the applyReveal loop", () => {
+  assert.ok(/shouldWidenFilterForSelection\(prevCaseId, nextCid, v, worklistFilter\)[\s\S]*worklistFilter\.add\(v\);[\s\S]*renderPane\("worklist"\)/.test(COCKPIT_SRC), "the widen uses the pure predicate + re-renders");
+  // CRITICAL ordering: the widen re-render must precede the reveal effects (else the reveal hits the pre-widen anchors).
+  assert.ok(COCKPIT_SRC.indexOf('renderPane("worklist"); // re-render with the widened filter') < COCKPIT_SRC.indexOf("for (const e of effects) applyReveal(e);"), "the widen renderPane precedes applyReveal in dispatch");
+});
+check("#214 filter: the webview chip click posts worklistFilterToggle{state}, BEFORE the [data-reveal] branch (controls first)", () => {
+  assert.ok(/type:'worklistFilterToggle',state:wf\.getAttribute\('data-worklist-filter'\)/.test(SCRIPT), "a chip click posts worklistFilterToggle{state}");
+  assert.ok(SCRIPT.indexOf("worklistFilterToggle") < SCRIPT.indexOf("[data-reveal]"), "the chip handler precedes [data-reveal]");
 });
 
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);
