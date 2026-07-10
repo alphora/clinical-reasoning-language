@@ -92,13 +92,16 @@ export function wrapLabel(label: string, maxChars: number): string[] {
   return [line1, rest.length > maxChars ? `${rest.slice(0, maxChars - 1).trimEnd()}…` : rest];
 }
 
-/** A centered node label — one `<text>` (short) or two vertically-centered `<tspan>`s (wrapped), inside a box of height `h`. */
-const labelMarkup = (label: string, x: number, y: number, h: number, maxChars: number, dx: number): string => {
+/** A node label — one `<text>` (short) or two `<tspan>`s (wrapped), vertically centered in a box of height `h`. Horizontally
+ *  it is LEFT-anchored at `x+dx` by default; `center` (a disposition LEAF, #210) sets `text-anchor="middle"` so `x+dx` is
+ *  the label's CENTER (the caller passes `dx = NODE_W/2`). */
+const labelMarkup = (label: string, x: number, y: number, h: number, maxChars: number, dx: number, center = false): string => {
   const lines = wrapLabel(label, maxChars);
   const tx = x + dx;
+  const anchor = center ? ` text-anchor="middle"` : "";
   return lines.length === 1
-    ? `<text x="${tx}" y="${y + h / 2 + 4}">${escapeHtml(lines[0])}</text>`
-    : `<text x="${tx}"><tspan x="${tx}" y="${y + h / 2 - 4}">${escapeHtml(lines[0])}</tspan><tspan x="${tx}" y="${y + h / 2 + 11}">${escapeHtml(lines[1])}</tspan></text>`;
+    ? `<text x="${tx}" y="${y + h / 2 + 4}"${anchor}>${escapeHtml(lines[0])}</text>`
+    : `<text x="${tx}"${anchor}><tspan x="${tx}" y="${y + h / 2 - 4}">${escapeHtml(lines[0])}</tspan><tspan x="${tx}" y="${y + h / 2 + 11}">${escapeHtml(lines[1])}</tspan></text>`;
 };
 
 // Layout constants (px). Fixed node width → deterministic + unit-testable coords. The SVG carries INTRINSIC width/height
@@ -500,7 +503,8 @@ export function renderFlowPane(
       `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
       `<title>${escapeHtml(n.full)}</title>` +
       `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="${rx}"/>` +
-      labelMarkup(n.label, x, y, NODE_H, LABEL_MAX, 10) +
+      // #210: a disposition LEAF (outcome tip) centers its label; interior nodes stay left-aligned at x+10.
+      (isLeafEnd ? labelMarkup(n.label, x, y, NODE_H, LABEL_MAX, NODE_W / 2, true) : labelMarkup(n.label, x, y, NODE_H, LABEL_MAX, 10)) +
       flowRing(x, y, NODE_W, NODE_H, 2.5, stadium ? (NODE_H + 5) / 2 : 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
       guardTab +
       allPassBadge +

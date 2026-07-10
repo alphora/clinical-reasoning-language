@@ -648,9 +648,10 @@ check("#208 render: a long label emits two <tspan>s in a NODE_H=44 box; a short 
     node("w:L", "when", "when L", ["c:LongName"], [node("a:s", "action", "Unmet", ["act:s"], [], { actionKind: "recommend-activity" })]),
   ] }];
   const rr = renderFlowPane(st, { concepts: cs });
-  // the long when concept wraps → two tspans inside its <g>; the short "Unmet"/"otherwise"/decision may be one <text>.
-  assert.match(rr.html, /<text x="\d+"><tspan x="\d+" y="\d+">[^<]+<\/tspan><tspan x="\d+" y="\d+">[^<]+<\/tspan><\/text>/, "a wrapped label renders two tspans");
-  assert.match(rr.html, /<text x="\d+" y="\d+">Unmet<\/text>/, "a short label stays a single <text>");
+  // the long when concept (INTERIOR) wraps → two tspans, LEFT-anchored (no text-anchor). The short "Unmet" is a disposition
+  // LEAF → one <text>, CENTERED (text-anchor="middle") per #210.
+  assert.match(rr.html, /<text x="\d+"><tspan x="\d+" y="\d+">[^<]+<\/tspan><tspan x="\d+" y="\d+">[^<]+<\/tspan><\/text>/, "a wrapped INTERIOR label renders two left-anchored tspans");
+  assert.match(rr.html, /<text x="\d+" y="\d+" text-anchor="middle">Unmet<\/text>/, "a disposition LEAF label is CENTERED (text-anchor=middle)");
   // every structure box is NODE_H=44 and its on-path ring rect is 44+2*2.5=49 tall (box height + 2*off).
   assert.ok(rr.html.includes('height="44"'), "structure boxes are NODE_H=44");
   assert.ok(rr.html.includes('height="49"'), "the on-path ring rect = box height + 2*off (44 + 5)");
