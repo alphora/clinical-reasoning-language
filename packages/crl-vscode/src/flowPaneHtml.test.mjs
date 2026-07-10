@@ -537,6 +537,22 @@ check("Todo 2 / #210: FLOW_STYLE — decision grey, NO certify/not-certify rules
   assert.equal((FLOW_STYLE.match(/focusBorder/g) || []).length, 1, "focusBorder (blue) appears ONLY in the on-path .current ring");
 });
 
+check("#210 flowchart shape: the decision ROOT (start) + a recommend LEAF (end) are STADIUMS (rx=NODE_H/2); when/use-decision are rects (rx=6)", () => {
+  const st = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w1", "when", "when A", ["c:A"], [node("aR", "action", "Approve", ["act:r"], [], { actionKind: "recommend-activity" })]),
+    node("aU", "action", "Sub", ["d:Sub", "c:A"], [], { actionKind: "use-decision" }),
+  ] }];
+  const rr = renderFlowPane(st, { concepts });
+  // rx of each node's BODY rect (the first <rect> right after its <title>), keyed by the node's identity CLASS.
+  const rxOfKind = (kindCls) => rr.html.match(new RegExp(`<g id="[^"]*" class="flow-row ${kindCls}[^"]*"[^>]*><title>[^<]*</title><rect[^>]*rx="([^"]*)"`))[1];
+  assert.equal(rxOfKind("flow-decision"), String(44 / 2), "the decision ROOT is a stadium (rx = NODE_H/2 = 22)");
+  assert.equal(rxOfKind("flow-activity"), String(44 / 2), "a recommend-activity LEAF is a stadium (rx = 22)");
+  assert.equal(rxOfKind("flow-when"), "6", "a `when` is a rounded RECT (rx 6), not a stadium");
+  assert.equal(rxOfKind("flow-use"), "6", "a use-decision is a rounded RECT (rx 6) — interior delegation glue, not a terminal");
+  // the on-path ring of a stadium node is ALSO a pill (rx = (NODE_H + 2*2.5)/2 = 24.5).
+  assert.match(rr.html, /rx="24\.5"/, "a stadium node's on-path ring is a pill (rx 24.5)");
+});
+
 // ── #187 Todo 3: the on-path RING (a deterministic hidden <rect>, revealed by .current / .flow-leaf-yes) replaces ✓/✗ ──
 check("Todo 3: a hidden .flow-ring <rect> on every structure node + outline leaf (none on op/ext/more rows); NO tick paths", () => {
   const cs = [concept("c:C", "C", { definitionKind: "defined-as" })];

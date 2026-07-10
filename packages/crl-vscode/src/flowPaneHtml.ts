@@ -482,12 +482,17 @@ export function renderFlowPane(
         `<rect x="${x + 8}" y="${y - 9}" width="${tw}" height="15" rx="4"/>` +
         `<text x="${x + 14}" y="${y + 2}">${escapeHtml(label)}</text></g>`;
     }
+    // #210 FLOWCHART SHAPE: the decision ROOT (start) and a recommend-activity outcome LEAF (end) are STADIUMS (fully
+    // rounded pills, rx = half-height); every INTERIOR node (when / use-decision / otherwise) stays a rounded rectangle
+    // (rx 6). The on-path ring matches — a stadium node rings as a pill (rx = half the ring-rect height, off 2.5 → NODE_H+5).
+    const stadium = n.kind === "decision" || (n.kind === "action" && !n.useDecision);
+    const rx = stadium ? NODE_H / 2 : 6;
     body +=
       `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
       `<title>${escapeHtml(n.full)}</title>` +
-      `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="6"/>` +
+      `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="${rx}"/>` +
       labelMarkup(n.label, x, y, NODE_H, LABEL_MAX, 10) +
-      flowRing(x, y, NODE_W, NODE_H, 2.5, 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
+      flowRing(x, y, NODE_W, NODE_H, 2.5, stadium ? (NODE_H + 5) / 2 : 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
       guardTab +
       `</g>`;
   }
