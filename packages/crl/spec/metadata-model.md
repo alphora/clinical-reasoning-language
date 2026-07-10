@@ -1,8 +1,8 @@
 # CRL metadata model
 
-> **Status: vocabulary settled; enforcement pending.** Two design-review rounds complete. The Validator that enforces this spec is not yet implemented (README flags `validateCRL` as a placeholder). The `@tag` convention parses today; enforcement is forthcoming. Canonical registry: [`metadata-registry.json`](./metadata-registry.json).
+> **Status: core stable (v0.2.0); enforcement pending.** The core vocabulary is settled (two design-review rounds); **v0.2.0 adds the review-flag tags** per KE #203 (additive; two further design-review rounds — disc 220). The Validator that enforces this spec is not yet implemented (README flags `validateCRL` as a placeholder). The `@tag` convention parses today (on `concept`); enforcement + the decision/library carrier are forthcoming. Canonical registry: [`metadata-registry.json`](./metadata-registry.json).
 
-Captures information *about* a CRL `concept` that lives outside its formal logic — descriptions, knowledge-engineer feedback, plain-language logic, external-store hints, and extraction provenance — so it survives the Knowledge Engineering Lifecycle (KEL) from authoring through to generated FHIR+CQL. (**v1 limit:** metadata attaches to `concept` only; KE feedback on `decision`/`activity`/logic blocks is a known gap pending a future carrier.)
+Captures information *about* CRL logic that lives outside the formal logic itself — descriptions, knowledge-engineer feedback, plain-language logic, external-store hints, extraction provenance, and **review flags** (the audit trail of deliberate, still-open decisions) — so it survives the Knowledge Engineering Lifecycle (KEL) from authoring through to generated FHIR+CQL. (**Carrier scope:** metadata parses on `concept` today; `decision`/`library` scope is the KE #203 *planned* carrier — a grammar change not yet landed, so decision/library `meta` lines are ParserErrors until then. The registry's `carrier.scope` = what parses; `plannedScope` = the intended expansion.)
 
 ## How it works
 
@@ -32,6 +32,11 @@ The terminating `.` goes **after** the closing backtick: `` - meta is `...`. `` 
 | `@kg-concept` | scored **hint for the decision** — a node in the **Concept Graph** ("KG" = Concept Graph) | A external-ref | agent/human | 0..n |
 | `@reef-reference` | scored **hint** for **REEF** ("the great reef"), the downstream artifact repo the CRL→CQL/FHIR skill + compiler consume | A external-ref | agent/human | 0..n |
 | `@semantic-parse-text` | semantic parse of the **source narrative** (extraction exhaust) | C provenance | human/agent | 0..n |
+| `@customer-confirmable` | **review flag** — an EXTERNAL-stakeholder ambiguity resolved provisionally, pending a customer/Burton ruling (`; assumption <x>`) | B narrative | human/agent | 0..n |
+| `@internal-inconsistency` | **review flag** (stop-and-flag) — the SOURCE contradicts itself (source-vs-source; distinct from `@fidelity-defect`) | B narrative | human/agent | 0..n |
+| `@open-fork` | **review flag** — an INTERNAL modeling fork encoded one way (`; chosen <b>`) but not settled (`; alternatives <…>`) | B narrative | human/agent | 0..n |
+| `@fidelity-defect` | **review flag** — a known encoding≠source defect; `; direction over-reach\|criterion-drop` (collapses the KE's two `*-to-fix` tags) | B narrative | human/agent | 0..n |
+| `@gap-filed` | a durable POINTER to a filed gap/issue (**not** a review flag — ships fine, no gate); required `; ref <issue>` | B narrative | human | 0..n |
 
 **Emitted to CQL.** The CQL emitter renders exactly the tags with `emit.cql: true` in the registry as a leading block comment on the concept's `define`: `@logic-expression-text`, `@crl-future-expression`, `@ke-feedback`, `@business-logic-deferred`, `@clinical-logic-deferred`, `@cql-comment`. All other tags and untyped notes are not emitted to CQL. Each tagged line keeps its `@tag: body` form in the comment **except** `@cql-comment`, whose prefix is stripped so only the body appears (a verbatim passthrough comment). (`@crl-future-expression` additionally surfaces as a structured `futureExpressions` entry on the emit result.)
 
@@ -74,13 +79,27 @@ Everything lives inline; the `.crl` is the source of truth (no sidecar). Extract
 
 Replace-eligible tags (family-C + candidate external refs) **require** a `run` so the match key is unambiguous — the Validator errors if it's omitted. Refs with `status: rejected` or `status: superseded` are **durable historical records** (preserved across re-runs so negative review work isn't lost).
 
+## Review flags (KE #203)
+
+Review flags are the **audit trail of deliberate, still-open decisions** — the ones the review discipline says must be grounded before ship. They reuse `@ke-feedback`'s machinery rather than a parallel convention:
+
+- **Status lifecycle:** `status open → resolved` (review flags use **open|resolved only** — no `deferred`). A resolved flag is a **durable tombstone** whose body carries the resolution (e.g. the ruling for `@customer-confirmable`) — it is **not deleted**, so the audit trail survives. Grep `status open` for the open worklist.
+- **Warn + ship-gate while open:** a review flag with `status open` (the default) raises a Validator **warning** ("open review flag — resolve before ship"); ship-*blocking* is a `shipPolicy` escalation (a later validator todo). The `warnWhileOpen` marker is **per-tag** (family B also holds non-gating tags like `@ke-feedback`/`@id`, which must NOT gate).
+- **Emit is pre-ship:** review flags emit to CQL **only while `status open`** — the generated CQL a KE reads during authoring shows the open flags; the ship-gate resolves them before the final ship, so the **shipped artifact is clean** (no leak). *(Status-aware emit is not yet implemented — a later todo; the registry declares it via `plannedEmit`.)*
+- **Re-add guard:** because a source property (e.g. `@internal-inconsistency`) persists across extraction runs, a resolved tombstone must not be re-opened. An extractor MUST NOT re-add a review flag whose `key` (a normalized source-span/hash) matches an existing `resolved` tombstone; a *genuinely-new* instance (different `key`) may be added.
+- **The four flags** (`@customer-confirmable`, `@internal-inconsistency`, `@open-fork`, `@fidelity-defect{direction}`) carve on distinct axes: external-ruling vs internal-fork vs source-self-contradiction vs encoding-fidelity.
+- **`@stage-boundary` is intentionally NOT a tag** — "the stage/language can't express this" is covered by the existing `@crl-future-expression` (language limit), `@business-logic-deferred` / `@clinical-logic-deferred` (deferred logic), or `@gap-filed` when the gap is filed. Adding a near-synonym is the concept-hiding smell.
+- **`@gap-filed` is a pointer, not a flag** — it ships fine (managed work tracked in the filed issue), needs a required `; ref <issue>`, and does **not** warn or gate. It deletes when the CRL no longer depends on the gap (the durable record lives in the tracker).
+- **Scope:** review flags are `concept`-scoped today; `decision`/`library` scope is the planned carrier (see the carrier note above).
+
 ## Stable identity (recommended)
 
 Metadata is keyed on the concept name by default. To make durable metadata survive renames, attach an optional `@id` and key tags on it. Rename / split / merge handling is a known v1 gap; `@id` is the operator-recommended hedge until a fuller story exists.
 
 ## Design decisions (settled)
 
-- **No grammar change** — `@tag` is a string convention; the Validator enforces correctness. (CRL already defers semantics.)
+- **No grammar change *for the `@tag` convention*** — `@tag` is a string convention on the `meta` line; the Validator enforces correctness. (CRL already defers semantics.) NOTE: extending the `meta` *carrier* to new SCOPES (`decision`/`library`, KE #203) IS a grammar change — the anticipated "future carrier", not a reversal of this decision (which was only ever about not needing a new element for concept metadata).
+- **Review flags reuse `@ke-feedback`'s status machinery** (open→resolved, resolved-durable, emit-only-while-open) rather than a parallel "presence=open / delete-on-fix" convention — one resolution mechanism, coherent with the registry's retention model (KE #203, disc 220).
 - **`@description` is a meta tag**, not a first-class element (uniform; would otherwise need a grammar change).
 - **Everything inline; `.crl` is the source of truth** — no sidecar; staleness handled by the re-run replace rule.
 - **KG = the Concept Graph; KG and REEF are distinct stores** — `@kg-concept` hints the decision, `@reef-reference` hints REEF.
