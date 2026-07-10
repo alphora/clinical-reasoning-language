@@ -21,8 +21,8 @@
   "flagModel": {
     "_about": "A `flag` (a tag with `flag: true`) is a narrative->CRL problem or a validation concern that BLOCKS Medical Validation completion while open. ONE mechanism; two categories by origin (KE #203, disc 220).",
     "categories": {
-      "review": "authored by the AI during narrative->CRL (source-ambiguity / source-contradiction / unsettled fork / encoding-infidelity). The tags: customer-confirmable, internal-inconsistency, open-fork, fidelity-defect.",
-      "note": "authored by a HUMAN during Medical Validation (a concern raised while validating). Same behavior as `review`; the note-flag carrier + tag land with the MV cockpit surface (Todo 4)."
+      "extraction": "an EXTRACTION flag — authored by the AI during narrative->CRL extraction (source-ambiguity / source-contradiction / unsettled fork / encoding-infidelity). The tags: customer-confirmable, internal-inconsistency, open-fork, fidelity-defect.",
+      "validation": "a VALIDATION flag — authored by a HUMAN during Medical Validation (a concern raised while validating). Same behavior as an extraction flag; the validation-flag carrier + tag land with the MV cockpit surface (Todo 4)."
     },
     "status": "open | resolved (NO deferred). `open` blocks mvComplete + emits; `resolved` persists (learning signal) + does not emit.",
     "mvComplete": "the real gate: mvComplete = (every MV case is `pass`) AND (no `open` flags). Resolved flags do NOT block it. Surfaced in the MV cockpit (Todo 4).",
@@ -222,7 +222,7 @@
       "aliases": [],
       "family": "B-narrative",
       "flag": true,
-      "category": "review",
+      "category": "extraction",
       "valueShape": "text",
       "extraFields": {
         "status": { "type": "enum", "values": ["open", "resolved"], "default": "open", "note": "a flag is `open` (blocks mvComplete; emits) or `resolved` (persists as a learning signal; no emit). No `deferred`. See `flagModel`. MV transitions open<->resolved ONLY; the `resolved`->deleted step is the separate learning system (not MV)." },
@@ -246,7 +246,7 @@
       "aliases": [],
       "family": "B-narrative",
       "flag": true,
-      "category": "review",
+      "category": "extraction",
       "valueShape": "text",
       "extraFields": {
         "status": { "type": "enum", "values": ["open", "resolved"], "default": "open" },
@@ -269,7 +269,7 @@
       "aliases": [],
       "family": "B-narrative",
       "flag": true,
-      "category": "review",
+      "category": "extraction",
       "valueShape": "text",
       "extraFields": {
         "status": { "type": "enum", "values": ["open", "resolved"], "default": "open" },
@@ -294,7 +294,7 @@
       "aliases": ["over-reach-to-fix", "criterion-drop-to-fix"],
       "family": "B-narrative",
       "flag": true,
-      "category": "review",
+      "category": "extraction",
       "valueShape": "text",
       "extraFields": {
         "status": { "type": "enum", "values": ["open", "resolved"], "default": "open" },

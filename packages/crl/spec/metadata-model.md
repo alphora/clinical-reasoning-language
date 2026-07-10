@@ -81,10 +81,10 @@ Replace-eligible tags (family-C + candidate external refs) **require** a `run` s
 
 ## Flags (KE #203)
 
-A **flag** (a tag with `flag: true`) marks a problem that **blocks Medical Validation completion while open**. ONE mechanism, two `category` values by origin (see `flagModel` in the registry):
+A **flag** (a tag with `flag: true`) marks a problem that **blocks Medical Validation completion while open**. ONE mechanism, two `category` values by the KEL phase of authorship (see `flagModel` in the registry):
 
-- **`category: review`** — authored by the **AI during narrative → CRL**: source-ambiguity (`@customer-confirmable`), source-self-contradiction (`@internal-inconsistency`), an unsettled modeling fork (`@open-fork`), or encoding-infidelity (`@fidelity-defect{direction}`). A **learning signal**.
-- **`category: note`** — authored by a **human during Medical Validation** (a concern raised while validating). Same behavior; the note-flag carrier lands with the MV cockpit surface.
+- **`category: extraction`** (extraction flag) — authored by the **AI during narrative → CRL extraction**: source-ambiguity (`@customer-confirmable`), source-self-contradiction (`@internal-inconsistency`), an unsettled modeling fork (`@open-fork`), or encoding-infidelity (`@fidelity-defect{direction}`). A **learning signal**.
+- **`category: validation`** (validation flag) — authored by a **human during Medical Validation** (a concern raised while validating). Same behavior; the validation-flag carrier lands with the MV cockpit surface.
 
 The mechanics (shared):
 
