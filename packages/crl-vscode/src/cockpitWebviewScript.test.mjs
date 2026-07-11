@@ -697,4 +697,40 @@ check("#219 webview: BOTH scroll handlers (highlight + markFailedCriteria) scrol
   assert.equal((SCRIPT.match(/if\(m\.scrollTo\)\{const t=document\.getElementById\(m\.scrollTo\);if\(t\)t\.scrollIntoView\(\{block:'center'\}\);\}/g) || []).length, 2, "both scroll paths are guarded on m.scrollTo (a suppressed reveal paints without scrolling)");
 });
 
+// ── #203 Todo 4b Slice A: per-node flag badges ──
+check("#203 Slice A webview: the flagBadges handler clears `.has-flag` off flaggableGids then sets it on gids, gen-gated", () => {
+  assert.match(SCRIPT, /m\.type==='flagBadges'\)\{if\(m\.gen!==gen\)return;/);
+  assert.match(SCRIPT, /m\.flaggableGids\|\|\[\]\)\)\{const el=document\.getElementById\(id\);if\(el\)el\.classList\.remove\('has-flag'\)/);
+  assert.match(SCRIPT, /m\.gids\|\|\[\]\)\)\{const el=document\.getElementById\(id\);if\(el\)el\.classList\.add\('has-flag'\)/);
+});
+check("#203 Slice A webview: a ⚑ badge click is intercepted BEFORE [data-reveal] and opens the flag list (mvFlags)", () => {
+  assert.match(SCRIPT, /closest\('\[data-mv-flag-badge\]'\)/);
+  // the badge intercept + return must precede the data-reveal routing (controls-first)
+  const badgeAt = SCRIPT.indexOf("data-mv-flag-badge");
+  const revealAt = SCRIPT.indexOf("closest('[data-reveal]')");
+  assert.ok(badgeAt > 0 && badgeAt < revealAt, "badge intercept comes before the data-reveal click routing");
+  assert.match(SCRIPT, /closest\('\[data-mv-flag-badge\]'\);.*postMessage\(\{type:'mvFlags'\}\);return;/s);
+});
+check("#203 Slice A host: driveFlagBadges matches concept flags by (lib,name), decision via anchors, orphans→single-decision start node; open-only", () => {
+  assert.match(COCKPIT_SRC, /function driveFlagBadges\(\)/);
+  assert.match(COCKPIT_SRC, /flagsList\.filter\(\(f\) => f\.status !== "resolved"\)/); // open-only (matches the gate)
+  assert.match(COCKPIT_SRC, /o\.name === f\.targetName && o\.lib === f\.libraryName/); // (lib,name), no name-only wildcard
+  assert.match(COCKPIT_SRC, /crlStructure\.find\(\(s\) => s\.decision === f\.targetName && s\.lib === f\.libraryName\)/); // decision by (lib,name)
+  assert.match(COCKPIT_SRC, /orphans > 0 && crlStructure\.length > 0/); // orphans → the primary start root (crlStructure[0])
+  assert.match(COCKPIT_SRC, /type: "flagBadges", gen: tree\.gen, flaggableGids: tree\.flaggableGids/);
+});
+check("#203 Slice A host: loadFlags runs BEFORE the panes render in rebuild (the gate + badges were stale after-render)", () => {
+  const load = COCKPIT_SRC.indexOf("(re)parse the policy `.crl` review flags BEFORE the panes render");
+  const render = COCKPIT_SRC.indexOf("for (const pane of PANES) renderPane(pane);");
+  assert.ok(load > 0 && render > 0 && load < render, "loadFlags precedes the renderPane loop");
+});
+check("#203 Slice A host: driveFlagBadges is re-driven on tree ack + rebuild + the write-back (survives the innerHTML swap)", () => {
+  // tree-ack re-drive (alongside driveDoneOverlay), rebuild, and both writeFlagStatus refresh paths
+  assert.ok((COCKPIT_SRC.match(/driveFlagBadges\(\)/g) || []).length >= 4, "driveFlagBadges wired at ≥4 sites");
+});
+check("#203 Slice A host: the tree render captures conceptOccurrences + flaggableGids atomically with the anchors", () => {
+  assert.match(COCKPIT_SRC, /v\.conceptOccurrences = r\.conceptOccurrences;/);
+  assert.match(COCKPIT_SRC, /v\.flaggableGids = r\.flaggableGids;/);
+});
+
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);

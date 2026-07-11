@@ -152,6 +152,11 @@ interface PaneView {
    *  from the flow render. `driveLeafMarks` joins `{lib,name}` to a case's conceptTruth for the yes/no verdict and gates on
    *  `topWhenKey` being an on-path-satisfied composite. Empty on every non-tree pane (and reset each render, like anchors). */
   leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }>;
+  /** #203 Todo 4b Slice A (TREE pane only): the flow render's per-node flag-badge substrate — `conceptOccurrences`
+   *  ({gid,lib,name} for each `when`/def-leaf) + `flaggableGids` (every gid that CAN carry a badge). `driveFlagBadges`
+   *  matches open flags → gids off these + posts `.has-flag`. Captured atomically with the anchors; reset each render. */
+  conceptOccurrences: { gid: string; lib: string; name: string }[];
+  flaggableGids: string[];
   disposables: vscode.Disposable[];
 }
 
@@ -922,6 +927,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const stale = (m: string): void => {
       loadFlags();
       renderTreeChrome();
+      driveFlagBadges(); // #203 Todo 4b Slice A: the node badges track the (re)loaded flag state
       flagNote(m);
     };
     if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return stale("policy changed — reopen the flags");
@@ -961,6 +967,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
     loadFlags(); // re-parse → fresh flagsList (never reuse a stale FlagInstance across edits)
     renderTreeChrome(); // EXPLICIT refresh — the watcher does not watch .crl
+    driveFlagBadges(); // #203 Todo 4b Slice A: repaint the per-node badges (a resolve un-paints its node without a re-render)
     flagNote(next === "resolved" ? "flag resolved" : "flag reopened");
   }
 
@@ -1168,6 +1175,46 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       error: segmentsFor(tree, [...error]).segmentIds,
       allPassLeaves: segmentsFor(tree, [...allPassLeaves]).segmentIds,
     });
+  }
+
+  /** #203 Todo 4b Slice A — paint the per-node flag badges. Mirrors `driveDoneOverlay`: a gen-stamped class-toggle message
+   *  (never a `#root` re-render, so the verdict/failed-criterion overlays survive). Matches every OPEN flag to its rendered
+   *  node(s): a concept flag → `conceptOccurrences` by (lib,name) — a concept drawn as several `when`s badges ALL; a
+   *  decision flag → the decision root's gid via `anchors`; a library-scope or unmatched-concept flag is an ORPHAN (no
+   *  node) → for a SINGLE-decision policy it lights the start node as the catch-all (multi-decision: orphans stay in the
+   *  chrome count only — a decision root must not claim policy-wide flags). Open-only (resolved flags never badge). */
+  function driveFlagBadges(): void {
+    const tree = views.get("tree");
+    if (!tree) return; // tree pane is opt-in
+    if (mode !== "medical-validation") {
+      void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [] });
+      return;
+    }
+    const open = flagsList.filter((f) => f.status !== "resolved"); // the blocking set (matches openFlags / the gate)
+    const gids = new Set<string>();
+    let orphans = 0;
+    for (const f of open) {
+      let matched: string[] = [];
+      if (f.scope === "concept") {
+        // (lib,name) — NEVER name alone (cross-lib same-name concepts). A flag with no libraryName (best-effort
+        // attribution absent) can't be safely placed → it falls through to orphan (gpt55 impl review).
+        matched = tree.conceptOccurrences.filter((o) => o.name === f.targetName && o.lib === f.libraryName).map((o) => o.gid);
+      } else if (f.scope === "decision") {
+        const d = crlStructure.find((s) => s.decision === f.targetName && s.lib === f.libraryName);
+        if (d) matched = segmentsFor(tree, [d.nodeKey]).segmentIds;
+      }
+      if (matched.length === 0) orphans++; // library-scope, or a concept/decision drawn nowhere / unresolvable
+      for (const g of matched) gids.add(g);
+    }
+    // Catch-all: orphans (library-scope, or an unmatchable target) light the PRIMARY decision root — `crlStructure[0]`, the
+    // flow's top root, which is the "start node" the operator works from. Anchored on ONE root (not every root — a decision
+    // must not claim policy-wide flags), and the chrome badge shows the same count regardless, so an orphan is never dropped.
+    // NB `crlStructure.length` counts helper/shared decisions too, so it is NOT a single-decision test (gpt55 impl review).
+    if (orphans > 0 && crlStructure.length > 0) {
+      const rootGid = tree.anchors[crlStructure[0].nodeKey]?.scrollTo;
+      if (rootGid) gids.add(rootGid);
+    }
+    void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [...gids] });
   }
 
   /** Post a gen-stamped `markThisNode` for a set of segment ids in one pane (#177 slice 4), after clearing the prior
@@ -1413,6 +1460,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     v.anchors = {};
     v.reveals = {};
     v.leafConcepts = {}; // #187 Todo 5 (tree-only); reset each render, re-set below in the tree branch
+    v.conceptOccurrences = []; // #203 Todo 4b Slice A (tree-only); reset each render, re-set in the tree branch
+    v.flaggableGids = [];
     if (pane === "source") {
       const units: UnitSpan[] = model.steps.flatMap((s) =>
         s.source.map((loc) => ({ unitId: s.unitId, range: loc.range })),
@@ -1477,6 +1526,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.anchors = r.anchors;
       v.reveals = r.reveals;
       v.leafConcepts = r.leafConcepts; // #187 Todo 5: the def-leaf verdict-join map (captured atomically with the anchors)
+      v.conceptOccurrences = r.conceptOccurrences; // #203 Todo 4b Slice A: the flag-badge substrate (captured atomically)
+      v.flaggableGids = r.flaggableGids;
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode });
     } else {
       // questionnaire (#177 slice 3) — a STATIC, read-only projection of the FOCUSED cel case's fired path. Gets the
@@ -1593,6 +1644,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.anchors = {};
       v.reveals = {};
       v.leafConcepts = {}; // #187 Todo 5
+      v.conceptOccurrences = []; // #203 Todo 4b Slice A: reset the flag-badge substrate too (symmetry; no stale tree data)
+      v.flaggableGids = [];
       void v.panel.webview.postMessage({ type: "render", html: `<p class="placeholder">${escapeHtml(message)}</p>`, gen, indexVersion, mode });
     }
   }
@@ -1619,6 +1672,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         // review overlay on ack so the at-rest verdict painting survives a render. (The failed-criterion overlay
         // re-applies via the selection-driven dispatch path; the review overlay is selection-INDEPENDENT, so it re-drives here.)
         driveDoneOverlay();
+        // #203 Todo 4b Slice A: a fresh tree render dropped its `.has-flag` classes — re-drive the per-node flag badges
+        // (selection-INDEPENDENT, like the review overlay). Uses this render's captured conceptOccurrences/flaggableGids.
+        driveFlagBadges();
         // #187 Todo 5: a fresh tree render dropped its `.flow-leaf-yes/no` classes (innerHTML replaced) — re-drive the
         // per-case leaf verdict overlay so a tree opened / re-rendered mid-session repaints the focused case's leaf answers.
         // NOTE: unlike the review overlay, this is selection-DEPENDENT — it rings `focusedScenario()`, which exists only in
@@ -1812,7 +1868,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const disposables: vscode.Disposable[] = [
       panel.webview.onDidReceiveMessage((m) => onWebviewMessage(pane, m)),
     ];
-    v = { panel, gen: 0, indexVersion: 0, acked: false, anchors: {}, reveals: {}, leafConcepts: {}, disposables };
+    v = { panel, gen: 0, indexVersion: 0, acked: false, anchors: {}, reveals: {}, leafConcepts: {}, conceptOccurrences: [], flaggableGids: [], disposables };
     views.set(pane, v);
     panel.onDidDispose(() => {
       for (const d of disposables) d.dispose();
@@ -1902,6 +1958,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const nums = [...new Set(unitsForConceptNode(c.nodeKey, m).map((u) => unitNumber.get(u)).filter((n): n is number => n !== undefined))].sort((a, b) => a - b);
       if (nums.length) conceptKeyNumbers[c.nodeKey] = nums;
     }
+    // #203 Todo 4b Slice A: (re)parse the policy `.crl` review flags BEFORE the panes render — the tree-chrome gate AND the
+    // per-node badges read `flagsList`, so loading AFTER the render (as it was) left both a rebuild stale (gpt55/Claude
+    // review). Independent of the correspondence model (reads the `.crl` directly); inert in cockpit mode (MV-only).
+    loadFlags();
     for (const pane of PANES) coord.clearPending(pane);
     dispatch({ type: "setInputs", index: toIndex(model, crlStructure, toCelNav(scenarios, caseIdByName, duplicateScenarioNames), indexVersion) });
     updateNavMessage();
@@ -1923,9 +1983,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // #187 Todo 5: the rebuilt tree lost its `.flow-leaf-yes/no` classes — re-drive the leaf verdict overlay too (same
     // self-healing-on-ack contract; the tree's ack also re-drives). Inert in cockpit / for a no/errored focused case.
     driveLeafMarks();
-    // #203 Todo 4: (re)parse the policy `.crl` files for review flags — the tree-chrome badge + the mvComplete gate read
-    // `flagsList`. Independent of the correspondence model (reads the `.crl` directly); inert in cockpit mode (MV-only).
-    loadFlags();
+    // #203 Todo 4b Slice A: the rebuilt tree lost its `.has-flag` classes — re-drive the per-node flag badges (flagsList
+    // was refreshed BEFORE the render above; the tree's ack also re-drives). Inert in cockpit mode.
+    driveFlagBadges();
   }
 
   /** On a discovery/build failure, drop stale provenance so the panes never stay interactive with wrong data. */
@@ -2736,6 +2796,11 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #210 all-pass ✓ badge: a 5th DISJOINT-purpose set on the same channel — the disposition leaves whose EVERY producing
   // route is pass. `.leaf-allpass` reveals a hidden green+white ✓ grandchild (CSS). Persistent + survives selection like the rest.
   `for(const id of (m.allPassLeaves||[])){const el=document.getElementById(id);if(el)el.classList.add('leaf-allpass');}}` +
+  // #203 Todo 4b Slice A: the per-node flag-badge channel — clear `.has-flag` from every flaggable node then set it on the
+  // flagged gids (clear-then-set, gen-guarded like the overlays; a class-toggle preserves the painted verdict overlays).
+  `else if(m.type==='flagBadges'){if(m.gen!==gen)return;` +
+  `for(const id of (m.flaggableGids||[])){const el=document.getElementById(id);if(el)el.classList.remove('has-flag');}` +
+  `for(const id of (m.gids||[])){const el=document.getElementById(id);if(el)el.classList.add('has-flag');}}` +
   // #177 slice 4: the "this node" cross-pane marker — a SEPARATE channel from .current, .failed-criterion AND the review
   // overlay. Like the review overlay it is mutated ONLY here (mark/clearThisNode), NEVER by highlight/clearHighlight/clrFC/
   // clrRO — so it SURVIVES a cockpit reveal (the focused question's node stays marked as the clinician clicks around). mark
@@ -2798,6 +2863,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // ("controls first"); the chip lives in the worklist header (no reveal ancestor), so this just posts the toggle + returns.
   `const wf=e.target.closest&&e.target.closest('[data-worklist-filter]');` +
   `if(wf){e.preventDefault();e.stopPropagation();v.postMessage({type:'worklistFilterToggle',state:wf.getAttribute('data-worklist-filter')});return;}` +
+  // #203 Todo 4b Slice A: a click on a per-node ⚑ flag badge — intercepted BEFORE [data-reveal] ("controls first") since
+  // the badge <g> is nested inside the row's data-reveal; opens the flag list (the same channel as the chrome badge).
+  `const fb=e.target.closest&&e.target.closest('[data-mv-flag-badge]');` +
+  `if(fb){e.preventDefault();e.stopPropagation();v.postMessage({type:'mvFlags'});return;}` +
   `const t=e.target.closest&&e.target.closest('[data-reveal]');` +
   `if(t)v.postMessage({type:'reveal',key:t.getAttribute('data-reveal')});});` +
   // #217: RIGHT-CLICK a flow node → the host opens a verdict quick-pick for the case(s) whose fired path runs through it.
