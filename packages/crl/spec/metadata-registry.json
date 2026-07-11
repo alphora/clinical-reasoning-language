@@ -1,6 +1,6 @@
 {
   "_about": "CRL metadata-annotation registry — the canonical tag vocabulary, value shapes, cardinality, and lifecycle for `@tag` annotations carried on `- meta is `@tag: <body>`.` lines. Consumed by the (future) Validator; human companion is metadata-model.md in this folder.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "status": "core-stable",
   "statusNote": "Core vocabulary stable (two design-review rounds). v0.2.0 adds the review-flag tags per KE #203 (additive; two further design-review rounds — disc 220). ENFORCEMENT (Todo 3 / #154): the Validator now enforces vocabulary (malformed/unknown `@tag` → warning), field shape (required/enum/duplicate), cardinality, and the open-flag warning — via `MetaTagValidator` reading the compile-time-inlined registry. REMAINDER (#154 follow-up): the family-C extraction-exhaust rules (`run`-required, re-run staleness) + the re-add-detection guard are not yet enforced. Ref schemes (kg:/reef:) are illustrative. Renames go through `aliases`.",
   "carrier": {
@@ -92,7 +92,7 @@
       "origin": "human",
       "retention": "inline",
       "lifecycle": "append",
-      "emit": { "cql": true, "fhir": false, "condition": "only unresolved (status open|deferred) emits; emitter MUST sanitize comment delimiters (*/)" },
+      "emit": { "cql": true, "fhir": false, "suppressWhenStatus": ["resolved"], "condition": "status-gate is machine (suppressWhenStatus: resolved suppresses; open|deferred emit); emitter MUST sanitize comment delimiters (*/)" },
       "notes": "Informaticist -> KE collaboration note; must survive to generated CQL."
     },
     {
@@ -235,8 +235,7 @@
       "lifecycle": "append",
       "lifecycleNote": "status open -> resolved (in MV); `resolved` PERSISTS as a learning signal (the separate learning system consumes + deletes it — see `flagModel`). Grep `status open` for the open worklist.",
       "warnWhileOpen": true,
-      "emit": { "cql": false, "fhir": false },
-      "plannedEmit": { "cql": true, "condition": "only status=open emits — normal meta-tag behavior (open flags show in the generated CQL a KE reads). `resolved` flags do NOT emit (noise in the artifact). Emit is orthogonal to the mvComplete gate. Status-aware emit is Todo 5 (#203)." },
+      "emit": { "cql": true, "fhir": false, "suppressWhenStatus": ["resolved"], "cqlScopes": ["concept"], "condition": "open emits (a KE reads open flags in the generated CQL); resolved suppresses (noise). Concept scope only; decision emit = #206 (FHIR .meta), library = gate-only. Orthogonal to mvComplete. Emitter MUST sanitize */." },
       "notes": "REVIEW FLAG. An EXTERNAL-stakeholder ambiguity resolved provisionally, pending a customer/Burton ruling. Resolve when the ruling arrives (record it in the `resolved` body). Distinct from @open-fork (INTERNAL modeling alternatives)."
     },
     {
@@ -257,8 +256,7 @@
       "lifecycle": "append",
       "lifecycleNote": "status open -> resolved (durable tombstone carrying the grounding/interpretation).",
       "warnWhileOpen": true,
-      "emit": { "cql": false, "fhir": false },
-      "plannedEmit": { "cql": true, "condition": "only status=open emits (see @customer-confirmable). Todo 4." },
+      "emit": { "cql": true, "fhir": false, "suppressWhenStatus": ["resolved"], "cqlScopes": ["concept"], "condition": "open emits; resolved suppresses. Concept scope only; decision emit = #206 (FHIR .meta), library = gate-only. Emitter MUST sanitize */." },
       "notes": "REVIEW FLAG (stop-and-flag). The SOURCE contradicts ITSELF (e.g. a preamble 'BMI >= 40' vs an operative 'greater than 40'). A source-vs-source contradiction — distinct from @fidelity-defect (encoding != source). Resolve by grounding the encoding in a ruling/interpretation (recorded in the `resolved` body)."
     },
     {
@@ -281,8 +279,7 @@
       "lifecycle": "append",
       "lifecycleNote": "status open -> resolved (durable tombstone recording the adjudication).",
       "warnWhileOpen": true,
-      "emit": { "cql": false, "fhir": false },
-      "plannedEmit": { "cql": true, "condition": "only status=open emits. Todo 4." },
+      "emit": { "cql": true, "fhir": false, "suppressWhenStatus": ["resolved"], "cqlScopes": ["concept"], "condition": "open emits; resolved suppresses. Concept scope only; decision emit = #206 (FHIR .meta), library = gate-only. Emitter MUST sanitize */." },
       "notes": "REVIEW FLAG. A genuine INTERNAL modeling fork — encoded one way (`; chosen <branch>`) but not settled; the alternatives (`; alternatives <...>`) remain open. Distinct from @customer-confirmable (needs an EXTERNAL ruling). Resolve when the fork is adjudicated."
     },
     {
@@ -304,8 +301,7 @@
       "lifecycle": "append",
       "lifecycleNote": "status open -> resolved (durable tombstone).",
       "warnWhileOpen": true,
-      "emit": { "cql": false, "fhir": false },
-      "plannedEmit": { "cql": true, "condition": "only status=open emits. Todo 4." },
+      "emit": { "cql": true, "fhir": false, "suppressWhenStatus": ["resolved"], "cqlScopes": ["concept"], "condition": "open emits; resolved suppresses. Concept scope only; decision emit = #206 (FHIR .meta), library = gate-only. Emitter MUST sanitize */." },
       "notes": "REVIEW FLAG. A known encoding != source defect to fix. ONE umbrella + a `; direction` discriminator (collapses the KE's @over-reach-to-fix / @criterion-drop-to-fix per the umbrella-pattern discipline; those names are `aliases`). Resolve by correcting the encoding."
     },
     {

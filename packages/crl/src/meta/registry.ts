@@ -15,6 +15,15 @@ interface RawTag {
   valueShape?: string;
   cardinality?: string;
   extraFields?: Record<string, { type?: string; required?: boolean; values?: readonly string[] }>;
+  emit?: {
+    cql?: boolean;
+    fhir?: boolean;
+    condition?: string;
+    /** statuses that SUPPRESS emit (e.g. `["resolved"]`) — the emitter is data-driven off this (never a hardcoded string). */
+    suppressWhenStatus?: readonly string[];
+    /** the emit lanes this tag's CQL comment actually reaches (e.g. `["concept"]` — decision/library have no CQL comment lane yet). */
+    cqlScopes?: readonly string[];
+  };
 }
 
 /** A field rule for a tag, merged from the tag's own `extraFields` AND (for ExternalReference-shaped tags) the
@@ -82,6 +91,27 @@ export function fieldRulesOf(rawTag: string): FieldRule[] {
   if (d.extraFields) for (const [k, v] of Object.entries(d.extraFields)) add(k, v);
   if (d.valueShape === "ExternalReference") for (const [k, v] of Object.entries(EXTERNAL_REF_FIELDS)) add(k, v as { type?: string; required?: boolean; values?: readonly string[] });
   return rules;
+}
+
+// #203 Todo 5: status-aware CQL emit. `emitsToCql` = the tag renders into a CQL block comment (registry `emit.cql`,
+// alias-canonical). `suppressStatusesOf` = the statuses that SUPPRESS that emit (registry `emit.suppressWhenStatus`),
+// consumed data-drivenly by the emitter — a line emits iff `emitsToCql(tag) ∧ !suppressStatusesOf(tag).includes(status)`.
+// `emitCqlTags` derives the old `EMIT_CQL_COMMENT_TAGS` set from the registry (no hand-maintained mirror).
+
+/** Does `rawTag` (canonical or alias) render into a CQL block comment? (registry `emit.cql === true`). */
+export function emitsToCql(rawTag: string): boolean {
+  return defOf(rawTag)?.emit?.cql === true;
+}
+
+/** The statuses that SUPPRESS this tag's CQL emit (e.g. `["resolved"]`); empty when the tag is not status-gated. */
+export function suppressStatusesOf(rawTag: string): readonly string[] {
+  return defOf(rawTag)?.emit?.suppressWhenStatus ?? [];
+}
+
+/** The set of CANONICAL tag ids with `emit.cql === true` — the registry-derived successor of the old hand-maintained
+ *  `EMIT_CQL_COMMENT_TAGS` mirror. */
+export function emitCqlTags(): Set<string> {
+  return new Set(TAGS.filter((t) => t.emit?.cql === true).map((t) => t.id));
 }
 
 export const REGISTRY_VERSION: string = METADATA_REGISTRY.version;

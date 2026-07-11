@@ -30,6 +30,10 @@
  */
 
 import { buildCRL } from "../index";
+// #203 Todo 5 — status-aware meta emit. Direct `../meta` imports (NOT via `../index`) to avoid a barrel cycle:
+// emitCQL already pulls buildCRL from ../index, and meta/* does not import cql-emitter, so the edge is one-directional.
+import { parseMetaTag } from "../meta/parseMetaTag";
+import { emitCqlTags, emitsToCql, suppressStatusesOf } from "../meta/registry";
 import { matchNarrative } from "../template-match";
 import { cqlStringLiteral } from "./cqlStrings";
 import type {
@@ -280,33 +284,30 @@ function indent(text: string, level = 1): string {
 }
 
 /**
- * Tags whose `@tag: <body>` meta lines are rendered into a CQL block comment
- * on the concept's `define`. Source of truth: the tags with `emit.cql: true`
- * in spec/metadata-registry.json. The drift-guard test
- * `meta-emit-registry.test.ts` asserts this set stays in sync with the registry
- * so adding/flipping a tag there fails the build until this mirror is updated.
+ * Tags whose `@tag: <body>` meta lines render into a CQL block comment on the concept's `define`. DERIVED from the
+ * registry's `emit.cql:true` tags (`emitCqlTags()`) — no hand-maintained mirror (#203 Todo 5, disc 225). Kept as an
+ * export for the drift-guard test + back-compat; the emit DECISION uses the registry accessors directly (below), which
+ * also canonicalize aliases (a raw `EMIT_CQL_COMMENT_TAGS.has(rawTag)` would miss `@over-reach-to-fix` etc.).
  */
-export const EMIT_CQL_COMMENT_TAGS: ReadonlySet<string> = new Set([
-  "logic-expression-text",
-  "crl-future-expression",
-  "ke-feedback",
-  "business-logic-deferred",
-  "clinical-logic-deferred",
-  "cql-comment",
-]);
+export const EMIT_CQL_COMMENT_TAGS: ReadonlySet<string> = emitCqlTags();
 
-const META_TAG_RE = /^@([a-z][a-z0-9-]*):/;
 // `@cql-comment` is a verbatim passthrough: its prefix is stripped so only the
 // body appears in the emitted comment (unlike the other emit.cql tags, which
 // keep their `@tag: body` form).
 const CQL_COMMENT_RE = /^@cql-comment:\s*(.*)$/;
 
-// A meta line reaches the generated CQL iff it carries an `@tag` whose tag is
-// in the emit.cql allowlist. Other tags (external refs, provenance) and untyped
-// notes stay in the .crl source only.
+// #203 Todo 5 — STATUS-AWARE emit. A meta line reaches the generated CQL iff its tag has `emit.cql:true` AND its status
+// is not a SUPPRESS status (registry `emit.suppressWhenStatus`, e.g. `["resolved"]`). So an OPEN flag emits (a KE reads
+// unresolved concerns in the generated CQL) and a RESOLVED flag does not (noise). Absent/unknown status → `open` →
+// EMITS (conservative; mirrors `openFlags` — the emit ⇔ open ⇔ blocks-mvComplete invariant for flags). Only an EXACT
+// suppress status suppresses — the emitter does NOT run the validator, so an annotated `status resolved (per Dr X)` or a
+// duplicate-status line reads as non-resolved and still emits (deliberate: surface anything not cleanly resolved).
+// We parse ONLY to obtain {tag, status}; the RAW line is still what gets rendered (see metaCommentText) so no fields drop.
 function metaEmitsToCql(line: string): boolean {
-  const m = META_TAG_RE.exec(line.trim());
-  return m !== null && EMIT_CQL_COMMENT_TAGS.has(m[1]);
+  const res = parseMetaTag(line);
+  if (res.kind !== "tag" || !emitsToCql(res.parsed.tag)) return false; // accessors canonicalize aliases
+  const status = res.parsed.fields.get("status") ?? "open"; // same status read as collectFlags
+  return !suppressStatusesOf(res.parsed.tag).includes(status);
 }
 
 // The text rendered into the CQL comment for an emit.cql line: the body alone
@@ -320,6 +321,10 @@ function metaCommentText(line: string): string {
 // comment to prepend to the concept's emitted `define`. Returns "" when no
 // eligible annotations are present. The defusing replacement keeps CRL meta
 // text containing "asterisk slash" from accidentally closing the comment early.
+// #203 Todo 5 SCOPE NOTE: this is the ONLY caller of the emit filter, and it renders CONCEPT meta — which is why the
+// flags' `emit.cqlScopes:["concept"]` is honored STRUCTURALLY (concept is the only lane that reaches here) rather than by
+// a code check. If #206 adds a library-header or decision emit path, that new caller MUST consult `cqlScopes` (via a new
+// `cqlScopesOf` accessor) before rendering a flag — else a concept-scoped flag would leak into a lane it doesn't declare.
 function renderMetaBlock(meta: { text: string }[] | undefined): string {
   if (!meta || meta.length === 0) return "";
   // #154 shape (b): meta entries carry {text, location}; the emit logic operates on the `.text` (the backtick body),
