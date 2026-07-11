@@ -273,10 +273,16 @@ export { collectFlags, openFlags } from "./meta/collectFlags";
 export type { FlagInstance } from "./meta/collectFlags";
 export { parseMetaTag } from "./meta/parseMetaTag";
 export type { ParseMetaResult, ParsedMetaTag } from "./meta/parseMetaTag";
+// #203 Todo 4b Slice B — the flag-tag vocabulary accessor for the create-flag pick (registry-driven, not hardcoded).
+export { flagTags } from "./meta/registry";
+export type { FlagTagInfo, FieldRule } from "./meta/registry";
 
 // #205 crl-refactors — the write-half of the CRL-source API. Instance #1: the flag-status flip (meta-quickfix family).
 export { rewriteMetaStatus, rewriteStatusInBody } from "./refactors/rewriteMetaStatus";
 export type { FlagStatus } from "./refactors/rewriteMetaStatus";
+// Instance #2 (#203 Todo 4b Slice B): resolve the insertion point for a NEW `- meta is` line on a concept/decision.
+export { resolveMetaInsertion } from "./refactors/resolveMetaInsertion";
+export type { MetaInsertionResult } from "./refactors/resolveMetaInsertion";
 
 export interface Token {
   line: number;

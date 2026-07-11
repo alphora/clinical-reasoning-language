@@ -114,4 +114,18 @@ export function emitCqlTags(): Set<string> {
   return new Set(TAGS.filter((t) => t.emit?.cql === true).map((t) => t.id));
 }
 
+/** One flag tag's authoring info for the create-flag pick (#203 Todo 4b Slice B). `fields` are the tag's rules from
+ *  `fieldRulesOf` (required/enum) so the create UI prompts them registry-driven — never hardcoded per tag. */
+export interface FlagTagInfo {
+  id: string;
+  category?: string;
+  fields: FieldRule[];
+}
+
+/** Every `flag:true` tag, in registry order, with its category + field rules. The create-flag tag-pick enumerates these
+ *  (rather than hardcoding the five in the cockpit) so a new flag tag appears automatically. */
+export function flagTags(): FlagTagInfo[] {
+  return TAGS.filter((t) => t.flag === true).map((t) => ({ id: t.id, category: t.category, fields: fieldRulesOf(t.id) }));
+}
+
 export const REGISTRY_VERSION: string = METADATA_REGISTRY.version;
