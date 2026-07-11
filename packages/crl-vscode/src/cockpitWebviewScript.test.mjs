@@ -773,6 +773,12 @@ check("#203 Slice B / #205: addFlagAtNode is a THIN SHIM over the shared createF
   assert.match(m[1], /tag\.fields\.filter\(\(f\) => f\.required\)/); // registry-driven required fields
   assert.match(m[1], /rule\.values && rule\.values\.length/); // enum → quick-pick
   assert.match(m[1], /fields\[rule\.key\] = value\.trim\(\)/); // fields collected into a Record for createFlag
+  // GAP 2: the DESCRIPTION is captured in a real multi-line note space (a scratch editor), not a one-line box; validated
+  // (backtick/`;`) BEFORE the note is closed so an invalid description isn't destroyed; the description IS the gist.
+  assert.match(m[1], /openTextDocument\(\{ language: "markdown", content: "" \}\)/); // the scratch note editor
+  assert.match(m[1], /showInformationMessage\([\s\S]*?"Insert flag"/); // non-modal confirm button
+  assert.match(m[1], /const gist = noteDoc\.getText\(\)\.trim\(\)/); // the note IS the gist (multi-line)
+  assert.match(m[1], /hasForbiddenGistChars\(gist\)[\s\S]*?edit the note/); // validate before closing (keep the user's text)
   // #205: the build/find/resolve/validate is the SHARED transform — the cockpit calls it against the LIVE doc text.
   assert.match(m[1], /createFlag\(doc\.getText\(\), \{ kind: target\.kind, name: target\.name, library: target\.lib \}, \{ tag: tag\.id, gist: gist\.trim\(\), fields, status: "open" \}\)/);
   assert.match(m[1], /if \(!made\.ok\) return flagNote/); // typed-reason surfacing

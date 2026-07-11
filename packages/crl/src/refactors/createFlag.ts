@@ -59,13 +59,21 @@ export type CreateFlagResult =
     }
   | { ok: false; reason: CreateFlagFailure; message: string; diagnostics?: SlimDiagnostic[] };
 
-/** The chars a flag gist / field value must NOT contain — a backtick or newline would break the `…` body, a `;` would
- *  spoof a field delimiter. Exported so a surface's live input-validation (the cockpit's `validateInput`) shares the
- *  EXACT rule the transform enforces, and the two can't drift (Claude design review, disc 230). */
+/** The chars a flag FIELD value must NOT contain — a backtick/newline would break the `…` body, a `;` would spoof a field
+ *  delimiter (a field is one `; key value` segment on one line). Exported so a surface's live input-validation (the
+ *  cockpit's field `validateInput`) shares the EXACT rule the transform enforces (Claude design review, disc 230). */
 export const FORBIDDEN_FLAG_CHARS = /[`\r\n;]/;
-/** Does `v` contain a char that's illegal inside a flag gist/field value? */
+/** Does `v` contain a char that's illegal inside a flag FIELD value? */
 export function hasForbiddenFlagChars(v: string): boolean {
   return FORBIDDEN_FLAG_CHARS.test(v);
+}
+/** The chars a flag GIST (the description — the body's first `;`-delimited segment) must NOT contain: a backtick (ends the
+ *  body) or a `;` (starts a field). NEWLINES ARE ALLOWED — the gist is a real multi-line description (the meta backtick
+ *  body legally spans lines), so a reviewer can write a reasonable account of the concern, not one cramped line. */
+export const FORBIDDEN_GIST_CHARS = /[`;]/;
+/** Does `v` contain a char that's illegal inside a flag gist? (backtick or `;` — newlines are fine). */
+export function hasForbiddenGistChars(v: string): boolean {
+  return FORBIDDEN_GIST_CHARS.test(v);
 }
 const BARE_IDENT = /^[a-z][a-z0-9-]*$/; // a field key is a bare lowercase identifier
 const FLAG_STATUSES = ["open", "resolved"] as const; // the FlagStatus lifecycle — status is a bare enum token
@@ -108,9 +116,9 @@ export function createFlag(source: string, target: CreateFlagTarget, input: Crea
   if (!canon || !isFlag(input.tag)) return { ok: false, reason: "unknown-tag", message: `"${input.tag}" is not a registered flag tag` };
 
   // 2. Gist: required + sanitized.
-  const gist = (input.gist ?? "").trim();
+  const gist = (input.gist ?? "").trim(); // trims outer whitespace/newlines; INTERNAL newlines are kept (multi-line description)
   if (gist === "") return { ok: false, reason: "invalid-value", message: "a gist is required" };
-  if (hasForbiddenFlagChars(gist)) return { ok: false, reason: "invalid-value", message: "the gist must not contain a backtick, newline, or `;`" };
+  if (hasForbiddenGistChars(gist)) return { ok: false, reason: "invalid-value", message: "the gist must not contain a backtick or `;` (a `;` starts a field)" };
 
   // 3. Fields: registry-required present; every provided field value sanitized + enum-checked; emitted in a stable order
   //    (registry-rule order first, then any extra provided keys). `status` is set explicitly below, never from fields.

@@ -100,6 +100,23 @@ describe("#205 createFlag — guards", () => {
     expect(errs(r.source)).toEqual([]); // meta landed AFTER type, not before it (would be a grammar error otherwise)
     expect(r.source).toMatch(/- type is Observation\.\n- meta is `@open-fork: x; status open`\.\n- code is/); // right after type
   });
+  it("accepts a MULTI-LINE gist (a real description) — newlines kept, validates clean, collectFlags reads it", () => {
+    const desc = "The policy narrative is ambiguous about the lookback window.\nCustomer confirmed 6 months verbally, but the doc says 'recent'.\nNeeds a written decision before this ships.";
+    const r = createFlag(CONCEPT, { kind: "concept", name: "C" }, { tag: "validation-concern", gist: desc });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(errs(r.source)).toEqual([]); // a multi-line backtick body is grammar-legal
+    expect(r.flag.body).toContain("lookback window"); // the whole description is the gist
+    expect(r.flag.body).toContain("before this ships");
+    expect(r.flag.status).toBe("open");
+  });
+  it("still rejects a `;` in the gist (it would start a field) but NOT a newline", () => {
+    expect(createFlag(CONCEPT, { kind: "concept", name: "C" }, { tag: "open-fork", gist: "line one\nline two" }).ok).toBe(true);
+    const semi = createFlag(CONCEPT, { kind: "concept", name: "C" }, { tag: "open-fork", gist: "a; b" });
+    expect(semi.ok).toBe(false);
+    if (semi.ok) return;
+    expect(semi.reason).toBe("invalid-value");
+  });
   it("rejects a `status` smuggled in via fields (use the top-level status)", () => {
     const r = createFlag(CONCEPT, { kind: "concept", name: "C" }, { tag: "open-fork", gist: "x", fields: { status: "resolved" } });
     expect(r.ok).toBe(false);

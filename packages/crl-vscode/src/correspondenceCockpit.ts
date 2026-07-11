@@ -16,6 +16,7 @@ import {
   createFlag,
   flagTags,
   hasForbiddenFlagChars,
+  hasForbiddenGistChars,
   nodeKey,
   parseMetaTag,
   rewriteMetaStatus,
@@ -2369,12 +2370,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     );
     if (!tagPick) return;
     const tag = tagPick.tag;
-    const gist = await vscode.window.showInputBox({
-      placeHolder: "one-line gist (the rich detail goes in the linked issue, not here)",
-      prompt: `@${tag.id} on "${target.name}"`,
-      validateInput: (v) => (hasForbiddenFlagChars(v) ? "no backtick, newline, or `;` in the gist" : v.trim() === "" ? "a gist is required" : undefined),
-    });
-    if (gist === undefined) return; // Esc
+    // Required fields first (short single-line values), THEN the DESCRIPTION in a real note space (below).
     const fields: Record<string, string> = {};
     for (const rule of tag.fields.filter((f) => f.required)) {
       let value: string | undefined;
@@ -2385,6 +2381,30 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       }
       if (value === undefined) return; // cancelled a required field → abort cleanly
       fields[rule.key] = value.trim();
+    }
+    // GAP 2 — the DESCRIPTION goes in a real, MULTI-LINE note space (a scratch editor), not a one-line box: a reviewer can
+    // write a reasonable account of the concern so it's understandable before it's fully detailed in the backlog. The
+    // description IS the gist (the meta backtick body legally spans lines). Confirm via a non-modal "Insert flag" button
+    // (the user edits the note while it's shown); dismissing leaves the note open so the text isn't lost. Backtick/`;` are
+    // rejected by createFlag (they delimit the body/fields); newlines are fine.
+    const noteDoc = await vscode.workspace.openTextDocument({ language: "markdown", content: "" });
+    await vscode.window.showTextDocument(noteDoc, { preview: false });
+    const go = await vscode.window.showInformationMessage(
+      `Write the flag description for @${tag.id} on "${target.name}" in the editor, then Insert. (No backticks or ";".)`,
+      "Insert flag",
+      "Cancel",
+    );
+    if (go !== "Insert flag") return; // Cancel / dismissed — leave the note open, no flag
+    const gist = noteDoc.getText().trim();
+    // Validate BEFORE closing the note, so an invalid description leaves the user's text in place to fix (not destroyed).
+    if (gist === "") return flagNote("a description is required — edit the note and Insert again");
+    if (hasForbiddenGistChars(gist)) return flagNote("the description can't contain a backtick or `;` — edit the note and Insert again");
+    // Best-effort close the scratch editor now that we've captured it (revert first so the untitled buffer doesn't prompt).
+    try {
+      await vscode.window.showTextDocument(noteDoc, { preview: false });
+      await vscode.commands.executeCommand("workbench.action.revertAndCloseActiveEditor");
+    } catch {
+      /* leave the scratch editor open if it can't be closed cleanly */
     }
     if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — flag not added");
     // Open the target + RE-READ its LIVE text NOW — the user may have edited the buffer during the tag/gist/field
