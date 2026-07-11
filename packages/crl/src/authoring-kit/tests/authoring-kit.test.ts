@@ -28,6 +28,7 @@ import {
   SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
 } from "../reference";
 import { getAuthoringKit, STAGES, USE_CASE_NAMES } from "../index";
+import { fieldRulesOf } from "../../meta/registry";
 
 function crlErrors(src: string) {
   return new Validator().validate(parseInput(src)).errors;
@@ -303,7 +304,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.5");
+    expect(kit.schemaVersion).toBe("1.6");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -661,8 +662,11 @@ describe("authoring-kit — getAuthoringKit", () => {
     // determination ActivityDefinition (`reasonCode` + `payload`/`note`), so the "coded-HCR01 outcome is a later
     // stage" boundary is RETIRED and the config `narrative` field dropped from the shape doc. Prior-auth content
     // changed → cpg hash holds, prior-auth hash moves.
-    expect(cpg.contentHash).toBe("746b84a0a2f546f8081aab1173dfbaa4e4b81480b622f211585d6a6f9cd79924");
-    expect(priorAuth.contentHash).toBe("3dd25589a5467070182dd7f8d1fa8927e8a441a77fc2b920983b045775a3e744");
+    // KE #203 Todo 6 (schemaVersion 1.5→1.6): the `review-flags` rule (cpg/process) + 3 examples were added; BOTH
+    // hashes move (schemaVersion is in the hashed base AND the cpg-edge rule/examples inherit into the prior-auth
+    // chain). KE seats re-sync both pins on the bump.
+    expect(cpg.contentHash).toBe("bec3c80d9f319a108d1d5939bd3a9c457e102483440e8070038822aa375784f5");
+    expect(priorAuth.contentHash).toBe("089ab86e7626c46a0e472ae926272ab0e18c4d6e3fbe3320f9acce6beac2b597");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
@@ -750,5 +754,41 @@ describe("authoring-kit — examples are validated (no unverified CRL ships)", (
         expect(shape.map((e) => e.rule)).toContain(ex.expectRule);
       }
     }
+  });
+});
+
+describe("authoring-kit — review-flag required fields are validator-enforced (backs the review-flags rule)", () => {
+  // The KitExample harness can only express DECISION-SHAPE don't-cases (meta errors aren't decision-shape), so the
+  // review-flags rule's "`@fidelity-defect` needs `; direction`, `@gap-filed` needs `; ref`" claim is backed HERE
+  // (gpt55 + Claude design review, disc 226): a targeted crlErrors check for the meta-missing-field enforcement.
+  const conceptWith = (metaLine: string): string =>
+    `# T\nlibrary "T".\nconcept "C":\n- type is Observation.\n- meta is \`${metaLine}\`.\n- code is \`c\`.`;
+
+  it("@fidelity-defect WITHOUT `; direction` → meta-missing-field", () => {
+    expect(crlErrors(conceptWith("@fidelity-defect: over-reached somewhere; status open")).map((e) => e.kind)).toContain(
+      "meta-missing-field",
+    );
+  });
+  it("@gap-filed WITHOUT `; ref` → meta-missing-field", () => {
+    expect(crlErrors(conceptWith("@gap-filed: eGFR normalization not expressible")).map((e) => e.kind)).toContain(
+      "meta-missing-field",
+    );
+  });
+  it("well-formed @fidelity-defect (+ `; direction`) and @gap-filed (+ `; ref`) raise NO missing-field error", () => {
+    expect(
+      crlErrors(conceptWith("@fidelity-defect: x; direction over-reach; status open; ref #207")).map((e) => e.kind),
+    ).not.toContain("meta-missing-field");
+    expect(crlErrors(conceptWith("@gap-filed: x; ref #180")).map((e) => e.kind)).not.toContain("meta-missing-field");
+  });
+  it("the taught optional `; ref` is REGISTRY-MODELED on ALL FOUR flag tags (v0.3.1) — proven via the accessor, not a no-error check", () => {
+    // MetaTagValidator tolerates unknown fields, so a no-error assertion would pass even WITHOUT `ref` in the registry
+    // (gpt55 impl review). Prove grounding directly: fieldRulesOf resolves an OPTIONAL `ref` for every flag tag.
+    for (const tag of ["customer-confirmable", "internal-inconsistency", "open-fork", "fidelity-defect"]) {
+      const ref = fieldRulesOf(tag).find((r) => r.key === "ref");
+      expect(ref).toBeDefined();
+      expect(ref?.required).toBe(false);
+    }
+    // @gap-filed's ref stays REQUIRED (the not-a-flag pointer).
+    expect(fieldRulesOf("gap-filed").find((r) => r.key === "ref")?.required).toBe(true);
   });
 });

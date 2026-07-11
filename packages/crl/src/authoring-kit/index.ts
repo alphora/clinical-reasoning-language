@@ -82,8 +82,16 @@ export type { AuthoringEdge, AuthoringKit, AuthoringStage, AuthoringUseCase, Kit
 //   concrete rules); a new prior-auth `dispositionModel` field surfaces the framework categories + config contract.
 //   T3b (same schemaVersion, hash re-pinned): migrated the PA reference artifacts to the config-driven model
 //   (local `<category>.<key>` activities; removed the shared `medical-policy-determination.crl`, 12→11 artifacts).
-// Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new shape.
-const SCHEMA_VERSION = "1.5";
+// "1.5" → "1.6": CONTENT change (KE #203 Todo 6) — adds the `review-flags` authoring rule (cpg/process; teaches all
+//   four tags customer-confirmable / internal-inconsistency / open-fork / fidelity-defect{direction}) + 3 cross-scope
+//   examples (open-fork on a concept, fidelity-defect on a decision, gap-filed the not-a-flag contrast), the LEAN
+//   form (gist + fields in the `.crl`; rich detail in a tracker
+//   issue filed at creation, linked via the new optional `; ref`), and the `@gap-filed` (not-a-flag pointer)
+//   contrast. NO payload-shape change. BOTH useCase hashes re-pin (schemaVersion is in the hashed base AND the
+//   cpg-edge rule/examples inherit into the prior-auth chain). Registry companion: metadata-registry.json v0.3.1
+//   adds the optional `ref` field to the four flag tags (so the taught `; ref` is registry-grounded).
+// Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
+const SCHEMA_VERSION = "1.6";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -405,6 +413,45 @@ const RULES: KitRule[] = [
     rule: "Verify with the MCP tools in order: validate_crl(path) clean → validate_cel(path) clean → run_decision(path) with every case's `result is` passing. validate_cel and run_decision need FILES under a project root (a package.json) — they do not accept inline code.",
     ref: "verifyLoop",
   },
+  {
+    id: "review-flags",
+    edge: "cpg",
+    category: "process",
+    rule:
+      "When extraction hits a problem you cannot cleanly resolve — a source ambiguity, a source self-contradiction, an " +
+      "unsettled modeling fork, or a place your encoding does not match the source — author a REVIEW FLAG rather than " +
+      "silently choosing. A flag is a `- meta is `@<tag>: <one-line gist>; <fields>; status open`.` line on the object it " +
+      "concerns, at the NARROWEST faithful scope: `concept`, `decision`, or `library`. The four tags, by what went wrong: " +
+      "`@customer-confirmable` — an EXTERNAL-stakeholder ambiguity you resolved provisionally (carry the reading you took " +
+      "as `; assumption <x>`); `@internal-inconsistency` — the SOURCE contradicts itself (source-vs-source); `@open-fork` " +
+      "— an INTERNAL modeling fork you encoded one way but did not settle (`; chosen <branch>`, `; alternatives <…>`); " +
+      "`@fidelity-defect` — a known encoding≠source defect, with a REQUIRED `; direction over-reach|criterion-drop` " +
+      "(over-reach = you ADDED logic the source doesn't support; criterion-drop = you OMITTED a source-required criterion). " +
+      "Keep the `.crl` flag LEAN — a one-line gist + those fields; the RICH detail (the source quote, the options, the " +
+      "reasoning) goes in a tracker ISSUE you file AT THE SAME TIME, linked with an optional `; ref #<issue>`. Author flags " +
+      "`status open`. An open flag blocks Medical Validation completion. Separately, `@gap-filed` is NOT a flag — it is a " +
+      "durable POINTER to an already-filed gap/issue with a REQUIRED `; ref <issue>`; it ships fine and does not gate.",
+    why:
+      "A silent guess buries a narrative→CRL problem inside a green-looking artifact; a flag surfaces it and prevents " +
+      "Medical Validation completion while open — the review signal is the point.",
+    ref: "spec/metadata-model.md (Flags); MetaTagValidator (open-flag / meta-missing-field); spec/metadata-registry.json (flag tags + gap-filed).",
+    clauses: [
+      {
+        text:
+          "When you cannot cleanly resolve a source/encoding problem during extraction, author a flag at the narrowest " +
+          "faithful scope rather than silently choosing; the `.crl` flag is LEAN (gist + fields + `status open`), the rich " +
+          "detail in a tracker issue filed at creation and linked with `; ref`. (`; assumption`/`; chosen`/`; alternatives` " +
+          "are the semantic fields to include when they apply — not validator-required.)",
+        force: "default",
+      },
+      {
+        text:
+          "`@fidelity-defect` REQUIRES `; direction over-reach|criterion-drop`, and `@gap-filed` REQUIRES `; ref <issue>` — " +
+          "a missing required field is a `meta-missing-field` validator error.",
+        force: "validator-enforced",
+      },
+    ],
+  },
 ];
 
 const STAGE_RECOMMENDED_CONCEPT_TYPES = [
@@ -480,6 +527,38 @@ const EXAMPLES: KitExample[] = [
     valid: false,
     expectRule: "any-over-branches",
     note: "Nondeterministic over branches. Compose conditions with `sem-or` into one concept, or use `first:`/`all:`.",
+  },
+  {
+    title: "Review flag: an @open-fork on the concept it concerns (LEAN — detail in the linked issue)",
+    language: "crl",
+    snippet:
+      'concept "BMI Threshold":\n- type is Observation.\n- meta is `@open-fork: eligibility threshold encoded as BMI-40-only, but the source also allows 35-plus-comorbidity; chosen bmi-40-only; alternatives bmi-35-plus-comorbidity; status open; ref #207`.\n- code is `bmi-threshold`.',
+    valid: true,
+    note: "The `.crl` flag is a one-line gist + `; chosen`/`; alternatives` (semantic, optional) + `status open` + an optional `; ref` to the tracker issue holding the full reasoning. Concept meta sits between `type is` and `code is`. An open flag blocks Medical Validation completion.",
+  },
+  {
+    title: "Review flag: an @fidelity-defect on a DECISION (required `; direction`)",
+    language: "crl",
+    snippet:
+      'decision "Coverage Decision":\n- meta is `@fidelity-defect: the encoding reads an axillary-only finding the source does not require; direction over-reach; status open; ref #207`.\nfirst:\n- when "Indication Present" then recommend activity "Approve".\n- otherwise then recommend activity "Deny".',
+    valid: true,
+    note: "Flags attach at the narrowest faithful scope — here a DECISION (leading `- meta is` before `first:`). `@fidelity-defect` REQUIRES `; direction over-reach|criterion-drop` (omitting it is a meta-missing-field error).",
+  },
+  {
+    title: "@gap-filed is NOT a flag — a pointer to a filed gap (required `; ref`), ships fine, does not gate",
+    language: "crl",
+    snippet:
+      'concept "Renal Function":\n- type is Observation.\n- meta is `@gap-filed: eGFR unit normalization not yet expressible; ref #180`.\n- code is `renal-function`.',
+    valid: true,
+    note: "A durable pointer to already-tracked work — REQUIRED `; ref`, does not block mvComplete. Contrast with a review flag (gist + discriminator + `status open`, blocks while open).",
+  },
+  {
+    title: "Review flag at LIBRARY scope: an @internal-inconsistency spanning the whole policy",
+    language: "crl",
+    snippet:
+      '- meta is `@internal-inconsistency: the eligibility section requires prior imaging, but the exclusions section forbids it; status open; ref #207`.',
+    valid: true,
+    note: "Library-scope meta is a TRAILING `- meta is` on the library statement (here right after `library \"T\".`). Use library scope for a contradiction that isn't about one concept or decision. `@internal-inconsistency` = the SOURCE contradicts itself.",
   },
 ];
 

@@ -1,8 +1,8 @@
 {
   "_about": "CRL metadata-annotation registry — the canonical tag vocabulary, value shapes, cardinality, and lifecycle for `@tag` annotations carried on `- meta is `@tag: <body>`.` lines. Consumed by the (future) Validator; human companion is metadata-model.md in this folder.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "status": "core-stable",
-  "statusNote": "Core vocabulary stable (two design-review rounds). v0.2.0 adds the review-flag tags per KE #203 (additive; two further design-review rounds — disc 220). ENFORCEMENT (Todo 3 / #154): the Validator now enforces vocabulary (malformed/unknown `@tag` → warning), field shape (required/enum/duplicate), cardinality, and the open-flag warning — via `MetaTagValidator` reading the compile-time-inlined registry. REMAINDER (#154 follow-up): the family-C extraction-exhaust rules (`run`-required, re-run staleness) + the re-add-detection guard are not yet enforced. Ref schemes (kg:/reef:) are illustrative. Renames go through `aliases`.",
+  "statusNote": "Core vocabulary stable (two design-review rounds). v0.2.0 adds the review-flag tags per KE #203 (additive; two further design-review rounds — disc 220). v0.3.0 (Todo 5): status-aware CQL emit — the 4 flag tags + `@ke-feedback` gain `emit.suppressWhenStatus:[resolved]`; the flags flip `emit.cql:true` + `emit.cqlScopes:[concept]`. v0.3.1 (Todo 6): the 4 flag tags gain an OPTIONAL `ref` field (the tracker-issue link; `@gap-filed`'s ref stays required). ENFORCEMENT (Todo 3 / #154): the Validator now enforces vocabulary (malformed/unknown `@tag` → warning), field shape (required/enum/duplicate), cardinality, and the open-flag warning — via `MetaTagValidator` reading the compile-time-inlined registry. REMAINDER (#154 follow-up): the family-C extraction-exhaust rules (`run`-required, re-run staleness) + the re-add-detection guard are not yet enforced. Ref schemes (kg:/reef:) are illustrative. Renames go through `aliases`.",
   "carrier": {
     "element": "meta",
     "rendering": "- meta is `@<tag>: <body>`.",
@@ -226,7 +226,8 @@
       "extraFields": {
         "status": { "type": "enum", "values": ["open", "resolved"], "default": "open", "note": "a flag is `open` (blocks mvComplete; emits) or `resolved` (persists as a learning signal; no emit). No `deferred`. See `flagModel`. MV transitions open<->resolved ONLY; the `resolved`->deleted step is the separate learning system (not MV)." },
         "assumption": { "type": "string", "required": false, "note": "the provisional reading taken pending the ruling" },
-        "key": { "type": "string", "required": false, "note": "stable re-detect key (agent-supplied: @id + a normalized source-span/hash). Matches a `resolved` tombstone to suppress re-add on a later extraction run (see `flagModel.reAddGuard`)." }
+        "key": { "type": "string", "required": false, "note": "stable re-detect key (agent-supplied: @id + a normalized source-span/hash). Matches a `resolved` tombstone to suppress re-add on a later extraction run (see `flagModel.reAddGuard`)." },
+        "ref": { "type": "string", "required": false, "note": "OPTIONAL pointer to the rich-detail tracker issue this flag links to (e.g. #203). The KE files the issue at flag CREATION; the `.crl` flag stays LEAN (gist + fields). Distinct from @gap-filed (a non-flag pointer whose ref is REQUIRED). NOT the #204 tags->issues->PR loop — just the link." }
       },
       "cardinality": "0..n",
       "attachmentTargets": ["concept", "decision", "library"],
@@ -247,7 +248,8 @@
       "valueShape": "text",
       "extraFields": {
         "status": { "type": "enum", "values": ["open", "resolved"], "default": "open" },
-        "key": { "type": "string", "required": false, "note": "stable re-detect key (see @customer-confirmable) — critical here: the SOURCE contradiction persists across runs, so the key lets a `resolved` tombstone suppress a re-extraction re-add." }
+        "key": { "type": "string", "required": false, "note": "stable re-detect key (see @customer-confirmable) — critical here: the SOURCE contradiction persists across runs, so the key lets a `resolved` tombstone suppress a re-extraction re-add." },
+        "ref": { "type": "string", "required": false, "note": "OPTIONAL pointer to the rich-detail tracker issue (see @customer-confirmable ref)." }
       },
       "cardinality": "0..n",
       "attachmentTargets": ["concept", "decision", "library"],
@@ -270,7 +272,8 @@
         "status": { "type": "enum", "values": ["open", "resolved"], "default": "open" },
         "chosen": { "type": "string", "required": false, "note": "the branch actually encoded" },
         "alternatives": { "type": "string", "required": false, "note": "the un-taken modeling alternatives still open" },
-        "key": { "type": "string", "required": false, "note": "stable re-detect key (see @customer-confirmable)" }
+        "key": { "type": "string", "required": false, "note": "stable re-detect key (see @customer-confirmable)" },
+        "ref": { "type": "string", "required": false, "note": "OPTIONAL pointer to the rich-detail tracker issue (see @customer-confirmable ref)." }
       },
       "cardinality": "0..n",
       "attachmentTargets": ["concept", "decision", "library"],
@@ -292,7 +295,8 @@
       "extraFields": {
         "status": { "type": "enum", "values": ["open", "resolved"], "default": "open" },
         "direction": { "type": "enum", "values": ["over-reach", "criterion-drop"], "required": true, "note": "over-reach = the encoding ADDED logic the source doesn't support; criterion-drop = the encoding OMITTED a source-required criterion" },
-        "key": { "type": "string", "required": false, "note": "stable re-detect key (see @customer-confirmable)" }
+        "key": { "type": "string", "required": false, "note": "stable re-detect key (see @customer-confirmable)" },
+        "ref": { "type": "string", "required": false, "note": "OPTIONAL pointer to the rich-detail tracker issue (see @customer-confirmable ref)." }
       },
       "cardinality": "0..n",
       "attachmentTargets": ["concept", "decision", "library"],
