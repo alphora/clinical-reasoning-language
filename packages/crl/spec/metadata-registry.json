@@ -2,15 +2,14 @@
   "_about": "CRL metadata-annotation registry — the canonical tag vocabulary, value shapes, cardinality, and lifecycle for `@tag` annotations carried on `- meta is `@tag: <body>`.` lines. Consumed by the (future) Validator; human companion is metadata-model.md in this folder.",
   "version": "0.2.0",
   "status": "core-stable",
-  "statusNote": "Core vocabulary stable (two design-review rounds). v0.2.0 adds the review-flag tags per KE #203 (additive; two further design-review rounds — disc 220). The Validator that enforces these rules is not yet implemented (see README — validateCRL is a placeholder). Ref schemes (kg:/reef:) are illustrative. Renames go through `aliases`; a rename should add the old id to the new tag's `aliases` so existing `.crl` flags don't orphan.",
+  "statusNote": "Core vocabulary stable (two design-review rounds). v0.2.0 adds the review-flag tags per KE #203 (additive; two further design-review rounds — disc 220). ENFORCEMENT (Todo 3 / #154): the Validator now enforces vocabulary (malformed/unknown `@tag` → warning), field shape (required/enum/duplicate), cardinality, and the open-flag warning — via `MetaTagValidator` reading the compile-time-inlined registry. REMAINDER (#154 follow-up): the family-C extraction-exhaust rules (`run`-required, re-run staleness) + the re-add-detection guard are not yet enforced. Ref schemes (kg:/reef:) are illustrative. Renames go through `aliases`.",
   "carrier": {
     "element": "meta",
     "rendering": "- meta is `@<tag>: <body>`.",
     "tagPattern": "^@([a-z][a-z0-9-]*):\\s*(.*)$",
     "terminator": "the `.` goes AFTER the closing backtick: - meta is `...`.",
-    "scope": ["concept"],
-    "plannedScope": ["concept", "decision", "library"],
-    "scopeNote": "REALITY: the `meta` carrier parses ONLY on `concept` (metaLine* in conceptBody). `plannedScope` (decision + library) is the KE #203 future carrier — a grammar change (Todo 2). Until it lands, decision/library meta lines are ParserErrors; `plannedScope` documents intent, `scope` documents what actually parses.",
+    "scope": ["concept", "decision", "library"],
+    "scopeNote": "The `meta` carrier parses on `concept` (metaLine* in conceptBody), `decision` (leading metaLine* in decisionBody), and `library` (trailing metaLine* on libraryStatement) — KE #203 Todo 2 (grammar) + Todo 3/#154 (validator).",
     "backCompat": "A meta line with no leading @tag is a legitimate untyped note and passes validation."
   },
   "families": {
@@ -230,8 +229,7 @@
         "key": { "type": "string", "required": false, "note": "stable re-detect key (agent-supplied: @id + a normalized source-span/hash). Matches a `resolved` tombstone to suppress re-add on a later extraction run (see `flagModel.reAddGuard`)." }
       },
       "cardinality": "0..n",
-      "attachmentTargets": ["concept"],
-      "plannedAttachmentTargets": ["concept", "decision", "library"],
+      "attachmentTargets": ["concept", "decision", "library"],
       "origin": "either",
       "retention": "inline",
       "lifecycle": "append",
@@ -253,8 +251,7 @@
         "key": { "type": "string", "required": false, "note": "stable re-detect key (see @customer-confirmable) — critical here: the SOURCE contradiction persists across runs, so the key lets a `resolved` tombstone suppress a re-extraction re-add." }
       },
       "cardinality": "0..n",
-      "attachmentTargets": ["concept"],
-      "plannedAttachmentTargets": ["concept", "decision", "library"],
+      "attachmentTargets": ["concept", "decision", "library"],
       "origin": "either",
       "retention": "inline",
       "lifecycle": "append",
@@ -278,8 +275,7 @@
         "key": { "type": "string", "required": false, "note": "stable re-detect key (see @customer-confirmable)" }
       },
       "cardinality": "0..n",
-      "attachmentTargets": ["concept"],
-      "plannedAttachmentTargets": ["concept", "decision", "library"],
+      "attachmentTargets": ["concept", "decision", "library"],
       "origin": "either",
       "retention": "inline",
       "lifecycle": "append",
@@ -302,8 +298,7 @@
         "key": { "type": "string", "required": false, "note": "stable re-detect key (see @customer-confirmable)" }
       },
       "cardinality": "0..n",
-      "attachmentTargets": ["concept"],
-      "plannedAttachmentTargets": ["concept", "decision", "library"],
+      "attachmentTargets": ["concept", "decision", "library"],
       "origin": "either",
       "retention": "inline",
       "lifecycle": "append",
@@ -322,8 +317,7 @@
         "ref": { "type": "string", "required": true, "note": "the tracker issue id (e.g. #203) — 'filed' is meaningless without it; a gap-filed WITHOUT a ref is an error" }
       },
       "cardinality": "0..n",
-      "attachmentTargets": ["concept"],
-      "plannedAttachmentTargets": ["concept", "decision", "library"],
+      "attachmentTargets": ["concept", "decision", "library"],
       "origin": "human",
       "retention": "inline",
       "lifecycle": "append",

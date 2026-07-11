@@ -320,9 +320,11 @@ function metaCommentText(line: string): string {
 // comment to prepend to the concept's emitted `define`. Returns "" when no
 // eligible annotations are present. The defusing replacement keeps CRL meta
 // text containing "asterisk slash" from accidentally closing the comment early.
-function renderMetaBlock(meta: string[] | undefined): string {
+function renderMetaBlock(meta: { text: string }[] | undefined): string {
   if (!meta || meta.length === 0) return "";
-  const emitted = meta.filter(metaEmitsToCql).map(metaCommentText);
+  // #154 shape (b): meta entries carry {text, location}; the emit logic operates on the `.text` (the backtick body),
+  // so the emitted CQL bytes are unchanged from the old `string[]`.
+  const emitted = meta.map((m) => m.text).filter(metaEmitsToCql).map(metaCommentText);
   if (emitted.length === 0) return "";
   const safe = emitted.map((line) => line.replace(/\*\//g, "* /"));
   return `/*\n${safe.map((l) => ` * ${l}`).join("\n")}\n */\n`;
@@ -1055,8 +1057,10 @@ class Emitter {
     // block comment). Other `@tag` prefixes (e.g. `@ke-feedback`,
     // `@logic-expression-text`) get only the comment.
     if (c.meta) {
-      for (const line of c.meta) {
-        const m = /^@crl-future-expression:\s*(.+)$/.exec(line);
+      for (const entry of c.meta) {
+        // #154 shape (b): read `.text`; KEEP `c.location` for the emitted coordinates (switching to the meta-line
+        // location would change the EmitResult envelope values, though not the .cql bytes).
+        const m = /^@crl-future-expression:\s*(.+)$/.exec(entry.text);
         if (m) {
           this.futureExpressions.push({
             conceptName: c.name,

@@ -113,6 +113,7 @@ import {
   Location,
   ConceptValueType,
   Representation,
+  MetaEntry,
 } from "./types";
 import type { CRL, LibraryDeclaration, Include, ReferenceName, QualifiedReference } from "./types";
 
@@ -570,16 +571,20 @@ export class CRLAstBuilder
    *  with no shared base, so the caller supplies the exact array). The `@tag` parse is the validator's job. */
   private metaFrom(
     metaLines: readonly (import("../grammar/generated/antlr/CRLParser").MetaLineContext | undefined)[],
-  ): string[] {
-    const metas: string[] = [];
+  ): MetaEntry[] {
+    const metas: MetaEntry[] = [];
     for (const metaCtx of metaLines) {
-      const backtickCtx = metaCtx?.backtickString?.();
+      if (!metaCtx) continue;
+      const backtickCtx = metaCtx.backtickString?.();
+      // #154 shape (b): text = the inner backtick body; location = the FULL `- meta is `…`.` line (metaCtx), not
+      // the backtick token — the cockpit rewrites the whole line and diagnostics anchor at it.
+      const location = getLocation(metaCtx);
       if (backtickCtx?.text !== undefined) {
-        metas.push(backtickCtx.text.slice(1, -1));
+        metas.push({ text: backtickCtx.text.slice(1, -1), location });
       } else if (backtickCtx?.BACKTICK_STRING) {
         const token = backtickCtx.BACKTICK_STRING();
         if (token?.text !== undefined) {
-          metas.push(token.text.slice(1, -1));
+          metas.push({ text: token.text.slice(1, -1), location });
         }
       }
     }

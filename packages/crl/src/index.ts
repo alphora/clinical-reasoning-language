@@ -268,6 +268,12 @@ export type {
 } from "./cel/ast/types";
 export type { ValidationError, ValidationErrorKind, ValidationResult } from "./validator/validator";
 
+// #154/#203 — flag detection API (the MV cockpit consumes this for the mvComplete gate + the flag list).
+export { collectFlags, openFlags } from "./meta/collectFlags";
+export type { FlagInstance } from "./meta/collectFlags";
+export { parseMetaTag } from "./meta/parseMetaTag";
+export type { ParseMetaResult, ParsedMetaTag } from "./meta/parseMetaTag";
+
 export interface Token {
   line: number;
   column: number;

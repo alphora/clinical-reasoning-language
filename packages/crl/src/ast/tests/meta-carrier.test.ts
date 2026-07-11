@@ -24,15 +24,15 @@ describe("#203 Todo 2 — meta carrier on decision + library", () => {
       const ast = parseInput(`library "L".
 decision "D":
 - meta is \`@open-fork: AR vs IL; chosen AR; status open\`.
-- meta is \`@fidelity-defect: direction over-reach; status open\`.
+- meta is \`@fidelity-defect: axillary-only over-reach; direction over-reach; status open\`.
 first:
 - when "C" then recommend activity "Not Certify".
 - otherwise then recommend activity "Certify".
 `);
       const d = decisionsOf(ast)[0];
-      expect(d.meta).toEqual([
+      expect(d.meta?.map((m) => m.text)).toEqual([
         "@open-fork: AR vs IL; chosen AR; status open",
-        "@fidelity-defect: direction over-reach; status open",
+        "@fidelity-defect: axillary-only over-reach; direction over-reach; status open",
       ]);
     });
 
@@ -70,7 +70,7 @@ concept "X":
 - type is Observation.
 - code is \`x\`.
 `);
-      expect(libOf(ast).meta).toEqual(["@internal-inconsistency: preamble vs operative; status open"]);
+      expect(libOf(ast).meta?.map((m) => m.text)).toEqual(["@internal-inconsistency: preamble vs operative; status open"]);
     });
 
     it("library meta comes BEFORE includes; a library with no meta has no `meta` key", () => {
@@ -81,7 +81,7 @@ concept "X":
 - type is Observation.
 - code is \`x\`.
 `);
-      expect(libOf(ast).meta).toEqual(["@customer-confirmable: BMI reading; status open"]);
+      expect(libOf(ast).meta?.map((m) => m.text)).toEqual(["@customer-confirmable: BMI reading; status open"]);
 
       const noMeta = parseInput(`library "Bare".
 concept "X":
@@ -110,8 +110,8 @@ concept "X":
 - meta is \`@description: gloss\`.
 - code is \`x\`.
 `);
-      const c = ast.statements.find((s) => s.type === "Concept") as { meta?: string[] };
-      expect(c.meta).toEqual(["@description: gloss"]);
+      const c = ast.statements.find((s) => s.type === "Concept") as { meta?: { text: string }[] };
+      expect(c.meta?.map((m) => m.text)).toEqual(["@description: gloss"]);
       // only `- meta is` is newly admitted at the top level; a stray dashed line still errors.
       expect(syntaxErrors(`library "L".\n- when "C" then recommend activity "Certify".\n`)).toBeGreaterThan(0);
     });

@@ -40,7 +40,7 @@ export interface LibraryDeclaration extends ASTNode {
   name: string;
   /** #203 Todo 2: library-scope `@tag` metadata (raw backtick bodies; the `@tag` parse is the validator's job).
    *  Omitted when the `library` declaration carries no `- meta is` lines. */
-  meta?: string[];
+  meta?: MetaEntry[];
   location: Location;
 }
 
@@ -124,7 +124,7 @@ export interface Decision extends ASTNode {
   body: DecisionBody;
   /** #203 Todo 2: decision-scope `@tag` metadata (raw backtick bodies; the `@tag` parse is the validator's job).
    *  Omitted when the decision body carries no leading `- meta is` lines. */
-  meta?: string[];
+  meta?: MetaEntry[];
   location: Location;
 }
 
@@ -346,7 +346,7 @@ export interface Concept extends ASTNode {
   definition?: ConceptDefinition;
   // `possible representation:` entries (ADR 0001 §3). May be empty.
   representations: Representation[];
-  meta?: string[];
+  meta?: MetaEntry[];
   evidence?: string;
   location: Location;
   /**
@@ -593,6 +593,15 @@ export type ArgValue =
   | Quantity
   | NDisjunction
   | NConjunction;
+
+// #154/#203 shape (b): a metadata annotation line. `text` = the inner backtick body (`@tag: …`); `location` = the
+// FULL `- meta is `…`.` source line span (the MetaLineContext), so the MV cockpit can rewrite the exact line and
+// diagnostics can anchor at it. `text` is deliberately NOT `source-at-location` — write-back reads the full line
+// via `location`, never by re-wrapping `text`.
+export interface MetaEntry {
+  text: string;
+  location: Location;
+}
 
 export interface Location {
   start: { line: number; column: number };

@@ -4,3 +4,4 @@ import "./nameUniqueness.test";
 import "./cycleDetector.test";
 import "./parameter.test";
 import "./decisionShape.test";
+import "./metaTag.test";

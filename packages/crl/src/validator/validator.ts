@@ -6,6 +6,7 @@ import type { SourceContext } from "../imports/scopes";
 import { CycleDetector } from "./cycleDetector";
 import { DecisionShapeValidator } from "./decisionShapeValidator";
 import { DispositionValidator } from "./dispositionValidator";
+import { MetaTagValidator } from "./metaTagValidator";
 import { NameUniquenessValidator } from "./nameUniquenessValidator";
 import { ReferenceResolver } from "./referenceResolver";
 
@@ -44,7 +45,15 @@ export type ValidationErrorKind =
   // configures `crl.dispositions.options` (the closed-set trigger); absent config = today's behavior.
   | "disposition-not-configured"
   | "disposition-request-type"
-  | "disposition-non-final-leaf";
+  | "disposition-non-final-leaf"
+  // #154/#203 — registry-backed metadata (@tag) enforcement.
+  | "meta-malformed-tag"
+  | "meta-unknown-tag"
+  | "meta-missing-field"
+  | "meta-invalid-field"
+  | "meta-duplicate-field"
+  | "meta-cardinality"
+  | "open-flag";
 
 /**
  * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
@@ -153,6 +162,19 @@ export interface DispositionNonFinalLeafError extends ValidationErrorBase {
   activityName: string;
 }
 
+// #154/#203 — a metadata (@tag) diagnostic. One interface for all meta kinds (the kind + payload live in `kind`
+// + `message`); carries its intrinsic `severity` (open-flag/unknown/malformed = warning; field/cardinality = error).
+export interface MetaDiagnostic extends ValidationErrorBase {
+  kind:
+    | "meta-malformed-tag"
+    | "meta-unknown-tag"
+    | "meta-missing-field"
+    | "meta-invalid-field"
+    | "meta-duplicate-field"
+    | "meta-cardinality"
+    | "open-flag";
+}
+
 export type ValidationError =
   | EmptyNameError
   | DuplicateNameError
@@ -165,7 +187,8 @@ export type ValidationError =
   | ReservedLibraryNameError
   | DispositionNotConfiguredError
   | DispositionRequestTypeError
-  | DispositionNonFinalLeafError;
+  | DispositionNonFinalLeafError
+  | MetaDiagnostic;
 
 export interface ValidationResult {
   isValid: boolean;
@@ -204,6 +227,9 @@ const SOFT_DEMOTABLE_KINDS: ReadonlySet<ValidationErrorKind> = new Set([
   // (parallels unresolved-reference) — demote under soft. `disposition-request-type` is a STRUCTURAL defect
   // (a determination modeled as an order) and stays a hard error (like decision-shape), so it is NOT listed.
   "disposition-not-configured",
+  // #154: a missing required @tag field is incomplete-but-fixable authoring state (parallels unresolved-reference)
+  // → demote under soft. An INVALID enum value (`meta-invalid-field`) is misuse, not incompleteness → stays a hard error.
+  "meta-missing-field",
 ]);
 
 function demote(e: ValidationError): ValidationError {
@@ -216,6 +242,7 @@ export class Validator {
   private readonly cycleDetector: CycleDetector;
   private readonly decisionShapeValidator: DecisionShapeValidator;
   private readonly dispositionValidator: DispositionValidator;
+  private readonly metaTagValidator: MetaTagValidator;
 
   constructor() {
     this.nameUniquenessValidator = new NameUniquenessValidator();
@@ -223,6 +250,7 @@ export class Validator {
     this.cycleDetector = new CycleDetector();
     this.decisionShapeValidator = new DecisionShapeValidator();
     this.dispositionValidator = new DispositionValidator();
+    this.metaTagValidator = new MetaTagValidator();
   }
 
   /**
@@ -248,7 +276,12 @@ export class Validator {
 
     const pushSplit = (results: ValidationError[]): void => {
       for (const e of results) {
-        if (options.soft && SOFT_DEMOTABLE_KINDS.has(e.kind)) {
+        // #154: route by INTRINSIC severity FIRST — sub-validators may now emit real warnings (open-flag,
+        // unknown/malformed tag) that must NOT become errors / flip isValid. Only ERROR-severity findings are
+        // eligible for soft demotion.
+        if (e.severity === "warning") {
+          warnings.push(e);
+        } else if (options.soft && SOFT_DEMOTABLE_KINDS.has(e.kind)) {
           warnings.push(demote(e));
         } else {
           errors.push(e);
@@ -274,6 +307,10 @@ export class Validator {
 
     // #187 — reserved catalog library names — always an error (never demoted).
     errors.push(...this.validateReservedLibraryNames(ast, sources));
+
+    // #154/#203 — registry-backed @tag metadata enforcement (vocabulary / field / cardinality / open-flag).
+    // Routed through pushSplit so open-flag/unknown/malformed WARN (not fail) and meta-missing-field soft-demotes.
+    pushSplit(this.metaTagValidator.validate(ast, sources));
 
     // Configurable PA determinations — only when the project supplied a config; the closed-set enforcement is
     // further gated on `config.configured` inside the validator. Always an error (a structural config violation).
