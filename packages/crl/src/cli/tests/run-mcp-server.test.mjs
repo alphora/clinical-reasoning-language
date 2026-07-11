@@ -31,12 +31,13 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 14 registered (…, validate_provenance, validate_provenance_worklist, generate_provenance)", async () => {
+  await check("MCP tools: 16 registered (+ #205 write-half create_flag / set_flag_status)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
       "authoring_kit",
       "build_crl_ast",
+      "create_flag",
       "emit_cel",
       "emit_cql",
       "emit_crl",
@@ -44,12 +45,59 @@ try {
       "generate_provenance",
       "render_scenario",
       "run_decision",
+      "set_flag_status",
       "tokenize_crl",
       "validate_cel",
       "validate_crl",
       "validate_provenance",
       "validate_provenance_worklist",
     ]);
+  });
+
+  await check("create_flag → authors a concept flag, returns rewritten source + the flag identity", async () => {
+    const code = 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.';
+    const r = await client.callTool({ name: "create_flag", arguments: { code, kind: "concept", name: "C", tag: "validation-concern", gist: "looks off for the customer" } });
+    assert.ok(!r.isError, "not a tool error");
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, true);
+    assert.match(out.source, /- meta is `@validation-concern: looks off for the customer; status open`\./);
+    assert.equal(out.flag.canonicalTag, "validation-concern");
+    assert.equal(out.flag.status, "open");
+  });
+
+  await check("create_flag → the returned flag.fields survives the wire (Map serialized, not {})", async () => {
+    const code = 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.';
+    const r = await client.callTool({ name: "create_flag", arguments: { code, kind: "concept", name: "C", tag: "fidelity-defect", gist: "over-reach", fields: { direction: "over-reach" } } });
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, true);
+    assert.equal(out.flag.fields.direction, "over-reach"); // Map → object over MCP
+  });
+
+  await check("create_flag → library scope authors a library flag", async () => {
+    const code = 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.';
+    const r = await client.callTool({ name: "create_flag", arguments: { code, kind: "library", name: "L", tag: "internal-inconsistency", gist: "sections contradict" } });
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, true);
+    assert.equal(out.flag.scope, "library");
+  });
+
+  await check("create_flag → a missing required field is a typed domain result (not a tool error)", async () => {
+    const code = 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.';
+    const r = await client.callTool({ name: "create_flag", arguments: { code, kind: "concept", name: "C", tag: "fidelity-defect", gist: "over-reach" } });
+    assert.ok(!r.isError, "domain failures are content, not tool errors");
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, false);
+    assert.equal(out.reason, "missing-field");
+  });
+
+  await check("set_flag_status → flips a flag open→resolved by selector; round-trips through create_flag", async () => {
+    const code = 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.';
+    const created = JSON.parse((await client.callTool({ name: "create_flag", arguments: { code, kind: "concept", name: "C", tag: "open-fork", gist: "unsure" } })).content[0].text);
+    const r = await client.callTool({ name: "set_flag_status", arguments: { code: created.source, scope: "concept", name: "C", tag: "open-fork", status: "resolved" } });
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, true);
+    assert.equal(out.changed, true);
+    assert.match(out.source, /; status resolved`\./);
   });
 
   await check("authoring_kit (default = cpg base) → PA-free local-decision-support payload", async () => {
@@ -73,8 +121,8 @@ try {
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
-    assert.equal(kit.schemaVersion, "1.5");
-    assert.equal(kit.contentHash, "746b84a0a2f546f8081aab1173dfbaa4e4b81480b622f211585d6a6f9cd79924");
+    assert.equal(kit.schemaVersion, "1.8"); // updated through Todo 6 (1.6) / Piece 1 (1.7) / #207 (1.8)
+    assert.equal(kit.contentHash, "61929405e3e723cc0df362b6072e0cfe099cbee4c2f8d6e88ac1d877a3b9f19a");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.
@@ -89,9 +137,9 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.useCase, "prior-auth");
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    assert.equal(kit.schemaVersion, "1.5");
+    assert.equal(kit.schemaVersion, "1.8");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "3dd25589a5467070182dd7f8d1fa8927e8a441a77fc2b920983b045775a3e744");
+    assert.equal(kit.contentHash, "69c689dacb39e3a762b1ee8f0241238957d54d9f9337132456b1af452a7e3a44");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.equal(refNames.length, 11); // shared medical-policy-determination.crl removed (config-driven local activities)
     assert.ok(!refNames.includes("medical-policy-determination.crl"));

@@ -13,12 +13,12 @@ import {
   buildCRL,
   collectFlags,
   conceptDeclRef,
+  createFlag,
   flagTags,
+  hasForbiddenFlagChars,
   nodeKey,
   parseMetaTag,
-  resolveMetaInsertion,
   rewriteMetaStatus,
-  validateCRL,
   type CorrespondenceModel,
   type CrlConceptNode,
   type ConceptShapeIndex,
@@ -2372,27 +2372,25 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const gist = await vscode.window.showInputBox({
       placeHolder: "one-line gist (the rich detail goes in the linked issue, not here)",
       prompt: `@${tag.id} on "${target.name}"`,
-      validateInput: (v) => (/[`\r\n]/.test(v) ? "no backticks or newlines in the gist" : v.includes(";") ? "no `;` — it delimits fields" : v.trim() === "" ? "a gist is required" : undefined),
+      validateInput: (v) => (hasForbiddenFlagChars(v) ? "no backtick, newline, or `;` in the gist" : v.trim() === "" ? "a gist is required" : undefined),
     });
     if (gist === undefined) return; // Esc
-    const fieldParts: string[] = [];
+    const fields: Record<string, string> = {};
     for (const rule of tag.fields.filter((f) => f.required)) {
       let value: string | undefined;
       if (rule.values && rule.values.length) {
         value = (await vscode.window.showQuickPick(rule.values.map((v) => ({ label: v })), { placeHolder: `${rule.key} (required)` }))?.label;
       } else {
-        value = await vscode.window.showInputBox({ prompt: `${rule.key} (required)`, validateInput: (v) => (/[`\r\n;]/.test(v) ? "no backtick / newline / semicolon" : v.trim() === "" ? "required" : undefined) });
+        value = await vscode.window.showInputBox({ prompt: `${rule.key} (required)`, validateInput: (v) => (hasForbiddenFlagChars(v) ? "no backtick / newline / semicolon" : v.trim() === "" ? "required" : undefined) });
       }
       if (value === undefined) return; // cancelled a required field → abort cleanly
-      fieldParts.push(`; ${rule.key} ${value.trim()}`);
+      fields[rule.key] = value.trim();
     }
     if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — flag not added");
-    const body = `@${tag.id}: ${gist.trim()}${fieldParts.join("")}; status open`;
     // Open the target + RE-READ its LIVE text NOW — the user may have edited the buffer during the tag/gist/field
-    // prompts (an edit doesn't bump indexVersion until save+rebuild), so `decl.source` (read pre-prompt in
-    // findDeclaration) can be stale. Resolve + validate against exactly the text we're about to edit (gpt55 impl
-    // review [critical]: never apply a slot computed off a pre-prompt snapshot). This mirrors writeFlagStatus's
-    // re-read-the-live-line discipline for the write-back.
+    // prompts (an edit doesn't bump indexVersion until save+rebuild), so a pre-prompt snapshot could be stale. Build +
+    // validate + place the flag via the SHARED #205 `createFlag` transform (the same atom the create_flag MCP tool uses,
+    // extracted so the two can't drift). The cockpit keeps its live-doc re-read + EOL/EOF-aware minimal WorkspaceEdit.
     let doc: vscode.TextDocument;
     try {
       doc = await vscode.workspace.openTextDocument(decl.filePath);
@@ -2400,35 +2398,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       return flagNote("couldn't open the .crl");
     }
     if (indexVersion !== ver || currentCel !== cel) return flagNote("policy changed — flag not added");
-    const liveText = doc.getText();
-    // Re-find the declaration in the LIVE text — its line may have moved. Parse + locate (kind, name, lib) again.
-    const reparsed = buildCRL(liveText);
-    if (!reparsed.success || !reparsed.result || reparsed.result.library?.name !== target.lib) return flagNote("the .crl changed — reopen the menu");
-    const astType = target.kind === "concept" ? "Concept" : "Decision";
-    const declNode = reparsed.result.statements.find((s) => s.type === astType && (s as { name?: string }).name === target.name);
-    if (!declNode) return flagNote("the .crl changed — reopen the menu");
-    const res = resolveMetaInsertion(liveText, { kind: target.kind, declLine: declNode.location.start.line });
-    if (!res.ok) return flagNote("couldn't resolve the insertion point");
-    const newLine = `${res.indent}- meta is \`${body}\`.`;
-    // Pre-VALIDATE the prospective source before writing — never author a flag that would red-squiggle. The SLOT is
-    // proven grammar-legal by the primitive's round-trip, and the gist is sanitized (no backtick/newline/`;`), but the
-    // body is built from arbitrary user input — validate the whole doc and abort on any NEW error the insert introduces
-    // (gpt55 impl review [important]).
-    const beforeErrs = (validateCRL(liveText).errors ?? []).length;
-    const lines = liveText.split(/\r?\n/);
-    lines.splice(res.insertLine, 0, newLine);
-    const afterErrs = validateCRL(lines.join("\n")).errors ?? [];
-    if (afterErrs.length > beforeErrs) return flagNote(`the flag would be invalid (${(afterErrs[afterErrs.length - 1] as { kind?: string }).kind ?? "error"}) — not added`);
+    const made = createFlag(doc.getText(), { kind: target.kind, name: target.name, library: target.lib }, { tag: tag.id, gist: gist.trim(), fields, status: "open" });
+    if (!made.ok) return flagNote(`flag not added: ${made.message}`);
     const eol = doc.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n"; // preserve the doc's line ending (CRLF `.crl` files)
     const edit = new vscode.WorkspaceEdit();
-    // EOF case: resolveMetaInsertion can legally return insertLine === lineCount (a concept as the LAST statement, no
-    // trailing newline). Position(lineCount, 0) clamps to the end of the last line, so `newLine + eol` would concatenate
-    // ONTO it (`- type is X.- meta is …`). Insert at end-of-last-line with a LEADING eol instead (Claude impl review
-    // [important]). This matches the string-splice model the pre-validate above ran on.
-    if (res.insertLine >= doc.lineCount) {
-      edit.insert(doc.uri, doc.lineAt(doc.lineCount - 1).range.end, eol + newLine);
+    // EOF case: insertLine can legally === lineCount (a concept as the LAST statement, no trailing newline).
+    // Position(lineCount, 0) clamps to the end of the last line, so `lineText + eol` would concatenate ONTO it — insert
+    // at end-of-last-line with a LEADING eol instead (Claude impl review). A point insert keeps cursor/undo stable.
+    if (made.insertLine >= doc.lineCount) {
+      edit.insert(doc.uri, doc.lineAt(doc.lineCount - 1).range.end, eol + made.lineText);
     } else {
-      edit.insert(doc.uri, new vscode.Position(res.insertLine, 0), newLine + eol);
+      edit.insert(doc.uri, new vscode.Position(made.insertLine, 0), made.lineText + eol);
     }
     if (!(await vscode.workspace.applyEdit(edit))) return flagNote("edit could not be applied");
     // The insert is now in the live buffer regardless of save. Refresh from it (loadFlags reads crlText = the live

@@ -758,23 +758,22 @@ check("#203 Slice B: findDeclaration re-parses src/crl (live-buffer via crlText)
   assert.match(m[1], /parsed\.result\.library\?\.name !== lib/); // match the declaring library
   assert.match(m[1], /declLine: decl\.location\.start\.line/);
 });
-check("#203 Slice B: addFlagAtNode — flagTags (validation-concern first), SANITIZED gist, registry-driven required fields, resolveMetaInsertion + WorkspaceEdit insert + save, ver/cel guard, reload+badges", () => {
+check("#203 Slice B / #205: addFlagAtNode is a THIN SHIM over the shared createFlag transform (verdict-first pick, registry fields, live-doc re-read, EOL/EOF WorkspaceEdit, ver/cel guard, reload+badges)", () => {
   const m = COCKPIT_SRC.match(/async function addFlagAtNode\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "addFlagAtNode body");
   assert.match(m[1], /flagTags\(\)/);
   assert.match(m[1], /a\.id === "validation-concern" \? -1/); // ordered validation-concern first
-  assert.match(m[1], /no backticks or newlines in the gist/); // sanitization
-  assert.match(m[1], /no `;` — it delimits fields/);
+  assert.match(m[1], /hasForbiddenFlagChars\(v\)/); // SHARED sanitization predicate (cockpit + createFlag can't drift)
   assert.match(m[1], /tag\.fields\.filter\(\(f\) => f\.required\)/); // registry-driven required fields
   assert.match(m[1], /rule\.values && rule\.values\.length/); // enum → quick-pick
-  // Byte-safety: re-READ the live doc, re-FIND the decl, and resolve against liveText (NOT the pre-prompt snapshot).
-  assert.match(m[1], /const liveText = doc\.getText\(\)/);
-  assert.match(m[1], /resolveMetaInsertion\(liveText, \{ kind: target\.kind, declLine: declNode\.location\.start\.line \}\)/);
-  assert.match(m[1], /afterErrs\.length > beforeErrs/); // pre-validate: abort if the insert introduces a NEW error
+  assert.match(m[1], /fields\[rule\.key\] = value\.trim\(\)/); // fields collected into a Record for createFlag
+  // #205: the build/find/resolve/validate is the SHARED transform — the cockpit calls it against the LIVE doc text.
+  assert.match(m[1], /createFlag\(doc\.getText\(\), \{ kind: target\.kind, name: target\.name, library: target\.lib \}, \{ tag: tag\.id, gist: gist\.trim\(\), fields, status: "open" \}\)/);
+  assert.match(m[1], /if \(!made\.ok\) return flagNote/); // typed-reason surfacing
   assert.match(m[1], /doc\.eol === vscode\.EndOfLine\.CRLF \? "\\r\\n" : "\\n"/); // preserve the doc EOL
-  assert.match(m[1], /res\.insertLine >= doc\.lineCount/); // EOF-safe: last-statement/no-trailing-newline slot
-  assert.match(m[1], /doc\.lineAt\(doc\.lineCount - 1\)\.range\.end, eol \+ newLine/); // leading-eol insert at EOF
-  assert.match(m[1], /edit\.insert\(doc\.uri, new vscode\.Position\(res\.insertLine, 0\)/);
+  assert.match(m[1], /made\.insertLine >= doc\.lineCount/); // EOF-safe using the transform's insertLine
+  assert.match(m[1], /doc\.lineAt\(doc\.lineCount - 1\)\.range\.end, eol \+ made\.lineText/); // leading-eol insert at EOF
+  assert.match(m[1], /edit\.insert\(doc\.uri, new vscode\.Position\(made\.insertLine, 0\), made\.lineText \+ eol\)/);
   assert.match(m[1], /const saved = await doc\.save\(\)/);
   assert.match(m[1], /indexVersion !== ver \|\| currentCel !== cel/); // retarget guard (mirrors the write-back)
   assert.match(m[1], /loadFlags\(\);[\s\S]*renderTreeChrome\(\);[\s\S]*driveFlagBadges\(\)/); // refresh: reload + chrome + badges

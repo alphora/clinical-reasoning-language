@@ -18,7 +18,9 @@ import { emitCrlTwoLane } from "../emit-two-lane";
 import { emitFhirDefFromPath } from "../fhir-emitter";
 import type { ImportDiagnostic } from "../imports/types";
 import { validateCRLImports } from "../imports/validate";
-import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "../index";
+import { tokenizeCRL, buildCRL, validateCRL, emitCQL, createFlag, setFlagStatus } from "../index";
+import type { CreateFlagInput, CreateFlagTarget, FlagSelector } from "../index";
+import type { FlagStatus } from "../refactors/rewriteMetaStatus";
 import { validateProvenanceFiles, generateProvenanceFiles } from "../provenance";
 
 // Caps the CRL SOURCE (input) size. Response size scales with this — there is
@@ -799,7 +801,104 @@ export function createServer(): McpServer {
       ),
   );
 
+  server.registerTool(
+    "create_flag",
+    {
+      title: "Create a review flag (#205 crl-refactors)",
+      description:
+        "Author a REVIEW FLAG — a `- meta is `@<tag>: <gist>; <fields>; status <status>`.` line — on a concept, decision, " +
+        "or library in a `.crl`, at the grammar-legal meta slot. This is the write-half of the CRL-source API (#205): a " +
+        "safe, meaning-aware source edit. Pass exactly one of `code` (inline CRL) or `path` (a .crl file — READ only; the " +
+        "tool NEVER writes files), plus the target + flag. `kind` is concept|decision|library; `name` is that node's name " +
+        "(for library, the library name). `tag` must be a registered flag tag (aliases are canonicalized); `gist` is the " +
+        "one-line summary (rich detail belongs in a linked issue via `fields.ref`). `fields` supplies extra `; key value` " +
+        "fields — any registry-REQUIRED field (e.g. `@fidelity-defect` needs `direction`) is enforced, and enum fields are " +
+        "checked. `status` defaults to `open`. Returns { success, source, insertLine, lineText, flag } on success — `source` " +
+        "is the rewritten CRL (the caller applies it); `flag` is the created flag's identity (a selector for set_flag_status). " +
+        "On a domain failure returns { success:false, reason, message, diagnostics? } (reason: unknown-tag | missing-field | " +
+        "invalid-value | decl-not-found | resolve-failed | invalid-result | parse-failed) — NEVER emits invalid CRL. Bad " +
+        "tool args (missing `tag`/`name`/`gist`/`kind`, or both/neither of code|path) come back as a tool error.",
+      inputSchema: {
+        ...inputSchema,
+        kind: z.enum(["concept", "decision", "library"]).describe("The kind of object the flag goes on."),
+        name: z.string().min(1).describe("The concept/decision name — or, for kind=library, the library name."),
+        library: z.string().optional().describe("The declaring library name (optional; a .crl declares exactly one). Ignored for kind=library."),
+        tag: z.string().min(1).describe("The flag tag id (e.g. `validation-concern`, `fidelity-defect`); aliases are canonicalized."),
+        gist: z.string().min(1).describe("The one-line gist. No backtick, newline, or `;`."),
+        fields: z.record(z.string(), z.string()).optional().describe("Extra `; key value` fields (e.g. { direction: 'over-reach', ref: '#203' }). Required fields for the tag are enforced."),
+        status: z.enum(["open", "resolved"]).optional().describe("The `; status` (default `open`)."),
+      },
+    },
+    (args) => runCreateFlag(args as CreateFlagArgs),
+  );
+
+  server.registerTool(
+    "set_flag_status",
+    {
+      title: "Set a review flag's status (#205 crl-refactors)",
+      description:
+        "Flip the `; status` of ONE review flag (open↔resolved) in a `.crl`, located by a selector. The write-half " +
+        "counterpart to create_flag (#205). Pass exactly one of `code`/`path` (READ only; never writes files), the " +
+        "selector, and `status` (the NEXT status). Selector: `scope` (concept|decision|library) + `name` + `tag` " +
+        "(canonicalized) uniquely identify the flag when there is one such flag on the node; pass `key` to disambiguate " +
+        "two same-tag flags, and `library` if you want to require a specific declaring library. Returns { success, source, " +
+        "changed, flag } — `changed:false` means it was already at that status (source unchanged; a sweeper can skip the " +
+        "write). On failure: { success:false, reason, message, candidates? } (reason: not-found | ambiguous | parse-failed " +
+        "| invalid-result). `ambiguous` returns the matching `candidates` (their line/status/key/gist) so the caller can " +
+        "pass a distinguishing key. Bad tool args come back as a tool error.",
+      inputSchema: {
+        ...inputSchema,
+        scope: z.enum(["concept", "decision", "library"]).describe("The scope the flag is on."),
+        name: z.string().min(1).describe("The concept/decision name — or, for scope=library, the library name."),
+        library: z.string().optional().describe("Require this declaring library (optional)."),
+        tag: z.string().min(1).describe("The flag tag id (canonicalized)."),
+        key: z.string().optional().describe("The `; key` value, to disambiguate two same-tag flags on one node."),
+        status: z.enum(["open", "resolved"]).describe("The NEXT status to set."),
+      },
+    },
+    (args) => runSetFlagStatus(args as SetFlagStatusArgs),
+  );
+
   return server;
+}
+
+type CreateFlagArgs = ToolArgs & { kind: CreateFlagTarget["kind"]; name: string; library?: string; tag: string; gist: string; fields?: Record<string, string>; status?: FlagStatus };
+type SetFlagStatusArgs = ToolArgs & { scope: FlagSelector["scope"]; name: string; library?: string; tag: string; key?: string; status: FlagStatus };
+
+/** JSON replacer: a FlagInstance's `fields` is a `Map`, which JSON.stringify would render as `{}` — serialize any Map as
+ *  a plain object so the returned `flag.fields` survives the wire (Claude impl review). */
+function mapReplacer(_key: string, value: unknown): unknown {
+  return value instanceof Map ? Object.fromEntries(value) : value;
+}
+
+/** ok→success envelope: the write tools return `{ success, ...rest }` to match the read tools' `{ success, … }` shape. */
+function writeResult(r: { ok: boolean } & Record<string, unknown>): { content: Array<{ type: "text"; text: string }> } {
+  const { ok, ...rest } = r;
+  return { content: [{ type: "text" as const, text: JSON.stringify({ success: ok, ...rest }, mapReplacer) }] };
+}
+
+/** Run a write transform behind resolveSource + a top-level guard: bad tool input and any UNEXPECTED throw map to an MCP
+ *  `isError` result (the transforms are total, but this makes the never-throws contract real at the tool boundary). */
+function runWrite(args: ToolArgs, apply: (source: string) => { ok: boolean } & Record<string, unknown>): { content: Array<{ type: "text"; text: string }>; isError?: boolean } {
+  let source: string;
+  try {
+    source = resolveSource(args);
+  } catch (e) {
+    return { content: [{ type: "text" as const, text: e instanceof ToolInputError ? e.message : `Unexpected error: ${(e as Error).message}` }], isError: true };
+  }
+  try {
+    return writeResult(apply(source));
+  } catch (e) {
+    return { content: [{ type: "text" as const, text: `Unexpected error: ${(e as Error).message}` }], isError: true };
+  }
+}
+
+function runCreateFlag(args: CreateFlagArgs): { content: Array<{ type: "text"; text: string }>; isError?: boolean } {
+  return runWrite(args, (source) => createFlag(source, { kind: args.kind, name: args.name, library: args.library }, { tag: args.tag, gist: args.gist, fields: args.fields, status: args.status }));
+}
+
+function runSetFlagStatus(args: SetFlagStatusArgs): { content: Array<{ type: "text"; text: string }>; isError?: boolean } {
+  return runWrite(args, (source) => setFlagStatus(source, { scope: args.scope, name: args.name, library: args.library, tag: args.tag, key: args.key }, args.status));
 }
 
 /** Tally diagnostics by `kind` into a plain record (sorted-insertion is irrelevant for an object; JSON readers don't rely on key order). */

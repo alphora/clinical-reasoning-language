@@ -283,6 +283,13 @@ export type { FlagStatus } from "./refactors/rewriteMetaStatus";
 // Instance #2 (#203 Todo 4b Slice B): resolve the insertion point for a NEW `- meta is` line on a concept/decision.
 export { resolveMetaInsertion } from "./refactors/resolveMetaInsertion";
 export type { MetaInsertionResult } from "./refactors/resolveMetaInsertion";
+// Instance #2 CREATE (extracted from the cockpit's embedded Slice-B logic — the #205 payoff): author a review flag on a
+// concept, decision, OR library; the shared atom the MV cockpit Add-flag AND the `create_flag` MCP tool both wrap.
+export { createFlag, FORBIDDEN_FLAG_CHARS, hasForbiddenFlagChars } from "./refactors/createFlag";
+export type { CreateFlagTarget, CreateFlagInput, CreateFlagResult, CreateFlagFailure, SlimDiagnostic } from "./refactors/createFlag";
+// The SOURCE-level status flip (headless `set_flag_status`): locate a flag by selector, apply `rewriteMetaStatus`.
+export { setFlagStatus } from "./refactors/setFlagStatus";
+export type { FlagSelector, FlagCandidate, SetFlagStatusResult, SetFlagStatusFailure } from "./refactors/setFlagStatus";
 
 export interface Token {
   line: number;
