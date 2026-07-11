@@ -35,8 +35,9 @@ The terminating `.` goes **after** the closing backtick: `` - meta is `...`. `` 
 | `@customer-confirmable` | **review flag** — an EXTERNAL-stakeholder ambiguity resolved provisionally, pending a customer/Burton ruling (`; assumption <x>`) | B narrative | human/agent | 0..n |
 | `@internal-inconsistency` | **review flag** (stop-and-flag) — the SOURCE contradicts itself (source-vs-source; distinct from `@fidelity-defect`) | B narrative | human/agent | 0..n |
 | `@open-fork` | **review flag** — an INTERNAL modeling fork encoded one way (`; chosen <b>`) but not settled (`; alternatives <…>`) | B narrative | human/agent | 0..n |
-| `@fidelity-defect` | **review flag** — a known encoding≠source defect; `; direction over-reach\|criterion-drop` (collapses the KE's two `*-to-fix` tags) | B narrative | human/agent | 0..n |
-| `@gap-filed` | a durable POINTER to a filed gap/issue (**not** a review flag — ships fine, no gate); required `; ref <issue>` | B narrative | human | 0..n |
+| `@fidelity-defect` | **extraction flag** — a known encoding≠narrative defect; `; direction over-reach\|criterion-drop` (collapses the KE's two `*-to-fix` tags) | B narrative | human/agent | 0..n |
+| `@validation-concern` | **validation flag** (`category:validation`) — a CRL-vs-CUSTOMER-INTENT concern the four extraction tags don't capture (policy narrative flawed, or an error); free-form gist; optional `; ref` | B narrative | human/agent | 0..n |
+| `@gap-filed` | a durable POINTER to a filed gap/issue (**not** a flag — ships fine, no gate); required `; ref <issue>` | B narrative | human | 0..n |
 
 **Emitted to CQL.** The CQL emitter renders the tags with `emit.cql: true` in the registry as a leading block comment on the concept's `define`: the narrative/deferred tags `@logic-expression-text`, `@crl-future-expression`, `@ke-feedback`, `@business-logic-deferred`, `@clinical-logic-deferred`, `@cql-comment`, **plus the four review-flag tags** `@customer-confirmable`, `@internal-inconsistency`, `@open-fork`, `@fidelity-defect` (Todo 5). Emit is **status-aware** (Todo 5): a tag whose registry `emit.suppressWhenStatus` includes the line's status is NOT emitted — so a `resolved` flag (and a `resolved` `@ke-feedback`) is suppressed while `open`/`deferred`/absent emits. All other tags and untyped notes are not emitted to CQL. Each tagged line keeps its full `@tag: body; …fields` form in the comment (the RAW line, so `; status`/`; direction` survive) **except** `@cql-comment`, whose prefix is stripped so only the body appears. (`@crl-future-expression` additionally surfaces as a structured `futureExpressions` entry on the emit result.)
 
@@ -81,10 +82,12 @@ Replace-eligible tags (family-C + candidate external refs) **require** a `run` s
 
 ## Flags (KE #203)
 
-A **flag** (a tag with `flag: true`) marks a problem that **blocks Medical Validation completion while open**. ONE mechanism, two `category` values by the KEL phase of authorship (see `flagModel` in the registry):
+A **flag** (a tag with `flag: true`) marks a problem that **blocks Medical Validation completion while open**. "Review flag" is the UMBRELLA name for all of them. ONE mechanism, two `category` values — the category is the **REFERENCE POINT** of the fidelity concern (what you're measuring the CRL against), NOT who logged it or when (every flag tag is `origin: either`). The chain is: customer intent → policy narrative → CRL.
 
-- **`category: extraction`** (extraction flag) — authored by the **AI during narrative → CRL extraction**: source-ambiguity (`@customer-confirmable`), source-self-contradiction (`@internal-inconsistency`), an unsettled modeling fork (`@open-fork`), or encoding-infidelity (`@fidelity-defect{direction}`). A **learning signal**.
-- **`category: validation`** (validation flag) — authored by a **human during Medical Validation** (a concern raised while validating). Same behavior; the validation-flag carrier lands with the MV cockpit surface.
+- **`category: extraction`** (an **extraction flag**) — a confidence gap in **CRL-faithful-to-the-POLICY-NARRATIVE** ("did we transform the narrative into CRL faithfully?"): source-ambiguity (`@customer-confirmable`), source-self-contradiction (`@internal-inconsistency`), an unsettled modeling fork (`@open-fork`), encoding-infidelity (`@fidelity-defect{direction}`). Typically the AI's during extraction, but an extraction concern is one **whoever finds it** (a human in MV who spots an over-reach vs the narrative uses `@fidelity-defect`, not a validation flag).
+- **`category: validation`** (a **validation flag**, `@validation-concern`) — a confidence gap that the CRL faithfully represents the **CUSTOMER'S INTENT** ("is the result actually right for the customer?" — the policy narrative itself may be flawed, or there's an error — "whatever") that ISN'T one of the four precise extraction-fidelity types. Free-form (the gist states the concern). Typically raised by a human in MV, but categorized by its reference point, not its author. **The extraction agent does NOT author it, but MUST preserve it** across re-extraction (it's on the registry's never-auto-replace list).
+
+**Choosing a tag:** is the concern about faithfulness to the **narrative** (→ one of the four extraction tags) or to the **customer's intent** the four don't capture (→ `@validation-concern`)?
 
 The mechanics (shared):
 

@@ -217,7 +217,13 @@ describe("#203 Todo 5 — status-aware flag emit", () => {
     // Covers customer-confirmable + internal-inconsistency, which no other behavior test drove through the resolved path.
     const registry = JSON.parse(readFileSync(REGISTRY, "utf-8")) as { tags: { id: string; flag?: boolean }[] };
     const flagIds = registry.tags.filter((t) => t.flag === true).map((t) => t.id);
-    expect(flagIds.sort()).toEqual(["customer-confirmable", "fidelity-defect", "internal-inconsistency", "open-fork"]);
+    expect(flagIds.sort()).toEqual([
+      "customer-confirmable",
+      "fidelity-defect",
+      "internal-inconsistency",
+      "open-fork",
+      "validation-concern",
+    ]);
     for (const id of flagIds) {
       expect(emitWithMeta(`@${id}: probe; status open`)).toContain(`@${id}:`); // open → emits
       expect(emitWithMeta(`@${id}: probe; status resolved`)).not.toContain(`@${id}:`); // resolved → suppressed

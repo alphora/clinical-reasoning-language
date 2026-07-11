@@ -90,8 +90,14 @@ export type { AuthoringEdge, AuthoringKit, AuthoringStage, AuthoringUseCase, Kit
 //   contrast. NO payload-shape change. BOTH useCase hashes re-pin (schemaVersion is in the hashed base AND the
 //   cpg-edge rule/examples inherit into the prior-auth chain). Registry companion: metadata-registry.json v0.3.1
 //   adds the optional `ref` field to the four flag tags (so the taught `; ref` is registry-grounded).
+// "1.6" → "1.7": CONTENT change (KE #203 Piece 1) — the `review-flags` rule gains a phase-boundary + PRESERVATION
+//   clause: the four flags are EXTRACTION concerns (CRL-vs-narrative fidelity); the new `category:validation`
+//   `@validation-concern` (CRL-vs-CUSTOMER-INTENT) is authored by a HUMAN in MV — the extraction agent does NOT
+//   author it but MUST preserve it across re-extraction. Registry companion: metadata-registry.json v0.3.2 adds the
+//   `@validation-concern` tag + the reference-point category discriminator + the reRunReplaceRule preservation entry.
+//   NO payload-shape change. BOTH useCase hashes re-pin.
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.6";
+const SCHEMA_VERSION = "1.7";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -430,7 +436,12 @@ const RULES: KitRule[] = [
       "Keep the `.crl` flag LEAN — a one-line gist + those fields; the RICH detail (the source quote, the options, the " +
       "reasoning) goes in a tracker ISSUE you file AT THE SAME TIME, linked with an optional `; ref #<issue>`. Author flags " +
       "`status open`. An open flag blocks Medical Validation completion. Separately, `@gap-filed` is NOT a flag — it is a " +
-      "durable POINTER to an already-filed gap/issue with a REQUIRED `; ref <issue>`; it ships fine and does not gate.",
+      "durable POINTER to an already-filed gap/issue with a REQUIRED `; ref <issue>`; it ships fine and does not gate. " +
+      "The four above are EXTRACTION flags (your concern: does the CRL faithfully represent the POLICY NARRATIVE?). A " +
+      "separate `@validation-concern` (category validation) is authored by a HUMAN during Medical Validation for a " +
+      "different reference point — does the CRL represent the CUSTOMER'S INTENT? — which you cannot judge from the " +
+      "narrative alone: you do NOT author it, but you MUST PRESERVE any that already exist (never rewrite or drop a " +
+      "human's `@validation-concern` on re-extraction).",
     why:
       "A silent guess buries a narrative→CRL problem inside a green-looking artifact; a flag surfaces it and prevents " +
       "Medical Validation completion while open — the review signal is the point.",
@@ -449,6 +460,13 @@ const RULES: KitRule[] = [
           "`@fidelity-defect` REQUIRES `; direction over-reach|criterion-drop`, and `@gap-filed` REQUIRES `; ref <issue>` — " +
           "a missing required field is a `meta-missing-field` validator error.",
         force: "validator-enforced",
+      },
+      {
+        text:
+          "Do NOT author `@validation-concern` — a HUMAN authors it in Medical Validation (category validation: a " +
+          "CRL-vs-CUSTOMER-INTENT concern). You MUST PRESERVE any that exist: never rewrite or drop a human's " +
+          "`@validation-concern` on re-extraction (it is on the registry's never-auto-replace list for this reason).",
+        force: "default",
       },
     ],
   },

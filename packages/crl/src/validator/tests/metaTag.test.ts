@@ -141,3 +141,58 @@ concept "C":
     expect(kinds(r.errors ?? [])).toContain("meta-invalid-field");
   });
 });
+
+describe("#203 Piece 1 — the @validation-concern (category:validation) flag", () => {
+  const validate = (input: string) => validateCRL(input);
+  const withFlag = (metaLine: string) =>
+    `library "L".\nconcept "C":\n- type is Observation.\n- meta is \`${metaLine}\`.\n- code is \`c\`.\n`;
+
+  it("is a flag, category validation; collectFlags/openFlags include it (gates mvComplete while open)", () => {
+    const b = ast(withFlag("@validation-concern: the policy threshold looks wrong for the customer; status open"));
+    const flags = collectFlags(b);
+    expect(flags.map((f) => `${f.canonicalTag}:${f.category}:${f.status}`)).toContain("validation-concern:validation:open");
+    expect(openFlags(b).map((f) => f.canonicalTag)).toContain("validation-concern"); // open → blocks the gate
+    expect(openFlags(ast(withFlag("@validation-concern: x; status resolved"))).map((f) => f.canonicalTag)).not.toContain(
+      "validation-concern",
+    ); // resolved → clears
+  });
+
+  it("an OPEN @validation-concern raises the open-flag warning (validation still succeeds)", () => {
+    const r = validate(withFlag("@validation-concern: is this what the customer intends?; status open"));
+    expect(r.success).toBe(true);
+    expect(kinds(r.warnings ?? [])).toContain("open-flag");
+  });
+
+  it("takes an OPTIONAL `; ref`, and has NO kind/key required-or-enum field (lean, free-form)", () => {
+    const r = validate(withFlag("@validation-concern: narrative is internally fine but wrong for the customer; status open; ref #207"));
+    expect(kinds(r.errors ?? [])).not.toContain("meta-missing-field");
+    expect(kinds(r.errors ?? [])).not.toContain("meta-invalid-field");
+  });
+});
+
+describe("#203 Piece 1 — registry category invariants (gpt55 design review)", () => {
+  const fs = require("fs") as typeof import("fs");
+  const path = require("path") as typeof import("path");
+  const registry = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "..", "..", "..", "spec", "metadata-registry.json"), "utf-8"),
+  ) as {
+    tags: { id: string; flag?: boolean; category?: string }[];
+    flagModel: { categories: Record<string, unknown> };
+    reRunReplaceRule: string;
+  };
+
+  it("every flagModel category (except the _discriminator note) has ≥1 flag tag; every flag's category is a known key", () => {
+    const categoryKeys = Object.keys(registry.flagModel.categories).filter((k) => !k.startsWith("_"));
+    const flagTags = registry.tags.filter((t) => t.flag === true);
+    for (const key of categoryKeys) {
+      expect(flagTags.some((t) => t.category === key)).toBe(true); // no category documented with zero vocabulary
+    }
+    for (const t of flagTags) {
+      expect(categoryKeys).toContain(t.category); // no flag with an unknown category
+    }
+  });
+
+  it("@validation-concern is on the reRunReplaceRule preservation list (a re-run must not clobber a human's concern)", () => {
+    expect(registry.reRunReplaceRule).toContain("validation-concern");
+  });
+});

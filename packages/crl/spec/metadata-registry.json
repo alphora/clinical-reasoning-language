@@ -1,8 +1,8 @@
 {
   "_about": "CRL metadata-annotation registry — the canonical tag vocabulary, value shapes, cardinality, and lifecycle for `@tag` annotations carried on `- meta is `@tag: <body>`.` lines. Consumed by the (future) Validator; human companion is metadata-model.md in this folder.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "status": "core-stable",
-  "statusNote": "Core vocabulary stable (two design-review rounds). v0.2.0 adds the review-flag tags per KE #203 (additive; two further design-review rounds — disc 220). v0.3.0 (Todo 5): status-aware CQL emit — the 4 flag tags + `@ke-feedback` gain `emit.suppressWhenStatus:[resolved]`; the flags flip `emit.cql:true` + `emit.cqlScopes:[concept]`. v0.3.1 (Todo 6): the 4 flag tags gain an OPTIONAL `ref` field (the tracker-issue link; `@gap-filed`'s ref stays required). ENFORCEMENT (Todo 3 / #154): the Validator now enforces vocabulary (malformed/unknown `@tag` → warning), field shape (required/enum/duplicate), cardinality, and the open-flag warning — via `MetaTagValidator` reading the compile-time-inlined registry. REMAINDER (#154 follow-up): the family-C extraction-exhaust rules (`run`-required, re-run staleness) + the re-add-detection guard are not yet enforced. Ref schemes (kg:/reef:) are illustrative. Renames go through `aliases`.",
+  "statusNote": "Core vocabulary stable (two design-review rounds). v0.2.0 adds the review-flag tags per KE #203 (additive; two further design-review rounds — disc 220). v0.3.0 (Todo 5): status-aware CQL emit — the 4 flag tags + `@ke-feedback` gain `emit.suppressWhenStatus:[resolved]`; the flags flip `emit.cql:true` + `emit.cqlScopes:[concept]`. v0.3.1 (Todo 6): the 4 flag tags gain an OPTIONAL `ref` field (the tracker-issue link; `@gap-filed`'s ref stays required). v0.3.2 (Piece 1, #203): adds the `category:validation` flag `@validation-concern` (CRL-faithful-to-CUSTOMER-INTENT, the residual) + rewrites `flagModel.categories` to the REFERENCE-POINT discriminator (not author) + adds `validation-concern` to the reRunReplaceRule preservation list. ENFORCEMENT (Todo 3 / #154): the Validator now enforces vocabulary (malformed/unknown `@tag` → warning), field shape (required/enum/duplicate), cardinality, and the open-flag warning — via `MetaTagValidator` reading the compile-time-inlined registry. REMAINDER (#154 follow-up): the family-C extraction-exhaust rules (`run`-required, re-run staleness) + the re-add-detection guard are not yet enforced. Ref schemes (kg:/reef:) are illustrative. Renames go through `aliases`.",
   "carrier": {
     "element": "meta",
     "rendering": "- meta is `@<tag>: <body>`.",
@@ -20,8 +20,9 @@
   "flagModel": {
     "_about": "A `flag` (a tag with `flag: true`) is a narrative->CRL problem or a validation concern that BLOCKS Medical Validation completion while open. ONE mechanism; two categories by origin (KE #203, disc 220).",
     "categories": {
-      "extraction": "an EXTRACTION flag — authored by the AI during narrative->CRL extraction (source-ambiguity / source-contradiction / unsettled fork / encoding-infidelity). The tags: customer-confirmable, internal-inconsistency, open-fork, fidelity-defect.",
-      "validation": "a VALIDATION flag — authored by a HUMAN during Medical Validation (a concern raised while validating). Same behavior as an extraction flag; the validation-flag carrier + tag land with the MV cockpit surface (Todo 4)."
+      "_discriminator": "The category is the REFERENCE POINT of the fidelity concern, NOT who logged it or when (every flag tag is `origin: either`). Chain: customer intent -> policy narrative -> CRL. EXTRACTION = confidence gap in CRL-faithful-to-the-POLICY-NARRATIVE (did we transform the narrative into CRL faithfully?). VALIDATION = confidence gap in CRL-faithful-to-the-CUSTOMER'S-INTENT (is the result actually right for the customer? — broader: the narrative itself may be flawed, or there's an error). RULE: if the concern is one of the four precise narrative-fidelity types, use THAT tag regardless of who found it; reach for @validation-concern only for a customer-intent concern the four don't capture.",
+      "extraction": "an EXTRACTION flag — a confidence gap in the narrative->CRL transformation (the CRL may not faithfully represent the POLICY as written): source-ambiguity / source-contradiction / unsettled fork / encoding-infidelity. Tags: customer-confirmable, internal-inconsistency, open-fork, fidelity-defect. (`origin: either` — an extraction concern is an extraction concern whoever finds it, incl. a human in MV.)",
+      "validation": "a VALIDATION flag — a confidence gap that the resulting CRL faithfully represents the CUSTOMER'S INTENT (whether the policy narrative itself is flawed, or there's an error — 'whatever'), that ISN'T one of the four precise extraction-fidelity types. Tag: validation-concern. Typically raised by a human during Medical Validation, but categorized by its reference point (customer intent), not its author."
     },
     "status": "open | resolved (NO deferred). `open` blocks mvComplete + emits; `resolved` persists (learning signal) + does not emit.",
     "mvComplete": "the real gate: mvComplete = (every MV case is `pass`) AND (no `open` flags). Resolved flags do NOT block it. Surfaced in the MV cockpit (Todo 4).",
@@ -325,6 +326,27 @@
       "emit": { "cql": false, "fhir": false },
       "plannedEmit": { "cql": true, "condition": "emit as a CQL block comment — a visible tracked gap, like @business-logic-deferred. Todo 4." },
       "notes": "A durable POINTER to a filed gap/issue — NOT a flag (no `flag`, no `warnWhileOpen`, no `status`; does not block mvComplete): a filed gap is managed work that ships fine (like `// TODO(#123)`). Requires `; ref <issue>`. Covers the KE's @stage-boundary case when the gap is FILED; the un-filed 'stage/language can't express this' cases REUSE @crl-future-expression (language limit) / @business-logic-deferred / @clinical-logic-deferred (deferred logic)."
+    },
+    {
+      "id": "validation-concern",
+      "aliases": [],
+      "family": "B-narrative",
+      "flag": true,
+      "category": "validation",
+      "valueShape": "text",
+      "extraFields": {
+        "status": { "type": "enum", "values": ["open", "resolved"], "default": "open", "note": "open (blocks mvComplete; emits) | resolved (persists as a learning signal; no emit). MV transitions open<->resolved only; the `resolved`->deleted step is the separate learning system." },
+        "ref": { "type": "string", "required": false, "note": "OPTIONAL pointer to the rich-detail tracker issue (see @customer-confirmable ref)." }
+      },
+      "cardinality": "0..n",
+      "attachmentTargets": ["concept", "decision", "library"],
+      "origin": "either",
+      "retention": "inline",
+      "lifecycle": "append",
+      "lifecycleNote": "status open -> resolved (in MV; durable tombstone). PRESERVED across re-extraction (see reRunReplaceRule) — an AI re-run must NEVER clobber a human's validation concern.",
+      "warnWhileOpen": true,
+      "emit": { "cql": true, "fhir": false, "suppressWhenStatus": ["resolved"], "cqlScopes": ["concept"], "condition": "open emits; resolved suppresses. Concept scope only; decision emit = #206 (FHIR .meta), library = gate-only. Emitter MUST sanitize */." },
+      "notes": "VALIDATION FLAG. A confidence gap that the CRL faithfully represents the CUSTOMER'S INTENT — the narrative itself may be flawed, or there's an error ('whatever') — that ISN'T one of the four precise extraction-fidelity types. FREE-FORM: the gist states the concern (no `kind`/`key` — a residual concern is free-form, and nothing re-adds it). Distinguished from the extraction flags by REFERENCE POINT (customer intent vs the narrative), NOT author: an over-reach vs the NARRATIVE stays @fidelity-defect even when a human finds it in MV. If a triage axis is ever needed, add an OPTIONAL one-axis `; kind` later."
     }
   ],
   "validatorRules": [
@@ -341,5 +363,5 @@
     "@gap-filed without a `ref` -> error (a filed gap needs its issue id)",
     "flags use status open|resolved ONLY -> a flag with status=deferred is an error (deferred/tracked work is @gap-filed or @business-logic-deferred, not a flag)"
   ],
-  "reRunReplaceRule": "On re-extraction, the producer replaces the prior run's family-C tags (semantic-parse-text) and candidate (status=candidate) external refs for a concept, matched by by/run. Confirmed refs and family-B durable tags (id, description, ke-feedback, logic-expression-text, controlled-natural-language, crl-future-expression, business-logic-deferred, clinical-logic-deferred, cql-comment, customer-confirmable, internal-inconsistency, open-fork, fidelity-defect, gap-filed) are never auto-replaced. Refs with status=rejected or status=superseded are durable historical records (preserved across re-runs so negative review work isn't lost). FLAG RE-ADD GUARD (`flag:true`): a resolved flag tombstone is durable; on re-extraction the producer MUST NOT re-add a review flag whose `key` matches an existing status=resolved tombstone on the same target — matched by (tag id + attachment `@id` + `key`, where `key` is a normalized source-span/hash). Prevents a persistent source contradiction from re-opening a flag the human already resolved."
+  "reRunReplaceRule": "On re-extraction, the producer replaces the prior run's family-C tags (semantic-parse-text) and candidate (status=candidate) external refs for a concept, matched by by/run. Confirmed refs and family-B durable tags (id, description, ke-feedback, logic-expression-text, controlled-natural-language, crl-future-expression, business-logic-deferred, clinical-logic-deferred, cql-comment, customer-confirmable, internal-inconsistency, open-fork, fidelity-defect, gap-filed, validation-concern) are never auto-replaced — @validation-concern especially: an AI re-extraction must NEVER clobber a human's Medical-Validation concern. Refs with status=rejected or status=superseded are durable historical records (preserved across re-runs so negative review work isn't lost). FLAG RE-ADD GUARD (`flag:true`): a resolved flag tombstone is durable; on re-extraction the producer MUST NOT re-add a review flag whose `key` matches an existing status=resolved tombstone on the same target — matched by (tag id + attachment `@id` + `key`, where `key` is a normalized source-span/hash). Prevents a persistent source contradiction from re-opening a flag the human already resolved."
 }

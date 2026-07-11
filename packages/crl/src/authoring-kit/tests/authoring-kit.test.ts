@@ -304,7 +304,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.6");
+    expect(kit.schemaVersion).toBe("1.7");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -665,8 +665,11 @@ describe("authoring-kit — getAuthoringKit", () => {
     // KE #203 Todo 6 (schemaVersion 1.5→1.6): the `review-flags` rule (cpg/process) + 3 examples were added; BOTH
     // hashes move (schemaVersion is in the hashed base AND the cpg-edge rule/examples inherit into the prior-auth
     // chain). KE seats re-sync both pins on the bump.
-    expect(cpg.contentHash).toBe("bec3c80d9f319a108d1d5939bd3a9c457e102483440e8070038822aa375784f5");
-    expect(priorAuth.contentHash).toBe("089ab86e7626c46a0e472ae926272ab0e18c4d6e3fbe3320f9acce6beac2b597");
+    // KE #203 Piece 1 (schemaVersion 1.6→1.7): the `review-flags` rule gained a phase-boundary + preservation clause
+    // for the new `category:validation` `@validation-concern`. BOTH hashes move (schemaVersion is hashed + the cpg-edge
+    // rule inherits into prior-auth). KE seats re-sync both pins on the bump (the SINGLE re-pin — full working set).
+    expect(cpg.contentHash).toBe("edf4deafcb7db72f5a09f3c407effd97479716512f7ff5c6369e57d8f1b517df");
+    expect(priorAuth.contentHash).toBe("311523cdb8f86cd68794d6b82129acb9dbb2b7fd28019f8e33a33bf799b0b56e");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
