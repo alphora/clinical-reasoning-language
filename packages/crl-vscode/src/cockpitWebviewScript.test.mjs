@@ -632,7 +632,7 @@ check("#217 webview: the render handler stamps the LIVE mode onto document.body.
   assert.ok(/if\(m\.mode\)document\.body\.dataset\.mode=m\.mode/.test(SCRIPT), "render carries + stamps mode (a static body stamp would go stale across a retarget)");
 });
 check("#217 host: nodeVerdictMenu is routed, normalizes the hit to a SEMANTIC key, resolves via the shared reach, never uses the raw reveal key", () => {
-  assert.ok(/msg\.type === "nodeVerdictMenu"[\s\S]*nodeVerdictMenu\(msg\.key\)/.test(COCKPIT_SRC), "routed from the nodeVerdictMenu message");
+  assert.ok(/msg\.type === "nodeVerdictMenu"[\s\S]*nodeMenu\(msg\.key\)/.test(COCKPIT_SRC), "routed from the nodeVerdictMenu message → the combined nodeMenu (#203 Slice B)");
   const m = COCKPIT_SRC.match(/async function nodeVerdictMenu\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "nodeVerdictMenu body");
   assert.ok(/tree\?\.reveals\[revealKey\]/.test(m[1]), "looks the opaque reveal key up in the tree reveals (never passes it raw to the resolver)");
@@ -731,6 +731,54 @@ check("#203 Slice A host: driveFlagBadges is re-driven on tree ack + rebuild + t
 check("#203 Slice A host: the tree render captures conceptOccurrences + flaggableGids atomically with the anchors", () => {
   assert.match(COCKPIT_SRC, /v\.conceptOccurrences = r\.conceptOccurrences;/);
   assert.match(COCKPIT_SRC, /v\.flaggableGids = r\.flaggableGids;/);
+});
+
+// ── #203 Todo 4b Slice B: create-flag ──
+check("#203 Slice B: the right-click routes to the COMBINED nodeMenu; a non-flaggable node → straight to the verdict pick", () => {
+  const m = COCKPIT_SRC.match(/async function nodeMenu\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "nodeMenu body");
+  assert.match(m[1], /const target = flaggableTarget\(hit\)/);
+  assert.match(m[1], /if \(!target\) return nodeVerdictMenu\(revealKey\)/); // non-flaggable → verdict only, unchanged
+  assert.match(m[1], /Set case verdict/); assert.match(m[1], /Add flag/);
+  assert.match(m[1], /const ver = indexVersion;/); // ver/cel captured BEFORE the menu (retarget-mid-menu safety)
+  assert.match(m[1], /addFlagAtNode\(target, ver, cel\)/);
+});
+check("#203 Slice B: flaggableTarget resolves a decision via crlStructure.nodeKey, a when/def-leaf via the Slice A conceptOccurrences gid", () => {
+  const m = COCKPIT_SRC.match(/function flaggableTarget\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "flaggableTarget body");
+  assert.match(m[1], /crlStructure\.find\(\(s\) => s\.nodeKey === hit\.nodeKey\)/); // decision root
+  assert.match(m[1], /tree\.anchors\[anchorKey\]\?\.scrollTo/); // anchor → gid
+  assert.match(m[1], /tree\.conceptOccurrences\.find\(\(o\) => o\.gid === gid\)/); // gid → concept (Slice A substrate)
+});
+check("#203 Slice B: findDeclaration re-parses src/crl (live-buffer via crlText), matching (name, lib) in the declaring library", () => {
+  const m = COCKPIT_SRC.match(/function findDeclaration\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "findDeclaration body");
+  assert.match(m[1], /readdirSync\(join\(src, "crl"\)\)/);
+  assert.match(m[1], /crlText\(filePath\)/); // live-buffer-aware
+  assert.match(m[1], /parsed\.result\.library\?\.name !== lib/); // match the declaring library
+  assert.match(m[1], /declLine: decl\.location\.start\.line/);
+});
+check("#203 Slice B: addFlagAtNode — flagTags (validation-concern first), SANITIZED gist, registry-driven required fields, resolveMetaInsertion + WorkspaceEdit insert + save, ver/cel guard, reload+badges", () => {
+  const m = COCKPIT_SRC.match(/async function addFlagAtNode\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "addFlagAtNode body");
+  assert.match(m[1], /flagTags\(\)/);
+  assert.match(m[1], /a\.id === "validation-concern" \? -1/); // ordered validation-concern first
+  assert.match(m[1], /no backticks or newlines in the gist/); // sanitization
+  assert.match(m[1], /no `;` — it delimits fields/);
+  assert.match(m[1], /tag\.fields\.filter\(\(f\) => f\.required\)/); // registry-driven required fields
+  assert.match(m[1], /rule\.values && rule\.values\.length/); // enum → quick-pick
+  // Byte-safety: re-READ the live doc, re-FIND the decl, and resolve against liveText (NOT the pre-prompt snapshot).
+  assert.match(m[1], /const liveText = doc\.getText\(\)/);
+  assert.match(m[1], /resolveMetaInsertion\(liveText, \{ kind: target\.kind, declLine: declNode\.location\.start\.line \}\)/);
+  assert.match(m[1], /afterErrs\.length > beforeErrs/); // pre-validate: abort if the insert introduces a NEW error
+  assert.match(m[1], /doc\.eol === vscode\.EndOfLine\.CRLF \? "\\r\\n" : "\\n"/); // preserve the doc EOL
+  assert.match(m[1], /res\.insertLine >= doc\.lineCount/); // EOF-safe: last-statement/no-trailing-newline slot
+  assert.match(m[1], /doc\.lineAt\(doc\.lineCount - 1\)\.range\.end, eol \+ newLine/); // leading-eol insert at EOF
+  assert.match(m[1], /edit\.insert\(doc\.uri, new vscode\.Position\(res\.insertLine, 0\)/);
+  assert.match(m[1], /const saved = await doc\.save\(\)/);
+  assert.match(m[1], /indexVersion !== ver \|\| currentCel !== cel/); // retarget guard (mirrors the write-back)
+  assert.match(m[1], /loadFlags\(\);[\s\S]*renderTreeChrome\(\);[\s\S]*driveFlagBadges\(\)/); // refresh: reload + chrome + badges
+  assert.match(m[1], /saved \? .* : .*it's unsaved/); // honest save-fail message (flag inserted-but-dirty, not "not added")
 });
 
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);

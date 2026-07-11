@@ -13,9 +13,12 @@ import {
   buildCRL,
   collectFlags,
   conceptDeclRef,
+  flagTags,
   nodeKey,
   parseMetaTag,
+  resolveMetaInsertion,
   rewriteMetaStatus,
+  validateCRL,
   type CorrespondenceModel,
   type CrlConceptNode,
   type ConceptShapeIndex,
@@ -1709,7 +1712,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     } else if (msg.type === "worklistSet" && typeof msg.key === "string") {
       setWorklist(msg.key, msg.value); // #156 slice 4: a worklist dropdown change (MV mode) — host validates + persists it
     } else if (msg.type === "nodeVerdictMenu" && typeof msg.key === "string") {
-      void nodeVerdictMenu(msg.key); // #217: a right-click on a flow node (MV) — open a verdict quick-pick for its case(s)
+      void nodeMenu(msg.key); // #217 + #203 Todo 4b Slice B: right-click a flow node (MV) — combined menu (verdict / add-flag); a non-flaggable node routes straight to the verdict pick
     } else if (msg.type === "worklistFilterToggle") {
       toggleWorklistFilter(msg.state); // #214: toggle a verdict in/out of the worklist filter (host validates the state)
     } else if (msg.type === "notesToggle" && typeof msg.key === "string") {
@@ -2238,6 +2241,166 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const caseIds = caseIdsForNodeThroughLit(semanticKey, entries);
     if (caseIds.length === 0) return note("no reviewable cases run through this node");
     await pickVerdictLoop(caseIds, ver, sidecar);
+  }
+
+  // ── #203 Todo 4b Slice B: create-flag ────────────────────────────────────────────
+  // Right-click a FLAGGABLE node → a combined menu (Set verdict / Add flag). A flag lives on a concept or decision (the
+  // only meta carriers), so the target is: a decision ROOT (→ the decision) or a `when`/def-leaf (→ its concept, resolved
+  // via the Slice A conceptOccurrences the render captured). An action/otherwise node has no meta target → no Add-flag.
+
+  /** Resolve a reveal hit → the concept/decision a flag would attach to, or undefined (non-flaggable). */
+  function flaggableTarget(hit: WebviewHit): { kind: "concept" | "decision"; name: string; lib: string } | undefined {
+    const tree = views.get("tree");
+    if (!tree) return undefined;
+    // A decision ROOT: its reveal nodeKey is a top-level structure key = a crlStructure entry.
+    if ("nodeKey" in hit) {
+      const d = crlStructure.find((s) => s.nodeKey === hit.nodeKey);
+      if (d) return { kind: "decision", name: d.decision, lib: d.lib };
+    }
+    // A `when` or def-leaf: map its anchor key → gid → the concept occurrence the render recorded (Slice A).
+    const anchorKey = isSubQuestionHit(hit) ? hit.subQuestionLeafKey : "nodeKey" in hit ? hit.nodeKey : undefined;
+    const gid = anchorKey ? tree.anchors[anchorKey]?.scrollTo : undefined;
+    const occ = gid ? tree.conceptOccurrences.find((o) => o.gid === gid) : undefined;
+    return occ ? { kind: "concept", name: occ.name, lib: occ.lib } : undefined;
+  }
+
+  /** Find a concept/decision's DECLARATION (file + 1-based decl line + source) by (name, lib) — re-parses the policy's
+   *  `src/crl/*.crl` (live-buffer-aware), matching the declaring library. The insertion resolver + WorkspaceEdit need it. */
+  function findDeclaration(kind: "concept" | "decision", name: string, lib: string): { filePath: string; declLine: number; source: string } | undefined {
+    if (!currentCel) return undefined;
+    const src = findPolicySrc(currentCel);
+    if (!src) return undefined;
+    let files: string[];
+    try {
+      files = readdirSync(join(src, "crl")).filter((f) => f.toLowerCase().endsWith(".crl")).sort(); // deterministic (match loadFlags)
+    } catch {
+      return undefined;
+    }
+    const astType = kind === "concept" ? "Concept" : "Decision";
+    for (const fname of files) {
+      const filePath = join(src, "crl", fname);
+      const text = crlText(filePath);
+      if (text === undefined) continue;
+      const parsed = buildCRL(text);
+      if (!parsed.success || !parsed.result || parsed.result.library?.name !== lib) continue;
+      const decl = parsed.result.statements.find((s) => s.type === astType && (s as { name?: string }).name === name);
+      if (decl) return { filePath, declLine: decl.location.start.line, source: text };
+    }
+    return undefined;
+  }
+
+  /** The combined node menu (right-click): verdict (existing) + Add-flag (flaggable nodes). A non-flaggable node routes
+   *  straight to the verdict flow (unchanged), preserving Todo #217. */
+  async function nodeMenu(revealKey: string): Promise<void> {
+    if (mode !== "medical-validation") return;
+    const tree = views.get("tree");
+    const hit = tree?.reveals[revealKey];
+    if (!tree || !hit) return flagNote("no node here");
+    const target = flaggableTarget(hit);
+    if (!target) return nodeVerdictMenu(revealKey); // action/otherwise → verdict only, unchanged
+    const ver = indexVersion; // capture BEFORE the menu — a retarget mid-menu must not act on this (now-old) hit/target
+    const cel = currentCel;
+    const pick = await vscode.window.showQuickPick(
+      [
+        { label: "$(checklist) Set case verdict…", act: "verdict" as const },
+        { label: "$(flag) Add flag…", act: "flag" as const },
+      ],
+      { placeHolder: `${target.kind} "${target.name}"` },
+    );
+    if (!pick) return;
+    if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — reopen the menu");
+    if (pick.act === "verdict") return nodeVerdictMenu(revealKey); // revealKey is gen-scoped; nodeVerdictMenu re-validates
+    await addFlagAtNode(target, ver, cel);
+  }
+
+  /** Author a flag on `target`: pick a tag (validation-concern first), a sanitized gist, any REGISTRY-required fields
+   *  (fieldRulesOf; enum → quick-pick), then insert a lean `- meta is` line at the grammar-legal slot via a WorkspaceEdit
+   *  + save, and refresh. `ver`/`cel` guard a retarget mid-menu (like the write-back). The vocab is shipped (Piece 1). */
+  async function addFlagAtNode(target: { kind: "concept" | "decision"; name: string; lib: string }, ver: number, cel: string | undefined): Promise<void> {
+    if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return; // findDeclaration reads live currentCel — re-check first (both reviewers [important])
+    const decl = findDeclaration(target.kind, target.name, target.lib);
+    if (!decl) return flagNote(`couldn't locate ${target.kind} "${target.name}" in the .crl`);
+    const tags = flagTags();
+    const ordered = [...tags].sort((a, b) => (a.id === "validation-concern" ? -1 : b.id === "validation-concern" ? 1 : 0));
+    const tagPick = await vscode.window.showQuickPick(
+      ordered.map((t) => ({
+        label: `@${t.id}`,
+        description: t.category === "validation" ? "validation — CRL-vs-CUSTOMER-INTENT (the usual MV concern)" : "extraction — CRL-vs-narrative fidelity",
+        tag: t,
+      })),
+      { placeHolder: `Add a flag on ${target.kind} "${target.name}"` },
+    );
+    if (!tagPick) return;
+    const tag = tagPick.tag;
+    const gist = await vscode.window.showInputBox({
+      placeHolder: "one-line gist (the rich detail goes in the linked issue, not here)",
+      prompt: `@${tag.id} on "${target.name}"`,
+      validateInput: (v) => (/[`\r\n]/.test(v) ? "no backticks or newlines in the gist" : v.includes(";") ? "no `;` — it delimits fields" : v.trim() === "" ? "a gist is required" : undefined),
+    });
+    if (gist === undefined) return; // Esc
+    const fieldParts: string[] = [];
+    for (const rule of tag.fields.filter((f) => f.required)) {
+      let value: string | undefined;
+      if (rule.values && rule.values.length) {
+        value = (await vscode.window.showQuickPick(rule.values.map((v) => ({ label: v })), { placeHolder: `${rule.key} (required)` }))?.label;
+      } else {
+        value = await vscode.window.showInputBox({ prompt: `${rule.key} (required)`, validateInput: (v) => (/[`\r\n;]/.test(v) ? "no backtick / newline / semicolon" : v.trim() === "" ? "required" : undefined) });
+      }
+      if (value === undefined) return; // cancelled a required field → abort cleanly
+      fieldParts.push(`; ${rule.key} ${value.trim()}`);
+    }
+    if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — flag not added");
+    const body = `@${tag.id}: ${gist.trim()}${fieldParts.join("")}; status open`;
+    // Open the target + RE-READ its LIVE text NOW — the user may have edited the buffer during the tag/gist/field
+    // prompts (an edit doesn't bump indexVersion until save+rebuild), so `decl.source` (read pre-prompt in
+    // findDeclaration) can be stale. Resolve + validate against exactly the text we're about to edit (gpt55 impl
+    // review [critical]: never apply a slot computed off a pre-prompt snapshot). This mirrors writeFlagStatus's
+    // re-read-the-live-line discipline for the write-back.
+    let doc: vscode.TextDocument;
+    try {
+      doc = await vscode.workspace.openTextDocument(decl.filePath);
+    } catch {
+      return flagNote("couldn't open the .crl");
+    }
+    if (indexVersion !== ver || currentCel !== cel) return flagNote("policy changed — flag not added");
+    const liveText = doc.getText();
+    // Re-find the declaration in the LIVE text — its line may have moved. Parse + locate (kind, name, lib) again.
+    const reparsed = buildCRL(liveText);
+    if (!reparsed.success || !reparsed.result || reparsed.result.library?.name !== target.lib) return flagNote("the .crl changed — reopen the menu");
+    const astType = target.kind === "concept" ? "Concept" : "Decision";
+    const declNode = reparsed.result.statements.find((s) => s.type === astType && (s as { name?: string }).name === target.name);
+    if (!declNode) return flagNote("the .crl changed — reopen the menu");
+    const res = resolveMetaInsertion(liveText, { kind: target.kind, declLine: declNode.location.start.line });
+    if (!res.ok) return flagNote("couldn't resolve the insertion point");
+    const newLine = `${res.indent}- meta is \`${body}\`.`;
+    // Pre-VALIDATE the prospective source before writing — never author a flag that would red-squiggle. The SLOT is
+    // proven grammar-legal by the primitive's round-trip, and the gist is sanitized (no backtick/newline/`;`), but the
+    // body is built from arbitrary user input — validate the whole doc and abort on any NEW error the insert introduces
+    // (gpt55 impl review [important]).
+    const beforeErrs = (validateCRL(liveText).errors ?? []).length;
+    const lines = liveText.split(/\r?\n/);
+    lines.splice(res.insertLine, 0, newLine);
+    const afterErrs = validateCRL(lines.join("\n")).errors ?? [];
+    if (afterErrs.length > beforeErrs) return flagNote(`the flag would be invalid (${(afterErrs[afterErrs.length - 1] as { kind?: string }).kind ?? "error"}) — not added`);
+    const eol = doc.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n"; // preserve the doc's line ending (CRLF `.crl` files)
+    const edit = new vscode.WorkspaceEdit();
+    // EOF case: resolveMetaInsertion can legally return insertLine === lineCount (a concept as the LAST statement, no
+    // trailing newline). Position(lineCount, 0) clamps to the end of the last line, so `newLine + eol` would concatenate
+    // ONTO it (`- type is X.- meta is …`). Insert at end-of-last-line with a LEADING eol instead (Claude impl review
+    // [important]). This matches the string-splice model the pre-validate above ran on.
+    if (res.insertLine >= doc.lineCount) {
+      edit.insert(doc.uri, doc.lineAt(doc.lineCount - 1).range.end, eol + newLine);
+    } else {
+      edit.insert(doc.uri, new vscode.Position(res.insertLine, 0), newLine + eol);
+    }
+    if (!(await vscode.workspace.applyEdit(edit))) return flagNote("edit could not be applied");
+    // The insert is now in the live buffer regardless of save. Refresh from it (loadFlags reads crlText = the live
+    // buffer), then report honestly: a failed save leaves the flag inserted-but-dirty, NOT "not added" (gpt55 [important]).
+    const saved = await doc.save();
+    loadFlags(); // re-parse → fresh flagsList (the insert shifted subsequent line locations)
+    renderTreeChrome();
+    driveFlagBadges();
+    flagNote(saved ? `flag added on ${target.kind} "${target.name}"` : `flag added — but save the .crl (it's unsaved)`);
   }
 
   /** #217: present the verdict quick-pick(s). ONE case → straight to the verdict pick. SEVERAL → a re-entrant loop: pick a
