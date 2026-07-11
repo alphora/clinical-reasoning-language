@@ -161,6 +161,8 @@ interface PaneView {
    *  matches open flags → gids off these + posts `.has-flag`. Captured atomically with the anchors; reset each render. */
   conceptOccurrences: { gid: string; lib: string; name: string }[];
   flaggableGids: string[];
+  /** the start/primary-node gid — carries the chrome-mirror count badge (see driveFlagBadges). */
+  startNodeGid?: string;
   disposables: vscode.Disposable[];
 }
 
@@ -1217,44 +1219,39 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     });
   }
 
-  /** #203 Todo 4b Slice A — paint the per-node flag badges. Mirrors `driveDoneOverlay`: a gen-stamped class-toggle message
-   *  (never a `#root` re-render, so the verdict/failed-criterion overlays survive). Matches every OPEN flag to its rendered
-   *  node(s): a concept flag → `conceptOccurrences` by (lib,name) — a concept drawn as several `when`s badges ALL; a
-   *  decision flag → the decision root's gid via `anchors`; a library-scope or unmatched-concept flag is an ORPHAN (no
-   *  node) → for a SINGLE-decision policy it lights the start node as the catch-all (multi-decision: orphans stay in the
-   *  chrome count only — a decision root must not claim policy-wide flags). Open-only (resolved flags never badge). */
+  /** #203 Todo 4b — paint the flag badges. Mirrors `driveDoneOverlay`: a gen-stamped class-toggle message (never a `#root`
+   *  re-render, so the verdict/failed-criterion overlays survive). TWO channels: (1) per-node ⚑ (`.has-flag`) marks WHICH
+   *  nodes carry an OPEN flag — a concept flag → `conceptOccurrences` by (lib,name) (badges every `when`/leaf it draws as);
+   *  a decision flag → the decision root's gid via `anchors`; an unmatchable (library-scope, or a concept drawn nowhere)
+   *  flag lights no per-node ⚑. (2) the START-NODE COUNT badge (`.has-startflag` on `startNodeGid`) mirrors the tree chrome
+   *  (`⚑ N open flags`): the policy-wide TOTAL open count + the catch-all, so an unmatchable flag is never dropped. Open-only
+   *  (resolved flags never badge a node; the count badge shows `✓` when all resolved). */
   function driveFlagBadges(): void {
     const tree = views.get("tree");
     if (!tree) return; // tree pane is opt-in
     if (mode !== "medical-validation") {
-      void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [] });
+      void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [], startNodeGid: tree.startNodeGid, open: 0, resolved: 0, flagError: false });
       return;
     }
     const open = flagsList.filter((f) => f.status !== "resolved"); // the blocking set (matches openFlags / the gate)
     const gids = new Set<string>();
-    let orphans = 0;
     for (const f of open) {
       let matched: string[] = [];
       if (f.scope === "concept") {
         // (lib,name) — NEVER name alone (cross-lib same-name concepts). A flag with no libraryName (best-effort
-        // attribution absent) can't be safely placed → it falls through to orphan (gpt55 impl review).
+        // attribution absent) can't be safely placed → it stays unmatched (surfaces only in the start-node count).
         matched = tree.conceptOccurrences.filter((o) => o.name === f.targetName && o.lib === f.libraryName).map((o) => o.gid);
       } else if (f.scope === "decision") {
         const d = crlStructure.find((s) => s.decision === f.targetName && s.lib === f.libraryName);
         if (d) matched = segmentsFor(tree, [d.nodeKey]).segmentIds;
       }
-      if (matched.length === 0) orphans++; // library-scope, or a concept/decision drawn nowhere / unresolvable
       for (const g of matched) gids.add(g);
     }
-    // Catch-all: orphans (library-scope, or an unmatchable target) light the PRIMARY decision root — `crlStructure[0]`, the
-    // flow's top root, which is the "start node" the operator works from. Anchored on ONE root (not every root — a decision
-    // must not claim policy-wide flags), and the chrome badge shows the same count regardless, so an orphan is never dropped.
-    // NB `crlStructure.length` counts helper/shared decisions too, so it is NOT a single-decision test (gpt55 impl review).
-    if (orphans > 0 && crlStructure.length > 0) {
-      const rootGid = tree.anchors[crlStructure[0].nodeKey]?.scrollTo;
-      if (rootGid) gids.add(rootGid);
-    }
-    void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [...gids] });
+    // The START-NODE COUNT badge is the chrome mirror + catch-all: it shows the TOTAL open count (so a library-scope or
+    // otherwise-unmatchable flag is never dropped — it surfaces here even when it lights no per-node ⚑). The per-node ⚑s
+    // above mark WHICH specific nodes carry a flag; this badge is the policy-wide total. Post both counts + the error flag.
+    const resolvedCount = flagsList.length - open.length;
+    void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [...gids], startNodeGid: tree.startNodeGid, open: open.length, resolved: resolvedCount, flagError: flagLoadError });
   }
 
   /** Post a gen-stamped `markThisNode` for a set of segment ids in one pane (#177 slice 4), after clearing the prior
@@ -1502,6 +1499,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     v.leafConcepts = {}; // #187 Todo 5 (tree-only); reset each render, re-set below in the tree branch
     v.conceptOccurrences = []; // #203 Todo 4b Slice A (tree-only); reset each render, re-set in the tree branch
     v.flaggableGids = [];
+    v.startNodeGid = undefined;
     if (pane === "source") {
       const units: UnitSpan[] = model.steps.flatMap((s) =>
         s.source.map((loc) => ({ unitId: s.unitId, range: loc.range })),
@@ -1568,6 +1566,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.leafConcepts = r.leafConcepts; // #187 Todo 5: the def-leaf verdict-join map (captured atomically with the anchors)
       v.conceptOccurrences = r.conceptOccurrences; // #203 Todo 4b Slice A: the flag-badge substrate (captured atomically)
       v.flaggableGids = r.flaggableGids;
+      v.startNodeGid = r.startNodeGid; // the chrome-mirror count badge's node
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode });
     } else {
       // questionnaire (#177 slice 3) — a STATIC, read-only projection of the FOCUSED cel case's fired path. Gets the
@@ -1686,6 +1685,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.leafConcepts = {}; // #187 Todo 5
       v.conceptOccurrences = []; // #203 Todo 4b Slice A: reset the flag-badge substrate too (symmetry; no stale tree data)
       v.flaggableGids = [];
+      v.startNodeGid = undefined;
       void v.panel.webview.postMessage({ type: "render", html: `<p class="placeholder">${escapeHtml(message)}</p>`, gen, indexVersion, mode });
     }
   }
@@ -2980,7 +2980,12 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // flagged gids (clear-then-set, gen-guarded like the overlays; a class-toggle preserves the painted verdict overlays).
   `else if(m.type==='flagBadges'){if(m.gen!==gen)return;` +
   `for(const id of (m.flaggableGids||[])){const el=document.getElementById(id);if(el)el.classList.remove('has-flag');}` +
-  `for(const id of (m.gids||[])){const el=document.getElementById(id);if(el)el.classList.add('has-flag');}}` +
+  `for(const id of (m.gids||[])){const el=document.getElementById(id);if(el)el.classList.add('has-flag');}` +
+  // the start-node COUNT badge (chrome mirror): set its text (`⚑ N` / `✓` / `⚠`) + `.has-startflag`, or hide it when clean.
+  `var sg=m.startNodeGid?document.getElementById(m.startNodeGid):null;` +
+  `if(sg){var st=sg.querySelector('.flow-startflag-text');` +
+  `var label=m.flagError?'⚠':(m.open>0?'⚑ '+m.open:(m.resolved>0?'✓':''));` +
+  `if(st)st.textContent=label;sg.classList.toggle('has-startflag',label!=='');}}` +
   // #177 slice 4: the "this node" cross-pane marker — a SEPARATE channel from .current, .failed-criterion AND the review
   // overlay. Like the review overlay it is mutated ONLY here (mark/clearThisNode), NEVER by highlight/clearHighlight/clrFC/
   // clrRO — so it SURVIVES a cockpit reveal (the focused question's node stays marked as the clinician clicks around). mark

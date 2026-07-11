@@ -65,6 +65,10 @@ export interface RenderedFlow {
   /** #203 Todo 4b Slice A — the gids of nodes that CAN carry a flag badge (`when` / decision root / def-leaf), so the
    *  webview can bulk-clear `.has-flag` before re-applying (a flag resolve must un-paint its node without a full re-render). */
   flaggableGids: string[];
+  /** #203 Todo 4b (start-node chrome mirror) — the gid of the PRIMARY/start node (the first decision root the operator
+   *  works from). It carries a COUNT badge (a copy of the tree chrome's `⚑ N open flags`) + is the catch-all click target;
+   *  the host sets its count text + `.has-startflag` visibility (like the chrome), separate from the per-node `.has-flag`. */
+  startNodeGid?: string;
 }
 
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -356,6 +360,8 @@ export function renderFlowPane(
 
   const conceptMap = new Map(concepts.map((c) => [c.nodeKey, c]));
   const { roots, maxDepth } = buildLaid(structure, conceptMap, { defExpr: opts.defExpr });
+  const startNodeKey = roots[0]?.nodeKey; // the PRIMARY/start node — carries the chrome-mirror count badge (see below)
+  let startNodeGid: string | undefined;
 
   const all: LaidNode[] = [];
   const collect = (n: LaidNode): void => {
@@ -529,6 +535,12 @@ export function renderFlowPane(
     if (flaggable) flaggableGids.push(gid);
     if (isWhenConcept) conceptOccurrences.push({ gid, lib: n.conceptLib!, name: n.conceptName! });
     const flagBadgeMarkup = flaggable ? flagBadge(stadium ? x + NODE_W - 30 : x + NODE_W - 14, y + 13) : "";
+    // The PRIMARY/start node (first decision root) additionally carries the chrome-mirror COUNT badge — a pill showing the
+    // total open-flag count (`⚑ N`), the catch-all click target (see driveFlagBadges). Pre-rendered hidden; the host sets
+    // its text + `.has-startflag`. Sits at the top-right, straddling the node's top edge (within the PAD, no clip).
+    const isStart = n.kind === "decision" && n.nodeKey === startNodeKey;
+    if (isStart) startNodeGid = gid;
+    const startFlagMarkup = isStart ? startFlagBadge(x + NODE_W - 48, y - 8) : "";
     body +=
       `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
       `<title>${escapeHtml(n.full)}</title>` +
@@ -539,6 +551,7 @@ export function renderFlowPane(
       guardTab +
       allPassBadge +
       flagBadgeMarkup +
+      startFlagMarkup +
       `</g>`;
   }
 
@@ -546,7 +559,7 @@ export function renderFlowPane(
     `<svg class="flow-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">` +
     body +
     `</svg>`;
-  return { html: `<div class="flow-wrap">${svg}</div>`, anchors, reveals, leafConcepts, conceptOccurrences, flaggableGids };
+  return { html: `<div class="flow-wrap">${svg}</div>`, anchors, reveals, leafConcepts, conceptOccurrences, flaggableGids, startNodeGid };
 }
 
 // #203 Todo 4b Slice A — the hidden per-node flag badge: a ⚑ glyph grandchild `<g>`, shown when the host adds `.has-flag`
@@ -557,6 +570,15 @@ export function renderFlowPane(
 const flagBadge = (bx: number, by: number): string =>
   `<g class="flow-flag-badge" data-mv-flag-badge="1"><title>review flag(s) on this node — click to open the flag list</title>` +
   `<circle cx="${bx}" cy="${by}" r="7"/><text class="flow-flag-glyph" x="${bx}" y="${by + 3.5}">⚑</text></g>`;
+
+// The start-node COUNT badge — a copy of the tree chrome (`⚑ N open flags`) pinned to the primary/start node: a pill with
+// a count the host sets (`.flow-startflag-text`), shown via `.has-startflag` on the row (the same class-toggle idiom as
+// `.has-flag`, so a flag change never re-renders `#root`). Clickable → the flag list (the catch-all: orphan/library-scope
+// flags surface here since they map to no specific node). Distinct from the per-node ⚑ (presence) — this is the TOTAL.
+const startFlagBadge = (bx: number, by: number): string =>
+  `<g class="flow-startflag-badge" data-mv-flag-badge="1"><title>open review flags (all) — click to review</title>` +
+  `<rect x="${bx}" y="${by}" width="44" height="16" rx="8"/>` +
+  `<text class="flow-startflag-text" x="${bx + 22}" y="${by + 11.5}" text-anchor="middle"></text></g>`;
 
 /** Flow-pane CSS — concatenated into the cockpit's nonced <style> (CSP-safe: no inline styles / no SVG <style>). Every
  *  var(--vscode-*) carries a hex fallback (the chart renders in tests / high-contrast with no live theme), matching
@@ -706,6 +728,12 @@ export const FLOW_STYLE =
   `.flow-row.has-flag .flow-flag-badge{display:inline}` +
   `.flow-flag-badge>circle{fill:var(--vscode-testing-iconQueued,var(--vscode-charts-yellow,#cca700));stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
   `.flow-flag-glyph{fill:#1e1e1e;font-size:9px;font-weight:bold;text-anchor:middle;pointer-events:none}` +
+  // The start-node COUNT badge (chrome mirror). HIDDEN; shown when the host toggles `.has-startflag` on the start row +
+  // sets `.flow-startflag-text`. Amber pill (open) — the host recolors the text/pill semantics via the count it posts.
+  `.flow-startflag-badge{display:none;cursor:pointer;pointer-events:auto}` +
+  `.flow-row.has-startflag .flow-startflag-badge{display:inline}` +
+  `.flow-startflag-badge>rect{fill:var(--vscode-testing-iconQueued,var(--vscode-charts-yellow,#cca700));stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
+  `.flow-startflag-text{fill:#1e1e1e;font-size:10px;font-weight:bold;pointer-events:none}` +
   // #177 slice 4: the "this node" cross-pane marker — the FOCUSED questionnaire question's tree node. It paints a
   // distinctive solid `stroke` on the >rect — the SAME proven axis `.current`/`.failed-criterion` use (FIX 1 impl review:
   // this repo's evidence is that `outline` does NOT paint on the SVG here, which is exactly why those switched to stroke).

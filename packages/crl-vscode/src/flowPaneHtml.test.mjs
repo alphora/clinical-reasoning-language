@@ -318,7 +318,7 @@ check("nested when-children (when → when → action) lay out without same-dept
       node("nq", "action", "Q", ["act:Q"], [], { actionKind: "recommend-activity" }),
     ],
   }], { concepts });
-  const rects = [...nested.html.matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)].map((m) => ({ x: +m[1], y: +m[2], h: +m[4] }));
+  const rects = [...nested.html.matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)].map((m) => ({ x: +m[1], y: +m[2], w: +m[3], h: +m[4] })).filter((rc) => rc.w >= 100); // NODE rects only (excl. the start-node count-badge pill, w=44)
   assert.equal(rects.length, 7); // d:N, nw1, nq, nw2, no, nx, ny
   const byX = new Map();
   for (const rc of rects) (byX.get(rc.x) ?? byX.set(rc.x, []).get(rc.x)).push(rc);
@@ -326,6 +326,23 @@ check("nested when-children (when → when → action) lay out without same-dept
     col.sort((a, b) => a.y - b.y);
     for (let i = 1; i < col.length; i++) assert.ok(col[i].y >= col[i - 1].y + col[i - 1].h, "no same-depth overlap in a nested tree");
   }
+});
+
+check("#203 start-node chrome mirror: the FIRST decision root carries a hidden count-badge pill + startNodeGid; ONLY the first root", () => {
+  const two = renderFlowPane([
+    { decision: "First", lib: "Pol", nodeKey: "d:First", location: {}, children: [node("a1", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })] },
+    { decision: "Second", lib: "Pol", nodeKey: "d:Second", location: {}, children: [node("a2", "action", "Y", ["act:Y"], [], { actionKind: "recommend-activity" })] },
+  ], { concepts });
+  // exactly ONE start-flag badge, and startNodeGid points at the first root's <g>
+  assert.equal([...two.html.matchAll(/class="flow-startflag-badge"/g)].length, 1, "only the first/primary root gets the count badge");
+  assert.ok(two.startNodeGid, "startNodeGid is set");
+  const startG = two.html.match(new RegExp(`<g id="${two.startNodeGid}"[\\s\\S]*?flow-startflag-badge`));
+  assert.ok(startG, "the count badge lives INSIDE the start node's <g>");
+  // hidden by default; a text slot the host fills; CSS reveals on .has-startflag
+  assert.match(two.html, /<g class="flow-startflag-badge" data-mv-flag-badge="1">/); // reuses the flag-list click channel (catch-all)
+  assert.match(two.html, /<text class="flow-startflag-text"[^>]*><\/text>/); // empty until the host posts the count
+  assert.match(FLOW_STYLE, /\.flow-startflag-badge\{display:none/); // hidden
+  assert.match(FLOW_STYLE, /\.flow-row\.has-startflag \.flow-startflag-badge\{display:inline\}/); // shown on the host class
 });
 
 check("Todo 2: a use-decision renders flow-use (NEUTRAL grey + dashed, NOT blue); its guard shows via the same 'when …' tab", () => {

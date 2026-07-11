@@ -703,6 +703,11 @@ check("#203 Slice A webview: the flagBadges handler clears `.has-flag` off flagg
   assert.match(SCRIPT, /m\.flaggableGids\|\|\[\]\)\)\{const el=document\.getElementById\(id\);if\(el\)el\.classList\.remove\('has-flag'\)/);
   assert.match(SCRIPT, /m\.gids\|\|\[\]\)\)\{const el=document\.getElementById\(id\);if\(el\)el\.classList\.add\('has-flag'\)/);
 });
+check("#203 webview: the flagBadges handler ALSO drives the start-node count badge (⚑ N / ✓ / ⚠) + .has-startflag", () => {
+  assert.match(SCRIPT, /var sg=m\.startNodeGid\?document\.getElementById\(m\.startNodeGid\):null;/);
+  assert.match(SCRIPT, /m\.flagError\?'⚠':\(m\.open>0\?'⚑ '\+m\.open:\(m\.resolved>0\?'✓':''\)\)/); // chrome-mirror label
+  assert.match(SCRIPT, /if\(st\)st\.textContent=label;sg\.classList\.toggle\('has-startflag',label!==''\)/); // set text + toggle visibility
+});
 check("#203 Slice A webview: a ⚑ badge click is intercepted BEFORE [data-reveal] and opens the flag list (mvFlags)", () => {
   assert.match(SCRIPT, /closest\('\[data-mv-flag-badge\]'\)/);
   // the badge intercept + return must precede the data-reveal routing (controls-first)
@@ -711,13 +716,14 @@ check("#203 Slice A webview: a ⚑ badge click is intercepted BEFORE [data-revea
   assert.ok(badgeAt > 0 && badgeAt < revealAt, "badge intercept comes before the data-reveal click routing");
   assert.match(SCRIPT, /closest\('\[data-mv-flag-badge\]'\);.*postMessage\(\{type:'mvFlags'\}\);return;/s);
 });
-check("#203 Slice A host: driveFlagBadges matches concept flags by (lib,name), decision via anchors, orphans→single-decision start node; open-only", () => {
+check("#203 host: driveFlagBadges — per-node ⚑ by (lib,name)/anchors + the START-NODE COUNT badge (chrome mirror, catch-all); open-only", () => {
   assert.match(COCKPIT_SRC, /function driveFlagBadges\(\)/);
   assert.match(COCKPIT_SRC, /flagsList\.filter\(\(f\) => f\.status !== "resolved"\)/); // open-only (matches the gate)
   assert.match(COCKPIT_SRC, /o\.name === f\.targetName && o\.lib === f\.libraryName/); // (lib,name), no name-only wildcard
   assert.match(COCKPIT_SRC, /crlStructure\.find\(\(s\) => s\.decision === f\.targetName && s\.lib === f\.libraryName\)/); // decision by (lib,name)
-  assert.match(COCKPIT_SRC, /orphans > 0 && crlStructure\.length > 0/); // orphans → the primary start root (crlStructure[0])
-  assert.match(COCKPIT_SRC, /type: "flagBadges", gen: tree\.gen, flaggableGids: tree\.flaggableGids/);
+  // the start-node COUNT badge replaces the old orphans→⚑ path: post the total open/resolved counts + the start gid
+  assert.doesNotMatch(COCKPIT_SRC, /orphans > 0 && crlStructure\.length > 0/); // the Slice-A orphan→⚑ path is GONE (one implementation)
+  assert.match(COCKPIT_SRC, /startNodeGid: tree\.startNodeGid, open: open\.length, resolved: resolvedCount, flagError: flagLoadError/);
 });
 check("#203 Slice A host: loadFlags runs BEFORE the panes render in rebuild (the gate + badges were stale after-render)", () => {
   const load = COCKPIT_SRC.indexOf("(re)parse the policy `.crl` review flags BEFORE the panes render");
