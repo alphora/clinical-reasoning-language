@@ -693,4 +693,24 @@ check("#218 legend: swatch tokens are the SAME shared consts as the paint — ke
   }
 });
 
+// ── #203 Todo 4b Slice A: per-node flag badges + the concept-occurrence map ──
+check("#203 Slice A: conceptOccurrences covers RESOLVED-concept `when` nodes (by lib,name); unresolved when excluded", () => {
+  assert.deepEqual(r.conceptOccurrences.map((o) => `${o.lib}|${o.name}`).sort(), ["Pol|A", "Pol|B"]);
+  for (const o of r.conceptOccurrences) assert.ok(typeof o.gid === "string" && o.gid.length, "occurrence carries a gid");
+});
+check("#203 Slice A: flaggableGids = decision root + resolved `when`s; NOT action/otherwise/unresolved-when", () => {
+  const gidOf = (k) => r.anchors[k].scrollTo;
+  const flaggable = new Set(r.flaggableGids);
+  for (const k of ["d:D", "w:A", "w:B"]) assert.ok(flaggable.has(gidOf(k)), `${k} should be flaggable`);
+  for (const k of ["a:X", "a:D2", "a:Y", "a:Q", "o", "w:Z"]) assert.ok(!flaggable.has(gidOf(k)), `${k} should NOT be flaggable (no meta carrier / unresolved)`);
+  assert.equal(r.flaggableGids.length, 3);
+});
+check("#203 Slice A: renders a HIDDEN, clickable ⚑ flag badge on each flaggable node; CSS toggles on .has-flag", () => {
+  assert.equal((r.html.match(/class="flow-flag-badge"/g) || []).length, 3); // d:D, w:A, w:B
+  assert.match(r.html, /data-mv-flag-badge="1"/);
+  assert.match(r.html, /class="flow-flag-glyph"[^>]*>⚑</);
+  assert.match(FLOW_STYLE, /\.flow-flag-badge\{display:none;/); // hidden by default
+  assert.match(FLOW_STYLE, /\.flow-row\.has-flag \.flow-flag-badge\{display:inline\}/); // shown on host toggle
+});
+
 console.log(`\nflowPaneHtml.test: ${pass} checks passed`);

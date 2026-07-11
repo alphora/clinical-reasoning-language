@@ -56,6 +56,15 @@ export interface RenderedFlow {
    *  composite `when` structure key. The cockpit joins `{lib,name}` to a case's `conceptTruth` for the yes/no verdict and
    *  gates on `topWhenKey` being on the fired-satisfied path. The `+N more` stub + cross-lib/omitted leaves get NO entry. */
   leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }>;
+  /** #203 Todo 4b Slice A — every rendered node that REPRESENTS a concept (a `when`'s gating concept + each def-leaf),
+   *  with its `<g>` id and the concept's `{lib,name}` identity. The cockpit maps a CONCEPT-scope flag `{libraryName,
+   *  targetName}` to these gids to paint the per-node flag badge (a concept may render as SEVERAL `when` nodes / def-leaves
+   *  → badge ALL; matched on (lib,name), never name alone — cross-lib same-name concepts exist). Decision-scope flags reuse
+   *  `anchors[decisionNodeKey]`; activity/`otherwise` nodes carry no meta so they never appear here (they can't be flagged). */
+  conceptOccurrences: { gid: string; lib: string; name: string }[];
+  /** #203 Todo 4b Slice A — the gids of nodes that CAN carry a flag badge (`when` / decision root / def-leaf), so the
+   *  webview can bulk-clear `.has-flag` before re-applying (a flag resolve must un-paint its node without a full re-render). */
+  flaggableGids: string[];
 }
 
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -338,9 +347,11 @@ export function renderFlowPane(
   const anchors: Record<string, FlowAnchor> = {};
   const reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string }> = {};
   const leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }> = {};
+  const conceptOccurrences: { gid: string; lib: string; name: string }[] = []; // #203 Todo 4b Slice A
+  const flaggableGids: string[] = [];
 
   if (structure.length === 0) {
-    return { html: '<p class="placeholder">No CRL decisions to chart.</p>', anchors, reveals, leafConcepts };
+    return { html: '<p class="placeholder">No CRL decisions to chart.</p>', anchors, reveals, leafConcepts, conceptOccurrences, flaggableGids };
   }
 
   const conceptMap = new Map(concepts.map((c) => [c.nodeKey, c]));
@@ -436,8 +447,15 @@ export function renderFlowPane(
       // concept PEEK → highlighted the parent `when` = the "selects its parent" bug; a first fix revealed the owning `when`'s
       // nodeKey, but that offered the parent's FULL case list, including cases this operand isn't on-path for.)
       reveals[key] = { subQuestionLeafKey: n.nodeKey };
+      // #203 Todo 4b Slice A: a def-leaf that names a concept is a concept OCCURRENCE (flaggable). The `; more`/external
+      // stubs (no conceptName) are not. A leaf-only concept flag lands here.
+      const leafConcept = n.conceptName !== undefined && n.conceptLib !== undefined && n.outlineRow === "leaf";
       if (n.conceptName !== undefined && n.conceptLib !== undefined && n.topWhenKey !== undefined)
         leafConcepts[n.nodeKey] = { lib: n.conceptLib, name: n.conceptName, topWhenKey: n.topWhenKey };
+      if (leafConcept) {
+        conceptOccurrences.push({ gid, lib: n.conceptLib!, name: n.conceptName! });
+        flaggableGids.push(gid);
+      }
       // #187 Todo 2: border by Source — inferred (no `code is`) → purple, Source → grey — kept DASHED (an operand chip,
       // not a decision box). `isSource === false` is inferred; `true`/`undefined` stay grey (never mis-purple).
       const classes = ["flow-row", "flow-leaf"];
@@ -448,6 +466,7 @@ export function renderFlowPane(
         `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
         labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX, 9) +
         flowRing(x, y, OUTLINE_NODE_W, OUTLINE_H, 1.5, 7) +
+        (leafConcept ? flagBadge(x + OUTLINE_NODE_W - 11, y + 11) : "") +
         `</g>`;
       continue;
     }
@@ -502,6 +521,14 @@ export function renderFlowPane(
     const allPassBadge = isLeafEnd
       ? `<g class="flow-allpass-badge"><circle cx="${badgeCx}" cy="${badgeCy}" r="8"/><path d="M${badgeCx - 4} ${badgeCy} l2.6 2.9 l5 -5.6"/></g>`
       : "";
+    // #203 Todo 4b Slice A: a `when` (→ its gating concept) and a decision ROOT (→ the decision) are FLAGGABLE; an action /
+    // otherwise / use-decision node carries no meta so it is not. Pre-render the hidden ⚑ + record the occurrence. The badge
+    // sits left of a stadium's rounded end (NODE_H/2 curve) for a decision, top-right for a rectangular `when`.
+    const isWhenConcept = n.kind === "when" && n.conceptName !== undefined && n.conceptLib !== undefined;
+    const flaggable = n.kind === "decision" || isWhenConcept;
+    if (flaggable) flaggableGids.push(gid);
+    if (isWhenConcept) conceptOccurrences.push({ gid, lib: n.conceptLib!, name: n.conceptName! });
+    const flagBadgeMarkup = flaggable ? flagBadge(stadium ? x + NODE_W - 30 : x + NODE_W - 14, y + 13) : "";
     body +=
       `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
       `<title>${escapeHtml(n.full)}</title>` +
@@ -511,6 +538,7 @@ export function renderFlowPane(
       flowRing(x, y, NODE_W, NODE_H, 2.5, stadium ? (NODE_H + 5) / 2 : 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
       guardTab +
       allPassBadge +
+      flagBadgeMarkup +
       `</g>`;
   }
 
@@ -518,8 +546,17 @@ export function renderFlowPane(
     `<svg class="flow-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">` +
     body +
     `</svg>`;
-  return { html: `<div class="flow-wrap">${svg}</div>`, anchors, reveals, leafConcepts };
+  return { html: `<div class="flow-wrap">${svg}</div>`, anchors, reveals, leafConcepts, conceptOccurrences, flaggableGids };
 }
+
+// #203 Todo 4b Slice A — the hidden per-node flag badge: a ⚑ glyph grandchild `<g>`, shown when the host adds `.has-flag`
+// to the row (the `.flow-allpass-badge` idiom — pre-rendered + class-toggled so a flag change never re-renders `#root` and
+// clobbers the painted verdict/failed-criterion overlays). Clickable (`pointer-events:auto` + `data-mv-flag-badge`, the
+// webview intercepts it BEFORE the row's `data-reveal`) → opens the flag list. Top-RIGHT interior (clears the left label +
+// the top guard-tab band; leaves never carry both an all-pass ✓ [right-center] and a flag [top-right]).
+const flagBadge = (bx: number, by: number): string =>
+  `<g class="flow-flag-badge" data-mv-flag-badge="1"><title>review flag(s) on this node — click to open the flag list</title>` +
+  `<circle cx="${bx}" cy="${by}" r="7"/><text class="flow-flag-glyph" x="${bx}" y="${by + 3.5}">⚑</text></g>`;
 
 /** Flow-pane CSS — concatenated into the cockpit's nonced <style> (CSP-safe: no inline styles / no SVG <style>). Every
  *  var(--vscode-*) carries a hex fallback (the chart renders in tests / high-contrast with no live theme), matching
@@ -661,6 +698,14 @@ export const FLOW_STYLE =
   `.flow-row.leaf-allpass .flow-allpass-badge{display:inline}` +
   `.flow-allpass-badge>circle{fill:var(--vscode-testing-iconPassed,#3fb950);stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
   `.flow-allpass-badge>path{fill:none;stroke:#ffffff;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}` +
+  // #203 Todo 4b Slice A — the per-node review-flag ⚑ badge. HIDDEN; shown when the host toggles `.has-flag` on the row
+  // (a flag resolve un-paints without a #root re-render, preserving the verdict/failed-criterion overlays). The `<g>` is
+  // CLICKABLE (`pointer-events:auto`) and carries `data-mv-flag-badge` — the webview intercepts it BEFORE the row's
+  // `data-reveal` and opens the flag list. Amber circle (the open-flag color, matching `.mv-flags-open`) + a dark ⚑ glyph.
+  `.flow-flag-badge{display:none;cursor:pointer;pointer-events:auto}` +
+  `.flow-row.has-flag .flow-flag-badge{display:inline}` +
+  `.flow-flag-badge>circle{fill:var(--vscode-testing-iconQueued,var(--vscode-charts-yellow,#cca700));stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
+  `.flow-flag-glyph{fill:#1e1e1e;font-size:9px;font-weight:bold;text-anchor:middle;pointer-events:none}` +
   // #177 slice 4: the "this node" cross-pane marker — the FOCUSED questionnaire question's tree node. It paints a
   // distinctive solid `stroke` on the >rect — the SAME proven axis `.current`/`.failed-criterion` use (FIX 1 impl review:
   // this repo's evidence is that `outline` does NOT paint on the SVG here, which is exactly why those switched to stroke).
