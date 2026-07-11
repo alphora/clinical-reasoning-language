@@ -96,8 +96,14 @@ export type { AuthoringEdge, AuthoringKit, AuthoringStage, AuthoringUseCase, Kit
 //   author it but MUST preserve it across re-extraction. Registry companion: metadata-registry.json v0.3.2 adds the
 //   `@validation-concern` tag + the reference-point category discriminator + the reRunReplaceRule preservation entry.
 //   NO payload-shape change. BOTH useCase hashes re-pin.
+// "1.7" → "1.8": CONTENT change (KE #207) — the `review-flags` rule gains an EMIT clause documenting Todo 5's shipped
+//   status-aware CQL emit (already reviewed + shipped b21b8e5): an OPEN flag at `concept` scope renders as a CQL block
+//   comment on the concept's `define`; `decision`/`library` scope is gate-only (no CQL — decision-scope emit reserved
+//   for a FHIR `.meta` marker, #206); `resolved` emits nothing; no FHIR flag emit yet. Teaches the KE that the SCOPE
+//   they pick is also the downstream surface. NO payload-shape change, NO registry change (the behavior is data-driven
+//   from the existing registry `emit` block). BOTH useCase hashes re-pin (schemaVersion is in the hashed base).
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.7";
+const SCHEMA_VERSION = "1.8";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -466,6 +472,18 @@ const RULES: KitRule[] = [
           "Do NOT author `@validation-concern` — a HUMAN authors it in Medical Validation (category validation: a " +
           "CRL-vs-CUSTOMER-INTENT concern). You MUST PRESERVE any that exist: never rewrite or drop a human's " +
           "`@validation-concern` on re-extraction (it is on the registry's never-auto-replace list for this reason).",
+        force: "default",
+      },
+      {
+        text:
+          "Emit behavior — where a flag shows up downstream, and why scope matters. An OPEN flag at `concept` scope " +
+          "renders as a block comment on that concept's generated CQL `define`, so the unresolved concern rides along " +
+          "with the compiled logic where a downstream reader sees it in place. A `decision`- or `library`-scoped flag is " +
+          "GATE-ONLY: it blocks Medical Validation completion but emits no CQL (decision-scope emit is reserved for a " +
+          "FHIR `.meta` marker, #206; library is gate-only by design). A `resolved` flag emits nothing at any scope, and " +
+          "there is no FHIR flag emit yet. You author the flag identically regardless (this is data-driven from the " +
+          "registry `emit` block) — but the scope you pick IS the downstream surface: pick `concept` when the concern " +
+          "should travel with the compiled logic.",
         force: "default",
       },
     ],

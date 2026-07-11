@@ -304,7 +304,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.7");
+    expect(kit.schemaVersion).toBe("1.8");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -668,8 +668,11 @@ describe("authoring-kit — getAuthoringKit", () => {
     // KE #203 Piece 1 (schemaVersion 1.6→1.7): the `review-flags` rule gained a phase-boundary + preservation clause
     // for the new `category:validation` `@validation-concern`. BOTH hashes move (schemaVersion is hashed + the cpg-edge
     // rule inherits into prior-auth). KE seats re-sync both pins on the bump (the SINGLE re-pin — full working set).
-    expect(cpg.contentHash).toBe("edf4deafcb7db72f5a09f3c407effd97479716512f7ff5c6369e57d8f1b517df");
-    expect(priorAuth.contentHash).toBe("311523cdb8f86cd68794d6b82129acb9dbb2b7fd28019f8e33a33bf799b0b56e");
+    // KE #207 (schemaVersion 1.7→1.8): the `review-flags` rule gained an EMIT clause documenting Todo 5's shipped
+    // status-aware CQL emit (concept→block comment; decision/library→gate-only; resolved→none). BOTH hashes move
+    // (schemaVersion is hashed + the cpg-edge rule inherits into prior-auth). Folds into the SAME single KE re-pin.
+    expect(cpg.contentHash).toBe("61929405e3e723cc0df362b6072e0cfe099cbee4c2f8d6e88ac1d877a3b9f19a");
+    expect(priorAuth.contentHash).toBe("69c689dacb39e3a762b1ee8f0241238957d54d9f9337132456b1af452a7e3a44");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
