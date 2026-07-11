@@ -187,6 +187,16 @@ check("contributes the crl.medical-validation.showKeys setting (boolean, default
   assert.equal(prop.scope, "window");
 });
 
+check("contributes the crl.issueBaseUrl setting (string, default '', window scope) (#203 Slice C)", () => {
+  // Guards the duplicate-`configuration`-key trap: a second contributes.configuration would shadow this via JSON
+  // last-wins and silently drop it from the manifest — this asserts it survives into the ONE effective block.
+  const prop = c.configuration?.properties?.["crl.issueBaseUrl"];
+  assert.ok(prop, "expected crl.issueBaseUrl in contributes.configuration.properties");
+  assert.equal(prop.type, "string");
+  assert.equal(prop.default, "");
+  assert.equal(prop.scope, "window");
+});
+
 check("failedCriteriaMode stays SHARED under crl.cockpit ONLY — no crl.medical-validation copy (#156 slice 3)", () => {
   assert.ok(c.configuration?.properties?.["crl.cockpit.failedCriteriaMode"], "crl.cockpit.failedCriteriaMode must exist (the shared key)");
   assert.equal(

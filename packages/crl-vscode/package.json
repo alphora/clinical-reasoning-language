@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL→CQL + CEL→FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "4.68.0",
+  "version": "4.69.0",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.85.0"
@@ -21,17 +21,6 @@
     "Programming Languages"
   ],
   "contributes": {
-    "configuration": {
-      "title": "Clinical Reasoning Language",
-      "properties": {
-        "crl.issueBaseUrl": {
-          "type": "string",
-          "default": "",
-          "scope": "window",
-          "markdownDescription": "The issue-tracker **collection** URL that a review flag's `; ref #N` resolves into — e.g. `https://github.com/owner/repo/issues`. In Medical Validation, a flag with a numeric ref shows an **Open issue #N** action that opens `<base>/N`. Must be an `http`/`https` URL with no credentials, query, or fragment. A value set in **workspace** settings applies only in a [trusted workspace](command:workbench.action.manageTrust); set it in **user** settings to use it everywhere. Leave empty to disable the link-out."
-        }
-      }
-    },
     "languages": [
       {
         "id": "crl",
@@ -356,6 +345,12 @@
           "default": true,
           "scope": "window",
           "description": "Show the at-rest correspondence key (a per-unit number + cycled color) on each corresponding element across the Medical Validation panel's panes and the navigator, so 'what links to what' is visible without selecting. Toggle live with 'CRL: Toggle Correspondence Keys'."
+        },
+        "crl.issueBaseUrl": {
+          "type": "string",
+          "default": "",
+          "scope": "window",
+          "markdownDescription": "The issue-tracker **collection** URL that a review flag's `; ref #N` resolves into — e.g. `https://github.com/owner/repo/issues`. In Medical Validation, a flag with a numeric ref shows an **Open issue #N** action that opens `<base>/N`. Must be an `http`/`https` URL with no credentials, query, or fragment. A value set in **workspace** settings applies only in a [trusted workspace](command:workbench.action.manageTrust); set it in **user** settings to use it everywhere. Leave empty to disable the link-out."
         }
       }
     }
