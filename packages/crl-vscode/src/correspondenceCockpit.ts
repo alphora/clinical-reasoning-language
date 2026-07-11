@@ -63,6 +63,7 @@ import {
 } from "./failedCriterionPeek";
 import { resolveThisNode } from "./thisNodeMarker";
 import { failedCriterionLabel } from "./failedCriterionLabel";
+import { buildIssueUrl, issueRefOf, sanitizeIssueBase } from "./issueLink";
 import {
   addNote,
   buildReviewPerCase,
@@ -903,18 +904,54 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
   }
 
-  /** The per-flag action menu — the status toggle (the crl-refactors write-back) + reveal-in-source. `ver`/`cel` are the
-   *  policy-identity captured at list-open; the write-back revalidates them so a retarget mid-menu can't patch the old `.crl`. */
+  /** #203 Todo 4b Slice C — resolve the issue-tracker collection base for the link-out. `crl.issueBaseUrl`, USER-scope
+   *  preferred (a global value isn't repo-controlled → usable regardless of workspace trust); a WORKSPACE value is
+   *  repo-controlled (`.vscode/settings.json`) → only when the workspace is TRUSTED (a repo must not silently steer the
+   *  browser). `sanitizeIssueBase` is the URL allowlist (http(s), no creds/query/frag). Returns undefined → no base. */
+  function resolveIssueBase(): string | undefined {
+    const info = vscode.workspace.getConfiguration("crl").inspect<string>("issueBaseUrl");
+    const userVal = sanitizeIssueBase(info?.globalValue);
+    if (userVal) return userVal;
+    if (!vscode.workspace.isTrusted) return undefined; // a repo-scoped base needs trust
+    return sanitizeIssueBase(info?.workspaceValue);
+  }
+
+  /** The per-flag action menu — the status toggle (the crl-refactors write-back) + reveal-in-source + (Slice C) the issue
+   *  link-out when the flag carries a numeric `; ref #N`. `ver`/`cel` are the policy-identity captured at list-open; the
+   *  write-back + the open both revalidate them so a retarget mid-menu can't patch the old `.crl` / open a stale link. */
   async function flagActionMenu(flag: FlagInstance, ver: number, cel: string | undefined): Promise<"continue" | "closed"> {
-    const actions = [
-      { label: flag.status === "resolved" ? "↻ Reopen flag" : "✓ Mark resolved", act: "toggle" as const },
-      { label: "→ Reveal in source", act: "reveal" as const },
+    const actions: { label: string; act: "toggle" | "reveal" | "issue" | "config" }[] = [
+      { label: flag.status === "resolved" ? "↻ Reopen flag" : "✓ Mark resolved", act: "toggle" },
+      { label: "→ Reveal in source", act: "reveal" },
     ];
+    // Slice C: offer the issue link ONLY for a numeric ref (the injection guard). A resolvable base → open; a trusted
+    // workspace with no base yet → a discoverable "set the setting" item (never silently hide the config path); an
+    // untrusted workspace or a non-numeric ref → no item. The base is re-resolved at click, so this is just for display.
+    const issueNo = issueRefOf(flag.fields.get("ref"));
+    if (issueNo) {
+      if (buildIssueUrl(resolveIssueBase(), issueNo)) actions.push({ label: `↗ Open issue #${issueNo}`, act: "issue" });
+      else if (vscode.workspace.isTrusted) actions.push({ label: `⚙ Set crl.issueBaseUrl to open issue #${issueNo}…`, act: "config" });
+    }
     const pick = await vscode.window.showQuickPick(actions, { placeHolder: `${flag.canonicalTag} — ${flag.body}` });
     if (!pick) return "continue"; // Esc → back to the list
     if (pick.act === "reveal") {
       await revealFlag(flag);
       return "closed";
+    }
+    if (pick.act === "config") {
+      await vscode.commands.executeCommand("workbench.action.openSettings", "crl.issueBaseUrl");
+      return "continue";
+    }
+    if (pick.act === "issue") {
+      // Re-check identity + RE-RESOLVE the base at click (config could have changed while the menu was open), then open.
+      if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return "continue";
+      const url = buildIssueUrl(resolveIssueBase(), issueNo);
+      if (!url) {
+        flagNote("no issue base — set crl.issueBaseUrl");
+        return "continue";
+      }
+      if (!(await vscode.env.openExternal(vscode.Uri.parse(url)))) flagNote(`could not open issue #${issueNo}`);
+      return "continue";
     }
     await writeFlagStatus(flag, flag.status === "resolved" ? "open" : "resolved", ver, cel);
     return "continue";

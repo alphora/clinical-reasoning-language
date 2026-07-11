@@ -781,4 +781,27 @@ check("#203 Slice B: addFlagAtNode — flagTags (validation-concern first), SANI
   assert.match(m[1], /saved \? .* : .*it's unsaved/); // honest save-fail message (flag inserted-but-dirty, not "not added")
 });
 
+// ── #203 Todo 4b Slice C: issue link-out ──
+check("#203 Slice C: resolveIssueBase prefers the USER (global) value; a workspace value is trust-gated", () => {
+  const m = COCKPIT_SRC.match(/function resolveIssueBase\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "resolveIssueBase body");
+  assert.match(m[1], /inspect<string>\("issueBaseUrl"\)/);
+  assert.match(m[1], /sanitizeIssueBase\(info\?\.globalValue\)/); // user value first
+  assert.match(m[1], /if \(!vscode\.workspace\.isTrusted\) return undefined/); // repo value needs trust
+  assert.match(m[1], /sanitizeIssueBase\(info\?\.workspaceValue\)/);
+});
+check("#203 Slice C: flagActionMenu offers Open-issue only for a numeric ref; a discoverable config item when trusted+no-base; re-resolve+guard at click", () => {
+  const m = COCKPIT_SRC.match(/async function flagActionMenu\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "flagActionMenu body");
+  assert.match(m[1], /const issueNo = issueRefOf\(flag\.fields\.get\("ref"\)\)/); // numeric-only guard
+  assert.match(m[1], /buildIssueUrl\(resolveIssueBase\(\), issueNo\)/); // resolvable base → open item
+  assert.match(m[1], /vscode\.workspace\.isTrusted\) actions\.push\(\{ label: `⚙ Set crl\.issueBaseUrl/); // discoverable config item
+  assert.match(m[1], /workbench\.action\.openSettings", "crl\.issueBaseUrl"/); // config item opens the setting
+  // open path: identity re-check + RE-RESOLVE at click + openExternal failure note + stays "continue"
+  assert.match(m[1], /if \(pick\.act === "issue"\)/);
+  assert.match(m[1], /indexVersion !== ver \|\| currentCel !== cel \|\| mode !== "medical-validation"\) return "continue"/);
+  assert.match(m[1], /const url = buildIssueUrl\(resolveIssueBase\(\), issueNo\)/); // re-resolve at click (config may have changed)
+  assert.match(m[1], /await vscode\.env\.openExternal\(vscode\.Uri\.parse\(url\)\)\)\) flagNote\(`could not open issue/);
+});
+
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);
