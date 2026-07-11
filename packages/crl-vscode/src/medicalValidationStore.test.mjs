@@ -7,7 +7,7 @@ import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, deriveAllPassLeaves, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote } =
+const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, deriveAllPassLeaves, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote, mvCasesClean, mvComplete, renderFlagChrome } =
   await load("medicalValidationStore.ts");
 
 let pass = 0;
@@ -783,6 +783,53 @@ check("load: STALE/orphan note caseIds are PRESERVED (coerce has no model to pru
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// ── #203 Todo 4: the flags-half readout + the mvComplete gate ──────────────────────
+const P = (o) => ({ total: 0, reviewed: 0, passed: 0, failed: 0, pending: 0, unreviewable: 0, stale: 0, ...o });
+
+check("mvCasesClean: every case passed, nothing else → true", () => {
+  assert.equal(mvCasesClean(P({ total: 3, reviewed: 3, passed: 3 })), true);
+});
+check("mvCasesClean: total 0 → false (no cases is not 'complete')", () => {
+  assert.equal(mvCasesClean(P({ total: 0 })), false);
+});
+check("mvCasesClean: a pending/failed/stale/unreviewable case → false", () => {
+  assert.equal(mvCasesClean(P({ total: 2, passed: 1, pending: 1 })), false);
+  assert.equal(mvCasesClean(P({ total: 2, reviewed: 2, passed: 1, failed: 1 })), false);
+  assert.equal(mvCasesClean(P({ total: 2, reviewed: 2, passed: 2, stale: 1 })), false);
+  assert.equal(mvCasesClean(P({ total: 2, reviewed: 2, passed: 2, unreviewable: 1 })), false);
+});
+
+check("mvComplete: cases clean AND no open flags AND no load error → true", () => {
+  assert.equal(mvComplete(P({ total: 1, reviewed: 1, passed: 1 }), { open: 0, resolved: 2, error: false }), true);
+});
+check("mvComplete: an open flag blocks even when cases are clean", () => {
+  assert.equal(mvComplete(P({ total: 1, reviewed: 1, passed: 1 }), { open: 1, resolved: 0, error: false }), false);
+});
+check("mvComplete: a flag LOAD ERROR blocks (unknown state must never silently pass)", () => {
+  assert.equal(mvComplete(P({ total: 1, reviewed: 1, passed: 1 }), { open: 0, resolved: 0, error: true }), false);
+});
+check("mvComplete: cases not clean → false regardless of flags", () => {
+  assert.equal(mvComplete(P({ total: 2, passed: 1, pending: 1 }), { open: 0, resolved: 0, error: false }), false);
+});
+
+check("renderFlagChrome: open>0 → clickable ⚑ count (singular/plural)", () => {
+  const one = renderFlagChrome({ open: 1, resolved: 0, error: false });
+  assert.ok(one.includes("data-mv-flags"), "clickable hook");
+  assert.ok(one.includes(">⚑ 1 open flag<"), "singular label");
+  assert.ok(renderFlagChrome({ open: 3, resolved: 0, error: false }).includes(">⚑ 3 open flags<"), "plural label");
+});
+check("renderFlagChrome: open 0 with resolved → ✓ flags clear (clickable)", () => {
+  const c = renderFlagChrome({ open: 0, resolved: 2, error: false });
+  assert.ok(c.includes("✓ flags clear") && c.includes("data-mv-flags"));
+});
+check("renderFlagChrome: no flags at all → '' (nothing to say)", () => {
+  assert.equal(renderFlagChrome({ open: 0, resolved: 0, error: false }), "");
+});
+check("renderFlagChrome: a load error → ⚠ flags unreadable (still clickable)", () => {
+  const e = renderFlagChrome({ open: 0, resolved: 0, error: true });
+  assert.ok(e.includes("⚠ flags unreadable") && e.includes("data-mv-flags"));
 });
 
 console.log(`\nmedicalValidationStore.test: ${pass} checks passed`);

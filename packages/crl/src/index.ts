@@ -274,6 +274,10 @@ export type { FlagInstance } from "./meta/collectFlags";
 export { parseMetaTag } from "./meta/parseMetaTag";
 export type { ParseMetaResult, ParsedMetaTag } from "./meta/parseMetaTag";
 
+// #205 crl-refactors — the write-half of the CRL-source API. Instance #1: the flag-status flip (meta-quickfix family).
+export { rewriteMetaStatus, rewriteStatusInBody } from "./refactors/rewriteMetaStatus";
+export type { FlagStatus } from "./refactors/rewriteMetaStatus";
+
 export interface Token {
   line: number;
   column: number;

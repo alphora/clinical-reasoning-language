@@ -5,18 +5,25 @@
 // The pure logic lives in correspondenceEngine / paneRevealCoordinator / sourcePaneHtml (all unit-tested);
 // this file is the untested integration per the established split. Design: .vibe-tools/discussions/118-c2a-source-spine.md.
 import { randomBytes, randomUUID } from "node:crypto";
-import { basename, isAbsolute, relative, sep } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { basename, isAbsolute, join, relative, sep } from "node:path";
 
 import {
   buildCockpitModel,
+  buildCRL,
+  collectFlags,
   conceptDeclRef,
   nodeKey,
+  parseMetaTag,
+  rewriteMetaStatus,
   type CorrespondenceModel,
   type CrlConceptNode,
   type ConceptShapeIndex,
   type DefExprIndex,
   type CrlDecisionStructure,
   type CrlStructureNode,
+  type FlagInstance,
+  type FlagStatus,
   type RenderScenarioResult,
   type ScenarioViewModel,
 } from "@smile-digital-health/crl";
@@ -64,11 +71,14 @@ import {
   isReviewState,
   loadSidecar,
   medicalValidationSidecarPath,
+  mvComplete,
+  renderFlagChrome,
   renderProgressChrome,
   REVIEW_STATES,
   reviewProgress,
   saveSidecar,
   setReviewState,
+  type FlagChrome,
   type Note,
   type PersistedReviewState,
   type ReviewState,
@@ -380,6 +390,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let openNotesCaseId: string | undefined;
   let editingNoteId: string | undefined;
   let mvSidecarPath: string | undefined;
+  // #203 Todo 4 — the review-flag surface. `flagsList` = ALL flags (open + resolved) across the policy's `src/crl/*.crl`
+  // files, freshly (re)loaded in loadFlags() from the LIVE editor buffer when a `.crl` is open (else disk) so a dirty edit's
+  // line offsets match what the write-back edits. `flagLoadError` = a `.crl` failed to parse → flag state is UNKNOWN, so the
+  // mvComplete gate conservatively does NOT report complete. Both cleared on retarget/reset (mirrors the MV-state resets).
+  let flagsList: FlagInstance[] = [];
+  let flagLoadError = false;
   let worklistActions: Record<string, { caseId: string }> = {};
   // #214: the worklist verdict FILTER — the set of verdicts whose rows are SHOWN. Session-only VIEW state (NOT persisted;
   // reset to all-shown on every MV retarget alongside the drawer state), so policy A's filter can't hide policy B.
@@ -745,10 +761,18 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // renders one checkbox per row; scenarioByCaseId, a Map, is the reviewable set slice 5 already paints from). A frozen
     // caseId is a per-case identity, so two differently-named rows can't collapse to one key — the same invariant the done
     // overlay's `scenarioByCaseId.keys()` paintable set relies on; this readout is no more fragile than the overlay it pairs with.
+    // #156 slice 6 (cases half) + #203 Todo 4 (flags half). The two are composed at the DISPLAY level only: when BOTH are
+    // clean the gate collapses to a single "✓ Medical validation complete"; otherwise each half shows what's blocking. The
+    // flag counts are conservative — only an explicit `; status resolved` clears (absent/unknown status blocks), matching
+    // openFlags. `flagLoadError` (an unparseable `.crl`) forces the gate open (mvComplete must never silently pass).
     let progress = "";
     if (mode === "medical-validation") {
       const p = reviewProgress(reviewByCaseId, [...scenarioByCaseId.keys()], scenarios?.scenarios.length ?? 0);
-      progress = renderProgressChrome(p);
+      const resolvedCount = flagsList.filter((f) => f.status === "resolved").length;
+      const fc: FlagChrome = { open: flagsList.length - resolvedCount, resolved: resolvedCount, error: flagLoadError };
+      progress = mvComplete(p, fc)
+        ? `<div class="mv-progress mv-progress-done mv-gate-complete">✓ Medical validation complete</div>`
+        : renderProgressChrome(p) + renderFlagChrome(fc);
     }
     const btn = (mode: "blocking" | "all", label: string): string =>
       `<button class="fc-toggle-btn${failedCriteriaMode === mode ? " fc-active" : ""}" data-fc-mode="${mode}">${label}</button>`;
@@ -788,6 +812,168 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function renderTreeChrome(): void {
     const tree = views.get("tree");
     if (tree) void tree.panel.webview.postMessage({ type: "fcChrome", html: buildTreeChromeHtml() });
+  }
+
+  // ── #203 Todo 4: the review-flag surface ────────────────────────────────────────────
+  // Flags live IN the `.crl` (unlike verdicts, which live in the sidecar). The cockpit LOADS them (all `src/crl/*.crl`,
+  // live-buffer-aware), surfaces the count + the mvComplete gate in the tree chrome, and WRITES BACK the open↔resolved
+  // status via the #205 `rewriteMetaStatus` refactor primitive (a WorkspaceEdit + save, guarded against a stale line).
+
+  /** Read a policy `.crl`'s text from the LIVE editor buffer when it's open (so an unsaved edit's line offsets match the
+   *  buffer the write-back edits), else from disk. Undefined if unreadable. */
+  function crlText(filePath: string): string | undefined {
+    // Case-insensitive fsPath compare on Windows (drive-letter/casing differences must not make loadFlags read DISK while
+    // the write-back edits the live BUFFER — the design depends on both seeing the same line offsets; gpt55 impl review).
+    const same = (a: string, b: string): boolean => (process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b);
+    const open = vscode.workspace.textDocuments.find((d) => same(d.uri.fsPath, filePath));
+    if (open) return open.getText();
+    try {
+      return readFileSync(filePath, "utf8");
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** (Re)load ALL review flags across the policy's `src/crl/*.crl` files into `flagsList`. An unparseable/unreadable `.crl`
+   *  sets `flagLoadError` (→ the mvComplete gate stays open — flag state is unknown, must not silently pass). Called from
+   *  rebuild() (MV mode) and after a status write-back. Globs the WHOLE crl/ dir so a library-scope flag in a decision-only
+   *  file is still found (the cross-library separate-file layout, #196); each flag carries its OWN filePath for the write-back. */
+  function loadFlags(): void {
+    flagsList = [];
+    flagLoadError = false;
+    if (mode !== "medical-validation" || !currentCel) return;
+    const src = findPolicySrc(currentCel);
+    if (!src) return;
+    let files: string[];
+    try {
+      // Case-insensitive `.crl` match + sorted, so the flag list order is deterministic across platforms/filesystems.
+      files = readdirSync(join(src, "crl")).filter((f) => f.toLowerCase().endsWith(".crl")).sort();
+    } catch (e) {
+      // A MISSING crl/ dir is legitimately "no flags" (a measure/activities-only policy has no decision `.crl`). But an
+      // unreadable PRESENT dir (EACCES/EIO) is an unknown source → block the gate (Claude impl review: don't silently pass).
+      if ((e as NodeJS.ErrnoException)?.code !== "ENOENT") flagLoadError = true;
+      return;
+    }
+    for (const name of files) {
+      const filePath = join(src, "crl", name);
+      const text = crlText(filePath);
+      if (text === undefined) {
+        flagLoadError = true;
+        continue;
+      }
+      const parsed = buildCRL(text);
+      if (!parsed.success || !parsed.result) {
+        flagLoadError = true;
+        continue;
+      }
+      flagsList.push(...collectFlags(parsed.result, { filePath }));
+    }
+  }
+
+  const flagNote = (m: string): void => void vscode.window.setStatusBarMessage(`Medical Validation: ${m}`, 3000);
+
+  /** Open the review-flag list (mirrors the verdict quick-pick idiom). Re-entrant: after a toggle the list re-opens over the
+   *  REFRESHED `flagsList` (loadFlags re-parses, so a stale FlagInstance is never reused across two edits). Esc, or a reveal
+   *  (which navigates away), ends the loop. */
+  async function openFlagList(): Promise<void> {
+    if (mode !== "medical-validation") return;
+    const ver = indexVersion; // retarget/rebuild guard: a policy switch while a picker is open must not write the old .crl
+    const cel = currentCel;
+    for (;;) {
+      if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return; // policy changed underneath
+      if (flagsList.length === 0) return flagNote(flagLoadError ? "a policy .crl could not be parsed" : "no review flags");
+      // Embed the FlagInstance on the item (not an index) so a rebuild that reloads `flagsList` during the pick can't make
+      // us act on a different flag at the same position (Claude impl review). The `ver` guard also aborts on rebuild.
+      const items = flagsList.map((f) => ({
+        label: `${f.status === "resolved" ? "✓" : "⚑"} ${f.canonicalTag}${f.body ? " — " + f.body : ""}`,
+        description: `${f.scope}:${f.targetName} · ${f.status}${f.fields.get("ref") ? " · " + f.fields.get("ref") : ""}`,
+        flag: f,
+      }));
+      const pick = await vscode.window.showQuickPick(items, { placeHolder: "Review flags — pick one (Esc to finish)" });
+      if (!pick) return; // Esc — done
+      if ((await flagActionMenu(pick.flag, ver, cel)) === "closed") return; // a reveal navigated away
+    }
+  }
+
+  /** The per-flag action menu — the status toggle (the crl-refactors write-back) + reveal-in-source. `ver`/`cel` are the
+   *  policy-identity captured at list-open; the write-back revalidates them so a retarget mid-menu can't patch the old `.crl`. */
+  async function flagActionMenu(flag: FlagInstance, ver: number, cel: string | undefined): Promise<"continue" | "closed"> {
+    const actions = [
+      { label: flag.status === "resolved" ? "↻ Reopen flag" : "✓ Mark resolved", act: "toggle" as const },
+      { label: "→ Reveal in source", act: "reveal" as const },
+    ];
+    const pick = await vscode.window.showQuickPick(actions, { placeHolder: `${flag.canonicalTag} — ${flag.body}` });
+    if (!pick) return "continue"; // Esc → back to the list
+    if (pick.act === "reveal") {
+      await revealFlag(flag);
+      return "closed";
+    }
+    await writeFlagStatus(flag, flag.status === "resolved" ? "open" : "resolved", ver, cel);
+    return "continue";
+  }
+
+  /** #205 crl-refactors — flip a flag's `; status` in its OWN `.crl` via `rewriteMetaStatus` + a WorkspaceEdit (undoable) +
+   *  save, then reload flags + refresh the chrome. GUARDS: the edit targets the LIVE document (offsets match the buffer);
+   *  the target line is re-read + re-parsed and must still be the SAME flag at the SAME status before we apply (a prior edit
+   *  / external change → abort, never patch the wrong line). The watcher does NOT watch `.crl`, so the refresh is EXPLICIT. */
+  async function writeFlagStatus(flag: FlagInstance, next: FlagStatus, ver: number, cel: string | undefined): Promise<void> {
+    if (!flag.filePath) return flagNote("flag has no source file");
+    // A stale guard that reloads the list so a retry sees fresh state (else the loop keeps re-showing the stale list).
+    const stale = (m: string): void => {
+      loadFlags();
+      renderTreeChrome();
+      flagNote(m);
+    };
+    if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return stale("policy changed — reopen the flags");
+    let doc: vscode.TextDocument;
+    try {
+      doc = await vscode.workspace.openTextDocument(flag.filePath);
+    } catch {
+      return flagNote("could not open the flag's .crl");
+    }
+    if (indexVersion !== ver || currentCel !== cel) return stale("policy changed — reopen the flags"); // the await could straddle a retarget
+    const lineNo = flag.lineLocation.start.line - 1; // AST Location is 1-based; vscode is 0-based
+    if (lineNo < 0 || lineNo >= doc.lineCount) return stale("flags changed — reopen the list");
+    const rawLine = doc.lineAt(lineNo).text;
+    // Stale guard: the target line must STILL be this exact flag (a prior/external edit could have shifted or changed it).
+    // We require a `- meta is` prefix + the same tag + body + loaded status — tag alone would let a same-tag flag at a
+    // shifted line be mis-edited (gpt55 impl review).
+    const bt1 = rawLine.indexOf("`");
+    const bt2 = rawLine.lastIndexOf("`");
+    if (!rawLine.trimStart().startsWith("- meta is") || bt1 === -1 || bt2 <= bt1) return stale("flags changed — reopen the list");
+    const res = parseMetaTag(rawLine.slice(bt1 + 1, bt2));
+    if (
+      res.kind !== "tag" ||
+      res.parsed.tag !== flag.tag ||
+      res.parsed.body !== flag.body ||
+      (res.parsed.fields.get("status") ?? "open") !== flag.status ||
+      // when present, the stable join key disambiguates two byte-identical meta lines in one file (Claude impl review).
+      (flag.key !== undefined && res.parsed.fields.get("key") !== flag.key)
+    ) {
+      return stale("flags changed — reopen the list");
+    }
+    const newLine = rewriteMetaStatus(rawLine, next);
+    if (newLine !== rawLine) {
+      const edit = new vscode.WorkspaceEdit();
+      edit.replace(doc.uri, doc.lineAt(lineNo).range, newLine);
+      if (!(await vscode.workspace.applyEdit(edit))) return flagNote("edit could not be applied");
+      if (!(await doc.save())) return stale("could not save the .crl — flag not changed"); // false → disk still open; don't advance the gate
+    }
+    loadFlags(); // re-parse → fresh flagsList (never reuse a stale FlagInstance across edits)
+    renderTreeChrome(); // EXPLICIT refresh — the watcher does not watch .crl
+    flagNote(next === "resolved" ? "flag resolved" : "flag reopened");
+  }
+
+  /** Reveal a flag at its meta line in the `.crl` source (its authoritative home — a library-scope flag has no tree node). */
+  async function revealFlag(flag: FlagInstance): Promise<void> {
+    if (!flag.filePath) return;
+    try {
+      const doc = await vscode.workspace.openTextDocument(flag.filePath);
+      const lineNo = Math.max(0, Math.min(flag.lineLocation.start.line - 1, doc.lineCount - 1));
+      await vscode.window.showTextDocument(doc, { selection: doc.lineAt(lineNo).range });
+    } catch {
+      flagNote("could not open the flag's source");
+    }
   }
 
   /**
@@ -1460,6 +1646,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       applyFailedCriteriaMode(msg.mode); // the tree-pane segmented toggle
     } else if (msg.type === "fcOpenSource" && typeof msg.idx === "number") {
       openFailedCriterionSource(msg.idx); // a gap row's "Open CRL source"
+    } else if (msg.type === "mvFlags") {
+      void openFlagList(); // #203 Todo 4: the tree-chrome flag badge → open the review-flag list (MV)
     } else if (msg.type === "questionNav" && (msg.dir === "prev" || msg.dir === "next")) {
       navigateQuestion(msg.dir); // #177 slice 5: the questionnaire pane's prev/next sub-nav — moves currentQuestionIndex
     } else if (msg.type === "worklistSet" && typeof msg.key === "string") {
@@ -1735,6 +1923,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // #187 Todo 5: the rebuilt tree lost its `.flow-leaf-yes/no` classes — re-drive the leaf verdict overlay too (same
     // self-healing-on-ack contract; the tree's ack also re-drives). Inert in cockpit / for a no/errored focused case.
     driveLeafMarks();
+    // #203 Todo 4: (re)parse the policy `.crl` files for review flags — the tree-chrome badge + the mvComplete gate read
+    // `flagsList`. Independent of the correspondence model (reads the `.crl` directly); inert in cockpit mode (MV-only).
+    loadFlags();
   }
 
   /** On a discovery/build failure, drop stale provenance so the panes never stay interactive with wrong data. */
@@ -1762,6 +1953,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     openNotesCaseId = undefined;
     editingNoteId = undefined;
     mvSidecarPath = undefined;
+    flagsList = []; // #203 Todo 4: drop the review-flag state too (a stale flag list/gate must not survive a failed retarget)
+    flagLoadError = false;
     worklistActions = {};
     worklistFilter = new Set(REVIEW_STATES); // #214: reset the verdict filter to all-shown (a stale filter must not hide the next policy)
     currentQuestionIndex = -1; // #177 slice 3: drop the questionnaire sub-nav cursor (no question focused) with the MV state
@@ -2453,6 +2646,12 @@ function shellHtml(): string {
 .fc-gap-open{text-decoration:underline;opacity:.85;margin-left:4px}
 .mv-progress{padding:4px 2px 2px;font-size:.85em;opacity:.85}
 .mv-progress-done{color:var(--vscode-testing-iconPassed,var(--vscode-charts-green,#89d185));opacity:1;font-weight:bold}
+/* #203 Todo 4: the review-flag readout (the flags half of the MV gate) — all clickable (→ the flag list). */
+.mv-flags{padding:2px 2px 4px;font-size:.85em;cursor:pointer}
+.mv-flags-open{color:var(--vscode-testing-iconQueued,var(--vscode-charts-yellow,#cca700));font-weight:bold}
+.mv-flags-clear{color:var(--vscode-testing-iconPassed,var(--vscode-charts-green,#89d185));opacity:.9}
+.mv-flags-error{color:var(--vscode-testing-iconErrored,var(--vscode-charts-red,#f14c4c));font-weight:bold}
+.mv-flags:hover{text-decoration:underline}
 ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
@@ -2625,4 +2824,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `const dv=e.target.closest&&e.target.closest('[data-diverter-toggle]');` +
   `if(dv){v.postMessage({type:'diverterToggle',on:dv.getAttribute('data-diverter-toggle')});return;}` +
   `const gap=e.target.closest&&e.target.closest('[data-fc-gap]');` +
-  `if(gap)v.postMessage({type:'fcOpenSource',idx:Number(gap.getAttribute('data-fc-gap'))});});`;
+  `if(gap){v.postMessage({type:'fcOpenSource',idx:Number(gap.getAttribute('data-fc-gap'))});return;}` +
+  // #203 Todo 4: the flag badge / mvComplete gate → open the review-flag list.
+  `const fl=e.target.closest&&e.target.closest('[data-mv-flags]');` +
+  `if(fl)v.postMessage({type:'mvFlags'});});`;

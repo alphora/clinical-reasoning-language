@@ -498,9 +498,16 @@ export function reviewProgress(
  * - Otherwise: `Reviewed N/M` (N = passed+failed), then `· P pending` (P>0), `· F failed` (F>0), `· U not reviewable`
  *   (U>0), `· S stale` (S>0). When `total===0` (but stale/unreviewable>0) the leading clause reads `0 reviewable`.
  */
+/** The cases-half "clean" predicate — EVERY reviewable case passed, nothing pending/failed/stale/unreviewable (and at
+ *  least one case exists). Exported so the flag-aware mvComplete gate ANDs it with `openFlags===0` at the DISPLAY level
+ *  WITHOUT the flag data ever entering `ReviewProgress` (the two halves refresh on independent channels — #203 Todo 4). */
+export function mvCasesClean(p: ReviewProgress): boolean {
+  return p.total > 0 && p.passed === p.total && p.pending === 0 && p.stale === 0 && p.unreviewable === 0;
+}
+
 export function renderProgressChrome(p: ReviewProgress): string {
   if (p.total === 0 && p.stale === 0 && p.unreviewable === 0) return "";
-  const clean = p.total > 0 && p.passed === p.total && p.pending === 0 && p.stale === 0 && p.unreviewable === 0;
+  const clean = mvCasesClean(p);
   if (clean) return `<div class="mv-progress mv-progress-done">✓ All passed</div>`;
   const parts: string[] = [p.total > 0 ? `Reviewed ${p.reviewed}/${p.total}` : `0 reviewable`];
   if (p.pending > 0) parts.push(`${p.pending} pending`);
@@ -508,4 +515,43 @@ export function renderProgressChrome(p: ReviewProgress): string {
   if (p.unreviewable > 0) parts.push(`${p.unreviewable} not reviewable`);
   if (p.stale > 0) parts.push(`${p.stale} stale`);
   return `<div class="mv-progress">${parts.join(" · ")}</div>`;
+}
+
+// ── flag readout + the mvComplete gate (#203 Todo 4) ─────────────────────────────────
+// The FLAGS half of Medical Validation completeness. Independent of `reviewProgress` (the CASES half) — the two refresh
+// on separate channels (verdicts ← sidecar; flag status ← the `.crl`), so they are composed only at the DISPLAY level
+// here, never coupled in data (reviewers R1, disc 223). `mvComplete = mvCasesClean(p) ∧ openFlags===0` — surfaced as a
+// single "✓ Medical validation complete" line when BOTH halves are clean; otherwise each half shows what's blocking.
+
+/** The tree-chrome flag counts. `error` = a `.crl` that couldn't be parsed → the flag state is UNKNOWN, so the gate is
+ *  conservatively NOT complete (mvComplete must never silently pass on an unreadable source — reviewers R1). */
+export interface FlagChrome {
+  open: number;
+  resolved: number;
+  error: boolean;
+}
+
+/** True only when every case passed AND there are no open flags AND the flags loaded cleanly — the surfaced MV gate. */
+export function mvComplete(p: ReviewProgress, f: FlagChrome): boolean {
+  return mvCasesClean(p) && !f.error && f.open === 0;
+}
+
+/**
+ * Render the flags-half readout as tree-chrome HTML (pure, vscode-free — like `renderProgressChrome`). Only integers +
+ * fixed literals are interpolated (NO free text → no escaping needed; keep it that way). The `data-mv-flags` hook makes
+ * the readout clickable → the host opens the flag list (mirrors the `data-fc-*` chrome-click channel).
+ *
+ * - `error` (a `.crl` failed to parse) → `⚠ flags unreadable` (blocks the gate; still clickable to see what loaded).
+ * - `open > 0` → `⚑ N open flag(s)` (blocks the gate).
+ * - `open === 0 && resolved > 0` → `✓ flags clear` (all resolved — a positive all-clear; still clickable to reopen).
+ * - no flags at all (`open===0 && resolved===0`) → "" (nothing to say, like the progress readout).
+ */
+export function renderFlagChrome(f: FlagChrome): string {
+  if (f.error) return `<div class="mv-flags mv-flags-error" data-mv-flags title="A policy .crl could not be parsed — flag state is unknown">⚠ flags unreadable</div>`;
+  if (f.open > 0) {
+    const label = f.open === 1 ? "1 open flag" : `${f.open} open flags`;
+    return `<div class="mv-flags mv-flags-open" data-mv-flags title="Open review flags block Medical Validation completion — click to review">⚑ ${label}</div>`;
+  }
+  if (f.resolved > 0) return `<div class="mv-flags mv-flags-clear" data-mv-flags title="All review flags resolved — click to review or reopen">✓ flags clear</div>`;
+  return "";
 }

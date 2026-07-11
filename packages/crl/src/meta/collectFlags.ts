@@ -76,8 +76,10 @@ export function collectFlags(ast: CRL, attr: Attribution = {}): FlagInstance[] {
   return out;
 }
 
-/** The OPEN flags — the ones that block `mvComplete`. (A flag whose status the parser couldn't read defaults to
- *  `open`, so it conservatively blocks rather than silently passing.) */
+/** The OPEN flags — the ones that block `mvComplete`. Conservative: only an EXPLICIT `; status resolved` clears; an
+ *  absent status (defaulted to `open`) AND any unknown/variant status (`pending`, a stray ruling) are all treated as open
+ *  so a malformed flag BLOCKS rather than silently passing. This matches the cockpit gate's `open = total − resolved`
+ *  (Claude impl review: `status === "open"` would undercount a variant status and contradict this docstring). */
 export function openFlags(ast: CRL, attr: Attribution = {}): FlagInstance[] {
-  return collectFlags(ast, attr).filter((f) => f.status === "open");
+  return collectFlags(ast, attr).filter((f) => f.status !== "resolved");
 }
