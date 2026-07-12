@@ -820,7 +820,10 @@ check("#211: commitFlagDraft — trust+github gated, pre-POST recheck, LOCK+try/
   const rechecks = (m[1].match(/currentCel !== cel \|\| mode !== "medical-validation"/g) || []).length;
   assert.ok(rechecks >= 3, "pre-write guard + at least two pre-POST rechecks");
   assert.match(m[1], /ref = `#\$\{await createGithubIssue\(/); // ref from the created number
-  assert.match(m[1], /catch \(e\)[\s\S]*?issueCreateErrorLabel\(e\)/); // labelled failure → issueNote
+  // 401 Bad credentials (a stale cached token) → force a FRESH session + retry ONCE, rather than dead-ending
+  assert.match(m[1], /e1 instanceof IssueCreateError && e1\.status === 401/);
+  assert.match(m[1], /const fresh = await githubToken\(true\)/);
+  assert.match(m[1], /catch \(e\)[\s\S]*?issue not created — \$\{e\.message\}/); // outer catch surfaces the RAW github message
   assert.match(m[1], /const withRef = ref \? \{ \.\.\.fields, ref \} : fields/);
   assert.match(m[1], /made\.insertLine >= doc2\.lineCount/); // EOF-safe on the captured file
   assert.match(m[1], /issue \$\{ref\} created but the flag couldn't be written/); // honest post-POST failure (never silent)
@@ -900,14 +903,14 @@ check("#211: githubRepoForFile derives {owner,repo} from the origin via the SHAR
   assert.match(m[1], /githubRepoFromRemote\(origin\?\.fetchUrl \|\| origin\?\.pushUrl\)/); // github-only parser
   assert.doesNotMatch(m[1], /cfg\.update|flagNote/); // no side effects
 });
-check("#211: githubToken tries SILENT first, then prompts once; a decline is remembered this session (no re-nag)", () => {
+check("#211: githubToken — SILENT probe first, prompt once, decline latches; forceNew forces a BRAND-NEW session (401 recovery)", () => {
   const m = COCKPIT_SRC.match(/async function githubToken\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "githubToken body");
+  assert.match(m[1], /if \(!forceNew\) \{/); // the silent probe + declined-latch are skipped on a forced re-auth
   assert.match(m[1], /getSession\("github", \["repo"\], \{ silent: true \}\)/); // silent probe first (no UI if signed in)
   assert.match(m[1], /if \(githubAuthDeclined\) return undefined/); // declined earlier → don't nag on every flag
-  assert.match(m[1], /getSession\("github", \["repo"\], \{ createIfNone: true \}\)/); // then prompt once
-  assert.match(m[1], /githubAuthDeclined = true;/); // decline REJECTS → caught → remembered this session
-  assert.match(m[1], /catch \{\s*\n\s*githubAuthDeclined = true;/); // set in the createIfNone catch
+  assert.match(m[1], /forceNew \? \{ forceNewSession: true \} : \{ createIfNone: true \}/); // 401 → a guaranteed-fresh session
+  assert.match(m[1], /if \(!forceNew\) githubAuthDeclined = true;/); // a normal decline latches; a forced re-auth decline doesn't
 });
 check("#204 auto-detect: detectIssueBaseFromGit uses the shared repo access, github-only, persists-if-unset, total (no throw)", () => {
   const m = COCKPIT_SRC.match(/async function detectIssueBaseFromGit\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);

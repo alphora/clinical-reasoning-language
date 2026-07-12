@@ -64,7 +64,7 @@ import {
 import { resolveThisNode } from "./thisNodeMarker";
 import { failedCriterionLabel } from "./failedCriterionLabel";
 import { buildIssueUrl, githubIssuesBaseFromRemote, githubRepoFromRemote, issueRefOf, sanitizeIssueBase } from "./issueLink";
-import { createGithubIssue, issueCreateErrorLabel } from "./githubIssue";
+import { createGithubIssue, IssueCreateError, issueCreateErrorLabel } from "./githubIssue";
 import { renderFlagDrawer } from "./flagDrawerHtml";
 import { isOccurrenceKey, occurrenceByNodeKey, occurrenceKeyValue, parseOccurrenceKey, resolveOccurrence, type OccurrenceRef } from "./occurrenceKey";
 import {
@@ -964,20 +964,24 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** #211 — a GitHub access token via VS Code's built-in auth provider: try SILENT first (no UI if a session exists), else
    *  prompt ONCE (`createIfNone`). A decline / no-provider REJECTS → caught → undefined (→ the flag is written without a
    *  ref). `repo` scope (policy repos are typically private, so `public_repo` wouldn't suffice). */
-  async function githubToken(): Promise<string | undefined> {
-    // Always try the SILENT probe (so a sign-in via the Accounts menu after an earlier decline is still picked up).
-    try {
-      const existing = await vscode.authentication.getSession("github", ["repo"], { silent: true });
-      if (existing) return existing.accessToken;
-    } catch {
-      /* silent probe failed — fall through */
+  async function githubToken(forceNew = false): Promise<string | undefined> {
+    if (!forceNew) {
+      // Try the SILENT probe first (so a sign-in via the Accounts menu after an earlier decline is still picked up).
+      try {
+        const existing = await vscode.authentication.getSession("github", ["repo"], { silent: true });
+        if (existing) return existing.accessToken;
+      } catch {
+        /* silent probe failed — fall through */
+      }
+      if (githubAuthDeclined) return undefined; // declined earlier this session → don't nag on every flag
     }
-    if (githubAuthDeclined) return undefined; // declined earlier this session → don't nag on every flag
+    // `forceNew` (after a 401) forces a BRAND-NEW session — the cached token was rejected as "Bad credentials", so a plain
+    // createIfNone (which returns that same stale session) wouldn't help.
     try {
-      const created = await vscode.authentication.getSession("github", ["repo"], { createIfNone: true });
+      const created = await vscode.authentication.getSession("github", ["repo"], forceNew ? { forceNewSession: true } : { createIfNone: true });
       return created?.accessToken;
     } catch {
-      githubAuthDeclined = true; // user declined / no provider → stop prompting this session
+      if (!forceNew) githubAuthDeclined = true; // a normal decline latches; a forced re-auth decline shouldn't (they're mid-fix)
       return undefined;
     }
   }
@@ -2657,7 +2661,19 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           try {
             const token = await githubToken();
             if (!token) issueNote = "not signed in to GitHub";
-            else ref = `#${await createGithubIssue({ owner: repo.owner, repo: repo.repo, title: summary, body: stub, token })}`;
+            else {
+              const args = { owner: repo.owner, repo: repo.repo, title: summary, body: stub };
+              try {
+                ref = `#${await createGithubIssue({ ...args, token })}`;
+              } catch (e1) {
+                // 401 Bad credentials = a stale/invalid cached VS Code token. Force a FRESH session + retry ONCE.
+                if (e1 instanceof IssueCreateError && e1.status === 401) {
+                  const fresh = await githubToken(true);
+                  if (!fresh) throw e1;
+                  ref = `#${await createGithubIssue({ ...args, token: fresh })}`;
+                } else throw e1;
+              }
+            }
           } catch (e) {
             // Surface the RAW GitHub message when we have one (e.g. "GitHub 403: Resource not accessible …") — a short
             // label alone hides the actionable detail (scope/permission). Falls back to the label for a non-typed error.
