@@ -10,19 +10,19 @@
 import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
 import {
+  AGENT_MAX_TOKENS,
+  MAX_TOOL_ROUNDS,
   resolveProvider,
   type ModelMessage,
-  type ModelProvider,
+  type StreamDelta,
 } from "./agentModelProvider";
+import { runAgentTurn, type ToolRegistry } from "./agentToolLoop";
+import { cockpitAgentBridge } from "./cockpitAgentBridge";
+import { appStateBlock, buildSystemPrompt, OPEN_FLAG_DRAWER, openFlagDrawerTool } from "./editorAgentPrompt";
 import { anthropicErrorLabel } from "./anthropicClient";
 import { CHAT_BODY, CHAT_STYLE, CHAT_WEBVIEW_SCRIPT, renderChatThread, type ChatEntry } from "./chatPaneHtml";
 
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
-
-/** The Todo-B system prompt — generic (no tools, no app perception yet). Todo C replaces/extends this with the editor-kit. */
-const SYSTEM_PROMPT =
-  "You are the CRL editor assistant, helping the user reason about Clinical Reasoning Language (CRL) documents and their " +
-  "clinical-decision content. Answer concisely and directly.";
 
 const PLACEHOLDER = "Ask the CRL agent anything about Clinical Reasoning Language.";
 
@@ -46,6 +46,8 @@ export function registerAgentChat(context: vscode.ExtensionContext): void {
     }),
     // Reveal/focus the view (VS Code auto-registers `<viewId>.focus` for a contributed view).
     vscode.commands.registerCommand("crl.agent.chat", () => vscode.commands.executeCommand("crl.agentChat.focus")),
+    // #210 Todo C — the selected-item chip: refresh it whenever the cockpit's flag anchor / policy / tree-pane changes.
+    cockpitAgentBridge.onDidChangeAppState(() => chat.refreshChip()),
     statusItem,
     { dispose: () => chat.dispose() },
   );
@@ -77,8 +79,36 @@ class AgentChat implements vscode.WebviewViewProvider {
   /** Bumped per send AND on Clear — a turn whose `gen` no longer matches was superseded by a Clear (or reset) mid-stream,
    *  so its completion must NOT re-push into a cleared transcript/`messages` (gpt55 [critical]). */
   private gen = 0;
+  /** The provider used by the last committed turn — a provider switch mid-conversation would replay THAT provider's tool
+   *  ids into the new backend (which rejects them), so on a change we clear the model context (A11). */
+  private lastProviderId: "vscode-lm" | "anthropic" | undefined;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
+
+  /** Re-render on a cockpit app-state change — updates the selected-item chip (does nothing while no view is resolved). */
+  refreshChip(): void {
+    this.render();
+  }
+
+  /** The chip label = what the agent perceives right now: the flag anchor, or a reason it can't perceive one. `undefined`
+   *  hides the chip (no MV cockpit). */
+  private chipLabel(): string | undefined {
+    const s = cockpitAgentBridge.getAppState();
+    if (!s) return undefined;
+    if (!s.treePaneOpen) return "no tree pane";
+    if (!s.anchorLabel) return "no node selected";
+    return s.anchorLabel;
+  }
+
+  /** True when the committed model context carries tool_use/tool_result blocks — used to decide whether a provider switch
+   *  must clear it (a plain-text-only history is provider-portable; tool ids are not). Checks block TYPES, not mere
+   *  array-ness: the driver always stores assistant turns as a `ContentBlock[]`, so an array check alone would be
+   *  unconditionally true and wipe even a pure-text conversation on every switch (A11). */
+  private messagesHaveToolBlocks(): boolean {
+    return this.messages.some(
+      (m) => Array.isArray(m.content) && m.content.some((b) => b.type === "tool_use" || b.type === "tool_result"),
+    );
+  }
 
   /** Resolve (or RE-resolve, on a close/reopen) the view: wire the webview, store the LATEST ref, and rehydrate the full
    *  transcript (+ any in-flight partial/thinking) from host state. A view dispose does NOT tear down the stream. */
@@ -122,6 +152,8 @@ class AgentChat implements vscode.WebviewViewProvider {
       status,
       thinking: this.thinking,
       thinkingSince: this.thinkingSince,
+      // #210 Todo C — the selected-item chip (the flag anchor the agent perceives); undefined hides it (no MV cockpit).
+      chip: this.chipLabel(),
     });
   }
 
@@ -197,42 +229,68 @@ class AgentChat implements vscode.WebviewViewProvider {
     }
 
     const provider = resolved.provider;
-    // Show the user turn immediately (UI); the model-context commit is DEFERRED until the stream succeeds (or is cancelled
-    // with partial text) so a mid-stream failure leaves `messages` clean.
+
+    // A11 — a provider switch mid-conversation would replay THIS-provider tool ids into the OTHER backend (which rejects
+    // them). If the committed context carries tool blocks, clear it (keep the UI transcript) + note it. A plain-text-only
+    // history is provider-portable, so no clear is needed then.
+    if (this.lastProviderId && this.lastProviderId !== provider.id && this.messagesHaveToolBlocks()) {
+      this.messages = [];
+      this.transcript.push({ kind: "status", text: `switched to the ${provider.id} provider — starting a fresh context` });
+    }
+    this.lastProviderId = provider.id;
+
+    // Show the user turn immediately (UI); the model-context commit is DEFERRED until the driver returns a committable,
+    // BALANCED turn so a mid-loop failure/cancel/cap leaves `messages` clean (the driver stages internally — A2).
     this.transcript.push({ kind: "user", text });
-    const userMsg: ModelMessage = { role: "user", content: text };
     this.partial = "";
     this.streaming = true;
     this.render(); // "working…" + the empty open assistant turn
 
-    let res: Awaited<ReturnType<ModelProvider["stream"]>>;
+    // The add-flag skill: the live app-state → system prompt + the flag tool; a per-turn registry (ONE successful action
+    // per turn — A15). The registry NEVER writes CRL: it opens the cockpit drawer prefilled via the bridge.
+    const system = buildSystemPrompt(cockpitAgentBridge.getAppState());
+    const tools = [openFlagDrawerTool(cockpitAgentBridge.getValidationKinds())];
+    let acted = false;
+    // A recoverable error result carries the FRESH app-state (targets + their current ids) so the model can retry in the
+    // same loop after a selection change — C has no separate read tool (A14).
+    const recoverable = (reason: string) => ({ content: `${reason}\n${appStateBlock(cockpitAgentBridge.getAppState())}`, isError: true });
+    const registry: ToolRegistry = {
+      run: async (name, input) => {
+        if (name !== OPEN_FLAG_DRAWER) return { content: `unknown tool "${name}"`, isError: true };
+        const a = (input ?? {}) as { target_id?: unknown; validation_kind?: unknown; summary?: unknown };
+        if (typeof a.target_id !== "string" || !a.target_id) return recoverable("target_id is required — use one from the flag-targets list.");
+        if (acted) {
+          return { content: "a flag drawer is already open for this turn — the validator should review + submit it first", isError: true };
+        }
+        const res = cockpitAgentBridge.openFlagDrawer({
+          targetId: a.target_id,
+          validationKind: typeof a.validation_kind === "string" ? a.validation_kind : undefined,
+          summary: typeof a.summary === "string" ? a.summary : undefined,
+        });
+        if (!res.ok) return recoverable(res.reason);
+        acted = true;
+        return { content: "The flag drawer is now open in the cockpit, prefilled. Tell the validator to review and submit it." };
+      },
+    };
+
+    let result: Awaited<ReturnType<typeof runAgentTurn>>;
     try {
-      res = await provider.stream(
-        { system: SYSTEM_PROMPT, messages: [...this.messages, userMsg], token },
-        (d) => {
-          // A Clear (or reset) mid-stream bumps `gen` — a queued delta arriving after that must NOT mutate/render the
-          // cleared state (else e.g. a stale "thinking…" ticker gets restarted and the gen-guarded completion never clears it).
-          if (myGen !== this.gen) return;
-          if (d.type === "text") {
-            this.partial += d.text;
-            void this.view?.webview.postMessage({ type: "delta", text: d.text });
-          } else if (d.type === "thinking_start") {
-            // Open the indicator: the webview shows a live "thinking… Ns" ticker (partial is still "" here, so a full
-            // re-render doesn't wipe any streamed text).
-            this.thinking = true;
-            this.thinkingSince = Date.now();
-            this.render();
-          } else if (d.type === "thinking_stop") {
-            // Freeze the duration + collapse to "Thought for Ns": a full re-render now carries `thoughtMs` on the open turn.
-            if (this.thinkingSince !== undefined) this.thoughtMs = Date.now() - this.thinkingSince;
-            this.thinking = false;
-            this.render();
-          }
-        },
-      );
+      result = await runAgentTurn({
+        provider,
+        registry,
+        baseMessages: this.messages,
+        userMessage: { role: "user", content: text },
+        system,
+        tools,
+        maxTokens: AGENT_MAX_TOKENS,
+        maxRounds: MAX_TOOL_ROUNDS,
+        token,
+        isSuperseded: () => myGen !== this.gen,
+        onDelta: (d) => this.onDelta(myGen, d),
+      });
     } catch (e) {
       // A genuine failure. Keep the partial the user already watched stream in (as a stopped turn) + surface the error
-      // inline (reusing Todo A's Anthropic label). `messages` stays untouched (the pair was never committed).
+      // inline. `messages` stays untouched (the driver staged internally; nothing was committed).
       const partial = this.partial;
       const thoughtMs = this.thoughtMs ?? (this.thinkingSince !== undefined ? Date.now() - this.thinkingSince : undefined);
       this.endStream();
@@ -244,28 +302,56 @@ class AgentChat implements vscode.WebviewViewProvider {
       return;
     }
 
-    // Capture the thought duration before endStream resets it — incl. a cancel that landed WHILE thinking (thinking_stop
-    // never fired), so a stopped-mid-thought turn still shows "Thought for Ns".
+    // Capture the thought duration + the final streamed partial before endStream resets them.
     const thoughtMs = this.thoughtMs ?? (this.thinkingSince !== undefined ? Date.now() - this.thinkingSince : undefined);
+    const finalPartial = this.partial;
     this.endStream();
-    if (myGen !== this.gen) return; // a Clear superseded this turn mid-stream — its result must not repopulate the cleared chat
-    const finalText = res.text;
-    if (res.stopReason === "cancelled") {
-      // Stop → the stream RETURNS the partial (not an error). Finalize it as a stopped assistant turn (keep the partial
-      // text). Commit the pair to model context only if it produced text — an empty cancelled turn commits nothing (so the
-      // conversation stays alternating; no dangling user turn).
-      this.transcript.push({ kind: "assistant", text: finalText || "(stopped)", stopped: true, thoughtMs });
-      if (finalText) {
-        this.messages.push(userMsg, { role: "assistant", content: finalText });
-      }
+    if (myGen !== this.gen) return; // a Clear superseded this turn mid-loop — its result must not repopulate the cleared chat
+
+    if (result.stopReason === "cancelled") {
+      // Stop → finalize the last streamed text as a stopped turn (any earlier rounds were already pushed on their tool_use).
+      this.transcript.push({ kind: "assistant", text: finalPartial || result.text || "(stopped)", stopped: true, thoughtMs });
+    } else if (result.commit) {
+      this.transcript.push({ kind: "assistant", text: result.text || "(done)", thoughtMs });
+    } else if (result.stopReason === "tool_round_cap") {
+      this.transcript.push({ kind: "assistant", text: "(stopped — too many tool steps in one turn)", thoughtMs });
     } else {
-      // Commit ONLY a non-empty pair. An empty reply (e.g. max_tokens spent inside the thinking block → no text_delta) must
-      // NOT enter `messages` — Anthropic rejects an empty-content assistant turn, so it would 400 EVERY later send until Clear.
-      const shown = finalText || (res.stopReason === "max_tokens" ? "(no text — the model stopped at max_tokens)" : "(no response)");
+      // An empty/uncommittable turn (e.g. max_tokens spent in the thinking block → no text). Shown but NOT committed.
+      const shown = result.text || (result.stopReason === "max_tokens" ? "(no text — the model stopped at max_tokens)" : "(no response)");
       this.transcript.push({ kind: "assistant", text: shown, thoughtMs });
-      if (finalText) this.messages.push(userMsg, { role: "assistant", content: finalText });
     }
+    // Commit the driver's BALANCED staged turns to model context (only when committable — never a dangling tool_use — A2/A4).
+    if (result.commit) this.messages.push(...result.messages);
     this.render();
+  }
+
+  /** The driver's per-delta callback (gen-guarded). Text streams into the open turn; a tool_use FINALIZES the current
+   *  round's text as a transcript turn + a "opening the flag drawer…" status, then resets `partial` so the next round's
+   *  text starts a fresh open turn (Todo C multi-round rendering). */
+  private onDelta(myGen: number, d: StreamDelta): void {
+    if (myGen !== this.gen) return; // superseded by a Clear — a queued delta must not mutate the cleared state
+    if (d.type === "text") {
+      this.partial += d.text;
+      void this.view?.webview.postMessage({ type: "delta", text: d.text });
+    } else if (d.type === "thinking_start") {
+      this.thinking = true;
+      this.thinkingSince = Date.now();
+      this.render();
+    } else if (d.type === "thinking_stop") {
+      if (this.thinkingSince !== undefined) this.thoughtMs = Date.now() - this.thinkingSince;
+      this.thinking = false;
+      this.render();
+    } else if (d.type === "tool_use") {
+      if (this.partial) this.transcript.push({ kind: "assistant", text: this.partial, thoughtMs: this.thoughtMs });
+      // Neutral phrasing: the model REQUESTED a flag (true regardless of whether the tool then executes or is cancelled/
+      // fails — the drawer's actual appearance + the follow-up reply convey the outcome).
+      this.transcript.push({ kind: "status", text: "⚑ proposing a flag…" });
+      this.partial = "";
+      this.thinking = false;
+      this.thinkingSince = undefined;
+      this.thoughtMs = undefined;
+      this.render();
+    }
   }
 
   /** Tear down the in-flight stream state (CTS + flags + partial + the thinking timer) — shared by every terminal path. */

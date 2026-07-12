@@ -1,62 +1,28 @@
-// #210 editor agent Todo A — the model-provider abstraction. Two backends behind one interface: `vscode-lm` (the user's
-// Copilot Chat models, zero-setup) and `anthropic` (a raw POST via anthropicClient.ts, key from env or SecretStorage).
-// This module imports `vscode`, but the KEY-RESOLUTION helpers (`resolveAnthropicKey`, `anthropicKeySource`) are pure +
-// exported so they're node-testable — the same split as the cockpit's pure cores. Non-streaming: `complete` returns the
-// whole reply (streaming lands with the chat pane, Todo B). `tools` is accepted but UNUSED here (future-proofing the seam
-// so Todo C's tool-calling is additive, not a churn of every call site).
+// #210 editor agent Todo A/C — the model-provider abstraction. Two backends behind one interface: `vscode-lm` (the user's
+// Copilot Chat models, zero-setup) and `anthropic` (a raw POST via anthropicClient.ts, key from env or SecretStorage). The
+// shared TYPE surface lives in the pure `agentTypes.ts` (so the streaming client + the loop driver import it without
+// `vscode`); this module re-exports it and adds the two vscode-backed IMPLEMENTATIONS. Todo C: both backends implement
+// tool-calling — Anthropic via the wire `tools`/`tool_use`; vscode-lm via `LanguageModelChatTool` + the `.stream` parts,
+// SYNTHESIZING `stopReason:"tool_use"` when any tool-call part is seen (the LM API has no stop-reason), and gracefully
+// degrading to plain chat on a non-tool Copilot model (no capability probe — Todo C, R1).
 import * as vscode from "vscode";
-import { callAnthropic, streamAnthropic, type AnthropicMessage } from "./anthropicClient";
+import { callAnthropic, streamAnthropic, toAnthropicMessages } from "./anthropicClient";
+import {
+  ANTHROPIC_SECRET_KEY,
+  ANTHROPIC_UNAVAILABLE,
+  DEFAULT_MAX_TOKENS,
+  VSCODE_LM_UNAVAILABLE,
+  type ContentBlock,
+  type ModelProvider,
+  type ModelRequest,
+  type ModelResponse,
+  type StreamDelta,
+  type ToolSpec,
+} from "./agentTypes";
 
-export interface ModelMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
-export interface ModelRequest {
-  system?: string;
-  messages: ModelMessage[];
-  /** Output cap — honored by the `anthropic` backend; the `vscode-lm` backend uses the Copilot model's own default. */
-  maxTokens?: number;
-  /** Accepted but UNSUPPORTED in Todo A — the seam Todo C's tool-calling fills in. Passing a non-empty `tools` now
-   *  throws (fail-fast) so a backend that hasn't implemented it can't silently degrade to a plain text completion. */
-  tools?: unknown[];
-  token?: vscode.CancellationToken;
-}
-
-/** The two provider-unavailable messages — plain text (shown in a notification, which does NOT render Markdown). */
-export const VSCODE_LM_UNAVAILABLE = "No language model available — install the GitHub Copilot Chat extension, or set crl.agent.provider to 'anthropic'.";
-export const ANTHROPIC_UNAVAILABLE = "No Anthropic API key — run 'CRL: Set Anthropic API Key' or set ANTHROPIC_API_KEY.";
-
-export interface ModelResponse {
-  text: string;
-  stopReason?: string;
-  usage?: { inputTokens?: number; outputTokens?: number };
-}
-
-/** A streamed increment. TAGGED from day one (a discriminated union on `type`) so Todo C's tool-calling adds a
- *  `{ type: "tool_use"; … }` variant WITHOUT reshaping the `onDelta` callback or touching the host post loop. The
- *  `thinking_start`/`thinking_stop` pair (Todo B.1) brackets an Anthropic adaptive-thinking block — the STATE only (the
- *  thinking TEXT is `display:"omitted"`, so there's nothing to surface), letting the host time + label it "Thought for Ns". */
-export type StreamDelta =
-  | { type: "text"; text: string }
-  | { type: "thinking_start" }
-  | { type: "thinking_stop" };
-
-export interface ModelProvider {
-  readonly id: "vscode-lm" | "anthropic";
-  isAvailable(): Promise<boolean>;
-  complete(req: ModelRequest): Promise<ModelResponse>;
-  /** Stream the reply, emitting each delta via `onDelta`, and resolve with the full `ModelResponse` (text + stopReason +
-   *  usage). A CANCEL (`req.token`) FINALIZES the accumulated partial as `{ …, stopReason: "cancelled" }` — it does NOT
-   *  throw; only a genuine failure throws. Mirrors `complete`'s fail-fast on a non-empty `req.tools`. */
-  stream(req: ModelRequest, onDelta: (d: StreamDelta) => void): Promise<ModelResponse>;
-}
-
-/** Default per-request output cap for the Anthropic backend (the connectivity proof is tiny; the chat pane will raise it). */
-export const DEFAULT_MAX_TOKENS = 1024;
-
-/** SecretStorage key for the Anthropic API key (written by the `crl.agent.setAnthropicKey` command). */
-export const ANTHROPIC_SECRET_KEY = "crl.agent.anthropicApiKey";
+// Re-export the shared type surface + constants so existing importers (agentChat.ts, agentCommands.ts) keep importing from
+// here. `export *` carries the types AND the value constants (VSCODE_LM_UNAVAILABLE, DEFAULT_MAX_TOKENS, …).
+export * from "./agentTypes";
 
 /** Pure key-resolution: env wins over SecretStorage, but ONLY a non-blank env value — an empty/whitespace `ANTHROPIC_API_KEY`
  *  must NOT win (that would send an empty key and 401 with the secret sitting right there). Trims both; blank → undefined. */
@@ -74,7 +40,8 @@ export function anthropicKeySource(
   return "none";
 }
 
-/** The Copilot-Chat backend. `isAvailable` = at least one chat model is contributed; consent fires on the first request. */
+/** The Copilot-Chat backend. `isAvailable` = at least one chat model is contributed; consent fires on the first request.
+ *  Tool-calling: pass `tools` + `toolMode:Auto`, read `.stream` parts, and synthesize the tool-use stop. */
 export class VsCodeLmProvider implements ModelProvider {
   readonly id = "vscode-lm" as const;
 
@@ -82,25 +49,53 @@ export class VsCodeLmProvider implements ModelProvider {
     return (await vscode.lm.selectChatModels({ vendor: "copilot" })).length > 0;
   }
 
-  /** `LanguageModelChatMessage` has no System role, so translate the system prompt into a leading User message. It's a
-   *  deliberate lossy mapping — the model treats it as the opening user turn rather than an operator instruction. Shared
-   *  by `complete` + `stream` so the two build an identical message list. */
+  /** Map our messages to `LanguageModelChatMessage[]`. `LanguageModelChatMessage` has no System role, so the system prompt
+   *  becomes a leading User message (deliberate lossy mapping). A `ContentBlock[]` content replays tool exchanges: an
+   *  assistant turn carries text + `LanguageModelToolCallPart`; a user turn carries text + `LanguageModelToolResultPart`. */
   private toLmMessages(req: ModelRequest): vscode.LanguageModelChatMessage[] {
     const msgs: vscode.LanguageModelChatMessage[] = [];
     if (req.system !== undefined) msgs.push(vscode.LanguageModelChatMessage.User(req.system));
     for (const m of req.messages) {
-      msgs.push(
-        m.role === "assistant"
-          ? vscode.LanguageModelChatMessage.Assistant(m.content)
-          : vscode.LanguageModelChatMessage.User(m.content),
-      );
+      if (typeof m.content === "string") {
+        msgs.push(
+          m.role === "assistant"
+            ? vscode.LanguageModelChatMessage.Assistant(m.content)
+            : vscode.LanguageModelChatMessage.User(m.content),
+        );
+        continue;
+      }
+      if (m.role === "assistant") {
+        const parts: (vscode.LanguageModelTextPart | vscode.LanguageModelToolCallPart)[] = [];
+        for (const b of m.content) {
+          if (b.type === "text") {
+            if (b.text) parts.push(new vscode.LanguageModelTextPart(b.text));
+          } else if (b.type === "tool_use") {
+            parts.push(new vscode.LanguageModelToolCallPart(b.id, b.name, (b.input ?? {}) as object));
+          }
+        }
+        msgs.push(vscode.LanguageModelChatMessage.Assistant(parts));
+      } else {
+        const parts: (vscode.LanguageModelTextPart | vscode.LanguageModelToolResultPart)[] = [];
+        for (const b of m.content) {
+          if (b.type === "text") {
+            if (b.text) parts.push(new vscode.LanguageModelTextPart(b.text));
+          } else if (b.type === "tool_result") {
+            parts.push(new vscode.LanguageModelToolResultPart(b.toolUseId, [new vscode.LanguageModelTextPart(b.content)]));
+          }
+        }
+        msgs.push(vscode.LanguageModelChatMessage.User(parts));
+      }
     }
     return msgs;
   }
 
-  /** Map a request failure to an actionable plain `Error` (shared by `complete` + `stream`). `isAvailable` (models present)
-   *  ≠ usable: the first request can throw when the user declined consent, or the request was blocked / the model vanished.
-   *  A non-`LanguageModelError` is returned as-is (rethrow the original). */
+  private toLmTools(tools: ToolSpec[]): vscode.LanguageModelChatTool[] {
+    return tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
+  }
+
+  /** Map a request failure to an actionable plain `Error`. `isAvailable` (models present) ≠ usable: the first request can
+   *  throw when the user declined consent, or the request was blocked / the model vanished. A non-`LanguageModelError` is
+   *  rethrown as-is. */
   private lmError(e: unknown): unknown {
     if (e instanceof vscode.LanguageModelError) {
       if (e.code === "NoPermissions") return new Error("you declined model access — re-run to grant it");
@@ -111,51 +106,68 @@ export class VsCodeLmProvider implements ModelProvider {
     return e;
   }
 
-  async complete(req: ModelRequest): Promise<ModelResponse> {
-    if (req.tools?.length) throw new Error("tool-calling is not supported yet (Todo C)"); // fail-fast, never silently drop tools
+  /** Shared request path for `complete` (onDelta undefined) + `stream`. Iterates the `.stream` parts (text + tool-call),
+   *  builds the ordered `content` (coalescing consecutive text), and — the LM API has NO stop reason — sets
+   *  `stopReason:"tool_use"` iff any tool-call part arrived (so the loop driver continues). A non-tool model simply yields
+   *  text and no tool-call parts → `stopReason` undefined → the loop ends (graceful degrade). */
+  private async run(req: ModelRequest, onDelta?: (d: StreamDelta) => void): Promise<ModelResponse> {
     const models = await vscode.lm.selectChatModels({ vendor: "copilot" });
     const model = models[0];
-    if (!model) {
-      throw new Error(VSCODE_LM_UNAVAILABLE);
+    if (!model) throw new Error(VSCODE_LM_UNAVAILABLE);
+    const options: vscode.LanguageModelChatRequestOptions = {};
+    if (req.tools?.length) {
+      options.tools = this.toLmTools(req.tools);
+      options.toolMode = vscode.LanguageModelChatToolMode.Auto;
     }
+    let text = "";
+    let sawToolCall = false;
+    const content: ContentBlock[] = [];
+    const pushText = (s: string): void => {
+      const last = content[content.length - 1];
+      if (last && last.type === "text") last.text += s;
+      else content.push({ type: "text", text: s });
+    };
     try {
-      const resp = await model.sendRequest(this.toLmMessages(req), {}, req.token);
-      let text = "";
-      for await (const chunk of resp.text) text += chunk;
-      return { text };
+      const resp = await model.sendRequest(
+        this.toLmMessages(req),
+        options,
+        req.token as vscode.CancellationToken | undefined,
+      );
+      for await (const part of resp.stream) {
+        if (part instanceof vscode.LanguageModelTextPart) {
+          onDelta?.({ type: "text", text: part.value });
+          text += part.value;
+          pushText(part.value);
+        } else if (part instanceof vscode.LanguageModelToolCallPart) {
+          sawToolCall = true;
+          const input = part.input ?? {};
+          content.push({ type: "tool_use", id: part.callId, name: part.name, input });
+          onDelta?.({ type: "tool_use", id: part.callId, name: part.name, input });
+        }
+        // Other parts (data / future) → ignore.
+      }
+      return { text, content: content.length ? content : undefined, stopReason: sawToolCall ? "tool_use" : undefined };
     } catch (e) {
+      // CANCEL = FINALIZE: a Stop cancels the token, which rejects the iteration. Return the accumulated partial as
+      // `stopReason:"cancelled"` (never a red error). A genuine failure (no cancellation) rethrows with the shared mapping.
+      if (req.token?.isCancellationRequested) {
+        return { text, content: content.length ? content : undefined, stopReason: "cancelled" };
+      }
       throw this.lmError(e);
     }
   }
 
+  async complete(req: ModelRequest): Promise<ModelResponse> {
+    return this.run(req);
+  }
+
   async stream(req: ModelRequest, onDelta: (d: StreamDelta) => void): Promise<ModelResponse> {
-    if (req.tools?.length) throw new Error("tool-calling is not supported yet (Todo C)"); // fail-fast, never silently drop tools
-    const models = await vscode.lm.selectChatModels({ vendor: "copilot" });
-    const model = models[0];
-    if (!model) {
-      throw new Error(VSCODE_LM_UNAVAILABLE);
-    }
-    let text = "";
-    try {
-      // `resp.text` is an async-iterable of chunks — emit each as a tagged text delta and accumulate.
-      const resp = await model.sendRequest(this.toLmMessages(req), {}, req.token);
-      for await (const chunk of resp.text) {
-        onDelta({ type: "text", text: chunk });
-        text += chunk;
-      }
-      return { text };
-    } catch (e) {
-      // CANCEL = FINALIZE: a Stop cancels the token, which rejects the iteration (a LanguageModelError / CancellationError).
-      // Return the accumulated partial as `stopReason:"cancelled"` rather than surfacing a red error. A genuine failure
-      // (no cancellation requested) rethrows with the shared mapping.
-      if (req.token?.isCancellationRequested) return { text, stopReason: "cancelled" };
-      throw this.lmError(e);
-    }
+    return this.run(req, onDelta);
   }
 }
 
 /** The Anthropic backend. Key = env `ANTHROPIC_API_KEY` (best-effort — GUI-launched VS Code may not inherit shell env)
- *  else SecretStorage. `isAvailable` = a key resolves. */
+ *  else SecretStorage. `isAvailable` = a key resolves. Tool-calling is native (the wire `tools`/`tool_use`). */
 export class AnthropicProvider implements ModelProvider {
   readonly id = "anthropic" as const;
 
@@ -164,7 +176,7 @@ export class AnthropicProvider implements ModelProvider {
     private readonly secrets: vscode.SecretStorage,
     /** env `ANTHROPIC_API_KEY` snapshot; the caller guards `typeof process` (web host has none). */
     private readonly envKey: string | undefined,
-    /** injected for tests (defaults to global fetch) so `complete` is unit-testable without a network. */
+    /** injected for tests (defaults to global fetch) so the backend is unit-testable without a network. */
     private readonly fetchImpl?: typeof fetch,
   ) {}
 
@@ -176,53 +188,51 @@ export class AnthropicProvider implements ModelProvider {
     return (await this.resolveKey()) !== undefined;
   }
 
-  async complete(req: ModelRequest): Promise<ModelResponse> {
-    if (req.tools?.length) throw new Error("tool-calling is not supported yet (Todo C)"); // fail-fast, never silently drop tools
-    const apiKey = await this.resolveKey();
-    if (!apiKey) {
-      throw new Error(ANTHROPIC_UNAVAILABLE);
-    }
-    // Bridge the CancellationToken to an AbortController so a cancel aborts the in-flight POST; dispose the listener.
-    // An ALREADY-cancelled token aborts before the POST goes out.
+  /** Bridge the CancellationToken to an AbortController so a cancel aborts the in-flight POST; dispose the listener. An
+   *  ALREADY-cancelled token aborts before the POST goes out. Shared by `complete` + `stream`. */
+  private abortFor(req: ModelRequest): { controller: AbortController; sub?: { dispose(): void } } {
     const controller = new AbortController();
     if (req.token?.isCancellationRequested) controller.abort();
     const sub = req.token?.onCancellationRequested(() => controller.abort());
+    return { controller, sub };
+  }
+
+  async complete(req: ModelRequest): Promise<ModelResponse> {
+    const apiKey = await this.resolveKey();
+    if (!apiKey) throw new Error(ANTHROPIC_UNAVAILABLE);
+    const { controller, sub } = this.abortFor(req);
     try {
       const r = await callAnthropic({
         apiKey,
         model: this.model,
         system: req.system,
-        messages: req.messages as AnthropicMessage[],
+        messages: toAnthropicMessages(req.messages),
         maxTokens: req.maxTokens ?? DEFAULT_MAX_TOKENS,
+        tools: req.tools,
         signal: controller.signal,
         fetchImpl: this.fetchImpl,
       });
-      return { text: r.text, stopReason: r.stopReason, usage: r.usage };
+      return { text: r.text, content: r.content, stopReason: r.stopReason, usage: r.usage };
     } finally {
       sub?.dispose();
     }
   }
 
   async stream(req: ModelRequest, onDelta: (d: StreamDelta) => void): Promise<ModelResponse> {
-    if (req.tools?.length) throw new Error("tool-calling is not supported yet (Todo C)"); // fail-fast, never silently drop tools
     const apiKey = await this.resolveKey();
-    if (!apiKey) {
-      throw new Error(ANTHROPIC_UNAVAILABLE);
-    }
-    // Same token→AbortController bridge as `complete` — a cancel aborts the in-flight stream; an ALREADY-cancelled token
-    // aborts before the POST. `streamAnthropic` turns that abort into a finalized partial (`stopReason:"cancelled"`), so
-    // the cancel contract is identical across both backends without a throw here.
-    const controller = new AbortController();
-    if (req.token?.isCancellationRequested) controller.abort();
-    const sub = req.token?.onCancellationRequested(() => controller.abort());
+    if (!apiKey) throw new Error(ANTHROPIC_UNAVAILABLE);
+    // `streamAnthropic` turns an abort into a finalized partial (`stopReason:"cancelled"`), so the cancel contract is
+    // identical across both backends without a throw here.
+    const { controller, sub } = this.abortFor(req);
     try {
       const r = await streamAnthropic(
         {
           apiKey,
           model: this.model,
           system: req.system,
-          messages: req.messages as AnthropicMessage[],
+          messages: toAnthropicMessages(req.messages),
           maxTokens: req.maxTokens ?? DEFAULT_MAX_TOKENS,
+          tools: req.tools,
           signal: controller.signal,
           fetchImpl: this.fetchImpl,
           stream: true,
@@ -230,8 +240,10 @@ export class AnthropicProvider implements ModelProvider {
         (t) => onDelta({ type: "text", text: t }),
         // Forward the adaptive-thinking STATE as tagged deltas — the host times the "thinking… → Thought for Ns" indicator.
         (state) => onDelta({ type: state === "start" ? "thinking_start" : "thinking_stop" }),
+        // Forward a fully-assembled tool call as a tool_use delta (Todo C).
+        (tu) => onDelta({ type: "tool_use", id: tu.id, name: tu.name, input: tu.input }),
       );
-      return { text: r.text, stopReason: r.stopReason, usage: r.usage };
+      return { text: r.text, content: r.content, stopReason: r.stopReason, usage: r.usage };
     } finally {
       sub?.dispose();
     }

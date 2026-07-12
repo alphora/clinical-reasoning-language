@@ -121,6 +121,14 @@ import {
   type PaneSpec,
 } from "./paneOrder";
 import { isConceptHit, isFactHit, isSubQuestionHit, type RevealHit, type WebviewHit } from "./webviewHit";
+import {
+  cockpitAgentBridge,
+  flagTargetId,
+  type CockpitAppState,
+  type FlagTargetView,
+  type OpenFlagDrawerArgs,
+  type OpenFlagDrawerResult,
+} from "./cockpitAgentBridge";
 import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordinator";
 import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE } from "./provenanceFindings";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
@@ -410,6 +418,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let flagDraft: FlagDraftState | undefined;
   let flagCommitting = false; // #211: an in-flight commit guard — a rapid second Insert must not double-POST / race the write
   let githubAuthDeclined = false; // #211: the user declined the GitHub sign-in this session → don't re-prompt on every flag
+  // #210 Todo C — the AGENT flag anchor: the last flag-capable node the user clicked (a WebviewHit, NOT State.selection —
+  // MV's `crl` primary is excluded, so a node click resolves to a source/cel selection with the nodeKey discarded). The
+  // bridge's getAppState re-derives its flag targets LIVE from this hit; it's cleared on retarget/reset/mode-out/tree-close.
+  // `cel` binds it to the policy so a coincidental nodeKey collision in another policy can't resolve it.
+  let flagAnchor: { hit: WebviewHit; cel: string | undefined } | undefined;
   let mvSidecarPath: string | undefined;
   // #203 Todo 4 — the review-flag surface. `flagsList` = ALL flags (open + resolved) across the policy's `src/crl/*.crl`
   // files, freshly (re)loaded in loadFlags() from the LIVE editor buffer when a `.crl` is open (else disk) so a dirty edit's
@@ -1904,6 +1917,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     } else if (msg.type === "reveal" && typeof msg.key === "string") {
       const hit = v.reveals[msg.key]; // trusted: looked up by opaque key, not a path/range from the webview
       if (!hit) return;
+      // #210 Todo C: record the last FLAG-CAPABLE node click as the agent's flag anchor — BEFORE the peek/sub-question
+      // early returns below, because a `when` condition renders as a sub-question hit that IS flaggable ("this condition").
+      // No-ops on a non-flaggable click (a fact/concept peek → flagTargetChoices returns []). Fires the chip-refresh event.
+      if (flagTargetChoices(hit).length) {
+        flagAnchor = { hit, cel: currentCel };
+        cockpitAgentBridge.notifyChanged();
+      }
       // #219: this is a CLICK in `pane` → its OWN reveal (peek or selection) must not scroll (respect the user's viewport;
       // cross-pane targets still scroll). Set at the TOP so it covers the peek paths too. Live for the SYNCHRONOUS work below
       // (a single-case selection dispatches inline → postReveal + the same-dispatch failed-criteria mark both see it) and
@@ -2051,8 +2071,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       views.delete(pane);
       // #211: the flag drawer lives in the tree pane's own region — if that pane is torn down mid-draft, drop the host
       // draft too (else `flagDraft` lingers invisible + uncommittable; a fresh tree panel wouldn't re-show it).
-      if (pane === "tree") flagDraft = undefined;
+      if (pane === "tree") {
+        flagDraft = undefined;
+        flagAnchor = undefined; // #210 Todo C: drop the anchor too — a reopened tree must not resurrect a stale target (B6)
+        cockpitAgentBridge.notifyChanged(); // the tree pane closed → the agent can't perceive/flag; update the chip
+      }
     });
+    // #210 Todo C: a tree pane (re)opened without a click still changes perceivability — refresh the chip off the new state.
+    if (pane === "tree") cockpitAgentBridge.notifyChanged();
     return v;
   }
 
@@ -2191,6 +2217,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     openNotesCaseId = undefined;
     editingNoteId = undefined;
     flagDraft = undefined; // #211: drop the create-flag draft (a stale drawer must not commit against a prior policy)
+    flagAnchor = undefined; // #210 Todo C: drop the agent flag anchor too (a stale anchor must not survive a failed retarget)
     postFlagDrawer(); // clear the webview region (posts empty since flagDraft is now undefined)
     mvSidecarPath = undefined;
     flagsList = []; // #203 Todo 4: drop the review-flag state too (a stale flag list/gate must not survive a failed retarget)
@@ -2209,6 +2236,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     dispatch({ type: "setInputs", index: { version: indexVersion, anchorFilePath: "", steps: [], sourceCycleIds: [], crlNav: [], celNav: [] } });
     navView.message = message;
     renderEmpty(message);
+    cockpitAgentBridge.notifyChanged(); // #210 Todo C: the anchor/policy cleared — refresh the agent chip
   }
 
   function setupWatcher(): void {
@@ -2271,6 +2299,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function openPanel(targetMode: "cockpit" | "medical-validation", celPath: string): void {
     mode = targetMode;
     currentCel = celPath;
+    flagAnchor = undefined; // #210 Todo C: a retarget / mode switch drops the prior policy's flag anchor
+    cockpitAgentBridge.notifyChanged(); // refresh the agent chip for the new mode/policy (getAppState reads live state)
     const uri = vscode.Uri.file(celPath);
     const section = configSection(mode);
     // Safe on-demand reveal (mirrors provenancePanel) — runs only when the user explicitly opens a panel on a .cel,
@@ -3074,6 +3104,58 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   });
 
   navView.message = "Open a .cel and run “CRL: Show Knowledge Engineering” or “CRL: Show Medical Validation”.";
+  // #210 Todo C — the CRL Assist agent bridge. Live-derived (reads mode/currentCel/flagAnchor/views at call time). The
+  // agent perceives the flag anchor via `getAppState` and proposes a flag via `openFlagDrawer` (which guards the tree pane,
+  // re-resolves the DETERMINISTIC opaque target id against the live choices, and validates the `kind` against the registry
+  // enum). It never writes CRL — it opens the SAME drawer the right-click does; the human confirms + submits.
+  const policyLabel = (): string | undefined =>
+    currentCel ? basename(currentCel).replace(/\.(cel|crl)$/i, "") : undefined;
+  const validationKinds = (): string[] => {
+    const vc = flagTags().find((t) => t.id === "validation-concern");
+    return vc?.fields.find((f) => f.key === "kind")?.values?.slice() ?? [];
+  };
+  // The anchor's flag targets, re-derived LIVE (empty unless MV + a policy-matching anchor + the tree pane is open).
+  const anchorChoices = (): FlagTargetChoice[] => {
+    if (mode !== "medical-validation" || !flagAnchor || flagAnchor.cel !== currentCel || !views.get("tree")) return [];
+    return flagTargetChoices(flagAnchor.hit);
+  };
+  const getAppState = (): CockpitAppState | undefined => {
+    // No MV cockpit if not in MV mode OR every pane was closed (A16 — the chip hides on a full cockpit close, not lingering
+    // on "no tree pane"; `mode` stays MV after the last pane disposes, so the `views.size` check is what drops it).
+    if (mode !== "medical-validation" || views.size === 0) return undefined;
+    const choices = anchorChoices();
+    const flagTargets: FlagTargetView[] = choices.map((c) => ({
+      id: flagTargetId({ cel: currentCel, kind: c.kind, lib: c.lib, name: c.name, key: c.key }),
+      label: c.label,
+      shortLabel: c.shortLabel,
+    }));
+    // The anchor label = the most specific choice (an occurrence "this condition/recommendation" if present, else the first).
+    const anchorLabel = choices.length ? (choices.find((c) => c.key) ?? choices[0]).shortLabel : null;
+    return { policy: policyLabel(), anchorLabel, flagTargets, treePaneOpen: !!views.get("tree") };
+  };
+  const bridgeOpenFlagDrawer = (args: OpenFlagDrawerArgs): OpenFlagDrawerResult => {
+    if (mode !== "medical-validation") return { ok: false, reason: "the Medical Validation cockpit is not open" };
+    if (!views.get("tree")) return { ok: false, reason: "open the Medical Validation tree pane, then try again" };
+    const choices = anchorChoices();
+    if (!choices.length) return { ok: false, reason: "no flaggable node is selected — click a decision or condition in the tree first" };
+    const match = choices.find(
+      (c) => flagTargetId({ cel: currentCel, kind: c.kind, lib: c.lib, name: c.name, key: c.key }) === args.targetId,
+    );
+    if (!match) {
+      return { ok: false, reason: `no current flag target matches that id — the selection changed. Current targets: ${choices.map((c) => c.shortLabel).join("; ")}` };
+    }
+    const kind = args.validationKind?.trim();
+    if (kind) {
+      const kinds = validationKinds();
+      if (!kinds.includes(kind)) return { ok: false, reason: `invalid kind "${kind}" — choose one of: ${kinds.join(", ")}` };
+    }
+    openFlagDrawer({ target: match, tag: "validation-concern", summary: args.summary, fields: kind ? { kind } : undefined });
+    return { ok: true };
+  };
+  context.subscriptions.push(
+    cockpitAgentBridge.register({ getAppState, openFlagDrawer: bridgeOpenFlagDrawer, getValidationKinds: validationKinds }),
+  );
+
   context.subscriptions.push(
     navView,
     showCmd,

@@ -67,6 +67,8 @@ export const CHAT_BODY =
   `<div class="chat-status" data-chat-status></div>` +
   `<textarea data-chat-input class="chat-input" rows="3" placeholder="Ask the CRL agent… (Enter to send, Shift+Enter for a newline)"></textarea>` +
   `<div class="chat-actions">` +
+  // #210 Todo C — the selected-item chip: the flag anchor the agent perceives, pushed to the LEFT of Send (margin-right:auto).
+  `<span class="chat-chip" data-chat-chip hidden></span>` +
   `<button type="button" data-chat-send class="chat-send">Send</button>` +
   `<button type="button" data-chat-stop class="chat-stop" hidden>Stop</button>` +
   `<button type="button" data-chat-clear class="chat-clear">Clear</button>` +
@@ -90,7 +92,9 @@ export const CHAT_STYLE = `body{font:13px var(--vscode-editor-font-family,monosp
 .chat-input{width:100%;box-sizing:border-box;resize:vertical;min-height:44px;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,#3c3c3c);font-family:inherit;font-size:inherit;padding:4px 6px}
 /* CRL Assist purple accent (Todo B.1) — the inferred-layer purple used as a focus ring, mirroring .crl-layer-inferred. */
 [data-chat-input]:focus-visible{outline:1px solid var(--vscode-charts-purple,#c586c0);outline-offset:1px}
-.chat-actions{display:flex;gap:6px;justify-content:flex-end}
+.chat-actions{display:flex;gap:6px;justify-content:flex-end;align-items:center}
+/* The flag-anchor chip (Todo C) — pushed left of the buttons; a purple-tinted badge showing what the agent perceives. */
+.chat-chip{margin-right:auto;max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.82em;padding:1px 8px;border-radius:10px;background:var(--vscode-badge-background,rgba(120,120,120,.25));color:var(--vscode-badge-foreground,var(--vscode-foreground))}
 .chat-actions button{cursor:pointer;border:none;border-radius:2px;padding:3px 12px;font:inherit}
 /* Send is the purple accent — DARK text on the light purple (mirrors .crl-layer-inferred; white would be low-contrast). */
 .chat-send{background:var(--vscode-charts-purple,#c586c0);color:var(--vscode-editor-background,#1e1e1e)}
@@ -114,6 +118,7 @@ export const CHAT_WEBVIEW_SCRIPT =
   `const stopBtn=document.querySelector('[data-chat-stop]');` +
   `const clearBtn=document.querySelector('[data-chat-clear]');` +
   `const statusEl=document.querySelector('[data-chat-status]');` +
+  `const chipEl=document.querySelector('[data-chat-chip]');` +
   `const scrollBottom=()=>{thread.scrollTop=thread.scrollHeight;};` +
   // THINKING indicator: a live "thinking… Ns" ticker driven off the host-supplied start time (wall-clock ms; same machine as
   // the host, so no skew). setInterval on a render with `thinking:true`; cleared on `thinking:false`, on the first delta, and
@@ -125,7 +130,7 @@ export const CHAT_WEBVIEW_SCRIPT =
   // REHYDRATE: the host is authoritative — replace the whole thread + drive the controls from the render's flags. When
   // `thinking` is set, run the live ticker (a rehydration mid-thinking resumes it from `thinkingSince`); otherwise show the
   // plain status line.
-  `if(m.type==='render'){thread.innerHTML=m.html;const s=!!m.busy;sendBtn.disabled=s;stopBtn.hidden=!s;if(m.thinking){showThinking(m.thinkingSince||Date.now());}else{clearThink();statusEl.textContent=m.status||'';}scrollBottom();}` +
+  `if(m.type==='render'){thread.innerHTML=m.html;const s=!!m.busy;sendBtn.disabled=s;stopBtn.hidden=!s;if(m.chip){chipEl.textContent='⚑ '+m.chip;chipEl.title=m.chip;chipEl.hidden=false;}else{chipEl.hidden=true;}if(m.thinking){showThinking(m.thinkingSince||Date.now());}else{clearThink();statusEl.textContent=m.status||'';}scrollBottom();}` +
   // DELTA: append to the OPEN assistant turn's text node — appendData on a text node, NEVER innerHTML (immune to a tag/entity
   // split across deltas). First delta clears the thinking ticker + the "working…" status line.
   `else if(m.type==='delta'){const turn=thread.querySelector('[data-chat-open]');if(turn){const hold=turn.querySelector('[data-chat-text]')||turn;let tn=hold.firstChild;if(!tn||tn.nodeType!==3){tn=document.createTextNode('');hold.appendChild(tn);}tn.appendData(m.text);clearThink();statusEl.textContent='';scrollBottom();}}` +

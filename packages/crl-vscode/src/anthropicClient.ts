@@ -1,7 +1,10 @@
-// #210 editor agent Todo A — a pure, `vscode`-free POST to Anthropic's Messages API. Mirrors `githubIssue.ts`: one
+// #210 editor agent Todo A/C — a pure, `vscode`-free POST to Anthropic's Messages API. Mirrors `githubIssue.ts`: one
 // effectful helper, an injectable `fetchImpl` for node tests, a typed error class carrying the HTTP status (0 = transport),
 // and an error-label helper. The AnthropicProvider (agentModelProvider.ts) is the only caller; keeping this module free of
 // `vscode` lets it run under the `.test.mjs` harness (esbuild-bundle-then-require) with an injected fetch — no network.
+// Todo C adds tool-calling: `tools` in the body, streamed `tool_use` blocks (per-index `input_json_delta` accumulation),
+// an ordered `content: ContentBlock[]` for replay, and the explicit `ContentBlock → Anthropic wire` conversion (A9/A10/A12).
+import type { ContentBlock, ToolSpec } from "./agentTypes";
 
 /** An Anthropic Messages API failure carrying the HTTP status (0 = network/transport error) and the API `error.type`
  *  (e.g. `authentication_error`, `rate_limit_error`) when the body parsed as the documented `{type:"error", error}` shape. */
@@ -16,10 +19,18 @@ export class AnthropicError extends Error {
   }
 }
 
-/** One turn in the conversation. The Anthropic `system` prompt is a top-level field, NOT a message (see callAnthropic). */
+/** A heterogeneous Anthropic wire content block (Todo C). Assistant turns carry `text` + `tool_use`; user turns carry
+ *  `text` + `tool_result`. `tool_result.content` is sent as a plain string (the API accepts string or block-array). */
+export type AnthropicBlock =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; id: string; name: string; input: unknown }
+  | { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean };
+
+/** One turn in the conversation. The Anthropic `system` prompt is a top-level field, NOT a message (see callAnthropic).
+ *  `content` is a plain string (text-only, the common case) OR a wire block array (tool rounds). */
 export interface AnthropicMessage {
   role: "user" | "assistant";
-  content: string;
+  content: string | AnthropicBlock[];
 }
 
 export interface CallAnthropicArgs {
@@ -30,6 +41,9 @@ export interface CallAnthropicArgs {
   messages: AnthropicMessage[];
   /** Required by the API — every request 400s without it. */
   maxTokens: number;
+  /** Tools the model may call this request (Todo C). Mapped to the wire `{name, description, input_schema}`; omitted from
+   *  the body when empty (a plain completion sends no `tools`). */
+  tools?: ToolSpec[];
   /** injected for tests; defaults to the global `fetch` (present in the VS Code extension-host Node ≥18). */
   fetchImpl?: typeof fetch;
   /** wired from a CancellationToken by the provider — aborts the in-flight POST. */
@@ -38,8 +52,32 @@ export interface CallAnthropicArgs {
 
 export interface CallAnthropicResult {
   text: string;
+  /** The assistant turn's ordered content blocks (text + tool_use), in wire order — for replay (Todo C, A3/A10). */
+  content?: ContentBlock[];
   stopReason?: string;
   usage?: { inputTokens?: number; outputTokens?: number };
+}
+
+/** Convert provider-neutral `ModelMessage.content` (string | ContentBlock[]) to the Anthropic wire shape (A12 — replaces
+ *  the old unsafe `as AnthropicMessage[]` cast). A plain string passes through; a block array maps text/tool_use/tool_result
+ *  1:1, preserving order. Empty text blocks are dropped (the API rejects an empty-content turn / empty text block). */
+export function toAnthropicMessages(
+  messages: { role: "user" | "assistant"; content: string | ContentBlock[] }[],
+): AnthropicMessage[] {
+  return messages.map((m) => {
+    if (typeof m.content === "string") return { role: m.role, content: m.content };
+    const blocks: AnthropicBlock[] = [];
+    for (const b of m.content) {
+      if (b.type === "text") {
+        if (b.text) blocks.push({ type: "text", text: b.text }); // drop empty text (API rejects it)
+      } else if (b.type === "tool_use") {
+        blocks.push({ type: "tool_use", id: b.id, name: b.name, input: b.input });
+      } else {
+        blocks.push({ type: "tool_result", tool_use_id: b.toolUseId, content: b.content, ...(b.isError ? { is_error: true } : {}) });
+      }
+    }
+    return { role: m.role, content: blocks };
+  });
 }
 
 /** The shared Anthropic Messages POST — URL, headers, body assembly (incl. `system`-omit + `max_tokens` + an optional
@@ -57,6 +95,8 @@ async function postAnthropicMessages(args: CallAnthropicArgs, stream: boolean): 
     messages: args.messages,
   };
   if (args.system !== undefined) body.system = args.system;
+  // Map the provider-neutral ToolSpec → the Anthropic wire (`input_schema`). Omit `tools` entirely for a plain completion.
+  if (args.tools?.length) body.tools = args.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
   if (stream) body.stream = true;
 
   let res: Awaited<ReturnType<typeof fetch>>;
@@ -115,14 +155,26 @@ export async function callAnthropic(args: CallAnthropicArgs): Promise<CallAnthro
     throw new AnthropicError(res.status, "Anthropic response was not JSON");
   }
 
-  // Concatenate ONLY text blocks. A naive `content.map(b => b.text)` corrupts output on adaptive-thinking models — a
-  // `thinking` block has no `.text`, so it would splice `undefined` into the reply.
+  // Walk the HETEROGENEOUS block array in order: concatenate `text` blocks into the reply, and collect `text`+`tool_use`
+  // blocks into the ordered `content` for replay (Todo C). A `thinking` block has no `.text` and is skipped for both — a
+  // naive `content.map(b => b.text)` would splice `undefined` into the reply.
   let text = "";
+  const content: ContentBlock[] = [];
   if (Array.isArray(parsed.content)) {
     for (const block of parsed.content) {
-      if (block && typeof block === "object" && (block as { type?: unknown }).type === "text") {
+      if (!block || typeof block !== "object") continue;
+      const bt = (block as { type?: unknown }).type;
+      if (bt === "text") {
         const t = (block as { text?: unknown }).text;
-        if (typeof t === "string") text += t;
+        if (typeof t === "string") {
+          text += t;
+          if (t) content.push({ type: "text", text: t });
+        }
+      } else if (bt === "tool_use") {
+        const tu = block as { id?: unknown; name?: unknown; input?: unknown };
+        if (typeof tu.id === "string" && typeof tu.name === "string") {
+          content.push({ type: "tool_use", id: tu.id, name: tu.name, input: tu.input ?? {} });
+        }
       }
     }
   }
@@ -131,6 +183,7 @@ export async function callAnthropic(args: CallAnthropicArgs): Promise<CallAnthro
   const outputTokens = parsed.usage?.output_tokens;
   return {
     text,
+    content: content.length ? content : undefined,
     stopReason: typeof parsed.stop_reason === "string" ? parsed.stop_reason : undefined,
     usage: {
       inputTokens: typeof inputTokens === "number" ? inputTokens : undefined,
@@ -193,13 +246,33 @@ export async function streamAnthropic(
   args: CallAnthropicArgs & { stream: true },
   onText: (t: string) => void,
   onThinking?: (state: "start" | "stop") => void,
+  /** Todo C — invoked ONCE per tool call when its input is fully assembled (at the block's `content_block_stop`). A cancel
+   *  before the stop never fires this (no partial tool_use). The provider maps it to a `{type:"tool_use"}` StreamDelta. */
+  onToolUse?: (block: { id: string; name: string; input: unknown }) => void,
 ): Promise<CallAnthropicResult> {
   let text = "";
   let stopReason: string | undefined;
   let inputTokens: number | undefined;
   let outputTokens: number | undefined;
   let thinking = false; // an adaptive-thinking block is open (start emitted, stop not yet)
-  const result = (): CallAnthropicResult => ({ text, stopReason, usage: { inputTokens, outputTokens } });
+  // Per-index block accumulators (Todo C). `text` blocks accumulate `.text`; `tool_use` blocks accumulate `.json`
+  // (`input_json_delta.partial_json`) and set `.input` at `content_block_stop`. `content` is assembled in index order,
+  // including a `tool_use` block ONLY once finalized (`.input` set) — so a cancel mid-accumulation drops the partial call.
+  interface BlockAcc { type: "text" | "tool_use" | "thinking" | "other"; id?: string; name?: string; text: string; json: string; input?: unknown; hasInput: boolean; }
+  const blocks = new Map<number, BlockAcc>();
+  const buildContent = (): ContentBlock[] | undefined => {
+    const out: ContentBlock[] = [];
+    for (const idx of [...blocks.keys()].sort((a, b) => a - b)) {
+      const b = blocks.get(idx)!;
+      if (b.type === "text") {
+        if (b.text) out.push({ type: "text", text: b.text });
+      } else if (b.type === "tool_use" && b.hasInput && b.id && b.name) {
+        out.push({ type: "tool_use", id: b.id, name: b.name, input: b.input ?? {} });
+      }
+    }
+    return out.length ? out : undefined;
+  };
+  const result = (): CallAnthropicResult => ({ text, content: buildContent(), stopReason, usage: { inputTokens, outputTokens } });
 
   // A cancel DURING the POST (before the body) also rejects — `postAnthropicMessages` maps it to `AnthropicError(-1)`.
   // Finalize (empty) as cancelled here too, so a Stop before the first byte is never surfaced as a red error (gpt55 [critical]).
@@ -225,8 +298,9 @@ export async function streamAnthropic(
   const handle = (ev: SseEvent): boolean => {
     let data: {
       type?: unknown;
-      delta?: { type?: unknown; text?: unknown; stop_reason?: unknown };
-      content_block?: { type?: unknown };
+      index?: unknown;
+      delta?: { type?: unknown; text?: unknown; partial_json?: unknown; stop_reason?: unknown };
+      content_block?: { type?: unknown; id?: unknown; name?: unknown };
       message?: { usage?: { input_tokens?: unknown } };
       usage?: { output_tokens?: unknown };
       error?: { type?: unknown; message?: unknown };
@@ -244,24 +318,50 @@ export async function streamAnthropic(
         onThinking?.("stop");
       }
     };
+    const idx = typeof data.index === "number" ? data.index : undefined;
     const t = data.type;
     if (t === "content_block_delta") {
       if (data.delta?.type === "text_delta" && typeof data.delta.text === "string") {
         endThinking();
         onText(data.delta.text);
         text += data.delta.text;
+        if (idx !== undefined) { const b = blocks.get(idx); if (b) b.text += data.delta.text; }
+      } else if (data.delta?.type === "input_json_delta" && typeof data.delta.partial_json === "string") {
+        // Accumulate the tool-call input JSON fragments for this block; parsed at `content_block_stop` (Todo C, A9).
+        if (idx !== undefined) { const b = blocks.get(idx); if (b) b.json += data.delta.partial_json; }
       }
       // thinking_delta / signature_delta / any other block delta → skip (no visible text), never throw.
     } else if (t === "content_block_start") {
-      // A `thinking` block opens the indicator; a `text` block closes any open one (the reply is about to stream).
+      // Register the block by index. A `thinking` block opens the indicator; a `text`/`tool_use` block closes any open one.
       const bt = data.content_block?.type;
+      const cbId = typeof data.content_block?.id === "string" ? data.content_block.id : undefined;
+      const cbName = typeof data.content_block?.name === "string" ? data.content_block.name : undefined;
+      const type = bt === "text" ? "text" : bt === "tool_use" ? "tool_use" : bt === "thinking" ? "thinking" : "other";
+      if (idx !== undefined) blocks.set(idx, { type, id: cbId, name: cbName, text: "", json: "", hasInput: false });
       if (bt === "thinking") {
         if (!thinking) {
           thinking = true;
           onThinking?.("start");
         }
-      } else if (bt === "text") {
+      } else if (bt === "text" || bt === "tool_use") {
         endThinking();
+      }
+    } else if (t === "content_block_stop") {
+      // Finalize the block. A `tool_use` block parses its accumulated JSON (empty → `{}`, never `JSON.parse("")`); malformed
+      // JSON is genuine corruption → throw (there's no valid tool to answer). Emit the tool_use ONCE, here (Todo C, A9/A10).
+      if (idx !== undefined) {
+        const b = blocks.get(idx);
+        if (b && b.type === "tool_use" && !b.hasInput) {
+          let input: unknown;
+          try {
+            input = JSON.parse(b.json.trim() || "{}");
+          } catch {
+            throw new AnthropicError(200, "malformed Anthropic tool input");
+          }
+          b.input = input;
+          b.hasInput = true;
+          if (b.id && b.name) onToolUse?.({ id: b.id, name: b.name, input });
+        }
       }
     } else if (t === "message_start") {
       const it = data.message?.usage?.input_tokens;
@@ -278,7 +378,7 @@ export async function streamAnthropic(
       endThinking(); // a thinking-only reply (no text) still closes the indicator before we finalize
       return true;
     }
-    // `ping` + `content_block_stop` + anything else → ignored.
+    // `ping` + anything else → ignored.
     return false;
   };
 

@@ -28,7 +28,11 @@ const stubVscode = {
     // Only ONE top-level vscode access exists (ORDERED_COLUMNS reads vscode.ViewColumn.*); stub just that enum. Everything
     // else under vscode.* is inside functions never called here, so an otherwise-empty module evaluates fine.
     b.onLoad({ filter: /.*/, namespace: "stub" }, () => ({
-      contents: "module.exports = { ViewColumn: { One: 1, Two: 2, Three: 3, Four: 4, Active: -1 } };",
+      // #210 Todo C: correspondenceCockpit now imports cockpitAgentBridge, which instantiates a `vscode.EventEmitter` at
+      // module load — the stub must provide a minimal one (fire/event/dispose) or the bundle throws on require.
+      contents:
+        "class EventEmitter{constructor(){this._l=[];}get event(){return (fn)=>{this._l.push(fn);return {dispose(){}};};}fire(){for(const f of this._l.slice())f();}dispose(){this._l=[];}}" +
+        "module.exports = { ViewColumn: { One: 1, Two: 2, Three: 3, Four: 4, Active: -1 }, EventEmitter };",
       loader: "js",
     }));
   },

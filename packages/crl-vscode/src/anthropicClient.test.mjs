@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./test-harness.mjs";
 
-const { callAnthropic, AnthropicError, anthropicErrorLabel, parseSseFrames, streamAnthropic } = await load("anthropicClient.ts");
+const { callAnthropic, AnthropicError, anthropicErrorLabel, parseSseFrames, streamAnthropic, toAnthropicMessages } = await load("anthropicClient.ts");
 
 const enc = (s) => new TextEncoder().encode(s);
 // A fake ReadableStream reader over a list of byte chunks. `abortAt` (index) aborts the controller INSIDE read() just
@@ -360,6 +360,140 @@ test("streamAnthropic: a malformed COMPLETE data frame throws AnthropicError(200
     () => streamAnthropic({ apiKey: "k", model: "m", messages: [{ role: "user", content: "x" }], maxTokens: 8, stream: true, fetchImpl: streamFetch(makeReader(frames)) }, () => {}),
     (e) => e instanceof AnthropicError && e.status === 200 && /malformed/.test(e.message),
   );
+});
+
+// ── #210 Todo C: tool-calling (streamed tool_use blocks, ordered content, conversion) ──
+const toolBlockStart = (index, id, name) => `event: content_block_start\ndata: ${JSON.stringify({ type: "content_block_start", index, content_block: { type: "tool_use", id, name } })}\n\n`;
+const textBlockStartAt = (index) => `event: content_block_start\ndata: ${JSON.stringify({ type: "content_block_start", index, content_block: { type: "text" } })}\n\n`;
+const textDeltaAt = (index, t) => `event: content_block_delta\ndata: ${JSON.stringify({ type: "content_block_delta", index, delta: { type: "text_delta", text: t } })}\n\n`;
+const inputJsonDelta = (index, pj) => `event: content_block_delta\ndata: ${JSON.stringify({ type: "content_block_delta", index, delta: { type: "input_json_delta", partial_json: pj } })}\n\n`;
+const blockStop = (index) => `event: content_block_stop\ndata: ${JSON.stringify({ type: "content_block_stop", index })}\n\n`;
+const toolStopDelta = `event: message_delta\ndata: ${JSON.stringify({ type: "message_delta", delta: { stop_reason: "tool_use" }, usage: { output_tokens: 7 } })}\n\n`;
+
+test("streamAnthropic: a tool_use block accumulates input_json_delta, fires onToolUse ONCE at stop, surfaces stop_reason:tool_use", async () => {
+  const frames = [
+    enc(toolBlockStart(0, "tu_1", "open_flag_drawer")),
+    enc(inputJsonDelta(0, '{"target_id":')),
+    enc(inputJsonDelta(0, '"abc","summary":"BMI underspecified"}')),
+    enc(blockStop(0)),
+    enc(toolStopDelta),
+    enc(messageStop),
+  ];
+  const tools = [];
+  const r = await streamAnthropic(
+    { apiKey: "k", model: "m", messages: [{ role: "user", content: "flag this" }], maxTokens: 64, stream: true, fetchImpl: streamFetch(makeReader(frames)) },
+    () => {},
+    undefined,
+    (tu) => tools.push(tu),
+  );
+  assert.equal(tools.length, 1, "onToolUse fired exactly once");
+  assert.deepEqual(tools[0], { id: "tu_1", name: "open_flag_drawer", input: { target_id: "abc", summary: "BMI underspecified" } });
+  assert.equal(r.stopReason, "tool_use");
+  assert.deepEqual(r.content, [{ type: "tool_use", id: "tu_1", name: "open_flag_drawer", input: { target_id: "abc", summary: "BMI underspecified" } }]);
+  assert.equal(r.text, "", "a tool-only turn has no visible text");
+});
+
+test("streamAnthropic: mixed text + tool_use assembles content in WIRE order (text first, then the call)", async () => {
+  const frames = [
+    enc(textBlockStartAt(0)),
+    enc(textDeltaAt(0, "I'll flag that. ")),
+    enc(blockStop(0)),
+    enc(toolBlockStart(1, "tu_9", "open_flag_drawer")),
+    enc(inputJsonDelta(1, '{"target_id":"x"}')),
+    enc(blockStop(1)),
+    enc(toolStopDelta),
+    enc(messageStop),
+  ];
+  const seen = [];
+  const r = await streamAnthropic(
+    { apiKey: "k", model: "m", messages: [{ role: "user", content: "flag" }], maxTokens: 64, stream: true, fetchImpl: streamFetch(makeReader(frames)) },
+    (t) => seen.push(t),
+  );
+  assert.deepEqual(seen, ["I'll flag that. "]);
+  assert.equal(r.text, "I'll flag that. ");
+  assert.deepEqual(r.content, [
+    { type: "text", text: "I'll flag that. " },
+    { type: "tool_use", id: "tu_9", name: "open_flag_drawer", input: { target_id: "x" } },
+  ]);
+});
+
+test("streamAnthropic: a tool_use with NO input_json_delta defaults its input to {} (never JSON.parse(''))", async () => {
+  const frames = [enc(toolBlockStart(0, "tu_2", "list_stuff")), enc(blockStop(0)), enc(toolStopDelta), enc(messageStop)];
+  const tools = [];
+  const r = await streamAnthropic(
+    { apiKey: "k", model: "m", messages: [{ role: "user", content: "x" }], maxTokens: 8, stream: true, fetchImpl: streamFetch(makeReader(frames)) },
+    () => {}, undefined, (tu) => tools.push(tu),
+  );
+  assert.deepEqual(tools[0].input, {}, "empty accumulator → {}");
+  assert.deepEqual(r.content, [{ type: "tool_use", id: "tu_2", name: "list_stuff", input: {} }]);
+});
+
+test("streamAnthropic: malformed tool input JSON throws AnthropicError(200) — no dropping the call silently", async () => {
+  const frames = [enc(toolBlockStart(0, "tu_3", "bad")), enc(inputJsonDelta(0, "{not json")), enc(blockStop(0))];
+  await assert.rejects(
+    () => streamAnthropic({ apiKey: "k", model: "m", messages: [{ role: "user", content: "x" }], maxTokens: 8, stream: true, fetchImpl: streamFetch(makeReader(frames)) }, () => {}),
+    (e) => e instanceof AnthropicError && e.status === 200 && /malformed.*tool input/i.test(e.message),
+  );
+});
+
+test("streamAnthropic: a cancel BEFORE content_block_stop emits NO tool_use (no partial call) + finalizes cancelled", async () => {
+  const controller = new AbortController();
+  const frames = [enc(toolBlockStart(0, "tu_4", "x")), enc(inputJsonDelta(0, '{"a":1'))]; // never reaches content_block_stop
+  const reader = makeReader(frames, { abortAt: 2, controller });
+  const tools = [];
+  const r = await streamAnthropic(
+    { apiKey: "k", model: "m", messages: [{ role: "user", content: "x" }], maxTokens: 8, stream: true, signal: controller.signal, fetchImpl: streamFetch(reader) },
+    () => {}, undefined, (tu) => tools.push(tu),
+  );
+  assert.equal(tools.length, 0, "no fully-assembled tool call → onToolUse never fires");
+  assert.equal(r.stopReason, "cancelled");
+  assert.equal(r.content, undefined, "an unfinalized tool_use is excluded from content");
+});
+
+test("streamAnthropic + body: tools are mapped to the wire {name, description, input_schema}", async () => {
+  let body;
+  const fetchImpl = async (_url, init) => { body = JSON.parse(init.body); return { ok: true, status: 200, body: { getReader: () => makeReader([enc(messageStop)]) } }; };
+  await streamAnthropic(
+    { apiKey: "k", model: "m", messages: [{ role: "user", content: "x" }], maxTokens: 8, stream: true, tools: [{ name: "t", description: "d", inputSchema: { type: "object" } }], fetchImpl },
+    () => {},
+  );
+  assert.deepEqual(body.tools, [{ name: "t", description: "d", input_schema: { type: "object" } }]);
+});
+
+test("callAnthropic: parses tool_use blocks into ordered content (non-streaming)", async () => {
+  const fetchImpl = async () => resp(true, 200, {
+    content: [
+      { type: "text", text: "flagging" },
+      { type: "tool_use", id: "tu_5", name: "open_flag_drawer", input: { target_id: "z" } },
+    ],
+    stop_reason: "tool_use",
+  });
+  const r = await callAnthropic({ apiKey: "k", model: "m", messages: [{ role: "user", content: "x" }], maxTokens: 8, fetchImpl });
+  assert.equal(r.text, "flagging");
+  assert.deepEqual(r.content, [
+    { type: "text", text: "flagging" },
+    { type: "tool_use", id: "tu_5", name: "open_flag_drawer", input: { target_id: "z" } },
+  ]);
+});
+
+test("toAnthropicMessages: a plain-string content passes through unchanged", () => {
+  assert.deepEqual(toAnthropicMessages([{ role: "user", content: "hi" }]), [{ role: "user", content: "hi" }]);
+});
+
+test("toAnthropicMessages: assistant tool_use + user tool_result map to wire blocks; empty text dropped; is_error preserved", () => {
+  const out = toAnthropicMessages([
+    { role: "assistant", content: [{ type: "text", text: "" }, { type: "tool_use", id: "tu_1", name: "f", input: { a: 1 } }] },
+    { role: "user", content: [{ type: "tool_result", toolUseId: "tu_1", content: "opened", isError: true }] },
+  ]);
+  assert.deepEqual(out, [
+    { role: "assistant", content: [{ type: "tool_use", id: "tu_1", name: "f", input: { a: 1 } }] },
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "tu_1", content: "opened", is_error: true }] },
+  ]);
+});
+
+test("toAnthropicMessages: a non-error tool_result omits is_error entirely (not is_error:false)", () => {
+  const [msg] = toAnthropicMessages([{ role: "user", content: [{ type: "tool_result", toolUseId: "t", content: "ok" }] }]);
+  assert.deepEqual(msg.content, [{ type: "tool_result", tool_use_id: "t", content: "ok" }]);
 });
 
 console.log("anthropicClient.test: ok");

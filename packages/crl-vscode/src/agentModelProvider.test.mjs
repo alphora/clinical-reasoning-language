@@ -91,9 +91,17 @@ test("AnthropicProvider.complete: a thinking-only response yields empty text (th
   assert.equal(r.stopReason, "max_tokens");
 });
 
-test("AnthropicProvider.complete: passing `tools` fails fast (never a silent plain-text degrade)", async () => {
-  const p = new AnthropicProvider("m", secretsWith("k"), undefined, okFetch({ content: [{ type: "text", text: "x" }] }));
-  await assert.rejects(() => p.complete({ messages: [{ role: "user", content: "hi" }], tools: [{}] }), /tool-calling/);
+test("AnthropicProvider.complete: passing `tools` sends the wire tools + returns parsed tool_use content (Todo C)", async () => {
+  let body;
+  const fetchImpl = async (_url, init) => {
+    body = JSON.parse(init.body);
+    return { ok: true, status: 200, json: async () => ({ content: [{ type: "tool_use", id: "tu_1", name: "open_flag_drawer", input: { target_id: "x" } }], stop_reason: "tool_use" }) };
+  };
+  const p = new AnthropicProvider("m", secretsWith("k"), undefined, fetchImpl);
+  const r = await p.complete({ messages: [{ role: "user", content: "hi" }], tools: [{ name: "open_flag_drawer", description: "d", inputSchema: { type: "object" } }] });
+  assert.deepEqual(body.tools, [{ name: "open_flag_drawer", description: "d", input_schema: { type: "object" } }]);
+  assert.equal(r.stopReason, "tool_use");
+  assert.deepEqual(r.content, [{ type: "tool_use", id: "tu_1", name: "open_flag_drawer", input: { target_id: "x" } }]);
 });
 
 test("AnthropicProvider: no key → not available; complete throws the actionable message", async () => {
@@ -141,9 +149,17 @@ test("AnthropicProvider.stream: an already-cancelled token FINALIZES the partial
   assert.equal(r.stopReason, "cancelled");
 });
 
-test("AnthropicProvider.stream: passing `tools` fails fast (never a silent plain-text degrade)", async () => {
-  const p = new AnthropicProvider("m", secretsWith("k"), undefined, streamFetch([stopFrame]));
-  await assert.rejects(() => p.stream({ messages: [{ role: "user", content: "hi" }], tools: [{}] }, () => {}), /tool-calling/);
+test("AnthropicProvider.stream: a streamed tool_use flows through as a tagged {type:'tool_use'} StreamDelta + content (Todo C)", async () => {
+  const toolStart = enc(`data: ${JSON.stringify({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "tu_1", name: "open_flag_drawer" } })}\n\n`);
+  const jsonDelta = enc(`data: ${JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"target_id":"x"}' } })}\n\n`);
+  const blockStopF = enc(`data: ${JSON.stringify({ type: "content_block_stop", index: 0 })}\n\n`);
+  const toolStopF = enc(`data: ${JSON.stringify({ type: "message_delta", delta: { stop_reason: "tool_use" } })}\n\n`);
+  const p = new AnthropicProvider("m", secretsWith("k"), undefined, streamFetch([toolStart, jsonDelta, blockStopF, toolStopF, stopFrame]));
+  const deltas = [];
+  const r = await p.stream({ messages: [{ role: "user", content: "flag this" }], tools: [{ name: "open_flag_drawer", description: "d", inputSchema: {} }] }, (d) => deltas.push(d));
+  assert.deepEqual(deltas, [{ type: "tool_use", id: "tu_1", name: "open_flag_drawer", input: { target_id: "x" } }]);
+  assert.equal(r.stopReason, "tool_use");
+  assert.deepEqual(r.content, [{ type: "tool_use", id: "tu_1", name: "open_flag_drawer", input: { target_id: "x" } }]);
 });
 
 test("AnthropicProvider.stream: no key → throws the actionable unavailable message", async () => {
