@@ -108,4 +108,38 @@ test("the unavailable messages are plain text (no Markdown — notifications don
   assert.match(ANTHROPIC_UNAVAILABLE, /ANTHROPIC_API_KEY/);
 });
 
+// ── #210 Todo B: AnthropicProvider.stream (injected fetch + fake SSE reader; no vscode token needed — a plain stub) ──
+const enc = (s) => new TextEncoder().encode(s);
+const textDelta = (t) => enc(`data: ${JSON.stringify({ type: "content_block_delta", delta: { type: "text_delta", text: t } })}\n\n`);
+const stopFrame = enc(`data: ${JSON.stringify({ type: "message_stop" })}\n\n`);
+const readerOf = (chunks) => { let i = 0; return { read: async () => (i < chunks.length ? { done: false, value: chunks[i++] } : { done: true, value: undefined }), cancel: async () => {} }; };
+const streamFetch = (chunks) => async () => ({ ok: true, status: 200, body: { getReader: () => readerOf(chunks) } });
+
+test("AnthropicProvider.stream: emits tagged text deltas + resolves the full ModelResponse", async () => {
+  const p = new AnthropicProvider("m", secretsWith("k"), undefined, streamFetch([textDelta("agent "), textDelta("online"), stopFrame]));
+  const deltas = [];
+  const r = await p.stream({ messages: [{ role: "user", content: "hi" }] }, (d) => deltas.push(d));
+  assert.deepEqual(deltas, [{ type: "text", text: "agent " }, { type: "text", text: "online" }], "each delta is a tagged {type:'text'}");
+  assert.equal(r.text, "agent online");
+});
+
+test("AnthropicProvider.stream: an already-cancelled token FINALIZES the partial (stopReason 'cancelled'), never throws", async () => {
+  // The token bridges to an AbortController; an already-cancelled token aborts before the read → streamAnthropic returns
+  // the (empty) partial with stopReason 'cancelled' rather than throwing.
+  const token = { isCancellationRequested: true, onCancellationRequested: () => ({ dispose() {} }) };
+  const p = new AnthropicProvider("m", secretsWith("k"), undefined, streamFetch([textDelta("x"), stopFrame]));
+  const r = await p.stream({ messages: [{ role: "user", content: "hi" }], token }, () => {});
+  assert.equal(r.stopReason, "cancelled");
+});
+
+test("AnthropicProvider.stream: passing `tools` fails fast (never a silent plain-text degrade)", async () => {
+  const p = new AnthropicProvider("m", secretsWith("k"), undefined, streamFetch([stopFrame]));
+  await assert.rejects(() => p.stream({ messages: [{ role: "user", content: "hi" }], tools: [{}] }, () => {}), /tool-calling/);
+});
+
+test("AnthropicProvider.stream: no key → throws the actionable unavailable message", async () => {
+  const p = new AnthropicProvider("m", secretsWith(undefined), undefined, streamFetch([stopFrame]));
+  await assert.rejects(() => p.stream({ messages: [{ role: "user", content: "hi" }] }, () => {}), /Set Anthropic API Key/);
+});
+
 console.log("agentModelProvider.test: ok");

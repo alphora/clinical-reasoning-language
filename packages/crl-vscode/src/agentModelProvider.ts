@@ -5,7 +5,7 @@
 // whole reply (streaming lands with the chat pane, Todo B). `tools` is accepted but UNUSED here (future-proofing the seam
 // so Todo C's tool-calling is additive, not a churn of every call site).
 import * as vscode from "vscode";
-import { callAnthropic, type AnthropicMessage } from "./anthropicClient";
+import { callAnthropic, streamAnthropic, type AnthropicMessage } from "./anthropicClient";
 
 export interface ModelMessage {
   role: "user" | "assistant";
@@ -33,10 +33,18 @@ export interface ModelResponse {
   usage?: { inputTokens?: number; outputTokens?: number };
 }
 
+/** A streamed increment. TAGGED from day one (a discriminated union on `type`) so Todo C's tool-calling adds a
+ *  `{ type: "tool_use"; … }` variant WITHOUT reshaping the `onDelta` callback or touching the host post loop. */
+export type StreamDelta = { type: "text"; text: string };
+
 export interface ModelProvider {
   readonly id: "vscode-lm" | "anthropic";
   isAvailable(): Promise<boolean>;
   complete(req: ModelRequest): Promise<ModelResponse>;
+  /** Stream the reply, emitting each delta via `onDelta`, and resolve with the full `ModelResponse` (text + stopReason +
+   *  usage). A CANCEL (`req.token`) FINALIZES the accumulated partial as `{ …, stopReason: "cancelled" }` — it does NOT
+   *  throw; only a genuine failure throws. Mirrors `complete`'s fail-fast on a non-empty `req.tools`. */
+  stream(req: ModelRequest, onDelta: (d: StreamDelta) => void): Promise<ModelResponse>;
 }
 
 /** Default per-request output cap for the Anthropic backend (the connectivity proof is tiny; the chat pane will raise it). */
@@ -69,15 +77,10 @@ export class VsCodeLmProvider implements ModelProvider {
     return (await vscode.lm.selectChatModels({ vendor: "copilot" })).length > 0;
   }
 
-  async complete(req: ModelRequest): Promise<ModelResponse> {
-    if (req.tools?.length) throw new Error("tool-calling is not supported yet (Todo C)"); // fail-fast, never silently drop tools
-    const models = await vscode.lm.selectChatModels({ vendor: "copilot" });
-    const model = models[0];
-    if (!model) {
-      throw new Error(VSCODE_LM_UNAVAILABLE);
-    }
-    // `LanguageModelChatMessage` has no System role, so translate the system prompt into a leading User message. It's a
-    // deliberate lossy mapping — the model treats it as the opening user turn rather than an operator instruction.
+  /** `LanguageModelChatMessage` has no System role, so translate the system prompt into a leading User message. It's a
+   *  deliberate lossy mapping — the model treats it as the opening user turn rather than an operator instruction. Shared
+   *  by `complete` + `stream` so the two build an identical message list. */
+  private toLmMessages(req: ModelRequest): vscode.LanguageModelChatMessage[] {
     const msgs: vscode.LanguageModelChatMessage[] = [];
     if (req.system !== undefined) msgs.push(vscode.LanguageModelChatMessage.User(req.system));
     for (const m of req.messages) {
@@ -87,27 +90,61 @@ export class VsCodeLmProvider implements ModelProvider {
           : vscode.LanguageModelChatMessage.User(m.content),
       );
     }
+    return msgs;
+  }
+
+  /** Map a request failure to an actionable plain `Error` (shared by `complete` + `stream`). `isAvailable` (models present)
+   *  ≠ usable: the first request can throw when the user declined consent, or the request was blocked / the model vanished.
+   *  A non-`LanguageModelError` is returned as-is (rethrow the original). */
+  private lmError(e: unknown): unknown {
+    if (e instanceof vscode.LanguageModelError) {
+      if (e.code === "NoPermissions") return new Error("you declined model access — re-run to grant it");
+      if (e.code === "Blocked") return new Error("the language model blocked this request");
+      if (e.code === "NotFound") return new Error("the selected language model is no longer available");
+      return new Error(`language model error: ${e.message}`);
+    }
+    return e;
+  }
+
+  async complete(req: ModelRequest): Promise<ModelResponse> {
+    if (req.tools?.length) throw new Error("tool-calling is not supported yet (Todo C)"); // fail-fast, never silently drop tools
+    const models = await vscode.lm.selectChatModels({ vendor: "copilot" });
+    const model = models[0];
+    if (!model) {
+      throw new Error(VSCODE_LM_UNAVAILABLE);
+    }
     try {
-      const resp = await model.sendRequest(msgs, {}, req.token);
+      const resp = await model.sendRequest(this.toLmMessages(req), {}, req.token);
       let text = "";
       for await (const chunk of resp.text) text += chunk;
       return { text };
     } catch (e) {
-      // `isAvailable` (models present) ≠ usable: the first request can throw when the user declined consent, or the
-      // request was blocked / the model vanished. Rethrow as a plain Error with an actionable message.
-      if (e instanceof vscode.LanguageModelError) {
-        if (e.code === "NoPermissions") {
-          throw new Error("you declined model access — re-run to grant it");
-        }
-        if (e.code === "Blocked") {
-          throw new Error("the language model blocked this request");
-        }
-        if (e.code === "NotFound") {
-          throw new Error("the selected language model is no longer available");
-        }
-        throw new Error(`language model error: ${e.message}`);
+      throw this.lmError(e);
+    }
+  }
+
+  async stream(req: ModelRequest, onDelta: (d: StreamDelta) => void): Promise<ModelResponse> {
+    if (req.tools?.length) throw new Error("tool-calling is not supported yet (Todo C)"); // fail-fast, never silently drop tools
+    const models = await vscode.lm.selectChatModels({ vendor: "copilot" });
+    const model = models[0];
+    if (!model) {
+      throw new Error(VSCODE_LM_UNAVAILABLE);
+    }
+    let text = "";
+    try {
+      // `resp.text` is an async-iterable of chunks — emit each as a tagged text delta and accumulate.
+      const resp = await model.sendRequest(this.toLmMessages(req), {}, req.token);
+      for await (const chunk of resp.text) {
+        onDelta({ type: "text", text: chunk });
+        text += chunk;
       }
-      throw e;
+      return { text };
+    } catch (e) {
+      // CANCEL = FINALIZE: a Stop cancels the token, which rejects the iteration (a LanguageModelError / CancellationError).
+      // Return the accumulated partial as `stopReason:"cancelled"` rather than surfacing a red error. A genuine failure
+      // (no cancellation requested) rethrows with the shared mapping.
+      if (req.token?.isCancellationRequested) return { text, stopReason: "cancelled" };
+      throw this.lmError(e);
     }
   }
 }
@@ -155,6 +192,38 @@ export class AnthropicProvider implements ModelProvider {
         signal: controller.signal,
         fetchImpl: this.fetchImpl,
       });
+      return { text: r.text, stopReason: r.stopReason, usage: r.usage };
+    } finally {
+      sub?.dispose();
+    }
+  }
+
+  async stream(req: ModelRequest, onDelta: (d: StreamDelta) => void): Promise<ModelResponse> {
+    if (req.tools?.length) throw new Error("tool-calling is not supported yet (Todo C)"); // fail-fast, never silently drop tools
+    const apiKey = await this.resolveKey();
+    if (!apiKey) {
+      throw new Error(ANTHROPIC_UNAVAILABLE);
+    }
+    // Same token→AbortController bridge as `complete` — a cancel aborts the in-flight stream; an ALREADY-cancelled token
+    // aborts before the POST. `streamAnthropic` turns that abort into a finalized partial (`stopReason:"cancelled"`), so
+    // the cancel contract is identical across both backends without a throw here.
+    const controller = new AbortController();
+    if (req.token?.isCancellationRequested) controller.abort();
+    const sub = req.token?.onCancellationRequested(() => controller.abort());
+    try {
+      const r = await streamAnthropic(
+        {
+          apiKey,
+          model: this.model,
+          system: req.system,
+          messages: req.messages as AnthropicMessage[],
+          maxTokens: req.maxTokens ?? DEFAULT_MAX_TOKENS,
+          signal: controller.signal,
+          fetchImpl: this.fetchImpl,
+          stream: true,
+        },
+        (t) => onDelta({ type: "text", text: t }),
+      );
       return { text: r.text, stopReason: r.stopReason, usage: r.usage };
     } finally {
       sub?.dispose();

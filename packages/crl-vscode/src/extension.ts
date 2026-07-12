@@ -44,6 +44,7 @@ import {
 } from "./navigation";
 import { ProjectIndex } from "@smile-digital-health/crl/language-services";
 import { registerAgentCommands } from "./agentCommands";
+import { registerAgentChat } from "./agentChat";
 
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -191,6 +192,9 @@ export function activate(context: vscode.ExtensionContext): void {
   // Agent (editor-agent Todo A) commands register EARLY too — key handling + the provider round-trip proof must survive a
   // provisioning failure. getOutputChannel() is private to this module, so pass the channel in.
   registerAgentCommands(context, getOutputChannel());
+  // The chat pane (editor-agent Todo B). Registers alongside the other agent commands — NOT gated behind `crl.active`
+  // (Todo B has no app-state dependency; chat is available whenever the extension is loaded).
+  registerAgentChat(context);
 
   // Language features (completion + hover + diagnostics) are independent of
   // provisioning — they activate whenever the extension loads and a `.crl`
