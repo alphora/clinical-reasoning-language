@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <title>Coral</title>
+  <g fill="none" stroke="#000" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 20.5V13.5V7V3.5"/>
+    <path d="M12 13.8L8.8 10.8L7.1 7.5"/>
+    <path d="M8.8 10.8L5.5 10L3.8 8.4"/>
+    <path d="M7.1 7.5V4.8"/>
+    <path d="M12 10.8L15.2 8L16.8 5"/>
+    <path d="M15.2 8L18.5 7.2L20.1 5.6"/>
+    <path d="M16.8 5V2.8"/>
+    <path d="M7 20.5H17"/>
+  </g>
+</svg>

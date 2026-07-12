@@ -206,6 +206,27 @@ check("failedCriteriaMode stays SHARED under crl.cockpit ONLY — no crl.medical
   );
 });
 
+check("Todo B.1: contributes the crlAssist activity-bar container + the crl.agentChat webview view (id, type:webview, NO when) + retitled command", () => {
+  // A DEDICATED container — NOT crlCockpit (which is crl.active-gated). The user drags it to the Secondary Side Bar once.
+  const containers = c.viewsContainers?.activitybar ?? [];
+  const assist = containers.find((x) => x.id === "crlAssist");
+  assert.ok(assist, "expected a crlAssist activity-bar container");
+  assert.notEqual(assist.id, "crlCockpit", "the chat container must be its OWN container, not the crl.active-gated crlCockpit");
+  assert.equal(assist.title, "CRL Assist");
+  assert.ok(assist.icon, "the crlAssist container needs an icon");
+
+  const views = c.views?.crlAssist ?? [];
+  const view = views.find((v) => v.id === "crl.agentChat");
+  assert.ok(view, "expected the crl.agentChat view under the crlAssist container");
+  assert.equal(view.type, "webview", "the chat view must be a webview view");
+  assert.equal(view.name, "CRL Assist");
+  assert.equal(view.when, undefined, "the chat view must NOT be gated by a `when` clause (chat is always available)");
+
+  const cmd = (c.commands ?? []).find((x) => x.command === "crl.agent.chat");
+  assert.ok(cmd, "expected the crl.agent.chat command");
+  assert.equal(cmd.title, "CRL: Open CRL Assist", "the command retitles to 'CRL: Open CRL Assist'");
+});
+
 // Verify the referenced language-configuration files exist on disk so a
 // package.json typo doesn't make it to release.
 check("contributes.languages.configuration paths resolve to real files", () => {
@@ -216,6 +237,24 @@ check("contributes.languages.configuration paths resolve to real files", () => {
     const exists = readFileSync(abs, "utf8");
     assert.ok(exists.length > 0, `language-configuration at ${abs} must exist and be non-empty`);
   }
+});
+
+// Coral branding assets (#B.1 follow-on): the container icon SVG + the `$(coral)` icon-font woff must exist on disk so a
+// missing/mis-referenced asset can't ship a broken icon.
+check("Coral assets: the crlCockpit container icon + the coral icon font resolve to real files", () => {
+  const container = (c.viewsContainers?.activitybar ?? []).find((x) => x.id === "crlCockpit");
+  assert.equal(container?.icon, "media/coral-activitybar.svg", "crlCockpit uses the Coral activity-bar SVG (not $(law))");
+  const svg = readFileSync(join(here, "..", container.icon), "utf8");
+  assert.match(svg, /<svg/, "the Coral activity-bar SVG is a real SVG");
+  const coralIcon = c.icons?.coral;
+  assert.ok(coralIcon && coralIcon.default?.fontCharacter === "\\E900", "the coral icon font is contributed at U+E900");
+  const woff = readFileSync(join(here, "..", coralIcon.default.fontPath.replace(/^\.\//, "")));
+  assert.ok(woff.length > 0, "the coral-icons.woff exists and is non-empty");
+});
+
+check("the CRL Assist reopener keybinding is contributed (Ctrl+Alt+A → crl.agent.chat)", () => {
+  const kb = (c.keybindings ?? []).find((x) => x.command === "crl.agent.chat");
+  assert.ok(kb && /ctrl\+alt\+a/i.test(kb.key), "expected a Ctrl+Alt+A keybinding for crl.agent.chat");
 });
 
 console.log(failed ? "\ntest:package FAILED" : "\npackage.test.mjs: v2.3.0 contributes restructure assertions passed.");
