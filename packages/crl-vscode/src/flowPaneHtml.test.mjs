@@ -730,4 +730,10 @@ check("#203 Slice A + GAP 3: renders a HIDDEN, clickable ⚑ flag badge on each 
   assert.match(FLOW_STYLE, /\.flow-row\.has-flag \.flow-flag-badge\{display:inline\}/); // shown on host toggle
 });
 
+check("tree zoom: renders a floating − / reset / + control (the % is filled in by the webview's applyZoom)", () => {
+  assert.match(r.html, /class="flow-zoom" data-flow-zoom/);
+  assert.match(r.html, /data-zoom="out"[\s\S]*?data-zoom="reset"[\s\S]*?data-zoom="in"/); // in DOM order
+  assert.match(r.html, /class="flow-zoom-pct"[^>]*>100%</); // stateless default; applyZoom updates it
+});
+
 console.log(`\nflowPaneHtml.test: ${pass} checks passed`);

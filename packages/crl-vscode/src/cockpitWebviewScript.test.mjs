@@ -931,4 +931,18 @@ check("#204 auto-detect: resolveOrDetectIssueBase — config WINS (respects the 
   assert.match(m[1], /return detectIssueBaseFromGit\(fileUri\)/);
 });
 
+check("tree zoom: applyZoom scales the SVG BOX (viewBox base × treeZoom, not a CSS transform), re-applied after render", () => {
+  assert.match(SCRIPT, /let treeZoom=1;/);
+  assert.match(SCRIPT, /const applyZoom=\(\)=>\{const s=root\.querySelector\('\.flow-svg'\)/); // reads the flow SVG
+  assert.match(SCRIPT, /s\.style\.width=\(bw\*treeZoom\)\+'px';s\.style\.height=\(bh\*treeZoom\)\+'px'/); // scale the box → the pane scrolls to pan
+  assert.match(SCRIPT, /const setZoom=\(z\)=>\{treeZoom=Math\.min\(3,Math\.max\(\.25,z\)\)/); // clamped 0.25–3×
+  assert.match(SCRIPT, /root\.innerHTML=m\.html;fcc\.innerHTML='';[\s\S]*?applyZoom\(\);/); // persists across a re-render
+});
+check("tree zoom: Ctrl+wheel (flow pane only, passive:false) + Ctrl +/-/0 + the − / reset / + control", () => {
+  assert.match(SCRIPT, /addEventListener\('wheel',\(e\)=>\{if\(!e\.ctrlKey\)return;if\(!root\.querySelector\('\.flow-svg'\)\)return;e\.preventDefault\(\)/); // Ctrl+wheel, tree only
+  assert.match(SCRIPT, /\{passive:false\}/); // preventDefault must work on wheel
+  assert.match(SCRIPT, /keydown[\s\S]*?e\.key==='0'[\s\S]*?setZoom\(1\)/); // Ctrl+0 resets
+  assert.match(SCRIPT, /closest\('\[data-zoom\]'\)[\s\S]*?setZoom\(a==='in'\?treeZoom\*1\.2:a==='out'\?treeZoom\/1\.2:1\)/); // control buttons
+});
+
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);

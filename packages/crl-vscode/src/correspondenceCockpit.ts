@@ -3206,6 +3206,11 @@ function shellHtml(): string {
 .flag-cancel,.flag-insert{cursor:pointer;border:none;border-radius:2px;padding:2px 10px;font-size:.9em}
 .flag-cancel{background:var(--vscode-button-secondaryBackground,#3a3d41);color:var(--vscode-button-secondaryForeground,#fff)}
 .flag-insert{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff)}
+/* tree zoom — a floating control fixed to the pane corner (the zoom LEVEL is webview state re-applied after each render). */
+.flow-zoom{position:fixed;bottom:10px;right:14px;z-index:7;display:flex;gap:1px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background));border:1px solid var(--vscode-panel-border,#454545);border-radius:4px;padding:1px;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.flow-zoom button{cursor:pointer;background:none;border:none;color:inherit;font:inherit;padding:1px 6px;min-width:22px;border-radius:3px}
+.flow-zoom button:hover{background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,.2))}
+.flow-zoom-pct{font-variant-numeric:tabular-nums;min-width:46px}
 .fc-toggle{display:flex;align-items:center;gap:4px;padding:4px 2px 6px;font-size:.85em}
 .fc-toggle-label{opacity:.7;margin-right:2px}
 .fc-toggle-btn{font:inherit;cursor:pointer;padding:1px 8px;border:1px solid var(--vscode-panel-border,#454545);background:var(--vscode-editorWidget-background,#252526);color:var(--vscode-foreground)}
@@ -3246,6 +3251,12 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #211: show ONLY the selected flag tag's field group (client-side; no host round-trip). Called after the drawer is
   // injected and on a tag-select change. Safe no-op when the drawer is empty.
   `const aff=()=>{const ts=fld.querySelector('[data-flag-tag]');if(!ts)return;const tg=ts.value;for(const g of fld.querySelectorAll('[data-flag-field-for]')){g.hidden=g.getAttribute('data-flag-field-for')!==tg;}};` +
+  // tree zoom — webview-local (persists across re-renders). SCALE the SVG's rendered width/height (not a CSS transform),
+  // so the pane's scrollbars grow with it and native scroll pans. applyZoom re-reads the ORIGINAL size from the viewBox
+  // (idempotent) and updates the % readout; it's re-run after every render so the persisted zoom survives a rebuild.
+  `let treeZoom=1;` +
+  `const applyZoom=()=>{const s=root.querySelector('.flow-svg');if(!s)return;const vb=s.viewBox&&s.viewBox.baseVal;const bw=vb&&vb.width?vb.width:parseFloat(s.getAttribute('width'))||0;const bh=vb&&vb.height?vb.height:parseFloat(s.getAttribute('height'))||0;s.style.width=(bw*treeZoom)+'px';s.style.height=(bh*treeZoom)+'px';const p=root.querySelector('.flow-zoom-pct');if(p)p.textContent=Math.round(treeZoom*100)+'%';};` +
+  `const setZoom=(z)=>{treeZoom=Math.min(3,Math.max(.25,z));applyZoom();};` +
   `const clrFC=()=>{for(const el of root.querySelectorAll('.failed-criterion,.failed-criterion-preempt')){el.classList.remove('failed-criterion');el.classList.remove('failed-criterion-preempt');}};` +
   // #156 slice 5 / #210: the review-overlay clear. DISTINCT from clrFC — called ONLY by mark/clearReviewOverlay, NEVER by the
   // selection channel (highlight/clearHighlight), so the verdict fills SURVIVE selection (the survives-selection invariant).
@@ -3273,7 +3284,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #217: LIVE mode signal — a cockpit↔MV retarget doesn't rebuild the shell HTML, so a static <body data-mode> would go
   // stale; every render carries the current mode and stamps it here. The right-click contextmenu gate reads it (host stays
   // authoritative — a webview that hasn't re-rendered since a retarget still gates as its last mode, but the host re-checks).
-  `gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;` +
+  `gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;applyZoom();` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');if(Object.prototype.hasOwnProperty.call(_d,k)){ta.value=_d[k];if(k===_a){ta.focus();try{ta.setSelectionRange(_s,_e);}catch(_x){}}}}` +
   `v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion});}` +
   // The at-rest selection channel (.current). Clearing/applying it ALSO wipes the failed-criterion overlay — so the
@@ -3394,6 +3405,9 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // the badge <g> is nested inside the row's data-reveal; opens the flag list (the same channel as the chrome badge).
   `const fb=e.target.closest&&e.target.closest('[data-mv-flag-badge]');` +
   `if(fb){e.preventDefault();e.stopPropagation();v.postMessage({type:'mvFlags'});return;}` +
+  // tree zoom control (− / reset / +) — a local view op, no host round-trip. Intercepted BEFORE [data-reveal].
+  `const zb=e.target.closest&&e.target.closest('[data-zoom]');` +
+  `if(zb){e.preventDefault();e.stopPropagation();const a=zb.getAttribute('data-zoom');setZoom(a==='in'?treeZoom*1.2:a==='out'?treeZoom/1.2:1);return;}` +
   `const t=e.target.closest&&e.target.closest('[data-reveal]');` +
   `if(t)v.postMessage({type:'reveal',key:t.getAttribute('data-reveal')});});` +
   // #217: RIGHT-CLICK a flow node → the host opens a verdict quick-pick for the case(s) whose fired path runs through it.
@@ -3413,6 +3427,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // keydown handling is needed. stopPropagation keeps the change from bubbling into any ancestor listener.
   `root.addEventListener('change',(e)=>{const ws=e.target.closest&&e.target.closest('[data-worklist-select]');` +
   `if(ws){e.stopPropagation();v.postMessage({type:'worklistSet',key:ws.getAttribute('data-worklist-select'),value:ws.value});}});` +
+  // tree zoom via Ctrl+wheel (only when the tree/flow pane is present; passive:false so preventDefault stops the page zoom).
+  `root.addEventListener('wheel',(e)=>{if(!e.ctrlKey)return;if(!root.querySelector('.flow-svg'))return;e.preventDefault();setZoom(treeZoom*(e.deltaY<0?1.1:1/1.1));},{passive:false});` +
+  // tree zoom via Ctrl +/-/0 (only when the flow pane is present).
+  `window.addEventListener('keydown',(e)=>{if(!e.ctrlKey&&!e.metaKey)return;if(!root.querySelector('.flow-svg'))return;if(e.key==='='||e.key==='+'){e.preventDefault();setZoom(treeZoom*1.2);}else if(e.key==='-'||e.key==='_'){e.preventDefault();setZoom(treeZoom/1.2);}else if(e.key==='0'){e.preventDefault();setZoom(1);}});` +
   // Chrome clicks: the All/Blocking toggle (data-fc-mode) + a gap row's Open CRL source (data-fc-gap).
   `fcc.addEventListener('click',(e)=>{const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
   `if(mode){v.postMessage({type:'fcMode',mode:mode.getAttribute('data-fc-mode')});return;}` +

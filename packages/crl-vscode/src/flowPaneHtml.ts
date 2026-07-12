@@ -564,7 +564,15 @@ export function renderFlowPane(
     `<svg class="flow-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">` +
     body +
     `</svg>`;
-  return { html: `<div class="flow-wrap">${svg}</div>`, anchors, reveals, leafConcepts, conceptOccurrences, flaggableGids, startNodeGid };
+  // A floating zoom control (fixed to the pane corner). The zoom LEVEL is webview-local state re-applied after every
+  // render (applyZoom); this markup is stateless — the % is filled in by applyZoom. Ctrl+wheel / Ctrl +/-/0 also zoom.
+  const zoom =
+    `<div class="flow-zoom" data-flow-zoom>` +
+    `<button type="button" data-zoom="out" title="Zoom out (Ctrl -)" aria-label="Zoom out">−</button>` +
+    `<button type="button" data-zoom="reset" class="flow-zoom-pct" title="Reset zoom (Ctrl 0)" aria-label="Reset zoom">100%</button>` +
+    `<button type="button" data-zoom="in" title="Zoom in (Ctrl +)" aria-label="Zoom in">+</button>` +
+    `</div>`;
+  return { html: `<div class="flow-wrap">${svg}</div>${zoom}`, anchors, reveals, leafConcepts, conceptOccurrences, flaggableGids, startNodeGid };
 }
 
 // #203 Todo 4b Slice A — the hidden per-node flag badge: a ⚑ glyph grandchild `<g>`, shown when the host adds `.has-flag`
