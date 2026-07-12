@@ -65,6 +65,7 @@ import {
 import { resolveThisNode } from "./thisNodeMarker";
 import { failedCriterionLabel } from "./failedCriterionLabel";
 import { buildIssueUrl, issueRefOf, sanitizeIssueBase } from "./issueLink";
+import { isOccurrenceKey, occurrenceByNodeKey, occurrenceKeyValue, parseOccurrenceKey, resolveOccurrence, type OccurrenceRef } from "./occurrenceKey";
 import {
   addNote,
   buildReviewPerCase,
@@ -898,7 +899,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // us act on a different flag at the same position (Claude impl review). The `ver` guard also aborts on rebuild.
       const items = flagsList.map((f) => ({
         label: `${f.status === "resolved" ? "✓" : "⚑"} ${f.canonicalTag}${f.body ? " — " + f.body : ""}`,
-        description: `${f.scope}:${f.targetName} · ${f.status}${f.fields.get("ref") ? " · " + f.fields.get("ref") : ""}`,
+        // GAP 3: an occurrence flag (a keyed decision flag) shows its node signature — `decision:D · <guard→activity> · open`
+        // — so it reads as a specific node, not the whole decision.
+        description: `${f.scope}:${f.targetName}${f.key && isOccurrenceKey(f.key) ? " · " + parseOccurrenceKey(f.key).signature : ""} · ${f.status}${f.fields.get("ref") ? " · " + f.fields.get("ref") : ""}`,
         flag: f,
       }));
       const pick = await vscode.window.showQuickPick(items, { placeHolder: "Review flags — pick one (Esc to finish)" });
@@ -1014,7 +1017,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     flagNote(next === "resolved" ? "flag resolved" : "flag reopened");
   }
 
-  /** Reveal a flag at its meta line in the `.crl` source (its authoritative home — a library-scope flag has no tree node). */
+  /** Reveal a flag at its meta line in the `.crl` source (its authoritative home). This is uniform for ALL flags incl.
+   *  GAP 3 occurrence flags — an occurrence flag physically LIVES on its owning decision's meta line, so "Reveal in source"
+   *  opens exactly where it is; the tree ⚑ badge (driveFlagBadges) + the flag-list signature label convey WHICH node it's
+   *  about. (Revealing/scrolling the specific tree node is a possible follow-on; the source line is the authoritative home.) */
   async function revealFlag(flag: FlagInstance): Promise<void> {
     if (!flag.filePath) return;
     try {
@@ -1231,28 +1237,45 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const tree = views.get("tree");
     if (!tree) return; // tree pane is opt-in
     if (mode !== "medical-validation") {
-      void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [], startNodeGid: tree.startNodeGid, open: 0, resolved: 0, flagError: false });
+      void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [], startNodeGid: tree.startNodeGid, open: 0, resolved: 0, flagError: false, unplaced: 0 });
       return;
     }
     const open = flagsList.filter((f) => f.status !== "resolved"); // the blocking set (matches openFlags / the gate)
     const gids = new Set<string>();
+    let unplaced = 0; // PER-FLAG: how many open flags matched ZERO nodes (orphaned/moved occurrence, or a concept drawn nowhere)
     for (const f of open) {
       let matched: string[] = [];
       if (f.scope === "concept") {
         // (lib,name) — NEVER name alone (cross-lib same-name concepts). A flag with no libraryName (best-effort
-        // attribution absent) can't be safely placed → it stays unmatched (surfaces only in the start-node count).
+        // attribution absent) can't be safely placed → it stays unmatched (counts as unplaced).
         matched = tree.conceptOccurrences.filter((o) => o.name === f.targetName && o.lib === f.libraryName).map((o) => o.gid);
       } else if (f.scope === "decision") {
-        const d = crlStructure.find((s) => s.decision === f.targetName && s.lib === f.libraryName);
-        if (d) matched = segmentsFor(tree, [d.nodeKey]).segmentIds;
+        const dec = crlStructure.find((s) => s.decision === f.targetName && s.lib === f.libraryName);
+        // GAP 3: a decision flag whose `key` is an OCCURRENCE key (`<nodeId>~<sig>`) → resolve to the ONE keyed node
+        // (nodeId + signature verify) BEFORE the decision-root path; orphan/moved → matched stays [] → unplaced (never a
+        // wrong node). A NON-occurrence key (e.g. a pre-existing re-add-guard source-hash) or NO key → the decision OBJECT
+        // → the whole decision (today), so an existing keyed decision flag isn't misread as a broken occurrence (gpt55).
+        if (f.key && isOccurrenceKey(f.key)) {
+          if (dec) {
+            const res = resolveOccurrence(dec, f.key);
+            const g = res.placed ? tree.anchors[res.ref.nodeKey]?.scrollTo : undefined;
+            if (g) matched = [g];
+          }
+        } else if (dec) {
+          matched = segmentsFor(tree, [dec.nodeKey]).segmentIds;
+        }
       }
+      // "unplaced" means ONLY a genuine OCCURRENCE flag whose target moved/removed (a keyed decision flag that resolved
+      // orphan/moved). An OBJECT flag drawn nowhere (a library flag, or a concept used only as decision-input / inside a
+      // collapsed composite) is "not charted" — expected, NOT "moved/removed" — so it must NOT dilute this signal (Claude).
+      if (matched.length === 0 && f.scope === "decision" && f.key && isOccurrenceKey(f.key)) unplaced++;
       for (const g of matched) gids.add(g);
     }
-    // The START-NODE COUNT badge is the chrome mirror + catch-all: it shows the TOTAL open count (so a library-scope or
-    // otherwise-unmatchable flag is never dropped — it surfaces here even when it lights no per-node ⚑). The per-node ⚑s
-    // above mark WHICH specific nodes carry a flag; this badge is the policy-wide total. Post both counts + the error flag.
+    // The START-NODE COUNT badge is the chrome mirror + catch-all: the TOTAL open count. `unplaced` = open flags that lit
+    // NO node (an orphaned/moved occurrence, or a concept/decision drawn nowhere) — surfaced so a re-homed flag is never a
+    // silent aggregate-count-only blocker (the flag list labels which). Per-flag tracked, not a gid-count subtraction.
     const resolvedCount = flagsList.length - open.length;
-    void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [...gids], startNodeGid: tree.startNodeGid, open: open.length, resolved: resolvedCount, flagError: flagLoadError });
+    void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [...gids], startNodeGid: tree.startNodeGid, open: open.length, resolved: resolvedCount, flagError: flagLoadError, unplaced });
   }
 
   /** Post a gen-stamped `markThisNode` for a set of segment ids in one pane (#177 slice 4), after clearing the prior
@@ -2286,20 +2309,43 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // only meta carriers), so the target is: a decision ROOT (→ the decision) or a `when`/def-leaf (→ its concept, resolved
   // via the Slice A conceptOccurrences the render captured). An action/otherwise node has no meta target → no Add-flag.
 
-  /** Resolve a reveal hit → the concept/decision a flag would attach to, or undefined (non-flaggable). */
-  function flaggableTarget(hit: WebviewHit): { kind: "concept" | "decision"; name: string; lib: string } | undefined {
+  /** A flag TARGET a reveal hit offers. An OBJECT flag (concept/decision, no key) OR an OCCURRENCE flag (GAP 3 — a keyed
+   *  decision flag on one tree node). The flag always LIVES on a concept or decision (the meta carriers); `key` narrows a
+   *  decision flag to one node. `label` is the menu wording. */
+  interface FlagTargetChoice {
+    kind: "concept" | "decision";
+    name: string;
+    lib: string;
+    key?: string; // an occurrence key `<nodeId>~<signature>` — present iff this is an occurrence target
+    label: string;
+  }
+
+  /** The flag targets a reveal hit offers (GAP 3): a decision ROOT → the decision (object); a `when` → BOTH the concept
+   *  (object, all uses) AND this condition (occurrence, decision+key); a recommend-activity LEAF → this recommendation
+   *  (occurrence). A menu shows one "Add flag on <label>" per choice. `[]` → not flaggable (verdict-only). */
+  function flagTargetChoices(hit: WebviewHit): FlagTargetChoice[] {
     const tree = views.get("tree");
-    if (!tree) return undefined;
-    // A decision ROOT: its reveal nodeKey is a top-level structure key = a crlStructure entry.
-    if ("nodeKey" in hit) {
-      const d = crlStructure.find((s) => s.nodeKey === hit.nodeKey);
-      if (d) return { kind: "decision", name: d.decision, lib: d.lib };
+    if (!tree) return [];
+    const nodeKey = isSubQuestionHit(hit) ? hit.subQuestionLeafKey : "nodeKey" in hit ? hit.nodeKey : undefined;
+    if (!nodeKey) return [];
+    // A decision ROOT (a top-level crlStructure entry) → object-decision only.
+    const decTop = crlStructure.find((s) => s.nodeKey === nodeKey);
+    if (decTop) return [{ kind: "decision", name: decTop.decision, lib: decTop.lib, label: `decision "${decTop.decision}"` }];
+    const choices: FlagTargetChoice[] = [];
+    // A `when` carries a CONCEPT (object) target — its gating concept, resolved via conceptOccurrences (Slice A).
+    const gid = tree.anchors[nodeKey]?.scrollTo;
+    const conceptOcc = gid ? tree.conceptOccurrences.find((o) => o.gid === gid) : undefined;
+    if (conceptOcc) choices.push({ kind: "concept", name: conceptOcc.name, lib: conceptOcc.lib, label: `the concept "${conceptOcc.name}" (every use)` });
+    // An OCCURRENCE node (a `when` condition, or a recommend-activity leaf) → a keyed decision flag on ONE node.
+    let occ: OccurrenceRef | undefined;
+    for (const dec of crlStructure) {
+      const o = occurrenceByNodeKey(dec, nodeKey);
+      if (o) { occ = o; break; }
     }
-    // A `when` or def-leaf: map its anchor key → gid → the concept occurrence the render recorded (Slice A).
-    const anchorKey = isSubQuestionHit(hit) ? hit.subQuestionLeafKey : "nodeKey" in hit ? hit.nodeKey : undefined;
-    const gid = anchorKey ? tree.anchors[anchorKey]?.scrollTo : undefined;
-    const occ = gid ? tree.conceptOccurrences.find((o) => o.gid === gid) : undefined;
-    return occ ? { kind: "concept", name: occ.name, lib: occ.lib } : undefined;
+    if (occ) {
+      choices.push({ kind: "decision", name: occ.decision, lib: occ.lib, key: occurrenceKeyValue(occ), label: occ.isLeaf ? `this recommendation (${occ.signature})` : `this condition (${occ.signature})` });
+    }
+    return choices;
   }
 
   /** Find a concept/decision's DECLARATION (file + 1-based decl line + source) by (name, lib) — re-parses the policy's
@@ -2334,28 +2380,32 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const tree = views.get("tree");
     const hit = tree?.reveals[revealKey];
     if (!tree || !hit) return flagNote("no node here");
-    const target = flaggableTarget(hit);
-    if (!target) return nodeVerdictMenu(revealKey); // action/otherwise → verdict only, unchanged
-    const ver = indexVersion; // capture BEFORE the menu — a retarget mid-menu must not act on this (now-old) hit/target
+    const choices = flagTargetChoices(hit);
+    if (choices.length === 0) return nodeVerdictMenu(revealKey); // otherwise / use-decision → verdict only, unchanged
+    const ver = indexVersion; // capture BEFORE the menu — a retarget mid-menu must not act on this (now-old) hit
     const cel = currentCel;
+    // Verdict + one "Add flag on <target>" per choice — a `when` offers BOTH the concept (object) and this condition
+    // (occurrence); a leaf offers just this recommendation; a decision root just the decision.
     const pick = await vscode.window.showQuickPick(
       [
-        { label: "$(checklist) Set case verdict…", act: "verdict" as const },
-        { label: "$(flag) Add flag…", act: "flag" as const },
+        { label: "$(checklist) Set case verdict…", act: "verdict" as const, choice: undefined as FlagTargetChoice | undefined },
+        ...choices.map((c) => ({ label: `$(flag) Add flag on ${c.label}`, act: "flag" as const, choice: c as FlagTargetChoice | undefined })),
       ],
-      { placeHolder: `${target.kind} "${target.name}"` },
+      { placeHolder: "Medical Validation" },
     );
     if (!pick) return;
     if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — reopen the menu");
     if (pick.act === "verdict") return nodeVerdictMenu(revealKey); // revealKey is gen-scoped; nodeVerdictMenu re-validates
-    await addFlagAtNode(target, ver, cel);
+    if (pick.choice) await addFlagAtNode(pick.choice, ver, cel);
   }
 
   /** Author a flag on `target`: pick a tag (validation-concern first), a sanitized gist, any REGISTRY-required fields
    *  (fieldRulesOf; enum → quick-pick), then insert a lean `- meta is` line at the grammar-legal slot via a WorkspaceEdit
    *  + save, and refresh. `ver`/`cel` guard a retarget mid-menu (like the write-back). The vocab is shipped (Piece 1). */
-  async function addFlagAtNode(target: { kind: "concept" | "decision"; name: string; lib: string }, ver: number, cel: string | undefined): Promise<void> {
+  async function addFlagAtNode(target: FlagTargetChoice, ver: number, cel: string | undefined): Promise<void> {
     if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return; // findDeclaration reads live currentCel — re-check first (both reviewers [important])
+    // The flag LIVES on `target.kind`/`target.name` (a concept or the owning decision). An occurrence flag is a DECISION
+    // flag whose `; key` (`target.key`) narrows it to one tree node — createFlag just carries the key as a field (GAP 3).
     const decl = findDeclaration(target.kind, target.name, target.lib);
     if (!decl) return flagNote(`couldn't locate ${target.kind} "${target.name}" in the .crl`);
     const tags = flagTags();
@@ -2372,6 +2422,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const tag = tagPick.tag;
     // Required fields first (short single-line values), THEN the DESCRIPTION in a real note space (below).
     const fields: Record<string, string> = {};
+    if (target.key) fields.key = target.key; // GAP 3: an occurrence flag carries the node address `<nodeId>~<signature>`
     for (const rule of tag.fields.filter((f) => f.required)) {
       let value: string | undefined;
       if (rule.values && rule.values.length) {
@@ -3005,6 +3056,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `var sg=m.startNodeGid?document.getElementById(m.startNodeGid):null;` +
   `if(sg){var st=sg.querySelector('.flow-startflag-text');` +
   `var label=m.flagError?'⚠':(m.open>0?'⚑ '+m.open:(m.resolved>0?'✓':''));` +
+  // GAP 3: N flags couldn't be placed (an orphaned/moved occurrence) → show it on the badge (title + a suffix) so a
+  // re-homed flag is visible, not a silent count. The flag list labels which are unplaced.
+  `if(m.unplaced>0){label+=' · '+m.unplaced+'⚠';}` +
+  `var tt=sg.querySelector('title');if(tt)tt.textContent=(m.unplaced>0?m.unplaced+' flag(s) couldn\\'t be placed (target moved/removed) — ':'')+'open review flags — click to review';` +
   `if(st)st.textContent=label;sg.classList.toggle('has-startflag',label!=='');}}` +
   // #177 slice 4: the "this node" cross-pane marker — a SEPARATE channel from .current, .failed-criterion AND the review
   // overlay. Like the review overlay it is mutated ONLY here (mark/clearThisNode), NEVER by highlight/clearHighlight/clrFC/

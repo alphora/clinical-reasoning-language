@@ -128,6 +128,9 @@ const FOREST_GAP = 1.4; // extra slot rows between successive decision trees
 const ROW = NODE_H + V_GAP; // one slot's pixel height
 const COL = NODE_W + H_GAP; // one depth's pixel width
 const LABEL_MAX = 22; // chars PER LINE before wrapping/truncation (the proven ~168px-box fit; already de-collides main labels)
+// #203 GAP 3: a LEAF's centered label must clear BOTH end badges — the all-pass ✓ (right-center) and the new ⚑ (left-
+// center) — so a leaf wraps/truncates a few chars sooner than a left-aligned node, reserving a badge gutter each side.
+const LEAF_LABEL_MAX = 17;
 
 type FlowKind = "decision" | "when" | "otherwise" | "action" | "leaf";
 
@@ -527,14 +530,16 @@ export function renderFlowPane(
     const allPassBadge = isLeafEnd
       ? `<g class="flow-allpass-badge"><circle cx="${badgeCx}" cy="${badgeCy}" r="8"/><path d="M${badgeCx - 4} ${badgeCy} l2.6 2.9 l5 -5.6"/></g>`
       : "";
-    // #203 Todo 4b Slice A: a `when` (→ its gating concept) and a decision ROOT (→ the decision) are FLAGGABLE; an action /
-    // otherwise / use-decision node carries no meta so it is not. Pre-render the hidden ⚑ + record the occurrence. The badge
-    // sits left of a stadium's rounded end (NODE_H/2 curve) for a decision, top-right for a rectangular `when`.
+    // #203 Slice A + GAP 3: a `when` (→ its concept, object-flaggable, OR the condition, occurrence-flaggable), a decision
+    // ROOT (→ the decision), AND a recommend-activity LEAF (→ the recommendation site, occurrence-flaggable) are FLAGGABLE;
+    // an `otherwise` / use-decision node is not. Pre-render the hidden ⚑ + record concept occurrences (for object flags).
     const isWhenConcept = n.kind === "when" && n.conceptName !== undefined && n.conceptLib !== undefined;
-    const flaggable = n.kind === "decision" || isWhenConcept;
+    const flaggable = n.kind === "decision" || isWhenConcept || isLeafEnd; // isLeafEnd = a recommend-activity leaf
     if (flaggable) flaggableGids.push(gid);
     if (isWhenConcept) conceptOccurrences.push({ gid, lib: n.conceptLib!, name: n.conceptName! });
-    const flagBadgeMarkup = flaggable ? flagBadge(stadium ? x + NODE_W - 30 : x + NODE_W - 14, y + 13) : "";
+    // Badge position: a LEAF mirrors its all-pass ✓ — ⚑ at LEFT-center, ✓ at right-center, label centered between (they
+    // no longer collide, GAP 3 / Claude I3); a decision stadium → left of its rounded end; a `when` rect → top-right.
+    const flagBadgeMarkup = flaggable ? flagBadge(isLeafEnd ? x + 13 : stadium ? x + NODE_W - 30 : x + NODE_W - 14, isLeafEnd ? y + NODE_H / 2 : y + 13) : "";
     // The PRIMARY/start node (first decision root) additionally carries the chrome-mirror COUNT badge — a pill showing the
     // total open-flag count (`⚑ N`), the catch-all click target (see driveFlagBadges). Pre-rendered hidden; the host sets
     // its text + `.has-startflag`. Sits at the top-right, straddling the node's top edge (within the PAD, no clip).
@@ -546,7 +551,7 @@ export function renderFlowPane(
       `<title>${escapeHtml(n.full)}</title>` +
       `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="${rx}"/>` +
       // #210: a disposition LEAF (outcome tip) centers its label; interior nodes stay left-aligned at x+10.
-      (isLeafEnd ? labelMarkup(n.label, x, y, NODE_H, LABEL_MAX, NODE_W / 2, true) : labelMarkup(n.label, x, y, NODE_H, LABEL_MAX, 10)) +
+      (isLeafEnd ? labelMarkup(n.label, x, y, NODE_H, LEAF_LABEL_MAX, NODE_W / 2, true) : labelMarkup(n.label, x, y, NODE_H, LABEL_MAX, 10)) +
       flowRing(x, y, NODE_W, NODE_H, 2.5, stadium ? (NODE_H + 5) / 2 : 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
       guardTab +
       allPassBadge +

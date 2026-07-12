@@ -715,15 +715,15 @@ check("#203 Slice A: conceptOccurrences covers RESOLVED-concept `when` nodes (by
   assert.deepEqual(r.conceptOccurrences.map((o) => `${o.lib}|${o.name}`).sort(), ["Pol|A", "Pol|B"]);
   for (const o of r.conceptOccurrences) assert.ok(typeof o.gid === "string" && o.gid.length, "occurrence carries a gid");
 });
-check("#203 Slice A: flaggableGids = decision root + resolved `when`s; NOT action/otherwise/unresolved-when", () => {
+check("#203 Slice A + GAP 3: flaggableGids = decision root + resolved `when`s + recommend-activity LEAVES; NOT use-decision/otherwise/unresolved-when", () => {
   const gidOf = (k) => r.anchors[k].scrollTo;
   const flaggable = new Set(r.flaggableGids);
-  for (const k of ["d:D", "w:A", "w:B"]) assert.ok(flaggable.has(gidOf(k)), `${k} should be flaggable`);
-  for (const k of ["a:X", "a:D2", "a:Y", "a:Q", "o", "w:Z"]) assert.ok(!flaggable.has(gidOf(k)), `${k} should NOT be flaggable (no meta carrier / unresolved)`);
-  assert.equal(r.flaggableGids.length, 3);
+  for (const k of ["d:D", "w:A", "w:B", "a:X", "a:Y", "a:Q"]) assert.ok(flaggable.has(gidOf(k)), `${k} should be flaggable`); // + GAP 3 leaves
+  for (const k of ["a:D2", "o", "w:Z"]) assert.ok(!flaggable.has(gidOf(k)), `${k} should NOT be flaggable (use-decision / otherwise / unresolved)`);
+  assert.equal(r.flaggableGids.length, 6);
 });
-check("#203 Slice A: renders a HIDDEN, clickable ⚑ flag badge on each flaggable node; CSS toggles on .has-flag", () => {
-  assert.equal((r.html.match(/class="flow-flag-badge"/g) || []).length, 3); // d:D, w:A, w:B
+check("#203 Slice A + GAP 3: renders a HIDDEN, clickable ⚑ flag badge on each flaggable node (incl. leaves); CSS toggles on .has-flag", () => {
+  assert.equal((r.html.match(/class="flow-flag-badge"/g) || []).length, 6); // d:D, w:A, w:B, a:X, a:Y, a:Q
   assert.match(r.html, /data-mv-flag-badge="1"/);
   assert.match(r.html, /class="flow-flag-glyph"[^>]*>⚑</);
   assert.match(FLOW_STYLE, /\.flow-flag-badge\{display:none;/); // hidden by default

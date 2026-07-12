@@ -740,21 +740,32 @@ check("#203 Slice A host: the tree render captures conceptOccurrences + flaggabl
 });
 
 // ── #203 Todo 4b Slice B: create-flag ──
-check("#203 Slice B: the right-click routes to the COMBINED nodeMenu; a non-flaggable node → straight to the verdict pick", () => {
+check("#203 Slice B + GAP 3: nodeMenu offers verdict + one 'Add flag on <target>' per choice; no choices → verdict only", () => {
   const m = COCKPIT_SRC.match(/async function nodeMenu\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "nodeMenu body");
-  assert.match(m[1], /const target = flaggableTarget\(hit\)/);
-  assert.match(m[1], /if \(!target\) return nodeVerdictMenu\(revealKey\)/); // non-flaggable → verdict only, unchanged
-  assert.match(m[1], /Set case verdict/); assert.match(m[1], /Add flag/);
-  assert.match(m[1], /const ver = indexVersion;/); // ver/cel captured BEFORE the menu (retarget-mid-menu safety)
-  assert.match(m[1], /addFlagAtNode\(target, ver, cel\)/);
+  assert.match(m[1], /const choices = flagTargetChoices\(hit\)/);
+  assert.match(m[1], /if \(choices\.length === 0\) return nodeVerdictMenu\(revealKey\)/); // not flaggable → verdict only
+  assert.match(m[1], /Set case verdict/);
+  assert.match(m[1], /choices\.map\(\(c\) =>/); // one menu item per target choice
+  assert.match(m[1], /Add flag on \$\{c\.label\}/); // labeled per choice
+  assert.match(m[1], /const ver = indexVersion/); // ver/cel captured BEFORE the menu
+  assert.match(m[1], /addFlagAtNode\(pick\.choice, ver, cel\)/);
 });
-check("#203 Slice B: flaggableTarget resolves a decision via crlStructure.nodeKey, a when/def-leaf via the Slice A conceptOccurrences gid", () => {
-  const m = COCKPIT_SRC.match(/function flaggableTarget\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
-  assert.ok(m, "flaggableTarget body");
-  assert.match(m[1], /crlStructure\.find\(\(s\) => s\.nodeKey === hit\.nodeKey\)/); // decision root
-  assert.match(m[1], /tree\.anchors\[anchorKey\]\?\.scrollTo/); // anchor → gid
-  assert.match(m[1], /tree\.conceptOccurrences\.find\(\(o\) => o\.gid === gid\)/); // gid → concept (Slice A substrate)
+check("#203 GAP 3: flagTargetChoices — decision root → object-decision; a `when` → concept (object) + this condition (occurrence); a leaf → this recommendation", () => {
+  const m = COCKPIT_SRC.match(/function flagTargetChoices\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "flagTargetChoices body");
+  assert.match(m[1], /crlStructure\.find\(\(s\) => s\.nodeKey === nodeKey\)/); // decision root = object-decision only
+  assert.match(m[1], /tree\.conceptOccurrences\.find\(\(o\) => o\.gid === gid\)/); // when → the concept (object)
+  assert.match(m[1], /occurrenceByNodeKey\(dec, nodeKey\)/); // leaf/condition → the occurrence
+  assert.match(m[1], /key: occurrenceKeyValue\(occ\)/); // occurrence target carries the <nodeId>~<signature> key
+});
+check("#203 GAP 3: driveFlagBadges routes a KEYED decision flag to ONE node via resolveOccurrence, BEFORE the decision-root path; per-flag unplaced count", () => {
+  const m = COCKPIT_SRC.match(/function driveFlagBadges\(\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "driveFlagBadges body");
+  assert.match(m[1], /if \(f\.key && isOccurrenceKey\(f\.key\)\) \{[\s\S]*?resolveOccurrence\(dec, f\.key\)/); // occurrence branch, guarded against non-occurrence keys
+  assert.match(m[1], /res\.placed \? tree\.anchors\[res\.ref\.nodeKey\]\?\.scrollTo : undefined/); // placed → the ONE node's gid
+  assert.match(m[1], /if \(matched\.length === 0 && f\.scope === "decision" && f\.key && isOccurrenceKey\(f\.key\)\) unplaced\+\+/); // ONLY a genuine occurrence flag counts as moved/removed
+  assert.match(m[1], /open: open\.length, resolved: resolvedCount, flagError: flagLoadError, unplaced/); // posts the unplaced count
 });
 check("#203 Slice B: findDeclaration re-parses src/crl (live-buffer via crlText), matching (name, lib) in the declaring library", () => {
   const m = COCKPIT_SRC.match(/function findDeclaration\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
