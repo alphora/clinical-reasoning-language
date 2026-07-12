@@ -304,7 +304,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.8");
+    expect(kit.schemaVersion).toBe("1.9");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -671,8 +671,8 @@ describe("authoring-kit — getAuthoringKit", () => {
     // KE #207 (schemaVersion 1.7→1.8): the `review-flags` rule gained an EMIT clause documenting Todo 5's shipped
     // status-aware CQL emit (concept→block comment; decision/library→gate-only; resolved→none). BOTH hashes move
     // (schemaVersion is hashed + the cpg-edge rule inherits into prior-auth). Folds into the SAME single KE re-pin.
-    expect(cpg.contentHash).toBe("61929405e3e723cc0df362b6072e0cfe099cbee4c2f8d6e88ac1d877a3b9f19a");
-    expect(priorAuth.contentHash).toBe("69c689dacb39e3a762b1ee8f0241238957d54d9f9337132456b1af452a7e3a44");
+    expect(cpg.contentHash).toBe("e9a920ea55f80f21d91cddb6f9607a9d1efbbc82f9aa87e8723bada509bbe17d");
+    expect(priorAuth.contentHash).toBe("9db76d6e06d2ddd5045d251e0754ad41108c667b7e9f983994987bccf04689b9");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {

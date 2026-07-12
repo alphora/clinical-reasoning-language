@@ -102,8 +102,12 @@ export type { AuthoringEdge, AuthoringKit, AuthoringStage, AuthoringUseCase, Kit
 //   for a FHIR `.meta` marker, #206); `resolved` emits nothing; no FHIR flag emit yet. Teaches the KE that the SCOPE
 //   they pick is also the downstream surface. NO payload-shape change, NO registry change (the behavior is data-driven
 //   from the existing registry `emit` block). BOTH useCase hashes re-pin (schemaVersion is in the hashed base).
+// "1.8" → "1.9": CONTENT change (KE #205/#203) — the `review-flags` rule gains a WRITE-TOOLS clause (author flags via
+//   the `create_flag`/`set_flag_status` MCP tools, not by hand-editing meta lines); registry companion metadata-registry
+//   .json v0.3.3 adds `@validation-concern`'s optional `; kind` triage enum (the KE-delivered validation taxonomy) + the
+//   GAP-3 occurrence-`key` note. NO payload-shape change. BOTH useCase hashes re-pin.
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.8";
+const SCHEMA_VERSION = "1.9";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -484,6 +488,17 @@ const RULES: KitRule[] = [
           "there is no FHIR flag emit yet. You author the flag identically regardless (this is data-driven from the " +
           "registry `emit` block) — but the scope you pick IS the downstream surface: pick `concept` when the concern " +
           "should travel with the compiled logic.",
+        force: "default",
+      },
+      {
+        text:
+          "How to WRITE flags (don't hand-edit `- meta is` lines). The `crl` MCP server exposes the write-half tools: " +
+          "`create_flag` authors a flag on a concept, decision, or library (pass the tag, a one-line gist, any " +
+          "registry-required fields, optional `; ref`); `set_flag_status` flips one flag `open`<->`resolved`. Both take " +
+          "`code` or `path`, RETURN the rewritten source (they never write files — you apply it), validate before " +
+          "emitting (never produce an invalid `.crl`), and reuse this same registry vocabulary. Prefer them over editing " +
+          "meta lines by hand so read and write agree on the tag shape. (`@validation-concern`'s optional `; kind` triage " +
+          "enum + any occurrence `; key` are carried as fields by the same tools.)",
         force: "default",
       },
     ],
