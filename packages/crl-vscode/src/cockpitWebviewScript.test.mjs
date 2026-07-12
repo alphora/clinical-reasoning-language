@@ -938,11 +938,11 @@ check("tree zoom: applyZoom scales the SVG BOX (viewBox base × treeZoom, not a 
   assert.match(SCRIPT, /const setZoom=\(z\)=>\{treeZoom=Math\.min\(3,Math\.max\(\.25,z\)\)/); // clamped 0.25–3×
   assert.match(SCRIPT, /root\.innerHTML=m\.html;fcc\.innerHTML='';[\s\S]*?applyZoom\(\);/); // persists across a re-render
 });
-check("tree zoom: Ctrl+wheel (flow pane only, passive:false) + Ctrl +/-/0 + the − / reset / + control", () => {
+check("tree zoom: Ctrl+wheel (flow pane only, passive:false) + the − / reset / + control (NO Ctrl+/-/0 — VS Code owns those)", () => {
   assert.match(SCRIPT, /addEventListener\('wheel',\(e\)=>\{if\(!e\.ctrlKey\)return;if\(!root\.querySelector\('\.flow-svg'\)\)return;e\.preventDefault\(\)/); // Ctrl+wheel, tree only
   assert.match(SCRIPT, /\{passive:false\}/); // preventDefault must work on wheel
-  assert.match(SCRIPT, /keydown[\s\S]*?e\.key==='0'[\s\S]*?setZoom\(1\)/); // Ctrl+0 resets
   assert.match(SCRIPT, /closest\('\[data-zoom\]'\)[\s\S]*?setZoom\(a==='in'\?treeZoom\*1\.2:a==='out'\?treeZoom\/1\.2:1\)/); // control buttons
+  assert.doesNotMatch(SCRIPT, /keydown[\s\S]*?setZoom/); // no keyboard zoom leg — it collides with VS Code's global zoom
 });
 
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);

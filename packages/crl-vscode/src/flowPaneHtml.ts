@@ -568,9 +568,9 @@ export function renderFlowPane(
   // render (applyZoom); this markup is stateless — the % is filled in by applyZoom. Ctrl+wheel / Ctrl +/-/0 also zoom.
   const zoom =
     `<div class="flow-zoom" data-flow-zoom>` +
-    `<button type="button" data-zoom="out" title="Zoom out (Ctrl -)" aria-label="Zoom out">−</button>` +
-    `<button type="button" data-zoom="reset" class="flow-zoom-pct" title="Reset zoom (Ctrl 0)" aria-label="Reset zoom">100%</button>` +
-    `<button type="button" data-zoom="in" title="Zoom in (Ctrl +)" aria-label="Zoom in">+</button>` +
+    `<button type="button" data-zoom="out" title="Zoom out" aria-label="Zoom out">−</button>` +
+    `<button type="button" data-zoom="reset" class="flow-zoom-pct" title="Reset zoom (or Ctrl+scroll to zoom)" aria-label="Reset zoom">100%</button>` +
+    `<button type="button" data-zoom="in" title="Zoom in" aria-label="Zoom in">+</button>` +
     `</div>`;
   return { html: `<div class="flow-wrap">${svg}</div>${zoom}`, anchors, reveals, leafConcepts, conceptOccurrences, flaggableGids, startNodeGid };
 }

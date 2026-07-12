@@ -3428,9 +3428,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `root.addEventListener('change',(e)=>{const ws=e.target.closest&&e.target.closest('[data-worklist-select]');` +
   `if(ws){e.stopPropagation();v.postMessage({type:'worklistSet',key:ws.getAttribute('data-worklist-select'),value:ws.value});}});` +
   // tree zoom via Ctrl+wheel (only when the tree/flow pane is present; passive:false so preventDefault stops the page zoom).
+  // NOTE: no Ctrl +/-/0 keyboard leg — those are VS Code GLOBAL keybindings the webview iframe can't override (they'd zoom
+  // all of VS Code). The floating control + Ctrl+wheel are the surfaces; a real keybinding would need a command + a
+  // webview-focus context key + a non-conflicting chord (deferred).
   `root.addEventListener('wheel',(e)=>{if(!e.ctrlKey)return;if(!root.querySelector('.flow-svg'))return;e.preventDefault();setZoom(treeZoom*(e.deltaY<0?1.1:1/1.1));},{passive:false});` +
-  // tree zoom via Ctrl +/-/0 (only when the flow pane is present).
-  `window.addEventListener('keydown',(e)=>{if(!e.ctrlKey&&!e.metaKey)return;if(!root.querySelector('.flow-svg'))return;if(e.key==='='||e.key==='+'){e.preventDefault();setZoom(treeZoom*1.2);}else if(e.key==='-'||e.key==='_'){e.preventDefault();setZoom(treeZoom/1.2);}else if(e.key==='0'){e.preventDefault();setZoom(1);}});` +
   // Chrome clicks: the All/Blocking toggle (data-fc-mode) + a gap row's Open CRL source (data-fc-gap).
   `fcc.addEventListener('click',(e)=>{const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
   `if(mode){v.postMessage({type:'fcMode',mode:mode.getAttribute('data-fc-mode')});return;}` +
