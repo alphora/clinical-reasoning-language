@@ -64,7 +64,7 @@ import {
 } from "./failedCriterionPeek";
 import { resolveThisNode } from "./thisNodeMarker";
 import { failedCriterionLabel } from "./failedCriterionLabel";
-import { buildIssueUrl, issueRefOf, sanitizeIssueBase } from "./issueLink";
+import { buildIssueUrl, githubIssuesBaseFromRemote, issueRefOf, sanitizeIssueBase } from "./issueLink";
 import { isOccurrenceKey, occurrenceByNodeKey, occurrenceKeyValue, parseOccurrenceKey, resolveOccurrence, type OccurrenceRef } from "./occurrenceKey";
 import {
   addNote,
@@ -922,6 +922,53 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     return sanitizeIssueBase(info?.workspaceValue);
   }
 
+  // The `vscode.git` extension API surface we touch (VS Code doesn't ship its types) — a minimal read-only view.
+  interface GitRemote { name: string; fetchUrl?: string; pushUrl?: string }
+  interface GitRepository { rootUri: vscode.Uri; state: { remotes: GitRemote[] } }
+  interface GitApi { getRepository(uri: vscode.Uri): GitRepository | null }
+  interface GitExtensionExports { getAPI(version: 1): GitApi }
+
+  /** #204 auto-detect — derive the issue base from the git ORIGIN of the repo that owns `fileUri` (via the vscode.git
+   *  extension API — in-memory, no subprocess), validate it (github.com-only + `sanitizeIssueBase`, in
+   *  `githubIssuesBaseFromRemote`), and — the operator's "write it if it doesn't exist" — PERSIST it to that folder's
+   *  settings (one source of truth) + a non-silent note. TOTAL: any throw (extension absent/not-activated, no repo, no
+   *  origin, a rejected `update`) is swallowed → undefined → the manual `⚙ Set crl.issueBaseUrl`. A link click never throws. */
+  async function detectIssueBaseFromGit(fileUri: vscode.Uri): Promise<string | undefined> {
+    try {
+      const ext = vscode.extensions.getExtension<GitExtensionExports>("vscode.git");
+      if (!ext) return undefined;
+      const api = (ext.isActive ? ext.exports : await ext.activate())?.getAPI?.(1);
+      const repo = api?.getRepository(fileUri); // the CLOSEST containing repo (handles nested/submodule) — never the first-repo guess
+      if (!repo) return undefined;
+      const origin = repo.state.remotes.find((r) => r.name === "origin");
+      const base = githubIssuesBaseFromRemote(origin?.fetchUrl || origin?.pushUrl);
+      if (!base) return undefined;
+      // Persist ONLY if unset anywhere (never clobber a user value) — to the OWNING folder (per-repo; origin is per-repo).
+      const cfg = vscode.workspace.getConfiguration("crl", fileUri);
+      const info = cfg.inspect<string>("issueBaseUrl");
+      if (!info?.globalValue && !info?.workspaceValue && !info?.workspaceFolderValue) {
+        try {
+          await cfg.update("issueBaseUrl", base, vscode.ConfigurationTarget.WorkspaceFolder);
+          flagNote("derived the issue tracker from your git origin — saved to crl.issueBaseUrl (edit it to change)");
+        } catch {
+          /* no folder / read-only settings — still return the base to open once this click */
+        }
+      }
+      return base;
+    } catch {
+      return undefined; // git extension quirks / API drift → manual fallback, never a throw on a click
+    }
+  }
+
+  /** Resolve the issue base at OPEN time (operator workflow): the config wins (so a user value is always respected); else,
+   *  in a TRUSTED workspace, auto-detect + persist from the git origin. Read-only `resolveIssueBase` stays for menu display. */
+  async function resolveOrDetectIssueBase(fileUri: vscode.Uri | undefined): Promise<string | undefined> {
+    const configured = resolveIssueBase();
+    if (configured) return configured;
+    if (!vscode.workspace.isTrusted || !fileUri) return undefined;
+    return detectIssueBaseFromGit(fileUri);
+  }
+
   /** The per-flag action menu — the status toggle (the crl-refactors write-back) + reveal-in-source + (Slice C) the issue
    *  link-out when the flag carries a numeric `; ref #N`. `ver`/`cel` are the policy-identity captured at list-open; the
    *  write-back + the open both revalidate them so a retarget mid-menu can't patch the old `.crl` / open a stale link. */
@@ -935,7 +982,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // untrusted workspace or a non-numeric ref → no item. The base is re-resolved at click, so this is just for display.
     const issueNo = issueRefOf(flag.fields.get("ref"));
     if (issueNo) {
+      // Menu build is READ-ONLY (never touches git / writes config — that would fire on merely opening the menu). A
+      // configured base → open directly; else a trusted workspace → offer "from git origin" (the click detects+persists);
+      // else the manual setting. Detection happens ONLY on the explicit click (below).
       if (buildIssueUrl(resolveIssueBase(), issueNo)) actions.push({ label: `↗ Open issue #${issueNo}`, act: "issue" });
+      else if (vscode.workspace.isTrusted && flag.filePath) actions.push({ label: `↗ Open issue #${issueNo} (from git origin)`, act: "issue" });
       else if (vscode.workspace.isTrusted) actions.push({ label: `⚙ Set crl.issueBaseUrl to open issue #${issueNo}…`, act: "config" });
     }
     const pick = await vscode.window.showQuickPick(actions, { placeHolder: `${flag.canonicalTag} — ${flag.body}` });
@@ -949,11 +1000,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       return "continue";
     }
     if (pick.act === "issue") {
-      // Re-check identity + RE-RESOLVE the base at click (config could have changed while the menu was open), then open.
       if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return "continue";
-      const url = buildIssueUrl(resolveIssueBase(), issueNo);
+      // Resolve at click: config wins; else auto-detect + persist from the flag's repo origin (the operator workflow).
+      // Keyed off the FLAG's `.crl` file (not the workspace root) so a nested/submodule flag uses its own repo's origin.
+      const fileUri = flag.filePath ? vscode.Uri.file(flag.filePath) : undefined;
+      const url = buildIssueUrl(await resolveOrDetectIssueBase(fileUri), issueNo);
       if (!url) {
-        flagNote("no issue base — set crl.issueBaseUrl");
+        flagNote("no issue base and none derivable from git — set crl.issueBaseUrl");
         return "continue";
       }
       if (!(await vscode.env.openExternal(vscode.Uri.parse(url)))) flagNote(`could not open issue #${issueNo}`);

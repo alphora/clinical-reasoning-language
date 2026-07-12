@@ -816,14 +816,36 @@ check("#203 Slice C: flagActionMenu offers Open-issue only for a numeric ref; a 
   const m = COCKPIT_SRC.match(/async function flagActionMenu\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "flagActionMenu body");
   assert.match(m[1], /const issueNo = issueRefOf\(flag\.fields\.get\("ref"\)\)/); // numeric-only guard
-  assert.match(m[1], /buildIssueUrl\(resolveIssueBase\(\), issueNo\)/); // resolvable base → open item
+  // MENU BUILD is READ-ONLY (resolveIssueBase, config-only — never detects/writes on menu-open); a trusted+no-config
+  // node offers "from git origin" (the click detects), else the manual-setting item.
+  assert.match(m[1], /buildIssueUrl\(resolveIssueBase\(\), issueNo\)/); // configured base → open item
+  assert.match(m[1], /isTrusted && flag\.filePath\) actions\.push\(\{ label: `↗ Open issue #\$\{issueNo\} \(from git origin\)`/); // detect-on-click item
   assert.match(m[1], /vscode\.workspace\.isTrusted\) actions\.push\(\{ label: `⚙ Set crl\.issueBaseUrl/); // discoverable config item
-  assert.match(m[1], /workbench\.action\.openSettings", "crl\.issueBaseUrl"/); // config item opens the setting
-  // open path: identity re-check + RE-RESOLVE at click + openExternal failure note + stays "continue"
+  // open path: identity guard, then RESOLVE-OR-DETECT at click (config wins; else auto-detect+persist from the flag's repo)
   assert.match(m[1], /if \(pick\.act === "issue"\)/);
   assert.match(m[1], /indexVersion !== ver \|\| currentCel !== cel \|\| mode !== "medical-validation"\) return "continue"/);
-  assert.match(m[1], /const url = buildIssueUrl\(resolveIssueBase\(\), issueNo\)/); // re-resolve at click (config may have changed)
+  assert.match(m[1], /const fileUri = flag\.filePath \? vscode\.Uri\.file\(flag\.filePath\) : undefined/); // keyed off the FLAG's .crl (nested/submodule)
+  assert.match(m[1], /buildIssueUrl\(await resolveOrDetectIssueBase\(fileUri\), issueNo\)/); // config-first, else detect
   assert.match(m[1], /await vscode\.env\.openExternal\(vscode\.Uri\.parse\(url\)\)\)\) flagNote\(`could not open issue/);
+});
+check("#204 auto-detect: detectIssueBaseFromGit uses vscode.git getRepository (not repositories[0]), github-only, persists-if-unset, total (no throw)", () => {
+  const m = COCKPIT_SRC.match(/async function detectIssueBaseFromGit\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "detectIssueBaseFromGit body");
+  assert.match(m[1], /ext\.isActive \? ext\.exports : await ext\.activate\(\)/); // activate if needed
+  assert.match(m[1], /api\?\.getRepository\(fileUri\)/); // closest containing repo — NOT repositories[0]
+  assert.doesNotMatch(m[1], /repositories\[0\]/); // never guess a repo
+  assert.match(m[1], /githubIssuesBaseFromRemote\(origin\?\.fetchUrl \|\| origin\?\.pushUrl\)/); // fetch|push, github-only parser
+  assert.match(m[1], /!info\?\.globalValue && !info\?\.workspaceValue && !info\?\.workspaceFolderValue/); // persist ONLY if unset (never clobber a user value)
+  assert.match(m[1], /ConfigurationTarget\.WorkspaceFolder/); // per-repo owning folder
+  assert.match(m[1], /derived the issue tracker from your git origin/); // non-silent note
+  assert.match(m[1], /\} catch \{\s*\n\s*return undefined;/); // TOTAL outer catch — a link click never throws
+});
+check("#204 auto-detect: resolveOrDetectIssueBase — config WINS (respects the user setting); detect only in a trusted workspace", () => {
+  const m = COCKPIT_SRC.match(/async function resolveOrDetectIssueBase\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "resolveOrDetectIssueBase body");
+  assert.match(m[1], /const configured = resolveIssueBase\(\);\s*\n\s*if \(configured\) return configured/); // config first — a set value is always respected
+  assert.match(m[1], /if \(!vscode\.workspace\.isTrusted \|\| !fileUri\) return undefined/); // detect needs trust
+  assert.match(m[1], /return detectIssueBaseFromGit\(fileUri\)/);
 });
 
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);
