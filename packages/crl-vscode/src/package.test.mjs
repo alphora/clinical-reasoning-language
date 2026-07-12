@@ -252,6 +252,13 @@ check("Coral assets: the crlCockpit container icon + the coral icon font resolve
   assert.ok(woff.length > 0, "the coral-icons.woff exists and is non-empty");
 });
 
+check("the marketplace extension icon is a real PNG (not the default placeholder)", () => {
+  assert.equal(pkg.icon, "media/icon.png", "the extension `icon` points to the Coral PNG");
+  const png = readFileSync(join(here, "..", pkg.icon));
+  // PNG magic bytes — ensure it's actually a PNG (marketplace rejects SVG here) and non-empty.
+  assert.ok(png.length > 1000 && png[0] === 0x89 && png[1] === 0x50, "media/icon.png is a real, non-trivial PNG");
+});
+
 check("the CRL Assist reopener keybinding is contributed (Ctrl+Alt+A → crl.agent.chat)", () => {
   const kb = (c.keybindings ?? []).find((x) => x.command === "crl.agent.chat");
   assert.ok(kb && /ctrl\+alt\+a/i.test(kb.key), "expected a Ctrl+Alt+A keybinding for crl.agent.chat");
