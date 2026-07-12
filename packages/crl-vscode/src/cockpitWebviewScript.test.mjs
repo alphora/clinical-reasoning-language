@@ -824,9 +824,19 @@ check("#211: commitFlagDraft — trust+github gated, pre-POST recheck, LOCK+try/
   assert.match(m[1], /const withRef = ref \? \{ \.\.\.fields, ref \} : fields/);
   assert.match(m[1], /made\.insertLine >= doc2\.lineCount/); // EOF-safe on the captured file
   assert.match(m[1], /issue \$\{ref\} created but the flag couldn't be written/); // honest post-POST failure (never silent)
-  assert.match(m[1], /const lead = ref \? .* : issueNote \? .* : ""/); // the "no issue link" reason is folded into the FINAL note
+  assert.match(m[1], /if \(ref\) \{\s*\n\s*flagNote\(`issue \$\{ref\} created; flag added/); // success → status-bar note
+  assert.match(m[1], /reportNoIssue\(`Flag added on [\s\S]*?issueNote \?\? "no issue link"\)/); // no issue → a LOUD, persistent warning with the reason
+  assert.match(m[1], /issue not created — \$\{e\.message\}/); // the RAW GitHub error is surfaced (e.g. a 403 scope message)
   assert.match(m[1], /if \(currentCel === cel && mode === "medical-validation"\) \{[\s\S]*?loadFlags\(\)/); // refresh only if policy unchanged
   assert.ok(repoAt > 0, "repo resolve present");
+});
+check("#211: reportNoIssue is a LOUD, actionable warning — Manage Trust / Sign in to GitHub (clears the no-nag latch)", () => {
+  const m = COCKPIT_SRC.match(/function reportNoIssue\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "reportNoIssue body");
+  assert.match(m[1], /showWarningMessage\(msg, "Manage Workspace Trust"\)[\s\S]*?workbench\.trust\.manage/); // trust → one-click fix
+  assert.match(m[1], /showWarningMessage\(msg, "Sign in to GitHub"\)/); // not-signed-in → a re-auth action
+  assert.match(m[1], /githubAuthDeclined = false;[\s\S]*?getSession\("github", \["repo"\], \{ createIfNone: true \}\)/); // the action clears the latch + re-prompts
+  assert.match(m[1], /showWarningMessage\(msg\);/); // other reasons (github error / no origin) → the raw message
 });
 check("#211: the drawer lives in a DEDICATED #flagDrawer region the render handler never wipes (survives a rebuild)", () => {
   assert.match(COCKPIT_SRC, /<div id="flagDrawer"><\/div>/); // shell region (sibling of #root)

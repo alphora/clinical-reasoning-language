@@ -2558,6 +2558,28 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     postFlagDrawer(); // posts an empty region
   }
 
+  /** #211 — surface a "flag written, but NO issue" outcome LOUDLY (a persistent warning, not a 3s status-bar note a
+   *  reviewer misses) with the exact reason + a one-click fix where one applies: trust the workspace, or re-attempt the
+   *  GitHub sign-in (clearing the no-nag latch, since the user explicitly asked). Other reasons (github error / no origin)
+   *  just show the message — the raw GitHub text (e.g. a 403 scope error) is the actionable detail. */
+  function reportNoIssue(lead: string, reason: string): void {
+    const msg = `${lead} — ${reason}.`;
+    if (reason === "workspace not trusted") {
+      void vscode.window.showWarningMessage(msg, "Manage Workspace Trust").then((a) => {
+        if (a) void vscode.commands.executeCommand("workbench.trust.manage");
+      });
+    } else if (reason === "not signed in to GitHub") {
+      void vscode.window.showWarningMessage(msg, "Sign in to GitHub").then((a) => {
+        if (a) {
+          githubAuthDeclined = false; // the user explicitly wants to sign in — clear the no-nag latch
+          void vscode.authentication.getSession("github", ["repo"], { createIfNone: true });
+        }
+      });
+    } else {
+      void vscode.window.showWarningMessage(msg);
+    }
+  }
+
   /** #211 — commit the drawer's Insert: author a lean flag whose issue is created "born together" (the #204 loop). Order
    *  (design review 233, both reviewers): stale-guard → local validate + a PURE `createFlag` DRY-RUN (no ref) so a
    *  tag/field/decl error aborts with NO orphan issue → resolve the github repo (pure) → auth → create the issue stub
@@ -2637,7 +2659,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
             if (!token) issueNote = "not signed in to GitHub";
             else ref = `#${await createGithubIssue({ owner: repo.owner, repo: repo.repo, title: summary, body: stub, token })}`;
           } catch (e) {
-            issueNote = `issue not created (${issueCreateErrorLabel(e)})`;
+            // Surface the RAW GitHub message when we have one (e.g. "GitHub 403: Resource not accessible …") — a short
+            // label alone hides the actionable detail (scope/permission). Falls back to the label for a non-typed error.
+            issueNote = e instanceof Error && e.message ? `issue not created — ${e.message}` : `issue not created (${issueCreateErrorLabel(e)})`;
           }
         }
       }
@@ -2674,8 +2698,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         renderTreeChrome();
         driveFlagBadges();
       }
-      const lead = ref ? `issue ${ref} created; ` : issueNote ? `${issueNote}; ` : "";
-      flagNote(saved ? `${lead}flag added on ${target.kind} "${target.name}"` : `${lead}flag added — but save the .crl (it's unsaved)`);
+      const savedTail = saved ? "" : " — but save the .crl (it's unsaved)";
+      if (ref) {
+        flagNote(`issue ${ref} created; flag added on ${target.kind} "${target.name}"${savedTail}`);
+      } else {
+        // The flag is written but NO issue was created. A transient status-bar note is too easy to miss (a reviewer just
+        // wonders where the issue went), so surface a PERSISTENT warning with the exact reason + a one-click fix.
+        reportNoIssue(`Flag added on ${target.kind} "${target.name}"${savedTail}, but no GitHub issue was created`, issueNote ?? "no issue link");
+      }
     } catch (e) {
       // Any unexpected throw AFTER a possible POST (openTextDocument/applyEdit/save/loadFlags reject) — surface it honestly,
       // never silent. If an issue was already created, say so + tell the user to add the flag manually.
