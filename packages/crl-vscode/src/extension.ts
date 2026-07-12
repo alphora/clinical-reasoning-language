@@ -43,6 +43,7 @@ import {
   CrlDocumentLinkProvider,
 } from "./navigation";
 import { ProjectIndex } from "@smile-digital-health/crl/language-services";
+import { registerAgentCommands } from "./agentCommands";
 
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -186,6 +187,10 @@ export function activate(context: vscode.ExtensionContext): void {
       removeAll(context).catch((e) => vscode.window.showErrorMessage(`CRL: ${messageOf(e)}`))
     )
   );
+
+  // Agent (editor-agent Todo A) commands register EARLY too — key handling + the provider round-trip proof must survive a
+  // provisioning failure. getOutputChannel() is private to this module, so pass the channel in.
+  registerAgentCommands(context, getOutputChannel());
 
   // Language features (completion + hover + diagnostics) are independent of
   // provisioning — they activate whenever the extension loads and a `.crl`

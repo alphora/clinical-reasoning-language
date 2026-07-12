@@ -2,10 +2,10 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL→CQL + CEL→FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "4.75.1",
+  "version": "4.76.0",
   "publisher": "smiledigitalhealth",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.95.0"
   },
   "main": "./dist/extension.js",
   "activationEvents": [
@@ -123,6 +123,18 @@
         "command": "crl.cockpit.toggleKeys",
         "title": "CRL: Toggle Correspondence Keys",
         "icon": "$(symbol-numeric)"
+      },
+      {
+        "command": "crl.agent.setAnthropicKey",
+        "title": "CRL: Set Anthropic API Key"
+      },
+      {
+        "command": "crl.agent.clearAnthropicKey",
+        "title": "CRL: Clear Anthropic API Key"
+      },
+      {
+        "command": "crl.agent.test",
+        "title": "CRL: Test Agent Model Provider"
       }
     ],
     "viewsContainers": {
@@ -351,6 +363,22 @@
           "default": "",
           "scope": "window",
           "markdownDescription": "The issue-tracker **collection** URL that a review flag's `; ref #N` resolves into — e.g. `https://github.com/owner/repo/issues`. In Medical Validation, a flag with a numeric ref shows an **Open issue #N** action that opens `<base>/N`. Must be an `http`/`https` URL with no credentials, query, or fragment. A value set in **workspace** settings applies only in a [trusted workspace](command:workbench.action.manageTrust); set it in **user** settings to use it everywhere. Leave empty to disable the link-out."
+        },
+        "crl.agent.provider": {
+          "type": "string",
+          "enum": [
+            "vscode-lm",
+            "anthropic"
+          ],
+          "default": "vscode-lm",
+          "scope": "window",
+          "markdownDescription": "Which model backend the CRL editor agent uses. `vscode-lm` (default) reuses the language models contributed by the **GitHub Copilot Chat** extension — zero setup, prompts stay within your VS Code language-model provider. `anthropic` sends prompts directly to **Anthropic's API** (`api.anthropic.com`) and requires an API key — run 'CRL: Set Anthropic API Key' or set the `ANTHROPIC_API_KEY` environment variable. There is no automatic fallback between the two."
+        },
+        "crl.agent.anthropicModel": {
+          "type": "string",
+          "default": "claude-sonnet-5",
+          "scope": "window",
+          "description": "The Anthropic model id the agent requests. Used only when crl.agent.provider is 'anthropic'."
         }
       }
     }
@@ -428,7 +456,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@smile-digital-health/crl": "*",
     "@types/node": "^18.19.130",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.95.0",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.24.0",
     "typescript": "^5.3.3",
