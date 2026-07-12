@@ -2431,7 +2431,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     name: string;
     lib: string;
     key?: string; // an occurrence key `<nodeId>~<signature>` — present iff this is an occurrence target
-    label: string;
+    label: string; // the FULL wording incl. the occurrence signature — the native menu item + the drawer's hover title
+    shortLabel: string; // the human header ("this condition" / the concept / the decision) — no verbose signature
   }
 
   /** #211 — the prefill for `openFlagDrawer`: the RESOLVED target (chosen host-side, never named by the webview) + optional
@@ -2458,12 +2459,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!nodeKey) return [];
     // A decision ROOT (a top-level crlStructure entry) → object-decision only.
     const decTop = crlStructure.find((s) => s.nodeKey === nodeKey);
-    if (decTop) return [{ kind: "decision", name: decTop.decision, lib: decTop.lib, label: `decision "${decTop.decision}"` }];
+    if (decTop) return [{ kind: "decision", name: decTop.decision, lib: decTop.lib, label: `decision "${decTop.decision}"`, shortLabel: `decision "${decTop.decision}"` }];
     const choices: FlagTargetChoice[] = [];
     // A `when` carries a CONCEPT (object) target — its gating concept, resolved via conceptOccurrences (Slice A).
     const gid = tree.anchors[nodeKey]?.scrollTo;
     const conceptOcc = gid ? tree.conceptOccurrences.find((o) => o.gid === gid) : undefined;
-    if (conceptOcc) choices.push({ kind: "concept", name: conceptOcc.name, lib: conceptOcc.lib, label: `the concept "${conceptOcc.name}" (every use)` });
+    if (conceptOcc) choices.push({ kind: "concept", name: conceptOcc.name, lib: conceptOcc.lib, label: `the concept "${conceptOcc.name}" (every use)`, shortLabel: `the concept "${conceptOcc.name}" (every use)` });
     // An OCCURRENCE node (a `when` condition, or a recommend-activity leaf) → a keyed decision flag on ONE node.
     let occ: OccurrenceRef | undefined;
     for (const dec of crlStructure) {
@@ -2471,7 +2472,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (o) { occ = o; break; }
     }
     if (occ) {
-      choices.push({ kind: "decision", name: occ.decision, lib: occ.lib, key: occurrenceKeyValue(occ), label: occ.isLeaf ? `this recommendation (${occ.signature})` : `this condition (${occ.signature})` });
+      const short = occ.isLeaf ? "this recommendation" : "this condition"; // the human header — no verbose signature
+      choices.push({ kind: "decision", name: occ.decision, lib: occ.lib, key: occurrenceKeyValue(occ), label: `${short} (${occ.signature})`, shortLabel: short });
     }
     return choices;
   }
@@ -2536,7 +2538,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function postFlagDrawer(): void {
     const tree = views.get("tree");
     if (!tree) return;
-    const html = flagDraft ? renderFlagDrawer({ targetLabel: flagDraft.target.label, tags: flagTags(), tag: flagDraft.tag, summary: flagDraft.summary, stub: flagDraft.stub, fields: flagDraft.fields }) : "";
+    const html = flagDraft ? renderFlagDrawer({ targetLabel: flagDraft.target.shortLabel, targetTitle: flagDraft.target.label, tags: flagTags(), tag: flagDraft.tag, summary: flagDraft.summary, stub: flagDraft.stub, fields: flagDraft.fields }) : "";
     void tree.panel.webview.postMessage({ type: "flagDrawer", html });
   }
 

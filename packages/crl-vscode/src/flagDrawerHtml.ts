@@ -20,8 +20,10 @@ export interface FlagDrawerTag {
 const HOST_MANAGED_FIELDS = new Set(["ref", "key", "status", "system"]);
 
 export interface FlagDrawerOptions {
-  /** The resolved target's human label (e.g. `the concept "diabetes" (every use)`) — shown in the header. */
+  /** The resolved target's SHORT human label (e.g. `this condition`, `the concept "diabetes" (every use)`) — the header. */
   targetLabel: string;
+  /** The FULL label (incl. an occurrence's verbose signature) — shown as the header's hover title. Defaults to targetLabel. */
+  targetTitle?: string;
   /** The flag tags to offer (validation-concern is floated first). */
   tags: FlagDrawerTag[];
   /** Prefill (the agent seam supplies these; the human right-click supplies none). */
@@ -72,7 +74,7 @@ export function renderFlagDrawer(opts: FlagDrawerOptions): string {
 
   return (
     `<div class="flag-drawer" data-flag-drawer>` +
-    `<div class="flag-head"><span class="flag-title">Add flag — ${escapeHtml(opts.targetLabel)}</span>` +
+    `<div class="flag-head"><span class="flag-title" title="${escapeHtml(opts.targetTitle ?? opts.targetLabel)}">Add flag — ${escapeHtml(opts.targetLabel)}</span>` +
     `<button type="button" class="flag-close" data-flag-close aria-label="Close">✕</button></div>` +
     `<label class="flag-row"><span class="flag-label">Type</span>` +
     `<select data-flag-tag aria-label="Flag type">${tagOptions}</select></label>` +

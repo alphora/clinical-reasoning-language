@@ -54,6 +54,11 @@ test("renderFlagDrawer: prefilled summary/stub/field values are placed (and sele
   assert.match(h, /<option value="under" selected>/);
 });
 
+test("renderFlagDrawer: the header shows the short label; the full label (signature) is the hover title", () => {
+  const h = renderFlagDrawer({ targetLabel: "this condition", targetTitle: "this condition (A/B/C long signature)", tags: TAGS });
+  assert.match(h, /<span class="flag-title" title="this condition \(A\/B\/C long signature\)">Add flag — this condition<\/span>/);
+});
+
 test("renderFlagDrawer: host-managed fields (ref/key/status/system) are NOT rendered — only real discriminators", () => {
   const tags = [
     {

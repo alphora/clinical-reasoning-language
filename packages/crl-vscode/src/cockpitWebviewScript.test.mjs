@@ -758,6 +758,9 @@ check("#203 GAP 3: flagTargetChoices — decision root → object-decision; a `w
   assert.match(m[1], /tree\.conceptOccurrences\.find\(\(o\) => o\.gid === gid\)/); // when → the concept (object)
   assert.match(m[1], /occurrenceByNodeKey\(dec, nodeKey\)/); // leaf/condition → the occurrence
   assert.match(m[1], /key: occurrenceKeyValue\(occ\)/); // occurrence target carries the <nodeId>~<signature> key
+  // #211: the occurrence carries a SHORT header label (no verbose signature) + the full label (signature) as the tooltip
+  assert.match(m[1], /const short = occ\.isLeaf \? "this recommendation" : "this condition"/);
+  assert.match(m[1], /label: `\$\{short\} \(\$\{occ\.signature\}\)`, shortLabel: short/);
 });
 check("#203 GAP 3: driveFlagBadges routes a KEYED decision flag to ONE node via resolveOccurrence, BEFORE the decision-root path; per-flag unplaced count", () => {
   const m = COCKPIT_SRC.match(/function driveFlagBadges\(\)[^{]*\{([\s\S]*?)\n  \}/);
