@@ -3150,6 +3150,7 @@ function shellHtml(): string {
 .flag-col{display:flex;flex-direction:column;gap:2px;flex:1;min-height:60px}
 .flag-label{opacity:.75;font-size:.85em;min-width:64px}
 .flag-fieldgroup{display:flex;flex-direction:column;gap:4px}
+.flag-fieldgroup[hidden]{display:none}
 .flag-drawer input,.flag-drawer select,.flag-drawer textarea{width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,#3c3c3c);font-family:inherit;font-size:.95em}
 .flag-drawer textarea{min-height:56px;resize:vertical;flex:1}
 .flag-drawer select{background:var(--vscode-dropdown-background);color:var(--vscode-dropdown-foreground);border-color:var(--vscode-dropdown-border,#3c3c3c)}

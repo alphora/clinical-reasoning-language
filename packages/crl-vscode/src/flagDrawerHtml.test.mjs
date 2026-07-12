@@ -54,6 +54,27 @@ test("renderFlagDrawer: prefilled summary/stub/field values are placed (and sele
   assert.match(h, /<option value="under" selected>/);
 });
 
+test("renderFlagDrawer: host-managed fields (ref/key/status/system) are NOT rendered — only real discriminators", () => {
+  const tags = [
+    {
+      id: "x",
+      category: "extraction",
+      fields: [
+        { key: "direction", required: true, values: ["over", "under"] },
+        { key: "ref", required: false },
+        { key: "key", required: false },
+        { key: "status", required: false, values: ["open", "resolved"] },
+        { key: "system", required: false },
+      ],
+    },
+  ];
+  const h = renderFlagDrawer({ targetLabel: "t", tags });
+  assert.match(h, /data-flag-field="direction"/); // the genuine discriminator stays
+  for (const hm of ["ref", "key", "status", "system"]) {
+    assert.ok(!h.includes(`data-flag-field="${hm}"`), `${hm} is host-managed and must not render as an input`);
+  }
+});
+
 test("renderFlagDrawer: all interpolated text is escaped (no breakout via label / prefill)", () => {
   const h = renderFlagDrawer({ targetLabel: '</span><script>x</script>', tags: TAGS, summary: '"><img>', stub: "</textarea><b>" });
   assert.ok(!h.includes("<script>x</script>"), "target label escaped");

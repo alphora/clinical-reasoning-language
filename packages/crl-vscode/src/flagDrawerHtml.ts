@@ -14,6 +14,11 @@ export interface FlagDrawerTag {
   fields: { key: string; required: boolean; values?: readonly string[] }[];
 }
 
+/** Field keys the HOST manages — never author-input in the drawer: `ref` (auto from the created issue), `key` (the GAP-3
+ *  occurrence address), `status` (always `open` for a new flag; `createFlag` rejects a `fields.status`), `system` (derived).
+ *  The drawer surfaces only a tag's genuine discriminators (e.g. `kind`, `direction`). */
+const HOST_MANAGED_FIELDS = new Set(["ref", "key", "status", "system"]);
+
 export interface FlagDrawerOptions {
   /** The resolved target's human label (e.g. `the concept "diabetes" (every use)`) — shown in the header. */
   targetLabel: string;
@@ -44,6 +49,7 @@ export function renderFlagDrawer(opts: FlagDrawerOptions): string {
   const fieldGroups = ordered
     .map((t) => {
       const rows = t.fields
+        .filter((f) => !HOST_MANAGED_FIELDS.has(f.key)) // host-managed plumbing (ref/key/status/system) is never author-input
         .map((f) => {
           const pre = opts.fields?.[f.key] ?? "";
           const req = f.required ? " *" : "";

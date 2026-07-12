@@ -831,6 +831,8 @@ check("#211: the drawer lives in a DEDICATED #flagDrawer region the render handl
   const render = SCRIPT.slice(SCRIPT.indexOf("if(m.type==='render')"), SCRIPT.indexOf("v.postMessage({type:'ready'"));
   assert.ok(!/fld\.innerHTML/.test(render), "the render handler must NOT touch #flagDrawer");
   assert.match(SCRIPT, /else if\(m\.type==='flagDrawer'\)\{fld\.innerHTML=m\.html;if\(m\.html\)aff\(\);\}/); // its own channel + field-toggle
+  // only the SELECTED tag's field group shows — a `.flag-fieldgroup` display rule must NOT beat the `[hidden]` attribute
+  assert.match(COCKPIT_SRC, /\.flag-fieldgroup\[hidden\]\{display:none\}/);
 });
 check("#211 webview: Insert collects the tag + summary + stub + the VISIBLE tag's fields; Cancel/Close drop the draft", () => {
   assert.match(SCRIPT, /data-flag-close.*data-flag-cancel/); // close/cancel → flagDraftCancel
