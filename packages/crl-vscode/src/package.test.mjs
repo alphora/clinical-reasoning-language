@@ -246,6 +246,10 @@ check("Coral assets: the crlCockpit container icon + the coral icon font resolve
   assert.equal(container?.icon, "media/coral-activitybar.svg", "crlCockpit uses the Coral activity-bar SVG (not $(law))");
   const svg = readFileSync(join(here, "..", container.icon), "utf8");
   assert.match(svg, /<svg/, "the Coral activity-bar SVG is a real SVG");
+  // CRL Assist gets a DISTINCT mark (Coral tree + a "+") so it isn't two identical Coral icons in the activity bar.
+  const assist = (c.viewsContainers?.activitybar ?? []).find((x) => x.id === "crlAssist");
+  assert.equal(assist?.icon, "media/coral-assist-activitybar.svg", "crlAssist uses the distinct Coral+ SVG (not $(sparkle))");
+  assert.match(readFileSync(join(here, "..", assist.icon), "utf8"), /<svg/, "the CRL Assist icon is a real SVG");
   const coralIcon = c.icons?.coral;
   assert.ok(coralIcon && coralIcon.default?.fontCharacter === "\\E900", "the coral icon font is contributed at U+E900");
   const woff = readFileSync(join(here, "..", coralIcon.default.fontPath.replace(/^\.\//, "")));

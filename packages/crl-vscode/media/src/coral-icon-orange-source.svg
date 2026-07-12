@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
   <defs>
     <linearGradient id="coralbg" x1="0" y1="0" x2="0.35" y2="1">
-      <stop offset="0" stop-color="#C586C0"/>
-      <stop offset="1" stop-color="#7E4E9C"/>
+      <stop offset="0" stop-color="#FF8A65"/>
+      <stop offset="1" stop-color="#F4511E"/>
     </linearGradient>
   </defs>
   <rect width="256" height="256" rx="52" fill="url(#coralbg)"/>
