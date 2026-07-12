@@ -15,7 +15,6 @@ import {
   conceptDeclRef,
   createFlag,
   flagTags,
-  hasForbiddenFlagChars,
   hasForbiddenGistChars,
   nodeKey,
   parseMetaTag,
@@ -64,7 +63,9 @@ import {
 } from "./failedCriterionPeek";
 import { resolveThisNode } from "./thisNodeMarker";
 import { failedCriterionLabel } from "./failedCriterionLabel";
-import { buildIssueUrl, githubIssuesBaseFromRemote, issueRefOf, sanitizeIssueBase } from "./issueLink";
+import { buildIssueUrl, githubIssuesBaseFromRemote, githubRepoFromRemote, issueRefOf, sanitizeIssueBase } from "./issueLink";
+import { createGithubIssue, issueCreateErrorLabel } from "./githubIssue";
+import { renderFlagDrawer } from "./flagDrawerHtml";
 import { isOccurrenceKey, occurrenceByNodeKey, occurrenceKeyValue, parseOccurrenceKey, resolveOccurrence, type OccurrenceRef } from "./occurrenceKey";
 import {
   addNote,
@@ -402,6 +403,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let notesByCaseId: Record<string, Note[]> = {};
   let openNotesCaseId: string | undefined;
   let editingNoteId: string | undefined;
+  // #211 create-flag drawer — the in-flight flag draft (the resolved target + prefill + the policy identity captured at
+  // open), or undefined when the drawer is closed. It lives in a DEDICATED `#flagDrawer` webview region that the render
+  // handler never touches, so the drawer + the user's typed text SURVIVE a same-policy tree rebuild; the host clears it
+  // (posting an empty region) on retarget / mode reset. `FlagDraftState` is declared with `FlagTargetChoice` below.
+  let flagDraft: FlagDraftState | undefined;
+  let flagCommitting = false; // #211: an in-flight commit guard — a rapid second Insert must not double-POST / race the write
+  let githubAuthDeclined = false; // #211: the user declined the GitHub sign-in this session → don't re-prompt on every flag
   let mvSidecarPath: string | undefined;
   // #203 Todo 4 — the review-flag surface. `flagsList` = ALL flags (open + resolved) across the policy's `src/crl/*.crl`
   // files, freshly (re)loaded in loadFlags() from the LIVE editor buffer when a `.crl` is open (else disk) so a dirty edit's
@@ -928,17 +936,59 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   interface GitApi { getRepository(uri: vscode.Uri): GitRepository | null }
   interface GitExtensionExports { getAPI(version: 1): GitApi }
 
-  /** #204 auto-detect — derive the issue base from the git ORIGIN of the repo that owns `fileUri` (via the vscode.git
-   *  extension API — in-memory, no subprocess), validate it (github.com-only + `sanitizeIssueBase`, in
-   *  `githubIssuesBaseFromRemote`), and — the operator's "write it if it doesn't exist" — PERSIST it to that folder's
-   *  settings (one source of truth) + a non-silent note. TOTAL: any throw (extension absent/not-activated, no repo, no
-   *  origin, a rejected `update`) is swallowed → undefined → the manual `⚙ Set crl.issueBaseUrl`. A link click never throws. */
-  async function detectIssueBaseFromGit(fileUri: vscode.Uri): Promise<string | undefined> {
+  /** The `vscode.git` repo that CONTAINS `fileUri` (the CLOSEST one — nested/submodule-correct, never a first-repo guess),
+   *  or undefined. Pure read: NO persist, NO note. TOTAL try/catch (extension absent/not-activated/API drift) → undefined.
+   *  Shared by the link-out auto-detect (`detectIssueBaseFromGit`) AND the #211 issue-create repo resolver
+   *  (`githubRepoForFile`) — the ONE place that touches the git extension, so the two can't diverge (design review 233). */
+  async function gitRepositoryForFile(fileUri: vscode.Uri): Promise<GitRepository | undefined> {
     try {
       const ext = vscode.extensions.getExtension<GitExtensionExports>("vscode.git");
       if (!ext) return undefined;
       const api = (ext.isActive ? ext.exports : await ext.activate())?.getAPI?.(1);
-      const repo = api?.getRepository(fileUri); // the CLOSEST containing repo (handles nested/submodule) — never the first-repo guess
+      return api?.getRepository(fileUri) ?? undefined;
+    } catch {
+      return undefined; // git extension quirks / API drift → manual fallback, never a throw
+    }
+  }
+
+  /** #211 — the GitHub `{owner, repo}` that owns `fileUri`, from its origin remote. PURE (no persist, no note) — distinct
+   *  from `detectIssueBaseFromGit` (which writes config): the issue-CREATE path must not have side effects. github.com-only
+   *  via `githubRepoFromRemote`. undefined → no auto-create (the flag is written without a `; ref`). */
+  async function githubRepoForFile(fileUri: vscode.Uri): Promise<{ owner: string; repo: string } | undefined> {
+    const repo = await gitRepositoryForFile(fileUri);
+    if (!repo) return undefined;
+    const origin = repo.state.remotes.find((r) => r.name === "origin");
+    return githubRepoFromRemote(origin?.fetchUrl || origin?.pushUrl);
+  }
+
+  /** #211 — a GitHub access token via VS Code's built-in auth provider: try SILENT first (no UI if a session exists), else
+   *  prompt ONCE (`createIfNone`). A decline / no-provider REJECTS → caught → undefined (→ the flag is written without a
+   *  ref). `repo` scope (policy repos are typically private, so `public_repo` wouldn't suffice). */
+  async function githubToken(): Promise<string | undefined> {
+    // Always try the SILENT probe (so a sign-in via the Accounts menu after an earlier decline is still picked up).
+    try {
+      const existing = await vscode.authentication.getSession("github", ["repo"], { silent: true });
+      if (existing) return existing.accessToken;
+    } catch {
+      /* silent probe failed — fall through */
+    }
+    if (githubAuthDeclined) return undefined; // declined earlier this session → don't nag on every flag
+    try {
+      const created = await vscode.authentication.getSession("github", ["repo"], { createIfNone: true });
+      return created?.accessToken;
+    } catch {
+      githubAuthDeclined = true; // user declined / no provider → stop prompting this session
+      return undefined;
+    }
+  }
+
+  /** #204 auto-detect — derive the issue base from the git ORIGIN of the repo that owns `fileUri` (via `gitRepositoryForFile`
+   *  — in-memory, no subprocess), validate it (github.com-only + `sanitizeIssueBase`, in `githubIssuesBaseFromRemote`), and
+   *  — the operator's "write it if it doesn't exist" — PERSIST it to that folder's settings (one source of truth) + a
+   *  non-silent note. TOTAL: any throw is swallowed → undefined → the manual `⚙ Set crl.issueBaseUrl`. Never throws. */
+  async function detectIssueBaseFromGit(fileUri: vscode.Uri): Promise<string | undefined> {
+    try {
+      const repo = await gitRepositoryForFile(fileUri);
       if (!repo) return undefined;
       const origin = repo.state.remotes.find((r) => r.name === "origin");
       const base = githubIssuesBaseFromRemote(origin?.fetchUrl || origin?.pushUrl);
@@ -1769,7 +1819,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   function onWebviewMessage(
     pane: Pane,
-    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string; state?: string },
+    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string; state?: string; tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown },
   ): void {
     const v = views.get(pane);
     if (!v) return;
@@ -1843,6 +1893,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       cancelEditNote();
     } else if (msg.type === "noteDelete" && typeof msg.noteId === "string") {
       deleteNoteFromWebview(msg.noteId);
+    } else if (msg.type === "flagDraftInsert") {
+      void commitFlagDraft({ tag: msg.tag, summary: msg.summary, stub: msg.stub, fields: msg.fields }); // host uses the captured target; payload is untrusted
+    } else if (msg.type === "flagDraftCancel") {
+      closeFlagDrawer();
     } else if (msg.type === "reveal" && typeof msg.key === "string") {
       const hit = v.reveals[msg.key]; // trusted: looked up by opaque key, not a path/range from the webview
       if (!hit) return;
@@ -1991,6 +2045,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       for (const d of disposables) d.dispose();
       coord.disposePane(pane);
       views.delete(pane);
+      // #211: the flag drawer lives in the tree pane's own region — if that pane is torn down mid-draft, drop the host
+      // draft too (else `flagDraft` lingers invisible + uncommittable; a fresh tree panel wouldn't re-show it).
+      if (pane === "tree") flagDraft = undefined;
     });
     return v;
   }
@@ -2129,6 +2186,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     notesByCaseId = {}; // #156 notes: drop the threads + drawer UI-state too (mirror loadReviewSidecar's clearing)
     openNotesCaseId = undefined;
     editingNoteId = undefined;
+    flagDraft = undefined; // #211: drop the create-flag draft (a stale drawer must not commit against a prior policy)
+    postFlagDrawer(); // clear the webview region (posts empty since flagDraft is now undefined)
     mvSidecarPath = undefined;
     flagsList = []; // #203 Todo 4: drop the review-flag state too (a stale flag list/gate must not survive a failed retarget)
     flagLoadError = false;
@@ -2252,6 +2311,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     notesByCaseId = {}; // #156 notes: reset the threads + drawer UI-state with the rest of the MV state
     openNotesCaseId = undefined;
     editingNoteId = undefined;
+    flagDraft = undefined; // #211: a policy (re)load drops any in-flight create-flag draft
+    postFlagDrawer(); // clear the webview region
     mvSidecarPath = undefined;
     worklistActions = {};
     worklistFilter = new Set(REVIEW_STATES); // #214: reset the verdict filter to all-shown on retarget (policy A's filter must not hide policy B)
@@ -2373,6 +2434,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     label: string;
   }
 
+  /** #211 — the prefill for `openFlagDrawer`: the RESOLVED target (chosen host-side, never named by the webview) + optional
+   *  seed values. The right-click path passes just `{ target }`; the future editor agent (EPIC #210) passes more. This is
+   *  the ONE agent surface for the flag command — a standalone callable, so the add-flag skill drives it directly. */
+  interface FlagDraftPrefill {
+    target: FlagTargetChoice;
+    tag?: string;
+    summary?: string;
+    stub?: string;
+    fields?: Record<string, string>;
+  }
+  /** The in-flight draft: the prefill + the POLICY (`currentCel`) captured at open. Identity is `cel`/`mode`, NOT
+   *  `indexVersion` — a same-policy rebuild must NOT invalidate the draft (the commit re-resolves on live text). */
+  type FlagDraftState = FlagDraftPrefill & { cel: string | undefined };
+
   /** The flag targets a reveal hit offers (GAP 3): a decision ROOT → the decision (object); a `when` → BOTH the concept
    *  (object, all uses) AND this condition (occurrence, decision+key); a recommend-activity LEAF → this recommendation
    *  (occurrence). A menu shows one "Add flag on <label>" per choice. `[]` → not flaggable (verdict-only). */
@@ -2449,99 +2524,165 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!pick) return;
     if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — reopen the menu");
     if (pick.act === "verdict") return nodeVerdictMenu(revealKey); // revealKey is gen-scoped; nodeVerdictMenu re-validates
-    if (pick.choice) await addFlagAtNode(pick.choice, ver, cel);
+    // Option A: the target is chosen HERE (native quick-pick); the drawer opens on the RESOLVED target. The webview never
+    // names a target (trusted-input discipline). `openFlagDrawer` is a standalone seam — the editor agent (EPIC #210)
+    // resolves the target itself and calls it directly, so the flag command has ONE entry point for both paths.
+    if (pick.choice) openFlagDrawer({ target: pick.choice });
   }
 
-  /** Author a flag on `target`: pick a tag (validation-concern first), a sanitized gist, any REGISTRY-required fields
-   *  (fieldRulesOf; enum → quick-pick), then insert a lean `- meta is` line at the grammar-legal slot via a WorkspaceEdit
-   *  + save, and refresh. `ver`/`cel` guard a retarget mid-menu (like the write-back). The vocab is shipped (Piece 1). */
-  async function addFlagAtNode(target: FlagTargetChoice, ver: number, cel: string | undefined): Promise<void> {
-    if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return; // findDeclaration reads live currentCel — re-check first (both reviewers [important])
-    // The flag LIVES on `target.kind`/`target.name` (a concept or the owning decision). An occurrence flag is a DECISION
-    // flag whose `; key` (`target.key`) narrows it to one tree node — createFlag just carries the key as a field (GAP 3).
-    const decl = findDeclaration(target.kind, target.name, target.lib);
-    if (!decl) return flagNote(`couldn't locate ${target.kind} "${target.name}" in the .crl`);
-    const tags = flagTags();
-    const ordered = [...tags].sort((a, b) => (a.id === "validation-concern" ? -1 : b.id === "validation-concern" ? 1 : 0));
-    const tagPick = await vscode.window.showQuickPick(
-      ordered.map((t) => ({
-        label: `@${t.id}`,
-        description: t.category === "validation" ? "validation — CRL-vs-CUSTOMER-INTENT (the usual MV concern)" : "extraction — CRL-vs-narrative fidelity",
-        tag: t,
-      })),
-      { placeHolder: `Add a flag on ${target.kind} "${target.name}"` },
-    );
-    if (!tagPick) return;
-    const tag = tagPick.tag;
-    // Required fields first (short single-line values), THEN the DESCRIPTION in a real note space (below).
+  /** Post the current `flagDraft` to the tree pane's dedicated `#flagDrawer` region (or an EMPTY region to clear it). The
+   *  region is a sibling of `#root`, so this never re-renders the flowchart (no overlay loss) and the render handler never
+   *  wipes the drawer (a same-policy rebuild leaves the user's typed text intact). */
+  function postFlagDrawer(): void {
+    const tree = views.get("tree");
+    if (!tree) return;
+    const html = flagDraft ? renderFlagDrawer({ targetLabel: flagDraft.target.label, tags: flagTags(), tag: flagDraft.tag, summary: flagDraft.summary, stub: flagDraft.stub, fields: flagDraft.fields }) : "";
+    void tree.panel.webview.postMessage({ type: "flagDrawer", html });
+  }
+
+  /** #211 — open the create-flag drawer on a RESOLVED target (the ONE agent seam). Captures the policy identity for the
+   *  commit stale-guards, then renders the drawer. Standalone: both the right-click (Option A) and the editor agent call
+   *  this directly. MV-only. */
+  function openFlagDrawer(prefill: FlagDraftPrefill): void {
+    if (mode !== "medical-validation") return;
+    flagDraft = { ...prefill, cel: currentCel };
+    postFlagDrawer();
+  }
+
+  /** Clear the drawer (drop the host draft + empty the webview region). */
+  function closeFlagDrawer(): void {
+    if (!flagDraft) return;
+    flagDraft = undefined;
+    postFlagDrawer(); // posts an empty region
+  }
+
+  /** #211 — commit the drawer's Insert: author a lean flag whose issue is created "born together" (the #204 loop). Order
+   *  (design review 233, both reviewers): stale-guard → local validate + a PURE `createFlag` DRY-RUN (no ref) so a
+   *  tag/field/decl error aborts with NO orphan issue → resolve the github repo (pure) → auth → create the issue stub
+   *  (best-effort; ANY failure → the flag is still written, without a `; ref`) → real `createFlag` + byte-safe
+   *  WorkspaceEdit + save → refresh. The webview supplies only `{tag, summary, stub, fields}` (untrusted); the TARGET is
+   *  the host-captured `flagDraft.target` (never named by the webview). */
+  async function commitFlagDraft(payload: { tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown }): Promise<void> {
+    const draft = flagDraft;
+    if (!draft) return;
+    if (flagCommitting) return; // in-flight guard: a rapid second Insert must not double-POST / race the write (gpt55 [critical])
+    if (mode !== "medical-validation") return closeFlagDrawer();
+    const { target, cel } = draft;
+    // Sanitize the webview payload (all untrusted). Reserved keys are stripped so a tampered message can't smuggle a fake
+    // issue link (`ref`) or occurrence address (`key`) — those are host-owned (`status` is rejected by createFlag).
+    const tag = typeof payload.tag === "string" ? payload.tag : "";
+    const summary = typeof payload.summary === "string" ? payload.summary.trim() : "";
+    const stub = typeof payload.stub === "string" ? payload.stub : "";
     const fields: Record<string, string> = {};
+    if (payload.fields && typeof payload.fields === "object") {
+      for (const [k, val] of Object.entries(payload.fields as Record<string, unknown>)) if (typeof val === "string" && val.trim() !== "") fields[k] = val.trim();
+    }
+    delete fields.ref;
+    delete fields.key;
     if (target.key) fields.key = target.key; // GAP 3: an occurrence flag carries the node address `<nodeId>~<signature>`
-    for (const rule of tag.fields.filter((f) => f.required)) {
-      let value: string | undefined;
-      if (rule.values && rule.values.length) {
-        value = (await vscode.window.showQuickPick(rule.values.map((v) => ({ label: v })), { placeHolder: `${rule.key} (required)` }))?.label;
-      } else {
-        value = await vscode.window.showInputBox({ prompt: `${rule.key} (required)`, validateInput: (v) => (hasForbiddenFlagChars(v) ? "no backtick / newline / semicolon" : v.trim() === "" ? "required" : undefined) });
-      }
-      if (value === undefined) return; // cancelled a required field → abort cleanly
-      fields[rule.key] = value.trim();
+    // Local summary validation (the lean gist must be ONE line — createFlag itself permits newline gists). Keep the drawer
+    // OPEN on a form error so the user's text isn't lost — they fix + Insert again.
+    if (summary === "") return flagNote("a summary is required");
+    if (/[\r\n]/.test(summary)) return flagNote("the summary must be a single line");
+    if (hasForbiddenGistChars(summary)) return flagNote("the summary can't contain a backtick or `;`");
+    // Identity guard keyed on `currentCel`/`mode`, NOT `indexVersion`: a same-policy rebuild (a background save) bumps
+    // indexVersion but the write re-resolves on LIVE text, so the draft must survive it (both reviewers). Only a DIFFERENT
+    // policy / mode change means there's nothing to write — and that surfaces a note (never a silent drop).
+    if (currentCel !== cel || mode !== "medical-validation") {
+      closeFlagDrawer();
+      return flagNote("policy changed — flag not added");
     }
-    // GAP 2 — the DESCRIPTION goes in a real, MULTI-LINE note space (a scratch editor), not a one-line box: a reviewer can
-    // write a reasonable account of the concern so it's understandable before it's fully detailed in the backlog. The
-    // description IS the gist (the meta backtick body legally spans lines). Confirm via a non-modal "Insert flag" button
-    // (the user edits the note while it's shown); dismissing leaves the note open so the text isn't lost. Backtick/`;` are
-    // rejected by createFlag (they delimit the body/fields); newlines are fine.
-    const noteDoc = await vscode.workspace.openTextDocument({ language: "markdown", content: "" });
-    await vscode.window.showTextDocument(noteDoc, { preview: false });
-    const go = await vscode.window.showInformationMessage(
-      `Write the flag description for @${tag.id} on "${target.name}" in the editor, then Insert. (No backticks or ";".)`,
-      "Insert flag",
-      "Cancel",
-    );
-    if (go !== "Insert flag") return; // Cancel / dismissed — leave the note open, no flag
-    const gist = noteDoc.getText().trim();
-    // Validate BEFORE closing the note, so an invalid description leaves the user's text in place to fix (not destroyed).
-    if (gist === "") return flagNote("a description is required — edit the note and Insert again");
-    if (hasForbiddenGistChars(gist)) return flagNote("the description can't contain a backtick or `;` — edit the note and Insert again");
-    // Best-effort close the scratch editor now that we've captured it (revert first so the untitled buffer doesn't prompt).
-    try {
-      await vscode.window.showTextDocument(noteDoc, { preview: false });
-      await vscode.commands.executeCommand("workbench.action.revertAndCloseActiveEditor");
-    } catch {
-      /* leave the scratch editor open if it can't be closed cleanly */
+    const decl = findDeclaration(target.kind, target.name, target.lib);
+    if (!decl) {
+      closeFlagDrawer();
+      return flagNote(`couldn't locate ${target.kind} "${target.name}" in the .crl`);
     }
-    if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — flag not added");
-    // Open the target + RE-READ its LIVE text NOW — the user may have edited the buffer during the tag/gist/field
-    // prompts (an edit doesn't bump indexVersion until save+rebuild), so a pre-prompt snapshot could be stale. Build +
-    // validate + place the flag via the SHARED #205 `createFlag` transform (the same atom the create_flag MCP tool uses,
-    // extracted so the two can't drift). The cockpit keeps its live-doc re-read + EOL/EOF-aware minimal WorkspaceEdit.
     let doc: vscode.TextDocument;
     try {
       doc = await vscode.workspace.openTextDocument(decl.filePath);
     } catch {
       return flagNote("couldn't open the .crl");
     }
-    if (indexVersion !== ver || currentCel !== cel) return flagNote("policy changed — flag not added");
-    const made = createFlag(doc.getText(), { kind: target.kind, name: target.name, library: target.lib }, { tag: tag.id, gist: gist.trim(), fields, status: "open" });
-    if (!made.ok) return flagNote(`flag not added: ${made.message}`);
-    const eol = doc.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n"; // preserve the doc's line ending (CRLF `.crl` files)
-    const edit = new vscode.WorkspaceEdit();
-    // EOF case: insertLine can legally === lineCount (a concept as the LAST statement, no trailing newline).
-    // Position(lineCount, 0) clamps to the end of the last line, so `lineText + eol` would concatenate ONTO it — insert
-    // at end-of-last-line with a LEADING eol instead (Claude impl review). A point insert keeps cursor/undo stable.
-    if (made.insertLine >= doc.lineCount) {
-      edit.insert(doc.uri, doc.lineAt(doc.lineCount - 1).range.end, eol + made.lineText);
-    } else {
-      edit.insert(doc.uri, new vscode.Position(made.insertLine, 0), made.lineText + eol);
+    // DRY-RUN the shared #205 transform (no ref) — catch unknown-tag / missing-field / invalid-value / decl-not-found /
+    // invalid-result BEFORE any issue POST, so a form error never orphans a GitHub issue. Keep the drawer open on failure.
+    const dry = createFlag(doc.getText(), { kind: target.kind, name: target.name, library: target.lib }, { tag, gist: summary, fields, status: "open" });
+    if (!dry.ok) return flagNote(`flag not added: ${dry.message}`);
+    // Past the dry-run boundary: LOCK (only one commit runs) and wrap EVERYTHING so any throw still surfaces an honest note
+    // (never silently drop a created issue). `finally` releases the lock so a later Insert can retry.
+    flagCommitting = true;
+    let ref: string | undefined;
+    let issueNote: string | undefined; // the "no issue link" reason — folded into the FINAL note, never overwritten (gpt55 [important])
+    try {
+      // Create the issue stub (best-effort). github-origin-only + trusted workspace (an authenticated write to a
+      // repo-controlled origin needs trust — same gate as the link-out); any failure → no ref, flag still written.
+      if (!vscode.workspace.isTrusted) {
+        issueNote = "workspace not trusted";
+      } else if (currentCel !== cel || mode !== "medical-validation") {
+        // A retarget during the (async) repo-resolve/auth must NOT create an issue for a policy the user left. Pre-POST
+        // abort is safe — nothing external has happened yet.
+        closeFlagDrawer();
+        return flagNote("policy changed — flag not added");
+      } else {
+        const repo = await githubRepoForFile(vscode.Uri.file(decl.filePath));
+        if (!repo) {
+          issueNote = "no GitHub origin";
+        } else if (currentCel !== cel || mode !== "medical-validation") {
+          closeFlagDrawer();
+          return flagNote("policy changed — flag not added");
+        } else {
+          try {
+            const token = await githubToken();
+            if (!token) issueNote = "not signed in to GitHub";
+            else ref = `#${await createGithubIssue({ owner: repo.owner, repo: repo.repo, title: summary, body: stub, token })}`;
+          } catch (e) {
+            issueNote = `issue not created (${issueCreateErrorLabel(e)})`;
+          }
+        }
+      }
+      // Real write. RE-READ live text (the doc may have changed during the async POST); write to the CAPTURED file even if
+      // the cockpit identity moved on (do NOT abort post-POST — that would strand the created issue). createFlag re-validates
+      // on the live text (byte-safe). On a post-POST failure, surface it honestly — never silently drop a real issue.
+      const doc2 = await vscode.workspace.openTextDocument(decl.filePath);
+      const withRef = ref ? { ...fields, ref } : fields;
+      const made = createFlag(doc2.getText(), { kind: target.kind, name: target.name, library: target.lib }, { tag, gist: summary, fields: withRef, status: "open" });
+      if (!made.ok) {
+        closeFlagDrawer();
+        flagNote(ref ? `issue ${ref} created but the flag couldn't be written (${made.message}) — add it manually` : `flag not added: ${made.message}`);
+        return;
+      }
+      const eol = doc2.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n"; // preserve the doc's line ending (CRLF `.crl` files)
+      const edit = new vscode.WorkspaceEdit();
+      // EOF case: insertLine can legally === lineCount (a concept as the LAST statement, no trailing newline). Insert at
+      // end-of-last-line with a LEADING eol (a point insert keeps cursor/undo stable) rather than concatenating onto it.
+      if (made.insertLine >= doc2.lineCount) {
+        edit.insert(doc2.uri, doc2.lineAt(doc2.lineCount - 1).range.end, eol + made.lineText);
+      } else {
+        edit.insert(doc2.uri, new vscode.Position(made.insertLine, 0), made.lineText + eol);
+      }
+      const applied = await vscode.workspace.applyEdit(edit);
+      closeFlagDrawer();
+      if (!applied) {
+        flagNote(ref ? `issue ${ref} created but the edit couldn't be applied — add the flag manually` : "edit could not be applied");
+        return;
+      }
+      const saved = await doc2.save();
+      // Refresh only if the policy we wrote is still current (loadFlags/chrome/badges read the current model).
+      if (currentCel === cel && mode === "medical-validation") {
+        loadFlags();
+        renderTreeChrome();
+        driveFlagBadges();
+      }
+      const lead = ref ? `issue ${ref} created; ` : issueNote ? `${issueNote}; ` : "";
+      flagNote(saved ? `${lead}flag added on ${target.kind} "${target.name}"` : `${lead}flag added — but save the .crl (it's unsaved)`);
+    } catch (e) {
+      // Any unexpected throw AFTER a possible POST (openTextDocument/applyEdit/save/loadFlags reject) — surface it honestly,
+      // never silent. If an issue was already created, say so + tell the user to add the flag manually.
+      closeFlagDrawer();
+      const why = e instanceof Error ? e.message : String(e);
+      flagNote(ref ? `issue ${ref} created but the flag couldn't be written (${why}) — add it manually` : `flag not added (${why})`);
+    } finally {
+      flagCommitting = false;
     }
-    if (!(await vscode.workspace.applyEdit(edit))) return flagNote("edit could not be applied");
-    // The insert is now in the live buffer regardless of save. Refresh from it (loadFlags reads crlText = the live
-    // buffer), then report honestly: a failed save leaves the flag inserted-but-dirty, NOT "not added" (gpt55 [important]).
-    const saved = await doc.save();
-    loadFlags(); // re-parse → fresh flagsList (the insert shifted subsequent line locations)
-    renderTreeChrome();
-    driveFlagBadges();
-    flagNote(saved ? `flag added on ${target.kind} "${target.name}"` : `flag added — but save the .crl (it's unsaved)`);
   }
 
   /** #217: present the verdict quick-pick(s). ONE case → straight to the verdict pick. SEVERAL → a re-entrant loop: pick a
@@ -2998,6 +3139,24 @@ function shellHtml(): string {
 .failed-criterion-preempt::after{content:" ◂ diverted here";color:var(--vscode-charts-yellow,#d29922);font-size:.85em;opacity:.9}
 #fcChrome{white-space:normal}
 #fcChrome:empty{display:none}
+#flagDrawer:empty{display:none}
+/* #211 create-flag drawer — a fixed right-side panel (mirrors .cel-notes-drawer), in its OWN #flagDrawer region so a
+   tree re-render never wipes it. Column layout; the fields scroll; the actions pin to the bottom. */
+.flag-drawer{position:fixed;top:0;right:0;bottom:0;width:min(360px,70%);z-index:6;display:flex;flex-direction:column;gap:6px;padding:8px;box-sizing:border-box;background:var(--vscode-editorWidget-background,var(--vscode-editor-background));border-left:1px solid var(--vscode-panel-border,#454545);box-shadow:-2px 0 6px rgba(0,0,0,.25);overflow-y:auto}
+.flag-head{display:flex;align-items:center;justify-content:space-between;font-weight:bold;padding-bottom:6px;border-bottom:1px solid var(--vscode-panel-border,#454545)}
+.flag-title{overflow:hidden;text-overflow:ellipsis;white-space:normal}
+.flag-close{cursor:pointer;background:none;border:none;color:inherit;font-size:1.1em;padding:0 4px}
+.flag-row{display:flex;align-items:center;gap:6px}
+.flag-col{display:flex;flex-direction:column;gap:2px;flex:1;min-height:60px}
+.flag-label{opacity:.75;font-size:.85em;min-width:64px}
+.flag-fieldgroup{display:flex;flex-direction:column;gap:4px}
+.flag-drawer input,.flag-drawer select,.flag-drawer textarea{width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,#3c3c3c);font-family:inherit;font-size:.95em}
+.flag-drawer textarea{min-height:56px;resize:vertical;flex:1}
+.flag-drawer select{background:var(--vscode-dropdown-background);color:var(--vscode-dropdown-foreground);border-color:var(--vscode-dropdown-border,#3c3c3c)}
+.flag-actions{display:flex;justify-content:flex-end;gap:6px;padding-top:6px;border-top:1px solid var(--vscode-panel-border,#454545)}
+.flag-cancel,.flag-insert{cursor:pointer;border:none;border-radius:2px;padding:2px 10px;font-size:.9em}
+.flag-cancel{background:var(--vscode-button-secondaryBackground,#3a3d41);color:var(--vscode-button-secondaryForeground,#fff)}
+.flag-insert{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff)}
 .fc-toggle{display:flex;align-items:center;gap:4px;padding:4px 2px 6px;font-size:.85em}
 .fc-toggle-label{opacity:.7;margin-right:2px}
 .fc-toggle-btn{font:inherit;cursor:pointer;padding:1px 8px;border:1px solid var(--vscode-panel-border,#454545);background:var(--vscode-editorWidget-background,#252526);color:var(--vscode-foreground)}
@@ -3020,7 +3179,7 @@ ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
-    `<style nonce="${styleNonce}">${style}</style></head><body><div id="fcChrome"></div><div id="root"></div>` +
+    `<style nonce="${styleNonce}">${style}</style></head><body><div id="fcChrome"></div><div id="root"></div><div id="flagDrawer"></div>` +
     `<script nonce="${nonce}">` +
     COCKPIT_WEBVIEW_SCRIPT +
     `</script></body></html>`
@@ -3034,7 +3193,10 @@ ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}`;
  *  the markReviewOverlay handler paints error-over-pass (skips .review-pass for ids in the error set) + the disjoint
  *  .review-fail/.review-pending sets + the all-pass .leaf-allpass badge (#210). */
 export const COCKPIT_WEBVIEW_SCRIPT =
-  `const v=acquireVsCodeApi();const root=document.getElementById('root');const fcc=document.getElementById('fcChrome');let gen=-1;` +
+  `const v=acquireVsCodeApi();const root=document.getElementById('root');const fcc=document.getElementById('fcChrome');const fld=document.getElementById('flagDrawer');let gen=-1;` +
+  // #211: show ONLY the selected flag tag's field group (client-side; no host round-trip). Called after the drawer is
+  // injected and on a tag-select change. Safe no-op when the drawer is empty.
+  `const aff=()=>{const ts=fld.querySelector('[data-flag-tag]');if(!ts)return;const tg=ts.value;for(const g of fld.querySelectorAll('[data-flag-field-for]')){g.hidden=g.getAttribute('data-flag-field-for')!==tg;}};` +
   `const clrFC=()=>{for(const el of root.querySelectorAll('.failed-criterion,.failed-criterion-preempt')){el.classList.remove('failed-criterion');el.classList.remove('failed-criterion-preempt');}};` +
   // #156 slice 5 / #210: the review-overlay clear. DISTINCT from clrFC — called ONLY by mark/clearReviewOverlay, NEVER by the
   // selection channel (highlight/clearHighlight), so the verdict fills SURVIVE selection (the survives-selection invariant).
@@ -3138,7 +3300,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `for(const id of (m.yesIds||[])){const el=document.getElementById(id);if(el)el.classList.add('flow-leaf-yes');}` +
   `for(const id of (m.noIds||[])){const el=document.getElementById(id);if(el)el.classList.add('flow-leaf-no');}}` +
   // The tree-pane chrome (toggle + gap banner) — injected ABOVE #root so it never clobbers the flowchart.
-  `else if(m.type==='fcChrome'){fcc.innerHTML=m.html;}});` +
+  `else if(m.type==='fcChrome'){fcc.innerHTML=m.html;}` +
+  // #211: the create-flag drawer's OWN region — set (or clear with '') its html. The render handler never touches it, so a
+  // same-policy tree rebuild leaves the drawer + the user's typed text intact. aff() shows the selected tag's fields.
+  `else if(m.type==='flagDrawer'){fld.innerHTML=m.html;if(m.html)aff();}});` +
   // #156 slice 4: a worklist review <select> sits INSIDE the .cel-case block (itself a data-reveal target). A CLICK on the
   // select must open the native dropdown WITHOUT selecting the case, so we stopPropagation (block the reveal) but do NOT
   // preventDefault (let the dropdown open). The state change rides the separate 'change' listener below. A DISABLED select
@@ -3209,4 +3374,21 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(gap){v.postMessage({type:'fcOpenSource',idx:Number(gap.getAttribute('data-fc-gap'))});return;}` +
   // #203 Todo 4: the flag badge / mvComplete gate → open the review-flag list.
   `const fl=e.target.closest&&e.target.closest('[data-mv-flags]');` +
-  `if(fl)v.postMessage({type:'mvFlags'});});`;
+  `if(fl)v.postMessage({type:'mvFlags'});});` +
+  // #211: the create-flag drawer's controls (its OWN region → a separate listener). Close/Cancel drops the draft; Insert
+  // collects the tag + summary + stub + the VISIBLE tag's field values and posts them (the host uses the captured target).
+  `fld.addEventListener('click',(e)=>{` +
+  `const cx=e.target.closest&&e.target.closest('[data-flag-close],[data-flag-cancel]');` +
+  `if(cx){e.preventDefault();v.postMessage({type:'flagDraftCancel'});return;}` +
+  `const ins=e.target.closest&&e.target.closest('[data-flag-insert]');` +
+  `if(ins){e.preventDefault();` +
+  `const ts=fld.querySelector('[data-flag-tag]');const tg=ts?ts.value:'';` +
+  `const su=fld.querySelector('[data-flag-summary]');const st=fld.querySelector('[data-flag-stub]');` +
+  // find the SELECTED tag's field group by iterating + comparing (NOT selector interpolation — a tag id with a quote/]
+  // would throw a SyntaxError and abort the click; matches aff()'s approach).
+  `const fields={};let grp=null;for(const g of fld.querySelectorAll('[data-flag-field-for]')){if(g.getAttribute('data-flag-field-for')===tg){grp=g;break;}}` +
+  `if(grp){for(const c of grp.querySelectorAll('[data-flag-field]')){const k=c.getAttribute('data-flag-field');const val=c.value;if(val&&val.trim()!=='')fields[k]=val;}}` +
+  `v.postMessage({type:'flagDraftInsert',tag:tg,summary:su?su.value:'',stub:st?st.value:'',fields:fields});return;}` +
+  `});` +
+  // The tag select's change toggles the visible field group (client-side; no host round-trip).
+  `fld.addEventListener('change',(e)=>{const ts=e.target.closest&&e.target.closest('[data-flag-tag]');if(ts){aff();}});`;

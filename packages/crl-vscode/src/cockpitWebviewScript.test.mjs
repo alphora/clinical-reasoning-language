@@ -749,7 +749,7 @@ check("#203 Slice B + GAP 3: nodeMenu offers verdict + one 'Add flag on <target>
   assert.match(m[1], /choices\.map\(\(c\) =>/); // one menu item per target choice
   assert.match(m[1], /Add flag on \$\{c\.label\}/); // labeled per choice
   assert.match(m[1], /const ver = indexVersion/); // ver/cel captured BEFORE the menu
-  assert.match(m[1], /addFlagAtNode\(pick\.choice, ver, cel\)/);
+  assert.match(m[1], /openFlagDrawer\(\{ target: pick\.choice \}\)/); // #211: opens the drawer on the RESOLVED target
 });
 check("#203 GAP 3: flagTargetChoices — decision root → object-decision; a `when` → concept (object) + this condition (occurrence); a leaf → this recommendation", () => {
   const m = COCKPIT_SRC.match(/function flagTargetChoices\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
@@ -775,32 +775,73 @@ check("#203 Slice B: findDeclaration re-parses src/crl (live-buffer via crlText)
   assert.match(m[1], /parsed\.result\.library\?\.name !== lib/); // match the declaring library
   assert.match(m[1], /declLine: decl\.location\.start\.line/);
 });
-check("#203 Slice B / #205: addFlagAtNode is a THIN SHIM over the shared createFlag transform (verdict-first pick, registry fields, live-doc re-read, EOL/EOF WorkspaceEdit, ver/cel guard, reload+badges)", () => {
-  const m = COCKPIT_SRC.match(/async function addFlagAtNode\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
-  assert.ok(m, "addFlagAtNode body");
-  assert.match(m[1], /flagTags\(\)/);
-  assert.match(m[1], /a\.id === "validation-concern" \? -1/); // ordered validation-concern first
-  assert.match(m[1], /hasForbiddenFlagChars\(v\)/); // SHARED sanitization predicate (cockpit + createFlag can't drift)
-  assert.match(m[1], /tag\.fields\.filter\(\(f\) => f\.required\)/); // registry-driven required fields
-  assert.match(m[1], /rule\.values && rule\.values\.length/); // enum → quick-pick
-  assert.match(m[1], /fields\[rule\.key\] = value\.trim\(\)/); // fields collected into a Record for createFlag
-  // GAP 2: the DESCRIPTION is captured in a real multi-line note space (a scratch editor), not a one-line box; validated
-  // (backtick/`;`) BEFORE the note is closed so an invalid description isn't destroyed; the description IS the gist.
-  assert.match(m[1], /openTextDocument\(\{ language: "markdown", content: "" \}\)/); // the scratch note editor
-  assert.match(m[1], /showInformationMessage\([\s\S]*?"Insert flag"/); // non-modal confirm button
-  assert.match(m[1], /const gist = noteDoc\.getText\(\)\.trim\(\)/); // the note IS the gist (multi-line)
-  assert.match(m[1], /hasForbiddenGistChars\(gist\)[\s\S]*?edit the note/); // validate before closing (keep the user's text)
-  // #205: the build/find/resolve/validate is the SHARED transform — the cockpit calls it against the LIVE doc text.
-  assert.match(m[1], /createFlag\(doc\.getText\(\), \{ kind: target\.kind, name: target\.name, library: target\.lib \}, \{ tag: tag\.id, gist: gist\.trim\(\), fields, status: "open" \}\)/);
-  assert.match(m[1], /if \(!made\.ok\) return flagNote/); // typed-reason surfacing
-  assert.match(m[1], /doc\.eol === vscode\.EndOfLine\.CRLF \? "\\r\\n" : "\\n"/); // preserve the doc EOL
-  assert.match(m[1], /made\.insertLine >= doc\.lineCount/); // EOF-safe using the transform's insertLine
-  assert.match(m[1], /doc\.lineAt\(doc\.lineCount - 1\)\.range\.end, eol \+ made\.lineText/); // leading-eol insert at EOF
-  assert.match(m[1], /edit\.insert\(doc\.uri, new vscode\.Position\(made\.insertLine, 0\), made\.lineText \+ eol\)/);
-  assert.match(m[1], /const saved = await doc\.save\(\)/);
-  assert.match(m[1], /indexVersion !== ver \|\| currentCel !== cel/); // retarget guard (mirrors the write-back)
-  assert.match(m[1], /loadFlags\(\);[\s\S]*renderTreeChrome\(\);[\s\S]*driveFlagBadges\(\)/); // refresh: reload + chrome + badges
-  assert.match(m[1], /saved \? .* : .*it's unsaved/); // honest save-fail message (flag inserted-but-dirty, not "not added")
+check("#211: nodeMenu opens the drawer on the RESOLVED target (Option A) — openFlagDrawer, not a native gist chain", () => {
+  const m = COCKPIT_SRC.match(/async function nodeMenu\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "nodeMenu body");
+  assert.match(m[1], /openFlagDrawer\(\{ target: pick\.choice \}\)/); // the ONE seam; the webview never names a target
+  assert.doesNotMatch(m[1], /addFlagAtNode/); // the old scratch-editor chain is gone
+});
+check("#211: openFlagDrawer is a STANDALONE seam — MV-only, captures ver/cel, posts the drawer", () => {
+  const m = COCKPIT_SRC.match(/function openFlagDrawer\(prefill[^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "openFlagDrawer body");
+  assert.match(m[1], /mode !== "medical-validation"\) return/); // MV-only
+  assert.match(m[1], /flagDraft = \{ \.\.\.prefill, cel: currentCel \}/); // capture the POLICY identity for the commit guard (not indexVersion)
+  assert.match(m[1], /postFlagDrawer\(\)/);
+});
+check("#211: commitFlagDraft — in-flight guard + DRY-RUN before any POST; identity keyed on currentCel/mode (NOT indexVersion)", () => {
+  const m = COCKPIT_SRC.match(/async function commitFlagDraft\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "commitFlagDraft body");
+  assert.match(m[1], /if \(flagCommitting\) return/); // a rapid second Insert must not double-POST / race the write
+  assert.match(m[1], /const \{ target, cel \} = draft/); // TARGET is host-captured, never from the webview payload
+  assert.match(m[1], /delete fields\.ref;\s*\n\s*delete fields\.key;/); // reserved keys stripped (tamper defense)
+  assert.match(m[1], /if \(summary === ""\) return flagNote/); // title required
+  assert.match(m[1], /\/\[\\r\\n\]\/\.test\(summary\)/); // lean gist must be ONE line
+  assert.match(m[1], /hasForbiddenGistChars\(summary\)/); // shared sanitization
+  // identity is currentCel/mode — a same-policy rebuild (indexVersion bump) must NOT discard the draft (both reviewers)
+  assert.match(m[1], /if \(currentCel !== cel \|\| mode !== "medical-validation"\)[\s\S]*?flagNote\("policy changed/);
+  assert.doesNotMatch(m[1], /indexVersion !== ver/); // the buggy guard is gone
+  // the DRY-RUN (no ref) precedes the issue creation in the source
+  const dryIdx = m[1].indexOf("const dry = createFlag(");
+  const repoIdx = m[1].indexOf("githubRepoForFile(");
+  assert.ok(dryIdx > 0 && repoIdx > 0 && dryIdx < repoIdx, "createFlag dry-run precedes the repo resolve / POST");
+  assert.match(m[1], /if \(!dry\.ok\) return flagNote/); // abort with NO issue created; drawer stays open
+});
+check("#211: commitFlagDraft — trust+github gated, pre-POST recheck, LOCK+try/finally, issueNote folded into ONE honest note", () => {
+  const m = COCKPIT_SRC.match(/async function commitFlagDraft\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.match(m[1], /flagCommitting = true;[\s\S]*?try \{/); // lock past the dry-run boundary, then the wrapped body
+  assert.match(m[1], /\} finally \{\s*\n\s*flagCommitting = false;/); // released for a later retry
+  assert.match(m[1], /if \(!vscode\.workspace\.isTrusted\)/); // trust gate
+  assert.match(m[1], /githubRepoForFile\(vscode\.Uri\.file\(decl\.filePath\)\)/); // pure repo resolve (no persist)
+  // a retarget during the async repo-resolve/auth aborts BEFORE any POST (no orphan issue for a policy the user left)
+  const repoAt = m[1].indexOf("githubRepoForFile(");
+  const rechecks = (m[1].match(/currentCel !== cel \|\| mode !== "medical-validation"/g) || []).length;
+  assert.ok(rechecks >= 3, "pre-write guard + at least two pre-POST rechecks");
+  assert.match(m[1], /ref = `#\$\{await createGithubIssue\(/); // ref from the created number
+  assert.match(m[1], /catch \(e\)[\s\S]*?issueCreateErrorLabel\(e\)/); // labelled failure → issueNote
+  assert.match(m[1], /const withRef = ref \? \{ \.\.\.fields, ref \} : fields/);
+  assert.match(m[1], /made\.insertLine >= doc2\.lineCount/); // EOF-safe on the captured file
+  assert.match(m[1], /issue \$\{ref\} created but the flag couldn't be written/); // honest post-POST failure (never silent)
+  assert.match(m[1], /const lead = ref \? .* : issueNote \? .* : ""/); // the "no issue link" reason is folded into the FINAL note
+  assert.match(m[1], /if \(currentCel === cel && mode === "medical-validation"\) \{[\s\S]*?loadFlags\(\)/); // refresh only if policy unchanged
+  assert.ok(repoAt > 0, "repo resolve present");
+});
+check("#211: the drawer lives in a DEDICATED #flagDrawer region the render handler never wipes (survives a rebuild)", () => {
+  assert.match(COCKPIT_SRC, /<div id="flagDrawer"><\/div>/); // shell region (sibling of #root)
+  // the render swap clears #root + #fcChrome but NOT #flagDrawer
+  const render = SCRIPT.slice(SCRIPT.indexOf("if(m.type==='render')"), SCRIPT.indexOf("v.postMessage({type:'ready'"));
+  assert.ok(!/fld\.innerHTML/.test(render), "the render handler must NOT touch #flagDrawer");
+  assert.match(SCRIPT, /else if\(m\.type==='flagDrawer'\)\{fld\.innerHTML=m\.html;if\(m\.html\)aff\(\);\}/); // its own channel + field-toggle
+});
+check("#211 webview: Insert collects the tag + summary + stub + the VISIBLE tag's fields; Cancel/Close drop the draft", () => {
+  assert.match(SCRIPT, /data-flag-close.*data-flag-cancel/); // close/cancel → flagDraftCancel
+  assert.match(SCRIPT, /v\.postMessage\(\{type:'flagDraftCancel'\}\)/);
+  assert.match(SCRIPT, /for\(const g of fld\.querySelectorAll\('\[data-flag-field-for\]'\)\)\{if\(g\.getAttribute\('data-flag-field-for'\)===tg\)\{grp=g;break;\}\}/); // collect the SELECTED group by iterating (no selector interpolation)
+  assert.match(SCRIPT, /v\.postMessage\(\{type:'flagDraftInsert',tag:tg,summary:[^,]+,stub:[^,]+,fields:fields\}\)/);
+  assert.match(SCRIPT, /const aff=\(\)=>\{[\s\S]*?g\.getAttribute\('data-flag-field-for'\)!==tg/); // client-side field-group toggle
+});
+check("#211: the message router wires flagDraftInsert → commitFlagDraft and flagDraftCancel → closeFlagDrawer", () => {
+  assert.match(COCKPIT_SRC, /msg\.type === "flagDraftInsert"[\s\S]*?commitFlagDraft\(\{ tag: msg\.tag, summary: msg\.summary, stub: msg\.stub, fields: msg\.fields \}\)/);
+  assert.match(COCKPIT_SRC, /msg\.type === "flagDraftCancel"[\s\S]*?closeFlagDrawer\(\)/);
 });
 
 // ── #203 Todo 4b Slice C: issue link-out ──
@@ -828,11 +869,35 @@ check("#203 Slice C: flagActionMenu offers Open-issue only for a numeric ref; a 
   assert.match(m[1], /buildIssueUrl\(await resolveOrDetectIssueBase\(fileUri\), issueNo\)/); // config-first, else detect
   assert.match(m[1], /await vscode\.env\.openExternal\(vscode\.Uri\.parse\(url\)\)\)\) flagNote\(`could not open issue/);
 });
-check("#204 auto-detect: detectIssueBaseFromGit uses vscode.git getRepository (not repositories[0]), github-only, persists-if-unset, total (no throw)", () => {
-  const m = COCKPIT_SRC.match(/async function detectIssueBaseFromGit\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
-  assert.ok(m, "detectIssueBaseFromGit body");
+check("#204/#211: gitRepositoryForFile is the SHARED, side-effect-free git-ext access (activate; getRepository, not repositories[0]); total", () => {
+  const m = COCKPIT_SRC.match(/async function gitRepositoryForFile\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "gitRepositoryForFile body");
   assert.match(m[1], /ext\.isActive \? ext\.exports : await ext\.activate\(\)/); // activate if needed
   assert.match(m[1], /api\?\.getRepository\(fileUri\)/); // closest containing repo — NOT repositories[0]
+  assert.doesNotMatch(m[1], /repositories\[0\]/); // never guess a repo
+  assert.doesNotMatch(m[1], /config\.update|cfg\.update|flagNote/); // PURE — no persist, no note (the #211 issue-create needs this)
+  assert.match(m[1], /\} catch \{\s*\n\s*return undefined;/); // total catch
+});
+check("#211: githubRepoForFile derives {owner,repo} from the origin via the SHARED helper + the github-only parser (no persist)", () => {
+  const m = COCKPIT_SRC.match(/async function githubRepoForFile\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "githubRepoForFile body");
+  assert.match(m[1], /await gitRepositoryForFile\(fileUri\)/); // reuse the shared access
+  assert.match(m[1], /githubRepoFromRemote\(origin\?\.fetchUrl \|\| origin\?\.pushUrl\)/); // github-only parser
+  assert.doesNotMatch(m[1], /cfg\.update|flagNote/); // no side effects
+});
+check("#211: githubToken tries SILENT first, then prompts once; a decline is remembered this session (no re-nag)", () => {
+  const m = COCKPIT_SRC.match(/async function githubToken\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "githubToken body");
+  assert.match(m[1], /getSession\("github", \["repo"\], \{ silent: true \}\)/); // silent probe first (no UI if signed in)
+  assert.match(m[1], /if \(githubAuthDeclined\) return undefined/); // declined earlier → don't nag on every flag
+  assert.match(m[1], /getSession\("github", \["repo"\], \{ createIfNone: true \}\)/); // then prompt once
+  assert.match(m[1], /githubAuthDeclined = true;/); // decline REJECTS → caught → remembered this session
+  assert.match(m[1], /catch \{\s*\n\s*githubAuthDeclined = true;/); // set in the createIfNone catch
+});
+check("#204 auto-detect: detectIssueBaseFromGit uses the shared repo access, github-only, persists-if-unset, total (no throw)", () => {
+  const m = COCKPIT_SRC.match(/async function detectIssueBaseFromGit\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "detectIssueBaseFromGit body");
+  assert.match(m[1], /await gitRepositoryForFile\(fileUri\)/); // shared access (the closest containing repo)
   assert.doesNotMatch(m[1], /repositories\[0\]/); // never guess a repo
   assert.match(m[1], /githubIssuesBaseFromRemote\(origin\?\.fetchUrl \|\| origin\?\.pushUrl\)/); // fetch|push, github-only parser
   assert.match(m[1], /!info\?\.globalValue && !info\?\.workspaceValue && !info\?\.workspaceFolderValue/); // persist ONLY if unset (never clobber a user value)

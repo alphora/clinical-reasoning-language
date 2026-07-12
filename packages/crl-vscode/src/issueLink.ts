@@ -40,16 +40,16 @@ export function sanitizeIssueBase(raw: unknown): string | undefined {
   return `${u.origin}${u.pathname.replace(/\/+$/, "")}`;
 }
 
-/** Derive the GitHub issues base (`https://github.com/<owner>/<repo>/issues`) from a git REMOTE url — for the auto-detect
- *  route (the origin is REPO-controlled, so this is the security boundary). GITHUB.COM ONLY, enforced HERE on an exact,
- *  lowercased hostname — NOT via `sanitizeIssueBase` (which allows arbitrary hosts by design for the manual setting). Two
- *  strict branches: the scp form `[ssh://]git@host:owner/repo(.git)?` (which `new URL` can't parse — bespoke regex, host
- *  group forbids `@`/`/` so `git@github.com.evil.com:…` reads host `github.com.evil.com` → reject) and the URL form
- *  (`https`/`ssh`/`git` only; the parsed `hostname` after the LAST `@` is exact-matched, so `ssh://git@github.com@evil/…`
- *  → host `evil` → reject). Takes the FIRST TWO path segments (`…/repo/tree/main` → `repo`); owner/repo must be a bare
- *  `[A-Za-z0-9._-]+` (rejects `..`). Any non-github / unparseable / aliased (`gh:owner/repo`) form → undefined → the manual
- *  setting. (gpt55 + Claude design review, disc 232.) */
-export function githubIssuesBaseFromRemote(remoteUrl: string | undefined): string | undefined {
+/** Parse a git REMOTE url → its GitHub `{owner, repo}` — the shared core for both the issues-base link-out AND the
+ *  #211 issue-CREATE flow (both need github.com identity; the origin is REPO-controlled, so this is the security
+ *  boundary). GITHUB.COM ONLY, enforced HERE on an exact, lowercased hostname — NOT via `sanitizeIssueBase` (which allows
+ *  arbitrary hosts by design for the manual setting). Two strict branches: the scp form `[ssh://]git@host:owner/repo(.git)?`
+ *  (which `new URL` can't parse — bespoke regex, host group forbids `@`/`/` so `git@github.com.evil.com:…` reads host
+ *  `github.com.evil.com` → reject) and the URL form (`https`/`ssh`/`git` only; the parsed `hostname` after the LAST `@` is
+ *  exact-matched, so `ssh://git@github.com@evil/…` → host `evil` → reject). Takes the FIRST TWO path segments
+ *  (`…/repo/tree/main` → `repo`); owner/repo must be a bare `[A-Za-z0-9._-]+` (rejects `..`). Any non-github / unparseable /
+ *  aliased (`gh:owner/repo`) form → undefined. (gpt55 + Claude design review, disc 232/233.) */
+export function githubRepoFromRemote(remoteUrl: string | undefined): { owner: string; repo: string } | undefined {
   if (typeof remoteUrl !== "string") return undefined;
   const url = remoteUrl.trim();
   if (url === "") return undefined;
@@ -80,7 +80,15 @@ export function githubIssuesBaseFromRemote(remoteUrl: string | undefined): strin
   if (host !== "github.com") return undefined; // EXACT — rejects GHE, www.github.com, github.com.evil.com, …
   const BARE = /^[A-Za-z0-9._-]+$/; // no `/`, `@`, `:`, whitespace, query, fragment
   if (!BARE.test(owner) || !BARE.test(repo) || owner === "." || owner === ".." || repo === "." || repo === "..") return undefined;
-  return sanitizeIssueBase(`https://github.com/${owner}/${repo}/issues`); // always https; defense-in-depth normalize
+  return { owner, repo };
+}
+
+/** Derive the GitHub issues base (`https://github.com/<owner>/<repo>/issues`) from a git REMOTE url — for the auto-detect
+ *  link-out route. Delegates to `githubRepoFromRemote` (the shared github.com-only parser), then normalizes through
+ *  `sanitizeIssueBase` (always https; defense-in-depth). Byte-compatible with the pre-#211 direct implementation. */
+export function githubIssuesBaseFromRemote(remoteUrl: string | undefined): string | undefined {
+  const r = githubRepoFromRemote(remoteUrl);
+  return r ? sanitizeIssueBase(`https://github.com/${r.owner}/${r.repo}/issues`) : undefined;
 }
 
 /** Build the final issue URL from a (sanitized) base + a numeric id: `${base}/${n}`. NOT `new URL(n, base)` — relative

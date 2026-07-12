@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./test-harness.mjs";
 
-const { issueRefOf, sanitizeIssueBase, buildIssueUrl, githubIssuesBaseFromRemote } = await load("issueLink.ts");
+const { issueRefOf, sanitizeIssueBase, buildIssueUrl, githubIssuesBaseFromRemote, githubRepoFromRemote } = await load("issueLink.ts");
 
 test("issueRefOf: full-string #?<digits> only (the injection guard)", () => {
   assert.equal(issueRefOf("#203"), "203");
@@ -104,6 +104,44 @@ test("githubIssuesBaseFromRemote: REJECTS non-github / host-confusion / bad-path
   ]) {
     assert.equal(githubIssuesBaseFromRemote(bad), undefined, `should reject ${JSON.stringify(bad)}`);
   }
+});
+
+test("githubRepoFromRemote: yields {owner,repo} for the real github.com forms (the #211 issue-create identity)", () => {
+  for (const ok of [
+    "https://github.com/owner/repo",
+    "https://github.com/owner/repo.git",
+    "git@github.com:owner/repo.git",
+    "ssh://git@github.com:22/owner/repo",
+    "git://github.com/owner/repo.git",
+    "https://user@github.com/owner/repo", // userinfo dropped
+    "git@GitHub.com:owner/repo.git", // host case-insensitive
+    "https://github.com/owner/repo/tree/main", // first two segments
+  ]) {
+    assert.deepEqual(githubRepoFromRemote(ok), { owner: "owner", repo: "repo" }, `should parse ${ok}`);
+  }
+});
+
+test("githubRepoFromRemote: undefined for non-github / host-confusion / bad-path / alias forms (same gate as the base)", () => {
+  for (const bad of [
+    "https://gitlab.com/owner/repo.git",
+    "https://ghe.example.com/owner/repo.git",
+    "https://www.github.com/owner/repo",
+    "git@github.com.evil.com:owner/repo.git",
+    "ssh://git@github.com@evil/owner/repo",
+    "https://github.com@evil.com/owner/repo",
+    "http://github.com/owner/repo", // https/ssh/git only
+    "https://github.com/owner", // no repo
+    "gh:owner/repo",
+    "", "   ", undefined, null, 42,
+  ]) {
+    assert.equal(githubRepoFromRemote(bad), undefined, `should reject ${JSON.stringify(bad)}`);
+  }
+});
+
+test("githubIssuesBaseFromRemote still delegates to the shared parser (byte-compatible: base = repo/issues)", () => {
+  // the base is built FROM githubRepoFromRemote — same accept set, same normalized output
+  assert.equal(githubIssuesBaseFromRemote("git@github.com:owner/repo.git"), "https://github.com/owner/repo/issues");
+  assert.equal(githubRepoFromRemote("git@github.com:owner/repo.git")?.owner, "owner");
 });
 
 console.log("issueLink.test: ok");
