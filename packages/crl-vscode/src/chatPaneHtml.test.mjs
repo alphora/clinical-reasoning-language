@@ -93,4 +93,36 @@ test("SCRIPT: Stop posts chatStop, Clear posts chatClear, and it requests the in
   assert.match(S, /v\.postMessage\(\{type:'chatReady'\}\)/);
 });
 
+// ── #236 Todo B.1: purple accent + the thinking indicator ──
+
+test("STYLE: the Send button is the inferred-layer purple with DARK text (mirrors .crl-layer-inferred, not white-on-purple)", () => {
+  const send = CHAT_STYLE.match(/\.chat-send\{[^}]*\}/)?.[0] ?? "";
+  assert.match(send, /background:var\(--vscode-charts-purple,#c586c0\)/, "Send background resolves to --vscode-charts-purple");
+  assert.match(send, /color:var\(--vscode-editor-background/, "Send uses DARK text (the editor background), not white");
+  assert.ok(!/vscode-button-background/.test(send), "Send no longer uses the default blue button background");
+});
+
+test("STYLE: the input focus ring is the purple accent (--vscode-charts-purple), not the theme default", () => {
+  assert.match(CHAT_STYLE, /\[data-chat-input\]:focus-visible\{outline:1px solid var\(--vscode-charts-purple,#c586c0\)/);
+});
+
+test("renderChatThread: an assistant turn with thoughtMs renders a muted 'Thought for Ns' line above the reply", () => {
+  const h = renderChatThread([{ kind: "assistant", text: "answer", thoughtMs: 3200 }]);
+  assert.match(h, /<div class="chat-thought">Thought for 3s<\/div><span data-chat-text>answer<\/span>/);
+  // sub-second thinking floors to 1s (never "0s"); no thoughtMs → no line
+  assert.match(renderChatThread([{ kind: "assistant", text: "x", thoughtMs: 200 }]), /Thought for 1s/);
+  assert.ok(!renderChatThread([{ kind: "assistant", text: "x" }]).includes("chat-thought"), "no line when thoughtMs is absent");
+  assert.match(CHAT_STYLE, /\.chat-thought\{/, "the thought line has a muted style");
+});
+
+test("SCRIPT: the thinking-state path exists — a live 'thinking… Ns' ticker driven off the render's thinking flag", () => {
+  assert.match(S, /const showThinking=\(since\)=>/, "a showThinking helper");
+  assert.match(S, /setInterval\(tick,1000\)/, "the ticker runs once a second");
+  assert.match(S, /statusEl\.textContent='thinking… '\+s\+'s'/, "the ticker text is set via textContent (XSS-safe), not innerHTML");
+  assert.match(S, /if\(m\.thinking\)\{showThinking\(m\.thinkingSince\|\|Date\.now\(\)\);\}else\{clearThink\(\);/, "render drives the ticker off m.thinking + resumes from thinkingSince");
+  // the first delta clears the ticker (thinking → text)
+  const deltaBody = S.slice(S.indexOf("m.type==='delta'"), S.indexOf("m.type==='delta'") + 360);
+  assert.match(deltaBody, /clearThink\(\)/, "a text delta clears the thinking ticker");
+});
+
 console.log("chatPaneHtml.test: ok");

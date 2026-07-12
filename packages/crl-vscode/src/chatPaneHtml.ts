@@ -10,13 +10,17 @@ const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"
 const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (c) => ESC[c]);
 
 /** One entry in the UI transcript. `assistant.open` = the in-flight turn (gets a `data-chat-text` node for delta append);
- *  `assistant.stopped` = a cancelled reply (keeps its partial text, labelled). `error`/`status` are UI-only (never enter the
- *  model `messages`). */
+ *  `assistant.stopped` = a cancelled reply (keeps its partial text, labelled); `assistant.thoughtMs` = how long the model's
+ *  adaptive-thinking block ran (Todo B.1) → a muted "Thought for Ns" line above the reply. `error`/`status` are UI-only
+ *  (never enter the model `messages`). */
 export type ChatEntry =
   | { kind: "user"; text: string }
-  | { kind: "assistant"; text: string; open?: boolean; stopped?: boolean }
+  | { kind: "assistant"; text: string; open?: boolean; stopped?: boolean; thoughtMs?: number }
   | { kind: "error"; text: string }
   | { kind: "status"; text: string };
+
+/** "Thought for Ns" — whole seconds, floored at 1s so a sub-second block never reads "0s". */
+const thoughtSeconds = (ms: number): number => Math.max(1, Math.floor(ms / 1000)); // FLOOR to match the live ticker (no +1 jump on collapse)
 
 export interface RenderChatOpts {
   /** Shown (escaped) when the transcript is empty — the pane's resting hint. */
@@ -37,11 +41,14 @@ export function renderChatThread(messages: ChatEntry[], opts: RenderChatOpts = {
     } else if (m.kind === "assistant") {
       const openAttr = m.open ? " data-chat-open" : "";
       const stopped = m.stopped ? `<span class="chat-stopped">(stopped)</span>` : "";
+      // A muted "Thought for Ns" line above the reply (the duration is a number, so no escaping needed). Rendered whenever
+      // the turn carries a `thoughtMs` — during streaming (once thinking stops) and on the finalized turn alike.
+      const thought = typeof m.thoughtMs === "number" ? `<div class="chat-thought">Thought for ${thoughtSeconds(m.thoughtMs)}s</div>` : "";
       // The `data-chat-text` holder is where streaming deltas append; render it for every assistant turn so a finalized
       // turn keeps the same shape as the open one it replaces.
       parts.push(
         `<div class="chat-msg chat-assistant"${openAttr}><span class="chat-role">Agent</span>` +
-          `<div class="chat-body"><span data-chat-text>${escapeHtml(m.text)}</span>${stopped}</div></div>`,
+          `<div class="chat-body">${thought}<span data-chat-text>${escapeHtml(m.text)}</span>${stopped}</div></div>`,
       );
     } else if (m.kind === "error") {
       parts.push(`<div class="chat-msg chat-error">${escapeHtml(m.text)}</div>`);
@@ -77,12 +84,17 @@ export const CHAT_STYLE = `body{font:13px var(--vscode-editor-font-family,monosp
 .chat-error{color:var(--vscode-editorError-foreground,#f14c4c);border:1px solid var(--vscode-editorError-foreground,#f14c4c);background:var(--vscode-inputValidation-errorBackground,rgba(255,80,80,.08));align-self:stretch;white-space:pre-wrap;word-break:break-word}
 .chat-status{opacity:.7;font-style:italic;align-self:center;font-size:.9em}
 .chat-stopped{opacity:.6;font-style:italic;margin-left:6px;font-size:.85em}
+.chat-thought{opacity:.6;font-style:italic;font-size:.85em;margin-bottom:3px}
 .chat-inputbar{display:flex;flex-direction:column;gap:6px;padding:8px;border-top:1px solid var(--vscode-panel-border,#454545);background:var(--vscode-editor-background)}
 .chat-inputbar .chat-status{align-self:flex-start;min-height:1em}
 .chat-input{width:100%;box-sizing:border-box;resize:vertical;min-height:44px;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,#3c3c3c);font-family:inherit;font-size:inherit;padding:4px 6px}
+/* CRL Assist purple accent (Todo B.1) — the inferred-layer purple used as a focus ring, mirroring .crl-layer-inferred. */
+[data-chat-input]:focus-visible{outline:1px solid var(--vscode-charts-purple,#c586c0);outline-offset:1px}
 .chat-actions{display:flex;gap:6px;justify-content:flex-end}
 .chat-actions button{cursor:pointer;border:none;border-radius:2px;padding:3px 12px;font:inherit}
-.chat-send{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff)}
+/* Send is the purple accent — DARK text on the light purple (mirrors .crl-layer-inferred; white would be low-contrast). */
+.chat-send{background:var(--vscode-charts-purple,#c586c0);color:var(--vscode-editor-background,#1e1e1e)}
+.chat-send:focus-visible{outline:1px solid var(--vscode-charts-purple,#c586c0);outline-offset:1px}
 .chat-send:disabled{opacity:.5;cursor:default}
 .chat-stop{background:var(--vscode-button-secondaryBackground,#3a3d41);color:var(--vscode-button-secondaryForeground,#fff)}
 .chat-clear{background:none;color:var(--vscode-foreground);opacity:.7}
@@ -103,12 +115,20 @@ export const CHAT_WEBVIEW_SCRIPT =
   `const clearBtn=document.querySelector('[data-chat-clear]');` +
   `const statusEl=document.querySelector('[data-chat-status]');` +
   `const scrollBottom=()=>{thread.scrollTop=thread.scrollHeight;};` +
+  // THINKING indicator: a live "thinking… Ns" ticker driven off the host-supplied start time (wall-clock ms; same machine as
+  // the host, so no skew). setInterval on a render with `thinking:true`; cleared on `thinking:false`, on the first delta, and
+  // never leaks (clearThink before each (re)start). Timer text via textContent — never innerHTML.
+  `let thinkTimer=null;` +
+  `const clearThink=()=>{if(thinkTimer){clearInterval(thinkTimer);thinkTimer=null;}};` +
+  `const showThinking=(since)=>{const tick=()=>{const s=Math.max(0,Math.floor((Date.now()-since)/1000));statusEl.textContent='thinking… '+s+'s';};clearThink();tick();thinkTimer=setInterval(tick,1000);};` +
   `window.addEventListener('message',(e)=>{const m=e.data;` +
-  // REHYDRATE: the host is authoritative — replace the whole thread + drive the controls from the render's flags.
-  `if(m.type==='render'){thread.innerHTML=m.html;statusEl.textContent=m.status||'';const s=!!m.streaming;sendBtn.disabled=s;stopBtn.hidden=!s;scrollBottom();}` +
+  // REHYDRATE: the host is authoritative — replace the whole thread + drive the controls from the render's flags. When
+  // `thinking` is set, run the live ticker (a rehydration mid-thinking resumes it from `thinkingSince`); otherwise show the
+  // plain status line.
+  `if(m.type==='render'){thread.innerHTML=m.html;const s=!!m.busy;sendBtn.disabled=s;stopBtn.hidden=!s;if(m.thinking){showThinking(m.thinkingSince||Date.now());}else{clearThink();statusEl.textContent=m.status||'';}scrollBottom();}` +
   // DELTA: append to the OPEN assistant turn's text node — appendData on a text node, NEVER innerHTML (immune to a tag/entity
-  // split across deltas). First delta clears the "working…" status line.
-  `else if(m.type==='delta'){const turn=thread.querySelector('[data-chat-open]');if(turn){const hold=turn.querySelector('[data-chat-text]')||turn;let tn=hold.firstChild;if(!tn||tn.nodeType!==3){tn=document.createTextNode('');hold.appendChild(tn);}tn.appendData(m.text);statusEl.textContent='';scrollBottom();}}` +
+  // split across deltas). First delta clears the thinking ticker + the "working…" status line.
+  `else if(m.type==='delta'){const turn=thread.querySelector('[data-chat-open]');if(turn){const hold=turn.querySelector('[data-chat-text]')||turn;let tn=hold.firstChild;if(!tn||tn.nodeType!==3){tn=document.createTextNode('');hold.appendChild(tn);}tn.appendData(m.text);clearThink();statusEl.textContent='';scrollBottom();}}` +
   `});` +
   // Send: guarded on the disabled (streaming) state HOST-side too, but block here for a snappy UI; drop an all-whitespace draft.
   `const send=()=>{if(sendBtn.disabled)return;const t=input.value;if(!t.trim())return;v.postMessage({type:'chatSend',text:t});input.value='';};` +

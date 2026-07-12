@@ -298,6 +298,62 @@ test("streamAnthropic: a cancel DURING the POST (fetch rejects) FINALIZES as can
   assert.equal(r.text, "");
 });
 
+// ── #236 Todo B.1: onThinking bracketing (adaptive-thinking; display:omitted → no thinking text, STATE only) ──
+const blockStart = (type) => `event: content_block_start\ndata: ${JSON.stringify({ type: "content_block_start", content_block: { type } })}\n\n`;
+const messageStop = `event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`;
+
+test("streamAnthropic: onThinking start on a content_block_start(thinking), stop on the content_block_start(text) — brackets the reply", async () => {
+  const frames = [
+    enc(blockStart("thinking")),
+    enc(thinkingDelta("reasoning…")), // skipped for text, but the block is open
+    enc(blockStart("text")),
+    enc(textDelta("hello")),
+    enc(messageStop),
+  ];
+  const think = [];
+  const seen = [];
+  const r = await streamAnthropic(
+    { apiKey: "k", model: "m", messages: [{ role: "user", content: "hi" }], maxTokens: 64, stream: true, fetchImpl: streamFetch(makeReader(frames)) },
+    (t) => seen.push(t),
+    (s) => think.push(s),
+  );
+  assert.deepEqual(think, ["start", "stop"], "one start (thinking block) + one stop (text block opened)");
+  assert.deepEqual(seen, ["hello"], "only the text_delta is emitted (thinking text stays skipped)");
+  assert.equal(r.text, "hello");
+});
+
+test("streamAnthropic: onThinking stop ALSO fires on the first text_delta when no content_block_start(text) preceded it", async () => {
+  const frames = [enc(blockStart("thinking")), enc(textDelta("hi")), enc(messageStop)];
+  const think = [];
+  await streamAnthropic(
+    { apiKey: "k", model: "m", messages: [{ role: "user", content: "x" }], maxTokens: 8, stream: true, fetchImpl: streamFetch(makeReader(frames)) },
+    () => {},
+    (s) => think.push(s),
+  );
+  assert.deepEqual(think, ["start", "stop"], "the text_delta closes the still-open thinking block");
+});
+
+test("streamAnthropic: onThinking stop fires on message_stop if the thinking block never yielded text", async () => {
+  const frames = [enc(blockStart("thinking")), enc(thinkingDelta("…")), enc(messageStop)];
+  const think = [];
+  const r = await streamAnthropic(
+    { apiKey: "k", model: "m", messages: [{ role: "user", content: "x" }], maxTokens: 8, stream: true, fetchImpl: streamFetch(makeReader(frames)) },
+    () => {},
+    (s) => think.push(s),
+  );
+  assert.deepEqual(think, ["start", "stop"], "message_stop closes an open thinking block");
+  assert.equal(r.text, "");
+});
+
+test("streamAnthropic: onThinking is optional — a text-only stream with no callback never throws", async () => {
+  const frames = [enc(textDelta("plain")), enc(messageStop)];
+  const r = await streamAnthropic(
+    { apiKey: "k", model: "m", messages: [{ role: "user", content: "x" }], maxTokens: 8, stream: true, fetchImpl: streamFetch(makeReader(frames)) },
+    () => {},
+  );
+  assert.equal(r.text, "plain");
+});
+
 test("streamAnthropic: a malformed COMPLETE data frame throws AnthropicError(200) — no silent truncation", async () => {
   const frames = [enc(textDelta("partial ")), enc("event: message_delta\ndata: {not valid json\n\n")];
   await assert.rejects(

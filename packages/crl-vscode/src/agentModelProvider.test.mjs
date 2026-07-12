@@ -111,6 +111,7 @@ test("the unavailable messages are plain text (no Markdown — notifications don
 // ── #210 Todo B: AnthropicProvider.stream (injected fetch + fake SSE reader; no vscode token needed — a plain stub) ──
 const enc = (s) => new TextEncoder().encode(s);
 const textDelta = (t) => enc(`data: ${JSON.stringify({ type: "content_block_delta", delta: { type: "text_delta", text: t } })}\n\n`);
+const blockStart = (type) => enc(`data: ${JSON.stringify({ type: "content_block_start", content_block: { type } })}\n\n`);
 const stopFrame = enc(`data: ${JSON.stringify({ type: "message_stop" })}\n\n`);
 const readerOf = (chunks) => { let i = 0; return { read: async () => (i < chunks.length ? { done: false, value: chunks[i++] } : { done: true, value: undefined }), cancel: async () => {} }; };
 const streamFetch = (chunks) => async () => ({ ok: true, status: 200, body: { getReader: () => readerOf(chunks) } });
@@ -121,6 +122,14 @@ test("AnthropicProvider.stream: emits tagged text deltas + resolves the full Mod
   const r = await p.stream({ messages: [{ role: "user", content: "hi" }] }, (d) => deltas.push(d));
   assert.deepEqual(deltas, [{ type: "text", text: "agent " }, { type: "text", text: "online" }], "each delta is a tagged {type:'text'}");
   assert.equal(r.text, "agent online");
+});
+
+test("AnthropicProvider.stream: thinking deltas flow through as tagged {type:'thinking_start'/'thinking_stop'} StreamDeltas around the text (Todo B.1)", async () => {
+  const p = new AnthropicProvider("m", secretsWith("k"), undefined, streamFetch([blockStart("thinking"), blockStart("text"), textDelta("hi"), stopFrame]));
+  const deltas = [];
+  const r = await p.stream({ messages: [{ role: "user", content: "hi" }] }, (d) => deltas.push(d));
+  assert.deepEqual(deltas, [{ type: "thinking_start" }, { type: "thinking_stop" }, { type: "text", text: "hi" }], "start, then stop (text block opens), then the text delta");
+  assert.equal(r.text, "hi");
 });
 
 test("AnthropicProvider.stream: an already-cancelled token FINALIZES the partial (stopReason 'cancelled'), never throws", async () => {

@@ -34,8 +34,13 @@ export interface ModelResponse {
 }
 
 /** A streamed increment. TAGGED from day one (a discriminated union on `type`) so Todo C's tool-calling adds a
- *  `{ type: "tool_use"; … }` variant WITHOUT reshaping the `onDelta` callback or touching the host post loop. */
-export type StreamDelta = { type: "text"; text: string };
+ *  `{ type: "tool_use"; … }` variant WITHOUT reshaping the `onDelta` callback or touching the host post loop. The
+ *  `thinking_start`/`thinking_stop` pair (Todo B.1) brackets an Anthropic adaptive-thinking block — the STATE only (the
+ *  thinking TEXT is `display:"omitted"`, so there's nothing to surface), letting the host time + label it "Thought for Ns". */
+export type StreamDelta =
+  | { type: "text"; text: string }
+  | { type: "thinking_start" }
+  | { type: "thinking_stop" };
 
 export interface ModelProvider {
   readonly id: "vscode-lm" | "anthropic";
@@ -223,6 +228,8 @@ export class AnthropicProvider implements ModelProvider {
           stream: true,
         },
         (t) => onDelta({ type: "text", text: t }),
+        // Forward the adaptive-thinking STATE as tagged deltas — the host times the "thinking… → Thought for Ns" indicator.
+        (state) => onDelta({ type: state === "start" ? "thinking_start" : "thinking_stop" }),
       );
       return { text: r.text, stopReason: r.stopReason, usage: r.usage };
     } finally {

@@ -1,9 +1,12 @@
-// #210 editor agent Todo B — the chat pane HOST. A single reusable `WebviewPanel` (create-or-reveal) driving a
-// conversation on the Todo-A model provider WITH streaming. NO agent tools / app-state perception (that's Todo C) — plain
-// chat. The conversation is HOST-AUTHORITATIVE: the host holds the model `messages` (only successful — or cancelled-with-
-// partial — user/assistant PAIRS) plus a separate UI `transcript` (which also carries inline errors + status the model
-// never sees) plus the in-flight `partial`; the webview is a pure view that rehydrates from a `render` post. The panel is
-// opened by `crl.agent.chat` and is NOT gated behind `crl.active` (Todo B has no app-state dependency).
+// #210 editor agent Todo B / #236 Todo B.1 — the chat pane HOST ("CRL Assist"). A `WebviewViewProvider` (re-homed from the
+// Todo-B `WebviewPanel` so the user can dock it in the Secondary Side Bar) driving a conversation on the Todo-A model
+// provider WITH streaming. NO agent tools / app-state perception (that's Todo C) — plain chat. The conversation is
+// HOST-AUTHORITATIVE: the host holds the model `messages` (only successful — or cancelled-with-partial — user/assistant
+// PAIRS) plus a separate UI `transcript` (which also carries inline errors + status the model never sees) plus the in-flight
+// `partial` (+ the adaptive-thinking timer, Todo B.1); the webview is a pure view that rehydrates from a `render` post. The
+// view is revealed by `crl.agent.chat` (→ `crl.agentChat.focus`) and is NOT gated behind `crl.active` (chat has no
+// app-state dependency). CRITICAL: a view dispose (a full close) must NOT cancel the in-flight stream — the host keeps
+// accumulating and re-renders when `resolveWebviewView` fires again.
 import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
 import {
@@ -23,18 +26,25 @@ const SYSTEM_PROMPT =
 
 const PLACEHOLDER = "Ask the CRL agent anything about Clinical Reasoning Language.";
 
-/** Register the `crl.agent.chat` command (open/reveal the chat pane). Wired in extension.ts next to the other agent commands. */
+/** Register the `crl.agentChat` webview-view PROVIDER + the `crl.agent.chat` reveal command. Wired in extension.ts next to
+ *  the other agent commands. `retainContextWhenHidden` keeps the webview alive across hide/show (deltas still post to the
+ *  hidden view); a full close/reopen re-resolves + rehydrates from the host-authoritative state. */
 export function registerAgentChat(context: vscode.ExtensionContext): void {
   const chat = new AgentChat(context);
   context.subscriptions.push(
-    vscode.commands.registerCommand("crl.agent.chat", () => chat.open()),
+    vscode.window.registerWebviewViewProvider("crl.agentChat", chat, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
+    // Reveal/focus the view (VS Code auto-registers `<viewId>.focus` for a contributed view).
+    vscode.commands.registerCommand("crl.agent.chat", () => vscode.commands.executeCommand("crl.agentChat.focus")),
     { dispose: () => chat.dispose() },
   );
 }
 
-/** Owns the single chat panel + the host-authoritative conversation state. One panel, one in-flight stream at a time. */
-class AgentChat {
-  private panel: vscode.WebviewPanel | undefined;
+/** Owns the chat view + the host-authoritative conversation state. One view (the latest resolved ref), one in-flight stream
+ *  at a time. */
+class AgentChat implements vscode.WebviewViewProvider {
+  private view: vscode.WebviewView | undefined;
   /** The model context — only successful (or cancelled-with-partial) user/assistant PAIRS. Errors/unavailability never enter. */
   private messages: ModelMessage[] = [];
   /** The UI transcript — user/assistant turns PLUS inline error/status the model never sees. Rendered to the webview. */
@@ -42,6 +52,15 @@ class AgentChat {
   /** The in-flight assistant reply's accumulated text (rendered as the OPEN turn while `streaming`). */
   private partial = "";
   private streaming = false;
+  /** True while `resolveProvider` is in flight (before streaming) — drives a cancellable "connecting…" busy state so the
+   *  UI isn't idle (Send disabled + Stop shown) during a slow resolution / first Copilot consent (gpt55 [important]). */
+  private resolving = false;
+  /** Adaptive-thinking indicator state (Todo B.1). `thinking` = a thinking block is currently open (show the live ticker);
+   *  `thinkingSince` = its wall-clock start (drives the webview timer + the elapsed compute); `thoughtMs` = the finalized
+   *  duration, carried onto the assistant `ChatEntry` as "Thought for Ns". All reset per turn in `endStream`. */
+  private thinking = false;
+  private thinkingSince: number | undefined;
+  private thoughtMs: number | undefined;
   private cts: vscode.CancellationTokenSource | undefined;
   /** A Stop pressed DURING provider resolution (which takes no token) — checked immediately after `resolveProvider`. */
   private cancelledDuringResolve = false;
@@ -51,47 +70,49 @@ class AgentChat {
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
-  open(): void {
-    if (this.panel) {
-      this.panel.reveal(this.panel.viewColumn ?? vscode.ViewColumn.Active);
-      return;
-    }
-    const panel = vscode.window.createWebviewPanel(
-      "crl.agentChat",
-      "CRL Agent Chat",
-      { viewColumn: vscode.ViewColumn.Active, preserveFocus: false },
-      { enableScripts: true, retainContextWhenHidden: true },
-    );
-    panel.webview.html = shellHtml();
-    panel.webview.onDidReceiveMessage((m) => this.onMessage(m));
-    panel.onDidDispose(() => {
-      // A dispose mid-stream cancels the in-flight request (the finalize-on-cancel path unwinds it harmlessly).
-      this.cts?.cancel();
-      this.cts?.dispose();
-      this.cts = undefined;
-      this.streaming = false;
-      this.partial = "";
-      this.panel = undefined;
+  /** Resolve (or RE-resolve, on a close/reopen) the view: wire the webview, store the LATEST ref, and rehydrate the full
+   *  transcript (+ any in-flight partial/thinking) from host state. A view dispose does NOT tear down the stream. */
+  resolveWebviewView(view: vscode.WebviewView): void {
+    this.view = view;
+    view.webview.options = { enableScripts: true };
+    view.webview.html = shellHtml();
+    view.webview.onDidReceiveMessage((m) => this.onMessage(m));
+    view.onDidDispose(() => {
+      // A full close (retain=true means hide/show does NOT dispose) — just drop the ref so posts become no-ops. The host
+      // keeps accumulating `partial`/`messages`/thinking and re-renders when `resolveWebviewView` fires again. Do NOT cancel
+      // the in-flight stream here.
+      if (this.view === view) this.view = undefined;
     });
-    this.panel = panel;
     this.render(); // initial rehydrate (also re-sent on the webview's `chatReady`)
   }
 
   dispose(): void {
-    this.panel?.dispose();
+    // Extension teardown — here (unlike a view dispose) tearing the stream down is correct.
+    this.cts?.cancel();
+    this.cts?.dispose();
+    this.cts = undefined;
   }
 
   /** Post the whole transcript (+ the in-flight open turn when streaming) to the webview. `statusOverride` shows a one-off
    *  status line (e.g. the concurrency rejection) without mutating the transcript. */
   private render(statusOverride?: string): void {
-    if (!this.panel) return;
+    if (!this.view) return;
     const entries: ChatEntry[] = [...this.transcript];
-    if (this.streaming) entries.push({ kind: "assistant", text: this.partial, open: true });
+    if (this.streaming) entries.push({ kind: "assistant", text: this.partial, open: true, thoughtMs: this.thoughtMs });
     const html = renderChatThread(entries, { placeholder: PLACEHOLDER });
-    // "working…" covers the sonnet adaptive-thinking pause + vscode-lm latency: shown from send until the first text delta
-    // (the webview clears it on that delta; the host also clears it on finalize by re-rendering with streaming=false).
-    const status = statusOverride ?? (this.streaming && this.partial === "" ? "working…" : "");
-    void this.panel.webview.postMessage({ type: "render", html, streaming: this.streaming, status });
+    // "working…" covers the vscode-lm latency + the post-thinking pre-first-text pause: shown from send until the first text
+    // delta (the webview clears it on that delta; the host also clears it on finalize by re-rendering with streaming=false).
+    // While a thinking block is open the webview shows its own live "thinking… Ns" ticker instead (driven by `thinking`).
+    const status = statusOverride ?? (this.streaming && this.partial === "" && !this.thinking ? "working…" : "");
+    void this.view.webview.postMessage({
+      type: "render",
+      html,
+      // `busy` (streaming OR resolving) drives Send-disabled + Stop-shown, so Stop is available during resolution too.
+      busy: this.streaming || this.resolving,
+      status,
+      thinking: this.thinking,
+      thinkingSince: this.thinkingSince,
+    });
   }
 
   private onMessage(m: unknown): void {
@@ -132,15 +153,24 @@ class AgentChat {
     this.cancelledDuringResolve = false;
     const token = this.cts.token;
 
+    this.resolving = true;
+    this.render("connecting…"); // busy state — feedback + Stop available while resolveProvider (consent) is in flight
+
     let resolved: Awaited<ReturnType<typeof resolveProvider>>;
     try {
       resolved = await resolveProvider({ secrets: this.context.secrets });
     } catch (e) {
       this.endStream();
+      // Superseded by a Clear, or cancelled during resolve → don't push the error into a cleared/abandoned transcript.
+      if (myGen !== this.gen || token.isCancellationRequested) {
+        this.render();
+        return;
+      }
       this.transcript.push({ kind: "error", text: `provider error — ${messageOf(e)}` });
       this.render();
       return;
     }
+    this.resolving = false;
 
     // A Stop during resolution/consent (which takes no token) → drop silently; the user backed out before we started.
     if (this.cancelledDuringResolve || token.isCancellationRequested) {
@@ -170,9 +200,23 @@ class AgentChat {
       res = await provider.stream(
         { system: SYSTEM_PROMPT, messages: [...this.messages, userMsg], token },
         (d) => {
+          // A Clear (or reset) mid-stream bumps `gen` — a queued delta arriving after that must NOT mutate/render the
+          // cleared state (else e.g. a stale "thinking…" ticker gets restarted and the gen-guarded completion never clears it).
+          if (myGen !== this.gen) return;
           if (d.type === "text") {
             this.partial += d.text;
-            void this.panel?.webview.postMessage({ type: "delta", text: d.text });
+            void this.view?.webview.postMessage({ type: "delta", text: d.text });
+          } else if (d.type === "thinking_start") {
+            // Open the indicator: the webview shows a live "thinking… Ns" ticker (partial is still "" here, so a full
+            // re-render doesn't wipe any streamed text).
+            this.thinking = true;
+            this.thinkingSince = Date.now();
+            this.render();
+          } else if (d.type === "thinking_stop") {
+            // Freeze the duration + collapse to "Thought for Ns": a full re-render now carries `thoughtMs` on the open turn.
+            if (this.thinkingSince !== undefined) this.thoughtMs = Date.now() - this.thinkingSince;
+            this.thinking = false;
+            this.render();
           }
         },
       );
@@ -180,15 +224,19 @@ class AgentChat {
       // A genuine failure. Keep the partial the user already watched stream in (as a stopped turn) + surface the error
       // inline (reusing Todo A's Anthropic label). `messages` stays untouched (the pair was never committed).
       const partial = this.partial;
+      const thoughtMs = this.thoughtMs ?? (this.thinkingSince !== undefined ? Date.now() - this.thinkingSince : undefined);
       this.endStream();
       if (myGen !== this.gen) return; // a Clear superseded this turn — don't push into a cleared transcript
-      if (partial) this.transcript.push({ kind: "assistant", text: partial, stopped: true });
+      if (partial) this.transcript.push({ kind: "assistant", text: partial, stopped: true, thoughtMs });
       const label = provider.id === "anthropic" ? anthropicErrorLabel(e) : messageOf(e);
       this.transcript.push({ kind: "error", text: `${provider.id}: ${label}` });
       this.render();
       return;
     }
 
+    // Capture the thought duration before endStream resets it — incl. a cancel that landed WHILE thinking (thinking_stop
+    // never fired), so a stopped-mid-thought turn still shows "Thought for Ns".
+    const thoughtMs = this.thoughtMs ?? (this.thinkingSince !== undefined ? Date.now() - this.thinkingSince : undefined);
     this.endStream();
     if (myGen !== this.gen) return; // a Clear superseded this turn mid-stream — its result must not repopulate the cleared chat
     const finalText = res.text;
@@ -196,21 +244,28 @@ class AgentChat {
       // Stop → the stream RETURNS the partial (not an error). Finalize it as a stopped assistant turn (keep the partial
       // text). Commit the pair to model context only if it produced text — an empty cancelled turn commits nothing (so the
       // conversation stays alternating; no dangling user turn).
-      this.transcript.push({ kind: "assistant", text: finalText || "(stopped)", stopped: true });
+      this.transcript.push({ kind: "assistant", text: finalText || "(stopped)", stopped: true, thoughtMs });
       if (finalText) {
         this.messages.push(userMsg, { role: "assistant", content: finalText });
       }
     } else {
-      this.transcript.push({ kind: "assistant", text: finalText });
-      this.messages.push(userMsg, { role: "assistant", content: finalText });
+      // Commit ONLY a non-empty pair. An empty reply (e.g. max_tokens spent inside the thinking block → no text_delta) must
+      // NOT enter `messages` — Anthropic rejects an empty-content assistant turn, so it would 400 EVERY later send until Clear.
+      const shown = finalText || (res.stopReason === "max_tokens" ? "(no text — the model stopped at max_tokens)" : "(no response)");
+      this.transcript.push({ kind: "assistant", text: shown, thoughtMs });
+      if (finalText) this.messages.push(userMsg, { role: "assistant", content: finalText });
     }
     this.render();
   }
 
-  /** Tear down the in-flight stream state (CTS + flags + partial) — shared by every terminal path. */
+  /** Tear down the in-flight stream state (CTS + flags + partial + the thinking timer) — shared by every terminal path. */
   private endStream(): void {
     this.streaming = false;
+    this.resolving = false;
     this.partial = "";
+    this.thinking = false;
+    this.thinkingSince = undefined;
+    this.thoughtMs = undefined;
     this.cts?.dispose();
     this.cts = undefined;
   }

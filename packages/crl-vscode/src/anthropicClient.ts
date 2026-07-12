@@ -185,15 +185,20 @@ export function parseSseFrames(text: string): { events: SseEvent[]; rest: string
  *  streams a failure) throws `AnthropicError(200,…)`; `message_stop` ends it. A `!res.ok` throws (via the shared
  *  `postAnthropicMessages`) BEFORE the body is read. CANCEL = FINALIZE, not error: if the token-bridged signal aborts
  *  during the read, STOP and RETURN the accumulated result with `stopReason:"cancelled"` (a genuine reader error still
- *  throws). */
+ *  throws). `onThinking` (optional) brackets an adaptive-thinking block: `"start"` on a `content_block_start` of
+ *  `type:"thinking"`, `"stop"` on the arrival of the first text (a `content_block_start` of `type:"text"` OR the first
+ *  `text_delta`), and — if thinking is still open — on `message_stop`. The thinking TEXT stays skipped (`display:"omitted"`
+ *  sends none); only the STATE is surfaced so the caller can time it. */
 export async function streamAnthropic(
   args: CallAnthropicArgs & { stream: true },
   onText: (t: string) => void,
+  onThinking?: (state: "start" | "stop") => void,
 ): Promise<CallAnthropicResult> {
   let text = "";
   let stopReason: string | undefined;
   let inputTokens: number | undefined;
   let outputTokens: number | undefined;
+  let thinking = false; // an adaptive-thinking block is open (start emitted, stop not yet)
   const result = (): CallAnthropicResult => ({ text, stopReason, usage: { inputTokens, outputTokens } });
 
   // A cancel DURING the POST (before the body) also rejects — `postAnthropicMessages` maps it to `AnthropicError(-1)`.
@@ -221,6 +226,7 @@ export async function streamAnthropic(
     let data: {
       type?: unknown;
       delta?: { type?: unknown; text?: unknown; stop_reason?: unknown };
+      content_block?: { type?: unknown };
       message?: { usage?: { input_tokens?: unknown } };
       usage?: { output_tokens?: unknown };
       error?: { type?: unknown; message?: unknown };
@@ -230,13 +236,33 @@ export async function streamAnthropic(
     } catch {
       throw new AnthropicError(200, "malformed Anthropic stream event");
     }
+    // Close an open thinking block the moment text arrives (belt-and-suspenders: the `content_block_start(text)` normally
+    // fires first, but a `text_delta` with no preceding text-block-start still collapses the indicator).
+    const endThinking = (): void => {
+      if (thinking) {
+        thinking = false;
+        onThinking?.("stop");
+      }
+    };
     const t = data.type;
     if (t === "content_block_delta") {
       if (data.delta?.type === "text_delta" && typeof data.delta.text === "string") {
+        endThinking();
         onText(data.delta.text);
         text += data.delta.text;
       }
       // thinking_delta / signature_delta / any other block delta → skip (no visible text), never throw.
+    } else if (t === "content_block_start") {
+      // A `thinking` block opens the indicator; a `text` block closes any open one (the reply is about to stream).
+      const bt = data.content_block?.type;
+      if (bt === "thinking") {
+        if (!thinking) {
+          thinking = true;
+          onThinking?.("start");
+        }
+      } else if (bt === "text") {
+        endThinking();
+      }
     } else if (t === "message_start") {
       const it = data.message?.usage?.input_tokens;
       if (typeof it === "number") inputTokens = it;
@@ -249,9 +275,10 @@ export async function streamAnthropic(
       const et = typeof data.error?.type === "string" ? data.error.type : undefined;
       throw new AnthropicError(200, msg, et);
     } else if (t === "message_stop") {
+      endThinking(); // a thinking-only reply (no text) still closes the indicator before we finalize
       return true;
     }
-    // `ping` + `content_block_start`/`content_block_stop` + anything else → ignored.
+    // `ping` + `content_block_stop` + anything else → ignored.
     return false;
   };
 
