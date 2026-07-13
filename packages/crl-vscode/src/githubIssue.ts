@@ -66,6 +66,90 @@ export async function createGithubIssue(args: CreateGithubIssueArgs): Promise<nu
   return body.number;
 }
 
+// #210 Todo D slice 2 — the PRIVATE issue-READ helper (GET). Backs the cockpit's purpose-bound `read_review_context` (which
+// fetches a policy's flag-linked issues); it is NEVER handed to the agent (mediation: the agent only calls the bounded
+// cockpit tool, whose owner/repo are cockpit-resolved). Returns a RESULT (never throws for an HTTP/network/abort failure) so
+// the caller can degrade per-issue ("couldn't read #5"). Takes an `AbortSignal` so a hung GET can't strand the agent turn.
+
+/** A GitHub issue as the review synthesis needs it. `isPullRequest` = the number was a PR (GitHub returns PRs from the
+ *  issues endpoint); `body` is normalized to "" (a real issue body can be null). */
+export interface GithubIssue {
+  number: number;
+  title: string;
+  body: string;
+  state: string;
+  htmlUrl: string;
+  isPullRequest: boolean;
+}
+export interface GetGithubIssueArgs {
+  owner: string;
+  repo: string;
+  number: number;
+  token: string;
+  /** Abort the GET (a turn cancel or a timeout) so it can't strand the caller. */
+  signal?: AbortSignal;
+  fetchImpl?: typeof fetch;
+}
+/** GET succeeded (`issue`) or failed with a short `reason` + the HTTP `status` (0 = network/abort). Never throws. */
+export type GetGithubIssueResult = { ok: true; issue: GithubIssue } | { ok: false; status: number; reason: string };
+
+/** GET `…/repos/{o}/{r}/issues/{n}`. Result-returning (no throw): a non-2xx / network error / abort becomes `{ok:false}`
+ *  with a classified reason. `body` is normalized to "" (issue bodies can be null); a PR number is flagged, not rejected. */
+export async function getGithubIssue(args: GetGithubIssueArgs): Promise<GetGithubIssueResult> {
+  const f = args.fetchImpl ?? fetch;
+  const url = `https://api.github.com/repos/${encodeURIComponent(args.owner)}/${encodeURIComponent(args.repo)}/issues/${encodeURIComponent(String(args.number))}`;
+  let res: Awaited<ReturnType<typeof fetch>>;
+  try {
+    res = await f(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${args.token}`,
+        Accept: "application/vnd.github+json",
+        "User-Agent": "crl-vscode",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      signal: args.signal,
+    });
+  } catch (e) {
+    // An AbortError (timeout / turn cancel) or a transport failure — status 0, degrade.
+    const aborted = e instanceof Error && e.name === "AbortError";
+    return { ok: false, status: 0, reason: aborted ? "timed out" : "couldn't reach GitHub" };
+  }
+  if (!res.ok) {
+    return { ok: false, status: res.status, reason: issueReadErrorLabel(res.status) };
+  }
+  let j: { number?: unknown; title?: unknown; body?: unknown; state?: unknown; html_url?: unknown; pull_request?: unknown };
+  try {
+    j = (await res.json()) as typeof j;
+  } catch {
+    return { ok: false, status: res.status, reason: "GitHub response was not JSON" };
+  }
+  // A 2xx with a non-object body (null / array / string — proxy or API drift) must NOT throw on the property reads below —
+  // this helper's contract is "never throws" so the caller's Promise.all can't reject (gpt55 impl review).
+  if (j === null || typeof j !== "object" || Array.isArray(j)) return { ok: false, status: res.status, reason: "GitHub response had an unexpected shape" };
+  return {
+    ok: true,
+    issue: {
+      number: typeof j.number === "number" ? j.number : args.number,
+      title: typeof j.title === "string" ? j.title : "",
+      body: typeof j.body === "string" ? j.body : "", // a real issue body can be null → ""
+      state: typeof j.state === "string" ? j.state : "open",
+      htmlUrl: typeof j.html_url === "string" ? j.html_url : "",
+      isPullRequest: j.pull_request != null, // GitHub returns PRs from the issues endpoint
+    },
+  };
+}
+
+/** A short human label for an issue-READ HTTP status (mirrors `issueCreateErrorLabel`, with 404 = not found, distinct from
+ *  the network/abort "couldn't reach GitHub" that `getGithubIssue` returns for status 0). */
+export function issueReadErrorLabel(status: number): string {
+  if (status === 401 || status === 403) return "not authorized";
+  if (status === 404) return "issue not found";
+  if (status === 410) return "issues disabled";
+  if (status === 429) return "rate limited";
+  return `GitHub ${status}`;
+}
+
 /** A short, human label for an issue-create failure — for the cockpit's "flag saved without a link (…)" note. */
 export function issueCreateErrorLabel(e: unknown): string {
   if (e instanceof IssueCreateError) {

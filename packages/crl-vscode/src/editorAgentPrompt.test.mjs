@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./test-harness.mjs";
 
-const { appStateBlock, buildSystemPrompt, openFlagDrawerTool, submitFlagTool, setVerdictTool, OPEN_FLAG_DRAWER, SUBMIT_FLAG, SET_VERDICT, VERDICT_VALUES, DEFAULT_VALIDATION_KINDS } = await load("editorAgentPrompt.ts");
+const { appStateBlock, buildSystemPrompt, openFlagDrawerTool, submitFlagTool, setVerdictTool, readReviewContextTool, OPEN_FLAG_DRAWER, SUBMIT_FLAG, SET_VERDICT, READ_REVIEW_CONTEXT, VERDICT_VALUES, DEFAULT_VALIDATION_KINDS } = await load("editorAgentPrompt.ts");
 
 test("appStateBlock: no cockpit → asks the validator to open one", () => {
   assert.match(appStateBlock(undefined), /No Medical Validation cockpit/);
@@ -78,6 +78,23 @@ test("setVerdictTool: requires case_id + verdict; enumerates the four verdict va
   assert.deepEqual(t.inputSchema.required, ["case_id", "verdict"]);
   assert.deepEqual(t.inputSchema.properties.verdict.enum, VERDICT_VALUES);
   assert.deepEqual(VERDICT_VALUES, ["pass", "fail", "pending", "unreviewed"]);
+});
+
+// #210 Todo D slice 2 — read_review_context (the where-do-we-stand read tool).
+test("readReviewContextTool: no args (bound to the open cockpit) + advertised READ-ONLY / untrusted-issue-text", () => {
+  const t = readReviewContextTool();
+  assert.equal(t.name, READ_REVIEW_CONTEXT);
+  assert.deepEqual(t.inputSchema, { type: "object", properties: {} });
+  assert.match(t.description, /READ-ONLY/);
+  assert.match(t.description, /untrusted/i);
+});
+
+test("buildSystemPrompt: teaches where-do-we-stand — call read_review_context ONCE, issues are UNTRUSTED, path-to-passing from real status, READ-ONLY", () => {
+  const p = buildSystemPrompt(undefined);
+  assert.match(p, new RegExp(READ_REVIEW_CONTEXT));
+  assert.match(p, /UNTRUSTED third-party input/);
+  assert.match(p, /never invent its contents|do NOT invent/i);
+  assert.match(p, /READ-ONLY/);
 });
 
 test("submitFlagTool: the default flag action — requires target_id + summary; enumerates the kinds", () => {

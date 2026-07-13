@@ -1023,4 +1023,33 @@ check("Todo D C2: bridgeSetVerdict re-resolves the opaque caseToken → the LIVE
   assert.match(COCKPIT_SRC, /if \(!applyVerdict\(caseId, args\.verdict\)\) return \{ ok: false/); // reuses the guarded persist path; save-fail classified
 });
 
+// ── #210 Todo D slice 2 (disc 242): bridgeReadReviewContext — the read-only review-context assembly (source-grep locks) ──
+check("slice2: read context captures currentCel ONCE + an interrupted() guard (cancel OR retarget) after each async await", () => {
+  assert.match(COCKPIT_SRC, /const cel = currentCel; \/\/ capture ONCE/);
+  assert.match(COCKPIT_SRC, /const interrupted = \(\): boolean => token\.isCancellationRequested \|\| currentCel !== cel \|\| mode !== "medical-validation"/);
+  assert.match(COCKPIT_SRC, /if \(interrupted\(\)\) return \{ ok: false, reason: "the read was interrupted/);
+});
+check("slice2: issue fetch is HARD-gated on isTrusted + SILENT auth (no mid-turn modal) + deduped + CAPPED refs", () => {
+  assert.match(COCKPIT_SRC, /if \(!vscode\.workspace\.isTrusted\) issuesNote = "workspace not trusted/); // hard trust gate before any authed GET
+  assert.match(COCKPIT_SRC, /const tok = await githubTokenSilent\(\)/); // silent-only auth for reads
+  assert.match(COCKPIT_SRC, /const allRefs = \[\.\.\.new Set\(flags\.map\(\(f\) => f\.issue\)\.filter/); // dedup the flag-linked refs
+  assert.match(COCKPIT_SRC, /const refs = allRefs\.slice\(0, REVIEW_CTX\.MAX_ISSUES\)/); // cap the count (payload + GET-burst bound)
+});
+check("slice2: getGithubIssue is aborted by the turn token OR an 8s timeout (a hung GET can't strand the agent)", () => {
+  assert.match(COCKPIT_SRC, /const ac = new AbortController\(\)/);
+  assert.match(COCKPIT_SRC, /setTimeout\(\(\) => ac\.abort\(\), REVIEW_CTX\.ISSUE_TIMEOUT_MS\)/);
+  assert.match(COCKPIT_SRC, /token\.onCancellationRequested\(\(\) => ac\.abort\(\)\)/);
+  assert.match(COCKPIT_SRC, /getGithubIssue\(\{ owner: repo\.owner, repo: repo\.repo, number: n, token: tok, signal: ac\.signal \}\)/);
+});
+check("slice2: text is CAPPED at assembly (the context is committed + re-sent every turn) + issue body capped", () => {
+  assert.match(COCKPIT_SRC, /SOURCE_CAP: 40_000, CRL_CAP: 60_000, ISSUE_BODY_CAP: 8_000/);
+  assert.match(COCKPIT_SRC, /body: capText\(r\.issue\.body, REVIEW_CTX\.ISSUE_BODY_CAP\)\.text/);
+});
+check("slice2: githubTokenSilent never prompts + never latches githubAuthDeclined (an agent read can't suppress the human sign-in)", () => {
+  const m = COCKPIT_SRC.match(/async function githubTokenSilent\(\)[\s\S]*?\n  \}/);
+  assert.ok(m, "githubTokenSilent exists");
+  assert.match(m[0], /getSession\("github", \["repo"\], \{ silent: true \}\)/);
+  assert.ok(!/createIfNone|githubAuthDeclined/.test(m[0]), "no modal prompt + no shared decline latch in the read token path");
+});
+
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);

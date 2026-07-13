@@ -64,7 +64,7 @@ import {
 import { resolveThisNode } from "./thisNodeMarker";
 import { failedCriterionLabel } from "./failedCriterionLabel";
 import { buildIssueUrl, githubIssuesBaseFromRemote, githubRepoFromRemote, issueRefOf, sanitizeIssueBase } from "./issueLink";
-import { createGithubIssue, IssueCreateError, issueCreateErrorLabel } from "./githubIssue";
+import { createGithubIssue, getGithubIssue, IssueCreateError, issueCreateErrorLabel } from "./githubIssue";
 import { renderFlagDrawer } from "./flagDrawerHtml";
 import { isOccurrenceKey, occurrenceByNodeKey, occurrenceKeyValue, parseOccurrenceKey, resolveOccurrence, type OccurrenceRef } from "./occurrenceKey";
 import {
@@ -130,6 +130,10 @@ import {
   type FlagDrawerResult,
   type FlagTargetView,
   type OpenFlagDrawerArgs,
+  type ReviewContextCase,
+  type ReviewContextFlag,
+  type ReviewContextIssue,
+  type ReviewContextResult,
   type SelectedCaseView,
   type SetVerdictArgs,
   type SetVerdictResult,
@@ -1012,6 +1016,19 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       return created?.accessToken;
     } catch {
       if (!forceNew) githubAuthDeclined = true; // a normal decline latches; a forced re-auth decline shouldn't (they're mid-fix)
+      return undefined;
+    }
+  }
+
+  /** #210 Todo D slice 2 — a SILENT-ONLY GitHub token for READ tools (`read_review_context`). Unlike `githubToken`, it NEVER
+   *  prompts (no `createIfNone` modal fired mid-turn while the agent is "thinking" — Claude/gpt55 review) and NEVER latches
+   *  `githubAuthDeclined` (an agent read must not suppress the next HUMAN flag-create's sign-in). No session → undefined →
+   *  the read degrades to "not signed in" and the synthesis proceeds without issue bodies. */
+  async function githubTokenSilent(): Promise<string | undefined> {
+    try {
+      const s = await vscode.authentication.getSession("github", ["repo"], { silent: true });
+      return s?.accessToken;
+    } catch {
       return undefined;
     }
   }
@@ -3373,12 +3390,151 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     cockpitAgentBridge.notifyChanged();
     return { ok: true, message: `${labelInPrimary(caseId, "cel").label} → ${REVIEW_LABEL[args.verdict]}` };
   };
+  // #210 Todo D slice 2 — assemble the READ-ONLY review context for the "where do we stand" synthesis. Purpose-bound (no
+  // args). Captures `currentCel` ONCE; text is CAPPED at assembly (it's committed + re-sent every turn); the flag-linked
+  // issues are fetched best-effort under a HARD `isTrusted` gate + SILENT auth + an abortable GET (the turn token / a timeout
+  // can't strand the agent). A retarget across the single async window degrades to "policy changed".
+  const REVIEW_CTX = { SOURCE_CAP: 40_000, CRL_CAP: 60_000, ISSUE_BODY_CAP: 8_000, ISSUE_TIMEOUT_MS: 8_000, MAX_ISSUES: 20 };
+  const TRUNC_MARK = "\n…(truncated)";
+  // Cap is a HARD budget: slice to leave room for the marker so the result never EXCEEDS `cap` (the whole context is committed
+  // + re-sent every turn — gpt55 nit). `cap` ≥ the marker length for the review caps.
+  const capText = (s: string, cap: number): { text: string; truncated: boolean } =>
+    s.length <= cap ? { text: s, truncated: false } : { text: s.slice(0, Math.max(0, cap - TRUNC_MARK.length)) + TRUNC_MARK, truncated: true };
+  const bridgeReadReviewContext = async (token: CancelToken): Promise<ReviewContextResult> => {
+    if (mode !== "medical-validation" || !currentCel) return { ok: false, reason: "no Medical Validation cockpit is open" };
+    if (!correspondence) return { ok: false, reason: "the policy model isn't loaded yet — try again in a moment" };
+    const cel = currentCel; // capture ONCE — the whole assembly (incl. the async fetch) is validated against this
+    const src = findPolicySrc(cel);
+    // Source (in memory) + CRL (concat of <src>/crl/*.crl via crlText), both CAPPED. Collect per-file read errors.
+    const source = capText(correspondence.anchor.text ?? "", REVIEW_CTX.SOURCE_CAP);
+    const crlErrors: string[] = [];
+    let crlRaw = "";
+    if (src) {
+      let files: string[] = [];
+      try {
+        files = readdirSync(join(src, "crl")).filter((f) => f.toLowerCase().endsWith(".crl")).sort();
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException)?.code !== "ENOENT") crlErrors.push("the crl/ directory is unreadable");
+      }
+      for (const name of files) {
+        const t = crlText(join(src, "crl", name));
+        if (t === undefined) {
+          crlErrors.push(`${name}: unreadable`);
+          continue;
+        }
+        // Report a PARSE failure too (the type promises read+parse errors) — but STILL include the text so the synthesis can
+        // reason over what's there; an unparseable `.crl` is a caveat, not an omission.
+        const parsed = buildCRL(t);
+        if (!parsed.success || !parsed.result) crlErrors.push(`${name}: unparseable`);
+        crlRaw += `\n=== ${name} ===\n${t}\n`;
+      }
+    } else {
+      // No policy `src/` located → empty CRL. Say so, so the synthesis distinguishes "the logic is empty" from "couldn't find
+      // the source dir" (Claude impl review — the crlErrors "don't invent a path around an unknown source" guard needs a signal).
+      crlErrors.push("couldn't locate the policy source directory");
+    }
+    const crl = capText(crlRaw.trim(), REVIEW_CTX.CRL_CAP);
+    // Review status — the pure helpers (the exact composition the tree chrome uses) + per-case detail. Snapshot `flagLoadError`
+    // ONCE (used for BOTH the mvComplete gate and the exposed field, so a same-policy reload mid-fetch can't tear them — Claude nit).
+    const flagLoadErrorSnapshot = flagLoadError;
+    const resolvedCount = flagsList.filter((f) => f.status === "resolved").length;
+    const progress = reviewProgress(reviewByCaseId, [...scenarioByCaseId.keys()], scenarios?.scenarios.length ?? 0);
+    const fc = { open: flagsList.length - resolvedCount, resolved: resolvedCount, error: flagLoadErrorSnapshot };
+    const cases: ReviewContextCase[] = [...scenarioByCaseId].map(([caseId, sv]) => ({
+      label: labelInPrimary(caseId, "cel").label,
+      runStatus: sv.status ?? "",
+      verdict: REVIEW_LABEL[reviewByCaseId[caseId] ?? "unreviewed"],
+    }));
+    const refNum = (f: (typeof flagsList)[number]): number | null => {
+      const r = issueRefOf(f.fields.get("ref")); // the digit STRING (or undefined for a non-numeric ref)
+      const n = r !== undefined ? Number(r) : NaN;
+      return Number.isInteger(n) && n > 0 ? n : null; // a positive issue number only (never `#0` → a pointless /issues/0 GET)
+    };
+    const flags: ReviewContextFlag[] = flagsList.map((f) => ({
+      status: f.status,
+      scope: f.scope,
+      target: f.targetName,
+      concern: f.body,
+      issue: refNum(f),
+    }));
+    const unresolvedRefs = flagsList.filter((f) => f.fields.get("ref") && issueRefOf(f.fields.get("ref")) === undefined).length;
+    // The deduped flag-linked issue numbers, CAPPED (several flags often share one tracking issue — a dup is a wasted read; and
+    // an unbounded set would commit a huge payload + fire a large concurrent GET burst — both reviewers).
+    const allRefs = [...new Set(flags.map((f) => f.issue).filter((n): n is number => n !== null))];
+    const refs = allRefs.slice(0, REVIEW_CTX.MAX_ISSUES);
+    const issuesOmitted = allRefs.length - refs.length;
+    // Fetch them best-effort — HARD trust gate (a repo-controlled origin + an authed GET needs trust, like the create path),
+    // SILENT auth (no mid-turn modal), abortable (turn token OR an 8s timeout).
+    let issues: ReviewContextIssue[] = [];
+    let issuesNote: string | undefined;
+    // Interrupted = the turn was cancelled OR the policy retargeted mid-read; checked after EACH await so an already-cancelled
+    // / between-await cancel bails fast (the awaits themselves are normally fast — silent getSession + in-memory getRepository;
+    // a genuine hang is the create path's shared residual). GET hangs are bounded by the AbortController below.
+    const interrupted = (): boolean => token.isCancellationRequested || currentCel !== cel || mode !== "medical-validation";
+    if (refs.length) {
+      if (!vscode.workspace.isTrusted) issuesNote = "workspace not trusted — issues not read";
+      else {
+        const repo = src ? await githubRepoForFile(vscode.Uri.file(join(src, "crl"))) : undefined;
+        if (interrupted()) return { ok: false, reason: "the read was interrupted (policy changed or cancelled) — ask again" };
+        if (!repo) issuesNote = "no GitHub origin — issues not read";
+        else {
+          const tok = await githubTokenSilent();
+          if (interrupted()) return { ok: false, reason: "the read was interrupted (policy changed or cancelled) — ask again" };
+          if (!tok) issuesNote = "not signed in to GitHub — sign in to include issue details";
+          else {
+            const ac = new AbortController();
+            const timer = setTimeout(() => ac.abort(), REVIEW_CTX.ISSUE_TIMEOUT_MS);
+            const sub = token.onCancellationRequested(() => ac.abort());
+            if (token.isCancellationRequested) ac.abort(); // already-cancelled: the structural token fires its listener async, so abort now
+            try {
+              issues = await Promise.all(
+                refs.map(async (n): Promise<ReviewContextIssue> => {
+                  const r = await getGithubIssue({ owner: repo.owner, repo: repo.repo, number: n, token: tok, signal: ac.signal });
+                  return r.ok
+                    ? { number: n, ok: true, title: r.issue.title, body: capText(r.issue.body, REVIEW_CTX.ISSUE_BODY_CAP).text, state: r.issue.state, isPullRequest: r.issue.isPullRequest }
+                    : { number: n, ok: false, reason: r.reason };
+                }),
+              );
+            } finally {
+              clearTimeout(timer);
+              sub.dispose();
+            }
+            if (interrupted()) return { ok: false, reason: "the read was interrupted (policy changed or cancelled) — ask again" };
+          }
+        }
+      }
+    }
+    // Note the capped-out issues (only meaningful when we actually fetched — a degrade note already explains a no-read).
+    if (issuesOmitted > 0) issuesNote = `${issuesNote ? issuesNote + "; " : ""}${issuesOmitted} more linked issue(s) not read (cap ${REVIEW_CTX.MAX_ISSUES})`;
+    return {
+      ok: true,
+      context: {
+        policy: policyLabel() ?? cel,
+        sourceText: source.text,
+        sourceTruncated: source.truncated,
+        crlText: crl.text,
+        crlTruncated: crl.truncated,
+        crlErrors,
+        status: {
+          progress: { total: progress.total, passed: progress.passed, failed: progress.failed, pending: progress.pending, unreviewable: progress.unreviewable, stale: progress.stale },
+          mvComplete: mvComplete(progress, fc),
+          cases,
+          flags,
+          flagLoadError: flagLoadErrorSnapshot,
+          unresolvedRefs,
+        },
+        issues,
+        issuesNote,
+      },
+    };
+  };
   context.subscriptions.push(
     cockpitAgentBridge.register({
       getAppState,
       beginFlagDrawer: bridgeBeginFlagDrawer,
       submitFlag: bridgeSubmitFlag,
       setVerdict: bridgeSetVerdict,
+      readReviewContext: bridgeReadReviewContext,
       getValidationKinds: validationKinds,
     }),
   );

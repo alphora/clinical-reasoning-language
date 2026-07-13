@@ -76,6 +76,9 @@ test("bridge.beginFlagDrawer/submitFlag/setVerdict: no cockpit registered → an
   const v = cockpitAgentBridge.setVerdict({ caseToken: "c1", verdict: "pass" });
   assert.equal(v.ok, false);
   assert.match(v.reason, /not open/);
+  const rc = await cockpitAgentBridge.readReviewContext(fakeToken);
+  assert.equal(rc.ok, false);
+  assert.match(rc.reason, /not open/);
 });
 
 test("bridge: register delegates getAppState/getValidationKinds/beginFlagDrawer/submitFlag; dispose clears them", async () => {
@@ -86,6 +89,7 @@ test("bridge: register delegates getAppState/getValidationKinds/beginFlagDrawer/
     beginFlagDrawer: (a) => ({ wait: Promise.resolve({ status: "cancelled", reason: "cancelled" }), purpose: `flag ${a.targetId}` }),
     submitFlag: async (a) => ({ ok: true, message: `filed on ${a.targetId}` }),
     setVerdict: (a) => ({ ok: true, message: `${a.caseToken} → ${a.verdict}` }),
+    readReviewContext: async () => ({ ok: true, context: { policy: "p" } }),
     getValidationKinds: () => ["underspecified"],
   });
   assert.ok(fired >= 1, "register fires the change event (the chip refreshes)");
@@ -94,6 +98,7 @@ test("bridge: register delegates getAppState/getValidationKinds/beginFlagDrawer/
   assert.equal(cockpitAgentBridge.beginFlagDrawer({ targetId: "x" }, fakeToken).purpose, "flag x");
   assert.deepEqual(await cockpitAgentBridge.submitFlag({ targetId: "z" }), { ok: true, message: "filed on z" });
   assert.deepEqual(cockpitAgentBridge.setVerdict({ caseToken: "c9", verdict: "fail" }), { ok: true, message: "c9 → fail" });
+  assert.deepEqual(await cockpitAgentBridge.readReviewContext(fakeToken), { ok: true, context: { policy: "p" } });
   disp.dispose();
   assert.equal(cockpitAgentBridge.getAppState(), undefined, "dispose clears the hooks");
   assert.deepEqual(cockpitAgentBridge.getValidationKinds(), []);

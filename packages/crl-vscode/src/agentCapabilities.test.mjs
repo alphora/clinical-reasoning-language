@@ -16,24 +16,40 @@ test("availableCapabilities: no cockpit (undefined) → nothing available", () =
 
 test("availableCapabilities: a flag target present → the Flag capability, activation = prompt (opens the drawer)", () => {
   const caps = availableCapabilities(stateWith({ flagTargets: oneFlagTarget }));
-  assert.deepEqual(caps.map((c) => c.id), ["flag"]);
-  assert.deepEqual(caps[0].activation, { kind: "prompt", text: "Flag this node." });
+  const flag = caps.find((c) => c.id === "flag");
+  assert.ok(flag, "the flag badge shows with a flag target");
+  assert.deepEqual(flag.activation, { kind: "prompt", text: "Flag this node." });
 });
 
 test("availableCapabilities: a selected case → the Verdict capability, activation = fillInput with the case label (no forced clarify round-trip)", () => {
   const caps = availableCapabilities(stateWith({ selectedCase: aCase }));
-  assert.deepEqual(caps.map((c) => c.id), ["verdict"]);
-  assert.equal(caps[0].activation.kind, "fillInput");
-  assert.match(caps[0].activation.text, /Set the verdict for Patient A to $/);
+  const verdict = caps.find((c) => c.id === "verdict");
+  assert.ok(verdict, "the verdict badge shows with a selected case");
+  assert.equal(verdict.activation.kind, "fillInput");
+  assert.match(verdict.activation.text, /Set the verdict for Patient A to $/);
 });
 
-test("availableCapabilities: both a flag target AND a selected case → both badges", () => {
+test("availableCapabilities: both a flag target AND a selected case → both badges (plus where-we-stand, policy open)", () => {
   const caps = availableCapabilities(stateWith({ flagTargets: oneFlagTarget, selectedCase: aCase }));
-  assert.deepEqual(caps.map((c) => c.id).sort(), ["flag", "verdict"]);
+  assert.deepEqual(caps.map((c) => c.id).sort(), ["flag", "verdict", "where-we-stand"]);
 });
 
-test("availableCapabilities: MV open but no anchor and no case → empty (context-filtered, not a static list)", () => {
-  assert.deepEqual(availableCapabilities(stateWith({})), []);
+test("availableCapabilities: a policy is open → the 'Where do we stand' capability (prompt-kind), always available with a policy", () => {
+  const caps = availableCapabilities(stateWith({ policy: "bariatric" }));
+  const stand = caps.find((c) => c.id === "where-we-stand");
+  assert.ok(stand, "the where-we-stand badge shows when a policy is open");
+  assert.deepEqual(stand.activation, { kind: "prompt", text: "Where do we stand on this policy?" });
+});
+
+test("availableCapabilities: no cockpit / no policy → no 'Where do we stand' badge", () => {
+  assert.deepEqual(availableCapabilities(undefined), []);
+  const caps = availableCapabilities(stateWith({ policy: undefined }));
+  assert.ok(!caps.some((c) => c.id === "where-we-stand"), "no policy → no where-we-stand");
+});
+
+test("availableCapabilities: MV open with a policy but no anchor and no case → ONLY where-we-stand (context-filtered)", () => {
+  const caps = availableCapabilities(stateWith({ policy: "p" }));
+  assert.deepEqual(caps.map((c) => c.id), ["where-we-stand"]);
 });
 
 test("registry: every descriptor exposes id/label/isAvailable/activation (the peer contract shape)", () => {

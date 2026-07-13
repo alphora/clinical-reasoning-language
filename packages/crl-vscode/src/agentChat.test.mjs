@@ -37,12 +37,33 @@ test("one-action guard: it is action-GENERIC (verdict XOR flag) — the same `al
   assert.ok(!/a flag was already filed\/opened this turn/.test(SRC), "the old flag-specific refusal copy is gone");
 });
 
-test("tools: set_verdict is listed FIRST (the primary review action), then open before submit (no nudge to the durable submit)", () => {
-  assert.match(SRC, /const tools = \[setVerdictTool\(\), openFlagDrawerTool\(kinds\), submitFlagTool\(kinds\)\]/);
+test("tools: read (non-durable) then set_verdict before the flag pair (open before submit — no nudge to the durable submit)", () => {
+  assert.match(SRC, /const tools = \[readReviewContextTool\(\), setVerdictTool\(\), openFlagDrawerTool\(kinds\), submitFlagTool\(kinds\)\]/);
 });
 
 test("render: the capability badges are computed from the LIVE app-state and posted each render", () => {
   assert.match(SRC, /capabilities: availableCapabilities\(cockpitAgentBridge\.getAppState\(\)\)/);
+});
+
+// #210 Todo D slice 2 — read_review_context (the where-do-we-stand READ tool) host wiring.
+test("registry: read_review_context is routed FIRST of all (before set_verdict + the flag guards) — it's a repeatable read", () => {
+  const readAt = SRC.indexOf("if (name === READ_REVIEW_CONTEXT)");
+  const verdictAt = SRC.indexOf("if (name === SET_VERDICT)");
+  assert.ok(readAt > 0 && verdictAt > 0, "both branches present");
+  assert.ok(readAt < verdictAt, "the read branch precedes the set_verdict branch");
+});
+
+test("read_review_context does NOT arm `acted` (reads are repeatable) and does NOT recoverable-wrap a success (no flag app-state noise)", () => {
+  const branch = SRC.slice(SRC.indexOf("if (name === READ_REVIEW_CONTEXT)"), SRC.indexOf("if (name === SET_VERDICT)"));
+  assert.ok(!/acted = true/.test(branch), "a read never arms the one-action guard");
+  assert.match(branch, /if \(!res\.ok\) return \{ content: res\.reason, isError: true \}/, "a failed read → plain isError (not recoverable's flag app-state block)");
+  assert.match(branch, /reviewCache = JSON\.stringify\(res\.context\)/, "a successful read → plain JSON content (cached per turn)");
+  assert.match(branch, /if \(reviewCache !== undefined\) return \{ content: reviewCache \}/, "a re-read this turn returns the cache (no re-fetch, no extra round)");
+});
+
+test("tools: read_review_context is registered in the per-turn tools; delta shows a read status (not a flag status)", () => {
+  assert.match(SRC, /const tools = \[readReviewContextTool\(\), setVerdictTool\(\)/);
+  assert.match(SRC, /READ_REVIEW_CONTEXT\s*\?\s*"📖 reading the review context…"/);
 });
 
 console.log("agentChat.test: ok");

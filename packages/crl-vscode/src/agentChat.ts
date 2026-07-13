@@ -19,7 +19,7 @@ import {
 import { runAgentTurn, type ToolRegistry } from "./agentToolLoop";
 import { cockpitAgentBridge } from "./cockpitAgentBridge";
 import { availableCapabilities } from "./agentCapabilities";
-import { appStateBlock, buildSystemPrompt, OPEN_FLAG_DRAWER, openFlagDrawerTool, SET_VERDICT, setVerdictTool, SUBMIT_FLAG, submitFlagTool } from "./editorAgentPrompt";
+import { appStateBlock, buildSystemPrompt, OPEN_FLAG_DRAWER, openFlagDrawerTool, READ_REVIEW_CONTEXT, readReviewContextTool, SET_VERDICT, setVerdictTool, SUBMIT_FLAG, submitFlagTool } from "./editorAgentPrompt";
 import type { ActiveElicitation } from "./agentDrivableUi";
 import { anthropicErrorLabel } from "./anthropicClient";
 import { CHAT_BODY, CHAT_STYLE, CHAT_WEBVIEW_SCRIPT, renderChatThread, type ChatEntry } from "./chatPaneHtml";
@@ -282,8 +282,11 @@ class AgentChat implements vscode.WebviewViewProvider {
     // Order matters (some models weight earlier tools — gpt55): set_verdict FIRST (the primary review action, a distinct
     // intent — no nudge concern), then the flag pair with open (the default) BEFORE submit so there's no lean toward the
     // durable submit path (reinforcing the prompt's explicit-only submit).
-    const tools = [setVerdictTool(), openFlagDrawerTool(kinds), submitFlagTool(kinds)];
+    const tools = [readReviewContextTool(), setVerdictTool(), openFlagDrawerTool(kinds), submitFlagTool(kinds)];
     let acted = false;
+    // #210 slice 2 — the review context is expensive (fs + GitHub) and STABLE within a turn; cache it so a model that calls
+    // read_review_context twice doesn't re-fetch or burn tool rounds toward the cap (gpt55 impl review). Reset per turn.
+    let reviewCache: string | undefined;
     // A recoverable error result carries the FRESH app-state (targets + their current ids) so the model can retry in the
     // same loop after a selection change — C has no separate read tool (A14).
     const recoverable = (reason: string) => ({ content: `${reason}\n${appStateBlock(cockpitAgentBridge.getAppState())}`, isError: true });
@@ -293,6 +296,17 @@ class AgentChat implements vscode.WebviewViewProvider {
     const registry: ToolRegistry = {
       run: async (name, input) => {
         const inObj = (input ?? {}) as Record<string, unknown>;
+        // #210 Todo D slice 2 (disc 242) — read_review_context is routed FIRST of all: it's a READ (no target_id, no case_id),
+        // repeatable, and must NOT arm `acted` (reads don't consume the one-action budget). A successful read returns its
+        // structured context as PLAIN content (NOT recoverable-wrapped — that appends the flag app-state noise + marks isError);
+        // a failed read returns a plain isError reason so the model can synthesize-without-issues. The bridge caps/degrades.
+        if (name === READ_REVIEW_CONTEXT) {
+          if (reviewCache !== undefined) return { content: reviewCache }; // a re-read this turn → the cached context (no re-fetch)
+          const res = await cockpitAgentBridge.readReviewContext(token);
+          if (!res.ok) return { content: res.reason, isError: true };
+          reviewCache = JSON.stringify(res.context);
+          return { content: reviewCache };
+        }
         // #210 Todo D (disc 241) — set_verdict is routed FIRST: it has no target_id, so it must branch before the flag-only
         // target_id requirement below. A durable but reversible sidecar write via the bridge (synchronous, no elicitation).
         if (name === SET_VERDICT) {
@@ -422,7 +436,14 @@ class AgentChat implements vscode.WebviewViewProvider {
       if (this.partial) this.transcript.push({ kind: "assistant", text: this.partial, thoughtMs: this.thoughtMs });
       // Neutral phrasing keyed on the tool: the model REQUESTED the action (true regardless of whether it then executes or
       // is cancelled/fails — the app change + the follow-up reply convey the outcome).
-      const actLabel = d.name === SET_VERDICT ? "⚖ setting the verdict…" : d.name === SUBMIT_FLAG ? "⚑ filing a flag…" : "⚑ opening the flag drawer…";
+      const actLabel =
+        d.name === READ_REVIEW_CONTEXT
+          ? "📖 reading the review context…"
+          : d.name === SET_VERDICT
+            ? "⚖ setting the verdict…"
+            : d.name === SUBMIT_FLAG
+              ? "⚑ filing a flag…"
+              : "⚑ opening the flag drawer…";
       this.transcript.push({ kind: "status", text: actLabel });
       this.partial = "";
       this.thinking = false;

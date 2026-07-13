@@ -69,6 +69,62 @@ export interface SetVerdictArgs {
  *  bad verdict / save failed) the agent relays + can act on (recoverable). A pure synchronous write (no external I/O). */
 export type SetVerdictResult = { ok: true; message: string } | { ok: false; reason: string };
 
+/** #210 Todo D slice 2 — the READ-ONLY review context the "where do we stand" synthesis reasons over. Assembled by the
+ *  cockpit from the policy under review; purpose-bound (no args — the agent can't point it elsewhere). Text is CAPPED at
+ *  assembly (this whole object is COMMITTED to the model context + re-sent every following turn). */
+export interface ReviewContextCase {
+  label: string;
+  /** the engine run status for the case (e.g. the scenario's disposition/status), or "" if unknown. */
+  runStatus: string;
+  /** the review verdict: "To do" | "Pending" | "Pass" | "Fail". */
+  verdict: string;
+}
+export interface ReviewContextFlag {
+  status: string; // "open" | "resolved" | …
+  scope: string; // "concept" | "decision" | "library"
+  target: string; // the concept/decision/library name
+  concern: string; // the flag body/gist (the reviewer's note)
+  /** the linked GitHub issue number, or null (no `; ref` / a non-numeric ref). */
+  issue: number | null;
+}
+/** One flag-linked issue, best-effort. `title`/`body`/`state` present on `ok`; `reason` on failure ("issue not found" /
+ *  "timed out" / "not signed in" / …). Issue text is UNTRUSTED third-party input (anyone can file an issue). */
+export interface ReviewContextIssue {
+  number: number;
+  ok: boolean;
+  title?: string;
+  body?: string;
+  state?: string;
+  /** true when the ref pointed at a PR, not an issue (the GET returns PRs) — so the synthesis can say so. */
+  isPullRequest?: boolean;
+  reason?: string;
+}
+export interface ReviewContext {
+  policy: string;
+  sourceText: string;
+  sourceTruncated: boolean;
+  crlText: string;
+  crlTruncated: boolean;
+  /** per-file CRL read/parse failures (an unknown-source blocker — the synthesis must not invent a path around it). */
+  crlErrors: string[];
+  status: {
+    progress: { total: number; passed: number; failed: number; pending: number; unreviewable: number; stale: number };
+    mvComplete: boolean;
+    cases: ReviewContextCase[];
+    flags: ReviewContextFlag[];
+    /** an unreadable/unparseable `.crl` → the flag set is UNKNOWN (the mvComplete gate stays open). */
+    flagLoadError: boolean;
+    /** flags whose `; ref` was non-numeric (disc/spec/cross-repo) → not openable here (so the synthesis doesn't say "no issues"). */
+    unresolvedRefs: number;
+  };
+  /** the deduped flag-linked issues, best-effort (UNTRUSTED text). */
+  issues: ReviewContextIssue[];
+  /** why issues are absent/partial ("workspace not trusted" / "not signed in" / "no GitHub origin"), or undefined. */
+  issuesNote?: string;
+}
+/** `ok` + the context, or an actionable reason (no cockpit / no model / policy changed mid-read) the agent relays. */
+export type ReviewContextResult = { ok: true; context: ReviewContext } | { ok: false; reason: string };
+
 /** The `completed` payload of a driven flag drawer — the human filed it; `message` is the outcome the agent relays. */
 export interface FlagDrawerResult {
   message: string;
@@ -94,6 +150,10 @@ export interface CockpitAgentHooks {
    *  moved selection / cross-policy retarget), then reuses the cockpit's guarded verdict persist path (`applyVerdict` — MV +
    *  sidecar guarded, memory-committed-only-after-disk, re-drives the worklist/tree/mvComplete chrome). Synchronous (no I/O). */
   setVerdict(args: SetVerdictArgs): SetVerdictResult;
+  /** #210 Todo D slice 2 — assemble the READ-ONLY review context for the policy under review (CRL + source + status + the
+   *  flag-linked GitHub issues). Purpose-bound (no args). Async (bundles a best-effort issue fetch under ONE captured cel);
+   *  the `token` aborts a hung GET so it can't strand the agent turn. Hard `isTrusted` gate + silent GitHub auth inside. */
+  readReviewContext(token: CancelToken): Promise<ReviewContextResult>;
   /** The registry's `validation-concern` `kind` enum values (source of truth) — for the tool schema + the prompt hint. */
   getValidationKinds(): string[];
 }
@@ -177,6 +237,12 @@ class CockpitAgentBridge {
   setVerdict(args: SetVerdictArgs): SetVerdictResult {
     if (!this.hooks) return { ok: false, reason: "the Medical Validation cockpit is not open — open it first" };
     return this.hooks.setVerdict(args);
+  }
+
+  /** #210 Todo D slice 2 — the read-only review context for the open policy (for the "where do we stand" synthesis). */
+  async readReviewContext(token: CancelToken): Promise<ReviewContextResult> {
+    if (!this.hooks) return { ok: false, reason: "the Medical Validation cockpit is not open — open it first" };
+    return this.hooks.readReviewContext(token);
   }
 
   dispose(): void {

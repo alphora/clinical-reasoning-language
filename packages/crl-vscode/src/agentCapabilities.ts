@@ -51,6 +51,14 @@ export const AGENT_CAPABILITIES: AgentCapability[] = [
     isAvailable: (s) => !!s?.selectedCase,
     activation: (s) => ({ kind: "fillInput", text: `Set the verdict for ${s?.selectedCase?.label ?? "the selected case"} to ` }),
   },
+  {
+    // Where-do-we-stand = `prompt`: a single well-formed intent (no value needed), so a click SENDS it and the agent reads the
+    // review context + synthesizes (disc 242). Available whenever a policy is open.
+    id: "where-we-stand",
+    label: "Where do we stand",
+    isAvailable: (s) => !!s?.policy,
+    activation: () => ({ kind: "prompt", text: "Where do we stand on this policy?" }),
+  },
 ];
 
 /** The capabilities available in the current context, resolved to their click behavior — the badge row the host renders. */
