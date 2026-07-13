@@ -6,6 +6,7 @@
 // (a stable hash of the target identity — A13/B5), so a re-mint on any chip refresh is idempotent and an id survives until
 // the target itself genuinely changes.
 import * as vscode from "vscode";
+import type { CancelToken, ElicitationOutcome } from "./agentDrivableUi";
 
 /** A flaggable target the agent can name, as surfaced to the model (opaque `id` + human labels — never the raw identity). */
 export interface FlagTargetView {
@@ -36,17 +37,31 @@ export interface OpenFlagDrawerArgs {
   /** The fuller concern text → the flag's GitHub issue body (the drawer's Description field). */
   description?: string;
 }
-export type OpenFlagDrawerResult = { ok: true } | { ok: false; reason: string };
 /** The result of an AGENT submit (#210 Todo C) — `ok` = the flag was written; `message` is the human-readable outcome
  *  (issue created / no issue + reason) the agent reports back in chat. On failure, `issued` = a GitHub issue was ALREADY
  *  created before the write failed, so the caller must NOT retry (a retry would POST a duplicate issue). */
 export type SubmitFlagResult = { ok: true; message: string } | { ok: false; reason: string; issued?: boolean };
 
+/** The `completed` payload of a driven flag drawer — the human filed it; `message` is the outcome the agent relays. */
+export interface FlagDrawerResult {
+  message: string;
+}
+/** The BLOCKING elicitation (disc 239): the agent opens the drawer prefilled; the human completes/cancels it; it settles
+ *  with an `ElicitationOutcome`. TWO-PHASE — a SYNC guard returns `{error}` immediately (no UI/banner) OR a successful open
+ *  returns `{wait, purpose}` — the promise the host awaits + the COCKPIT-DERIVED banner line (the host doesn't guess it; the
+ *  cockpit knows what field is empty + the target). The agent supplies NO focus/purpose — the drawer auto-derives both. */
+export type BeginFlagDrawer =
+  | { error: string }
+  | { wait: Promise<ElicitationOutcome<FlagDrawerResult>>; purpose: string };
+
 /** What the cockpit implements + hands to the bridge. Both read the cockpit's LIVE closures at call time. */
 export interface CockpitAgentHooks {
   getAppState(): CockpitAppState | undefined;
-  openFlagDrawer(args: OpenFlagDrawerArgs): OpenFlagDrawerResult;
-  /** Fill AND submit the flag — writes it into the .crl + opens a GitHub issue (reuses the human Insert path). */
+  /** Open the flag drawer as a BLOCKING elicitation — the resolver is installed here (ONLY here, not on the human right-click
+   *  or the autonomous submit). Settles on every terminal path (Insert-filed / Cancel / token / retarget / dispose / replace). */
+  beginFlagDrawer(args: OpenFlagDrawerArgs, token: CancelToken): BeginFlagDrawer;
+  /** Fill AND submit the flag autonomously — writes it into the .crl + opens a GitHub issue (reuses the human Insert path).
+   *  Settles any pending elicitation `{replaced}` first (it shares the singleton drawer). */
   submitFlag(args: OpenFlagDrawerArgs): Promise<SubmitFlagResult>;
   /** The registry's `validation-concern` `kind` enum values (source of truth) — for the tool schema + the prompt hint. */
   getValidationKinds(): string[];
@@ -99,11 +114,12 @@ class CockpitAgentBridge {
     return this.hooks?.getValidationKinds() ?? [];
   }
 
-  /** Open the flag drawer prefilled — the ONE agent action seam. Returns an actionable reason when it can't (no cockpit /
-   *  no tree pane / stale target / bad kind), which the tool turns into an `isError` tool_result the model recovers from. */
-  openFlagDrawer(args: OpenFlagDrawerArgs): OpenFlagDrawerResult {
-    if (!this.hooks) return { ok: false, reason: "the Medical Validation cockpit is not open — open it first" };
-    return this.hooks.openFlagDrawer(args);
+  /** Open the flag drawer as a BLOCKING elicitation (disc 239). Two-phase: `{error}` synchronously when it can't open (no
+   *  cockpit / no tree pane / stale target / bad kind — the tool turns it into a recoverable isError, no banner shown), else
+   *  `{wait}` — the promise the host awaits (showing the static banner) until the human resolves the drawer. */
+  beginFlagDrawer(args: OpenFlagDrawerArgs, token: CancelToken): BeginFlagDrawer {
+    if (!this.hooks) return { error: "the Medical Validation cockpit is not open — open it first" };
+    return this.hooks.beginFlagDrawer(args, token);
   }
 
   /** Fill AND submit the flag — writes the flag into the .crl + opens a GitHub issue. Used ONLY on an explicit submit/file

@@ -50,13 +50,26 @@ test("renderFlagDrawer: a chosen prefill.tag selects that tag + shows ITS group"
 test("renderFlagDrawer: prefilled summary/stub/field values are placed (and selected in an enum)", () => {
   const h = renderFlagDrawer({ targetLabel: "t", tags: TAGS, tag: "fidelity-defect", summary: "S", stub: "B", fields: { direction: "under" } });
   assert.match(h, /data-flag-summary value="S"/);
-  assert.match(h, /<textarea data-flag-stub[^>]*>B<\/textarea>/);
+  assert.match(h, /<textarea[^>]*data-flag-stub[^>]*>B<\/textarea>/);
   assert.match(h, /<option value="under" selected>/);
 });
 
 test("renderFlagDrawer: the header shows the short label; the full label (signature) is the hover title", () => {
   const h = renderFlagDrawer({ targetLabel: "this condition", targetTitle: "this condition (A/B/C long signature)", tags: TAGS });
   assert.match(h, /<span class="flag-title" title="this condition \(A\/B\/C long signature\)">Add flag — this condition<\/span>/);
+});
+
+test("renderFlagDrawer: #210 (disc 239) focus rings ONLY the requested element (summary/description/submit)", () => {
+  const desc = renderFlagDrawer({ targetLabel: "t", tags: TAGS, focus: "description" });
+  assert.match(desc, /<textarea class="flag-input flag-focus" data-flag-stub/);
+  assert.doesNotMatch(desc, /data-flag-summary[^>]*flag-focus|flag-insert flag-focus/);
+  const sum = renderFlagDrawer({ targetLabel: "t", tags: TAGS, focus: "summary" });
+  assert.match(sum, /<input type="text" class="flag-input flag-focus" data-flag-summary/);
+  const sub = renderFlagDrawer({ targetLabel: "t", tags: TAGS, focus: "submit" });
+  assert.match(sub, /class="flag-insert flag-focus" data-flag-insert/);
+  // no focus → no ring anywhere (the human right-click path)
+  const none = renderFlagDrawer({ targetLabel: "t", tags: TAGS });
+  assert.doesNotMatch(none, /flag-focus/);
 });
 
 test("renderFlagDrawer: host-managed fields (ref/key/status/system) are NOT rendered — only real discriminators", () => {

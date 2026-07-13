@@ -53,28 +53,29 @@ test("flagTargetId: a different policy (cel) → a different id (no cross-policy
   );
 });
 
-test("bridge.openFlagDrawer/submitFlag: no cockpit registered → an actionable reason (not ok)", async () => {
-  const o = cockpitAgentBridge.openFlagDrawer({ targetId: "x" });
-  assert.equal(o.ok, false);
-  assert.match(o.reason, /not open/);
+const fakeToken = { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {} }) };
+
+test("bridge.beginFlagDrawer/submitFlag: no cockpit registered → an actionable reason (not ok)", async () => {
+  const o = cockpitAgentBridge.beginFlagDrawer({ targetId: "x" }, fakeToken);
+  assert.match(o.error, /not open/);
   const s = await cockpitAgentBridge.submitFlag({ targetId: "x" });
   assert.equal(s.ok, false);
   assert.match(s.reason, /not open/);
 });
 
-test("bridge: register delegates getAppState/getValidationKinds/openFlagDrawer/submitFlag; dispose clears them", async () => {
+test("bridge: register delegates getAppState/getValidationKinds/beginFlagDrawer/submitFlag; dispose clears them", async () => {
   let fired = 0;
   cockpitAgentBridge.onDidChangeAppState(() => fired++);
   const disp = cockpitAgentBridge.register({
     getAppState: () => ({ policy: "p", anchorLabel: "n", flagTargets: [], treePaneOpen: true }),
-    openFlagDrawer: () => ({ ok: true }),
+    beginFlagDrawer: (a) => ({ wait: Promise.resolve({ status: "cancelled", reason: "cancelled" }), purpose: `flag ${a.targetId}` }),
     submitFlag: async (a) => ({ ok: true, message: `filed on ${a.targetId}` }),
     getValidationKinds: () => ["underspecified"],
   });
   assert.ok(fired >= 1, "register fires the change event (the chip refreshes)");
   assert.equal(cockpitAgentBridge.getAppState().policy, "p");
   assert.deepEqual(cockpitAgentBridge.getValidationKinds(), ["underspecified"]);
-  assert.deepEqual(cockpitAgentBridge.openFlagDrawer({ targetId: "x" }), { ok: true });
+  assert.equal(cockpitAgentBridge.beginFlagDrawer({ targetId: "x" }, fakeToken).purpose, "flag x");
   assert.deepEqual(await cockpitAgentBridge.submitFlag({ targetId: "z" }), { ok: true, message: "filed on z" });
   disp.dispose();
   assert.equal(cockpitAgentBridge.getAppState(), undefined, "dispose clears the hooks");

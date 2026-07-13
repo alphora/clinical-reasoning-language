@@ -124,12 +124,14 @@ import { isConceptHit, isFactHit, isSubQuestionHit, type RevealHit, type Webview
 import {
   cockpitAgentBridge,
   flagTargetId,
+  type BeginFlagDrawer,
   type CockpitAppState,
+  type FlagDrawerResult,
   type FlagTargetView,
   type OpenFlagDrawerArgs,
-  type OpenFlagDrawerResult,
   type SubmitFlagResult,
 } from "./cockpitAgentBridge";
+import type { CancelToken, ElicitationCancelReason, ElicitationOutcome } from "./agentDrivableUi";
 import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordinator";
 import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE } from "./provenanceFindings";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
@@ -417,6 +419,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // handler never touches, so the drawer + the user's typed text SURVIVE a same-policy tree rebuild; the host clears it
   // (posting an empty region) on retarget / mode reset. `FlagDraftState` is declared with `FlagTargetChoice` below.
   let flagDraft: FlagDraftState | undefined;
+  // #210 (disc 239) — the AGENT elicitation resolver for a BLOCKING open_flag_drawer. Installed ONLY by beginFlagDrawer;
+  // settled EXACTLY ONCE by `settleDrawer` on every terminal (Insert-filed / Cancel / token / retarget / dispose / replace).
+  // Idempotent: `settleDrawer` nulls it before resolving, so a Stop racing an Insert can't double-resolve. No-op when a human
+  // right-click / autonomous submit opened the drawer (they install no resolver).
+  let pendingDrawer: { settle: (o: ElicitationOutcome<FlagDrawerResult>) => void; sub?: vscode.Disposable } | undefined;
   let flagCommitting = false; // #211: an in-flight commit guard — a rapid second Insert must not double-POST / race the write
   let githubAuthDeclined = false; // #211: the user declined the GitHub sign-in this session → don't re-prompt on every flag
   // #210 Todo C — the AGENT flag anchor: the last flag-capable node the user clicked (a WebviewHit, NOT State.selection —
@@ -1912,8 +1919,24 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     } else if (msg.type === "noteDelete" && typeof msg.noteId === "string") {
       deleteNoteFromWebview(msg.noteId);
     } else if (msg.type === "flagDraftInsert") {
-      void commitFlagDraft({ tag: msg.tag, summary: msg.summary, stub: msg.stub, fields: msg.fields }); // host uses the captured target; payload is untrusted
+      // #210 (disc 239): the human filed it (or hit a terminal failure). Await the outcome; if the drawer CLOSED (written or
+      // a closing-failure — `flagDraft` now undefined), SETTLE the agent elicitation (completed on a write, else error). A
+      // KEEP-OPEN form error leaves the drawer + the pending resolver up (the human fixes + re-Inserts). Idempotent: if Stop
+      // already settled, `settleDrawer` no-ops. `commitFlagDraft` uses the host-captured target; the payload is untrusted.
+      // HANG-SAFE proxy (Claude review): `!flagDraft` is "the drawer closed", not "THIS commit closed it". KNOWN minor
+      // limitation — a SAME-policy lifecycle clear (sidecar reload / reset / tree-dispose) racing this commit's async window
+      // settles `{cancelled}` while the commit still proceeds to file; the eventual `settleDrawer(completed)` then no-ops, so
+      // the agent reports "not completed" though the flag WAS filed. Never a false-complete, never a hang, never data loss.
+      void commitFlagDraft({ tag: msg.tag, summary: msg.summary, stub: msg.stub, fields: msg.fields }).then(
+        (outcome) => {
+          if (!flagDraft) settleDrawer(outcome.ok ? { status: "completed", result: { message: outcome.note } } : { status: "error", reason: outcome.note });
+        },
+        // Defensive (gpt55): an unexpected throw BEFORE commitFlagDraft's own try/catch would leave the promise rejected +
+        // the agent's wait stranded — settle error so it can never hang.
+        (e) => settleDrawer({ status: "error", reason: e instanceof Error ? e.message : String(e) }),
+      );
     } else if (msg.type === "flagDraftCancel") {
+      settleDrawer({ status: "cancelled", reason: "cancelled" }); // #210 (disc 239): the human cancelled the agent's request
       closeFlagDrawer();
     } else if (msg.type === "reveal" && typeof msg.key === "string") {
       const hit = v.reveals[msg.key]; // trusted: looked up by opaque key, not a path/range from the webview
@@ -2073,7 +2096,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // #211: the flag drawer lives in the tree pane's own region — if that pane is torn down mid-draft, drop the host
       // draft too (else `flagDraft` lingers invisible + uncommittable; a fresh tree panel wouldn't re-show it).
       if (pane === "tree") {
-        flagDraft = undefined;
+        clearFlagDraft("disposed"); // #210 (disc 239): drop the draft + SETTLE any pending agent elicitation (else it hangs)
         flagAnchor = undefined; // #210 Todo C: drop the anchor too — a reopened tree must not resurrect a stale target (B6)
         cockpitAgentBridge.notifyChanged(); // the tree pane closed → the agent can't perceive/flag; update the chip
       }
@@ -2217,9 +2240,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     notesByCaseId = {}; // #156 notes: drop the threads + drawer UI-state too (mirror loadReviewSidecar's clearing)
     openNotesCaseId = undefined;
     editingNoteId = undefined;
-    flagDraft = undefined; // #211: drop the create-flag draft (a stale drawer must not commit against a prior policy)
+    clearFlagDraft("retarget"); // #211/#210: drop the draft + postFlagDrawer + SETTLE any pending agent elicitation (else it hangs)
     flagAnchor = undefined; // #210 Todo C: drop the agent flag anchor too (a stale anchor must not survive a failed retarget)
-    postFlagDrawer(); // clear the webview region (posts empty since flagDraft is now undefined)
     mvSidecarPath = undefined;
     flagsList = []; // #203 Todo 4: drop the review-flag state too (a stale flag list/gate must not survive a failed retarget)
     flagLoadError = false;
@@ -2298,6 +2320,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  fires async, so reopening against a disposing webview is the race FIX 5 avoids). config reads use
    *  `configSection(targetMode)` + the matching pane spec; `failedCriteriaMode` stays SHARED under `crl.cockpit`. */
   function openPanel(targetMode: "cockpit" | "medical-validation", celPath: string): void {
+    clearFlagDraft("retarget"); // #210 (disc 239): a (re)show/retarget SETTLES any pending agent elicitation + drops the draft
     mode = targetMode;
     currentCel = celPath;
     flagAnchor = undefined; // #210 Todo C: a retarget / mode switch drops the prior policy's flag anchor
@@ -2346,8 +2369,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     notesByCaseId = {}; // #156 notes: reset the threads + drawer UI-state with the rest of the MV state
     openNotesCaseId = undefined;
     editingNoteId = undefined;
-    flagDraft = undefined; // #211: a policy (re)load drops any in-flight create-flag draft
-    postFlagDrawer(); // clear the webview region
+    clearFlagDraft("retarget"); // #211/#210: a policy (re)load drops the draft + SETTLES any pending agent elicitation
     mvSidecarPath = undefined;
     worklistActions = {};
     worklistFilter = new Set(REVIEW_STATES); // #214: reset the verdict filter to all-shown on retarget (policy A's filter must not hide policy B)
@@ -2479,6 +2501,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     summary?: string;
     stub?: string;
     fields?: Record<string, string>;
+    /** #210 (disc 239) — which drawer element to ring in CRL Assist purple (a field key, or "submit"). Auto-derived by the
+     *  agent-open path; undefined for the human right-click (no ring). */
+    focus?: string;
   }
   /** The in-flight draft: the prefill + the POLICY (`currentCel`) captured at open. Identity is `cel`/`mode`, NOT
    *  `indexVersion` — a same-policy rebuild must NOT invalidate the draft (the commit re-resolves on live text). */
@@ -2576,7 +2601,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function postFlagDrawer(): void {
     const tree = views.get("tree");
     if (!tree) return;
-    const html = flagDraft ? renderFlagDrawer({ targetLabel: flagDraft.target.shortLabel, targetTitle: flagDraft.target.label, tags: flagTags(), tag: flagDraft.tag, summary: flagDraft.summary, stub: flagDraft.stub, fields: flagDraft.fields }) : "";
+    const html = flagDraft ? renderFlagDrawer({ targetLabel: flagDraft.target.shortLabel, targetTitle: flagDraft.target.label, tags: flagTags(), tag: flagDraft.tag, summary: flagDraft.summary, stub: flagDraft.stub, fields: flagDraft.fields, focus: flagDraft.focus }) : "";
     void tree.panel.webview.postMessage({ type: "flagDrawer", html });
   }
 
@@ -2585,15 +2610,50 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  this directly. MV-only. */
   function openFlagDrawer(prefill: FlagDraftPrefill): void {
     if (mode !== "medical-validation") return;
+    settleDrawer({ status: "cancelled", reason: "replaced" }); // #210 (disc 239): a NEW drawer supersedes any pending elicitation
     flagDraft = { ...prefill, cel: currentCel };
     postFlagDrawer();
   }
 
-  /** Clear the drawer (drop the host draft + empty the webview region). */
+  /** Clear the drawer (drop the host draft + empty the webview region). Does NOT settle the agent elicitation — the terminal
+   *  paths (Insert/Cancel/lifecycle) settle explicitly; closeFlagDrawer is just the UI clear (so commitFlagDraft's SUCCESS
+   *  path, which calls this, doesn't pre-settle `cancelled`). */
   function closeFlagDrawer(): void {
     if (!flagDraft) return;
     flagDraft = undefined;
     postFlagDrawer(); // posts an empty region
+  }
+
+  // #210 (disc 239) — the settle-once choke-point + the auto-derive. See the `pendingDrawer` declaration.
+  /** Settle the agent elicitation EXACTLY ONCE (idempotent: nulls before resolving + disposes the token sub). No-op when no
+   *  agent open is pending. */
+  function settleDrawer(outcome: ElicitationOutcome<FlagDrawerResult>): void {
+    const p = pendingDrawer;
+    if (!p) return;
+    pendingDrawer = undefined;
+    p.sub?.dispose();
+    p.settle(outcome);
+  }
+  /** The choke-point every LIFECYCLE drop of the draft (retarget / reset / pane-dispose) routes through: settle any pending
+   *  agent elicitation `{cancelled}` (else a blocking open HANGS) then clear the drawer UI. */
+  function clearFlagDraft(reason: ElicitationCancelReason): void {
+    settleDrawer({ status: "cancelled", reason });
+    flagDraft = undefined;
+    postFlagDrawer();
+  }
+  /** The drawer element to ring — AUTHORITATIVELY derived from the live prefill (the agent supplies no override): the first
+   *  empty EXPECTED field (summary → description), else "submit". NOTE (gpt55 review): the plan's order also includes "any
+   *  empty REQUIRED tag-field" before submit — a no-op for the sole current consumer (`validation-concern`'s `kind` is
+   *  optional), so it's omitted here; a future flag tag with a required field would extend this to ring its `data-flag-field`. */
+  function deriveFlagFocus(prefill: FlagDraftPrefill): string {
+    if (!prefill.summary?.trim()) return "summary";
+    if (!prefill.stub?.trim()) return "description";
+    return "submit";
+  }
+  /** The static-banner line the host shows while the drawer is the open request — derived from the focus + the target. */
+  function deriveFlagPurpose(focus: string, target: FlagTargetChoice): string {
+    if (focus === "submit") return `Review and submit the flag on ${target.shortLabel}`;
+    return `Fill out the ${focus === "summary" ? "summary" : "description"} to flag ${target.shortLabel}`;
   }
 
   /** #211 — surface a "flag written, but NO issue" outcome LOUDLY (a persistent warning, not a 3s status-bar note a
@@ -3181,19 +3241,31 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
     return { prefill: { target: match, tag: "validation-concern", summary: args.summary, stub: args.description, fields: kind ? { kind } : undefined } };
   };
-  const bridgeOpenFlagDrawer = (args: OpenFlagDrawerArgs): OpenFlagDrawerResult => {
+  // #210 (disc 239) — open the flag drawer as a BLOCKING elicitation. TWO-PHASE: a SYNC guard fail returns `{error}` (no
+  // drawer, no banner — the tool surfaces a recoverable isError); success opens the drawer (auto-deriving the purple focus
+  // ring + the banner), installs the resolver (settled EXACTLY ONCE on every terminal), and returns `{wait, purpose}`.
+  const bridgeBeginFlagDrawer = (args: OpenFlagDrawerArgs, token: CancelToken): BeginFlagDrawer => {
     const r = resolveFlagPrefill(args);
-    if ("error" in r) return { ok: false, reason: r.error };
-    openFlagDrawer(r.prefill);
-    return { ok: true };
+    if ("error" in r) return { error: r.error };
+    const focus = deriveFlagFocus(r.prefill); // AUTHORITATIVE (first empty of summary→description, else "submit")
+    const purpose = deriveFlagPurpose(focus, r.prefill.target);
+    openFlagDrawer({ ...r.prefill, focus }); // settles any pending {replaced} + posts the drawer with the ring
+    const wait = new Promise<ElicitationOutcome<FlagDrawerResult>>((resolve) => {
+      pendingDrawer = { settle: resolve, sub: token.onCancellationRequested(() => settleDrawer({ status: "cancelled", reason: "stopped" })) };
+      // Robust regardless of the token's late-subscription timing: VS Code fires an ALREADY-cancelled token's listener on a
+      // LATER tick (setTimeout(0)), not synchronously — so settle NOW if it's already cancelled (a stranded resolver would
+      // hang the agent). settleDrawer is idempotent, so the later async fire is a harmless no-op. Stop leaves the drawer OPEN.
+      if (token.isCancellationRequested) settleDrawer({ status: "cancelled", reason: "stopped" });
+    });
+    return { wait, purpose };
   };
   const bridgeSubmitFlag = async (args: OpenFlagDrawerArgs): Promise<SubmitFlagResult> => {
     const r = resolveFlagPrefill(args);
     if ("error" in r) return { ok: false, reason: r.error };
     const summary = args.summary?.trim();
     if (!summary) return { ok: false, reason: "a one-line summary is required to file the flag — ask the validator for it" };
-    // Open the drawer prefilled (so the write is visible), then commit via the SAME guarded path the human Insert uses
-    // (dry-run → best-effort issue → byte-safe write). Relay the structured outcome back to the agent.
+    // Open the drawer prefilled (settles any pending elicitation {replaced} via openFlagDrawer), then commit via the SAME
+    // guarded path the human Insert uses (dry-run → best-effort issue → byte-safe write). No resolver installed (autonomous).
     openFlagDrawer(r.prefill);
     const outcome = await commitFlagDraft({ tag: "validation-concern", summary, stub: args.description, fields: r.prefill.fields });
     // `issued` = an issue was already created before the write failed → the agent must NOT retry (would POST a duplicate).
@@ -3202,7 +3274,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   context.subscriptions.push(
     cockpitAgentBridge.register({
       getAppState,
-      openFlagDrawer: bridgeOpenFlagDrawer,
+      beginFlagDrawer: bridgeBeginFlagDrawer,
       submitFlag: bridgeSubmitFlag,
       getValidationKinds: validationKinds,
     }),
@@ -3333,6 +3405,8 @@ function shellHtml(): string {
 .flag-label{opacity:.75;font-size:.85em;min-width:64px}
 .flag-fieldgroup{display:flex;flex-direction:column;gap:4px}
 .flag-fieldgroup[hidden]{display:none}
+/* #210 (disc 239) — the CRL Assist purple focus ring on the element the agent wants completed (outline: no layout shift). */
+.flag-focus{outline:2px solid var(--vscode-charts-purple,#c586c0);outline-offset:1px}
 .flag-drawer input,.flag-drawer select,.flag-drawer textarea{width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,#3c3c3c);font-family:inherit;font-size:.95em}
 .flag-drawer textarea{min-height:56px;resize:vertical;flex:1}
 .flag-drawer select{background:var(--vscode-dropdown-background);color:var(--vscode-dropdown-foreground);border-color:var(--vscode-dropdown-border,#3c3c3c)}

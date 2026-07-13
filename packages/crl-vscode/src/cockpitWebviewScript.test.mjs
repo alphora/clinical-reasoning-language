@@ -872,6 +872,28 @@ check("#211: the message router wires flagDraftInsert → commitFlagDraft and fl
   assert.match(COCKPIT_SRC, /msg\.type === "flagDraftCancel"[\s\S]*?closeFlagDrawer\(\)/);
 });
 
+// ── #210 (disc 239): the settle-once choke-point — the elicitation lifecycle rigor (the races aren't runtime-testable, so
+//    the goldens guard that every terminal routes through settleDrawer exactly once, keyed on the flagDraft transition). ──
+check("#210 (disc 239): EVERY flagDraft clear routes through the settle-once choke-point (no direct assignment strands a blocking elicitation)", () => {
+  // `flagDraft = undefined` must appear ONLY in closeFlagDrawer + clearFlagDraft — the lifecycle sites (tree-dispose /
+  // resetToEmpty / policy-reload / openPanel) route through clearFlagDraft, which SETTLES any pending agent elicitation.
+  const clears = (COCKPIT_SRC.match(/flagDraft = undefined/g) || []).length;
+  assert.equal(clears, 2, "flagDraft = undefined is confined to closeFlagDrawer + clearFlagDraft");
+  // settleDrawer is idempotent: nulls the resolver BEFORE resolving (a Stop racing an Insert can't double-resolve).
+  assert.match(COCKPIT_SRC, /function settleDrawer[\s\S]*?pendingDrawer = undefined;[\s\S]*?p\.settle\(outcome\)/);
+  assert.match(COCKPIT_SRC, /function clearFlagDraft[\s\S]*?settleDrawer\(\{ status: "cancelled", reason \}\)/);
+  // the Insert handler settles ONLY when the drawer CLOSED (terminal) — a keep-open form error leaves the pending resolver up;
+  // a rejection handler settles error so an unexpected throw can't strand the wait.
+  assert.match(COCKPIT_SRC, /flagDraftInsert[\s\S]*?commitFlagDraft\([\s\S]*?if \(!flagDraft\) settleDrawer/);
+  assert.match(COCKPIT_SRC, /flagDraftInsert[\s\S]*?\(e\) => settleDrawer\(\{ status: "error"/);
+  // Cancel + a NEW drawer (openFlagDrawer) each settle first; beginFlagDrawer installs the resolver + the token→settle link
+  // + a defensive already-cancelled settle (no stranded resolver).
+  assert.match(COCKPIT_SRC, /msg\.type === "flagDraftCancel"[\s\S]*?settleDrawer\(\{ status: "cancelled", reason: "cancelled" \}\)/);
+  assert.match(COCKPIT_SRC, /function openFlagDrawer[\s\S]*?settleDrawer\(\{ status: "cancelled", reason: "replaced" \}\)/);
+  assert.match(COCKPIT_SRC, /pendingDrawer = \{ settle: resolve, sub: token\.onCancellationRequested\(\(\) => settleDrawer\(\{ status: "cancelled", reason: "stopped" \}\)\)/);
+  assert.match(COCKPIT_SRC, /if \(token\.isCancellationRequested\) settleDrawer\(\{ status: "cancelled", reason: "stopped" \}\)/);
+});
+
 // ── #203 Todo 4b Slice C: issue link-out ──
 check("#203 Slice C: resolveIssueBase prefers the USER (global) value; a workspace value is trust-gated", () => {
   const m = COCKPIT_SRC.match(/function resolveIssueBase\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);

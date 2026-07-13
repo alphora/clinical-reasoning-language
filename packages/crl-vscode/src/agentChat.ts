@@ -19,6 +19,7 @@ import {
 import { runAgentTurn, type ToolRegistry } from "./agentToolLoop";
 import { cockpitAgentBridge } from "./cockpitAgentBridge";
 import { appStateBlock, buildSystemPrompt, OPEN_FLAG_DRAWER, openFlagDrawerTool, SUBMIT_FLAG, submitFlagTool } from "./editorAgentPrompt";
+import type { ActiveElicitation } from "./agentDrivableUi";
 import { anthropicErrorLabel } from "./anthropicClient";
 import { CHAT_BODY, CHAT_STYLE, CHAT_WEBVIEW_SCRIPT, renderChatThread, type ChatEntry } from "./chatPaneHtml";
 
@@ -82,8 +83,27 @@ class AgentChat implements vscode.WebviewViewProvider {
   /** The provider used by the last committed turn — a provider switch mid-conversation would replay THAT provider's tool
    *  ids into the new backend (which rejects them), so on a change we clear the model context (A11). */
   private lastProviderId: "vscode-lm" | "anthropic" | undefined;
+  /** #210 (disc 239) — the in-flight BLOCKING elicitation (a driven app UI, e.g. the flag drawer). While set, the chat input
+   *  shows a static purpose banner instead of the textarea. `turnGen` guards ownership so a stale turn can't clear a newer one. */
+  private eliciting: ActiveElicitation | undefined;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
+
+  /** Drive an `AgentDrivableUI` request: show the static purpose banner (Send already disabled by the `busy` state), await
+   *  the UI's resolution, and clear the banner — but ONLY if this turn still owns it (a Clear + a new turn must not wipe the
+   *  new banner). Any tool that elicits via an app UI wraps its wait in this. */
+  private async withElicitation<T>(turnGen: number, purpose: string, fn: () => Promise<T>): Promise<T> {
+    this.eliciting = { turnGen, purpose };
+    this.render();
+    try {
+      return await fn();
+    } finally {
+      if (this.eliciting?.turnGen === turnGen) {
+        this.eliciting = undefined;
+        this.render();
+      }
+    }
+  }
 
   /** Re-render on a cockpit app-state change — updates the selected-item chip (does nothing while no view is resolved). */
   refreshChip(): void {
@@ -154,6 +174,9 @@ class AgentChat implements vscode.WebviewViewProvider {
       thinkingSince: this.thinkingSince,
       // #210 Todo C — the selected-item chip (the flag anchor the agent perceives); undefined hides it (no MV cockpit).
       chip: this.chipLabel(),
+      // #210 (disc 239) — the static elicitation banner (a purpose line) replaces the input while an app UI is the open
+      // request; undefined restores the textarea.
+      eliciting: this.eliciting?.purpose,
     });
   }
 
@@ -284,10 +307,16 @@ class AgentChat implements vscode.WebviewViewProvider {
           acted = true;
           return { content: res.message }; // the human outcome (issue #N created / no issue: reason) — the agent relays it
         }
-        const res = cockpitAgentBridge.openFlagDrawer(args);
-        if (!res.ok) return recoverable(res.reason);
+        // #210 (disc 239) — a BLOCKING elicitation: begin (sync guard). On an error, recoverable (no banner). On success,
+        // arm `acted` (shown-once counts, even if the human later cancels) + await the drawer while the static banner shows;
+        // map the outcome to the tool result the agent relays.
+        const begin = cockpitAgentBridge.beginFlagDrawer(args, token);
+        if ("error" in begin) return recoverable(begin.error);
         acted = true;
-        return { content: "The flag drawer is now open in the cockpit, prefilled. Tell the validator to review and submit it." };
+        const outcome = await this.withElicitation(myGen, begin.purpose, () => begin.wait);
+        if (outcome.status === "completed") return { content: outcome.result.message };
+        if (outcome.status === "error") return recoverable(outcome.reason);
+        return { content: "The validator didn't complete the flag — the drawer is still open in the cockpit (or they cancelled)." };
       },
     };
 
@@ -311,8 +340,10 @@ class AgentChat implements vscode.WebviewViewProvider {
       // inline. `messages` stays untouched (the driver staged internally; nothing was committed).
       const partial = this.partial;
       const thoughtMs = this.thoughtMs ?? (this.thinkingSince !== undefined ? Date.now() - this.thinkingSince : undefined);
+      // Ownership guard BEFORE endStream: a Clear superseded this turn (and already tore it down), so this stale continuation
+      // must NOT run endStream — that would clobber the NEW turn's `cts` (killing its Stop) + `eliciting` banner (both reviewers).
+      if (myGen !== this.gen) return;
       this.endStream();
-      if (myGen !== this.gen) return; // a Clear superseded this turn — don't push into a cleared transcript
       if (partial) this.transcript.push({ kind: "assistant", text: partial, stopped: true, thoughtMs });
       const label = provider.id === "anthropic" ? anthropicErrorLabel(e) : messageOf(e);
       this.transcript.push({ kind: "error", text: `${provider.id}: ${label}` });
@@ -323,8 +354,10 @@ class AgentChat implements vscode.WebviewViewProvider {
     // Capture the thought duration + the final streamed partial before endStream resets them.
     const thoughtMs = this.thoughtMs ?? (this.thinkingSince !== undefined ? Date.now() - this.thinkingSince : undefined);
     const finalPartial = this.partial;
+    // Ownership guard BEFORE endStream: a Clear superseded this turn (and already tore it down) — a stale continuation running
+    // endStream would clobber the NEW turn's `cts` (killing its Stop) + `eliciting` banner (both reviewers).
+    if (myGen !== this.gen) return;
     this.endStream();
-    if (myGen !== this.gen) return; // a Clear superseded this turn mid-loop — its result must not repopulate the cleared chat
 
     if (result.stopReason === "cancelled") {
       // Stop → finalize the last streamed text as a stopped turn (any earlier rounds were already pushed on their tool_use).
@@ -376,6 +409,7 @@ class AgentChat implements vscode.WebviewViewProvider {
   private endStream(): void {
     this.streaming = false;
     this.resolving = false;
+    this.eliciting = undefined; // #210 (disc 239): any in-flight elicitation banner clears with the turn (Clear/error teardown)
     this.partial = "";
     this.thinking = false;
     this.thinkingSince = undefined;

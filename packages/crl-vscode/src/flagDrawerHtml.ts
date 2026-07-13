@@ -31,12 +31,17 @@ export interface FlagDrawerOptions {
   summary?: string;
   stub?: string;
   fields?: Record<string, string>;
+  /** #210 (disc 239) — the element to RING in CRL Assist purple ("summary" | "description" | "submit"), auto-derived by the
+   *  agent-open path to draw the validator's eye to what's needed. Undefined for the human right-click (no ring). */
+  focus?: string;
 }
 
 /** Render the create-flag drawer: a tag `<select>` (validation-concern first) + each tag's registry field controls (only
  *  the selected tag's group is visible; the webview toggles them client-side), a one-line summary (→ issue title + flag
  *  gist), a "just enough" stub (→ issue body), and Insert / Cancel. The whole thing carries `data-flag-drawer`. */
 export function renderFlagDrawer(opts: FlagDrawerOptions): string {
+  // #210 (disc 239) — the CRL Assist purple focus ring: ` flag-focus` on the element the agent-open path derived as needed.
+  const ring = (key: string): string => (opts.focus === key ? " flag-focus" : "");
   // validation-concern first (the usual MV concern), the rest in the given (registry) order.
   const ordered = [...opts.tags].sort((a, b) => (a.id === "validation-concern" ? -1 : b.id === "validation-concern" ? 1 : 0));
   const selTag = ordered.some((t) => t.id === opts.tag) ? (opts.tag as string) : ordered[0]?.id;
@@ -80,12 +85,12 @@ export function renderFlagDrawer(opts: FlagDrawerOptions): string {
     `<select data-flag-tag aria-label="Flag type">${tagOptions}</select></label>` +
     `<div class="flag-fields">${fieldGroups}</div>` +
     `<label class="flag-row"><span class="flag-label">Summary</span>` +
-    `<input type="text" data-flag-summary value="${escapeHtml(opts.summary ?? "")}" placeholder="one line — the issue title & the flag" aria-label="Summary"></label>` +
+    `<input type="text" class="flag-input${ring("summary")}" data-flag-summary value="${escapeHtml(opts.summary ?? "")}" placeholder="one line — the issue title & the flag" aria-label="Summary"></label>` +
     `<label class="flag-col"><span class="flag-label">Description</span>` +
-    `<textarea data-flag-stub placeholder="the concern in a couple of lines — becomes the GitHub issue body" aria-label="Description">${escapeHtml(opts.stub ?? "")}</textarea></label>` +
+    `<textarea class="flag-input${ring("description")}" data-flag-stub placeholder="the concern in a couple of lines — becomes the GitHub issue body" aria-label="Description">${escapeHtml(opts.stub ?? "")}</textarea></label>` +
     `<div class="flag-actions">` +
     `<button type="button" class="flag-cancel" data-flag-cancel>Cancel</button>` +
-    `<button type="button" class="flag-insert" data-flag-insert>Insert flag + create issue</button>` +
+    `<button type="button" class="flag-insert${ring("submit")}" data-flag-insert>Insert flag + create issue</button>` +
     `</div></div>`
   );
 }
