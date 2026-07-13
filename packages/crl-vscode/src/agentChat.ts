@@ -110,14 +110,14 @@ class AgentChat implements vscode.WebviewViewProvider {
     this.render();
   }
 
-  /** The chip label = what the agent perceives right now: the flag anchor, or a reason it can't perceive one. `undefined`
-   *  hides the chip (no MV cockpit). */
-  private chipLabel(): string | undefined {
+  /** The chip = what the agent perceives right now: the flag anchor (concise `label` + a bulleted-path `title` for the hover),
+   *  or a reason it can't perceive one. `undefined` hides the chip (no MV cockpit). */
+  private chipInfo(): { label: string; title: string } | undefined {
     const s = cockpitAgentBridge.getAppState();
     if (!s) return undefined;
-    if (!s.treePaneOpen) return "no tree pane";
-    if (!s.anchorLabel) return "no node selected";
-    return s.anchorLabel;
+    if (!s.treePaneOpen) return { label: "no tree pane", title: "no tree pane" };
+    if (!s.anchorLabel) return { label: "no node selected", title: "no node selected" };
+    return { label: s.anchorLabel, title: s.anchorTitle ?? s.anchorLabel };
   }
 
   /** True when the committed model context carries tool_use/tool_result blocks — used to decide whether a provider switch
@@ -173,7 +173,9 @@ class AgentChat implements vscode.WebviewViewProvider {
       thinking: this.thinking,
       thinkingSince: this.thinkingSince,
       // #210 Todo C — the selected-item chip (the flag anchor the agent perceives); undefined hides it (no MV cockpit).
-      chip: this.chipLabel(),
+      // `chip` = the concise label; `chipTitle` = the bulleted node-path hover.
+      chip: this.chipInfo()?.label,
+      chipTitle: this.chipInfo()?.title,
       // #210 (disc 239) — the static elicitation banner (a purpose line) replaces the input while an app UI is the open
       // request; undefined restores the textarea.
       eliciting: this.eliciting?.purpose,

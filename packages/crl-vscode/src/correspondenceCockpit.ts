@@ -2514,6 +2514,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     key?: string; // an occurrence key `<nodeId>~<signature>` — present iff this is an occurrence target
     label: string; // the FULL wording incl. the occurrence signature — the native menu item + the drawer's hover title
     shortLabel: string; // the human header ("this condition" / the concept / the decision) — no verbose signature
+    signature?: string; // #210 (disc 239): the occurrence's guard-path signature (`lib:name/lib:name`) — for the chip label/hover
   }
 
   /** #211 — the prefill for `openFlagDrawer`: the RESOLVED target (chosen host-side, never named by the webview) + optional
@@ -2560,7 +2561,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
     if (occ) {
       const short = occ.isLeaf ? "this recommendation" : "this condition"; // the human header — no verbose signature
-      choices.push({ kind: "decision", name: occ.decision, lib: occ.lib, key: occurrenceKeyValue(occ), label: `${short} (${occ.signature})`, shortLabel: short });
+      choices.push({ kind: "decision", name: occ.decision, lib: occ.lib, key: occurrenceKeyValue(occ), label: `${short} (${occ.signature})`, shortLabel: short, signature: occ.signature });
     }
     return choices;
   }
@@ -3244,10 +3245,25 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       label: c.label,
       shortLabel: c.shortLabel,
     }));
-    // The anchor label = the most specific choice's FULL label (incl. the occurrence signature, e.g. "this condition
-    // (BMI Over 40)") — descriptive enough to tell nodes apart, not the bare "this condition".
-    const anchorLabel = choices.length ? (choices.find((c) => c.key) ?? choices[0]).label : null;
-    return { policy: policyLabel(), anchorLabel, flagTargets, treePaneOpen: !!views.get("tree") };
+    // The chip label + hover (operator feedback): DROP the leading "this", and instead of the full colon-separated signature
+    // show `<type> (<LAST segment>)` — the last colon-segment is the node actually in context (e.g. "condition (BMI Qualifies)").
+    // The hover bullets each segment on its own line (the node path as a readable vertical list). Concept/decision anchors
+    // have no signature → the short label as-is.
+    let anchorLabel: string | null = null;
+    let anchorTitle: string | null = null;
+    if (choices.length) {
+      const c = choices.find((x) => x.key) ?? choices[0];
+      const type = c.shortLabel.replace(/^this /, "");
+      if (c.signature) {
+        const segs = c.signature.split(":").map((s) => s.trim()).filter(Boolean);
+        anchorLabel = `${type} (${segs[segs.length - 1] ?? c.signature})`;
+        anchorTitle = [type, ...segs.map((s) => `• ${s}`)].join("\n");
+      } else {
+        anchorLabel = type;
+        anchorTitle = type;
+      }
+    }
+    return { policy: policyLabel(), anchorLabel, anchorTitle, flagTargets, treePaneOpen: !!views.get("tree") };
   };
   // Resolve the agent's args → a drawer prefill (shared by open + submit): guard MV + the tree pane, re-resolve the opaque
   // target_id against the LIVE choices, and validate the kind against the registry enum. `error` becomes an isError result.

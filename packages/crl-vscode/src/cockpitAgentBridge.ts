@@ -21,8 +21,10 @@ export interface FlagTargetView {
 export interface CockpitAppState {
   /** The open policy (a `.cel` basename), or undefined. */
   policy: string | undefined;
-  /** The short label of the current FLAG ANCHOR (the last flag-capable node the user clicked), or null if none/stale. */
+  /** The concise chip label of the current FLAG ANCHOR ("condition (BMI Qualifies)"), or null if none/stale. */
   anchorLabel: string | null;
+  /** The chip HOVER: the full node path as a bulleted vertical list (each signature segment on its own line). */
+  anchorTitle: string | null;
   /** The flag targets the anchor offers (a `when` offers the concept + this condition; a decision root just the decision). */
   flagTargets: FlagTargetView[];
   /** False when the MV tree pane is hidden/closed — then no node can be perceived or flagged (surfaced honestly, A6/B7). */

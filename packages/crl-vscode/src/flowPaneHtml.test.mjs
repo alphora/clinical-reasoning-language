@@ -129,10 +129,10 @@ check("no <style> or style= inside the SVG (CSP); FLOW_STYLE carries var() + fal
   // #187 Todo 3: the on-path highlight is the SVG-friendly RING (a rect stroke on `.flow-ring>rect`), NOT a CSS outline.
   assert.ok(/\.flow-ring>rect\{[^}]*stroke:/.test(FLOW_STYLE), "SVG-friendly on-path ring (rect stroke)");
   assert.ok(!/\.flow-row\.current>rect\{stroke:/.test(FLOW_STYLE), "Todo 3: .current no longer recolors the base rect stroke COLOUR (a stroke-WIDTH thicken is fine)");
-  // #210 (disc 239): the flag-anchor focus is a WHITE GLOW (drop-shadow — a SEPARATE axis from the rect stroke; a bright
-  // NEUTRAL since every semantic colour is taken), so it does NOT recolor the base border and can't override the protected
-  // .this-node/.current/inferred strokes (gpt55).
-  assert.ok(/\.flow-row\.node-focus>rect\{filter:drop-shadow\([^}]*#ffffff/.test(FLOW_STYLE), "white .node-focus GLOW");
+  // #210 (disc 239): the flag-anchor focus is a THEME-ADAPTIVE neutral GLOW (drop-shadow — a SEPARATE axis from the rect
+  // stroke; every semantic colour is taken), so it does NOT recolor the base border / override the protected strokes (gpt55).
+  assert.ok(/\.flow-row\.node-focus>rect\{filter:drop-shadow\([^}]*#ffffff/.test(FLOW_STYLE), "white .node-focus GLOW (dark theme default)");
+  assert.ok(/body\.vscode-light \.flow-row\.node-focus>rect[^{]*\{filter:drop-shadow\([^}]*#000000/.test(FLOW_STYLE), "black .node-focus GLOW on light themes (adaptive)");
   assert.ok(!/\.flow-row\.node-focus>rect\{[^}]*stroke:/.test(FLOW_STYLE), ".node-focus never recolors the base rect stroke (independent axis)");
 });
 

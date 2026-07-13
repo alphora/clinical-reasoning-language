@@ -759,12 +759,14 @@ export const FLOW_STYLE =
   // on the path", so the focus ("the question you're on") must read differently from a path node (it is not on the path,
   // e.g. a not-adult deny whose Q1 `when` isn't in the reveal cluster). Thicker than `.current` (2.5); `stroke-dasharray:none`.
   `.flow-row.this-node>rect{stroke:var(--vscode-charts-orange,#d18616);stroke-width:3;stroke-dasharray:none}` +
-  // #210 (disc 239): the CRL Assist FOCUS ring — the tree node the agent has as its flag anchor. A WHITE GLOW (drop-shadow),
+  // #210 (disc 239): the CRL Assist FOCUS ring — the tree node the agent has as its flag anchor. A neutral GLOW (drop-shadow),
   // NOT a coloured stroke: EVERY semantic colour in the flowchart is taken (blue=selection, orange=this-node, purple=Inferred,
   // yellow=flags/pending, green/red=verdicts), so a bright NEUTRAL halo is the only non-colliding "the agent is focused here"
   // signal. A glow is a separate visual axis — it leaves every node's border intact + coexists with the protected overlays.
-  // Two shadows for a crisp, punchy halo. (Tuned for dark themes; a light-theme variant would swap to a dark neutral.)
+  // THEME-ADAPTIVE: a WHITE halo pops on a dark canvas (default / HC-dark); on a LIGHT theme swap to a BLACK halo (VS Code
+  // stamps `vscode-light` / `vscode-high-contrast-light` on the webview body) so it never disappears. Two shadows = crisp.
   `.flow-row.node-focus>rect{filter:drop-shadow(0 0 5px #ffffff) drop-shadow(0 0 2px #ffffff)}` +
+  `body.vscode-light .flow-row.node-focus>rect,body.vscode-high-contrast-light .flow-row.node-focus>rect{filter:drop-shadow(0 0 5px #000000) drop-shadow(0 0 2px #000000)}` +
   // #187 Todo 3: the per-case leaf verdict is now the on-path RING (above) — `markLeaves` toggles `.flow-leaf-yes` (TRUE
   // → ring) / `.flow-leaf-no` (false → NOTHING; `.flow-leaf-no` is a RESERVED no-op class, kept so a muted false marker is
   // a cheap re-add if the audit ever needs false≠unevaluated). The old green ✓ / grey ✗ tick glyphs are removed.

@@ -137,7 +137,7 @@ export const CHAT_WEBVIEW_SCRIPT =
   // REHYDRATE: the host is authoritative — replace the whole thread + drive the controls from the render's flags. When
   // `thinking` is set, run the live ticker (a rehydration mid-thinking resumes it from `thinkingSince`); otherwise show the
   // plain status line.
-  `if(m.type==='render'){thread.innerHTML=m.html;const s=!!m.busy;sendBtn.disabled=s;stopBtn.hidden=!s;if(m.chip){chipEl.textContent=m.chip;chipEl.title='Selected in the cockpit — '+m.chip;chipEl.hidden=false;}else{chipEl.hidden=true;}` +
+  `if(m.type==='render'){thread.innerHTML=m.html;const s=!!m.busy;sendBtn.disabled=s;stopBtn.hidden=!s;if(m.chip){chipEl.textContent=m.chip;chipEl.title=m.chipTitle||m.chip;chipEl.hidden=false;}else{chipEl.hidden=true;}` +
   // Elicitation: swap the textarea for the static purpose banner (keep the textarea NODE — just hide it — so its refs survive).
   `if(m.eliciting){elicitEl.textContent=m.eliciting;elicitEl.hidden=false;input.hidden=true;}else{elicitEl.hidden=true;input.hidden=false;}if(m.thinking){showThinking(m.thinkingSince||Date.now());}else{clearThink();statusEl.textContent=m.status||'';}scrollBottom();}` +
   // DELTA: append to the OPEN assistant turn's text node — appendData on a text node, NEVER innerHTML (immune to a tag/entity
