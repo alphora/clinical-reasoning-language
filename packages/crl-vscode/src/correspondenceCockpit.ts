@@ -122,6 +122,7 @@ import {
 } from "./paneOrder";
 import { isConceptHit, isFactHit, isSubQuestionHit, type RevealHit, type WebviewHit } from "./webviewHit";
 import {
+  caseTokenId,
   cockpitAgentBridge,
   flagTargetId,
   type BeginFlagDrawer,
@@ -129,6 +130,9 @@ import {
   type FlagDrawerResult,
   type FlagTargetView,
   type OpenFlagDrawerArgs,
+  type SelectedCaseView,
+  type SetVerdictArgs,
+  type SetVerdictResult,
   type SubmitFlagResult,
 } from "./cockpitAgentBridge";
 import type { CancelToken, ElicitationCancelReason, ElicitationOutcome } from "./agentDrivableUi";
@@ -585,6 +589,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         renderPane("worklist"); // re-render with the widened filter so the selection's reveal (below) finds the case's anchor
       }
     }
+    // #210 Todo D (disc 241 C1): a REAL focused-case change refreshes the agent's app-state (the "Set verdict" badge + the
+    // selected-case chip track the selection). GATED on a CHANGED caseId — `dispatch` also re-runs on same-selection re-drives
+    // (applyVerdict's re-select, restore-highlight after a re-render — :2457/:2960/:3128), which must NOT spam the emitter.
+    // MV-only (a cel selection is MV-only in practice; guard anyway). `getAppState` reads live state, so no payload here.
+    if (mode === "medical-validation" && prevCaseId !== nextCid) cockpitAgentBridge.notifyChanged();
     for (const e of effects) applyReveal(e);
     onNav.fire(undefined);
     reflectSelectionToTree();
@@ -3235,6 +3244,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (mode !== "medical-validation" || !flagAnchor || flagAnchor.cel !== currentCel || !views.get("tree")) return [];
     return flagTargetChoices(flagAnchor.hit);
   };
+  // #210 Todo D (disc 241, impl review) — a case is verdict-settable iff MV + a sidecar to persist into + it's in the LIVE
+  // reviewable set. The SHARED accept predicate: `getAppState.selectedCase` (badge availability) uses it so the "Set verdict"
+  // badge can't show for a case `bridgeSetVerdict` (which guards MV + `mvSidecarPath`) would reject (I1 — the mvSidecarPath half).
+  const canReviewCase = (caseId: string): boolean => mode === "medical-validation" && !!mvSidecarPath && scenarioByCaseId.has(caseId);
   const getAppState = (): CockpitAppState | undefined => {
     // No MV cockpit if not in MV mode OR every pane was closed (A16 — the chip hides on a full cockpit close, not lingering
     // on "no tree pane"; `mode` stays MV after the last pane disposes, so the `views.size` check is what drops it).
@@ -3270,7 +3283,21 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         anchorTitle = type;
       }
     }
-    return { policy: policyLabel(), anchorLabel, anchorTitle, flagTargets, treePaneOpen: !!views.get("tree") };
+    // #210 Todo D (disc 241): the selected review case (the set_verdict target). Non-null ONLY for a case the bridge would
+    // ACCEPT — `canReviewCase` mirrors `bridgeSetVerdict`'s guards (MV + a sidecar to persist into + live membership), so the
+    // "Set verdict" badge (isAvailable = !!selectedCase) never shows for a case set_verdict would reject (disc 241 I1; the
+    // `mvSidecarPath` half caught in impl review — a non-policy .cel renders selectable cases but has no sidecar). A SHARED
+    // predicate keeps the two sites from drifting. Tree-INDEPENDENT. The `token` embeds `currentCel` (no cross-policy collision — C2).
+    const sel = state.selection;
+    const selectedCase: SelectedCaseView | null =
+      sel && sel.primary === "cel" && canReviewCase(sel.caseId)
+        ? {
+            token: caseTokenId(currentCel, sel.caseId),
+            label: labelInPrimary(sel.caseId, "cel").label,
+            verdictLabel: REVIEW_LABEL[reviewByCaseId[sel.caseId] ?? "unreviewed"],
+          }
+        : null;
+    return { policy: policyLabel(), anchorLabel, anchorTitle, flagTargets, treePaneOpen: !!views.get("tree"), selectedCase };
   };
   // Resolve the agent's args → a drawer prefill (shared by open + submit): guard MV + the tree pane, re-resolve the opaque
   // target_id against the LIVE choices, and validate the kind against the registry enum. `error` becomes an isError result.
@@ -3318,11 +3345,40 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // `issued` = an issue was already created before the write failed → the agent must NOT retry (would POST a duplicate).
     return outcome.ok ? { ok: true, message: outcome.note } : { ok: false, reason: outcome.note, issued: !!outcome.ref };
   };
+  // #210 Todo D (disc 241) — set a case's verdict via the SHARED guarded persist path (`applyVerdict`). Re-resolve the opaque
+  // `caseToken` → the live caseId by hashing each reviewable caseId under the CURRENT cel. This writes the case the AGENT NAMED
+  // (the token it was given), NOT the live selection — so a mid-turn re-selection can't redirect the write (C2). A token whose
+  // case is GONE (removed on rebuild, or a cross-policy retarget → a different cel hashes differently) finds NO match → rejected.
+  // COLLISION-SAFE (gpt55 impl review): `caseTokenId` is a 32-bit djb2, so require EXACTLY ONE match — 0 = gone, >1 = an
+  // (astronomically rare) intra-policy hash collision → reject as ambiguous rather than write the wrong case. Synchronous: no
+  // await between resolve + apply, so no `pickVerdictLoop`-style stale-guard is needed (applyVerdict re-checks MV + sidecar
+  // synchronously). Reasons are pre-classified (bad verdict / no-or-ambiguous match / save fail) for the agent to relay + retry
+  // (I3/I4). notifyChanged so the agent's NEXT perception reflects the new verdict (applyVerdict's same-case re-select does not
+  // fire the dispatch emitter — C1 gate).
+  const bridgeSetVerdict = (args: SetVerdictArgs): SetVerdictResult => {
+    if (mode !== "medical-validation" || !mvSidecarPath) return { ok: false, reason: "the Medical Validation cockpit is not open — open it first" };
+    if (!isReviewState(args.verdict)) return { ok: false, reason: `"${args.verdict}" is not a valid verdict — use pass, fail, pending, or unreviewed.` };
+    const matches = [...scenarioByCaseId.keys()].filter((id) => caseTokenId(currentCel, id) === args.caseToken);
+    if (matches.length !== 1) {
+      return {
+        ok: false,
+        reason:
+          matches.length === 0
+            ? "that case is no longer the reviewable selection — ask the validator to re-select the case, then try again."
+            : "that case reference is ambiguous — ask the validator to re-select the case, then try again.",
+      };
+    }
+    const caseId = matches[0];
+    if (!applyVerdict(caseId, args.verdict)) return { ok: false, reason: "the verdict could not be saved (the review sidecar write failed) — it was NOT changed." };
+    cockpitAgentBridge.notifyChanged();
+    return { ok: true, message: `${labelInPrimary(caseId, "cel").label} → ${REVIEW_LABEL[args.verdict]}` };
+  };
   context.subscriptions.push(
     cockpitAgentBridge.register({
       getAppState,
       beginFlagDrawer: bridgeBeginFlagDrawer,
       submitFlag: bridgeSubmitFlag,
+      setVerdict: bridgeSetVerdict,
       getValidationKinds: validationKinds,
     }),
   );

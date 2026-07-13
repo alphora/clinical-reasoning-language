@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./test-harness.mjs";
 
-const { appStateBlock, buildSystemPrompt, openFlagDrawerTool, submitFlagTool, OPEN_FLAG_DRAWER, SUBMIT_FLAG, DEFAULT_VALIDATION_KINDS } = await load("editorAgentPrompt.ts");
+const { appStateBlock, buildSystemPrompt, openFlagDrawerTool, submitFlagTool, setVerdictTool, OPEN_FLAG_DRAWER, SUBMIT_FLAG, SET_VERDICT, VERDICT_VALUES, DEFAULT_VALIDATION_KINDS } = await load("editorAgentPrompt.ts");
 
 test("appStateBlock: no cockpit → asks the validator to open one", () => {
   assert.match(appStateBlock(undefined), /No Medical Validation cockpit/);
@@ -40,6 +40,44 @@ test("buildSystemPrompt: base skill (submit is the default, never hand-edits CRL
   assert.match(p, /never hand-edit CRL/);
   assert.match(p, new RegExp(SUBMIT_FLAG));
   assert.match(p, /No Medical Validation cockpit/);
+});
+
+test("buildSystemPrompt: teaches set_verdict AND forbids guessing a verdict (disc 241 I5)", () => {
+  const p = buildSystemPrompt(undefined);
+  assert.match(p, new RegExp(SET_VERDICT));
+  assert.match(p, /NEVER call set_verdict with a verdict the validator did not state/);
+});
+
+// #210 Todo D (disc 241) — the selected-case line (the set_verdict target) is tree-INDEPENDENT.
+test("appStateBlock: a selected case → a Selected case line with its label, current verdict, and opaque case_id", () => {
+  const b = appStateBlock({
+    policy: "p", anchorLabel: null, anchorTitle: null, flagTargets: [], treePaneOpen: true,
+    selectedCase: { token: "c7", label: "Patient A — BMI 42", verdictLabel: "To do" },
+  });
+  assert.match(b, /Selected case: Patient A — BMI 42 \(current verdict: To do\)/);
+  assert.match(b, /case_id="c7"/);
+});
+
+test("appStateBlock: the Selected case line SURVIVES a closed tree pane (verdict is worklist-only — disc 241 I11)", () => {
+  const b = appStateBlock({
+    policy: "p", anchorLabel: null, anchorTitle: null, flagTargets: [], treePaneOpen: false,
+    selectedCase: { token: "c7", label: "Patient A", verdictLabel: "Pass" },
+  });
+  assert.match(b, /Selected case: Patient A \(current verdict: Pass\)/, "the verdict target shows even with the tree closed");
+  assert.match(b, /tree pane is closed/, "and the flag section still honestly reports the closed tree");
+});
+
+test("appStateBlock: no selected case → no Selected case line", () => {
+  const b = appStateBlock({ policy: "p", anchorLabel: null, anchorTitle: null, flagTargets: [], treePaneOpen: true, selectedCase: null });
+  assert.doesNotMatch(b, /Selected case:/);
+});
+
+test("setVerdictTool: requires case_id + verdict; enumerates the four verdict values", () => {
+  const t = setVerdictTool();
+  assert.equal(t.name, SET_VERDICT);
+  assert.deepEqual(t.inputSchema.required, ["case_id", "verdict"]);
+  assert.deepEqual(t.inputSchema.properties.verdict.enum, VERDICT_VALUES);
+  assert.deepEqual(VERDICT_VALUES, ["pass", "fail", "pending", "unreviewed"]);
 });
 
 test("submitFlagTool: the default flag action — requires target_id + summary; enumerates the kinds", () => {

@@ -18,7 +18,8 @@ import {
 } from "./agentModelProvider";
 import { runAgentTurn, type ToolRegistry } from "./agentToolLoop";
 import { cockpitAgentBridge } from "./cockpitAgentBridge";
-import { appStateBlock, buildSystemPrompt, OPEN_FLAG_DRAWER, openFlagDrawerTool, SUBMIT_FLAG, submitFlagTool } from "./editorAgentPrompt";
+import { availableCapabilities } from "./agentCapabilities";
+import { appStateBlock, buildSystemPrompt, OPEN_FLAG_DRAWER, openFlagDrawerTool, SET_VERDICT, setVerdictTool, SUBMIT_FLAG, submitFlagTool } from "./editorAgentPrompt";
 import type { ActiveElicitation } from "./agentDrivableUi";
 import { anthropicErrorLabel } from "./anthropicClient";
 import { CHAT_BODY, CHAT_STYLE, CHAT_WEBVIEW_SCRIPT, renderChatThread, type ChatEntry } from "./chatPaneHtml";
@@ -179,6 +180,9 @@ class AgentChat implements vscode.WebviewViewProvider {
       // #210 (disc 239) — the static elicitation banner (a purpose line) replaces the input while an app UI is the open
       // request; undefined restores the textarea.
       eliciting: this.eliciting?.purpose,
+      // #210 Todo D (disc 241) — the capability BADGES for the current context (the "what can I do here" strip). Resolved from
+      // the live app-state; the webview builds one button per entry (disabled while busy/eliciting). Empty ⇒ no strip.
+      capabilities: availableCapabilities(cockpitAgentBridge.getAppState()),
     });
   }
 
@@ -275,20 +279,40 @@ class AgentChat implements vscode.WebviewViewProvider {
     // per turn — A15). The registry NEVER writes CRL: it opens the cockpit drawer prefilled via the bridge.
     const system = buildSystemPrompt(cockpitAgentBridge.getAppState());
     const kinds = cockpitAgentBridge.getValidationKinds();
-    // open (the default) is listed FIRST — some models weight earlier tools, and we don't want a nudge toward the durable
-    // submit path (reviewers [nit], reinforcing the prompt's explicit-only submit).
-    const tools = [openFlagDrawerTool(kinds), submitFlagTool(kinds)];
+    // Order matters (some models weight earlier tools — gpt55): set_verdict FIRST (the primary review action, a distinct
+    // intent — no nudge concern), then the flag pair with open (the default) BEFORE submit so there's no lean toward the
+    // durable submit path (reinforcing the prompt's explicit-only submit).
+    const tools = [setVerdictTool(), openFlagDrawerTool(kinds), submitFlagTool(kinds)];
     let acted = false;
     // A recoverable error result carries the FRESH app-state (targets + their current ids) so the model can retry in the
     // same loop after a selection change — C has no separate read tool (A14).
     const recoverable = (reason: string) => ({ content: `${reason}\n${appStateBlock(cockpitAgentBridge.getAppState())}`, isError: true });
+    // ONE durable action per turn total — a verdict XOR a flag (a second call, of either kind, is refused). Kept action-generic
+    // (disc 241 I2), so verdict-then-flag / flag-then-verdict / a duplicate verdict all bounce with the same neutral copy.
+    const alreadyActed = { content: "an action was already taken this turn — finish that one before starting another", isError: true } as const;
     const registry: ToolRegistry = {
       run: async (name, input) => {
+        const inObj = (input ?? {}) as Record<string, unknown>;
+        // #210 Todo D (disc 241) — set_verdict is routed FIRST: it has no target_id, so it must branch before the flag-only
+        // target_id requirement below. A durable but reversible sidecar write via the bridge (synchronous, no elicitation).
+        if (name === SET_VERDICT) {
+          // The one-action guard comes FIRST — a second call after an action already fired this turn bounces with the generic
+          // copy, not a misleading "case_id is required" if the second call also happens to be malformed (impl review [nit]).
+          if (acted) return alreadyActed;
+          const caseToken = inObj.case_id;
+          const verdict = inObj.verdict;
+          if (typeof caseToken !== "string" || !caseToken) return recoverable("case_id is required — use the one from the [cockpit] Selected case line (if there's none, ask the validator to select a case first).");
+          if (typeof verdict !== "string" || !verdict) return recoverable("verdict is required — pass, fail, pending, or unreviewed (ask the validator if unstated).");
+          const res = cockpitAgentBridge.setVerdict({ caseToken, verdict });
+          if (!res.ok) return recoverable(res.reason); // moved selection / bad verdict / save failure — the model can retry
+          acted = true;
+          return { content: res.message }; // "Patient A → Pass" — the agent relays it
+        }
         if (name !== OPEN_FLAG_DRAWER && name !== SUBMIT_FLAG) return { content: `unknown tool "${name}"`, isError: true };
-        const a = (input ?? {}) as { target_id?: unknown; validation_kind?: unknown; summary?: unknown; description?: unknown };
+        const a = inObj as { target_id?: unknown; validation_kind?: unknown; summary?: unknown; description?: unknown };
         if (typeof a.target_id !== "string" || !a.target_id) return recoverable("target_id is required — use one from the flag-targets list.");
-        // One flag action per turn — a second call (or a duplicate in one message) is refused (A15).
-        if (acted) return { content: "a flag was already filed/opened this turn — finish that one first", isError: true };
+        // One durable action per turn — a second call (or a duplicate in one message) is refused (A15 / disc 241 I2).
+        if (acted) return alreadyActed;
         const args = {
           targetId: a.target_id,
           validationKind: typeof a.validation_kind === "string" ? a.validation_kind : undefined,
@@ -397,8 +421,9 @@ class AgentChat implements vscode.WebviewViewProvider {
     } else if (d.type === "tool_use") {
       if (this.partial) this.transcript.push({ kind: "assistant", text: this.partial, thoughtMs: this.thoughtMs });
       // Neutral phrasing keyed on the tool: the model REQUESTED the action (true regardless of whether it then executes or
-      // is cancelled/fails — the drawer's appearance + the follow-up reply convey the outcome).
-      this.transcript.push({ kind: "status", text: d.name === SUBMIT_FLAG ? "⚑ filing a flag…" : "⚑ opening the flag drawer…" });
+      // is cancelled/fails — the app change + the follow-up reply convey the outcome).
+      const actLabel = d.name === SET_VERDICT ? "⚖ setting the verdict…" : d.name === SUBMIT_FLAG ? "⚑ filing a flag…" : "⚑ opening the flag drawer…";
+      this.transcript.push({ kind: "status", text: actLabel });
       this.partial = "";
       this.thinking = false;
       this.thinkingSince = undefined;

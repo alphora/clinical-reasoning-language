@@ -17,6 +17,18 @@ export interface FlagTargetView {
   shortLabel: string;
 }
 
+/** The review case currently selected in the cockpit (the `set_verdict` target). Tree-INDEPENDENT — a verdict works with just
+ *  the worklist pane open. `token` is an OPAQUE, cel-embedded id (like `flagTargetId`) the agent passes back to `set_verdict`;
+ *  the bridge re-resolves it against the LIVE reviewable set, so a selection that moved (or a cross-policy retarget) is
+ *  rejected rather than writing the wrong case (disc 241 C2). Non-null ONLY for a live reviewable cel selection (disc 241 I1). */
+export interface SelectedCaseView {
+  token: string;
+  /** The human case label ("Patient A — BMI 42"). */
+  label: string;
+  /** The current verdict, humanized ("To do" / "Pending" / "Pass" / "Fail"). */
+  verdictLabel: string;
+}
+
 /** The cockpit app-state the agent perceives. `undefined` (from `getAppState`) means no MV cockpit is open. */
 export interface CockpitAppState {
   /** The open policy (a `.cel` basename), or undefined. */
@@ -29,6 +41,8 @@ export interface CockpitAppState {
   flagTargets: FlagTargetView[];
   /** False when the MV tree pane is hidden/closed — then no node can be perceived or flagged (surfaced honestly, A6/B7). */
   treePaneOpen: boolean;
+  /** The selected review case (the `set_verdict` target), or null when no live reviewable case is selected (disc 241). */
+  selectedCase: SelectedCaseView | null;
 }
 
 export interface OpenFlagDrawerArgs {
@@ -43,6 +57,17 @@ export interface OpenFlagDrawerArgs {
  *  (issue created / no issue + reason) the agent reports back in chat. On failure, `issued` = a GitHub issue was ALREADY
  *  created before the write failed, so the caller must NOT retry (a retry would POST a duplicate issue). */
 export type SubmitFlagResult = { ok: true; message: string } | { ok: false; reason: string; issued?: boolean };
+
+/** #210 Todo D (disc 241) — the args the agent passes to `set_verdict`. `caseToken` is the OPAQUE cel-embedded id from the
+ *  [cockpit] selected-case line (NOT a raw caseId — the cockpit re-resolves it against the live set); `verdict` is the raw
+ *  state string ("pass"/"fail"/"pending"/"unreviewed"), validated by the cockpit against the known ReviewState set. */
+export interface SetVerdictArgs {
+  caseToken: string;
+  verdict: string;
+}
+/** The result of a `set_verdict` — `ok` + a human outcome ("Patient A → Pass"), or an actionable reason (no case matches /
+ *  bad verdict / save failed) the agent relays + can act on (recoverable). A pure synchronous write (no external I/O). */
+export type SetVerdictResult = { ok: true; message: string } | { ok: false; reason: string };
 
 /** The `completed` payload of a driven flag drawer — the human filed it; `message` is the outcome the agent relays. */
 export interface FlagDrawerResult {
@@ -65,6 +90,10 @@ export interface CockpitAgentHooks {
   /** Fill AND submit the flag autonomously — writes it into the .crl + opens a GitHub issue (reuses the human Insert path).
    *  Settles any pending elicitation `{replaced}` first (it shares the singleton drawer). */
   submitFlag(args: OpenFlagDrawerArgs): Promise<SubmitFlagResult>;
+  /** #210 Todo D (disc 241) — set a case's review verdict. Re-resolves the opaque `caseToken` → the live caseId (rejects a
+   *  moved selection / cross-policy retarget), then reuses the cockpit's guarded verdict persist path (`applyVerdict` — MV +
+   *  sidecar guarded, memory-committed-only-after-disk, re-drives the worklist/tree/mvComplete chrome). Synchronous (no I/O). */
+  setVerdict(args: SetVerdictArgs): SetVerdictResult;
   /** The registry's `validation-concern` `kind` enum values (source of truth) — for the tool schema + the prompt hint. */
   getValidationKinds(): string[];
 }
@@ -78,6 +107,18 @@ export function flagTargetId(parts: { cel: string | undefined; kind: string; lib
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
   return "t" + h.toString(36);
+}
+
+/** #210 Todo D (disc 241) — a DETERMINISTIC opaque id for a review case, embedding the policy `cel` so a DIFFERENT policy
+ *  hashes to a DIFFERENT token (a cross-policy retarget can't collide onto the same case — disc 241 C2). The bridge injects
+ *  it into the [cockpit] block; the agent passes it to `set_verdict`; the cockpit re-resolves it by hashing each LIVE
+ *  reviewable caseId under the CURRENT cel and matching — a moved selection / stale token simply finds no match. The "c"
+ *  prefix keeps it disjoint from a flag target's "t" id. Same shape as `flagTargetId` (djb2). */
+export function caseTokenId(cel: string | undefined, caseId: string): string {
+  const s = `${cel ?? ""}|${caseId}`;
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return "c" + h.toString(36);
 }
 
 class CockpitAgentBridge {
@@ -129,6 +170,13 @@ class CockpitAgentBridge {
   async submitFlag(args: OpenFlagDrawerArgs): Promise<SubmitFlagResult> {
     if (!this.hooks) return { ok: false, reason: "the Medical Validation cockpit is not open — open it first" };
     return this.hooks.submitFlag(args);
+  }
+
+  /** #210 Todo D (disc 241) — set a case's verdict via the cockpit's guarded persist path. Synchronous. `{ok:false}` when no
+   *  cockpit is open OR the cockpit rejects (moved selection / bad verdict / save failure) — the tool surfaces it recoverably. */
+  setVerdict(args: SetVerdictArgs): SetVerdictResult {
+    if (!this.hooks) return { ok: false, reason: "the Medical Validation cockpit is not open — open it first" };
+    return this.hooks.setVerdict(args);
   }
 
   dispose(): void {

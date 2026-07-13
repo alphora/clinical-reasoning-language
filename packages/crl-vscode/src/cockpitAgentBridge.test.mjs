@@ -30,7 +30,7 @@ async function loadBridge() {
   await build({ entryPoints: [resolve(here, "cockpitAgentBridge.ts")], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent", plugins: [stubVscode] });
   return require(out);
 }
-const { flagTargetId, cockpitAgentBridge } = await loadBridge();
+const { flagTargetId, caseTokenId, cockpitAgentBridge } = await loadBridge();
 
 test("flagTargetId: deterministic — same identity → same OPAQUE id (idempotent re-mint on a chip refresh)", () => {
   const a = flagTargetId({ cel: "p.cel", kind: "decision", lib: "L", name: "D", key: "n~sig" });
@@ -53,23 +53,39 @@ test("flagTargetId: a different policy (cel) → a different id (no cross-policy
   );
 });
 
+// #210 Todo D (disc 241) — caseTokenId (the opaque, cel-embedded review-case id for set_verdict).
+test("caseTokenId: deterministic — same (cel, caseId) → same OPAQUE id, with a 'c' prefix (disjoint from a flag 't' id)", () => {
+  const a = caseTokenId("p.cel", "case-1");
+  assert.equal(a, caseTokenId("p.cel", "case-1"));
+  assert.match(a, /^c[0-9a-z]+$/, "opaque; 'c' prefix keeps it disjoint from a flag target's 't' id");
+});
+
+test("caseTokenId: a different case OR a different policy (cel) → a different id (no cross-policy collision — C2)", () => {
+  assert.notEqual(caseTokenId("p.cel", "case-1"), caseTokenId("p.cel", "case-2"));
+  assert.notEqual(caseTokenId("a.cel", "case-1"), caseTokenId("b.cel", "case-1"));
+});
+
 const fakeToken = { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {} }) };
 
-test("bridge.beginFlagDrawer/submitFlag: no cockpit registered → an actionable reason (not ok)", async () => {
+test("bridge.beginFlagDrawer/submitFlag/setVerdict: no cockpit registered → an actionable reason (not ok)", async () => {
   const o = cockpitAgentBridge.beginFlagDrawer({ targetId: "x" }, fakeToken);
   assert.match(o.error, /not open/);
   const s = await cockpitAgentBridge.submitFlag({ targetId: "x" });
   assert.equal(s.ok, false);
   assert.match(s.reason, /not open/);
+  const v = cockpitAgentBridge.setVerdict({ caseToken: "c1", verdict: "pass" });
+  assert.equal(v.ok, false);
+  assert.match(v.reason, /not open/);
 });
 
 test("bridge: register delegates getAppState/getValidationKinds/beginFlagDrawer/submitFlag; dispose clears them", async () => {
   let fired = 0;
   cockpitAgentBridge.onDidChangeAppState(() => fired++);
   const disp = cockpitAgentBridge.register({
-    getAppState: () => ({ policy: "p", anchorLabel: "n", flagTargets: [], treePaneOpen: true }),
+    getAppState: () => ({ policy: "p", anchorLabel: "n", flagTargets: [], treePaneOpen: true, selectedCase: null }),
     beginFlagDrawer: (a) => ({ wait: Promise.resolve({ status: "cancelled", reason: "cancelled" }), purpose: `flag ${a.targetId}` }),
     submitFlag: async (a) => ({ ok: true, message: `filed on ${a.targetId}` }),
+    setVerdict: (a) => ({ ok: true, message: `${a.caseToken} → ${a.verdict}` }),
     getValidationKinds: () => ["underspecified"],
   });
   assert.ok(fired >= 1, "register fires the change event (the chip refreshes)");
@@ -77,9 +93,11 @@ test("bridge: register delegates getAppState/getValidationKinds/beginFlagDrawer/
   assert.deepEqual(cockpitAgentBridge.getValidationKinds(), ["underspecified"]);
   assert.equal(cockpitAgentBridge.beginFlagDrawer({ targetId: "x" }, fakeToken).purpose, "flag x");
   assert.deepEqual(await cockpitAgentBridge.submitFlag({ targetId: "z" }), { ok: true, message: "filed on z" });
+  assert.deepEqual(cockpitAgentBridge.setVerdict({ caseToken: "c9", verdict: "fail" }), { ok: true, message: "c9 → fail" });
   disp.dispose();
   assert.equal(cockpitAgentBridge.getAppState(), undefined, "dispose clears the hooks");
   assert.deepEqual(cockpitAgentBridge.getValidationKinds(), []);
+  assert.equal(cockpitAgentBridge.setVerdict({ caseToken: "c9", verdict: "fail" }).ok, false, "setVerdict is not-ok once the hooks are cleared");
 });
 
 console.log("cockpitAgentBridge.test: ok");

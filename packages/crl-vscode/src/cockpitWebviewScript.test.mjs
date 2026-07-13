@@ -1004,4 +1004,23 @@ check("tree zoom: Ctrl+wheel (flow pane only, passive:false) + the − / reset /
   assert.doesNotMatch(SCRIPT, /keydown[\s\S]*?setZoom/); // no keyboard zoom leg — it collides with VS Code's global zoom
 });
 
+// ── #210 Todo D (disc 241): the capability registry / set_verdict HOST wiring (source-grep locks) ──
+check("Todo D C1: a REAL focused-case change fires the agent bridge (badge/chip track the selection), GATED on prevCaseId !== nextCid", () => {
+  // The badge row won't update on selection unless dispatch notifies — but the guard must be a CHANGED caseId (dispatch
+  // re-runs on same-selection re-drives, which must not spam the emitter).
+  assert.match(COCKPIT_SRC, /mode === "medical-validation" && prevCaseId !== nextCid\) cockpitAgentBridge\.notifyChanged\(\)/);
+});
+check("Todo D I1: getAppState.selectedCase uses the SHARED canReviewCase predicate (MV + mvSidecarPath + live membership) — badge == bridge accept", () => {
+  // The "Set verdict" badge (isAvailable = !!selectedCase) must agree with bridgeSetVerdict's accept guards, else a dead badge.
+  assert.match(COCKPIT_SRC, /const canReviewCase = \(caseId: string\): boolean => mode === "medical-validation" && !!mvSidecarPath && scenarioByCaseId\.has\(caseId\)/);
+  assert.match(COCKPIT_SRC, /sel && sel\.primary === "cel" && canReviewCase\(sel\.caseId\)/);
+  assert.match(COCKPIT_SRC, /token: caseTokenId\(currentCel, sel\.caseId\)/); // the opaque, cel-embedded id (C2)
+});
+check("Todo D C2: bridgeSetVerdict re-resolves the opaque caseToken → the LIVE caseId; requires EXACTLY ONE match (collision-safe)", () => {
+  assert.match(COCKPIT_SRC, /\[\.\.\.scenarioByCaseId\.keys\(\)\]\.filter\(\(id\) => caseTokenId\(currentCel, id\) === args\.caseToken\)/);
+  assert.match(COCKPIT_SRC, /if \(matches\.length !== 1\)/); // 0 = gone → reject; >1 = a djb2 collision → reject as ambiguous, never a wrong-case write
+  assert.match(COCKPIT_SRC, /if \(!isReviewState\(args\.verdict\)\) return \{ ok: false/); // bad verdict classified
+  assert.match(COCKPIT_SRC, /if \(!applyVerdict\(caseId, args\.verdict\)\) return \{ ok: false/); // reuses the guarded persist path; save-fail classified
+});
+
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);

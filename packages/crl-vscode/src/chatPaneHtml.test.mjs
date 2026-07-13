@@ -60,6 +60,7 @@ test("CHAT_BODY: the thread + input controls exist with their data-hooks", () =>
   assert.match(CHAT_BODY, /data-chat-stop[^>]*hidden/, "Stop starts hidden (shown only while streaming)");
   assert.match(CHAT_BODY, /data-chat-clear/);
   assert.match(CHAT_BODY, /data-chat-status/);
+  assert.match(CHAT_BODY, /data-chat-caps/, "#210 Todo D — the capability badge strip exists");
 });
 
 // ── CHAT_WEBVIEW_SCRIPT: the message protocol (string-level, like COCKPIT_WEBVIEW_SCRIPT) ──
@@ -123,6 +124,35 @@ test("SCRIPT: the thinking-state path exists — a live 'thinking… Ns' ticker 
   // the first delta clears the ticker (thinking → text)
   const deltaBody = S.slice(S.indexOf("m.type==='delta'"), S.indexOf("m.type==='delta'") + 360);
   assert.match(deltaBody, /clearThink\(\)/, "a text delta clears the thinking ticker");
+});
+
+// ── #210 Todo D (disc 241): the capability badge strip ──
+
+test("SCRIPT: renderCaps builds badges via textContent + a per-button click closure (data, NEVER host HTML — CSP)", () => {
+  const start = S.indexOf("const renderCaps=");
+  const caps = S.slice(start, S.indexOf("capsEl.appendChild(b);}};", start) + 25); // bound to the renderCaps body (not the render handler after it)
+  assert.match(caps, /createElement\('button'\)/, "buttons are created in the DOM, not injected as host HTML");
+  assert.match(caps, /b\.textContent=c\.label/, "the label is set via textContent (XSS-safe)");
+  assert.ok(!/innerHTML/.test(caps), "renderCaps never assigns innerHTML");
+  assert.match(caps, /b\.disabled=disabled/, "each badge honors the disabled flag");
+});
+
+test("SCRIPT: a prompt-badge SENDS its text; a fillInput-badge PREFILLS the composer only when empty (never clobbers a draft)", () => {
+  const start = S.indexOf("const renderCaps=");
+  const caps = S.slice(start, S.indexOf("capsEl.appendChild(b);}};", start) + 25); // bound to the renderCaps body (not the render handler after it)
+  assert.match(caps, /act\.kind==='prompt'.*postMessage\(\{type:'chatSend',text:act\.text/s, "prompt → chatSend");
+  assert.match(caps, /act\.kind==='fillInput'\)\{if\(!input\.value\)\{input\.value=act\.text/, "fillInput fills ONLY when the draft is empty");
+  assert.match(caps, /input\.focus\(\)/, "fillInput focuses the composer");
+});
+
+test("SCRIPT: render rebuilds the badge row, disabled while busy OR eliciting (mirrors Send)", () => {
+  assert.match(S, /renderCaps\(m\.capabilities,s\|\|!!m\.eliciting\)/, "badges disabled when busy (s) or eliciting");
+});
+
+test("STYLE: the capability badge is a purple-outlined pill (the CRL Assist accent), disabled dims", () => {
+  const cap = CHAT_STYLE.match(/\.chat-cap\{[^}]*\}/)?.[0] ?? "";
+  assert.match(cap, /border:1px solid var\(--vscode-charts-purple,#c586c0\)/, "purple outline");
+  assert.match(CHAT_STYLE, /\.chat-cap:disabled\{opacity:\.4/, "disabled badges dim");
 });
 
 console.log("chatPaneHtml.test: ok");

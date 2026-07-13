@@ -9,6 +9,11 @@ import type { CockpitAppState } from "./cockpitAgentBridge";
 
 export const OPEN_FLAG_DRAWER = "open_flag_drawer";
 export const SUBMIT_FLAG = "submit_flag";
+export const SET_VERDICT = "set_verdict";
+
+/** The verdict values `set_verdict` accepts (the raw ReviewState set — the cockpit validates authoritatively). `unreviewed`
+ *  resets a case to "To do". Kept here (not imported from the store) so this module stays fs/vscode-free + node-testable. */
+export const VERDICT_VALUES = ["pass", "fail", "pending", "unreviewed"];
 
 /** Fallback kinds for the tool schema when no cockpit is registered (so the schema is still meaningful). The bridge
  *  validates AUTHORITATIVELY against the live registry — this list is only the schema hint. */
@@ -25,6 +30,12 @@ const BASE_PROMPT =
   `- ${SUBMIT_FLAG} fills AND submits autonomously — writes the flag into the .crl + opens a GitHub issue with no drawer step. ` +
   `Use it ONLY when the validator EXPLICITLY said to submit/file (e.g. "flag this and submit", "file it") AND you already ` +
   `have a summary + description. In every other case use ${OPEN_FLAG_DRAWER} and let the drawer collect the rest.\n\n` +
+  "You can also SET A CASE'S REVIEW VERDICT (its pass/fail/pending state in the worklist):\n" +
+  `- ${SET_VERDICT} sets the verdict of the case in the [cockpit] Selected case line. Pass its case_id (from that line) and ` +
+  "the verdict the validator STATED (pass / fail / pending, or unreviewed to reset it to \"To do\"). NEVER call " +
+  `${SET_VERDICT} with a verdict the validator did not state — ASK them (\"pass, fail, or pending?\") first. State what ` +
+  "you're setting (e.g. \"Marking <case> as Pass\") before you call it. The write updates the worklist immediately. If there " +
+  "is NO Selected case line in the [cockpit] block, ask the validator to select a case in the worklist first.\n\n" +
   "Guidance:\n" +
   `- To raise a flag, just call ${OPEN_FLAG_DRAWER} with whatever the validator gave you (target + summary + description + ` +
   "kind, whichever you have). Don't ask for missing pieces first — the drawer does that.\n" +
@@ -37,16 +48,25 @@ const BASE_PROMPT =
   "- Pick the flag target that matches the concern (a whole decision, a concept's every use, or one condition/recommendation).\n" +
   "- Be concise.";
 
-/** The compact app-state block injected into the system prompt each turn (A9). The chip mirrors the anchor visually. */
+/** The compact app-state block injected into the system prompt each turn (A9). The chip mirrors the anchor visually. The
+ *  SELECTED-CASE line (for `set_verdict`) is tree-INDEPENDENT, so it's emitted BEFORE the tree-dependent flag section — a
+ *  case can be verdict-set with only the worklist open (disc 241 I11). */
 export function appStateBlock(state: CockpitAppState | undefined): string {
   if (!state) {
     return "\n\n[cockpit] No Medical Validation cockpit is open — ask the validator to open one (\"CRL: Show Medical Validation\") before flagging.";
   }
-  if (!state.treePaneOpen) {
-    return `\n\n[cockpit] Policy: ${state.policy ?? "(none)"}. The tree pane is closed — reopen it before a node can be perceived or flagged.`;
-  }
   const lines = [`\n\n[cockpit] Policy: ${state.policy ?? "(none)"}.`];
-  if (!state.anchorLabel || state.flagTargets.length === 0) {
+  // The selected review case (the set_verdict target) — survives a closed tree pane (verdict is worklist-only, disc 241 I11).
+  if (state.selectedCase) {
+    lines.push(
+      `Selected case: ${state.selectedCase.label} (current verdict: ${state.selectedCase.verdictLabel}). ` +
+        `To set its verdict, call ${SET_VERDICT} with case_id="${state.selectedCase.token}".`,
+    );
+  }
+  // The flag anchor + targets — tree-DEPENDENT (a node can only be perceived/flagged with the tree pane open).
+  if (!state.treePaneOpen) {
+    lines.push("The tree pane is closed — reopen it before a node can be perceived or flagged.");
+  } else if (!state.anchorLabel || state.flagTargets.length === 0) {
     lines.push("Flag anchor: none yet — ask the validator to click a decision or condition in the tree.");
   } else {
     lines.push(`Flag anchor: ${state.anchorLabel}.`);
@@ -96,5 +116,26 @@ export function submitFlagTool(validationKinds: string[]): ToolSpec {
       "target_id + a one-line summary; include the description + kind when known. Ask for anything missing first, and state " +
       "what you're filing before you call this.",
     inputSchema: { type: "object", properties: flagProps(validationKinds), required: ["target_id", "summary"] },
+  };
+}
+
+/** #210 Todo D (disc 241) — the `set_verdict` tool: set the selected review case's verdict. Both args required — `case_id`
+ *  (the opaque id from the [cockpit] Selected case line; the cockpit re-resolves it, rejecting a moved selection) + `verdict`
+ *  (the value the validator stated; NEVER guessed). A durable write to the review sidecar — reversible (set again). */
+export function setVerdictTool(): ToolSpec {
+  return {
+    name: SET_VERDICT,
+    description:
+      "Set a review case's verdict in the worklist (a durable write; reversible by setting it again). Pass case_id from the " +
+      "[cockpit] Selected case line and the verdict the validator STATED. NEVER pass a verdict the validator did not give — " +
+      "ask them first. 'unreviewed' resets the case to 'To do'.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        case_id: { type: "string", description: "The opaque id of the case, from the [cockpit] Selected case line." },
+        verdict: { type: "string", enum: VERDICT_VALUES, description: "The verdict the validator stated. 'unreviewed' resets to 'To do'." },
+      },
+      required: ["case_id", "verdict"],
+    },
   };
 }

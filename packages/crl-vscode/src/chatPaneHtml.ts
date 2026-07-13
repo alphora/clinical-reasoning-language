@@ -67,6 +67,10 @@ export const CHAT_BODY =
   // A subtle status line ABOVE the box (working… / thinking…) — collapses to zero height when empty, so it never leaves a
   // permanent empty band.
   `<div class="chat-status" data-chat-status></div>` +
+  // #210 Todo D (disc 241) — the capability BADGE row (the "what can I do here" strip), just above the box. Populated from the
+  // render's `capabilities`; empty ⇒ zero height (gap only applies between children). Buttons are built in the script (data,
+  // not host HTML — CSP).
+  `<div class="chat-caps" data-chat-caps></div>` +
   // ONE unified input box (like a modern chat composer): the textarea on top, a single compact toolbar row underneath (the
   // context chip on the left, the actions on the right), all inside one rounded, focus-ringed container.
   `<div class="chat-box" data-chat-box>` +
@@ -100,6 +104,12 @@ export const CHAT_STYLE = `body{font:13px var(--vscode-editor-font-family,monosp
 .chat-inputbar{display:flex;flex-direction:column;gap:4px;padding:8px;border-top:1px solid var(--vscode-panel-border,#454545);background:var(--vscode-editor-background)}
 /* status: a subtle line ABOVE the box; EMPTY → zero height (no permanent middle band). */
 .chat-status{opacity:.7;font-style:italic;font-size:.85em;align-self:flex-start;min-height:0;padding:0 2px}
+/* #210 Todo D — the capability badge strip: wraps, zero height when empty (gap is inter-child only). */
+.chat-caps{display:flex;flex-wrap:wrap;gap:5px}
+.chat-cap{cursor:pointer;font:inherit;font-size:.82em;padding:2px 10px;border-radius:11px;background:transparent;color:var(--vscode-foreground);border:1px solid var(--vscode-charts-purple,#c586c0)}
+.chat-cap:hover:not(:disabled){background:var(--vscode-charts-purple,#c586c0);color:var(--vscode-editor-background,#1e1e1e)}
+.chat-cap:focus-visible{outline:1px solid var(--vscode-charts-purple,#c586c0);outline-offset:1px}
+.chat-cap:disabled{opacity:.4;cursor:default}
 /* the ONE unified input box: textarea + toolbar in a single rounded, focus-ringed container (no more stacked bands). */
 .chat-box{display:flex;flex-direction:column;gap:5px;background:var(--vscode-input-background);border:1px solid var(--vscode-input-border,#3c3c3c);border-radius:8px;padding:6px 8px}
 .chat-box:focus-within{border-color:var(--vscode-charts-purple,#c586c0);box-shadow:0 0 0 1px var(--vscode-charts-purple,#c586c0)}
@@ -136,6 +146,7 @@ export const CHAT_WEBVIEW_SCRIPT =
   `const statusEl=document.querySelector('[data-chat-status]');` +
   `const chipEl=document.querySelector('[data-chat-chip]');` +
   `const elicitEl=document.querySelector('[data-chat-eliciting]');` +
+  `const capsEl=document.querySelector('[data-chat-caps]');` +
   `const scrollBottom=()=>{thread.scrollTop=thread.scrollHeight;};` +
   // THINKING indicator: a live "thinking… Ns" ticker driven off the host-supplied start time (wall-clock ms; same machine as
   // the host, so no skew). setInterval on a render with `thinking:true`; cleared on `thinking:false`, on the first delta, and
@@ -143,13 +154,17 @@ export const CHAT_WEBVIEW_SCRIPT =
   `let thinkTimer=null;` +
   `const clearThink=()=>{if(thinkTimer){clearInterval(thinkTimer);thinkTimer=null;}};` +
   `const showThinking=(since)=>{const tick=()=>{const s=Math.max(0,Math.floor((Date.now()-since)/1000));statusEl.textContent='thinking… '+s+'s';};clearThink();tick();thinkTimer=setInterval(tick,1000);};` +
+  // #210 Todo D (disc 241) — rebuild the capability badge row from the render's `capabilities`. Buttons via textContent + a
+  // per-button click closure (data, never host HTML — CSP). `disabled` = busy OR eliciting (mirrors Send). `prompt` SENDS the
+  // text; `fillInput` prefills the composer but NEVER clobbers a non-empty draft (only fills when empty), then focuses.
+  `const renderCaps=(list,disabled)=>{capsEl.textContent='';if(!Array.isArray(list))return;for(const c of list){const b=document.createElement('button');b.type='button';b.className='chat-cap';b.textContent=c.label;b.disabled=disabled;const act=c.activation||{};b.addEventListener('click',()=>{if(b.disabled)return;if(act.kind==='fillInput'){if(!input.value){input.value=act.text||'';grow();}input.focus();}else if(act.kind==='prompt'){v.postMessage({type:'chatSend',text:act.text||''});}});capsEl.appendChild(b);}};` +
   `window.addEventListener('message',(e)=>{const m=e.data;` +
   // REHYDRATE: the host is authoritative — replace the whole thread + drive the controls from the render's flags. When
   // `thinking` is set, run the live ticker (a rehydration mid-thinking resumes it from `thinkingSince`); otherwise show the
   // plain status line.
   `if(m.type==='render'){thread.innerHTML=m.html;const s=!!m.busy;sendBtn.disabled=s;stopBtn.hidden=!s;if(m.chip){chipEl.textContent=m.chip;chipEl.title=m.chipTitle||m.chip;chipEl.hidden=false;}else{chipEl.hidden=true;}` +
   // Elicitation: swap the textarea for the static purpose banner (keep the textarea NODE — just hide it — so its refs survive).
-  `if(m.eliciting){elicitEl.textContent=m.eliciting;elicitEl.hidden=false;input.hidden=true;}else{elicitEl.hidden=true;input.hidden=false;}if(m.thinking){showThinking(m.thinkingSince||Date.now());}else{clearThink();statusEl.textContent=m.status||'';}scrollBottom();}` +
+  `if(m.eliciting){elicitEl.textContent=m.eliciting;elicitEl.hidden=false;input.hidden=true;}else{elicitEl.hidden=true;input.hidden=false;}renderCaps(m.capabilities,s||!!m.eliciting);if(m.thinking){showThinking(m.thinkingSince||Date.now());}else{clearThink();statusEl.textContent=m.status||'';}scrollBottom();}` +
   // DELTA: append to the OPEN assistant turn's text node — appendData on a text node, NEVER innerHTML (immune to a tag/entity
   // split across deltas). First delta clears the thinking ticker + the "working…" status line.
   `else if(m.type==='delta'){const turn=thread.querySelector('[data-chat-open]');if(turn){const hold=turn.querySelector('[data-chat-text]')||turn;let tn=hold.firstChild;if(!tn||tn.nodeType!==3){tn=document.createTextNode('');hold.appendChild(tn);}tn.appendData(m.text);clearThink();statusEl.textContent='';scrollBottom();}}` +
