@@ -64,19 +64,25 @@ export function renderChatThread(messages: ChatEntry[], opts: RenderChatOpts = {
 export const CHAT_BODY =
   `<div id="chat-thread" class="chat-thread"></div>` +
   `<div class="chat-inputbar">` +
+  // A subtle status line ABOVE the box (working… / thinking…) — collapses to zero height when empty, so it never leaves a
+  // permanent empty band.
   `<div class="chat-status" data-chat-status></div>` +
-  `<textarea data-chat-input class="chat-input" rows="3" placeholder="Ask the CRL agent… (Enter to send, Shift+Enter for a newline)"></textarea>` +
-  // #210 (disc 239) — the static elicitation banner: replaces the textarea (visually) while an app UI is the agent's open
-  // request. A LABEL only — the `busy` state already disables Send. Purple-tinted (the CRL Assist "the agent is asking" cue).
+  // ONE unified input box (like a modern chat composer): the textarea on top, a single compact toolbar row underneath (the
+  // context chip on the left, the actions on the right), all inside one rounded, focus-ringed container.
+  `<div class="chat-box" data-chat-box>` +
+  `<textarea data-chat-input class="chat-input" rows="2" placeholder="Ask the CRL agent…  (Enter to send · Shift+Enter for a newline)"></textarea>` +
+  // #210 (disc 239) — the static elicitation banner replaces the textarea (in place) while an app UI is the agent's open
+  // request. A LABEL only (the `busy` state disables Send). Purple-tinted — the CRL Assist "the agent is asking" cue.
   `<div class="chat-eliciting" data-chat-eliciting hidden></div>` +
-  `<div class="chat-actions">` +
-  // #210 Todo C — the selected-item chip: the cockpit item the agent has in context (flagging is one of many actions on it),
-  // pushed to the LEFT of Send (margin-right:auto). NEUTRAL, not flag-branded.
+  `<div class="chat-toolbar">` +
+  // #210 Todo C — the context chip (the cockpit item the agent perceives), on the LEFT; NEUTRAL, not flag-branded.
   `<span class="chat-chip" data-chat-chip hidden></span>` +
-  `<button type="button" data-chat-send class="chat-send">Send</button>` +
-  `<button type="button" data-chat-stop class="chat-stop" hidden>Stop</button>` +
-  `<button type="button" data-chat-clear class="chat-clear">Clear</button>` +
-  `</div></div>`;
+  `<span class="chat-tools">` +
+  `<button type="button" data-chat-clear class="chat-clear" title="Clear the conversation">Clear</button>` +
+  `<button type="button" data-chat-stop class="chat-stop" hidden title="Stop">Stop</button>` +
+  `<button type="button" data-chat-send class="chat-send" title="Send  (Enter)" aria-label="Send">↑</button>` +
+  `</span>` +
+  `</div></div></div>`;
 
 /** The chat pane CSS — VS Code theme tokens throughout, `white-space: pre-wrap` on the bodies so model newlines render. */
 export const CHAT_STYLE = `body{font:13px var(--vscode-editor-font-family,monospace);color:var(--vscode-foreground);margin:0;height:100vh;display:flex;flex-direction:column}
@@ -91,23 +97,27 @@ export const CHAT_STYLE = `body{font:13px var(--vscode-editor-font-family,monosp
 .chat-status{opacity:.7;font-style:italic;align-self:center;font-size:.9em}
 .chat-stopped{opacity:.6;font-style:italic;margin-left:6px;font-size:.85em}
 .chat-thought{opacity:.6;font-style:italic;font-size:.85em;margin-bottom:3px}
-.chat-inputbar{display:flex;flex-direction:column;gap:6px;padding:8px;border-top:1px solid var(--vscode-panel-border,#454545);background:var(--vscode-editor-background)}
-.chat-inputbar .chat-status{align-self:flex-start;min-height:1em}
-.chat-input{width:100%;box-sizing:border-box;resize:vertical;min-height:44px;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,#3c3c3c);font-family:inherit;font-size:inherit;padding:4px 6px}
-/* CRL Assist purple accent (Todo B.1) — the inferred-layer purple used as a focus ring, mirroring .crl-layer-inferred. */
-[data-chat-input]:focus-visible{outline:1px solid var(--vscode-charts-purple,#c586c0);outline-offset:1px}
-/* #210 (disc 239) — the static elicitation banner (purple-tinted; "complete the app UI to continue"). */
-.chat-eliciting{min-height:44px;display:flex;align-items:center;padding:6px 10px;border-radius:3px;font-style:italic;border:1px solid var(--vscode-charts-purple,#c586c0);background:var(--vscode-inputValidation-infoBackground,rgba(197,134,192,.12));color:var(--vscode-foreground)}
-.chat-actions{display:flex;gap:6px;justify-content:flex-end;align-items:center}
-/* The flag-anchor chip (Todo C) — pushed left of the buttons; a purple-tinted badge showing what the agent perceives. */
-.chat-chip{margin-right:auto;max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.82em;padding:1px 8px;border-radius:10px;background:var(--vscode-badge-background,rgba(120,120,120,.25));color:var(--vscode-badge-foreground,var(--vscode-foreground))}
-.chat-actions button{cursor:pointer;border:none;border-radius:2px;padding:3px 12px;font:inherit}
-/* Send is the purple accent — DARK text on the light purple (mirrors .crl-layer-inferred; white would be low-contrast). */
-.chat-send{background:var(--vscode-charts-purple,#c586c0);color:var(--vscode-editor-background,#1e1e1e)}
+.chat-inputbar{display:flex;flex-direction:column;gap:4px;padding:8px;border-top:1px solid var(--vscode-panel-border,#454545);background:var(--vscode-editor-background)}
+/* status: a subtle line ABOVE the box; EMPTY → zero height (no permanent middle band). */
+.chat-status{opacity:.7;font-style:italic;font-size:.85em;align-self:flex-start;min-height:0;padding:0 2px}
+/* the ONE unified input box: textarea + toolbar in a single rounded, focus-ringed container (no more stacked bands). */
+.chat-box{display:flex;flex-direction:column;gap:5px;background:var(--vscode-input-background);border:1px solid var(--vscode-input-border,#3c3c3c);border-radius:8px;padding:6px 8px}
+.chat-box:focus-within{border-color:var(--vscode-charts-purple,#c586c0);box-shadow:0 0 0 1px var(--vscode-charts-purple,#c586c0)}
+.chat-input{width:100%;box-sizing:border-box;resize:none;min-height:34px;max-height:180px;background:transparent;color:var(--vscode-input-foreground);border:none;outline:none;font-family:inherit;font-size:inherit;padding:0}
+/* #210 (disc 239) — the static elicitation banner replaces the textarea IN the box (the box supplies the frame). */
+.chat-eliciting{min-height:34px;display:flex;align-items:center;font-style:italic;color:var(--vscode-charts-purple,#c586c0)}
+/* the single compact toolbar row inside the box: the context chip on the left, the actions on the right. */
+.chat-toolbar{display:flex;align-items:center;gap:6px}
+.chat-tools{display:flex;align-items:center;gap:6px;margin-left:auto}
+/* the context chip — a neutral badge showing the cockpit item the agent perceives. */
+.chat-chip{max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.82em;padding:1px 8px;border-radius:10px;background:var(--vscode-badge-background,rgba(120,120,120,.25));color:var(--vscode-badge-foreground,var(--vscode-foreground))}
+.chat-tools button{cursor:pointer;border:none;border-radius:4px;font:inherit}
+/* Send is a compact purple arrow — DARK glyph on the light purple (mirrors .crl-layer-inferred). */
+.chat-send{background:var(--vscode-charts-purple,#c586c0);color:var(--vscode-editor-background,#1e1e1e);font-weight:600;width:26px;height:22px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:1.05em}
 .chat-send:focus-visible{outline:1px solid var(--vscode-charts-purple,#c586c0);outline-offset:1px}
-.chat-send:disabled{opacity:.5;cursor:default}
-.chat-stop{background:var(--vscode-button-secondaryBackground,#3a3d41);color:var(--vscode-button-secondaryForeground,#fff)}
-.chat-clear{background:none;color:var(--vscode-foreground);opacity:.7}
+.chat-send:disabled{opacity:.45;cursor:default}
+.chat-stop{background:var(--vscode-button-secondaryBackground,#3a3d41);color:var(--vscode-button-secondaryForeground,#fff);padding:2px 8px}
+.chat-clear{background:none;color:var(--vscode-foreground);opacity:.6;font-size:.9em;padding:2px 6px}
 .chat-clear:hover{opacity:1}`;
 
 /** The webview SCRIPT BODY — extracted as a pure, nonce-free string so the message protocol is string-testable (mirrors
@@ -144,8 +154,11 @@ export const CHAT_WEBVIEW_SCRIPT =
   // split across deltas). First delta clears the thinking ticker + the "working…" status line.
   `else if(m.type==='delta'){const turn=thread.querySelector('[data-chat-open]');if(turn){const hold=turn.querySelector('[data-chat-text]')||turn;let tn=hold.firstChild;if(!tn||tn.nodeType!==3){tn=document.createTextNode('');hold.appendChild(tn);}tn.appendData(m.text);clearThink();statusEl.textContent='';scrollBottom();}}` +
   `});` +
+  // Auto-grow the single-line composer with content (capped by the CSS max-height, then it scrolls) — the modern composer feel.
+  `const grow=()=>{input.style.height='auto';input.style.height=Math.min(input.scrollHeight,180)+'px';};` +
+  `input.addEventListener('input',grow);` +
   // Send: guarded on the disabled (streaming) state HOST-side too, but block here for a snappy UI; drop an all-whitespace draft.
-  `const send=()=>{if(sendBtn.disabled)return;const t=input.value;if(!t.trim())return;v.postMessage({type:'chatSend',text:t});input.value='';};` +
+  `const send=()=>{if(sendBtn.disabled)return;const t=input.value;if(!t.trim())return;v.postMessage({type:'chatSend',text:t});input.value='';grow();};` +
   `sendBtn.addEventListener('click',send);` +
   `stopBtn.addEventListener('click',()=>v.postMessage({type:'chatStop'}));` +
   `clearBtn.addEventListener('click',()=>v.postMessage({type:'chatClear'}));` +

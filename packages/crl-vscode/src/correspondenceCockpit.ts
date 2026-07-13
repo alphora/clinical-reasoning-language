@@ -3255,7 +3255,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const c = choices.find((x) => x.key) ?? choices[0];
       const type = c.shortLabel.replace(/^this /, "");
       if (c.signature) {
-        const segs = c.signature.split(":").map((s) => s.trim()).filter(Boolean);
+        // The signature is the guard chain `lib:name/lib:name/…` ("/"-separated steps, a leaf's activity via "→"), each step
+        // LIBRARY-QUALIFIED. Split on the path (normalize "→"→"/"), then STRIP the "lib:" prefix per step — the repeated
+        // library name is noise for this display (operator). → clean node names; the chip shows the LAST (the node in context).
+        const segs = c.signature
+          .replace(/→/g, "/")
+          .split("/")
+          .map((s) => (s.includes(":") ? s.slice(s.lastIndexOf(":") + 1) : s).trim())
+          .filter(Boolean);
         anchorLabel = `${type} (${segs[segs.length - 1] ?? c.signature})`;
         anchorTitle = [type, ...segs.map((s) => `• ${s}`)].join("\n");
       } else {

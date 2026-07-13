@@ -102,8 +102,8 @@ test("STYLE: the Send button is the inferred-layer purple with DARK text (mirror
   assert.ok(!/vscode-button-background/.test(send), "Send no longer uses the default blue button background");
 });
 
-test("STYLE: the input focus ring is the purple accent (--vscode-charts-purple), not the theme default", () => {
-  assert.match(CHAT_STYLE, /\[data-chat-input\]:focus-visible\{outline:1px solid var\(--vscode-charts-purple,#c586c0\)/);
+test("STYLE: the unified input box gets the purple accent on focus-within (not the theme default)", () => {
+  assert.match(CHAT_STYLE, /\.chat-box:focus-within\{[^}]*var\(--vscode-charts-purple,#c586c0\)/);
 });
 
 test("renderChatThread: an assistant turn with thoughtMs renders a muted 'Thought for Ns' line above the reply", () => {
