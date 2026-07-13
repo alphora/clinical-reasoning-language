@@ -67,7 +67,8 @@ export const CHAT_BODY =
   `<div class="chat-status" data-chat-status></div>` +
   `<textarea data-chat-input class="chat-input" rows="3" placeholder="Ask the CRL agent… (Enter to send, Shift+Enter for a newline)"></textarea>` +
   `<div class="chat-actions">` +
-  // #210 Todo C — the selected-item chip: the flag anchor the agent perceives, pushed to the LEFT of Send (margin-right:auto).
+  // #210 Todo C — the selected-item chip: the cockpit item the agent has in context (flagging is one of many actions on it),
+  // pushed to the LEFT of Send (margin-right:auto). NEUTRAL, not flag-branded.
   `<span class="chat-chip" data-chat-chip hidden></span>` +
   `<button type="button" data-chat-send class="chat-send">Send</button>` +
   `<button type="button" data-chat-stop class="chat-stop" hidden>Stop</button>` +
@@ -130,7 +131,7 @@ export const CHAT_WEBVIEW_SCRIPT =
   // REHYDRATE: the host is authoritative — replace the whole thread + drive the controls from the render's flags. When
   // `thinking` is set, run the live ticker (a rehydration mid-thinking resumes it from `thinkingSince`); otherwise show the
   // plain status line.
-  `if(m.type==='render'){thread.innerHTML=m.html;const s=!!m.busy;sendBtn.disabled=s;stopBtn.hidden=!s;if(m.chip){chipEl.textContent='⚑ '+m.chip;chipEl.title=m.chip;chipEl.hidden=false;}else{chipEl.hidden=true;}if(m.thinking){showThinking(m.thinkingSince||Date.now());}else{clearThink();statusEl.textContent=m.status||'';}scrollBottom();}` +
+  `if(m.type==='render'){thread.innerHTML=m.html;const s=!!m.busy;sendBtn.disabled=s;stopBtn.hidden=!s;if(m.chip){chipEl.textContent=m.chip;chipEl.title='Selected in the cockpit — '+m.chip;chipEl.hidden=false;}else{chipEl.hidden=true;}if(m.thinking){showThinking(m.thinkingSince||Date.now());}else{clearThink();statusEl.textContent=m.status||'';}scrollBottom();}` +
   // DELTA: append to the OPEN assistant turn's text node — appendData on a text node, NEVER innerHTML (immune to a tag/entity
   // split across deltas). First delta clears the thinking ticker + the "working…" status line.
   `else if(m.type==='delta'){const turn=thread.querySelector('[data-chat-open]');if(turn){const hold=turn.querySelector('[data-chat-text]')||turn;let tn=hold.firstChild;if(!tn||tn.nodeType!==3){tn=document.createTextNode('');hold.appendChild(tn);}tn.appendData(m.text);clearThink();statusEl.textContent='';scrollBottom();}}` +

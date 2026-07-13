@@ -81,8 +81,8 @@ export function renderFlagDrawer(opts: FlagDrawerOptions): string {
     `<div class="flag-fields">${fieldGroups}</div>` +
     `<label class="flag-row"><span class="flag-label">Summary</span>` +
     `<input type="text" data-flag-summary value="${escapeHtml(opts.summary ?? "")}" placeholder="one line — the issue title & the flag" aria-label="Summary"></label>` +
-    `<label class="flag-col"><span class="flag-label">Just enough (→ issue)</span>` +
-    `<textarea data-flag-stub placeholder="a couple lines; flesh out the issue after the meeting" aria-label="Stub">${escapeHtml(opts.stub ?? "")}</textarea></label>` +
+    `<label class="flag-col"><span class="flag-label">Description</span>` +
+    `<textarea data-flag-stub placeholder="the concern in a couple of lines — becomes the GitHub issue body" aria-label="Description">${escapeHtml(opts.stub ?? "")}</textarea></label>` +
     `<div class="flag-actions">` +
     `<button type="button" class="flag-cancel" data-flag-cancel>Cancel</button>` +
     `<button type="button" class="flag-insert" data-flag-insert>Insert flag + create issue</button>` +

@@ -53,24 +53,29 @@ test("flagTargetId: a different policy (cel) → a different id (no cross-policy
   );
 });
 
-test("bridge.openFlagDrawer: no cockpit registered → an actionable reason (not ok)", () => {
-  const r = cockpitAgentBridge.openFlagDrawer({ targetId: "x" });
-  assert.equal(r.ok, false);
-  assert.match(r.reason, /not open/);
+test("bridge.openFlagDrawer/submitFlag: no cockpit registered → an actionable reason (not ok)", async () => {
+  const o = cockpitAgentBridge.openFlagDrawer({ targetId: "x" });
+  assert.equal(o.ok, false);
+  assert.match(o.reason, /not open/);
+  const s = await cockpitAgentBridge.submitFlag({ targetId: "x" });
+  assert.equal(s.ok, false);
+  assert.match(s.reason, /not open/);
 });
 
-test("bridge: register delegates getAppState/getValidationKinds/openFlagDrawer; dispose clears them", () => {
+test("bridge: register delegates getAppState/getValidationKinds/openFlagDrawer/submitFlag; dispose clears them", async () => {
   let fired = 0;
   cockpitAgentBridge.onDidChangeAppState(() => fired++);
   const disp = cockpitAgentBridge.register({
     getAppState: () => ({ policy: "p", anchorLabel: "n", flagTargets: [], treePaneOpen: true }),
     openFlagDrawer: () => ({ ok: true }),
+    submitFlag: async (a) => ({ ok: true, message: `filed on ${a.targetId}` }),
     getValidationKinds: () => ["underspecified"],
   });
   assert.ok(fired >= 1, "register fires the change event (the chip refreshes)");
   assert.equal(cockpitAgentBridge.getAppState().policy, "p");
   assert.deepEqual(cockpitAgentBridge.getValidationKinds(), ["underspecified"]);
   assert.deepEqual(cockpitAgentBridge.openFlagDrawer({ targetId: "x" }), { ok: true });
+  assert.deepEqual(await cockpitAgentBridge.submitFlag({ targetId: "z" }), { ok: true, message: "filed on z" });
   disp.dispose();
   assert.equal(cockpitAgentBridge.getAppState(), undefined, "dispose clears the hooks");
   assert.deepEqual(cockpitAgentBridge.getValidationKinds(), []);

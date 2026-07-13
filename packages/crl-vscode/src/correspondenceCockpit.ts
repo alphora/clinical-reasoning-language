@@ -128,6 +128,7 @@ import {
   type FlagTargetView,
   type OpenFlagDrawerArgs,
   type OpenFlagDrawerResult,
+  type SubmitFlagResult,
 } from "./cockpitAgentBridge";
 import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordinator";
 import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE } from "./provenanceFindings";
@@ -2482,6 +2483,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** The in-flight draft: the prefill + the POLICY (`currentCel`) captured at open. Identity is `cel`/`mode`, NOT
    *  `indexVersion` — a same-policy rebuild must NOT invalidate the draft (the commit re-resolves on live text). */
   type FlagDraftState = FlagDraftPrefill & { cel: string | undefined };
+  /** The structured result of `commitFlagDraft` (#210 Todo C) — `ok` = the flag was WRITTEN (regardless of the best-effort
+   *  issue); `note` = the same human message the status bar shows; `ref` = the created issue (`#N`) when there is one. */
+  interface FlagCommitOutcome { ok: boolean; note: string; ref?: string; }
 
   /** The flag targets a reveal hit offers (GAP 3): a decision ROOT → the decision (object); a `when` → BOTH the concept
    *  (object, all uses) AND this condition (occurrence, decision+key); a recommend-activity LEAF → this recommendation
@@ -2620,11 +2624,18 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  (best-effort; ANY failure → the flag is still written, without a `; ref`) → real `createFlag` + byte-safe
    *  WorkspaceEdit + save → refresh. The webview supplies only `{tag, summary, stub, fields}` (untrusted); the TARGET is
    *  the host-captured `flagDraft.target` (never named by the webview). */
-  async function commitFlagDraft(payload: { tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown }): Promise<void> {
+  async function commitFlagDraft(payload: { tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown }): Promise<FlagCommitOutcome> {
+    // Every exit keeps its human `flagNote`/`reportNoIssue` (the webview Insert path ignores the return); the STRUCTURED
+    // outcome is for the #210 agent submit path, which reports it back in chat. `ok` = the flag was written (regardless of
+    // whether the issue was created). `fail` folds the flagNote + the outcome so a form error surfaces both.
+    const fail = (note: string): FlagCommitOutcome => (flagNote(note), { ok: false, note });
     const draft = flagDraft;
-    if (!draft) return;
-    if (flagCommitting) return; // in-flight guard: a rapid second Insert must not double-POST / race the write (gpt55 [critical])
-    if (mode !== "medical-validation") return closeFlagDrawer();
+    if (!draft) return { ok: false, note: "no flag draft is open" };
+    if (flagCommitting) return { ok: false, note: "a flag is already being submitted" }; // in-flight guard (gpt55 [critical])
+    if (mode !== "medical-validation") {
+      closeFlagDrawer();
+      return { ok: false, note: "the Medical Validation cockpit is not open" };
+    }
     const { target, cel } = draft;
     // Sanitize the webview payload (all untrusted). Reserved keys are stripped so a tampered message can't smuggle a fake
     // issue link (`ref`) or occurrence address (`key`) — those are host-owned (`status` is rejected by createFlag).
@@ -2640,37 +2651,39 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (target.key) fields.key = target.key; // GAP 3: an occurrence flag carries the node address `<nodeId>~<signature>`
     // Local summary validation (the lean gist must be ONE line — createFlag itself permits newline gists). Keep the drawer
     // OPEN on a form error so the user's text isn't lost — they fix + Insert again.
-    if (summary === "") return flagNote("a summary is required");
-    if (/[\r\n]/.test(summary)) return flagNote("the summary must be a single line");
-    if (hasForbiddenGistChars(summary)) return flagNote("the summary can't contain a backtick or `;`");
+    if (summary === "") return fail("a summary is required");
+    if (/[\r\n]/.test(summary)) return fail("the summary must be a single line");
+    if (hasForbiddenGistChars(summary)) return fail("the summary can't contain a backtick or `;`");
     // Identity guard keyed on `currentCel`/`mode`, NOT `indexVersion`: a same-policy rebuild (a background save) bumps
     // indexVersion but the write re-resolves on LIVE text, so the draft must survive it (both reviewers). Only a DIFFERENT
     // policy / mode change means there's nothing to write — and that surfaces a note (never a silent drop).
     if (currentCel !== cel || mode !== "medical-validation") {
       closeFlagDrawer();
-      return flagNote("policy changed — flag not added");
+      return fail("policy changed — flag not added");
     }
     const decl = findDeclaration(target.kind, target.name, target.lib);
     if (!decl) {
       closeFlagDrawer();
-      return flagNote(`couldn't locate ${target.kind} "${target.name}" in the .crl`);
+      return fail(`couldn't locate ${target.kind} "${target.name}" in the .crl`);
     }
-    let doc: vscode.TextDocument;
-    try {
-      doc = await vscode.workspace.openTextDocument(decl.filePath);
-    } catch {
-      return flagNote("couldn't open the .crl");
-    }
-    // DRY-RUN the shared #205 transform (no ref) — catch unknown-tag / missing-field / invalid-value / decl-not-found /
-    // invalid-result BEFORE any issue POST, so a form error never orphans a GitHub issue. Keep the drawer open on failure.
-    const dry = createFlag(doc.getText(), { kind: target.kind, name: target.name, library: target.lib }, { tag, gist: summary, fields, status: "open" });
-    if (!dry.ok) return flagNote(`flag not added: ${dry.message}`);
-    // Past the dry-run boundary: LOCK (only one commit runs) and wrap EVERYTHING so any throw still surfaces an honest note
-    // (never silently drop a created issue). `finally` releases the lock so a later Insert can retry.
-    flagCommitting = true;
+    // LOCK before the FIRST await (both reviewers [critical]): the top guard READS `flagCommitting`, so it MUST be SET
+    // synchronously before any suspension — else two rapid Inserts (or an agent submit racing the still-live webview Insert
+    // button) both pass the check, both await `openTextDocument`, and both POST + write (a duplicate issue). `finally`
+    // releases it, so a form error / retry still works. `ref`/`issueNote` are hoisted so the catch/finally see them.
     let ref: string | undefined;
     let issueNote: string | undefined; // the "no issue link" reason — folded into the FINAL note, never overwritten (gpt55 [important])
+    flagCommitting = true;
     try {
+      let doc: vscode.TextDocument;
+      try {
+        doc = await vscode.workspace.openTextDocument(decl.filePath);
+      } catch {
+        return fail("couldn't open the .crl");
+      }
+      // DRY-RUN the shared #205 transform (no ref) — catch unknown-tag / missing-field / invalid-value / decl-not-found /
+      // invalid-result BEFORE any issue POST, so a form error never orphans a GitHub issue. Keep the drawer open on failure.
+      const dry = createFlag(doc.getText(), { kind: target.kind, name: target.name, library: target.lib }, { tag, gist: summary, fields, status: "open" });
+      if (!dry.ok) return fail(`flag not added: ${dry.message}`);
       // Create the issue stub (best-effort). github-origin-only + trusted workspace (an authenticated write to a
       // repo-controlled origin needs trust — same gate as the link-out); any failure → no ref, flag still written.
       if (!vscode.workspace.isTrusted) {
@@ -2679,17 +2692,23 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         // A retarget during the (async) repo-resolve/auth must NOT create an issue for a policy the user left. Pre-POST
         // abort is safe — nothing external has happened yet.
         closeFlagDrawer();
-        return flagNote("policy changed — flag not added");
+        return fail("policy changed — flag not added");
       } else {
         const repo = await githubRepoForFile(vscode.Uri.file(decl.filePath));
         if (!repo) {
           issueNote = "no GitHub origin";
         } else if (currentCel !== cel || mode !== "medical-validation") {
           closeFlagDrawer();
-          return flagNote("policy changed — flag not added");
+          return fail("policy changed — flag not added");
         } else {
           try {
             const token = await githubToken();
+            // Recheck AFTER the auth await — a sign-in prompt can stall while the user retargets; this is the LAST guard
+            // before the POST, so a policy switch during sign-in never files an issue for the old target (gpt55 [critical]).
+            if (currentCel !== cel || mode !== "medical-validation") {
+              closeFlagDrawer();
+              return fail("policy changed — flag not added");
+            }
             if (!token) issueNote = "not signed in to GitHub";
             else {
               const args = { owner: repo.owner, repo: repo.repo, title: summary, body: stub };
@@ -2700,6 +2719,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
                 if (e1 instanceof IssueCreateError && e1.status === 401) {
                   const fresh = await githubToken(true);
                   if (!fresh) throw e1;
+                  // Recheck after the SECOND auth await too (same stall window) before the retry POST.
+                  if (currentCel !== cel || mode !== "medical-validation") {
+                    closeFlagDrawer();
+                    return fail("policy changed — flag not added");
+                  }
                   ref = `#${await createGithubIssue({ ...args, token: fresh })}`;
                 } else throw e1;
               }
@@ -2719,8 +2743,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const made = createFlag(doc2.getText(), { kind: target.kind, name: target.name, library: target.lib }, { tag, gist: summary, fields: withRef, status: "open" });
       if (!made.ok) {
         closeFlagDrawer();
-        flagNote(ref ? `issue ${ref} created but the flag couldn't be written (${made.message}) — add it manually` : `flag not added: ${made.message}`);
-        return;
+        const note = ref ? `issue ${ref} created but the flag couldn't be written (${made.message}) — add it manually` : `flag not added: ${made.message}`;
+        flagNote(note);
+        return { ok: false, note, ref };
       }
       const eol = doc2.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n"; // preserve the doc's line ending (CRLF `.crl` files)
       const edit = new vscode.WorkspaceEdit();
@@ -2734,8 +2759,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const applied = await vscode.workspace.applyEdit(edit);
       closeFlagDrawer();
       if (!applied) {
-        flagNote(ref ? `issue ${ref} created but the edit couldn't be applied — add the flag manually` : "edit could not be applied");
-        return;
+        const note = ref ? `issue ${ref} created but the edit couldn't be applied — add the flag manually` : "edit could not be applied";
+        flagNote(note);
+        return { ok: false, note, ref };
       }
       const saved = await doc2.save();
       // Refresh only if the policy we wrote is still current (loadFlags/chrome/badges read the current model).
@@ -2746,18 +2772,23 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       }
       const savedTail = saved ? "" : " — but save the .crl (it's unsaved)";
       if (ref) {
-        flagNote(`issue ${ref} created; flag added on ${target.kind} "${target.name}"${savedTail}`);
-      } else {
-        // The flag is written but NO issue was created. A transient status-bar note is too easy to miss (a reviewer just
-        // wonders where the issue went), so surface a PERSISTENT warning with the exact reason + a one-click fix.
-        reportNoIssue(`Flag added on ${target.kind} "${target.name}"${savedTail}, but no GitHub issue was created`, issueNote ?? "no issue link");
+        const note = `issue ${ref} created; flag added on ${target.kind} "${target.name}"${savedTail}`;
+        flagNote(note);
+        return { ok: true, note, ref };
       }
+      // The flag is written but NO issue was created. A transient status-bar note is too easy to miss (a reviewer just
+      // wonders where the issue went), so surface a PERSISTENT warning with the exact reason + a one-click fix.
+      const noIssueMsg = `Flag added on ${target.kind} "${target.name}"${savedTail}, but no GitHub issue was created`;
+      reportNoIssue(noIssueMsg, issueNote ?? "no issue link");
+      return { ok: true, note: `${noIssueMsg} (${issueNote ?? "no issue link"})` };
     } catch (e) {
       // Any unexpected throw AFTER a possible POST (openTextDocument/applyEdit/save/loadFlags reject) — surface it honestly,
       // never silent. If an issue was already created, say so + tell the user to add the flag manually.
       closeFlagDrawer();
       const why = e instanceof Error ? e.message : String(e);
-      flagNote(ref ? `issue ${ref} created but the flag couldn't be written (${why}) — add it manually` : `flag not added (${why})`);
+      const note = ref ? `issue ${ref} created but the flag couldn't be written (${why}) — add it manually` : `flag not added (${why})`;
+      flagNote(note);
+      return { ok: false, note, ref };
     } finally {
       flagCommitting = false;
     }
@@ -3129,31 +3160,52 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       label: c.label,
       shortLabel: c.shortLabel,
     }));
-    // The anchor label = the most specific choice (an occurrence "this condition/recommendation" if present, else the first).
-    const anchorLabel = choices.length ? (choices.find((c) => c.key) ?? choices[0]).shortLabel : null;
+    // The anchor label = the most specific choice's FULL label (incl. the occurrence signature, e.g. "this condition
+    // (BMI Over 40)") — descriptive enough to tell nodes apart, not the bare "this condition".
+    const anchorLabel = choices.length ? (choices.find((c) => c.key) ?? choices[0]).label : null;
     return { policy: policyLabel(), anchorLabel, flagTargets, treePaneOpen: !!views.get("tree") };
   };
-  const bridgeOpenFlagDrawer = (args: OpenFlagDrawerArgs): OpenFlagDrawerResult => {
-    if (mode !== "medical-validation") return { ok: false, reason: "the Medical Validation cockpit is not open" };
-    if (!views.get("tree")) return { ok: false, reason: "open the Medical Validation tree pane, then try again" };
+  // Resolve the agent's args → a drawer prefill (shared by open + submit): guard MV + the tree pane, re-resolve the opaque
+  // target_id against the LIVE choices, and validate the kind against the registry enum. `error` becomes an isError result.
+  const resolveFlagPrefill = (args: OpenFlagDrawerArgs): { prefill: FlagDraftPrefill } | { error: string } => {
+    if (mode !== "medical-validation") return { error: "the Medical Validation cockpit is not open" };
+    if (!views.get("tree")) return { error: "open the Medical Validation tree pane, then try again" };
     const choices = anchorChoices();
-    if (!choices.length) return { ok: false, reason: "no flaggable node is selected — click a decision or condition in the tree first" };
-    const match = choices.find(
-      (c) => flagTargetId({ cel: currentCel, kind: c.kind, lib: c.lib, name: c.name, key: c.key }) === args.targetId,
-    );
-    if (!match) {
-      return { ok: false, reason: `no current flag target matches that id — the selection changed. Current targets: ${choices.map((c) => c.shortLabel).join("; ")}` };
-    }
+    if (!choices.length) return { error: "no flaggable node is selected — click a decision or condition in the tree first" };
+    const match = choices.find((c) => flagTargetId({ cel: currentCel, kind: c.kind, lib: c.lib, name: c.name, key: c.key }) === args.targetId);
+    if (!match) return { error: `no current flag target matches that id — the selection changed. Current targets: ${choices.map((c) => c.shortLabel).join("; ")}` };
     const kind = args.validationKind?.trim();
-    if (kind) {
+    if (kind && !validationKinds().includes(kind)) {
       const kinds = validationKinds();
-      if (!kinds.includes(kind)) return { ok: false, reason: `invalid kind "${kind}" — choose one of: ${kinds.join(", ")}` };
+      return { error: kinds.length ? `invalid kind "${kind}" — choose one of: ${kinds.join(", ")}` : `invalid kind "${kind}" — no validation kinds are configured` };
     }
-    openFlagDrawer({ target: match, tag: "validation-concern", summary: args.summary, fields: kind ? { kind } : undefined });
+    return { prefill: { target: match, tag: "validation-concern", summary: args.summary, stub: args.description, fields: kind ? { kind } : undefined } };
+  };
+  const bridgeOpenFlagDrawer = (args: OpenFlagDrawerArgs): OpenFlagDrawerResult => {
+    const r = resolveFlagPrefill(args);
+    if ("error" in r) return { ok: false, reason: r.error };
+    openFlagDrawer(r.prefill);
     return { ok: true };
   };
+  const bridgeSubmitFlag = async (args: OpenFlagDrawerArgs): Promise<SubmitFlagResult> => {
+    const r = resolveFlagPrefill(args);
+    if ("error" in r) return { ok: false, reason: r.error };
+    const summary = args.summary?.trim();
+    if (!summary) return { ok: false, reason: "a one-line summary is required to file the flag — ask the validator for it" };
+    // Open the drawer prefilled (so the write is visible), then commit via the SAME guarded path the human Insert uses
+    // (dry-run → best-effort issue → byte-safe write). Relay the structured outcome back to the agent.
+    openFlagDrawer(r.prefill);
+    const outcome = await commitFlagDraft({ tag: "validation-concern", summary, stub: args.description, fields: r.prefill.fields });
+    // `issued` = an issue was already created before the write failed → the agent must NOT retry (would POST a duplicate).
+    return outcome.ok ? { ok: true, message: outcome.note } : { ok: false, reason: outcome.note, issued: !!outcome.ref };
+  };
   context.subscriptions.push(
-    cockpitAgentBridge.register({ getAppState, openFlagDrawer: bridgeOpenFlagDrawer, getValidationKinds: validationKinds }),
+    cockpitAgentBridge.register({
+      getAppState,
+      openFlagDrawer: bridgeOpenFlagDrawer,
+      submitFlag: bridgeSubmitFlag,
+      getValidationKinds: validationKinds,
+    }),
   );
 
   context.subscriptions.push(

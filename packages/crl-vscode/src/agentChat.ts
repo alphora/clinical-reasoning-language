@@ -18,7 +18,7 @@ import {
 } from "./agentModelProvider";
 import { runAgentTurn, type ToolRegistry } from "./agentToolLoop";
 import { cockpitAgentBridge } from "./cockpitAgentBridge";
-import { appStateBlock, buildSystemPrompt, OPEN_FLAG_DRAWER, openFlagDrawerTool } from "./editorAgentPrompt";
+import { appStateBlock, buildSystemPrompt, OPEN_FLAG_DRAWER, openFlagDrawerTool, SUBMIT_FLAG, submitFlagTool } from "./editorAgentPrompt";
 import { anthropicErrorLabel } from "./anthropicClient";
 import { CHAT_BODY, CHAT_STYLE, CHAT_WEBVIEW_SCRIPT, renderChatThread, type ChatEntry } from "./chatPaneHtml";
 
@@ -249,24 +249,42 @@ class AgentChat implements vscode.WebviewViewProvider {
     // The add-flag skill: the live app-state → system prompt + the flag tool; a per-turn registry (ONE successful action
     // per turn — A15). The registry NEVER writes CRL: it opens the cockpit drawer prefilled via the bridge.
     const system = buildSystemPrompt(cockpitAgentBridge.getAppState());
-    const tools = [openFlagDrawerTool(cockpitAgentBridge.getValidationKinds())];
+    const kinds = cockpitAgentBridge.getValidationKinds();
+    // open (the default) is listed FIRST — some models weight earlier tools, and we don't want a nudge toward the durable
+    // submit path (reviewers [nit], reinforcing the prompt's explicit-only submit).
+    const tools = [openFlagDrawerTool(kinds), submitFlagTool(kinds)];
     let acted = false;
     // A recoverable error result carries the FRESH app-state (targets + their current ids) so the model can retry in the
     // same loop after a selection change — C has no separate read tool (A14).
     const recoverable = (reason: string) => ({ content: `${reason}\n${appStateBlock(cockpitAgentBridge.getAppState())}`, isError: true });
     const registry: ToolRegistry = {
       run: async (name, input) => {
-        if (name !== OPEN_FLAG_DRAWER) return { content: `unknown tool "${name}"`, isError: true };
-        const a = (input ?? {}) as { target_id?: unknown; validation_kind?: unknown; summary?: unknown };
+        if (name !== OPEN_FLAG_DRAWER && name !== SUBMIT_FLAG) return { content: `unknown tool "${name}"`, isError: true };
+        const a = (input ?? {}) as { target_id?: unknown; validation_kind?: unknown; summary?: unknown; description?: unknown };
         if (typeof a.target_id !== "string" || !a.target_id) return recoverable("target_id is required — use one from the flag-targets list.");
-        if (acted) {
-          return { content: "a flag drawer is already open for this turn — the validator should review + submit it first", isError: true };
-        }
-        const res = cockpitAgentBridge.openFlagDrawer({
+        // One flag action per turn — a second call (or a duplicate in one message) is refused (A15).
+        if (acted) return { content: "a flag was already filed/opened this turn — finish that one first", isError: true };
+        const args = {
           targetId: a.target_id,
           validationKind: typeof a.validation_kind === "string" ? a.validation_kind : undefined,
           summary: typeof a.summary === "string" ? a.summary : undefined,
-        });
+          description: typeof a.description === "string" ? a.description : undefined,
+        };
+        if (name === SUBMIT_FLAG) {
+          const res = await cockpitAgentBridge.submitFlag(args);
+          if (!res.ok) {
+            // If a GitHub issue was ALREADY created but the flag write then failed, do NOT let the model retry — a retry
+            // would POST a duplicate issue. Arm `acted` + return a non-recoverable error (Claude [important]).
+            if (res.issued) {
+              acted = true;
+              return { content: `${res.reason} — do NOT retry (the issue already exists; the validator must add the flag manually)`, isError: true };
+            }
+            return recoverable(res.reason);
+          }
+          acted = true;
+          return { content: res.message }; // the human outcome (issue #N created / no issue: reason) — the agent relays it
+        }
+        const res = cockpitAgentBridge.openFlagDrawer(args);
         if (!res.ok) return recoverable(res.reason);
         acted = true;
         return { content: "The flag drawer is now open in the cockpit, prefilled. Tell the validator to review and submit it." };
@@ -343,9 +361,9 @@ class AgentChat implements vscode.WebviewViewProvider {
       this.render();
     } else if (d.type === "tool_use") {
       if (this.partial) this.transcript.push({ kind: "assistant", text: this.partial, thoughtMs: this.thoughtMs });
-      // Neutral phrasing: the model REQUESTED a flag (true regardless of whether the tool then executes or is cancelled/
-      // fails — the drawer's actual appearance + the follow-up reply convey the outcome).
-      this.transcript.push({ kind: "status", text: "⚑ proposing a flag…" });
+      // Neutral phrasing keyed on the tool: the model REQUESTED the action (true regardless of whether it then executes or
+      // is cancelled/fails — the drawer's appearance + the follow-up reply convey the outcome).
+      this.transcript.push({ kind: "status", text: d.name === SUBMIT_FLAG ? "⚑ filing a flag…" : "⚑ opening the flag drawer…" });
       this.partial = "";
       this.thinking = false;
       this.thinkingSince = undefined;

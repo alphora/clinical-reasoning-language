@@ -33,13 +33,21 @@ export interface OpenFlagDrawerArgs {
   /** A `validation-concern` `kind` — validated against the registry enum by the cockpit before prefilling. */
   validationKind?: string;
   summary?: string;
+  /** The fuller concern text → the flag's GitHub issue body (the drawer's Description field). */
+  description?: string;
 }
 export type OpenFlagDrawerResult = { ok: true } | { ok: false; reason: string };
+/** The result of an AGENT submit (#210 Todo C) — `ok` = the flag was written; `message` is the human-readable outcome
+ *  (issue created / no issue + reason) the agent reports back in chat. On failure, `issued` = a GitHub issue was ALREADY
+ *  created before the write failed, so the caller must NOT retry (a retry would POST a duplicate issue). */
+export type SubmitFlagResult = { ok: true; message: string } | { ok: false; reason: string; issued?: boolean };
 
 /** What the cockpit implements + hands to the bridge. Both read the cockpit's LIVE closures at call time. */
 export interface CockpitAgentHooks {
   getAppState(): CockpitAppState | undefined;
   openFlagDrawer(args: OpenFlagDrawerArgs): OpenFlagDrawerResult;
+  /** Fill AND submit the flag — writes it into the .crl + opens a GitHub issue (reuses the human Insert path). */
+  submitFlag(args: OpenFlagDrawerArgs): Promise<SubmitFlagResult>;
   /** The registry's `validation-concern` `kind` enum values (source of truth) — for the tool schema + the prompt hint. */
   getValidationKinds(): string[];
 }
@@ -96,6 +104,13 @@ class CockpitAgentBridge {
   openFlagDrawer(args: OpenFlagDrawerArgs): OpenFlagDrawerResult {
     if (!this.hooks) return { ok: false, reason: "the Medical Validation cockpit is not open — open it first" };
     return this.hooks.openFlagDrawer(args);
+  }
+
+  /** Fill AND submit the flag — writes the flag into the .crl + opens a GitHub issue. Used ONLY on an explicit submit/file
+   *  command (`openFlagDrawer` is the default). Returns the human outcome for the agent to relay, or an actionable reason. */
+  async submitFlag(args: OpenFlagDrawerArgs): Promise<SubmitFlagResult> {
+    if (!this.hooks) return { ok: false, reason: "the Medical Validation cockpit is not open — open it first" };
+    return this.hooks.submitFlag(args);
   }
 
   dispose(): void {

@@ -798,20 +798,26 @@ check("#211: openFlagDrawer is a STANDALONE seam — MV-only, captures ver/cel, 
 check("#211: commitFlagDraft — in-flight guard + DRY-RUN before any POST; identity keyed on currentCel/mode (NOT indexVersion)", () => {
   const m = COCKPIT_SRC.match(/async function commitFlagDraft\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "commitFlagDraft body");
+  assert.match(COCKPIT_SRC, /async function commitFlagDraft\([^)]*\): Promise<FlagCommitOutcome>/); // #210 Todo C: returns a structured outcome for the agent submit path
   assert.match(m[1], /if \(flagCommitting\) return/); // a rapid second Insert must not double-POST / race the write
   assert.match(m[1], /const \{ target, cel \} = draft/); // TARGET is host-captured, never from the webview payload
   assert.match(m[1], /delete fields\.ref;\s*\n\s*delete fields\.key;/); // reserved keys stripped (tamper defense)
-  assert.match(m[1], /if \(summary === ""\) return flagNote/); // title required
+  assert.match(m[1], /if \(summary === ""\) return fail/); // title required (`fail` folds the flagNote + the outcome)
   assert.match(m[1], /\/\[\\r\\n\]\/\.test\(summary\)/); // lean gist must be ONE line
   assert.match(m[1], /hasForbiddenGistChars\(summary\)/); // shared sanitization
   // identity is currentCel/mode — a same-policy rebuild (indexVersion bump) must NOT discard the draft (both reviewers)
-  assert.match(m[1], /if \(currentCel !== cel \|\| mode !== "medical-validation"\)[\s\S]*?flagNote\("policy changed/);
+  assert.match(m[1], /if \(currentCel !== cel \|\| mode !== "medical-validation"\)[\s\S]*?fail\("policy changed/);
   assert.doesNotMatch(m[1], /indexVersion !== ver/); // the buggy guard is gone
   // the DRY-RUN (no ref) precedes the issue creation in the source
   const dryIdx = m[1].indexOf("const dry = createFlag(");
   const repoIdx = m[1].indexOf("githubRepoForFile(");
   assert.ok(dryIdx > 0 && repoIdx > 0 && dryIdx < repoIdx, "createFlag dry-run precedes the repo resolve / POST");
-  assert.match(m[1], /if \(!dry\.ok\) return flagNote/); // abort with NO issue created; drawer stays open
+  assert.match(m[1], /if \(!dry\.ok\) return fail/); // abort with NO issue created; drawer stays open
+  // #210 Todo C [critical, both reviewers]: the in-flight lock MUST be armed BEFORE the first await, or two rapid Inserts
+  // (or an agent submit racing the live webview Insert) both pass the top `if (flagCommitting)` check and double-POST/write.
+  const lockIdx = m[1].indexOf("flagCommitting = true");
+  const firstOpenIdx = m[1].indexOf("await vscode.workspace.openTextDocument");
+  assert.ok(lockIdx > 0 && firstOpenIdx > 0 && lockIdx < firstOpenIdx, "the in-flight lock is set BEFORE the first await (closes the double-commit TOCTOU)");
 });
 check("#211: commitFlagDraft — trust+github gated, pre-POST recheck, LOCK+try/finally, issueNote folded into ONE honest note", () => {
   const m = COCKPIT_SRC.match(/async function commitFlagDraft\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
@@ -831,8 +837,8 @@ check("#211: commitFlagDraft — trust+github gated, pre-POST recheck, LOCK+try/
   assert.match(m[1], /const withRef = ref \? \{ \.\.\.fields, ref \} : fields/);
   assert.match(m[1], /made\.insertLine >= doc2\.lineCount/); // EOF-safe on the captured file
   assert.match(m[1], /issue \$\{ref\} created but the flag couldn't be written/); // honest post-POST failure (never silent)
-  assert.match(m[1], /if \(ref\) \{\s*\n\s*flagNote\(`issue \$\{ref\} created; flag added/); // success → status-bar note
-  assert.match(m[1], /reportNoIssue\(`Flag added on [\s\S]*?issueNote \?\? "no issue link"\)/); // no issue → a LOUD, persistent warning with the reason
+  assert.match(m[1], /const note = `issue \$\{ref\} created; flag added[\s\S]*?return \{ ok: true, note, ref \}/); // success → the note + a structured outcome for the agent
+  assert.match(m[1], /reportNoIssue\(noIssueMsg, issueNote \?\? "no issue link"\)/); // no issue → a LOUD, persistent warning with the reason
   assert.match(m[1], /issue not created — \$\{e\.message\}/); // the RAW GitHub error is surfaced (e.g. a 403 scope message)
   assert.match(m[1], /if \(currentCel === cel && mode === "medical-validation"\) \{[\s\S]*?loadFlags\(\)/); // refresh only if policy unchanged
   assert.ok(repoAt > 0, "repo resolve present");
