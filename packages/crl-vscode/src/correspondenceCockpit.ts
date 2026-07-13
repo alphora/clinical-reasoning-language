@@ -3906,6 +3906,16 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // all of VS Code). The floating control + Ctrl+wheel are the surfaces; a real keybinding would need a command + a
   // webview-focus context key + a non-conflicting chord (deferred).
   `root.addEventListener('wheel',(e)=>{if(!e.ctrlKey)return;if(!root.querySelector('.flow-svg'))return;e.preventDefault();setZoom(treeZoom*(e.deltaY<0?1.1:1/1.1));},{passive:false});` +
+  // grab-drag PAN of the flow/tree pane — press on the tree and drag to pan its scroll (works with OR without zoom: a chart
+  // wider/taller than the pane overflows the document, which is what scrolls). A press that MOVES past a small threshold pans
+  // + swallows the ensuing node click; a stationary press still selects the node (so clicking a node is unaffected). move/up
+  // ride `window` so a drag that leaves the pane still tracks; `fpMoved` resets on each pointerdown so a no-click pan can't
+  // suppress the NEXT real click.
+  `let fpPan=false,fpMoved=false,fpX=0,fpY=0,fpL=0,fpT=0;const fpSc=()=>document.scrollingElement||document.documentElement;` +
+  `root.addEventListener('pointerdown',(e)=>{if(e.button!==0||!(e.target.closest&&e.target.closest('.flow-svg')))return;fpPan=true;fpMoved=false;fpX=e.clientX;fpY=e.clientY;const s=fpSc();fpL=s.scrollLeft;fpT=s.scrollTop;});` +
+  `window.addEventListener('pointermove',(e)=>{if(!fpPan)return;const dx=e.clientX-fpX,dy=e.clientY-fpY;if(!fpMoved&&Math.abs(dx)+Math.abs(dy)<4)return;fpMoved=true;document.body.style.cursor='grabbing';const s=fpSc();s.scrollLeft=fpL-dx;s.scrollTop=fpT-dy;e.preventDefault();});` +
+  `window.addEventListener('pointerup',()=>{if(fpPan){fpPan=false;document.body.style.cursor='';}});` +
+  `root.addEventListener('click',(e)=>{if(fpMoved){fpMoved=false;e.stopPropagation();e.preventDefault();}},true);` +
   // Chrome clicks: the All/Blocking toggle (data-fc-mode) + a gap row's Open CRL source (data-fc-gap).
   `fcc.addEventListener('click',(e)=>{const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
   `if(mode){v.postMessage({type:'fcMode',mode:mode.getAttribute('data-fc-mode')});return;}` +

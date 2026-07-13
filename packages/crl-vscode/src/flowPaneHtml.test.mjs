@@ -136,6 +136,13 @@ check("no <style> or style= inside the SVG (CSP); FLOW_STYLE carries var() + fal
   assert.ok(!/\.flow-row\.node-focus>rect\{[^}]*stroke:/.test(FLOW_STYLE), ".node-focus never recolors the base rect stroke (independent axis)");
 });
 
+check("grab-drag pan affordance: .flow-svg is cursor:grab + user-select:none; rows keep cursor:pointer (clickable)", () => {
+  const svg = FLOW_STYLE.match(/\.flow-svg\{([^}]*)\}/)?.[1] ?? "";
+  assert.match(svg, /cursor:grab/, "the tree background shows the grab hand");
+  assert.match(svg, /user-select:none/, "a pan-drag over node text doesn't select it");
+  assert.match(FLOW_STYLE, /\.flow-row\{cursor:pointer\}/, "rows still read as clickable (override grab)");
+});
+
 check("#210 verdict painting: .review-pass/-fail/-pending + .error-node overlay CSS exists, is NON-OUTLINE (fill, not stroke/outline)", () => {
   // The verdict overlay must be a fill tint, NOT a stroke/outline — so it coexists with .current (ring) + .failed-criterion
   // (dashed stroke) on independent SVG axes. Assert all four rules exist and set `fill` (and crucially NOT `stroke`/`outline`).

@@ -632,7 +632,9 @@ export function flowLegendChrome(mode: "cockpit" | "medical-validation"): string
 
 export const FLOW_STYLE =
   `.flow-wrap{display:inline-block;min-width:100%}` +
-  `.flow-svg{display:block;font:12px var(--vscode-editor-font-family,sans-serif)}` +
+  // `cursor:grab` = the grab-drag pan affordance on the tree background (a `.flow-row` overrides it with `pointer`, so nodes
+  // still read as clickable); `user-select:none` so a pan-drag over node text doesn't select it.
+  `.flow-svg{display:block;font:12px var(--vscode-editor-font-family,sans-serif);cursor:grab;user-select:none}` +
   `.flow-row{cursor:pointer}` +
   `.flow-row>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-panel-border,#454545);stroke-width:1}` +
   `.flow-row>text{fill:var(--vscode-foreground,#cccccc)}` +

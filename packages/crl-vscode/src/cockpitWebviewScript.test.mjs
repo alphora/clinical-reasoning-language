@@ -997,6 +997,14 @@ check("tree zoom: applyZoom scales the SVG BOX (viewBox base × treeZoom, not a 
   assert.match(SCRIPT, /const setZoom=\(z\)=>\{treeZoom=Math\.min\(3,Math\.max\(\.25,z\)\)/); // clamped 0.25–3×
   assert.match(SCRIPT, /root\.innerHTML=m\.html;fcc\.innerHTML='';[\s\S]*?applyZoom\(\);/); // persists across a re-render
 });
+check("grab-drag pan: pointerdown on .flow-svg starts a pan; window pointermove past a threshold adjusts scroll + swallows the node click", () => {
+  // press starts only on the flow pane, left button, and captures the scroll origin
+  assert.match(SCRIPT, /addEventListener\('pointerdown',\(e\)=>\{if\(e\.button!==0\|\|!\(e\.target\.closest&&e\.target\.closest\('\.flow-svg'\)\)\)return;fpPan=true;fpMoved=false;/);
+  // move rides window (tracks outside the pane), has a 4px threshold (so a stationary press still selects), and pans scroll
+  assert.match(SCRIPT, /window\.addEventListener\('pointermove',\(e\)=>\{if\(!fpPan\)return;.*Math\.abs\(dx\)\+Math\.abs\(dy\)<4\)return;fpMoved=true;.*s\.scrollLeft=fpL-dx;s\.scrollTop=fpT-dy;e\.preventDefault\(\)/);
+  // a moved (panned) press swallows the ensuing click in CAPTURE so the node isn't selected after a pan
+  assert.match(SCRIPT, /addEventListener\('click',\(e\)=>\{if\(fpMoved\)\{fpMoved=false;e\.stopPropagation\(\);e\.preventDefault\(\);\}\},true\)/);
+});
 check("tree zoom: Ctrl+wheel (flow pane only, passive:false) + the − / reset / + control (NO Ctrl+/-/0 — VS Code owns those)", () => {
   assert.match(SCRIPT, /addEventListener\('wheel',\(e\)=>\{if\(!e\.ctrlKey\)return;if\(!root\.querySelector\('\.flow-svg'\)\)return;e\.preventDefault\(\)/); // Ctrl+wheel, tree only
   assert.match(SCRIPT, /\{passive:false\}/); // preventDefault must work on wheel
