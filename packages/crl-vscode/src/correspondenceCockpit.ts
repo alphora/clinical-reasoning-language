@@ -1421,6 +1421,24 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     for (const v of views.values()) void v.panel.webview.postMessage({ type: "clearThisNode" });
   }
 
+  /** #210 (disc 239) — the CRL Assist FOCUS ring: a purple ring on the tree node the agent has as its FLAG ANCHOR (the last
+   *  flag-capable node the user clicked). An INDEPENDENT channel (its own `.node-focus` class) that never touches the
+   *  `.current` eval-chain highlight / `.has-flag` badges / `.this-node` / review overlays — mirrors `driveThisNode`'s tree
+   *  leg but reads `flagAnchor` and marks ONLY the tree pane. An empty `segmentIds` clears it (gen-guarded, current tree gen).
+   *  Re-driven on the tree ack (repaint after rebuild) + whenever the anchor changes. */
+  function driveNodeFocus(): void {
+    const tree = views.get("tree");
+    if (!tree) return; // tree pane opt-in
+    let segmentIds: string[] = [];
+    if (mode === "medical-validation" && flagAnchor && flagAnchor.cel === currentCel) {
+      const hit = flagAnchor.hit;
+      // The anchored node's tree-anchor key (the SAME extraction flagTargetChoices uses) → its segment (one gid on the tree).
+      const key = isSubQuestionHit(hit) ? hit.subQuestionLeafKey : "nodeKey" in hit ? hit.nodeKey : undefined;
+      if (key) segmentIds = segmentsFor(tree, [key]).segmentIds;
+    }
+    void tree.panel.webview.postMessage({ type: "markNodeFocus", gen: tree.gen, segmentIds });
+  }
+
   /** disc 164: paint the produced-path diverter overlay on one pane (the rows/units already mapped to segment ids). No
    *  scroll (mirrors markThisNode — the .current reveal owns scroll; the diverter is a secondary rationale highlight). */
   function markDiverters(v: PaneView, segmentIds: string[]): void {
@@ -1872,6 +1890,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         // NOTE: unlike the review overlay, this is selection-DEPENDENT — it rings `focusedScenario()`, which exists only in
         // cel-primary; it re-drives HERE (on ack) to survive the innerHTML replacement, and ALSO on every selection dispatch.
         driveLeafMarks();
+        // #210 (disc 239): a fresh tree render dropped its `.node-focus` class — re-drive the agent's flag-anchor focus ring.
+        driveNodeFocus();
       }
       // #177 slice 4: a freshly-(re)rendered marker-bearing pane (tree/crl/source/questionnaire) loses its `.this-node`
       // class (innerHTML replaced) — re-drive the marker on its ack so the focused question's node re-paints. Like the
@@ -1947,6 +1967,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (flagTargetChoices(hit).length) {
         flagAnchor = { hit, cel: currentCel };
         cockpitAgentBridge.notifyChanged();
+        driveNodeFocus(); // #210 (disc 239): move the purple focus ring to the newly-anchored node (no rebuild here)
       }
       // #219: this is a CLICK in `pane` → its OWN reveal (peek or selection) must not scroll (respect the user's viewport;
       // cross-pane targets still scroll). Set at the TOP so it covers the peek paths too. Live for the SYNCHRONOUS work below
@@ -2214,6 +2235,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // #203 Todo 4b Slice A: the rebuilt tree lost its `.has-flag` classes — re-drive the per-node flag badges (flagsList
     // was refreshed BEFORE the render above; the tree's ack also re-drives). Inert in cockpit mode.
     driveFlagBadges();
+    // #210 (disc 239): re-drive the agent's flag-anchor focus ring (immediate parity + a retarget clears it since the new
+    // policy's openPanel dropped flagAnchor; the tree's ack also re-drives). Inert outside MV / with no anchor.
+    driveNodeFocus();
   }
 
   /** On a discovery/build failure, drop stale provenance so the panes never stay interactive with wrong data. */
@@ -3473,6 +3497,9 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // selection channel (highlight/clearHighlight), so `.this-node` SURVIVES a cockpit reveal (it tracks the focused QUESTION,
   // not the selection — it moves only when the case or the question changes, the done-overlay lifecycle).
   `const clrTN=()=>{for(const el of root.querySelectorAll('.this-node'))el.classList.remove('this-node');};` +
+  // #210 (disc 239): the CRL Assist focus-ring clear. Its OWN channel — called only by markNodeFocus, NEVER by the selection
+  // channel — so the purple ring layers cleanly over `.current`/`.has-flag`/`.this-node` and tracks the agent's flag anchor.
+  `const clrNF=()=>{for(const el of root.querySelectorAll('.node-focus'))el.classList.remove('node-focus');};` +
   // disc 164: the produced-path diverter clear. Like clrFC (and UNLIKE clrTN/clrRO) it IS called by the selection channel
   // (highlight/clearHighlight) — the diverters are per-selected-case, so they clear on a reveal and the same-selection
   // markDiverters (a later post-dispatch post) re-applies; the NEXT selection's reveal drops them.
@@ -3552,6 +3579,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `else if(m.type==='clearThisNode'){clrTN();}` +
   `else if(m.type==='markThisNode'){if(m.gen!==gen)return;clrTN();` +
   `for(const id of (m.segmentIds||[])){const el=document.getElementById(id);if(el)el.classList.add('this-node');}}` +
+  // #210 (disc 239): the CRL Assist focus ring (.node-focus) on the agent's flag-anchor node. Gen-guarded clear-then-set,
+  // its own channel; an empty segmentIds is a clean clear. NEVER touched by highlight/clearHighlight (independent overlay).
+  `else if(m.type==='markNodeFocus'){if(m.gen!==gen)return;clrNF();` +
+  `for(const id of (m.segmentIds||[])){const el=document.getElementById(id);if(el)el.classList.add('node-focus');}}` +
   // disc 164: the produced-path diverter channel (.diverter). Gen-guarded clear-then-set like the others; coexists with
   // .current/.failed-criterion/.this-node/the review overlay (independent class). No scroll (the .current reveal already
   // scrolls to the produced cluster; the diverter is a secondary rationale highlight, must not yank the pane).

@@ -759,6 +759,11 @@ export const FLOW_STYLE =
   // on the path", so the focus ("the question you're on") must read differently from a path node (it is not on the path,
   // e.g. a not-adult deny whose Q1 `when` isn't in the reveal cluster). Thicker than `.current` (2.5); `stroke-dasharray:none`.
   `.flow-row.this-node>rect{stroke:var(--vscode-charts-orange,#d18616);stroke-width:3;stroke-dasharray:none}` +
+  // #210 (disc 239): the CRL Assist FOCUS ring — the tree node the agent has as its flag anchor. A purple GLOW (drop-shadow),
+  // NOT a stroke: purple is already the INFERRED layer's border colour + a stroke would OVERRIDE the protected
+  // .this-node/.current/.failed-criterion strokes (gpt55). A glow is a SEPARATE visual axis — it leaves every node's border
+  // (inferred purple / selection / this-node) intact and adds a distinct "the agent is focused here" halo that coexists.
+  `.flow-row.node-focus>rect{filter:drop-shadow(0 0 4px var(--vscode-charts-purple,#c586c0))}` +
   // #187 Todo 3: the per-case leaf verdict is now the on-path RING (above) — `markLeaves` toggles `.flow-leaf-yes` (TRUE
   // → ring) / `.flow-leaf-no` (false → NOTHING; `.flow-leaf-no` is a RESERVED no-op class, kept so a muted false marker is
   // a cheap re-add if the audit ever needs false≠unevaluated). The old green ✓ / grey ✗ tick glyphs are removed.

@@ -209,6 +209,33 @@ check("GEN-GUARD: markThisNode drops a mark aimed at a superseded render (m.gen!
   assert.ok(!/m\.gen!==gen/.test(clear), "clearThisNode is ungated (a class-strip is always safe)");
 });
 
+// ── #210 (disc 239): the CRL Assist FOCUS ring (.node-focus) — the agent's flag-anchor node in the tree, an INDEPENDENT
+//    overlay channel mirroring .this-node (never touched by the selection/eval-chain highlight). ──
+check("#210 focus ring: markNodeFocus is a gen-guarded clear-then-set channel; clrNF strips ONLY .node-focus", () => {
+  assert.match(SCRIPT, /const clrNF=\(\)=>\{/, "clrNF is defined");
+  const clrM = SCRIPT.match(/const clrNF=\(\)=>\{[^}]*\};/)[0];
+  assert.ok(!/this-node|current|has-flag|failed-criterion|review-pass|review-fail|review-pending|error-node/.test(clrM), "clrNF strips only .node-focus");
+  const mark = handlerBody("markNodeFocus");
+  assert.ok(/if\(m\.gen!==gen\)return;/.test(mark) && /clrNF\(\);/.test(mark) && /add\('node-focus'\)/.test(mark), "gen-guarded clear-then-set");
+});
+check("#210 focus ring: the selection channel (highlight/clearHighlight) NEVER touches .node-focus (independent overlay)", () => {
+  for (const type of ["highlight", "clearHighlight"]) {
+    const body = handlerBody(type);
+    assert.ok(!/clrNF\(\)|node-focus/.test(body), `${type} MUST NOT touch the .node-focus ring`);
+  }
+  // exactly one clrNF() call site (inside markNodeFocus) — no scattered clears
+  assert.equal((SCRIPT.match(/clrNF\(\)/g) || []).length, 1, "clrNF is called only in markNodeFocus");
+});
+check("#210 focus ring HOST: driveNodeFocus reads flagAnchor → the tree's segments, and re-drives on the tree ack", () => {
+  const m = COCKPIT_SRC.match(/function driveNodeFocus\(\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "driveNodeFocus body");
+  assert.match(m[1], /flagAnchor/); // reads the agent flag anchor
+  assert.match(m[1], /segmentsFor\(tree, \[key\]\)\.segmentIds/); // resolves the anchor key → the tree segment
+  assert.match(m[1], /type: "markNodeFocus", gen: tree\.gen/); // posts to the tree with its gen (empty = clear)
+  assert.match(COCKPIT_SRC, /driveLeafMarks\(\);[\s\S]*?driveNodeFocus\(\);/); // re-driven on the tree ack after the other overlays
+  assert.match(COCKPIT_SRC, /flagAnchor = \{ hit, cel: currentCel \};[\s\S]*?driveNodeFocus\(\);/); // + when the anchor is set (no rebuild)
+});
+
 // ── #177 slice 4 FIX 3(b): the HOST ack-drive lifecycle (the pane-ack re-drive is the survives-reveal GUARANTEE) ──
 check("HOST: the pane-ack (`ready`) handler drives the marker (driveThisNode), and the marker is NEVER cleared by the selection path", () => {
   // The marker's correctness rests on a re-drive when a marker-bearing pane re-renders (its `ready` ack). Assert the host
