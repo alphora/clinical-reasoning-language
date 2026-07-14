@@ -9,6 +9,9 @@
 // (never silently dropped — dropping a flag would remove a blocker). `id`/`createdAt` are HOST-injected (keeps this pure).
 
 export type MvFlagStatus = "open" | "resolved";
+/** The status lifecycle a flag SURFACE (cockpit / MCP tool) types against — an alias of `MvFlagStatus`, re-homed here from the
+ *  deleted `rewriteMetaStatus` (#212 step 4) so both callers keep the `FlagStatus` name without depending on `.crl` refactors. */
+export type FlagStatus = MvFlagStatus;
 /** Provenance: who/when raised it — `extraction` = AI, during KE authoring; `validation` = human, in MV. Both are MV concerns. */
 export type MvFlagCategory = "extraction" | "validation";
 export type MvFlagScope = "concept" | "decision" | "library";

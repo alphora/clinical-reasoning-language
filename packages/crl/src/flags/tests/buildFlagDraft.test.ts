@@ -70,3 +70,48 @@ test("a parse failure → parse-failed (never a crash)", () => {
   if (r.ok) return;
   expect(r.reason).toBe("parse-failed");
 });
+
+// ── the direct MvFlag build (ported from legacyToMvFlag) — the load-bearing branches (gpt55 + Claude impl review) ─────────────
+const DECISION = 'library "L".\nconcept "A":\n- type is Observation.\n- code is `a`.\ndecision "D":\nfirst:\n- when "A" then recommend activity "X".\n- otherwise then recommend activity "X".';
+
+test("a decision-occurrence `; key` (`<nodeId>~<signature>`) promotes to anchor.occurrenceKey + a `name · sig` label; key is stripped from fields", () => {
+  const r = validateAndBuildMvFlagDraft(DECISION, { kind: "decision", name: "D" }, { tag: "validation-concern", gist: "wrong node", fields: { key: "when[0]~A" } });
+  expect(r.ok).toBe(true);
+  if (!r.ok) return;
+  expect(r.flag.anchor).toMatchObject({ scope: "decision", name: "D", occurrenceKey: "when[0]~A", label: "D · A" });
+  expect(r.flag.fields.key).toBeUndefined(); // key lives in the anchor, not the stored fields
+  expect(r.flag.dedupKey).not.toBe("when[0]~A"); // an occurrence key is NOT the dedupKey (it's a synthesized content hash)
+});
+
+test("a NON-occurrence `; key` on a decision becomes the dedupKey verbatim (re-add guard) — NOT an occurrenceKey; stripped from fields", () => {
+  const r = validateAndBuildMvFlagDraft(DECISION, { kind: "decision", name: "D" }, { tag: "open-fork", gist: "unsettled fork", fields: { key: "src-hash-abc123" } });
+  expect(r.ok).toBe(true);
+  if (!r.ok) return;
+  expect(r.flag.anchor.occurrenceKey).toBeUndefined();
+  expect(r.flag.dedupKey).toBe("src-hash-abc123");
+  expect(r.flag.fields.key).toBeUndefined();
+});
+
+test("a library-target build → a library-scope anchor (name = the library name)", () => {
+  const r = validateAndBuildMvFlagDraft(DECISION, { kind: "library", name: "L" }, { tag: "internal-inconsistency", gist: "source contradicts itself" });
+  expect(r.ok).toBe(true);
+  if (!r.ok) return;
+  expect(r.flag.anchor).toMatchObject({ scope: "library", name: "L", label: "L" });
+  expect(r.flag.category).toBe("extraction"); // STRICT from the tag
+});
+
+test("category is STRICT from the tag — validation-concern → validation, the extraction flags → extraction", () => {
+  const vc = build({ tag: "validation-concern" });
+  const fd = build({ tag: "fidelity-defect", fields: { direction: "over-reach" } });
+  expect(vc.ok && fd.ok).toBe(true);
+  if (!vc.ok || !fd.ok) return;
+  expect(vc.flag.category).toBe("validation");
+  expect(fd.flag.category).toBe("extraction");
+});
+
+test("a tag ALIAS canonicalizes through the full seam (over-reach-to-fix → fidelity-defect)", () => {
+  const r = build({ tag: "over-reach-to-fix", fields: { direction: "over-reach" } });
+  expect(r.ok).toBe(true);
+  if (!r.ok) return;
+  expect(r.flag.tag).toBe("fidelity-defect");
+});

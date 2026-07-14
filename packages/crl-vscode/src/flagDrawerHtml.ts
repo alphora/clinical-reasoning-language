@@ -6,7 +6,7 @@
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (c) => ESC[c]);
 
-/** A flag tag's authoring info for the drawer — structurally `FlagTagInfo` from the registry (id + category + field
+/** A flag tag's authoring info for the drawer — structurally `FlagTagInfo` from the crl flag vocabulary (id + category + field
  *  rules), redeclared locally so this module stays decoupled from the crl package + node-testable. */
 export interface FlagDrawerTag {
   id: string;

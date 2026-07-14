@@ -273,21 +273,20 @@ export { collectFlags, openFlags } from "./meta/collectFlags";
 export type { FlagInstance } from "./meta/collectFlags";
 export { parseMetaTag } from "./meta/parseMetaTag";
 export type { ParseMetaResult, ParsedMetaTag } from "./meta/parseMetaTag";
-// #203 Todo 4b Slice B — the flag-tag vocabulary accessor for the create-flag pick (registry-driven, not hardcoded).
-export { flagTags } from "./meta/registry";
-export type { FlagTagInfo, FieldRule } from "./meta/registry";
+// #212 step 4 — the CORE-owned flag VOCABULARY (moved OUT of the `.crl` meta-registry; flags left `.crl`). The single source
+// of the flag tags/fields/aliases/categories/enums for the cockpit drawer, the MCP flag tools, and the create seam. Plus the
+// pure field validator + the forbidden-char rules (re-homed from `createFlag`) + the create-seam target/input types.
+export { flagTags, isFlagTag, canonicalFlagTag, flagCategoryOf, flagFieldRulesOf, validateFlagFields, FORBIDDEN_FLAG_CHARS, hasForbiddenFlagChars, FORBIDDEN_GIST_CHARS, hasForbiddenGistChars } from "./flags/flagVocab";
+export type { FlagTagInfo, FieldRule, FlagStatus, CreateFlagTarget, CreateFlagInput, ValidateFlagFieldsResult, FlagFieldsFailure } from "./flags/flagVocab";
 
-// #205 crl-refactors — the write-half of the CRL-source API. Instance #1: the flag-status flip (meta-quickfix family).
+// #205 crl-refactors — the write-half of the CRL-source API. NOTE (#212 step 4): these `.crl`-splicing flag transforms
+// (`createFlag`/`setFlagStatus`/`rewriteMetaStatus`/`resolveMetaInsertion`) are no longer wired to any store surface — the
+// store seam (`validateAndBuildMvFlagDraft`) + the MCP tools replaced them; they are stripped in 4b.
 export { rewriteMetaStatus, rewriteStatusInBody } from "./refactors/rewriteMetaStatus";
-export type { FlagStatus } from "./refactors/rewriteMetaStatus";
-// Instance #2 (#203 Todo 4b Slice B): resolve the insertion point for a NEW `- meta is` line on a concept/decision.
 export { resolveMetaInsertion } from "./refactors/resolveMetaInsertion";
 export type { MetaInsertionResult } from "./refactors/resolveMetaInsertion";
-// Instance #2 CREATE (extracted from the cockpit's embedded Slice-B logic — the #205 payoff): author a review flag on a
-// concept, decision, OR library; the shared atom the MV cockpit Add-flag AND the `create_flag` MCP tool both wrap.
-export { createFlag, FORBIDDEN_FLAG_CHARS, hasForbiddenFlagChars, FORBIDDEN_GIST_CHARS, hasForbiddenGistChars } from "./refactors/createFlag";
-export type { CreateFlagTarget, CreateFlagInput, CreateFlagResult, CreateFlagFailure, SlimDiagnostic } from "./refactors/createFlag";
-// The SOURCE-level status flip (headless `set_flag_status`): locate a flag by selector, apply `rewriteMetaStatus`.
+export { createFlag } from "./refactors/createFlag";
+export type { CreateFlagResult, CreateFlagFailure, SlimDiagnostic } from "./refactors/createFlag";
 export { setFlagStatus } from "./refactors/setFlagStatus";
 export type { FlagSelector, FlagCandidate, SetFlagStatusResult, SetFlagStatusFailure } from "./refactors/setFlagStatus";
 

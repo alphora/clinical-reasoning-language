@@ -2860,7 +2860,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         return fail("couldn't open the .crl");
       }
       // VALIDATE via the shared seam (no ref) — catch unknown-tag / missing-field / invalid-value / decl-not-found /
-      // invalid-result BEFORE any issue POST, so a form error never orphans a GitHub issue. Keep the drawer open on failure.
+      // parse-failed BEFORE any issue POST, so a form error never orphans a GitHub issue. Keep the drawer open on failure.
       // (Discard the built draft; the real record is built AFTER the POST, with the `ref`, so its dedupKey reflects the
       // persisted content — gpt55 [critical]: a single pre-POST build would bake a stale dedupKey.)
       const dry = validateAndBuildMvFlagDraft(doc.getText(), { kind: target.kind, name: target.name, library: target.lib }, { tag, gist: summary, fields, status: "open" });

@@ -21,10 +21,10 @@ import { validateCRLImports } from "../imports/validate";
 import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "../index";
 // #212 step 2 — the MCP flag tools write the `.crl/flags/` STORE (not `.crl` meta-tags): validate+build via the shared seam,
 // then dedup-check + save. `createFlag`/`setFlagStatus` (the `.crl` splicers) are no longer used here.
-import { validateAndBuildMvFlagDraft, flagStoreDir, loadFlags, saveFlag, isOpen } from "../index";
-import type { CreateFlagTarget, MvFlag, MvFlagScope } from "../index";
-import { canonicalTag } from "../meta/registry"; // canonicalize a selector's tag alias (set_flag_status matches on the canonical tag)
-import type { FlagStatus } from "../refactors/rewriteMetaStatus";
+import { validateAndBuildMvFlagDraft, flagStoreDir, loadFlags, saveFlag, isOpen, canonicalFlagTag } from "../index";
+import type { CreateFlagTarget, MvFlag, MvFlagScope, FlagStatus } from "../index";
+// canonicalize a selector's tag alias — `canonicalFlagTag` (the flag vocab), NOT the `.crl` registry's `canonicalTag`
+// (#212 step 4: flag tags left the registry, so the registry no longer knows them; the store holds the canonical tag).
 import { validateProvenanceFiles, generateProvenanceFiles } from "../provenance";
 
 // Caps the CRL SOURCE (input) size. Response size scales with this — there is
@@ -865,9 +865,9 @@ export function createServer(): McpServer {
         "`id` selects it for set_flag_status; NOTE the shape: `tag`, `anchor.scope`, `status`, `fields` — there is NO `source`). " +
         "IDEMPOTENT while OPEN: a retry with the same content returns the existing open record ({ success:true, flag, " +
         "deduped:true }) rather than duplicating (a previously-RESOLVED same-content flag does NOT suppress a new open one). " +
-        "On a domain failure: { success:false, reason, message, " +
-        "diagnostics? } (reason: unknown-tag | missing-field | invalid-value | decl-not-found | invalid-result | parse-failed | " +
-        "store-warning). Bad tool args (missing fields, or `code`/no `path`, or a path outside a policy) come back as a tool error.",
+        "On a domain failure: { success:false, reason, message } (reason: unknown-tag | missing-field | invalid-value | " +
+        "decl-not-found | parse-failed | store-warning). Bad tool args (missing fields, or `code`/no `path`, or a path outside " +
+        "a policy) come back as a tool error.",
       inputSchema: {
         ...inputSchema,
         kind: z.enum(["concept", "decision", "library"]).describe("The kind of object the flag goes on."),
@@ -970,7 +970,7 @@ function runSetFlagStatus(args: SetFlagStatusArgs): ToolResponse {
   try {
     const loaded = loadFlags(storeDir);
     if (loaded.warning) return writeResult({ ok: false, reason: "store-warning", message: loaded.warning });
-    const canon = canonicalTag(args.tag) ?? args.tag; // match on the CANONICAL tag (the store holds canonical; the selector may be an alias)
+    const canon = canonicalFlagTag(args.tag) ?? args.tag; // match on the CANONICAL tag (the store holds canonical; the selector may be an alias)
     const matches = loaded.flags.filter(
       (f) =>
         f.anchor.scope === args.scope &&
