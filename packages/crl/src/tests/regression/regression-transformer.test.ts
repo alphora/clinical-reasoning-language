@@ -1,14 +1,14 @@
 import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+const CRL_PKG_ROOT = path.resolve(__dirname, "..", "..", ".."); // = packages/crl (vitest runs from repo root; the `npm run cli:*` subprocess needs the crl cwd)
 
 import stripAnsi from "strip-ansi";
 
 // DEPRECATED: the FSH→CRL transformer is no longer a supported lane of this
-// project, so this regression test is skipped. It is retained for reference
-// only; do not treat its failures as actionable. Already excluded from the
-// regression aggregator (see regression/index.test.ts). Remove when the FSH
-// transformer is removed.
+// project, so this regression test is skipped (`describe.skip`). It is retained
+// for reference only; do not treat its failures as actionable. Remove when the
+// FSH transformer is removed.
 describe.skip("Transformer regression test: IMMZ example (DEPRECATED — FSH lane)", () => {
   const TMP_FILE = path.join(__dirname, "testdata", "regression-transformer-actual.crl");
   const EXPECTED_FILE = path.join(__dirname, "testdata", "regression-transformer-expected.crl");
@@ -22,7 +22,7 @@ describe.skip("Transformer regression test: IMMZ example (DEPRECATED — FSH lan
     let output = execSync(
       "npm run cli:transformer:fsh-to-crl -- " +
         path.join(__dirname, "testdata", "smart-example-immz"),
-      { encoding: "utf8" },
+      { encoding: "utf8", cwd: CRL_PKG_ROOT },
     );
 
     // Filter out SUSHI/npm log lines (colored warn/info, npm script headers)

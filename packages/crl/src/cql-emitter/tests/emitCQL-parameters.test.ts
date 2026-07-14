@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it } from "vitest";
 
 import type { CRL, Parameter, ParameterType } from "../../ast/types";
 import { emitCQL, emitCQLFromAST } from "../emitCQL";

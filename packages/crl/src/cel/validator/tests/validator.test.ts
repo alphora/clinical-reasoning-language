@@ -911,7 +911,7 @@ describe("CEL Todo 4 — soft mode", () => {
 describe("CEL Todo 4 — validateCEL() consumes pre-built graphs", () => {
   test("works on a ResolvedCelGraph from resolveCelImports", () => {
     const graph = resolveCelImports(CORPUS.cms22);
-    const r = require("../validator").validateCEL(graph);
+    const r = validateCEL(graph);
     expect(r.errors).toEqual([]);
   });
 });

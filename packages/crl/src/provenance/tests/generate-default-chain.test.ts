@@ -22,6 +22,7 @@ import * as path from "node:path";
 
 import { resolveCelImports } from "../../cel/imports";
 import * as cre from "../../cre";
+import { vi, type MockInstance } from "vitest";
 import type { AnchorSourceMeta } from "../artifact";
 import { generateProvenanceScaffold } from "../generate";
 
@@ -306,10 +307,10 @@ describe("#175 default-mode — a name-collision on a CHAINING decision DEFERS h
 // phantom Main attach. This is the worst-case the honest-defer gate exists to close.
 describe("#175 default-mode FIX 2 — a chaining D that also recommends X: a forced render-fail attaches NO ref to D", () => {
   let fx: Fx;
-  let spy: jest.SpyInstance;
+  let spy: MockInstance;
   beforeAll(() => {
     fx = mkFx("def-chain-dual-renderfail-", DUAL_CRL, DUAL_CEL);
-    spy = jest.spyOn(cre, "renderScenario").mockReturnValue({
+    spy = vi.spyOn(cre, "renderScenario").mockReturnValue({
       schemaVersion: 1,
       success: false,
       source: { celFilePath: fx.celPath },
@@ -339,10 +340,10 @@ describe("#175 default-mode FIX 2 — a chaining D that also recommends X: a for
 // ── 6) RENDER-FAIL still scaffolds: the structural artifact emits; a CHAINING policy's cases DEFER (no ref to D) ─────
 describe("#175 default-mode — a wholesale render failure still emits the structural scaffold; chaining cases DEFER", () => {
   let fx: Fx;
-  let spy: jest.SpyInstance;
+  let spy: MockInstance;
   beforeAll(() => {
     fx = mkFx("def-chain-renderfail-", CHAIN_CRL, CHAIN_CEL);
-    spy = jest.spyOn(cre, "renderScenario").mockReturnValue({
+    spy = vi.spyOn(cre, "renderScenario").mockReturnValue({
       schemaVersion: 1,
       success: false,
       source: { celFilePath: fx.celPath },

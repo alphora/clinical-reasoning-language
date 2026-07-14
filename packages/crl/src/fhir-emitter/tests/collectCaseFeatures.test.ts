@@ -11,7 +11,7 @@
  * entirely so the local condition's collected inputs survive.
  */
 
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it } from "vitest";
 
 import { buildCRL } from "../../index";
 import { lowerLocalCodes } from "../../cql-emitter/lowerLocalCodes";

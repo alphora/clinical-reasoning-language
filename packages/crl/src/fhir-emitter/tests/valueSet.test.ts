@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it } from "vitest";
 
 import type { Terminology, TerminologyBodyLine } from "../../ast/types";
 import { emitValueSet, emitValueSetsForLibrary } from "../valueSet";

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it } from "vitest";
 
 import { buildCRL } from "../../index";
 import type { CRL, Concept, Terminology, Location } from "../../ast/types";

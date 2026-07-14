@@ -1,7 +1,9 @@
+import { emitCQLImports } from "../../imports/emit";
+import { resolveImports } from "../../imports/index";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
 import * as path from "path";
 
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it } from "vitest";
 
 import {
   applyContentUrlInvariant,
@@ -69,7 +71,6 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
   });
 
   it("R1 byte-equality: the FHIR CodeSystem.url == the CQL `codesystem '<url>'` literal, both POLICY-ID slugged", () => {
-    const { emitCQLImports } = require("../../imports/emit") as typeof import("../../imports/emit");
 
     // FHIR lane — the local CodeSystem url is policy-id based.
     const cs = result.resources.find((r) => r.resourceType === "CodeSystem")!;
@@ -270,8 +271,6 @@ describe("applyContentUrlInvariant — Library content-url integrity (Inv 4)", (
 /* ─── Inv 4 wired into emitFhirDefClosure end-to-end (slice 4c / E) ───── */
 
 describe("emitFhirDefClosure — content-url invariant is wired into the pipeline", () => {
-  const { resolveImports } = require("../../imports/index") as typeof import("../../imports/index");
-  const { emitCQLImports } = require("../../imports/emit") as typeof import("../../imports/emit");
 
   const METADATA: CpgMetadata = {
     version: "1.0.0",
@@ -336,8 +335,6 @@ describe("emitFhirDefClosure — content-url invariant is wired into the pipelin
 /* ─── D3 — the two structured-error guards (hand-built manifest) ──────── */
 
 describe("emitFhirDefClosure — structured-error guards on a malformed manifest (D3)", () => {
-  const { resolveImports } = require("../../imports/index") as typeof import("../../imports/index");
-  const { emitCQLImports } = require("../../imports/emit") as typeof import("../../imports/emit");
   const FIXED = { date: new Date("2020-01-01T00:00:00.000Z") };
 
   const METADATA: CpgMetadata = {

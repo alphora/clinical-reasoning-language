@@ -1,6 +1,7 @@
 import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+const CRL_PKG_ROOT = path.resolve(__dirname, "..", "..", ".."); // = packages/crl (vitest runs from repo root; the `npm run cli:*` subprocess needs the crl cwd)
 
 describe("Lexer regression test: IMMZ example", () => {
   const TMP_FILE = path.join(__dirname, "testdata", "regression-lexer-actual.tokens");
@@ -16,7 +17,7 @@ describe("Lexer regression test: IMMZ example", () => {
     // Run the lexer CLI and capture output
     const output = execSync(
       "npm run cli:lexer -- " + path.join(__dirname, "testdata", "smart-example-immz"),
-      { encoding: "utf8" },
+      { encoding: "utf8", cwd: CRL_PKG_ROOT },
     );
     fs.writeFileSync(TMP_FILE, output, "utf8");
 
@@ -47,7 +48,7 @@ describe("Lexer regression test: Example files run without error", () => {
   EXAMPLES.forEach((examplePath) => {
     it(`should lex ${path.basename(examplePath)} without error`, () => {
       expect(() => {
-        execSync(`npm run cli:lexer -- ${examplePath}`, { encoding: "utf8" });
+        execSync(`npm run cli:lexer -- ${examplePath}`, { encoding: "utf8", cwd: CRL_PKG_ROOT });
       }).not.toThrow();
     });
   });

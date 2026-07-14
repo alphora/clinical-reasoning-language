@@ -17,6 +17,7 @@
     "package:extension": "npm run package -w crl-language-support"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.10",
     "vitest": "^4.1.10"
   }
 }

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
 import * as path from "path";
 
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it } from "vitest";
 
 import { resolveCelImports } from "../../imports";
 import { emitCelToFhir } from "../emitFhir";

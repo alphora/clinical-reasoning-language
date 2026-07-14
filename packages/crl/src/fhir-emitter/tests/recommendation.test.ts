@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it } from "vitest";
 
 import type { Activity, ActivityType } from "../../ast/types";
 import { activityDefinitionCanonicalUrl } from "../activity";

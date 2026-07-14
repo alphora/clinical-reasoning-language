@@ -14,6 +14,7 @@ import * as path from "node:path";
 
 import { resolveCelImports } from "../../cel/imports";
 import * as cre from "../../cre";
+import { vi, type MockInstance } from "vitest";
 import type { AnchorSourceMeta, CrlNodeRef, ProvenanceArtifact } from "../artifact";
 import { generateProvenanceScaffold } from "../generate";
 import { generateProvenanceFiles } from "../generateFiles";
@@ -356,12 +357,13 @@ describe("disposition-path — case-FIRST classification keeps the GOOD cases (F
 
 describe("disposition-path — a failed render emits coverage-only + ONE render-failed diagnostic (FIX 2b)", () => {
   let fx: Fixture;
-  let spy: jest.SpyInstance;
+  let spy: MockInstance;
   beforeAll(() => {
     fx = mkFixture("gen-dpp-renderfail-", POLICY_CRL, CEL);
-    // Force renderScenario to report a wholesale failure (the generator imports it from "../cre"; ts-jest compiles the
-    // named import to a property access on the module object, so spying on the module is observed at the call site).
-    spy = jest.spyOn(cre, "renderScenario").mockReturnValue({
+    // Force renderScenario to report a wholesale failure (the generator imports it from "../cre"; vitest's ESM transform,
+    // like ts-jest, resolves the named import through the module namespace, so spying `cre.renderScenario` is observed at the
+    // call site — verified under vitest).
+    spy = vi.spyOn(cre, "renderScenario").mockReturnValue({
       schemaVersion: 1,
       success: false,
       source: { celFilePath: fx.celPath },
@@ -411,9 +413,9 @@ describe("disposition-path — a failed render emits coverage-only + ONE render-
  *  scenario's tree on a deep clone — so the generator sees a SUCCESSFUL render carrying a surgically-corrupted node. */
 function spyRenderWithMutation(
   mutate: (tree: { kind: string; nodeId: string; action?: Record<string, unknown>; children?: unknown[] }[]) => void,
-): jest.SpyInstance {
+): MockInstance {
   const realRender = cre.renderScenario; // capture BEFORE installing the spy (avoids requireActual recursion)
-  return jest.spyOn(cre, "renderScenario").mockImplementation((graph) => {
+  return vi.spyOn(cre, "renderScenario").mockImplementation((graph) => {
     const real = realRender(graph);
     const clone = JSON.parse(JSON.stringify(real)) as typeof real;
     if (clone.success !== false) {
@@ -426,7 +428,7 @@ function spyRenderWithMutation(
 
 describe("disposition-path — FIX 3a: a successful render with an UN-INDEXED produced node defers (not a wrong scaffold)", () => {
   let fx: Fixture;
-  let spy: jest.SpyInstance | undefined;
+  let spy: MockInstance | undefined;
   beforeAll(() => {
     fx = mkFixture("gen-dpp-honesty-idmiss-", POLICY_CRL, CEL);
   });
@@ -475,7 +477,7 @@ describe("disposition-path — FIX 3a: a successful render with an UN-INDEXED pr
 
 describe("disposition-path — FIX 3b: a `gaps`-nonempty path (absent target.name expanded boundary) defers", () => {
   let fx: Fixture;
-  let spy: jest.SpyInstance | undefined;
+  let spy: MockInstance | undefined;
   beforeAll(() => {
     fx = mkFixture("gen-dpp-honesty-gaps-", POLICY_CRL, CEL);
   });

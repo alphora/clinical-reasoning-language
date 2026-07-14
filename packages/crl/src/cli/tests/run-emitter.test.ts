@@ -15,7 +15,7 @@ import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = join(__dirname, "..", "..", "..");
 const CLI = join(REPO_ROOT, "src", "cli", "run-emitter.ts");

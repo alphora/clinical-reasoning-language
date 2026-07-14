@@ -1,6 +1,7 @@
 import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+const CRL_PKG_ROOT = path.resolve(__dirname, "..", "..", ".."); // = packages/crl (vitest runs from repo root; the `npm run cli:*` subprocess needs the crl cwd)
 
 describe("Parser regression test: IMMZ example", () => {
   const TMP_FILE = path.join(__dirname, "testdata", "regression-parser-actual.parse");
@@ -18,7 +19,7 @@ describe("Parser regression test: IMMZ example", () => {
     // Run the parser CLI and capture output
     const output = execSync(
       "npm run cli:parser -- " + path.join(__dirname, "testdata", "smart-example-immz"),
-      { encoding: "utf8" },
+      { encoding: "utf8", cwd: CRL_PKG_ROOT },
     );
     fs.writeFileSync(TMP_FILE, output, "utf8");
 
@@ -55,7 +56,7 @@ describe("Parser regression test: Example files run without error", () => {
     const runner = isDeprecatedImmz ? it.skip : it;
     runner(`should parse ${path.basename(examplePath)} without error`, () => {
       expect(() => {
-        execSync(`npm run cli:parser -- ${examplePath}`, { encoding: "utf8" });
+        execSync(`npm run cli:parser -- ${examplePath}`, { encoding: "utf8", cwd: CRL_PKG_ROOT });
       }).not.toThrow();
     });
   });

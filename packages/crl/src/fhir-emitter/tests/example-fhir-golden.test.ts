@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "fs";
 import * as path from "path";
 
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it } from "vitest";
 
 import { emitFhirDefFromPath } from "../closureOrchestrator";
 

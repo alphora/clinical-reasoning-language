@@ -2,14 +2,6 @@ import * as path from "path";
 
 import { resolveImports } from "../index";
 
-import "./registry.test";
-import "./resolver.test";
-import "./namespace.test";
-import "./validate.test";
-import "./emit.test";
-import "./registry-and-resolver-v21.test";
-import "./scoping-v21.test";
-import "./overlay.test";
 
 const FIXTURES = path.resolve(__dirname, "fixtures");
 

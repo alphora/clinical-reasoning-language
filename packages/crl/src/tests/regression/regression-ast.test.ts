@@ -1,6 +1,7 @@
 import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+const CRL_PKG_ROOT = path.resolve(__dirname, "..", "..", ".."); // = packages/crl (vitest runs from repo root; the `npm run cli:*` subprocess needs the crl cwd)
 
 describe("AST builder regression test: IMMZ example", () => {
   const TMP_FILE = path.join(__dirname, "testdata", "regression-ast-actual.json");
@@ -16,7 +17,7 @@ describe("AST builder regression test: IMMZ example", () => {
     // Run the AST builder CLI and capture output
     const output = execSync(
       "npm run cli:ast -- " + path.join(__dirname, "testdata", "smart-example-immz"),
-      { encoding: "utf8" },
+      { encoding: "utf8", cwd: CRL_PKG_ROOT },
     );
     fs.writeFileSync(TMP_FILE, output, "utf8");
 
@@ -53,7 +54,7 @@ describe("AST builder regression test: Example files run without error", () => {
     const runner = isDeprecatedImmz ? it.skip : it;
     runner(`should build AST for ${path.basename(examplePath)} without error`, () => {
       expect(() => {
-        execSync(`npm run cli:ast -- ${examplePath}`, { encoding: "utf8" });
+        execSync(`npm run cli:ast -- ${examplePath}`, { encoding: "utf8", cwd: CRL_PKG_ROOT });
       }).not.toThrow();
     });
   });

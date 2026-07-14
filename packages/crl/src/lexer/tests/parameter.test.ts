@@ -1,3 +1,4 @@
+import { buildCRL } from "../../index";
 import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
 import { tokenizeCRL } from "../../index";
 
@@ -132,7 +133,6 @@ parameter "Measurement Period":
   });
 
   it("buildCRL with mixed parameter + concept parses end-to-end (Todo 2 resolves bare refs)", () => {
-    const { buildCRL } = require("../../index");
     const r = buildCRL(`# T
 library "T".
 parameter "Measurement Period":

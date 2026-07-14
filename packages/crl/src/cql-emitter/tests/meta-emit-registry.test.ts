@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import * as path from "path";
 
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it } from "vitest";
 
 import { emitCQL, EMIT_CQL_COMMENT_TAGS } from "../emitCQL";
 
