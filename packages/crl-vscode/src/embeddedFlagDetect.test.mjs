@@ -1,9 +1,7 @@
 // #212 S3 — the un-migrated-flag safety-net detector (pure). Covers the whitespace/comment/status edges the source-goldens can't.
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { countEmbeddedFlags, FORMER_FLAG_TAGS } = await load("embeddedFlagDetect.ts");
+import { countEmbeddedFlags, FORMER_FLAG_TAGS } from "./embeddedFlagDetect.ts";
 
 test("catches a canonical embedded flag", () => {
   assert.equal(countEmbeddedFlags("concept \"C\":\n- meta is `@validation-concern: BMI is wrong; status open`."), 1);

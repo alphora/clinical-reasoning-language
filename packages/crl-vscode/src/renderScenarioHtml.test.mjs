@@ -3,16 +3,16 @@
 // vscode-free, so — like the golden oracle — esbuild bundles them to ESM and we import them under node. The
 // happy-path fixture is a REAL RenderScenarioResult from the core (renderScenario on dme101-030).
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { resolveCelImports, renderScenario } from "@smile-digital-health/crl";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-const { renderScenarioHtml, renderErrorHtml, failedCriterionMarks } = await load("renderScenarioHtml.ts");
-const { isRelevantSave } = await load("scenarioWatch.ts");
+import { renderScenarioHtml, renderErrorHtml, failedCriterionMarks } from "./renderScenarioHtml.ts";
+import { isRelevantSave } from "./scenarioWatch.ts";
 
+test("renderScenarioHtml — render/error/reveal/XSS/isRelevantSave", () => {
 // --- renderScenarioHtml over the real dme101 view-model ---
 const celPath = resolve(here, "../../crl/src/tests/fixtures/policies/dme101-030/dme101-030.cel");
 const result = renderScenario(resolveCelImports(celPath));
@@ -135,11 +135,9 @@ if (process.platform === "win32") {
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 // #173 T3b — the failed-criterion in-place highlight (failedCriterionMarks + the stamped data-fc-* attributes).
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-let t3bPass = 0;
-const t3b = (label, fn) => {
-  try { fn(); t3bPass++; }
-  catch (e) { console.error(`FAIL  T3b: ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+});
+
+const t3b = test;
 
 // VM node builders carrying the run-state fields the T2 selectors read.
 const vmWhen = (nodeId, satisfied, name, children = []) => ({
@@ -250,4 +248,3 @@ t3b("render: All-mode marks survive on a PASS case's untaken-branch unsatisfied 
   assert.ok(renderScenarioHtml(resultOf(sv)).html.includes('data-fc-all="1"'), "stamped for All mode");
 });
 
-console.log(`renderScenarioHtml.test.mjs: ${keys.length} reveal keys; render + XSS + error + isRelevantSave checks passed; T3b: ${t3bPass} failed-criterion checks passed.`);

@@ -1,15 +1,10 @@
-// Unit tests for the CRL pane RENDERER (#156 C2b-2). vscode-free + crl types erase → esbuild-bundle-then-import.
+// Unit tests for the CRL pane RENDERER (#156 C2b-2). vscode-free → imported directly (vitest transforms the .ts).
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { renderCrlPane } = await load("crlPaneHtml.ts");
-const { corrColorClass } = await load("corrKey.ts");
+import { renderCrlPane } from "./crlPaneHtml.ts";
+import { corrColorClass } from "./corrKey.ts";
 
-let pass = 0;
-const check = (label, fn) => {
-  try { fn(); pass++; console.log(`  ok  ${label}`); }
-  catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+const check = test;
 const node = (nodeKey, kind, label, extra = {}, children = []) => ({ nodeKey, nodeId: nodeKey, decision: "D", lib: "T", kind, label, refKeys: [], location: {}, children, ...extra });
 const structure = [
   {
@@ -134,4 +129,3 @@ check("revealPrefix namespaces ids + reveal keys", () => {
   assert.ok(out.anchors.dD.scrollTo.startsWith("9:"));
 });
 
-console.log(`\ncrlPaneHtml.test: ${pass} checks passed`);

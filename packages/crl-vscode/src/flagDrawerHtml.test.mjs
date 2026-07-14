@@ -1,10 +1,8 @@
 // #211 create-flag drawer — renderFlagDrawer: structure, tag ordering, per-tag field groups (only the selected visible),
 // prefill, and escaping. Pure HTML; no vscode.
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { renderFlagDrawer } = await load("flagDrawerHtml.ts");
+import { renderFlagDrawer } from "./flagDrawerHtml.ts";
 
 const TAGS = [
   { id: "fidelity-defect", category: "extraction", fields: [{ key: "direction", required: true, values: ["over", "under"] }] },

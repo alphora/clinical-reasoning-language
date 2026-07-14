@@ -18,29 +18,33 @@ const stub = resolve(here, "vscode-stub.ts");
 const services = ["hover", "completion", "navigation", "diagnostics"];
 
 for (const svc of services) {
-  const bundle = resolve(here, `.gen/check-${svc}.cjs`);
-  await build({
-    entryPoints: [resolve(here, `generate-${svc}.ts`)],
-    bundle: true,
-    platform: "node",
-    format: "cjs",
-    target: "node18",
-    alias: { vscode: stub },
-    outfile: bundle,
-    logLevel: "silent",
+  // Each service is its own async test: the `await build` (esbuild) + `execFileSync` regeneration must run inside the
+  // test body, so the callback is async. (This file is discovered by vitest via an explicit `include` entry — its name
+  // matches neither the `src/**/*.test.mjs` nor `test/vitest/**` globs.)
+  test(`oracle ${svc}: regenerated output matches golden/${svc}.json`, async () => {
+    const bundle = resolve(here, `.gen/check-${svc}.cjs`);
+    await build({
+      entryPoints: [resolve(here, `generate-${svc}.ts`)],
+      bundle: true,
+      platform: "node",
+      format: "cjs",
+      target: "node18",
+      alias: { vscode: stub },
+      outfile: bundle,
+      logLevel: "silent",
+    });
+    const out = resolve(here, `.gen/${svc}.check.json`);
+    execFileSync(process.execPath, [bundle], {
+      cwd: pkgDir,
+      env: { ...process.env, CRL_ORACLE_OUT: out },
+      stdio: "pipe",
+    });
+    const fresh = readFileSync(out, "utf-8");
+    const golden = readFileSync(resolve(here, `golden/${svc}.json`), "utf-8");
+    assert.equal(
+      fresh,
+      golden,
+      `oracle ${svc}: regenerated output drifted from golden/${svc}.json — behavior preservation broken; re-verify the ${svc} extraction.`,
+    );
   });
-  const out = resolve(here, `.gen/${svc}.check.json`);
-  execFileSync(process.execPath, [bundle], {
-    cwd: pkgDir,
-    env: { ...process.env, CRL_ORACLE_OUT: out },
-    stdio: "pipe",
-  });
-  const fresh = readFileSync(out, "utf-8");
-  const golden = readFileSync(resolve(here, `golden/${svc}.json`), "utf-8");
-  assert.equal(
-    fresh,
-    golden,
-    `oracle ${svc}: regenerated output drifted from golden/${svc}.json — behavior preservation broken; re-verify the ${svc} extraction.`,
-  );
-  console.log(`oracle ${svc}: ${JSON.parse(fresh).length} cases match golden/${svc}.json.`);
 }

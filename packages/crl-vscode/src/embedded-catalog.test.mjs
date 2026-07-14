@@ -8,6 +8,8 @@ import { dirname, resolve } from "node:path";
 import assert from "node:assert/strict";
 
 import * as catalogMod from "@smile-digital-health/crl/language-services";
+
+test("embedded-catalog — top-level checks", () => {
 const { parseCatalog } = catalogMod.default ?? catalogMod;
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -26,3 +28,4 @@ assert.equal(
 assert.deepEqual(embedded, fresh, "dist/catalog.json content drifted from the parser output — rebuild");
 
 console.log(`embedded-catalog.test.mjs: dist/catalog.json embeds ${embedded.length} patterns, matches parser output.`);
+});

@@ -1,10 +1,8 @@
 // #211 create-flag drawer — createGithubIssue (the effectful issue-stub POST). Tested via an INJECTED fetch (no network):
 // success → the number; every failure mode → an IssueCreateError the cockpit turns into "flag saved without a link".
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { createGithubIssue, getGithubIssue, issueReadErrorLabel, IssueCreateError, issueCreateErrorLabel } = await load("githubIssue.ts");
+import { createGithubIssue, getGithubIssue, issueReadErrorLabel, IssueCreateError, issueCreateErrorLabel } from "./githubIssue.ts";
 
 // A minimal Response-ish stub for the injected fetch.
 const resp = (ok, status, json) => ({ ok, status, json: async () => (json instanceof Error ? (() => { throw json; })() : json) });

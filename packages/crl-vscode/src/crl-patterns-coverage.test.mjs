@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 import * as mod from "@smile-digital-health/crl/language-services";
 const { parseCatalog } = mod.default ?? mod;
 
+test("catalog ↔ CRLCommon.cql: every referenced function is defined", () => {
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../crl");
 const catalogPath = resolve(repoRoot, "src/cql-emitter/catalog/inference-pattern-catalog.md");
@@ -41,13 +42,5 @@ for (const p of patterns) {
   }
 }
 
-if (missing.length > 0) {
-  console.error("Missing CRLCommon.cql functions:");
-  for (const m of missing) console.error(`  - ${m}`);
-  process.exit(1);
-}
-
-console.log(
-  `crl-patterns-coverage.test.mjs: ${patterns.length} catalog patterns, ` +
-    `${definedFns.size} library function names — full coverage.`
-);
+assert.equal(missing.length, 0, `Missing CRLCommon.cql functions:\n${missing.map((x) => `  - ${x}`).join("\n")}`);
+});

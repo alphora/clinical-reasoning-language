@@ -1,14 +1,9 @@
-// Unit tests for the three-pane viewer CORE (#156 C1): buildViewerModel. vscode-free → esbuild-bundle-then-import.
+// Unit tests for the three-pane viewer CORE (#156 C1): buildViewerModel. vscode-free → imported directly (vitest transforms the .ts).
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { buildViewerModel } = await load("provenanceViewer.ts");
+import { buildViewerModel } from "./provenanceViewer.ts";
 
-let pass = 0;
-const check = (label, fn) => {
-  try { fn(); pass++; console.log(`  ok  ${label}`); }
-  catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+const check = test;
 
 const zr = (line) => ({ startLine: line, startCol: 0, endLine: line, endCol: 5 });
 const crl = (nodeKey, file, line, decisionReached = false, extra = {}) => ({ nodeKey, location: { filePath: file, range: zr(line) }, decisionReached, ...extra });
@@ -143,4 +138,3 @@ check("unresolved source + crl identity on a partial-but-included unit", () => {
   assert.deepEqual(s.unresolved.crl, [{ ref: "kbad", reason: "unresolved-ref" }]);
 });
 
-console.log(`\nprovenanceViewer.test: ${pass} checks passed`);

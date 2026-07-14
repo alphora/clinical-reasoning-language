@@ -1,15 +1,10 @@
-// Unit tests for the cockpit navigator ENGINE (#156 C2a): the pure reducer. vscode-free → esbuild-bundle-then-import.
+// Unit tests for the cockpit navigator ENGINE (#156 C2a): the pure reducer. vscode-free → imported directly (vitest transforms the .ts).
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 import { resolve } from "node:path";
 
-const { reduce, initialState, navigatorItems, shouldReflectNavigatorSelection } = await load("correspondenceEngine.ts");
+import { reduce, initialState, navigatorItems, shouldReflectNavigatorSelection } from "./correspondenceEngine.ts";
 
-let pass = 0;
-const check = (label, fn) => {
-  try { fn(); pass++; console.log(`  ok  ${label}`); }
-  catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+const check = test;
 
 const step = (unitId) => ({ unitId, label: unitId, source: [], secondaryCrl: [], cel: [], unresolved: { source: [], crl: [], cel: [] }, findingIds: [] });
 const idx = (unitIds, sourceCycleIds, crlNav = [], celNav = []) => ({ version: 1, anchorFilePath: "/a.txt", steps: unitIds.map(step), sourceCycleIds, crlNav, celNav });
@@ -166,4 +161,3 @@ check("shouldReflectNavigatorSelection: cockpit always reveals; MV only when nav
   assert.equal(shouldReflectNavigatorSelection("medical-validation", false), false);
 });
 
-console.log(`\ncorrespondenceEngine.test: ${pass} checks passed`);

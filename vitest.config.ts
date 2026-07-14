@@ -1,9 +1,7 @@
-// #vitest-unification T1 — the monorepo vitest scaffolding. One root config with `test.projects` (vitest 4 removed the
-// `vitest.workspace.ts` file), one project per workspace package. T1 SCOPE: prove one suite runs in each project; the
-// `include`s are deliberately SCOPED to the proof-of-life suites so this does NOT run the bulk (that's T2/T3, which broaden
-// the globs). Both legacy commands (`npm test` = crl jest via the aggregator; `npm run test:ext` = crl-vscode node runner)
-// stay green in parallel — the crl proof is an UNCHANGED existing suite, and the crl-vscode proof lives OUTSIDE the
-// `src/*.test.mjs` set the legacy runner discovers.
+// #vitest-unification — the monorepo vitest config. One root config with `test.projects` (vitest 4 removed the
+// `vitest.workspace.ts` file), one project per workspace package. Both packages are fully on vitest: `crl` (T2, ts-jest →
+// vitest) and `crl-vscode` (T3, the bespoke node-harness suites → vitest, retiring `run-tests.mjs`/`test-harness.mjs`).
+// Run the whole monorepo with `npm run test:vitest`, or a single project via `--project crl` / `--project crl-vscode`.
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -53,12 +51,16 @@ export default defineConfig({
           name: "crl-vscode",
           environment: "node",
           globals: true,
-          // Many legacy suites call `process.exit()`; `forks` (v4 default) isolates each file so one can't tear down the run.
-          // `forks` (v4 default): child-process isolation — the future T3 suites call `process.exit()`, which a fork contains.
+          // mcp-server/provision/stableServer spawn built servers + do real fs work; the default 5s is tight under a cold
+          // transform + process spawn. 30s (matching the crl project) gives the integration suites room.
+          testTimeout: 30_000,
+          hookTimeout: 30_000,
+          // `forks` (v4 default): child-process isolation. The integration suites (mcp-server, provision, stableServer)
+          // spawn built servers + child processes and do real fs work; a per-file fork keeps that fully isolated per suite.
           pool: "forks",
-          // T1 proof-of-life ONLY, and OUTSIDE `src/*.test.mjs` so the legacy `run-tests.mjs` never discovers it. T3 moves the
-          // bulk under this project and retires the legacy runner.
-          include: ["test/vitest/**/*.vitest.test.ts"],
+          // T3: the full crl-vscode suite. `src/**/*.test.mjs` are the migrated node-harness suites; the T1 proof stays; the
+          // oracle golden gate lives outside src/ and is listed explicitly (its filename matches neither glob).
+          include: ["src/**/*.test.mjs", "test/vitest/**/*.vitest.test.ts", "test/oracle/check.mjs"],
         },
       },
     ],

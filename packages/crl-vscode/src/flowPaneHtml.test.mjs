@@ -1,18 +1,13 @@
-// Unit tests for the flow-pane RENDERER (graphical decision-tree flowchart, T2 / disc 132). vscode-free → esbuild-bundle.
+// Unit tests for the flow-pane RENDERER (graphical decision-tree flowchart, T2 / disc 132). vscode-free → imported directly.
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-const { renderFlowPane, FLOW_STYLE, flowLegendChrome, wrapLabel, collectDispositionLeafKeys } = await load("flowPaneHtml.ts");
+import { renderFlowPane, FLOW_STYLE, flowLegendChrome, wrapLabel, collectDispositionLeafKeys } from "./flowPaneHtml.ts";
 
-let pass = 0;
-const check = (label, fn) => {
-  try { fn(); pass++; console.log(`  ok  ${label}`); }
-  catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+const check = test;
 
 // ── fixtures (the renderer ignores `location`, so {} suffices) ──
 const node = (nodeKey, kind, label, refKeys, children = [], extra = {}) => ({
@@ -748,4 +743,3 @@ check("tree zoom: renders a floating − / reset / + control (the % is filled in
   assert.match(r.html, /class="flow-zoom-pct"[^>]*>100%</); // stateless default; applyZoom updates it
 });
 
-console.log(`\nflowPaneHtml.test: ${pass} checks passed`);

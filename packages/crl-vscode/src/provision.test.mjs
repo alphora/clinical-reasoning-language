@@ -8,20 +8,18 @@ import { join } from "node:path";
 
 const target = mod.claudeCodeTarget ?? mod.default?.claudeCodeTarget;
 
-let failed = false;
-const check = (label, fn) => {
-  let ws;
-  try {
-    ws = mkdtempSync(join(tmpdir(), "crl-prov-"));
-    fn(ws);
-    console.log(`  ok  ${label}`);
-  } catch (e) {
-    failed = true;
-    console.error(`FAIL  ${label}\n      ${e.stack || e.message}`);
-  } finally {
-    if (ws) try { rmSync(ws, { recursive: true, force: true }); } catch {}
-  }
-};
+// Fixture-wrapping check: each test gets its own throwaway temp workspace (passed to `fn`), cleaned in `finally`.
+const check = (label, fn) =>
+  test(label, () => {
+    const ws = mkdtempSync(join(tmpdir(), "crl-prov-"));
+    try {
+      fn(ws);
+    } finally {
+      try {
+        rmSync(ws, { recursive: true, force: true });
+      } catch {}
+    }
+  });
 
 // Context whose server path carries the ownership marker and actually exists
 // (apply() pre-flights the bundle's existence).
@@ -183,6 +181,3 @@ check("remove recognizes ownership with backslash paths", (ws) => {
   writeFileSync(mcp(ws), JSON.stringify({ mcpServers: { crl: { type: "stdio", command: "node", args } } }, null, 2));
   assert.equal(target.remove(ctxFor(ws)).mcp, "removed");
 });
-
-console.log(failed ? "\ntest:provision FAILED" : "\ntest:provision passed");
-process.exit(failed ? 1 : 0);

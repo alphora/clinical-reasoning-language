@@ -1,11 +1,9 @@
 // #210 editor agent Todo B — chatPaneHtml (pure): renderChatThread structure + escaping, the static CHAT_BODY controls, and
 // the CHAT_WEBVIEW_SCRIPT message protocol (Enter vs Shift+Enter, Send-disabled-while-streaming, Stop/Clear posts, the
 // XSS-safe delta append via a text node's appendData — never innerHTML). vscode-free, so the shared harness `load` suffices.
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { renderChatThread, CHAT_BODY, CHAT_STYLE, CHAT_WEBVIEW_SCRIPT } = await load("chatPaneHtml.ts");
+import { renderChatThread, CHAT_BODY, CHAT_STYLE, CHAT_WEBVIEW_SCRIPT } from "./chatPaneHtml.ts";
 
 test("renderChatThread: empty transcript renders the placeholder (escaped)", () => {
   assert.match(renderChatThread([], { placeholder: "Ask <me>" }), /class="chat-empty">Ask &lt;me&gt;</);

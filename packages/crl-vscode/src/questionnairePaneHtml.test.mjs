@@ -4,7 +4,6 @@
 // anchors). esbuild bundles the extension TS to CJS (vscode-free). Design authority:
 // .vibe-tools/discussions/163-questionnaire-panel-design.md ("Pane registration surface" / "Selection-scoped render").
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -13,13 +12,9 @@ import { resolveCelImports, renderScenario } from "@smile-digital-health/crl";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-const { renderQuestionnairePane, QUESTIONNAIRE_STYLE, shouldRerenderQuestionnaire, nextQuestionIndex } = await load("questionnairePaneHtml.ts");
+import { renderQuestionnairePane, QUESTIONNAIRE_STYLE, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml.ts";
 
-let pass = 0;
-const check = (label, fn) => {
-  try { fn(); pass++; console.log(`  ok  ${label}`); }
-  catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+const check = test;
 
 // Write a CRL+CEL project to a fresh temp dir and render the named case → its ScenarioViewModel + decision lib.
 function renderCase(files, celName, caseName) {
@@ -827,4 +822,3 @@ case "a+b":
   assert.ok(!/data-qnav="next" disabled/.test(r.html), "Next is enabled → the user navigates to question 1");
 });
 
-console.log(`\nquestionnairePaneHtml.test.mjs: ${pass} checks passed.`);

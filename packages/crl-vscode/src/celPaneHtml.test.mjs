@@ -1,17 +1,12 @@
-// Unit tests for the CEL pane RENDERER (#156 C2c-1). vscode-free + crl types erase → esbuild-bundle-then-import.
+// Unit tests for the CEL pane RENDERER (#156 C2c-1). vscode-free → imported directly (vitest transforms the .ts).
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { renderCelPane, reverseCelAnchors, formatNoteTimestamp, REVIEW_ORDER } = await load("celPaneHtml.ts");
-const { REVIEW_STATES } = await load("medicalValidationStore.ts");
+import { renderCelPane, reverseCelAnchors, formatNoteTimestamp, REVIEW_ORDER } from "./celPaneHtml.ts";
+import { REVIEW_STATES } from "./medicalValidationStore.ts";
 // Use the REAL nodeKey (the same fn celPaneHtml + crlStructure call) so the gate-key format is proven, not assumed.
 const { nodeKey } = await import("@smile-digital-health/crl");
 
-let pass = 0;
-const check = (label, fn) => {
-  try { fn(); pass++; console.log(`  ok  ${label}`); }
-  catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+const check = test;
 // facts: a string → a bare fact (no definedBy); an object → passed through (carries definedBy for fact-level tests).
 const sc = (name, status, facts = [], produced = [], subject) => ({
   case: { name, subject, facts: facts.map((f) => (typeof f === "string" ? { name: f } : f)) },
@@ -459,4 +454,3 @@ check("notes: worklist ABSENT (cockpit) → no glyph, no drawer even if notes pa
   assert.ok(!out.html.includes("cel-notes-glyph") && !out.html.includes("cel-notes-drawer"), "cockpit render unaffected");
 });
 
-console.log(`\ncelPaneHtml.test: ${pass} checks passed`);

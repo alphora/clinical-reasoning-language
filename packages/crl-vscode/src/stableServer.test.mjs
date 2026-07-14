@@ -14,16 +14,7 @@ const stageStableServer = mod.stageStableServer ?? mod.default?.stageStableServe
 const STABLE_SERVER_ASSETS = mod.STABLE_SERVER_ASSETS ?? mod.default?.STABLE_SERVER_ASSETS;
 const distDir = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 
-let failed = false;
-const check = (label, fn) => {
-  try {
-    fn();
-    console.log(`  ok  ${label}`);
-  } catch (e) {
-    failed = true;
-    console.error(`FAIL  ${label}\n      ${e.stack || e.message}`);
-  }
-};
+const check = test;
 
 check("stages mcp-server.js + all catalog .cql into the stable dir, returns the server path", () => {
   const bundled = mkdtempSync(join(tmpdir(), "crl-bundled-"));
@@ -66,9 +57,3 @@ check("STABLE_SERVER_ASSETS stages every catalog .cql esbuild ships to dist", ()
     );
   }
 });
-
-if (failed) {
-  console.error("stableServer.test FAILED");
-  process.exit(1);
-}
-console.log("stableServer.test passed");

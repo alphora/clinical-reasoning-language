@@ -1,15 +1,10 @@
 // Unit tests for the Source pane RENDERER (#156 C2a): segmentation + anchors/reveals + XSS. vscode-free.
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { renderSourcePane } = await load("sourcePaneHtml.ts");
+import { renderSourcePane } from "./sourcePaneHtml.ts";
 const num = (...pairs) => new Map(pairs); // unitId→number map helper
 
-let pass = 0;
-const check = (label, fn) => {
-  try { fn(); pass++; console.log(`  ok  ${label}`); }
-  catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+const check = test;
 // single-line range helper
 const r = (a, b) => ({ startLine: 0, startCol: a, endLine: 0, endCol: b });
 const unit = (unitId, a, b) => ({ unitId, range: r(a, b) });
@@ -141,4 +136,3 @@ check("multi-unit covered run → sorted numbers in the badge", () => {
   assert.ok(out.html.includes('<span class="corr-num">3,7</span>'), "sorted ascending regardless of unit order");
 });
 
-console.log(`\nsourcePaneHtml.test: ${pass} checks passed`);

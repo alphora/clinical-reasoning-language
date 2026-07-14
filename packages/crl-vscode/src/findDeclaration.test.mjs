@@ -6,6 +6,8 @@ import { strict as assert } from "node:assert";
 import { canonicalize } from "@smile-digital-health/crl/language-services";
 import { findDeclarationAtPosition } from "@smile-digital-health/crl/language-services";
 
+test("findDeclaration — top-level checks", () => {
+
 function fakeIndex({ declarations = [], libraries = [], references = [] } = {}) {
   return {
     getDeclarations: () => declarations,
@@ -99,3 +101,4 @@ const FILE = canonicalize("/p/a.crl");
 }
 
 console.log("findDeclaration tests passed.");
+});

@@ -1,20 +1,15 @@
 // Unit tests for the failed-criterion PEEK model (#173 T3, disc 158/159). vscode-free + crl types erase →
-// esbuild-bundle-then-import (mirrors celPaneHtml.test.mjs). Covers buildRuntimeRefIndex (the runtime-ref → row-nodeKey
+// imported directly (vitest transforms the .ts) (mirrors celPaneHtml.test.mjs). Covers buildRuntimeRefIndex (the runtime-ref → row-nodeKey
 // join, incl. a deep cross-lib chain) + resolveFailedCriteria (frontier re-root → standalone nodeKey; the gap fallback;
 // whole-path validation; dedup).
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 import { resolve } from "node:path";
 
-const { buildRuntimeRefIndex, resolveFailedCriteria, runtimeRefKey } = await load("failedCriterionPeek.ts");
+import { buildRuntimeRefIndex, resolveFailedCriteria, runtimeRefKey } from "./failedCriterionPeek.ts";
 // The REAL T2 selectors, to prove the end-to-end frontier→re-root chain (not just the re-root in isolation).
 const { failedCriterionFrontier, allUnsatisfiedCriteria } = await import("@smile-digital-health/crl/provenance");
 
-let pass = 0;
-const check = (label, fn) => {
-  try { fn(); pass++; console.log(`  ok  ${label}`); }
-  catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+const check = test;
 
 // ── fixture builders (the structural fields the pure module reads) ──
 // A structure node: nodeKey + standalone (lib,decision,nodeId) + children.
@@ -186,4 +181,3 @@ check("E2E (Blocking): a PASS case → empty frontier → empty resolve (self-ga
   assert.deepEqual(resolveFailedCriteria(failedCriterionFrontier(sv), { lib: "Pol", decision: "Top" }, sv.tree, new Map()), []);
 });
 
-console.log(`\nfailedCriterionPeek.test: ${pass} checks passed`);

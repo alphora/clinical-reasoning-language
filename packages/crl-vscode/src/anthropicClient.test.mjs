@@ -1,11 +1,9 @@
 // #210 editor agent Todo A — callAnthropic (the effectful Messages POST). Tested via an INJECTED fetch (no network):
 // success → concatenated text; the KEY regression = a leading `thinking` block is skipped, only `text` blocks concatenate;
 // every failure mode → an AnthropicError the test command turns into a labelled notification.
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { callAnthropic, AnthropicError, anthropicErrorLabel, parseSseFrames, streamAnthropic, toAnthropicMessages } = await load("anthropicClient.ts");
+import { callAnthropic, AnthropicError, anthropicErrorLabel, parseSseFrames, streamAnthropic, toAnthropicMessages } from "./anthropicClient.ts";
 
 const enc = (s) => new TextEncoder().encode(s);
 // A fake ReadableStream reader over a list of byte chunks. `abortAt` (index) aborts the controller INSIDE read() just

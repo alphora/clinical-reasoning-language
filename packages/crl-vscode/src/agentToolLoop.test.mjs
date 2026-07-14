@@ -1,11 +1,9 @@
 // #210 editor agent Todo C — the pure agentic loop driver (runAgentTurn). Node-tested with a SCRIPTED fake provider + a
 // fake tool registry (no vscode, no network). Covers the load-bearing invariants: staged-buffer commit, the tool-only
 // assistant turn, 1:1 tool_result, cap-discard (no dangling tool_use), exec-gated cancel, and balanced/empty commit rules.
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { runAgentTurn } = await load("agentToolLoop.ts");
+import { runAgentTurn } from "./agentToolLoop.ts";
 
 // A scripted provider: returns responses[i] on the i-th `stream`, emitting text + tool_use deltas along the way. Records
 // each request's `messages` so a test can assert the staged replay. `onEach(i)` runs after emitting, before returning.

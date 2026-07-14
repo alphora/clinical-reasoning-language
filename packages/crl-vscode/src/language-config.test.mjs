@@ -18,16 +18,7 @@ const syntaxesDir = resolve(here, "../syntaxes");
 const crl = JSON.parse(readFileSync(join(syntaxesDir, "crl.language-configuration.json"), "utf8"));
 const cel = JSON.parse(readFileSync(join(syntaxesDir, "cel.language-configuration.json"), "utf8"));
 
-let failed = false;
-const check = (label, fn) => {
-  try {
-    fn();
-    console.log(`  ok  ${label}`);
-  } catch (e) {
-    failed = true;
-    console.error(`FAIL  ${label}\n      ${e.stack || e.message}`);
-  }
-};
+const check = test;
 
 for (const [name, cfg] of [
   ["CRL", crl],
@@ -59,5 +50,3 @@ for (const [name, cfg] of [
   });
 }
 
-console.log(failed ? "\ntest:language-config FAILED" : "\nlanguage-config.test.mjs: v2.3.0 language-configuration assertions passed.");
-process.exit(failed ? 1 : 0);

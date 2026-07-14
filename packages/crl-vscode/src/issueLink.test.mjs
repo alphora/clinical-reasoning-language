@@ -1,10 +1,8 @@
 // #203 Todo 4b Slice C — the security core for the flag issue link-out. The adversarial reject matrix (both reviewers:
 // source-lock alone is not enough; the pure helpers must actually reject the malicious bases + ref edges).
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { issueRefOf, sanitizeIssueBase, buildIssueUrl, githubIssuesBaseFromRemote, githubRepoFromRemote } = await load("issueLink.ts");
+import { issueRefOf, sanitizeIssueBase, buildIssueUrl, githubIssuesBaseFromRemote, githubRepoFromRemote } from "./issueLink.ts";
 
 test("issueRefOf: full-string #?<digits> only (the injection guard)", () => {
   assert.equal(issueRefOf("#203"), "203");

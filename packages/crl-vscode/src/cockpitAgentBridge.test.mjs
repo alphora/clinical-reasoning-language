@@ -1,36 +1,9 @@
 // #210 editor agent Todo C — the cockpit↔agent bridge: the DETERMINISTIC opaque target id (B5) + the register/getAppState/
 // openFlagDrawer conduit. The module instantiates a `vscode.EventEmitter` at load, so — like agentModelProvider.test.mjs —
-// we esbuild-bundle it with a `vscode` stub, here providing a MINIMAL EventEmitter.
-import { build } from "esbuild";
+// we import it directly and rely on the crl-vscode project's `vscode` alias → the shared test stub (which provides EventEmitter).
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { test } from "node:test";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
-
-const stubVscode = {
-  name: "stub-vscode",
-  setup(b) {
-    b.onResolve({ filter: /^vscode$/ }, () => ({ path: "vscode", namespace: "stub" }));
-    b.onLoad({ filter: /.*/, namespace: "stub" }, () => ({
-      contents:
-        "class EventEmitter{constructor(){this._l=[];}get event(){return (fn)=>{this._l.push(fn);return {dispose:()=>{this._l=this._l.filter(x=>x!==fn);}};};}fire(){for(const f of this._l.slice())f();}dispose(){this._l=[];}}" +
-        "module.exports={EventEmitter};",
-      loader: "js",
-    }));
-  },
-};
-
-async function loadBridge() {
-  const out = resolve(tmpdir(), `crl-cockpit-bridge-${process.pid}.cjs`);
-  await build({ entryPoints: [resolve(here, "cockpitAgentBridge.ts")], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent", plugins: [stubVscode] });
-  return require(out);
-}
-const { flagTargetId, caseTokenId, cockpitAgentBridge } = await loadBridge();
+import { flagTargetId, caseTokenId, cockpitAgentBridge } from "./cockpitAgentBridge.ts";
 
 test("flagTargetId: deterministic — same identity → same OPAQUE id (idempotent re-mint on a chip refresh)", () => {
   const a = flagTargetId({ cel: "p.cel", kind: "decision", lib: "L", name: "D", key: "n~sig" });

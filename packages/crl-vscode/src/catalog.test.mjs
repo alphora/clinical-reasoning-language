@@ -4,6 +4,8 @@ import { dirname, resolve } from "node:path";
 import assert from "node:assert/strict";
 
 import * as mod from "@smile-digital-health/crl/language-services";
+
+test("catalog — top-level checks", () => {
 const {
   parseCatalog,
   narrativePlaceholders,
@@ -181,3 +183,4 @@ assert.equal(
 );
 
 console.log(`catalog.test.mjs: ${patterns.length} patterns parsed; spot-checks + helper tests passed.`);
+});

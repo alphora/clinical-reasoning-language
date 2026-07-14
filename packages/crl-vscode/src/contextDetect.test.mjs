@@ -5,6 +5,8 @@
 import { strict as assert } from "node:assert";
 import { detectExpectedKind, detectQualifiedRefQualifier, isInsideOpenQuote } from "@smile-digital-health/crl/language-services";
 
+test("contextDetect — top-level checks", () => {
+
 const cases = [
   // [prefix, expectedKind]
   ['- coded from "', "terminology"],
@@ -63,3 +65,4 @@ assert.equal(isInsideOpenQuote('- coded from "X". '), false);
 assert.equal(isInsideOpenQuote('- defined as "Lib"."'), true);
 
 console.log("contextDetect tests passed.");
+});

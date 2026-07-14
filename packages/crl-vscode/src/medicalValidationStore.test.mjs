@@ -2,25 +2,13 @@
 // load/saveSidecar, deriveReviewOverlay, nextReviewState. vscode-free, so — like provenanceFindings.test.mjs — esbuild
 // bundles the TS to CJS and we import it under node. Design authority: .vibe-tools/discussions/161-...
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, deriveAllPassLeaves, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote, mvCasesClean, mvComplete, renderFlagChrome } =
-  await load("medicalValidationStore.ts");
+import { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, deriveAllPassLeaves, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote, mvCasesClean, mvComplete, renderFlagChrome } from "./medicalValidationStore.ts";
 
-let pass = 0;
-const check = (label, fn) => {
-  try {
-    fn();
-    pass++;
-    console.log(`  ok  ${label}`);
-  } catch (e) {
-    console.error(`FAIL  ${label}\n      ${e.message}`);
-    process.exitCode = 1;
-  }
-};
+const check = test;
 
 // ── path helper (temp fixture replicating the crl-content policy-dir layout) ─────
 // artifacts/<policy>/src/{cel,provenance,medical-validation}. policyName = parent-of-src basename.
@@ -832,4 +820,3 @@ check("renderFlagChrome: a load error → ⚠ flags unreadable (still clickable)
   assert.ok(e.includes("⚠ flags unreadable") && e.includes("data-mv-flags"));
 });
 
-console.log(`\nmedicalValidationStore.test: ${pass} checks passed`);

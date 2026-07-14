@@ -9,16 +9,7 @@ const { loadCrlRules, applyHighlight, removeHighlight, clearStaleCrlAssociations
 const here = dirname(fileURLToPath(import.meta.url));
 const grammar = resolve(here, "../syntaxes/crl.tmLanguage.json");
 
-let failed = false;
-const check = (label, fn) => {
-  try {
-    fn();
-    console.log(`  ok  ${label}`);
-  } catch (e) {
-    failed = true;
-    console.error(`FAIL  ${label}\n      ${e.stack || e.message}`);
-  }
-};
+const check = test;
 
 const rules = loadCrlRules(grammar);
 
@@ -145,5 +136,3 @@ check("defensive: non-array textMateRules and undefined inputs don't throw", () 
   assert.doesNotThrow(() => removeHighlight(undefined, undefined, rules));
 });
 
-console.log(failed ? "\ntest:highlight FAILED" : "\ntest:highlight passed");
-process.exit(failed ? 1 : 0);

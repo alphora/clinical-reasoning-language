@@ -2,7 +2,6 @@
 // coarse-but-load-bearing SOURCE-GREP over the host closure (agentChat imports `vscode`, and the registry `run` routing +
 // one-action arming live inside a closure the repo doesn't unit-test elsewhere). The impl review flagged the guard's arming
 // semantics as "subtle + prone to silent rot" — these locks pin the invariants that matter for a durable verdict write.
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";

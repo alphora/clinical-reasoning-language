@@ -1,7 +1,6 @@
 // Unit tests for the findings-panel CORE (#156 slice 1 / T2): discoverProvenance + buildFindingsTree.
 // vscode-free, so — like renderScenarioHtml.test.mjs — esbuild bundles the TS to CJS and we import it under node.
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -10,19 +9,9 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-const { discoverProvenance, buildFindingsTree, headline, findPolicySrc } = await load("provenanceFindings.ts");
+import { discoverProvenance, buildFindingsTree, headline, findPolicySrc } from "./provenanceFindings.ts";
 
-let pass = 0;
-const check = (label, fn) => {
-  try {
-    fn();
-    pass++;
-    console.log(`  ok  ${label}`);
-  } catch (e) {
-    console.error(`FAIL  ${label}\n      ${e.message}`);
-    process.exitCode = 1;
-  }
-};
+const check = test;
 
 const sha256 = (t) => "sha256:" + createHash("sha256").update(Buffer.from(t, "utf8")).digest("hex");
 
@@ -269,4 +258,3 @@ check("barrel export: buildCorrespondenceModel is importable from @smile-digital
   assert.equal(typeof barrel.buildCorrespondenceModel, "function");
 });
 
-console.log(`\nprovenanceFindings.test: ${pass} checks passed`);

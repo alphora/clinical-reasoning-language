@@ -11,6 +11,8 @@ import * as cdMod from "@smile-digital-health/crl/language-services";
 const { detectQualifiedRefQualifier, isInsideOpenQuote } = cdMod.default ?? cdMod;
 
 import * as mod from "@smile-digital-health/crl/language-services";
+
+test("completion — top-level checks", () => {
 const {
   isTypeCompletionPrefix,
   isValuetypeCompletionPrefix,
@@ -262,3 +264,4 @@ assert.equal(isUnquotedTypeSlotPrefix("- type isSome \""), false, "isSome lacks 
 }
 
 console.log(`completion.test.mjs: predicate + precedence-helper tests passed.`);
+});

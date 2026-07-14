@@ -1,43 +1,10 @@
 // #210 editor agent Todo A — the PURE key-resolution bits of agentModelProvider.ts. `resolveAnthropicKey` (env wins, but
 // only a non-blank env) + `anthropicKeySource`. agentModelProvider.ts imports `vscode` (unavailable under plain node), so —
-// like cockpitWebviewScript.test.mjs — we esbuild-bundle it with a tiny plugin resolving `vscode` to an EMPTY stub. The
-// module's top level is only imports + class/function definitions (no vscode access at import time), so the stub suffices.
-import { build } from "esbuild";
+// like cockpitWebviewScript.test.mjs — we import it directly and the crl-vscode project aliases `vscode` → the shared
+// test stub. The module's top level is only imports + class/function definitions (no vscode access at import time).
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { test } from "node:test";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
-
-// esbuild plugin: resolve `vscode` to an empty CJS module (agentModelProvider never touches vscode at import time).
-const stubVscode = {
-  name: "stub-vscode",
-  setup(b) {
-    b.onResolve({ filter: /^vscode$/ }, () => ({ path: "vscode", namespace: "stub" }));
-    b.onLoad({ filter: /.*/, namespace: "stub" }, () => ({ contents: "module.exports = {};", loader: "js" }));
-  },
-};
-
-async function loadProvider() {
-  const out = resolve(tmpdir(), `crl-agent-model-provider-${process.pid}.cjs`);
-  await build({
-    entryPoints: [resolve(here, "agentModelProvider.ts")],
-    bundle: true,
-    platform: "node",
-    format: "cjs",
-    target: "node18",
-    outfile: out,
-    logLevel: "silent",
-    plugins: [stubVscode],
-  });
-  return require(out);
-}
-
-const { resolveAnthropicKey, anthropicKeySource, DEFAULT_MAX_TOKENS, AnthropicProvider, VSCODE_LM_UNAVAILABLE, ANTHROPIC_UNAVAILABLE } = await loadProvider();
+import { resolveAnthropicKey, anthropicKeySource, DEFAULT_MAX_TOKENS, AnthropicProvider, VSCODE_LM_UNAVAILABLE, ANTHROPIC_UNAVAILABLE } from "./agentModelProvider.ts";
 
 const secretsWith = (val) => ({ get: async () => val, store: async () => {}, delete: async () => {} });
 const okFetch = (json) => async () => ({ ok: true, status: 200, json: async () => json });

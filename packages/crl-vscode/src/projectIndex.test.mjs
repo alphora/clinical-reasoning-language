@@ -9,6 +9,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ProjectIndex } from "@smile-digital-health/crl/language-services";
 
+test("projectIndex — top-level checks", () => {
+
 const root = mkdtempSync(join(tmpdir(), "crl-index-test-"));
 writeFileSync(join(root, "package.json"), JSON.stringify({ name: "tmp", version: "0.0.0" }));
 writeFileSync(
@@ -75,3 +77,4 @@ const found = index.findRefsTo(rootFile, "Root", "BMI", "concept");
 assert.equal(found.length, 1, "findRefsTo Root.BMI should return exactly the bare ref");
 
 console.log(`projectIndex tests passed (${decls.length} decls, ${refs.length} refs indexed).`);
+});

@@ -17,16 +17,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const pkgPath = resolve(here, "../package.json");
 const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
 
-let failed = false;
-const check = (label, fn) => {
-  try {
-    fn();
-    console.log(`  ok  ${label}`);
-  } catch (e) {
-    failed = true;
-    console.error(`FAIL  ${label}\n      ${e.stack || e.message}`);
-  }
-};
+const check = test;
 
 const c = pkg.contributes ?? {};
 
@@ -268,5 +259,3 @@ check("the CRL Assist reopener keybinding is contributed (Ctrl+Alt+A → crl.age
   assert.ok(kb && /ctrl\+alt\+a/i.test(kb.key), "expected a Ctrl+Alt+A keybinding for crl.agent.chat");
 });
 
-console.log(failed ? "\ntest:package FAILED" : "\npackage.test.mjs: v2.3.0 contributes restructure assertions passed.");
-process.exit(failed ? 1 : 0);

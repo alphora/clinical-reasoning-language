@@ -2,9 +2,8 @@
 // panel. vscode-free. The cockpit checks below assert the BYTE-IDENTICAL pre-spec behavior (COCKPIT_PANE_SPEC); the
 // medical-validation block exercises `worklist` as a first-class pane (pane split, disc 179) + the MV default + valid set.
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { normalizePaneOrder, COCKPIT_PANE_SPEC, MEDICAL_VALIDATION_PANE_SPEC } = await load("paneOrder.ts");
+import { normalizePaneOrder, COCKPIT_PANE_SPEC, MEDICAL_VALIDATION_PANE_SPEC } from "./paneOrder.ts";
 
 // The cockpit canonical set (for the invariant) — derived from the spec so the test stays in lockstep with it.
 const CANONICAL_PANE_ORDER = COCKPIT_PANE_SPEC.canonical;
@@ -12,11 +11,7 @@ const CANONICAL_PANE_ORDER = COCKPIT_PANE_SPEC.canonical;
 const cockpit = (raw) => normalizePaneOrder(raw, COCKPIT_PANE_SPEC);
 const mv = (raw) => normalizePaneOrder(raw, MEDICAL_VALIDATION_PANE_SPEC);
 
-let pass = 0;
-const check = (label, fn) => {
-  try { fn(); pass++; console.log(`  ok  ${label}`); }
-  catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+const check = test;
 // A valid order: no dupes, ALL canonical panes present, and only valid ids (the 3 canonical + the opt-in "tree").
 const VALID_IDS = ["source", "crl", "cel", "tree"];
 const isValidOrder = (a) =>
@@ -120,4 +115,3 @@ check("cockpit spec does NOT recognize 'questionnaire' (MV-only pane) → droppe
   assert.ok(!cockpit(["source", "crl", "cel", "tree"]).includes("questionnaire"), "questionnaire never appears in a cockpit order");
 });
 
-console.log(`\npaneOrder.test: ${pass} checks passed`);

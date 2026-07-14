@@ -1,9 +1,9 @@
 // #vitest-unification T1 — proof-of-life for the crl-vscode project. This is the deliverable that PROVES the shared `vscode`
 // mock + vitest's native `.ts` transform: it imports `correspondenceCockpit` DIRECTLY (no esbuild-`load()` harness), which
 // evaluates `vscode.ViewColumn.*` + `new vscode.EventEmitter()` at module load — so a successful import means the
-// `resolve.alias` to test/oracle/vscode-stub.ts (now carrying ViewColumn + EventEmitter) works. It lives under test/vitest/
-// (NOT src/*.test.mjs) so the legacy `run-tests.mjs` never picks it up. The FULL cockpit coverage stays in
-// cockpitWebviewScript.test.mjs until T3 ports it; this is only the scaffolding proof.
+// `resolve.alias` to test/oracle/vscode-stub.ts (now carrying ViewColumn + EventEmitter) works. It was the T1 scaffolding
+// proof and is kept as a focused alias regression check; the FULL cockpit coverage lives in cockpitWebviewScript.test.mjs
+// (ported to vitest in T3, which also retired `run-tests.mjs`).
 import { EventEmitter } from "vscode"; // resolves to the stub via the crl-vscode project's resolve.alias
 import { describe, expect, it } from "vitest";
 

@@ -1,10 +1,8 @@
 // #210 editor agent Todo D (disc 241) — the capability registry: the pure, context-filtered "what can I do here" descriptors.
-// PURE (type-only import of CockpitAppState), so the standard harness loads it directly.
-import { test } from "node:test";
+// PURE (type-only import of CockpitAppState), so it is imported directly.
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { AGENT_CAPABILITIES, availableCapabilities } = await load("agentCapabilities.ts");
+import { AGENT_CAPABILITIES, availableCapabilities } from "./agentCapabilities.ts";
 
 const stateWith = (over) => ({ policy: "p", anchorLabel: null, anchorTitle: null, flagTargets: [], treePaneOpen: true, selectedCase: null, ...over });
 const oneFlagTarget = [{ id: "t1", label: "this condition", shortLabel: "this condition" }];

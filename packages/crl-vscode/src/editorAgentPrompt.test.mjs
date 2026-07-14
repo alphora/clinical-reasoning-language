@@ -1,9 +1,7 @@
 // #210 editor agent Todo C — the "add-flag skill" prompt builder (pure; type-only imports, so the standard harness loads it).
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { appStateBlock, buildSystemPrompt, openFlagDrawerTool, submitFlagTool, setVerdictTool, readReviewContextTool, OPEN_FLAG_DRAWER, SUBMIT_FLAG, SET_VERDICT, READ_REVIEW_CONTEXT, VERDICT_VALUES, DEFAULT_VALIDATION_KINDS } = await load("editorAgentPrompt.ts");
+import { appStateBlock, buildSystemPrompt, openFlagDrawerTool, submitFlagTool, setVerdictTool, readReviewContextTool, OPEN_FLAG_DRAWER, SUBMIT_FLAG, SET_VERDICT, READ_REVIEW_CONTEXT, VERDICT_VALUES, DEFAULT_VALIDATION_KINDS } from "./editorAgentPrompt.ts";
 
 test("appStateBlock: no cockpit → asks the validator to open one", () => {
   assert.match(appStateBlock(undefined), /No Medical Validation cockpit/);

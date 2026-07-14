@@ -1,14 +1,9 @@
-// Unit tests for the PaneRevealCoordinator (#156 C2a) — the reveal state machine. vscode-free → esbuild-bundle-then-import.
+// Unit tests for the PaneRevealCoordinator (#156 C2a) — the reveal state machine. vscode-free → imported directly (vitest transforms the .ts).
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { PaneRevealCoordinator } = await load("paneRevealCoordinator.ts");
+import { PaneRevealCoordinator } from "./paneRevealCoordinator.ts";
 
-let pass = 0;
-const check = (label, fn) => {
-  try { fn(); pass++; console.log(`  ok  ${label}`); }
-  catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+const check = test;
 const T = (id) => ({ kind: "unit", id });
 
 check("reveal queued before the first render flushes when the render readies", () => {
@@ -81,4 +76,3 @@ check("clearPending empties the slot; disposePane resets the pane", () => {
   assert.equal(c.startRender("source"), 1);
 });
 
-console.log(`\npaneRevealCoordinator.test: ${pass} checks passed`);

@@ -1,19 +1,14 @@
 // Unit tests for the "this node" cross-pane marker RE-ROOTING (#177 slice 4). vscode-free + crl types erase →
-// esbuild-bundle-then-import (mirrors failedCriterionPeek.test.mjs). Covers resolveThisNode: a runtime nodeId →
+// imported directly (vitest transforms the .ts) (mirrors failedCriterionPeek.test.mjs). Covers resolveThisNode: a runtime nodeId →
 // { nodeKey, sourceUnits } via the failed-criterion join — the grounded case (tree/crl nodeKey + source units), a
 // no-source-unit node (nodeKey present, empty sourceUnits → silent source degrade), an ungroundable nodeId (no nodeKey,
 // empty units), a cross-lib re-root, and the maps-absent path.
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { resolveThisNode } = await load("thisNodeMarker.ts");
-const { buildRuntimeRefIndex } = await load("failedCriterionPeek.ts");
+import { resolveThisNode } from "./thisNodeMarker.ts";
+import { buildRuntimeRefIndex } from "./failedCriterionPeek.ts";
 
-let pass = 0;
-const check = (label, fn) => {
-  try { fn(); pass++; console.log(`  ok  ${label}`); }
-  catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+const check = test;
 
 // ── fixtures (mirror failedCriterionPeek.test.mjs) ──
 const sNode = (lib, decision, nodeId, nodeKey, children = []) => ({ nodeKey, nodeId, decision, lib, children });
@@ -102,4 +97,3 @@ check("maps undefined → nodeKey still resolves (tree/crl), sourceUnits empty",
   assert.deepEqual(r.sourceUnits, []);
 });
 
-console.log(`\nthisNodeMarker.test: ${pass} checks passed`);

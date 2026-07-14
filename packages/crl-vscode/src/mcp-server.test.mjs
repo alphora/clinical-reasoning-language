@@ -1,6 +1,8 @@
 // Integration test: spawn the BUILT dist/mcp-server.js as a real MCP stdio
 // server and drive it with the SDK client. Run via `npm run test:mcp`
-// (pretest:mcp compiles first). Exits non-zero on any assertion failure.
+// (the script compiles first). Every check shares ONE connected client
+// (connected in beforeAll, closed in afterAll), so the checks are
+// `test.sequential` — they must not interleave against the single client.
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import assert from "node:assert/strict";
@@ -19,20 +21,21 @@ const BOM = String.fromCharCode(0xfeff);
 const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath] });
 const client = new Client({ name: "crl-test", version: "0.0.0" });
 
-let failed = false;
-const check = async (label, fn) => {
-  try {
-    await fn();
-    console.log(`  ok  ${label}`);
-  } catch (e) {
-    failed = true;
-    console.error(`FAIL  ${label}\n      ${e.message}`);
-  }
-};
+// Explicit sequential (not relying on vitest's default in-file ordering): all checks drive the ONE shared client.
+const check = test.sequential;
 
-await client.connect(transport);
-try {
-  await check("MCP tools: 16 registered (+ #205 write-half create_flag / set_flag_status)", async () => {
+let connected = false;
+beforeAll(async () => {
+  await client.connect(transport);
+  connected = true;
+});
+afterAll(async () => {
+  // Only close if connect actually succeeded — an unconditional close on a never-connected client would throw in
+  // afterAll and mask the real (connect) failure.
+  if (connected) await client.close();
+});
+
+check("MCP tools: 16 registered (+ #205 write-half create_flag / set_flag_status)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
@@ -55,7 +58,7 @@ try {
     ]);
   });
 
-  await check("authoring_kit (default = cpg base) → PA-free payload + embedded reference validates clean", async () => {
+check("authoring_kit (default = cpg base) → PA-free payload + embedded reference validates clean", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: {} });
     assert.ok(!r.isError, "should not be a tool error");
     const kit = JSON.parse(r.content[0].text);
@@ -76,7 +79,7 @@ try {
     assert.equal(v.success, true, "embedded reference CRL must validate clean through the bundled server");
   });
 
-  await check("authoring_kit useCase:'prior-auth' → the full inherited 11-artifact set + dispositionModel", async () => {
+check("authoring_kit useCase:'prior-auth' → the full inherited 11-artifact set + dispositionModel", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: { useCase: "prior-auth" } });
     assert.ok(!r.isError, "should not be a tool error");
     const kit = JSON.parse(r.content[0].text);
@@ -102,19 +105,19 @@ try {
     assert.ok(kit.dispositionModel && kit.dispositionModel.categories.length === 3, "prior-auth surfaces the dispositionModel (3 categories)");
   });
 
-  await check("authoring_kit unknown stage → isError listing valid stages", async () => {
+check("authoring_kit unknown stage → isError listing valid stages", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: { stage: "emit" } });
     assert.equal(r.isError, true);
     assert.match(r.content[0].text, /local-decision-support/);
   });
 
-  await check("authoring_kit unknown useCase → isError listing valid useCases", async () => {
+check("authoring_kit unknown useCase → isError listing valid useCases", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: { useCase: "measure" } });
     assert.equal(r.isError, true);
     assert.match(r.content[0].text, /Unknown authoring useCase|cpg|prior-auth/);
   });
 
-  await check("run_decision via path → dme101-030.cel: 3 cases pass the result-is oracle", async () => {
+check("run_decision via path → dme101-030.cel: 3 cases pass the result-is oracle", async () => {
     const dme101Cel = resolve(here, "../../crl/src/tests/fixtures/policies/dme101-030/dme101-030.cel");
     const r = await client.callTool({ name: "run_decision", arguments: { path: dme101Cel } });
     assert.ok(!r.isError, "should not be a tool error");
@@ -125,12 +128,12 @@ try {
     assert.equal(out.errorCount, 0);
   });
 
-  await check("run_decision without path → isError", async () => {
+check("run_decision without path → isError", async () => {
     const r = await client.callTool({ name: "run_decision", arguments: {} });
     assert.equal(r.isError, true);
   });
 
-  await check("render_scenario via path → dme101-030.cel: view-model envelope through the bundled server", async () => {
+check("render_scenario via path → dme101-030.cel: view-model envelope through the bundled server", async () => {
     const dme101Cel = resolve(here, "../../crl/src/tests/fixtures/policies/dme101-030/dme101-030.cel");
     const r = await client.callTool({ name: "render_scenario", arguments: { path: dme101Cel } });
     assert.ok(!r.isError, "should not be a tool error");
@@ -141,7 +144,7 @@ try {
     assert.ok(out.scenarios[0].tree.every((n) => typeof n.nodeId === "string" && n.source?.range), "tree nodes carry nodeId + source");
   });
 
-  await check("validate_cel via path → cms22.cel validates clean", async () => {
+check("validate_cel via path → cms22.cel validates clean", async () => {
     const cms22Cel = resolve(here, "../../crl/src/tests/fixtures/corpus/cms22/cms22.cel");
     const r = await client.callTool({ name: "validate_cel", arguments: { path: cms22Cel } });
     assert.ok(!r.isError);
@@ -150,12 +153,12 @@ try {
     assert.equal(out.errors.length, 0);
   });
 
-  await check("validate_cel without path → isError", async () => {
+check("validate_cel without path → isError", async () => {
     const r = await client.callTool({ name: "validate_cel", arguments: {} });
     assert.equal(r.isError, true);
   });
 
-  await check("build_crl_ast via path → valid AST with expected structure", async () => {
+check("build_crl_ast via path → valid AST with expected structure", async () => {
     const r = await client.callTool({ name: "build_crl_ast", arguments: { path: fixturePath } });
     assert.ok(!r.isError, "should not be a tool error");
     const ast = JSON.parse(r.content[0].text);
@@ -166,7 +169,7 @@ try {
     assert.equal(ast.result.statements[0].name, "CMS69 BMI Screening Strategy");
   });
 
-  await check("tokenize_crl via code → tokens", async () => {
+check("tokenize_crl via code → tokens", async () => {
     const code = readFileSync(fixturePath, "utf8");
     const r = await client.callTool({ name: "tokenize_crl", arguments: { code } });
     assert.ok(!r.isError);
@@ -175,7 +178,7 @@ try {
     assert.ok(Array.isArray(out.result) && out.result.length > 0);
   });
 
-  await check("malformed CRL → success:false content, NOT a tool error", async () => {
+check("malformed CRL → success:false content, NOT a tool error", async () => {
     const r = await client.callTool({ name: "build_crl_ast", arguments: { code: "@@@ not valid" } });
     assert.ok(!r.isError, "malformed CRL is a normal result");
     const out = JSON.parse(r.content[0].text);
@@ -183,39 +186,39 @@ try {
     assert.ok(Array.isArray(out.errors) && out.errors.length > 0);
   });
 
-  await check("both code+path → isError", async () => {
+check("both code+path → isError", async () => {
     const r = await client.callTool({ name: "tokenize_crl", arguments: { code: "x", path: "y" } });
     assert.equal(r.isError, true);
   });
 
-  await check("neither code nor path → isError", async () => {
+check("neither code nor path → isError", async () => {
     const r = await client.callTool({ name: "tokenize_crl", arguments: {} });
     assert.equal(r.isError, true);
   });
 
-  await check("nonexistent path → isError (not a crash)", async () => {
+check("nonexistent path → isError (not a crash)", async () => {
     const r = await client.callTool({ name: "build_crl_ast", arguments: { path: "/no/such/file.crl" } });
     assert.equal(r.isError, true);
   });
 
-  await check("directory path → isError (not a crash)", async () => {
+check("directory path → isError (not a crash)", async () => {
     const r = await client.callTool({ name: "build_crl_ast", arguments: { path: here } });
     assert.equal(r.isError, true);
   });
 
-  await check("oversized inline code → isError", async () => {
+check("oversized inline code → isError", async () => {
     const r = await client.callTool({ name: "tokenize_crl", arguments: { code: "x".repeat(1_000_001) } });
     assert.equal(r.isError, true);
   });
 
-  await check("empty code → success:false content, NOT a tool error", async () => {
+check("empty code → success:false content, NOT a tool error", async () => {
     const r = await client.callTool({ name: "build_crl_ast", arguments: { code: "" } });
     assert.ok(!r.isError, "empty code is a degenerate document, not bad input");
     const out = JSON.parse(r.content[0].text);
     assert.equal(typeof out.success, "boolean");
   });
 
-  await check("leading BOM is stripped → parses like the fixture", async () => {
+check("leading BOM is stripped → parses like the fixture", async () => {
     const code = BOM + readFileSync(fixturePath, "utf8");
     const r = await client.callTool({ name: "build_crl_ast", arguments: { code } });
     assert.ok(!r.isError);
@@ -235,7 +238,7 @@ try {
     "../../crl/src/tests/fixtures/corpus/cms22/cms22-inferred.crl"
   );
 
-  await check("validate_crl via path → project mode resolves sibling libraries", async () => {
+check("validate_crl via path → project mode resolves sibling libraries", async () => {
     const r = await client.callTool({
       name: "validate_crl",
       arguments: { path: cms22Inferred },
@@ -259,7 +262,7 @@ try {
   // without the esbuild catalog-copy step this would ENOENT. Registration-only
   // tests miss it — this INVOKES the tool through the built bundle end-to-end and
   // asserts success + the two emitted catalog Libraries are present.
-  await check("emit_crl_fhir via path → emits successfully + catalog Libraries resolve (bundle catalog-copy guard)", async () => {
+check("emit_crl_fhir via path → emits successfully + catalog Libraries resolve (bundle catalog-copy guard)", async () => {
     const semandCrl = resolve(
       here,
       "../../crl/src/fhir-emitter/tests/golden/example-semand/src/crl/example-semand.crl"
@@ -292,7 +295,7 @@ try {
   // call, through the SAME shared emitCrlTwoLane the CLI uses. Exercised on the
   // patient-age BOTH-REPRESENTATION fixture — the case emit_cql "direct" mode
   // rejects — proving the layered lane lowers it and both lanes come back.
-  await check("emit_crl via path → both-rep patient-age emits BOTH cql.libraries AND fhir resources", async () => {
+check("emit_crl via path → both-rep patient-age emits BOTH cql.libraries AND fhir resources", async () => {
     const patientAgeCrl = resolve(
       here,
       "../../crl/src/fhir-emitter/tests/fixtures/patient-age/src/crl/patient-age.crl"
@@ -315,7 +318,7 @@ try {
     assert.equal(out.filenameCollisions.length, 0, "no CQL filename collisions");
   });
 
-  await check("validate_crl via inline code → single-file mode (no cross-file context)", async () => {
+check("validate_crl via inline code → single-file mode (no cross-file context)", async () => {
     // A file that uses qualified refs into a sibling library will be flagged
     // when validated as inline code — there's no project context to resolve
     // against. This is the documented inline-code behavior.
@@ -334,7 +337,7 @@ try {
   // historically drift: a tool added to one but not the other ships a broken
   // VSIX. Spawn BOTH and assert identical tool NAME sets. Requires the root
   // package to be built (dist/cli/run-mcp-server.js present).
-  await check("CLI and extension MCP servers expose the identical tool set (drift guard)", async () => {
+check("CLI and extension MCP servers expose the identical tool set (drift guard)", async () => {
     const cliServerPath = resolve(here, "../../crl/dist/cli/run-mcp-server.js");
     const cliTransport = new StdioClientTransport({ command: process.execPath, args: [cliServerPath] });
     const cliClient = new Client({ name: "crl-cli-parity", version: "0.0.0" });
@@ -351,9 +354,3 @@ try {
       await cliClient.close();
     }
   });
-} finally {
-  await client.close();
-}
-
-console.log(failed ? "\ntest:mcp FAILED" : "\ntest:mcp passed");
-process.exit(failed ? 1 : 0);

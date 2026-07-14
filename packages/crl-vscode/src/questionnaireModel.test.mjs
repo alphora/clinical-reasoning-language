@@ -5,25 +5,14 @@
 // `buildQuestionnaire` projection. Design authority: .vibe-tools/discussions/163-questionnaire-panel-design.md
 // + the slice-2 impl-review re-axis (the path follows the ACTUAL produced disposition, not expected/pass-fail).
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { resolveCelImports, renderScenario } from "@smile-digital-health/crl";
 
-const { buildQuestionnaire, producedPathDiverterIds, collectProducedActions } = await load("questionnaireModel.ts");
+import { buildQuestionnaire, producedPathDiverterIds, collectProducedActions } from "./questionnaireModel.ts";
 
-let pass = 0;
-const check = (label, fn) => {
-  try {
-    fn();
-    pass++;
-    console.log(`  ok  ${label}`);
-  } catch (e) {
-    console.error(`FAIL  ${label}\n      ${e.message}`);
-    process.exitCode = 1;
-  }
-};
+const check = test;
 
 // Write a CRL+CEL project to a fresh temp dir (its own project root) and render the named case.
 // `files` is a map of relative-name → contents. Returns the single ScenarioViewModel + its decision lib.
@@ -1002,4 +991,3 @@ check("Option-3 DEPTH cap: a named-composite chain deeper than MAX_EXPR_DEPTH(4)
   assert.equal(node.composite.count, 0, "count 0 → a '…' (depth) stub, not a '+N more' (width) stub");
 });
 
-console.log(`\nquestionnaireModel.test.mjs: ${pass} checks passed.`);

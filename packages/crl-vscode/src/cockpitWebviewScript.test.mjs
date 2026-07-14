@@ -3,63 +3,21 @@
 // only comment/code-protected. Here we lock it against the exported COCKPIT_WEBVIEW_SCRIPT string.
 //
 // correspondenceCockpit.ts imports `vscode` (unavailable under plain node), so — unlike the other vscode-free renderers —
-// we esbuild-bundle it with a tiny plugin that resolves `vscode` to an EMPTY stub. The module's top level only runs imports
-// + const/function definitions (no side effects), so the stub suffices to evaluate COCKPIT_WEBVIEW_SCRIPT (a pure string).
-import { build } from "esbuild";
+// we import it directly and the crl-vscode project aliases `vscode` → the shared test stub. The module's top level only
+// runs imports + const/function definitions (no side effects), so evaluating COCKPIT_WEBVIEW_SCRIPT (a pure string) is safe.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { COCKPIT_WEBVIEW_SCRIPT as SCRIPT, leafMarkBuckets, leafBucketsFromQuestionnaire, resolveProducedLeafKeys, shouldWidenFilterForSelection, caseIdsForNodeThroughLit } from "./correspondenceCockpit.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
 // The cockpit SHELL source text — for the HOST-side lifecycle wiring that lives outside the bundled webview SCRIPT string
 // (the ack-drive of the marker is host code, not in COCKPIT_WEBVIEW_SCRIPT). A coarse but load-bearing source-grep lock.
 const COCKPIT_SRC = readFileSync(resolve(here, "correspondenceCockpit.ts"), "utf8");
 const ENGINE_SRC = readFileSync(resolve(here, "correspondenceEngine.ts"), "utf8");
 
-// esbuild plugin: resolve `vscode` to an empty CJS module (the cockpit never touches vscode at import time).
-const stubVscode = {
-  name: "stub-vscode",
-  setup(b) {
-    b.onResolve({ filter: /^vscode$/ }, () => ({ path: "vscode", namespace: "stub" }));
-    // Only ONE top-level vscode access exists (ORDERED_COLUMNS reads vscode.ViewColumn.*); stub just that enum. Everything
-    // else under vscode.* is inside functions never called here, so an otherwise-empty module evaluates fine.
-    b.onLoad({ filter: /.*/, namespace: "stub" }, () => ({
-      // #210 Todo C: correspondenceCockpit now imports cockpitAgentBridge, which instantiates a `vscode.EventEmitter` at
-      // module load — the stub must provide a minimal one (fire/event/dispose) or the bundle throws on require.
-      contents:
-        "class EventEmitter{constructor(){this._l=[];}get event(){return (fn)=>{this._l.push(fn);return {dispose(){}};};}fire(){for(const f of this._l.slice())f();}dispose(){this._l=[];}}" +
-        "module.exports = { ViewColumn: { One: 1, Two: 2, Three: 3, Four: 4, Active: -1 }, EventEmitter };",
-      loader: "js",
-    }));
-  },
-};
-
-async function loadCockpit() {
-  const out = resolve(tmpdir(), `crl-cockpit-script-${process.pid}.cjs`);
-  await build({
-    entryPoints: [resolve(here, "correspondenceCockpit.ts")],
-    bundle: true,
-    platform: "node",
-    format: "cjs",
-    target: "node18",
-    outfile: out,
-    logLevel: "silent",
-    plugins: [stubVscode],
-  });
-  return require(out);
-}
-
-const { COCKPIT_WEBVIEW_SCRIPT: SCRIPT, leafMarkBuckets, leafBucketsFromQuestionnaire, resolveProducedLeafKeys, shouldWidenFilterForSelection, caseIdsForNodeThroughLit } = await loadCockpit();
-
-let pass = 0;
-const check = (label, fn) => {
-  try { fn(); pass++; console.log(`  ok  ${label}`); }
-  catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+const check = test;
 
 // Helper: extract a single message handler body `else if(m.type==='<type>'){...}` (or the leading `if(...)` for render).
 // The script is one big concatenation; each handler is delimited by the next `else if(m.type===` / `}});`.
@@ -1106,4 +1064,3 @@ check("slice2: githubTokenSilent never prompts + never latches githubAuthDecline
   assert.ok(!/createIfNone|githubAuthDeclined/.test(m[0]), "no modal prompt + no shared decline latch in the read token path");
 });
 
-console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);

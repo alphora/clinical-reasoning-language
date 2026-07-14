@@ -21,16 +21,7 @@ const syntaxesDir = resolve(here, "../syntaxes");
 const crlPath = join(syntaxesDir, "crl.tmLanguage.json");
 const celPath = join(syntaxesDir, "cel.tmLanguage.json");
 
-let failed = false;
-const check = (label, fn) => {
-  try {
-    fn();
-    console.log(`  ok  ${label}`);
-  } catch (e) {
-    failed = true;
-    console.error(`FAIL  ${label}\n      ${e.stack || e.message}`);
-  }
-};
+const check = test;
 
 const crl = JSON.parse(readFileSync(crlPath, "utf8"));
 const cel = JSON.parse(readFileSync(celPath, "utf8"));
@@ -99,5 +90,3 @@ check("CRL grammar: extension.ts:grammarPath() string literal matches the actual
   assert.ok(existsSync(expected), `file at ${expected} (per extension.ts literal) must exist`);
 });
 
-console.log(failed ? "\ntest:grammar FAILED" : "\ngrammar.test.mjs: v2.3.0 grammar restructure assertions passed.");
-process.exit(failed ? 1 : 0);

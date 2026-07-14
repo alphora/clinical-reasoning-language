@@ -1,15 +1,10 @@
 // Unit tests for the webview hit classifier (#156 C2c-2). Guards the peek-only invariant: a fact hit must NEVER be
-// routed into the engine selection path. vscode-free + crl types erase → esbuild-bundle-then-import.
+// routed into the engine selection path. vscode-free → imported directly (vitest transforms the .ts).
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { isFactHit, isConceptHit, isSubQuestionHit } = await load("webviewHit.ts");
+import { isFactHit, isConceptHit, isSubQuestionHit } from "./webviewHit.ts";
 
-let pass = 0;
-const check = (label, fn) => {
-  try { fn(); pass++; console.log(`  ok  ${label}`); }
-  catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+const check = test;
 
 check("a fact hit (has conceptKey) → isFactHit true (→ peek, NOT engine selection)", () => {
   assert.equal(isFactHit({ conceptKey: "k", factAnchorKey: "fact:g_cel0:f0" }), true);
@@ -42,4 +37,3 @@ check("#216 a sub-question hit (has subQuestionLeafKey) → isSubQuestionHit tru
   assert.equal(isSubQuestionHit({ caseId: "c1" }), false);
 });
 
-console.log(`\nwebviewHit.test: ${pass} checks passed`);

@@ -1,14 +1,9 @@
-// Unit tests for the at-rest correspondence key renderer (#163). vscode-free → esbuild-bundle-then-import.
+// Unit tests for the at-rest correspondence key renderer (#163). vscode-free → imported directly (vitest transforms the .ts).
 import assert from "node:assert/strict";
-import { load } from "./test-harness.mjs";
 
-const { corrKeyHtml, corrColorClass, corrDepthClass, CORR_STYLE, CORR_PALETTE_SIZE } = await load("corrKey.ts");
+import { corrKeyHtml, corrColorClass, corrDepthClass, CORR_STYLE, CORR_PALETTE_SIZE } from "./corrKey.ts";
 
-let pass = 0;
-const check = (label, fn) => {
-  try { fn(); pass++; console.log(`  ok  ${label}`); }
-  catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
-};
+const check = test;
 
 check("empty numbers → no slot", () => {
   assert.equal(corrKeyHtml([]), "");
@@ -45,4 +40,3 @@ check("CORR_STYLE is CSP-safe (classes only) + defines the palette + depth class
   assert.ok(CORR_STYLE.includes("user-select:none"), "key slot is not selectable");
 });
 
-console.log(`\ncorrKey.test: ${pass} checks passed`);
