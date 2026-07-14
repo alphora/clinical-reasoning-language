@@ -25,7 +25,6 @@ import {
   type DefExprIndex,
   type CrlDecisionStructure,
   type CrlStructureNode,
-  type FlagInstance,
   type FlagStatus,
   type RenderScenarioResult,
   type ScenarioViewModel,
@@ -66,7 +65,11 @@ import { failedCriterionLabel } from "./failedCriterionLabel";
 import { buildIssueUrl, githubIssuesBaseFromRemote, githubRepoFromRemote, issueRefOf, sanitizeIssueBase } from "./issueLink";
 import { createGithubIssue, getGithubIssue, IssueCreateError, issueCreateErrorLabel } from "./githubIssue";
 import { renderFlagDrawer } from "./flagDrawerHtml";
-import { isOccurrenceKey, occurrenceByNodeKey, occurrenceKeyValue, parseOccurrenceKey, resolveOccurrence, type OccurrenceRef } from "./occurrenceKey";
+import { occurrenceByNodeKey, occurrenceKeyValue, parseOccurrenceKey, type OccurrenceRef } from "./occurrenceKey";
+import { isOpen, type MvFlag } from "./mvFlag";
+import { flagStoreDir, loadFlags as loadStoredFlags, saveFlag } from "./mvFlagStore";
+import { legacyToMvFlag, storeReadFlag, type ReadFlag } from "./mvFlagLegacy";
+import { resolveAnchor, type AnchorContext } from "./mvFlagAnchor";
 import {
   addNote,
   buildReviewPerCase,
@@ -440,12 +443,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // `cel` binds it to the policy so a coincidental nodeKey collision in another policy can't resolve it.
   let flagAnchor: { hit: WebviewHit; cel: string | undefined } | undefined;
   let mvSidecarPath: string | undefined;
-  // #203 Todo 4 — the review-flag surface. `flagsList` = ALL flags (open + resolved) across the policy's `src/crl/*.crl`
-  // files, freshly (re)loaded in loadFlags() from the LIVE editor buffer when a `.crl` is open (else disk) so a dirty edit's
-  // line offsets match what the write-back edits. `flagLoadError` = a `.crl` failed to parse → flag state is UNKNOWN, so the
-  // mvComplete gate conservatively does NOT report complete. Both cleared on retarget/reset (mirrors the MV-state resets).
-  let flagsList: FlagInstance[] = [];
-  let flagLoadError = false;
+  // #203 Todo 4 / #212 S2 — the review-flag surface. `flagsList` = ALL flags (open + resolved) as `ReadFlag`s: the UNION of the
+  // new `.crl/flags/` JSON store (origin "store") and legacy `.crl` meta-tag flags (origin "legacy", adapted via legacyToMvFlag),
+  // refreshed in reloadReviewFlags(). `flagStateError` = a source (a `.crl` that failed to parse, OR a corrupt store record) left
+  // flag state UNKNOWN → the mvComplete gate conservatively does NOT report complete. `anchorCtx` = the current CRL structure the
+  // anchor resolver matches a flag's stored target against (assembled in rebuild). All cleared on retarget/reset.
+  let flagsList: ReadFlag[] = [];
+  let flagStateError = false;
+  let anchorCtx: AnchorContext | undefined;
   let worklistActions: Record<string, { caseId: string }> = {};
   // #214: the worklist verdict FILTER — the set of verdicts whose rows are SHOWN. Session-only VIEW state (NOT persisted;
   // reset to all-shown on every MV retarget alongside the drawer state), so policy A's filter can't hide policy B.
@@ -486,7 +491,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   const views = new Map<Pane, PaneView>();
   let paneOrder: Pane[] = normalizePaneOrder(undefined, COCKPIT_PANE_SPEC); // user layout (configSection(mode).paneOrder), normalized
   let watcher: vscode.FileSystemWatcher | undefined;
+  let flagsWatcher: vscode.FileSystemWatcher | undefined; // #212 S2 (I6): the `.crl/flags/` store is OUTSIDE the src-scoped watcher
   let debounce: ReturnType<typeof setTimeout> | undefined;
+  let flagsDebounce: ReturnType<typeof setTimeout> | undefined;
   let orderDebounce: ReturnType<typeof setTimeout> | undefined;
 
   /** The column a pane opens in = its index among the OPEN panes in paneOrder (panels already created PLUS the one being
@@ -819,12 +826,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // #156 slice 6 (cases half) + #203 Todo 4 (flags half). The two are composed at the DISPLAY level only: when BOTH are
     // clean the gate collapses to a single "✓ Medical validation complete"; otherwise each half shows what's blocking. The
     // flag counts are conservative — only an explicit `; status resolved` clears (absent/unknown status blocks), matching
-    // openFlags. `flagLoadError` (an unparseable `.crl`) forces the gate open (mvComplete must never silently pass).
+    // openFlags. `flagStateError` (an unparseable `.crl`) forces the gate open (mvComplete must never silently pass).
     let progress = "";
     if (mode === "medical-validation") {
       const p = reviewProgress(reviewByCaseId, [...scenarioByCaseId.keys()], scenarios?.scenarios.length ?? 0);
-      const resolvedCount = flagsList.filter((f) => f.status === "resolved").length;
-      const fc: FlagChrome = { open: flagsList.length - resolvedCount, resolved: resolvedCount, error: flagLoadError };
+      const resolvedCount = flagsList.filter((rf) => rf.flag.status === "resolved").length;
+      const fc: FlagChrome = { open: flagsList.length - resolvedCount, resolved: resolvedCount, error: flagStateError };
       progress = mvComplete(p, fc)
         ? `<div class="mv-progress mv-progress-done mv-gate-complete">✓ Medical validation complete</div>`
         : renderProgressChrome(p) + renderFlagChrome(fc);
@@ -889,40 +896,63 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
   }
 
-  /** (Re)load ALL review flags across the policy's `src/crl/*.crl` files into `flagsList`. An unparseable/unreadable `.crl`
-   *  sets `flagLoadError` (→ the mvComplete gate stays open — flag state is unknown, must not silently pass). Called from
-   *  rebuild() (MV mode) and after a status write-back. Globs the WHOLE crl/ dir so a library-scope flag in a decision-only
-   *  file is still found (the cross-library separate-file layout, #196); each flag carries its OWN filePath for the write-back. */
-  function loadFlags(): void {
+  /** (Re)load ALL review flags into `flagsList` as `ReadFlag`s — the UNION of the new `.crl/flags/` JSON store (origin "store")
+   *  and legacy `.crl` meta-tag flags (origin "legacy", adapted). Also (re)assembles `anchorCtx`. An unparseable/unreadable
+   *  `.crl` OR a corrupt store record sets `flagStateError` (→ the mvComplete gate stays open — flag state is UNKNOWN, must not
+   *  silently pass). Called from rebuild() (MV mode) + after a status write-back / create. Globs the WHOLE crl/ dir so a
+   *  library-scope flag in a decision-only file is still found (#196). #212 S2: the store is the migration target; both sources
+   *  are read during the transition (S5 migrates the legacy `.crl` flags in and drops the legacy leg). */
+  function reloadReviewFlags(): void {
     flagsList = [];
-    flagLoadError = false;
+    flagStateError = false;
+    anchorCtx = undefined;
     if (mode !== "medical-validation" || !currentCel) return;
     const src = findPolicySrc(currentCel);
     if (!src) return;
-    let files: string[];
+    // ── legacy `.crl` meta-tag flags (adapted to ReadFlag) ──
+    const libNames = new Set<string>(); // library names discovered here — a library-meta-only library is in NEITHER layer (I1)
+    let files: string[] = [];
     try {
       // Case-insensitive `.crl` match + sorted, so the flag list order is deterministic across platforms/filesystems.
       files = readdirSync(join(src, "crl")).filter((f) => f.toLowerCase().endsWith(".crl")).sort();
     } catch (e) {
       // A MISSING crl/ dir is legitimately "no flags" (a measure/activities-only policy has no decision `.crl`). But an
       // unreadable PRESENT dir (EACCES/EIO) is an unknown source → block the gate (Claude impl review: don't silently pass).
-      if ((e as NodeJS.ErrnoException)?.code !== "ENOENT") flagLoadError = true;
-      return;
+      if ((e as NodeJS.ErrnoException)?.code !== "ENOENT") flagStateError = true;
     }
     for (const name of files) {
       const filePath = join(src, "crl", name);
       const text = crlText(filePath);
       if (text === undefined) {
-        flagLoadError = true;
+        flagStateError = true;
         continue;
       }
       const parsed = buildCRL(text);
       if (!parsed.success || !parsed.result) {
-        flagLoadError = true;
+        flagStateError = true;
         continue;
       }
-      flagsList.push(...collectFlags(parsed.result, { filePath }));
+      if (parsed.result.library?.name) libNames.add(parsed.result.library.name);
+      for (const fi of collectFlags(parsed.result, { filePath })) flagsList.push(legacyToMvFlag(fi));
     }
+    // ── new `.crl/flags/` JSON store ──
+    // NOTE: the two layers are assumed DISJOINT (a flag lives in the `.crl` OR the store, never both) — true during S2→S5 since
+    // new flags are store-only and pre-existing ones are `.crl`-only. The S5 migration must be idempotent (move, then drop the
+    // `.crl` flag in the same commit) so nothing is ever counted twice; there is no cross-layer dedup here.
+    const storeDir = flagStoreDir(currentCel); // undefined when the .cel isn't in a discoverable policy src/ → no store flags, no warning (I8)
+    if (storeDir) {
+      const loaded = loadStoredFlags(storeDir);
+      if (loaded.warning) flagStateError = true; // a corrupt/unreadable store record → flag state partially UNKNOWN → block the gate
+      for (const f of loaded.flags) flagsList.push(storeReadFlag(f));
+    }
+    // ── the anchor context (badge placement + reveal classification match a flag's stored target against the CURRENT structure) ──
+    anchorCtx = {
+      decisions: crlStructure,
+      concepts: conceptLayer.map((c) => ({ name: c.name, lib: c.lib })),
+      // I1: union the decision libs + concept libs + the parsed library names, so a library-scope flag whose library has no
+      // decisions/concepts in scope still resolves live (its name is in `libraries`).
+      libraries: [...new Set([...crlStructure.map((d) => d.lib), ...conceptLayer.map((c) => c.lib), ...libNames])],
+    };
   }
 
   const flagNote = (m: string): void => void vscode.window.setStatusBarMessage(`Medical Validation: ${m}`, 3000);
@@ -936,16 +966,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const cel = currentCel;
     for (;;) {
       if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return; // policy changed underneath
-      if (flagsList.length === 0) return flagNote(flagLoadError ? "a policy .crl could not be parsed" : "no review flags");
-      // Embed the FlagInstance on the item (not an index) so a rebuild that reloads `flagsList` during the pick can't make
-      // us act on a different flag at the same position (Claude impl review). The `ver` guard also aborts on rebuild.
-      const items = flagsList.map((f) => ({
-        label: `${f.status === "resolved" ? "✓" : "⚑"} ${f.canonicalTag}${f.body ? " — " + f.body : ""}`,
-        // GAP 3: an occurrence flag (a keyed decision flag) shows its node signature — `decision:D · <guard→activity> · open`
-        // — so it reads as a specific node, not the whole decision.
-        description: `${f.scope}:${f.targetName}${f.key && isOccurrenceKey(f.key) ? " · " + parseOccurrenceKey(f.key).signature : ""} · ${f.status}${f.fields.get("ref") ? " · " + f.fields.get("ref") : ""}`,
-        flag: f,
-      }));
+      if (flagsList.length === 0) return flagNote(flagStateError ? "flag state is unknown (a source could not be read)" : "no review flags");
+      // Embed the ReadFlag on the item (not an index) so a rebuild that reloads `flagsList` during the pick can't make us act
+      // on a different flag at the same position (Claude impl review). The `ver` guard also aborts on rebuild.
+      const items = flagsList.map((rf) => {
+        const f = rf.flag;
+        const a = f.anchor;
+        return {
+          label: `${f.status === "resolved" ? "✓" : "⚑"} ${f.tag}${f.gist ? " — " + f.gist : ""}`,
+          // GAP 3: an occurrence flag (a keyed decision flag) shows its node signature — `decision:D · <guard→activity> · open`
+          // — so it reads as a specific node, not the whole decision.
+          description: `${a.scope}:${a.name}${a.occurrenceKey ? " · " + parseOccurrenceKey(a.occurrenceKey).signature : ""} · ${f.status}${f.fields.ref ? " · " + f.fields.ref : ""}`,
+          flag: rf,
+        };
+      });
       const pick = await vscode.window.showQuickPick(items, { placeHolder: "Review flags — pick one (Esc to finish)" });
       if (!pick) return; // Esc — done
       if ((await flagActionMenu(pick.flag, ver, cel)) === "closed") return; // a reveal navigated away
@@ -1073,27 +1107,31 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** The per-flag action menu — the status toggle (the crl-refactors write-back) + reveal-in-source + (Slice C) the issue
    *  link-out when the flag carries a numeric `; ref #N`. `ver`/`cel` are the policy-identity captured at list-open; the
    *  write-back + the open both revalidate them so a retarget mid-menu can't patch the old `.crl` / open a stale link. */
-  async function flagActionMenu(flag: FlagInstance, ver: number, cel: string | undefined): Promise<"continue" | "closed"> {
+  async function flagActionMenu(rf: ReadFlag, ver: number, cel: string | undefined): Promise<"continue" | "closed"> {
+    const flag = rf.flag;
     const actions: { label: string; act: "toggle" | "reveal" | "issue" | "config" }[] = [
       { label: flag.status === "resolved" ? "↻ Reopen flag" : "✓ Mark resolved", act: "toggle" },
       { label: "→ Reveal in source", act: "reveal" },
     ];
+    // The file URI whose git origin resolves the issue base: a legacy flag uses its OWN `.crl` (a nested/submodule flag → its
+    // own repo); a store flag has no source file, so it uses the policy `src/crl` dir (the precedent at bridgeReadReviewContext).
+    const repoFileUri = flagRepoFileUri(rf);
     // Slice C: offer the issue link ONLY for a numeric ref (the injection guard). A resolvable base → open; a trusted
     // workspace with no base yet → a discoverable "set the setting" item (never silently hide the config path); an
     // untrusted workspace or a non-numeric ref → no item. The base is re-resolved at click, so this is just for display.
-    const issueNo = issueRefOf(flag.fields.get("ref"));
+    const issueNo = issueRefOf(flag.fields.ref);
     if (issueNo) {
       // Menu build is READ-ONLY (never touches git / writes config — that would fire on merely opening the menu). A
       // configured base → open directly; else a trusted workspace → offer "from git origin" (the click detects+persists);
       // else the manual setting. Detection happens ONLY on the explicit click (below).
       if (buildIssueUrl(resolveIssueBase(), issueNo)) actions.push({ label: `↗ Open issue #${issueNo}`, act: "issue" });
-      else if (vscode.workspace.isTrusted && flag.filePath) actions.push({ label: `↗ Open issue #${issueNo} (from git origin)`, act: "issue" });
+      else if (vscode.workspace.isTrusted && repoFileUri) actions.push({ label: `↗ Open issue #${issueNo} (from git origin)`, act: "issue" });
       else if (vscode.workspace.isTrusted) actions.push({ label: `⚙ Set crl.issueBaseUrl to open issue #${issueNo}…`, act: "config" });
     }
-    const pick = await vscode.window.showQuickPick(actions, { placeHolder: `${flag.canonicalTag} — ${flag.body}` });
+    const pick = await vscode.window.showQuickPick(actions, { placeHolder: `${flag.tag} — ${flag.gist}` });
     if (!pick) return "continue"; // Esc → back to the list
     if (pick.act === "reveal") {
-      await revealFlag(flag);
+      await revealFlag(rf);
       return "closed";
     }
     if (pick.act === "config") {
@@ -1103,9 +1141,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (pick.act === "issue") {
       if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return "continue";
       // Resolve at click: config wins; else auto-detect + persist from the flag's repo origin (the operator workflow).
-      // Keyed off the FLAG's `.crl` file (not the workspace root) so a nested/submodule flag uses its own repo's origin.
-      const fileUri = flag.filePath ? vscode.Uri.file(flag.filePath) : undefined;
-      const url = buildIssueUrl(await resolveOrDetectIssueBase(fileUri), issueNo);
+      const url = buildIssueUrl(await resolveOrDetectIssueBase(repoFileUri), issueNo);
       if (!url) {
         flagNote("no issue base and none derivable from git — set crl.issueBaseUrl");
         return "continue";
@@ -1113,48 +1149,90 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (!(await vscode.env.openExternal(vscode.Uri.parse(url)))) flagNote(`could not open issue #${issueNo}`);
       return "continue";
     }
-    await writeFlagStatus(flag, flag.status === "resolved" ? "open" : "resolved", ver, cel);
+    await writeFlagStatus(rf, flag.status === "resolved" ? "open" : "resolved", ver, cel);
     return "continue";
   }
 
-  /** #205 crl-refactors — flip a flag's `; status` in its OWN `.crl` via `rewriteMetaStatus` + a WorkspaceEdit (undoable) +
-   *  save, then reload flags + refresh the chrome. GUARDS: the edit targets the LIVE document (offsets match the buffer);
-   *  the target line is re-read + re-parsed and must still be the SAME flag at the SAME status before we apply (a prior edit
-   *  / external change → abort, never patch the wrong line). The watcher does NOT watch `.crl`, so the refresh is EXPLICIT. */
-  async function writeFlagStatus(flag: FlagInstance, next: FlagStatus, ver: number, cel: string | undefined): Promise<void> {
-    if (!flag.filePath) return flagNote("flag has no source file");
+  /** The file URI whose git origin resolves the issue base for a flag: a LEGACY flag uses its OWN `.crl` file (a nested /
+   *  submodule flag → its own repo's origin); a STORE flag has no source file, so it falls back to the policy `src/crl` dir
+   *  (the same resolution bridgeReadReviewContext uses). Undefined when neither is available. */
+  function flagRepoFileUri(rf: ReadFlag): vscode.Uri | undefined {
+    if (rf.origin === "legacy") return rf.src.filePath ? vscode.Uri.file(rf.src.filePath) : undefined;
+    const src = currentCel ? findPolicySrc(currentCel) : undefined;
+    return src ? vscode.Uri.file(join(src, "crl")) : undefined;
+  }
+
+  /** Flip a flag's status. STORE flags: read-modify-write the `<id>.json` record (status + editedAt) via `saveFlag`. LEGACY
+   *  `.crl` flags (#205 crl-refactors): flip `; status` in the flag's OWN `.crl` via `rewriteMetaStatus` + a WorkspaceEdit
+   *  (undoable) + save. LEGACY guards: the edit targets the LIVE document (offsets match the buffer); the target line is
+   *  re-read + re-parsed and must still be the SAME flag at the SAME RAW status (compared against the `src` handle, NOT the
+   *  coerced MvFlag view — a coerced "pending"→open would falsely read as stale; gpt55 I2) before we apply. Either path
+   *  reloads flags + refreshes the chrome EXPLICITLY (the store watcher also fires, but a resolve must repaint immediately). */
+  async function writeFlagStatus(rf: ReadFlag, next: FlagStatus, ver: number, cel: string | undefined): Promise<void> {
     // A stale guard that reloads the list so a retry sees fresh state (else the loop keeps re-showing the stale list).
     const stale = (m: string): void => {
-      loadFlags();
+      reloadReviewFlags();
       renderTreeChrome();
-      driveFlagBadges(); // #203 Todo 4b Slice A: the node badges track the (re)loaded flag state
+      driveFlagBadges(); // the node badges track the (re)loaded flag state
       flagNote(m);
     };
     if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return stale("policy changed — reopen the flags");
+
+    if (rf.origin === "store") {
+      const dir = currentCel ? flagStoreDir(currentCel) : undefined;
+      if (!dir) return flagNote("no flag store for this policy");
+      // Genuine read-modify-write (NOT a blind overwrite of the list-open snapshot): re-read the CURRENT on-disk record by id
+      // and merge ONLY status+editedAt onto it, so a concurrent edit (git checkout/merge, the watcher having reloaded, an
+      // agent/external write between list-open and this toggle) to gist/fields/anchor/description is preserved, and a record
+      // deleted out from under us is NOT resurrected — it's reported stale (mirrors the legacy path's line stale-guard; gpt55/Claude).
+      const current = loadStoredFlags(dir).flags.find((f) => f.id === rf.flag.id);
+      if (!current) return stale("flags changed — reopen the list"); // deleted/renamed on disk → don't recreate a stale snapshot
+      if (current.status === next) {
+        // already at the target (a concurrent toggle won the race) — just refresh so the list reflects disk; no redundant write.
+        reloadReviewFlags();
+        renderTreeChrome();
+        driveFlagBadges();
+        return;
+      }
+      try {
+        saveFlag(dir, { ...current, status: next, editedAt: new Date().toISOString() });
+      } catch (e) {
+        return flagNote(`could not write the flag: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      reloadReviewFlags();
+      renderTreeChrome(); // EXPLICIT refresh (the store watcher also fires — belt and suspenders)
+      driveFlagBadges();
+      flagNote(next === "resolved" ? "flag resolved" : "flag reopened");
+      return;
+    }
+
+    // origin "legacy" — flip `; status` in the flag's OWN `.crl` (the pre-#212 write-back, now keyed off the `src` handle).
+    const src = rf.src;
+    if (!src.filePath) return flagNote("flag has no source file");
     let doc: vscode.TextDocument;
     try {
-      doc = await vscode.workspace.openTextDocument(flag.filePath);
+      doc = await vscode.workspace.openTextDocument(src.filePath);
     } catch {
       return flagNote("could not open the flag's .crl");
     }
     if (indexVersion !== ver || currentCel !== cel) return stale("policy changed — reopen the flags"); // the await could straddle a retarget
-    const lineNo = flag.lineLocation.start.line - 1; // AST Location is 1-based; vscode is 0-based
+    const lineNo = src.lineLocation.start.line - 1; // AST Location is 1-based; vscode is 0-based
     if (lineNo < 0 || lineNo >= doc.lineCount) return stale("flags changed — reopen the list");
     const rawLine = doc.lineAt(lineNo).text;
     // Stale guard: the target line must STILL be this exact flag (a prior/external edit could have shifted or changed it).
-    // We require a `- meta is` prefix + the same tag + body + loaded status — tag alone would let a same-tag flag at a
-    // shifted line be mis-edited (gpt55 impl review).
+    // `- meta is` prefix + the same RAW tag + body + RAW status — tag alone would let a same-tag flag at a shifted line be
+    // mis-edited (gpt55 impl review). Compared against `src` (the uncoerced parsed values), not the coerced MvFlag view.
     const bt1 = rawLine.indexOf("`");
     const bt2 = rawLine.lastIndexOf("`");
     if (!rawLine.trimStart().startsWith("- meta is") || bt1 === -1 || bt2 <= bt1) return stale("flags changed — reopen the list");
     const res = parseMetaTag(rawLine.slice(bt1 + 1, bt2));
     if (
       res.kind !== "tag" ||
-      res.parsed.tag !== flag.tag ||
-      res.parsed.body !== flag.body ||
-      (res.parsed.fields.get("status") ?? "open") !== flag.status ||
+      res.parsed.tag !== src.tag ||
+      res.parsed.body !== src.body ||
+      (res.parsed.fields.get("status") ?? "open") !== src.rawStatus ||
       // when present, the stable join key disambiguates two byte-identical meta lines in one file (Claude impl review).
-      (flag.key !== undefined && res.parsed.fields.get("key") !== flag.key)
+      (src.key !== undefined && res.parsed.fields.get("key") !== src.key)
     ) {
       return stale("flags changed — reopen the list");
     }
@@ -1165,24 +1243,36 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (!(await vscode.workspace.applyEdit(edit))) return flagNote("edit could not be applied");
       if (!(await doc.save())) return stale("could not save the .crl — flag not changed"); // false → disk still open; don't advance the gate
     }
-    loadFlags(); // re-parse → fresh flagsList (never reuse a stale FlagInstance across edits)
+    reloadReviewFlags(); // re-parse → fresh flagsList (never reuse a stale record across edits)
     renderTreeChrome(); // EXPLICIT refresh — the watcher does not watch .crl
-    driveFlagBadges(); // #203 Todo 4b Slice A: repaint the per-node badges (a resolve un-paints its node without a re-render)
+    driveFlagBadges(); // repaint the per-node badges (a resolve un-paints its node without a re-render)
     flagNote(next === "resolved" ? "flag resolved" : "flag reopened");
   }
 
-  /** Reveal a flag at its meta line in the `.crl` source (its authoritative home). This is uniform for ALL flags incl.
-   *  GAP 3 occurrence flags — an occurrence flag physically LIVES on its owning decision's meta line, so "Reveal in source"
-   *  opens exactly where it is; the tree ⚑ badge (driveFlagBadges) + the flag-list signature label convey WHICH node it's
-   *  about. (Revealing/scrolling the specific tree node is a possible follow-on; the source line is the authoritative home.) */
-  async function revealFlag(flag: FlagInstance): Promise<void> {
-    if (!flag.filePath) return;
+  /** Reveal a flag. LEGACY flags live on a `.crl` meta line — reveal it (its authoritative home; ALWAYS resolvable, so a legacy
+   *  flag NEVER bounces to the policy start node — C6). STORE flags (the primary type now — `commitFlagDraft` writes the store)
+   *  have no source line, so they reveal the policy `.cel` (their home); the tree ⚑ badge (driveFlagBadges places it on the
+   *  anchored node) already conveys WHICH node an occurrence flag is about. Precise tree-node scroll-on-reveal is a follow-up
+   *  (it needs a standalone tree scroll channel that won't collide with the selection highlight). */
+  async function revealFlag(rf: ReadFlag): Promise<void> {
+    if (rf.origin === "legacy") {
+      if (!rf.src.filePath) return;
+      try {
+        const doc = await vscode.workspace.openTextDocument(rf.src.filePath);
+        const lineNo = Math.max(0, Math.min(rf.src.lineLocation.start.line - 1, doc.lineCount - 1));
+        await vscode.window.showTextDocument(doc, { selection: doc.lineAt(lineNo).range });
+      } catch {
+        flagNote("could not open the flag's source");
+      }
+      return;
+    }
+    // origin "store" — a store flag has no textual home; reveal the policy `.cel` (the ⚑ badge shows the anchored node).
+    if (!currentCel) return flagNote("could not reveal the flag");
     try {
-      const doc = await vscode.workspace.openTextDocument(flag.filePath);
-      const lineNo = Math.max(0, Math.min(flag.lineLocation.start.line - 1, doc.lineCount - 1));
-      await vscode.window.showTextDocument(doc, { selection: doc.lineAt(lineNo).range });
+      const doc = await vscode.workspace.openTextDocument(currentCel);
+      await vscode.window.showTextDocument(doc);
     } catch {
-      flagNote("could not open the flag's source");
+      flagNote("could not reveal the flag");
     }
   }
 
@@ -1394,42 +1484,43 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [], startNodeGid: tree.startNodeGid, open: 0, resolved: 0, flagError: false, unplaced: 0 });
       return;
     }
-    const open = flagsList.filter((f) => f.status !== "resolved"); // the blocking set (matches openFlags / the gate)
+    const open = flagsList.filter((rf) => isOpen(rf.flag)); // the blocking set (matches openFlags / the gate)
     const gids = new Set<string>();
     let unplaced = 0; // PER-FLAG: how many open flags matched ZERO nodes (orphaned/moved occurrence, or a concept drawn nowhere)
-    for (const f of open) {
+    for (const rf of open) {
+      const a = rf.flag.anchor;
+      // Placement is SELF-VERIFYING against the tree render (a concept/decision drawn nowhere simply matches no gid), so it is
+      // NOT gated on resolveAnchor's liveness — that gate would only SUPPRESS a legit badge (e.g. a concept duplicated across
+      // asserted/inferred/interface layers → resolveAnchor `>1 ⇒ orphaned`, but it's clearly drawn; gpt55/Claude). resolveAnchor
+      // is used ONLY for the OCCURRENCE resolution (the nodeId + signature verify that decides placed vs moved/orphaned).
       let matched: string[] = [];
-      if (f.scope === "concept") {
-        // (lib,name) — NEVER name alone (cross-lib same-name concepts). A flag with no libraryName (best-effort
-        // attribution absent) can't be safely placed → it stays unmatched (counts as unplaced).
-        matched = tree.conceptOccurrences.filter((o) => o.name === f.targetName && o.lib === f.libraryName).map((o) => o.gid);
-      } else if (f.scope === "decision") {
-        const dec = crlStructure.find((s) => s.decision === f.targetName && s.lib === f.libraryName);
-        // GAP 3: a decision flag whose `key` is an OCCURRENCE key (`<nodeId>~<sig>`) → resolve to the ONE keyed node
-        // (nodeId + signature verify) BEFORE the decision-root path; orphan/moved → matched stays [] → unplaced (never a
-        // wrong node). A NON-occurrence key (e.g. a pre-existing re-add-guard source-hash) or NO key → the decision OBJECT
-        // → the whole decision (today), so an existing keyed decision flag isn't misread as a broken occurrence (gpt55).
-        if (f.key && isOccurrenceKey(f.key)) {
-          if (dec) {
-            const res = resolveOccurrence(dec, f.key);
-            const g = res.placed ? tree.anchors[res.ref.nodeKey]?.scrollTo : undefined;
-            if (g) matched = [g];
-          }
-        } else if (dec) {
-          matched = segmentsFor(tree, [dec.nodeKey]).segmentIds;
+      if (a.scope === "concept") {
+        // (lib,name) — NEVER name alone (cross-lib same-name concepts). Lights every `when`/leaf the concept draws as.
+        matched = tree.conceptOccurrences.filter((o) => o.name === a.name && o.lib === a.library).map((o) => o.gid);
+      } else if (a.scope === "decision") {
+        if (a.occurrenceKey) {
+          // GAP 3: an occurrence anchor → the ONE keyed node when it still resolves LIVE (placed); moved/orphan → [] → unplaced.
+          const cls = resolveAnchor(a, anchorCtx);
+          const g = cls.state === "live" && cls.nodeKey ? tree.anchors[cls.nodeKey]?.scrollTo : undefined;
+          if (g) matched = [g];
+        } else {
+          // a decision-OBJECT flag (no occurrence key) → the whole decision.
+          const dec = crlStructure.find((s) => s.decision === a.name && s.lib === a.library);
+          if (dec) matched = segmentsFor(tree, [dec.nodeKey]).segmentIds;
         }
       }
-      // "unplaced" means ONLY a genuine OCCURRENCE flag whose target moved/removed (a keyed decision flag that resolved
-      // orphan/moved). An OBJECT flag drawn nowhere (a library flag, or a concept used only as decision-input / inside a
-      // collapsed composite) is "not charted" — expected, NOT "moved/removed" — so it must NOT dilute this signal (Claude).
-      if (matched.length === 0 && f.scope === "decision" && f.key && isOccurrenceKey(f.key)) unplaced++;
+      // library scope: drawn nowhere → no per-node ⚑ (the start-node count is its catch-all).
+      // "unplaced" means ONLY a genuine OCCURRENCE flag whose target moved/removed (an occurrence anchor that didn't place). An
+      // OBJECT flag drawn nowhere (a library flag, or a concept used only as decision-input / inside a collapsed composite) is
+      // "not charted" — expected, NOT "moved/removed" — so it must NOT dilute this signal (Claude).
+      if (matched.length === 0 && a.scope === "decision" && a.occurrenceKey) unplaced++;
       for (const g of matched) gids.add(g);
     }
-    // The START-NODE COUNT badge is the chrome mirror + catch-all: the TOTAL open count. `unplaced` = open flags that lit
-    // NO node (an orphaned/moved occurrence, or a concept/decision drawn nowhere) — surfaced so a re-homed flag is never a
-    // silent aggregate-count-only blocker (the flag list labels which). Per-flag tracked, not a gid-count subtraction.
+    // The START-NODE COUNT badge is the chrome mirror + catch-all: the TOTAL open count. `unplaced` = open OCCURRENCE flags that
+    // lit NO node (moved/removed) — surfaced so a re-homed flag is never a silent aggregate-count-only blocker (the flag list
+    // labels which). Per-flag tracked, not a gid-count subtraction.
     const resolvedCount = flagsList.length - open.length;
-    void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [...gids], startNodeGid: tree.startNodeGid, open: open.length, resolved: resolvedCount, flagError: flagLoadError, unplaced });
+    void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [...gids], startNodeGid: tree.startNodeGid, open: open.length, resolved: resolvedCount, flagError: flagStateError, unplaced });
   }
 
   /** Post a gen-stamped `markThisNode` for a set of segment ids in one pane (#177 slice 4), after clearing the prior
@@ -2236,7 +2327,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // #203 Todo 4b Slice A: (re)parse the policy `.crl` review flags BEFORE the panes render — the tree-chrome gate AND the
     // per-node badges read `flagsList`, so loading AFTER the render (as it was) left both a rebuild stale (gpt55/Claude
     // review). Independent of the correspondence model (reads the `.crl` directly); inert in cockpit mode (MV-only).
-    loadFlags();
+    reloadReviewFlags();
     for (const pane of PANES) coord.clearPending(pane);
     dispatch({ type: "setInputs", index: toIndex(model, crlStructure, toCelNav(scenarios, caseIdByName, duplicateScenarioNames), indexVersion) });
     updateNavMessage();
@@ -2294,7 +2385,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     flagAnchor = undefined; // #210 Todo C: drop the agent flag anchor too (a stale anchor must not survive a failed retarget)
     mvSidecarPath = undefined;
     flagsList = []; // #203 Todo 4: drop the review-flag state too (a stale flag list/gate must not survive a failed retarget)
-    flagLoadError = false;
+    flagStateError = false;
+    anchorCtx = undefined; // #212 S2: drop the anchor context with the structure (a stale ctx must not resolve the next policy's flags)
     worklistActions = {};
     worklistFilter = new Set(REVIEW_STATES); // #214: reset the verdict filter to all-shown (a stale filter must not hide the next policy)
     currentQuestionIndex = -1; // #177 slice 3: drop the questionnaire sub-nav cursor (no question focused) with the MV state
@@ -2315,18 +2407,43 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function setupWatcher(): void {
     watcher?.dispose();
     watcher = undefined;
+    flagsWatcher?.dispose();
+    flagsWatcher = undefined;
+    if (flagsDebounce) clearTimeout(flagsDebounce); // a retarget must cancel a pending flags-refresh scheduled for the OLD policy
+    flagsDebounce = undefined;
     if (!currentCel) return;
     const src = findPolicySrc(currentCel);
     const pat = src ? new vscode.RelativePattern(src, "{provenance/*.provenance.json,anchor-source/*.txt}") : undefined;
-    if (!pat) return;
-    watcher = vscode.workspace.createFileSystemWatcher(pat);
-    const onFs = () => {
-      if (debounce) clearTimeout(debounce);
-      debounce = setTimeout(rebuild, 150);
-    };
-    watcher.onDidCreate(onFs);
-    watcher.onDidChange(onFs);
-    watcher.onDidDelete(onFs);
+    if (pat) {
+      watcher = vscode.workspace.createFileSystemWatcher(pat);
+      const onFs = () => {
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(rebuild, 150);
+      };
+      watcher.onDidCreate(onFs);
+      watcher.onDidChange(onFs);
+      watcher.onDidDelete(onFs);
+    }
+    // #212 S2 (I6): watch the `.crl/flags/` JSON store — it lives at the ARTIFACT root, outside the src-scoped watcher above.
+    // An external change (git checkout/merge, a manual repair of a corrupt record) must refresh the live gate + badges. A
+    // LIGHT refresh (reload flags + repaint chrome/badges), NOT a full rebuild — the model is unchanged.
+    const flagsDir = flagStoreDir(currentCel);
+    if (flagsDir) {
+      const watchedCel = currentCel; // capture: a debounced fire after a retarget must NOT refresh a DIFFERENT policy (gpt55)
+      flagsWatcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(flagsDir, "*.json"));
+      const onFlags = () => {
+        if (flagsDebounce) clearTimeout(flagsDebounce);
+        flagsDebounce = setTimeout(() => {
+          if (mode !== "medical-validation" || currentCel !== watchedCel) return; // policy moved on → drop the stale event
+          reloadReviewFlags();
+          renderTreeChrome();
+          driveFlagBadges();
+        }, 150);
+      };
+      flagsWatcher.onDidCreate(onFlags);
+      flagsWatcher.onDidChange(onFlags);
+      flagsWatcher.onDidDelete(onFlags);
+    }
   }
 
   // ── commands ──
@@ -2805,7 +2922,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         closeFlagDrawer();
         return fail("policy changed — flag not added");
       } else {
-        const repo = await githubRepoForFile(vscode.Uri.file(decl.filePath));
+        // #212 S2 (C1): resolve the issue repo from the policy `src/crl` dir — the SAME source `flagRepoFileUri` (store link-out)
+        // and bridgeReadReviewContext (issue-read) use — so a store flag's `; ref #N` is created against, and later resolved
+        // against, ONE repo (a `decl.filePath` in a nested/submodule repo would drift create vs read; gpt55 [critical]).
+        const policySrc = cel ? findPolicySrc(cel) : undefined;
+        const repo = policySrc ? await githubRepoForFile(vscode.Uri.file(join(policySrc, "crl"))) : undefined;
         if (!repo) {
           issueNote = "no GitHub origin";
         } else if (currentCel !== cel || mode !== "medical-validation") {
@@ -2846,50 +2967,59 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           }
         }
       }
-      // Real write. RE-READ live text (the doc may have changed during the async POST); write to the CAPTURED file even if
-      // the cockpit identity moved on (do NOT abort post-POST — that would strand the created issue). createFlag re-validates
-      // on the live text (byte-safe). On a post-POST failure, surface it honestly — never silently drop a real issue.
+      // #212 S2b — the write goes to the `.crl/flags/` STORE, not the `.crl`. RE-VALIDATE via `createFlag` (drift-proof: the
+      // SAME registry tag/field/enum + decl-exists checks the `.crl` path used) on the live decl text — but only to VALIDATE +
+      // produce the canonical FlagInstance; its `.source`/`WorkspaceEdit` output is discarded. Then adapt it to an `MvFlag`
+      // (legacyToMvFlag) and host-inject a fresh `id` + `createdAt` (S1: host-owned). Write to the CAPTURED policy's store even
+      // if the cockpit identity moved on (do NOT abort post-POST — that would strand a created issue).
       const doc2 = await vscode.workspace.openTextDocument(decl.filePath);
       const withRef = ref ? { ...fields, ref } : fields;
       const made = createFlag(doc2.getText(), { kind: target.kind, name: target.name, library: target.lib }, { tag, gist: summary, fields: withRef, status: "open" });
       if (!made.ok) {
         closeFlagDrawer();
-        const note = ref ? `issue ${ref} created but the flag couldn't be written (${made.message}) — add it manually` : `flag not added: ${made.message}`;
+        const note = ref ? `issue ${ref} created but the flag couldn't be validated (${made.message}) — try again` : `flag not added: ${made.message}`;
         flagNote(note);
         return { ok: false, note, ref };
       }
-      const eol = doc2.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n"; // preserve the doc's line ending (CRLF `.crl` files)
-      const edit = new vscode.WorkspaceEdit();
-      // EOF case: insertLine can legally === lineCount (a concept as the LAST statement, no trailing newline). Insert at
-      // end-of-last-line with a LEADING eol (a point insert keeps cursor/undo stable) rather than concatenating onto it.
-      if (made.insertLine >= doc2.lineCount) {
-        edit.insert(doc2.uri, doc2.lineAt(doc2.lineCount - 1).range.end, eol + made.lineText);
-      } else {
-        edit.insert(doc2.uri, new vscode.Position(made.insertLine, 0), made.lineText + eol);
+      const storeDir = cel ? flagStoreDir(cel) : undefined;
+      if (!storeDir) {
+        closeFlagDrawer();
+        const note = ref ? `issue ${ref} created but this policy has no flag store — add the flag manually` : "no flag store for this policy";
+        flagNote(note);
+        return { ok: false, note, ref };
       }
-      const applied = await vscode.workspace.applyEdit(edit);
+      // Build the store record from the validated FlagInstance (canonical tag + registry-ordered fields + the anchor derived
+      // from the target), then host-inject identity. `key`/`status` are already split out of `fields` and into the anchor /
+      // top-level by legacyToMvFlag; `ref` (a registry field) rides along in `fields`. The drawer's multi-line `stub` (the
+      // #203 GAP-2 note) is persisted as `description` — the store CAN hold it (unlike the lean `.crl` tag), so it's NOT lost
+      // when no GitHub issue is created (gpt55/Claude review: it was going only to the issue body before).
+      const desc = stub.trim();
+      const flag: MvFlag = { ...legacyToMvFlag(made.flag).flag, id: randomUUID(), createdAt: new Date().toISOString(), ...(desc ? { description: desc } : {}) };
+      try {
+        saveFlag(storeDir, flag);
+      } catch (e) {
+        // A local write failure AFTER a possible issue POST — surface it honestly (never silently drop a real issue).
+        closeFlagDrawer();
+        const why = e instanceof Error ? e.message : String(e);
+        const note = ref ? `issue ${ref} created but the flag couldn't be written (${why}) — add it manually` : `flag not added (${why})`;
+        flagNote(note);
+        return { ok: false, note, ref };
+      }
       closeFlagDrawer();
-      if (!applied) {
-        const note = ref ? `issue ${ref} created but the edit couldn't be applied — add the flag manually` : "edit could not be applied";
-        flagNote(note);
-        return { ok: false, note, ref };
-      }
-      const saved = await doc2.save();
-      // Refresh only if the policy we wrote is still current (loadFlags/chrome/badges read the current model).
+      // Refresh only if the policy we wrote is still current (the store watcher also fires, but repaint immediately).
       if (currentCel === cel && mode === "medical-validation") {
-        loadFlags();
+        reloadReviewFlags();
         renderTreeChrome();
         driveFlagBadges();
       }
-      const savedTail = saved ? "" : " — but save the .crl (it's unsaved)";
       if (ref) {
-        const note = `issue ${ref} created; flag added on ${target.kind} "${target.name}"${savedTail}`;
+        const note = `issue ${ref} created; flag added on ${target.kind} "${target.name}"`;
         flagNote(note);
         return { ok: true, note, ref };
       }
       // The flag is written but NO issue was created. A transient status-bar note is too easy to miss (a reviewer just
       // wonders where the issue went), so surface a PERSISTENT warning with the exact reason + a one-click fix.
-      const noIssueMsg = `Flag added on ${target.kind} "${target.name}"${savedTail}, but no GitHub issue was created`;
+      const noIssueMsg = `Flag added on ${target.kind} "${target.name}", but no GitHub issue was created`;
       reportNoIssue(noIssueMsg, issueNote ?? "no issue link");
       return { ok: true, note: `${noIssueMsg} (${issueNote ?? "no issue link"})` };
     } catch (e) {
@@ -3434,30 +3564,30 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       crlErrors.push("couldn't locate the policy source directory");
     }
     const crl = capText(crlRaw.trim(), REVIEW_CTX.CRL_CAP);
-    // Review status — the pure helpers (the exact composition the tree chrome uses) + per-case detail. Snapshot `flagLoadError`
+    // Review status — the pure helpers (the exact composition the tree chrome uses) + per-case detail. Snapshot `flagStateError`
     // ONCE (used for BOTH the mvComplete gate and the exposed field, so a same-policy reload mid-fetch can't tear them — Claude nit).
-    const flagLoadErrorSnapshot = flagLoadError;
-    const resolvedCount = flagsList.filter((f) => f.status === "resolved").length;
+    const flagStateErrorSnapshot = flagStateError;
+    const resolvedCount = flagsList.filter((rf) => rf.flag.status === "resolved").length;
     const progress = reviewProgress(reviewByCaseId, [...scenarioByCaseId.keys()], scenarios?.scenarios.length ?? 0);
-    const fc = { open: flagsList.length - resolvedCount, resolved: resolvedCount, error: flagLoadErrorSnapshot };
+    const fc = { open: flagsList.length - resolvedCount, resolved: resolvedCount, error: flagStateErrorSnapshot };
     const cases: ReviewContextCase[] = [...scenarioByCaseId].map(([caseId, sv]) => ({
       label: labelInPrimary(caseId, "cel").label,
       runStatus: sv.status ?? "",
       verdict: REVIEW_LABEL[reviewByCaseId[caseId] ?? "unreviewed"],
     }));
-    const refNum = (f: (typeof flagsList)[number]): number | null => {
-      const r = issueRefOf(f.fields.get("ref")); // the digit STRING (or undefined for a non-numeric ref)
+    const refNum = (f: MvFlag): number | null => {
+      const r = issueRefOf(f.fields.ref); // the digit STRING (or undefined for a non-numeric ref)
       const n = r !== undefined ? Number(r) : NaN;
       return Number.isInteger(n) && n > 0 ? n : null; // a positive issue number only (never `#0` → a pointless /issues/0 GET)
     };
-    const flags: ReviewContextFlag[] = flagsList.map((f) => ({
-      status: f.status,
-      scope: f.scope,
-      target: f.targetName,
-      concern: f.body,
-      issue: refNum(f),
+    const flags: ReviewContextFlag[] = flagsList.map((rf) => ({
+      status: rf.flag.status,
+      scope: rf.flag.anchor.scope,
+      target: rf.flag.anchor.name,
+      concern: rf.flag.gist,
+      issue: refNum(rf.flag),
     }));
-    const unresolvedRefs = flagsList.filter((f) => f.fields.get("ref") && issueRefOf(f.fields.get("ref")) === undefined).length;
+    const unresolvedRefs = flagsList.filter((rf) => rf.flag.fields.ref && issueRefOf(rf.flag.fields.ref) === undefined).length;
     // The deduped flag-linked issue numbers, CAPPED (several flags often share one tracking issue — a dup is a wasted read; and
     // an unbounded set would commit a huge payload + fire a large concurrent GET burst — both reviewers).
     const allRefs = [...new Set(flags.map((f) => f.issue).filter((n): n is number => n !== null))];
@@ -3520,7 +3650,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           mvComplete: mvComplete(progress, fc),
           cases,
           flags,
-          flagLoadError: flagLoadErrorSnapshot,
+          flagStateError: flagStateErrorSnapshot,
           unresolvedRefs,
         },
         issues,
@@ -3554,7 +3684,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     {
       dispose: () => {
         watcher?.dispose();
+        flagsWatcher?.dispose();
         if (debounce) clearTimeout(debounce); // a pending rebuild/reorder must not fire on disposed panels
+        if (flagsDebounce) clearTimeout(flagsDebounce);
         if (orderDebounce) clearTimeout(orderDebounce);
       },
     },

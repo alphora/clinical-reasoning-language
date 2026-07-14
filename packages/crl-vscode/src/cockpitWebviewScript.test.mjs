@@ -749,12 +749,12 @@ check("#203 Slice A webview: a ⚑ badge click is intercepted BEFORE [data-revea
 });
 check("#203 host: driveFlagBadges — per-node ⚑ by (lib,name)/anchors + the START-NODE COUNT badge (chrome mirror, catch-all); open-only", () => {
   assert.match(COCKPIT_SRC, /function driveFlagBadges\(\)/);
-  assert.match(COCKPIT_SRC, /flagsList\.filter\(\(f\) => f\.status !== "resolved"\)/); // open-only (matches the gate)
-  assert.match(COCKPIT_SRC, /o\.name === f\.targetName && o\.lib === f\.libraryName/); // (lib,name), no name-only wildcard
-  assert.match(COCKPIT_SRC, /crlStructure\.find\(\(s\) => s\.decision === f\.targetName && s\.lib === f\.libraryName\)/); // decision by (lib,name)
+  assert.match(COCKPIT_SRC, /flagsList\.filter\(\(rf\) => isOpen\(rf\.flag\)\)/); // #212 S2: open-only over ReadFlags (matches the gate)
+  assert.match(COCKPIT_SRC, /o\.name === a\.name && o\.lib === a\.library/); // (lib,name) off the anchor, no name-only wildcard
+  assert.match(COCKPIT_SRC, /crlStructure\.find\(\(s\) => s\.decision === a\.name && s\.lib === a\.library\)/); // decision by (lib,name)
   // the start-node COUNT badge replaces the old orphans→⚑ path: post the total open/resolved counts + the start gid
   assert.doesNotMatch(COCKPIT_SRC, /orphans > 0 && crlStructure\.length > 0/); // the Slice-A orphan→⚑ path is GONE (one implementation)
-  assert.match(COCKPIT_SRC, /startNodeGid: tree\.startNodeGid, open: open\.length, resolved: resolvedCount, flagError: flagLoadError/);
+  assert.match(COCKPIT_SRC, /startNodeGid: tree\.startNodeGid, open: open\.length, resolved: resolvedCount, flagError: flagStateError/);
 });
 check("#203 Slice A host: loadFlags runs BEFORE the panes render in rebuild (the gate + badges were stale after-render)", () => {
   const load = COCKPIT_SRC.indexOf("(re)parse the policy `.crl` review flags BEFORE the panes render");
@@ -793,13 +793,53 @@ check("#203 GAP 3: flagTargetChoices — decision root → object-decision; a `w
   assert.match(m[1], /const short = occ\.isLeaf \? "this recommendation" : "this condition"/);
   assert.match(m[1], /label: `\$\{short\} \(\$\{occ\.signature\}\)`, shortLabel: short/);
 });
-check("#203 GAP 3: driveFlagBadges routes a KEYED decision flag to ONE node via resolveOccurrence, BEFORE the decision-root path; per-flag unplaced count", () => {
+check("#203 GAP 3 / #212 S2: driveFlagBadges classifies each anchor via resolveAnchor; a live occurrence → its ONE node's gid; per-flag unplaced count", () => {
   const m = COCKPIT_SRC.match(/function driveFlagBadges\(\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "driveFlagBadges body");
-  assert.match(m[1], /if \(f\.key && isOccurrenceKey\(f\.key\)\) \{[\s\S]*?resolveOccurrence\(dec, f\.key\)/); // occurrence branch, guarded against non-occurrence keys
-  assert.match(m[1], /res\.placed \? tree\.anchors\[res\.ref\.nodeKey\]\?\.scrollTo : undefined/); // placed → the ONE node's gid
-  assert.match(m[1], /if \(matched\.length === 0 && f\.scope === "decision" && f\.key && isOccurrenceKey\(f\.key\)\) unplaced\+\+/); // ONLY a genuine occurrence flag counts as moved/removed
-  assert.match(m[1], /open: open\.length, resolved: resolvedCount, flagError: flagLoadError, unplaced/); // posts the unplaced count
+  assert.match(m[1], /const cls = resolveAnchor\(a, anchorCtx\)/); // #212 S2: resolveAnchor does the occurrence nodeId+signature verify
+  assert.match(m[1], /cls\.state === "live" && cls\.nodeKey \? tree\.anchors\[cls\.nodeKey\]\?\.scrollTo : undefined/); // placed → the ONE node's gid; moved/orphan → []
+  assert.match(m[1], /if \(matched\.length === 0 && a\.scope === "decision" && a\.occurrenceKey\) unplaced\+\+/); // ONLY a genuine occurrence flag counts as moved/removed
+  assert.match(m[1], /open: open\.length, resolved: resolvedCount, flagError: flagStateError, unplaced/); // posts the unplaced count
+});
+
+// ── #212 S2: the store⊎legacy read-model + origin-dispatched writes ──
+check("#212 S2: reloadReviewFlags unions the legacy `.crl` flags (adapted) with the `.crl/flags/` store; a store warning blocks the gate", () => {
+  const m = COCKPIT_SRC.match(/function reloadReviewFlags\(\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "reloadReviewFlags body");
+  assert.match(m[1], /collectFlags\(parsed\.result, \{ filePath \}\)\) flagsList\.push\(legacyToMvFlag\(fi\)\)/); // legacy adapted to ReadFlag
+  assert.match(m[1], /const storeDir = flagStoreDir\(currentCel\)/); // the new per-policy store
+  assert.match(m[1], /loadStoredFlags\(storeDir\)/); // aliased store loader (no name collision with this function)
+  assert.match(m[1], /if \(loaded\.warning\) flagStateError = true/); // a corrupt store record → UNKNOWN → block the gate
+  assert.match(m[1], /flagsList\.push\(storeReadFlag\(f\)\)/); // store records wrapped as ReadFlags
+  // I1: the anchor context's library set unions BOTH layers + the parsed library names (a library-meta-only lib is in neither)
+  assert.match(m[1], /libraries: \[\.\.\.new Set\(\[\.\.\.crlStructure\.map\(\(d\) => d\.lib\), \.\.\.conceptLayer\.map\(\(c\) => c\.lib\), \.\.\.libNames\]\)\]/);
+});
+check("#212 S2: writeFlagStatus dispatches by origin — a store flag read-modify-saveFlag's; a legacy flag rewrites its `.crl` guarded on the RAW src status", () => {
+  const m = COCKPIT_SRC.match(/async function writeFlagStatus\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "writeFlagStatus body");
+  assert.match(m[1], /if \(rf\.origin === "store"\)/); // origin dispatch
+  // store: a GENUINE read-modify-write — re-read the current on-disk record by id, merge only status+editedAt (never clobber a
+  // concurrent edit to gist/fields/anchor/description), and report a deleted record as stale (gpt55/Claude).
+  assert.match(m[1], /loadStoredFlags\(dir\)\.flags\.find\(\(f\) => f\.id === rf\.flag\.id\)/);
+  assert.match(m[1], /if \(!current\) return stale\(/); // deleted on disk → don't resurrect the snapshot
+  assert.match(m[1], /saveFlag\(dir, \{ \.\.\.current, status: next, editedAt: new Date\(\)\.toISOString\(\) \}\)/); // merge onto CURRENT, not the snapshot
+  assert.match(m[1], /const src = rf\.src/); // legacy: the write-back handle
+  assert.match(m[1], /\(res\.parsed\.fields\.get\("status"\) \?\? "open"\) !== src\.rawStatus/); // I2: guard on the RAW status, not the coerced view
+  assert.match(m[1], /rewriteMetaStatus\(rawLine, next\)/); // legacy in-place `.crl` rewrite (unchanged)
+});
+check("#212 S2 (C6): revealFlag never bounces a legacy flag to the start node — it reveals the `.crl` meta line; a store flag reveals the policy", () => {
+  const m = COCKPIT_SRC.match(/async function revealFlag\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "revealFlag body");
+  assert.match(m[1], /if \(rf\.origin === "legacy"\)/); // legacy floor: the meta line, ALWAYS
+  assert.match(m[1], /rf\.src\.lineLocation\.start\.line - 1/); // its authoritative source line
+  assert.match(m[1], /openTextDocument\(currentCel\)/); // store flag → the policy `.cel` (no textual home; S2b adds node nav)
+});
+check("#212 S2 (I6): a FileSystemWatcher covers the `.crl/flags/` store (outside the src-scoped watcher); a change does a LIGHT refresh, not a rebuild", () => {
+  const m = COCKPIT_SRC.match(/function setupWatcher\(\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "setupWatcher body");
+  assert.match(m[1], /const flagsDir = flagStoreDir\(currentCel\)/);
+  assert.match(m[1], /new vscode\.RelativePattern\(flagsDir, "\*\.json"\)/); // watch the JSON store
+  assert.match(m[1], /reloadReviewFlags\(\);\s*\n\s*renderTreeChrome\(\);\s*\n\s*driveFlagBadges\(\)/); // LIGHT refresh (no rebuild — the model is unchanged)
 });
 check("#203 Slice B: findDeclaration re-parses src/crl (live-buffer via crlText), matching (name, lib) in the declaring library", () => {
   const m = COCKPIT_SRC.match(/function findDeclaration\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
@@ -851,7 +891,7 @@ check("#211: commitFlagDraft — trust+github gated, pre-POST recheck, LOCK+try/
   assert.match(m[1], /flagCommitting = true;[\s\S]*?try \{/); // lock past the dry-run boundary, then the wrapped body
   assert.match(m[1], /\} finally \{\s*\n\s*flagCommitting = false;/); // released for a later retry
   assert.match(m[1], /if \(!vscode\.workspace\.isTrusted\)/); // trust gate
-  assert.match(m[1], /githubRepoForFile\(vscode\.Uri\.file\(decl\.filePath\)\)/); // pure repo resolve (no persist)
+  assert.match(m[1], /githubRepoForFile\(vscode\.Uri\.file\(join\(policySrc, "crl"\)\)\)/); // #212 S2 C1: repo from policy src/crl (matches the read paths — no create-vs-read drift)
   // a retarget during the async repo-resolve/auth aborts BEFORE any POST (no orphan issue for a policy the user left)
   const repoAt = m[1].indexOf("githubRepoForFile(");
   const rechecks = (m[1].match(/currentCel !== cel \|\| mode !== "medical-validation"/g) || []).length;
@@ -862,12 +902,17 @@ check("#211: commitFlagDraft — trust+github gated, pre-POST recheck, LOCK+try/
   assert.match(m[1], /const fresh = await githubToken\(true\)/);
   assert.match(m[1], /catch \(e\)[\s\S]*?issue not created — \$\{e\.message\}/); // outer catch surfaces the RAW github message
   assert.match(m[1], /const withRef = ref \? \{ \.\.\.fields, ref \} : fields/);
-  assert.match(m[1], /made\.insertLine >= doc2\.lineCount/); // EOF-safe on the captured file
+  // #212 S2b: the write goes to the `.crl/flags/` STORE — createFlag is the drift-proof VALIDATOR (its FlagInstance builds the
+  // MvFlag via legacyToMvFlag); host-inject id + createdAt; saveFlag. The `.crl` WorkspaceEdit/insert is GONE.
+  assert.match(m[1], /const flag: MvFlag = \{ \.\.\.legacyToMvFlag\(made\.flag\)\.flag, id: randomUUID\(\), createdAt: new Date\(\)\.toISOString\(\), \.\.\.\(desc \? \{ description: desc \} : \{\}\) \}/);
+  assert.match(m[1], /const desc = stub\.trim\(\)/); // #212 S2: the drawer note persists as MvFlag.description (not lost when no issue)
+  assert.match(m[1], /saveFlag\(storeDir, flag\)/);
+  assert.doesNotMatch(m[1], /new vscode\.WorkspaceEdit\(\)/); // no more `.crl` text splice on create
   assert.match(m[1], /issue \$\{ref\} created but the flag couldn't be written/); // honest post-POST failure (never silent)
   assert.match(m[1], /const note = `issue \$\{ref\} created; flag added[\s\S]*?return \{ ok: true, note, ref \}/); // success → the note + a structured outcome for the agent
   assert.match(m[1], /reportNoIssue\(noIssueMsg, issueNote \?\? "no issue link"\)/); // no issue → a LOUD, persistent warning with the reason
   assert.match(m[1], /issue not created — \$\{e\.message\}/); // the RAW GitHub error is surfaced (e.g. a 403 scope message)
-  assert.match(m[1], /if \(currentCel === cel && mode === "medical-validation"\) \{[\s\S]*?loadFlags\(\)/); // refresh only if policy unchanged
+  assert.match(m[1], /if \(currentCel === cel && mode === "medical-validation"\) \{[\s\S]*?reloadReviewFlags\(\)/); // refresh only if policy unchanged
   assert.ok(repoAt > 0, "repo resolve present");
 });
 check("#211: reportNoIssue is a LOUD, actionable warning — Manage Trust / Sign in to GitHub (clears the no-nag latch)", () => {
@@ -933,17 +978,17 @@ check("#203 Slice C: resolveIssueBase prefers the USER (global) value; a workspa
 check("#203 Slice C: flagActionMenu offers Open-issue only for a numeric ref; a discoverable config item when trusted+no-base; re-resolve+guard at click", () => {
   const m = COCKPIT_SRC.match(/async function flagActionMenu\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "flagActionMenu body");
-  assert.match(m[1], /const issueNo = issueRefOf\(flag\.fields\.get\("ref"\)\)/); // numeric-only guard
+  assert.match(m[1], /const issueNo = issueRefOf\(flag\.fields\.ref\)/); // #212 S2: numeric-only guard off the MvFlag Record
   // MENU BUILD is READ-ONLY (resolveIssueBase, config-only — never detects/writes on menu-open); a trusted+no-config
   // node offers "from git origin" (the click detects), else the manual-setting item.
   assert.match(m[1], /buildIssueUrl\(resolveIssueBase\(\), issueNo\)/); // configured base → open item
-  assert.match(m[1], /isTrusted && flag\.filePath\) actions\.push\(\{ label: `↗ Open issue #\$\{issueNo\} \(from git origin\)`/); // detect-on-click item
+  assert.match(m[1], /isTrusted && repoFileUri\) actions\.push\(\{ label: `↗ Open issue #\$\{issueNo\} \(from git origin\)`/); // detect-on-click item
   assert.match(m[1], /vscode\.workspace\.isTrusted\) actions\.push\(\{ label: `⚙ Set crl\.issueBaseUrl/); // discoverable config item
   // open path: identity guard, then RESOLVE-OR-DETECT at click (config wins; else auto-detect+persist from the flag's repo)
   assert.match(m[1], /if \(pick\.act === "issue"\)/);
   assert.match(m[1], /indexVersion !== ver \|\| currentCel !== cel \|\| mode !== "medical-validation"\) return "continue"/);
-  assert.match(m[1], /const fileUri = flag\.filePath \? vscode\.Uri\.file\(flag\.filePath\) : undefined/); // keyed off the FLAG's .crl (nested/submodule)
-  assert.match(m[1], /buildIssueUrl\(await resolveOrDetectIssueBase\(fileUri\), issueNo\)/); // config-first, else detect
+  assert.match(m[1], /const repoFileUri = flagRepoFileUri\(rf\)/); // #212 S2: legacy → its own .crl; store → the policy src/crl
+  assert.match(m[1], /buildIssueUrl\(await resolveOrDetectIssueBase\(repoFileUri\), issueNo\)/); // config-first, else detect
   assert.match(m[1], /await vscode\.env\.openExternal\(vscode\.Uri\.parse\(url\)\)\)\) flagNote\(`could not open issue/);
 });
 check("#204/#211: gitRepositoryForFile is the SHARED, side-effect-free git-ext access (activate; getRepository, not repositories[0]); total", () => {

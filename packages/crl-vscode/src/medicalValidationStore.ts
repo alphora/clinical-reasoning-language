@@ -541,13 +541,13 @@ export function mvComplete(p: ReviewProgress, f: FlagChrome): boolean {
  * fixed literals are interpolated (NO free text → no escaping needed; keep it that way). The `data-mv-flags` hook makes
  * the readout clickable → the host opens the flag list (mirrors the `data-fc-*` chrome-click channel).
  *
- * - `error` (a `.crl` failed to parse) → `⚠ flags unreadable` (blocks the gate; still clickable to see what loaded).
+ * - `error` (a source — a `.crl` that failed to parse, OR a corrupt flag-store record) → `⚠ flags unreadable` (blocks the gate).
  * - `open > 0` → `⚑ N open flag(s)` (blocks the gate).
  * - `open === 0 && resolved > 0` → `✓ flags clear` (all resolved — a positive all-clear; still clickable to reopen).
  * - no flags at all (`open===0 && resolved===0`) → "" (nothing to say, like the progress readout).
  */
 export function renderFlagChrome(f: FlagChrome): string {
-  if (f.error) return `<div class="mv-flags mv-flags-error" data-mv-flags title="A policy .crl could not be parsed — flag state is unknown">⚠ flags unreadable</div>`;
+  if (f.error) return `<div class="mv-flags mv-flags-error" data-mv-flags title="Flag state is unknown — a policy .crl could not be parsed, or a stored flag record is unreadable or invalid">⚠ flags unreadable</div>`;
   if (f.open > 0) {
     const label = f.open === 1 ? "1 open flag" : `${f.open} open flags`;
     return `<div class="mv-flags mv-flags-open" data-mv-flags title="Open review flags block Medical Validation completion — click to review">⚑ ${label}</div>`;

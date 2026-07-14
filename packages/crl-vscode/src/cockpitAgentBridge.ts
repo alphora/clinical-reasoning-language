@@ -112,8 +112,8 @@ export interface ReviewContext {
     mvComplete: boolean;
     cases: ReviewContextCase[];
     flags: ReviewContextFlag[];
-    /** an unreadable/unparseable `.crl` → the flag set is UNKNOWN (the mvComplete gate stays open). */
-    flagLoadError: boolean;
+    /** a source (an unparseable `.crl`, OR a corrupt `.crl/flags/` store record) left the flag set UNKNOWN (mvComplete stays open). */
+    flagStateError: boolean;
     /** flags whose `; ref` was non-numeric (disc/spec/cross-repo) → not openable here (so the synthesis doesn't say "no issues"). */
     unresolvedRefs: number;
   };
