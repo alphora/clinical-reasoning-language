@@ -13,11 +13,12 @@ const base = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   test: {
-    // NOTE on parallelism: the suites each import a heavy ANTLR+core graph; a worker PER FILE (threads or forks) exhausts
-    // resources on constrained machines and intermittently fails worker init ("Vitest failed to find the runner"). Each
-    // project pins serial execution via `poolOptions` (`singleThread`/`singleFork`) — a config-level option that IS honored
-    // per-project (unlike `fileParallelism`, which is global-only and silently ignored under `projects`). So EVERY invocation
-    // is serial+stable, not just the npm scripts. Revisit a bounded pool once validated on clean CI.
+    // NOTE on parallelism: at scale (130+ files) a per-worker pool hits a vitest "failed to find the runner" worker-init
+    // error, so the run scripts pass `--no-file-parallelism` (files run one at a time, each still isolated) — the proven-
+    // reliable path. Config-level serial is NOT cleanly expressible here: `fileParallelism:false` is a global-only option
+    // (silently ignored under `projects`), and `poolOptions.{maxThreads:1/singleThread}` itself triggers the runner error.
+    // So a bare `npx vitest run` uses the default parallel pool (fine for a subset / a --project filter); the full-suite
+    // scripts carry the flag. Revisit once on a clean CI + after auditing the regression suites' fixed-path fixture writes.
     projects: [
       {
         // crl (core): ts-jest → vitest. jest-API suites run under vitest globals unchanged.
@@ -30,14 +31,7 @@ export default defineConfig({
           // import a heavy ANTLR+core graph, and a process-per-file fork pool balloons memory (→ resource-driven flakiness on
           // constrained machines/CI). (We don't need forks' `process.chdir` — the execSync regression suites pass an explicit
           // `cwd` instead.)
-          pool: "threads",
-          // `maxThreads:1` = a ONE-worker pool, so files run SEQUENTIALLY but each still gets its own ISOLATED module context
-          // (NOT `singleThread:true`, which crams all files into one un-isolated worker → cross-file state leaks). Baked into
-          // the config (a `poolOption` IS honored per-project, unlike `fileParallelism`) so EVERY invocation — `npx vitest`,
-          // IDE runners, CI — is serial+isolated+stable, not just the scripts. Cross-file parallelism intermittently fails
-          // worker init here ("Vitest failed to find the runner"); serial is deterministic + green. Revisit a bounded pool
-          // once validated on clean CI (and after auditing the regression suites' fixed-path fixture writes).
-          poolOptions: { threads: { maxThreads: 1, minThreads: 1 } },
+          pool: "threads", // thread workers are lighter than child-process forks for the heavy ANTLR+core per-file imports
           // The heaviest suites spawn `npm run cli:*` (ts-node) via execSync, and cold module transforms (the big ANTLR+core
           // graph) can push the first test in a file past the 5s default. 30s gives them room.
           testTimeout: 30_000,
@@ -60,9 +54,8 @@ export default defineConfig({
           environment: "node",
           globals: true,
           // Many legacy suites call `process.exit()`; `forks` (v4 default) isolates each file so one can't tear down the run.
-          // `maxForks:1` = a one-process pool, serial + isolated (same rationale + reliability as the crl project's maxThreads:1).
+          // `forks` (v4 default): child-process isolation — the future T3 suites call `process.exit()`, which a fork contains.
           pool: "forks",
-          poolOptions: { forks: { maxForks: 1, minForks: 1 } },
           // T1 proof-of-life ONLY, and OUTSIDE `src/*.test.mjs` so the legacy `run-tests.mjs` never discovers it. T3 moves the
           // bulk under this project and retires the legacy runner.
           include: ["test/vitest/**/*.vitest.test.ts"],
