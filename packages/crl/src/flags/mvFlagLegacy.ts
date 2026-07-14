@@ -7,7 +7,7 @@
 // only ever sees a store/host `MvFlag` — the transient `src` can't leak (design review 246, gpt55+Claude).
 import { createHash } from "node:crypto";
 
-import type { FlagInstance } from "@smile-digital-health/crl";
+import type { FlagInstance } from "../meta/collectFlags";
 
 import { coerceFlagStatus, type MvFlag, type MvFlagAnchor, type MvFlagCategory } from "./mvFlag";
 import { isOccurrenceKey, parseOccurrenceKey } from "./occurrenceKey";

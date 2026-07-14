@@ -10,7 +10,7 @@
 // the original node found — following it would navigate to the WRONG node. So moved ⇒ orphaned. ⚠ Scope-level resolution
 // keys on (name, LIBRARY) — never name alone (cross-lib same-name concepts); a missing library or a multi-match (post-rename
 // collision) ⇒ orphaned, never a guessed pick.
-import type { CrlDecisionStructure } from "@smile-digital-health/crl";
+import type { CrlDecisionStructure } from "../provenance/crlStructure";
 
 import { resolveOccurrence, type OccurrenceRef } from "./occurrenceKey";
 import type { MvFlagAnchor } from "./mvFlag";

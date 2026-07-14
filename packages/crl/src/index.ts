@@ -291,6 +291,22 @@ export type { CreateFlagTarget, CreateFlagInput, CreateFlagResult, CreateFlagFai
 export { setFlagStatus } from "./refactors/setFlagStatus";
 export type { FlagSelector, FlagCandidate, SetFlagStatusResult, SetFlagStatusFailure } from "./refactors/setFlagStatus";
 
+// #212 — the `.crl/flags/` STORE model (moved from crl-vscode so BOTH the cockpit AND the MCP flag tools share it). The
+// single home for review flags: a pure record model + per-flag JSON store + a navigation anchor resolver + the legacy `.crl`
+// adapter (transition-only). See .vibe-tools/discussions/248.
+export { coerceFlag, coerceFlagStatus, isOpen, isValidFlagId } from "./flags/mvFlag";
+export type { MvFlag, MvFlagAnchor, MvFlagStatus, MvFlagCategory, MvFlagScope } from "./flags/mvFlag";
+export { flagStoreDir, loadFlags, saveFlag, removeFlag } from "./flags/mvFlagStore";
+export type { FlagStoreLoad } from "./flags/mvFlagStore";
+export { resolveAnchor } from "./flags/mvFlagAnchor";
+export type { AnchorContext, AnchorConceptRef, AnchorResolution } from "./flags/mvFlagAnchor";
+export { legacyToMvFlag, storeReadFlag, LEGACY_CREATED_AT } from "./flags/mvFlagLegacy";
+export type { ReadFlag, LegacyFlagSrc } from "./flags/mvFlagLegacy";
+export { occurrencesOf, occurrenceByNodeId, occurrenceByNodeKey, occurrenceKeyValue, parseOccurrenceKey, resolveOccurrence, isOccurrenceKey, isOccurrenceNode } from "./flags/occurrenceKey";
+export type { OccurrenceRef } from "./flags/occurrenceKey";
+// #212 — the policy source-layout primitive (shared by the flag store + provenance/MV discovery).
+export { findPolicySrc } from "./provenance/policyLayout";
+
 export interface Token {
   line: number;
   column: number;

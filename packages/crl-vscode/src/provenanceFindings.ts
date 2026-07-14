@@ -10,7 +10,12 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 import type { CorrespondenceModel, FindingTarget } from "@smile-digital-health/crl";
+import { findPolicySrc } from "@smile-digital-health/crl";
 import { canonicalize } from "@smile-digital-health/crl/language-services";
+
+// #212: `findPolicySrc` moved to core (shared with the flag store); re-exported here so this module's existing consumers
+// (discoverProvenance below, medicalValidationStore, provenancePanel, the cockpit) keep importing it from `./provenanceFindings`.
+export { findPolicySrc };
 
 /**
  * The authoring surfaces (findings panel + correspondence cockpit) validate in WORKLIST mode: an in-progress scaffold's
@@ -39,18 +44,6 @@ interface ArtifactLite {
   policyVersion?: string;
   anchorSource?: { textHash?: string };
   clusters?: { cel?: { file?: string }[] }[];
-}
-
-/** The policy `src/` dir is the first ancestor of the .cel whose basename is `src` and that has a `provenance/` child.
- *  Exported so the panel can scope its FileSystemWatcher to this policy (not the whole workspace). */
-export function findPolicySrc(celPath: string): string | undefined {
-  let dir = dirname(celPath);
-  for (;;) {
-    if (basename(dir) === "src" && existsSync(join(dir, "provenance"))) return dir;
-    const parent = dirname(dir);
-    if (parent === dir) return undefined;
-    dir = parent;
-  }
 }
 
 function listFiles(dir: string, suffix: string): string[] {

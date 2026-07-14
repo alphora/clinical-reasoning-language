@@ -38,3 +38,10 @@ import "../provenance/tests/crlStructure.test";
 import "../provenance/tests/generate.test";
 import "../provenance/tests/merge.test";
 import "../provenance/tests/revealMaps.test";
+
+// #212 — the flag store model (moved from crl-vscode, disc 248).
+import "../flags/tests/mvFlag.test";
+import "../flags/tests/mvFlagStore.test";
+import "../flags/tests/mvFlagAnchor.test";
+import "../flags/tests/mvFlagLegacy.test";
+import "../flags/tests/occurrenceKey.test";

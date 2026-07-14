@@ -65,11 +65,23 @@ import { failedCriterionLabel } from "./failedCriterionLabel";
 import { buildIssueUrl, githubIssuesBaseFromRemote, githubRepoFromRemote, issueRefOf, sanitizeIssueBase } from "./issueLink";
 import { createGithubIssue, getGithubIssue, IssueCreateError, issueCreateErrorLabel } from "./githubIssue";
 import { renderFlagDrawer } from "./flagDrawerHtml";
-import { occurrenceByNodeKey, occurrenceKeyValue, parseOccurrenceKey, type OccurrenceRef } from "./occurrenceKey";
-import { isOpen, type MvFlag } from "./mvFlag";
-import { flagStoreDir, loadFlags as loadStoredFlags, saveFlag } from "./mvFlagStore";
-import { legacyToMvFlag, storeReadFlag, type ReadFlag } from "./mvFlagLegacy";
-import { resolveAnchor, type AnchorContext } from "./mvFlagAnchor";
+// #212: the flag store model now lives in core (packages/crl) so the cockpit AND the MCP flag tools share it.
+import {
+  occurrenceByNodeKey,
+  occurrenceKeyValue,
+  parseOccurrenceKey,
+  isOpen,
+  flagStoreDir,
+  loadFlags as loadStoredFlags,
+  saveFlag,
+  legacyToMvFlag,
+  storeReadFlag,
+  resolveAnchor,
+  type OccurrenceRef,
+  type MvFlag,
+  type ReadFlag,
+  type AnchorContext,
+} from "@smile-digital-health/crl";
 import {
   addNote,
   buildReviewPerCase,

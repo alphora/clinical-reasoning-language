@@ -11,7 +11,7 @@
 import { mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
-import { findPolicySrc } from "./provenanceFindings";
+import { findPolicySrc } from "../provenance/policyLayout";
 import { coerceFlag, isValidFlagId, type MvFlag } from "./mvFlag";
 
 const isEnoent = (e: unknown): boolean => (e as NodeJS.ErrnoException)?.code === "ENOENT";

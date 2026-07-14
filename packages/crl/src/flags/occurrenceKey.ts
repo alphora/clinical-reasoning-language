@@ -9,7 +9,7 @@
 //
 // Pure + vscode-free (tested in occurrenceKey.test.mjs). The transforms (createFlag/setFlagStatus) are untouched — the
 // occurrence key is just the value of the `key` field they already carry.
-import type { CrlDecisionStructure, CrlStructureNode } from "@smile-digital-health/crl";
+import type { CrlDecisionStructure, CrlStructureNode } from "../provenance/crlStructure";
 
 /** A resolved occurrence: the owning decision + the node's positional address + its readable signature. */
 export interface OccurrenceRef {
