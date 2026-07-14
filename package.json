@@ -13,6 +13,10 @@
     "test": "npm test -w @smile-digital-health/crl",
     "test:mcp": "npm run test:mcp -w @smile-digital-health/crl",
     "test:ext": "npm test -w crl-language-support",
+    "test:vitest": "vitest run",
     "package:extension": "npm run package -w crl-language-support"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
   }
 }

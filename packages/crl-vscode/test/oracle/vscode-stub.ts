@@ -146,3 +146,35 @@ export class WorkspaceEdit {
 export const workspace: { workspaceFolders?: { uri: Uri }[] } = { workspaceFolders: undefined };
 export const window = {};
 export const languages = {};
+
+// #vitest-unification T1 — the two MODULE-LOAD-TIME `vscode.*` reads a runtime-vscode module (correspondenceCockpit +
+// cockpitAgentBridge) evaluates at import: `vscode.ViewColumn.*` (ORDERED_COLUMNS) and `new vscode.EventEmitter()`. Ported
+// from the inline esbuild-plugin stub in cockpitWebviewScript.test.mjs (its authoritative minimal set — every OTHER `vscode.*`
+// use is inside a function, erased at import). Additive to the golden-oracle stub above (the language services never touch
+// these, so the oracle snapshot is unchanged).
+export const ViewColumn = { Active: -1, Beside: -2, One: 1, Two: 2, Three: 3, Four: 4, Five: 5, Six: 6, Seven: 7, Eight: 8, Nine: 9 } as const;
+
+export class EventEmitter<T = unknown> {
+  private listeners: ((e: T) => void)[] = [];
+  // A VS Code `Event<T>` is a subscribe fn `(listener, thisArgs?) => Disposable`. The disposable removes THAT listener
+  // (faithful — a no-op dispose would mask leak/duplicate-listener bugs once this stub is the shared alias for behavioral
+  // tests in T3; gpt55 impl review).
+  get event(): (fn: (e: T) => void, thisArgs?: unknown) => { dispose(): void } {
+    return (fn, thisArgs) => {
+      const listener = thisArgs ? (e: T): void => fn.call(thisArgs, e) : fn;
+      this.listeners.push(listener);
+      return {
+        dispose: (): void => {
+          const i = this.listeners.indexOf(listener);
+          if (i >= 0) this.listeners.splice(i, 1);
+        },
+      };
+    };
+  }
+  fire(e: T): void {
+    for (const fn of this.listeners.slice()) fn(e);
+  }
+  dispose(): void {
+    this.listeners = [];
+  }
+}
