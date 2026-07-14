@@ -297,16 +297,16 @@ export const EMIT_CQL_COMMENT_TAGS: ReadonlySet<string> = emitCqlTags();
 const CQL_COMMENT_RE = /^@cql-comment:\s*(.*)$/;
 
 // #203 Todo 5 — STATUS-AWARE emit. A meta line reaches the generated CQL iff its tag has `emit.cql:true` AND its status
-// is not a SUPPRESS status (registry `emit.suppressWhenStatus`, e.g. `["resolved"]`). So an OPEN flag emits (a KE reads
-// unresolved concerns in the generated CQL) and a RESOLVED flag does not (noise). Absent/unknown status → `open` →
-// EMITS (conservative; mirrors `openFlags` — the emit ⇔ open ⇔ blocks-mvComplete invariant for flags). Only an EXACT
-// suppress status suppresses — the emitter does NOT run the validator, so an annotated `status resolved (per Dr X)` or a
-// duplicate-status line reads as non-resolved and still emits (deliberate: surface anything not cleanly resolved).
-// We parse ONLY to obtain {tag, status}; the RAW line is still what gets rendered (see metaCommentText) so no fields drop.
+// is not a SUPPRESS status (registry `emit.suppressWhenStatus`, e.g. `["resolved"]`). So an OPEN @ke-feedback emits (a KE
+// reads unresolved notes in the generated CQL) and a RESOLVED one does not (noise). Absent/unknown status → `open` →
+// EMITS (conservative). Only an EXACT suppress status suppresses — the emitter does NOT run the validator, so an annotated
+// `status resolved (per Dr X)` or a duplicate-status line reads as non-resolved and still emits (deliberate: surface
+// anything not cleanly resolved). (#212 step 4b: review FLAGS left the registry — no flag tag emits anymore; the store is
+// their home.) We parse ONLY to obtain {tag, status}; the RAW line is still what gets rendered (see metaCommentText).
 function metaEmitsToCql(line: string): boolean {
   const res = parseMetaTag(line);
   if (res.kind !== "tag" || !emitsToCql(res.parsed.tag)) return false; // accessors canonicalize aliases
-  const status = res.parsed.fields.get("status") ?? "open"; // same status read as collectFlags
+  const status = res.parsed.fields.get("status") ?? "open"; // absent status → open (conservative)
   return !suppressStatusesOf(res.parsed.tag).includes(status);
 }
 

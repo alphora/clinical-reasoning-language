@@ -182,7 +182,7 @@ try {
     assert.equal(one.flag.id, amb.candidates[0].id);
   });
 
-  await check("create_flag → a multi-line gist is accepted (createFlag allows newlines)", async () => {
+  await check("create_flag → a multi-line gist is accepted (the validator allows newlines)", async () => {
     const { crlPath } = mkPolicy();
     const out = JSON.parse((await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "validation-concern", gist: "line one\nline two" } })).content[0].text);
     assert.equal(out.success, true);

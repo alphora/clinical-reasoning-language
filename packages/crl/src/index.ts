@@ -268,40 +268,23 @@ export type {
 } from "./cel/ast/types";
 export type { ValidationError, ValidationErrorKind, ValidationResult } from "./validator/validator";
 
-// #154/#203 — flag detection API (the MV cockpit consumes this for the mvComplete gate + the flag list).
-export { collectFlags, openFlags } from "./meta/collectFlags";
-export type { FlagInstance } from "./meta/collectFlags";
 export { parseMetaTag } from "./meta/parseMetaTag";
 export type { ParseMetaResult, ParsedMetaTag } from "./meta/parseMetaTag";
 // #212 step 4 — the CORE-owned flag VOCABULARY (moved OUT of the `.crl` meta-registry; flags left `.crl`). The single source
 // of the flag tags/fields/aliases/categories/enums for the cockpit drawer, the MCP flag tools, and the create seam. Plus the
-// pure field validator + the forbidden-char rules (re-homed from `createFlag`) + the create-seam target/input types.
+// pure field validator + the forbidden-char rules + the create-seam target/input types.
 export { flagTags, isFlagTag, canonicalFlagTag, flagCategoryOf, flagFieldRulesOf, validateFlagFields, FORBIDDEN_FLAG_CHARS, hasForbiddenFlagChars, FORBIDDEN_GIST_CHARS, hasForbiddenGistChars } from "./flags/flagVocab";
 export type { FlagTagInfo, FieldRule, FlagStatus, CreateFlagTarget, CreateFlagInput, ValidateFlagFieldsResult, FlagFieldsFailure } from "./flags/flagVocab";
 
-// #205 crl-refactors — the write-half of the CRL-source API. NOTE (#212 step 4): these `.crl`-splicing flag transforms
-// (`createFlag`/`setFlagStatus`/`rewriteMetaStatus`/`resolveMetaInsertion`) are no longer wired to any store surface — the
-// store seam (`validateAndBuildMvFlagDraft`) + the MCP tools replaced them; they are stripped in 4b.
-export { rewriteMetaStatus, rewriteStatusInBody } from "./refactors/rewriteMetaStatus";
-export { resolveMetaInsertion } from "./refactors/resolveMetaInsertion";
-export type { MetaInsertionResult } from "./refactors/resolveMetaInsertion";
-export { createFlag } from "./refactors/createFlag";
-export type { CreateFlagResult, CreateFlagFailure, SlimDiagnostic } from "./refactors/createFlag";
-export { setFlagStatus } from "./refactors/setFlagStatus";
-export type { FlagSelector, FlagCandidate, SetFlagStatusResult, SetFlagStatusFailure } from "./refactors/setFlagStatus";
-
 // #212 — the `.crl/flags/` STORE model (moved from crl-vscode so BOTH the cockpit AND the MCP flag tools share it). The
-// single home for review flags: a pure record model + per-flag JSON store + a navigation anchor resolver + the legacy `.crl`
-// adapter (transition-only). See .vibe-tools/discussions/248.
+// single home for review flags: a pure record model + per-flag JSON store + a navigation anchor resolver. See discussions/248.
 export { coerceFlag, coerceFlagStatus, isOpen, isValidFlagId } from "./flags/mvFlag";
 export type { MvFlag, MvFlagAnchor, MvFlagStatus, MvFlagCategory, MvFlagScope } from "./flags/mvFlag";
 export { flagStoreDir, loadFlags, saveFlag, removeFlag } from "./flags/mvFlagStore";
 export type { FlagStoreLoad } from "./flags/mvFlagStore";
 export { resolveAnchor } from "./flags/mvFlagAnchor";
 export type { AnchorContext, AnchorConceptRef, AnchorResolution } from "./flags/mvFlagAnchor";
-export { legacyToMvFlag, storeReadFlag, LEGACY_CREATED_AT } from "./flags/mvFlagLegacy";
-export type { ReadFlag, LegacyFlagSrc } from "./flags/mvFlagLegacy";
-// #212 step 2 — the single validate-a-draft + build-a-store-record seam (MCP tool + cockpit both route through it; S4 swaps its validator).
+// #212 step 2 — the single validate-a-draft + build-a-store-record seam (MCP tool + cockpit both route through it).
 export { validateAndBuildMvFlagDraft } from "./flags/buildFlagDraft";
 export type { BuildFlagResult, BuildFlagFailure } from "./flags/buildFlagDraft";
 export { occurrencesOf, occurrenceByNodeId, occurrenceByNodeKey, occurrenceKeyValue, parseOccurrenceKey, resolveOccurrence, isOccurrenceKey, isOccurrenceNode } from "./flags/occurrenceKey";

@@ -1,8 +1,9 @@
 // #154/#203: registry-backed enforcement of the `@tag` metadata model. Walks every concept/decision/library
 // `.meta` line and validates against the compile-time registry: VOCABULARY (malformed / unknown `@tag`), FIELD
-// shape (required fields present; enum fields in range; no duplicate keyed fields), CARDINALITY (by canonical tag),
-// and the FLAG open-warning (an `open` flag blocks Medical Validation completion). Anchors every diagnostic at the
-// meta LINE (shape (b) location). Emits diagnostics with intrinsic `severity`; the orchestrator routes by that.
+// shape (required fields present; enum fields in range; no duplicate keyed fields), and CARDINALITY (by canonical
+// tag). Anchors every diagnostic at the meta LINE (shape (b) location). Emits diagnostics with intrinsic `severity`;
+// the orchestrator routes by that. (#212 step 4b: review FLAGS left the registry — the `.crl`-meta open-flag warning
+// is gone; the MV gate reads the `.crl/flags/` store now.)
 //
 // SCOPE (this pass): the flag-feature-critical + core registry rules above. The family-C extraction-exhaust rules
 // (`run`-required, re-run staleness) and the re-add-detection guard are the documented #154 remainder — they concern
@@ -11,7 +12,7 @@ import type { CRL, Concept, Decision, Location, MetaEntry } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
 
 import { parseMetaTag } from "../meta/parseMetaTag";
-import { cardinalityOf, canonicalTag, fieldRulesOf, isFlag, isKnownTag } from "../meta/registry";
+import { cardinalityOf, canonicalTag, fieldRulesOf, isKnownTag } from "../meta/registry";
 
 import type { MetaDiagnostic } from "./validator";
 
@@ -89,13 +90,8 @@ export class MetaTagValidator {
           out.push(this.diag("meta-invalid-field", "error", `'@${tag}:' field '${rule.key}' has invalid value '${value}' — allowed: ${rule.values.join(" | ")}.`, entry.location, attr));
         }
       }
-      // FLAG: an `open` flag (status absent → open) blocks mvComplete → warn.
-      if (isFlag(tag)) {
-        const status = fields.get("status") ?? "open";
-        if (status === "open") {
-          out.push(this.diag("open-flag", "warning", `Open flag '@${tag}:' on ${attr.libraryName ? "" : ""}'${this.body(res.parsed.body)}' — blocks Medical Validation completion; resolve it in MV.`, entry.location, attr));
-        }
-      }
+      // (#212 step 4b: review FLAGS left the `.crl` registry — the open-flag warning is gone; the MV gate reads the
+      //  `.crl/flags/` store now, not `.crl` meta tags. A former flag tag simply validates as `meta-unknown-tag` above.)
     }
     // cardinality (by canonical tag)
     for (const [canon, count] of canonicalCounts) {

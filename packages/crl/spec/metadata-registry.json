@@ -1,14 +1,18 @@
 {
-  "_about": "CRL metadata-annotation registry — the canonical tag vocabulary, value shapes, cardinality, and lifecycle for `@tag` annotations carried on `- meta is `@tag: <body>`.` lines. Consumed by the (future) Validator; human companion is metadata-model.md in this folder.",
-  "version": "0.3.3",
+  "_about": "CRL metadata-annotation registry — the canonical tag vocabulary, value shapes, cardinality, and lifecycle for `@tag` annotations carried on `- meta is `@tag: <body>`.` lines. Consumed by the Validator; human companion is metadata-model.md in this folder.",
+  "version": "0.3.4",
   "status": "core-stable",
-  "statusNote": "v0.3.3 (KE #205): `@validation-concern` gains an OPTIONAL `; kind` triage enum (underspecified/narrative-error/intent-divergence/context-conflict — the KE-delivered validation-issue taxonomy; gate/emit-neutral) + a note that a `; key` on a validation-concern is the #203 GAP-3 occurrence address, not a re-add-guard hash. Core vocabulary stable (two design-review rounds). v0.2.0 adds the review-flag tags per KE #203 (additive; two further design-review rounds — disc 220). v0.3.0 (Todo 5): status-aware CQL emit — the 4 flag tags + `@ke-feedback` gain `emit.suppressWhenStatus:[resolved]`; the flags flip `emit.cql:true` + `emit.cqlScopes:[concept]`. v0.3.1 (Todo 6): the 4 flag tags gain an OPTIONAL `ref` field (the tracker-issue link; `@gap-filed`'s ref stays required). v0.3.2 (Piece 1, #203): adds the `category:validation` flag `@validation-concern` (CRL-faithful-to-CUSTOMER-INTENT, the residual) + rewrites `flagModel.categories` to the REFERENCE-POINT discriminator (not author) + adds `validation-concern` to the reRunReplaceRule preservation list. ENFORCEMENT (Todo 3 / #154): the Validator now enforces vocabulary (malformed/unknown `@tag` → warning), field shape (required/enum/duplicate), cardinality, and the open-flag warning — via `MetaTagValidator` reading the compile-time-inlined registry. REMAINDER (#154 follow-up): the family-C extraction-exhaust rules (`run`-required, re-run staleness) + the re-add-detection guard are not yet enforced. Ref schemes (kg:/reef:) are illustrative. Renames go through `aliases`.",
+  "statusNote": "v0.3.4 (#212 step 4b): the review-FLAG tags LEFT this registry — flags now live as .crl/flags/<id>.json store records (vocabulary in flags/flagVocab.ts). REMOVED: the 5 flag:true tags, flagModel, the flag validatorRules, and the flag clause of reRunReplaceRule; @gap-filed (a non-flag pointer) stays. The .crl-meta open-flag warning is gone — the MV gate now reads the flag store, not .crl meta. v0.3.3 (KE #205): `@validation-concern` gains an OPTIONAL `; kind` triage enum (underspecified/narrative-error/intent-divergence/context-conflict — the KE-delivered validation-issue taxonomy; gate/emit-neutral) + a note that a `; key` on a validation-concern is the #203 GAP-3 occurrence address, not a re-add-guard hash. Core vocabulary stable (two design-review rounds). v0.2.0 adds the review-flag tags per KE #203 (additive; two further design-review rounds — disc 220). v0.3.0 (Todo 5): status-aware CQL emit — the 4 flag tags + `@ke-feedback` gain `emit.suppressWhenStatus:[resolved]`; the flags flip `emit.cql:true` + `emit.cqlScopes:[concept]`. v0.3.1 (Todo 6): the 4 flag tags gain an OPTIONAL `ref` field (the tracker-issue link; `@gap-filed`'s ref stays required). v0.3.2 (Piece 1, #203): adds the `category:validation` flag `@validation-concern` (CRL-faithful-to-CUSTOMER-INTENT, the residual) + rewrites `flagModel.categories` to the REFERENCE-POINT discriminator (not author) + adds `validation-concern` to the reRunReplaceRule preservation list. ENFORCEMENT (Todo 3 / #154): the Validator now enforces vocabulary (malformed/unknown `@tag` → warning), field shape (required/enum/duplicate), and cardinality — via `MetaTagValidator` reading the compile-time-inlined registry. REMAINDER (#154 follow-up): the family-C extraction-exhaust rules (`run`-required, re-run staleness) + the re-add-detection guard are not yet enforced. Ref schemes (kg:/reef:) are illustrative. Renames go through `aliases`.",
   "carrier": {
     "element": "meta",
     "rendering": "- meta is `@<tag>: <body>`.",
     "tagPattern": "^@([a-z][a-z0-9-]*):\\s*(.*)$",
     "terminator": "the `.` goes AFTER the closing backtick: - meta is `...`.",
-    "scope": ["concept", "decision", "library"],
+    "scope": [
+      "concept",
+      "decision",
+      "library"
+    ],
     "scopeNote": "The `meta` carrier parses on `concept` (metaLine* in conceptBody), `decision` (leading metaLine* in decisionBody), and `library` (trailing metaLine* on libraryStatement) — KE #203 Todo 2 (grammar) + Todo 3/#154 (validator).",
     "backCompat": "A meta line with no leading @tag is a legitimate untyped note and passes validation."
   },
@@ -17,41 +21,88 @@
     "A-external-ref": "Scored hints to an external store. Candidates are extraction-derived (replace-by-run); confirmed are durable.",
     "C-provenance": "Extraction exhaust (regenerated each run; replace-by-run)."
   },
-  "flagModel": {
-    "_about": "A `flag` (a tag with `flag: true`) is a narrative->CRL problem or a validation concern that BLOCKS Medical Validation completion while open. ONE mechanism; two categories by origin (KE #203, disc 220).",
-    "categories": {
-      "_discriminator": "The category is the REFERENCE POINT of the fidelity concern, NOT who logged it or when (every flag tag is `origin: either`). Chain: customer intent -> policy narrative -> CRL. EXTRACTION = confidence gap in CRL-faithful-to-the-POLICY-NARRATIVE (did we transform the narrative into CRL faithfully?). VALIDATION = confidence gap in CRL-faithful-to-the-CUSTOMER'S-INTENT (is the result actually right for the customer? — broader: the narrative itself may be flawed, or there's an error). RULE: if the concern is one of the four precise narrative-fidelity types, use THAT tag regardless of who found it; reach for @validation-concern only for a customer-intent concern the four don't capture.",
-      "extraction": "an EXTRACTION flag — a confidence gap in the narrative->CRL transformation (the CRL may not faithfully represent the POLICY as written): source-ambiguity / source-contradiction / unsettled fork / encoding-infidelity. Tags: customer-confirmable, internal-inconsistency, open-fork, fidelity-defect. (`origin: either` — an extraction concern is an extraction concern whoever finds it, incl. a human in MV.)",
-      "validation": "a VALIDATION flag — a confidence gap that the resulting CRL faithfully represents the CUSTOMER'S INTENT (whether the policy narrative itself is flawed, or there's an error — 'whatever'), that ISN'T one of the four precise extraction-fidelity types. Tag: validation-concern. Typically raised by a human during Medical Validation, but categorized by its reference point (customer intent), not its author."
-    },
-    "status": "open | resolved (NO deferred). `open` blocks mvComplete + emits; `resolved` persists (learning signal) + does not emit.",
-    "mvComplete": "the real gate: mvComplete = (every MV case is `pass`) AND (no `open` flags). Resolved flags do NOT block it. Surfaced in the MV cockpit (Todo 4).",
-    "lifecycle": "agent/human authors `open` -> human RESOLVES to `resolved` IN MV (open<->resolved only; MV NEVER deletes) -> the separate LEARNING system consumes + DELETES `resolved` flags (backlog; not MV, not this feature).",
-    "transitions": "state changes happen in the MV cockpit: a warning badge on the tree START NODE while any flag is `open` -> the flag list -> per-flag open<->resolved toggle -> the cockpit edits the `.crl` META line (metadata-only; never the decision logic).",
-    "emit": "open flags emit to CQL as normal meta-tag behavior (a KE reads them in generated CQL); resolved flags do NOT emit (noise). Orthogonal to mvComplete.",
-    "reAddGuard": "a resolved flag's `key` (normalized source-span/hash) suppresses re-add on re-extraction while the source problem persists; correcting the source removes it cleanly."
-  },
   "valueTypes": {
     "ExternalReference": {
       "note": "Shared shape for the two external-ref tags. KG (Concept Graph) and REEF are DISTINCT stores serving different purposes; both hold scored hints.",
       "rendering": "<display label>; ref <ref>; confidence <0..1>; rank <int>; status <enum>; by <author>",
       "fields": {
-        "system": { "type": "enum", "values": ["kg", "reef"], "source": "derived from the tag (@kg-concept -> kg [the Concept Graph, hint for the decision], @reef-reference -> reef [the great REEF, a hint])" },
-        "ref": { "type": "string", "required": true, "note": "identifier within the Concept Graph (kg) or REEF (reef)" },
-        "rank": { "type": "integer", "minimum": 1, "required": false, "note": "1-based; 1 = best-ranked candidate. Explicit; NOT inferred from line order." },
-        "confidence": { "type": "decimal", "range": [0, 1], "required": false, "note": "probability-like score, 0-1 decimal" },
-        "status": { "type": "enum", "values": ["candidate", "confirmed", "rejected", "superseded"], "required": false, "default": "candidate", "retention": { "candidate": "replace-by-run", "confirmed": "durable", "rejected": "durable (historical review record)", "superseded": "durable (historical review record)" } }
+        "system": {
+          "type": "enum",
+          "values": [
+            "kg",
+            "reef"
+          ],
+          "source": "derived from the tag (@kg-concept -> kg [the Concept Graph, hint for the decision], @reef-reference -> reef [the great REEF, a hint])"
+        },
+        "ref": {
+          "type": "string",
+          "required": true,
+          "note": "identifier within the Concept Graph (kg) or REEF (reef)"
+        },
+        "rank": {
+          "type": "integer",
+          "minimum": 1,
+          "required": false,
+          "note": "1-based; 1 = best-ranked candidate. Explicit; NOT inferred from line order."
+        },
+        "confidence": {
+          "type": "decimal",
+          "range": [
+            0,
+            1
+          ],
+          "required": false,
+          "note": "probability-like score, 0-1 decimal"
+        },
+        "status": {
+          "type": "enum",
+          "values": [
+            "candidate",
+            "confirmed",
+            "rejected",
+            "superseded"
+          ],
+          "required": false,
+          "default": "candidate",
+          "retention": {
+            "candidate": "replace-by-run",
+            "confirmed": "durable",
+            "rejected": "durable (historical review record)",
+            "superseded": "durable (historical review record)"
+          }
+        }
       }
     },
     "Origin": {
       "rendering": "trailing `; by <author>; run <id>; at <iso-timestamp>; source <ref>#<hash>; span <range>; quote <text>`",
       "fields": {
-        "by": { "type": "author", "shape": "<human name|id>  OR  agent <name>@<version>", "note": "omitted = implicit current author of the edit" },
-        "run": { "type": "string", "required": false },
-        "at": { "type": "iso-timestamp", "required": false },
-        "source": { "type": "string", "required": false, "shape": "<ref>#<hash>" },
-        "span": { "type": "string", "required": false, "note": "source span/range — more actionable than a whole-doc hash" },
-        "quote": { "type": "string", "required": false }
+        "by": {
+          "type": "author",
+          "shape": "<human name|id>  OR  agent <name>@<version>",
+          "note": "omitted = implicit current author of the edit"
+        },
+        "run": {
+          "type": "string",
+          "required": false
+        },
+        "at": {
+          "type": "iso-timestamp",
+          "required": false
+        },
+        "source": {
+          "type": "string",
+          "required": false,
+          "shape": "<ref>#<hash>"
+        },
+        "span": {
+          "type": "string",
+          "required": false,
+          "note": "source span/range — more actionable than a whole-doc hash"
+        },
+        "quote": {
+          "type": "string",
+          "required": false
+        }
       }
     }
   },
@@ -62,11 +113,16 @@
       "family": "B-narrative",
       "valueShape": "text",
       "cardinality": "0..1",
-      "attachmentTargets": ["concept"],
+      "attachmentTargets": [
+        "concept"
+      ],
       "origin": "human",
       "retention": "inline",
       "lifecycle": "append",
-      "emit": { "cql": false, "fhir": false },
+      "emit": {
+        "cql": false,
+        "fhir": false
+      },
       "notes": "Stable concept identifier. Durable metadata should key on @id so a concept rename does not orphan its tags. Rename/split/merge handling is a known v1 gap."
     },
     {
@@ -75,11 +131,16 @@
       "family": "B-narrative",
       "valueShape": "text",
       "cardinality": "0..1",
-      "attachmentTargets": ["concept"],
+      "attachmentTargets": [
+        "concept"
+      ],
       "origin": "human",
       "retention": "inline",
       "lifecycle": "append",
-      "emit": { "cql": false, "fhir": false },
+      "emit": {
+        "cql": false,
+        "fhir": false
+      },
       "notes": "Author's gloss of the object. Distinct from `evidence` (verbatim source quote)."
     },
     {
@@ -87,13 +148,32 @@
       "aliases": [],
       "family": "B-narrative",
       "valueShape": "text",
-      "extraFields": { "status": { "type": "enum", "values": ["open", "resolved", "deferred"], "default": "open" } },
+      "extraFields": {
+        "status": {
+          "type": "enum",
+          "values": [
+            "open",
+            "resolved",
+            "deferred"
+          ],
+          "default": "open"
+        }
+      },
       "cardinality": "0..n",
-      "attachmentTargets": ["concept"],
+      "attachmentTargets": [
+        "concept"
+      ],
       "origin": "human",
       "retention": "inline",
       "lifecycle": "append",
-      "emit": { "cql": true, "fhir": false, "suppressWhenStatus": ["resolved"], "condition": "status-gate is machine (suppressWhenStatus: resolved suppresses; open|deferred emit); emitter MUST sanitize comment delimiters (*/)" },
+      "emit": {
+        "cql": true,
+        "fhir": false,
+        "suppressWhenStatus": [
+          "resolved"
+        ],
+        "condition": "status-gate is machine (suppressWhenStatus: resolved suppresses; open|deferred emit); emitter MUST sanitize comment delimiters (*/)"
+      },
       "notes": "Informaticist -> KE collaboration note; must survive to generated CQL."
     },
     {
@@ -102,11 +182,17 @@
       "family": "B-narrative",
       "valueShape": "text",
       "cardinality": "0..1",
-      "attachmentTargets": ["concept"],
+      "attachmentTargets": [
+        "concept"
+      ],
       "origin": "either",
       "retention": "inline",
       "lifecycle": "append",
-      "emit": { "cql": true, "fhir": false, "condition": "emit as CQL block comment; emitter MUST sanitize */" },
+      "emit": {
+        "cql": true,
+        "fhir": false,
+        "condition": "emit as CQL block comment; emitter MUST sanitize */"
+      },
       "notes": "Captures THE LOGIC — the case features / decision points (what the logic tests). Pairs with controlled-natural-language (which captures the flow). Emitted as a CQL block comment so the logic statement reaches downstream CQL readers."
     },
     {
@@ -115,11 +201,16 @@
       "family": "B-narrative",
       "valueShape": "text",
       "cardinality": "0..1",
-      "attachmentTargets": ["concept"],
+      "attachmentTargets": [
+        "concept"
+      ],
       "origin": "either",
       "retention": "inline",
       "lifecycle": "append",
-      "emit": { "cql": false, "fhir": false },
+      "emit": {
+        "cql": false,
+        "fhir": false
+      },
       "notes": "Captures THE LOGIC FLOW — the order and sequencing in which the logic is applied (how). Pairs with logic-expression-text (which captures the case features / decision points)."
     },
     {
@@ -128,11 +219,17 @@
       "family": "B-narrative",
       "valueShape": "text",
       "cardinality": "0..n",
-      "attachmentTargets": ["concept"],
+      "attachmentTargets": [
+        "concept"
+      ],
       "origin": "either",
       "retention": "inline",
       "lifecycle": "append",
-      "emit": { "cql": true, "fhir": false, "condition": "emit as CQL block comment; emitter MUST sanitize */" },
+      "emit": {
+        "cql": true,
+        "fhir": false,
+        "condition": "emit as CQL block comment; emitter MUST sanitize */"
+      },
       "notes": "CNL for logic CRL cannot express yet (missing CQL operators/valueTypes). Dual consumer: a local KE note AND CRL-roadmap telemetry."
     },
     {
@@ -141,11 +238,17 @@
       "family": "B-narrative",
       "valueShape": "text",
       "cardinality": "0..n",
-      "attachmentTargets": ["concept"],
+      "attachmentTargets": [
+        "concept"
+      ],
       "origin": "either",
       "retention": "inline",
       "lifecycle": "append",
-      "emit": { "cql": true, "fhir": false, "condition": "emit as CQL block comment; emitter MUST sanitize */" },
+      "emit": {
+        "cql": true,
+        "fhir": false,
+        "condition": "emit as CQL block comment; emitter MUST sanitize */"
+      },
       "notes": "Business logic intentionally deferred (not yet implemented in CRL/CQL). Lands in a CQL block comment so the deferral is visible to downstream CQL readers. Distinct from clinical-logic-deferred (deferred clinical decision logic)."
     },
     {
@@ -154,11 +257,17 @@
       "family": "B-narrative",
       "valueShape": "text",
       "cardinality": "0..n",
-      "attachmentTargets": ["concept"],
+      "attachmentTargets": [
+        "concept"
+      ],
       "origin": "either",
       "retention": "inline",
       "lifecycle": "append",
-      "emit": { "cql": true, "fhir": false, "condition": "emit as CQL block comment; emitter MUST sanitize */" },
+      "emit": {
+        "cql": true,
+        "fhir": false,
+        "condition": "emit as CQL block comment; emitter MUST sanitize */"
+      },
       "notes": "Clinical decision logic intentionally deferred (not yet implemented in CRL/CQL). Lands in a CQL block comment so the deferral is visible to downstream CQL readers. Distinct from business-logic-deferred."
     },
     {
@@ -167,11 +276,17 @@
       "family": "B-narrative",
       "valueShape": "text",
       "cardinality": "0..n",
-      "attachmentTargets": ["concept"],
+      "attachmentTargets": [
+        "concept"
+      ],
       "origin": "either",
       "retention": "inline",
       "lifecycle": "append",
-      "emit": { "cql": true, "fhir": false, "condition": "emit the BODY as a plain CQL block-comment line with NO `@cql-comment:` tag prefix (raw passthrough); emitter MUST sanitize */" },
+      "emit": {
+        "cql": true,
+        "fhir": false,
+        "condition": "emit the BODY as a plain CQL block-comment line with NO `@cql-comment:` tag prefix (raw passthrough); emitter MUST sanitize */"
+      },
       "notes": "Verbatim author comment to carry into the generated CQL. Unlike the other emit.cql tags, the `@cql-comment:` prefix is stripped — only the body text appears in the emitted CQL comment."
     },
     {
@@ -181,12 +296,17 @@
       "valueShape": "ExternalReference",
       "system": "kg",
       "cardinality": "0..n",
-      "attachmentTargets": ["concept"],
+      "attachmentTargets": [
+        "concept"
+      ],
       "origin": "either",
       "retention": "inline",
       "lifecycle": "replace-by-run",
       "lifecycleNote": "status=candidate entries replaced on re-extraction; status=confirmed entries are durable",
-      "emit": { "cql": false, "fhir": false },
+      "emit": {
+        "cql": false,
+        "fhir": false
+      },
       "notes": "Scored HINT FOR THE DECISION — a reference to a node in the Concept Graph ('KG' = Concept Graph). ref scheme `kg:` illustrative."
     },
     {
@@ -196,12 +316,17 @@
       "valueShape": "ExternalReference",
       "system": "reef",
       "cardinality": "0..n",
-      "attachmentTargets": ["concept"],
+      "attachmentTargets": [
+        "concept"
+      ],
       "origin": "either",
       "retention": "inline",
       "lifecycle": "replace-by-run",
       "lifecycleNote": "status=candidate entries replaced on re-extraction; status=confirmed entries are durable",
-      "emit": { "cql": false, "fhir": false },
+      "emit": {
+        "cql": false,
+        "fhir": false
+      },
       "notes": "Scored HINT for REEF ('the great reef') — the likely concept in REEF, the downstream artifact repo the CRL->CQL/FHIR skill + compiler consume. A hint, not an authoritative mapping. ref scheme `reef:` illustrative."
     },
     {
@@ -210,104 +335,17 @@
       "family": "C-provenance",
       "valueShape": "text",
       "cardinality": "0..n",
-      "attachmentTargets": ["concept"],
+      "attachmentTargets": [
+        "concept"
+      ],
       "origin": "either",
       "retention": "inline",
       "lifecycle": "replace-by-run",
-      "emit": { "cql": false, "fhir": false },
+      "emit": {
+        "cql": false,
+        "fhir": false
+      },
       "notes": "Semantic parse of the SOURCE narrative (meaning representation). Extraction exhaust."
-    },
-    {
-      "id": "customer-confirmable",
-      "aliases": [],
-      "family": "B-narrative",
-      "flag": true,
-      "category": "extraction",
-      "valueShape": "text",
-      "extraFields": {
-        "status": { "type": "enum", "values": ["open", "resolved"], "default": "open", "note": "a flag is `open` (blocks mvComplete; emits) or `resolved` (persists as a learning signal; no emit). No `deferred`. See `flagModel`. MV transitions open<->resolved ONLY; the `resolved`->deleted step is the separate learning system (not MV)." },
-        "assumption": { "type": "string", "required": false, "note": "the provisional reading taken pending the ruling" },
-        "key": { "type": "string", "required": false, "note": "stable re-detect key (agent-supplied: @id + a normalized source-span/hash). Matches a `resolved` tombstone to suppress re-add on a later extraction run (see `flagModel.reAddGuard`)." },
-        "ref": { "type": "string", "required": false, "note": "OPTIONAL pointer to the rich-detail tracker issue this flag links to (e.g. #203). The KE files the issue at flag CREATION; the `.crl` flag stays LEAN (gist + fields). Distinct from @gap-filed (a non-flag pointer whose ref is REQUIRED). NOT the #204 tags->issues->PR loop — just the link." }
-      },
-      "cardinality": "0..n",
-      "attachmentTargets": ["concept", "decision", "library"],
-      "origin": "either",
-      "retention": "inline",
-      "lifecycle": "append",
-      "lifecycleNote": "status open -> resolved (in MV); `resolved` PERSISTS as a learning signal (the separate learning system consumes + deletes it — see `flagModel`). Grep `status open` for the open worklist.",
-      "warnWhileOpen": true,
-      "emit": { "cql": true, "fhir": false, "suppressWhenStatus": ["resolved"], "cqlScopes": ["concept"], "condition": "open emits (a KE reads open flags in the generated CQL); resolved suppresses (noise). Concept scope only; decision emit = #206 (FHIR .meta), library = gate-only. Orthogonal to mvComplete. Emitter MUST sanitize */." },
-      "notes": "REVIEW FLAG. An EXTERNAL-stakeholder ambiguity resolved provisionally, pending a customer/Burton ruling. Resolve when the ruling arrives (record it in the `resolved` body). Distinct from @open-fork (INTERNAL modeling alternatives)."
-    },
-    {
-      "id": "internal-inconsistency",
-      "aliases": [],
-      "family": "B-narrative",
-      "flag": true,
-      "category": "extraction",
-      "valueShape": "text",
-      "extraFields": {
-        "status": { "type": "enum", "values": ["open", "resolved"], "default": "open" },
-        "key": { "type": "string", "required": false, "note": "stable re-detect key (see @customer-confirmable) — critical here: the SOURCE contradiction persists across runs, so the key lets a `resolved` tombstone suppress a re-extraction re-add." },
-        "ref": { "type": "string", "required": false, "note": "OPTIONAL pointer to the rich-detail tracker issue (see @customer-confirmable ref)." }
-      },
-      "cardinality": "0..n",
-      "attachmentTargets": ["concept", "decision", "library"],
-      "origin": "either",
-      "retention": "inline",
-      "lifecycle": "append",
-      "lifecycleNote": "status open -> resolved (durable tombstone carrying the grounding/interpretation).",
-      "warnWhileOpen": true,
-      "emit": { "cql": true, "fhir": false, "suppressWhenStatus": ["resolved"], "cqlScopes": ["concept"], "condition": "open emits; resolved suppresses. Concept scope only; decision emit = #206 (FHIR .meta), library = gate-only. Emitter MUST sanitize */." },
-      "notes": "REVIEW FLAG (stop-and-flag). The SOURCE contradicts ITSELF (e.g. a preamble 'BMI >= 40' vs an operative 'greater than 40'). A source-vs-source contradiction — distinct from @fidelity-defect (encoding != source). Resolve by grounding the encoding in a ruling/interpretation (recorded in the `resolved` body)."
-    },
-    {
-      "id": "open-fork",
-      "aliases": [],
-      "family": "B-narrative",
-      "flag": true,
-      "category": "extraction",
-      "valueShape": "text",
-      "extraFields": {
-        "status": { "type": "enum", "values": ["open", "resolved"], "default": "open" },
-        "chosen": { "type": "string", "required": false, "note": "the branch actually encoded" },
-        "alternatives": { "type": "string", "required": false, "note": "the un-taken modeling alternatives still open" },
-        "key": { "type": "string", "required": false, "note": "stable re-detect key (see @customer-confirmable)" },
-        "ref": { "type": "string", "required": false, "note": "OPTIONAL pointer to the rich-detail tracker issue (see @customer-confirmable ref)." }
-      },
-      "cardinality": "0..n",
-      "attachmentTargets": ["concept", "decision", "library"],
-      "origin": "either",
-      "retention": "inline",
-      "lifecycle": "append",
-      "lifecycleNote": "status open -> resolved (durable tombstone recording the adjudication).",
-      "warnWhileOpen": true,
-      "emit": { "cql": true, "fhir": false, "suppressWhenStatus": ["resolved"], "cqlScopes": ["concept"], "condition": "open emits; resolved suppresses. Concept scope only; decision emit = #206 (FHIR .meta), library = gate-only. Emitter MUST sanitize */." },
-      "notes": "REVIEW FLAG. A genuine INTERNAL modeling fork — encoded one way (`; chosen <branch>`) but not settled; the alternatives (`; alternatives <...>`) remain open. Distinct from @customer-confirmable (needs an EXTERNAL ruling). Resolve when the fork is adjudicated."
-    },
-    {
-      "id": "fidelity-defect",
-      "aliases": ["over-reach-to-fix", "criterion-drop-to-fix"],
-      "family": "B-narrative",
-      "flag": true,
-      "category": "extraction",
-      "valueShape": "text",
-      "extraFields": {
-        "status": { "type": "enum", "values": ["open", "resolved"], "default": "open" },
-        "direction": { "type": "enum", "values": ["over-reach", "criterion-drop"], "required": true, "note": "over-reach = the encoding ADDED logic the source doesn't support; criterion-drop = the encoding OMITTED a source-required criterion" },
-        "key": { "type": "string", "required": false, "note": "stable re-detect key (see @customer-confirmable)" },
-        "ref": { "type": "string", "required": false, "note": "OPTIONAL pointer to the rich-detail tracker issue (see @customer-confirmable ref)." }
-      },
-      "cardinality": "0..n",
-      "attachmentTargets": ["concept", "decision", "library"],
-      "origin": "either",
-      "retention": "inline",
-      "lifecycle": "append",
-      "lifecycleNote": "status open -> resolved (durable tombstone).",
-      "warnWhileOpen": true,
-      "emit": { "cql": true, "fhir": false, "suppressWhenStatus": ["resolved"], "cqlScopes": ["concept"], "condition": "open emits; resolved suppresses. Concept scope only; decision emit = #206 (FHIR .meta), library = gate-only. Emitter MUST sanitize */." },
-      "notes": "REVIEW FLAG. A known encoding != source defect to fix. ONE umbrella + a `; direction` discriminator (collapses the KE's @over-reach-to-fix / @criterion-drop-to-fix per the umbrella-pattern discipline; those names are `aliases`). Resolve by correcting the encoding."
     },
     {
       "id": "gap-filed",
@@ -315,39 +353,31 @@
       "family": "B-narrative",
       "valueShape": "text",
       "extraFields": {
-        "ref": { "type": "string", "required": true, "note": "the tracker issue id (e.g. #203) — 'filed' is meaningless without it; a gap-filed WITHOUT a ref is an error" }
+        "ref": {
+          "type": "string",
+          "required": true,
+          "note": "the tracker issue id (e.g. #203) — 'filed' is meaningless without it; a gap-filed WITHOUT a ref is an error"
+        }
       },
       "cardinality": "0..n",
-      "attachmentTargets": ["concept", "decision", "library"],
+      "attachmentTargets": [
+        "concept",
+        "decision",
+        "library"
+      ],
       "origin": "human",
       "retention": "inline",
       "lifecycle": "append",
       "lifecycleNote": "DELETE when the CRL no longer depends on the gap. Delete-on-fix is DELIBERATE here (unlike the review flags): the durable record lives in the FILED ISSUE, not inline.",
-      "emit": { "cql": false, "fhir": false },
-      "plannedEmit": { "cql": true, "condition": "emit as a CQL block comment — a visible tracked gap, like @business-logic-deferred. Todo 4." },
-      "notes": "A durable POINTER to a filed gap/issue — NOT a flag (no `flag`, no `warnWhileOpen`, no `status`; does not block mvComplete): a filed gap is managed work that ships fine (like `// TODO(#123)`). Requires `; ref <issue>`. Covers the KE's @stage-boundary case when the gap is FILED; the un-filed 'stage/language can't express this' cases REUSE @crl-future-expression (language limit) / @business-logic-deferred / @clinical-logic-deferred (deferred logic)."
-    },
-    {
-      "id": "validation-concern",
-      "aliases": [],
-      "family": "B-narrative",
-      "flag": true,
-      "category": "validation",
-      "valueShape": "text",
-      "extraFields": {
-        "status": { "type": "enum", "values": ["open", "resolved"], "default": "open", "note": "open (blocks mvComplete; emits) | resolved (persists as a learning signal; no emit). MV transitions open<->resolved only; the `resolved`->deleted step is the separate learning system." },
-        "kind": { "type": "enum", "required": false, "values": ["underspecified", "narrative-error", "intent-divergence", "context-conflict"], "note": "OPTIONAL triage axis (KE #205; a KE seed the MV humans extend — data-driven, so adding a value is a 1-line change). The STRUCTURAL type of customer-intent gap (all resolve 'needs a customer ruling'; they differ in what/how-to-route, not shape — which is why they're ONE tag's kinds, not sibling tags): `underspecified` = the narrative doesn't DETERMINE an answer the customer must supply (a coverage/disposition/workflow choice it leaves open — the EIU-vs-Unmet residual; an unstated dose cap; pend-vs-deny) | `narrative-error` = the narrative MIS-STATES (factually wrong / medically impossible / outdated) but is NOT self-contradictory (self-contradiction is @internal-inconsistency) | `intent-divergence` = clear + faithfully encoded, but the LITERAL EFFECT diverges from customer intent (an edge/boundary outcome; over-/under-reach vs actual intent) | `context-conflict` = the faithful encoding CONFLICTS with something outside this narrative the customer is bound by (a sibling policy, a blanket rule, a mandate, operational reality). Partition: under-determination / mis-statement / mis-implication / external-conflict." },
-        "ref": { "type": "string", "required": false, "note": "OPTIONAL pointer to the rich-detail tracker issue (see @customer-confirmable ref)." }
+      "emit": {
+        "cql": false,
+        "fhir": false
       },
-      "cardinality": "0..n",
-      "attachmentTargets": ["concept", "decision", "library"],
-      "origin": "either",
-      "retention": "inline",
-      "lifecycle": "append",
-      "lifecycleNote": "status open -> resolved (in MV; durable tombstone). PRESERVED across re-extraction (see reRunReplaceRule) — an AI re-run must NEVER clobber a human's validation concern.",
-      "warnWhileOpen": true,
-      "emit": { "cql": true, "fhir": false, "suppressWhenStatus": ["resolved"], "cqlScopes": ["concept"], "condition": "open emits; resolved suppresses. Concept scope only; decision emit = #206 (FHIR .meta), library = gate-only. Emitter MUST sanitize */." },
-      "notes": "VALIDATION FLAG. A confidence gap that the CRL faithfully represents the CUSTOMER'S INTENT — the narrative itself may be flawed, or there's an error ('whatever') — that ISN'T one of the four precise extraction-fidelity types. FREE-FORM gist; an OPTIONAL `; kind` triage axis (KE #205 — see the field) classifies it without gating. Distinguished from the extraction flags by REFERENCE POINT (customer intent vs the narrative), NOT author: an over-reach vs the NARRATIVE stays @fidelity-defect even when a human finds it in MV. NOTE: a `; key` on a validation-concern is the #203 GAP-3 OCCURRENCE address (`<nodeId>~<signature>` — the tree node a decision-scope flag targets), NOT a re-add-guard source-hash; a future re-add guard must not conflate the two."
+      "plannedEmit": {
+        "cql": true,
+        "condition": "emit as a CQL block comment — a visible tracked gap, like @business-logic-deferred. Todo 4."
+      },
+      "notes": "A durable POINTER to a filed gap/issue — NOT a flag (no `flag`, no `warnWhileOpen`, no `status`; does not block mvComplete): a filed gap is managed work that ships fine (like `// TODO(#123)`). Requires `; ref <issue>`. Covers the KE's @stage-boundary case when the gap is FILED; the un-filed 'stage/language can't express this' cases REUSE @crl-future-expression (language limit) / @business-logic-deferred / @clinical-logic-deferred (deferred logic)."
     }
   ],
   "validatorRules": [
@@ -358,11 +388,7 @@
     "a meta line NOT starting '@' -> legitimate untyped note (back-compat), no diagnostic",
     "re-run staleness: warn if two distinct run ids' family-C / candidate-ref exhaust coexist on one concept",
     "family-C tags and candidate (status=candidate) external refs MUST carry `run` -> error if omitted (otherwise the re-run replace match key is undefined)",
-    "flag (`flag:true`) with status=open (or status absent -> defaults open) -> WARNING (open flag — blocks mvComplete; resolve in MV). The mvComplete predicate (Todo 3) consumes this: mvComplete = all cases pass AND no open flags.",
-    "flag RE-ADD GUARD: an extractor MUST NOT emit a flag whose `key` matches an existing status=resolved tombstone on the same target (the source property persists, but the human resolution stands). A genuinely-new instance (different `key` / source-span) MAY be added. See `flagModel.reAddGuard`.",
-    "@fidelity-defect without a `direction` (over-reach|criterion-drop) -> error",
-    "@gap-filed without a `ref` -> error (a filed gap needs its issue id)",
-    "flags use status open|resolved ONLY -> a flag with status=deferred is an error (deferred/tracked work is @gap-filed or @business-logic-deferred, not a flag)"
+    "@gap-filed without a `ref` -> error (a filed gap needs its issue id)"
   ],
-  "reRunReplaceRule": "On re-extraction, the producer replaces the prior run's family-C tags (semantic-parse-text) and candidate (status=candidate) external refs for a concept, matched by by/run. Confirmed refs and family-B durable tags (id, description, ke-feedback, logic-expression-text, controlled-natural-language, crl-future-expression, business-logic-deferred, clinical-logic-deferred, cql-comment, customer-confirmable, internal-inconsistency, open-fork, fidelity-defect, gap-filed, validation-concern) are never auto-replaced — @validation-concern especially: an AI re-extraction must NEVER clobber a human's Medical-Validation concern. Refs with status=rejected or status=superseded are durable historical records (preserved across re-runs so negative review work isn't lost). FLAG RE-ADD GUARD (`flag:true`): a resolved flag tombstone is durable; on re-extraction the producer MUST NOT re-add a review flag whose `key` matches an existing status=resolved tombstone on the same target — matched by (tag id + attachment `@id` + `key`, where `key` is a normalized source-span/hash). Prevents a persistent source contradiction from re-opening a flag the human already resolved."
+  "reRunReplaceRule": "On re-extraction, the producer replaces the prior run's family-C tags (semantic-parse-text) and candidate (status=candidate) external refs for a concept, matched by by/run. Confirmed refs and family-B durable tags (id, description, ke-feedback, logic-expression-text, controlled-natural-language, crl-future-expression, business-logic-deferred, clinical-logic-deferred, cql-comment, gap-filed) are never auto-replaced. Refs with status=rejected or status=superseded are durable historical records (preserved across re-runs so negative review work isn't lost). (Review FLAGS left the .crl registry in #212 step 4b — the flag re-add guard now lives with the .crl/flags/ store, not here.)"
 }

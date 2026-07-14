@@ -29,6 +29,7 @@ import {
 } from "../reference";
 import { getAuthoringKit, STAGES, USE_CASE_NAMES } from "../index";
 import { fieldRulesOf } from "../../meta/registry";
+import { flagFieldRulesOf, validateFlagFields } from "../../flags/flagVocab"; // #212 step 4b: flag field rules live in the vocab now
 
 function crlErrors(src: string) {
   return new Validator().validate(parseInput(src)).errors;
@@ -763,38 +764,35 @@ describe("authoring-kit — examples are validated (no unverified CRL ships)", (
   });
 });
 
-describe("authoring-kit — review-flag required fields are validator-enforced (backs the review-flags rule)", () => {
-  // The KitExample harness can only express DECISION-SHAPE don't-cases (meta errors aren't decision-shape), so the
-  // review-flags rule's "`@fidelity-defect` needs `; direction`, `@gap-filed` needs `; ref`" claim is backed HERE
-  // (gpt55 + Claude design review, disc 226): a targeted crlErrors check for the meta-missing-field enforcement.
+describe("authoring-kit — review-flag + @gap-filed required fields are enforced (backs the review-flags rule)", () => {
+  // #212 step 4b: review FLAGS left the `.crl` registry — their field enforcement moved to the flag vocab
+  // (`validateFlagFields`), while `@gap-filed` (a NON-flag `.crl` meta tag) stays validator-enforced. The kit's
+  // "`@fidelity-defect` needs `; direction`, `@gap-filed` needs `; ref`" claim is backed HERE.
   const conceptWith = (metaLine: string): string =>
     `# T\nlibrary "T".\nconcept "C":\n- type is Observation.\n- meta is \`${metaLine}\`.\n- code is \`c\`.`;
 
-  it("@fidelity-defect WITHOUT `; direction` → meta-missing-field", () => {
-    expect(crlErrors(conceptWith("@fidelity-defect: over-reached somewhere; status open")).map((e) => e.kind)).toContain(
-      "meta-missing-field",
-    );
+  it("@fidelity-defect WITHOUT `; direction` → validateFlagFields missing-field", () => {
+    const r = validateFlagFields({ tag: "fidelity-defect", gist: "over-reached somewhere" });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toBe("missing-field");
   });
-  it("@gap-filed WITHOUT `; ref` → meta-missing-field", () => {
+  it("@gap-filed WITHOUT `; ref` → meta-missing-field (a NON-flag `.crl` tag, still validator-enforced)", () => {
     expect(crlErrors(conceptWith("@gap-filed: eGFR normalization not expressible")).map((e) => e.kind)).toContain(
       "meta-missing-field",
     );
   });
-  it("well-formed @fidelity-defect (+ `; direction`) and @gap-filed (+ `; ref`) raise NO missing-field error", () => {
-    expect(
-      crlErrors(conceptWith("@fidelity-defect: x; direction over-reach; status open; ref #207")).map((e) => e.kind),
-    ).not.toContain("meta-missing-field");
+  it("well-formed @fidelity-defect (+ `; direction`) validates; @gap-filed (+ `; ref`) raises NO missing-field error", () => {
+    expect(validateFlagFields({ tag: "fidelity-defect", gist: "x", fields: { direction: "over-reach", ref: "#207" } }).ok).toBe(true);
     expect(crlErrors(conceptWith("@gap-filed: x; ref #180")).map((e) => e.kind)).not.toContain("meta-missing-field");
   });
-  it("the taught optional `; ref` is REGISTRY-MODELED on ALL FOUR flag tags (v0.3.1) — proven via the accessor, not a no-error check", () => {
-    // MetaTagValidator tolerates unknown fields, so a no-error assertion would pass even WITHOUT `ref` in the registry
-    // (gpt55 impl review). Prove grounding directly: fieldRulesOf resolves an OPTIONAL `ref` for every flag tag.
-    for (const tag of ["customer-confirmable", "internal-inconsistency", "open-fork", "fidelity-defect"]) {
-      const ref = fieldRulesOf(tag).find((r) => r.key === "ref");
+  it("the taught optional `; ref` is VOCAB-MODELED on ALL FIVE flag tags — proven via the accessor", () => {
+    for (const tag of ["customer-confirmable", "internal-inconsistency", "open-fork", "fidelity-defect", "validation-concern"]) {
+      const ref = flagFieldRulesOf(tag).find((r) => r.key === "ref");
       expect(ref).toBeDefined();
       expect(ref?.required).toBe(false);
     }
-    // @gap-filed's ref stays REQUIRED (the not-a-flag pointer).
+    // @gap-filed's ref stays REQUIRED in the `.crl` registry (the not-a-flag pointer).
     expect(fieldRulesOf("gap-filed").find((r) => r.key === "ref")?.required).toBe(true);
   });
 });

@@ -43,9 +43,6 @@ import "../provenance/tests/revealMaps.test";
 import "../flags/tests/mvFlag.test";
 import "../flags/tests/mvFlagStore.test";
 import "../flags/tests/mvFlagAnchor.test";
-import "../flags/tests/mvFlagLegacy.test";
 import "../flags/tests/occurrenceKey.test";
 import "../flags/tests/buildFlagDraft.test";
-import "../flags/tests/buildFlagDraft.equivalence.test"; // 4a build-parity oracle — deleted in 4b
 import "../flags/tests/flagVocab.test";
-import "../flags/tests/flagVocab.equivalence.test"; // 4a vocab-parity oracle — deleted in 4b

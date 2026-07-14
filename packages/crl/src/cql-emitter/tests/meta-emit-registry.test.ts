@@ -42,9 +42,9 @@ describe("meta emit ↔ registry sync", () => {
     }
   });
 
-  it("#203 Todo 5: the four review-flag tags are now emit.cql=true", () => {
-    for (const t of ["customer-confirmable", "internal-inconsistency", "open-fork", "fidelity-defect"]) {
-      expect(EMIT_CQL_COMMENT_TAGS.has(t)).toBe(true);
+  it("#212 step 4b: the former review-flag tags are GONE from emit.cql (flags left the `.crl` registry)", () => {
+    for (const t of ["customer-confirmable", "internal-inconsistency", "open-fork", "fidelity-defect", "validation-concern"]) {
+      expect(EMIT_CQL_COMMENT_TAGS.has(t)).toBe(false);
     }
   });
 
@@ -57,7 +57,7 @@ describe("meta emit ↔ registry sync", () => {
       }[];
     };
     const gated = registry.tags.filter((t) => t.emit?.suppressWhenStatus);
-    expect(gated.length).toBeGreaterThan(0); // ke-feedback + the 4 flags
+    expect(gated.length).toBeGreaterThan(0); // @ke-feedback (the flags left the registry in #212 step 4b)
     for (const t of gated) {
       expect(t.emit?.cql).toBe(true); // a suppress gate on a non-emitting tag is meaningless
       const allowed = t.extraFields?.status?.values ?? [];
@@ -157,8 +157,8 @@ describe("meta emit behavior", () => {
   });
 });
 
-describe("#203 Todo 5 — status-aware flag emit", () => {
-  // Emit a concept carrying one meta line; return the CQL (concept meta is the only CQL emit lane for flags).
+describe("#203 Todo 5 — status-aware meta emit (@ke-feedback; the flags left the registry in #212 step 4b)", () => {
+  // Emit a concept carrying one meta line; return the CQL (concept meta is the CQL emit lane).
   const emitWithMeta = (metaLine: string): string => {
     const src = lib(
       "T",
@@ -170,63 +170,38 @@ describe("#203 Todo 5 — status-aware flag emit", () => {
     return r.result ?? "";
   };
 
-  it("an OPEN flag emits; a RESOLVED flag does NOT (the core rule)", () => {
-    expect(emitWithMeta("@open-fork: AR vs IL; status open; ref #12")).toContain("@open-fork:");
-    expect(emitWithMeta("@open-fork: AR vs IL; status resolved; ref #12")).not.toContain("@open-fork:");
+  it("an OPEN status-gated tag emits; a RESOLVED one does NOT (the core rule)", () => {
+    expect(emitWithMeta("@ke-feedback: confirm the reading; status open")).toContain("@ke-feedback:");
+    expect(emitWithMeta("@ke-feedback: confirm the reading; status resolved")).not.toContain("@ke-feedback:");
   });
 
-  it("a flag with ABSENT status emits (defaults open — conservative)", () => {
-    expect(emitWithMeta("@customer-confirmable: confirm the reading")).toContain("@customer-confirmable:");
+  it("ABSENT status emits (defaults open — conservative)", () => {
+    expect(emitWithMeta("@ke-feedback: confirm the reading")).toContain("@ke-feedback:");
   });
 
-  it("an ALIAS of a flag emits when open / suppresses when resolved (canonicalized)", () => {
-    // over-reach-to-fix is an alias of fidelity-defect (which requires a `direction` field).
-    expect(emitWithMeta("@over-reach-to-fix: axillary over-reach; direction over-reach; status open")).toContain("@over-reach-to-fix:");
-    expect(emitWithMeta("@over-reach-to-fix: axillary over-reach; direction over-reach; status resolved")).not.toContain("@over-reach-to-fix:");
-  });
-
-  it("REGRESSION: a resolved ke-feedback is now SUPPRESSED (was status-blind before Todo 5); open/deferred still emit", () => {
+  it("REGRESSION: a resolved @ke-feedback is SUPPRESSED (was status-blind before Todo 5); open/deferred still emit", () => {
     expect(emitWithMeta("@ke-feedback: confirm a single reading suffices; status resolved")).not.toContain("@ke-feedback:");
     expect(emitWithMeta("@ke-feedback: confirm a single reading suffices; status open")).toContain("@ke-feedback:");
     expect(emitWithMeta("@ke-feedback: parked pending SME; status deferred")).toContain("@ke-feedback:"); // deferred is NOT a suppress status
   });
 
-  it("BYTE-SAFETY: the RAW line is rendered — `; status`/`; direction` fields survive (not parsed.body)", () => {
-    const cql = emitWithMeta("@fidelity-defect: axillary only; direction over-reach; status open");
-    expect(cql).toContain("@fidelity-defect: axillary only; direction over-reach; status open");
+  it("BYTE-SAFETY: the RAW line is rendered — trailing `; key value`/`; status` fields survive (not parsed.body)", () => {
+    const cql = emitWithMeta("@ke-feedback: axillary only; note some-detail; status open");
+    expect(cql).toContain("@ke-feedback: axillary only; note some-detail; status open");
   });
 
   it("only an EXACT suppress status suppresses — an annotated status still emits (emitter runs no validator)", () => {
-    expect(emitWithMeta("@open-fork: x; status resolved (pending Dr X)")).toContain("@open-fork:"); // not exactly `resolved` → emits
+    expect(emitWithMeta("@ke-feedback: x; status resolved (pending Dr X)")).toContain("@ke-feedback:"); // not exactly `resolved` → emits
   });
 
-  it("duplicate status is last-wins (matches parseMetaTag/collectFlags): trailing resolved suppresses", () => {
-    expect(emitWithMeta("@open-fork: x; status open; status resolved")).not.toContain("@open-fork:");
-    expect(emitWithMeta("@open-fork: x; status resolved; status open")).toContain("@open-fork:");
+  it("duplicate status is last-wins (matches parseMetaTag): trailing resolved suppresses", () => {
+    expect(emitWithMeta("@ke-feedback: x; status open; status resolved")).not.toContain("@ke-feedback:");
+    expect(emitWithMeta("@ke-feedback: x; status resolved; status open")).toContain("@ke-feedback:");
   });
 
   it("@cql-comment is NOT status-gated — `; status resolved` still emits (no suppressWhenStatus), prefix stripped", () => {
     const cql = emitWithMeta("@cql-comment: keep me; status resolved");
     expect(cql).toContain("keep me; status resolved"); // whole body incl the literal `; status resolved`, prefix stripped
     expect(cql).not.toContain("@cql-comment:");
-  });
-
-  it("TABLE-DRIVEN over EVERY flag tag: open emits, resolved suppresses (drives the GENERATED const → catches a stale regen)", () => {
-    // Reads the flag ids from the source JSON but exercises emit through the emitter (which reads the generated const),
-    // so a `suppressWhenStatus` edit that forgot to regenerate registry.generated.ts fails HERE (gpt55/Claude impl review).
-    // Covers customer-confirmable + internal-inconsistency, which no other behavior test drove through the resolved path.
-    const registry = JSON.parse(readFileSync(REGISTRY, "utf-8")) as { tags: { id: string; flag?: boolean }[] };
-    const flagIds = registry.tags.filter((t) => t.flag === true).map((t) => t.id);
-    expect(flagIds.sort()).toEqual([
-      "customer-confirmable",
-      "fidelity-defect",
-      "internal-inconsistency",
-      "open-fork",
-      "validation-concern",
-    ]);
-    for (const id of flagIds) {
-      expect(emitWithMeta(`@${id}: probe; status open`)).toContain(`@${id}:`); // open → emits
-      expect(emitWithMeta(`@${id}: probe; status resolved`)).not.toContain(`@${id}:`); // resolved → suppressed
-    }
   });
 });

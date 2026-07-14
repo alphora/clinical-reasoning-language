@@ -23,16 +23,16 @@ describe("#203 Todo 2 — meta carrier on decision + library", () => {
     it("parses leading `- meta is` on a decision → Decision.meta", () => {
       const ast = parseInput(`library "L".
 decision "D":
-- meta is \`@open-fork: AR vs IL; chosen AR; status open\`.
-- meta is \`@fidelity-defect: axillary-only over-reach; direction over-reach; status open\`.
+- meta is \`@ke-feedback: AR vs IL; chosen AR; status open\`.
+- meta is \`@cql-comment: axillary-only over-reach; direction over-reach; status open\`.
 first:
 - when "C" then recommend activity "Not Certify".
 - otherwise then recommend activity "Certify".
 `);
       const d = decisionsOf(ast)[0];
       expect(d.meta?.map((m) => m.text)).toEqual([
-        "@open-fork: AR vs IL; chosen AR; status open",
-        "@fidelity-defect: axillary-only over-reach; direction over-reach; status open",
+        "@ke-feedback: AR vs IL; chosen AR; status open",
+        "@cql-comment: axillary-only over-reach; direction over-reach; status open",
       ]);
     });
 
@@ -65,23 +65,23 @@ decision "D":
   describe("library-scope meta", () => {
     it("parses `- meta is` after the library declaration → LibraryDeclaration.meta", () => {
       const ast = parseInput(`library "Policy".
-- meta is \`@internal-inconsistency: preamble vs operative; status open\`.
+- meta is \`@ke-feedback: preamble vs operative; status open\`.
 concept "X":
 - type is Observation.
 - code is \`x\`.
 `);
-      expect(libOf(ast).meta?.map((m) => m.text)).toEqual(["@internal-inconsistency: preamble vs operative; status open"]);
+      expect(libOf(ast).meta?.map((m) => m.text)).toEqual(["@ke-feedback: preamble vs operative; status open"]);
     });
 
     it("library meta comes BEFORE includes; a library with no meta has no `meta` key", () => {
       const ast = parseInput(`library "Policy".
-- meta is \`@customer-confirmable: BMI reading; status open\`.
+- meta is \`@description: BMI reading; status open\`.
 include "Shared".
 concept "X":
 - type is Observation.
 - code is \`x\`.
 `);
-      expect(libOf(ast).meta?.map((m) => m.text)).toEqual(["@customer-confirmable: BMI reading; status open"]);
+      expect(libOf(ast).meta?.map((m) => m.text)).toEqual(["@description: BMI reading; status open"]);
 
       const noMeta = parseInput(`library "Bare".
 concept "X":
