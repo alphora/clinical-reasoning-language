@@ -18,8 +18,12 @@ import { emitCrlTwoLane } from "../emit-two-lane";
 import { emitFhirDefFromPath } from "../fhir-emitter";
 import type { ImportDiagnostic } from "../imports/types";
 import { validateCRLImports } from "../imports/validate";
-import { tokenizeCRL, buildCRL, validateCRL, emitCQL, createFlag, setFlagStatus } from "../index";
-import type { CreateFlagInput, CreateFlagTarget, FlagSelector } from "../index";
+import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "../index";
+// #212 step 2 — the MCP flag tools write the `.crl/flags/` STORE (not `.crl` meta-tags): validate+build via the shared seam,
+// then dedup-check + save. `createFlag`/`setFlagStatus` (the `.crl` splicers) are no longer used here.
+import { validateAndBuildMvFlagDraft, flagStoreDir, loadFlags, saveFlag, isOpen } from "../index";
+import type { CreateFlagTarget, MvFlag, MvFlagScope } from "../index";
+import { canonicalTag } from "../meta/registry"; // canonicalize a selector's tag alias (set_flag_status matches on the canonical tag)
 import type { FlagStatus } from "../refactors/rewriteMetaStatus";
 import { validateProvenanceFiles, generateProvenanceFiles } from "../provenance";
 
@@ -74,6 +78,48 @@ function resolveSource(args: ToolArgs): string {
   }
   // strip a leading UTF-8 BOM (clinical files are often saved with one)
   return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
+/** #212 step 2 — the WRITE tools need the `.crl/flags/` store LOCATION, which only a filesystem `path` provides. The
+ *  path-required guard shared by both tools: reject inline `code` (no location), require a non-dir file path inside a
+ *  discoverable policy, and return its store dir. NO content read (a status flip needs only the location — so it isn't
+ *  size-capped on a large `.crl`). `flagStoreDir` undefined (path outside a policy) → ToolInputError. */
+function resolveStoreDir(args: ToolArgs): { path: string; storeDir: string } {
+  if (typeof args.code === "string") {
+    throw new ToolInputError("Inline `code` can't locate a flag store — pass `path` (the target `.crl` file in the policy).");
+  }
+  if (typeof args.path !== "string" || args.path.trim().length === 0) {
+    throw new ToolInputError("Provide `path` (the target `.crl` file in the policy).");
+  }
+  const p = args.path.trim();
+  try {
+    if (statSync(p).isDirectory()) throw new ToolInputError(`Path is a directory, not a file: "${p}".`);
+  } catch (e) {
+    if (e instanceof ToolInputError) throw e;
+    throw new ToolInputError(`Cannot stat path "${p}": ${(e as Error).message}`);
+  }
+  const storeDir = flagStoreDir(p);
+  if (!storeDir) {
+    throw new ToolInputError(`"${p}" is not inside a discoverable policy (no ancestor \`src/\` with a \`provenance/\` dir) — can't locate the flag store.`);
+  }
+  return { path: p, storeDir };
+}
+
+/** `create_flag` additionally needs the `.crl` TEXT (to validate the target declaration). Reads it with the same size/BOM
+ *  guards as resolveSource. A non-CRL file resolves here (readable) → the validator returns a `parse-failed` domain result. */
+function resolvePathSource(args: ToolArgs): { text: string; storeDir: string } {
+  const { path: p, storeDir } = resolveStoreDir(args);
+  let text: string;
+  try {
+    if (statSync(p).size > MAX_INPUT_BYTES) throw new ToolInputError(`File too large: > ${MAX_INPUT_BYTES} bytes.`);
+    text = readFileSync(p, "utf8");
+  } catch (e) {
+    if (e instanceof ToolInputError) throw e;
+    throw new ToolInputError(`Cannot read path "${p}": ${(e as Error).message}`);
+  }
+  if (Buffer.byteLength(text, "utf8") > MAX_INPUT_BYTES) throw new ToolInputError(`Input too large: > ${MAX_INPUT_BYTES} bytes.`);
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  return { text, storeDir };
 }
 
 function runTool(fn: CrlFn, args: ToolArgs) {
@@ -806,25 +852,29 @@ export function createServer(): McpServer {
     {
       title: "Create a review flag (#205 crl-refactors)",
       description:
-        "Author a REVIEW FLAG — a `- meta is `@<tag>: <gist>; <fields>; status <status>`.` line — on a concept, decision, " +
-        "or library in a `.crl`, at the grammar-legal meta slot. This is the write-half of the CRL-source API (#205): a " +
-        "safe, meaning-aware source edit. Pass exactly one of `code` (inline CRL) or `path` (a .crl file — READ only; the " +
-        "tool NEVER writes files), plus the target + flag. `kind` is concept|decision|library; `name` is that node's name " +
-        "(for library, the library name). `tag` must be a registered flag tag (aliases are canonicalized); `gist` is the " +
-        "one-line summary (rich detail belongs in a linked issue via `fields.ref`). `fields` supplies extra `; key value` " +
-        "fields — any registry-REQUIRED field (e.g. `@fidelity-defect` needs `direction`) is enforced, and enum fields are " +
-        "checked. `status` defaults to `open`. Returns { success, source, insertLine, lineText, flag } on success — `source` " +
-        "is the rewritten CRL (the caller applies it); `flag` is the created flag's identity (a selector for set_flag_status). " +
-        "On a domain failure returns { success:false, reason, message, diagnostics? } (reason: unknown-tag | missing-field | " +
-        "invalid-value | decl-not-found | resolve-failed | invalid-result | parse-failed) — NEVER emits invalid CRL. Bad " +
-        "tool args (missing `tag`/`name`/`gist`/`kind`, or both/neither of code|path) come back as a tool error.",
+        "Author a REVIEW FLAG as a store record under the policy's `.crl/flags/` (#212). WRITES a `<id>.json` file directly " +
+        "(the flag store is machine-managed sidecar metadata, not `.crl` source). Pass `path` — the target `.crl` file in the " +
+        "policy (used to VALIDATE the target exists AND to locate the store via the enclosing `src/`); inline `code` is NOT " +
+        "supported (a store can't be located without a filesystem path). Plus the target + flag: `kind` is concept|decision|" +
+        "library; `name` is that node's name (for library, the library name). `tag` must be a registered flag tag (aliases " +
+        "canonicalized); `gist` is the summary (rich detail belongs in a linked issue via `fields.ref`). `fields` supplies " +
+        "extra `; key value` fields — any registry-REQUIRED field (e.g. `@fidelity-defect` needs `direction`) is enforced and " +
+        "enum fields are checked. To anchor the flag to a SPECIFIC decision node, pass its occurrence key as `fields.key` " +
+        "(`<nodeId>~<signature>`) — it is NOT validated for placement, so a stale/wrong key just orphans to the policy. " +
+        "`status` defaults to `open`. Returns { success:true, flag } on success — `flag` is the written MvFlag record (its " +
+        "`id` selects it for set_flag_status; NOTE the shape: `tag`, `anchor.scope`, `status`, `fields` — there is NO `source`). " +
+        "IDEMPOTENT while OPEN: a retry with the same content returns the existing open record ({ success:true, flag, " +
+        "deduped:true }) rather than duplicating (a previously-RESOLVED same-content flag does NOT suppress a new open one). " +
+        "On a domain failure: { success:false, reason, message, " +
+        "diagnostics? } (reason: unknown-tag | missing-field | invalid-value | decl-not-found | invalid-result | parse-failed | " +
+        "store-warning). Bad tool args (missing fields, or `code`/no `path`, or a path outside a policy) come back as a tool error.",
       inputSchema: {
         ...inputSchema,
         kind: z.enum(["concept", "decision", "library"]).describe("The kind of object the flag goes on."),
         name: z.string().min(1).describe("The concept/decision name — or, for kind=library, the library name."),
         library: z.string().optional().describe("The declaring library name (optional; a .crl declares exactly one). Ignored for kind=library."),
         tag: z.string().min(1).describe("The flag tag id (e.g. `validation-concern`, `fidelity-defect`); aliases are canonicalized."),
-        gist: z.string().min(1).describe("The one-line gist. No backtick, newline, or `;`."),
+        gist: z.string().min(1).describe("The gist / summary. No backtick or `;` (newlines ARE allowed for multi-line detail)."),
         fields: z.record(z.string(), z.string()).optional().describe("Extra `; key value` fields (e.g. { direction: 'over-reach', ref: '#203' }). Required fields for the tag are enforced."),
         status: z.enum(["open", "resolved"]).optional().describe("The `; status` (default `open`)."),
       },
@@ -837,22 +887,25 @@ export function createServer(): McpServer {
     {
       title: "Set a review flag's status (#205 crl-refactors)",
       description:
-        "Flip the `; status` of ONE review flag (open↔resolved) in a `.crl`, located by a selector. The write-half " +
-        "counterpart to create_flag (#205). Pass exactly one of `code`/`path` (READ only; never writes files), the " +
+        "Flip the status (open↔resolved) of ONE review flag store record (#212), located by a selector. The counterpart to " +
+        "create_flag. Pass `path` (the target `.crl` — locates the `.crl/flags/` store; inline `code` is NOT supported), the " +
         "selector, and `status` (the NEXT status). Selector: `scope` (concept|decision|library) + `name` + `tag` " +
-        "(canonicalized) uniquely identify the flag when there is one such flag on the node; pass `key` to disambiguate " +
-        "two same-tag flags, and `library` if you want to require a specific declaring library. Returns { success, source, " +
-        "changed, flag } — `changed:false` means it was already at that status (source unchanged; a sweeper can skip the " +
-        "write). On failure: { success:false, reason, message, candidates? } (reason: not-found | ambiguous | parse-failed " +
-        "| invalid-result). `ambiguous` returns the matching `candidates` (their line/status/key/gist) so the caller can " +
-        "pass a distinguishing key. Bad tool args come back as a tool error.",
+        "(canonicalized) identify the flag when there is one such flag; pass `key` (a decision-occurrence key or the record's " +
+        "dedup key) to disambiguate, and `library` to require a specific library. NOTE the store is POLICY-WIDE (all libraries), " +
+        "so `library` is often needed when the same concept/tag appears in more than one library. WRITES the record " +
+        "(status+editedAt merged onto the current on-disk record). Returns { success:true, changed, flag } — `changed:false` " +
+        "means it was already at that status (no write; a sweeper skips). On failure: { success:false, reason, message, " +
+        "candidates? } (reason: not-found | ambiguous | store-warning); `ambiguous` returns `candidates` (id/status/key/gist/" +
+        "anchor) so the caller can pass a distinguishing `key`. A pre-#212 `.crl`-embedded flag is NOT addressable (migrate " +
+        "it first). Bad tool args come back as a tool error.",
       inputSchema: {
         ...inputSchema,
         scope: z.enum(["concept", "decision", "library"]).describe("The scope the flag is on."),
         name: z.string().min(1).describe("The concept/decision name — or, for scope=library, the library name."),
         library: z.string().optional().describe("Require this declaring library (optional)."),
         tag: z.string().min(1).describe("The flag tag id (canonicalized)."),
-        key: z.string().optional().describe("The `; key` value, to disambiguate two same-tag flags on one node."),
+        key: z.string().optional().describe("A decision-occurrence key or the record's dedup key, to disambiguate two same-tag flags on one node."),
+        id: z.string().optional().describe("The flag record's `id` (from a create result or an `ambiguous` candidate) — uniquely selects it."),
         status: z.enum(["open", "resolved"]).describe("The NEXT status to set."),
       },
     },
@@ -863,42 +916,91 @@ export function createServer(): McpServer {
 }
 
 type CreateFlagArgs = ToolArgs & { kind: CreateFlagTarget["kind"]; name: string; library?: string; tag: string; gist: string; fields?: Record<string, string>; status?: FlagStatus };
-type SetFlagStatusArgs = ToolArgs & { scope: FlagSelector["scope"]; name: string; library?: string; tag: string; key?: string; status: FlagStatus };
+type SetFlagStatusArgs = ToolArgs & { scope: MvFlagScope; name: string; library?: string; tag: string; key?: string; id?: string; status: FlagStatus };
 
-/** JSON replacer: a FlagInstance's `fields` is a `Map`, which JSON.stringify would render as `{}` — serialize any Map as
- *  a plain object so the returned `flag.fields` survives the wire (Claude impl review). */
-function mapReplacer(_key: string, value: unknown): unknown {
-  return value instanceof Map ? Object.fromEntries(value) : value;
-}
+type ToolResponse = { content: Array<{ type: "text"; text: string }>; isError?: boolean };
 
 /** ok→success envelope: the write tools return `{ success, ...rest }` to match the read tools' `{ success, … }` shape. */
-function writeResult(r: { ok: boolean } & Record<string, unknown>): { content: Array<{ type: "text"; text: string }> } {
+function writeResult(r: { ok: boolean } & Record<string, unknown>): ToolResponse {
   const { ok, ...rest } = r;
-  return { content: [{ type: "text" as const, text: JSON.stringify({ success: ok, ...rest }, mapReplacer) }] };
+  return { content: [{ type: "text" as const, text: JSON.stringify({ success: ok, ...rest }) }] };
 }
+const toolError = (e: unknown): ToolResponse => ({ content: [{ type: "text" as const, text: e instanceof ToolInputError ? e.message : `Unexpected error: ${(e as Error).message}` }], isError: true });
 
-/** Run a write transform behind resolveSource + a top-level guard: bad tool input and any UNEXPECTED throw map to an MCP
- *  `isError` result (the transforms are total, but this makes the never-throws contract real at the tool boundary). */
-function runWrite(args: ToolArgs, apply: (source: string) => { ok: boolean } & Record<string, unknown>): { content: Array<{ type: "text"; text: string }>; isError?: boolean } {
-  let source: string;
+/** The unified selector key a caller passes (and candidates report): a decision-occurrence anchor's `occurrenceKey`, else the
+ *  re-add-guard `dedupKey`. They're mutually exclusive on a record (legacyToMvFlag), so `??` picks the right one. */
+const selectorKey = (f: MvFlag): string | undefined => f.anchor.occurrenceKey ?? f.dedupKey;
+
+/** #212 step 2 — `create_flag` WRITES a `.crl/flags/<id>.json` store record. Validate+build via the shared seam (against the
+ *  `.crl` at `path`), then dedup-check the store (an agent RETRY after a dropped response returns the existing record, not a
+ *  duplicate) and `saveFlag`. Bad args / a path outside a policy → isError; a domain failure (bad tag/field/target) →
+ *  `{success:false, reason, …}`; an IO/store-write failure → isError (the write is a real side effect now). */
+function runCreateFlag(args: CreateFlagArgs): ToolResponse {
+  let src: { text: string; storeDir: string };
   try {
-    source = resolveSource(args);
+    src = resolvePathSource(args);
   } catch (e) {
-    return { content: [{ type: "text" as const, text: e instanceof ToolInputError ? e.message : `Unexpected error: ${(e as Error).message}` }], isError: true };
+    return toolError(e);
   }
   try {
-    return writeResult(apply(source));
+    const built = validateAndBuildMvFlagDraft(src.text, { kind: args.kind, name: args.name, library: args.library }, { tag: args.tag, gist: args.gist, fields: args.fields, status: args.status });
+    if (!built.ok) return writeResult(built); // domain validation failure — no file written
+    const loaded = loadFlags(src.storeDir);
+    if (loaded.warning) return writeResult({ ok: false, reason: "store-warning", message: loaded.warning }); // don't write into a partially-unreadable store
+    const existing = loaded.flags.find((f) => f.dedupKey !== undefined && f.dedupKey === built.flag.dedupKey && isOpen(f));
+    if (existing) return writeResult({ ok: true, flag: existing, deduped: true }); // idempotent: an open flag with this dedupKey already exists
+    saveFlag(src.storeDir, built.flag);
+    return writeResult({ ok: true, flag: built.flag });
   } catch (e) {
-    return { content: [{ type: "text" as const, text: `Unexpected error: ${(e as Error).message}` }], isError: true };
+    return toolError(e);
   }
 }
 
-function runCreateFlag(args: CreateFlagArgs): { content: Array<{ type: "text"; text: string }>; isError?: boolean } {
-  return runWrite(args, (source) => createFlag(source, { kind: args.kind, name: args.name, library: args.library }, { tag: args.tag, gist: args.gist, fields: args.fields, status: args.status }));
-}
-
-function runSetFlagStatus(args: SetFlagStatusArgs): { content: Array<{ type: "text"; text: string }>; isError?: boolean } {
-  return runWrite(args, (source) => setFlagStatus(source, { scope: args.scope, name: args.name, library: args.library, tag: args.tag, key: args.key }, args.status));
+/** #212 step 2 — `set_flag_status` flips a store record's status. Loads the WHOLE policy store (store is policy-wide, unlike the
+ *  old per-`.crl` selector), matches by the selector, and saves the freshly-loaded record with only status+editedAt merged (no
+ *  stale-snapshot overwrite). 0 → not-found; >1 → ambiguous + candidates (pass `key` to disambiguate); already-at-status →
+ *  changed:false. Store-only: a pre-#212 `.crl`-embedded flag is NOT addressable here (all content is migrated). */
+function runSetFlagStatus(args: SetFlagStatusArgs): ToolResponse {
+  let storeDir: string;
+  try {
+    storeDir = resolveStoreDir(args).storeDir; // status flip needs only the location — no `.crl` read/size-cap
+  } catch (e) {
+    return toolError(e);
+  }
+  try {
+    const loaded = loadFlags(storeDir);
+    if (loaded.warning) return writeResult({ ok: false, reason: "store-warning", message: loaded.warning });
+    const canon = canonicalTag(args.tag) ?? args.tag; // match on the CANONICAL tag (the store holds canonical; the selector may be an alias)
+    const matches = loaded.flags.filter(
+      (f) =>
+        f.anchor.scope === args.scope &&
+        f.anchor.name === args.name &&
+        f.tag === canon &&
+        (args.library === undefined || f.anchor.library === args.library) &&
+        (args.key === undefined || selectorKey(f) === args.key) &&
+        (args.id === undefined || f.id === args.id), // `id` (from an `ambiguous` candidate) uniquely disambiguates
+    );
+    if (matches.length === 0) return writeResult({ ok: false, reason: "not-found", message: `no ${args.scope} flag @${canon} on "${args.name}"${args.library ? ` in "${args.library}"` : ""}${args.key ? ` with key "${args.key}"` : ""}${args.id ? ` (id ${args.id})` : ""} in the store` });
+    if (matches.length > 1) {
+      return writeResult({
+        ok: false,
+        reason: "ambiguous",
+        message: `${matches.length} flags match — pass \`id\` (or \`key\`/\`library\`) to disambiguate`,
+        candidates: matches.map((f) => ({ id: f.id, status: f.status, key: selectorKey(f), gist: f.gist, anchor: f.anchor })),
+      });
+    }
+    const matched = matches[0];
+    if (matched.status === args.status) return writeResult({ ok: true, changed: false, flag: matched }); // already there — a sweeper skips
+    // Re-read by id right before save: merge status+editedAt onto the CURRENT on-disk record (don't clobber a concurrent edit
+    // to gist/fields/anchor, and don't resurrect a record deleted between the load and the save — return not-found).
+    const current = loadFlags(storeDir).flags.find((f) => f.id === matched.id);
+    if (!current) return writeResult({ ok: false, reason: "not-found", message: "the flag was removed before the update could be applied — reload and retry" });
+    const updated: MvFlag = { ...current, status: args.status, editedAt: new Date().toISOString() };
+    saveFlag(storeDir, updated);
+    return writeResult({ ok: true, changed: true, flag: updated });
+  } catch (e) {
+    return toolError(e);
+  }
 }
 
 /** Tally diagnostics by `kind` into a plain record (sorted-insertion is irrelevant for an object; JSON readers don't rely on key order). */

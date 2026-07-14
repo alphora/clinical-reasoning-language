@@ -302,6 +302,9 @@ export { resolveAnchor } from "./flags/mvFlagAnchor";
 export type { AnchorContext, AnchorConceptRef, AnchorResolution } from "./flags/mvFlagAnchor";
 export { legacyToMvFlag, storeReadFlag, LEGACY_CREATED_AT } from "./flags/mvFlagLegacy";
 export type { ReadFlag, LegacyFlagSrc } from "./flags/mvFlagLegacy";
+// #212 step 2 — the single validate-a-draft + build-a-store-record seam (MCP tool + cockpit both route through it; S4 swaps its validator).
+export { validateAndBuildMvFlagDraft } from "./flags/buildFlagDraft";
+export type { BuildFlagResult, BuildFlagFailure } from "./flags/buildFlagDraft";
 export { occurrencesOf, occurrenceByNodeId, occurrenceByNodeKey, occurrenceKeyValue, parseOccurrenceKey, resolveOccurrence, isOccurrenceKey, isOccurrenceNode } from "./flags/occurrenceKey";
 export type { OccurrenceRef } from "./flags/occurrenceKey";
 // #212 — the policy source-layout primitive (shared by the flag store + provenance/MV discovery).

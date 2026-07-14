@@ -5,8 +5,29 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import assert from "node:assert/strict";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+
+// #212 — the flag tools now write the `.crl/flags/` STORE, located from a `.crl` path via the enclosing policy `src/`
+// (an ancestor `src/` with a `provenance/` child). Build a minimal on-disk policy so `path` resolves + the store lands.
+const CONCEPT_CRL = 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.';
+function mkPolicy(crlText = CONCEPT_CRL) {
+  const root = mkdtempSync(join(tmpdir(), "crlmcp-"));
+  mkdirSync(join(root, "src", "provenance"), { recursive: true });
+  mkdirSync(join(root, "src", "crl"), { recursive: true });
+  const crlPath = join(root, "src", "crl", "L.crl");
+  writeFileSync(crlPath, crlText, "utf8");
+  return { root, crlPath, storeDir: join(root, ".crl", "flags") };
+}
+const storeFlags = (storeDir) => {
+  try {
+    return readdirSync(storeDir).filter((f) => f.endsWith(".json")).map((f) => JSON.parse(readFileSync(join(storeDir, f), "utf8")));
+  } catch {
+    return [];
+  }
+};
 
 const here = dirname(fileURLToPath(import.meta.url));
 const serverPath = resolve(here, "../../../dist/cli/run-mcp-server.js");
@@ -54,50 +75,118 @@ try {
     ]);
   });
 
-  await check("create_flag → authors a concept flag, returns rewritten source + the flag identity", async () => {
-    const code = 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.';
-    const r = await client.callTool({ name: "create_flag", arguments: { code, kind: "concept", name: "C", tag: "validation-concern", gist: "looks off for the customer" } });
+  await check("create_flag → writes a concept flag store record (MvFlag shape: tag/anchor.scope/status; NO source)", async () => {
+    const { crlPath, storeDir } = mkPolicy();
+    const r = await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "validation-concern", gist: "looks off for the customer" } });
     assert.ok(!r.isError, "not a tool error");
     const out = JSON.parse(r.content[0].text);
     assert.equal(out.success, true);
-    assert.match(out.source, /- meta is `@validation-concern: looks off for the customer; status open`\./);
-    assert.equal(out.flag.canonicalTag, "validation-concern");
+    assert.equal(out.source, undefined, "no rewritten source — the tool writes the store");
+    assert.equal(out.flag.tag, "validation-concern"); // MvFlag.tag (was FlagInstance.canonicalTag)
+    assert.equal(out.flag.anchor.scope, "concept"); // MvFlag.anchor.scope (was FlagInstance.scope)
     assert.equal(out.flag.status, "open");
+    const onDisk = storeFlags(storeDir);
+    assert.equal(onDisk.length, 1, "one <id>.json written under .crl/flags/");
+    assert.equal(onDisk[0].id, out.flag.id);
   });
 
-  await check("create_flag → the returned flag.fields survives the wire (Map serialized, not {})", async () => {
-    const code = 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.';
-    const r = await client.callTool({ name: "create_flag", arguments: { code, kind: "concept", name: "C", tag: "fidelity-defect", gist: "over-reach", fields: { direction: "over-reach" } } });
+  await check("create_flag → inline `code` is rejected (a store can't be located without a path)", async () => {
+    const r = await client.callTool({ name: "create_flag", arguments: { code: CONCEPT_CRL, kind: "concept", name: "C", tag: "validation-concern", gist: "x" } });
+    assert.ok(r.isError, "code-only → tool error (Decision B)");
+    assert.match(r.content[0].text, /can't locate a flag store|pass `path`/);
+  });
+
+  await check("create_flag → the returned flag.fields carries registry fields", async () => {
+    const { crlPath } = mkPolicy();
+    const r = await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "fidelity-defect", gist: "over-reach", fields: { direction: "over-reach" } } });
     const out = JSON.parse(r.content[0].text);
     assert.equal(out.success, true);
-    assert.equal(out.flag.fields.direction, "over-reach"); // Map → object over MCP
+    assert.equal(out.flag.fields.direction, "over-reach");
   });
 
-  await check("create_flag → library scope authors a library flag", async () => {
-    const code = 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.';
-    const r = await client.callTool({ name: "create_flag", arguments: { code, kind: "library", name: "L", tag: "internal-inconsistency", gist: "sections contradict" } });
+  await check("create_flag → library scope writes a library-anchored record", async () => {
+    const { crlPath } = mkPolicy();
+    const r = await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "library", name: "L", tag: "internal-inconsistency", gist: "sections contradict" } });
     const out = JSON.parse(r.content[0].text);
     assert.equal(out.success, true);
-    assert.equal(out.flag.scope, "library");
+    assert.equal(out.flag.anchor.scope, "library");
   });
 
-  await check("create_flag → a missing required field is a typed domain result (not a tool error)", async () => {
-    const code = 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.';
-    const r = await client.callTool({ name: "create_flag", arguments: { code, kind: "concept", name: "C", tag: "fidelity-defect", gist: "over-reach" } });
+  await check("create_flag → a missing required field is a typed domain result (not a tool error), no file written", async () => {
+    const { crlPath, storeDir } = mkPolicy();
+    const r = await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "fidelity-defect", gist: "over-reach" } });
     assert.ok(!r.isError, "domain failures are content, not tool errors");
     const out = JSON.parse(r.content[0].text);
     assert.equal(out.success, false);
     assert.equal(out.reason, "missing-field");
+    assert.equal(storeFlags(storeDir).length, 0, "no record written on validation failure");
   });
 
-  await check("set_flag_status → flips a flag open→resolved by selector; round-trips through create_flag", async () => {
-    const code = 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.';
-    const created = JSON.parse((await client.callTool({ name: "create_flag", arguments: { code, kind: "concept", name: "C", tag: "open-fork", gist: "unsure" } })).content[0].text);
-    const r = await client.callTool({ name: "set_flag_status", arguments: { code: created.source, scope: "concept", name: "C", tag: "open-fork", status: "resolved" } });
+  await check("create_flag → a retry with the same content is IDEMPOTENT (deduped, not a second record)", async () => {
+    const { crlPath, storeDir } = mkPolicy();
+    const args = { path: crlPath, kind: "concept", name: "C", tag: "validation-concern", gist: "same finding" };
+    const a = JSON.parse((await client.callTool({ name: "create_flag", arguments: args })).content[0].text);
+    const b = JSON.parse((await client.callTool({ name: "create_flag", arguments: args })).content[0].text);
+    assert.equal(b.success, true);
+    assert.equal(b.deduped, true, "the retry returns the existing record");
+    assert.equal(b.flag.id, a.flag.id);
+    assert.equal(storeFlags(storeDir).length, 1, "still one record");
+  });
+
+  await check("set_flag_status → flips a store record open→resolved by selector (via path)", async () => {
+    const { crlPath, storeDir } = mkPolicy();
+    await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "open-fork", gist: "unsure" } });
+    const r = await client.callTool({ name: "set_flag_status", arguments: { path: crlPath, scope: "concept", name: "C", tag: "open-fork", status: "resolved" } });
     const out = JSON.parse(r.content[0].text);
     assert.equal(out.success, true);
     assert.equal(out.changed, true);
-    assert.match(out.source, /; status resolved`\./);
+    assert.equal(out.flag.status, "resolved");
+    assert.equal(storeFlags(storeDir)[0].status, "resolved", "the on-disk record flipped");
+  });
+
+  await check("set_flag_status → not-found for a flag that isn't in the store", async () => {
+    const { crlPath } = mkPolicy();
+    const out = JSON.parse((await client.callTool({ name: "set_flag_status", arguments: { path: crlPath, scope: "concept", name: "C", tag: "open-fork", status: "resolved" } })).content[0].text);
+    assert.equal(out.success, false);
+    assert.equal(out.reason, "not-found");
+  });
+
+  await check("set_flag_status → already at status → changed:false (no write)", async () => {
+    const { crlPath } = mkPolicy();
+    await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "validation-concern", gist: "x" } });
+    const out = JSON.parse((await client.callTool({ name: "set_flag_status", arguments: { path: crlPath, scope: "concept", name: "C", tag: "validation-concern", status: "open" } })).content[0].text);
+    assert.equal(out.success, true);
+    assert.equal(out.changed, false);
+  });
+
+  await check("set_flag_status → resolves a flag by a tag ALIAS (over-reach-to-fix → fidelity-defect)", async () => {
+    const { crlPath } = mkPolicy();
+    await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "fidelity-defect", gist: "over", fields: { direction: "over-reach" } } });
+    const out = JSON.parse((await client.callTool({ name: "set_flag_status", arguments: { path: crlPath, scope: "concept", name: "C", tag: "over-reach-to-fix", status: "resolved" } })).content[0].text);
+    assert.equal(out.success, true, "the alias canonicalizes to fidelity-defect");
+    assert.equal(out.changed, true);
+  });
+
+  await check("set_flag_status → two same-tag flags → ambiguous + candidates; `id` disambiguates", async () => {
+    const { crlPath } = mkPolicy();
+    // two distinct fidelity-defect flags on C (different direction → different dedupKey → both created)
+    await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "fidelity-defect", gist: "g", fields: { direction: "over-reach" } } });
+    await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "fidelity-defect", gist: "g", fields: { direction: "criterion-drop" } } });
+    const amb = JSON.parse((await client.callTool({ name: "set_flag_status", arguments: { path: crlPath, scope: "concept", name: "C", tag: "fidelity-defect", status: "resolved" } })).content[0].text);
+    assert.equal(amb.success, false);
+    assert.equal(amb.reason, "ambiguous");
+    assert.equal(amb.candidates.length, 2);
+    const one = JSON.parse((await client.callTool({ name: "set_flag_status", arguments: { path: crlPath, scope: "concept", name: "C", tag: "fidelity-defect", id: amb.candidates[0].id, status: "resolved" } })).content[0].text);
+    assert.equal(one.success, true);
+    assert.equal(one.changed, true);
+    assert.equal(one.flag.id, amb.candidates[0].id);
+  });
+
+  await check("create_flag → a multi-line gist is accepted (createFlag allows newlines)", async () => {
+    const { crlPath } = mkPolicy();
+    const out = JSON.parse((await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "validation-concern", gist: "line one\nline two" } })).content[0].text);
+    assert.equal(out.success, true);
+    assert.match(out.flag.gist, /line one\nline two/);
   });
 
   await check("authoring_kit (default = cpg base) → PA-free local-decision-support payload", async () => {

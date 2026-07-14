@@ -45,3 +45,4 @@ import "../flags/tests/mvFlagStore.test";
 import "../flags/tests/mvFlagAnchor.test";
 import "../flags/tests/mvFlagLegacy.test";
 import "../flags/tests/occurrenceKey.test";
+import "../flags/tests/buildFlagDraft.test";

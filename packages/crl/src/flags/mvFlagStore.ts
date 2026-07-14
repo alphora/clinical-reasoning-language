@@ -9,6 +9,7 @@
 // writes; the gate stays on the old `.crl` source until the migration slice, to avoid a transition blind-gate regression).
 // ⚠ KELP must be configured to TRACK `.crl/flags/` (carry it on the artifact branch) — a KELP-integration item, not this slice.
 import { mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { basename, dirname, join } from "node:path";
 
 import { findPolicySrc } from "../provenance/policyLayout";
@@ -66,14 +67,14 @@ export function loadFlags(storeDir: string): FlagStoreLoad {
   return warning ? { flags, warning } : { flags };
 }
 
-/** Write one flag as `<storeDir>/<id>.json` via write-tmp-then-rename (tear-free; per-PROCESS-unique tmp so concurrent
- *  writers don't clobber a shared tmp — mirrors saveSidecar). Creates `.crl/flags/`. THROWS on a real IO failure (the S2
- *  caller surfaces it — a failed save must not silently diverge memory from disk). */
+/** Write one flag as `<storeDir>/<id>.json` via write-tmp-then-rename (tear-free; per-CALL-unique tmp — pid + a fresh uuid —
+ *  so two writers to the same id in one process can't clobber a shared tmp). Creates `.crl/flags/`. THROWS on a real IO
+ *  failure (the caller surfaces it — a failed save must not silently diverge memory from disk). */
 export function saveFlag(storeDir: string, flag: MvFlag): void {
   if (!isValidFlagId(flag.id)) throw new Error(`refusing to save flag with unsafe id ${JSON.stringify(flag.id)}`); // never a `../x` into join()
   mkdirSync(storeDir, { recursive: true });
   const dest = join(storeDir, `${flag.id}.json`);
-  const tmp = `${dest}.${process.pid}.tmp`;
+  const tmp = `${dest}.${process.pid}.${randomUUID()}.tmp`;
   writeFileSync(tmp, JSON.stringify(flag, null, 2) + "\n", "utf8");
   renameSync(tmp, dest);
 }
