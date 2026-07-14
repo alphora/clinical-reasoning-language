@@ -107,10 +107,11 @@ export interface ForceModel {
   governingPrinciple: string;
 }
 
-/** A small teaching snippet. `valid` distinguishes a do-case from an intentional don't-case. */
+/** A small teaching snippet. `valid` distinguishes a do-case from an intentional don't-case. `text` = a non-CRL/CEL
+ *  illustration (e.g. an MCP tool call) — the example harness only CRL-validates `crl` snippets, so `text` is descriptive. */
 export interface KitExample {
   title: string;
-  language: "crl" | "cel";
+  language: "crl" | "cel" | "text";
   snippet: string;
   /** true = author this (validates clean); false = an intentional don't-case the validator rejects. */
   valid: boolean;

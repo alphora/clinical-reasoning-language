@@ -210,8 +210,8 @@ try {
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
-    assert.equal(kit.schemaVersion, "1.9"); // updated through Todo 6 (1.6) / Piece 1 (1.7) / #207 (1.8)
-    assert.equal(kit.contentHash, "e9a920ea55f80f21d91cddb6f9607a9d1efbbc82f9aa87e8723bada509bbe17d");
+    assert.equal(kit.schemaVersion, "1.10"); // Todo 6 (1.6) / Piece 1 (1.7) / #207 (1.8) / #205 (1.9) / #212 4c flags→store (1.10)
+    assert.equal(kit.contentHash, "28fe9a720c043c1eed6389ccb5d506c7972cc7dace8c0360c76537a28e103b19");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.
@@ -226,9 +226,9 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.useCase, "prior-auth");
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    assert.equal(kit.schemaVersion, "1.9");
+    assert.equal(kit.schemaVersion, "1.10");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "9db76d6e06d2ddd5045d251e0754ad41108c667b7e9f983994987bccf04689b9");
+    assert.equal(kit.contentHash, "a6d4fe2207e4ebef7afd430e351b57785d8ed945063c1bcf162c0ae40c07d6ef");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.equal(refNames.length, 11); // shared medical-policy-determination.crl removed (config-driven local activities)
     assert.ok(!refNames.includes("medical-policy-determination.crl"));

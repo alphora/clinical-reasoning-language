@@ -305,7 +305,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.9");
+    expect(kit.schemaVersion).toBe("1.10");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -672,8 +672,13 @@ describe("authoring-kit — getAuthoringKit", () => {
     // KE #207 (schemaVersion 1.7→1.8): the `review-flags` rule gained an EMIT clause documenting Todo 5's shipped
     // status-aware CQL emit (concept→block comment; decision/library→gate-only; resolved→none). BOTH hashes move
     // (schemaVersion is hashed + the cpg-edge rule inherits into prior-auth). Folds into the SAME single KE re-pin.
-    expect(cpg.contentHash).toBe("e9a920ea55f80f21d91cddb6f9607a9d1efbbc82f9aa87e8723bada509bbe17d");
-    expect(priorAuth.contentHash).toBe("9db76d6e06d2ddd5045d251e0754ad41108c667b7e9f983994987bccf04689b9");
+    // KE #205/#203 (schemaVersion 1.8→1.9): the `review-flags` rule gained a WRITE-TOOLS clause (author via create_flag/
+    // set_flag_status). BOTH hashes move.
+    // #212 step 4c (schemaVersion 1.9→1.10): review FLAGS left `.crl` for the `.crl/flags/` store — the `review-flags` rule
+    // is rewritten to the store model (create_flag WRITES the store, no rewritten source; flags don't emit; the 3 flag
+    // examples became `text` tool calls); @gap-filed stays a `.crl` meta tag. BOTH hashes move. KE seats re-sync both pins.
+    expect(cpg.contentHash).toBe("28fe9a720c043c1eed6389ccb5d506c7972cc7dace8c0360c76537a28e103b19");
+    expect(priorAuth.contentHash).toBe("a6d4fe2207e4ebef7afd430e351b57785d8ed945063c1bcf162c0ae40c07d6ef");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
@@ -794,5 +799,55 @@ describe("authoring-kit — review-flag + @gap-filed required fields are enforce
     }
     // @gap-filed's ref stays REQUIRED in the `.crl` registry (the not-a-flag pointer).
     expect(fieldRulesOf("gap-filed").find((r) => r.key === "ref")?.required).toBe(true);
+  });
+});
+
+describe("authoring-kit — the review-flags rule teaches the `.crl/flags/` STORE model, not `.crl`-meta flags (#212 step 4c)", () => {
+  // Guards the kit PAYLOAD (what a KE agent receives) against re-teaching the deleted `.crl`-meta flag path (gpt55 impl
+  // review, disc 253). The strip tests prove the tags left the registry; this proves the kit no longer instructs authoring
+  // them as `.crl` lines / claims the tools return rewritten source.
+  const kit = getAuthoringKit();
+  const payload = JSON.stringify(kit);
+  const rule = kit.rules.find((r) => r.id === "review-flags");
+
+  it("the review-flags rule points at the flag STORE + create_flag (a flag is a store record, not a `- meta is` line)", () => {
+    expect(rule).toBeDefined();
+    const text = JSON.stringify(rule);
+    expect(text).toContain(".crl/flags/");
+    expect(text).toContain("create_flag");
+    expect(text).toContain("STORE RECORD");
+  });
+
+  // The former-flag-tag `- meta is` construction, anywhere (rule prose OR an example) — the structural regression signal.
+  const FLAG_META_LINE = /-\s*meta is\s*`@(customer-confirmable|internal-inconsistency|open-fork|fidelity-defect|validation-concern)\b/;
+
+  it("the DEAD `.crl`-meta flag teaching is gone from the WHOLE payload (prose + examples), not just a couple phrases", () => {
+    expect(payload).not.toMatch(FLAG_META_LINE); // no "author a flag as `- meta is `@open-fork…`" reworded anywhere
+    expect(payload).not.toMatch(/create_flag[\s\S]{0,200}returns?[\s\S]{0,80}(source|crl)/i); // "create_flag … returns … source/crl"
+    expect(payload).not.toMatch(/(updated|rewritten)\s+\.?crl\s+source/i);
+    expect(payload).not.toMatch(/RETURN the rewritten source/i); // the exact pre-4c phrase (belt-and-suspenders)
+  });
+
+  it("the flag EXAMPLES are `text` tool calls; NO `crl` example authors a former flag tag as a `- meta is` line", () => {
+    const toolCallExamples = kit.examples.filter((e) => /create_flag/.test(e.snippet));
+    expect(toolCallExamples.length).toBeGreaterThan(0);
+    for (const e of toolCallExamples) expect(e.language).toBe("text");
+    const teachesCrlFlag = kit.examples.some((e) => e.language === "crl" && FLAG_META_LINE.test(e.snippet));
+    expect(teachesCrlFlag).toBe(false);
+  });
+
+  it("the `text` create_flag examples reference only real tool args + real flag fields (catches a stale/renamed key)", () => {
+    // Every `<key>:` token in a create_flag illustration must be a real create_flag arg OR a real flagVocab field — so a
+    // renamed arg (e.g. gist→summary) or a bogus field surfaces here (gpt55 + Claude impl review).
+    const toolArgs = new Set(["path", "code", "kind", "name", "library", "tag", "gist", "fields", "status"]);
+    const flagFields = new Set(
+      ["customer-confirmable", "internal-inconsistency", "open-fork", "fidelity-defect", "validation-concern"].flatMap((t) =>
+        flagFieldRulesOf(t).map((r) => r.key),
+      ),
+    );
+    for (const e of kit.examples.filter((ex) => /create_flag/.test(ex.snippet))) {
+      const keys = [...e.snippet.matchAll(/\b([a-z][a-z-]*)\s*:/g)].map((m) => m[1]);
+      for (const k of keys) expect(toolArgs.has(k) || flagFields.has(k)).toBe(true);
+    }
   });
 });

@@ -106,8 +106,15 @@ export type { AuthoringEdge, AuthoringKit, AuthoringStage, AuthoringUseCase, Kit
 //   the `create_flag`/`set_flag_status` MCP tools, not by hand-editing meta lines); registry companion metadata-registry
 //   .json v0.3.3 adds `@validation-concern`'s optional `; kind` triage enum (the KE-delivered validation taxonomy) + the
 //   GAP-3 occurrence-`key` note. NO payload-shape change. BOTH useCase hashes re-pin.
+// "1.9" → "1.10": CONTENT change (#212 step 4c) — review FLAGS left `.crl` for the `.crl/flags/` store. The `review-flags`
+//   rule is rewritten to the store model: a flag is NOT a `- meta is` line but a `.crl/flags/<id>.json` record authored via
+//   `create_flag` (path-required, WRITES the store, does NOT return `.crl` source); the emit clause now states flags do NOT
+//   emit to CQL/FHIR (they left the registry); `@fidelity-defect`'s `direction` is enforced by `create_flag` (not the `.crl`
+//   validator); the 3 flag EXAMPLES became `text` tool-call illustrations (a `.crl` flag tag would now be `meta-unknown-tag`).
+//   `@gap-filed` stays a `.crl` meta tag. Registry companion metadata-registry.json v0.3.4 removed the flag entries + flagModel.
+//   NO payload-shape change. BOTH useCase hashes re-pin.
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.9";
+const SCHEMA_VERSION = "1.10";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -436,69 +443,76 @@ const RULES: KitRule[] = [
     rule:
       "When extraction hits a problem you cannot cleanly resolve — a source ambiguity, a source self-contradiction, an " +
       "unsettled modeling fork, or a place your encoding does not match the source — author a REVIEW FLAG rather than " +
-      "silently choosing. A flag is a `- meta is `@<tag>: <one-line gist>; <fields>; status open`.` line on the object it " +
-      "concerns, at the NARROWEST faithful scope: `concept`, `decision`, or `library`. The four tags, by what went wrong: " +
-      "`@customer-confirmable` — an EXTERNAL-stakeholder ambiguity you resolved provisionally (carry the reading you took " +
-      "as `; assumption <x>`); `@internal-inconsistency` — the SOURCE contradicts itself (source-vs-source); `@open-fork` " +
-      "— an INTERNAL modeling fork you encoded one way but did not settle (`; chosen <branch>`, `; alternatives <…>`); " +
-      "`@fidelity-defect` — a known encoding≠source defect, with a REQUIRED `; direction over-reach|criterion-drop` " +
-      "(over-reach = you ADDED logic the source doesn't support; criterion-drop = you OMITTED a source-required criterion). " +
-      "Keep the `.crl` flag LEAN — a one-line gist + those fields; the RICH detail (the source quote, the options, the " +
-      "reasoning) goes in a tracker ISSUE you file AT THE SAME TIME, linked with an optional `; ref #<issue>`. Author flags " +
-      "`status open`. An open flag blocks Medical Validation completion. Separately, `@gap-filed` is NOT a flag — it is a " +
-      "durable POINTER to an already-filed gap/issue with a REQUIRED `; ref <issue>`; it ships fine and does not gate. " +
-      "The four above are EXTRACTION flags (your concern: does the CRL faithfully represent the POLICY NARRATIVE?). A " +
-      "separate `@validation-concern` (category validation) is authored by a HUMAN during Medical Validation for a " +
-      "different reference point — does the CRL represent the CUSTOMER'S INTENT? — which you cannot judge from the " +
-      "narrative alone: you do NOT author it, but you MUST PRESERVE any that already exist (never rewrite or drop a " +
-      "human's `@validation-concern` on re-extraction).",
+      "silently choosing. A flag is NOT `.crl` content: it is a structured STORE RECORD you create with the `create_flag` " +
+      "MCP tool, which writes a `<policy>/.crl/flags/<id>.json` file (machine-managed sidecar metadata, NOT a `- meta is` " +
+      "line). Anchor it at the NARROWEST faithful scope — `concept`, `decision`, or `library` — by passing that node's name. " +
+      "The four tags, by what went wrong: `@customer-confirmable` — an EXTERNAL-stakeholder ambiguity you resolved " +
+      "provisionally (carry the reading you took as the `assumption` field); `@internal-inconsistency` — the SOURCE " +
+      "contradicts itself (source-vs-source); `@open-fork` — an INTERNAL modeling fork you encoded one way but did not " +
+      "settle (`chosen`/`alternatives` fields); `@fidelity-defect` — a known encoding≠source defect, with a REQUIRED " +
+      "`direction` = `over-reach|criterion-drop` (over-reach = you ADDED logic the source doesn't support; criterion-drop = " +
+      "you OMITTED a source-required criterion). Keep the flag LEAN — a one-line gist + those fields; the RICH detail (the " +
+      "source quote, the options, the reasoning) goes in a tracker ISSUE you file AT THE SAME TIME, linked with the " +
+      "optional `ref` field (e.g. `#207`). Author flags `status open` (the default). An open flag blocks Medical Validation " +
+      "completion. Separately, `@gap-filed` IS still a `.crl` meta tag (NOT a flag) — a durable `- meta is `@gap-filed: …; " +
+      "ref <issue>`.` pointer to an already-filed gap, REQUIRED `; ref`; it ships fine and does not gate. The four flag " +
+      "tags above are EXTRACTION flags (your concern: does the CRL faithfully represent the POLICY NARRATIVE?). A separate " +
+      "`@validation-concern` (category validation) is authored by a HUMAN during Medical Validation for a different " +
+      "reference point — does the CRL represent the CUSTOMER'S INTENT? — which you cannot judge from the narrative alone: " +
+      "you do NOT author it, but you MUST PRESERVE any that already exist (never delete a human's `@validation-concern` " +
+      "store record on re-extraction).",
     why:
       "A silent guess buries a narrative→CRL problem inside a green-looking artifact; a flag surfaces it and prevents " +
-      "Medical Validation completion while open — the review signal is the point.",
-    ref: "spec/metadata-model.md (Flags); MetaTagValidator (open-flag / meta-missing-field); spec/metadata-registry.json (flag tags + gap-filed).",
+      "Medical Validation completion while open — the review signal is the point. Flags live in the `.crl/flags/` store " +
+      "(not `.crl` source) so an AI re-extraction that rewrites the `.crl` cannot clobber the human review trail.",
+    ref: "spec/metadata-model.md (review flags → the `.crl/flags/` store); src/flags/flagVocab.ts (the flag vocabulary); the `create_flag`/`set_flag_status` MCP tools.",
     clauses: [
       {
         text:
-          "When you cannot cleanly resolve a source/encoding problem during extraction, author a flag at the narrowest " +
-          "faithful scope rather than silently choosing; the `.crl` flag is LEAN (gist + fields + `status open`), the rich " +
-          "detail in a tracker issue filed at creation and linked with `; ref`. (`; assumption`/`; chosen`/`; alternatives` " +
-          "are the semantic fields to include when they apply — not validator-required.)",
+          "When you cannot cleanly resolve a source/encoding problem during extraction, author a flag (via `create_flag`) " +
+          "at the narrowest faithful scope rather than silently choosing; the flag record is LEAN (gist + fields + `status " +
+          "open`), the rich detail in a tracker issue filed at creation and linked with the `ref` field. (`assumption`/" +
+          "`chosen`/`alternatives` are the semantic fields to include when they apply — not required.)",
         force: "default",
       },
       {
         text:
-          "`@fidelity-defect` REQUIRES `; direction over-reach|criterion-drop`, and `@gap-filed` REQUIRES `; ref <issue>` — " +
-          "a missing required field is a `meta-missing-field` validator error.",
+          "`@fidelity-defect` REQUIRES a `direction` = `over-reach|criterion-drop` — `create_flag` rejects a missing " +
+          "required field (`reason: missing-field`) rather than writing the record. Separately, the `.crl` meta tag " +
+          "`@gap-filed` REQUIRES `; ref <issue>` — omitting it is a `meta-missing-field` validator error on the `.crl`.",
         force: "validator-enforced",
       },
       {
         text:
           "Do NOT author `@validation-concern` — a HUMAN authors it in Medical Validation (category validation: a " +
-          "CRL-vs-CUSTOMER-INTENT concern). You MUST PRESERVE any that exist: never rewrite or drop a human's " +
-          "`@validation-concern` on re-extraction (it is on the registry's never-auto-replace list for this reason).",
+          "CRL-vs-CUSTOMER-INTENT concern). You MUST PRESERVE any that exist: never delete a human's `@validation-concern` " +
+          "store record on re-extraction (the flag store is deliberately OUTSIDE `.crl` so an AI `.crl` rewrite can't " +
+          "touch it).",
         force: "default",
       },
       {
         text:
-          "Emit behavior — where a flag shows up downstream, and why scope matters. An OPEN flag at `concept` scope " +
-          "renders as a block comment on that concept's generated CQL `define`, so the unresolved concern rides along " +
-          "with the compiled logic where a downstream reader sees it in place. A `decision`- or `library`-scoped flag is " +
-          "GATE-ONLY: it blocks Medical Validation completion but emits no CQL (decision-scope emit is reserved for a " +
-          "FHIR `.meta` marker, #206; library is gate-only by design). A `resolved` flag emits nothing at any scope, and " +
-          "there is no FHIR flag emit yet. You author the flag identically regardless (this is data-driven from the " +
-          "registry `emit` block) — but the scope you pick IS the downstream surface: pick `concept` when the concern " +
-          "should travel with the compiled logic.",
+          "Flags do NOT appear in generated CQL/FHIR — they left `.crl` for the `.crl/flags/` store, so nothing renders " +
+          "into the compiled artifact. The store is their home; they surface in the Medical Validation cockpit (the flag " +
+          "list + the mvComplete gate), not in the generated logic. Scope still matters for the ANCHOR (where the flag " +
+          "points + how it's grouped in the cockpit), not for any emit surface.",
         force: "default",
       },
       {
         text:
-          "How to WRITE flags (don't hand-edit `- meta is` lines). The `crl` MCP server exposes the write-half tools: " +
-          "`create_flag` authors a flag on a concept, decision, or library (pass the tag, a one-line gist, any " +
-          "registry-required fields, optional `; ref`); `set_flag_status` flips one flag `open`<->`resolved`. Both take " +
-          "`code` or `path`, RETURN the rewritten source (they never write files — you apply it), validate before " +
-          "emitting (never produce an invalid `.crl`), and reuse this same registry vocabulary. Prefer them over editing " +
-          "meta lines by hand so read and write agree on the tag shape. (`@validation-concern`'s optional `; kind` triage " +
-          "enum + any occurrence `; key` are carried as fields by the same tools.)",
+          "How to WRITE flags — use the `crl` MCP tools; they write the store directly. `create_flag` authors a flag on a " +
+          "concept, decision, or library (pass `kind`, `name`, the `tag`, a one-line `gist`, any required extra `fields` " +
+          "like `direction`, and the optional issue link as `fields.ref`); `set_flag_status` flips one flag " +
+          "`open`<->`resolved` by selector. Pass `tag` as the BARE tag id — `\"open-fork\"`, `\"fidelity-defect\"` (the `@` " +
+          "prefix is display-only prose; `tag: \"@open-fork\"` is an `unknown-tag`). Both REQUIRE a `path` to a `.crl` file " +
+          "in the policy (inline `code` is NOT accepted — a store can't be located without a filesystem path); `create_flag` " +
+          "uses it to VALIDATE the anchor target exists AND to locate the store, while `set_flag_status` uses it ONLY to " +
+          "locate the store (it does no `.crl` content read). They WRITE the `.crl/flags/<id>.json` record (they do NOT " +
+          "return `.crl` source for you to apply, and they never edit `.crl` files). `create_flag` is idempotent while open " +
+          "(a same-content retry returns the existing record). PRECONDITION: the store is located by walking up to the " +
+          "policy's `src/` dir (the one holding `provenance/`); if the tool errors \"not inside a discoverable policy\", the " +
+          "policy layout isn't set up yet (run the provenance/promotion step first). (`@validation-concern`'s optional " +
+          "`kind` triage enum + any occurrence `key` are carried as `fields` by the same tools.)",
         force: "default",
       },
     ],
@@ -580,36 +594,36 @@ const EXAMPLES: KitExample[] = [
     note: "Nondeterministic over branches. Compose conditions with `sem-or` into one concept, or use `first:`/`all:`.",
   },
   {
-    title: "Review flag: an @open-fork on the concept it concerns (LEAN — detail in the linked issue)",
-    language: "crl",
+    title: "Review flag: an @open-fork on the concept it concerns (via create_flag — LEAN, detail in the linked issue)",
+    language: "text",
     snippet:
-      'concept "BMI Threshold":\n- type is Observation.\n- meta is `@open-fork: eligibility threshold encoded as BMI-40-only, but the source also allows 35-plus-comorbidity; chosen bmi-40-only; alternatives bmi-35-plus-comorbidity; status open; ref #207`.\n- code is `bmi-threshold`.',
+      'create_flag(\n  path: "<policy>/src/crl/coverage-policy.crl",\n  kind: "concept", name: "BMI Threshold",\n  tag: "open-fork",\n  gist: "eligibility threshold encoded as BMI-40-only, but the source also allows 35-plus-comorbidity",\n  fields: { chosen: "bmi-40-only", alternatives: "bmi-35-plus-comorbidity", ref: "#207" }\n)\n→ writes <policy>/.crl/flags/<id>.json  (status defaults to open)',
     valid: true,
-    note: "The `.crl` flag is a one-line gist + `; chosen`/`; alternatives` (semantic, optional) + `status open` + an optional `; ref` to the tracker issue holding the full reasoning. Concept meta sits between `type is` and `code is`. An open flag blocks Medical Validation completion.",
+    note: "The flag is a STORE record, not a `.crl` line: a one-line gist + `chosen`/`alternatives` (semantic, optional) + an optional `ref` to the tracker issue with the full reasoning. `create_flag` writes `.crl/flags/<id>.json`; it does NOT touch the `.crl`. An open flag blocks Medical Validation completion.",
   },
   {
-    title: "Review flag: an @fidelity-defect on a DECISION (required `; direction`)",
-    language: "crl",
+    title: "Review flag: an @fidelity-defect on a DECISION (required `direction` field)",
+    language: "text",
     snippet:
-      'decision "Coverage Decision":\n- meta is `@fidelity-defect: the encoding reads an axillary-only finding the source does not require; direction over-reach; status open; ref #207`.\nfirst:\n- when "Indication Present" then recommend activity "Approve".\n- otherwise then recommend activity "Deny".',
+      'create_flag(\n  path: "<policy>/src/crl/coverage-decision.crl",\n  kind: "decision", name: "Coverage Decision",\n  tag: "fidelity-defect",\n  gist: "the encoding reads an axillary-only finding the source does not require",\n  fields: { direction: "over-reach", ref: "#207" }\n)',
     valid: true,
-    note: "Flags attach at the narrowest faithful scope — here a DECISION (leading `- meta is` before `first:`). `@fidelity-defect` REQUIRES `; direction over-reach|criterion-drop` (omitting it is a meta-missing-field error).",
+    note: "Anchor at the narrowest faithful scope — here `kind: \"decision\"`. `@fidelity-defect` REQUIRES a `direction` = over-reach|criterion-drop; omitting it → `create_flag` returns `reason: missing-field` and writes nothing.",
   },
   {
-    title: "@gap-filed is NOT a flag — a pointer to a filed gap (required `; ref`), ships fine, does not gate",
+    title: "@gap-filed is NOT a flag — it stays a `.crl` meta tag (required `; ref`), ships fine, does not gate",
     language: "crl",
     snippet:
       'concept "Renal Function":\n- type is Observation.\n- meta is `@gap-filed: eGFR unit normalization not yet expressible; ref #180`.\n- code is `renal-function`.',
     valid: true,
-    note: "A durable pointer to already-tracked work — REQUIRED `; ref`, does not block mvComplete. Contrast with a review flag (gist + discriminator + `status open`, blocks while open).",
+    note: "A durable pointer to already-tracked work — a REAL `.crl` meta tag (unlike flags, which left `.crl`), REQUIRED `; ref`, does not block mvComplete. Contrast with a review flag (a `.crl/flags/` store record authored via create_flag, blocks while open).",
   },
   {
-    title: "Review flag at LIBRARY scope: an @internal-inconsistency spanning the whole policy",
-    language: "crl",
+    title: "Review flag at LIBRARY scope: an @internal-inconsistency spanning the whole policy (via create_flag)",
+    language: "text",
     snippet:
-      '- meta is `@internal-inconsistency: the eligibility section requires prior imaging, but the exclusions section forbids it; status open; ref #207`.',
+      'create_flag(\n  path: "<policy>/src/crl/policy.crl",\n  kind: "library", name: "Coverage Policy",\n  tag: "internal-inconsistency",\n  gist: "the eligibility section requires prior imaging, but the exclusions section forbids it",\n  fields: { ref: "#207" }\n)',
     valid: true,
-    note: "Library-scope meta is a TRAILING `- meta is` on the library statement (here right after `library \"T\".`). Use library scope for a contradiction that isn't about one concept or decision. `@internal-inconsistency` = the SOURCE contradicts itself.",
+    note: "Use `kind: \"library\"` (name = the library name) for a contradiction that isn't about one concept or decision. `@internal-inconsistency` = the SOURCE contradicts itself. The flag anchors to the library; nothing is written into the `.crl`.",
   },
 ];
 
