@@ -2,8 +2,7 @@
   "root": true,
   "env": {
     "es2021": true,
-    "node": true,
-    "jest": true
+    "node": true
   },
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
@@ -25,19 +24,38 @@
   ],
   "rules": {
     "prettier/prettier": "error",
-    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_"
+      }
+    ],
     "@typescript-eslint/explicit-function-return-type": "warn",
     "@typescript-eslint/no-explicit-any": "warn",
     "import/no-unresolved": [
       "error",
-      { "ignore": ["^@modelcontextprotocol/sdk/"] }
+      {
+        "ignore": [
+          "^@modelcontextprotocol/sdk/"
+        ]
+      }
     ],
     "import/order": [
       "error",
       {
-        "groups": ["builtin", "external", "internal", "parent", "sibling", "index"],
+        "groups": [
+          "builtin",
+          "external",
+          "internal",
+          "parent",
+          "sibling",
+          "index"
+        ],
         "newlines-between": "always",
-        "alphabetize": { "order": "asc", "caseInsensitive": true }
+        "alphabetize": {
+          "order": "asc",
+          "caseInsensitive": true
+        }
       }
     ]
   },

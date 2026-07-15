@@ -13,7 +13,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, normalize } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -184,7 +184,6 @@ describe("CLI dispatch matrix — output layout convention", () => {
     const relUrl = "../../cql/MyLib.cql";
     // Path arithmetic identity: dirname(fhirLibPath) + "/" + relUrl normalizes to
     // <out-dir>/cql/MyLib.cql
-    const { dirname, normalize } = require("node:path") as typeof import("node:path");
     const resolved = normalize(join(dirname(fhirLibPath), relUrl));
     expect(resolved.replace(/\\/g, "/")).toBe("any-out-dir/cql/MyLib.cql");
   });

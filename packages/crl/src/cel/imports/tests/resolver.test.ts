@@ -54,7 +54,9 @@ describe("CEL Todo 3 — resolveCelImports against the worked corpus", () => {
     expect(g.coversTarget).toBeUndefined();
     const unresolved = g.diagnostics.find((d) => d.kind === "unresolved-covers");
     expect(unresolved).toBeDefined();
-    expect(unresolved?.kind === "unresolved-covers" ? unresolved.coversName : "").toBe("Some Strategy Library");
+    expect(unresolved?.kind === "unresolved-covers" ? unresolved.coversName : "").toBe(
+      "Some Strategy Library",
+    );
   });
 });
 
@@ -63,14 +65,17 @@ describe("CEL Todo 3 — boundary diagnostics", () => {
     // Overlay a synthetic .cel source that covers a library we know exists.
     const canonical = CORPUS.cms22;
     const overlay = new Map<string, string>([
-      [require("path").resolve(canonical).replace(/\//g, require("path").sep), [
-        "# Overlay",
-        "library \"Overlayed\".",
-        "covers \"cms22\".",
-        "fact \"X\":",
-        "- name is \"X\".",
-        "- defined by \"Patient\".",
-      ].join("\n")],
+      [
+        path.resolve(canonical).replace(/\//g, path.sep),
+        [
+          "# Overlay",
+          'library "Overlayed".',
+          'covers "cms22".',
+          'fact "X":',
+          '- name is "X".',
+          '- defined by "Patient".',
+        ].join("\n"),
+      ],
     ]);
     const g = resolveCelImports(canonical, { overlays: overlay });
     expect(g.cel?.library.name).toBe("Overlayed");

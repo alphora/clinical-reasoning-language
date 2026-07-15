@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
+
+import { describe, expect, it } from "vitest";
 
 import type { EmittedResource, FhirDefEmitResult } from "../types";
 import { writeFhirResources } from "../writer";
@@ -11,7 +12,10 @@ function tmpDir(): { dir: string; cleanup: () => void } {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
-function fakeResource(relativePath: string, resourceType: EmittedResource["resourceType"]): EmittedResource {
+function fakeResource(
+  relativePath: string,
+  resourceType: EmittedResource["resourceType"],
+): EmittedResource {
   return {
     resourceType,
     relativePath,
@@ -78,7 +82,13 @@ describe("fhir-emitter writer.writeFhirResources", () => {
     try {
       const emit: FhirDefEmitResult = {
         success: true,
-        resources: [{ resourceType: "ValueSet", relativePath: "../escape.json", resource: { resourceType: "ValueSet", id: "x" } }],
+        resources: [
+          {
+            resourceType: "ValueSet",
+            relativePath: "../escape.json",
+            resource: { resourceType: "ValueSet", id: "x" },
+          },
+        ],
       };
       expect(() => writeFhirResources(emit, dir)).toThrow(/Path traversal/);
     } finally {
@@ -97,8 +107,8 @@ describe("fhir-emitter writer.writeFhirResources", () => {
         ],
       };
       const paths = writeFhirResources(emit, dir);
-      expect(paths[0]!.endsWith("PlanDefinition" + require("path").sep + "p.json")).toBe(true);
-      expect(paths[1]!.endsWith("ValueSet" + require("path").sep + "v.json")).toBe(true);
+      expect(paths[0]!.endsWith("PlanDefinition" + sep + "p.json")).toBe(true);
+      expect(paths[1]!.endsWith("ValueSet" + sep + "v.json")).toBe(true);
     } finally {
       cleanup();
     }

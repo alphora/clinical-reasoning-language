@@ -15,22 +15,85 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          # Full history so the change-detector can diff against the PR base. Cheap for this repo.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
+      # Path-scoped test selection. The dependency is ASYMMETRIC: crl-vscode imports the BUILT @smile-digital-health/crl,
+      # so any packages/crl/** change can break the extension (→ run BOTH), but a packages/crl-vscode/**-only change cannot
+      # affect core (→ run the extension only, skip core). Anything else (root config, lockfile, .github, docs) defaults to
+      # BOTH — an unclassified path must never skip both and go falsely green. On release/workflow_dispatch there is no PR
+      # base to diff, so both always run. Any error in detection falls back to running BOTH (fail-safe). Kept as step-level
+      # `if:` inside this ONE job (not split into separate jobs) so the required-check name `test-release` is unchanged and
+      # a skipped step never sits as a never-reported required check on the protected branch.
+      - name: Detect changed packages
+        id: changes
+        run: |
+          set -euo pipefail
+          run_core=true
+          run_ext=true
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_ref="${{ github.base_ref }}"
+            # Fetch the base into refs/remotes/origin/<base> explicitly (a bare `git fetch origin <ref>` may only land in
+            # FETCH_HEAD depending on config), so the three-dot merge-base diff below resolves.
+            if git fetch --no-tags origin "$base_ref:refs/remotes/origin/$base_ref" \
+               && files=$(git diff --name-only "origin/$base_ref...HEAD"); then
+              echo "Changed files:"; echo "$files"
+              # An empty (but successful) diff must NOT skip both — fall back to BOTH (run_core/run_ext keep their `true`).
+              if [ -z "$files" ]; then
+                echo "empty diff — defaulting to running BOTH (fail-safe)"
+              else
+                core=false; ext=false; shared=false
+                while IFS= read -r f; do
+                  [ -z "$f" ] && continue
+                  case "$f" in
+                    packages/crl/*) core=true ;;
+                    packages/crl-vscode/*) ext=true ;;
+                    *) shared=true ;;
+                  esac
+                done <<< "$files"
+                # skip core ONLY when the change set is exclusively under packages/crl-vscode/**
+                if [ "$core" = true ] || [ "$shared" = true ]; then run_core=true; else run_core=false; fi
+                # run the extension when core changed (dep), the extension changed, or anything shared changed
+                if [ "$core" = true ] || [ "$ext" = true ] || [ "$shared" = true ]; then run_ext=true; else run_ext=false; fi
+              fi
+            else
+              echo "diff failed — defaulting to running BOTH (fail-safe)"
+            fi
+          else
+            echo "event=${{ github.event_name }} (not a PR) — running BOTH"
+          fi
+          # Universal safety net: the invariant is "never skip BOTH". If classification ever narrows to nothing, run both.
+          if [ "$run_core" = false ] && [ "$run_ext" = false ]; then run_core=true; run_ext=true; fi
+          echo "run_core=$run_core" >> "$GITHUB_OUTPUT"
+          echo "run_ext=$run_ext" >> "$GITHUB_OUTPUT"
+          echo "→ run_core=$run_core  run_ext=$run_ext"
+
       - name: Install dependencies (workspaces)
         run: npm install
 
+      # Always build core: the extension depends on it, and skipping it would only save seconds.
       - name: Build core
         run: npm run build -w @smile-digital-health/crl
 
       - name: Test core
+        if: steps.changes.outputs.run_core == 'true'
         run: npm test -w @smile-digital-health/crl
 
+      # The MCP integration test spawns the BUILT dist/cli/run-mcp-server.js; it is a build-gated standalone script, NOT part
+      # of `npm test`, so it is wired in explicitly here to stop being orphaned from CI. Invoke the built test directly rather
+      # than `npm run test:mcp` — the latter's `pretest:mcp` would redundantly rebuild core, already done by "Build core".
+      - name: Test core — MCP integration
+        if: steps.changes.outputs.run_core == 'true'
+        run: node packages/crl/src/cli/tests/run-mcp-server.test.mjs
+
       - name: Test extension
+        if: steps.changes.outputs.run_ext == 'true'
         run: npm test -w crl-language-support
 
   publish-npm:

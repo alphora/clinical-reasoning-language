@@ -405,8 +405,8 @@ npm test
 # Run tests with coverage
 npm run test:coverage
 
-# Run specific test files
-npx jest src/ast/tests/decision-structure.test.ts --verbose --no-cache --colors --forceExit --detectOpenHandles --watchAll=false 
+# Run specific test files (vitest positional filter — substring match on the test path)
+npx vitest run --root ../.. --project crl src/ast/tests/decision-structure.test.ts
 
 # Run tests in watch mode (useful during development)
 npm run test:watch
@@ -556,23 +556,9 @@ This project implements robust, layered error handling across all stages of the 
 }
 ```
 
-#### Clean Test Output: Suppressing Console Errors in Jest
+#### Test Output and Console Errors
 
-To keep test output clean and focused on actual test failures, all `console.error` output is globally suppressed during tests. This is achieved by adding the following to `jest.setup.js`:
-
-```js
-beforeAll(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-});
-```
-
-And registering it in `jest.config.js`:
-
-```js
-setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-```
-
-This ensures that error logs are visible during development and CLI runs, but do not clutter test output.
+These tests run on [vitest](https://vitest.dev/) (migrated from jest). There is intentionally **no** global `console.error` suppression: a global mute made real failure diagnostics dead code, and the muted lines only fire on failure paths anyway (so removing it added no noise on green runs). A suite that intentionally exercises an error path mutes `console.error` locally instead — e.g. `vi.spyOn(console, "error").mockImplementation(() => {})` scoped to that test, restored after.
 
 ## Editor Support: VS Code Extension
 

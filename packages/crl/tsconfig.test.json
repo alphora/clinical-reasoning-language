@@ -1,7 +1,11 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "rootDir": "src"
+    "rootDir": "src",
+    "types": [
+      "vitest/globals",
+      "node"
+    ]
   },
   "include": [
     "src/**/*.test.ts",
@@ -18,4 +22,4 @@
     "src/transformer/fsh-to-crl/mapping/**/*.test.ts",
     "tests/**/*.ts"
   ]
-} 
+}

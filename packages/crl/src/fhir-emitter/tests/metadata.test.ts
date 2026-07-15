@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { normalizePackageMetadata, readPackageMetadata } from "../metadata";
@@ -76,18 +78,15 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
     ["@acme/policy", "scoped npm name (@ + /)"],
     ["foo.bar", "dotted name"],
     ["MyPolicy", "pure-uppercase camelCase"],
-  ])(
-    "R1 — a lossy-slug `name` %p (%s) is a hard error (lossy-package-name-slug)",
-    (name) => {
-      const r = normalizePackageMetadata({
-        name,
-        version: "1.0.0",
-        crl: { canonicalBase: "http://example.org/x" },
-      });
-      expect(r.metadata).toBeNull();
-      expect(r.errors.some((e) => e.kind === "lossy-package-name-slug")).toBe(true);
-    },
-  );
+  ])("R1 — a lossy-slug `name` %p (%s) is a hard error (lossy-package-name-slug)", (name) => {
+    const r = normalizePackageMetadata({
+      name,
+      version: "1.0.0",
+      crl: { canonicalBase: "http://example.org/x" },
+    });
+    expect(r.metadata).toBeNull();
+    expect(r.errors.some((e) => e.kind === "lossy-package-name-slug")).toBe(true);
+  });
 
   it("F6 — an over-long policy-id slug (> 64 chars) is a hard error (oversized-package-name-slug)", () => {
     // The CQL lane names layer libraries from the RAW name while the FHIR lane
@@ -276,15 +275,7 @@ describe("fhir-emitter metadata.readPackageMetadata (filesystem)", () => {
   });
 
   it("reads the cms22 corpus package.json end-to-end", () => {
-    const corpus = require("path").resolve(
-      __dirname,
-      "..",
-      "..",
-      "tests",
-      "fixtures",
-      "corpus",
-      "cms22",
-    );
+    const corpus = resolve(__dirname, "..", "..", "tests", "fixtures", "corpus", "cms22");
     const r = readPackageMetadata(corpus);
     expect(r.metadata).not.toBeNull();
     expect(r.errors).toEqual([]);

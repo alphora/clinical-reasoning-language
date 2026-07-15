@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "build": "npm run build -w @smile-digital-health/crl",
-    "test": "npm test -w @smile-digital-health/crl",
+    "test": "npm test -w @smile-digital-health/crl && npm test -w crl-language-support",
     "test:mcp": "npm run test:mcp -w @smile-digital-health/crl",
     "test:ext": "npm test -w crl-language-support",
     "test:vitest": "vitest run --no-file-parallelism",

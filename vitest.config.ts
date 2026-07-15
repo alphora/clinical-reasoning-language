@@ -33,7 +33,9 @@ export default defineConfig({
           // The heaviest suites spawn `npm run cli:*` (ts-node) via execSync, and cold module transforms (the big ANTLR+core
           // graph) can push the first test in a file past the 5s default. 30s gives them room.
           testTimeout: 30_000,
-          setupFiles: ["./vitest.setup.ts"], // ports jest.setup.js (console.error mock) via vi.spyOn
+          // No setupFiles: the jest.setup.js console.error mock was NOT ported (T4 D2) — a global mute made real failure
+          // diagnostics dead code, and the muted lines only fire on failure paths, so removing it adds zero noise on green
+          // runs. A suite that intentionally exercises an error path mutes console.error locally instead.
           // T2: the full crl suite. The leaf-importing aggregators were de-aggregated (7 pure deleted; the 2 mixed stripped of
           // their leaf-imports, own tests kept), so a plain glob discovers every leaf exactly once — no double-registration.
           include: ["src/**/*.test.ts"],

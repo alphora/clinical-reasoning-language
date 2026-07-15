@@ -1,6 +1,9 @@
 // #154/#203/#212: the registry-backed @tag validator + parseMetaTag. (#212 step 4b: review FLAGS left the `.crl` meta-registry
 // — they now live in the `.crl/flags/` store — so the collectFlags/openFlags/open-flag/flag-field blocks are gone; the former
 // flag tags now validate as `meta-unknown-tag`, which this file's "former flag tags" block guards.)
+import * as fs from "node:fs";
+import * as path from "node:path";
+
 import { parseMetaTag, validateCRL } from "../../index";
 
 const kinds = (list: { kind?: string }[]): string[] => list.map((e) => e.kind ?? "");
@@ -109,8 +112,6 @@ describe("#212 step 4b — review FLAGS left the `.crl` meta-registry (now `.crl
   });
 
   it("the registry carries NO flag entries and no flagModel", () => {
-    const fs = require("fs") as typeof import("fs");
-    const path = require("path") as typeof import("path");
     const registry = JSON.parse(
       fs.readFileSync(path.join(__dirname, "..", "..", "..", "spec", "metadata-registry.json"), "utf-8"),
     ) as { tags: { id: string; flag?: boolean }[]; flagModel?: unknown };
