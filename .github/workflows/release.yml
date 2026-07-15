@@ -14,15 +14,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           # Full history so the change-detector can diff against the PR base. Cheap for this repo.
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       # Path-scoped test selection. The dependency is ASYMMETRIC: crl-vscode imports the BUILT @smile-digital-health/crl,
       # so any packages/crl/** change can break the extension (→ run BOTH), but a packages/crl-vscode/**-only change cannot
@@ -102,11 +102,11 @@ jobs:
     needs: test-release
     if: github.event_name == 'release' && github.event.action == 'published' && !github.event.release.draft && !github.event.release.prerelease
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org/'
       - name: Install dependencies (workspaces)
         run: npm ci
