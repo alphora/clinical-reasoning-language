@@ -108,8 +108,12 @@ jobs:
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org/'
+      # `npm install`, not `npm ci`: the committed package-lock.json is generated on Windows, and linux `npm ci` (strict)
+      # rejects it over platform-resolved optional deps (esbuild/@emnapi/@types/node variants). `npm install` tolerates the
+      # diff and is what the test-release job already uses successfully on the same runner. (A linux-generated lock would let
+      # us restore `npm ci` here.)
       - name: Install dependencies (workspaces)
-        run: npm ci
+        run: npm install
       - name: Build core
         run: npm run build -w @smile-digital-health/crl
       - name: Pack and verify
