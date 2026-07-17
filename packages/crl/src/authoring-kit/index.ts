@@ -225,8 +225,8 @@ const RULES: KitRule[] = [
     id: "concept-form",
     edge: "cpg",
     category: "concept-model",
-    rule: "Stage-1 leaf concepts carry `type is` + `code is` (local). A SINGLE criterion stated at a finer data-grain — multiple representations/components of ONE clinical fact — is normalized with `defined as` (INFERENCE) over named local leaves, drop-one-leaf testable (e.g. \"failed conservative therapy\" = failed drug OR physical therapy). The conjunction of DISTINCT criteria (a policy's \"ALL of the following are met\") is decision COMPOSITION and belongs in the decision TREE — each criterion a nested `when` node — NOT a `defined as` `Criteria Met` composite (see decision-composition). `defined as`/`sem-and`/`sem-or` NEVER joins distinct criteria. Still OUT this stage: `source representation`/`coded from` (external) and `definition is` predicates (count/temporal/value) — the SOLE exception: the patient-age both-rep `definition is age today at least <N> years` (see rule patient-age-both-rep). The boundary is the concept FORM, not the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional.",
-    why: "Local-source pass proves decision authoring (incl. one-concept `defined as` inference) before external sources and predicate inference are added; conflating inference with decision composition hides criteria from the decision (#168).",
+    rule: "Stage-1 leaf concepts carry `type is` + `code is` (local). A SINGLE criterion stated at a finer data-grain — multiple representations/components of ONE clinical fact — is normalized with `defined as` (INFERENCE) over named local leaves, drop-one-leaf testable (e.g. \"failed conservative therapy\" = failed drug OR physical therapy). The conjunction of DISTINCT criteria (a policy's \"ALL of the following are met\") is decision COMPOSITION (see decision-composition): author it as tree `when` nodes when the criteria route to DIFFERENT consequences, or as a single-consequence `defined as` composite gated as a `when` when they all share one outcome (equally faithful — run_decision renders the operand truth-table). At the CONCEPT level this stage, `defined as` normalizes ONE concept's sub-representations; joining distinct criteria is a DECISION-level construct, not a concept-model one. Still OUT this stage: `source representation`/`coded from` (external) and `definition is` predicates (count/temporal/value) — the SOLE exception: the patient-age both-rep `definition is age today at least <N> years` (see rule patient-age-both-rep). The boundary is the concept FORM, not the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional.",
+    why: "Local-source pass proves decision authoring (incl. one-concept `defined as` inference) before external sources and predicate inference are added; keeping one-concept inference distinct from decision composition keeps the decision logic where a reviewer expects it (#168 — the test there is disposition-consequence, not visibility; see decision-composition).",
     ref: "concept-layer-model; src/tests/fixtures/representation/mammogram-and-bmi.crl",
     clauses: [
       {
@@ -234,7 +234,7 @@ const RULES: KitRule[] = [
         force: "default",
       },
       {
-        text: "`defined as` is INFERENCE over the sub-representations/components of ONE concept (the §1 rung-1 unit). It NEVER joins a policy's DISTINCT criteria AS THE DECISION'S AUDIT SURFACE — combining distinct criteria is decision composition (the tree's job, §1 rung-2); collapsing them into a `defined as` composite gated as the SOLE branch (hiding which failed) is the #168 hollowing (see decision-composition). EXCEPTION — the disposition-arbitration refinement (§1, at scale) MAY compute pathway / FINAL-* ARBITRATION inputs in the inference layer over criteria, PROVIDED those criteria are RE-EXPOSED as visible `when` nodes so the audit surface is preserved (#168-clean; see disposition-arbitration-reference). The violation is HIDING criteria as the sole gate, not using inference to arbitrate outcome precedence.",
+        text: "`defined as` at the CONCEPT level (this stage) is INFERENCE over the sub-representations/components of ONE concept (the §1 rung-1 unit). Joining a policy's DISTINCT criteria is a DECISION-level construct, not a concept-model one (see decision-composition): a single-consequence `defined as` composite gated as a `when` is FAITHFUL (run_decision renders its operand truth-table, so which criterion failed is visible), and only DIVERGENT routing — criteria the policy sends to DIFFERENT consequences (divergent dispositions / precedence / exclusion-first / per-criterion sub-tree) — requires tree `when` nodes. The disposition-arbitration refinement computes FINAL-* precedence in the inference layer, with the criteria that route to different outcomes carried as visible `when` nodes (see disposition-arbitration-reference). The violation is DIVERGENT routing collapsed into one true/false, not using inference to arbitrate outcome precedence.",
         force: "invariant",
         test: "judgeLens.composition:hollowed-criteria",
       },
@@ -293,8 +293,8 @@ const RULES: KitRule[] = [
     id: "decision-composition",
     edge: "cpg",
     category: "decision-shape",
-    rule: "The COMPOSITION LADDER (§1) — the primitive is decided by the UNIT you are combining: (rung 1) sub-representations of ONE criterion → `defined as` INFERENCE (sem-and/or/not, closed-world; see concept-form); (rung 2) DISTINCT criteria of ONE determination → the decision TREE (nested `when` = AND; sibling `when` under `first:`, each recommending the same disposition with `otherwise`, = OR; `otherwise` = NOT; `first:` = precedence); (rung 3) SEPARATE determinations the SOURCE delegates, OR a GENUINELY-SHARED determination reused across policies/pathways → chained `use decision` (see chaining-necessity — source-delegation OR genuine reuse, NOT fabricated coupling). The tree already expresses AND/OR/NOT, so \"I have boolean logic\" is NOT a chaining signal — almost all of it stays in ONE tree. (`any:` is over ACTIONS only — alternatives WITHIN one matched branch — NEVER an OR over `when` branches; see decision-qualifiers.) A `when` takes a SINGLE concept by design. Putting a policy's distinct-criteria conjunction in a `defined as` \"Criteria Met\" composite gated as the sole branch HIDES which criterion failed (#168) — author each criterion as its own (nested or sibling) `when` node (see criteria-decision-reference). The REVERSE — exposing ONE criterion's sub-representations AS `when` nodes (§3) — makes the audit surface MORE visible and is presumed-faithful: do NOT revert it. AT SCALE, when one determination has many OVERLAPPING pathways with outcome precedence + fall-through, the plain nested tree duplicates shared criteria; the disposition-arbitration refinement (compute precedence in the inference layer via pairwise-disjoint `sem-not` FINAL-* concepts carried as flat `when` siblings, approve criteria re-exposed as visible nodes — #168-clean, NO `use decision`) is an option (see disposition-arbitration-reference) — but for a FEW pathways the plain tree is simpler and equally faithful.",
-    why: "The decision tree is the audit surface — a reviewer/cockpit must see WHICH criterion failed. `defined as`/sem-* is INFERENCE (one concept), not decision composition (the tree's job); conflating them hides criteria and was the #168 black-box failure (a fresh agent copied a `Criteria Met` composite → a decision with zero criterion nodes). The asymmetry (§3): hollowing distinct criteria INTO a composite is the violation; exposing one criterion's representations OUT to nodes is faithful.",
+    rule: "The COMPOSITION LADDER (§1) — the primitive is decided by the UNIT you are combining: (rung 1) sub-representations of ONE criterion → `defined as` INFERENCE (sem-and/or/not, closed-world; see concept-form); (rung 2) DISTINCT criteria of ONE determination → the decision TREE (nested `when` = AND; sibling `when` under `first:`, each recommending the same disposition with `otherwise`, = OR; `otherwise` = NOT; `first:` = precedence) WHEN the criteria route to DIFFERENT consequences; a conjunction whose criteria ALL share ONE consequence MAY instead be a single `defined as` composite gated as a `when` (equally faithful — run_decision renders its operand truth-table); (rung 3) SEPARATE determinations the SOURCE delegates, OR a GENUINELY-SHARED determination reused across policies/pathways → chained `use decision` (see chaining-necessity — source-delegation OR genuine reuse, NOT fabricated coupling). The tree already expresses AND/OR/NOT, so \"I have boolean logic\" is NOT a chaining signal — almost all of it stays in ONE tree. (`any:` is over ACTIONS only — alternatives WITHIN one matched branch — NEVER an OR over `when` branches; see decision-qualifiers.) A `when` takes a SINGLE concept by design. A `defined as` composite over distinct criteria gated as a `when` is FAITHFUL when those criteria share ONE disposition consequence — run_decision and the cockpit render the composite's full operand truth-table, so which criterion failed is visible in place. It is a VIOLATION only when the policy routes them to DIFFERENT consequences (divergent dispositions / precedence / exclusion-first / per-criterion sub-tree), which a single true/false cannot express — there each criterion is its own (nested or sibling) `when` node (see criteria-decision-reference). Exposing ONE criterion's sub-representations AS `when` nodes (§3) is likewise presumed-faithful: do NOT revert it. AT SCALE, when one determination has many OVERLAPPING pathways with outcome precedence + fall-through, the plain nested tree duplicates shared criteria; the disposition-arbitration refinement (compute precedence in the inference layer via pairwise-disjoint `sem-not` FINAL-* concepts carried as flat `when` siblings, approve criteria re-exposed as visible nodes — #168-clean, NO `use decision`) is an option (see disposition-arbitration-reference) — but for a FEW pathways the plain tree is simpler and equally faithful.",
+    why: "The real #168 harm is not visibility — run_decision and the cockpit now render a `defined as` composite's full operand truth-table (every criterion named + evaluated, which one failed), so a composite hides nothing. The harm is that a composite emits ONE true/false with ONE downstream consequence: flattening criteria that the policy routes to DIFFERENT consequences (divergent dispositions, precedence, exclusion-first, per-criterion sub-tree) into one composite produces a WRONG disposition. So the test is disposition-consequence, not audit: a single-consequence composite is faithful (and avoids the doubled-tree the old visibility rule forced); a divergent-routing collapse is the violation. (The original rule was written for a tool that rendered composites as opaque boxes — 'a decision with zero criterion nodes'; the tool caught up, the rule now does.)",
     ref: "docs/decision-shapes.md; criteria-decision-reference; disposition-arbitration-reference; chaining-necessity; #168",
     clauses: [
       {
@@ -302,16 +302,20 @@ const RULES: KitRule[] = [
         force: "default",
       },
       {
-        text: "Collapsing a policy's DISTINCT criteria into a `defined as` composite gated as the SOLE branch HIDES which criterion failed (#168) — author each as its own `when` node. Flag and revert even against a human.",
+        text: "A `defined as` composite over a policy's DISTINCT criteria, gated as a `when`, is FAITHFUL when those criteria share a SINGLE disposition consequence (the whole conjunction → one outcome; any failure → one fall-through). run_decision and the cockpit render the composite's FULL operand truth-table — every criterion named and evaluated in place (which one failed is visible; no short-circuit) — so nothing is hidden. It is a VIOLATION only when the policy routes the criteria to DIFFERENT consequences — divergent dispositions (fail A → Unmet but fail B → EIU), precedence, exclusion-first, or a per-criterion sub-tree — because a composite emits ONE true/false with ONE downstream consequence and CANNOT express divergent routing; there each criterion MUST be a tree `when` node. Flag and revert (even against a human) the divergent-routing collapse; do NOT revert a single-consequence composite. (#168's original 'a composite hides which criterion failed' assumed an opaque-box renderer the tool has since outgrown — visibility is no longer the test; divergent routing is.)",
         force: "invariant",
         test: "judgeLens.composition:hollowed-criteria",
       },
       {
-        text: "Exposing ONE criterion's sub-representations as `when` nodes (§3, inference→decision) is presumed-faithful — it makes the audit surface more visible. Do NOT revert it (caveat: flag only if it mis-casts what the source states as ONE criterion into several independent presented criteria).",
+        text: "OR-of-PATHWAYS: when a policy offers criteria as ALTERNATIVE multi-criterion pathways ('medically necessary for ANY ONE of the following indications'), gate each pathway on its FULL conjunction as a `defined as` entry-gate composite (`when \"Pathway N Qualifies\" then …`). This is required for ACCURACY, not audit: under `first:` a matched branch COMMITS and `otherwise` is TERMINAL, so gating a pathway on a BARE criterion strands a patient who fails it but qualifies under the next pathway (no fall-through). Since the pathway shares one consequence, do NOT additionally re-expose its criteria as nested `when` nodes — the composite's operand truth-table already IS the audit surface, and the re-exposure is behaviour-neutral (always true once the gate holds) and reads as a duplication bug.",
         force: "default",
       },
       {
-        text: "The disposition-arbitration refinement (sem-not FINAL-* arbitration, flat siblings, approve criteria re-exposed) is an AT-SCALE option for many overlapping pathways with precedence + fall-through; for a few pathways the plain nested tree is simpler and equally faithful.",
+        text: "Exposing ONE criterion's sub-representations as `when` nodes (§3, inference→decision) remains presumed-faithful — do NOT revert it (caveat: flag only if it mis-casts what the source states as ONE criterion into several independent presented criteria). But a single-consequence `defined as` composite is EQUALLY faithful and avoids the duplication, so a composite is not itself a signal to expand.",
+        force: "default",
+      },
+      {
+        text: "The disposition-arbitration refinement (sem-not FINAL-* arbitration, flat siblings, criteria that route to different FINAL-* outcomes carried as visible `when` nodes) is the AT-SCALE form of the divergent-routing case above — many overlapping pathways with precedence + fall-through; for a few pathways the plain tree is simpler and equally faithful.",
         force: "default",
       },
     ],
@@ -567,7 +571,7 @@ const EXAMPLES: KitExample[] = [
     snippet:
       'concept "Failed Drug Therapy":\n- type is Observation.\n- code is `failed-drug`.\nconcept "Failed Physical Therapy":\n- type is Observation.\n- code is `failed-pt`.\nconcept "Failed Conservative Therapy":\n- defined as ( "Failed Drug Therapy" sem-or "Failed Physical Therapy" ).',
     valid: true,
-    note: "ONE criterion satisfiable by either representation → one fact (drop-one testable). `defined as`/`sem-*` normalizes one concept; it NEVER joins DISTINCT criteria — combining the policy's distinct criteria is the decision tree's job (nested `when` nodes; see decision-composition + criteria-decision-reference). #168.",
+    note: "ONE criterion satisfiable by either representation → one fact (drop-one testable). This is rung-1 INFERENCE over ONE concept's representations — distinct from joining a policy's DISTINCT criteria, which is decision composition (a single-consequence `defined as` composite gated as a `when`, OR tree `when` nodes when the criteria route to different consequences; see decision-composition + criteria-decision-reference). #168.",
   },
   {
     title: "Matched branch with a guarded `any:` menu",
@@ -755,15 +759,22 @@ const JUDGE_LENS: JudgeLens = {
     {
       check: "hollowed-criteria",
       weightedBy:
-        "whether the `defined as` operands are the source's DISTINCT criteria vs sub-representations of ONE criterion.",
+        "whether the policy routes the composite's criteria to a SINGLE disposition consequence vs DIFFERENT consequences (divergent dispositions / precedence / exclusion-first / per-criterion sub-tree).",
       guidance:
-        "Collapsing DISTINCT criteria into a `defined as` composite gated as the SOLE branch is a #168 violation " +
-        "(it hides which criterion failed). The REVERSE — exposing one criterion's sub-representations as `when` " +
-        "nodes — is presumed-faithful: do NOT revert it.",
+        "A `defined as` composite over distinct criteria, gated as a `when`, is FAITHFUL when ALL its criteria share ONE " +
+        "disposition consequence (whole conjunction → one outcome; any failure → one fall-through). run_decision and the " +
+        "cockpit render the composite's full operand truth-table (every criterion named + evaluated, which one failed) — " +
+        "so it hides NOTHING; the old premise ('a composite hides which criterion failed') assumed an opaque-box renderer " +
+        "the tool has outgrown. It is a VIOLATION only when the policy assigns any criterion a DIFFERENT consequence than " +
+        "the others: a composite emits ONE true/false and cannot route divergently, so those criteria must be visible " +
+        "`when` nodes. A single-consequence composite STANDS even if deliberate; a divergent-routing collapse is flagged " +
+        "even if deliberate. (The REVERSE — exposing one criterion's sub-representations as `when` nodes — is also faithful; " +
+        "do NOT revert it.) NOT behaviour-based: deleting a re-exposed node that duplicated the composite is a zero-behaviour " +
+        "diff — 'it changed nothing' is expected, not evidence.",
       checkpoints: [
-        "Are the operands distinct criteria the source lists, or representations of one criterion?",
-        "Is the composite gated as the SOLE branch (the black-box shape)?",
-        "Does the cockpit still show which criterion failed?",
+        "Do ALL the composite's criteria share ONE disposition consequence (whole conjunction → one outcome, any failure → one fall-through)?",
+        "Does the policy route ANY criterion differently — a different disposition, precedence / exclusion-first ordering, or a per-criterion sub-tree? (Only then must the criteria be `when` nodes.)",
+        "(NOT 'does the cockpit show which criterion failed' — the composite's operand truth-table already does.)",
       ],
     },
     {
@@ -900,7 +911,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     language: "crl",
     edge: "prior-auth",
     purpose:
-      "The model for #168: a policy's DISTINCT criteria as nested `when` decision NODES (each criterion visible/auditable; nesting = AND), PLUS one genuine `defined as` INFERENCE (a single criterion satisfiable by either of two representations). `defined as` normalizes ONE concept; it never joins distinct criteria — that is the decision tree's job.",
+      "The model for #168: a policy's DISTINCT criteria as nested `when` decision NODES (each criterion visible/auditable; nesting = AND), PLUS one genuine `defined as` INFERENCE (a single criterion satisfiable by either of two representations). The nested-`when` shape is ALWAYS valid and is REQUIRED when criteria route to DIFFERENT consequences; a conjunction whose criteria share ONE consequence is EQUALLY faithful as a single `defined as` composite gated as a `when` (see decision-composition). `defined as` at the concept level normalizes ONE concept.",
     source: CRITERIA_DECISION_REFERENCE_CRL,
   },
   {

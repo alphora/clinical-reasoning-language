@@ -677,8 +677,12 @@ describe("authoring-kit — getAuthoringKit", () => {
     // #212 step 4c (schemaVersion 1.9→1.10): review FLAGS left `.crl` for the `.crl/flags/` store — the `review-flags` rule
     // is rewritten to the store model (create_flag WRITES the store, no rewritten source; flags don't emit; the 3 flag
     // examples became `text` tool calls); @gap-filed stays a `.crl` meta tag. BOTH hashes move. KE seats re-sync both pins.
-    expect(cpg.contentHash).toBe("28fe9a720c043c1eed6389ccb5d506c7972cc7dace8c0360c76537a28e103b19");
-    expect(priorAuth.contentHash).toBe("a6d4fe2207e4ebef7afd430e351b57785d8ed945063c1bcf162c0ae40c07d6ef");
+    // #219 (content-only, schemaVersion unchanged): the `hollowed-criteria` invariant is RETARGETED from auditability to
+    // DISPOSITION-CONSEQUENCE — a `defined as` composite over distinct criteria is faithful when they share ONE consequence
+    // (run_decision renders the operand truth-table), a violation only under DIVERGENT routing. Swept across decision-
+    // composition, concept-form, the judge-lens, and the reference notes. BOTH hashes move. KE seats re-sync both pins.
+    expect(cpg.contentHash).toBe("6643f898e0caa5438f067a5014a8aee2baa141742fab34bdba946e32a00abcfb");
+    expect(priorAuth.contentHash).toBe("8d1aa964725db6481ad821601cd69ce3c48976779bf19e6ae877ac5a144e4f16");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
