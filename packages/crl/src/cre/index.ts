@@ -7,7 +7,13 @@ export type {
   CompositionTrace,
   BranchConditionTrace,
 } from "./run";
-export { renderScenario, SCENARIO_VIEW_MODEL_SCHEMA_VERSION } from "./viewModel";
+export {
+  renderScenario,
+  SCENARIO_VIEW_MODEL_SCHEMA_VERSION,
+  unsatisfiedFrontier,
+  frontierShortLabel,
+  frontierTooltip,
+} from "./viewModel";
 export type {
   RenderScenarioResult,
   ScenarioViewModel,
@@ -17,6 +23,9 @@ export type {
   ViewNode,
   ConditionView,
   BranchConditionView,
+  ConceptView,
+  Frontier,
+  FrontierItem,
   GuardView,
   ActionView,
   ExplanationView,

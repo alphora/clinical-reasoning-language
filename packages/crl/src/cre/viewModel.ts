@@ -47,7 +47,7 @@ import {
 export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 2;
 
 type ActionKind = "recommend-activity" | "use-decision";
-type ConceptView = { name: string; libraryName?: string };
+export type ConceptView = { name: string; libraryName?: string };
 /** A per-concept case answer (#187 Todo 2), projected from `CaseRun.conceptTruth`. `libraryName` is CONCRETE (never
  *  bare) so same-name concepts across libraries are distinct rows; a pane joins a displayed concept via
  *  `(concept.libraryName ?? currentFrameLib, name)`. An ABSENT concept is UNKNOWN — render blank, never `false`. */
@@ -140,6 +140,21 @@ export interface ConditionView {
   satisfied?: boolean;
   facts: string[];
 }
+
+/** #224 i.4b — "which conjunct failed". The UNSATISFIED FRONTIER of a false compound
+ *  guard: the minimal set of blocking sub-expressions that explain why the branch did
+ *  not fire. Purely a projection of `BranchConditionView` per-node `satisfied` — carries
+ *  NO new runtime state and never re-queries the VM (FIX-3: consumers render from the
+ *  frontier alone). A `no-alternative` (a false `or`) keeps each alternative's rendered
+ *  LABEL alongside its own sub-frontier so a tooltip can say "alt 2 (B and C): C unmet"
+ *  without reconstructing the tree. `opaque` is the drift-only escape hatch: a false node
+ *  the zip degraded (structural mismatch → `satisfied` undefined) that can't be pinpointed;
+ *  a HEALTHY evaluated-false guard NEVER yields opaque (pinned by test). */
+export type FrontierItem =
+  | { kind: "ref"; concept: ConceptView }
+  | { kind: "no-alternative"; alternatives: { label: string; frontier: Frontier }[] }
+  | { kind: "opaque"; label: string };
+export type Frontier = FrontierItem[];
 
 export interface GuardView {
   polarity: "unless" | "only-when";
@@ -592,10 +607,18 @@ function zipConditionTrace(cond: BranchCondition, bt: BranchConditionTrace): Bra
     // The trace leaf must actually BE a ref — else degrade to unevaluated (never
     // attach another node's `satisfied`/facts to this leaf).
     if (bt.op !== "ref") return astConditionExpr(cond);
+    // #224 i.4 root fix: carry the TRACE's frame-resolved concept identity onto the
+    // VM leaf. `conceptView(cond.ref)` would drop the library for a BARE ref, but the
+    // trace leaf already holds the resolved `{name, libraryName}` (run.ts:415 —
+    // `getRefLibrary(ref) ?? frame.currentLib`, so cross-library `use decision` frames
+    // bind correctly). Concrete identity here makes frontier dedup (`A and Main.A`),
+    // cross-lib display, and i.4c blocking-match by concept key all correct in one move.
+    // Additive/schema-neutral (a leaf already may carry `libraryName`). Compound-only:
+    // a single-ref `when` never produces a `conditionTrace`, so it never reaches here.
     return {
       op: "ref",
       ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
-      concept: conceptView(cond.ref),
+      concept: { name: bt.concept.name, ...(bt.concept.libraryName ? { libraryName: bt.concept.libraryName } : {}) },
       ...(bt.composition ? { explanation: mapComposition(bt.composition) } : {}),
       ...(bt.facts && bt.facts.length > 0 ? { facts: bt.facts } : {}),
     };
@@ -615,6 +638,125 @@ function astConditionExpr(cond: BranchCondition): BranchConditionView {
   if (cond.type === "BranchConditionRef") return { op: "ref", concept: conceptView(cond.ref) };
   const op: "and" | "or" = cond.type === "BranchConditionAnd" ? "and" : "or";
   return { op, operands: cond.operands.map(astConditionExpr) };
+}
+
+// ── #224 i.4b: unsatisfied frontier ("which conjunct failed") ──────────────────
+// Projection over `BranchConditionView` per-node `satisfied` — no runtime re-query.
+// Contract: only false/blocking nodes contribute; a `true` (or absent-because-not-
+// -evaluated) subtree contributes []. `opaque` appears ONLY when a false node can't be
+// pinpointed (a zip-degraded subtree), never for a healthy evaluated-false guard.
+
+/** Render a VM guard subtree to a short label. v0: every guard atom is same-library
+ *  (cross-lib guard refs cascade-suppress), so the leaf renders BARE — correct by
+ *  construction. When cross-lib concept refs in guards land, qualify iff the leaf's
+ *  (now frame-resolved) `libraryName` differs from the frame: a 1-line change here. */
+function describeConditionView(v: BranchConditionView): string {
+  if (v.op === "ref") return v.concept.name;
+  const joiner = v.op === "and" ? " and " : " or ";
+  const parts = v.operands.map((o) => (o.op === "ref" ? describeConditionView(o) : `(${describeConditionView(o)})`));
+  return parts.join(joiner);
+}
+
+/** The minimal blocking frontier of a false compound guard. Dedups `ref` items (by concept
+ *  identity — `A and A` → one) and `no-alternative` items (by alternative signature). */
+export function unsatisfiedFrontier(v: BranchConditionView): Frontier {
+  const f = dedupeFrontier(rawFrontier(v));
+  // A NON-satisfied node that produced NO frontier is a zip-degraded subtree the recursion couldn't pinpoint —
+  // e.g. an `or` ROOT whose own `satisfied` is undefined (the `and` branch has an inline opaque fallback, `or`
+  // does not, and a degraded root never reaches either). It must still surface SOMETHING, never an empty
+  // "unmet:". `satisfied === true` keeps `[]` (all-satisfied → no frontier); anything else → the opaque hatch.
+  if (f.length === 0 && v.satisfied !== true) return [{ kind: "opaque", label: describeConditionView(v) }];
+  return f;
+}
+
+function rawFrontier(v: BranchConditionView): Frontier {
+  if (v.op === "ref") return v.satisfied === false ? [{ kind: "ref", concept: v.concept }] : [];
+  if (v.op === "and") {
+    if (v.satisfied === true) return [];
+    const sub = v.operands.flatMap(rawFrontier);
+    // False with contributing children → the false conjunct(s). False but nothing
+    // pinpointable (a degraded/undefined subtree) → opaque, the drift escape hatch.
+    return sub.length > 0 ? sub : [{ kind: "opaque", label: describeConditionView(v) }];
+  }
+  // or: a false `or` means NONE of its alternatives held (no short-circuit ⇒ all false).
+  if (v.satisfied === false) {
+    const alternatives = v.operands.map((o) => {
+      // Recurse via `unsatisfiedFrontier` (NOT `rawFrontier`) so each alternative's OWN sub-frontier is deduped
+      // too — else `A or (B and B)` carries a duplicate `B`, and a nested repeated `or` a duplicate item.
+      const frontier = unsatisfiedFrontier(o);
+      // Never a silent empty alternative: a degraded child collapses to its own opaque item.
+      return {
+        label: describeConditionView(o),
+        frontier: frontier.length > 0 ? frontier : [{ kind: "opaque" as const, label: describeConditionView(o) }],
+      };
+    });
+    return [{ kind: "no-alternative", alternatives }];
+  }
+  return [];
+}
+
+/** A STRUCTURAL identity key for one frontier item — keyed on CONCEPT IDENTITY (resolved libraryName + name),
+ *  item kind, and nested sub-frontier identity, NOT rendered display labels. This is what makes dedup SAFE: two
+ *  items that merely RENDER alike (e.g. `LibA.A` and `LibB.A`, both shown bare as "A") stay distinct, so dedup
+ *  never silently collapses two genuinely-different blockers. Control-char separators keep `libA`+`X` from
+ *  colliding with `lib`+`AX`. */
+function frontierItemKey(item: FrontierItem): string {
+  if (item.kind === "ref") return `r:${item.concept.libraryName ?? ""}\u0001${item.concept.name}`;
+  if (item.kind === "opaque") return `o:${item.label}`;
+  return `n:[${item.alternatives.map((a) => a.frontier.map(frontierItemKey).join(",")).join("|")}]`;
+}
+
+/** Stable dedup at one frontier level, keyed by structural identity (`frontierItemKey`). First occurrence wins. */
+function dedupeFrontier(f: Frontier): Frontier {
+  const seen = new Set<string>();
+  const out: Frontier = [];
+  for (const item of f) {
+    const key = frontierItemKey(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
+/** Short label for a `when` failure line: `when <guard> — unmet: <frontierShortLabel>`.
+ *  Single ref → the concept name; a false `or` → "no alternative held"; opaque → its
+ *  label; multiple items → joined. Renders from the frontier ALONE (FIX-3). */
+export function frontierShortLabel(f: Frontier): string {
+  if (f.length === 0) return "";
+  return f
+    .map((item) =>
+      item.kind === "ref"
+        ? item.concept.name
+        : item.kind === "no-alternative"
+          ? "no alternative held"
+          : item.label,
+    )
+    .join(", ");
+}
+
+/** Rich per-alternative tooltip detail — for a `no-alternative` frontier, spells out why
+ *  each alternative failed ("alt 1 (A): unmet; alt 2 (B and C): C unmet"). Frontier-only. */
+export function frontierTooltip(f: Frontier): string {
+  return f.map(frontierItemTooltip).join("; ");
+}
+
+function frontierItemTooltip(item: FrontierItem): string {
+  // A top-level ref reads as "X unmet" so a MIXED frontier (`(A or B) and C` all-false → the OR breakdown
+  // followed by the bare conjunct) has no dangling token: "alt 1 (A): unmet; alt 2 (B): unmet; C unmet".
+  if (item.kind === "ref") return `${item.concept.name} unmet`;
+  if (item.kind === "opaque") return item.label;
+  return item.alternatives.map((a, i) => `alt ${i + 1} (${a.label}): ${altUnmetDetail(a)}`).join("; ");
+}
+
+/** How an alternative of a false `or` failed. WHOLLY unmet (a false leaf, or a false nested `or`/degraded
+ *  subtree whose entire self failed) → "unmet". PARTIALLY unmet (a false conjunct of an `and`) → "<part> unmet".
+ *  Detecting a nested `no-alternative`/`opaque` avoids the ungrammatical "no alternative held unmet". */
+function altUnmetDetail(a: { label: string; frontier: Frontier }): string {
+  const wholly =
+    a.frontier.some((i) => i.kind === "no-alternative" || i.kind === "opaque") ||
+    frontierShortLabel(a.frontier) === a.label;
+  return wholly ? "unmet" : `${frontierShortLabel(a.frontier)} unmet`;
 }
 
 function mapComposition(ct: CompositionTrace): ExplanationView {

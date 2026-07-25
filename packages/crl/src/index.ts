@@ -61,7 +61,13 @@ export type {
   CompositionTrace,
   BranchConditionTrace,
 } from "./cre";
-export { renderScenario, SCENARIO_VIEW_MODEL_SCHEMA_VERSION } from "./cre";
+export {
+  renderScenario,
+  SCENARIO_VIEW_MODEL_SCHEMA_VERSION,
+  unsatisfiedFrontier,
+  frontierShortLabel,
+  frontierTooltip,
+} from "./cre";
 
 // #224 decision-layer boolean guards: the `WhenBlock.condition` expression node
 // and its traversal. Published so external consumers of the AST (`buildCRL`)
@@ -92,6 +98,9 @@ export type {
   ViewNode,
   ConditionView,
   BranchConditionView,
+  ConceptView,
+  Frontier,
+  FrontierItem,
   GuardView,
   ActionView,
   ExplanationView,

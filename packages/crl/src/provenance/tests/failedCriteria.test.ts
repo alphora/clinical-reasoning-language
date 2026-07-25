@@ -140,8 +140,8 @@ describe("allUnsatisfiedCriteria — every evaluated-unsatisfied when, any case"
     expect(got.every((g) => g.reason === "unsatisfied-when")).toBe(true);
     expect(got[0].conceptLabel).toBe("when B");
     // display carries the precise false-when concept (FIX 3).
-    expect(got[0].display).toEqual({ reason: "unsatisfied-when", concept: { name: "B" } });
-    expect(got[1].display).toEqual({ reason: "unsatisfied-when", concept: { name: "D" } });
+    expect(got[0].display).toEqual({ reason: "unsatisfied-when", guard: "single", concept: { name: "B" } });
+    expect(got[1].display).toEqual({ reason: "unsatisfied-when", guard: "single", concept: { name: "D" } });
   });
 
   it("does NOT collect unreached (evaluated:false) whens, nor satisfied whens", () => {
@@ -162,6 +162,59 @@ describe("allUnsatisfiedCriteria — every evaluated-unsatisfied when, any case"
     ];
     const got = allUnsatisfiedCriteria(sv("pass", "Approve", tree));
     expect(got.map((g) => g.nodeId)).toEqual(["when[1]"]);
+  });
+});
+
+// ── compound guards (#224 i.4b): the widened display carries guardLabel + frontier ───────────────────────────────
+// Minimal `BranchConditionView` literals for the duck-typed fixtures (tests aren't in the tsc program).
+const bcRef = (name: string, satisfied: boolean) => ({ op: "ref" as const, satisfied, concept: { name } });
+const bcAnd = (satisfied: boolean, ...operands: ReturnType<typeof bcRef>[]) => ({
+  op: "and" as const,
+  satisfied,
+  operands,
+});
+const compoundWhen = (
+  nodeId: string,
+  expr: ReturnType<typeof bcAnd>,
+  satisfied: boolean,
+  guardLabel: string,
+  children: FcViewNode[] = [],
+): FcViewNode => ({
+  nodeId,
+  kind: "when",
+  label: `when ${guardLabel}`,
+  source: SRC,
+  evaluated: true,
+  condition: { expr, satisfied },
+  children,
+});
+
+describe("compound-guard display (#224 i.4b) — guardLabel + unsatisfied frontier", () => {
+  const tree = () => [
+    compoundWhen("when[0]", bcAnd(false, bcRef("A", true), bcRef("B", false)), false, "A and B", [
+      action("when[0]/action[0]", "Approve", { evaluated: false }),
+    ]),
+    otherwise("otherwise", { evaluated: true }, [
+      action("otherwise/action[0]", "Deny", { evaluated: true, produced: true }),
+    ]),
+  ];
+
+  it("frontier: a false `A and B` blocker carries guard:compound + guardLabel + [B]", () => {
+    const got = failedCriterionFrontier(sv("fail", "Approve", tree()));
+    expect(got).toHaveLength(1);
+    expect(got[0].reason).toBe("unsatisfied-when");
+    expect(got[0].display).toEqual({
+      reason: "unsatisfied-when",
+      guard: "compound",
+      guardLabel: "A and B",
+      frontier: [{ kind: "ref", concept: { name: "B" } }],
+    });
+  });
+
+  it("all-mode: the same compound false `when` carries the compound display", () => {
+    const got = allUnsatisfiedCriteria(sv("fail", "Approve", tree()));
+    const compound = got.find((g) => g.nodeId === "when[0]")!;
+    expect(compound.display).toMatchObject({ guard: "compound", guardLabel: "A and B" });
   });
 });
 
@@ -222,7 +275,7 @@ describe("failedCriterionFrontier — (a) gating when false", () => {
     expect(got[0].nodeId).toBe("when[0]");
     expect(got[0].reason).toBe("unsatisfied-when");
     expect(got[0].conceptLabel).toBe("when Indic");
-    expect(got[0].display).toEqual({ reason: "unsatisfied-when", concept: { name: "Indic" } });
+    expect(got[0].display).toEqual({ reason: "unsatisfied-when", guard: "single", concept: { name: "Indic" } });
   });
 
   it("a SHALLOWER guarded-out delegation ancestor wins over a deeper would-be blocker (realistic priority)", () => {
@@ -461,7 +514,7 @@ describe("failedCriterionFrontier — deep delegation: blocker buried in an inli
     );
     expect(got[0].reason).toBe("unsatisfied-when");
     expect(got[0].conceptLabel).toBe("when Gate");
-    expect(got[0].display).toEqual({ reason: "unsatisfied-when", concept: { name: "Gate" } });
+    expect(got[0].display).toEqual({ reason: "unsatisfied-when", guard: "single", concept: { name: "Gate" } });
   });
 });
 

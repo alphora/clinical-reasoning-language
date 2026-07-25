@@ -201,6 +201,26 @@ t3b("render: a failing case stamps data-fc-blocking + data-fc-all + reason on th
   assert.match(out.html, /<li class="node[^"]*" data-fc-blocking="1" data-fc-all="1" data-fc-reason="unsatisfied-when" data-fc-tip="blocked: when Indication">/);
 });
 
+// #224 i.4b — a COMPOUND guard whose failure is a false `or` gets the rich per-alternative HOVER detail
+// (data-fc-tip + title), while the always-visible inline label stays the short "unmet: ..." summary.
+const bcRef = (name, satisfied) => ({ op: "ref", satisfied, concept: { name } });
+const vmCompoundWhen = (nodeId, expr, satisfied, guardLabel, children = []) => ({
+  nodeId, kind: "when", label: `when ${guardLabel}`, source: { filePath: "p.crl", range: { startLine: 0, startCol: 0, endLine: 0, endCol: 1 } },
+  evaluated: true, condition: { expr, satisfied, facts: [] }, children,
+});
+t3b("render: a compound `(A or B) and C` all-false blocker carries per-alternative detail in the HOVER, short label inline", () => {
+  const expr = { op: "and", satisfied: false, operands: [
+    { op: "or", satisfied: false, operands: [bcRef("A", false), bcRef("B", false)] },
+    bcRef("C", false),
+  ] };
+  const sv = scenario("fail", "Approve", [vmCompoundWhen("when[0]", expr, false, "(A or B) and C", [vmAct("when[0]/action[0]", "Approve")])]);
+  const out = renderScenarioHtml(resultOf(sv));
+  // the HOVER (data-fc-tip) expands the false `or` into its alternatives + the bare conjunct — no dangling token.
+  assert.match(out.html, /data-fc-tip="blocked: when \(A or B\) and C — unmet: no alternative held, C — alt 1 \(A\): unmet; alt 2 \(B\): unmet; C unmet"/);
+  // the always-on inline label is the SHORT summary only (no per-alternative expansion).
+  assert.match(out.html, /<span class="fc-tip[^"]*">blocked: when \(A or B\) and C — unmet: no alternative held, C<\/span>/);
+});
+
 // FIX 2 (disc 160): the label must be USER-VISIBLE — a row `title` + an inline `.fc-tip` span — not just the inert
 // data-fc-tip attribute (which nothing rendered).
 t3b("render: a blocker's label is VISIBLE — the .row title AND an inline .fc-tip span carry 'blocked: when Indication'", () => {

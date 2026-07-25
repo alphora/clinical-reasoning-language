@@ -9,8 +9,8 @@
 // via innerHTML) carries no styles of its own. `opts.revealPrefix` namespaces reveal keys per
 // render so a click on stale DOM (after the host swapped in a new render's `reveals`) resolves to
 // an unknown key and is ignored, rather than mis-resolving to a same-positioned node.
-import { displayDetermination, type RenderScenarioResult, type ScenarioViewModel, type ViewNode } from "@smile-digital-health/crl";
-import { allUnsatisfiedCriteria, failedCriterionFrontier } from "@smile-digital-health/crl/provenance";
+import { displayDetermination, frontierTooltip, type RenderScenarioResult, type ScenarioViewModel, type ViewNode } from "@smile-digital-health/crl";
+import { allUnsatisfiedCriteria, failedCriterionFrontier, type FailedCriterionNode } from "@smile-digital-health/crl/provenance";
 
 import { failedCriterionLabel } from "./failedCriterionLabel";
 
@@ -22,10 +22,22 @@ interface FcMark {
   reason: "unsatisfied-when" | "guarded-out" | "preemption";
   /** Short label for the node's tooltip (failedCriterionLabel). */
   label: string;
+  /** #224 i.4b: for a COMPOUND guard whose failure was a false `or` (a `no-alternative` frontier), the rich
+   *  per-alternative detail ("alt 1 (A): unmet; alt 2 (B and C): C unmet"). Absent for single-ref guards and
+   *  plain-conjunct compounds (whose short `label` already names the unmet conjunct). Enriches the HOVER only. */
+  tooltip?: string;
   /** In the "Blocking" frontier set (the criteria that blocked the expected disposition). */
   inBlocking: boolean;
   /** In the "All" set (every evaluated-unsatisfied `when`). A preemption sibling is satisfied → NEVER in All. */
   inAll: boolean;
+}
+
+/** #224 i.4b: the rich per-alternative hover detail — ONLY when the compound guard's failure was a false `or`
+ *  (`no-alternative`). A plain-conjunct compound's short `label` (`unmet: B`) already suffices, so no extra hover. */
+function compoundDetail(c: FailedCriterionNode): string | undefined {
+  const d = c.display;
+  if (d.reason !== "unsatisfied-when" || d.guard !== "compound") return undefined;
+  return d.frontier.some((i) => i.kind === "no-alternative") ? frontierTooltip(d.frontier) : undefined;
 }
 
 /**
@@ -47,13 +59,20 @@ export function failedCriterionMarks(sv: ScenarioViewModel): Map<string, FcMark>
     return m;
   };
   // All-mode set: every evaluated-unsatisfied `when` (reason is always "unsatisfied-when" here).
-  for (const c of allUnsatisfiedCriteria(sv)) get(c.nodeId, "unsatisfied-when", failedCriterionLabel(c)).inAll = true;
+  for (const c of allUnsatisfiedCriteria(sv)) {
+    const m = get(c.nodeId, "unsatisfied-when", failedCriterionLabel(c));
+    m.inAll = true;
+    const tip = compoundDetail(c);
+    if (tip) m.tooltip = tip;
+  }
   // Blocking-mode set: the frontier (empty for a pass / non-fail). A preemption blocker keeps its own reason so the
   // renderer marks the SATISFIED matched sibling distinctly (amber "diverted"), not as a red failed criterion.
   for (const c of failedCriterionFrontier(sv)) {
     const m = get(c.nodeId, c.reason, failedCriterionLabel(c));
     m.inBlocking = true;
     m.reason = c.reason; // the frontier reason wins (a node in both sets is the frontier's unsatisfied-when anyway)
+    const tip = compoundDetail(c);
+    if (tip) m.tooltip = tip;
   }
   return marks;
 }
@@ -127,13 +146,16 @@ function renderNode(
       tipCls = "fc-tip-blk";
     }
     parts.push(`data-fc-reason="${mark.reason}"`);
-    fcTip = mark.reason === "preemption" ? `matched first and diverted the run — ${mark.label}` : `blocked: ${mark.label}`;
+    // Short line drives the inline VISIBLE label; the HOVER (data-fc-tip + title) appends the compound per-alternative
+    // detail when present (#224 i.4b), so "which alternative failed" is available without cluttering the always-on label.
+    const fcTipShort = mark.reason === "preemption" ? `matched first and diverted the run — ${mark.label}` : `blocked: ${mark.label}`;
+    fcTip = mark.tooltip ? `${fcTipShort} — ${mark.tooltip}` : fcTipShort;
     parts.push(`data-fc-tip="${esc(fcTip)}"`);
     fcAttrs = ` ${parts.join(" ")}`;
     // The inline visible label. Class encodes both the channel (blk/preempt color) and the mode-membership so CSS can
     // show it only in the active mode (a blocker shows in its set; a preemption is Blocking-only) — mirrors the outline.
     const modeCls = mark.reason === "preemption" ? "fc-only-blocking" : `${mark.inBlocking ? "fc-in-blocking " : ""}${mark.inAll ? "fc-in-all" : ""}`.trim();
-    fcTipSpan = `<span class="fc-tip ${tipCls} ${modeCls}">${esc(fcTip)}</span>`;
+    fcTipSpan = `<span class="fc-tip ${tipCls} ${modeCls}">${esc(fcTipShort)}</span>`;
   }
 
   const facts =

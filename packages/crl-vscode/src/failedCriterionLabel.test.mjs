@@ -14,8 +14,30 @@ const check = test;
 // A minimal FailedCriterionNode carrying just the `display` the labeler reads.
 const node = (display) => ({ nodeId: "n", conceptLabel: "x", source: {}, reason: display.reason, display });
 
-check("unsatisfied-when → 'when <concept>'", () => {
-  assert.equal(failedCriterionLabel(node({ reason: "unsatisfied-when", concept: { name: "Indication" } })), "when Indication");
+check("unsatisfied-when (single) → 'when <concept>' (byte-identical to pre-#224)", () => {
+  assert.equal(failedCriterionLabel(node({ reason: "unsatisfied-when", guard: "single", concept: { name: "Indication" } })), "when Indication");
+});
+
+check("unsatisfied-when (compound) → 'when <guardLabel> — unmet: <frontier>'", () => {
+  // a false conjunct: `A and B`, B unmet
+  assert.equal(
+    failedCriterionLabel(
+      node({ reason: "unsatisfied-when", guard: "compound", guardLabel: "A and B", frontier: [{ kind: "ref", concept: { name: "B" } }] }),
+    ),
+    "when A and B — unmet: B",
+  );
+  // a false `or`: fixed phrase
+  assert.equal(
+    failedCriterionLabel(
+      node({
+        reason: "unsatisfied-when",
+        guard: "compound",
+        guardLabel: "A or B",
+        frontier: [{ kind: "no-alternative", alternatives: [{ label: "A", frontier: [] }, { label: "B", frontier: [] }] }],
+      }),
+    ),
+    "when A or B — unmet: no alternative held",
+  );
 });
 
 check("guarded-out WITH concept → '<polarity> <concept>'", () => {

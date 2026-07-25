@@ -3,7 +3,13 @@
  * §"WHICH criteria" / §"Trigger" / §"Slice plan T2"). NO UI, NO engine coupling: both functions read a DUCK-TYPED
  * scenario view-model (the structural `ScenarioViewModel` contract — viewModel.ts) and return runtime nodeIds the cockpit
  * later re-roots through `runtimeNodePathRefs` (runPath.ts, T1). Kept in `provenance/` next to runPath.ts so T3 joins
- * one module; the duck-type means no `cre` import (no cycle).
+ * one module.
+ *
+ * #224 i.4b: the module now imports the frontier projection (`BranchConditionView`, `Frontier`,
+ * `unsatisfiedFrontier`) from `cre` to compute WHICH conjunct of a compound guard failed. This stays ACYCLIC —
+ * `cre/` never imports `provenance/` (the dependency is one-way: `provenance → cre`, already established by
+ * cockpitModel/generate). The rest of the scenario shape remains a local DUCK-TYPE (`FcViewNode`/`FcScenario`),
+ * so this module still does not depend on the full `ScenarioViewModel` surface — only the frontier helper.
  *
  * The TWO modes (operator decision, disc 158 §"WHICH criteria" — a toggle, both ship, default the frontier):
  *   - `allUnsatisfiedCriteria` — "All": every evaluated-unsatisfied `when` in the tree (the raw truth, any case).
@@ -24,8 +30,11 @@
  *     never produced in run.ts) → it is EXCLUDED from target-site collection.
  */
 
+import { unsatisfiedFrontier, type BranchConditionView, type Frontier } from "../cre";
+
 /** DUCK-TYPED ViewNode — a structural superset of the fields this module reads (compatible with the real
- *  `ViewNode` from viewModel.ts). Kept local + minimal so the module stays pure (no `cre` import). */
+ *  `ViewNode` from viewModel.ts). `condition.expr` is the REAL `BranchConditionView` (#224 i.4b) so the
+ *  frontier walk can see `operands` + per-node `satisfied`; the rest stays a minimal local duck-type. */
 export interface FcViewNode {
   nodeId: string;
   kind: "when" | "otherwise" | "action";
@@ -35,12 +44,11 @@ export interface FcViewNode {
   evaluated: boolean;
   /** Only on an unreached BRANCH whose ordered block had a prior matching sibling. */
   unreachedReason?: "preempted";
-  /** #224: the guard EXPRESSION (was a single `concept`). For the failed-criterion
-   *  display we need only the op + a `ref`'s concept; a compound falls back to the
-   *  branch `label` (rich per-conjunct rendering is i.4). Structurally a subset of
-   *  the real `ConditionView.expr` / `BranchConditionView`. */
+  /** #224: the guard EXPRESSION (was a single `concept`). i.4b widens `expr` to the REAL
+   *  `BranchConditionView` so a compound guard's per-conjunct frontier can be computed at
+   *  build time; a single-ref guard is a `ref` leaf (unchanged rendering). */
   condition?: {
-    expr: { op: "and" | "or" | "ref"; concept?: { name: string; libraryName?: string } };
+    expr: BranchConditionView;
     satisfied?: boolean;
   };
   guard?: {
@@ -64,14 +72,18 @@ export interface FcScenario {
 /**
  * The precise display payload for ONE failed criterion, discriminated by `reason` (FIX 3 — label sufficiency). The
  * cockpit renders each blocker correctly from THIS alone — no second VM lookup:
- *   - "unsatisfied-when": the `when` concept that was false (render e.g. "when Indication").
- *   - "preemption": the MATCHED prior sibling — a `when` (its concept) or an `otherwise` (no concept) — that diverted
- *     the run (render e.g. "matched: when Early" / "matched: otherwise").
+ *   - "unsatisfied-when": a false `when` guard. An explicit `guard` discriminant (i.4b) splits it:
+ *       · "single"   — a single-ref guard → the `concept` that was false (render e.g. "when Indication").
+ *       · "compound" — an `and`/`or` guard → the whole-guard `guardLabel` plus the unsatisfied `frontier` (which
+ *         conjunct/alternative blocked it), so the cockpit renders "when A and B — unmet: B" without a VM re-query.
+ *   - "preemption": the MATCHED prior sibling — a `when` (its concept, or the whole-guard label for a compound
+ *     preemptor) or an `otherwise` (no concept) — that diverted the run (render e.g. "matched: when Early").
  *   - "guarded-out": the GUARD that excluded the action — polarity + concept (render e.g. "unless Contraindication" /
  *     "only-when Indication"). `concept` is absent only for the structurally-degenerate guard with no concept.
  */
 export type FailedCriterionDisplay =
-  | { reason: "unsatisfied-when"; concept: { name: string; libraryName?: string } }
+  | { reason: "unsatisfied-when"; guard: "single"; concept: { name: string; libraryName?: string } }
+  | { reason: "unsatisfied-when"; guard: "compound"; guardLabel: string; frontier: Frontier }
   | {
       reason: "preemption";
       siblingKind: "when" | "otherwise";
@@ -245,24 +257,36 @@ function firstBlockerOnPath(
 
 // ── blocker → FailedCriterionNode builders (each carries the precise per-reason `display`, FIX 3) ───────────────────
 
-/** An evaluated-unsatisfied `when` blocker → display carries the false `when`'s concept. */
-/** #224: the display concept for a failed `when`. A single-ref guard → its
- *  concept; a COMPOUND guard → the whole guard label (the branch failed;
- *  which-conjunct-failed rendering is i.4). Never masquerades one operand as the
- *  whole guard. */
+/** #224: the display concept for a SINGLE-REF failed `when` (or a compound PREEMPTOR,
+ *  where we only need a coarse label). A single-ref guard → its concept; anything else →
+ *  the whole-guard label. Never masquerades one operand as the whole guard — the compound
+ *  UNSATISFIED case takes the `guard:"compound"` display path instead (see `unsatisfiedWhenNode`). */
 function fcConcept(n: FcViewNode): { name: string; libraryName?: string } {
   const e = n.condition?.expr;
   if (e && e.op === "ref" && e.concept) return e.concept;
   return { name: n.label.replace(/^when\s+/, "") };
 }
 
+/** An evaluated-unsatisfied `when` blocker. i.4b: a single-ref guard carries its `concept`; a COMPOUND
+ *  guard carries the whole-guard `guardLabel` + the unsatisfied `frontier` (which conjunct/alternative
+ *  failed), computed HERE at build time so the cockpit renders from `display` alone (FIX-3). */
 function unsatisfiedWhenNode(n: FcViewNode): FailedCriterionNode {
+  const expr = n.condition?.expr;
+  const display: FailedCriterionDisplay =
+    expr && expr.op !== "ref"
+      ? {
+          reason: "unsatisfied-when",
+          guard: "compound",
+          guardLabel: n.label.replace(/^when\s+/, ""),
+          frontier: unsatisfiedFrontier(expr),
+        }
+      : { reason: "unsatisfied-when", guard: "single", concept: fcConcept(n) };
   return {
     nodeId: n.nodeId,
     conceptLabel: n.label,
     source: n.source,
     reason: "unsatisfied-when",
-    display: { reason: "unsatisfied-when", concept: fcConcept(n) },
+    display,
   };
 }
 
