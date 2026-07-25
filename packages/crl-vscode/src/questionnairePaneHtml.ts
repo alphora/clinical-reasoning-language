@@ -115,6 +115,14 @@ function renderExpansion(body: QExpr): string {
   return connDiv("or", true) + renderQExpr(body);
 }
 
+/** #224 i.4c: render a decision GUARD's boolean tree — NO forced top `or` chip (a guard is NOT a representation-
+ *  disjunction). The authored operator shows as-is: `and`→ALL OF, `or`→ANY OF. Atoms are QExpr leaves; a blocking
+ *  atom (branch-false ∧ atom RUNTIME-evaluated false ∧ no ancestor `or` satisfied) is marked so the failed conjunct
+ *  reads distinctly — an informational false (a false member of a satisfied `or`, or a degraded atom) is not. */
+function renderGuardExpansion(body: QExpr): string {
+  return renderQExpr(body);
+}
+
 /** An INFERRED composite `when` (no `code is`) can't be answered directly — it is DERIVED from its representations. So its
  *  concept + its derived Yes/No render (in PARENS) just ABOVE the box — a NORMAL-FLOW element that reflows/wraps as the pane
  *  narrows (unlike an absolute title on the border). The derived answer is purple-bordered; there is NO top `or`. */
@@ -157,7 +165,9 @@ function renderQExpr(e: QExpr): string {
       const cls = ["q-exp-leaf"];
       if (!e.isSource) cls.push("q-nonsource");
       if (e.isInferred) cls.push("q-inferred");
-      const row = `<div class="${cls.join(" ")}"><span class="q-prompt"><span class="q-concept">${escapeHtml(e.name)}</span>?</span>${renderExpOpts(e.answer)}</div>`;
+      if (e.blocking) cls.push("q-blocking"); // #224 i.4c: the failed conjunct that actually blocked the branch
+      const blkTitle = e.blocking ? ` title="this criterion blocked the branch"` : "";
+      const row = `<div class="${cls.join(" ")}"${blkTitle}><span class="q-prompt"><span class="q-concept">${escapeHtml(e.name)}</span>?</span>${renderExpOpts(e.answer)}</div>`;
       // A named-composite / both-rep operand is answerable AND expandable → its OWN `defined as` body renders below (with
       // its own forced top `or`, since it too is a disjunction of alternatives).
       return e.composite ? row + renderExpansion(e.composite) : row;
@@ -278,11 +288,16 @@ export function renderQuestionnairePane(
     const gid = `${prefix}q${i}`;
     anchors[question.nodeId] = { scrollTo: gid, segmentIds: [gid] };
     if (question.isNavStop) questionNodeIds.push(question.nodeId);
-    // A composite WITH a `code is` (both-rep) is answerable directly OR via its sub-questions → a normal row + top `or` +
-    // box. A composite WITHOUT a `code is` is INFERRED (derived) → its concept + derived answer render ON the box border.
-    if (question.expansion && !question.isSource) {
+    // #224 i.4c: a GUARD box (a compound `when`'s per-atom case-features) is a normal guard ROW + a box with NO forced
+    // `or` chip — never the inferred-when (box-on-border) treatment, which is a `defined as` representation form.
+    if (question.expansionKind === "guard" && question.expansion) {
+      items += renderQuestion(question, gid);
+      items += `<li class="q-exp q-guard-exp">${renderGuardExpansion(question.expansion)}</li>`;
+    } else if (question.expansion && !question.isSource) {
+      // A composite WITHOUT a `code is` is INFERRED (derived) → its concept + derived answer render ON the box border.
       items += renderInferredWhen(question, gid, question.expansion);
     } else {
+      // A composite WITH a `code is` (both-rep) is answerable directly OR via its sub-questions → a normal row + top `or` + box.
       items += renderQuestion(question, gid);
       if (question.expansion) items += `<li class="q-exp">${renderExpansion(question.expansion)}</li>`;
     }
@@ -389,6 +404,10 @@ export const QUESTIONNAIRE_STYLE =
   `.q-inferred-title .q-opt-answer,.q-exp-leaf.q-nonsource .q-opt-answer{background:rgba(197,134,192,.22);border-color:var(--vscode-charts-purple,#c586c0)}` +
   // a leaf row inside a box (the concept + its Yes/No answer). Reuses .q-nonsource/.q-opt.
   `.q-exp-leaf{padding:2px 0;margin:1px 0}` +
+  // #224 i.4c: a GUARD-box atom that BLOCKED the branch — a red left-rule + tinted "No", distinct from an
+  // informational false atom (a false conjunct of a satisfied `or`), which renders as a plain "no".
+  `.q-blocking{border-left:2px solid var(--vscode-editorError-foreground,#f14c4c);padding-left:6px;margin-left:-8px}` +
+  `.q-blocking .q-opt-answer{background:rgba(241,76,76,.18);border-color:var(--vscode-editorError-foreground,#f14c4c)}` +
   `.q-layer{display:inline-block;min-width:13px;text-align:center;font:700 9px/1 var(--vscode-editor-font-family,monospace);color:var(--vscode-descriptionForeground,#8c8c8c);background:var(--vscode-editorWidget-background,#2b2b2e);border:1px solid var(--vscode-panel-border,#454545);border-radius:3px;padding:1px 3px;margin-right:7px;vertical-align:middle}` +
   `.q-external{opacity:.75;font-style:italic}` +
   `.q-ext-mark{font-size:.75em;opacity:.7;margin-left:6px}` +

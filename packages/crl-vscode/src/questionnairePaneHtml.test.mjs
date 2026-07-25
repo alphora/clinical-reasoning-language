@@ -822,3 +822,47 @@ case "a+b":
   assert.ok(!/data-qnav="next" disabled/.test(r.html), "Next is enabled → the user navigates to question 1");
 });
 
+
+// ── #224 i.4c: a COMPOUND guard renders a per-atom box with NO forced `or` chip; the blocking atom is marked ──
+check("i.4c render: a FAILED compound guard → an ALL OF box, NO forced top `or` chip, blocking atom marked", () => {
+  const crl = `library "G".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "G":
+first:
+- when "A" and "B" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+  const cel = `library "GC".
+covers "G".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fA":
+- code is "http://example.org|a".
+- date is "2026-01-01".
+- defined by "A".
+case "onlyA":
+- subject is "Pat".
+- fact is "fA".
+- result is "G" is "Deny".`;
+  const { sv, rootLib } = renderCase({ "g.crl": crl, "g.cel": cel }, "g.cel", "onlyA");
+  const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_" });
+  // the guard box is a q-guard-exp <li> (never the inferred-when box-on-border form).
+  assert.match(r.html, /<li class="q-exp q-guard-exp">/, "the compound guard renders a q-guard-exp box");
+  // NO forced top `or` chip immediately inside the guard-exp li (that chip is a `defined as` representation form).
+  assert.doesNotMatch(r.html, /<li class="q-exp q-guard-exp"><div class="q-conn q-conn-or q-conn-top">/, "no forced or chip on a guard box");
+  // the ALL OF box is present (A and B), and the false conjunct B carries the blocking class.
+  assert.match(r.html, /q-box q-box-and/, "A and B → ALL OF box");
+  assert.match(r.html, /q-exp-leaf[^"]*q-blocking/, "the blocking false atom is marked");
+});

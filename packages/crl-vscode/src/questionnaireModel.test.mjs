@@ -991,3 +991,214 @@ check("Option-3 DEPTH cap: a named-composite chain deeper than MAX_EXPR_DEPTH(4)
   assert.equal(node.composite.count, 0, "count 0 → a '…' (depth) stub, not a '+N more' (width) stub");
 });
 
+
+// ── #224 i.4c: COMPOUND guard → a per-atom case-feature box on the ONE guard row ──────────────────────────────
+// A COMPOUND `when` keeps its single nav-stop ROW; its atoms render inside `expansion` (kind "guard", NO forced
+// `or` chip). Failed compound → the blocking atom(s) marked; preempted → informational (never evaluated).
+const guardCrl = (guard) => `library "G".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+concept "C":
+- type is Condition.
+- code is \`c\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "G":
+first:
+- when ${guard} then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+const factOf = (name, code) => `fact "${name}":
+- code is "http://example.org|${code}".
+- date is "2026-01-01".
+- defined by "${name.replace(/^f/, "")}".`;
+const guardCel = (facts, hold) => `library "GC".
+covers "G".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+${facts.map((n) => factOf("f" + n, n.toLowerCase())).join("\n")}
+case "c":
+- subject is "Pat".
+${facts.map((n) => `- fact is "f${n}".`).join("\n")}
+- result is "G" is "Deny".`;
+
+check("i.4c: a FAILED `A and B` → a guard-box (kind and) of per-atom leaves; the false atom is BLOCKING", () => {
+  const { sv, rootLib } = renderCase({ "g.crl": guardCrl(`"A" and "B"`), "g.cel": guardCel(["A"]) }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.ok(when, "the compound when is a row");
+  assert.equal(when.expansionKind, "guard", "a guard-kind expansion (no forced or)");
+  assert.ok(when.isNavStop, "the ONE guard row is the nav-stop");
+  assert.equal(when.expansion.kind, "and", "A and B → ALL OF");
+  const [la, lb] = when.expansion.operands;
+  assert.equal(la.name, "A"); assert.equal(la.answer, "yes"); assert.ok(!la.blocking, "A held → not blocking");
+  assert.equal(lb.name, "B"); assert.equal(lb.answer, "no"); assert.ok(lb.blocking, "B is the blocking false conjunct");
+  // leaves are NOT flat questions / nav-stops (the ONE row is).
+  assert.deepEqual(q.questions.map((x) => x.conceptName), ["A and B"], "just the guard row; atoms live in expansion");
+});
+
+check("i.4c: `(A or B) and C` — a false member of a SATISFIED or is INFORMATIONAL; C is the blocker", () => {
+  const { sv, rootLib } = renderCase({ "g.crl": guardCrl(`( "A" or "B" ) and "C"`), "g.cel": guardCel(["A"]) }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.expansion.kind, "and");
+  const [orBox, lc] = when.expansion.operands;
+  assert.equal(orBox.kind, "or", "the parenthesized group is an ANY OF box");
+  const [la, lb] = orBox.operands;
+  assert.equal(la.name, "A"); assert.equal(la.answer, "yes");
+  assert.equal(lb.name, "B"); assert.equal(lb.answer, "no");
+  assert.ok(!lb.blocking, "B is a false member of a SATISFIED or → informational, NOT blocking");
+  assert.equal(lc.name, "C"); assert.equal(lc.answer, "no"); assert.ok(lc.blocking, "C is the blocking conjunct");
+});
+
+check("i.4c: `A and A` FAILED → structure-faithful (TWO leaves kept, never collapsed to one)", () => {
+  const { sv, rootLib } = renderCase({ "g.crl": guardCrl(`"A" and "A"`), "g.cel": guardCel([]) }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.expansion.kind, "and");
+  assert.equal(when.expansion.operands.length, 2, "A and A keeps BOTH positional atoms");
+  assert.ok(when.expansion.operands.every((o) => o.name === "A" && o.answer === "no"), "both are A, same answer");
+});
+
+check("i.4c: a PREEMPTED compound guard box is INFORMATIONAL (never evaluated → no blocking)", () => {
+  const crl = `library "G".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+concept "C":
+- type is Condition.
+- code is \`c\`.
+activity "First":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Second":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "G":
+first:
+- when "A" then recommend activity "First".
+- when "B" and "C" then recommend activity "Second".
+- otherwise then recommend activity "Deny".`;
+  // A present (fB) + C absent → the preempted atoms source their answers from conceptTruth: B="yes", C="no".
+  const cel = guardCel(["A", "B"]).replace(`- result is "G" is "Deny".`, `- result is "G" is "First".`);
+  const { sv, rootLib } = renderCase({ "g.crl": crl, "g.cel": cel }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const pre = q.questions.find((x) => x.rowKind === "when-preempted");
+  assert.ok(pre, "the `B and C` when is preempted by the matched `A`");
+  assert.equal(pre.expansionKind, "guard", "a preempted compound still shows its atom box");
+  assert.ok(pre.expansion.operands.every((o) => !o.blocking), "a preempted (never-evaluated) guard marks NOTHING blocking");
+  // answer-source contract: a preempted atom uses conceptTruth (present → yes, absent-but-declared → no).
+  const byName = Object.fromEntries(pre.expansion.operands.map((o) => [o.name, o]));
+  assert.equal(byName.B.answer, "yes", "B present in the case → conceptTruth yes");
+  assert.equal(byName.C.answer, "no", "C absent-but-declared → conceptTruth no (never blank/unknown here)");
+});
+
+check("i.4c: a SATISFIED `A or B` (A=yes,B=no) IS boxed — both runtime answers shown, NOTHING blocking", () => {
+  const { sv, rootLib } = renderCase({ "g.crl": guardCrl(`"A" or "B"`), "g.cel": guardCel(["A"]).replace(`is "Deny"`, `is "Approve"`) }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.answer, "yes", "the satisfied compound fired");
+  assert.equal(when.expansionKind, "guard", "an evaluated compound IS boxed (disc 294 — satisfied too)");
+  assert.equal(when.expansion.kind, "or");
+  const [la, lb] = when.expansion.operands;
+  assert.equal(la.answer, "yes"); assert.equal(lb.answer, "no");
+  assert.ok(when.expansion.operands.every((o) => !o.blocking), "a satisfied guard blocks NOTHING (branch fired)");
+});
+
+check("i.4c blocking: failed `A or B` (both false) → BOTH alternatives blocking", () => {
+  const { sv, rootLib } = renderCase({ "g.crl": guardCrl(`"A" or "B"`), "g.cel": guardCel([]) }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.expansion.kind, "or");
+  assert.ok(when.expansion.operands.every((o) => o.answer === "no" && o.blocking), "both false alternatives block");
+});
+
+check("i.4c blocking: failed `A or (B and C)` with A=no,B=yes,C=no → A and C blocking, B not", () => {
+  const { sv, rootLib } = renderCase({ "g.crl": guardCrl(`"A" or ( "B" and "C" )`), "g.cel": guardCel(["B"]) }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.expansion.kind, "or");
+  const [la, andBox] = when.expansion.operands;
+  assert.equal(la.name, "A"); assert.ok(la.blocking, "A false alternative blocks");
+  assert.equal(andBox.kind, "and");
+  const byName = Object.fromEntries(andBox.operands.map((o) => [o.name, o]));
+  assert.ok(!byName.B.blocking, "B held → not blocking"); assert.equal(byName.B.answer, "yes");
+  assert.ok(byName.C.blocking, "C false → blocking"); assert.equal(byName.C.answer, "no");
+});
+
+check("i.4c blocking: failed `(A and B) or C` with A=yes,B=no,C=no → B and C blocking, A not", () => {
+  const { sv, rootLib } = renderCase({ "g.crl": guardCrl(`( "A" and "B" ) or "C"`), "g.cel": guardCel(["A"]) }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.expansion.kind, "or");
+  const [andBox, lc] = when.expansion.operands;
+  const byName = Object.fromEntries(andBox.operands.map((o) => [o.name, o]));
+  assert.ok(!byName.A.blocking, "A held → not blocking");
+  assert.ok(byName.B.blocking, "B false → blocking");
+  assert.ok(lc.blocking, "C false → blocking"); assert.equal(lc.name, "C");
+});
+
+check("i.4c: a COMPOSITE atom inside a guard box nests its own `defined as` body; no spurious blocking inside it", () => {
+  const crl = `library "CX".
+concept "Comp":
+- type is Condition.
+- code is \`c\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "CX":
+first:
+- when "Comp" and "B" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+  // Comp holds, B absent → the compound is FALSE → Comp (yes, composite, not blocking) + B (no, blocking).
+  const cel = `library "CXC".
+covers "CX".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fC":
+- code is "http://x|c".
+- defined by "Comp".
+case "c":
+- subject is "Pat".
+- fact is "fC".
+- result is "CX" is "Deny".`;
+  const { sv, rootLib } = renderCase({ "cx.crl": crl, "cx.cel": cel }, "cx.cel", "c");
+  const shapeByName = { Comp: { nodeKey: "k:Comp", hasCodeIs: true, leafEligible: true, isInferred: true, hasDefinedAs: true, children: [] } };
+  const ref = (name, o = {}) => ({ kind: "ref", ref: { name, lib: "CX", crossLib: false, nodeKey: `k:${name}`, hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, ...o } });
+  const compEntry = { nodeKey: "k:Comp", lib: "CX", name: "Comp", hasCodeIs: true, leafEligible: true, isInferred: true, hasDefinedAs: true, body: { kind: "or", operands: [ref("Leaf1"), ref("Leaf2")] } };
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib, {
+    conceptShape: (_lib, name) => shapeByName[name],
+    defExpr: (lib, name) => (lib === "CX" && name === "Comp" ? compEntry : undefined),
+  });
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.expansion.kind, "and");
+  const byName = Object.fromEntries(when.expansion.operands.map((o) => [o.name, o]));
+  assert.ok(byName.Comp.composite, "the composite atom nests its own defined-as body");
+  assert.equal(byName.Comp.composite.kind, "or", "Comp = (Leaf1 or Leaf2) → ANY OF box");
+  assert.ok(!byName.Comp.blocking, "Comp held → not blocking");
+  assert.ok(byName.Comp.composite.operands.every((o) => !o.blocking), "a `defined as` body never carries guard-blocking marks");
+  assert.ok(byName.B.blocking, "B false → the blocking conjunct"); assert.equal(byName.B.answer, "no");
+});

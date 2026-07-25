@@ -15,7 +15,7 @@
 // NAV/GROUNDING (disc 193 Q4/Q5): only RUNTIME rows (whens + the blocked guard) are nav-stops + cross-pane markable
 // (their `nodeId` grounds in `sv.tree` via `resolveThisNode`). Expanded LEAF rows render but are NOT nav-stops — a
 // synthetic leaf id can't ground `driveThisNode` (that's Todo 5). This module imports ONLY types from the core.
-import type { ConceptShapeNode, DefExprEntry, DefStructExpr, ScenarioViewModel, ViewNode, GuardView, ConditionView } from "@smile-digital-health/crl";
+import type { BranchConditionView, ConceptShapeNode, DefExprEntry, DefStructExpr, ScenarioViewModel, ViewNode, GuardView, ConditionView } from "@smile-digital-health/crl";
 import { buildDefStruct, displayDetermination } from "@smile-digital-health/crl";
 
 export type ConceptValueType = string;
@@ -37,6 +37,13 @@ export type QExpr =
       valueType: ConceptValueType | null;
       /** A named-composite / both-rep operand's OWN `defined as` body, as a nested box (the operand is answerable AND expandable). */
       composite?: QExpr;
+      /** #224 i.4c: a GUARD-box atom that actually BLOCKED the branch (branch-false ∧ this atom RUNTIME-evaluated
+       *  false ∧ no ancestor `or` satisfied). "Runtime-evaluated false" — NOT a `conceptTruth` display fallback: a
+       *  zip-degraded atom (no runtime `satisfied`) is never a blocker, even if its DISPLAYED answer is "no" (mirrors
+       *  i.4b's opaque handling — a degraded node is never a pinpointed blocker). A false-but-non-blocking atom (a
+       *  false conjunct of a satisfied `or`) leaves this unset → renders informational. Computed LOCALLY in
+       *  `buildGuardStruct`. Only ever set on guard-box leaves; a `defined as` expansion leaf never carries it. */
+      blocking?: boolean;
     }
   | { kind: "external"; name: string; lib: string } // a cross-library operand — NOT evaluated here (distinct from local "unknown")
   | { kind: "more"; count: number }; // width truncation (`+N more`) or, count 0, a depth-cap `…` stub
@@ -72,8 +79,13 @@ export interface Question {
   /** An evaluated on-path `when` — the ONLY rows `producedPathDiverterIds` may light (never a leaf/preempted row). */
   diverterEligible: boolean;
   /** #187 Option-3: on an ON-PATH-SATISFIED composite `when`, its `defined as` operator tree (ANY OF / ALL OF boxes).
-   *  Absent for a non-composite / preempted / reached-false / off-path when (those stay flat rows). */
+   *  #224 i.4c: ALSO the per-atom case-feature box of a COMPOUND guard (a failed / preempted compound `when`).
+   *  Absent for a non-composite single-ref / an on-path-satisfied compound / off-path when (those stay flat rows). */
   expansion?: QExpr;
+  /** #224 i.4c: which KIND of `expansion` this is — a `defined as` representation-disjunction ("defined-as", the
+   *  default, gets a forced top `or` chip) vs a decision guard's boolean tree ("guard", rendered with NO forced `or`
+   *  chip: `and`→ALL OF, `or`→ANY OF as authored). Present only when `expansion` is. */
+  expansionKind?: "defined-as" | "guard";
   source?: ViewNode["source"];
 }
 
@@ -228,7 +240,66 @@ export function buildQuestionnaire(
     // The `expansion` is the RAW operator tree (the ALL OF / ANY OF structure is unchanged). `defined as` is a disjunction
     // of alternative representations, but that top-level `or` is a RENDER annotation (a forced `or` chip above the body —
     // see renderExpansion), NOT an extra box — so a top-level `and` shows `or` then its ALL OF, one compound alternative.
-    if (entry?.hasDefinedAs && entry.body) q.expansion = enrich(buildDefStruct(entry.body, opts.defExpr, new Set([entry.nodeKey]), 1));
+    if (entry?.hasDefinedAs && entry.body) {
+      q.expansion = enrich(buildDefStruct(entry.body, opts.defExpr, new Set([entry.nodeKey]), 1));
+      q.expansionKind = "defined-as";
+    }
+  };
+
+  // #224 i.4c: build the per-atom case-feature box of a COMPOUND guard — a QExpr box faithful to the AUTHORED guard
+  // tree (`and`→ALL OF, `or`→ANY OF; every positional occurrence kept, NEVER deduped/pruned, so `A and B` never
+  // collapses to `A`). Each atom is a QExpr LEAF (no nodeId/nav/diverter — the nav-stop is the ONE guard ROW; leaf
+  // invariants hold BY CONSTRUCTION). This is a COCKPIT VALIDATION surface (the whole authored guard's case-features),
+  // NOT the emitted arm-specific DTR `$apply` input (emit lowers to DNF arms with arm-specific `action.input`).
+  //   answer  — the atom's per-leaf runtime `satisfied` when evaluated (no short-circuit ⇒ every operand has it);
+  //             else `conceptTruth` (a preempted guard, or a zip-degraded operand) → "unknown" if absent, never "no".
+  //   blocking — LOCAL: branch-false ∧ atom-false ∧ no ancestor `or` satisfied (§ `blocking` doc on QExpr leaf).
+  const buildGuardStruct = (
+    expr: BranchConditionView,
+    frameLib: string | undefined,
+    branchFalse: boolean,
+    underSatisfiedOr: boolean,
+  ): QExpr => {
+    if (expr.op !== "ref") {
+      // A satisfied `or` on the path makes its false members INFORMATIONAL (not blockers) for the whole subtree.
+      const nextUnderSatOr = underSatisfiedOr || (expr.op === "or" && expr.satisfied === true);
+      return { kind: expr.op, operands: expr.operands.map((o) => buildGuardStruct(o, frameLib, branchFalse, nextUnderSatOr)) };
+    }
+    const lib = expr.concept.libraryName ?? frameLib ?? "";
+    const name = expr.concept.name;
+    const valueTypes = resolveValueTypes(lib, name);
+    const shape = shapeOf(lib, name);
+    const answer: "yes" | "no" | "unknown" =
+      expr.satisfied !== undefined ? (expr.satisfied ? "yes" : "no") : truthAnswer(lib, name);
+    const leaf: Extract<QExpr, { kind: "leaf" }> = {
+      kind: "leaf",
+      name,
+      lib,
+      answer,
+      isSource: shape ? shape.hasCodeIs : true,
+      isInferred: shape ? shape.isInferred : false,
+      valueType: valueTypes[0] ?? null,
+    };
+    // Blocking requires RUNTIME evidence (`expr.satisfied === false`), NOT the displayed `answer`: a zip-degraded
+    // leaf (no runtime `satisfied`) falls to `conceptTruth` for DISPLAY, but an off-trace fallback must never claim
+    // "this criterion blocked the branch" (mirrors i.4b's opaque handling — a degraded node is never a pinpointed blocker).
+    if (branchFalse && expr.satisfied === false && !underSatisfiedOr) leaf.blocking = true;
+    // A composite atom (its own `defined as`) is answerable AND expandable → nest its body via the SHARED positional
+    // builder (a representation-disjunction — the forced top `or` chip is CORRECT for it, unlike the guard-box top).
+    if (opts.defExpr) {
+      const entry = opts.defExpr(lib, name);
+      if (entry?.hasDefinedAs && entry.body) {
+        leaf.composite = enrich(buildDefStruct(entry.body, opts.defExpr, new Set([entry.nodeKey]), 1));
+      }
+    }
+    return leaf;
+  };
+
+  // Attach the guard box to a COMPOUND `when` row. `branchFalse` (the whole guard evaluated false) enables blocking
+  // styling; a preempted guard (never evaluated) passes false → informational only.
+  const attachGuardStruct = (q: Question, cond: ConditionView, frameLib: string | undefined): void => {
+    q.expansion = buildGuardStruct(cond.expr, frameLib, cond.satisfied === false, false);
+    q.expansionKind = "guard";
   };
 
   type GuardTerminal = { node: ViewNode; guard: GuardView; frameLib: string | undefined; depth: number };
@@ -249,20 +320,29 @@ export function buildQuestionnaire(
         const guardConcept = guardConceptOf(node, cond.expr);
         const isSingleRef = cond.expr.op === "ref";
         if (node.unreachedReason === "preempted") {
-          // first:-preempted sibling → DIMMED terminal; case answer from conceptTruth (off-path). No recurse/expand.
-          emitWhen(guardConcept, node, frameLib, depth, "when-preempted", "preempted", undefined);
+          // first:-preempted sibling → DIMMED terminal; case answer from conceptTruth (off-path). No recurse.
+          const wq = emitWhen(guardConcept, node, frameLib, depth, "when-preempted", "preempted", undefined);
+          // #224 i.4c: a COMPOUND preempted guard shows its per-atom case-feature box (informational — never
+          // evaluated, so no blocking). A single-ref preempted stays a flat row (pre-#224).
+          if (!isSingleRef) attachGuardStruct(wq, cond, frameLib);
           continue;
         }
         if (cond.satisfied === true) {
           const wq = emitWhen(guardConcept, node, frameLib, depth, "when-evaluated", "evaluated", true);
-          // ON-PATH single-ref composite → attach its `defined as` operator tree (ANY OF / ALL OF box).
+          // ON-PATH single-ref composite → its `defined as` operator tree (ANY OF / ALL OF box). A SATISFIED COMPOUND
+          // guard ALSO gets its per-atom box (every EVALUATED compound shows its leaves' runtime `satisfied` — disc 294);
+          // `branchFalse` is false so nothing is blocking (e.g. a false member of a satisfied `or` reads informational).
+          // The guard still RECURSES into its body (the box is the guard's atoms; the children are its sub-decisions).
           if (isSingleRef) attachExpansion(wq, guardConcept, frameLib);
+          else attachGuardStruct(wq, cond, frameLib);
           walk(node.children ?? [], frameLib, depth + 1);
           continue;
         }
         if (cond.satisfied === false) {
-          // reached-and-false → terminal (shows what fired); no recurse, no leaf-expand (only on-path composites expand).
-          emitWhen(guardConcept, node, frameLib, depth, "when-evaluated", "evaluated", false);
+          // reached-and-false → terminal (shows what fired); no recurse.
+          const wq = emitWhen(guardConcept, node, frameLib, depth, "when-evaluated", "evaluated", false);
+          // #224 i.4c: a COMPOUND failed guard shows WHICH atoms blocked it (per-atom box, blocking styling).
+          if (!isSingleRef) attachGuardStruct(wq, cond, frameLib);
           continue;
         }
         continue; // unevaluated, non-preempted (unreached subtree under a terminal parent) → not on the surface
