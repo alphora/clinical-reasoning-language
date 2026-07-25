@@ -63,6 +63,79 @@ export function branchConditionRefs(c: BranchCondition): BranchConditionRef[] {
 }
 
 /**
+ * Disjunctive Normal Form of a guard: the list of ARMS, each an ordered list of
+ * ref atoms (a conjunction). Each arm lowers to ONE `PlanDefinition.action` with
+ * N ANDed `condition[kind=applicability]` (#224 i.3 structural emit).
+ *   - ref       → `[[ref]]`
+ *   - and(ops)  → cartesian PRODUCT of the operands' DNFs (atoms concatenated,
+ *                 operand order preserved)
+ *   - or(ops)   → CONCATENATION (union) of the operands' DNFs
+ * Atom order within an arm is deterministic left-to-right source order; duplicate
+ * atoms are PRESERVED (dedup is a display/input concern, not identity). Callers
+ * that lower to FHIR MUST first guard on `branchConditionArmCount` (below) — this
+ * fully materializes the product and is unbounded for a pathological guard.
+ *
+ * PRECONDITION: a WELL-FORMED condition (every `and`/`or` has an `operands` array
+ * with >= 2 entries — the builder/grammar invariant, asserted by
+ * `assertWellFormedBranchCondition`). Unlike `branchConditionRefs` (which tolerates
+ * a malformed operand-less node for the projectIndex editor-buffer path), this
+ * structural transform assumes valid input — the emitter only ever runs on a
+ * parse-success AST, so the invariant holds there.
+ */
+export function branchConditionDNF(c: BranchCondition): BranchConditionRef[][] {
+  switch (c.type) {
+    case "BranchConditionRef":
+      return [[c]];
+    case "BranchConditionOr":
+      return c.operands.flatMap((o) => branchConditionDNF(o));
+    case "BranchConditionAnd": {
+      // Cartesian product: start with one empty arm, extend by each operand's arms.
+      let arms: BranchConditionRef[][] = [[]];
+      for (const operand of c.operands) {
+        const opArms = branchConditionDNF(operand);
+        const next: BranchConditionRef[][] = [];
+        for (const arm of arms) for (const opArm of opArms) next.push([...arm, ...opArm]);
+        arms = next;
+      }
+      return arms;
+    }
+  }
+}
+
+/**
+ * The number of DNF arms `branchConditionDNF` WOULD produce, computed WITHOUT
+ * materializing them and SATURATING at `cap + 1` so a pathological `and`-of-`or`s
+ * (2^N arms) can never allocate exponentially. The emitter checks this against the
+ * expansion cap (16) BEFORE calling `branchConditionDNF`, so a bad editor buffer
+ * bundled into crl-vscode reports a compile error instead of hanging/OOM.
+ *   - ref      → 1
+ *   - and(ops) → product of children (saturating)
+ *   - or(ops)  → sum of children (saturating)
+ */
+export function branchConditionArmCount(c: BranchCondition, cap = 16): number {
+  const ceiling = cap + 1;
+  const go = (n: BranchCondition): number => {
+    if (n.type === "BranchConditionRef") return 1;
+    if (n.type === "BranchConditionOr") {
+      let sum = 0;
+      for (const o of n.operands) {
+        sum += go(o);
+        if (sum >= ceiling) return ceiling;
+      }
+      return sum;
+    }
+    // and: product
+    let product = 1;
+    for (const o of n.operands) {
+      product *= go(o);
+      if (product >= ceiling) return ceiling;
+    }
+    return product;
+  };
+  return go(c);
+}
+
+/**
  * Assert every `and`/`or` node carries >= 2 operands (the grammar/builder
  * invariant). i.1 has no producer of compounds; i.2's builder and the semantic
  * validator call this on parsed / hand-built compounds. Throws on violation.

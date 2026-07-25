@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   assertWellFormedBranchCondition,
+  branchConditionArmCount,
+  branchConditionDNF,
   branchConditionRefs,
   describeBranchCondition,
   soleRef,
@@ -113,6 +115,63 @@ describe("branchCondition traversal helpers", () => {
       // e.g. a half-built condition from an invalid buffer, cast through `unknown`.
       const malformed = { type: "BranchConditionAnd", location: LOC } as unknown as BranchCondition;
       expect(branchConditionRefs(malformed)).toEqual([]);
+    });
+  });
+
+  describe("branchConditionDNF — arms as ordered atom lists (#224 i.3)", () => {
+    const names = (arms: ReturnType<typeof branchConditionDNF>): string[][] =>
+      arms.map((arm) => arm.map((a) => a.ref as string));
+
+    it("single ref → one arm", () => {
+      expect(names(branchConditionDNF(ref("A")))).toEqual([["A"]]);
+    });
+    it("`A and B` → one arm, two atoms", () => {
+      expect(names(branchConditionDNF(and(ref("A"), ref("B"))))).toEqual([["A", "B"]]);
+    });
+    it("`A or B` → two arms", () => {
+      expect(names(branchConditionDNF(or(ref("A"), ref("B"))))).toEqual([["A"], ["B"]]);
+    });
+    it("`(A or B) and C` → distributes to [A,C], [B,C]", () => {
+      const c = and(or(ref("A"), ref("B")), ref("C"));
+      expect(names(branchConditionDNF(c))).toEqual([
+        ["A", "C"],
+        ["B", "C"],
+      ]);
+    });
+    it("`(A or B) and (C or D)` → exact 4-arm cartesian order", () => {
+      const c = and(or(ref("A"), ref("B")), or(ref("C"), ref("D")));
+      expect(names(branchConditionDNF(c))).toEqual([
+        ["A", "C"],
+        ["A", "D"],
+        ["B", "C"],
+        ["B", "D"],
+      ]);
+    });
+    it("duplicates are preserved (identity, not deduped)", () => {
+      expect(names(branchConditionDNF(and(ref("A"), ref("A"))))).toEqual([["A", "A"]]);
+      expect(names(branchConditionDNF(or(ref("A"), ref("A"))))).toEqual([["A"], ["A"]]);
+    });
+  });
+
+  describe("branchConditionArmCount — saturating, no materialization (#224 i.3)", () => {
+    it("counts without saturating below the cap", () => {
+      expect(branchConditionArmCount(ref("A"))).toBe(1);
+      expect(branchConditionArmCount(and(ref("A"), ref("B")))).toBe(1);
+      expect(branchConditionArmCount(or(ref("A"), ref("B")))).toBe(2);
+      // (A or B) and (C or D) = 4
+      expect(
+        branchConditionArmCount(and(or(ref("A"), ref("B")), or(ref("C"), ref("D")))),
+      ).toBe(4);
+    });
+    it("saturates at cap+1 for a pathological and-of-ors (never materializes 2^N)", () => {
+      // five binary ORs producted = 2^5 = 32 arms; count saturates at 17 (default cap 16).
+      const bigOr = (n: number) => or(ref(`${n}a`), ref(`${n}b`));
+      const guard = and(bigOr(1), bigOr(2), bigOr(3), bigOr(4), bigOr(5));
+      expect(branchConditionArmCount(guard)).toBe(17);
+    });
+    it("exactly at the cap is not saturated", () => {
+      const bigOr = (n: number) => or(ref(`${n}a`), ref(`${n}b`));
+      expect(branchConditionArmCount(and(bigOr(1), bigOr(2), bigOr(3), bigOr(4)))).toBe(16);
     });
   });
 });

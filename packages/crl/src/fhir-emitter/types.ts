@@ -60,6 +60,7 @@ import type { CRLError } from "../types/errors";
  *   invalid-source-date-epoch                      error    `SOURCE_DATE_EPOCH` env is not a non-negative integer of epoch seconds (rejects ms-shaped values).
  *   missing-publishable-date                       error    Publishable+ emit with no resolvable date (no --date/SOURCE_DATE_EPOCH/crl.date). Reproducibility is not opt-in.
  *   executable-capability-unsupported              error    `--capability executable` requested, but emit produces design-time forms (text/cql, value-set compose), not run-time forms (ELM, expansion). Max is publishable. See #113.
+ *   compound-guard-expansion-overflow              error    A compound `when` guard's DNF exceeds the 16-arm cap. The branch is suppressed; the author must hoist the disjunction into nested `first:`/`when` branches. NEVER a CQL fallback (a decision boolean never lowers to CQL). (#224 i.3)
  */
 
 /**
@@ -348,11 +349,7 @@ export interface UnmatchedReference {
     // removed). It carries no machine signal, so routing it to `unmatched` would
     // wrongly pin `success:false`.
     | "unsupported-communication-with-terminology"
-    | "unsupported-questionnaire-with"
-    // #224 i.2: a compound `and`/`or` `when` guard — structural DNF lowering is
-    // i.3. Pins success:false so the partial (semantically-wrong) resource is
-    // never shipped; the branch is suppressed with this diagnostic.
-    | "unsupported-compound-guard";
+    | "unsupported-questionnaire-with";
   text: string;
   line?: number;
   column?: number;

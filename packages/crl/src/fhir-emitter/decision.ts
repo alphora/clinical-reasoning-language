@@ -30,6 +30,13 @@
  * convention for CQL identifier references (confirmed via
  * cc-screening example).
  *
+ * #224 COMPOUND GUARDS (`when A and B`, `when (A or B) and C`): a `when` maps to
+ * 1..N actions, NOT one. The decision boolean lowers to `action` STRUCTURE, NEVER
+ * to a CQL expression. `and` → one action with N ANDed `condition[]`; `or` → DNF
+ * arms placed context-sensitively (spliced under `first:`, or wrapped in one
+ * `cqf-applicabilityBehavior` "any" grouping action under `all:`/flat). See
+ * `emitCompoundWhenBlock`.
+ *
  * Recursive `when...then` nests as `action.action[]`. Leaves use
  * `action.definitionCanonical`: `recommend activity X` →
  * Recommendation PlanDef wrapping X; `use decision Y` → sub-decision Y.
@@ -62,7 +69,9 @@ import type {
   ActionStatement,
   BlockBody,
   BlockMember,
+  BlockQualifier,
   BranchBlock,
+  BranchConditionRef,
   Concept,
   Decision,
   OtherwiseBlock,
@@ -71,7 +80,12 @@ import type {
   WhenBlockBody,
 } from "../ast/types";
 import { getRefName, isQualifiedRef, normalizeLocalRef, refDisplay } from "../ast/types";
-import { soleRef, describeBranchCondition } from "../ast/branchCondition";
+import {
+  soleRef,
+  describeBranchCondition,
+  branchConditionDNF,
+  branchConditionArmCount,
+} from "../ast/branchCondition";
 import type { CRLError } from "../types/errors";
 import { libraryCanonicalUrl } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
@@ -243,11 +257,17 @@ function defaultClock(): Date {
 
 /* ─── Cascade-suppression tri-state for action emit ──────────────── */
 
+// A single authored branch (a `when`/`otherwise`) emits 1..N sibling actions. A
+// single-ref `when`, a pure-`and` `when`, and an `otherwise` emit exactly one; a
+// `when` whose guard contains `or` emits its DNF arms (spliced under `first:`, or
+// wrapped in one `"any"` grouping action under `all:`/flat — see `emitWhenBlock`).
+// The multiplicity lives INSIDE `actions`, so the caller stays 1:1 with source
+// statements (the cascade-diagnostic index loops rely on that).
 type EmitActionResult =
-  | { kind: "emitted"; action: Record<string, unknown> }
+  | { kind: "emitted"; actions: Record<string, unknown>[] }
   | {
       kind: "suppressed";
-      reason: "unresolved-ref" | "all-children-suppressed" | "unsupported-compound-guard";
+      reason: "unresolved-ref" | "all-children-suppressed" | "compound-guard-overflow";
     };
 
 /* ─── Single-Decision emit ───────────────────────────────────────── */
@@ -336,10 +356,12 @@ export function emitDecisionPlanDefinition(
     errors,
     unmatched,
   };
-  const topLevelResults = decision.body.statements.map((branch) => emitBranch(branch, ctx));
+  const topLevelResults = decision.body.statements.map((branch) =>
+    emitBranch(branch, ctx, decision.body.qualifier),
+  );
   const topLevelActions = topLevelResults
-    .filter((r): r is { kind: "emitted"; action: Record<string, unknown> } => r.kind === "emitted")
-    .map((r) => r.action);
+    .filter((r): r is { kind: "emitted"; actions: Record<string, unknown>[] } => r.kind === "emitted")
+    .flatMap((r) => r.actions);
 
   if (topLevelActions.length === 0) {
     // Rule 6: top-level all-suppressed → decision-cascade-suppressed
@@ -351,7 +373,7 @@ export function emitDecisionPlanDefinition(
     errors.push({
       type: "Validation",
       kind: "decision-cascade-suppressed",
-      message: `Decision "${decision.name}" would emit with zero surviving top-level actions due to cascade suppression. Skipping resource. See the accompanying diagnostics (unresolved references and/or unsupported constructs such as compound guards).`,
+      message: `Decision "${decision.name}" would emit with zero surviving top-level actions due to cascade suppression. Skipping resource. See the accompanying diagnostics (unresolved references and/or an over-cap compound-guard expansion).`,
       line: decision.location?.start.line,
       column: decision.location?.start.column,
     });
@@ -463,39 +485,100 @@ interface EmitCtx {
   unmatched: UnmatchedReference[];
 }
 
-/** Dispatch a branch to its when/otherwise emit. */
-function emitBranch(branch: BranchBlock, ctx: EmitCtx): EmitActionResult {
-  return branch.type === "WhenBlock" ? emitWhenBlock(branch, ctx) : emitOtherwiseBlock(branch, ctx);
+/**
+ * Dispatch a branch to its when/otherwise emit. `enclosingQualifier` is the
+ * qualifier of the block this branch is a sibling in (`decision.body.qualifier`
+ * at the top level, `body.qualifier` when nested). It decides `or`-arm placement
+ * in `emitWhenBlock`: splice under `first:`, wrap under everything else.
+ */
+function emitBranch(
+  branch: BranchBlock,
+  ctx: EmitCtx,
+  enclosingQualifier: BlockQualifier | undefined,
+): EmitActionResult {
+  return branch.type === "WhenBlock"
+    ? emitWhenBlock(branch, ctx, enclosingQualifier)
+    : emitOtherwiseBlock(branch, ctx);
+}
+
+/** Max DNF disjunct-arms one authored compound guard may expand to (#224 i.3). */
+const COMPOUND_GUARD_ARM_CAP = 16;
+
+/** A guideline-based-care `code[]` block — every emitted action carries it. */
+function guidelineCareCode(): Array<Record<string, unknown>> {
+  return [{ coding: [{ system: CPG_COMMON_PROCESS_CS, code: "guideline-based-care" }] }];
 }
 
 /**
- * Recursive WhenBlock → action emit. Returns the tri-state result.
- * Cascade rules per plan v3.2 §"Cascade-suppression behavior".
+ * Deep-clone a JSON-plain fragment. Used to give each DNF arm its OWN copy of the
+ * shared body fields — the emitted payload is strings/booleans/arrays/objects only,
+ * so the round-trip is lossless, and no arm aliases another's nested `action`.
  */
-function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
-  // Normalize the condition ref ONCE (F5 — single computation): a SAME-library
-  // qualified ref (`MyLib."X"` inside `MyLib`) is stripped to bare `X`; a genuine
-  // cross-library ref (`OtherLib."X"`) is left qualified. This normalized ref + its
-  // bare name (`refName`) drive the condition resolver, the action-level input
-  // lookup, AND the displays, so the input path treats a self-qualified ref the
-  // SAME way the condition path does (F2 — no self-qualified asymmetry).
-  // #224 i.2 EMIT GATE: a COMPOUND guard (`and`/`or`) has no structural DNF
-  // lowering yet (that is i.3). Suppress the branch with a clear diagnostic
-  // rather than emit a wrong condition. The non-empty `unmatched` pins emit
-  // success:false, so the partial PlanDefinition is never shipped — a suppressed
-  // `when` inside `first:` shifts sibling preemption, so the artifact is
-  // semantically wrong and not usable until i.3.
-  const guardRefNode = soleRef(wb.condition);
-  if (!guardRefNode) {
-    ctx.unmatched.push({
-      kind: "unsupported-compound-guard",
-      text: `${describeBranchCondition(wb.condition, refDisplay)} — compound guard not yet emittable (#224 i.3); branch suppressed, emitted PlanDefinition not usable until then`,
-      line: wb.location?.start.line,
-      column: wb.location?.start.column,
-    });
-    return { kind: "suppressed", reason: "unsupported-compound-guard" };
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/**
+ * Action-level `input[]` (DTR pattern) for a set of condition concepts, in order,
+ * deduped by canonical (first-seen wins, keeping its first-seen name). A single-ref
+ * `when` passes `[refName]`; a DNF arm passes ITS atoms (arm-aware union, G15). Each
+ * collected concept → one `Observation` input profiled to its case-feature SD. The
+ * case-features are the RECURSIVE `code is` closure of each condition in INFERENCE
+ * ORDER (see `caseFeatureCollection.ts`); pass only NON-qualified (local) names —
+ * a genuinely-foreign atom has no case-features in v0. Returns `undefined` when empty.
+ */
+function buildActionInputs(
+  conceptNames: string[],
+  ctx: EmitCtx,
+): Array<Record<string, unknown>> | undefined {
+  const seenCanonicals = new Set<string>();
+  const inputs: Array<Record<string, unknown>> = [];
+  for (const conceptName of conceptNames) {
+    for (const { name, canonical } of ctx.caseFeatureInputResolver(conceptName)) {
+      if (seenCanonicals.has(canonical)) continue;
+      seenCanonicals.add(canonical);
+      inputs.push({
+        extension: [
+          { url: CPG_INPUT_TEXT_EXT, valueString: `${name}?` },
+          { url: CPG_INPUT_DESCRIPTION_EXT, valueMarkdown: name },
+        ],
+        type: "Observation",
+        profile: [canonical],
+      });
+    }
   }
-  const guardRef = guardRefNode.ref;
+  return inputs.length > 0 ? inputs : undefined;
+}
+
+/** Dedup key for a normalized atom (ReferenceName is string | QualifiedReference,
+ *  so a Set on the raw node would key by object identity). */
+function atomKey(normalized: ReferenceName): string {
+  return isQualifiedRef(normalized)
+    ? `q:${JSON.stringify([normalized.libraryName, normalized.name])}`
+    : `b:${normalized}`;
+}
+
+/**
+ * Recursive WhenBlock → action emit. Returns the tri-state result (1..N actions).
+ * A SINGLE-ref guard takes the byte-identical pre-#224 path; a COMPOUND guard
+ * (`and`/`or`) lowers structurally via `emitCompoundWhenBlock`. Cascade rules per
+ * plan v3.2 §"Cascade-suppression behavior".
+ */
+function emitWhenBlock(
+  wb: WhenBlock,
+  ctx: EmitCtx,
+  enclosingQualifier: BlockQualifier | undefined,
+): EmitActionResult {
+  const sole = soleRef(wb.condition);
+  if (!sole) return emitCompoundWhenBlock(wb, ctx, enclosingQualifier);
+
+  // ── Single-ref path (byte-identical to pre-#224) ──
+  // Normalize the condition ref ONCE (F5): a SAME-library qualified ref
+  // (`MyLib."X"` inside `MyLib`) is stripped to bare `X`; a genuine cross-library
+  // ref (`OtherLib."X"`) is left qualified. This normalized ref + its bare name
+  // drive the condition resolver, the input lookup, AND the displays, so the input
+  // path treats a self-qualified ref the SAME way the condition path does (F2).
+  const guardRef = sole.ref;
   const normalizedRef = normalizeLocalRef(guardRef, ctx.libraryName);
   const refName = getRefName(normalizedRef);
 
@@ -512,17 +595,12 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
   }
 
   // 2. Build action skeleton (with applicability condition). Title/description use
-  // the NORMALIZED bare name — byte-identical to the raw `getRefName(guardRef)`
-  // for an unqualified ref, and consistent with the condition/input for a
-  // self-qualified one.
+  // the NORMALIZED bare name — byte-identical to the raw `getRefName(guardRef)` for
+  // an unqualified ref, and consistent with the condition/input for a self-qualified one.
   const action: Record<string, unknown> = {
     title: refName,
     description: refName,
-    code: [
-      {
-        coding: [{ system: CPG_COMMON_PROCESS_CS, code: "guideline-based-care" }],
-      },
-    ],
+    code: guidelineCareCode(),
     condition: [
       {
         kind: "applicability",
@@ -531,40 +609,142 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
     ],
   };
 
-  // Action-level `input[]` (DTR pattern). The `when` condition references a SINGLE
-  // concept, but its case-feature inputs are the RECURSIVE `code is` closure of
-  // that condition in INFERENCE ORDER (the condition's own `code is` first, then
-  // its `defined as` operands left-to-right — see `caseFeatureCollection.ts`). F2 —
-  // normalize the ref the SAME way the condition path does, THEN skip ONLY if the
-  // NORMALIZED ref is still qualified (a genuine cross-library ref); a
-  // self-qualified eligible `when` (`MyLib."X"` inside `MyLib`) gets its inputs,
-  // consistent with the condition it already got. Each collected concept becomes
-  // one `Observation` input profiled to that concept's case-feature SD, labelled +
-  // described by the concept name. Dedup by canonical within THIS action (the
-  // collection already dedups by name; canonical-dedup is a belt-and-suspenders
-  // guard against two names slugging to the same SD).
-  if (!isQualifiedRef(normalizedRef)) {
-    const collected = ctx.caseFeatureInputResolver(refName);
-    if (collected.length > 0) {
-      const seenCanonicals = new Set<string>();
-      const inputs: Array<Record<string, unknown>> = [];
-      for (const { name, canonical } of collected) {
-        if (seenCanonicals.has(canonical)) continue;
-        seenCanonicals.add(canonical);
-        inputs.push({
-          extension: [
-            { url: CPG_INPUT_TEXT_EXT, valueString: `${name}?` },
-            { url: CPG_INPUT_DESCRIPTION_EXT, valueMarkdown: name },
-          ],
-          type: "Observation",
-          profile: [canonical],
-        });
-      }
-      if (inputs.length > 0) action.input = inputs;
-    }
-  }
+  // Action-level `input[]` — skip ONLY when the NORMALIZED ref is still qualified
+  // (a genuine cross-library ref); a self-qualified eligible `when` gets its inputs.
+  const inputs = buildActionInputs(isQualifiedRef(normalizedRef) ? [] : [refName], ctx);
+  if (inputs) action.input = inputs;
 
   return fillBranchBody(action, wb.body, ctx);
+}
+
+/**
+ * Compound WhenBlock (`and`/`or` guard) → structural FHIR emit (#224 i.3).
+ *
+ * The guard lowers to Disjunctive Normal Form — a list of ARMS, each a conjunction
+ * of ref atoms → ONE action with N ANDed `condition[kind=applicability]` (cqf `$apply`
+ * ANDs multiple conditions by default). The DECISION boolean NEVER lowers to CQL.
+ *
+ * Placement is CONTEXT-SENSITIVE (harness-proven, disc 286):
+ *   - enclosing `first:` → SPLICE the arms as contiguous ordered siblings (an
+ *     unconditional `"any"` wrapper under `first:` selects while empty and STARVES
+ *     `otherwise`);
+ *   - `all:`/flat/undefined → wrap the arms in ONE synthesized `cqf-applicabilityBehavior`
+ *     `"any"` grouping action (exactly one arm fires).
+ * A pure-`and` guard is a single arm → one action, no wrapper either way.
+ */
+function emitCompoundWhenBlock(
+  wb: WhenBlock,
+  ctx: EmitCtx,
+  enclosingQualifier: BlockQualifier | undefined,
+): EmitActionResult {
+  // Cap FIRST — before materializing DNF or resolving — so an over-cap guard is a
+  // DETERMINISTIC overflow error (not whichever-atom-unresolved-first), and a
+  // pathologically DEEP but well-formed guard (`and`-of-`or`s) can never allocate
+  // 2^N arms via the saturating count. This emitter ships in the crl-vscode bundle,
+  // so a large valid guard must report, never OOM. NEVER a CQL fallback (the
+  // load-bearing principle).
+  if (branchConditionArmCount(wb.condition, COMPOUND_GUARD_ARM_CAP) > COMPOUND_GUARD_ARM_CAP) {
+    ctx.errors.push({
+      type: "Validation",
+      kind: "compound-guard-expansion-overflow",
+      message: `Compound guard \`${describeBranchCondition(
+        wb.condition,
+        getRefName,
+      )}\` expands to more than ${COMPOUND_GUARD_ARM_CAP} disjunct arms. Hoist the disjunction into nested \`first:\`/\`when\` branches instead of one flat guard.`,
+      line: wb.location?.start.line,
+      column: wb.location?.start.column,
+    });
+    return { kind: "suppressed", reason: "compound-guard-overflow" };
+  }
+
+  const arms = branchConditionDNF(wb.condition);
+
+  // Resolve every DISTINCT atom once (first-seen order across arms). Collect ALL
+  // unresolved atoms — each with its OWN location — so the author sees every bad
+  // ref, then suppress the whole guard ONCE (mirrors the single-ref suppression).
+  const resolvedByKey = new Map<string, string>();
+  const distinctSeen = new Set<string>();
+  const unresolved: BranchConditionRef[] = [];
+  for (const arm of arms) {
+    for (const atom of arm) {
+      const normalized = normalizeLocalRef(atom.ref, ctx.libraryName);
+      const key = atomKey(normalized);
+      if (distinctSeen.has(key)) continue;
+      distinctSeen.add(key);
+      const cqlId = ctx.conceptResolver(normalized);
+      if (cqlId === null) {
+        unresolved.push(atom);
+        continue;
+      }
+      resolvedByKey.set(key, cqlId);
+    }
+  }
+  if (unresolved.length > 0) {
+    for (const atom of unresolved) {
+      ctx.unmatched.push({
+        kind: "unresolved-concept",
+        text: refDisplay(atom.ref), // raw ref — parity with the single-ref path
+        line: atom.location?.start.line,
+        column: atom.location?.start.column,
+      });
+    }
+    return { kind: "suppressed", reason: "unresolved-ref" };
+  }
+
+  // Emit the shared body ONCE on a body-less skeleton — `fillBranchBody` may push
+  // unresolved-leaf / cascade diagnostics into ctx, so calling it per-arm would
+  // N-count them. A suppressed body suppresses the whole authored `when`.
+  const bodySkeleton: Record<string, unknown> = {
+    title: "",
+    description: "",
+    code: guidelineCareCode(),
+  };
+  const bodyResult = fillBranchBody(bodySkeleton, wb.body, ctx);
+  if (bodyResult.kind === "suppressed") return bodyResult;
+  const filled = bodyResult.actions[0]!; // body-less skeleton → exactly one action
+  const bodyFields: Record<string, unknown> = {};
+  for (const k of ["definitionCanonical", "action", "extension"] as const) {
+    if (k in filled) bodyFields[k] = filled[k];
+  }
+
+  const armActions: Array<Record<string, unknown>> = arms.map((arm) => {
+    const normalizedAtoms = arm.map((a) => normalizeLocalRef(a.ref, ctx.libraryName));
+    const armLabel = normalizedAtoms.map((n) => getRefName(n)).join(" and ");
+    const conditions = normalizedAtoms.map((n) => ({
+      kind: "applicability",
+      expression: { language: "text/cql-identifier", expression: resolvedByKey.get(atomKey(n))! },
+    }));
+    // Arm-aware `input`: union over the arm's NON-qualified atoms (G15).
+    const armInputNames = normalizedAtoms.filter((n) => !isQualifiedRef(n)).map((n) => getRefName(n));
+    const inputs = buildActionInputs(armInputNames, ctx);
+    return {
+      title: armLabel,
+      description: armLabel,
+      code: guidelineCareCode(),
+      condition: conditions,
+      ...(inputs ? { input: inputs } : {}),
+      // Clone the shared body fields into EVERY arm (incl. arm 0) — anti-aliasing +
+      // future-mutation hygiene. The body is emitted ONCE, so an unresolved LEAF
+      // diagnoses once (not per arm); only a downstream closure check that walks each
+      // arm's now-independent nested inputs (Inv-5 input profiles) can report per arm.
+      ...cloneJson(bodyFields),
+    };
+  });
+
+  // Placement. Single arm (pure-`and`) → the one action, no wrapper. >=2 arms:
+  // splice under an enclosing `first:`, else one `"any"` grouping wrapper.
+  if (armActions.length >= 2 && enclosingQualifier !== "first") {
+    const guardLabel = describeBranchCondition(wb.condition, getRefName);
+    const wrapper: Record<string, unknown> = {
+      title: guardLabel,
+      description: guardLabel,
+      code: guidelineCareCode(),
+      action: armActions,
+    };
+    addApplicabilityBehaviorExtension(wrapper);
+    return { kind: "emitted", actions: [wrapper] };
+  }
+  return { kind: "emitted", actions: armActions };
 }
 
 /**
@@ -580,11 +760,7 @@ function emitOtherwiseBlock(ob: OtherwiseBlock, ctx: EmitCtx): EmitActionResult 
   const action: Record<string, unknown> = {
     title: "otherwise",
     description: "otherwise",
-    code: [
-      {
-        coding: [{ system: CPG_COMMON_PROCESS_CS, code: "guideline-based-care" }],
-      },
-    ],
+    code: guidelineCareCode(),
     // No `condition[]` — the catch-all is unconditional.
   };
 
@@ -608,14 +784,16 @@ function fillBranchBody(
       return { kind: "suppressed", reason: "unresolved-ref" };
     }
     action.definitionCanonical = leafResult;
-    return { kind: "emitted", action };
+    return { kind: "emitted", actions: [action] };
   }
 
-  // body is BlockBody — recurse into its children.
-  const childResults = body.statements.map((stmt) => emitBlockStatement(stmt, ctx));
+  // body is BlockBody — recurse into its children. Each child may itself emit 1..N
+  // actions (a compound `or` child spliced under this block's `first:`), so flat-map;
+  // the childResults stay 1:1 with statements for the cascade-diagnostic index loop.
+  const childResults = body.statements.map((stmt) => emitBlockStatement(stmt, ctx, body.qualifier));
   const survivingChildren = childResults
-    .filter((r): r is { kind: "emitted"; action: Record<string, unknown> } => r.kind === "emitted")
-    .map((r) => r.action);
+    .filter((r): r is { kind: "emitted"; actions: Record<string, unknown>[] } => r.kind === "emitted")
+    .flatMap((r) => r.actions);
 
   if (survivingChildren.length === 0) {
     // Round-6 Claude I-Rule7 fix: do NOT emit cascade-suppression warning
@@ -673,7 +851,7 @@ function fillBranchBody(
     ];
   }
 
-  return { kind: "emitted", action };
+  return { kind: "emitted", actions: [action] };
 }
 
 /**
@@ -684,8 +862,10 @@ function fillBranchBody(
 function emitBlockStatement(
   stmt: BlockMember,
   ctx: EmitCtx,
+  enclosingQualifier: BlockQualifier | undefined,
 ): EmitActionResult {
-  if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock") return emitBranch(stmt, ctx);
+  if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock")
+    return emitBranch(stmt, ctx, enclosingQualifier);
 
   // ActionStatement at the body level (no enclosing WhenBlock condition).
   // Per CRL grammar this happens inside a BlockBody with no condition —
@@ -702,14 +882,10 @@ function emitBlockStatement(
   const action: Record<string, unknown> = {
     title: actionTitle(stmt.action),
     description: actionTitle(stmt.action),
-    code: [
-      {
-        coding: [{ system: CPG_COMMON_PROCESS_CS, code: "guideline-based-care" }],
-      },
-    ],
+    code: guidelineCareCode(),
     definitionCanonical: leafResult,
   };
-  return { kind: "emitted", action };
+  return { kind: "emitted", actions: [action] };
 }
 
 /**

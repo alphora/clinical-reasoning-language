@@ -7,6 +7,7 @@ import type {
   BlockBody,
   BlockQualifier,
   BranchBlock,
+  BranchCondition,
   Concept,
   ConceptType,
   Decision,
@@ -19,6 +20,7 @@ import type {
 import { libraryCanonicalUrl } from "../library";
 import {
   type ActivityResolver,
+  type CaseFeatureInputResolver,
   type ConceptResolver,
   type DecisionResolver,
   emitDecisionPlanDefinition,
@@ -83,6 +85,19 @@ function when(condition: string, body: WhenBlockBody): WhenBlock {
     body,
     location: LOC,
   };
+}
+// #224 compound-guard condition builders.
+function refC(ref: string): BranchCondition {
+  return { type: "BranchConditionRef", ref, location: LOC };
+}
+function andC(...operands: BranchCondition[]): BranchCondition {
+  return { type: "BranchConditionAnd", operands, location: LOC };
+}
+function orC(...operands: BranchCondition[]): BranchCondition {
+  return { type: "BranchConditionOr", operands, location: LOC };
+}
+function whenC(condition: BranchCondition, body: WhenBlockBody): WhenBlock {
+  return { type: "WhenBlock", condition, body, location: LOC };
 }
 function otherwise(body: WhenBlockBody): OtherwiseBlock {
   return { type: "OtherwiseBlock", body, location: LOC };
@@ -150,31 +165,6 @@ describe("decision — emitDecisionPlanDefinition Strategy (isRoot=true)", () =>
     expect((r.type as { coding: Array<{ code: string }> }).coding[0]!.code).toBe("workflow-definition");
   });
 
-  it("i.2: a COMPOUND branch condition is emit-GATED (suppressed + `unsupported-compound-guard`, no crash)", () => {
-    // Structural DNF lowering is i.3. Until then a compound guard must NOT crash
-    // emit and must NOT emit a wrong condition — it is suppressed with a
-    // diagnostic that pins success:false.
-    const compoundWhen: WhenBlock = {
-      type: "WhenBlock",
-      condition: {
-        type: "BranchConditionAnd",
-        operands: [
-          { type: "BranchConditionRef", ref: "A", location: LOC },
-          { type: "BranchConditionRef", ref: "B", location: LOC },
-        ],
-        location: LOC,
-      },
-      body: leaf(recommend("X")),
-      location: LOC,
-    };
-    const d = decision("Top", [compoundWhen]);
-    const { unmatched } = emitDecisionPlanDefinition(
-      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
-    );
-    const gate = unmatched.find((u) => u.kind === "unsupported-compound-guard");
-    expect(gate).toBeDefined();
-    expect(gate!.text).toMatch(/not yet emittable|not usable/i);
-  });
 
   it("emits `version` from package.json (CRMI shareable floor)", () => {
     const d = decision("Top", [when("C", leaf(recommend("A")))]);
@@ -860,4 +850,286 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
     const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
     expect(action.input).toEqual([cfInput("Active Crohns Disease", CF_URL)]);
   });
+});
+
+/* ─── #224 i.3 — compound-guard structural emit (and / or DNF) ───── */
+
+type Act = Record<string, unknown>;
+const acts = (a: unknown): Act[] => (a as { action?: Act[] }).action ?? [];
+const rootActions = (resource: { resource: unknown } | null): Act[] =>
+  acts(resource!.resource);
+const condExprs = (a: Act): string[] =>
+  ((a.condition as Array<{ expression: { expression: string } }>) ?? []).map(
+    (c) => c.expression.expression,
+  );
+const hasAnyBehavior = (a: Act): boolean =>
+  ((a.extension as Array<{ url: string; valueString?: string }>) ?? []).some(
+    (e) => e.url.includes("cqf-applicabilityBehavior") && e.valueString === "any",
+  );
+
+function emitTop(d: Decision, inputResolver?: CaseFeatureInputResolver, conceptResolver = RESOLVE_ALL) {
+  return emitDecisionPlanDefinition(
+    d,
+    "Lib",
+    METADATA,
+    conceptResolver,
+    RESOLVE_ACT_OK,
+    RESOLVE_DEC_OK,
+    true,
+    { clock: FIXED_CLOCK },
+    "",
+    inputResolver,
+  );
+}
+
+describe("decision — #224 i.3 compound-guard structural emit", () => {
+  it("`and` guard → ONE action carrying N ANDed applicability conditions", () => {
+    const d = decision(
+      "Top",
+      [whenC(andC(refC("A"), refC("B")), leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
+      "first",
+    );
+    const { resource, unmatched, errors } = emitTop(d);
+    expect(unmatched).toEqual([]);
+    expect(errors).toEqual([]);
+    const children = acts(rootActions(resource)[0]); // under the first: switch wrapper
+    expect(children).toHaveLength(2); // [A∧B arm, otherwise]
+    expect(condExprs(children[0]!)).toEqual(["A", "B"]);
+    expect(children[0]!.definitionCanonical).toContain("lib-x-recommendation");
+    expect(children[1]!.title).toBe("otherwise");
+  });
+
+  it("`or` guard under `first:` → arms SPLICED as ordered siblings (no wrapper, otherwise not starved)", () => {
+    const d = decision(
+      "Top",
+      [whenC(orC(refC("A"), refC("B")), leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
+      "first",
+    );
+    const children = acts(rootActions(emitTop(d).resource)[0]);
+    expect(children).toHaveLength(3); // [armA, armB, otherwise]
+    expect(condExprs(children[0]!)).toEqual(["A"]);
+    expect(condExprs(children[1]!)).toEqual(["B"]);
+    expect(children[2]!.title).toBe("otherwise");
+    // arms are bare siblings — NOT wrapped in an unconditional "any" grouping
+    expect(hasAnyBehavior(children[0]!)).toBe(false);
+    expect(hasAnyBehavior(children[1]!)).toBe(false);
+  });
+
+  it("`or` guard under flat/no-qualifier → ONE `cqf-applicabilityBehavior any` wrapper over the arms", () => {
+    const d = decision("Top", [whenC(orC(refC("A"), refC("B")), leaf(recommend("X")))]); // flat
+    const top = rootActions(emitTop(d).resource);
+    expect(top).toHaveLength(1);
+    expect(hasAnyBehavior(top[0]!)).toBe(true);
+    const arms = acts(top[0]);
+    expect(arms).toHaveLength(2);
+    expect(condExprs(arms[0]!)).toEqual(["A"]);
+    expect(condExprs(arms[1]!)).toEqual(["B"]);
+  });
+
+  it("`(A or B) and C` → DNF arms [A,C] then [B,C] (exact order)", () => {
+    const d = decision(
+      "Top",
+      [
+        whenC(andC(orC(refC("A"), refC("B")), refC("C")), leaf(recommend("X"))),
+        otherwise(leaf(recommend("Y"))),
+      ],
+      "first",
+    );
+    const children = acts(rootActions(emitTop(d).resource)[0]);
+    expect(condExprs(children[0]!)).toEqual(["A", "C"]);
+    expect(condExprs(children[1]!)).toEqual(["B", "C"]);
+    expect(children[2]!.title).toBe("otherwise");
+  });
+
+  it("compound `or` inside a NESTED `first:` block splices under the parent when-action", () => {
+    // when "G" then { first: when (A or B) then X ; otherwise Y }
+    const inner = block("first", [
+      whenC(orC(refC("A"), refC("B")), leaf(recommend("X"))),
+      otherwise(leaf(recommend("Y"))),
+    ]);
+    const d = decision("Top", [when("G", inner)], "first");
+    const gAction = acts(rootActions(emitTop(d).resource)[0])[0]!; // the `when G` action
+    const nested = acts(gAction);
+    expect(nested.map((n) => n.title)).toEqual(["A", "B", "otherwise"]); // spliced, not wrapped
+    expect(hasAnyBehavior(gAction)).toBe(true); // parent carries the nested-first "any"
+  });
+
+  it("per-arm `input` = arm-aware union over the arm's atoms, deduped by canonical (first-seen)", () => {
+    const inputResolver: CaseFeatureInputResolver = (name) => {
+      if (name === "A") return [cf("A", "urn:A"), cf("Shared", "urn:S")];
+      if (name === "B") return [cf("B", "urn:B")];
+      if (name === "C") return [cf("C", "urn:C"), cf("Shared", "urn:S")];
+      return [];
+    };
+    const d = decision(
+      "Top",
+      [whenC(andC(orC(refC("A"), refC("B")), refC("C")), leaf(recommend("X")))],
+      "first",
+    );
+    const children = acts(rootActions(emitTop(d, inputResolver).resource)[0]);
+    const profiles = (a: Act) => (a.input as Array<{ profile: string[] }>).map((i) => i.profile[0]);
+    // arm [A,C]: A→urn:A,urn:S ; C→urn:C, urn:S(dup dropped) → [A, S, C]
+    expect(profiles(children[0]!)).toEqual(["urn:A", "urn:S", "urn:C"]);
+    // arm [B,C]: B→urn:B ; C→urn:C, urn:S → [B, C, S]
+    expect(profiles(children[1]!)).toEqual(["urn:B", "urn:C", "urn:S"]);
+  });
+
+  it("cap: exactly 16 arms is accepted", () => {
+    const bigOr = (n: number) => orC(refC(`${n}a`), refC(`${n}b`));
+    const guard = andC(bigOr(1), bigOr(2), bigOr(3), bigOr(4)); // 2^4 = 16
+    const d = decision(
+      "Top",
+      [whenC(guard, leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
+      "first",
+    );
+    const { errors, resource } = emitTop(d);
+    expect(errors.find((e) => e.kind === "compound-guard-expansion-overflow")).toBeUndefined();
+    const children = acts(rootActions(resource)[0]);
+    expect(children.filter((c) => c.title !== "otherwise")).toHaveLength(16);
+  });
+
+  it("cap: >16 arms → hard `compound-guard-expansion-overflow` error, suppressed, NO CQL fallback", () => {
+    const bigOr = (n: number) => orC(refC(`${n}a`), refC(`${n}b`));
+    const guard = andC(bigOr(1), bigOr(2), bigOr(3), bigOr(4), bigOr(5)); // 2^5 = 32
+    const d = decision(
+      "Top",
+      [whenC(guard, leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
+      "first",
+    );
+    const { errors, resource } = emitTop(d);
+    const overflow = errors.find((e) => e.kind === "compound-guard-expansion-overflow");
+    expect(overflow).toBeDefined();
+    expect(overflow!.message).toMatch(/more than 16|hoist/i);
+    // the over-cap `when` is suppressed; only `otherwise` survives — no arm emitted
+    const children = acts(rootActions(resource)[0]);
+    expect(children).toHaveLength(1);
+    expect(children[0]!.title).toBe("otherwise");
+  });
+
+  it("an unresolved atom suppresses the WHOLE compound `when`; every bad atom is reported", () => {
+    const resolveOnlyA: ConceptResolver = (ref) =>
+      (typeof ref === "string" ? ref : ref.name) === "A" ? "A" : null;
+    const d = decision(
+      "Top",
+      [whenC(andC(refC("A"), refC("B")), leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
+      "first",
+    );
+    const { unmatched, resource } = emitTop(d, undefined, resolveOnlyA);
+    const bad = unmatched.filter((u) => u.kind === "unresolved-concept").map((u) => u.text);
+    expect(bad).toContain('"B"'); // raw refDisplay, parity with single-ref path
+    const children = acts(rootActions(resource)[0]);
+    expect(children).toHaveLength(1); // compound when suppressed; only otherwise
+    expect(children[0]!.title).toBe("otherwise");
+  });
+
+  it("shared body emitted ONCE — an unresolved leaf under a 2-arm `or` reports ONE diagnostic, not per-arm", () => {
+    const resolveActNotX: ActivityResolver = (ref) =>
+      (typeof ref === "string" ? ref : ref.name) === "X" ? null : RESOLVE_ACT_OK(ref);
+    const d = decision(
+      "Top",
+      [whenC(orC(refC("A"), refC("B")), leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
+      "first",
+    );
+    const { unmatched } = emitDecisionPlanDefinition(
+      d,
+      "Lib",
+      METADATA,
+      RESOLVE_ALL,
+      resolveActNotX,
+      RESOLVE_DEC_OK,
+      true,
+      { clock: FIXED_CLOCK },
+    );
+    // "X" is shared by both arms — body emitted once → ONE unresolved-activity, not two.
+    expect(unmatched.filter((u) => u.kind === "unresolved-activity")).toHaveLength(1);
+  });
+
+  it("duplicate atom `A and A` → two applicability conditions, ONE deduped input", () => {
+    const inputResolver: CaseFeatureInputResolver = (name) =>
+      name === "A" ? [cf("A", "urn:A")] : [];
+    const d = decision("Top", [whenC(andC(refC("A"), refC("A")), leaf(recommend("X")))], "first");
+    const arm = acts(rootActions(emitTop(d, inputResolver).resource)[0])[0]!;
+    expect(condExprs(arm)).toEqual(["A", "A"]); // duplicates preserved in condition[]
+    expect((arm.input as Array<{ profile: string[] }>).map((i) => i.profile[0])).toEqual(["urn:A"]);
+  });
+
+  it("same-library qualified atom `A and Lib.\"B\"` (in library Lib) is normalized + included", () => {
+    // Lib."B" inside library "Lib" strips to bare "B" — resolves like a local ref and
+    // gets its inputs, byte-consistent with the condition it emits.
+    const inputResolver: CaseFeatureInputResolver = (name) =>
+      name === "A" ? [cf("A", "urn:A")] : name === "B" ? [cf("B", "urn:B")] : [];
+    const d = decision(
+      "Top",
+      [whenC(andC(refC("A"), refQC("Lib", "B")), leaf(recommend("X")))],
+      "first",
+    );
+    const arm = acts(rootActions(emitTop(d, inputResolver).resource)[0])[0]!;
+    expect(condExprs(arm)).toEqual(["A", "B"]); // qualifier stripped, both resolve
+    expect((arm.input as Array<{ profile: string[] }>).map((i) => i.profile[0])).toEqual([
+      "urn:A",
+      "urn:B",
+    ]);
+  });
+
+  it("genuinely-foreign atom `A and Other.\"B\"` (unresolved cross-lib) suppresses the whole guard", () => {
+    // v0: a cross-library concept ref does not resolve → whole compound `when`
+    // suppressed, reported with the RAW qualified diagnostic (not the bare name).
+    const resolveLocalOnly: ConceptResolver = (ref) => (typeof ref === "string" ? ref : null);
+    const d = decision(
+      "Top",
+      [
+        whenC(andC(refC("A"), refQC("Other", "B")), leaf(recommend("X"))),
+        otherwise(leaf(recommend("Y"))),
+      ],
+      "first",
+    );
+    const { unmatched, resource } = emitTop(d, undefined, resolveLocalOnly);
+    const bad = unmatched.filter((u) => u.kind === "unresolved-concept").map((u) => u.text);
+    expect(bad).toContain('"Other"."B"'); // raw qualified refDisplay
+    const children = acts(rootActions(resource)[0]);
+    expect(children).toHaveLength(1); // whole compound when suppressed; only otherwise
+    expect(children[0]!.title).toBe("otherwise");
+  });
+
+  it("two foreign atoms with the SAME name in DIFFERENT libraries → distinct diagnostics (atomKey)", () => {
+    const resolveLocalOnly: ConceptResolver = (ref) => (typeof ref === "string" ? ref : null);
+    const d = decision(
+      "Top",
+      [whenC(andC(refQC("LibX", "A"), refQC("LibY", "A")), leaf(recommend("X")))],
+      "first",
+    );
+    const { unmatched } = emitTop(d, undefined, resolveLocalOnly);
+    const bad = unmatched.filter((u) => u.kind === "unresolved-concept").map((u) => u.text);
+    // both reported (distinct atomKeys q:[LibX,A] vs q:[LibY,A]) — not collapsed to one
+    expect(bad).toContain('"LibX"."A"');
+    expect(bad).toContain('"LibY"."A"');
+  });
+
+  it("cap boundary: exactly 17 arms → overflow (the >16 edge, not just 32)", () => {
+    // 16 from 4 binary ORs, then one ternary OR pushes to 3·... — build 17 directly:
+    // (a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q) is a single 17-wide OR → 17 arms.
+    const wide = orC(...Array.from({ length: 17 }, (_, i) => refC(`r${i}`)));
+    const d = decision(
+      "Top",
+      [whenC(wide, leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
+      "first",
+    );
+    const { errors } = emitTop(d);
+    expect(errors.find((e) => e.kind === "compound-guard-expansion-overflow")).toBeDefined();
+  });
+
+  it("`or` under an explicit `all:` qualifier → the `any` wrapper (named disc-286 contract case)", () => {
+    const d = decision("Top", [whenC(orC(refC("A"), refC("B")), leaf(recommend("X")))], "all");
+    const top = rootActions(emitTop(d).resource);
+    expect(top).toHaveLength(1);
+    expect(hasAnyBehavior(top[0]!)).toBe(true);
+    expect(acts(top[0]).map((a) => condExprs(a))).toEqual([["A"], ["B"]]);
+  });
+});
+
+const cf = (name: string, canonical: string) => ({ name, canonical });
+const refQC = (libraryName: string, name: string): BranchCondition => ({
+  type: "BranchConditionRef",
+  ref: { type: "QualifiedReference", libraryName, name, location: LOC },
+  location: LOC,
 });
