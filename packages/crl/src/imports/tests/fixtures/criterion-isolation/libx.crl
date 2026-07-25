@@ -1,0 +1,9 @@
+# criterion-isolation LibX: a criterion "A" with no cross-library ref.
+library "LibX".
+
+concept "Age Qualifies":
+- type is Observation.
+- code is `age`.
+
+criterion "A":
+- when ( "Age Qualifies" ).

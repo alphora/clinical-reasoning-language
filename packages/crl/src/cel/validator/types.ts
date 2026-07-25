@@ -5,6 +5,11 @@ export type CELValidationErrorKind =
   | "unresolved-bare-type"
   | "unresolved-qualified-library"
   | "unresolved-qualified-declaration"
+  // #224 ii — a `defined by "Lib"."X"` where X names a `criterion` in Lib. A
+  // criterion is a decision-guard sub-expression with no case-feature identity, so
+  // it is never a valid `defined by` target — a targeted error instead of the
+  // misleading "no Concept or Activity named X".
+  | "criterion-not-a-defined-by-target"
   | "unsupported-yet"
   // Result is
   | "unresolved-result-leaf"

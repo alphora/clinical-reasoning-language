@@ -1,0 +1,13 @@
+# criterion-xor: concept + criterion sharing a name in ONE library must fire duplicate-name in the multi-file path.
+library "Root".
+
+concept "Age Qualifies":
+- type is Observation.
+- code is `age`.
+
+concept "Eligible":
+- type is Observation.
+- code is `elig`.
+
+criterion "Eligible":
+- when ( "Age Qualifies" ).

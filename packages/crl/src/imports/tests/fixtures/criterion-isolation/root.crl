@@ -1,0 +1,4 @@
+# criterion-isolation root: includes both libraries; per-(origin,library) keying must keep the two "A" criteria distinct (no cycle).
+library "Root".
+include "LibX".
+include "LibY".

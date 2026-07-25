@@ -1,8 +1,10 @@
 import type {
   CRL,
   Concept,
+  Criterion,
   Decision,
   BranchBlock,
+  BranchCondition,
   WhenBlockBody,
   BlockBody,
   ActionStatement,
@@ -74,7 +76,10 @@ export class CycleDetector {
     const decisionErrors = sources
       ? this.validateDecisionCyclesScoped(sources)
       : this.validateDecisionCyclesFlat(ast);
-    return [...conceptErrors, ...decisionErrors];
+    const criterionErrors = sources
+      ? this.validateCriterionCyclesScoped(sources)
+      : this.validateCriterionCyclesFlat(ast);
+    return [...conceptErrors, ...decisionErrors, ...criterionErrors];
   }
 
   // ─────────────────────── CONCEPT — single-file ───────────────────────
@@ -191,13 +196,78 @@ export class CycleDetector {
     );
   }
 
+  // ─────────────────────── CRITERION — single-file ─────────────────────
+  // #224 ii: a `criterion` body is a `BranchCondition`; a
+  // `BranchConditionCriterionRef` leaf inside it is an edge to another criterion.
+  // Cross-library criterion refs are out of scope in v0 (classification only marks
+  // bare / self-qualified refs), so the graph is always same-library — no scope
+  // resolution needed, unlike concept/decision refs.
+
+  private validateCriterionCyclesFlat(ast: CRL): ValidationError[] {
+    const adjacency = new Map<string, Set<string>>();
+    const locations = new Map<string, Location>();
+
+    for (const statement of ast.statements) {
+      if (statement.type !== "Criterion" || !statement.name) continue;
+      const criterion = statement as Criterion;
+      locations.set(criterion.name, criterion.location);
+      const refs = new Set<string>();
+      collectCriterionRefs(criterion.condition, refs);
+      adjacency.set(criterion.name, refs);
+    }
+
+    return this.runDfs(
+      adjacency,
+      locations,
+      undefined,
+      "criterion-cycle",
+      "Criterion cycle detected",
+      (display) => display.map((n) => `"${n}"`).join(" → "),
+    );
+  }
+
+  // ─────────────────────── CRITERION — multi-file ──────────────────────
+
+  private validateCriterionCyclesScoped(sources: SourceContext[]): ValidationError[] {
+    const adjacency = new Map<string, Set<string>>();
+    const locations = new Map<string, Location>();
+    const sourcesByNode = new Map<string, { libraryName: string; filePath: string }>();
+
+    for (const { stmt, scope } of sources) {
+      if (stmt.type !== "Criterion" || !stmt.name) continue;
+      const criterion = stmt as Criterion;
+      const key = nodeKey(scope.origin, scope.currentLibrary, criterion.name);
+      locations.set(key, criterion.location);
+      sourcesByNode.set(key, {
+        libraryName: scope.currentLibrary,
+        filePath: scope.filePath,
+      });
+      // Criterion refs are same-library-only (classification never marks a foreign
+      // ref), so every edge stays within this library's `(origin, library)` key.
+      const names = new Set<string>();
+      collectCriterionRefs(criterion.condition, names);
+      const refs = new Set<string>();
+      for (const n of names) refs.add(nodeKey(scope.origin, scope.currentLibrary, n));
+      adjacency.set(key, refs);
+    }
+
+    return this.runDfs(
+      adjacency,
+      locations,
+      sourcesByNode,
+      "criterion-cycle",
+      "Criterion cycle detected",
+      (display) => formatScopedPath(display),
+    );
+  }
+
   // ─────────────────────── shared DFS routine ──────────────────────────
 
   private runDfs(
     adjacency: Map<string, Set<string>>,
     locations: Map<string, Location>,
     sourcesByNode: Map<string, { libraryName: string; filePath: string }> | undefined,
-    kind: "reference-cycle" | "decision-delegation-cycle",
+    kind: "reference-cycle" | "decision-delegation-cycle" | "criterion-cycle",
     messagePrefix: string,
     formatDisplay: (path: string[]) => string,
   ): ValidationError[] {
@@ -508,6 +578,26 @@ export class CycleDetector {
 
 function nodeKey(origin: "local" | "package" | "root", libraryName: string, name: string): string {
   return `${origin}|${libraryName}|${name}`;
+}
+
+// #224 ii: collect the criterion-ref leaf NAMES in a criterion body (the criterion→
+// criterion edges). Concept-ref leaves (`BranchConditionRef`) are NOT edges — they
+// resolve via concept resolution, not criterion expansion. `getRefName` on the
+// (bare / self-qualified) criterion ref yields the target criterion's local name.
+function collectCriterionRefs(cond: BranchCondition, out: Set<string>): void {
+  switch (cond.type) {
+    case "BranchConditionRef":
+      return;
+    case "BranchConditionCriterionRef": {
+      const name = getRefName(cond.ref);
+      if (name) out.add(name);
+      return;
+    }
+    case "BranchConditionAnd":
+    case "BranchConditionOr":
+      for (const o of cond.operands) collectCriterionRefs(o, out);
+      return;
+  }
 }
 
 function formatScopedPath(display: string[]): string {

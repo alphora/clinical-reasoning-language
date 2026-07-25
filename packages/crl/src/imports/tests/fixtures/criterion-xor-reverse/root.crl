@@ -1,0 +1,13 @@
+# criterion-xor-reverse: criterion declared BEFORE the same-named concept; XOR must fire regardless of order (names the prior kind = criterion).
+library "Root".
+
+criterion "Eligible":
+- when ( "Age Qualifies" ).
+
+concept "Age Qualifies":
+- type is Observation.
+- code is `age`.
+
+concept "Eligible":
+- type is Observation.
+- code is `elig`.

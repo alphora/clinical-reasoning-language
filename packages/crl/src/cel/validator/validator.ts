@@ -363,13 +363,26 @@ function validateDefinedBy(
   const candidates = buildDefinedByCandidates(lib.ast.statements);
   const target = candidates.get(declName);
   if (!target) {
+    // #224 ii: if the name is a `criterion` (not a Concept/Activity), say so —
+    // a criterion is a decision-guard sub-expression, never a `defined by` target —
+    // instead of the generic "no Concept or Activity named X".
+    const isCriterion = lib.ast.statements.some(
+      (s) => s.type === "Criterion" && s.name === declName,
+    );
     errors.push(
-      err(
-        "unresolved-qualified-declaration",
-        `No Concept or Activity declaration named "${declName}" in library "${libName}"`,
-        fb.location,
-        fp,
-      ),
+      isCriterion
+        ? err(
+            "criterion-not-a-defined-by-target",
+            `"${libName}"."${declName}" names a criterion, which is not a valid 'defined by' target (a criterion is a decision-guard sub-expression with no case-feature identity)`,
+            fb.location,
+            fp,
+          )
+        : err(
+            "unresolved-qualified-declaration",
+            `No Concept or Activity declaration named "${declName}" in library "${libName}"`,
+            fb.location,
+            fp,
+          ),
     );
     return;
   }

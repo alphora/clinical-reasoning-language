@@ -11,6 +11,12 @@ export interface LibraryScopeNames {
   decisions: Set<string>;
   activities: Set<string>;
   parameters: Set<string>;
+  // #224 ii: a library's `criterion` declarations. Kept SEPARATE from `concepts`
+  // (concept XOR criterion is a distinct-declaration invariant, enforced by
+  // `NameUniquenessValidator`); the reference resolver reads this to give a
+  // targeted `criterion-misuse` diagnostic when a criterion name lands in a
+  // concept-only slot or a foreign qualified ref, instead of "unresolved concept".
+  criteria: Set<string>;
 }
 
 /**
@@ -67,6 +73,7 @@ function emptyNames(): LibraryScopeNames {
     decisions: new Set(),
     activities: new Set(),
     parameters: new Set(),
+    criteria: new Set(),
   };
 }
 
@@ -88,6 +95,9 @@ function collectLocalNames(entry: RegistryEntry): LibraryScopeNames {
         break;
       case "Parameter":
         if (stmt.name) names.parameters.add(stmt.name);
+        break;
+      case "Criterion":
+        if (stmt.name) names.criteria.add(stmt.name);
         break;
     }
   }

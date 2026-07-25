@@ -2,6 +2,7 @@ import type {
   CRL,
   Statement,
   Concept,
+  Criterion,
   Decision,
   Activity,
   BranchBlock,
@@ -22,6 +23,7 @@ import type { LibraryScope, SourceContext } from "../imports/scopes";
 import { lookupKnownLibrary } from "../imports/scopes";
 
 import { ValidationError } from "./validator";
+import type { CriterionSlot } from "./validator";
 
 type RefKind = "concept" | "terminology" | "decision" | "activity" | "parameter";
 
@@ -41,6 +43,24 @@ const TERMINOLOGY_REF_KINDS: AcceptableKinds = ["terminology"] as const;
 const DECISION_REF_KINDS: AcceptableKinds = ["decision"] as const;
 /** Activity-only slot — `recommend activity`. */
 const ACTIVITY_REF_KINDS: AcceptableKinds = ["activity"] as const;
+
+// #224 ii: the reference SLOT `checkRef` uses for the `criterion-misuse` diagnostic.
+// `ConceptOnlySlot` = a slot where a criterion name is always a misuse (mirrors the
+// error's `CriterionSlot` minus the output-only `qualified`). `when-guard` = a guard
+// position where a bare/self-qualified local criterion is valid (and pre-classified),
+// but a foreign library-qualified criterion is still a misuse. `null` = a non-concept
+// slot (terminology/decision/activity) where no criterion check applies.
+type ConceptOnlySlot = Exclude<CriterionSlot, "qualified">;
+type ConceptSlotArg = ConceptOnlySlot | "when-guard" | null;
+
+function isConceptOnlySlot(slot: ConceptSlotArg): slot is ConceptOnlySlot {
+  return (
+    slot === "defined-as" ||
+    slot === "composition" ||
+    slot === "narrative" ||
+    slot === "action-guard"
+  );
+}
 
 // Map RefKind (singular) to the plural keys used by `LibraryScopeNames`
 // in `src/imports/scopes.ts`. The scope shape uses plural for historical
@@ -109,11 +129,16 @@ export class ReferenceResolver {
       this.walkStatement(
         statement,
         {
-          parentName: statement.type === "Concept" || statement.type === "Decision" || statement.type === "Activity"
-            ? statement.name
-            : "<unknown>",
+          parentName:
+            statement.type === "Concept" ||
+            statement.type === "Decision" ||
+            statement.type === "Activity" ||
+            statement.type === "Criterion"
+              ? statement.name
+              : "<unknown>",
           parentKind: parentKindOf(statement),
           localNames: names,
+          criterionNames: names.criterion,
           selfLibrary,
           policeQualified,
           libraryName: undefined,
@@ -139,9 +164,13 @@ export class ReferenceResolver {
       this.walkStatement(
         stmt,
         {
-          parentName: stmt.type === "Concept" || stmt.type === "Decision" || stmt.type === "Activity"
-            ? stmt.name
-            : "<unknown>",
+          parentName:
+            stmt.type === "Concept" ||
+            stmt.type === "Decision" ||
+            stmt.type === "Activity" ||
+            stmt.type === "Criterion"
+              ? stmt.name
+              : "<unknown>",
           parentKind: parentKindOf(stmt),
           localNames: {
             concept: scope.localNames.concepts,
@@ -150,6 +179,7 @@ export class ReferenceResolver {
             activity: scope.localNames.activities,
             parameter: scope.localNames.parameters,
           },
+          criterionNames: scope.localNames.criteria,
           selfLibrary: scope.currentLibrary,
           policeQualified: true,
           libraryName: scope.currentLibrary,
@@ -176,6 +206,9 @@ export class ReferenceResolver {
       case "Activity":
         this.walkActivity(stmt as Activity, ctx, errors);
         return;
+      case "Criterion":
+        this.walkCriterion(stmt as Criterion, ctx, errors);
+        return;
       case "Terminology":
         // Terminology bodies don't carry refs (just valueset URLs + codes).
         return;
@@ -197,14 +230,14 @@ export class ReferenceResolver {
         case "CodedFromDefinition": {
           // Named coded-from resolves to a terminology; inline coding carries no ref.
           if (def.terminologyName) {
-            this.checkRef(def.terminologyName, TERMINOLOGY_REF_KINDS, def.location, ctx, errors);
+            this.checkRef(def.terminologyName, TERMINOLOGY_REF_KINDS, def.location, ctx, errors, null);
           }
           break;
         }
         case "DefinedAsDefinition": {
           const body = def.body;
           if (body.type === "DefinedAsBareRef") {
-            this.checkRef(body.ref, CONCEPT_REF_KINDS, body.location, ctx, errors);
+            this.checkRef(body.ref, CONCEPT_REF_KINDS, body.location, ctx, errors, "defined-as");
           } else if (body.type === "DefinedAsComposition") {
             this.walkComposition(
               (body as DefinedAsComposition).expression,
@@ -223,7 +256,7 @@ export class ReferenceResolver {
     // inline codings carry no terminology reference.
     for (const rep of concept.representations ?? []) {
       if (rep.terminologyName) {
-        this.checkRef(rep.terminologyName, TERMINOLOGY_REF_KINDS, rep.location, ctx, errors);
+        this.checkRef(rep.terminologyName, TERMINOLOGY_REF_KINDS, rep.location, ctx, errors, null);
       }
     }
   }
@@ -243,7 +276,7 @@ export class ReferenceResolver {
         this.walkComposition(expr.expression, ctx, errors);
         return;
       case "CompositionRef":
-        this.checkRef(expr.ref, CONCEPT_REF_KINDS, expr.location, ctx, errors);
+        this.checkRef(expr.ref, CONCEPT_REF_KINDS, expr.location, ctx, errors, "composition");
         return;
     }
   }
@@ -257,7 +290,7 @@ export class ReferenceResolver {
   private walkNarrativeElement(el: NarrativeElement, ctx: WalkContext, errors: ValidationError[]): void {
     switch (el.type) {
       case "NConceptRef":
-        this.checkRef(el.value, NARRATIVE_REF_KINDS, el.location, ctx, errors);
+        this.checkRef(el.value, NARRATIVE_REF_KINDS, el.location, ctx, errors, "narrative");
         return;
       case "NDisjunction":
         for (const av of el.disjuncts) {
@@ -276,7 +309,7 @@ export class ReferenceResolver {
   private walkArgValue(av: ArgValue, ctx: WalkContext, errors: ValidationError[]): void {
     switch (av.type) {
       case "NConceptRef":
-        this.checkRef(av.value, NARRATIVE_REF_KINDS, av.location, ctx, errors);
+        this.checkRef(av.value, NARRATIVE_REF_KINDS, av.location, ctx, errors, "narrative");
         return;
       case "NDisjunction":
         for (const inner of av.disjuncts) {
@@ -306,7 +339,7 @@ export class ReferenceResolver {
     // own location (not the whole `when` line).
     if (branch.type === "WhenBlock") {
       for (const atom of branchConditionRefs(branch.condition)) {
-        this.checkRef(atom.ref, CONCEPT_REF_KINDS, atom.location, ctx, errors);
+        this.checkRef(atom.ref, CONCEPT_REF_KINDS, atom.location, ctx, errors, "when-guard");
       }
     }
     this.walkWhenBlockBody(branch.body, ctx, errors);
@@ -335,14 +368,16 @@ export class ReferenceResolver {
   private walkActionStatement(stmt: ActionStatement, ctx: WalkContext, errors: ValidationError[]): void {
     const action = stmt.action;
     if (action.type === "RecommendActivity") {
-      this.checkRef(action.activityName, ACTIVITY_REF_KINDS, action.location, ctx, errors);
+      this.checkRef(action.activityName, ACTIVITY_REF_KINDS, action.location, ctx, errors, null);
     } else if (action.type === "UseDecision") {
-      this.checkRef(action.decisionName, DECISION_REF_KINDS, action.location, ctx, errors);
+      this.checkRef(action.decisionName, DECISION_REF_KINDS, action.location, ctx, errors, null);
     }
     // A per-action guard references a concept (same ref kinds as a `when`
     // condition); resolve it so an unknown guard concept is a reference error.
+    // #224 ii: action guards are CONCEPT-ONLY in v0 — a criterion name here is a
+    // targeted `criterion-misuse` (criteria are `when`-guard-only), not "unresolved".
     if (stmt.guard) {
-      this.checkRef(stmt.guard.conceptName, CONCEPT_REF_KINDS, stmt.guard.location, ctx, errors);
+      this.checkRef(stmt.guard.conceptName, CONCEPT_REF_KINDS, stmt.guard.location, ctx, errors, "action-guard");
     }
   }
 
@@ -357,7 +392,23 @@ export class ReferenceResolver {
         withClause.location,
         ctx,
         errors,
+        null,
       );
+    }
+  }
+
+  // ------------------------ criterion body walk -------------------------
+
+  // #224 ii: a `criterion` body is a `BranchCondition` (the same guard grammar as a
+  // `when`). Resolve its CONCEPT-ref atoms so an undefined concept inside a criterion
+  // declaration is diagnosed ONCE at the declaration (not per use site). Nested
+  // criterion refs are NOT resolved here — `branchConditionRefs` skips them (they are
+  // valid by classification-construction; their cycles are caught by CycleDetector).
+  // The slot is `when-guard`: bare local criteria are valid here (and already
+  // classified away), but a foreign library-qualified criterion ref is still a misuse.
+  private walkCriterion(criterion: Criterion, ctx: WalkContext, errors: ValidationError[]): void {
+    for (const atom of branchConditionRefs(criterion.condition)) {
+      this.checkRef(atom.ref, CONCEPT_REF_KINDS, atom.location, ctx, errors, "when-guard");
     }
   }
 
@@ -369,6 +420,14 @@ export class ReferenceResolver {
     location: Location,
     ctx: WalkContext,
     errors: ValidationError[],
+    // #224 ii: the reference SLOT, for the `criterion-misuse` diagnostic. A
+    // concept-ONLY slot (`defined-as`/`composition`/`narrative`/`action-guard`) turns
+    // a criterion name into a targeted error instead of "unresolved concept".
+    // `when-guard` = a guard position where a bare/self-qualified local criterion is
+    // valid (already classified away), but a foreign qualified criterion is still a
+    // misuse. `null` = a non-concept slot (terminology/decision/activity) — no
+    // criterion check applies.
+    slot: ConceptSlotArg,
   ): void {
     const refName = getRefName(ref);
 
@@ -376,6 +435,11 @@ export class ReferenceResolver {
       // Bare ref: try each acceptable bucket in precedence order; succeed on first hit.
       for (const kind of acceptableKinds) {
         if (ctx.localNames[kind].has(refName)) return;
+      }
+      // A concept-only slot naming a LOCAL criterion → targeted misuse, not "unresolved".
+      if (isConceptOnlySlot(slot) && ctx.criterionNames.has(refName)) {
+        errors.push(criterionMisuse(refName, slot, ctx, location));
+        return;
       }
       errors.push(this.unresolvedRefError(acceptableKinds, refName, ctx, location));
       return;
@@ -386,6 +450,12 @@ export class ReferenceResolver {
     if (targetLib === ctx.selfLibrary) {
       for (const kind of acceptableKinds) {
         if (ctx.localNames[kind].has(refName)) return;
+      }
+      // Self-qualified (`"Self"."X"`) is bare-equivalent — a local criterion here is
+      // the same misuse as the bare spelling.
+      if (isConceptOnlySlot(slot) && ctx.criterionNames.has(refName)) {
+        errors.push(criterionMisuse(refName, slot, ctx, location));
+        return;
       }
       errors.push(this.unresolvedRefError(acceptableKinds, refName, ctx, location));
       return;
@@ -414,6 +484,14 @@ export class ReferenceResolver {
       for (const kind of acceptableKinds) {
         const targetSet = target.names[REF_KIND_TO_PLURAL[kind]];
         if (targetSet.has(refName)) return;
+      }
+      // The foreign library resolved but has no matching concept. If the name is a
+      // CRITERION there, say so — criterion refs cannot be library-qualified in v0 —
+      // instead of the misleading "library has no concept named X". Applies in any
+      // concept-accepting slot (including a `when` guard).
+      if (slot !== null && target.names.criteria.has(refName)) {
+        errors.push(criterionMisuseQualified(targetLib, refName, ctx, location));
+        return;
       }
       errors.push(qualifiedRefUnresolved(targetLib, refName, acceptableKinds, ctx, location));
       return;
@@ -447,6 +525,11 @@ interface NameBuckets {
   decision: Set<string>;
   activity: Set<string>;
   parameter: Set<string>;
+  // #224 ii: criteria are NOT a resolvable ref-kind (a criterion is not a valid
+  // concept/etc. target), so this bucket is never consulted by the bare-ref
+  // resolution loop — only by the `criterion-misuse` diagnostic, which turns a
+  // criterion name in a concept-only slot into a targeted error.
+  criterion: Set<string>;
 }
 
 function emptyBuckets(): NameBuckets {
@@ -456,6 +539,7 @@ function emptyBuckets(): NameBuckets {
     decision: new Set(),
     activity: new Set(),
     parameter: new Set(),
+    criterion: new Set(),
   };
 }
 
@@ -479,23 +563,32 @@ function collectNames(statements: Statement[]): NameBuckets {
       case "Parameter":
         buckets.parameter.add(s.name);
         break;
+      case "Criterion":
+        buckets.criterion.add(s.name);
+        break;
     }
   }
   return buckets;
 }
 
-function parentKindOf(stmt: Statement): RefKind | "<other>" {
+// The display label for the CONTAINER a ref sits in (for the unresolved-reference
+// message). Mostly a `RefKind`, plus `"criterion"` — which is NOT a resolvable
+// `RefKind` but still names its container ("in criterion \"X\"").
+type ParentKindLabel = RefKind | "criterion" | "<other>";
+
+function parentKindOf(stmt: Statement): ParentKindLabel {
   if (stmt.type === "Concept") return "concept";
   if (stmt.type === "Decision") return "decision";
   if (stmt.type === "Activity") return "activity";
   if (stmt.type === "Terminology") return "terminology";
   if (stmt.type === "Parameter") return "parameter";
+  if (stmt.type === "Criterion") return "criterion";
   return "<other>";
 }
 
 interface WalkContext {
   parentName: string;
-  parentKind: RefKind | "<other>";
+  parentKind: ParentKindLabel;
   // Per-kind name sets for bare-ref lookup. In single-file mode this is
   // derived from the AST's own statements; in multi-file mode it comes
   // from `scope.localNames` (mapped to per-kind sets).
@@ -506,6 +599,10 @@ interface WalkContext {
     activity: Set<string>;
     parameter: Set<string>;
   };
+  // #224 ii: this library's `criterion` names — for the `criterion-misuse`
+  // diagnostic (a criterion in a concept-only slot / self-qualified). Never used
+  // for resolution (a criterion is not a valid ref target).
+  criterionNames: Set<string>;
   selfLibrary: string;
   // false only in single-file self-scope with empty library name; suppresses
   // qualified-ref diagnostic firing because the parse error is the real signal.
@@ -538,6 +635,48 @@ function unresolvedMessage(acceptableKinds: AcceptableKinds, refName: string, ct
     ? acceptableKinds[0]
     : acceptableKinds.slice(0, -1).join(", ") + " or " + acceptableKinds[acceptableKinds.length - 1];
   return `Unresolved reference "${refName}" in ${parentLabel} "${parent}" (no ${list} declared with this name)`;
+}
+
+// #224 ii: human phrase for each concept-only slot in the `criterion-misuse` message.
+const SLOT_PHRASE: Record<ConceptOnlySlot, string> = {
+  "defined-as": "a `defined as` concept definition",
+  composition: "a `defined as` concept composition",
+  narrative: "a `definition is` narrative",
+  "action-guard": "an action guard (`unless` / `only when`)",
+};
+
+function criterionMisuse(
+  name: string,
+  slot: ConceptOnlySlot,
+  ctx: WalkContext,
+  location: Location,
+): ValidationError {
+  return {
+    kind: "criterion-misuse",
+    slot,
+    message: `Criterion "${name}" cannot be used in ${SLOT_PHRASE[slot]} — criteria may only appear in a decision \`when\` guard or another criterion's body (v0)`,
+    location,
+    severity: "error",
+    ...(ctx.libraryName !== undefined ? { libraryName: ctx.libraryName } : {}),
+    ...(ctx.filePath !== undefined ? { filePath: ctx.filePath } : {}),
+  };
+}
+
+function criterionMisuseQualified(
+  targetLib: string,
+  name: string,
+  ctx: WalkContext,
+  location: Location,
+): ValidationError {
+  return {
+    kind: "criterion-misuse",
+    slot: "qualified",
+    message: `Criterion references cannot be library-qualified: "${targetLib}"."${name}" names a criterion in library "${targetLib}" (criteria are usable only in same-library \`when\` guards or criterion bodies in v0)`,
+    location,
+    severity: "error",
+    ...(ctx.libraryName !== undefined ? { libraryName: ctx.libraryName } : {}),
+    ...(ctx.filePath !== undefined ? { filePath: ctx.filePath } : {}),
+  };
 }
 
 function externalLibraryNotIncluded(

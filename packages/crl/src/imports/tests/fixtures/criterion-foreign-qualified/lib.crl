@@ -1,0 +1,9 @@
+# criterion-foreign-qualified — the criterion lives in "Lib".
+library "Lib".
+
+concept "Age Qualifies":
+- type is Observation.
+- code is `age`.
+
+criterion "Eligible":
+- when ( "Age Qualifies" ).

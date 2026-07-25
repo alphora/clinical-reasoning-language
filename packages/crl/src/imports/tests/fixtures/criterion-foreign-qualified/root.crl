@@ -1,0 +1,15 @@
+# criterion-foreign-qualified: a library-qualified criterion ref must produce criterion-misuse, not "no concept named X".
+library "Root".
+include "Lib".
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `ok`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `no`.
+
+decision "D":
+first:
+- when "Lib"."Eligible" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".

@@ -1,0 +1,12 @@
+# criterion-cycle-scoped: a criterion A->B->A cycle exercised through the multi-file (scoped) validator path; must report criterion-cycle attributed to this library/file.
+library "Root".
+
+concept "Age Qualifies":
+- type is Observation.
+- code is `age`.
+
+criterion "A":
+- when ( "B" and "Age Qualifies" ).
+
+criterion "B":
+- when ( "A" ).

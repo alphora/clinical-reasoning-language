@@ -191,6 +191,33 @@ describe("CEL Todo 4 — qualified `defined by` rule table", () => {
     });
   });
 
+  // #224 ii.1a-2: a criterion is a decision-guard sub-expression, never a `defined by`
+  // target — give the targeted diagnostic instead of "no Concept or Activity named X".
+  test("qualified ref to a Criterion → criterion-not-a-defined-by-target", () => {
+    withProject((root) => {
+      write(root, "lib.crl", [
+        "# L",
+        "library \"L\".",
+        "concept \"Age Qualifies\":",
+        "- type is Observation.",
+        "- code is `age`.",
+        "criterion \"Eligible\":",
+        "- when ( \"Age Qualifies\" ).",
+      ].join("\n"));
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "fact \"Y\":",
+        "- code is \"sys|c\".",
+        "- defined by \"L\".\"Eligible\".",
+        "case \"C\":",
+        "- subject is \"Subject\".",
+      ].join("\n"));
+      const r = validateCELFile(file);
+      expect(r.errors.some((e) => e.kind === "criterion-not-a-defined-by-target")).toBe(true);
+      expect(r.errors.some((e) => e.kind === "unresolved-qualified-declaration")).toBe(false);
+    });
+  });
+
   test("qualified ref to Terminology → unresolved-qualified-declaration (Step 2 candidate exclusion)", () => {
     withProject((root) => {
       write(root, "lib.crl", [

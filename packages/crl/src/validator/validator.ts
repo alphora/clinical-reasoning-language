@@ -37,6 +37,15 @@ export type ValidationErrorKind =
   | "unresolved-reference"
   | "reference-cycle"
   | "decision-delegation-cycle"
+  // #224 ii — a `criterion` whose body transitively references itself
+  // (`A → B → A`, or a self-ref). Structural defect (like the other cycles);
+  // never soft-demoted.
+  | "criterion-cycle"
+  // #224 ii — a `criterion` name used in a CONCEPT-only reference slot
+  // (`defined as`, `sem-*` composition, `definition is` narrative, an action
+  // guard `unless`/`only when`), or a library-qualified criterion ref. Criteria
+  // may only appear in a decision `when` guard (or another criterion's body) in v0.
+  | "criterion-misuse"
   | "external-library-not-included"
   | "qualified-ref-unresolved"
   | "decision-shape"
@@ -118,6 +127,31 @@ export interface ReferenceCycleError extends ValidationErrorBase {
 export interface DecisionDelegationCycleError extends ValidationErrorBase {
   kind: "decision-delegation-cycle";
 }
+// #224 ii — a cycle in the criterion-reference graph (`criterion "A"` whose body
+// references `criterion "B"` whose body references `"A"`, or a self-reference).
+// Detected over the COMPLETE criterion graph (including unused criteria) so a
+// non-terminating expansion is caught at the source, not at expansion time.
+export interface CriterionCycleError extends ValidationErrorBase {
+  kind: "criterion-cycle";
+}
+// #224 ii — a criterion name used somewhere criteria are not allowed: a concept-only
+// reference slot, or a library-qualified criterion ref. `slot` names the offending
+// slot for consumers; the message spells out the v0 rule (criteria are `when`-guard-only).
+export interface CriterionMisuseError extends ValidationErrorBase {
+  kind: "criterion-misuse";
+  slot: CriterionSlot;
+}
+
+// Where a criterion name was wrongly used. `qualified` = a FOREIGN library-qualified
+// criterion ref — criterion refs cannot be library-qualified in v0. (A self-qualified
+// ref is bare-equivalent, so it yields a slot-specific misuse or is valid, never
+// `qualified`.)
+export type CriterionSlot =
+  | "defined-as"
+  | "composition"
+  | "narrative"
+  | "action-guard"
+  | "qualified";
 export interface ExternalLibraryNotIncludedError extends ValidationErrorBase {
   kind: "external-library-not-included";
   // The library name in the offending qualified ref `"<targetLibrary>"."X"`.
@@ -181,6 +215,8 @@ export type ValidationError =
   | UnresolvedReferenceError
   | ReferenceCycleError
   | DecisionDelegationCycleError
+  | CriterionCycleError
+  | CriterionMisuseError
   | ExternalLibraryNotIncludedError
   | QualifiedRefUnresolvedError
   | DecisionShapeError
