@@ -179,10 +179,24 @@ export type BranchCondition =
   | BranchConditionOr
   | BranchConditionCriterionRef;
 
+// #224 ii.1b: provenance stamped on the BOUNDARY-ROOT of a criterion substitution
+// during `expandCriteria` — the criterion whose (expanded) body this subtree is, plus
+// the location of the criterion REF that was replaced. Emit IGNORES it (expansion is
+// byte-identical to hand-inlined); it exists for rendering the author's criterion name
+// at the boundary (A7) and for source correspondence. Present ONLY on expanded output,
+// never on a source AST. For coincident boundaries (a bare-alias chain `X → Y → A`,
+// whose boundary-roots are the same physical node) the OUTERMOST criterion wins (the
+// author wrote `X`), so the stamp overwrites unconditionally.
+export interface SourcedFromCriterion {
+  name: string;
+  refLocation: Location;
+}
+
 export interface BranchConditionRef extends ASTNode {
   type: "BranchConditionRef";
   ref: ReferenceName;
   location: Location;
+  sourcedFromCriterion?: SourcedFromCriterion;
 }
 
 // #224 ii: a guard atom that references a named `criterion` (NOT a concept). The
@@ -193,24 +207,32 @@ export interface BranchConditionRef extends ASTNode {
 // consumer (eval / DNF / emit) treats an un-expanded `BranchConditionCriterionRef`
 // as a hard error — so a missed expansion is a loud throw, never a silent
 // misresolved concept. SOURCE-side consumers (validation, find-refs, structure)
-// handle it directly. `sourcedFromCriterion` is added to the EXPANDED nodes (ii.1b),
-// not here.
+// handle it directly. `sourcedFromCriterion` (ii.1b) is stamped on the expanded
+// Ref/And/Or nodes that REPLACE this one — never on `BranchConditionCriterionRef`
+// itself, since an expanded tree contains none.
 export interface BranchConditionCriterionRef extends ASTNode {
   type: "BranchConditionCriterionRef";
   ref: ReferenceName;
   location: Location;
+  // #224 ii.1b: type-enforce "a criterion ref never carries an expansion marker" — an
+  // expanded tree contains no criterion ref. `?: never` also makes `sourcedFromCriterion`
+  // a known (absent) property across the whole `BranchCondition` union, so a consumer can
+  // read it off any member without a type narrow.
+  sourcedFromCriterion?: never;
 }
 
 export interface BranchConditionAnd extends ASTNode {
   type: "BranchConditionAnd";
   operands: BranchCondition[]; // invariant: length >= 2
   location: Location;
+  sourcedFromCriterion?: SourcedFromCriterion; // #224 ii.1b — see SourcedFromCriterion
 }
 
 export interface BranchConditionOr extends ASTNode {
   type: "BranchConditionOr";
   operands: BranchCondition[]; // invariant: length >= 2
   location: Location;
+  sourcedFromCriterion?: SourcedFromCriterion; // #224 ii.1b — see SourcedFromCriterion
 }
 
 // When block. The guard is a `BranchCondition` expression (was a single

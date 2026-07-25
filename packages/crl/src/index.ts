@@ -80,8 +80,21 @@ export type {
   BranchConditionOr,
   BranchConditionCriterionRef,
   Criterion,
+  SourcedFromCriterion,
 } from "./ast/types";
 export { classifyCriterionRefs } from "./ast/criterionClassify";
+// #224 ii.1b — the criterion EXPANSION engine (pure transform + the atoms/depth
+// envelope). Seam-wiring is ii.1c; this publishes the primitives those seams call.
+export {
+  expandCriteria,
+  expandedSize,
+  containsCriterionRef,
+  buildCriterionTable,
+  CriterionExpansionError,
+  CRITERION_EXPANSION_ATOM_CAP,
+  CRITERION_MAX_DEPTH,
+} from "./ast/criterionExpansion";
+export type { CriterionTable, ExpandedSize, ExpansionReason } from "./ast/criterionExpansion";
 export {
   visitBranchCondition,
   branchConditionRefs,
