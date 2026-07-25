@@ -104,10 +104,27 @@ blockQualifier
     ;
 
 branchItem
-    : DASH WHEN conceptReference THEN blockBody              # WhenWithBody
-    | DASH WHEN conceptReference THEN actionStatement DOT    # WhenSingleAction
-    | DASH OTHERWISE THEN blockBody                          # OtherwiseWithBody
-    | DASH OTHERWISE THEN actionStatement DOT                # OtherwiseSingleAction
+    : DASH WHEN branchCondition THEN blockBody              # WhenWithBody
+    | DASH WHEN branchCondition THEN actionStatement DOT    # WhenSingleAction
+    | DASH OTHERWISE THEN blockBody                         # OtherwiseWithBody
+    | DASH OTHERWISE THEN actionStatement DOT               # OtherwiseSingleAction
+    ;
+
+// A decision branch guard (#224): a monotone boolean expression over concept
+// refs. PERMISSIVE grammar — a homogeneous chain (`A and B and C`, `A or B or C`)
+// or a single ref parses bare; a MIXED bare chain (`A and B or C`) also parses
+// but the BUILDER rejects it with a "parenthesize mixed and/or" diagnostic
+// (house precedent: `decisionBody`'s optional qualifier, validator-required).
+// Mixing REQUIRES parentheses: `(A or B) and C`. There is NO `not` — negation
+// has no structural lowering. `THEN` is the clean right edge (no ATN ambiguity;
+// same common-prefix shape as `argGroup`).
+branchCondition
+    : bcAtom ( (AND | OR) bcAtom )*
+    ;
+
+bcAtom
+    : conceptReference                  # BcRef
+    | LPAREN branchCondition RPAREN      # BcGroup
     ;
 
 // A nested `then:` block body. Homogeneous: branches XOR actions

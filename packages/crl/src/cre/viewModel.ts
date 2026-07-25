@@ -23,7 +23,8 @@ import type {
   WhenBlockBody,
 } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
-import { soleRefOrThrow } from "../ast/branchCondition";
+import { describeBranchCondition } from "../ast/branchCondition";
+import type { BranchCondition } from "../ast/types";
 import type { CELCase, CELDefinedByField, CELFact } from "../cel/ast/types";
 import { resolveDefinedByTarget } from "../cel/definedByResolve";
 import type { ResolvedCelGraph, CelImportDiagnostic } from "../cel/imports/types";
@@ -32,11 +33,18 @@ import { toZeroBasedRange } from "../language-services/contracts";
 import { mapImportDiagnostic } from "../language-services/diagnostics";
 
 import { buildGlobalDecisionMap, makeResolveDecision } from "./decisionResolver";
-import { childId, runCel, type CompositionTrace, type TraceNode } from "./run";
+import {
+  childId,
+  runCel,
+  type BranchConditionTrace,
+  type CompositionTrace,
+  type TraceNode,
+} from "./run";
 
 /** Bump on any breaking change to the shapes below (the UI/agent contract). The C2c-2 `facts[].definedBy`
  *  addition is OPTIONAL/additive — existing consumers reading `name`/`conceptRef` are unaffected (no bump). */
-export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 1;
+// v2 (#224): `ConditionView.concept` → `ConditionView.expr` (guard expression tree).
+export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 2;
 
 type ActionKind = "recommend-activity" | "use-decision";
 type ConceptView = { name: string; libraryName?: string };
@@ -116,12 +124,21 @@ export interface ViewNode {
   children?: ViewNode[];
 }
 
+/** #224: a `when` guard is a monotone boolean expression tree. Leaves carry the
+ *  concept, its per-leaf `satisfied?`, `defined as` `explanation?`, and `facts`;
+ *  and/or nodes carry their combined `satisfied?`. A simple guard is a single
+ *  `ref`. Rich "which conjunct failed" rendering is i.4; i.2 makes it
+ *  compound-SAFE + TRUTHFUL (no first-operand-masquerading-as-the-whole-guard). */
+export type BranchConditionView =
+  | { op: "and" | "or"; satisfied?: boolean; operands: BranchConditionView[] }
+  | { op: "ref"; satisfied?: boolean; concept: ConceptView; explanation?: ExplanationView; facts?: string[] };
+
 export interface ConditionView {
-  concept: ConceptView;
-  /** Present iff the `when` was evaluated (omitted for an unreached branch). */
+  /** The guard expression tree (was `concept: ConceptView` before #224). */
+  expr: BranchConditionView;
+  /** OVERALL branch result. Present iff the `when` was evaluated. */
   satisfied?: boolean;
   facts: string[];
-  explanation?: ExplanationView;
 }
 
 export interface GuardView {
@@ -374,23 +391,19 @@ function walkBranchesVM(
     }
     const nodeId = childId(parentId, `when[${i}]`);
     const t = traceIndex.get(nodeId);
-    // i.1: single-ref guard. The ConditionView stays concept-shaped this slice.
-    // Its expression reshape MUST land by i.2 (once the grammar accepts compound
-    // guards, this `soleRefOrThrow` would throw on a legal document) — the
-    // "which conjunct failed" rendering then follows in i.4.
-    const concept = conceptView(soleRefOrThrow(b.condition, "cre/viewModel.ts walkBranchesVM").ref);
-    const condition: ConditionView = t
-      ? {
-          concept,
-          ...(t.satisfied !== undefined ? { satisfied: t.satisfied } : {}),
-          facts: t.facts ?? [],
-          ...(t.composition ? { explanation: mapComposition(t.composition) } : {}),
-        }
-      : { concept, facts: [] };
+    // #224 i.2: the guard is a boolean expression. Build the `expr` tree by
+    // zipping the AST condition (source of truth for the concept refs) with the
+    // runtime trace (per-node satisfied). Single-ref stays a single `ref` leaf.
+    const expr = mapConditionExpr(b.condition, t);
+    const condition: ConditionView = {
+      expr,
+      ...(t?.satisfied !== undefined ? { satisfied: t.satisfied } : {}),
+      facts: t?.facts ?? [],
+    };
     const node: ViewNode = {
       nodeId,
       kind: "when",
-      label: `when ${concept.name}`,
+      label: `when ${describeBranchCondition(b.condition, getRefName)}`,
       source: span(b.location, filePath),
       evaluated: !!t,
       condition,
@@ -553,6 +566,55 @@ function buildActionVM(
     };
   }
   return node;
+}
+
+// #224 i.2 — build the VM guard expression. `mapConditionExpr` dispatches on the
+// runtime trace; `zipConditionTrace` walks the AST + the compound trace together
+// (AST = concept refs/structure, trace = per-node satisfied); `astConditionExpr`
+// is the unevaluated/preempted fallback (no `satisfied`). Trace/AST misalignment
+// degrades to an unevaluated leaf rather than throwing (keeps the VM stable).
+function mapConditionExpr(cond: BranchCondition, t: TraceNode | undefined): BranchConditionView {
+  if (t?.conditionTrace) return zipConditionTrace(cond, t.conditionTrace);
+  if (t && cond.type === "BranchConditionRef") {
+    return {
+      op: "ref",
+      ...(t.satisfied !== undefined ? { satisfied: t.satisfied } : {}),
+      concept: conceptView(cond.ref),
+      ...(t.composition ? { explanation: mapComposition(t.composition) } : {}),
+      ...(t.facts && t.facts.length > 0 ? { facts: t.facts } : {}),
+    };
+  }
+  return astConditionExpr(cond);
+}
+
+function zipConditionTrace(cond: BranchCondition, bt: BranchConditionTrace): BranchConditionView {
+  if (cond.type === "BranchConditionRef") {
+    // The trace leaf must actually BE a ref — else degrade to unevaluated (never
+    // attach another node's `satisfied`/facts to this leaf).
+    if (bt.op !== "ref") return astConditionExpr(cond);
+    return {
+      op: "ref",
+      ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
+      concept: conceptView(cond.ref),
+      ...(bt.composition ? { explanation: mapComposition(bt.composition) } : {}),
+      ...(bt.facts && bt.facts.length > 0 ? { facts: bt.facts } : {}),
+    };
+  }
+  const op: "and" | "or" = cond.type === "BranchConditionAnd" ? "and" : "or";
+  // Any STRUCTURAL mismatch (operator or arity) → degrade the WHOLE subtree to
+  // unevaluated (drop `satisfied` entirely); don't half-trust a mismatched trace.
+  if (bt.op !== op || bt.operands.length !== cond.operands.length) return astConditionExpr(cond);
+  return {
+    op,
+    ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
+    operands: cond.operands.map((o, k) => zipConditionTrace(o, bt.operands[k]!)),
+  };
+}
+
+function astConditionExpr(cond: BranchCondition): BranchConditionView {
+  if (cond.type === "BranchConditionRef") return { op: "ref", concept: conceptView(cond.ref) };
+  const op: "and" | "or" = cond.type === "BranchConditionAnd" ? "and" : "or";
+  return { op, operands: cond.operands.map(astConditionExpr) };
 }
 
 function mapComposition(ct: CompositionTrace): ExplanationView {

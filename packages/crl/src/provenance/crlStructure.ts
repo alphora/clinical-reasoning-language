@@ -12,7 +12,7 @@
  * closure — a source viewer must not silently drop an authored-but-unreached decision.
  */
 import { decisionSpine, type SpineNodeKind } from "../ast/decisionSpine";
-import type { ActionStatement, ReferenceName, WhenBlock } from "../ast/types";
+import type { ActionStatement, BranchCondition, ReferenceName, WhenBlock } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import { branchConditionRefs, describeBranchCondition } from "../ast/branchCondition";
 import type { ResolvedCelGraph } from "../cel/imports/types";
@@ -36,6 +36,10 @@ export interface CrlStructureNode {
    *  otherwise→[]). The cross-pane bridge: a source unit linking to concept "A" highlights the `when A` row. Built with
    *  the same lib/kind/name rules as the indexer (byte-identical keys); pure string construction — NOT index-resolved. */
   refKeys: string[];
+  /** #224: a canonical lib-qualified STRUCTURAL signature of a `when` guard, used
+   *  for persisted occurrence-flag keys. Present iff kind === "when". A single-ref
+   *  guard renders as `lib:Name` (byte-identical to the pre-#224 signature). */
+  sigLabel?: string;
   location: LsLocation; // always present: location-less nodes are skipped (mirrors the indexer) to keep nodeKey parity
   children: CrlStructureNode[];
 }
@@ -68,6 +72,35 @@ function refKey(ref: ReferenceName, kind: string, decisionLib: string): string {
   // Concept keys route through the shared conceptDeclRef so the cross-pane join key cannot drift from the indexer +
   // the new concept layer (activity/decision stay inline — they have no separate layer consumer).
   return nodeKey(kind === "concept" ? conceptDeclRef(lib, name) : { lib, kind, name });
+}
+
+// #224: `; key`-safe (no backtick/`;`/newline; whitespace-collapsed + trimmed) —
+// MUST match occurrenceKey.ts's `sanitizeSig` byte-for-byte.
+const sanitizeSig = (s: string): string => s.replace(/[`;\r\n]/g, " ").replace(/\s+/g, " ").trim();
+
+/** A canonical, lib-qualified STRUCTURAL signature of a `when` guard, for persisted
+ *  occurrence-flag keys. A single ref renders EXACTLY as the pre-#224
+ *  `refSig(refKeys[0])` output (`lib:Name`) so existing flags never re-key;
+ *  `and`/`or` wrap their operands (`and(lib:A,or(lib:B,lib:C))`) so operator AND
+ *  operand structure survive — unlike a `refKeys` join (loses the operator) or the
+ *  display label (lib-stripped). The leaf lib matches `refKey`'s (`getRefLibrary ??
+ *  decisionLib`), so single-ref output equals `refSig` of that leaf's refKey. */
+function conditionSigLabel(cond: BranchCondition, decisionLib: string): string {
+  const rawLeaf = (ref: ReferenceName): string =>
+    sanitizeSig(`${getRefLibrary(ref) ?? decisionLib}:${getRefName(ref)}`);
+  // Inside a compound, escape the structural delimiters so a concept name
+  // containing `,` `(` `)` `\` (clinical names DO — "Diabetes, Type 2") cannot
+  // inject structure and collide two DIFFERENT guards onto one signature.
+  const escLeaf = (ref: ReferenceName): string => rawLeaf(ref).replace(/([\\(),])/g, "\\$1");
+  const go = (c: BranchCondition): string =>
+    c.type === "BranchConditionRef"
+      ? escLeaf(c.ref)
+      : c.type === "BranchConditionAnd"
+        ? `and(${c.operands.map(go).join(",")})`
+        : `or(${c.operands.map(go).join(",")})`;
+  // Top-level single ref → RAW leaf (byte-identical to `refSig(refKeys[0])`, so
+  // existing single-ref flags never re-key); compound → escaped structural form.
+  return cond.type === "BranchConditionRef" ? rawLeaf(cond.ref) : go(cond);
 }
 
 /** The concept/activity/decision keys a row references — the cross-pane bridge. The kind is statically known from the
@@ -140,6 +173,9 @@ export function buildCrlStructure(
           label: labelOf(sn.kind, sn.node),
           ...(sn.kind === "action" ? { actionKind: actionKindOf(sn.node as ActionStatement) } : {}),
           refKeys: refKeysOf(sn.kind, sn.node, lib),
+          ...(sn.kind === "when"
+            ? { sigLabel: conditionSigLabel((sn.node as WhenBlock).condition, lib) }
+            : {}),
           location,
           children: [],
         });

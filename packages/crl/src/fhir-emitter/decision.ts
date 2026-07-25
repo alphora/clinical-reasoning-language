@@ -71,7 +71,7 @@ import type {
   WhenBlockBody,
 } from "../ast/types";
 import { getRefName, isQualifiedRef, normalizeLocalRef, refDisplay } from "../ast/types";
-import { soleRefOrThrow, describeBranchCondition } from "../ast/branchCondition";
+import { soleRef, describeBranchCondition } from "../ast/branchCondition";
 import type { CRLError } from "../types/errors";
 import { libraryCanonicalUrl } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
@@ -245,7 +245,10 @@ function defaultClock(): Date {
 
 type EmitActionResult =
   | { kind: "emitted"; action: Record<string, unknown> }
-  | { kind: "suppressed"; reason: "unresolved-ref" | "all-children-suppressed" };
+  | {
+      kind: "suppressed";
+      reason: "unresolved-ref" | "all-children-suppressed" | "unsupported-compound-guard";
+    };
 
 /* ─── Single-Decision emit ───────────────────────────────────────── */
 
@@ -348,7 +351,7 @@ export function emitDecisionPlanDefinition(
     errors.push({
       type: "Validation",
       kind: "decision-cascade-suppressed",
-      message: `Decision "${decision.name}" would emit with zero surviving top-level actions due to cascade suppression. Skipping resource. Resolve the underlying unresolved-* references.`,
+      message: `Decision "${decision.name}" would emit with zero surviving top-level actions due to cascade suppression. Skipping resource. See the accompanying diagnostics (unresolved references and/or unsupported constructs such as compound guards).`,
       line: decision.location?.start.line,
       column: decision.location?.start.column,
     });
@@ -476,9 +479,23 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
   // bare name (`refName`) drive the condition resolver, the action-level input
   // lookup, AND the displays, so the input path treats a self-qualified ref the
   // SAME way the condition path does (F2 — no self-qualified asymmetry).
-  // i.1: single-ref guard (grammar). N-conditions / DNF for a compound land in
-  // i.3; `soleRefOrThrow` guards a hand-built compound reaching emit early.
-  const guardRef = soleRefOrThrow(wb.condition, "fhir-emitter/decision.ts emitWhenBlock").ref;
+  // #224 i.2 EMIT GATE: a COMPOUND guard (`and`/`or`) has no structural DNF
+  // lowering yet (that is i.3). Suppress the branch with a clear diagnostic
+  // rather than emit a wrong condition. The non-empty `unmatched` pins emit
+  // success:false, so the partial PlanDefinition is never shipped — a suppressed
+  // `when` inside `first:` shifts sibling preemption, so the artifact is
+  // semantically wrong and not usable until i.3.
+  const guardRefNode = soleRef(wb.condition);
+  if (!guardRefNode) {
+    ctx.unmatched.push({
+      kind: "unsupported-compound-guard",
+      text: `${describeBranchCondition(wb.condition, refDisplay)} — compound guard not yet emittable (#224 i.3); branch suppressed, emitted PlanDefinition not usable until then`,
+      line: wb.location?.start.line,
+      column: wb.location?.start.column,
+    });
+    return { kind: "suppressed", reason: "unsupported-compound-guard" };
+  }
+  const guardRef = guardRefNode.ref;
   const normalizedRef = normalizeLocalRef(guardRef, ctx.libraryName);
   const refName = getRefName(normalizedRef);
 

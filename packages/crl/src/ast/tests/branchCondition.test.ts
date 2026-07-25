@@ -4,7 +4,6 @@ import {
   branchConditionRefs,
   describeBranchCondition,
   soleRef,
-  soleRefOrThrow,
   visitBranchCondition,
 } from "../branchCondition";
 import { getRefName, refDisplay, type BranchCondition, type ReferenceName } from "../types";
@@ -52,15 +51,6 @@ describe("branchCondition traversal helpers", () => {
       expect(soleRef(and(ref("A")))).toBeNull();
       expect(soleRef(or(ref("A")))).toBeNull();
       expect(soleRef(and(ref("A"), ref("B")))).toBeNull();
-    });
-  });
-
-  describe("soleRefOrThrow — self-enforcing single-ref handoff", () => {
-    it("single ref → the ref node", () => {
-      expect(soleRefOrThrow(ref("A"), "site").ref).toBe("A");
-    });
-    it("compound → throws a named internal error carrying the site tag", () => {
-      expect(() => soleRefOrThrow(and(ref("A"), ref("B")), "my-site")).toThrow(/my-site/);
     });
   });
 

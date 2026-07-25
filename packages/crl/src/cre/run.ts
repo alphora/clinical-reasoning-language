@@ -66,7 +66,8 @@ import type {
   WhenBlockBody,
 } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
-import { soleRefOrThrow, describeBranchCondition } from "../ast/branchCondition";
+import { soleRef, describeBranchCondition } from "../ast/branchCondition";
+import type { BranchCondition } from "../ast/types";
 import type { CELCase, CELDefinedByField, CELFact, CELResultField } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { LsLocation } from "../language-services/contracts";
@@ -102,6 +103,24 @@ export interface CompositionTrace {
   composition?: CompositionTrace; // op === "ref" to a composite — its own sub-evaluation
 }
 
+/** Sub-evaluation of a COMPOUND decision guard (`when A and (B or C)`) — the
+ *  decision-layer analogue of `CompositionTrace` (do NOT conflate: `sem-*`
+ *  inference vs decision `and`/`or`). Named `conditionTrace` on TraceNode to
+ *  avoid colliding with `TraceNode.guard` (the action-guard). A ref leaf carries
+ *  a STRUCTURED identity (cross-library same-name operands stay distinct), its
+ *  own `defined as` `CompositionTrace` if it is a composite, and its own facts.
+ *  Present ONLY for a compound guard; a single-ref `when` keeps the legacy
+ *  `concept` + `composition` fields and omits this. */
+export type BranchConditionTrace =
+  | { op: "and" | "or"; satisfied: boolean; operands: BranchConditionTrace[] }
+  | {
+      op: "ref";
+      satisfied: boolean;
+      concept: { name: string; libraryName?: string };
+      composition?: CompositionTrace;
+      facts?: string[];
+    };
+
 export interface TraceNode {
   node: string;
   /** Decision-relative structural path id (e.g. "when[0]/action[1]", "otherwise", "when[1]/when[0]") —
@@ -125,6 +144,10 @@ export interface TraceNode {
   facts?: string[];
   /** Present when the `when`/guard concept is `defined as` a composition. */
   composition?: CompositionTrace;
+  /** Present ONLY for a COMPOUND `when` guard (`and`/`or`); mutually exclusive
+   *  with the single-ref `concept`/`composition` fields. Discriminator for a
+   *  compound branch: `conditionTrace !== undefined`. */
+  conditionTrace?: BranchConditionTrace;
   children?: TraceNode[];
 }
 
@@ -372,6 +395,52 @@ function conceptSatisfied(
   };
 }
 
+/** Evaluate a COMPOUND `when` guard (`and`/`or` over concept refs). FULL-evaluate
+ *  every operand (NO short-circuit) so the trace shows which conjunct failed:
+ *  `and` = all satisfied, `or` = any. Facts = ordered first-occurrence union over
+ *  the evaluated ref leaves. A single-ref guard does NOT come here — walkBranches
+ *  keeps its legacy `concept`+`composition` trace path (no golden drift). Note:
+ *  full evaluation may surface DIAGNOSTICS from a non-decisive operand (e.g. the
+ *  second operand of a satisfied `or`); intentional, for a complete trace. */
+function evalBranchCondition(
+  cond: BranchCondition,
+  ctx: Ctx,
+  frame: Frame,
+): { sat: boolean; facts: string[]; trace: BranchConditionTrace } {
+  if (cond.type === "BranchConditionRef") {
+    const { sat, facts, composition } = conceptSatisfied(cond.ref, ctx, frame);
+    // Structured RESOLVED identity: a bare ref resolves against the current frame
+    // (a delegated cross-library decision → the sub's lib), so two same-named
+    // bare leaves in different frames stay distinguishable in the trace.
+    const lib = getRefLibrary(cond.ref) ?? frame.currentLib;
+    return {
+      sat,
+      facts,
+      trace: {
+        op: "ref",
+        satisfied: sat,
+        concept: { name: getRefName(cond.ref), libraryName: lib },
+        ...(composition ? { composition } : {}),
+        ...(facts.length > 0 ? { facts } : {}),
+      },
+    };
+  }
+  const op: "and" | "or" = cond.type === "BranchConditionAnd" ? "and" : "or";
+  const results = cond.operands.map((o) => evalBranchCondition(o, ctx, frame));
+  const sat = op === "and" ? results.every((r) => r.sat) : results.some((r) => r.sat);
+  const seen = new Set<string>();
+  const facts: string[] = [];
+  for (const r of results) {
+    for (const f of r.facts) {
+      if (!seen.has(f)) {
+        seen.add(f);
+        facts.push(f);
+      }
+    }
+  }
+  return { sat, facts, trace: { op, satisfied: sat, operands: results.map((r) => r.trace) } };
+}
+
 export function recName(action: ActionStatement["action"]): string {
   return action.type === "RecommendActivity"
     ? getRefName(action.activityName)
@@ -602,27 +671,49 @@ function walkBranches(
       if (ordered) return;
       continue;
     }
-    // i.1: guard is a single-ref condition (grammar); boolean evaluation of a
-    // compound guard + GuardTrace land in i.2. `soleRefOrThrow` makes a compound
-    // reaching here (hand-built AST) fail loudly instead of silently.
-    const guardRef = soleRefOrThrow(b.condition, "cre/run.ts walkBranches").ref;
-    const { sat, facts, composition } = conceptSatisfied(guardRef, ctx, frame);
+    // #224 i.2: a single-ref guard keeps the LEGACY trace (`concept` +
+    // `composition`) — byte-identical, no golden drift. A COMPOUND guard is
+    // full-evaluated into a `conditionTrace` and OMITS `concept` (its label lives
+    // in `node`). `label`/`viaWhen` = the rendered guard (bare name for a single
+    // ref = legacy-identical).
     const nodeId = childId(parentId, `when[${i}]`);
-    const node: TraceNode = {
-      node: `when ${describeBranchCondition(b.condition, getRefName)}`,
-      nodeId,
-      kind: "when",
-      source: spanOf(b.location, frame),
-      concept: getRefName(guardRef),
-      satisfied: sat,
-      evaluated: true,
-      facts,
-      ...(composition ? { composition } : {}),
-      children: [],
-    };
+    const label = describeBranchCondition(b.condition, getRefName);
+    const soleR = soleRef(b.condition);
+    let sat: boolean;
+    let node: TraceNode;
+    if (soleR) {
+      const r = conceptSatisfied(soleR.ref, ctx, frame);
+      sat = r.sat;
+      node = {
+        node: `when ${label}`,
+        nodeId,
+        kind: "when",
+        source: spanOf(b.location, frame),
+        concept: getRefName(soleR.ref),
+        satisfied: sat,
+        evaluated: true,
+        facts: r.facts,
+        ...(r.composition ? { composition: r.composition } : {}),
+        children: [],
+      };
+    } else {
+      const r = evalBranchCondition(b.condition, ctx, frame);
+      sat = r.sat;
+      node = {
+        node: `when ${label}`,
+        nodeId,
+        kind: "when",
+        source: spanOf(b.location, frame),
+        satisfied: sat,
+        evaluated: true,
+        facts: r.facts,
+        conditionTrace: r.trace,
+        children: [],
+      };
+    }
     into.push(node);
     if (sat) {
-      executeBody(b.body, getRefName(guardRef), ctx, frame, node.children!, nodeId);
+      executeBody(b.body, label, ctx, frame, node.children!, nodeId);
       if (ordered) return; // first match wins — remaining branches are not evaluated.
     }
   }

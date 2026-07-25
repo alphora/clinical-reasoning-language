@@ -81,6 +81,7 @@ describe("renderScenario — view-model (#item 2)", () => {
   it("builds the FULL tree from the AST spine, overlaying run state (preempted + condition-false body)", () => {
     const vm = renderScenario(graphFrom(COVERAGE_CRL, COVERAGE_CEL));
     expect(vm.schemaVersion).toBe(SCENARIO_VIEW_MODEL_SCHEMA_VERSION);
+    expect(vm.schemaVersion).toBe(2); // #224 bumped 1→2 (ConditionView.concept → expr)
     const indic = vm.scenarios.find((s) => s.case.name === "indication only")!;
     expect(indic.status).toBe("pass");
     // All THREE branches present (the CRE trace short-circuited away `otherwise`; the AST restores it).
@@ -88,7 +89,7 @@ describe("renderScenario — view-model (#item 2)", () => {
 
     const excl = byId(indic.tree, "when[0]")!;
     expect(excl).toMatchObject({ kind: "when", evaluated: true });
-    expect(excl.condition).toMatchObject({ concept: { name: "Excl" }, satisfied: false });
+    expect(excl.condition).toMatchObject({ expr: { concept: { name: "Excl" } }, satisfied: false });
     // Excl's body action did NOT run (condition false) → reached:false, no preempted reason.
     const exclDeny = byId(indic.tree, "when[0]/action[0]")!;
     expect(exclDeny).toMatchObject({ kind: "action", evaluated: false });
@@ -462,10 +463,10 @@ case "nested":
     const sc = vm.scenarios[0];
     expect(sc.status).toBe("pass");
     const outer = byId(sc.tree, "when[0]")!;
-    expect(outer.condition).toMatchObject({ concept: { name: "A" }, satisfied: true });
+    expect(outer.condition).toMatchObject({ expr: { concept: { name: "A" } }, satisfied: true });
     const inner = byId(sc.tree, "when[0]/when[0]")!;
     expect(inner).toMatchObject({ kind: "when", evaluated: true });
-    expect(inner.condition).toMatchObject({ concept: { name: "B" }, satisfied: true });
+    expect(inner.condition).toMatchObject({ expr: { concept: { name: "B" } }, satisfied: true });
     expect(byId(sc.tree, "when[0]/when[0]/action[0]")).toMatchObject({
       action: { target: { name: "X" }, produced: true },
     });
@@ -514,7 +515,9 @@ case "both -> go":
     expect(sc.decision).toMatchObject({ name: "D", libraryName: "C", resolved: true });
     const both = byId(sc.tree, "when[0]")!;
     expect(both.condition?.satisfied).toBe(true);
-    const exp = both.condition?.explanation;
+    // #224: the leaf `defined as` explanation now lives on the guard expression's ref leaf.
+    const leaf = both.condition?.expr;
+    const exp = leaf && leaf.op === "ref" ? leaf.explanation : undefined;
     expect(exp).toMatchObject({ op: "sem-and", satisfied: true });
     if (exp?.op === "sem-and") {
       expect(exp.operands.map((o) => o.op)).toEqual(["ref", "ref"]);

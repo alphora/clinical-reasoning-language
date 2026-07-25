@@ -57,6 +57,10 @@ import {
   WhenSingleActionContext,
   OtherwiseWithBodyContext,
   OtherwiseSingleActionContext,
+  BranchConditionContext,
+  BcAtomContext,
+  BcRefContext,
+  BcGroupContext,
 } from "../grammar/generated/antlr/CRLParser";
 import { CRLParserVisitor } from "../grammar/generated/antlr/CRLParserVisitor";
 import type { CRLError } from "../types/errors";
@@ -67,7 +71,7 @@ import {
   Decision,
   DecisionBody,
   WhenBlock,
-  BranchConditionRef,
+  BranchCondition,
   OtherwiseBlock,
   BranchBlock,
   BlockMember,
@@ -308,27 +312,61 @@ export class CRLAstBuilder
     return null as unknown as BranchBlock;
   }
 
-  // Slice i.1: the grammar still yields a single `conceptReference`, so the
-  // builder only ever produces the single-ref `BranchCondition`. The `and`/`or`
-  // builder cases arrive with the grammar rule in i.2. The ref leaf carries the
-  // conceptReference's OWN location (not the whole `when`) for per-operand
-  // diagnostics/find-refs.
-  private branchConditionFromRef(refCtx: ConceptReferenceContext): BranchConditionRef {
-    return {
-      type: "BranchConditionRef",
-      ref: refFromRefContext(refCtx),
-      location: getLocation(refCtx),
-    };
+  // #224 i.2: build the `when` guard from a `branchCondition` — a monotone
+  // boolean over concept refs. A homogeneous chain (`A and B and C`) flattens to
+  // ONE n-ary node (chain flatten); parens preserve nesting; a single ref stays
+  // a ref (its OWN location, for per-operand find-refs). A MIXED bare chain
+  // (`A and B or C`) is reported here (parenthesize) — degraded, never thrown,
+  // so language services survive ANTLR error-recovery on partial buffers.
+  private branchConditionFrom(ctx: BranchConditionContext): BranchCondition {
+    const atoms = ctx.bcAtom();
+    if (atoms.length === 0) {
+      // ANTLR error-recovery can yield an empty branchCondition. Report it and
+      // return a placeholder ref so downstream NEVER sees an empty `and`/`or`
+      // (which would evaluate vacuously true/false).
+      this.reportError("a `when` guard must have at least one condition", ctx);
+      return { type: "BranchConditionRef", ref: "", location: getLocation(ctx) };
+    }
+    if (atoms.length === 1) return this.bcAtomToCondition(atoms[0]!);
+    const ands = ctx.AND();
+    const ors = ctx.OR();
+    if (ands.length > 0 && ors.length > 0) {
+      this.reportError(
+        "mixed 'and'/'or' in a `when` guard requires parentheses, e.g. `(A or B) and C`",
+        ctx,
+      );
+    }
+    const operands = atoms.map((a) => this.bcAtomToCondition(a));
+    const location = getLocation(ctx);
+    return ors.length > 0 && ands.length === 0
+      ? { type: "BranchConditionOr", operands, location }
+      : { type: "BranchConditionAnd", operands, location };
+  }
+
+  private bcAtomToCondition(ctx: BcAtomContext): BranchCondition {
+    if (ctx instanceof BcRefContext) {
+      const refCtx = ctx.conceptReference();
+      return {
+        type: "BranchConditionRef",
+        ref: refFromRefContext(refCtx),
+        location: getLocation(refCtx),
+      };
+    }
+    if (ctx instanceof BcGroupContext) {
+      return this.branchConditionFrom(ctx.branchCondition());
+    }
+    this.reportError("Unknown bcAtom alternative", ctx);
+    return { type: "BranchConditionRef", ref: "", location: getLocation(ctx) };
   }
 
   visitWhenWithBody(ctx: WhenWithBodyContext): WhenBlock {
-    const condition = this.branchConditionFromRef(ctx.conceptReference());
+    const condition = this.branchConditionFrom(ctx.branchCondition());
     const body = this.visit(ctx.blockBody()) as BlockBody;
     return { type: "WhenBlock", condition, body, location: getLocation(ctx) };
   }
 
   visitWhenSingleAction(ctx: WhenSingleActionContext): WhenBlock {
-    const condition = this.branchConditionFromRef(ctx.conceptReference());
+    const condition = this.branchConditionFrom(ctx.branchCondition());
     const action = this.visit(ctx.actionStatement()) as ActionStatement;
     return { type: "WhenBlock", condition, body: action, location: getLocation(ctx) };
   }

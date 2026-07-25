@@ -88,20 +88,6 @@ export function soleRef(c: BranchCondition): BranchConditionRef | null {
 }
 
 /**
- * Like `soleRef`, but throws a NAMED internal error at sites that only handle
- * the single-ref case (the compound semantics land in a later slice). This
- * makes the i.1 -> i.2 handoff self-enforcing: a compound reaching such a site
- * fails loudly with context instead of passing `undefined` deep into emit.
- */
-export function soleRefOrThrow(c: BranchCondition, siteTag: string): BranchConditionRef {
-  if (c.type === "BranchConditionRef") return c;
-  throw new Error(
-    `compound branch condition reached single-ref site "${siteTag}" ` +
-      `before slice i.2/i.3 added compound support`,
-  );
-}
-
-/**
  * Human-readable guard label, e.g. `"A"`, `"A" and "B"`, `("A" or "B") and "C"`.
  * `display` renders each ref — pass `getRefName` for bare names or `refDisplay`
  * for qualified display; the two call sites (cascade labels vs unmatched-ref

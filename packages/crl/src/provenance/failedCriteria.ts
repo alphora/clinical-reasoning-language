@@ -35,7 +35,14 @@ export interface FcViewNode {
   evaluated: boolean;
   /** Only on an unreached BRANCH whose ordered block had a prior matching sibling. */
   unreachedReason?: "preempted";
-  condition?: { concept: { name: string; libraryName?: string }; satisfied?: boolean };
+  /** #224: the guard EXPRESSION (was a single `concept`). For the failed-criterion
+   *  display we need only the op + a `ref`'s concept; a compound falls back to the
+   *  branch `label` (rich per-conjunct rendering is i.4). Structurally a subset of
+   *  the real `ConditionView.expr` / `BranchConditionView`. */
+  condition?: {
+    expr: { op: "and" | "or" | "ref"; concept?: { name: string; libraryName?: string } };
+    satisfied?: boolean;
+  };
   guard?: {
     polarity: "unless" | "only-when";
     concept: { name: string; libraryName?: string };
@@ -239,13 +246,23 @@ function firstBlockerOnPath(
 // ── blocker → FailedCriterionNode builders (each carries the precise per-reason `display`, FIX 3) ───────────────────
 
 /** An evaluated-unsatisfied `when` blocker → display carries the false `when`'s concept. */
+/** #224: the display concept for a failed `when`. A single-ref guard → its
+ *  concept; a COMPOUND guard → the whole guard label (the branch failed;
+ *  which-conjunct-failed rendering is i.4). Never masquerades one operand as the
+ *  whole guard. */
+function fcConcept(n: FcViewNode): { name: string; libraryName?: string } {
+  const e = n.condition?.expr;
+  if (e && e.op === "ref" && e.concept) return e.concept;
+  return { name: n.label.replace(/^when\s+/, "") };
+}
+
 function unsatisfiedWhenNode(n: FcViewNode): FailedCriterionNode {
   return {
     nodeId: n.nodeId,
     conceptLabel: n.label,
     source: n.source,
     reason: "unsatisfied-when",
-    display: { reason: "unsatisfied-when", concept: n.condition?.concept ?? { name: "" } },
+    display: { reason: "unsatisfied-when", concept: fcConcept(n) },
   };
 }
 
@@ -277,7 +294,7 @@ function preemptionNode(matched: FcViewNode): FailedCriterionNode {
         ? {
             reason: "preemption",
             siblingKind: "when",
-            ...(matched.condition?.concept ? { concept: matched.condition.concept } : {}),
+            ...(matched.condition ? { concept: fcConcept(matched) } : {}),
           }
         : { reason: "preemption", siblingKind: "otherwise" },
   };

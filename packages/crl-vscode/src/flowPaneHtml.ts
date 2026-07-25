@@ -269,7 +269,11 @@ function buildLaid(
     // Only a `when` IS its concept (the box carries its border). An action's guard concept is no longer resolved here —
     // Todo 2 removed the guard peek + colors an action by its DETERMINATION target, not its guard — so resolving it would
     // be dead work (the guard stays visible in the crl pane).
-    const conceptRef = n.kind === "when" ? n.refKeys[0] : undefined;
+    // #224: only a SINGLE-ref `when` IS one concept (border/peek/outline). A
+    // COMPOUND guard (>1 refKey) has no single concept — `refKeys[0]` would
+    // masquerade the first operand as the whole guard, so drop the peek/border
+    // and let the display fall back to the full guard label.
+    const conceptRef = n.kind === "when" && n.refKeys.length === 1 ? n.refKeys[0] : undefined;
     const cf = conceptFields(conceptRef);
     const useDecision = n.kind === "action" && n.actionKind === "use-decision";
     // #187 Todo 2b: a guarded action (`recommend X when <guard>` OR `use decision D when <guard>`) — resolve the guard

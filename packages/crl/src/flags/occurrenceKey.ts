@@ -51,7 +51,10 @@ function refSig(refKey: string | undefined): string {
  *  The FULL chain (not just the nearest guard) so two nodes with the same nearest-guard+activity under DIFFERENT outer
  *  guards are distinguishable — closing a silent wrong-node an outer-branch reorder would otherwise cause (Claude). */
 function signatureFor(node: CrlStructureNode, ancestors: readonly string[]): string {
-  const own = refSig(node.refKeys[0]);
+  // #224: a `when` uses its canonical guard `sigLabel` (structural, lib-qualified;
+  // single-ref = `lib:Name`, byte-identical to `refSig(refKeys[0])`). Compound
+  // guards keep operator + operand structure that a flat `refKeys[0]` would drop.
+  const own = node.kind === "when" ? (node.sigLabel ?? refSig(node.refKeys[0])) : refSig(node.refKeys[0]);
   if (node.kind === "when") return [...ancestors, own].join("/"); // a condition IS in its ancestor context
   return `${ancestors.length ? ancestors.join("/") : "(top)"}→${own}`; // a recommend-activity leaf: ancestors → activity
 }
@@ -65,7 +68,7 @@ export function occurrencesOf(dec: CrlDecisionStructure): OccurrenceRef[] {
       out.push({ decision: dec.decision, lib: dec.lib, nodeId: node.nodeId, signature: signatureFor(node, ancestors), nodeKey: node.nodeKey, isLeaf: node.kind === "action" });
     }
     // a `when` appends its concept to the chain; an `otherwise` appends `otherwise`; anything else passes through.
-    const childAncestors = node.kind === "when" ? [...ancestors, refSig(node.refKeys[0])] : node.kind === "otherwise" ? [...ancestors, "otherwise"] : ancestors;
+    const childAncestors = node.kind === "when" ? [...ancestors, node.sigLabel ?? refSig(node.refKeys[0])] : node.kind === "otherwise" ? [...ancestors, "otherwise"] : ancestors;
     for (const c of node.children) walk(c, childAncestors);
   };
   for (const c of dec.children) walk(c, []);

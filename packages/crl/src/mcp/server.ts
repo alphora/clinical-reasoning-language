@@ -606,7 +606,9 @@ export function createServer(): McpServer {
         'CEL fact `defined by "Lib"."C"` to satisfy one); an unresolved/cyclic target is non-producing. ' +
         "Returns { success, caseCount, passCount, " +
         "failCount, errorCount, runs:[{case, decision, status, expected, produced, trace:[{node, nodeId, " +
-        "source, ...}], diagnostics, conceptTruth:[{lib, name, satisfied}]}], errors, importDiagnostics }. " +
+        "source, satisfied, ...}], diagnostics, conceptTruth:[{lib, name, satisfied}]}], errors, importDiagnostics }. " +
+        "#224: a `when` may guard on a compound `and`/`or` — such a node OMITS `concept` and carries " +
+        "`conditionTrace` (op:and|or|ref tree, each ref-leaf {name,libraryName?}); a single-ref `when` keeps `concept`. " +
         "`conceptTruth` is the case's per-concept answer over the whole closure — including OFF-path concepts " +
         "`first:` never evaluated; an ABSENT (lib,name) is UNKNOWN, never `false`. NOT yet evaluated (deferred): `definition " +
         "is` predicates (count/temporal/value) and `coded from`/external value sets.",
@@ -633,7 +635,9 @@ export function createServer(): McpServer {
         "host-independent CRE↔UI contract (roadmap item #2) the scenario-runner UI consumes. Unlike " +
         "`run_decision` (raw evaluation trace), this returns the FULL decision tree (the CRL AST is the " +
         "structural spine — EVERY branch and action, reached or not) overlaid with per-node run state: " +
-        "`evaluated` (reached?), `condition` (satisfied + which facts + a `defined as` explanation), " +
+        "`evaluated` (reached?), `condition` (overall satisfied + facts, plus `expr`: the #224 guard expression " +
+        "tree — a single `ref` leaf or `and`/`or` nodes, each with per-node satisfied + leaf facts/`defined as` " +
+        "explanation; schemaVersion 2 replaced the old `condition.concept`), " +
         "`guard` provenance, `guardedOut`, `action` (recommend-activity vs use-decision, qualifier, " +
         'produced), `unreachedReason:"preempted"` for first:-short-circuited branches, and a `source` ' +
         "span (filePath + 0-based range) per node for navigation. Pass `path` (absolute .cel); `case` " +

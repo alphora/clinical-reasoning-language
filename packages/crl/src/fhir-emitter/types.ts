@@ -348,7 +348,11 @@ export interface UnmatchedReference {
     // removed). It carries no machine signal, so routing it to `unmatched` would
     // wrongly pin `success:false`.
     | "unsupported-communication-with-terminology"
-    | "unsupported-questionnaire-with";
+    | "unsupported-questionnaire-with"
+    // #224 i.2: a compound `and`/`or` `when` guard — structural DNF lowering is
+    // i.3. Pins success:false so the partial (semantically-wrong) resource is
+    // never shipped; the branch is suppressed with this diagnostic.
+    | "unsupported-compound-guard";
   text: string;
   line?: number;
   column?: number;

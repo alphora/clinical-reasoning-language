@@ -18,7 +18,8 @@ import {
 } from "../types";
 
 import { parseInput } from "./parseInput";
-import { soleRef } from "../branchCondition";
+import { soleRef, branchConditionRefs } from "../branchCondition";
+import type { BranchConditionAnd, BranchConditionOr } from "../types";
 
 describe("CRLAstBuilder", () => {
   describe("Decision Statements", () => {
@@ -76,6 +77,53 @@ library "Test".
       expect(leaf?.ref).toBe("X");
       // the ref leaf carries its OWN location, not a fallback to the whole `when`
       expect(leaf?.location?.start?.line).toEqual(expect.any(Number));
+    });
+
+    const guardOf = (body: string) => {
+      const src = `library "T".\n        decision "D":\n${body}\n      `;
+      const decision = parseInput(src).statements[0] as Decision;
+      return (decision.body.statements[0] as WhenBlock).condition;
+    };
+
+    it("#224 i.2: parses an `and` chain FLATTENED to one n-ary node", () => {
+      const c = guardOf(`          - when "A" and "B" and "C" then recommend activity "X".`);
+      expect(c.type).toBe("BranchConditionAnd");
+      expect((c as BranchConditionAnd).operands).toHaveLength(3);
+      expect(branchConditionRefs(c).map((r) => r.ref)).toEqual(["A", "B", "C"]);
+    });
+
+    it("#224 i.2: parses an `or` chain", () => {
+      const c = guardOf(`          - when "A" or "B" then recommend activity "X".`);
+      expect(c.type).toBe("BranchConditionOr");
+      expect((c as BranchConditionOr).operands).toHaveLength(2);
+    });
+
+    it("#224 i.2: parenthesized mixing preserves nesting `(A or B) and C`", () => {
+      const c = guardOf(`          - when ("A" or "B") and "C" then recommend activity "X".`);
+      expect(c.type).toBe("BranchConditionAnd");
+      const ops = (c as BranchConditionAnd).operands;
+      expect(ops[0]!.type).toBe("BranchConditionOr");
+      expect(ops[1]!.type).toBe("BranchConditionRef");
+      // leaf order preserved across the nesting
+      expect(branchConditionRefs(c).map((r) => r.ref)).toEqual(["A", "B", "C"]);
+    });
+
+    it("#224 i.2: a BARE MIXED chain is rejected (parenthesize)", () => {
+      expect(() =>
+        parseInput(`library "T".
+        decision "D":
+          - when "A" and "B" or "C" then recommend activity "X".
+      `),
+      ).toThrow(/parenthes|mixed/i);
+    });
+
+    it("#224 i.2: `not` in a guard is a parse error (monotone)", () => {
+      expect(() =>
+        parseInput(`library "T".
+        decision "D":
+          - when "A" and not "B" then recommend activity "X".
+      `),
+      ).toThrow();
     });
 
     it("should parse a decision with any/all qualifiers", () => {

@@ -150,11 +150,10 @@ describe("decision — emitDecisionPlanDefinition Strategy (isRoot=true)", () =>
     expect((r.type as { coding: Array<{ code: string }> }).coding[0]!.code).toBe("workflow-definition");
   });
 
-  it("emitting a COMPOUND branch condition throws the named single-ref-site error (i.1→i.2 handoff guard)", () => {
-    // i.1's grammar can't produce a compound, but the AST TYPE permits one and
-    // emitDecisionPlanDefinition is root-exported + tests hand-build WhenBlocks.
-    // A compound must fail LOUDLY at the single-ref emit boundary, not pass
-    // `undefined` deep into emit.
+  it("i.2: a COMPOUND branch condition is emit-GATED (suppressed + `unsupported-compound-guard`, no crash)", () => {
+    // Structural DNF lowering is i.3. Until then a compound guard must NOT crash
+    // emit and must NOT emit a wrong condition — it is suppressed with a
+    // diagnostic that pins success:false.
     const compoundWhen: WhenBlock = {
       type: "WhenBlock",
       condition: {
@@ -169,11 +168,12 @@ describe("decision — emitDecisionPlanDefinition Strategy (isRoot=true)", () =>
       location: LOC,
     };
     const d = decision("Top", [compoundWhen]);
-    expect(() =>
-      emitDecisionPlanDefinition(
-        d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
-      ),
-    ).toThrow(/emitWhenBlock/);
+    const { unmatched } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
+    );
+    const gate = unmatched.find((u) => u.kind === "unsupported-compound-guard");
+    expect(gate).toBeDefined();
+    expect(gate!.text).toMatch(/not yet emittable|not usable/i);
   });
 
   it("emits `version` from package.json (CRMI shareable floor)", () => {

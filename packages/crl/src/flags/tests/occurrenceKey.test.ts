@@ -37,6 +37,56 @@ test("nested branches: same nearest-guard + activity under DIFFERENT outer guard
   expect(leaves.sort()).toEqual(["Pol:A/Pol:B→Pol:X", "Pol:C/Pol:B→Pol:X"]);
 });
 
+test("#224 compound guard: occurrence sig = structural sigLabel; operator swap differs; single-ref byte-identical", () => {
+  const mkWhen = (sigLabel: string): CrlDecisionStructure =>
+    ({
+      decision: "D",
+      lib: "Pol",
+      nodeKey: "k:D",
+      location: {},
+      children: [
+        {
+          nodeKey: "k:w",
+          nodeId: "when[0]",
+          decision: "D",
+          lib: "Pol",
+          kind: "when",
+          label: "when g",
+          refKeys: [rk("Pol", "concept", "A"), rk("Pol", "concept", "B")],
+          sigLabel,
+          location: {},
+          children: [
+            {
+              nodeKey: "k:a",
+              nodeId: "when[0]/action[0]",
+              decision: "D",
+              lib: "Pol",
+              kind: "action",
+              actionKind: "recommend-activity",
+              label: "Approve",
+              refKeys: [rk("Pol", "activity", "Approve")],
+              location: {},
+              children: [],
+            },
+          ],
+        },
+      ],
+    }) as unknown as CrlDecisionStructure;
+  const sigOf = (d: CrlDecisionStructure) => {
+    const occ = occurrencesOf(d);
+    return {
+      when: occ.find((o) => o.nodeId === "when[0]")!.signature,
+      leaf: occ.find((o) => o.isLeaf)!.signature,
+    };
+  };
+  const andS = sigOf(mkWhen("and(Pol:A,Pol:B)"));
+  const orS = sigOf(mkWhen("or(Pol:A,Pol:B)"));
+  expect(andS.when).toBe("and(Pol:A,Pol:B)"); // structural, operator-aware (not refKeys[0])
+  expect(andS.when).not.toBe(orS.when); // operator swap → DIFFERENT persisted key
+  expect(andS.leaf).toBe("and(Pol:A,Pol:B)→Pol:Approve"); // ancestor chain uses sigLabel too
+  expect(sigOf(mkWhen("Pol:Adult")).when).toBe("Pol:Adult"); // single-ref = pre-#224 refSig output
+});
+
 test("isOccurrenceKey: a nodeId-path key is an occurrence; a re-add-guard source-hash key is NOT", () => {
   expect(isOccurrenceKey("when[0]/action[0]~Pol:Adult→Pol:Approve")).toBe(true);
   expect(isOccurrenceKey("otherwise~x")).toBe(true);

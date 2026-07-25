@@ -53,7 +53,14 @@ export type {
   CelImportDiagnostic,
 } from "./cel/imports";
 export { runCel } from "./cre";
-export type { CaseRun, CelRunResult, ProducedRec, TraceNode, CompositionTrace } from "./cre";
+export type {
+  CaseRun,
+  CelRunResult,
+  ProducedRec,
+  TraceNode,
+  CompositionTrace,
+  BranchConditionTrace,
+} from "./cre";
 export { renderScenario, SCENARIO_VIEW_MODEL_SCHEMA_VERSION } from "./cre";
 
 // #224 decision-layer boolean guards: the `WhenBlock.condition` expression node
@@ -84,6 +91,7 @@ export type {
   DecisionView,
   ViewNode,
   ConditionView,
+  BranchConditionView,
   GuardView,
   ActionView,
   ExplanationView,

@@ -140,7 +140,7 @@ export function buildQuestionnaire(
   // Emit a runtime `when` (or guard) row. `evaluatedSat` present ⇒ show what FIRED; absent ⇒ off-path `conceptTruth`.
   // Returns the pushed Question so an on-path composite can attach its `expansion` (the ANY OF / ALL OF box tree).
   const emitWhen = (
-    concept: ConditionView["concept"] | GuardView["concept"],
+    concept: { name: string; libraryName?: string },
     node: ViewNode,
     frameLib: string | undefined,
     depth: number,
@@ -207,7 +207,21 @@ export function buildQuestionnaire(
 
   // Attach the operator-tree `expansion` to an ON-PATH composite `when`'s Question (the box render). The when ROW itself
   // carries the composite's own answer (emitWhen); the expansion is its `defined as` BODY (operands only — no own-leaf).
-  const attachExpansion = (q: Question, concept: ConditionView["concept"], frameLib: string | undefined): void => {
+  // #224: ONE representative row per `when`. Single-ref → its concept (pre-#224
+  // behavior). A COMPOUND guard → the whole guard label (per-leaf case-feature
+  // questions are i.4) — one nav-stop nodeId + branch-level diverter, no
+  // first-operand masquerade.
+  const guardConceptOf = (
+    node: ViewNode,
+    e: ConditionView["expr"],
+  ): { name: string; libraryName?: string } =>
+    e.op === "ref" ? e.concept : { name: node.label.replace(/^when\s+/, "") };
+
+  const attachExpansion = (
+    q: Question,
+    concept: { name: string; libraryName?: string },
+    frameLib: string | undefined,
+  ): void => {
     if (!opts.defExpr) return;
     const lib = concept.libraryName ?? frameLib ?? "";
     const entry = opts.defExpr(lib, concept.name);
@@ -228,21 +242,27 @@ export function buildQuestionnaire(
       if (node.kind === "when") {
         const cond = node.condition;
         if (!cond) continue;
+        // #224: ONE row per `when` (guard as a whole). Single-ref keeps pre-#224
+        // behavior; a compound shows the guard label. The answer is the
+        // BRANCH-level result (so a false conjunct of a satisfied `or` never gets
+        // mislabelled a diverter).
+        const guardConcept = guardConceptOf(node, cond.expr);
+        const isSingleRef = cond.expr.op === "ref";
         if (node.unreachedReason === "preempted") {
           // first:-preempted sibling → DIMMED terminal; case answer from conceptTruth (off-path). No recurse/expand.
-          emitWhen(cond.concept, node, frameLib, depth, "when-preempted", "preempted", undefined);
+          emitWhen(guardConcept, node, frameLib, depth, "when-preempted", "preempted", undefined);
           continue;
         }
         if (cond.satisfied === true) {
-          const wq = emitWhen(cond.concept, node, frameLib, depth, "when-evaluated", "evaluated", true);
-          // ON-PATH composite → attach its `defined as` operator tree as the when's `expansion` (ANY OF / ALL OF box).
-          attachExpansion(wq, cond.concept, frameLib);
+          const wq = emitWhen(guardConcept, node, frameLib, depth, "when-evaluated", "evaluated", true);
+          // ON-PATH single-ref composite → attach its `defined as` operator tree (ANY OF / ALL OF box).
+          if (isSingleRef) attachExpansion(wq, guardConcept, frameLib);
           walk(node.children ?? [], frameLib, depth + 1);
           continue;
         }
         if (cond.satisfied === false) {
           // reached-and-false → terminal (shows what fired); no recurse, no leaf-expand (only on-path composites expand).
-          emitWhen(cond.concept, node, frameLib, depth, "when-evaluated", "evaluated", false);
+          emitWhen(guardConcept, node, frameLib, depth, "when-evaluated", "evaluated", false);
           continue;
         }
         continue; // unevaluated, non-preempted (unreached subtree under a terminal parent) → not on the surface
