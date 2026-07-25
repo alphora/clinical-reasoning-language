@@ -18,6 +18,7 @@ import {
 } from "../types";
 
 import { parseInput } from "./parseInput";
+import { soleRef } from "../branchCondition";
 
 describe("CRLAstBuilder", () => {
   describe("Decision Statements", () => {
@@ -34,7 +35,7 @@ library "Test".
       expect(decision.type).toBe("Decision");
       expect(decision.name).toBe("BMI");
       expect(decision.body.statements).toHaveLength(1);
-      expect(decision.body.statements[0].conceptName).toBe("BMI > 30");
+      expect(soleRef((decision.body.statements[0] as WhenBlock).condition)?.ref).toBe("BMI > 30");
       const whenBlock = decision.body.statements[0] as WhenBlock;
       if (isActionStatement(whenBlock.body)) {
         const body: ActionStatement = whenBlock.body;
@@ -58,8 +59,23 @@ library "Test".
       const result = parseInput(input);
       const decision = result.statements[0] as Decision;
       expect(decision.body.statements).toHaveLength(2);
-      expect(decision.body.statements[0].conceptName).toBe("BMI");
-      expect(decision.body.statements[1].conceptName).toBe("Weight");
+      expect(soleRef((decision.body.statements[0] as WhenBlock).condition)?.ref).toBe("BMI");
+      expect(soleRef((decision.body.statements[1] as WhenBlock).condition)?.ref).toBe("Weight");
+    });
+
+    it("serializes a `when` guard as a BranchConditionRef carrying its own location (public AST shape)", () => {
+      const input = `# Test
+library "Test".
+        decision "D":
+          - when "X" then recommend activity "A".
+      `;
+      const decision = parseInput(input).statements[0] as Decision;
+      const cond = (decision.body.statements[0] as WhenBlock).condition;
+      expect(cond.type).toBe("BranchConditionRef");
+      const leaf = soleRef(cond);
+      expect(leaf?.ref).toBe("X");
+      // the ref leaf carries its OWN location, not a fallback to the whole `when`
+      expect(leaf?.location?.start?.line).toEqual(expect.any(Number));
     });
 
     it("should parse a decision with any/all qualifiers", () => {

@@ -1,4 +1,5 @@
-import { ASTNode } from "./types";
+import { ASTNode, getRefName, type BranchCondition } from "./types";
+import { describeBranchCondition } from "./branchCondition";
 
 interface ASTComparison {
   lineCountsMatch: boolean;
@@ -31,8 +32,14 @@ export function printAST(node: ASTNode, indent = 0): string {
   if ("activityName" in node) {
     output += `${spaces}  activityName: "${node.activityName}"\n`;
   }
+  // ActionGuard still carries a single `conceptName`; the `when` branch guard
+  // is now a `condition` expression (#224).
   if ("conceptName" in node) {
     output += `${spaces}  conceptName: "${node.conceptName}"\n`;
+  }
+  if ("condition" in node && node.type === "WhenBlock") {
+    const c = (node as { condition: BranchCondition }).condition;
+    output += `${spaces}  condition: ${describeBranchCondition(c, getRefName)}\n`;
   }
   if ("qualifier" in node && node.qualifier) {
     output += `${spaces}  qualifier: "${String(node.qualifier)}"\n`;

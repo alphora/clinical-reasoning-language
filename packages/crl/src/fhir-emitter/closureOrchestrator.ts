@@ -37,6 +37,7 @@
 
 import type { Activity, BranchBlock, Concept, Decision, ReferenceName, Terminology } from "../ast/types";
 import { getRefLibrary, getRefName, isQualifiedRef, normalizeLocalRef } from "../ast/types";
+import { branchConditionRefs } from "../ast/branchCondition";
 import { resolveDispositionConfig } from "../dispositions";
 import { computeFhirEmitClosure } from "../imports/computeEmitClosure";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
@@ -421,9 +422,14 @@ export function collectCaseFeatures(
   }
 
   // Collect every `when` condition ref across the source's decisions (any depth).
+  // A compound guard contributes ALL its operand refs (each is a case-feature
+  // input). NOTE (i.1): this is the full atom set for the decision; the
+  // ARM-SPECIFIC input union per emitted DNF arm (G15) is decided at the emit
+  // site (decision.ts) in i.3, not here.
   const conditionRefs: ReferenceName[] = [];
   const visitBranch = (branch: BranchBlock): void => {
-    if (branch.type === "WhenBlock") conditionRefs.push(branch.conceptName);
+    if (branch.type === "WhenBlock")
+      for (const atom of branchConditionRefs(branch.condition)) conditionRefs.push(atom.ref);
     const body = branch.body;
     if (body.type === "ActionStatement") return;
     for (const stmt of body.statements) {

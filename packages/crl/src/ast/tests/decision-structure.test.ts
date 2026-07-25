@@ -8,6 +8,7 @@ import {
 } from "../types";
 
 import { parseInput } from "./parseInput";
+import { soleRef } from "../branchCondition";
 
 /**
  * This test suite verifies the correct structure of nested decisions in the AST.
@@ -150,7 +151,7 @@ decision "Test Decision":
     // The second top-level when block
     const whenBlock2 = decision.body.statements[1] as WhenBlock;
     expect(whenBlock2.type).toBe("WhenBlock");
-    expect(whenBlock2.conceptName).toBe("Condition");
+    expect(soleRef(whenBlock2.condition)?.ref).toBe("Condition");
     const actionStatement = whenBlock2.body as ActionStatement;
     expect(actionStatement.type).toBe("ActionStatement");
     expect(actionStatement.action.type).toBe("RecommendActivity");
@@ -277,8 +278,8 @@ decision "Test Decision":
     expect(decision.body.statements).toHaveLength(2);
     const whenBlock1 = decision.body.statements[0] as WhenBlock;
     const whenBlock2 = decision.body.statements[1] as WhenBlock;
-    expect(whenBlock1.conceptName).toBe("Age Greater Than 18");
-    expect(whenBlock2.conceptName).toBe("Age Greater Than 18");
+    expect(soleRef(whenBlock1.condition)?.ref).toBe("Age Greater Than 18");
+    expect(soleRef(whenBlock2.condition)?.ref).toBe("Age Greater Than 18");
   });
 
   it("should preserve repeated use statements", () => {

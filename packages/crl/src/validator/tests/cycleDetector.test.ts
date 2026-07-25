@@ -225,7 +225,7 @@ describe("CycleDetector", () => {
           statements: [
             {
               type: "WhenBlock",
-              conceptName: "Gate",
+              condition: { type: "BranchConditionRef", ref: "Gate", location: L },
               body: {
                 type: "ActionStatement",
                 action: {
@@ -312,7 +312,7 @@ describe("CycleDetector", () => {
               statements: [
                 {
                   type: "WhenBlock",
-                  conceptName: "Gate",
+                  condition: { type: "BranchConditionRef", ref: "Gate", location: L },
                   body: {
                     type: "ActionStatement",
                     action: {
@@ -348,14 +348,14 @@ describe("CycleDetector", () => {
               statements: [
                 {
                   type: "WhenBlock",
-                  conceptName: "Gate",
+                  condition: { type: "BranchConditionRef", ref: "Gate", location: L },
                   body: {
                     type: "BlockBody",
                     qualifier: "any",
                     statements: [
                       {
                         type: "WhenBlock",
-                        conceptName: "Sub",
+                        condition: { type: "BranchConditionRef", ref: "Sub", location: L },
                         body: {
                           type: "ActionStatement",
                           action: { type: "UseDecision", decisionName: "B", location: L },
@@ -393,7 +393,7 @@ describe("CycleDetector", () => {
               statements: [
                 {
                   type: "WhenBlock",
-                  conceptName: "Gate",
+                  condition: { type: "BranchConditionRef", ref: "Gate", location: L },
                   body: {
                     type: "BlockBody",
                     qualifier: "all",
@@ -447,7 +447,7 @@ describe("CycleDetector", () => {
               statements: [
                 {
                   type: "WhenBlock",
-                  conceptName: "Gate",
+                  condition: { type: "BranchConditionRef", ref: "Gate", location: L },
                   body: {
                     type: "ActionStatement",
                     action: {
@@ -489,7 +489,7 @@ describe("CycleDetector", () => {
                 statements: [
                   {
                     type: "WhenBlock",
-                    conceptName: "Gate",
+                    condition: { type: "BranchConditionRef", ref: "Gate", location: L },
                     body: {
                       type: "ActionStatement",
                       action: {
@@ -569,7 +569,7 @@ describe("CycleDetector", () => {
               statements: [
                 {
                   type: "WhenBlock",
-                  conceptName: "Gate",
+                  condition: { type: "BranchConditionRef", ref: "Gate", location: L },
                   body: {
                     type: "ActionStatement",
                     action: { type: "UseDecision", decisionName: "D", location: L },

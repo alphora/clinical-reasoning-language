@@ -67,7 +67,7 @@ describe("collectCaseFeatures — foreign-qualified condition does not clobber a
     };
     const foreignWhen: WhenBlock = {
       ...localWhen,
-      conceptName: foreignRef,
+      condition: { type: "BranchConditionRef", ref: foreignRef, location: localWhen.location },
     };
     // Put the foreign branch FIRST so a clobber (if the bug regressed) would
     // overwrite the later local entry — proving the skip, not just last-wins luck.

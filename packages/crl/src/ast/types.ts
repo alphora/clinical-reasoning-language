@@ -149,10 +149,40 @@ export interface DecisionBody extends ASTNode {
   location: Location;
 }
 
-// When block
+// A decision branch guard: a monotone boolean expression over concept refs
+// (`and`/`or`, parens). Introduced with #224 decision-layer boolean guards.
+// In slice i.1 the grammar produces ONLY the single-ref (`BranchConditionRef`)
+// shape; `and`/`or` parsing lands in i.2. There is NO `not` — negation has no
+// structural lowering (it would force a CQL `not`, the forbidden case).
+// Every node carries its own `location` so per-operand diagnostics, find-refs,
+// and duplicate-operand (`"A" and "A"`) identity work without a fallback to the
+// whole `when` line.
+export type BranchCondition = BranchConditionRef | BranchConditionAnd | BranchConditionOr;
+
+export interface BranchConditionRef extends ASTNode {
+  type: "BranchConditionRef";
+  ref: ReferenceName;
+  location: Location;
+}
+
+export interface BranchConditionAnd extends ASTNode {
+  type: "BranchConditionAnd";
+  operands: BranchCondition[]; // invariant: length >= 2
+  location: Location;
+}
+
+export interface BranchConditionOr extends ASTNode {
+  type: "BranchConditionOr";
+  operands: BranchCondition[]; // invariant: length >= 2
+  location: Location;
+}
+
+// When block. The guard is a `BranchCondition` expression (was a single
+// `conceptName: ReferenceName` before #224). Read guard refs ONLY through the
+// helpers in `ast/branchCondition.ts` — never re-walk the union inline.
 export interface WhenBlock extends ASTNode {
   type: "WhenBlock";
-  conceptName: ReferenceName;
+  condition: BranchCondition;
   body: WhenBlockBody;
   location: Location;
 }

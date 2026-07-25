@@ -67,6 +67,7 @@ import {
   Decision,
   DecisionBody,
   WhenBlock,
+  BranchConditionRef,
   OtherwiseBlock,
   BranchBlock,
   BlockMember,
@@ -307,16 +308,29 @@ export class CRLAstBuilder
     return null as unknown as BranchBlock;
   }
 
+  // Slice i.1: the grammar still yields a single `conceptReference`, so the
+  // builder only ever produces the single-ref `BranchCondition`. The `and`/`or`
+  // builder cases arrive with the grammar rule in i.2. The ref leaf carries the
+  // conceptReference's OWN location (not the whole `when`) for per-operand
+  // diagnostics/find-refs.
+  private branchConditionFromRef(refCtx: ConceptReferenceContext): BranchConditionRef {
+    return {
+      type: "BranchConditionRef",
+      ref: refFromRefContext(refCtx),
+      location: getLocation(refCtx),
+    };
+  }
+
   visitWhenWithBody(ctx: WhenWithBodyContext): WhenBlock {
-    const conceptName = refFromRefContext(ctx.conceptReference());
+    const condition = this.branchConditionFromRef(ctx.conceptReference());
     const body = this.visit(ctx.blockBody()) as BlockBody;
-    return { type: "WhenBlock", conceptName, body, location: getLocation(ctx) };
+    return { type: "WhenBlock", condition, body, location: getLocation(ctx) };
   }
 
   visitWhenSingleAction(ctx: WhenSingleActionContext): WhenBlock {
-    const conceptName = refFromRefContext(ctx.conceptReference());
+    const condition = this.branchConditionFromRef(ctx.conceptReference());
     const action = this.visit(ctx.actionStatement()) as ActionStatement;
-    return { type: "WhenBlock", conceptName, body: action, location: getLocation(ctx) };
+    return { type: "WhenBlock", condition, body: action, location: getLocation(ctx) };
   }
 
   visitOtherwiseWithBody(ctx: OtherwiseWithBodyContext): OtherwiseBlock {

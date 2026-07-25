@@ -23,6 +23,7 @@ import type {
   WhenBlockBody,
 } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
+import { soleRefOrThrow } from "../ast/branchCondition";
 import type { CELCase, CELDefinedByField, CELFact } from "../cel/ast/types";
 import { resolveDefinedByTarget } from "../cel/definedByResolve";
 import type { ResolvedCelGraph, CelImportDiagnostic } from "../cel/imports/types";
@@ -373,7 +374,11 @@ function walkBranchesVM(
     }
     const nodeId = childId(parentId, `when[${i}]`);
     const t = traceIndex.get(nodeId);
-    const concept = conceptView(b.conceptName);
+    // i.1: single-ref guard. The ConditionView stays concept-shaped this slice.
+    // Its expression reshape MUST land by i.2 (once the grammar accepts compound
+    // guards, this `soleRefOrThrow` would throw on a legal document) — the
+    // "which conjunct failed" rendering then follows in i.4.
+    const concept = conceptView(soleRefOrThrow(b.condition, "cre/viewModel.ts walkBranchesVM").ref);
     const condition: ConditionView = t
       ? {
           concept,

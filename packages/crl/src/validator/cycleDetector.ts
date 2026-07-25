@@ -391,9 +391,12 @@ export class CycleDetector {
     scope: LibraryScope | undefined,
     currentLibName: string,
   ): void {
-    // A `when`'s conceptName is a concept ref, not a decision ref; `otherwise`
-    // carries no condition. Either way, walk the body for nested UseDecisions —
-    // a `use decision` reached only through `otherwise` is still a delegation edge.
+    // A `when`'s `condition` is a boolean over CONCEPT refs, not decision refs,
+    // so it contributes no decision-cycle edges (decision cycles follow
+    // `use decision` only); `otherwise` carries no condition. Either way, walk
+    // the body for nested UseDecisions — a `use decision` reached only through
+    // `otherwise` is still a delegation edge. (Criterion-referencing-criterion
+    // cycles arrive with slice ii, in different code.)
     this.walkDecisionWhenBlockBody(branch.body, refs, scope, currentLibName);
   }
 

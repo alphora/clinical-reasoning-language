@@ -65,6 +65,7 @@ import type {
   InterfaceSourceLayer,
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
+import { branchConditionRefs } from "../ast/branchCondition";
 import { pascalCaseNameForId } from "../fhir-emitter/slug";
 
 import type { CRLError } from "../types/errors";
@@ -886,8 +887,9 @@ function buildLayerAst(
  * dedicated `<policyId>-Interface` library.
  *
  * The INTERFACE CONCEPTS are exactly the concepts a decision's branches/actions
- * reference: `WhenBlock.conceptName` + `ActionGuard.conceptName` across every
- * `Decision` in the source. For each (deduped, in stable first-seen order) the
+ * reference: every operand of `WhenBlock.condition` (via `branchConditionRefs`)
+ * + `ActionGuard.conceptName` across every `Decision` in the source. For each
+ * (deduped, in stable first-seen order) the
  * synthesis emits ONE re-export `Concept` whose body is a `defined as` bare-ref
  * PRE-QUALIFIED to the concept's OWN source layer:
  *   - `code is` concept  → `<policyId>-LocalSource."X"`
@@ -961,7 +963,7 @@ export function interfaceSurface(ast: CRL): { name: string; sourceLayer: Layer |
   };
   const walkMember = (member: BlockMember): void => {
     if (member.type === "WhenBlock") {
-      add(member.conceptName);
+      for (const atom of branchConditionRefs(member.condition)) add(atom.ref);
       walkBlock(member.body);
     } else if (member.type === "OtherwiseBlock") {
       walkBlock(member.body);

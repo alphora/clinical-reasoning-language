@@ -66,6 +66,7 @@ import type {
   WhenBlockBody,
 } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
+import { soleRefOrThrow, describeBranchCondition } from "../ast/branchCondition";
 import type { CELCase, CELDefinedByField, CELFact, CELResultField } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { LsLocation } from "../language-services/contracts";
@@ -601,14 +602,18 @@ function walkBranches(
       if (ordered) return;
       continue;
     }
-    const { sat, facts, composition } = conceptSatisfied(b.conceptName, ctx, frame);
+    // i.1: guard is a single-ref condition (grammar); boolean evaluation of a
+    // compound guard + GuardTrace land in i.2. `soleRefOrThrow` makes a compound
+    // reaching here (hand-built AST) fail loudly instead of silently.
+    const guardRef = soleRefOrThrow(b.condition, "cre/run.ts walkBranches").ref;
+    const { sat, facts, composition } = conceptSatisfied(guardRef, ctx, frame);
     const nodeId = childId(parentId, `when[${i}]`);
     const node: TraceNode = {
-      node: `when ${getRefName(b.conceptName)}`,
+      node: `when ${describeBranchCondition(b.condition, getRefName)}`,
       nodeId,
       kind: "when",
       source: spanOf(b.location, frame),
-      concept: getRefName(b.conceptName),
+      concept: getRefName(guardRef),
       satisfied: sat,
       evaluated: true,
       facts,
@@ -617,7 +622,7 @@ function walkBranches(
     };
     into.push(node);
     if (sat) {
-      executeBody(b.body, getRefName(b.conceptName), ctx, frame, node.children!, nodeId);
+      executeBody(b.body, getRefName(guardRef), ctx, frame, node.children!, nodeId);
       if (ordered) return; // first match wins — remaining branches are not evaluated.
     }
   }

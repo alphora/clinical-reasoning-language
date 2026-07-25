@@ -71,6 +71,7 @@ import type {
   WhenBlockBody,
 } from "../ast/types";
 import { getRefName, isQualifiedRef, normalizeLocalRef, refDisplay } from "../ast/types";
+import { soleRefOrThrow, describeBranchCondition } from "../ast/branchCondition";
 import type { CRLError } from "../types/errors";
 import { libraryCanonicalUrl } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
@@ -361,7 +362,10 @@ export function emitDecisionPlanDefinition(
     const r = topLevelResults[i]!;
     if (r.kind === "suppressed" && r.reason === "all-children-suppressed") {
       const branch = decision.body.statements[i]!;
-      const label = branch.type === "WhenBlock" ? `when ${getRefName(branch.conceptName)}` : "otherwise";
+      const label =
+        branch.type === "WhenBlock"
+          ? `when ${describeBranchCondition(branch.condition, getRefName)}`
+          : "otherwise";
       errors.push({
         type: "Validation",
         kind: "unresolved-reference-cascade-suppression",
@@ -472,7 +476,10 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
   // bare name (`refName`) drive the condition resolver, the action-level input
   // lookup, AND the displays, so the input path treats a self-qualified ref the
   // SAME way the condition path does (F2 — no self-qualified asymmetry).
-  const normalizedRef = normalizeLocalRef(wb.conceptName, ctx.libraryName);
+  // i.1: single-ref guard (grammar). N-conditions / DNF for a compound land in
+  // i.3; `soleRefOrThrow` guards a hand-built compound reaching emit early.
+  const guardRef = soleRefOrThrow(wb.condition, "fhir-emitter/decision.ts emitWhenBlock").ref;
+  const normalizedRef = normalizeLocalRef(guardRef, ctx.libraryName);
   const refName = getRefName(normalizedRef);
 
   // 1. Resolve the condition concept. Suppressed when unresolved.
@@ -480,7 +487,7 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
   if (conceptCqlId === null) {
     ctx.unmatched.push({
       kind: "unresolved-concept",
-      text: refDisplay(wb.conceptName),
+      text: refDisplay(guardRef),
       line: wb.location?.start.line,
       column: wb.location?.start.column,
     });
@@ -488,7 +495,7 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
   }
 
   // 2. Build action skeleton (with applicability condition). Title/description use
-  // the NORMALIZED bare name — byte-identical to the raw `getRefName(wb.conceptName)`
+  // the NORMALIZED bare name — byte-identical to the raw `getRefName(guardRef)`
   // for an unqualified ref, and consistent with the condition/input for a
   // self-qualified one.
   const action: Record<string, unknown> = {
@@ -615,7 +622,7 @@ function fillBranchBody(
       const childStmt = body.statements[i]!;
       const childName =
         childStmt.type === "WhenBlock"
-          ? `when ${getRefName(childStmt.conceptName)}`
+          ? `when ${describeBranchCondition(childStmt.condition, getRefName)}`
           : childStmt.type === "OtherwiseBlock"
           ? "otherwise"
           : actionTitle(childStmt.action);

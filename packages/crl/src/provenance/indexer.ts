@@ -30,7 +30,9 @@ import type {
   Statement,
   Location,
 } from "../ast/types";
+import type { WhenBlock } from "../ast/types";
 import { getRefName, getRefLibrary } from "../ast/types";
+import { branchConditionRefs } from "../ast/branchCondition";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { RegistryEntry } from "../imports/types";
 import type { LsLocation, ZeroBasedRange } from "../language-services/contracts";
@@ -529,13 +531,9 @@ export function buildProvenanceIndex(
         relation: "spine-member",
       });
       if (sn.kind === "when") {
-        reach(
-          (sn.node as { conceptName: ReferenceName }).conceptName,
-          lib,
-          fromDecision,
-          sn.nodeId,
-          "when-condition",
-        );
+        for (const atom of branchConditionRefs((sn.node as WhenBlock).condition)) {
+          reach(atom.ref, lib, fromDecision, sn.nodeId, "when-condition");
+        }
       } else if (sn.kind === "action") {
         const stmt = sn.node as {
           action: { type: string; activityName?: ReferenceName; decisionName?: ReferenceName };

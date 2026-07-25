@@ -55,6 +55,23 @@ export type {
 export { runCel } from "./cre";
 export type { CaseRun, CelRunResult, ProducedRec, TraceNode, CompositionTrace } from "./cre";
 export { renderScenario, SCENARIO_VIEW_MODEL_SCHEMA_VERSION } from "./cre";
+
+// #224 decision-layer boolean guards: the `WhenBlock.condition` expression node
+// and its traversal. Published so external consumers of the AST (`buildCRL`)
+// can read guard refs through the shared helpers rather than re-walking the union.
+export type {
+  BranchCondition,
+  BranchConditionRef,
+  BranchConditionAnd,
+  BranchConditionOr,
+} from "./ast/types";
+export {
+  visitBranchCondition,
+  branchConditionRefs,
+  soleRef,
+  describeBranchCondition,
+  assertWellFormedBranchCondition,
+} from "./ast/branchCondition";
 // DISPLAY-only projection of a PA determination outcome name (`"certify.Met"` → `"Met"`); the cockpit renderers in
 // crl-vscode import this so the outcome shows only the human `<key>`. See dispositions/displayName.ts.
 export { displayDetermination, determinationCategory, parseDeterminationName } from "./dispositions";

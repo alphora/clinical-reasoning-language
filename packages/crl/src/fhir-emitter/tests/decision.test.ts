@@ -79,7 +79,7 @@ function block(qualifier: BlockQualifier | undefined, statements: BlockBody["sta
 function when(condition: string, body: WhenBlockBody): WhenBlock {
   return {
     type: "WhenBlock",
-    conceptName: condition,
+    condition: { type: "BranchConditionRef", ref: condition, location: LOC },
     body,
     location: LOC,
   };
@@ -148,6 +148,32 @@ describe("decision — emitDecisionPlanDefinition Strategy (isRoot=true)", () =>
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition",
     ]);
     expect((r.type as { coding: Array<{ code: string }> }).coding[0]!.code).toBe("workflow-definition");
+  });
+
+  it("emitting a COMPOUND branch condition throws the named single-ref-site error (i.1→i.2 handoff guard)", () => {
+    // i.1's grammar can't produce a compound, but the AST TYPE permits one and
+    // emitDecisionPlanDefinition is root-exported + tests hand-build WhenBlocks.
+    // A compound must fail LOUDLY at the single-ref emit boundary, not pass
+    // `undefined` deep into emit.
+    const compoundWhen: WhenBlock = {
+      type: "WhenBlock",
+      condition: {
+        type: "BranchConditionAnd",
+        operands: [
+          { type: "BranchConditionRef", ref: "A", location: LOC },
+          { type: "BranchConditionRef", ref: "B", location: LOC },
+        ],
+        location: LOC,
+      },
+      body: leaf(recommend("X")),
+      location: LOC,
+    };
+    const d = decision("Top", [compoundWhen]);
+    expect(() =>
+      emitDecisionPlanDefinition(
+        d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
+      ),
+    ).toThrow(/emitWhenBlock/);
   });
 
   it("emits `version` from package.json (CRMI shareable floor)", () => {
@@ -730,7 +756,11 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
   function whenQualified(libraryName: string, name: string, body: WhenBlockBody): WhenBlock {
     return {
       type: "WhenBlock",
-      conceptName: { type: "QualifiedReference", libraryName, name, location: LOC },
+      condition: {
+        type: "BranchConditionRef",
+        ref: { type: "QualifiedReference", libraryName, name, location: LOC },
+        location: LOC,
+      },
       body,
       location: LOC,
     };

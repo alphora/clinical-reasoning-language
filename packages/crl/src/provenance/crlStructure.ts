@@ -14,6 +14,7 @@
 import { decisionSpine, type SpineNodeKind } from "../ast/decisionSpine";
 import type { ActionStatement, ReferenceName, WhenBlock } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
+import { branchConditionRefs, describeBranchCondition } from "../ast/branchCondition";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { LsLocation } from "../language-services/contracts";
 
@@ -48,7 +49,8 @@ export interface CrlDecisionStructure {
 }
 
 function labelOf(kind: CrlNodeKind, node: WhenBlock | ActionStatement | { type: string }): string {
-  if (kind === "when") return `when ${getRefName((node as WhenBlock).conceptName)}`;
+  if (kind === "when")
+    return `when ${describeBranchCondition((node as WhenBlock).condition, getRefName)}`;
   if (kind === "otherwise") return "otherwise";
   const a = (node as ActionStatement).action;
   return getRefName(a.type === "RecommendActivity" ? a.activityName : a.decisionName);
@@ -75,7 +77,10 @@ function refKeysOf(
   node: WhenBlock | ActionStatement | { type: string },
   decisionLib: string,
 ): string[] {
-  if (kind === "when") return [refKey((node as WhenBlock).conceptName, "concept", decisionLib)];
+  if (kind === "when")
+    return branchConditionRefs((node as WhenBlock).condition).map((atom) =>
+      refKey(atom.ref, "concept", decisionLib),
+    );
   if (kind === "otherwise") return [];
   const stmt = node as ActionStatement;
   const a = stmt.action;

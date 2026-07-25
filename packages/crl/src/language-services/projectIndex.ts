@@ -4,7 +4,8 @@ import * as path from "node:path";
 import { resolveImports } from "../imports";
 import { findProjectRoot } from "../imports/registry";
 import { collectDecisionArms } from "../ast/decisionArms";
-import type { Decision } from "../ast/types";
+import type { Decision, BranchCondition } from "../ast/types";
+import { branchConditionRefs } from "../ast/branchCondition";
 import type { ResolvedGraph, RegistryEntry } from "../imports/types";
 import type { ZeroBasedRange } from "./contracts";
 import { canonicalize } from "./paths";
@@ -723,7 +724,7 @@ function walkWhenBlock(
   if (!wb || typeof wb !== "object") return;
   const w = wb as {
     type?: string;
-    conceptName?: unknown;
+    condition?: unknown;
     body?: unknown;
     statements?: unknown[];
     action?: { type?: string; activityName?: unknown; decisionName?: unknown; location?: Loc };
@@ -731,7 +732,14 @@ function walkWhenBlock(
     location?: Loc;
   };
   if (w.type === "WhenBlock" && w.location) {
-    addRef(w.conceptName, "concept", owningLib, filePath, source, w.location, out);
+    // Index EACH guard operand at its OWN location so find-refs/go-to-def land on
+    // the exact concept token (not the whole `when` line), and duplicate operands
+    // stay distinct.
+    if (w.condition) {
+      for (const atom of branchConditionRefs(w.condition as BranchCondition)) {
+        addRef(atom.ref, "concept", owningLib, filePath, source, atom.location, out);
+      }
+    }
     walkWhenBlock(w.body, owningLib, filePath, source, out);
     return;
   }

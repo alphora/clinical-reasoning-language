@@ -38,6 +38,7 @@ import type {
   BranchBlock,
 } from "../ast/types";
 import { getRefLibrary, isQualifiedRef } from "../ast/types";
+import { branchConditionRefs } from "../ast/branchCondition";
 
 import { buildLibraryScopes, lookupKnownLibrary } from "./scopes";
 import type { LibraryScope } from "./scopes";
@@ -333,8 +334,9 @@ function visitArgValue(av: ArgValue, visit: (ref: ReferenceName) => void): void 
 
 function visitDecisionRefs(decision: Decision, visit: (ref: ReferenceName) => void): void {
   function visitBranch(branch: BranchBlock): void {
-    // `when` carries a concept ref; `otherwise` carries none.
-    if (branch.type === "WhenBlock") visit(branch.conceptName);
+    // `when` carries a boolean guard over concept refs; `otherwise` carries none.
+    if (branch.type === "WhenBlock")
+      for (const atom of branchConditionRefs(branch.condition)) visit(atom.ref);
     const body = branch.body;
     if (body.type === "ActionStatement") {
       const action = body.action;

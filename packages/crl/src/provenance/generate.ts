@@ -28,6 +28,7 @@ import { collectDecisionArms } from "../ast/decisionArms";
 import { decisionSpine, type SpineNode } from "../ast/decisionSpine";
 import type { ActionStatement, Decision, ReferenceName, WhenBlock } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
+import { branchConditionRefs, describeBranchCondition } from "../ast/branchCondition";
 import type { CELBranchResult, CELCase, CELResultField } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import { renderScenario, type ScenarioViewModel } from "../cre";
@@ -247,7 +248,9 @@ export function generateProvenanceScaffold(
     const gatingConceptKeys = new Set<string>();
     for (const sn of spine) {
       if (sn.kind === "when") {
-        gatingConceptKeys.add(conceptKeyOf((sn.node as WhenBlock).conceptName, lib));
+        for (const atom of branchConditionRefs((sn.node as WhenBlock).condition)) {
+          gatingConceptKeys.add(conceptKeyOf(atom.ref, lib));
+        }
       } else if (sn.kind === "action") {
         const guard = (sn.node as ActionStatement).guard;
         if (guard) gatingConceptKeys.add(conceptKeyOf(guard.conceptName, lib));
@@ -1059,7 +1062,7 @@ function emitDecisionHints(
 }
 
 function labelOfWhen(sn: SpineNode): string {
-  return `when ${getRefName((sn.node as WhenBlock).conceptName)}`;
+  return `when ${describeBranchCondition((sn.node as WhenBlock).condition, getRefName)}`;
 }
 
 // ── CEL pass ───────────────────────────────────────────────────────────────────

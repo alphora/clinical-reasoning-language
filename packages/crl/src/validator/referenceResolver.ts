@@ -17,6 +17,7 @@ import type {
   ReferenceName,
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
+import { branchConditionRefs } from "../ast/branchCondition";
 import type { LibraryScope, SourceContext } from "../imports/scopes";
 import { lookupKnownLibrary } from "../imports/scopes";
 
@@ -300,9 +301,13 @@ export class ReferenceResolver {
   }
 
   private walkBranch(branch: BranchBlock, ctx: WalkContext, errors: ValidationError[]): void {
-    // `when "Concept"` carries a concept ref; `otherwise` carries no condition.
+    // `when <expr>` carries a boolean guard over concept refs; `otherwise` has
+    // no condition. Resolve EVERY operand, anchoring each error to the operand's
+    // own location (not the whole `when` line).
     if (branch.type === "WhenBlock") {
-      this.checkRef(branch.conceptName, CONCEPT_REF_KINDS, branch.location, ctx, errors);
+      for (const atom of branchConditionRefs(branch.condition)) {
+        this.checkRef(atom.ref, CONCEPT_REF_KINDS, atom.location, ctx, errors);
+      }
     }
     this.walkWhenBlockBody(branch.body, ctx, errors);
   }
