@@ -974,23 +974,25 @@ describe("decision — #224 i.3 compound-guard structural emit", () => {
     expect(profiles(children[1]!)).toEqual(["urn:B", "urn:C", "urn:S"]);
   });
 
-  it("cap: exactly 16 arms is accepted", () => {
-    const bigOr = (n: number) => orC(refC(`${n}a`), refC(`${n}b`));
-    const guard = andC(bigOr(1), bigOr(2), bigOr(3), bigOr(4)); // 2^4 = 16
-    const d = decision(
-      "Top",
-      [whenC(guard, leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
-      "first",
-    );
+  it("a faithful multi-category model (4×5 = 20 arms) EMITS — the cap is NOT an authoring gate (#224 KE)", () => {
+    // "qualifying diagnosis (1 of 4) and qualifying severity (1 of 5)" — a plausible
+    // faithful decision that the old 16-arm cap wrongly BLOCKED. It must just emit its
+    // 20 arms; the emitter never distorts what is modelable.
+    const wideOr = (p: string, k: number) =>
+      orC(...Array.from({ length: k }, (_, i) => refC(`${p}${i}`)));
+    const guard = andC(wideOr("dx", 4), wideOr("sev", 5)); // 4 × 5 = 20
+    const d = decision("Top", [whenC(guard, leaf(recommend("X")))], "first");
     const { errors, resource } = emitTop(d);
     expect(errors.find((e) => e.kind === "compound-guard-expansion-overflow")).toBeUndefined();
-    const children = acts(rootActions(resource)[0]);
-    expect(children.filter((c) => c.title !== "otherwise")).toHaveLength(16);
+    expect(acts(rootActions(resource)[0])).toHaveLength(20);
   });
 
-  it("cap: >16 arms → hard `compound-guard-expansion-overflow` error, suppressed, NO CQL fallback", () => {
-    const bigOr = (n: number) => orC(refC(`${n}a`), refC(`${n}b`));
-    const guard = andC(bigOr(1), bigOr(2), bigOr(3), bigOr(4), bigOr(5)); // 2^5 = 32
+  it("resource envelope: a pathological `and`-of-`or`s (>256 arms) → hard overflow, NO CQL, no OOM", () => {
+    // 4^5 = 1024 arms — well past the materialization envelope. The SATURATING count
+    // catches it BEFORE any 2^N allocation; the branch is suppressed with a boundary
+    // signal, NEVER a CQL fallback and NEVER a prescribed restructure.
+    const wideOr = (n: number) => orC(...Array.from({ length: 4 }, (_, i) => refC(`${n}_${i}`)));
+    const guard = andC(wideOr(1), wideOr(2), wideOr(3), wideOr(4), wideOr(5)); // 4^5 = 1024
     const d = decision(
       "Top",
       [whenC(guard, leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
@@ -999,8 +1001,10 @@ describe("decision — #224 i.3 compound-guard structural emit", () => {
     const { errors, resource } = emitTop(d);
     const overflow = errors.find((e) => e.kind === "compound-guard-expansion-overflow");
     expect(overflow).toBeDefined();
-    expect(overflow!.message).toMatch(/more than 16|hoist/i);
-    // the over-cap `when` is suppressed; only `otherwise` survives — no arm emitted
+    expect(overflow!.message).toMatch(/materialization envelope|resource boundary/i);
+    // the message must NOT prescribe the trap-prone "nest under first:" remedy
+    expect(overflow!.message).not.toMatch(/hoist|nest.*first/i);
+    // suppressed; only `otherwise` survives — no arm emitted, no CQL
     const children = acts(rootActions(resource)[0]);
     expect(children).toHaveLength(1);
     expect(children[0]!.title).toBe("otherwise");
@@ -1105,17 +1109,17 @@ describe("decision — #224 i.3 compound-guard structural emit", () => {
     expect(bad).toContain('"LibY"."A"');
   });
 
-  it("cap boundary: exactly 17 arms → overflow (the >16 edge, not just 32)", () => {
-    // 16 from 4 binary ORs, then one ternary OR pushes to 3·... — build 17 directly:
-    // (a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q) is a single 17-wide OR → 17 arms.
+  it("a 17-wide `or` EMITS 17 spliced arms — the old 16 gate no longer bites (#224 KE)", () => {
     const wide = orC(...Array.from({ length: 17 }, (_, i) => refC(`r${i}`)));
     const d = decision(
       "Top",
       [whenC(wide, leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
       "first",
     );
-    const { errors } = emitTop(d);
-    expect(errors.find((e) => e.kind === "compound-guard-expansion-overflow")).toBeDefined();
+    const { errors, resource } = emitTop(d);
+    expect(errors.find((e) => e.kind === "compound-guard-expansion-overflow")).toBeUndefined();
+    const children = acts(rootActions(resource)[0]);
+    expect(children.filter((c) => c.title !== "otherwise")).toHaveLength(17);
   });
 
   it("`or` under an explicit `all:` qualifier → the `any` wrapper (named disc-286 contract case)", () => {

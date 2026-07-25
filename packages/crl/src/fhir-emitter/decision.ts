@@ -501,8 +501,18 @@ function emitBranch(
     : emitOtherwiseBlock(branch, ctx);
 }
 
-/** Max DNF disjunct-arms one authored compound guard may expand to (#224 i.3). */
-const COMPOUND_GUARD_ARM_CAP = 16;
+/**
+ * The emit MATERIALIZATION ENVELOPE — the most DNF disjunct-arms this emitter will
+ * materialize for one compound guard (#224 i.3). This is a RESOURCE guard against a
+ * pathological `and`-of-`or`s (2^N arms → OOM), NOT a FHIR limit (PlanDefinition holds
+ * far more) and NOT an authoring-complexity limit. It sits far above any faithful
+ * model (a product of small OR-widths — 4×4=16, 4×5=20, 4×4×4=64 all emit fine) and
+ * far below OOM. The "how complex is too complex / how to factor" doctrine belongs to
+ * the authoring kit + KE, not a baked-in emitter opinion (#224 KE feedback): the
+ * emitter enforces the lowering contract (structural, never CQL) and REPORTS its
+ * envelope; it does not gate authoring or prescribe a restructure.
+ */
+const COMPOUND_GUARD_ARM_CAP = 256;
 
 /** A guideline-based-care `code[]` block — every emitted action carries it. */
 function guidelineCareCode(): Array<Record<string, unknown>> {
@@ -637,12 +647,14 @@ function emitCompoundWhenBlock(
   ctx: EmitCtx,
   enclosingQualifier: BlockQualifier | undefined,
 ): EmitActionResult {
-  // Cap FIRST — before materializing DNF or resolving — so an over-cap guard is a
-  // DETERMINISTIC overflow error (not whichever-atom-unresolved-first), and a
-  // pathologically DEEP but well-formed guard (`and`-of-`or`s) can never allocate
-  // 2^N arms via the saturating count. This emitter ships in the crl-vscode bundle,
-  // so a large valid guard must report, never OOM. NEVER a CQL fallback (the
-  // load-bearing principle).
+  // Resource guard FIRST — before materializing DNF or resolving — via the SATURATING
+  // count, so a pathological `and`-of-`or`s (2^N arms) can never allocate before we
+  // catch it (this emitter ships in the crl-vscode bundle → must report, never OOM).
+  // This is a MATERIALIZATION boundary, NOT an authoring gate: the message reports the
+  // envelope and defers the "what to do" to the kit/KE (#224 feedback). It NEVER falls
+  // back to a CQL expression (the load-bearing principle) — but note the invariant is
+  // never actually threatened by arm count, since DNF always lowers structurally; this
+  // is purely a resource bound.
   if (branchConditionArmCount(wb.condition, COMPOUND_GUARD_ARM_CAP) > COMPOUND_GUARD_ARM_CAP) {
     ctx.errors.push({
       type: "Validation",
@@ -650,7 +662,7 @@ function emitCompoundWhenBlock(
       message: `Compound guard \`${describeBranchCondition(
         wb.condition,
         getRefName,
-      )}\` expands to more than ${COMPOUND_GUARD_ARM_CAP} disjunct arms. Hoist the disjunction into nested \`first:\`/\`when\` branches instead of one flat guard.`,
+      )}\` expands to more than ${COMPOUND_GUARD_ARM_CAP} applicability arms, exceeding the emit materialization envelope. This is an emit-stage RESOURCE boundary — NOT a FHIR limit (PlanDefinition holds far more) and NOT an authoring-complexity limit. If the model is faithful, treat this as a capability gap (raise an issue) or consult the authoring kit for factoring guidance; do not restructure the decision solely to satisfy this bound.`,
       line: wb.location?.start.line,
       column: wb.location?.start.column,
     });
