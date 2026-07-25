@@ -14,7 +14,8 @@
 import { decisionSpine, type SpineNodeKind } from "../ast/decisionSpine";
 import type { ActionStatement, BranchCondition, ReferenceName, WhenBlock } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
-import { branchConditionRefs, describeBranchCondition } from "../ast/branchCondition";
+import { branchConditionConceptRefsFollowingCriteria, describeBranchCondition } from "../ast/branchCondition";
+import { buildCriterionTable, type CriterionTable } from "../ast/criterionExpansion";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { LsLocation } from "../language-services/contracts";
 
@@ -122,9 +123,16 @@ function refKeysOf(
   kind: CrlNodeKind,
   node: WhenBlock | ActionStatement | { type: string },
   decisionLib: string,
+  criterionTable: CriterionTable,
 ): string[] {
   if (kind === "when")
-    return branchConditionRefs((node as WhenBlock).condition).map((atom) =>
+    // #224 ii.1c — a `when` guard atom may reference a criterion; bridge the row to the
+    // criterion BODY's concepts (following criteria into their bodies, source-side, no
+    // materialization) so the cross-pane bridge lands on real concept keys rather than a
+    // dangling criterion-kind key. The `criterion(<name>)` structure-sig token (refSig
+    // above) still identifies the guard node itself; the criterion NAME-level declaration
+    // index (find-refs / rename) stays ii.4.
+    return branchConditionConceptRefsFollowingCriteria((node as WhenBlock).condition, criterionTable).map((atom) =>
       refKey(atom.ref, "concept", decisionLib),
     );
   if (kind === "otherwise") return [];
@@ -163,6 +171,9 @@ export function buildCrlStructure(
 
   const out: CrlDecisionStructure[] = [];
   for (const [lib, info] of libs) {
+    // #224 ii.1c — the lib's criterion table, so a `when` guard's criterion refs bridge to
+    // their body concepts (refKeysOf). Built once per library.
+    const criterionTable = buildCriterionTable(info.entry.ast.statements);
     // Iterate the AST statements directly (SOURCE order, deterministic) + filter to decisions — NOT the by-name decls
     // map (which would order by first-name-appearance and could be perturbed by a cross-kind same-name declaration).
     for (const s of info.entry.ast.statements) {
@@ -185,7 +196,7 @@ export function buildCrlStructure(
           kind: sn.kind,
           label: labelOf(sn.kind, sn.node),
           ...(sn.kind === "action" ? { actionKind: actionKindOf(sn.node as ActionStatement) } : {}),
-          refKeys: refKeysOf(sn.kind, sn.node, lib),
+          refKeys: refKeysOf(sn.kind, sn.node, lib, criterionTable),
           ...(sn.kind === "when"
             ? { sigLabel: conditionSigLabel((sn.node as WhenBlock).condition, lib) }
             : {}),

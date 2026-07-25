@@ -14,6 +14,15 @@ import type {
   BranchConditionCriterionRef,
   ReferenceName,
 } from "./types";
+import { getRefName } from "./types";
+import {
+  expandGuardOrRecord,
+  containsCriterionRef,
+  expandedSize,
+  type CriterionTable,
+  type ExpandedSize,
+  type ExpansionReason,
+} from "./criterionExpansion";
 
 // #224 ii: an un-expanded `BranchConditionCriterionRef` reaching a SEMANTIC guard
 // consumer (DNF / arm-count / eval / emit) means the criterion-expansion seam was
@@ -109,6 +118,81 @@ export function branchConditionConceptRefsStrict(
   };
   walk(c);
   return out;
+}
+
+/**
+ * #224 ii.1c — SOURCE-side concept refs of a guard, FOLLOWING criterion refs INTO their
+ * bodies. For provenance reachability / gating: a concept referenced ONLY inside a criterion
+ * body is still gating on / reached by the decision (the disc-300 closure argument, source-
+ * side). Unlike `branchConditionConceptRefsExpanded` this does NOT materialize a fresh tree —
+ * it walks the body in place and collects its concept-ref LEAVES (a criterion ref becomes its
+ * body's concepts, recursively).
+ *
+ * The GLOBAL envelope still applies (a criterion DAG doubles: `C_k := C_{k-1} and C_{k-1}` →
+ * 2^k leaf visits). Provenance runs on UNVALIDATED input (`buildProvenanceIndex` calls no
+ * validator — the same reason `runCel` must gate), so a cyclic OR envelope-breaching table
+ * would otherwise loop/hang the host. Gate on `expandedSize` first; a non-`ok` guard falls
+ * back to its INLINE concept refs only (criteria skipped — the pre-ii.1c behavior: the
+ * criterion-only concepts are under-reported for that one guard, not collected via an
+ * unbounded walk). The `ok` path is then bounded by the atom cap (≤ CAP leaf visits). The
+ * `active` cycle guard is retained as defence in depth even though `ok` implies acyclic.
+ *
+ * Name-level criterion DECLARATION indexing (find-refs / hover / rename on the criterion NAME
+ * itself) stays deferred to ii.4; this covers only the concept-reachability correctness.
+ */
+export function branchConditionConceptRefsFollowingCriteria(
+  c: BranchCondition,
+  table: CriterionTable,
+): BranchConditionRef[] {
+  // GLOBAL-envelope gate (see doc): a breaching/cyclic table falls back to inline refs only,
+  // never an unbounded DAG walk. Criterion-free guards are `ok` with no walk (exempt).
+  if (containsCriterionRef(c) && expandedSize(c, table).status !== "ok") {
+    return branchConditionRefs(c);
+  }
+  const out: BranchConditionRef[] = [];
+  const active = new Set<string>(); // criterion names on the current path (cycle guard)
+  const walk = (n: BranchCondition): void => {
+    if (n.type === "BranchConditionRef") {
+      out.push(n);
+      return;
+    }
+    if (n.type === "BranchConditionCriterionRef") {
+      const name = getRefName(n.ref);
+      const crit = table.get(name);
+      if (!crit || active.has(name)) return; // undefined or cyclic → contribute nothing
+      active.add(name);
+      walk(crit.condition);
+      active.delete(name);
+      return;
+    }
+    if (Array.isArray((n as BranchConditionAnd | BranchConditionOr).operands))
+      (n as BranchConditionAnd | BranchConditionOr).operands.forEach(walk);
+  };
+  walk(c);
+  return out;
+}
+
+/**
+ * #224 ii.1c — the criterion-aware ref collector for the EMIT seams (closure, CQL
+ * interface surface, case-features). It EXPANDS the guard's criterion refs (gated by the
+ * GLOBAL envelope) against `table`, then collects the concept refs of the expanded tree
+ * via `branchConditionConceptRefsStrict` — which therefore never trips (the expanded tree
+ * holds no criterion ref). A criterion-free guard fast-paths to identity (no envelope).
+ *
+ * On a non-`ok` envelope status it returns `{ refs: [], overflow }` WITHOUT throwing — the
+ * seam disposes of the overflow per its lane (closure/case-features: skip; CQL interface:
+ * hard error). This is the single point where the emit seams cross the criterion boundary,
+ * so the tripwire in `branchConditionConceptRefsStrict` stays a live backstop for any seam
+ * that forgot to route through here.
+ */
+export function branchConditionConceptRefsExpanded(
+  c: BranchCondition,
+  table: CriterionTable,
+  where: string,
+): { refs: BranchConditionRef[]; overflow?: { status: ExpansionReason; detail?: ExpandedSize["detail"] } } {
+  const g = expandGuardOrRecord(c, table);
+  if (!g.ok) return { refs: [], overflow: { status: g.status, detail: g.detail } };
+  return { refs: branchConditionConceptRefsStrict(g.cond, where) };
 }
 
 /**

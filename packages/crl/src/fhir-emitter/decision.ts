@@ -86,6 +86,7 @@ import {
   branchConditionDNF,
   branchConditionArmCount,
 } from "../ast/branchCondition";
+import { expandGuardOrRecord, type CriterionTable } from "../ast/criterionExpansion";
 import type { CRLError } from "../types/errors";
 import { libraryCanonicalUrl } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
@@ -267,7 +268,11 @@ type EmitActionResult =
   | { kind: "emitted"; actions: Record<string, unknown>[] }
   | {
       kind: "suppressed";
-      reason: "unresolved-ref" | "all-children-suppressed" | "compound-guard-overflow";
+      reason:
+        | "unresolved-ref"
+        | "all-children-suppressed"
+        | "compound-guard-overflow"
+        | "criterion-overflow";
     };
 
 /* ─── Single-Decision emit ───────────────────────────────────────── */
@@ -321,6 +326,10 @@ export function emitDecisionPlanDefinition(
   // condition's inputs, no ancestor/descendant aggregation. Defaults to an
   // empty-returning resolver → no input (keeps cms / unit-test callers unchanged).
   caseFeatureInputResolver: CaseFeatureInputResolver = () => [],
+  // #224 ii.1c — the emitting library's criterion table (`name → Criterion`). Guards are
+  // expanded gated-by-the-GLOBAL-envelope at `emitWhenBlock` entry. Defaults to empty so
+  // cms / unit-test callers with no criteria are byte-unchanged (every guard fast-paths).
+  criterionTable: CriterionTable = new Map(),
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -355,6 +364,7 @@ export function emitDecisionPlanDefinition(
     isStrategy: isRoot,
     errors,
     unmatched,
+    criterionTable,
   };
   const topLevelResults = decision.body.statements.map((branch) =>
     emitBranch(branch, ctx, decision.body.qualifier),
@@ -483,6 +493,11 @@ interface EmitCtx {
   isStrategy: boolean;
   errors: CRLError[];
   unmatched: UnmatchedReference[];
+  // #224 ii.1c — the emitting library's criterion table. Guards are expanded (gated by the
+  // GLOBAL envelope) at `emitWhenBlock` ENTRY, so `soleRef` / arm-cap / DNF / `guardLabel`
+  // all see the fully-inlined guard (sole-ref collapse + byte-identity, disc 303 C3). Empty
+  // for callers with no criteria (cms / unit tests) → every guard fast-paths to identity.
+  criterionTable: CriterionTable;
 }
 
 /**
@@ -575,10 +590,36 @@ function atomKey(normalized: ReferenceName): string {
  * plan v3.2 §"Cascade-suppression behavior".
  */
 function emitWhenBlock(
-  wb: WhenBlock,
+  wbRaw: WhenBlock,
   ctx: EmitCtx,
   enclosingQualifier: BlockQualifier | undefined,
 ): EmitActionResult {
+  // #224 ii.1c — expand criterion refs at the WhenBlock ENTRY, BEFORE soleRef / arm-cap /
+  // DNF / guardLabel, so a criterion aliasing a single concept re-enters the byte-identical
+  // single-ref path (sole-ref collapse, disc 303 C3) and every downstream reader sees the
+  // fully-inlined guard. The envelope is GLOBAL; a breach pushes a `criterion-expansion-
+  // overflow` diagnostic (RESOURCE bound, "materialized tree" — disc 302) and suppresses the
+  // guard (parity with the arm-cap overflow). A criterion-free guard fast-paths to identity
+  // → byte-unchanged goldens. The message renders the AUTHOR's criterion name (raw guard).
+  const guard = expandGuardOrRecord(wbRaw.condition, ctx.criterionTable);
+  if (!guard.ok) {
+    ctx.errors.push({
+      type: "Validation",
+      kind: "criterion-expansion-overflow",
+      message: `Guard \`${describeBranchCondition(
+        wbRaw.condition,
+        getRefName,
+      )}\` references a criterion whose materialized tree exceeds the criterion-expansion envelope (${guard.status}${
+        guard.detail?.name ? `: "${guard.detail.name}"` : ""
+      }). This is an emit-stage RESOURCE boundary — the fully-inlined guard is too large to materialize — NOT a FHIR limit and NOT an authoring-complexity limit. A \`criterion\` inline-expands, so it does not reduce the emitted arm count; factor the determination (e.g. a \`use decision\` sub-decision) or consult the authoring kit.`,
+      line: wbRaw.location?.start.line,
+      column: wbRaw.location?.start.column,
+    });
+    return { kind: "suppressed", reason: "criterion-overflow" };
+  }
+  // Reuse the node when nothing expanded (identity fast path) to avoid churn.
+  const wb: WhenBlock = guard.cond === wbRaw.condition ? wbRaw : { ...wbRaw, condition: guard.cond };
+
   const sole = soleRef(wb.condition);
   if (!sole) return emitCompoundWhenBlock(wb, ctx, enclosingQualifier);
 
@@ -1063,6 +1104,10 @@ export function emitDecisionPlanDefinitionsForLibrary(
   libraryName: string,
   metadata: CpgMetadata,
   opts: EmitOptions = {},
+  // #224 ii.1c — the library's criterion table (`name → Criterion`), so a guard that
+  // references a criterion is expanded before emit. Defaults to empty for callers with no
+  // criteria (byte-unchanged). Build via `buildCriterionTable(<library statements>)`.
+  criterionTable: CriterionTable = new Map(),
 ): {
   resources: EmittedResource[];
   errors: CRLError[];
@@ -1135,6 +1180,9 @@ export function emitDecisionPlanDefinitionsForLibrary(
       decisionResolver,
       isRoot,
       opts,
+      undefined, // libraryReferenceSuffix (per-library path: source-name-keeping)
+      undefined, // caseFeatureInputResolver (default → no action.input)
+      criterionTable,
     );
     if (r.resource) resources.push(r.resource);
     errors.push(...r.errors);

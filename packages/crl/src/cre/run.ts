@@ -68,6 +68,18 @@ import type {
 import { getRefLibrary, getRefName } from "../ast/types";
 import { soleRef, describeBranchCondition } from "../ast/branchCondition";
 import type { BranchCondition } from "../ast/types";
+// #224 ii.1c — expand a decision's criterion-guard refs before evaluation. The envelope is
+// GLOBAL (materialization bounds eval too, and `runCel` runs NO semantic validation — a
+// cyclic/undefined table can reach here directly), so a breach degrades GRACEFULLY to
+// status:"error" rather than throwing out of the run. The wiring is SHARED with the view-
+// model (expandDecisions.ts) so run + render expand from the SAME table source (the
+// both-sides-expanded trace-zip invariant, disc 303 Q3).
+import type { CriterionExpansionError } from "../ast/criterionExpansion";
+import {
+  buildCriterionTablesForGraph,
+  expandCoveredDecisions,
+  wrapResolveWithExpansion,
+} from "./expandDecisions";
 import type { CELCase, CELDefinedByField, CELFact, CELResultField } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { LsLocation } from "../language-services/contracts";
@@ -214,6 +226,10 @@ interface Ctx {
    *  cross-library qualified ref resolves its sub in its own library. (The root-decision lookup in `runCase` reads its
    *  own `decisions` map BEFORE Ctx is built, so no per-library decision map is stored on Ctx.) */
   resolveDecision: (callerLib: string, ref: ReferenceName) => ResolvedDecision | undefined;
+  /** #224 ii.1c — sub-decisions whose criterion guard breached the GLOBAL envelope (populated
+   *  by `wrapResolveWithExpansion` as `resolveDecision` is called). Keyed `idOf(lib,name)`. A
+   *  `use decision` whose target is here is an OVERFLOW (status:"error"), NOT a not-found. */
+  subExpansionErrors: Map<string, CriterionExpansionError>;
   /** The ROOT (covered) library — the frame `currentLib` is seeded with it; a cross-library sub pushes its OWN lib. */
   rootLib: string;
   /** `(lib,name)` keys on the current delegation path (cycle guard; seeded with `idOf(rootLib, rootDecisionName)`).
@@ -540,6 +556,20 @@ function emitAction(
   const refLib = getRefLibrary(stmt.action.decisionName);
   const resolved = ctx.resolveDecision(frame.currentLib, stmt.action.decisionName);
   if (!resolved) {
+    // #224 ii.1c — DISTINGUISH an envelope OVERFLOW from a genuine not-found: the resolver
+    // returns `undefined` for both, but a sub whose guard breached the criterion envelope was
+    // recorded in `subExpansionErrors` (keyed by the resolved owning lib — `refLib` for a
+    // qualified ref, else the caller's frame). An overflow is a RUNTIME error (status:"error"),
+    // not a missing target — report it precisely and stop the walk (mirrors the delegation-cycle
+    // disposition), rather than silently evaluating the delegation as an empty production.
+    const overflow = ctx.subExpansionErrors.get(idOf(refLib ?? frame.currentLib, name));
+    if (overflow) {
+      ctx.runtimeError = true;
+      ctx.diagnostics.push(
+        `\`use decision "${name}"\` cannot be evaluated: its guard exceeds the criterion-expansion envelope (${overflow.reason}${overflow.detail?.name ? `: "${overflow.detail.name}"` : ""})`,
+      );
+      return false;
+    }
     // Leaf + diagnostic (don't crash, don't produce a phantom disposition). THREE distinct messages:
     //  - a QUALIFIED target whose library/sub is not in the resolved graph → unresolved-cross-lib;
     //  - a BARE target not found in the CURRENT frame's library → not-found-in-current-lib. Naming `frame.currentLib`
@@ -737,6 +767,14 @@ function runCase(
   filePath: string,
   concepts: Map<Id, ConceptEntry>,
   resolveDecision: (callerLib: string, ref: ReferenceName) => ResolvedDecision | undefined,
+  // #224 ii.1c — covered decisions whose criterion guard breached the GLOBAL expansion
+  // envelope; a case targeting one gets a precise status:"error" (not the generic
+  // "not found", which the absent expanded entry would otherwise trigger).
+  decisionExpansionErrors: Map<string, CriterionExpansionError>,
+  // #224 ii.1c — SUB-decisions (`use decision` targets) whose guard breached the envelope
+  // (populated lazily by the resolver wrapper); consulted in `emitAction` so an overflow
+  // delegation reports status:"error" instead of a misleading not-found.
+  subExpansionErrors: Map<string, CriterionExpansionError>,
 ): CaseRun {
   const diagnostics: string[] = [];
   let subjectFact: string | undefined;
@@ -783,6 +821,24 @@ function runCase(
   }
   const decisionName = result.leafName;
   const expectedBranch = result.value.branchName;
+  // #224 ii.1c — a covered decision whose guard exceeded the criterion-expansion envelope
+  // can't be evaluated; report it precisely (before the generic not-found path below).
+  const expansionError = decisionExpansionErrors.get(decisionName);
+  if (expansionError) {
+    return {
+      case: c.name,
+      decision: decisionName,
+      status: "error",
+      expected: { leaf: decisionName, branch: expectedBranch },
+      produced: [],
+      trace: [],
+      diagnostics: [
+        ...diagnostics,
+        `decision "${decisionName}" cannot be evaluated: its guard exceeds the criterion-expansion envelope (${expansionError.reason}${expansionError.detail?.name ? `: "${expansionError.detail.name}"` : ""})`,
+      ],
+      conceptTruth: [],
+    };
+  }
   const decision = decisions.get(decisionName);
   if (!decision) {
     return {
@@ -809,6 +865,7 @@ function runCase(
     trace: [],
     diagnostics,
     resolveDecision,
+    subExpansionErrors,
     rootLib: coveredLib,
     // Seed the delegation cycle guard with `(rootLib, rootDecisionName)` — the `(lib,name)` re-key (#172). For the
     // same-library recursion this is a 1:1 rename of the old bare-name seed.
@@ -862,22 +919,36 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
   if (coveredLib === null) {
     return { success: false, runs: [], errors: ["covered library has no name"] };
   }
-  const decisions = new Map<string, Decision>();
+  const rawDecisions: Decision[] = [];
   for (const s of graph.coversTarget.ast.statements) {
-    if (s.type === "Decision") decisions.set(s.name, s);
+    if (s.type === "Decision") rawDecisions.push(s);
   }
+
+  // #224 ii.1c — per-library criterion tables + expand the top-level covered decisions'
+  // criterion guards. The envelope is GLOBAL (`expandDecisionCriteria` materializes the tree
+  // the CRE walks); a breach degrades to a per-case status:"error" (recorded in
+  // `decisionExpansionErrors`, surfaced in runCase) rather than throwing. Criterion-free
+  // decisions pass through by identity. Wiring shared with the view-model (expandDecisions.ts).
+  const criterionTablesByLib = buildCriterionTablesForGraph(graph);
+  const coveredTable = criterionTablesByLib.get(coveredLib) ?? new Map();
+  const { decisions, errors: decisionExpansionErrors } = expandCoveredDecisions(rawDecisions, coveredTable);
 
   // Global `(lib,name)` decision map + the shared resolver over the WHOLE graph (#172). LOCAL-FIRST precedence matches
   // the provenance indexer (indexer.ts:11-13). The covered library's own decisions are added last → authoritative for
-  // its name (and the only source on the inline-graph path where crlRegistry is absent). For a same-library `use
-  // decision` the resolver returns the byte-identical Decision `decisions` does; a cross-library one binds in its lib.
+  // its name (and the only source on the inline-graph path where crlRegistry is absent). The map holds RAW decisions;
+  // `wrapResolveWithExpansion` expands each resolved sub-decision against its target library's table — so a same-library
+  // `use decision` yields a STRUCTURALLY-identical guard to the top-level `decisions` map (fresh nodes; the trace zip is
+  // structural, not identity-based, per disc 303 Q3), and a cross-library one binds in its own lib.
   const globalDecisionMap = buildGlobalDecisionMap({
     crlRegistry: graph.crlRegistry,
     coveredLib,
     coveredFilePath: graph.coversTarget.filePath,
-    coveredStatements: [...decisions.values()],
+    coveredStatements: rawDecisions,
   });
-  const resolveDecision = makeResolveDecision(globalDecisionMap);
+  const { resolve: resolveDecision, errors: subExpansionErrors } = wrapResolveWithExpansion(
+    makeResolveDecision(globalDecisionMap),
+    criterionTablesByLib,
+  );
 
   // Concept definitions across the resolved closure — needed to evaluate
   // `defined as` operands (bare = local to the defining library; qualified =
@@ -907,7 +978,19 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
   const runs: CaseRun[] = [];
   for (const s of graph.cel.statements) {
     if (s.type === "CELCase")
-      runs.push(runCase(s, decisions, facts, coveredLib, filePath, concepts, resolveDecision));
+      runs.push(
+        runCase(
+          s,
+          decisions,
+          facts,
+          coveredLib,
+          filePath,
+          concepts,
+          resolveDecision,
+          decisionExpansionErrors,
+          subExpansionErrors,
+        ),
+      );
   }
   return { success: true, runs, errors };
 }

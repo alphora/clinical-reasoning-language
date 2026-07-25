@@ -37,7 +37,8 @@
 
 import type { Activity, BranchBlock, Concept, Decision, ReferenceName, Terminology } from "../ast/types";
 import { getRefLibrary, getRefName, isQualifiedRef, normalizeLocalRef } from "../ast/types";
-import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
+import { branchConditionConceptRefsExpanded } from "../ast/branchCondition";
+import { buildCriterionTable } from "../ast/criterionExpansion";
 import { resolveDispositionConfig } from "../dispositions";
 import { computeFhirEmitClosure } from "../imports/computeEmitClosure";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
@@ -426,10 +427,18 @@ export function collectCaseFeatures(
   // input). NOTE (i.1): this is the full atom set for the decision; the
   // ARM-SPECIFIC input union per emitted DNF arm (G15) is decided at the emit
   // site (decision.ts) in i.3, not here.
+  // #224 ii.1c — a guard atom may reference a `criterion`; case-features must be collected
+  // from the EXPANDED guard (its body concepts are inputs too). Criteria survive lowering
+  // unchanged, so a table from the lowered `ast` matches. A guard that breaches the GLOBAL
+  // envelope is SKIPPED (its decision is suppressed by the decision emit — decision.ts — so
+  // it contributes no action.input/SD; nothing dangles).
+  const criterionTable = buildCriterionTable(lowered.ast.statements);
   const conditionRefs: ReferenceName[] = [];
   const visitBranch = (branch: BranchBlock): void => {
     if (branch.type === "WhenBlock")
-      for (const atom of branchConditionConceptRefsStrict(branch.condition, "case-feature collection")) conditionRefs.push(atom.ref);
+      for (const atom of branchConditionConceptRefsExpanded(branch.condition, criterionTable, "case-feature collection")
+        .refs)
+        conditionRefs.push(atom.ref);
     const body = branch.body;
     if (body.type === "ActionStatement") return;
     for (const stmt of body.statements) {
@@ -1561,6 +1570,11 @@ export function emitFhirDefClosure(
     // When the contract is violated we skip THIS source's decision emit (handled by
     // the loop guard below); there are no later per-lib steps, so a plain guarded
     // loop suffices.
+    // #224 ii.1c — the source library's criterion table (from the RAW `lib.ast`; criteria
+    // survive lowering unchanged, so it matches the lowered-AST table `collectCaseFeatures`
+    // builds). Threaded to the decision emit so a guard referencing a criterion is expanded
+    // at `emitWhenBlock` entry (sole-ref collapse + the overflow diagnostic live there).
+    const libCriterionTable = buildCriterionTable(lib.ast.statements);
     for (const decision of hasDecisionLibraryTarget ? lib.decisions : []) {
       const decKey = qualifiedKey([lib.libraryName, decision.name]);
       if (classification.cycleMemberKeys.has(decKey)) continue;
@@ -1576,6 +1590,7 @@ export function emitFhirDefClosure(
         resolvedOpts,
         libraryReferenceSuffix,
         caseFeatureInputResolver,
+        libCriterionTable,
       );
       if (decResult.resource) resources.push(decResult.resource);
       errors.push(...decResult.errors);

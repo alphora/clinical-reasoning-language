@@ -47,14 +47,19 @@
 // materialization.
 
 import type {
+  BranchBlock,
   BranchCondition,
   BranchConditionAnd,
   BranchConditionOr,
   BranchConditionRef,
   Criterion,
+  Decision,
+  DecisionBody,
   Location,
   SourcedFromCriterion,
   Statement,
+  WhenBlock,
+  WhenBlockBody,
 } from "./types";
 import { getRefName } from "./types";
 
@@ -297,4 +302,126 @@ function materialize(c: BranchCondition, table: CriterionTable): MarkableConditi
 /** Return `node` with `sourcedFromCriterion` set (a fresh object; unconditional). */
 function stamp(node: MarkableCondition, marker: SourcedFromCriterion): MarkableCondition {
   return { ...node, sourcedFromCriterion: marker };
+}
+
+// ─────────────────────────── ii.1c: decision-level wiring ───────────────────────────
+//
+// The seams (eval / render / emit) consume DECISIONS, not bare guards. These two helpers
+// lift the guard-level engine to a Decision:
+//  - `expandGuardOrRecord` is the GRACEFUL per-guard step every seam shares: gate on
+//    `expandedSize`, expand on "ok", and on a non-"ok" status return the reason for the
+//    seam to dispose of (eval → status:"error"; FHIR emit → diagnose+suppress; CQL emit →
+//    hard error; closure → skip+signal). It NEVER throws — the throw lives only in the
+//    `expandCriteria` hard backstop.
+//  - `expandDecisionCriteria` deep-copies a Decision, expanding every `WhenBlock` guard at
+//    any nesting depth. It THROWS on a non-"ok" guard (the hard-backstop contract), so a
+//    caller that must degrade gracefully drives `expandGuardOrRecord` per guard instead
+//    (the eval + emit families do); a caller that has already validated the envelope (or
+//    accepts the loud backstop) can use it directly.
+
+/** The graceful per-guard step. `{ ok: true, cond }` carries the expanded guard (identity
+ *  for a criterion-free guard); `{ ok: false, ... }` carries the refusal reason + detail for
+ *  the seam to turn into its own disposition. Shares the SAME `table` the eventual
+ *  `expandCriteria` would use, so an "ok" here guarantees the materialization cannot throw. */
+export function expandGuardOrRecord(
+  cond: BranchCondition,
+  table: CriterionTable,
+):
+  | { ok: true; cond: BranchCondition }
+  | { ok: false; status: ExpansionReason; detail?: ExpandedSize["detail"] } {
+  const size = expandedSize(cond, table);
+  if (size.status !== "ok") return { ok: false, status: size.status, detail: size.detail };
+  return { ok: true, cond: expandCriteria(cond, table) };
+}
+
+/**
+ * Deep-copy `decision`, replacing every `WhenBlock` guard (at any nesting depth) with its
+ * criterion-expanded form over `table`. A decision with NO criterion ref anywhere is
+ * returned by IDENTITY (fast path — preserves byte-identity for criterion-free documents,
+ * so goldens/emit never perturb). Non-guard structure (bodies, actions, metadata) is
+ * structurally SHARED — only the branch spine that carries a rewritten guard is rebuilt.
+ *
+ * THROWS `CriterionExpansionError` if any guard breaches the envelope (the hard-backstop
+ * contract, shared with `expandCriteria`). A seam that must degrade gracefully (the eval
+ * and emit families) drives `expandGuardOrRecord` per guard instead of calling this.
+ * Same well-formed / same-table precondition as `expandCriteria`.
+ */
+export function expandDecisionCriteria(decision: Decision, table: CriterionTable): Decision {
+  if (!decisionContainsCriterionRef(decision)) return decision; // identity fast path
+  return {
+    ...decision,
+    body: expandDecisionBody(decision.body, table),
+  };
+}
+
+/** True if any `WhenBlock` guard anywhere in the decision holds a criterion ref. */
+function decisionContainsCriterionRef(decision: Decision): boolean {
+  const branchHas = (b: BranchBlock): boolean =>
+    (b.type === "WhenBlock" && containsCriterionRef(b.condition)) || bodyHas(b.body);
+  const bodyHas = (body: WhenBlockBody): boolean => {
+    if (body.type === "ActionStatement") return false;
+    return body.statements.some((m) => (m.type === "WhenBlock" || m.type === "OtherwiseBlock") && branchHas(m));
+  };
+  return decision.body.statements.some(branchHas);
+}
+
+function expandDecisionBody(body: DecisionBody, table: CriterionTable): DecisionBody {
+  return { ...body, statements: body.statements.map((b) => expandBranch(b, table)) };
+}
+
+function expandBranch(branch: BranchBlock, table: CriterionTable): BranchBlock {
+  if (branch.type === "WhenBlock") {
+    const rebuilt: WhenBlock = {
+      ...branch,
+      condition: expandCriteria(branch.condition, table),
+      body: expandWhenBlockBody(branch.body, table),
+    };
+    return rebuilt;
+  }
+  // OtherwiseBlock — no guard, only a body that may nest further branches.
+  return { ...branch, body: expandWhenBlockBody(branch.body, table) };
+}
+
+function expandWhenBlockBody(body: WhenBlockBody, table: CriterionTable): WhenBlockBody {
+  if (body.type === "ActionStatement") return body; // actions carry no branch guard
+  return {
+    ...body,
+    statements: body.statements.map((m) =>
+      m.type === "WhenBlock" || m.type === "OtherwiseBlock" ? expandBranch(m, table) : m,
+    ),
+  };
+}
+
+/** A guard whose criterion expansion breaches the GLOBAL envelope, with the offending
+ *  guard's location so a seam can diagnose it. */
+export interface GuardOverflow {
+  status: ExpansionReason;
+  detail?: ExpandedSize["detail"];
+  location: Location;
+}
+
+/**
+ * Every `WhenBlock` guard in `decision` (any nesting depth) whose criterion expansion is
+ * non-`ok`, for a seam that must DIAGNOSE overflow up front rather than materialize (the CQL
+ * emit boundary, which has no per-decision suppression channel). Criterion-free guards and
+ * `ok` guards contribute nothing. Bounded (each guard is one `expandedSize` — memoized,
+ * saturating — never a materialization).
+ */
+export function decisionGuardOverflows(decision: Decision, table: CriterionTable): GuardOverflow[] {
+  const out: GuardOverflow[] = [];
+  const visitBody = (body: WhenBlockBody): void => {
+    if (body.type === "ActionStatement") return;
+    for (const m of body.statements) {
+      if (m.type === "WhenBlock" || m.type === "OtherwiseBlock") visitBranch(m);
+    }
+  };
+  const visitBranch = (b: BranchBlock): void => {
+    if (b.type === "WhenBlock") {
+      const size = expandedSize(b.condition, table);
+      if (size.status !== "ok") out.push({ status: size.status, detail: size.detail, location: b.location });
+    }
+    visitBody(b.body);
+  };
+  for (const b of decision.body.statements) visitBranch(b);
+  return out;
 }

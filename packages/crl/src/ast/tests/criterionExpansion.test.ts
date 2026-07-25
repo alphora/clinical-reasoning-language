@@ -10,7 +10,12 @@ import {
   CRITERION_MAX_DEPTH,
   type CriterionTable,
 } from "../criterionExpansion";
-import { branchConditionArmCount, branchConditionDNF, soleRef } from "../branchCondition";
+import {
+  branchConditionArmCount,
+  branchConditionDNF,
+  branchConditionConceptRefsFollowingCriteria,
+  soleRef,
+} from "../branchCondition";
 import type {
   BranchCondition,
   BranchConditionAnd,
@@ -55,6 +60,39 @@ const crit = (name: string, condition: BranchCondition): Criterion => ({
   location: L(),
 });
 const table = (...cs: Criterion[]): CriterionTable => new Map(cs.map((c) => [c.name, c]));
+
+describe("branchConditionConceptRefsFollowingCriteria (source-side, provenance)", () => {
+  it("follows a criterion ref into its body and collects the body's concept refs", () => {
+    const t = table(crit("Elig", and(ref("A"), ref("B"))));
+    const refs = branchConditionConceptRefsFollowingCriteria(cref("Elig"), t);
+    expect(refs.map((r) => r.ref)).toEqual(["A", "B"]);
+  });
+
+  it("mixes inline + criterion-body concepts (a concept reachable only via the criterion)", () => {
+    const t = table(crit("Elig", ref("Hidden")));
+    const refs = branchConditionConceptRefsFollowingCriteria(and(ref("Inline"), cref("Elig")), t);
+    expect(refs.map((r) => r.ref)).toEqual(["Inline", "Hidden"]);
+  });
+
+  it("an ENVELOPE-BREACHING criterion DAG falls back to inline refs — NO unbounded walk (C3)", () => {
+    // C0..C10 doubling chain (C10 = 2048 atoms > cap). A naive follow is 2^11 visits; the
+    // gate must fall back to the guard's INLINE concept refs instead of walking the DAG. If
+    // the gate were absent this test would HANG (the proof is that it returns promptly).
+    const cs = [crit("C0", and(ref("A"), ref("A")))];
+    for (let k = 1; k <= 10; k++) cs.push(crit(`C${k}`, and(cref(`C${k - 1}`), cref(`C${k - 1}`))));
+    const t = table(...cs);
+    // Guard = one inline concept AND the over-cap criterion → only the inline ref survives.
+    const refs = branchConditionConceptRefsFollowingCriteria(and(ref("Keep"), cref("C10")), t);
+    expect(refs.map((r) => r.ref)).toEqual(["Keep"]);
+  });
+
+  it("a CYCLIC criterion table falls back to inline refs (no infinite loop)", () => {
+    const t = table(crit("X", cref("Y")), crit("Y", cref("X")));
+    expect(branchConditionConceptRefsFollowingCriteria(and(ref("Keep"), cref("X")), t).map((r) => r.ref)).toEqual([
+      "Keep",
+    ]);
+  });
+});
 
 describe("containsCriterionRef", () => {
   it("is true iff a criterion ref appears anywhere", () => {

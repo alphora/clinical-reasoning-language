@@ -32,7 +32,8 @@ import type {
 } from "../ast/types";
 import type { WhenBlock } from "../ast/types";
 import { getRefName, getRefLibrary } from "../ast/types";
-import { branchConditionRefs } from "../ast/branchCondition";
+import { branchConditionRefs, branchConditionConceptRefsFollowingCriteria } from "../ast/branchCondition";
+import { buildCriterionTable, type CriterionTable } from "../ast/criterionExpansion";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { RegistryEntry } from "../imports/types";
 import type { LsLocation, ZeroBasedRange } from "../language-services/contracts";
@@ -332,6 +333,18 @@ export function buildProvenanceIndex(
   const { libs, coversName, diagnostics } = collectLibs(graph, opts);
   if (!coversName) return emptyIndex(diagnostics);
 
+  // #224 ii.1c — per-library criterion table, memoized (built once per library, not per
+  // decision walked).
+  const criterionTableCache = new Map<string, CriterionTable>();
+  const criterionTableFor = (lib: string): CriterionTable => {
+    let t = criterionTableCache.get(lib);
+    if (!t) {
+      t = buildCriterionTable(libs.get(lib)?.entry.ast.statements ?? []);
+      criterionTableCache.set(lib, t);
+    }
+    return t;
+  };
+
   const intrinsicNodeKind = (declKind: DeclKind, node: Statement): NodeKind => {
     switch (declKind) {
       case "terminology":
@@ -521,6 +534,11 @@ export function buildProvenanceIndex(
     const dkey = nodeKey({ lib, kind: "decision", name: decision.name });
     if (seenDecisions.has(dkey)) return;
     seenDecisions.add(dkey);
+    // #224 ii.1c — follow criterion refs into their bodies so a concept referenced ONLY via a
+    // criterion is still decision-REACHED (the disc-300 closure argument, source-side; no
+    // materialization). The criterion NAME-level declaration index stays ii.4. Table memoized
+    // per library (hoisted out of the per-decision walk).
+    const criterionTable = criterionTableFor(lib);
     // A reached decision AND all its sub-nodes are themselves decision-reached (structural members of a reached subtree) —
     // so §9.2 can flag an item linked to any decision sub-node, and isDecisionReached works for nodeId-bearing refs.
     recordEdge(dkey, { fromDecision, fromNodeId: "", relation: "spine-member" });
@@ -531,7 +549,10 @@ export function buildProvenanceIndex(
         relation: "spine-member",
       });
       if (sn.kind === "when") {
-        for (const atom of branchConditionRefs((sn.node as WhenBlock).condition)) {
+        for (const atom of branchConditionConceptRefsFollowingCriteria(
+          (sn.node as WhenBlock).condition,
+          criterionTable,
+        )) {
           reach(atom.ref, lib, fromDecision, sn.nodeId, "when-condition");
         }
       } else if (sn.kind === "action") {

@@ -38,7 +38,8 @@ import type {
   BranchBlock,
 } from "../ast/types";
 import { getRefLibrary, isQualifiedRef } from "../ast/types";
-import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
+import { branchConditionConceptRefsExpanded } from "../ast/branchCondition";
+import { buildCriterionTable, type CriterionTable } from "../ast/criterionExpansion";
 
 import { buildLibraryScopes, lookupKnownLibrary } from "./scopes";
 import type { LibraryScope } from "./scopes";
@@ -190,9 +191,13 @@ export function collectCqlEmitRefs(entry: RegistryEntry, scope: LibraryScope): S
     if (!isQualifiedRef(ref)) return;
     addIfCross(getRefLibrary(ref));
   };
+  // #224 ii.1c — a decision guard may reference a `criterion`; the closure must see the
+  // EXPANDED guard (a concept referenced only inside a criterion body is otherwise invisible
+  // to closure — disc 300). Build the entry's criterion table once and thread it in.
+  const criterionTable = buildCriterionTable(entry.ast.statements);
   for (const stmt of entry.ast.statements) {
     if (stmt.type === "Decision") {
-      visitDecisionRefs(stmt as Decision, visit);
+      visitDecisionRefs(stmt as Decision, visit, criterionTable);
     } else if (stmt.type === "Concept") {
       // Representation terminology refs: closure-only (see doc above / `collectCqlIncludeRefs`).
       visitConceptRepresentationRefs(stmt as Concept, visit);
@@ -332,11 +337,23 @@ function visitArgValue(av: ArgValue, visit: (ref: ReferenceName) => void): void 
   }
 }
 
-function visitDecisionRefs(decision: Decision, visit: (ref: ReferenceName) => void): void {
+function visitDecisionRefs(
+  decision: Decision,
+  visit: (ref: ReferenceName) => void,
+  criterionTable: CriterionTable,
+): void {
   function visitBranch(branch: BranchBlock): void {
-    // `when` carries a boolean guard over concept refs; `otherwise` carries none.
+    // `when` carries a boolean guard over concept refs (any of which may be a criterion ref
+    // to expand); `otherwise` carries none. A guard that breaches the GLOBAL envelope is
+    // SKIPPED here. This closure feeds BOTH emit lanes (collectCqlEmitRefs + the FHIR
+    // superset), so the skip is justified lane-accurately, NOT by decision.ts (which never
+    // runs on a standalone CQL emit): on the CQL lane the SAME overflow is a hard error at
+    // the `emitCQLImports` boundary (`decisionGuardOverflows`), so an incomplete closure
+    // never ships; on the FHIR lane the decision action is suppressed. Either way the
+    // under-included refs belong to output that isn't emitted — a benign under-inclusion.
     if (branch.type === "WhenBlock")
-      for (const atom of branchConditionConceptRefsStrict(branch.condition, "emit closure")) visit(atom.ref);
+      for (const atom of branchConditionConceptRefsExpanded(branch.condition, criterionTable, "emit closure").refs)
+        visit(atom.ref);
     const body = branch.body;
     if (body.type === "ActionStatement") {
       const action = body.action;

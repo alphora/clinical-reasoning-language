@@ -33,6 +33,16 @@ import { toZeroBasedRange } from "../language-services/contracts";
 import { mapImportDiagnostic } from "../language-services/diagnostics";
 
 import { buildGlobalDecisionMap, makeResolveDecision } from "./decisionResolver";
+// #224 ii.1c — the view-model expands the SAME graph guards the CRE evaluated (shared
+// wiring in expandDecisions.ts), so the trace zip walks structurally-identical guards
+// (the both-sides-expanded invariant, disc 303 Q3). Without this the zip degrades to
+// unevaluated leaves (astConditionExpr, viewModel.ts:610) for any criterion-bearing guard.
+import type { CriterionTable } from "../ast/criterionExpansion";
+import {
+  buildCriterionTablesForGraph,
+  expandCoveredDecisions,
+  wrapResolveWithExpansion,
+} from "./expandDecisions";
 import {
   childId,
   runCel,
@@ -209,11 +219,20 @@ export function renderScenario(
     };
   }
 
-  const decisions = new Map<string, Decision>();
+  // #224 ii.1c — expand covered-decision criterion guards from the SAME table source the CRE
+  // used (both-sides-expanded, disc 303 Q3). A decision whose guard breached the GLOBAL
+  // envelope is absent from `decisions` (→ shown unresolved); its case already carries
+  // status:"error" from runCel, so the scenario is an error regardless.
+  const criterionTablesByLib = buildCriterionTablesForGraph(graph);
+  const rawDecisions: Decision[] = [];
   if (graph.coversTarget) {
-    for (const s of graph.coversTarget.ast.statements)
-      if (s.type === "Decision") decisions.set(s.name, s);
+    for (const s of graph.coversTarget.ast.statements) if (s.type === "Decision") rawDecisions.push(s);
   }
+  const coveredTableName = graph.coversTarget?.name ?? "";
+  const { decisions } = expandCoveredDecisions(
+    rawDecisions,
+    criterionTablesByLib.get(coveredTableName) ?? new Map(),
+  );
   const celCases = new Map<string, CELCase>();
   const facts = new Map<string, CELFact>();
   if (graph.cel) {
@@ -227,7 +246,7 @@ export function renderScenario(
 
   const runs = opts?.case ? result.runs.filter((r) => r.case === opts.case) : result.runs;
   const scenarios = runs.map((run) =>
-    buildScenario(run, celCases.get(run.case), decisions, facts, filePath, coveredLib, graph),
+    buildScenario(run, celCases.get(run.case), decisions, facts, filePath, coveredLib, graph, criterionTablesByLib),
   );
 
   const passCount = scenarios.filter((s) => s.status === "pass").length;
@@ -254,6 +273,7 @@ function buildScenario(
   filePath: string,
   coveredLib: string | undefined,
   graph: ResolvedCelGraph,
+  criterionTablesByLib: Map<string, CriterionTable>,
 ): ScenarioViewModel {
   const dec = run.decision ? decisions.get(run.decision) : undefined;
   const decision: DecisionView | null = run.decision
@@ -278,7 +298,13 @@ function buildScenario(
     coveredFilePath: filePath,
     coveredStatements: [...decisions.values()],
   });
-  const resolve = makeResolveDecision(globalDecisionMap);
+  // #224 ii.1c — expand sub-decision guards on resolve, exactly as the CRE does (shared
+  // wrapper), so the VM recurses structurally-identical guards and the nodeId sets stay
+  // aligned with the trace. (`decisions` is already expanded, so the covered-statement seed
+  // above is criterion-free; the wrapper covers cross-library `use decision` targets.) The
+  // wrapper's `errors` map is unused here: an overflow sub already made the RUN report
+  // status:"error" for the case, so the VM tolerably renders that sub unresolved.
+  const { resolve } = wrapResolveWithExpansion(makeResolveDecision(globalDecisionMap), criterionTablesByLib);
   const tree = dec
     ? walkBranchesVM(
         dec.body.statements,

@@ -65,7 +65,8 @@ import type {
   InterfaceSourceLayer,
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
-import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
+import { branchConditionConceptRefsExpanded } from "../ast/branchCondition";
+import { buildCriterionTable } from "../ast/criterionExpansion";
 import { pascalCaseNameForId } from "../fhir-emitter/slug";
 
 import type { CRLError } from "../types/errors";
@@ -939,6 +940,16 @@ export function interfaceConceptNames(ast: CRL): string[] {
  */
 export function interfaceSurface(ast: CRL): { name: string; sourceLayer: Layer | undefined }[] {
   const maps = buildNameLayerMaps(ast, FULL_PARTITION);
+  // #224 ii.1c — a guard atom may reference a `criterion`; the Interface re-export surface
+  // must include the EXPANDED guard's concepts (each atom lowers to a CQL define the emitted
+  // decision references, though the guard boolean itself never lowers to CQL). Expand
+  // GRACEFULLY (skip an envelope-breaching guard's atoms rather than throw): the overflow is
+  // surfaced as a structured HARD error at the CQL emit BOUNDARY (`emitCQLImports`, via
+  // `decisionGuardOverflows`), which fails the emit before this runs — so an overflow guard
+  // never actually reaches here in a public CQL emit; the graceful skip is the backstop that
+  // keeps a direct `interfaceSurface` caller from crashing. Criteria survive lowering
+  // unchanged, so this table (from the lowered `ast`) matches the FHIR lane's.
+  const criterionTable = buildCriterionTable(ast.statements);
   const out: { name: string; sourceLayer: Layer | undefined }[] = [];
   const seen = new Set<string>();
   const add = (ref: ReferenceName): void => {
@@ -963,7 +974,12 @@ export function interfaceSurface(ast: CRL): { name: string; sourceLayer: Layer |
   };
   const walkMember = (member: BlockMember): void => {
     if (member.type === "WhenBlock") {
-      for (const atom of branchConditionConceptRefsStrict(member.condition, "cql-emit interfaceSurface")) add(atom.ref);
+      for (const atom of branchConditionConceptRefsExpanded(
+        member.condition,
+        criterionTable,
+        "cql-emit interfaceSurface",
+      ).refs)
+        add(atom.ref);
       walkBlock(member.body);
     } else if (member.type === "OtherwiseBlock") {
       walkBlock(member.body);

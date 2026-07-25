@@ -28,7 +28,12 @@ import { collectDecisionArms } from "../ast/decisionArms";
 import { decisionSpine, type SpineNode } from "../ast/decisionSpine";
 import type { ActionStatement, Decision, ReferenceName, WhenBlock } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
-import { branchConditionRefs, describeBranchCondition } from "../ast/branchCondition";
+import {
+  branchConditionRefs,
+  branchConditionConceptRefsFollowingCriteria,
+  describeBranchCondition,
+} from "../ast/branchCondition";
+import { buildCriterionTable, type CriterionTable } from "../ast/criterionExpansion";
 import type { CELBranchResult, CELCase, CELResultField } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import { renderScenario, type ScenarioViewModel } from "../cre";
@@ -242,13 +247,32 @@ export function generateProvenanceScaffold(
     return decl ? (decl.node as Decision) : undefined;
   };
 
+  // #224 ii.1c — per-library criterion table (memoized; hoisted out of the per-decision
+  // buildCtx so a library's table is built once, not once per decision).
+  const criterionTableCache = new Map<string, CriterionTable>();
+  const tableFor = (lib: string): CriterionTable => {
+    let t = criterionTableCache.get(lib);
+    if (!t) {
+      t = buildCriterionTable(libs.get(lib)?.entry.ast.statements ?? []);
+      criterionTableCache.set(lib, t);
+    }
+    return t;
+  };
+
   const buildCtx = (lib: string, decision: Decision): DecisionCtx => {
     const declRef = decisionDeclRef(lib, decision.name);
     const spine = decisionSpine(decision);
     const gatingConceptKeys = new Set<string>();
+    // #224 ii.1c — follow criterion refs into their bodies so a concept referenced ONLY via
+    // a criterion is still a gating concept (source-side, no materialization; the criterion
+    // NAME-level index stays ii.4).
+    const criterionTable = tableFor(lib);
     for (const sn of spine) {
       if (sn.kind === "when") {
-        for (const atom of branchConditionRefs((sn.node as WhenBlock).condition)) {
+        for (const atom of branchConditionConceptRefsFollowingCriteria(
+          (sn.node as WhenBlock).condition,
+          criterionTable,
+        )) {
           gatingConceptKeys.add(conceptKeyOf(atom.ref, lib));
         }
       } else if (sn.kind === "action") {

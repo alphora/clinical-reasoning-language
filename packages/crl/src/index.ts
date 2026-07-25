@@ -93,6 +93,9 @@ export {
   CriterionExpansionError,
   CRITERION_EXPANSION_ATOM_CAP,
   CRITERION_MAX_DEPTH,
+  // #224 ii.1c — decision-level wiring lifted over the guard-level engine.
+  expandDecisionCriteria,
+  expandGuardOrRecord,
 } from "./ast/criterionExpansion";
 export type { CriterionTable, ExpandedSize, ExpansionReason } from "./ast/criterionExpansion";
 export {
