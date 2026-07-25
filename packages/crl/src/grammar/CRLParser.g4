@@ -62,6 +62,7 @@ statement
     | activityStatement
     | conceptStatement
     | parameterStatement
+    | criterionStatement
     ;
 
 // ============================
@@ -78,6 +79,21 @@ statement
 //
 decisionStatement
     : DECISION decisionIdentifier COLON decisionBody
+    ;
+
+// ============================
+// Criterion Statement (#224 ii)
+// ============================
+//
+// A named, reusable decision-guard sub-expression: `criterion "X": - when ( <cond> ).`
+// The body reuses the SAME `branchCondition` rule as a `when` branch (monotone
+// and/or over concept/criterion refs; no `not`). The parens are REQUIRED (unlike a
+// bare `when` branch, which uses `THEN` as its right edge) so `RPAREN DOT` is a
+// clean statement edge — `DOT` is also the qualified-ref separator, so an
+// unparenthesized `... "Lib"."X".` tail would be ambiguous. The KE authoring house
+// style parenthesizes regardless.
+criterionStatement
+    : CRITERION criterionIdentifier COLON DASH WHEN LPAREN branchCondition RPAREN DOT
     ;
 
 // The top-level decision block: `when`/`otherwise` branches with an optional
@@ -489,7 +505,7 @@ narrative
 narrativeElement
     : qualifiableReference                                                                       # NConceptRef
     | quantity                                                                                   # NQuantity
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | OTHERWISE | UNLESS | ONLY_WHEN | NARRATIVE_WORD | TIME_UNIT)  # NWord
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | NARRATIVE_WORD | TIME_UNIT)  # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 
@@ -534,6 +550,10 @@ qualifiableReference
     ;
 
 decisionIdentifier
+    : identifier
+    ;
+
+criterionIdentifier
     : identifier
     ;
 

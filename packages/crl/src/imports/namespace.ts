@@ -30,6 +30,13 @@ export function buildCombinedNamespace(
 
   for (const entry of resolvedLibraries) {
     for (const statement of entry.ast.statements) {
+      // #224 ii: a `criterion` has NO cross-library namespace entry — it is a
+      // source-side, library-local guard macro (expanded away before emit), not a
+      // `NodeKind`. Skip it so the `statement.type as NodeKind` cast below can't push
+      // "Criterion" into `mapForKind` (which returns undefined → a `map.get` crash on
+      // EVERY multi-file flow via `resolveImports`). Criterion name uniqueness / the
+      // Concept-XOR-Criterion rule is the validator's job (ii.1a-2), not the namespace.
+      if (statement.type === "Criterion") continue;
       const kind = statement.type as NodeKind;
       const name = statement.name;
       const map = mapForKind(namespace, kind);

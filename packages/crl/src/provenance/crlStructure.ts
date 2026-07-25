@@ -92,15 +92,28 @@ function conditionSigLabel(cond: BranchCondition, decisionLib: string): string {
   // containing `,` `(` `)` `\` (clinical names DO — "Diabetes, Type 2") cannot
   // inject structure and collide two DIFFERENT guards onto one signature.
   const escLeaf = (ref: ReferenceName): string => rawLeaf(ref).replace(/([\\(),])/g, "\\$1");
+  // #224 ii: `crlStructure` is a SOURCE-side (pre-expansion) consumer, so a guard
+  // atom may be a criterion ref. Give it a STABLE, distinct signature token
+  // (`criterion(<escaped name>)`, reusing the same `escLeaf` escaping) — the pinned
+  // sig policy: a named criterion is a stable structure node whose persisted
+  // occurrence-flag key never collapses onto a concept of the same name and never
+  // re-keys as the criterion body changes.
   const go = (c: BranchCondition): string =>
     c.type === "BranchConditionRef"
       ? escLeaf(c.ref)
-      : c.type === "BranchConditionAnd"
-        ? `and(${c.operands.map(go).join(",")})`
-        : `or(${c.operands.map(go).join(",")})`;
+      : c.type === "BranchConditionCriterionRef"
+        ? `criterion(${escLeaf(c.ref)})`
+        : c.type === "BranchConditionAnd"
+          ? `and(${c.operands.map(go).join(",")})`
+          : `or(${c.operands.map(go).join(",")})`;
   // Top-level single ref → RAW leaf (byte-identical to `refSig(refKeys[0])`, so
-  // existing single-ref flags never re-key); compound → escaped structural form.
-  return cond.type === "BranchConditionRef" ? rawLeaf(cond.ref) : go(cond);
+  // existing single-ref flags never re-key); a top-level criterion ref → its stable
+  // criterion token; compound → escaped structural form.
+  return cond.type === "BranchConditionRef"
+    ? rawLeaf(cond.ref)
+    : cond.type === "BranchConditionCriterionRef"
+      ? `criterion(${escLeaf(cond.ref)})`
+      : go(cond);
 }
 
 /** The concept/activity/decision keys a row references — the cross-pane bridge. The kind is statically known from the

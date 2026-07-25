@@ -425,6 +425,16 @@ function evalBranchCondition(
       },
     };
   }
+  if (cond.type === "BranchConditionCriterionRef") {
+    // #224 ii TRIPWIRE: a criterion ref must be replaced by its condition at the
+    // expansion seam BEFORE evaluation. Reaching the CRE means the seam was missed —
+    // throw LOUDLY rather than mis-evaluate it as an (absent → false, or a stray
+    // fact → true) concept. This is exactly the silent-wrong-answer the distinct
+    // node type exists to make impossible.
+    throw new Error(
+      `internal: un-expanded criterion reference "${getRefName(cond.ref)}" reached evalBranchCondition — criterion expansion must run before the CRE`,
+    );
+  }
   const op: "and" | "or" = cond.type === "BranchConditionAnd" ? "and" : "or";
   const results = cond.operands.map((o) => evalBranchCondition(o, ctx, frame));
   const sat = op === "and" ? results.every((r) => r.sat) : results.some((r) => r.sat);

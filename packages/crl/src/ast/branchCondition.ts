@@ -11,8 +11,20 @@ import type {
   BranchConditionAnd,
   BranchConditionOr,
   BranchConditionRef,
+  BranchConditionCriterionRef,
   ReferenceName,
 } from "./types";
+
+// #224 ii: an un-expanded `BranchConditionCriterionRef` reaching a SEMANTIC guard
+// consumer (DNF / arm-count / eval / emit) means the criterion-expansion seam was
+// missed — a bug, never a valid state post-expansion. Throw LOUDLY (the tripwire)
+// rather than mis-handle it as a concept. SOURCE-side consumers (refs, describe,
+// well-formedness, structure sig) handle it directly — it is expected there.
+function unexpandedCriterion(node: BranchConditionCriterionRef, where: string): never {
+  throw new Error(
+    `internal: un-expanded criterion reference "${String(node.ref)}" reached ${where} — criterion expansion must run before this seam`,
+  );
+}
 
 /**
  * Structure-preserving fold. Each callback receives the node plus the
@@ -25,11 +37,16 @@ export function visitBranchCondition<T>(
     ref: (node: BranchConditionRef) => T;
     and: (node: BranchConditionAnd, operands: T[]) => T;
     or: (node: BranchConditionOr, operands: T[]) => T;
+    /** #224 ii: a criterion-ref leaf (source-side). REQUIRED so every fold caller
+     *  decides explicitly rather than silently mis-folding it as a concept ref. */
+    criterionRef: (node: BranchConditionCriterionRef) => T;
   },
 ): T {
   switch (c.type) {
     case "BranchConditionRef":
       return v.ref(c);
+    case "BranchConditionCriterionRef":
+      return v.criterionRef(c);
     case "BranchConditionAnd":
       return v.and(
         c,
@@ -44,17 +61,49 @@ export function visitBranchCondition<T>(
 }
 
 /**
- * All ref LEAVES in left-to-right order, duplicates PRESERVED. Returns the ref
- * nodes (not bare names) so callers keep each occurrence's own `location`.
+ * All CONCEPT ref LEAVES in left-to-right order, duplicates PRESERVED. Returns the
+ * ref nodes (not bare names) so callers keep each occurrence's own `location`.
+ *
+ * #224 ii: a `BranchConditionCriterionRef` is EXPLICITLY EXCLUDED — it is NOT a
+ * concept ref (it resolves via criterion expansion, not concept resolution). Only
+ * SOURCE-side callers that legitimately want concept-refs-only (the reference
+ * resolver; the source-side provenance/index refKey collectors, which defer criterion
+ * indexing to ii.4) use this. A SEMANTIC consumer (emit / CQL interface / closure)
+ * that runs POST-expansion and must never SILENTLY drop a criterion ref uses
+ * `branchConditionConceptRefsStrict` — else a missed expansion vanishes without a
+ * diagnostic (the exact silent-omission the distinct node exists to prevent).
  */
 export function branchConditionRefs(c: BranchCondition): BranchConditionRef[] {
   const out: BranchConditionRef[] = [];
   const walk = (n: BranchCondition): void => {
     if (n.type === "BranchConditionRef") out.push(n);
+    else if (n.type === "BranchConditionCriterionRef") return; // EXPLICIT source-side skip (not a concept ref)
     // `Array.isArray` guards the untyped boundary (`projectIndex` casts a
     // possibly-malformed editor-buffer node to BranchCondition) — a node with no
     // `operands` array is skipped, matching the pre-#224 tolerant behavior rather
     // than throwing on a partial parse.
+    else if (Array.isArray((n as BranchConditionAnd | BranchConditionOr).operands))
+      (n as BranchConditionAnd | BranchConditionOr).operands.forEach(walk);
+  };
+  walk(c);
+  return out;
+}
+
+/**
+ * #224 ii: concept ref leaves for a SEMANTIC consumer (emit / CQL interface / emit
+ * closure) that runs on the POST-expansion guard. THROWS on an un-expanded
+ * `BranchConditionCriterionRef` (the tripwire, via `unexpandedCriterion`) instead of
+ * silently dropping it — so a missed expansion is a loud error at every semantic
+ * seam, not just at DNF/eval. `where` names the calling seam for the message.
+ */
+export function branchConditionConceptRefsStrict(
+  c: BranchCondition,
+  where: string,
+): BranchConditionRef[] {
+  const out: BranchConditionRef[] = [];
+  const walk = (n: BranchCondition): void => {
+    if (n.type === "BranchConditionRef") out.push(n);
+    else if (n.type === "BranchConditionCriterionRef") unexpandedCriterion(n, where);
     else if (Array.isArray((n as BranchConditionAnd | BranchConditionOr).operands))
       (n as BranchConditionAnd | BranchConditionOr).operands.forEach(walk);
   };
@@ -86,6 +135,8 @@ export function branchConditionDNF(c: BranchCondition): BranchConditionRef[][] {
   switch (c.type) {
     case "BranchConditionRef":
       return [[c]];
+    case "BranchConditionCriterionRef":
+      return unexpandedCriterion(c, "branchConditionDNF");
     case "BranchConditionOr":
       return c.operands.flatMap((o) => branchConditionDNF(o));
     case "BranchConditionAnd": {
@@ -116,6 +167,7 @@ export function branchConditionArmCount(c: BranchCondition, cap = 16): number {
   const ceiling = cap + 1;
   const go = (n: BranchCondition): number => {
     if (n.type === "BranchConditionRef") return 1;
+    if (n.type === "BranchConditionCriterionRef") return unexpandedCriterion(n, "branchConditionArmCount");
     if (n.type === "BranchConditionOr") {
       let sum = 0;
       for (const o of n.operands) {
@@ -142,7 +194,9 @@ export function branchConditionArmCount(c: BranchCondition, cap = 16): number {
  */
 export function assertWellFormedBranchCondition(c: BranchCondition): void {
   const check = (n: BranchCondition): void => {
-    if (n.type === "BranchConditionRef") return;
+    // A concept ref OR a criterion ref is a well-formed leaf (source-side; criterion
+    // bodies + guards are validated pre-expansion, where criterion refs are expected).
+    if (n.type === "BranchConditionRef" || n.type === "BranchConditionCriterionRef") return;
     if (n.operands.length < 2) {
       throw new Error(`${n.type} requires >= 2 operands, got ${n.operands.length}`);
     }
@@ -171,7 +225,9 @@ export function describeBranchCondition(
   display: (r: ReferenceName) => string,
 ): string {
   const go = (n: BranchCondition, parentOp: "and" | "or" | null): string => {
-    if (n.type === "BranchConditionRef") return display(n.ref);
+    // A concept ref OR a criterion ref renders via `display` (source-side label; a
+    // criterion ref shows the criterion's own name — the name-preserving render).
+    if (n.type === "BranchConditionRef" || n.type === "BranchConditionCriterionRef") return display(n.ref);
     const op: "and" | "or" = n.type === "BranchConditionAnd" ? "and" : "or";
     const inner = n.operands.map((o) => go(o, op)).join(` ${op} `);
     // Parenthesize a sub-expression nested under a DIFFERENT operator so the

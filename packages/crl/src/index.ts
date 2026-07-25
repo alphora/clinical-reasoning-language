@@ -1,6 +1,7 @@
 import { ParseTree } from "antlr4ts/tree/ParseTree";
 
 import { CRLAstBuilder } from "./ast/builder";
+import { classifyCriterionRefs } from "./ast/criterionClassify";
 import { CRL } from "./ast/types";
 import { CRLLexer } from "./grammar/generated/antlr/CRLLexer";
 import { createLexer } from "./lexer/createLexer";
@@ -77,7 +78,10 @@ export type {
   BranchConditionRef,
   BranchConditionAnd,
   BranchConditionOr,
+  BranchConditionCriterionRef,
+  Criterion,
 } from "./ast/types";
+export { classifyCriterionRefs } from "./ast/criterionClassify";
 export {
   visitBranchCondition,
   branchConditionRefs,
@@ -442,7 +446,11 @@ export function buildCRL(input: string): ParseResult<CRL> {
     if (builderErrors.length > 0) {
       return { success: false, errors: builderErrors };
     }
-    return { success: true, result: ast };
+    // #224 ii: classify guard refs that name a local `criterion` into distinct
+    // `BranchConditionCriterionRef` nodes, so the single source AST every consumer
+    // reads is already classified (the expansion tripwire precondition). Pure +
+    // byte-identical when the file declares no criteria.
+    return { success: true, result: classifyCriterionRefs(ast) };
   } catch (error) {
     // Collect all errors if available, plus the exception
     const errors = [

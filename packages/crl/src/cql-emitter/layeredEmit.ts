@@ -65,7 +65,7 @@ import type {
   InterfaceSourceLayer,
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
-import { branchConditionRefs } from "../ast/branchCondition";
+import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import { pascalCaseNameForId } from "../fhir-emitter/slug";
 
 import type { CRLError } from "../types/errors";
@@ -963,7 +963,7 @@ export function interfaceSurface(ast: CRL): { name: string; sourceLayer: Layer |
   };
   const walkMember = (member: BlockMember): void => {
     if (member.type === "WhenBlock") {
-      for (const atom of branchConditionRefs(member.condition)) add(atom.ref);
+      for (const atom of branchConditionConceptRefsStrict(member.condition, "cql-emit interfaceSurface")) add(atom.ref);
       walkBlock(member.body);
     } else if (member.type === "OtherwiseBlock") {
       walkBlock(member.body);

@@ -603,6 +603,11 @@ function mapConditionExpr(cond: BranchCondition, t: TraceNode | undefined): Bran
 }
 
 function zipConditionTrace(cond: BranchCondition, bt: BranchConditionTrace): BranchConditionView {
+  // #224 ii: a criterion ref should have been expanded before the VM runs on the
+  // AST spine. If a seam is half-missed (run expanded, VM not), the trace won't
+  // match — degrade to an unevaluated leaf (the VM's stability contract; a display
+  // oddity, never a throw), showing the criterion's own name.
+  if (cond.type === "BranchConditionCriterionRef") return astConditionExpr(cond);
   if (cond.type === "BranchConditionRef") {
     // The trace leaf must actually BE a ref — else degrade to unevaluated (never
     // attach another node's `satisfied`/facts to this leaf).
@@ -635,7 +640,11 @@ function zipConditionTrace(cond: BranchCondition, bt: BranchConditionTrace): Bra
 }
 
 function astConditionExpr(cond: BranchCondition): BranchConditionView {
-  if (cond.type === "BranchConditionRef") return { op: "ref", concept: conceptView(cond.ref) };
+  // A concept ref OR a stray (un-expanded) criterion ref → an unevaluated `ref`
+  // leaf carrying its name. A criterion ref here is a missed-seam display oddity
+  // (the CRE would have thrown); the VM shows the criterion name rather than crash.
+  if (cond.type === "BranchConditionRef" || cond.type === "BranchConditionCriterionRef")
+    return { op: "ref", concept: conceptView(cond.ref) };
   const op: "and" | "or" = cond.type === "BranchConditionAnd" ? "and" : "or";
   return { op, operands: cond.operands.map(astConditionExpr) };
 }

@@ -84,6 +84,7 @@ describe("branchCondition traversal helpers", () => {
       const count = (c: BranchCondition): number =>
         visitBranchCondition<number>(c, {
           ref: () => 1,
+          criterionRef: () => 1, // #224 ii: a criterion-ref leaf counts as one atom
           and: (_n, ops) => ops.reduce((a, b) => a + b, 0),
           or: (_n, ops) => ops.reduce((a, b) => a + b, 0),
         });

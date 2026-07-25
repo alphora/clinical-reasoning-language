@@ -31,7 +31,7 @@ export interface CRL extends ASTNode {
 // land as the fifth top-level kind (issue #59). Reference resolution +
 // per-library uniqueness for parameters are Todo 2; emit is Todo 3;
 // extension UI is Todo 4.
-export type Statement = Decision | Concept | Activity | Terminology | Parameter;
+export type Statement = Decision | Concept | Activity | Terminology | Parameter | Criterion;
 
 // File-level library identity declaration. Required in v2.1.0.
 // npm packaging IS the version system — no version field on the AST node.
@@ -128,6 +128,22 @@ export interface Decision extends ASTNode {
   location: Location;
 }
 
+// --------------------------- CRITERION STATEMENT ---------------------------
+//
+// #224 ii: a named, reusable decision-guard sub-expression. `criterion "X": - when
+// ( <cond> ).` — the body is the SAME `BranchCondition` grammar as a `when` guard
+// (monotone and/or over concept/criterion refs; no `not`). A criterion is
+// AUTHORING-DRY: it inline-EXPANDS into the guard DNF and has NO FHIR mapping of
+// its own (the emitter emits nothing for it). A `when`/criterion-body ref to a
+// criterion is a distinct `BranchConditionCriterionRef` (below), replaced by this
+// `condition` at the criterion-expansion seam.
+export interface Criterion extends ASTNode {
+  type: "Criterion";
+  name: string;
+  condition: BranchCondition;
+  location: Location;
+}
+
 // Block combination qualifier. Over branches: `first` = ordered first-match,
 // `all` = every matching branch. Over actions: `any` = offer one, `all` = do all.
 // (`any` over branches and `first` over actions are rejected by the validator,
@@ -157,10 +173,30 @@ export interface DecisionBody extends ASTNode {
 // Every node carries its own `location` so per-operand diagnostics, find-refs,
 // and duplicate-operand (`"A" and "A"`) identity work without a fallback to the
 // whole `when` line.
-export type BranchCondition = BranchConditionRef | BranchConditionAnd | BranchConditionOr;
+export type BranchCondition =
+  | BranchConditionRef
+  | BranchConditionAnd
+  | BranchConditionOr
+  | BranchConditionCriterionRef;
 
 export interface BranchConditionRef extends ASTNode {
   type: "BranchConditionRef";
+  ref: ReferenceName;
+  location: Location;
+}
+
+// #224 ii: a guard atom that references a named `criterion` (NOT a concept). The
+// parser produces a `BranchConditionRef` for every bare atom; the criterion-
+// CLASSIFICATION pass rewrites a ref whose name resolves to a criterion into this
+// distinct node. Making it a distinct union member is the TRIPWIRE: the criterion-
+// EXPANSION seam replaces it with the criterion's condition, and every SEMANTIC
+// consumer (eval / DNF / emit) treats an un-expanded `BranchConditionCriterionRef`
+// as a hard error — so a missed expansion is a loud throw, never a silent
+// misresolved concept. SOURCE-side consumers (validation, find-refs, structure)
+// handle it directly. `sourcedFromCriterion` is added to the EXPANDED nodes (ii.1b),
+// not here.
+export interface BranchConditionCriterionRef extends ASTNode {
+  type: "BranchConditionCriterionRef";
   ref: ReferenceName;
   location: Location;
 }

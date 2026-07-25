@@ -53,6 +53,22 @@ describe("buildCombinedNamespace", () => {
     expect(diagnostics).toHaveLength(0);
   });
 
+  // #224 ii: a `criterion` is NOT a NodeKind — it must be SKIPPED here, not pushed
+  // through `mapForKind` (which returns undefined → a `map.get` crash on EVERY
+  // multi-file flow via resolveImports). Regression test for that crash.
+  it("SKIPS a `criterion` statement without crashing (no cross-library namespace entry)", () => {
+    const criterion = {
+      type: "Criterion",
+      name: "Eligible",
+      condition: { type: "BranchConditionRef", ref: "C1", location: dummyLoc },
+      location: dummyLoc,
+    } as unknown as CRL["statements"][number];
+    const lib = makeLibrary("LibA", "/lib-a.crl", [makeConcept("C1"), criterion]);
+    expect(() => buildCombinedNamespace([lib])).not.toThrow();
+    const { namespace } = buildCombinedNamespace([lib]);
+    expect(namespace.concepts.has("C1")).toBe(true); // the concept still registers
+  });
+
   it("allows the same name across different kinds (cross-kind is legal)", () => {
     const libA = makeLibrary("LibA", "/lib-a.crl", [makeConcept("BMI")]);
     const libB = makeLibrary("LibB", "/lib-b.crl", [makeTerminology("BMI")]);

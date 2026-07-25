@@ -38,7 +38,7 @@ import type {
   BranchBlock,
 } from "../ast/types";
 import { getRefLibrary, isQualifiedRef } from "../ast/types";
-import { branchConditionRefs } from "../ast/branchCondition";
+import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 
 import { buildLibraryScopes, lookupKnownLibrary } from "./scopes";
 import type { LibraryScope } from "./scopes";
@@ -336,7 +336,7 @@ function visitDecisionRefs(decision: Decision, visit: (ref: ReferenceName) => vo
   function visitBranch(branch: BranchBlock): void {
     // `when` carries a boolean guard over concept refs; `otherwise` carries none.
     if (branch.type === "WhenBlock")
-      for (const atom of branchConditionRefs(branch.condition)) visit(atom.ref);
+      for (const atom of branchConditionConceptRefsStrict(branch.condition, "emit closure")) visit(atom.ref);
     const body = branch.body;
     if (body.type === "ActionStatement") {
       const action = body.action;

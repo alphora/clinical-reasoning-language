@@ -29,6 +29,7 @@ AND          : 'and';
 AS           : 'as';
 BECAUSE      : 'because';
 CONCEPT      : 'concept';
+CRITERION    : 'criterion';
 DECISION     : 'decision';
 END          : 'end';
 INCLUDE      : 'include';

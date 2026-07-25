@@ -4,6 +4,7 @@ import { AbstractParseTreeVisitor } from "antlr4ts/tree/AbstractParseTreeVisitor
 import {
   CrlContext,
   DecisionStatementContext,
+  CriterionStatementContext,
   DecisionBodyContext,
   BranchItemContext,
   BlockBodyContext,
@@ -69,6 +70,7 @@ import {
   ASTNode,
   Statement,
   Decision,
+  Criterion,
   DecisionBody,
   WhenBlock,
   BranchCondition,
@@ -290,6 +292,16 @@ export class CRLAstBuilder
     // to avoid double-representation). Conditional-spread keeps a meta-less decision byte-identical.
     const meta = this.metaFrom(decisionBody.metaLine());
     return { type: "Decision", name, body, ...(meta.length > 0 ? { meta } : {}), location: getLocation(ctx) };
+  }
+
+  // #224 ii: `criterion "X": - when ( <cond> ).` — the body reuses the SAME
+  // `branchConditionFrom` builder as a `when` guard. Produces `BranchConditionRef`
+  // atoms uniformly; the criterion-classification pass later rewrites a ref that
+  // names a criterion into a distinct `BranchConditionCriterionRef`.
+  visitCriterionStatement(ctx: CriterionStatementContext): Criterion {
+    const name = ctx.criterionIdentifier().text.slice(1, -1);
+    const condition = this.branchConditionFrom(ctx.branchCondition());
+    return { type: "Criterion", name, condition, location: getLocation(ctx) };
   }
 
   visitDecisionBody(ctx: DecisionBodyContext): DecisionBody {

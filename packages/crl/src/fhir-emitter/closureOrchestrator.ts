@@ -37,7 +37,7 @@
 
 import type { Activity, BranchBlock, Concept, Decision, ReferenceName, Terminology } from "../ast/types";
 import { getRefLibrary, getRefName, isQualifiedRef, normalizeLocalRef } from "../ast/types";
-import { branchConditionRefs } from "../ast/branchCondition";
+import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import { resolveDispositionConfig } from "../dispositions";
 import { computeFhirEmitClosure } from "../imports/computeEmitClosure";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
@@ -429,7 +429,7 @@ export function collectCaseFeatures(
   const conditionRefs: ReferenceName[] = [];
   const visitBranch = (branch: BranchBlock): void => {
     if (branch.type === "WhenBlock")
-      for (const atom of branchConditionRefs(branch.condition)) conditionRefs.push(atom.ref);
+      for (const atom of branchConditionConceptRefsStrict(branch.condition, "case-feature collection")) conditionRefs.push(atom.ref);
     const body = branch.body;
     if (body.type === "ActionStatement") return;
     for (const stmt of body.statements) {
