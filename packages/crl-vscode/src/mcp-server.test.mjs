@@ -332,6 +332,101 @@ check("validate_crl via inline code → single-file mode (no cross-file context)
       "expected at least one external-library-not-included error in single-file mode"
     );
   });
+  // --- #224 criterion + compound-guard: the BUNDLE must parse/validate the new
+  // grammar (the previously-shipped bundle FAILS on `when (`). These inline-code
+  // checks are the "don't release shit" functional gate before the KE handoff. ---
+  const CRIT_VALID = [
+    "# Criterion functional",
+    'library "CritFn".',
+    'concept "Has Qualifying Diagnosis":',
+    "- type is Observation.",
+    "- code is `dx`.",
+    'concept "Failed Drug Therapy":',
+    "- type is Observation.",
+    "- code is `fdt`.",
+    'concept "Failed Physical Therapy":',
+    "- type is Observation.",
+    "- code is `fpt`.",
+    'concept "Failed Conservative Therapy":',
+    '- defined as ( "Failed Drug Therapy" sem-or "Failed Physical Therapy" ).',
+    'concept "Imaging Not Recent":',
+    "- type is Observation.",
+    "- code is `inr`.",
+    'criterion "Meets Coverage Preconditions":',
+    '- when ( "Has Qualifying Diagnosis" and "Failed Conservative Therapy" ).',
+    'decision "Advanced Imaging Coverage":',
+    "first:",
+    '- when ( "Meets Coverage Preconditions" and "Imaging Not Recent" ) then recommend activity "Approve".',
+    '- otherwise then recommend activity "Deny".',
+    'activity "Approve":',
+    "- request CPGServiceRequest.",
+    "- with `ok`.",
+    'activity "Deny":',
+    "- request CPGCommunicationRequest.",
+    "- with `no`.",
+  ].join("\n");
+
+check("#224 build_crl_ast (code) → the bundle parses `criterion` + compound `when (` guard", async () => {
+    const r = await client.callTool({ name: "build_crl_ast", arguments: { code: CRIT_VALID } });
+    assert.ok(!r.isError, "criterion doc is a normal result");
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, true, `bundle must parse criterion/compound grammar; errors: ${JSON.stringify(out.errors ?? []).slice(0, 300)}`);
+    const kinds = out.result.statements.map((s) => s.type);
+    assert.ok(kinds.includes("Criterion"), `expected a Criterion statement; got ${JSON.stringify(kinds)}`);
+    assert.ok(kinds.includes("Decision"));
+  });
+
+check("#224 validate_crl (code) → a valid criterion doc validates clean through the bundle", async () => {
+    const r = await client.callTool({ name: "validate_crl", arguments: { code: CRIT_VALID } });
+    assert.ok(!r.isError);
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, true, `valid criterion doc should validate; errors: ${JSON.stringify(out.errors ?? []).slice(0, 300)}`);
+  });
+
+check("#224 validate_crl (code) → a mixed bare `and`/`or` guard is rejected (compound-guard builder is live)", async () => {
+    const bad = CRIT_VALID.replace(
+      '- when ( "Meets Coverage Preconditions" and "Imaging Not Recent" ) then recommend activity "Approve".',
+      '- when "Meets Coverage Preconditions" or "Imaging Not Recent" and "Has Qualifying Diagnosis" then recommend activity "Approve".',
+    );
+    const r = await client.callTool({ name: "validate_crl", arguments: { code: bad } });
+    assert.ok(!r.isError, "a mixed-bare guard is a normal (failing) result, not a tool error");
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, false);
+    assert.ok(
+      JSON.stringify(out.errors).match(/requires parentheses|parenthesize/i),
+      `expected a mixed-guard parentheses diagnostic; got ${JSON.stringify(out.errors).slice(0, 300)}`,
+    );
+  });
+
+check("#224 validate_crl (code) → a criterion name in a `defined as` slot → criterion-misuse", async () => {
+    const misuse = [
+      "# misuse",
+      'library "Mis".',
+      'concept "A":',
+      "- type is Observation.",
+      "- code is `a`.",
+      'criterion "Gate":',
+      '- when ( "A" ).',
+      'concept "Bad":',
+      '- defined as ( "Gate" sem-or "A" ).',
+      'decision "D":',
+      "first:",
+      '- when "Bad" then recommend activity "Act".',
+      '- otherwise then recommend activity "Act".',
+      'activity "Act":',
+      "- request CPGServiceRequest.",
+      "- with `ok`.",
+    ].join("\n");
+    const r = await client.callTool({ name: "validate_crl", arguments: { code: misuse } });
+    assert.ok(!r.isError);
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, false);
+    assert.ok(
+      out.errors.some((e) => e.kind === "criterion-misuse"),
+      `expected a criterion-misuse error; got ${JSON.stringify(out.errors).slice(0, 300)}`,
+    );
+  });
+
   // --- Cross-server tool parity (drift guard) ---
   // The CLI server (src/cli/run-mcp-server.ts → dist) and this extension bundle
   // historically drift: a tool added to one but not the other ships a broken
