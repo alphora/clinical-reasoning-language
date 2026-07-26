@@ -461,16 +461,17 @@ case "neither -> deny in parent otherwise":
 `;
 
 /**
- * Worked exemplar C — DISPOSITION-ARBITRATION (kit teaching §1-refinement / §5-C / §6). VERIFIED GREEN 6/6
- * including the two load-bearing overlap cases. The TEMPTING-but-DON'T-chain case: ONE determination with
- * MULTIPLE OVERLAPPING qualifying pathways + a PRECEDENCE among outcome categories + fall-through. A KE is
- * tempted to factor it into chained sub-decisions, but the source draws NO determination boundary → it is
- * ONE determination. The faithful, provable refinement (at scale): compute the precedence in the INFERENCE
- * layer — make the FINAL-* concepts pairwise-disjoint via \`sem-not\` complement-guards, carry them as flat
- * \`when\` siblings, and RE-EXPOSE the approve criteria as visible nodes (#168-clean). Uses only kit-in-scope
- * inference; NO \`use decision\`. The two denies use DISTINCT activities (not-certify.Deny vs not-certify.EIU) so \`result is\`
- * can distinguish them (§4-req1). Verbatim from the KE deliverable (green: validate_crl/validate_cel clean,
- * run_decision 6/6). NOTE: this is an AT-SCALE option — for a few pathways the plain nested tree is simpler.
+ * Worked exemplar C — DISPOSITION-ARBITRATION (kit teaching §5-C / §6). VERIFIED GREEN 6/6 including the two
+ * load-bearing overlap cases. The TEMPTING-but-DON'T-chain case: ONE determination with MULTIPLE OVERLAPPING
+ * qualifying pathways + a PRECEDENCE among outcome categories + fall-through. A KE is tempted to factor it into
+ * chained sub-decisions, but the source draws NO determination boundary → it is ONE determination. Faithful form
+ * (CRL #224 — structure, not inference): each pathway a sibling \`when\` gated on its FULL conjunction as a
+ * COMPOUND BRANCH GUARD, the Approve > Deny > EIU precedence carried by \`first:\` branch ORDER, the residual by
+ * \`otherwise\` — every criterion a visible guard atom, partial matches fall through (no trap), NO \`use decision\`
+ * and NO \`sem-not\` inference-layer arbitration. The two denies use DISTINCT activities (not-certify.Deny vs
+ * not-certify.EIU) so \`result is\` can distinguish them (§4-req1). The frozen \`.cel\` truth function is UNCHANGED
+ * from the pre-#224 \`sem-not\` form (run_decision 6/6); this artifact RE-GROUNDS that form to the decision layer —
+ * the \`sem-not\` FINAL-* arbitration was the single-concept-\`when\`-era workaround the decision layer now subsumes.
  */
 export const DISPOSITION_ARBITRATION_REFERENCE_CRL = `# Disposition-Arbitration Reference — overlapping qualifying pathways with outcome precedence (Stage 1)
 library "Disposition Arbitration Reference".
@@ -482,19 +483,28 @@ EIU), with fall-through. This is the DISPOSITION-ARBITRATION model.
 
 WHEN this model is faithful: the source presents ONE determination whose outcome categories have a
 precedence over an OVERLAPPING population. It is NOT the model when the source presents SEPARATE
-sub-determinations that compose — that is \`use decision\` (a distinct primitive; provability is a
-separate axis from faithfulness).
+sub-determinations that compose — that is \`use decision\` (a distinct primitive).
 
-HOW it works: the precedence is computed in the INFERENCE layer. The FINAL-* concepts are made
-pairwise-DISJOINT by \`sem-not\` complement-guards (Approve = no guard, highest; Deny carries ¬Approve;
-EIU carries ¬Approve ∧ ¬Deny = the complement). Carried as the top-level \`when\` siblings, the
-disjointness means flat siblings cannot mis-fire — no "overlap pop". The clinical CRITERIA stay
-VISIBLE \`when\` nodes under the Approve branch (#168-clean: the cockpit shows which criterion drove the
-approval); the inference layer only ARBITRATES which outcome category wins, it does not HIDE criteria.
-Provable TODAY: \`defined as\`/\`sem-not\` is CRE-evaluated (#126); no \`use decision\` needed.
+HOW it works (CRL #224 — structure, not inference): each qualifying pathway is a sibling \`when\` branch
+gated on its FULL conjunction as a COMPOUND BRANCH GUARD (\`when ( c1 and c2 )\`). The precedence is the
+\`first:\` BRANCH ORDER — Approve pathways first, then the covered-but-unqualified Deny, then the residual
+off-indication EIU (\`otherwise\`). The full-conjunction guard is what makes a PARTIAL pathway match fall
+THROUGH to the next branch rather than being trapped, so a patient who satisfies BOTH indications but
+fails one pathway still approves via the other — no "overlap pop". Every clinical criterion stays a
+VISIBLE guard atom in the emitted PlanDefinition (each pathway's \`condition[]\` shows which criteria
+drove it) — #168-clean by construction.
+
+This REPLACES the pre-#224 form, which computed the precedence in the INFERENCE layer via
+pairwise-disjoint \`sem-not\` FINAL-* concepts (Deny = ¬Approve, EIU = the complement) — an inference
+workaround for the era when a \`when\` could take only a SINGLE concept, so a conjunction had to live in
+\`defined as\` and disjointness had to be manufactured to keep flat siblings safe. The decision layer now
+subsumes it: \`first:\` gives precedence, the compound guard gives the conjunction. The truth function is
+UNCHANGED — the frozen cases below pass identically.
 
 OVERLAP ORACLE (load-bearing): a patient who satisfies BOTH indications but fails ONE pathway's
-criteria still APPROVES via the OTHER pathway — the failure does not pop to a deny.
+criteria still APPROVES via the OTHER pathway — the failure does not pop to a deny. The oracle asserts
+WHICH outcome wins (the EXACT disposition under \`first:\`), so a precedence inversion would FAIL it —
+"a disposition fired" is not enough.
 */
 
 // ===== Clinical criteria (local case-features; visible decision nodes) =====
@@ -511,37 +521,18 @@ concept "Has Severe Markers":
 - type is Observation.
 - code is \`severe-markers\`.
 
-// ===== Pathway gates (INFERENCE: each pathway's full conjunction -> one fact; arbitration inputs) =====
-concept "Indication X Pathway Qualifies":
-- defined as ( "Has Indication X" sem-and "Failed Standard Therapy" ).
-concept "Indication Y Pathway Qualifies":
-- defined as ( "Has Indication Y" sem-and "Has Severe Markers" ).
-concept "Any Covered Indication":
-- defined as ( "Has Indication X" sem-or "Has Indication Y" ).
-
-// ===== Outcome arbitration (pairwise-DISJOINT via sem-not; precedence Approve > Deny > EIU) =====
-concept "Final Approve":
-- defined as ( "Indication X Pathway Qualifies" sem-or "Indication Y Pathway Qualifies" ).
-concept "Final Deny":
-- defined as ( "Any Covered Indication" sem-and sem-not "Final Approve" ).
-concept "Final Experimental":
-- defined as ( sem-not "Final Approve" sem-and sem-not "Final Deny" ).
-
-// ===== Decision: flat FINAL-* siblings; APPROVE criteria re-exposed as visible nodes (#168-clean) =====
+// ===== Decision: sibling compound-guard pathways; precedence = first: branch ORDER (CRL #224) =====
+// Each pathway is gated on its FULL conjunction as a compound branch guard, so a PARTIAL match falls
+// THROUGH to the next branch (no trap); the Approve > Deny > EIU precedence is the branch ORDER; every
+// clinical criterion stays a VISIBLE guard atom in the emitted PlanDefinition (#168-clean by
+// construction). No \`defined as\` composite and no \`sem-not\` arbitration — decision precedence lives
+// in the decision layer.
 decision "Coverage Determination":
 first:
-- when "Final Approve" then:
-  all:
-  - when "Has Indication X" then:
-    - when "Failed Standard Therapy" then recommend activity "certify.Approve".
-    end.
-  - when "Has Indication Y" then:
-    - when "Has Severe Markers" then recommend activity "certify.Approve".
-    end.
-  end.
-- when "Final Deny" then recommend activity "not-certify.Deny".
-- when "Final Experimental" then recommend activity "not-certify.EIU".
-- otherwise then recommend activity "not-certify.Deny".
+- when ( "Has Indication X" and "Failed Standard Therapy" ) then recommend activity "certify.Approve".
+- when ( "Has Indication Y" and "Has Severe Markers" ) then recommend activity "certify.Approve".
+- when ( "Has Indication X" or "Has Indication Y" ) then recommend activity "not-certify.Deny".
+- otherwise then recommend activity "not-certify.EIU".
 ` + DETERMINATION_ACTIVITIES_WITH_EIU;
 
 export const DISPOSITION_ARBITRATION_REFERENCE_CEL = `# Disposition-Arbitration Reference — cases (Stage 1)
@@ -551,9 +542,10 @@ covers "Disposition Arbitration Reference".
 /*
 Exercises the arbitration: each pathway alone (approve), BOTH overlap cases (a both-indication patient
 who fails one pathway still approves via the other — the load-bearing "no overlap-pop" oracle),
-within-indication failure (Deny), and off-indication (Deny EIU). The two overlap cases are what a flat
-sibling tree WITHOUT the sem-not arbitration would get wrong (first-match would deny on the failed
-pathway).
+within-indication failure (Deny), and off-indication (Deny EIU). The two overlap cases are what a sibling
+tree gated on PARTIAL conditions (bare indications, not each pathway's FULL conjunction) would get wrong —
+first-match would strand the patient on the failed pathway; the full-conjunction compound guards make the
+partial match fall THROUGH (the OR-of-pathways trap rule).
 */
 
 fact "Sample Patient":

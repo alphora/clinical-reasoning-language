@@ -201,7 +201,10 @@ Syntax and semantics:
   there is `criterion-misuse` ("cannot be library-qualified"); before it is
   included, you get the more basic `external-library-not-included` first.
   Criteria are not cross-library exports — to share guard logic across libraries,
-  share a **concept** (which can be qualified) or delegate to a `use decision`.
+  share a **concept** *only when it names one genuine clinical fact* (a
+  library-qualified concept ref, per rung 1 — not a container for distinct-criteria
+  guard logic, which would be the retired `defined as` composite), or delegate to a
+  `use decision`; otherwise duplicate the guard inline.
 - **Errors:** a cycle (`A` references `B` references `A`, or a self-reference) is
   rejected (`criterion-cycle`); using a criterion name where only a concept
   belongs — inside `defined as` / `sem-*`, a narrative, or a per-action

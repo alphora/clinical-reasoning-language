@@ -265,7 +265,11 @@ describe("authoring-kit — reference artifacts", () => {
   });
 
   it("disposition-arbitration-reference (C): validates clean + the CRE proves the arbitration 6/6 (incl. both overlap cases)", () => {
-    // Exemplar C — the at-scale sem-not outcome arbitration (verbatim from the KE deliverable, verified 6/6).
+    // Exemplar C — disposition-arbitration re-grounded to `first:`-precedence STRUCTURE (#224): sibling `when`
+    // branches on full-conjunction compound guards, precedence = branch order. The CRE proves the arbitration
+    // 6/6 incl. both overlap oracles; the frozen CEL's exact `result is` per case guards precedence fidelity
+    // (a precedence inversion would produce a different disposition and fail). Truth function unchanged from the
+    // retired pre-#224 `sem-not` form.
     const dir = mkdtempSync(join(tmpdir(), "authoring-kit-arb-"));
     writeFileSync(
       join(dir, "package.json"),
@@ -677,12 +681,39 @@ describe("authoring-kit — getAuthoringKit", () => {
     // #212 step 4c (schemaVersion 1.9→1.10): review FLAGS left `.crl` for the `.crl/flags/` store — the `review-flags` rule
     // is rewritten to the store model (create_flag WRITES the store, no rewritten source; flags don't emit; the 3 flag
     // examples became `text` tool calls); @gap-filed stays a `.crl` meta tag. BOTH hashes move. KE seats re-sync both pins.
-    // #219 (content-only, schemaVersion unchanged): the `hollowed-criteria` invariant is RETARGETED from auditability to
-    // DISPOSITION-CONSEQUENCE — a `defined as` composite over distinct criteria is faithful when they share ONE consequence
-    // (run_decision renders the operand truth-table), a violation only under DIVERGENT routing. Swept across decision-
-    // composition, concept-form, the judge-lens, and the reference notes. BOTH hashes move. KE seats re-sync both pins.
-    expect(cpg.contentHash).toBe("6643f898e0caa5438f067a5014a8aee2baa141742fab34bdba946e32a00abcfb");
-    expect(priorAuth.contentHash).toBe("8d1aa964725db6481ad821601cd69ce3c48976779bf19e6ae877ac5a144e4f16");
+    // #224 re-pin (content-only, schemaVersion unchanged) — SUPERSEDES the prior #219 entry above (which recorded the
+    // now-retired disposition-consequence doctrine as current). The `hollowed-criteria` invariant is INVERTED to
+    // SEMANTIC-SAMENESS + EMIT-OPACITY: a `defined as`/`sem-*` composite over a policy's DISTINCT criteria is a VIOLATION
+    // regardless of shared consequence (it ships ONE opaque `condition[]` and asserts a sameness distinct criteria lack);
+    // distinct criteria compose in decision STRUCTURE (compound branch guard / `criterion` / sibling `when` branches).
+    // Adds the branch-guards / criterion / guard-or-vs-sibling-or rules + 2 #224 do-examples; re-grounds the
+    // disposition-arbitration reference from `sem-not` inference to `first:`-precedence structure (its CEL truth function
+    // is FROZEN). Swept across decision-composition, concept-form, the judge-lens, boundary, minimalism, cel-cases,
+    // verify-loop, the examples, and BOTH reference artifacts. BOTH hashes move. KE seats re-sync both pins.
+    expect(cpg.contentHash).toBe("ade9c96d9f03c37c276687c94e8932afc71a8f5d86894530ac7de8d4406deac4");
+    expect(priorAuth.contentHash).toBe("00dd9867c30ccef6de1a68a058d3fef34436e71b9af23e51065a3b8fb205ec00");
+  });
+
+  it("no RETIRED positive doctrine survives anywhere in the serialized payload (#224 anti-half-inversion guard)", () => {
+    // The #224 re-pin INVERTED hollowed-criteria; a half-inverted payload (a surviving 'composite is faithful' /
+    // 'sem-not arbitration is the faithful refinement' claim in an example note, a reference `purpose`, or a clause)
+    // is worse than the old rule — the review found four such survivors on the first pass. This sweeps the WHOLE
+    // serialized payload for the retired POSITIVE claims. Patterns are chosen NEGATION-SAFE: the new prose's
+    // retirement quotes (e.g. "'a single-consequence composite is faithful' rule") do NOT match these. Both
+    // useCases, since cpg content inherits into prior-auth.
+    for (const uc of ["cpg", "prior-auth"] as const) {
+      const blob = JSON.stringify(getAuthoringKit("local-decision-support", uc));
+      const retired: RegExp[] = [
+        /EQUALLY faithful/i,
+        /disposition-consequence, not (audit|visibility)/i,
+        /faithful, provable refinement/i,
+        /computed in the inference layer/i,
+        /is FAITHFUL when (those criteria|they|all)/i,
+      ];
+      for (const re of retired) {
+        expect(blob, `retired doctrine still in ${uc} payload: ${re}`).not.toMatch(re);
+      }
+    }
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
