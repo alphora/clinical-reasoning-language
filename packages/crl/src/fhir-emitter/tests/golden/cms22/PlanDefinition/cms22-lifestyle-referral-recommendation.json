@@ -44,7 +44,7 @@
     ]
   },
   "library": [
-    "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22"
+    "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/Cms22Strategy"
   ],
   "action": [
     {

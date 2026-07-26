@@ -205,16 +205,20 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
 /* ─── Inv 4 — content-url ↔ emitted-CQL-file integrity (slice 4c / E) ─── */
 
 describe("applyContentUrlInvariant — Library content-url integrity (Inv 4)", () => {
-  function lib(contentUrl: string, sourceName: string): EmittedResource {
+  // #227 — Inv 4 now keys on the Library's emitted `id` (== the manifest identity `S`),
+  // not `sourceName`. The second arg is that identity (the value the manifest pairs with
+  // a filename); stamp it as the resource `id`.
+  function lib(contentUrl: string, identity: string): EmittedResource {
     return {
       resourceType: "Library",
-      relativePath: `Library/${sourceName}.json`,
+      relativePath: `Library/${identity}.json`,
       resource: {
         resourceType: "Library",
+        id: identity,
         content: [{ contentType: "text/cql", url: contentUrl }],
       },
       sourceKind: "Library",
-      sourceName,
+      sourceName: identity,
     };
   }
 

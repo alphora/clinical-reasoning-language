@@ -1,0 +1,18 @@
+// #227 collision fixture sibling: "Guard-One" -> "GuardOne" (same S as "Guard One").
+// Decision-bearing + no `code is` -> `none` (name-keeping-root), not a layer split.
+library "Guard-One".
+
+terminology "Sib Vs":
+- valueset is `sib-vs`.
+
+concept "L":
+- type is Observation.
+- coded from "Sib Vs".
+
+activity "SibAct":
+- request CPGServiceRequest.
+
+decision "SibDecision":
+- when "L" then:
+  - recommend activity "SibAct".
+  end.

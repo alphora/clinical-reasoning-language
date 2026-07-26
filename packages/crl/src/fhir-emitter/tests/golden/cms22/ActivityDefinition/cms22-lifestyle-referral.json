@@ -36,7 +36,7 @@
   "publisher": "Smile Digital Health",
   "description": "Lifestyle counselling is the first-line intervention for stage-1 hypertension",
   "library": [
-    "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22"
+    "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/Cms22Strategy"
   ],
   "kind": "ServiceRequest",
   "profile": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-servicerequest",

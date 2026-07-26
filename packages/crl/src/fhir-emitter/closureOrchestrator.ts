@@ -686,12 +686,13 @@ function urlTail(url: string): string {
 export function applyLibraryIdentityInvariant(
   resources: ReadonlyArray<EmittedResource>,
   metadata: CpgMetadata,
-  // #186 — the set of LAYERED library identities `S` this closure emitted (from
-  // the split manifest). The identity agreement is enforced ONLY for these — the
-  // non-layered Root / cms single-library case intentionally keeps `name =
-  // pascalCaseName(slug)` ≠ id (its execution-resolution is a SEPARATE, deferred
-  // concern per #186's scope: cms measures are out of scope, don't reshape). An
-  // EMPTY set (graph-only / non-layered) makes the invariant a no-op.
+  // #186 / #227 — the set of enforced library identities `S` this closure emitted
+  // (from the manifest). Every manifest-backed policy Library is enrolled: layered
+  // libraries by their per-layer `S`, and (since #227) the name-keeping Root by its
+  // unified `S = pascalCaseNameForId(<raw name>)` — the fix that made the Root's FHIR
+  // id agree with its CQL header so cqf can load the source. Only the SHARED catalog
+  // libraries are excluded by the caller. An EMPTY set (graph-only) makes the
+  // invariant a no-op.
   layeredIdentities: ReadonlySet<string>,
 ): CRLError[] {
   if (layeredIdentities.size === 0) return [];
@@ -918,10 +919,12 @@ export function applyContentUrlInvariant(
     if (r.resourceType !== "Library") continue;
     const content = (r.resource as { content?: Array<{ url?: string }> }).content;
     if (!Array.isArray(content)) continue;
-    // Each Library's identity is the cqlLibraryName the FHIR lane stamped as
-    // sourceName; the manifest pairs that identity with the ONE filename it must
-    // reference.
-    const expected = r.sourceName !== undefined ? expectedFilenameByLibrary.get(r.sourceName) : undefined;
+    // #227 — key on the Library's OWN emitted `id` (== the manifest `libraryName` ==
+    // `S`), NOT the resource's `sourceName`. `sourceName` is public source-attribution
+    // (echoed in the MCP resource manifest) and stays the raw CRL name for a
+    // name-keeping-root; the id is the identity the manifest pairs with the filename.
+    const libId = (r.resource as { id?: string }).id;
+    const expected = libId !== undefined ? expectedFilenameByLibrary.get(libId) : undefined;
     for (const item of content) {
       const url = item.url;
       // A non-string/empty url is itself a broken content reference — fall through
@@ -1213,23 +1216,21 @@ export function emitFhirDefClosure(
     // A `root` entry that keeps the SOURCE name (the cms / per-CRL non-layered
     // library) has NO layer identity → `undefined`, so `emitLibrary` falls back to
     // the pre-#186 `policyIdBase` id (keeps those goldens byte-identical).
-    const isNameKeepingRoot = (entry: PerLibraryEmit): boolean =>
-      entry.role === "root" && entry.libraryName === entry.sourceLibraryName;
-    const identityForEntry = (entry: PerLibraryEmit): string | undefined => {
-      if (!isNameKeepingRoot(entry)) return entry.libraryName;
-      // #198 C1 — a name-keeping ROOT (the per-CRL/`none` path) normally has NO
-      // layered identity → `undefined` (its id falls back to the bare `policyIdBase`,
-      // keeping cms/per-CRL goldens byte-identical). But a cross-lib `code is` SIBLING
-      // on the `none` path carries a DISAMBIGUATED local-domain base
-      // (`entry.localDomainId` = `<policyId>-<librarySlug>`, threaded from the CQL
-      // manifest). Its CodeSystem is already disambiguated; give its base Library the
-      // matching unified identity `pascalCaseNameForId(<policyId>-<slug>)` (id == name
-      // == url-tail, the layered convention) so it no longer collides with the bare
-      // `<policyId>` and every reference to it (its ActivityDefinition/Recommendation
-      // `library[]`) agrees. The PRIMARY `none` root has no `localDomainId` → stays
-      // `undefined` → byte-identical.
-      return entry.localDomainId ? pascalCaseNameForId(entry.localDomainId) : undefined;
-    };
+    // A ROOT entry — the per-CRL (`none`-path) source library that emits directly
+    // (no `code is` layer split). #227 stamped its manifest `libraryName` with the
+    // unified `S = pascalCaseNameForId(<raw name>)`, so this is now role-based (the
+    // pre-#227 `libraryName === sourceLibraryName` test no longer holds — `S ≠ raw`).
+    // Catalog libraries also carry role "root" but their `sourceLibraryName` is never
+    // a closure source, so `manifestBySource` never surfaces them into these finds.
+    const isRootEntry = (entry: PerLibraryEmit): boolean => entry.role === "root";
+    // #227 — every manifest-backed Library takes its manifest `libraryName` VERBATIM
+    // as the FHIR id == name == url-tail. Layered libraries carry their per-layer `S`;
+    // a name-keeping ROOT now carries the unified `S = pascalCaseNameForId(<raw name>)`
+    // the CQL lane stamped, so its CQL header/id/name/url-tail all agree and cqf can
+    // load its source. The pre-#227 `undefined` branch (root → bare `policyIdBase`) is
+    // retired here; the no-manifest / graph-only callers (the single-entry site's
+    // `only` undefined) still reach `libraryId`'s `policyIdBase` fallback directly.
+    const identityForEntry = (entry: PerLibraryEmit): string => entry.libraryName;
     // Reference targets are found by the RAW partition value (`entry.layer`), the
     // one source of truth the CQL split stamps alongside `S` — never by slugging.
     const entryByLayer = (layer: string): PerLibraryEmit | undefined =>
@@ -1244,7 +1245,7 @@ export function emitFhirDefClosure(
       const entries = manifestBySource.get(sourceName) ?? [];
       const iface = entries.find((e) => e.role === "interface");
       if (iface) return identityForEntry(iface);
-      const nameRoot = entries.find(isNameKeepingRoot);
+      const nameRoot = entries.find(isRootEntry);
       return nameRoot ? identityForEntry(nameRoot) : undefined;
     };
     const sourceHasInterface = (sourceName: string): boolean =>
@@ -1266,7 +1267,7 @@ export function emitFhirDefClosure(
     // `emitFhirDefClosure` against a hand-built mismatched (manifest, bindings) pair.
     if (isSuppressed) {
       const consumerEntries = manifestBySource.get(suppressConsumer) ?? [];
-      const hasRebindTarget = consumerEntries.some((e) => e.role === "interface" || isNameKeepingRoot(e));
+      const hasRebindTarget = consumerEntries.some((e) => e.role === "interface" || isRootEntry(e));
       if (!hasRebindTarget) {
         errors.push({
           type: "Validation",
@@ -1295,6 +1296,10 @@ export function emitFhirDefClosure(
       if (libResult.resource) {
         // Plan v3.2 §"emitLibrary post-decorate"
         libResult.resource.sourceKind = "Library";
+        // #227 — `sourceName` stays SOURCE ATTRIBUTION (the `libraryName` arg — the raw
+        // CRL name for a name-keeping-root), which the MCP resource manifest echoes.
+        // Inv 4 keys on the Library's emitted `id` instead, so the identity check does
+        // not depend on repurposing this public-output field.
         libResult.resource.sourceName = libraryName;
         if (lib.ast.library?.location) libResult.resource.location = lib.ast.library.location;
         resources.push(libResult.resource);
@@ -1315,31 +1320,35 @@ export function emitFhirDefClosure(
       // named file still resolves; otherwise the source-derived `lib.cqlFileName`.
       const only = manifestEntries[0];
       // Single-entry sanity (slice-4c review gpt55 [important] #6): a one-entry
-      // source from a well-formed manifest is the `none`/per-CRL Root keeping the
-      // source name. A malformed/hand-built manifest with a single `concepts`
-      // entry, or one whose `libraryName !== sourceLibraryName`, would emit a
-      // source-named Library inconsistent with the manifest while Inv 4 (which
-      // matches by filename) still passed. Surface that as a structured error
-      // rather than silently emitting the inconsistent resource.
-      if (only && (only.role !== "root" || only.libraryName !== lib.libraryName)) {
+      // source from a well-formed manifest is the `none`/per-CRL Root FOR this source.
+      // #227 — `only.sourceLibraryName === lib.libraryName` is a TAUTOLOGY here
+      // (`manifestBySource` is keyed by `sourceLibraryName`, so every entry it returns
+      // matches `lib.libraryName`), which would have neutered this guard. The identity
+      // that must hold for a well-formed Root is `libraryName === pascalCaseNameForId(source)`
+      // (the SAME `S` the CQL lane stamps). A hand-built manifest (exported
+      // `emitFhirDefClosure`) stamping a wrong-but-self-consistent `S`, or a single
+      // `concepts` entry, would emit a Library inconsistent with the source while Inv 4
+      // (which keys off that same `S`) still passed — surface it as a structured error.
+      if (only && (only.role !== "root" || only.libraryName !== pascalCaseNameForId(lib.libraryName))) {
         errors.push({
           type: "Validation",
           kind: "library-content-url-unresolved",
           message:
             `Source library "${lib.libraryName}" has a single manifest entry that is not its Root ` +
-            `(role="${only.role}", cqlLibraryName="${only.libraryName}"). A single-entry source must be ` +
-            `the per-CRL Root keeping the source name; this manifest is malformed.`,
+            `(role="${only.role}", libraryName="${only.libraryName}", expected ` +
+            `"${pascalCaseNameForId(lib.libraryName)}"). A single-entry source must be the per-CRL ` +
+            `Root whose identity is pascalCaseNameForId(sourceName); this manifest is malformed.`,
         });
       }
       const cqlFileName = only ? `../../cql/${only.outputFilename}` : lib.cqlFileName;
       const dependsOn = [...vsCanonicals, ...(csUrl ? [csUrl] : [])];
-      // Single-entry / no-manifest source = the non-layered name-keeping Root
-      // (cms / per-CRL) → no layered identity, id falls back to `policyIdBase`.
-      // #198 C1 — EXCEPT a `none` cross-lib `code is` SIBLING, whose manifest entry
-      // carries a disambiguated `localDomainId`; `identityForEntry` then returns its
-      // unified `<policyId>-<slug>` PascalCase identity so its base Library id/url/name
-      // is disambiguated (matching its already-disambiguated CodeSystem) instead of the
-      // bare `<policyId>`. No-manifest callers (`only` undefined) keep the fallback.
+      // #227 — a single-entry source is the per-CRL Root; its id/url/name are the
+      // unified `S` the CQL lane stamped as `only.libraryName` (`identityForEntry`).
+      // This subsumes the #198 `code is` sibling case: each sibling now carries its
+      // OWN `S = pascalCaseNameForId(<raw name>)`, so distinct raw names get distinct
+      // identities structurally (its local CodeSystem keeps its `localDomainId` base
+      // independently). No-manifest callers (`only` undefined) keep the `policyIdBase`
+      // fallback via `libraryId`.
       emitOneLibrary(lib.libraryName, only ? identityForEntry(only) : undefined, dependsOn, cqlFileName);
     } else {
       // Multi-entry (split). The canonicals of THIS source's emitted CQL
@@ -1425,33 +1434,32 @@ export function emitFhirDefClosure(
     // `interface` kind), so their decision surface resolves to the synthesized
     // `<policyId>-Interface` re-export library — the unified `S` of the
     // `role:"interface"` manifest entry (`identityForEntry` → its `libraryName`).
-    // ELSE (cms `none`/per-CRL, no Interface) it stays `undefined` → the
-    // source/root canonical (`policyIdBase` — UNCHANGED, keeps cms byte-identical).
+    // ELSE (cms `none`/per-CRL, no Interface) it resolves to the ROOT entry's
+    // identity, which is now the unified `S = pascalCaseNameForId(<raw name>)`
+    // (#227 — was the bare `policyIdBase`, but that made the FHIR id disagree with
+    // the CQL header and cqf could not load the source).
     const interfaceEntry = manifestEntries.find((e) => e.role === "interface");
-    // #198 C1 — for a NONE-kind source (no Interface entry) the decision/activity/
-    // recommendation `library[]` must resolve to the source's base Library. That base
-    // is normally the bare-`policyIdBase` name-keeping Root (`undefined` suffix), but a
-    // disambiguated `code is` SIBLING's base Library id is now its unified
-    // `<policyId>-<slug>` identity (via `identityForEntry`) — so the references must use
-    // the SAME suffix or they would dangle at the bare `<policyId>` url. Route through
-    // the name-keeping Root entry so primary (undefined) and sibling (disambiguated)
-    // both agree with their emitted base Library.
-    const nameKeepingRootEntry = manifestEntries.find(isNameKeepingRoot);
+    // #227 — for a NONE-kind source (no Interface entry) the decision/activity/
+    // recommendation `library[]` resolves to the source's ROOT base Library, whose
+    // id/name/url-tail are all the unified `S` the CQL lane stamped. Route through the
+    // ROOT entry so primary and #198-disambiguated `code is` siblings alike agree with
+    // their emitted base Library (each sibling now carries its own `S`).
+    const rootEntry = manifestEntries.find(isRootEntry);
     const libraryReferenceSuffix = interfaceEntry
       ? identityForEntry(interfaceEntry)
-      : nameKeepingRootEntry
-        ? identityForEntry(nameKeepingRootEntry)
+      : rootEntry
+        ? identityForEntry(rootEntry)
         : undefined;
     // #224 iii.1 (A″) — the CQL library NAME (`library X` header) of the library the PD's
     // `library[]` references. A negated `unless` guard emits an inline `text/cql-expression`
     // `not "<name>"."<C>"`, and cqf compiles that against a synthetic library that includes
-    // the PD's library UNDER THIS NAME — so the qualifier must be the CQL header, NOT the
-    // FHIR url-tail id. It is the entry's `libraryName` for BOTH an interface re-export (=
-    // the id) AND a name-keeping Root (the RAW CRL library name, which ≠ the `policyIdBase`
-    // id that `identityForEntry` deliberately returns `undefined` for). Falls back to the
-    // source library name on the degenerate no-manifest-entry path.
+    // the PD's library UNDER THIS NAME — so the qualifier must be the CQL header. It is the
+    // entry's `libraryName` for BOTH an interface re-export AND a name-keeping ROOT: #227
+    // unified the ROOT's `libraryName` to the same `S` the CQL header now renders, so this
+    // qualifier and the header agree. Falls back to the source library name on the
+    // degenerate no-manifest-entry path.
     const guardQualifierLibraryName =
-      (interfaceEntry ?? nameKeepingRootEntry)?.libraryName ?? lib.libraryName;
+      (interfaceEntry ?? rootEntry)?.libraryName ?? lib.libraryName;
 
     // #186 follow-up — the `library[]` + interface-scope the ActivityDefinitions and
     // recommendation PlanDefinitions bind to. A SUPPRESSED activities-only library
@@ -1519,10 +1527,14 @@ export function emitFhirDefClosure(
     // `library[]` would dangle — surface a structured error (NOT a throw; no
     // try/catch on the MCP path) and SKIP this source's decision emit.
     const hasInterfaceEntry = interfaceEntry !== undefined;
-    const hasRootKeepingSourceName =
-      manifestEntries.length === 0 ||
-      manifestEntries.some((e) => e.role === "root" && e.libraryName === lib.libraryName);
-    const hasDecisionLibraryTarget = hasInterfaceEntry || hasRootKeepingSourceName;
+    // #227 — a ROOT entry exists for this source. Every entry in `manifestEntries` is
+    // already keyed to this source (`manifestBySource` groups by `sourceLibraryName`),
+    // so `role === "root"` alone is the post-#227 condition (the pre-#227 predicate keyed
+    // on `libraryName === lib.libraryName`, which no longer holds now the Root's name is
+    // `S`). `manifestEntries.length === 0` is the no-manifest direct-caller path.
+    const hasRootForSource =
+      manifestEntries.length === 0 || manifestEntries.some((e) => e.role === "root");
+    const hasDecisionLibraryTarget = hasInterfaceEntry || hasRootForSource;
     if (lib.decisions.length > 0 && !hasDecisionLibraryTarget) {
       errors.push({
         type: "Validation",
@@ -1697,27 +1709,19 @@ export function emitFhirDefClosure(
   // Inv 5 — action-level `input[].profile[]` referential integrity (DTR pattern).
   // Runs over the post-Inv-1 surviving set like Inv 2/3.
   const inv5errors = applyActionInputProfileInvariant(inv1.surviving, inv1.droppedPaths);
-  // Inv 6 (#186) — Library identity agreement (id == name == url-tail; referent
-  // url-tail == target Library.name), enforced ONLY for the LAYERED library
-  // identities `S` this closure emitted (from the manifest). A layered entry is
-  // one whose emitted CQL `libraryName` (= S) is NOT the source-name-keeping Root.
-  const layeredIdentities = new Set<string>(
-    cqlByLibrary
-      .filter((e) => !(e.role === "root" && e.libraryName === e.sourceLibraryName))
-      .map((e) => e.libraryName),
+  // Inv 6 (#186 / #227) — Library identity agreement (id == name == url-tail;
+  // referent url-tail == target Library.name), enforced for EVERY manifest-backed
+  // policy Library `S`. Pre-#227 the name-keeping Root was exempt (its id was the
+  // bare `policyIdBase` ≠ name); #227 unified the Root onto its own `S`, so it is now
+  // enrolled too — INCLUDING a root whose raw name is already a PascalCase fixpoint
+  // (`library "Sib"`), which the old `libraryName === sourceLibraryName` exemption
+  // wrongly dropped (panel catch). Only the SHARED catalog assets are exempt, keyed on
+  // the EXPLICIT `isSharedCatalog` flag — their id/name/header already agree and they
+  // are not manifest-identity-controlled.
+  const enforcedIdentities = new Set<string>(
+    cqlByLibrary.filter((e) => !e.isSharedCatalog).map((e) => e.libraryName),
   );
-  // #198 C1 — a disambiguated `none` cross-lib `code is` SIBLING's base Library now
-  // carries a unified `<policyId>-<slug>` PascalCase identity (id == name == url-tail).
-  // Enroll it in the enforced set so Inv 6 checks its self-agreement AND that every
-  // reference (its ActivityDefinition/Recommendation `library[]`) resolves to a
-  // Library whose name equals the url-tail. The PRIMARY `none` root (no `localDomainId`)
-  // stays exempt, unchanged.
-  for (const e of cqlByLibrary) {
-    if (e.role === "root" && e.libraryName === e.sourceLibraryName && e.localDomainId) {
-      layeredIdentities.add(pascalCaseNameForId(e.localDomainId));
-    }
-  }
-  const inv6errors = applyLibraryIdentityInvariant(inv1.surviving, metadata, layeredIdentities);
+  const inv6errors = applyLibraryIdentityInvariant(inv1.surviving, metadata, enforcedIdentities);
   errors.push(...inv2errors, ...inv3errors, ...inv4errors, ...inv5errors, ...inv6errors);
 
   // Round-5 gpt55 [important]: severity-aware success (warnings don't sink

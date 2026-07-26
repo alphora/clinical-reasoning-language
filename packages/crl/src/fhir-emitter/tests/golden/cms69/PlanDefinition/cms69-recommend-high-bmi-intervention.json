@@ -43,7 +43,7 @@
     ]
   },
   "library": [
-    "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/cms69"
+    "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/Cms69Strategy"
   ],
   "action": [
     {
@@ -102,7 +102,7 @@
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-expression",
-                "expression": "not Coalesce(\"cms69-strategy\".\"Has Anti-Obesity Medication Contraindication\", false)"
+                "expression": "not Coalesce(\"Cms69Strategy\".\"Has Anti-Obesity Medication Contraindication\", false)"
               }
             }
           ],

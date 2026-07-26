@@ -36,7 +36,7 @@
   "publisher": "Smile Digital Health",
   "description": "CMS69 requires documented care planning when BMI is low",
   "library": [
-    "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/cms69"
+    "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/Cms69Strategy"
   ],
   "kind": "CommunicationRequest",
   "profile": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-communicationrequest",

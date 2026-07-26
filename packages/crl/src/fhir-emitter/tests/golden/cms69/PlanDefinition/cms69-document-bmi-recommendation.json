@@ -44,7 +44,7 @@
     ]
   },
   "library": [
-    "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/cms69"
+    "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/Cms69Strategy"
   ],
   "action": [
     {

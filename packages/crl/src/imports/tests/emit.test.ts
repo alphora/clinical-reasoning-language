@@ -39,8 +39,12 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
 
     // Every library in the include-walk closure gets its own CQL.
     // 4 layers: cms22 (interface) → inferred → asserted → concepts.
+    // #227 — each name-keeping-root (`none`-path) library now emits under its
+    // unified identity `S = pascalCaseNameForId(<name>)` (hyphen/space-free
+    // PascalCase), so `CMS22 Inferred` → `CMS22Inferred` etc. `CMS22` is already
+    // PascalCase, so it is unchanged.
     const names = policyLibNames(result);
-    expect(names).toEqual(["CMS22", "CMS22 Asserted", "CMS22 Concepts", "CMS22 Inferred"]);
+    expect(names).toEqual(["CMS22", "CMS22Asserted", "CMS22Concepts", "CMS22Inferred"]);
 
     // The interface library (the unsuffixed file) emits as `library CMS22`
     // — simple identifier, unquoted (CQL convention for the public entry
@@ -50,19 +54,19 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(cms22).not.toMatch(/library CMS22 version/);
 
     // The cms22 (interface) library has its IP concept + an include of
-    // the inferred layer.
+    // the inferred layer — rendered under the sibling's unified `S`.
     expect(cms22).toMatch(/define "Initial Population"/);
-    expect(cms22).toMatch(/include "CMS22 Inferred"/);
+    expect(cms22).toMatch(/include CMS22Inferred/);
 
-    // Library names with spaces emit as quoted CQL identifiers.
-    const inferred = findLib(result, "CMS22 Inferred") ?? "";
-    expect(inferred).toMatch(/library "CMS22 Inferred"\n/);
+    // #227 — the space-carrying name renders under `S` (unquoted PascalCase id).
+    const inferred = findLib(result, "CMS22Inferred") ?? "";
+    expect(inferred).toMatch(/library CMS22Inferred\n/);
 
-    // Cross-library qualified ref `"CMS22 Asserted"."Qualifying Encounter Source"`
-    // emits as native CQL `"CMS22 Asserted"."Qualifying Encounter Source"`.
-    expect(inferred).toMatch(/"CMS22 Asserted"\."Qualifying Encounter Source"/);
-    // And the includes header carries the dep.
-    expect(inferred).toMatch(/include "CMS22 Asserted"/);
+    // Cross-library qualified ref renders through `S`: `"CMS22 Asserted"."…"` →
+    // `CMS22Asserted."Qualifying Encounter Source"`.
+    expect(inferred).toMatch(/CMS22Asserted\."Qualifying Encounter Source"/);
+    // And the includes header carries the dep under `S`.
+    expect(inferred).toMatch(/include CMS22Asserted/);
 
     // Each emitted POLICY CQL declares its own FHIRHelpers + CRLCommon includes.
     // (The appended catalog libraries — CRLCommon/CaseFeatureCommon/FHIRHelpers —
@@ -75,13 +79,13 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     }
 
     // Terminology lives in the concepts library only.
-    const term = findLib(result, "CMS22 Concepts") ?? "";
+    const term = findLib(result, "CMS22Concepts") ?? "";
     expect(term).toMatch(/valueset "Qualifying Encounters Valueset"/);
     // And the interface library does NOT inline the terminology.
     expect(cms22).not.toMatch(/valueset "Qualifying Encounters Valueset"/);
 
     // Asserted concepts live in their declaring library.
-    const asserted = findLib(result, "CMS22 Asserted") ?? "";
+    const asserted = findLib(result, "CMS22Asserted") ?? "";
     expect(asserted).toMatch(/define "Qualifying Encounter Source"/);
   });
 
@@ -267,15 +271,18 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     const root = path.join(FIXTURES, "layered-name-collision", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
+    // #227 — the foreign `none` sibling `X Asserted` now emits under its unified
+    // identity `XAsserted`, and the Inferred LAYER's foreign `include` renders
+    // through it (the layered path threads the same raw→S rename map).
     const names = policyLibNames(result);
     expect(names).toEqual([
       "CrlTestFixtureInferred",
       "CrlTestFixtureRecordConcepts",
       "CrlTestFixtureRecordSource",
-      "X Asserted",
+      "XAsserted",
     ]);
     const inferred = findLib(result, "CrlTestFixtureInferred") ?? "";
-    expect(inferred).toMatch(/include "X Asserted"/);
+    expect(inferred).toMatch(/include XAsserted/);
   });
 
   it("a MIXED `code is` + NON-`defined as` definition (`coded from`) is a hard error", () => {
@@ -446,9 +453,11 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(result.success).toBe(true);
     const cms22 = result.cqlByLibrary.find((e) => e.libraryName === "CMS22");
     expect(cms22?.outputFilename).toBe("CMS22.cql");
-    // Spaces preserved (CQL translator expects exact match).
-    const inferred = result.cqlByLibrary.find((e) => e.libraryName === "CMS22 Inferred");
-    expect(inferred?.outputFilename).toBe("CMS22 Inferred.cql");
+    // #227 — the filename is derived from the unified identity `S`, so a
+    // space-carrying name emits `CMS22Inferred.cql` (was `CMS22 Inferred.cql`);
+    // header, id, url-tail and filename now agree.
+    const inferred = result.cqlByLibrary.find((e) => e.libraryName === "CMS22Inferred");
+    expect(inferred?.outputFilename).toBe("CMS22Inferred.cql");
   });
 
   // v2.2 Todo 3 (issue #59) — cross-library parameter refs.
@@ -571,16 +580,35 @@ activity "Refer":
     const root = path.join(FIXTURES, "partial-concepts-name-collision", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
+    // #227 — the foreign `none` sibling `Pol Concepts` emits under `PolConcepts`.
+    // The manifest `includes` field keeps the RAW ref name (`Pol Concepts`) — the
+    // rename applies only to the RENDERED CQL `include`/qualified-ref text, not the
+    // manifest's dependency-resolution keys.
     const names = policyLibNames(result);
     expect(names).toEqual([
       "CrlTestFixtureInferred",
       "CrlTestFixtureInterface",
       "CrlTestFixtureLocalConcepts",
       "CrlTestFixtureLocalSource",
-      "Pol Concepts",
+      "PolConcepts",
     ]);
     const inferred = result.cqlByLibrary.find((e) => e.libraryName === "CrlTestFixtureInferred");
     expect(inferred?.includes).toContain("Pol Concepts");
+  });
+
+  it("#227: two `none` libraries whose names PascalCase to the SAME `S` collide in the CQL lane", () => {
+    // "Guard One" and "Guard-One" both → `S = "GuardOne"`. Pre-#227 the `none` path
+    // registered the RAW name (distinct), so this transformed-identity clobber slipped
+    // past the CQL-lane preflight and would silently overwrite one `GuardOne.cql`.
+    // #227 registers the emitted `S` in the preflight, so the collision fails loudly
+    // BEFORE either file/library is emitted — matching the FHIR-lane id uniqueness.
+    const root = path.join(FIXTURES, "none-s-collision", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(false);
+    expect(result.cqlByLibrary).toHaveLength(0);
+    const err = result.errors?.find((e) => e.kind === "layered-name-collision");
+    expect(err).toBeDefined();
+    expect(err!.message).toMatch(/GuardOne/);
   });
 
   it("idempotency: re-lowering an already-lowered synthetic Concepts AST is a no-op", () => {

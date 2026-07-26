@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "cms69",
+  "id": "Cms69Strategy",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,7 +26,7 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/cms69",
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/Cms69Strategy",
   "version": "1.0.0",
   "name": "Cms69Strategy",
   "title": "cms69-strategy",
@@ -104,7 +104,7 @@
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/cms69-strategy.cql"
+      "url": "../../cql/Cms69Strategy.cql"
     }
   ]
 }

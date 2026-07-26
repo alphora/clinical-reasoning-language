@@ -644,10 +644,13 @@ const NONE_CODE_IS_SIBLING = join(
 
 describe("closureOrchestrator — a `none` cross-lib `code is` sibling's base Library is disambiguated (#198 C1)", () => {
   const BASE = "http://example.org/crl/none-sibling";
-  // policyId = package name "none-sibling-fixture"; the sibling library "Sib" (slug
-  // "sib") disambiguates to `<policyId>-sib`. Its base Library gets the unified
-  // PascalCase identity `pascalCaseNameForId(none-sibling-fixture-sib)`.
-  const SIB_BASE_LIB_ID = "NoneSiblingFixtureSib";
+  // #227 — a name-keeping-root (`none`) library takes its unified identity from its
+  // OWN library name: `S = pascalCaseNameForId("Sib") = "Sib"`. This SUBSUMES the
+  // pre-#227 #198 disambiguation (which keyed the base Library on the localDomainId
+  // `<policyId>-sib`): distinct library NAMES already mint distinct identities, so the
+  // sibling no longer collides with the main policy's id. Its local CodeSystem keeps
+  // its own `<policyId>-sib-local` base independently (see SIB_CS_URL below).
+  const SIB_BASE_LIB_ID = "Sib";
   const SIB_BASE_LIB_URL = `${BASE}/Library/${SIB_BASE_LIB_ID}`;
   const SIB_CS_URL = `${BASE}/CodeSystem/none-sibling-fixture-sib-local`;
   const BARE_LIB_URL = `${BASE}/Library/none-sibling-fixture`;
@@ -709,6 +712,65 @@ describe("closureOrchestrator — a `none` cross-lib `code is` sibling's base Li
       (r) => r.resourceType === "PlanDefinition" && r.sourceKind === "Recommendation" && r.sourceName === "Approve",
     )!;
     expect((rec.resource as { library?: string[] }).library).toEqual([SIB_BASE_LIB_URL]);
+  });
+});
+
+/* ─── #227 — name-keeping-root identity unification (FHIR ↔ CQL) ─────── */
+
+describe("closureOrchestrator — a name-keeping-root's FHIR id == CQL header == S (#227)", () => {
+  // cms22-strategy is a decision-bearing name-keeping-root (`none` path): a single
+  // library, no `code is` layering. Pre-#227 its FHIR Library.id was the bare
+  // `policyIdBase` (`cms22`) while its CQL `library` header was the raw name
+  // (`cms22-strategy`) and its Library.name was PascalCase (`Cms22Strategy`) — three
+  // disagreeing identifiers, so cqf could not load its library source. #227 unifies
+  // all five surfaces onto `S = pascalCaseNameForId("cms22-strategy") = "Cms22Strategy"`.
+  const STRATEGY = join(ROOT, "src/tests/fixtures/corpus/cms22/cms22-strategy.crl");
+  const S = "Cms22Strategy";
+  const urlTail = (u: string): string => u.slice(u.lastIndexOf("/") + 1);
+
+  it("Library id == name == url-tail == content-file == the PD's library[] ref, all = S", () => {
+    const result = emitFhirDefFromPath(STRATEGY, { clock: FIXED_CLOCK });
+    expect(result.success).toBe(true);
+    // The seam that broke first when the Root stopped keeping the source name.
+    expect(result.errors.some((e) => e.kind === "decision-root-library-missing")).toBe(false);
+    expect(result.errors.some((e) => e.kind === "library-identity-disagreement")).toBe(false);
+
+    const lib = result.resources.find(
+      (r) => r.resourceType === "Library" && (r.resource as { id?: string }).id === S,
+    );
+    expect(lib).toBeDefined();
+    const res = lib!.resource as { id: string; name: string; url: string; content?: Array<{ url?: string }> };
+    // (a) Library self-agreement: id == name == url-tail.
+    expect(res.id).toBe(S);
+    expect(res.name).toBe(S);
+    expect(urlTail(res.url)).toBe(S);
+    // (b) content points at the S-named sibling CQL file.
+    expect(res.content?.[0]?.url).toBe(`../../cql/${S}.cql`);
+
+    // (c) EVERY PlanDefinition that references the strategy library does so at the
+    // unified url-tail S (the ref cqf resolves to load the source).
+    const pdsWithLib = result.resources.filter(
+      (r) => r.resourceType === "PlanDefinition" && Array.isArray((r.resource as { library?: unknown }).library),
+    );
+    expect(pdsWithLib.length).toBeGreaterThan(0);
+    for (const pd of pdsWithLib) {
+      for (const u of (pd.resource as { library: string[] }).library) {
+        if (urlTail(u) === S || u.includes(`/Library/${S}`)) expect(urlTail(u)).toBe(S);
+      }
+    }
+  });
+
+  it("the emitted CQL `library` header equals S (so it matches the FHIR id/url-tail)", () => {
+    const cql = emitCQLImports(STRATEGY);
+    expect(cql.success).toBe(true);
+    const entry = cql.cqlByLibrary.find((e) => e.sourceLibraryName === "cms22-strategy");
+    expect(entry).toBeDefined();
+    // manifest identity == S, header rendered under S, file named S.cql.
+    expect(entry!.libraryName).toBe(S);
+    expect(entry!.outputFilename).toBe(`${S}.cql`);
+    expect(entry!.cql).toMatch(new RegExp(`^library ${S}\\n`, "m"));
+    // the RAW source name never leaks into the emitted header.
+    expect(entry!.cql).not.toMatch(/library "cms22-strategy"/);
   });
 });
 

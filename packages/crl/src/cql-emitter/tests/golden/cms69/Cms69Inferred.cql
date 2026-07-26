@@ -1,39 +1,39 @@
-library "cms69-Inferred"
+library Cms69Inferred
 
 using FHIR version '4.0.1'
 
 include FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
-include "cms69-RecordSource"
+include Cms69RecordSource
 
 parameter "Measurement Period" Interval<DateTime>
 
 context Patient
 
 define "High BMI Follow-up Order Date":
-  "cms69-RecordSource"."High BMI Follow-up Service Requests"
+  Cms69RecordSource."High BMI Follow-up Service Requests"
 
 define "Weight Assessment Referral Date":
-  "cms69-RecordSource"."Weight Assessment Referrals"
+  Cms69RecordSource."Weight Assessment Referrals"
 
 define "High BMI Medication Order Date":
-  "cms69-RecordSource"."High BMI Medications"
+  Cms69RecordSource."High BMI Medications"
 
 define "Low BMI Follow-up Order Date":
-  "cms69-RecordSource"."Low BMI Follow-up Service Requests"
+  Cms69RecordSource."Low BMI Follow-up Service Requests"
 
 define "Low BMI Medication Order Date":
-  "cms69-RecordSource"."Low BMI Medications"
+  Cms69RecordSource."Low BMI Medications"
 
 define "High BMI Procedure Performed Date":
-  "cms69-RecordSource"."High BMI Follow-up Procedures"
+  Cms69RecordSource."High BMI Follow-up Procedures"
 
 define "Low BMI Procedure Performed Date":
-  "cms69-RecordSource"."Low BMI Follow-up Procedures"
+  Cms69RecordSource."Low BMI Follow-up Procedures"
 
 define "BMI Evaluation Encounter (not virtual)":
-  "cms69-RecordSource"."Encounters to Evaluate BMI"
-    except "cms69-RecordSource"."Virtual Encounters"
+  Cms69RecordSource."Encounters to Evaluate BMI"
+    except Cms69RecordSource."Virtual Encounters"
 
 define "BMI Evaluation Encounter (not virtual) During MP":
   CRLCommon.During("BMI Evaluation Encounter (not virtual)", "Measurement Period")
@@ -46,11 +46,11 @@ define "Qualifying Encounter":
     intersect "BMI Evaluation Encounter (not virtual) Performed"
 
 define "BMI Observation During MP":
-  CRLCommon.During("cms69-RecordSource"."BMI Observations", "Measurement Period")
+  CRLCommon.During(Cms69RecordSource."BMI Observations", "Measurement Period")
 
 define "BMI Observation Has Positive Value":
   // FIXME: Exceeds is inherently boolean; refinement consumer cannot use it as a list
-  CRLCommon.Exceeds("cms69-RecordSource"."BMI Observations", 0 'kg/m2')
+  CRLCommon.Exceeds(Cms69RecordSource."BMI Observations", 0 'kg/m2')
 
 define "BMI During Measurement Period":
   "BMI Observation During MP"
@@ -82,10 +82,10 @@ define "Has Normal BMI":
     and "Without Documented Abnormal BMI"
 
 define "Overweight or Obese Diagnoses Active":
-  CRLCommon.Active("cms69-RecordSource"."Overweight or Obese Diagnoses")
+  CRLCommon.Active(Cms69RecordSource."Overweight or Obese Diagnoses")
 
 define "Underweight Diagnoses Active":
-  CRLCommon.Active("cms69-RecordSource"."Underweight Diagnoses")
+  CRLCommon.Active(Cms69RecordSource."Underweight Diagnoses")
 
 define "Has Overweight or Obese":
   "Overweight or Obese Diagnoses Active"
@@ -94,7 +94,7 @@ define "Has Underweight":
   "Underweight Diagnoses Active"
 
 define "High BMI Follow-up Justified by Overweight Diagnosis":
-  CRLCommon.Justified("cms69-RecordSource"."High BMI Follow-up Service Requests", "cms69-RecordSource"."Overweight or Obese Diagnoses")
+  CRLCommon.Justified(Cms69RecordSource."High BMI Follow-up Service Requests", Cms69RecordSource."Overweight or Obese Diagnoses")
 
 define "Has Overweight On Or Before High BMI Follow-up Order":
   exists CRLCommon.OnOrBefore("Has Overweight or Obese", "High BMI Follow-up Order Date")
@@ -104,7 +104,7 @@ define "High BMI Follow-up Order":
     union /* FIXME: boolean operand in refinement composition */ "Has Overweight On Or Before High BMI Follow-up Order"
 
 define "Weight Assessment Referral Justified by Overweight Diagnosis":
-  CRLCommon.Justified("cms69-RecordSource"."Weight Assessment Referrals", "cms69-RecordSource"."Overweight or Obese Diagnoses")
+  CRLCommon.Justified(Cms69RecordSource."Weight Assessment Referrals", Cms69RecordSource."Overweight or Obese Diagnoses")
 
 define "Has Overweight On Or Before Weight Assessment Referral":
   exists CRLCommon.OnOrBefore("Has Overweight or Obese", "Weight Assessment Referral Date")
@@ -114,7 +114,7 @@ define "High BMI Weight Assessment Referral":
     union /* FIXME: boolean operand in refinement composition */ "Has Overweight On Or Before Weight Assessment Referral"
 
 define "High BMI Medication Justified by Overweight Diagnosis":
-  CRLCommon.Justified("cms69-RecordSource"."High BMI Medications", "cms69-RecordSource"."Overweight or Obese Diagnoses")
+  CRLCommon.Justified(Cms69RecordSource."High BMI Medications", Cms69RecordSource."Overweight or Obese Diagnoses")
 
 define "Has Overweight On Or Before High BMI Medication Order":
   exists CRLCommon.OnOrBefore("Has Overweight or Obese", "High BMI Medication Order Date")
@@ -129,7 +129,7 @@ define "High BMI Interventions Ordered":
     or exists ("High BMI Medication Order")
 
 define "High BMI Procedure Justified by Overweight Diagnosis":
-  CRLCommon.Justified("cms69-RecordSource"."High BMI Follow-up Procedures", "cms69-RecordSource"."Overweight or Obese Diagnoses")
+  CRLCommon.Justified(Cms69RecordSource."High BMI Follow-up Procedures", Cms69RecordSource."Overweight or Obese Diagnoses")
 
 define "Has Overweight On Or Before High BMI Procedure":
   exists CRLCommon.OnOrBefore("Has Overweight or Obese", "High BMI Procedure Performed Date")
@@ -150,7 +150,7 @@ define "High BMI And Follow Up Provided":
     or exists ("High BMI Interventions Performed"))
 
 define "Low BMI Follow-up Justified by Underweight Diagnosis":
-  CRLCommon.Justified("cms69-RecordSource"."Low BMI Follow-up Service Requests", "cms69-RecordSource"."Underweight Diagnoses")
+  CRLCommon.Justified(Cms69RecordSource."Low BMI Follow-up Service Requests", Cms69RecordSource."Underweight Diagnoses")
 
 define "Has Underweight On Or Before Low BMI Follow-up Order":
   exists CRLCommon.OnOrBefore("Has Underweight", "Low BMI Follow-up Order Date")
@@ -164,7 +164,7 @@ define "Low BMI Follow-up Order":
     intersect /* FIXME: boolean operand in refinement composition */ "Low BMI Follow-up Order Date During MP")
 
 define "Weight Assessment Referral Justified by Underweight Diagnosis":
-  exists CRLCommon.Justified("cms69-RecordSource"."Weight Assessment Referrals", "cms69-RecordSource"."Underweight Diagnoses")
+  exists CRLCommon.Justified(Cms69RecordSource."Weight Assessment Referrals", Cms69RecordSource."Underweight Diagnoses")
 
 define "Has Underweight On Or Before Weight Assessment Referral":
   exists CRLCommon.OnOrBefore("Has Underweight", "Weight Assessment Referral Date")
@@ -178,7 +178,7 @@ define "Low BMI Weight Assessment Referral":
     intersect /* FIXME: boolean operand in refinement composition */ "Weight Assessment Referral Date During MP")
 
 define "Low BMI Medication Justified by Underweight Diagnosis":
-  CRLCommon.Justified("cms69-RecordSource"."Low BMI Medications", "cms69-RecordSource"."Underweight Diagnoses")
+  CRLCommon.Justified(Cms69RecordSource."Low BMI Medications", Cms69RecordSource."Underweight Diagnoses")
 
 define "Has Underweight On Or Before Low BMI Medication Order":
   exists CRLCommon.OnOrBefore("Has Underweight", "Low BMI Medication Order Date")
@@ -197,10 +197,10 @@ define "Low BMI Interventions Ordered":
     or exists ("Low BMI Medication Order")
 
 define "Low BMI Procedure Justified by Underweight Diagnosis":
-  CRLCommon.Justified("cms69-RecordSource"."Low BMI Follow-up Procedures", "cms69-RecordSource"."Underweight Diagnoses")
+  CRLCommon.Justified(Cms69RecordSource."Low BMI Follow-up Procedures", Cms69RecordSource."Underweight Diagnoses")
 
 define "Low BMI Follow-up Procedures Performed":
-  CRLCommon.WasPerformed("cms69-RecordSource"."Low BMI Follow-up Procedures")
+  CRLCommon.WasPerformed(Cms69RecordSource."Low BMI Follow-up Procedures")
 
 define "Has Underweight On Or Before Low BMI Procedure":
   exists CRLCommon.OnOrBefore("Has Underweight", "Low BMI Procedure Performed Date")
@@ -226,23 +226,23 @@ define "Low BMI And Follow Up Provided":
     or exists ("Low BMI Interventions Performed"))
 
 define "BMI Observation Not Done With Reason":
-  CRLCommon.NotDoneWithReason("cms69-RecordSource"."BMI Observations", ("cms69-RecordSource"."Medical Reasons" union "cms69-RecordSource"."Patient Declined Reasons"))
+  CRLCommon.NotDoneWithReason(Cms69RecordSource."BMI Observations", (Cms69RecordSource."Medical Reasons" union Cms69RecordSource."Patient Declined Reasons"))
 
 define "BMI Observation Same Day As Qualifying Encounter":
-  CRLCommon.SameDay("cms69-RecordSource"."BMI Observations", "Qualifying Encounter")
+  CRLCommon.SameDay(Cms69RecordSource."BMI Observations", "Qualifying Encounter")
 
 define "Medical Reason Or Patient Reason For Not Performing BMI Exam":
   exists ("BMI Observation Not Done With Reason")
     and exists ("BMI Observation Same Day As Qualifying Encounter")
 
 define "High BMI Follow-up Not Done With Medical Reason":
-  CRLCommon.NotDoneWithReason("cms69-RecordSource"."High BMI Follow-up Service Requests", "cms69-RecordSource"."Medical Reasons")
+  CRLCommon.NotDoneWithReason(Cms69RecordSource."High BMI Follow-up Service Requests", Cms69RecordSource."Medical Reasons")
 
 define "High BMI Follow-up Same Day As Qualifying Encounter":
-  CRLCommon.SameDay("cms69-RecordSource"."High BMI Follow-up Service Requests", "Qualifying Encounter")
+  CRLCommon.SameDay(Cms69RecordSource."High BMI Follow-up Service Requests", "Qualifying Encounter")
 
 define "High BMI Follow-up Performed":
-  CRLCommon.WasPerformed("cms69-RecordSource"."High BMI Follow-up Service Requests")
+  CRLCommon.WasPerformed(Cms69RecordSource."High BMI Follow-up Service Requests")
 
 define "High BMI Follow-up Not Done With Reason":
   "High BMI Follow-up Not Done With Medical Reason"
@@ -250,13 +250,13 @@ define "High BMI Follow-up Not Done With Reason":
     intersect "High BMI Follow-up Performed"
 
 define "Low BMI Follow-up Not Done With Medical Reason":
-  CRLCommon.NotDoneWithReason("cms69-RecordSource"."Low BMI Follow-up Service Requests", "cms69-RecordSource"."Medical Reasons")
+  CRLCommon.NotDoneWithReason(Cms69RecordSource."Low BMI Follow-up Service Requests", Cms69RecordSource."Medical Reasons")
 
 define "Low BMI Follow-up Same Day As Qualifying Encounter":
-  CRLCommon.SameDay("cms69-RecordSource"."Low BMI Follow-up Service Requests", "Qualifying Encounter")
+  CRLCommon.SameDay(Cms69RecordSource."Low BMI Follow-up Service Requests", "Qualifying Encounter")
 
 define "Low BMI Follow-up Performed":
-  CRLCommon.WasPerformed("cms69-RecordSource"."Low BMI Follow-up Service Requests")
+  CRLCommon.WasPerformed(Cms69RecordSource."Low BMI Follow-up Service Requests")
 
 define "Low BMI Follow-up Not Done With Reason":
   "Low BMI Follow-up Not Done With Medical Reason"
@@ -264,13 +264,13 @@ define "Low BMI Follow-up Not Done With Reason":
     intersect "Low BMI Follow-up Performed"
 
 define "Weight Assessment Referral Not Done With Medical Reason":
-  CRLCommon.NotDoneWithReason("cms69-RecordSource"."Weight Assessment Referrals", "cms69-RecordSource"."Medical Reasons")
+  CRLCommon.NotDoneWithReason(Cms69RecordSource."Weight Assessment Referrals", Cms69RecordSource."Medical Reasons")
 
 define "Weight Assessment Referral Same Day As Qualifying Encounter":
-  CRLCommon.SameDay("cms69-RecordSource"."Weight Assessment Referrals", "Qualifying Encounter")
+  CRLCommon.SameDay(Cms69RecordSource."Weight Assessment Referrals", "Qualifying Encounter")
 
 define "Weight Assessment Referral Performed":
-  CRLCommon.WasPerformed("cms69-RecordSource"."Weight Assessment Referrals")
+  CRLCommon.WasPerformed(Cms69RecordSource."Weight Assessment Referrals")
 
 define "Weight Assessment Referral Not Done With Reason":
   "Weight Assessment Referral Not Done With Medical Reason"
@@ -278,13 +278,13 @@ define "Weight Assessment Referral Not Done With Reason":
     intersect "Weight Assessment Referral Performed"
 
 define "High BMI Medication Not Done With Medical Reason":
-  CRLCommon.NotDoneWithReason("cms69-RecordSource"."High BMI Medications", "cms69-RecordSource"."Medical Reasons")
+  CRLCommon.NotDoneWithReason(Cms69RecordSource."High BMI Medications", Cms69RecordSource."Medical Reasons")
 
 define "High BMI Medication Same Day As Qualifying Encounter":
-  CRLCommon.SameDay("cms69-RecordSource"."High BMI Medications", "Qualifying Encounter")
+  CRLCommon.SameDay(Cms69RecordSource."High BMI Medications", "Qualifying Encounter")
 
 define "High BMI Medication Performed":
-  CRLCommon.WasPerformed("cms69-RecordSource"."High BMI Medications")
+  CRLCommon.WasPerformed(Cms69RecordSource."High BMI Medications")
 
 define "High BMI Medication Not Done With Reason":
   "High BMI Medication Not Done With Medical Reason"
@@ -292,13 +292,13 @@ define "High BMI Medication Not Done With Reason":
     intersect "High BMI Medication Performed"
 
 define "Low BMI Medication Not Done With Medical Reason":
-  CRLCommon.NotDoneWithReason("cms69-RecordSource"."Low BMI Medications", "cms69-RecordSource"."Medical Reasons")
+  CRLCommon.NotDoneWithReason(Cms69RecordSource."Low BMI Medications", Cms69RecordSource."Medical Reasons")
 
 define "Low BMI Medication Same Day As Qualifying Encounter":
-  CRLCommon.SameDay("cms69-RecordSource"."Low BMI Medications", "Qualifying Encounter")
+  CRLCommon.SameDay(Cms69RecordSource."Low BMI Medications", "Qualifying Encounter")
 
 define "Low BMI Medication Performed":
-  CRLCommon.WasPerformed("cms69-RecordSource"."Low BMI Medications")
+  CRLCommon.WasPerformed(Cms69RecordSource."Low BMI Medications")
 
 define "Low BMI Medication Not Done With Reason":
   "Low BMI Medication Not Done With Medical Reason"
@@ -313,19 +313,19 @@ define "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI"
     or exists ("Low BMI Medication Not Done With Reason")
 
 define "Pregnancy Diagnoses Active During MP":
-  CRLCommon.Active("cms69-RecordSource"."Pregnancy Diagnoses", "Measurement Period")
+  CRLCommon.Active(Cms69RecordSource."Pregnancy Diagnoses", "Measurement Period")
 
 define "Active Pregnancy Diagnosis":
   "Pregnancy Diagnoses Active During MP"
 
 define "Pregnancy Status Overlaps MP":
-  CRLCommon.Overlaps("cms69-RecordSource"."Pregnancy Status Observations", "Measurement Period")
+  CRLCommon.Overlaps(Cms69RecordSource."Pregnancy Status Observations", "Measurement Period")
 
 define "Pregnancy Status Verified":
-  CRLCommon.IsVerified("cms69-RecordSource"."Pregnancy Status Observations")
+  CRLCommon.IsVerified(Cms69RecordSource."Pregnancy Status Observations")
 
 define "Pregnancy Status Documented As Pregnancy Related":
-  CRLCommon.DocumentedAs("cms69-RecordSource"."Pregnancy Status Observations", "cms69-RecordSource"."Pregnancy or Other Related Diagnoses")
+  CRLCommon.DocumentedAs(Cms69RecordSource."Pregnancy Status Observations", Cms69RecordSource."Pregnancy or Other Related Diagnoses")
 
 define "Verified Pregnancy Status":
   exists ("Pregnancy Status Overlaps MP")

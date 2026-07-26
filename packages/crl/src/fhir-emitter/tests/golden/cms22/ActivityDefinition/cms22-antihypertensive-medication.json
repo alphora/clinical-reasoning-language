@@ -36,7 +36,7 @@
   "publisher": "Smile Digital Health",
   "description": "Patient has confirmed hypertension and an in-range encounter",
   "library": [
-    "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22"
+    "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/Cms22Strategy"
   ],
   "kind": "MedicationRequest",
   "profile": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-medicationrequest",

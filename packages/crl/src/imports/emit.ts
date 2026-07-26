@@ -23,7 +23,7 @@ import type { Partition } from "../cql-emitter/layeredEmit";
 import { loadCatalogLibraries } from "../cql-emitter/catalog/loadCatalog";
 import { lowerLocalCodes, localCodeSystemUrl, astHasConceptLocalCode } from "../cql-emitter/lowerLocalCodes";
 import { readCanonicalBase, readPolicyId } from "../fhir-emitter/metadata";
-import { localDomainIdFor } from "../fhir-emitter/slug";
+import { localDomainIdFor, pascalCaseNameForId } from "../fhir-emitter/slug";
 import type { CRLError } from "../types/errors";
 
 import { resolveImports } from "./index";
@@ -90,7 +90,23 @@ export interface PerLibraryEmit {
   // hyphen-free). `layer` and `libraryName` (= S) are produced together by the
   // CQL split, so they cannot drift.
   layer?: string;
+  // The CQL library names this entry `include`s — its `collectLayerIncludes` result
+  // (empty for the per-CRL path). #227 — these are the RAW source-ref names; the emit
+  // RENDERS them through the `libraryRenames` map (raw→`S`) into the `.cql` text, so a
+  // foreign name-keeping-root include reads as `include <S>` while this field keeps the
+  // raw name. The only functional consumer, the FHIR lane's `siblingCanonicals`, is
+  // PER-SOURCE: within-source split siblings carry already-final layer names (`S`, keys
+  // match) and cross-source/foreign includes were never resolved into depends-on — so
+  // keeping raw here is correct; the field is a dependency ledger, not the emitted text.
   includes: string[];
+  // #227 — `true` ONLY for the three shared catalog libraries (CRLCommon /
+  // CaseFeatureCommon / FHIRHelpers), which are fixed emitter assets (no source `.crl`,
+  // `filePath: ""`) appended to every closure. The FHIR-lane Inv 6 identity invariant
+  // enrolls every REAL policy Library but must EXEMPT these (their id/name/header
+  // already agree and they are not manifest-identity-controlled). An explicit flag —
+  // NOT the `libraryName === sourceLibraryName` accident, which also matches any policy
+  // root whose raw name is already a PascalCase fixpoint (e.g. `library "Sib"`).
+  isSharedCatalog?: boolean;
   // #198 C1 — the per-source DISAMBIGUATED local-domain base (`<policyId>-<librarySlug>`)
   // when this entry's source is a cross-lib `code is` SIBLING, else `undefined` (the
   // PRIMARY seed, a non-`code is` sibling, or a metadata-less caller). This is the
@@ -678,6 +694,18 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   }
 
 
+  // #227 — the render-only raw→`S` rename map for NAME-KEEPING-ROOT (`none`-path)
+  // libraries, built HERE (the preflight sees every entry before the emit loop, so
+  // a `none`→`none` cross-ref resolves forward). Keyed by the raw CRL library name,
+  // valued at the unified identity `S = pascalCaseNameForId(name)` that the emit
+  // loop stamps as the manifest `libraryName` and the CQL header. ONLY `none`
+  // entries are enrolled — a layered entry's emitted identity is its per-layer name
+  // (NOT `pascalCaseNameForId(name)`), so poisoning the map with it would mis-render
+  // a `none`→layered ref; leaving it out renders that (untested, non-deliverable)
+  // shape under the raw name, unchanged from pre-#227. Consumed only by the
+  // `none`-path `emitCQLFromAST` call below.
+  const libraryRenames = new Map<string, string>();
+
   // Slice 2 (layeredEmit) — generated-name collision preflight. The full set
   // of emitted CQL library names = every UNSPLIT entry's own name PLUS every
   // SPLIT entry's generated layer names (`<X> Concepts` / `<X> Asserted` /
@@ -697,6 +725,15 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
         emittedNamesSource.set(name, source);
       }
     };
+    // #227 — reserve the three SHARED catalog identities FIRST. #227 widens the raw-name
+    // preimage of every emitted identifier (`library "CRL Common"` now transforms to `S =
+    // "CRLCommon"`), so a `none` policy can newly clobber a catalog name from a raw name
+    // that previously could not. Pre-registering them makes that fail LOUDLY here (the
+    // catalog append later would otherwise silently skip the real asset by the
+    // filename-idempotence guard, leaving policy `include CRLCommon` refs self-referential).
+    for (const cat of loadCatalogLibraries()) {
+      register(cat.libraryName, "shared catalog library");
+    }
     for (const entry of emitClosure) {
       if (entry.name === null || entry.name === "") continue;
       // A suppressed activities-only library emits NO CQL — exclude it from the
@@ -720,8 +757,16 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
         plan.kind === "none"
           ? `library "${entry.name}"`
           : `auto-split of library "${entry.name}"`;
+      // #227 — a `none` library now emits its CQL header/file + FHIR identity under
+      // `S = pascalCaseNameForId(<name>)`, not the raw name. Record the rename and
+      // register `S` (not the raw) so two raw names that PascalCase to the SAME `S`
+      // collide HERE (CQL lane), matching the FHIR-lane Library.id uniqueness check.
+      // Layered `emittedLibraryNames` are already their final `S` — registered as-is.
+      if (plan.kind === "none") {
+        libraryRenames.set(entry.name, pascalCaseNameForId(entry.name));
+      }
       for (const emittedName of plan.emittedLibraryNames) {
-        register(emittedName, source);
+        register(plan.kind === "none" ? pascalCaseNameForId(emittedName) : emittedName, source);
       }
     }
     if (collisions.length > 0) {
@@ -793,6 +838,10 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
         crossLibraryParameters,
         canonicalBase,
         localDomainId: entryLocalDomainId,
+        // #227 — a layered library may FOREIGN-ref a name-keeping-root (`none`)
+        // sibling; render that `include`/qualified-ref through `S` so it matches the
+        // renamed target's header. Layered sibling names aren't in the map (identity).
+        libraryRenames,
       });
       if (!partitioned.success) {
         return {
@@ -865,9 +914,16 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       statements: entry.ast.statements,
       location: entry.ast.location,
     };
+    // #227 — the unified identity `S` for this name-keeping-root library. The CQL
+    // header (rendered via `libraryRenames`), the emitted `.cql` filename, and the
+    // manifest `libraryName` (→ FHIR Library.id/name/url-tail) ALL take `S`, so the
+    // five identity surfaces agree and cqf can load the library source. The RAW
+    // `entry.name` stays the `sourceLibraryName` (manifest keying) and the emit
+    // `options.libraryName` (self-ref detection / lookup keys).
+    const rootIdentity = pascalCaseNameForId(entry.name);
     let outputFilename: string;
     try {
-      outputFilename = safeOutputFilename(entry.name);
+      outputFilename = safeOutputFilename(rootIdentity);
     } catch (e) {
       return {
         success: false,
@@ -881,6 +937,9 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       libraryName: entry.name,
       crossLibraryIncludes: crossLibs,
       crossLibraryParameters,
+      // #227 — render header/`include`/qualified-refs through `S` (comparisons stay
+      // keyed on the raw `libraryName` above); consulted only on this `none` path.
+      libraryRenames,
       canonicalBase,
       // #198 — per-entry local domain: a `none`/per-CRL sibling `code is` library
       // still gets its disambiguated `codesystem '<url>'` decl (primary unchanged).
@@ -896,7 +955,10 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       };
     }
     cqlByLibrary.push({
-      libraryName: entry.name,
+      // #227 — the manifest identity is `S` (the FHIR lane reads this as the
+      // Library.id/name/url-tail); the RAW `entry.name` is the `sourceLibraryName`
+      // that keys the manifest and stays the source-of-truth for source grouping.
+      libraryName: rootIdentity,
       filePath: entry.filePath,
       outputFilename,
       cql: emit.result,
@@ -944,6 +1006,9 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       sourceLibraryName: cat.libraryName,
       role: "root",
       includes: [],
+      // #227 — mark the shared catalog assets so the FHIR-lane Inv 6 can exempt them
+      // explicitly (not via the name-fixpoint accident).
+      isSharedCatalog: true,
     });
   }
 

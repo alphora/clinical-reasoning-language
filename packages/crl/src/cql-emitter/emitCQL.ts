@@ -164,6 +164,22 @@ export interface EmitOptions {
      */
     recordSourceLibrary?: string;
   };
+  /**
+   * #227 — RENDER-ONLY library-qualifier rename map (raw CRL library name → the
+   * unified FHIR/CQL identity `S = pascalCaseNameForId(name)`). Threaded by
+   * `emitCQLImports` for the per-CRL (`none`) path so a NAME-KEEPING-ROOT policy's
+   * emitted CQL `library` header, `include` lines, and qualified cross-refs all
+   * render under `S` — making the CQL header byte-equal the FHIR `Library.id` ==
+   * `name` == url-tail (the identity cqf requires to load the library source).
+   *
+   * RENDERING ONLY. Self-ref detection (`crossLibraryOf`), context-parameter
+   * lookup (`lookupContextParameter`), and the arg-library check stay keyed on the
+   * RAW `options.libraryName` / AST qualifier — this map is consulted solely when
+   * the qualifier is written into the emitted text. `renderLib` is the identity for
+   * any name not in the map, so the layered path (which never passes this) and
+   * single-file callers stay byte-unchanged.
+   */
+  libraryRenames?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -668,6 +684,9 @@ class Emitter {
         localSourceLibrary: "",
         inferredLibrary: "",
       },
+      // #227 — render-only qualifier rename map (raw → `S`); empty for the layered
+      // path and single-file callers, making `renderLib` the identity there.
+      libraryRenames: options.libraryRenames ?? new Map<string, string>(),
     };
     // Normalize the case-feature emit mode. The public option has no `"off"` arm
     // (absence === off); map it onto the internal discriminated union so the
@@ -828,7 +847,10 @@ class Emitter {
       // also no version. `using FHIR version` is a semantic FHIR model
       // identifier (R4 vs R5 is a different shape) — kept. FHIRHelpers
       // ships versioned with the FHIR spec — version pin kept.
-      `library ${cqlLibIdent(this.options.libraryName ?? "GeneratedFromCRL")}`,
+      // #227 — render the header through the rename map: a name-keeping-root's
+      // `library` header must be `S` (== the FHIR Library.id/name/url-tail), not
+      // the raw CRL name. Identity for the layered path (empty map).
+      `library ${cqlLibIdent(this.renderLib(this.options.libraryName ?? "GeneratedFromCRL"))}`,
       "",
       "using FHIR version '4.0.1'",
       "",
@@ -858,7 +880,9 @@ class Emitter {
     // file qualified-refs gets its own `include` line. Simple include (no
     // `called` alias) so qualified refs can use the natural `Lib."X"` form.
     for (const otherLib of this.options.crossLibraryIncludes ?? []) {
-      lines.push(`include ${cqlLibIdent(otherLib)}`);
+      // #227 — render each cross-library `include` under the target's `S`, so an
+      // `include` of a name-keeping-root sibling matches that sibling's header/id.
+      lines.push(`include ${cqlLibIdent(this.renderLib(otherLib))}`);
     }
     return lines.join("\n");
   }
@@ -872,8 +896,22 @@ class Emitter {
     if (!isQualifiedRef(ref)) return null;
     const lib = getRefLibrary(ref);
     if (lib === null) return null;
+    // Self-ref detection stays keyed on the RAW library name (#227): the AST
+    // qualifier and `options.libraryName` are both raw on the `none` path.
     if (lib === this.options.libraryName) return null;
-    return lib;
+    // A genuine cross-lib qualifier — RENDER it through the rename map so a
+    // reference to a name-keeping-root sibling emits under that sibling's `S`.
+    return this.renderLib(lib);
+  }
+
+  /**
+   * #227 — map a library qualifier from its RAW CRL name to the emitted CQL/FHIR
+   * identity `S` for RENDERING (header / `include` / qualified ref). Identity for
+   * any name absent from the map, so the layered path and single-file callers
+   * (which pass no `libraryRenames`) are byte-unchanged.
+   */
+  private renderLib(name: string): string {
+    return this.options.libraryRenames.get(name) ?? name;
   }
 
   /**
@@ -1562,7 +1600,8 @@ class Emitter {
         const ctx = this.lookupContextParameter(arg.library, arg.value);
         if (ctx) return ctx.contextType;
         if (arg.library && arg.library !== this.options.libraryName) {
-          return cqlQualifiedRef(arg.library, arg.value);
+          // #227 — cross-lib arg ref: compare RAW, render the qualifier through `S`.
+          return cqlQualifiedRef(this.renderLib(arg.library), arg.value);
         }
         return cqlIdent(arg.value);
       }

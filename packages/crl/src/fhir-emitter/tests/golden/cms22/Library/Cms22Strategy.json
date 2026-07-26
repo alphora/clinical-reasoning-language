@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "cms22",
+  "id": "Cms22Strategy",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,7 +26,7 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22",
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/Cms22Strategy",
   "version": "1.0.0",
   "name": "Cms22Strategy",
   "title": "cms22-strategy",
@@ -88,7 +88,7 @@
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/cms22-strategy.cql"
+      "url": "../../cql/Cms22Strategy.cql"
     }
   ]
 }

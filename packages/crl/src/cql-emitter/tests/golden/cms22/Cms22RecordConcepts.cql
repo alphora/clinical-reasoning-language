@@ -1,4 +1,4 @@
-library "cms22-RecordConcepts"
+library Cms22RecordConcepts
 
 using FHIR version '4.0.1'
 

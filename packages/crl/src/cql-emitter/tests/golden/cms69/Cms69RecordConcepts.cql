@@ -1,4 +1,4 @@
-library "cms69-RecordConcepts"
+library Cms69RecordConcepts
 
 using FHIR version '4.0.1'
 

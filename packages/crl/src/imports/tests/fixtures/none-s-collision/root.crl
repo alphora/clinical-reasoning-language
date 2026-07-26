@@ -1,0 +1,21 @@
+// #227 collision fixture: "Guard One" and "Guard-One" both PascalCase to "GuardOne".
+// Decision-bearing + no `code is` -> `none` (name-keeping-root). `include`s the
+// sibling so both land in one emit closure; the CQL-lane preflight must detect the
+// transformed-identity (`S`) collision before either `GuardOne.cql` is emitted.
+library "Guard One".
+include "Guard-One".
+
+terminology "Root Vs":
+- valueset is `root-vs`.
+
+concept "R":
+- type is Observation.
+- coded from "Root Vs".
+
+activity "RootAct":
+- request CPGServiceRequest.
+
+decision "RootDecision":
+- when "R" then:
+  - recommend activity "RootAct".
+  end.
