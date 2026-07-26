@@ -6,8 +6,12 @@ import { buildCEL } from "../../cel";
 import type { ResolvedCelGraph } from "../../cel/imports/types";
 import type { RegistryEntry } from "../../imports/types";
 
-import { runCel } from "../run";
-import { renderScenario } from "../viewModel";
+import { runCel, __evalBranchConditionForTest } from "../run";
+import { renderScenario, __zipConditionTraceForTest } from "../viewModel";
+import type { BranchCondition } from "../../ast/types";
+
+const LOC = { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } } as const;
+const critRef = (ref: string): BranchCondition => ({ type: "BranchConditionCriterionRef", ref, location: LOC });
 
 // #224 ii.1c — the EVAL + RENDER wiring for a `criterion` guard. A `when` that references a
 // criterion must expand to the criterion's body BEFORE the CRE evaluates it (S1) and BEFORE
@@ -166,6 +170,26 @@ first:
     expect(runs.every((r) => r.status === "error")).toBe(true);
     expect(runs.some((r) => r.diagnostics.some((d) => /criterion-expansion|envelope/.test(d)))).toBe(true);
   });
+
+  it("the RENDER lane degrades with the eval status on an overflow doc (no throw — census row 5's overflow side)", () => {
+    // Battery 3's render-lane overflow disposition (disc 305 Claude #5c): renderScenario over an
+    // envelope-breaching covered decision must NOT throw the tripwire; it degrades WITH the eval
+    // status (the case becomes an error scenario), consistent with runCel above.
+    const overflow = `library "GuardLib".
+${LEAVES}
+${ACTIVITIES}
+${doublingChain()}
+decision "D":
+first:
+- when "C10" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+    const render = renderScenario(graphFrom(overflow, CASES));
+    // No uncaught throw; every scenario carries the error status (degrades with eval, not silent).
+    // Guard against vacuity: `.every` is trivially true on `[]`, and a graph-level empty render on
+    // overflow IS a failure of "degrades per-case" — so pin the exact count (CASES = both + onlyA).
+    expect(render.scenarios).toHaveLength(2);
+    expect(render.scenarios.every((s) => s.status === "error")).toBe(true);
+  });
 });
 
 describe("#224 ii.1c — criterion through a `use decision` sub-decision", () => {
@@ -224,5 +248,79 @@ first:
     expect(run.status).toBe("error");
     expect(run.diagnostics.some((d) => /envelope/.test(d))).toBe(true);
     expect(run.diagnostics.some((d) => /not found/.test(d))).toBe(false);
+  });
+});
+
+// ── ii.2 Battery 2 — the STRICT eval throw-site + the SOFT render degrade ─────────
+// The 4th (and highest-stakes) tripwire site is `evalBranchCondition` (run.ts:444) — the
+// "silent-wrong-answer" case. It is a non-exported function, so unlike the three
+// `branchCondition.ts` collector sites (pinned in criterionClassify.test.ts) it can only be
+// reached via the test-only export. The render lane is the counterexample: it DEGRADES.
+describe("#224 ii.2 — tripwire liveness: STRICT eval throws, SOFT render degrades", () => {
+  it("evalBranchCondition THROWS on a raw un-expanded criterion ref (the eval tripwire is live)", () => {
+    // ctx/frame are unread on the criterion-ref branch (it throws before touching them), so
+    // stubs suffice to drive the site.
+    expect(() =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      __evalBranchConditionForTest(critRef("Eligible"), {} as any, {} as any),
+    ).toThrow(/un-expanded criterion/i);
+  });
+
+  it("the render lane DEGRADES a raw criterion ref at the ROUTING site (never throws)", () => {
+    // Pin the ACTUAL routing site (`zipConditionTrace`, viewModel.ts:636), not just the terminal
+    // helper: given a stray criterion ref + a (mismatched) trace, it must return a NAMED
+    // unevaluated leaf — NOT throw, NOT attach the trace's satisfied state. This is the VM
+    // stability contract and the enumerated exception to "STRICT lanes throw"; the safety net is
+    // the parity/presence assertions, not a throw. (The trace here is deliberately a `satisfied`
+    // ref the routing must IGNORE for a criterion ref.)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const view = __zipConditionTraceForTest(critRef("Eligible"), { op: "ref", satisfied: true } as any);
+    expect(view).toEqual({ op: "ref", concept: { name: "Eligible" } });
+  });
+});
+
+// ── ii.2 Battery 5 — structure-preserving + deterministic PIPELINE invariants ─────
+describe("#224 ii.2 — pipeline invariants (joint parity + determinism)", () => {
+  const TWICE_VIA = `library "GuardLib".
+${LEAVES}
+${ACTIVITIES}
+criterion "Eligible":
+- when ( "Leaf A" and "Leaf B" ).
+decision "D":
+all:
+- when "Eligible" then recommend activity "Approve".
+- when "Eligible" then recommend activity "Deny".`;
+  const TWICE_INLINE = `library "GuardLib".
+${LEAVES}
+${ACTIVITIES}
+decision "D":
+all:
+- when ( "Leaf A" and "Leaf B" ) then recommend activity "Approve".
+- when ( "Leaf A" and "Leaf B" ) then recommend activity "Deny".`;
+
+  it("a twice-used criterion's run+render is JOINTLY identical to the twice-inlined hand doc", () => {
+    // Run parity on the MEANINGFUL projection — case, status, AND the produced recommendation set
+    // (two semantically different runs can share statuses; the produced set is what the oracle
+    // checks). A status-only comparison would miss a divergent recommendation.
+    const runProjection = (g: ResolvedCelGraph) =>
+      runCel(g)
+        .runs.map((r) => ({ case: r.case, status: r.status, produced: r.produced.map((p) => p.recommendation).sort() }))
+        .sort((a, b) => a.case.localeCompare(b.case));
+    expect(runProjection(graphFrom(TWICE_VIA, CASES))).toEqual(runProjection(graphFrom(TWICE_INLINE, CASES)));
+    // …AND render parity: both branches' guard-expression trees match the hand-inlined doc's
+    // (the criterion is authoring-DRY, indistinguishable in the rendered VM too).
+    const bothVia = renderScenario(graphFrom(TWICE_VIA, CASES)).scenarios.find((s) => s.case.name === "both")!;
+    const bothInl = renderScenario(graphFrom(TWICE_INLINE, CASES)).scenarios.find((s) => s.case.name === "both")!;
+    const expr = (s: typeof bothVia, i: number): unknown =>
+      (s.tree[i] as { condition: { expr: unknown } }).condition.expr;
+    expect(expr(bothVia, 0)).toEqual(expr(bothInl, 0));
+    expect(expr(bothVia, 1)).toEqual(expr(bothInl, 1));
+  });
+
+  it("run + render are DETERMINISTIC across repeated invocations (no table/Map-order leakage)", () => {
+    expect(statuses(graphFrom(VIA_CRITERION, CASES))).toEqual(statuses(graphFrom(VIA_CRITERION, CASES)));
+    const r1 = renderScenario(graphFrom(VIA_CRITERION, CASES));
+    const r2 = renderScenario(graphFrom(VIA_CRITERION, CASES));
+    expect(JSON.stringify(r1.scenarios)).toEqual(JSON.stringify(r2.scenarios));
   });
 });

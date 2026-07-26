@@ -467,6 +467,13 @@ function evalBranchCondition(
   return { sat, facts, trace: { op, satisfied: sat, operands: results.map((r) => r.trace) } };
 }
 
+// #224 ii.2 — test-only export. `evalBranchCondition` is the highest-stakes STRICT tripwire
+// site (run.ts:444 — the "silent-wrong-answer" case) and, unlike the three `branchCondition.ts`
+// collector sites, is a non-exported function unreachable from the public API without bypassing
+// the expansion seam. Exported solely so the ii.2 tripwire battery can pin that a raw
+// un-expanded `BranchConditionCriterionRef` throws here. NOT for production use.
+export const __evalBranchConditionForTest = evalBranchCondition;
+
 export function recName(action: ActionStatement["action"]): string {
   return action.type === "RecommendActivity"
     ? getRefName(action.activityName)

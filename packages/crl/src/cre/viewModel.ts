@@ -665,6 +665,19 @@ function zipConditionTrace(cond: BranchCondition, bt: BranchConditionTrace): Bra
   };
 }
 
+// #224 ii.2 — test-only export. `zipConditionTrace` is the SOFT-lane degrade ROUTING site: on a
+// stray un-expanded criterion ref it returns a NAMED unevaluated leaf (never throws — the VM
+// stability contract) rather than recognising it as an evaluated node. In production it never
+// receives one (renderScenario expands first), so this defensive routing is otherwise untestable.
+// Exported (with its trace arg) solely so the ii.2 tripwire battery can pin that the render lane
+// degrades at the routing site — unlike the STRICT lanes, which throw. NOT for production use.
+export function __zipConditionTraceForTest(
+  cond: BranchCondition,
+  trace: BranchConditionTrace,
+): BranchConditionView {
+  return zipConditionTrace(cond, trace);
+}
+
 function astConditionExpr(cond: BranchCondition): BranchConditionView {
   // A concept ref OR a stray (un-expanded) criterion ref → an unevaluated `ref`
   // leaf carrying its name. A criterion ref here is a missed-seam display oddity
