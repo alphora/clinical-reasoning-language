@@ -2,6 +2,10 @@ import { describe, it, expect } from "vitest";
 
 import { buildCRL } from "../../index";
 import { Validator, type ValidationError } from "../validator";
+import { ReferenceResolver } from "../referenceResolver";
+import type { LibraryScope, SourceContext } from "../../imports/scopes";
+import type { Decision } from "../../ast/types";
+import type { RegistryEntry } from "../../imports/types";
 
 // #224 ii.1a-2 — SEMANTIC validation for `criterion`: name uniqueness
 // (concept XOR criterion) + empty name; cycle detection over the criterion graph;
@@ -286,5 +290,107 @@ ${ACTS}`;
     const { errors, warnings } = validateSoft(src);
     expect(errors.some((e) => e.kind === "criterion-cycle")).toBe(true);
     expect(warnings.some((e) => e.kind === "criterion-cycle")).toBe(false);
+  });
+});
+
+// #224 iii.2 — the decision-negation MERGE GATE. `not` parses + lowers structurally (iii.2
+// language), but the emit/eval/display seams land in iii.3; until then the validator rejects any
+// source-side `not` so no half-wired document ships. Non-soft-demotable structural gate.
+describe("#224 iii.2 — `decision-negation-unsupported` merge gate", () => {
+  const negs = (errs: ValidationError[]) => errs.filter((e) => e.kind === "decision-negation-unsupported");
+
+  it("rejects `not` in a decision `when` guard", () => {
+    const errs = validate(`library "G".
+${CONCEPTS}
+decision "D":
+- when "Age Qualifies" and not "Has Diagnosis" then recommend activity "Approve".
+${ACTS}`);
+    expect(negs(errs)).toHaveLength(1);
+  });
+
+  it("rejects `not` in a NESTED `when` guard", () => {
+    const errs = validate(`library "G".
+${CONCEPTS}
+decision "D":
+- when "Age Qualifies" then:
+  - when not "Has Diagnosis" then recommend activity "Approve".
+  end.
+${ACTS}`);
+    expect(negs(errs)).toHaveLength(1);
+  });
+
+  it("rejects `not` in a criterion BODY (even an unreferenced criterion)", () => {
+    const errs = validate(`library "G".
+${CONCEPTS}
+criterion "Excluded":
+- when ( not "Has Diagnosis" ).
+decision "D":
+- when "Age Qualifies" then recommend activity "Approve".
+${ACTS}`);
+    expect(negs(errs)).toHaveLength(1);
+  });
+
+  it("`not not A` reports ONE (outermost negation only)", () => {
+    const errs = validate(`library "G".
+${CONCEPTS}
+decision "D":
+- when not not "Has Diagnosis" then recommend activity "Approve".
+${ACTS}`);
+    expect(negs(errs)).toHaveLength(1);
+  });
+
+  it("stays a hard ERROR under soft mode (non-soft-demotable structural gate)", () => {
+    const src = `library "G".
+${CONCEPTS}
+decision "D":
+- when not "Has Diagnosis" then recommend activity "Approve".
+${ACTS}`;
+    const { errors, warnings } = validateSoft(src);
+    expect(errors.some((e) => e.kind === "decision-negation-unsupported")).toBe(true);
+    expect(warnings.some((e) => e.kind === "decision-negation-unsupported")).toBe(false);
+  });
+
+  it("a positive guard produces NO negation gate error", () => {
+    const errs = validate(`library "G".
+${CONCEPTS}
+decision "D":
+- when "Age Qualifies" and "Has Diagnosis" then recommend activity "Approve".
+${ACTS}`);
+    expect(negs(errs)).toHaveLength(0);
+  });
+
+  it("multi-file: the gate error is STAMPED with the owning source's libraryName + filePath", () => {
+    // Drive the scoped (multi-file) resolver path directly so the finding carries source attribution.
+    const built = buildCRL(`library "G".
+${CONCEPTS}
+decision "D":
+- when not "Has Diagnosis" then recommend activity "Approve".
+${ACTS}`);
+    if (!built.success || !built.result) throw new Error("build failed");
+    const decision = built.result.statements.find((s) => s.type === "Decision") as Decision;
+    const emptyNames = () => ({
+      concepts: new Set<string>(),
+      terminologies: new Set<string>(),
+      decisions: new Set<string>(),
+      activities: new Set<string>(),
+      parameters: new Set<string>(),
+      criteria: new Set<string>(),
+    });
+    const scope: LibraryScope = {
+      currentLibrary: "G",
+      filePath: "/proj/g.crl",
+      origin: "local",
+      localNames: emptyNames(),
+      knownLibraries: new Map(),
+      explicitIncludes: new Set(),
+    };
+    const sources: SourceContext[] = [
+      { stmt: decision, entry: { name: "G", filePath: "/proj/g.crl", ast: built.result, isRoot: true, origin: "local" } as RegistryEntry, scope },
+    ];
+    const errs = new ReferenceResolver().validate(built.result, sources);
+    const neg = errs.find((e) => e.kind === "decision-negation-unsupported");
+    expect(neg).toBeDefined();
+    expect(neg!.libraryName).toBe("G");
+    expect(neg!.filePath).toBe("/proj/g.crl");
   });
 });

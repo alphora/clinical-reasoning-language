@@ -60,6 +60,9 @@ function rewriteCond(cond: BranchCondition, isCrit: IsCrit): BranchCondition {
         : cond;
     case "BranchConditionCriterionRef":
       return cond; // idempotent
+    case "BranchConditionNot":
+      // #224 iii.2: recurse the negated operand — `not "SomeCriterion"` must classify too.
+      return { ...cond, operand: rewriteCond(cond.operand, isCrit) };
     case "BranchConditionAnd":
     case "BranchConditionOr":
       return { ...cond, operands: cond.operands.map((o) => rewriteCond(o, isCrit)) };

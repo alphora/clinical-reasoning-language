@@ -117,13 +117,23 @@ library "Test".
       ).toThrow(/parenthes|mixed/i);
     });
 
-    it("#224 i.2: `not` in a guard is a parse error (monotone)", () => {
-      expect(() =>
-        parseInput(`library "T".
-        decision "D":
-          - when "A" and not "B" then recommend activity "X".
-      `),
-      ).toThrow();
+    it("#224 iii.2: `not` PARSES as a prefix over an atom (was a parse error in i.2)", () => {
+      // Negation binds tighter than `and`/`or`: `A and not B` = `And[Ref A, Not(Ref B)]`.
+      const c = guardOf(`          - when "A" and not "B" then recommend activity "X".`);
+      expect(c.type).toBe("BranchConditionAnd");
+      const ops = (c as BranchConditionAnd).operands;
+      expect(ops[0]!.type).toBe("BranchConditionRef");
+      expect(ops[1]!.type).toBe("BranchConditionNot");
+      // `branchConditionRefs` collects THROUGH the `not` — the ref under it is still a ref.
+      expect(branchConditionRefs(c).map((r) => r.ref)).toEqual(["A", "B"]);
+    });
+
+    it("#224 iii.2: `not` over a parenthesized group parses (`not (A or B)`)", () => {
+      const c = guardOf(`          - when not ("A" or "B") then recommend activity "X".`);
+      expect(c.type).toBe("BranchConditionNot");
+      const inner = (c as import("../types").BranchConditionNot).operand;
+      expect(inner.type).toBe("BranchConditionOr");
+      expect(branchConditionRefs(c).map((r) => r.ref)).toEqual(["A", "B"]);
     });
 
     it("should parse a decision with any/all qualifiers", () => {

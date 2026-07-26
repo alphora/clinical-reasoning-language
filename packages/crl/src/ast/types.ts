@@ -165,19 +165,23 @@ export interface DecisionBody extends ASTNode {
   location: Location;
 }
 
-// A decision branch guard: a monotone boolean expression over concept refs
-// (`and`/`or`, parens). Introduced with #224 decision-layer boolean guards.
-// In slice i.1 the grammar produces ONLY the single-ref (`BranchConditionRef`)
-// shape; `and`/`or` parsing lands in i.2. There is NO `not` — negation has no
-// structural lowering (it would force a CQL `not`, the forbidden case).
+// A decision branch guard: a boolean expression over concept refs (`and`/`or`,
+// `not`, parens). Introduced with #224 decision-layer boolean guards.
 // Every node carries its own `location` so per-operand diagnostics, find-refs,
 // and duplicate-operand (`"A" and "A"`) identity work without a fallback to the
 // whole `when` line.
+//
+// #224 iii.2: `not` is a distinct `BranchConditionNot` member. Negation DOES lower —
+// but never to one compound CQL boolean: a single negated literal has a CQL carrier
+// (`not Coalesce(...)`, iii.1) and any composition is pushed to negation-normal-form
+// (`toNNF`, branchCondition.ts) then DNF'd into arms of single SIGNED literals, each
+// emitting its own `PlanDefinition.action.condition`. See `BranchConditionLiteral`.
 export type BranchCondition =
   | BranchConditionRef
   | BranchConditionAnd
   | BranchConditionOr
-  | BranchConditionCriterionRef;
+  | BranchConditionCriterionRef
+  | BranchConditionNot;
 
 // #224 ii.1b: provenance stamped on the BOUNDARY-ROOT of a criterion substitution
 // during `expandCriteria` — the criterion whose (expanded) body this subtree is, plus
@@ -234,6 +238,32 @@ export interface BranchConditionOr extends ASTNode {
   location: Location;
   sourcedFromCriterion?: SourcedFromCriterion; // #224 ii.1b — see SourcedFromCriterion
 }
+
+// #224 iii.2: a UNARY negation over a single operand. In a SOURCE tree the operand may
+// be any `BranchCondition` (`not "A"`, `not ("A" or "B")`, `not "Criterion"`, `not not
+// "A"`). `toNNF` (branchCondition.ts) pushes negation to the leaves via De Morgan, so a
+// NORMALIZED tree only ever has a `Not` DIRECTLY over a `BranchConditionRef` (a signed
+// literal — see `BranchConditionNegatedLiteral`). `sourcedFromCriterion` may sit on a
+// `Not` when a criterion's expanded body root is a negation (MarkableCondition,
+// criterionExpansion.ts); the NNF marker-transfer rule moves it onto the rewritten root.
+export interface BranchConditionNot extends ASTNode {
+  type: "BranchConditionNot";
+  operand: BranchCondition; // unary; exactly one. May be undefined-ish only on a malformed editor buffer.
+  location: Location;
+  sourcedFromCriterion?: SourcedFromCriterion; // #224 ii.1b — see SourcedFromCriterion
+}
+
+// #224 iii.2: a `Not` STATICALLY guaranteed to wrap a single concept ref — the only
+// shape a negation may take in a DNF arm (post-`toNNF`). The intersection puts the
+// "negation is a single atom" invariant in the type system: emit reads `lit.operand.ref`
+// without a runtime narrow. `branchConditionDNF` asserts this at the `Not` case.
+export type BranchConditionNegatedLiteral = BranchConditionNot & { operand: BranchConditionRef };
+
+// #224 iii.2: a DNF ARM ATOM — a positive concept ref OR a negated single-ref literal.
+// `branchConditionDNF` returns `BranchConditionLiteral[][]`. A positive-only guard yields
+// only `BranchConditionRef` atoms (byte-identical to the pre-iii.2 `BranchConditionRef[][]`
+// output — zero golden drift); a negated literal carries its own located `Not` node.
+export type BranchConditionLiteral = BranchConditionRef | BranchConditionNegatedLiteral;
 
 // When block. The guard is a `BranchCondition` expression (was a single
 // `conceptName: ReferenceName` before #224). Read guard refs ONLY through the

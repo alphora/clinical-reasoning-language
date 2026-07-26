@@ -1034,6 +1034,37 @@ function emitTop(d: Decision, inputResolver?: CaseFeatureInputResolver, conceptR
   );
 }
 
+const notC = (operand: BranchCondition): BranchCondition => ({
+  type: "BranchConditionNot",
+  operand,
+  location: LOC,
+});
+
+describe("decision — #224 iii.2 negated guard is diagnosed + suppressed (interim; real emit = iii.3)", () => {
+  it("`A and not B` → branch SUPPRESSED with a `decision-negation-unemittable` error (never mis-emit)", () => {
+    const d = decision(
+      "Top",
+      [whenC(andC(refC("A"), notC(refC("B"))), leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
+      "first",
+    );
+    const { errors } = emitTop(d);
+    expect(errors.some((e) => e.kind === "decision-negation-unemittable")).toBe(true);
+    // The negated branch does NOT emit an (always-applicable) unguarded action.
+    const children = acts(rootActions(emitTop(d).resource)[0]);
+    expect(children.some((c) => condExprs(c).includes("A"))).toBe(false);
+  });
+
+  it("a single `not B` guard is also suppressed (not the positive single-ref fast path)", () => {
+    const d = decision(
+      "Top",
+      [whenC(notC(refC("B")), leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
+      "first",
+    );
+    const { errors } = emitTop(d);
+    expect(errors.some((e) => e.kind === "decision-negation-unemittable")).toBe(true);
+  });
+});
+
 describe("decision — #224 i.3 compound-guard structural emit", () => {
   it("`and` guard → ONE action carrying N ANDed applicability conditions", () => {
     const d = decision(

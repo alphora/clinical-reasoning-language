@@ -404,3 +404,42 @@ describe("expandCriteria — the expanded tree is a clean guard for downstream h
     expect(built.size).toBe(2);
   });
 });
+
+// #224 iii.2 — criterion × `not`: expand BEFORE toNNF (the seam order), `not` = 0 atoms.
+describe("#224 iii.2 — criterion × not", () => {
+  const not = (operand: BranchCondition): BranchCondition => ({
+    type: "BranchConditionNot",
+    operand,
+    location: L(),
+  });
+  const dnfSigned = (c: BranchCondition): string[][] =>
+    branchConditionDNF(c).map((arm) =>
+      arm.map((a) => (a.type === "BranchConditionNot" ? `-${a.operand.ref}` : `+${a.ref}`)),
+    );
+
+  it("`not <criterion>` expands the body, THEN De Morgan pushes negation in", () => {
+    // C := (A or B). `not C` → not(A or B) → not A and not B.
+    const t = table(crit("C", or(ref("A"), ref("B"))));
+    const expanded = expandCriteria(not(cref("C")), t);
+    expect(dnfSigned(expanded)).toEqual([["-A", "-B"]]);
+  });
+
+  it("a `not` contributes 0 atoms to the expansion envelope", () => {
+    const t = table(crit("C", and(ref("A"), ref("B"))));
+    // not C expands to the same 2 atoms as C (the `not` node is free).
+    expect(expandedSize(not(cref("C")), t)).toMatchObject({ atoms: 2, status: "ok" });
+  });
+
+  it("`containsCriterionRef` sees a criterion ref under a `not`", () => {
+    expect(containsCriterionRef(not(cref("C")))).toBe(true);
+    expect(containsCriterionRef(not(ref("A")))).toBe(false);
+  });
+
+  it("a criterion whose BODY ROOT is a `not` carries the marker onto the Not (materialize)", () => {
+    // C := not X. `when C` (positive) → expansion stamps C's marker on the body-root Not.
+    const t = table(crit("C", not(ref("X"))));
+    const expanded = expandCriteria(cref("C"), t);
+    expect(expanded.type).toBe("BranchConditionNot");
+    expect(expanded.sourcedFromCriterion?.name).toBe("C");
+  });
+});

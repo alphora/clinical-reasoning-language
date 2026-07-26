@@ -104,9 +104,13 @@ function conditionSigLabel(cond: BranchCondition, decisionLib: string): string {
       ? escLeaf(c.ref)
       : c.type === "BranchConditionCriterionRef"
         ? `criterion(${escLeaf(c.ref)})`
-        : c.type === "BranchConditionAnd"
-          ? `and(${c.operands.map(go).join(",")})`
-          : `or(${c.operands.map(go).join(",")})`;
+        : c.type === "BranchConditionNot"
+          ? // #224 iii.2: a stable `not(<operand>)` structural token — distinct from its
+            // operand's sig so a negated guard never collapses onto the un-negated one.
+            `not(${go(c.operand)})`
+          : c.type === "BranchConditionAnd"
+            ? `and(${c.operands.map(go).join(",")})`
+            : `or(${c.operands.map(go).join(",")})`;
   // Top-level single ref → RAW leaf (byte-identical to `refSig(refKeys[0])`, so
   // existing single-ref flags never re-key); a top-level criterion ref → its stable
   // criterion token; compound → escaped structural form.

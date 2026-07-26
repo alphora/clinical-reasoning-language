@@ -79,6 +79,13 @@ export type {
   BranchConditionAnd,
   BranchConditionOr,
   BranchConditionCriterionRef,
+  // #224 iii.2 — decision-guard negation. `BranchConditionNot` is a new member of the
+  // (already public) `BranchCondition` union, so external exhaustive switches over it must
+  // add a `not` case (a breaking exhaustiveness change, intentional). The narrowed
+  // `BranchConditionLiteral`/`…NegatedLiteral` are the DNF-arm atom type that emit consumes.
+  BranchConditionNot,
+  BranchConditionLiteral,
+  BranchConditionNegatedLiteral,
   Criterion,
   SourcedFromCriterion,
 } from "./ast/types";
@@ -104,6 +111,10 @@ export {
   soleRef,
   describeBranchCondition,
   assertWellFormedBranchCondition,
+  // #224 iii.2 — negation-normal-form + the `not` structural helpers.
+  toNNF,
+  containsNot,
+  collectNegations,
 } from "./ast/branchCondition";
 // DISPLAY-only projection of a PA determination outcome name (`"certify.Met"` → `"Met"`); the cockpit renderers in
 // crl-vscode import this so the outcome shows only the human `<key>`. See dispositions/displayName.ts.

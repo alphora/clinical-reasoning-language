@@ -54,7 +54,10 @@ import {
 /** Bump on any breaking change to the shapes below (the UI/agent contract). The C2c-2 `facts[].definedBy`
  *  addition is OPTIONAL/additive — existing consumers reading `name`/`conceptRef` are unaffected (no bump). */
 // v2 (#224): `ConditionView.concept` → `ConditionView.expr` (guard expression tree).
-export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 2;
+// v3 (#224 iii.2): `BranchConditionView` gains a `{ op: "not" }` variant (decision-guard
+//   negation). An exhaustive decoder must handle it; reachable only via the unvalidated
+//   render lane (the validator merge-gate rejects `not` for authored docs).
+export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 3;
 
 type ActionKind = "recommend-activity" | "use-decision";
 export type ConceptView = { name: string; libraryName?: string };
@@ -141,6 +144,10 @@ export interface ViewNode {
  *  compound-SAFE + TRUTHFUL (no first-operand-masquerading-as-the-whole-guard). */
 export type BranchConditionView =
   | { op: "and" | "or"; satisfied?: boolean; operands: BranchConditionView[] }
+  // #224 iii.2: a decision-guard `not`. Structure-faithful so the VM stays total (never
+  // throws) on the unvalidated live-typing lane; `satisfied` is the closed-world negation
+  // from the CRE trace. Rich webview rendering of the negation lands in iii.3.
+  | { op: "not"; satisfied?: boolean; operand: BranchConditionView }
   | { op: "ref"; satisfied?: boolean; concept: ConceptView; explanation?: ExplanationView; facts?: string[] };
 
 export interface ConditionView {
@@ -654,6 +661,16 @@ function zipConditionTrace(cond: BranchCondition, bt: BranchConditionTrace): Bra
       ...(bt.facts && bt.facts.length > 0 ? { facts: bt.facts } : {}),
     };
   }
+  if (cond.type === "BranchConditionNot") {
+    // #224 iii.2: keep the negation structure; on any trace-shape mismatch degrade the whole
+    // subtree to unevaluated (the VM stability contract — a display oddity, never a throw).
+    if (bt.op !== "not") return astConditionExpr(cond);
+    return {
+      op: "not",
+      ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
+      operand: zipConditionTrace(cond.operand, bt.operand),
+    };
+  }
   const op: "and" | "or" = cond.type === "BranchConditionAnd" ? "and" : "or";
   // Any STRUCTURAL mismatch (operator or arity) → degrade the WHOLE subtree to
   // unevaluated (drop `satisfied` entirely); don't half-trust a mismatched trace.
@@ -684,6 +701,8 @@ function astConditionExpr(cond: BranchCondition): BranchConditionView {
   // (the CRE would have thrown); the VM shows the criterion name rather than crash.
   if (cond.type === "BranchConditionRef" || cond.type === "BranchConditionCriterionRef")
     return { op: "ref", concept: conceptView(cond.ref) };
+  if (cond.type === "BranchConditionNot") // #224 iii.2: unevaluated negation (no trace)
+    return { op: "not", operand: astConditionExpr(cond.operand) };
   const op: "and" | "or" = cond.type === "BranchConditionAnd" ? "and" : "or";
   return { op, operands: cond.operands.map(astConditionExpr) };
 }
@@ -700,6 +719,9 @@ function astConditionExpr(cond: BranchCondition): BranchConditionView {
  *  (now frame-resolved) `libraryName` differs from the frame: a 1-line change here. */
 function describeConditionView(v: BranchConditionView): string {
   if (v.op === "ref") return v.concept.name;
+  // #224 iii.2: `not` binds tightest — bare operand for a ref, parenthesized for a compound.
+  if (v.op === "not")
+    return `not ${v.operand.op === "ref" ? describeConditionView(v.operand) : `(${describeConditionView(v.operand)})`}`;
   const joiner = v.op === "and" ? " and " : " or ";
   const parts = v.operands.map((o) => (o.op === "ref" ? describeConditionView(o) : `(${describeConditionView(o)})`));
   return parts.join(joiner);
@@ -719,6 +741,11 @@ export function unsatisfiedFrontier(v: BranchConditionView): Frontier {
 
 function rawFrontier(v: BranchConditionView): Frontier {
   if (v.op === "ref") return v.satisfied === false ? [{ kind: "ref", concept: v.concept }] : [];
+  // #224 iii.2: a false `not` (the negated concept IS established → it blocked) surfaces as an
+  // opaque frontier item; precise "which negated literal" pinpointing is iii.3. A satisfied /
+  // unevaluated `not` contributes nothing.
+  if (v.op === "not")
+    return v.satisfied === false ? [{ kind: "opaque", label: describeConditionView(v) }] : [];
   if (v.op === "and") {
     if (v.satisfied === true) return [];
     const sub = v.operands.flatMap(rawFrontier);

@@ -199,4 +199,61 @@ case "AC":
     expect(t.operands).toHaveLength(2); // second operand NOT short-circuited away
     expect(t.operands.map((o) => o.op === "ref" && o.satisfied)).toEqual([true, false]);
   });
+
+  // #224 iii.2 — closed-world negation in the CRE. `runCel` runs NO validation (run.ts:72), so a
+  // `not` guard reaches evalBranchCondition even though the `decision-negation-unsupported` merge
+  // gate rejects it for validated authoring. It must EVALUATE (closed-world `!sat`), never throw.
+  describe("closed-world `not` (#224 iii.2 — unvalidated eval lane)", () => {
+    const notCrl = `library "GuardLib".
+${LEAVES}
+decision "D":
+first:
+- when not "Leaf A" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
+${ACTIVITIES}`;
+
+    // Expected outcome per case for `when not "Leaf A"`: Leaf A absent → Approve, present → Deny.
+    const NOT_CASES = `library "Cases".
+covers "GuardLib".
+${PATIENT}
+fact "fA":
+- code is "http://e|leaf-a".
+- date is "2026-01-01".
+- defined by "GuardLib"."Leaf A".
+fact "fB":
+- code is "http://e|leaf-b".
+- date is "2026-01-01".
+- defined by "GuardLib"."Leaf B".
+case "aPresent":
+- subject is "Pat".
+- fact is "fA".
+- result is "D" is "Deny".
+case "aAbsent":
+- subject is "Pat".
+- fact is "fB".
+- result is "D" is "Approve".`;
+
+    it("`not A` is satisfied iff A is NOT established (closed-world) — both cases PASS", () => {
+      expect(statuses(graphFrom(notCrl, NOT_CASES))).toEqual(["aPresent:pass", "aAbsent:pass"]);
+    });
+
+    it("the trace carries `op:\"not\"` with the negated `satisfied` and the operand subtrace", () => {
+      const run = runCel(graphFrom(notCrl, NOT_CASES)).runs.find((r) => r.case === "aAbsent")!;
+      const t = compoundWhen(run)!.conditionTrace!;
+      if (t.op !== "not") throw new Error("expected not");
+      expect(t.satisfied).toBe(true); // Leaf A absent → not-satisfied
+      expect(t.operand.op).toBe("ref");
+      expect(t.operand.satisfied).toBe(false); // the underlying Leaf A is unsatisfied
+    });
+
+    it("renderScenario builds a structure-faithful `not` view WITHOUT throwing (unvalidated lane)", () => {
+      const result = renderScenario(graphFrom(notCrl, NOT_CASES));
+      expect(result.success).toBe(true);
+      // schema bumped to 3 for the `not` BranchConditionView variant.
+      expect(result.schemaVersion).toBe(3);
+      // Find the `not` guard node in the aAbsent case's view and assert its structure + negated satisfied.
+      const json = JSON.stringify(result);
+      expect(json).toContain('"op":"not"');
+    });
+  });
 });

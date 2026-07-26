@@ -62,6 +62,7 @@ import {
   BcAtomContext,
   BcRefContext,
   BcGroupContext,
+  BcNotContext,
 } from "../grammar/generated/antlr/CRLParser";
 import { CRLParserVisitor } from "../grammar/generated/antlr/CRLParserVisitor";
 import type { CRLError } from "../types/errors";
@@ -366,6 +367,26 @@ export class CRLAstBuilder
     }
     if (ctx instanceof BcGroupContext) {
       return this.branchConditionFrom(ctx.branchCondition());
+    }
+    // #224 iii.2: `not <atom>` — a unary negation. ANTLR error-recovery can yield a
+    // BcNot with no inner atom (`when not then …` mid-typing); return a placeholder ref
+    // operand so downstream (the tolerant walkers, NNF) never sees `operand === undefined`
+    // without a diagnostic — mirroring the empty-branchCondition recovery above.
+    if (ctx instanceof BcNotContext) {
+      const inner = ctx.bcAtom();
+      if (!inner) {
+        this.reportError("`not` must be followed by a condition", ctx);
+        return {
+          type: "BranchConditionNot",
+          operand: { type: "BranchConditionRef", ref: "", location: getLocation(ctx) },
+          location: getLocation(ctx),
+        };
+      }
+      return {
+        type: "BranchConditionNot",
+        operand: this.bcAtomToCondition(inner),
+        location: getLocation(ctx),
+      };
     }
     this.reportError("Unknown bcAtom alternative", ctx);
     return { type: "BranchConditionRef", ref: "", location: getLocation(ctx) };

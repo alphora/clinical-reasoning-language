@@ -260,6 +260,13 @@ export function buildQuestionnaire(
     branchFalse: boolean,
     underSatisfiedOr: boolean,
   ): QExpr => {
+    if (expr.op === "not") {
+      // #224 iii.2: structure-faithful negation box (never dedups). Recurse the operand;
+      // `branchFalse`/`underSatisfiedOr` propagate unchanged. Precise blocking attribution
+      // under negation (a `not X` blocks when X IS established) is display polish for iii.3 —
+      // this keeps the guard box total + non-crashing on the unvalidated live-typing lane.
+      return { kind: "not", operand: buildGuardStruct(expr.operand, frameLib, branchFalse, underSatisfiedOr) };
+    }
     if (expr.op !== "ref") {
       // A satisfied `or` on the path makes its false members INFORMATIONAL (not blockers) for the whole subtree.
       const nextUnderSatOr = underSatisfiedOr || (expr.op === "or" && expr.satisfied === true);

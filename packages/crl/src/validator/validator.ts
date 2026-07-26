@@ -46,6 +46,11 @@ export type ValidationErrorKind =
   // guard `unless`/`only when`), or a library-qualified criterion ref. Criteria
   // may only appear in a decision `when` guard (or another criterion's body) in v0.
   | "criterion-misuse"
+  // #224 iii.2 — a decision-guard negation (`not`) in a `when` guard or a criterion body.
+  // The LANGUAGE (grammar/AST/DNF) lands in iii.2 but the emit/eval/display SEAMS land in
+  // iii.3; until then `not` is gated here so no half-wired document ships. STRUCTURAL merge
+  // gate — never soft-demoted. Removed in iii.3 when the seams go live.
+  | "decision-negation-unsupported"
   | "external-library-not-included"
   | "qualified-ref-unresolved"
   | "decision-shape"
@@ -152,6 +157,12 @@ export type CriterionSlot =
   | "narrative"
   | "action-guard"
   | "qualified";
+// #224 iii.2 — a `not` used in a decision guard / criterion body before the emit+eval+display
+// seams are wired (iii.3). One error per OUTERMOST negation (a `not not A` is one). Anchored at
+// the `not`'s own location. Non-soft-demotable structural merge gate.
+export interface DecisionNegationUnsupportedError extends ValidationErrorBase {
+  kind: "decision-negation-unsupported";
+}
 export interface ExternalLibraryNotIncludedError extends ValidationErrorBase {
   kind: "external-library-not-included";
   // The library name in the offending qualified ref `"<targetLibrary>"."X"`.
@@ -217,6 +228,7 @@ export type ValidationError =
   | DecisionDelegationCycleError
   | CriterionCycleError
   | CriterionMisuseError
+  | DecisionNegationUnsupportedError
   | ExternalLibraryNotIncludedError
   | QualifiedRefUnresolvedError
   | DecisionShapeError

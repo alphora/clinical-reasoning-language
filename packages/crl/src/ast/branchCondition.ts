@@ -12,6 +12,9 @@ import type {
   BranchConditionOr,
   BranchConditionRef,
   BranchConditionCriterionRef,
+  BranchConditionNot,
+  BranchConditionLiteral,
+  BranchConditionNegatedLiteral,
   ReferenceName,
 } from "./types";
 import { getRefName } from "./types";
@@ -49,6 +52,9 @@ export function visitBranchCondition<T>(
     /** #224 ii: a criterion-ref leaf (source-side). REQUIRED so every fold caller
      *  decides explicitly rather than silently mis-folding it as a concept ref. */
     criterionRef: (node: BranchConditionCriterionRef) => T;
+    /** #224 iii.2: a `not` node, with its already-folded operand result. REQUIRED so no
+     *  fold caller silently drops the negated subtree (the tolerant-walker hazard). */
+    not: (node: BranchConditionNot, operand: T) => T;
   },
 ): T {
   switch (c.type) {
@@ -56,6 +62,8 @@ export function visitBranchCondition<T>(
       return v.ref(c);
     case "BranchConditionCriterionRef":
       return v.criterionRef(c);
+    case "BranchConditionNot":
+      return v.not(c, visitBranchCondition(c.operand, v));
     case "BranchConditionAnd":
       return v.and(
         c,
@@ -87,6 +95,13 @@ export function branchConditionRefs(c: BranchCondition): BranchConditionRef[] {
   const walk = (n: BranchCondition): void => {
     if (n.type === "BranchConditionRef") out.push(n);
     else if (n.type === "BranchConditionCriterionRef") return; // EXPLICIT source-side skip (not a concept ref)
+    // #224 iii.2: a `not` node carries `operand` (NOT `operands`), so it would fall
+    // THROUGH the `Array.isArray(operands)` branch below and its refs would be SILENTLY
+    // DROPPED. Handle it explicitly BEFORE the operands check; tolerate a missing operand
+    // (malformed editor buffer) like the array guard tolerates a missing operands array.
+    else if (n.type === "BranchConditionNot") {
+      if (n.operand) walk(n.operand);
+    }
     // `Array.isArray` guards the untyped boundary (`projectIndex` casts a
     // possibly-malformed editor-buffer node to BranchCondition) — a node with no
     // `operands` array is skipped, matching the pre-#224 tolerant behavior rather
@@ -113,7 +128,11 @@ export function branchConditionConceptRefsStrict(
   const walk = (n: BranchCondition): void => {
     if (n.type === "BranchConditionRef") out.push(n);
     else if (n.type === "BranchConditionCriterionRef") unexpandedCriterion(n, where);
-    else if (Array.isArray((n as BranchConditionAnd | BranchConditionOr).operands))
+    // #224 iii.2: explicit `not` handling (has `operand`, not `operands`) — see the note
+    // in `branchConditionRefs`. A negated ref is STILL a concept ref for this seam.
+    else if (n.type === "BranchConditionNot") {
+      if (n.operand) walk(n.operand);
+    } else if (Array.isArray((n as BranchConditionAnd | BranchConditionOr).operands))
       (n as BranchConditionAnd | BranchConditionOr).operands.forEach(walk);
   };
   walk(c);
@@ -165,6 +184,12 @@ export function branchConditionConceptRefsFollowingCriteria(
       active.delete(name);
       return;
     }
+    // #224 iii.2: explicit `not` handling (has `operand`, not `operands`) — see the note
+    // in `branchConditionRefs`. Concept reachability is polarity-agnostic; recurse in.
+    if (n.type === "BranchConditionNot") {
+      if (n.operand) walk(n.operand);
+      return;
+    }
     if (Array.isArray((n as BranchConditionAnd | BranchConditionOr).operands))
       (n as BranchConditionAnd | BranchConditionOr).operands.forEach(walk);
   };
@@ -196,61 +221,200 @@ export function branchConditionConceptRefsExpanded(
 }
 
 /**
- * Disjunctive Normal Form of a guard: the list of ARMS, each an ordered list of
- * ref atoms (a conjunction). Each arm lowers to ONE `PlanDefinition.action` with
- * N ANDed `condition[kind=applicability]` (#224 i.3 structural emit).
- *   - ref       → `[[ref]]`
- *   - and(ops)  → cartesian PRODUCT of the operands' DNFs (atoms concatenated,
- *                 operand order preserved)
- *   - or(ops)   → CONCATENATION (union) of the operands' DNFs
- * Atom order within an arm is deterministic left-to-right source order; duplicate
- * atoms are PRESERVED (dedup is a display/input concern, not identity). Callers
- * that lower to FHIR MUST first guard on `branchConditionArmCount` (below) — this
- * fully materializes the product and is unbounded for a pathological guard.
- *
- * PRECONDITION: a WELL-FORMED condition (every `and`/`or` has an `operands` array
- * with >= 2 entries — the builder/grammar invariant, asserted by
- * `assertWellFormedBranchCondition`). Unlike `branchConditionRefs` (which tolerates
- * a malformed operand-less node for the projectIndex editor-buffer path), this
- * structural transform assumes valid input — the emitter only ever runs on a
- * parse-success AST, so the invariant holds there.
+ * #224 iii.2: the OUTERMOST `not` nodes in a SOURCE guard, each with its own `location`. The
+ * merge-gate validator (`decision-negation-unsupported`) reports one error per node until the
+ * emit/eval/display seams land (iii.3). Descends `and`/`or` but STOPS at the first `not` on any
+ * path — so `not not A` reports ONE (the outer), `not A and not B` reports TWO (distinct
+ * negations). Tolerant of a malformed editor-buffer node (no `operands` array → skipped),
+ * matching `branchConditionRefs`.
  */
-export function branchConditionDNF(c: BranchCondition): BranchConditionRef[][] {
-  switch (c.type) {
-    case "BranchConditionRef":
-      return [[c]];
-    case "BranchConditionCriterionRef":
-      return unexpandedCriterion(c, "branchConditionDNF");
-    case "BranchConditionOr":
-      return c.operands.flatMap((o) => branchConditionDNF(o));
-    case "BranchConditionAnd": {
-      // Cartesian product: start with one empty arm, extend by each operand's arms.
-      let arms: BranchConditionRef[][] = [[]];
-      for (const operand of c.operands) {
-        const opArms = branchConditionDNF(operand);
-        const next: BranchConditionRef[][] = [];
-        for (const arm of arms) for (const opArm of opArms) next.push([...arm, ...opArm]);
-        arms = next;
-      }
-      return arms;
+export function collectNegations(c: BranchCondition): BranchConditionNot[] {
+  const out: BranchConditionNot[] = [];
+  const walk = (n: BranchCondition): void => {
+    if (!n || typeof (n as { type?: unknown }).type !== "string") return;
+    if (n.type === "BranchConditionNot") {
+      out.push(n); // outermost — do NOT descend into the negated operand
+      return;
     }
+    if (n.type === "BranchConditionAnd" || n.type === "BranchConditionOr") {
+      if (Array.isArray(n.operands)) n.operands.forEach(walk);
+    }
+    // Ref / CriterionRef carry no negation.
+  };
+  walk(c);
+  return out;
+}
+
+/** #224 iii.2: does the guard contain any `not` node? The fast-path predicate for `toNNF`
+ *  — a guard with NONE is already in negation-normal form and is returned by identity. */
+export function containsNot(c: BranchCondition): boolean {
+  switch (c.type) {
+    case "BranchConditionNot":
+      return true;
+    case "BranchConditionRef":
+    case "BranchConditionCriterionRef":
+      return false;
+    case "BranchConditionAnd":
+    case "BranchConditionOr":
+      return c.operands.some(containsNot);
   }
 }
 
 /**
- * The number of DNF arms `branchConditionDNF` WOULD produce, computed WITHOUT
- * materializing them and SATURATING at `cap + 1` so a pathological `and`-of-`or`s
- * (2^N arms) can never allocate exponentially. The emitter checks this against the
- * expansion cap (16) BEFORE calling `branchConditionDNF`, so a bad editor buffer
- * bundled into crl-vscode reports a compile error instead of hanging/OOM.
+ * #224 iii.2 — Negation-normal form: push every `not` down to the ref LEAVES via De Morgan
+ * (`not(A or B)` → `not A and not B`; `not(A and B)` → `not A or not B`; `not not A` → `A`),
+ * so the result has a `Not` ONLY DIRECTLY over a `BranchConditionRef` (a signed literal).
+ * This is what lets `branchConditionDNF` produce arms of SINGLE signed literals — the
+ * load-bearing "negation never lowers to one compound CQL boolean" invariant.
+ *
+ * SEMANTIC / POST-EXPANSION: a `BranchConditionCriterionRef` reached at ANY polarity THROWS
+ * `unexpandedCriterion` — NNF cannot push through a criterion whose body is unknown, so
+ * expansion must run first (classify → expand → NNF → DNF). (A `not`-FREE tree fast-paths to
+ * identity, so a stray criterion ref there is caught downstream by the DNF/armCount switch
+ * instead; a not-free tree trivially satisfies "every `not` on a leaf".)
+ *
+ * IDENTITY on a `not`-free tree (fast path — refs and `and`/`or` nodes returned UNCHANGED,
+ * so a positive guard's DNF is byte-identical to the pre-iii.2 output; zero golden drift).
+ * Idempotent (NNF of an NNF tree is itself).
+ *
+ * MARKER TRANSFER (ii.1b): each rewritten node transfers its OWN `sourcedFromCriterion` onto
+ * the replacement root; coincident outer/inner markers resolve OUTERMOST-wins (the outer
+ * transfer overwrites last — matching `materialize`'s boundary rule). LOCATION: a flipped
+ * `and`/`or` keeps the rewritten node's OWN location; a synthesized `Not(ref)` leaf takes the
+ * underlying REF's location (per-operand diagnostic precision). NOTE: DNF output for a
+ * `not`-containing guard therefore holds SYNTHESIZED nodes not present in the source AST —
+ * consumers must not assume arm atoms map 1:1 to source spans.
+ */
+export function toNNF(c: BranchCondition): BranchCondition {
+  // Identity fast path for an already-NNF tree — BUT honor the criterion tripwire: a not-free
+  // tree carrying a stray (unexpanded) criterion ref must still throw (the public contract),
+  // never slip through as identity. A not-free AND criterion-free tree returns by identity
+  // (byte-stable for positive guards); anything else runs the recursion (which throws on a
+  // criterion ref at any polarity).
+  if (!containsNot(c) && !containsCriterionRef(c)) return c;
+  const nnf = (n: BranchCondition, negated: boolean): BranchCondition => {
+    // Transfer THIS source node's criterion marker onto the produced root (outermost wins,
+    // since the outer call's transfer runs after the inner). Only clones when a marker is
+    // present, so unmarked positive refs keep object identity.
+    // `out` is never a `BranchConditionCriterionRef` here (those throw), so stamping a marker
+    // is always type-sound; the cast keeps the generic return type through the spread.
+    const withMarker = <T extends BranchCondition>(out: T): T =>
+      n.sourcedFromCriterion ? ({ ...out, sourcedFromCriterion: n.sourcedFromCriterion } as T) : out;
+    switch (n.type) {
+      case "BranchConditionCriterionRef":
+        return unexpandedCriterion(n, "toNNF");
+      case "BranchConditionRef":
+        if (!negated) return withMarker(n); // positive literal — marker stays on the ref
+        // Negated literal: HOIST the marker onto the new `Not` (the boundary root), and DROP it
+        // from the embedded ref — a marker must sit on the boundary root ONLY, never be
+        // duplicated onto an inner node (else an iii.3 attribution collector double-counts the
+        // criterion). The ref is re-wrapped in a fresh `Not` regardless, so no identity is lost.
+        return withMarker({
+          type: "BranchConditionNot",
+          operand: { type: "BranchConditionRef", ref: n.ref, location: n.location },
+          location: n.location,
+        });
+      case "BranchConditionNot":
+        // `not X` flips polarity; the Not's own marker transfers onto whatever X produces.
+        return withMarker(nnf(n.operand, !negated));
+      case "BranchConditionAnd":
+      case "BranchConditionOr": {
+        // De Morgan: under negation `and`↔`or` and each operand is negated.
+        const flipTo =
+          negated && n.type === "BranchConditionAnd"
+            ? "BranchConditionOr"
+            : negated && n.type === "BranchConditionOr"
+              ? "BranchConditionAnd"
+              : n.type;
+        return withMarker({
+          type: flipTo,
+          operands: n.operands.map((o) => nnf(o, negated)),
+          location: n.location,
+        });
+      }
+    }
+  };
+  return nnf(c, false);
+}
+
+/**
+ * Disjunctive Normal Form of a guard: the list of ARMS, each an ordered list of SIGNED
+ * LITERAL atoms (a conjunction). Each arm lowers to ONE `PlanDefinition.action` with N ANDed
+ * `condition[kind=applicability]` (#224 i.3 structural emit); a NEGATED literal lowers to the
+ * `not Coalesce(...)` carrier (#224 iii.1), a positive one to a bare `text/cql-identifier`.
+ *
+ * `toNNF` runs FIRST (so `not` sits only on ref leaves), then:
+ *   - ref        → `[[ref]]`                    (positive literal)
+ *   - not(ref)   → `[[not(ref)]]`               (negated literal; asserted single-atom)
+ *   - and(ops)   → cartesian PRODUCT of the operands' DNFs (atoms concatenated, order kept)
+ *   - or(ops)    → CONCATENATION (union) of the operands' DNFs
+ * A POSITIVE-only guard yields only `BranchConditionRef` atoms — byte-identical to the
+ * pre-iii.2 `BranchConditionRef[][]` output (positive goldens never drift). Atom order within
+ * an arm is deterministic left-to-right; duplicate atoms are PRESERVED (dedup is a display
+ * concern). Callers that lower to FHIR MUST first guard on `branchConditionArmCount` — this
+ * fully materializes the product and is unbounded for a pathological guard.
+ *
+ * PRECONDITION: a WELL-FORMED condition (every `and`/`or` has >= 2 operands; every `not` a
+ * single operand — the builder/grammar invariant, `assertWellFormedBranchCondition`). Unlike
+ * `branchConditionRefs` (which tolerates a malformed node for projectIndex), this structural
+ * transform assumes valid input — the emitter only runs on a parse-success AST.
+ */
+export function branchConditionDNF(c: BranchCondition): BranchConditionLiteral[][] {
+  const dnf = (n: BranchCondition): BranchConditionLiteral[][] => {
+    switch (n.type) {
+      case "BranchConditionRef":
+        return [[n]];
+      case "BranchConditionNot": {
+        // Post-`toNNF` invariant: a `not` wraps EXACTLY a ref (the single-atom boundary that
+        // keeps every arm free of a compound CQL boolean). A `Not` over anything else means
+        // `toNNF` did not run / failed — a loud internal error, never silent mis-emit.
+        if (n.operand.type !== "BranchConditionRef") {
+          throw new Error(
+            `internal: branchConditionDNF saw a non-normalized negation over ${n.operand.type} — toNNF must run first`,
+          );
+        }
+        return [[n as BranchConditionNegatedLiteral]];
+      }
+      case "BranchConditionCriterionRef":
+        return unexpandedCriterion(n, "branchConditionDNF");
+      case "BranchConditionOr":
+        return n.operands.flatMap((o) => dnf(o));
+      case "BranchConditionAnd": {
+        // Cartesian product: start with one empty arm, extend by each operand's arms.
+        let arms: BranchConditionLiteral[][] = [[]];
+        for (const operand of n.operands) {
+          const opArms = dnf(operand);
+          const next: BranchConditionLiteral[][] = [];
+          for (const arm of arms) for (const opArm of opArms) next.push([...arm, ...opArm]);
+          arms = next;
+        }
+        return arms;
+      }
+    }
+  };
+  return dnf(toNNF(c));
+}
+
+/**
+ * The number of DNF arms `branchConditionDNF` WOULD produce, SATURATING at `cap + 1` so a
+ * pathological `and`-of-`or`s (2^N arms) can never allocate exponentially. The emitter checks
+ * this against the expansion cap (16) BEFORE calling `branchConditionDNF`, so a bad editor
+ * buffer bundled into crl-vscode reports a compile error instead of hanging/OOM.
  *   - ref      → 1
+ *   - not(ref) → 1   (#224 iii.2: post-NNF a negated single literal is one arm)
  *   - and(ops) → product of children (saturating)
  *   - or(ops)  → sum of children (saturating)
+ * #224 iii.2: counts on `toNNF(c)` so De Morgan (which can RAISE the arm count, e.g.
+ * `not(A and B)` = 2 arms) is reflected. `toNNF` materializes the NNF tree (linear — De
+ * Morgan does not blow up node count), but NOT the exponential DNF product; so this stays a
+ * cheap saturating count over the normalized tree, and `armCount === DNF.length` by
+ * construction (both consume the same `toNNF` output).
  */
 export function branchConditionArmCount(c: BranchCondition, cap = 16): number {
   const ceiling = cap + 1;
   const go = (n: BranchCondition): number => {
     if (n.type === "BranchConditionRef") return 1;
+    if (n.type === "BranchConditionNot") return 1; // post-NNF: `not` over a single ref = 1 arm
     if (n.type === "BranchConditionCriterionRef") return unexpandedCriterion(n, "branchConditionArmCount");
     if (n.type === "BranchConditionOr") {
       let sum = 0;
@@ -268,19 +432,24 @@ export function branchConditionArmCount(c: BranchCondition, cap = 16): number {
     }
     return product;
   };
-  return go(c);
+  return go(toNNF(c));
 }
 
 /**
- * Assert every `and`/`or` node carries >= 2 operands (the grammar/builder
- * invariant). i.1 has no producer of compounds; i.2's builder and the semantic
- * validator call this on parsed / hand-built compounds. Throws on violation.
+ * Assert every `and`/`or` node carries >= 2 operands, and every `not` a single operand
+ * (the grammar/builder invariant). i.2's builder and the semantic validator call this on
+ * parsed / hand-built compounds. Throws on violation.
  */
 export function assertWellFormedBranchCondition(c: BranchCondition): void {
   const check = (n: BranchCondition): void => {
     // A concept ref OR a criterion ref is a well-formed leaf (source-side; criterion
     // bodies + guards are validated pre-expansion, where criterion refs are expected).
     if (n.type === "BranchConditionRef" || n.type === "BranchConditionCriterionRef") return;
+    // #224 iii.2: a `not` is a well-formed UNARY node — exactly one operand, recurse into it.
+    if (n.type === "BranchConditionNot") {
+      check(n.operand);
+      return;
+    }
     if (n.operands.length < 2) {
       throw new Error(`${n.type} requires >= 2 operands, got ${n.operands.length}`);
     }
@@ -299,10 +468,11 @@ export function soleRef(c: BranchCondition): BranchConditionRef | null {
 }
 
 /**
- * Human-readable guard label, e.g. `"A"`, `"A" and "B"`, `("A" or "B") and "C"`.
- * `display` renders each ref — pass `getRefName` for bare names or `refDisplay`
- * for qualified display; the two call sites (cascade labels vs unmatched-ref
- * messages) need different renderings, so it is explicit, never defaulted.
+ * Human-readable guard label, e.g. `"A"`, `"A" and "B"`, `("A" or "B") and "C"`,
+ * `not "A"`, `not ("A" or "B")`. `display` renders each ref — pass `getRefName` for bare
+ * names or `refDisplay` for qualified display; the two call sites (cascade labels vs
+ * unmatched-ref messages) need different renderings, so it is explicit, never defaulted.
+ * Renders the SOURCE tree (pre-`toNNF`), so the author's own `not (...)` spelling is shown.
  */
 export function describeBranchCondition(
   c: BranchCondition,
@@ -312,6 +482,14 @@ export function describeBranchCondition(
     // A concept ref OR a criterion ref renders via `display` (source-side label; a
     // criterion ref shows the criterion's own name — the name-preserving render).
     if (n.type === "BranchConditionRef" || n.type === "BranchConditionCriterionRef") return display(n.ref);
+    // #224 iii.2: `not` binds tighter than `and`/`or`, so `not "A"` needs no parens, but a
+    // compound operand does: `not ("A" or "B")`. Never needs outer parens from a parent op.
+    if (n.type === "BranchConditionNot") {
+      const compound =
+        n.operand.type === "BranchConditionAnd" || n.operand.type === "BranchConditionOr";
+      const inner = go(n.operand, null);
+      return `not ${compound ? `(${inner})` : inner}`;
+    }
     const op: "and" | "or" = n.type === "BranchConditionAnd" ? "and" : "or";
     const inner = n.operands.map((o) => go(o, op)).join(` ${op} `);
     // Parenthesize a sub-expression nested under a DIFFERENT operator so the

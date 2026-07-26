@@ -81,7 +81,7 @@ describe("renderScenario — view-model (#item 2)", () => {
   it("builds the FULL tree from the AST spine, overlaying run state (preempted + condition-false body)", () => {
     const vm = renderScenario(graphFrom(COVERAGE_CRL, COVERAGE_CEL));
     expect(vm.schemaVersion).toBe(SCENARIO_VIEW_MODEL_SCHEMA_VERSION);
-    expect(vm.schemaVersion).toBe(2); // #224 bumped 1→2 (ConditionView.concept → expr)
+    expect(vm.schemaVersion).toBe(3); // #224 bumped 1→2 (concept→expr), 2→3 (iii.2 `not` view variant)
     const indic = vm.scenarios.find((s) => s.case.name === "indication only")!;
     expect(indic.status).toBe("pass");
     // All THREE branches present (the CRE trace short-circuited away `otherwise`; the AST restores it).

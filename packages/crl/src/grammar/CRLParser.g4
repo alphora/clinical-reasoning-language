@@ -131,9 +131,15 @@ branchItem
 // or a single ref parses bare; a MIXED bare chain (`A and B or C`) also parses
 // but the BUILDER rejects it with a "parenthesize mixed and/or" diagnostic
 // (house precedent: `decisionBody`'s optional qualifier, validator-required).
-// Mixing REQUIRES parentheses: `(A or B) and C`. There is NO `not` — negation
-// has no structural lowering. `THEN` is the clean right edge (no ATN ambiguity;
-// same common-prefix shape as `argGroup`).
+// Mixing REQUIRES parentheses: `(A or B) and C`. `THEN` is the clean right edge
+// (no ATN ambiguity; same common-prefix shape as `argGroup`).
+//
+// #224 iii.2: `not` is a PREFIX unary over an atom (`BcNot`), binding TIGHTER than
+// `and`/`or` (`not A and B` = `(not A) and B`). It may wrap any atom incl. a
+// parenthesized group (`not (A or B)`) — De Morgan normalizes it (see toNNF). Unlike
+// the pre-iii.2 note, negation IS lowered: a single negated literal has a CQL carrier
+// (`not Coalesce(...)`, iii.1) and any composition De Morgans/DNFs into arms of single
+// signed literals FIRST — it never lowers to one compound CQL boolean.
 branchCondition
     : bcAtom ( (AND | OR) bcAtom )*
     ;
@@ -141,6 +147,7 @@ branchCondition
 bcAtom
     : conceptReference                  # BcRef
     | LPAREN branchCondition RPAREN      # BcGroup
+    | NOT bcAtom                         # BcNot
     ;
 
 // A nested `then:` block body. Homogeneous: branches XOR actions

@@ -593,6 +593,11 @@ function collectCriterionRefs(cond: BranchCondition, out: Set<string>): void {
       if (name) out.add(name);
       return;
     }
+    case "BranchConditionNot":
+      // #224 iii.2: a criterion edge under a negation (`not "SomeCriterion"`) is still an
+      // edge for cycle detection — recurse the operand.
+      collectCriterionRefs(cond.operand, out);
+      return;
     case "BranchConditionAnd":
     case "BranchConditionOr":
       for (const o of cond.operands) collectCriterionRefs(o, out);

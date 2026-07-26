@@ -52,6 +52,7 @@ import type {
   BranchConditionAnd,
   BranchConditionOr,
   BranchConditionRef,
+  BranchConditionNot,
   Criterion,
   Decision,
   DecisionBody,
@@ -65,8 +66,14 @@ import { getRefName } from "./types";
 
 // The BranchCondition node kinds that can carry a `sourcedFromCriterion` marker — an
 // EXPANDED tree contains no `BranchConditionCriterionRef`, so `materialize` never
-// returns one, and `stamp` only ever sees these three.
-type MarkableCondition = BranchConditionRef | BranchConditionAnd | BranchConditionOr;
+// returns one, and `stamp` only ever sees these. #224 iii.2: a criterion whose expanded
+// body ROOT is a `not` (`criterion "C": - when (not "X").`) stamps the marker ON the `Not`,
+// so `BranchConditionNot` is Markable too.
+type MarkableCondition =
+  | BranchConditionRef
+  | BranchConditionAnd
+  | BranchConditionOr
+  | BranchConditionNot;
 
 // Materialized concept-atom-leaf count of a fully-expanded guard. An OPERATIONAL
 // resource default (a well-formed guard with 1024 leaves has ≤1023 operator nodes),
@@ -105,6 +112,8 @@ export function containsCriterionRef(c: BranchCondition): boolean {
       return true;
     case "BranchConditionRef":
       return false;
+    case "BranchConditionNot":
+      return containsCriterionRef(c.operand); // #224 iii.2: recurse the negated operand
     case "BranchConditionAnd":
     case "BranchConditionOr":
       return c.operands.some(containsCriterionRef);
@@ -184,6 +193,9 @@ export function expandedSize(cond: BranchCondition, table: CriterionTable): Expa
     switch (c.type) {
       case "BranchConditionRef":
         return { atoms: 1, criterionDepth: 0, status: "ok" };
+      case "BranchConditionNot":
+        // #224 iii.2: a `not` contributes 0 atoms and 0 depth — its size IS its operand's.
+        return sizeOf(c.operand);
       case "BranchConditionCriterionRef": {
         const name = getRefName(c.ref);
         if (!table.has(name)) {
@@ -284,6 +296,14 @@ function materialize(c: BranchCondition, table: CriterionTable): MarkableConditi
       return keep({
         type: "BranchConditionOr",
         operands: c.operands.map((o) => materialize(o, table)),
+        location: c.location,
+      });
+    case "BranchConditionNot":
+      // #224 iii.2: rebuild the `not` with its expanded operand; `keep` carries any
+      // pre-existing marker (a criterion whose body root is a negation, MarkableCondition).
+      return keep({
+        type: "BranchConditionNot",
+        operand: materialize(c.operand, table),
         location: c.location,
       });
     case "BranchConditionCriterionRef": {

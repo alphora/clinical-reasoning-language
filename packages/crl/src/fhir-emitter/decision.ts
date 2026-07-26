@@ -72,6 +72,7 @@ import type {
   BlockQualifier,
   BranchBlock,
   BranchConditionRef,
+  BranchConditionNegatedLiteral,
   Concept,
   Decision,
   OtherwiseBlock,
@@ -273,7 +274,11 @@ type EmitActionResult =
         | "unresolved-ref"
         | "all-children-suppressed"
         | "compound-guard-overflow"
-        | "criterion-overflow";
+        | "criterion-overflow"
+        // #224 iii.2 INTERIM: a guard `not` reached emit before its polarity lowering lands
+        // (iii.3). The validator merge-gate is the author-facing reject; this is the emit-lane
+        // defense-in-depth (emit is public/bypassable) — diagnose + suppress, never mis-emit.
+        | "decision-negation-unemittable";
     };
 
 /* ─── Single-Decision emit ───────────────────────────────────────── */
@@ -774,7 +779,31 @@ function emitCompoundWhenBlock(
     return { kind: "suppressed", reason: "compound-guard-overflow" };
   }
 
-  const arms = branchConditionDNF(wb.condition);
+  const literalArms = branchConditionDNF(wb.condition);
+
+  // #224 iii.2 INTERIM — a NEGATED literal (`not X`) cannot be lowered until iii.3 threads
+  // polarity into `guardApplicabilityCondition` per literal. The validator merge-gate
+  // (`decision-negation-unsupported`) is the author-facing reject; emit is public/bypassable,
+  // so here (defense-in-depth) we DIAGNOSE + SUPPRESS the whole guard rather than mis-emit an
+  // unguarded (always-applicable) action. Never a raw throw — mirrors the unresolved-ref lane.
+  const negated = literalArms
+    .flat()
+    .filter((a): a is BranchConditionNegatedLiteral => a.type === "BranchConditionNot");
+  if (negated.length > 0) {
+    ctx.errors.push({
+      type: "Validation",
+      kind: "decision-negation-unemittable",
+      message: `Decision-guard negation (\`not\`) in \`${describeBranchCondition(
+        wb.condition,
+        getRefName,
+      )}\` is not yet lowered to FHIR (lands in #224 iii.3); the branch was suppressed.`,
+      line: wb.location?.start.line,
+      column: wb.location?.start.column,
+    });
+    return { kind: "suppressed", reason: "decision-negation-unemittable" };
+  }
+  // All arms are POSITIVE from here (the negated scan above returned) — narrow to refs.
+  const arms = literalArms as BranchConditionRef[][];
 
   // Resolve every DISTINCT atom once (first-seen order across arms). Collect ALL
   // unresolved atoms — each with its OWN location — so the author sees every bad
