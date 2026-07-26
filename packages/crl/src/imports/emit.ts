@@ -484,7 +484,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
         criterionOverflowErrors.push({
           type: "Validation",
           kind: "criterion-expansion-overflow",
-          message: `Decision "${stmt.name}" has a guard whose criterion expansion exceeds the materialized-tree envelope (${o.status}${o.detail?.name ? `: "${o.detail.name}"` : ""}). This is an emit-stage RESOURCE boundary, not a FHIR or authoring-complexity limit; factor the determination (e.g. a \`use decision\` sub-decision) or consult the authoring kit.`,
+          message: `Decision "${stmt.name}" has a guard whose materialized tree exceeds the criterion-expansion envelope (${o.status}${o.detail?.name ? `: "${o.detail.name}"` : ""}). This is an emit-stage RESOURCE boundary, not a FHIR or authoring-complexity limit; factor the determination (e.g. a \`use decision\` sub-decision) or consult the authoring kit.`,
           line: o.location.start.line,
           column: o.location.start.column,
         });

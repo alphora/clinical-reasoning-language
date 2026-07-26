@@ -114,8 +114,10 @@ describe("#224 ii.1c — criterion CQL emit (closure + interface surface)", () =
       expect(overflow).toBeDefined();
       // Message READABILITY (disc 305): the CQL-lane diagnostic names the decision and states the
       // materialized-tree resource boundary (a `kind`-only assertion lets the message rot).
+      // Wording is UNIFIED with the FHIR lane (disc 305 follow-up): "materialized tree exceeds the
+      // criterion-expansion envelope".
       expect(overflow!.message).toContain("PolicyDec");
-      expect(overflow!.message).toContain("materialized-tree");
+      expect(overflow!.message).toContain("materialized tree");
     });
   });
 });

@@ -304,13 +304,15 @@ describe("#224 ii.2 — cross-lane coherence on an envelope-breaching criterion"
         }
 
         // CQL lane: a STRUCTURED error at the boundary (never an uncaught throw) whose MESSAGE
-        // names the decision and states the materialized-tree resource boundary (readability).
+        // names the decision and states the materialized-tree resource boundary (readability;
+        // wording unified with the FHIR lane — "materialized tree exceeds the criterion-expansion
+        // envelope").
         const cql = emitCQLImports(crl);
         expect(cql.success).toBe(false);
         const cqlOverflow = (cql.errors ?? []).find((e) => e.kind === "criterion-expansion-overflow");
         expect(cqlOverflow).toBeDefined();
         expect(cqlOverflow!.message).toContain("PolicyDec");
-        expect(cqlOverflow!.message).toContain("materialized-tree");
+        expect(cqlOverflow!.message).toContain("materialized tree");
 
         // Provenance lane: FALLBACK-EXACT. The source-side follow-walk returns the INLINE refs
         // only, so "Inline Gate" (a real inline atom) stays reached — the POSITIVE CONTROL that
