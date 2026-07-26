@@ -72,6 +72,18 @@ check("CEL grammar: NO __readme_*_snippet__ (CEL relies on theme defaults — 05
   );
 });
 
+check("CRL grammar: entity.name.type matches `criterion` (and peers), not `use decision` (#224 ii.4)", () => {
+  const pat = crl.patterns.find((p) => p.name === "entity.name.type.crl");
+  assert.ok(pat, "entity.name.type.crl pattern must exist");
+  const re = new RegExp(pat.match);
+  // criterion is a top-level declaration keyword — highlighted like decision/concept.
+  assert.equal(re.exec('criterion "Meets X":')?.[1], "criterion");
+  assert.equal(re.exec('decision "D":')?.[1], "decision");
+  assert.equal(re.exec('concept "C":')?.[1], "concept");
+  // the `decision` inside `use decision` must NOT match (negative lookbehind).
+  assert.equal(re.exec('use decision "D".'), null);
+});
+
 check("CRL grammar: extension.ts:grammarPath() string literal matches the actual file on disk", () => {
   // Parse the literal grammarPath() builds in extension.ts and verify the
   // file exists. Catches BOTH (a) future renames that miss extension.ts and

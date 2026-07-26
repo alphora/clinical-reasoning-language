@@ -26,7 +26,7 @@
     },
     {
       "name": "entity.name.type.crl",
-      "match": "(?<!\\buse\\s)(?<!\\brecommend\\s)\\b(decision|activity|concept|terminology|parameter)\\b(?![\\w`\"])"
+      "match": "(?<!\\buse\\s)(?<!\\brecommend\\s)\\b(decision|activity|concept|terminology|parameter|criterion)\\b(?![\\w`\"])"
     },
     {
       "name": "keyword.control.import.crl",
