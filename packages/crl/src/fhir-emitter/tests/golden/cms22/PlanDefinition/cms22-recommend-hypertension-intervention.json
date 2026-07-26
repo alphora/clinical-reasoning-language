@@ -82,6 +82,15 @@
               ]
             }
           ],
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-expression",
+                "expression": "not Coalesce(\"cms22-strategy\".\"Has Antihypertensive Contraindication\", false)"
+              }
+            }
+          ],
           "definitionCanonical": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/PlanDefinition/cms22-antihypertensive-medication-recommendation"
         },
         {

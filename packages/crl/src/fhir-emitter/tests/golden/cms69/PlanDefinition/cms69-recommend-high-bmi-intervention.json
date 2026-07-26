@@ -97,6 +97,15 @@
               ]
             }
           ],
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-expression",
+                "expression": "not Coalesce(\"cms69-strategy\".\"Has Anti-Obesity Medication Contraindication\", false)"
+              }
+            }
+          ],
           "definitionCanonical": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/PlanDefinition/cms69-order-high-bmi-medication-recommendation"
         }
       ],

@@ -22,3 +22,16 @@ export function escapeCqlString(s: string): string {
 export function cqlStringLiteral(s: string): string {
   return `'${escapeCqlString(s)}'`;
 }
+
+/**
+ * A CQL quoted (delimited) identifier for `s` (e.g. `Patient Has Diabetes` →
+ * `"Patient Has Diabetes"`). Delimited identifiers escape `\` first (so later
+ * passes aren't re-doubled) then the `"` delimiter, mirroring the string-literal
+ * escape grammar with a `"` fence. The ONE place both emit lanes quote an
+ * identifier — the CQL library emitter (`emitCQL.ts`) and the FHIR lane's inline
+ * `text/cql-expression` (a negated action/branch guard, `not "<name>"`, #224 iii)
+ * — so they can never drift. Leaf module (no emitter imports).
+ */
+export function cqlQuotedIdentifier(s: string): string {
+  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}

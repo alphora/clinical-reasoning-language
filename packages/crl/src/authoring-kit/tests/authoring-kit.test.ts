@@ -690,8 +690,12 @@ describe("authoring-kit — getAuthoringKit", () => {
     // disposition-arbitration reference from `sem-not` inference to `first:`-precedence structure (its CEL truth function
     // is FROZEN). Swept across decision-composition, concept-form, the judge-lens, boundary, minimalism, cel-cases,
     // verify-loop, the examples, and BOTH reference artifacts. BOTH hashes move. KE seats re-sync both pins.
-    expect(cpg.contentHash).toBe("ade9c96d9f03c37c276687c94e8932afc71a8f5d86894530ac7de8d4406deac4");
-    expect(priorAuth.contentHash).toBe("00dd9867c30ccef6de1a68a058d3fef34436e71b9af23e51065a3b8fb205ec00");
+    // #224 iii.1 re-pin (content-only) — the per-action-guard `guards` rule + the branch-guards `text`
+    // flipped their "action guards NOT YET lowered to FHIR" caveat: `unless`/`only when` now LOWER to a
+    // per-item `condition[applicability]` (`unless` → library-qualified null-safe `not Coalesce(...)`).
+    // BOTH hashes move (the `guards` rule is a cpg edge inheriting into prior-auth). KE seats re-sync both pins.
+    expect(cpg.contentHash).toBe("7222c7faece156394a6d6e1a8f4023ac9f8b1c2c0bf1b4964ee4554a0f6bcd3a");
+    expect(priorAuth.contentHash).toBe("24800b7e68f2b01f2524395599066ff12c0e6b4c540daaa087a285c4afc1cbd4");
   });
 
   it("no RETIRED positive doctrine survives anywhere in the serialized payload (#224 anti-half-inversion guard)", () => {

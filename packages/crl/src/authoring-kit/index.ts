@@ -348,7 +348,7 @@ const RULES: KitRule[] = [
     id: "guards",
     edge: "cpg",
     category: "guards",
-    rule: "PER-ACTION guard: a menu item in an `any:`/`all:` action block may carry `unless \"C\"` (drop when C holds) or `only when \"C\"` (include only when C holds). Guards are legal ONLY on multi-action menu members — not on inline `when … then recommend`, not on `otherwise`, not on a single menu-less action. Takes a CONCEPT only (a `criterion` name here is `criterion-misuse`). Keep at least one ALWAYS-offered (unguarded) item so a matched branch can never produce nothing. ⚠ EMIT STATUS: action guards are honored in CRE/scenario EXECUTION but are NOT YET lowered to FHIR emit — a guarded menu item currently emits WITHOUT its condition (docs/decision-shapes.md); a contraindication that MUST hold in the shipped PlanDefinition should be modeled as a BRANCH (an exclusion `when` ordered first under `first:`) instead. (This is a DIFFERENT construct from a branch guard — the `when` condition; see branch-guards.)",
+    rule: "PER-ACTION guard: a menu item in an `any:`/`all:` action block may carry `unless \"C\"` (drop when C holds) or `only when \"C\"` (include only when C holds). Guards are legal ONLY on multi-action menu members — not on inline `when … then recommend`, not on `otherwise`, not on a single menu-less action. Takes a CONCEPT only (a `criterion` name here is `criterion-misuse`). Keep at least one ALWAYS-offered (unguarded) item so a matched branch can never produce nothing. EMIT: action guards LOWER to FHIR (#224 iii.1) — a guarded menu item emits its own `condition[kind=applicability]` (`only when \"C\"` → positive `text/cql-identifier`; `unless \"C\"` → a library-qualified, null-safe negation `not Coalesce(\"<Library>\".\"C\", false)` as `text/cql-expression`) PLUS the guard concept as a case-feature `input`. The guard boolean itself never lowers to CQL — it stays a single per-item applicability condition. (This is a DIFFERENT construct from a branch guard — the `when` condition; see branch-guards.)",
     ref: "docs/decision-shapes.md; validator rule guard-on-single-action",
   },
   {
@@ -364,7 +364,7 @@ const RULES: KitRule[] = [
         force: "validator-enforced",
       },
       {
-        text: "A `when` branch condition is a monotone `and`/`or` boolean over concept/criterion refs; it lowers to PlanDefinition.action STRUCTURE (ANDed `condition[]` for `and`; DNF arms for `or`) — never a CQL boolean — so each atom stays a VISIBLE per-criterion `condition[]`. Express negation/precedence by ordering an exclusion branch FIRST under `first:` (there is no branch `not`; the per-action `unless` is ⚠ not yet lowered to FHIR emit — see guards).",
+        text: "A `when` branch condition is a monotone `and`/`or` boolean over concept/criterion refs; it lowers to PlanDefinition.action STRUCTURE (ANDed `condition[]` for `and`; DNF arms for `or`) — never a CQL boolean — so each atom stays a VISIBLE per-criterion `condition[]`. Express negation/precedence by ordering an exclusion branch FIRST under `first:` (there is no branch `not` yet; the per-action `unless` DOES lower to FHIR emit as of #224 iii.1 — see guards).",
         force: "default",
       },
       {

@@ -443,6 +443,13 @@ export function collectCaseFeatures(
     if (body.type === "ActionStatement") return;
     for (const stmt of body.statements) {
       if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock") visitBranch(stmt);
+      // #224 iii.1 — a menu member's `unless`/`only when` guard concept is a case
+      // feature too (its `code is` closure → an action `input` + case-feature SD).
+      // Without this, a concept referenced ONLY by an action guard would never enter
+      // `unionConcepts`, and the emit-site `action.input` would dangle (reference an
+      // SD that was never emitted). Both polarities contribute the same case feature.
+      else if (stmt.type === "ActionStatement" && stmt.guard)
+        conditionRefs.push(stmt.guard.conceptName);
     }
   };
   for (const dec of decisions) for (const branch of dec.body.statements) visitBranch(branch);
@@ -1435,6 +1442,16 @@ export function emitFhirDefClosure(
       : nameKeepingRootEntry
         ? identityForEntry(nameKeepingRootEntry)
         : undefined;
+    // #224 iii.1 (A″) — the CQL library NAME (`library X` header) of the library the PD's
+    // `library[]` references. A negated `unless` guard emits an inline `text/cql-expression`
+    // `not "<name>"."<C>"`, and cqf compiles that against a synthetic library that includes
+    // the PD's library UNDER THIS NAME — so the qualifier must be the CQL header, NOT the
+    // FHIR url-tail id. It is the entry's `libraryName` for BOTH an interface re-export (=
+    // the id) AND a name-keeping Root (the RAW CRL library name, which ≠ the `policyIdBase`
+    // id that `identityForEntry` deliberately returns `undefined` for). Falls back to the
+    // source library name on the degenerate no-manifest-entry path.
+    const guardQualifierLibraryName =
+      (interfaceEntry ?? nameKeepingRootEntry)?.libraryName ?? lib.libraryName;
 
     // #186 follow-up — the `library[]` + interface-scope the ActivityDefinitions and
     // recommendation PlanDefinitions bind to. A SUPPRESSED activities-only library
@@ -1591,6 +1608,7 @@ export function emitFhirDefClosure(
         libraryReferenceSuffix,
         caseFeatureInputResolver,
         libCriterionTable,
+        guardQualifierLibraryName,
       );
       if (decResult.resource) resources.push(decResult.resource);
       errors.push(...decResult.errors);

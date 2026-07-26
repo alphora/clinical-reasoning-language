@@ -122,6 +122,74 @@ describe("#224 ii.1c — criterion CQL emit (closure + interface surface)", () =
   });
 });
 
+// ── #224 iii.1 — per-action guard emit, end-to-end through the real orchestrator ──
+// A concept referenced ONLY by a SELF-QUALIFIED `unless` action guard must (a) get an
+// Interface re-export (else the negated condition dangles at $apply — the self-qualified
+// normalization fix), (b) emit a case-feature StructureDefinition + action input, and
+// (c) lower to a library-qualified, Coalesce-wrapped negated applicability condition.
+const GUARD_POLICY = `# Policy
+library "Policy".
+concept "Gate Concept":
+- type is Observation.
+- code is \`gate\`.
+concept "Blocker":
+- type is Observation.
+- code is \`blocker\`.
+decision "PolicyDec":
+first:
+- when "Gate Concept" then:
+  any:
+  - recommend activity "Act" unless "Policy"."Blocker".
+  - recommend activity "No".
+  end.
+${ACTIVITIES}`;
+
+describe("#224 iii.1 — per-action guard emit (self-qualified, guard-only concept)", () => {
+  it("re-exports the guard-only concept on the INTERFACE (self-qualified `unless \"Policy\".\"Blocker\"` does not dangle)", () => {
+    withPolicy(GUARD_POLICY, (root) => {
+      const result = emitCQLImports(path.join(root, "policy.crl"));
+      expect(result.success).toBe(true);
+      // Before the interfaceSurface normalization fix, `"Policy"."Blocker"` was skipped as a
+      // qualified ref → no re-export → the emitted negated condition referenced a missing define.
+      const iface = result.cqlByLibrary.find((e) => e.libraryName === "PolicyInterface")?.cql ?? "";
+      expect(iface).toContain("Blocker");
+    });
+  });
+
+  it("emits the negated condition (qualified + Coalesce) + the guard concept's input & case-feature SD", () => {
+    withPolicy(GUARD_POLICY, (root) => {
+      const result = emitFhirDefFromPath(path.join(root, "policy.crl"), { date: "2026-06-04" });
+      expect(result.success).toBe(true);
+      const resources = result.resources.map((r) => r.resource as Record<string, any>);
+      // (a) the negated applicability condition, library-qualified to the Interface + Coalesce.
+      const pd = resources.find((r) => r.resourceType === "PlanDefinition" && String(r.id).includes("policydec"));
+      const conds: any[] = [];
+      const stack = [...(pd!.action ?? [])];
+      while (stack.length) {
+        const a = stack.pop();
+        if (a.condition) conds.push(...a.condition);
+        if (a.action) stack.push(...a.action);
+      }
+      const neg = conds.find((c) => c.expression?.language === "text/cql-expression");
+      expect(neg?.expression.expression).toBe('not Coalesce("PolicyInterface"."Blocker", false)');
+      // (b) a case-feature StructureDefinition for the guard-only concept.
+      const sd = resources.find(
+        (r) => r.resourceType === "StructureDefinition" && String(r.id).includes("blocker"),
+      );
+      expect(sd).toBeDefined();
+      // (c) the guarded action carries an input profiled to that SD (no dangle).
+      const actStack = [...(pd!.action ?? [])];
+      let guardedInputProfile: string | undefined;
+      while (actStack.length) {
+        const a = actStack.pop();
+        if (a.title === "Act" && a.input) guardedInputProfile = a.input[0]?.profile?.[0];
+        if (a.action) actStack.push(...a.action);
+      }
+      expect(guardedInputProfile).toBe(sd!.url);
+    });
+  });
+});
+
 // ── ii.2 Battery 1 — PARSE-DRIVEN parity (the full pipeline, not just the emitter) ──
 // AST-constructed parity (criterionEmit.test.ts) bypasses builder classification + lowering.
 // A classification bug (a criterion ref left as a concept ref → silent cascade-suppression) is

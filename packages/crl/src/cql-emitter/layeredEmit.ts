@@ -64,7 +64,7 @@ import type {
   ActionStatement,
   InterfaceSourceLayer,
 } from "../ast/types";
-import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
+import { getRefName, getRefLibrary, isQualifiedRef, normalizeLocalRef } from "../ast/types";
 import { branchConditionConceptRefsExpanded } from "../ast/branchCondition";
 import { buildCriterionTable } from "../ast/criterionExpansion";
 import { pascalCaseNameForId } from "../fhir-emitter/slug";
@@ -953,13 +953,17 @@ export function interfaceSurface(ast: CRL): { name: string; sourceLayer: Layer |
   const out: { name: string; sourceLayer: Layer | undefined }[] = [];
   const seen = new Set<string>();
   const add = (ref: ReferenceName): void => {
-    // F5 — SKIP a qualified ref (`"OtherLib"."X"`). Cross-library concept refs in
-    // a decision when/guard are v0-unsupported; stripping the qualifier to bare
-    // `X` (the pre-F5 `getRefName` behavior) would mis-look-up a same-named LOCAL
-    // concept and synthesize a wrong Interface re-export. Leave it for the normal
-    // cross-library resolution path instead of fabricating a same-name re-export.
-    if (isQualifiedRef(ref)) return;
-    const name = getRefName(ref);
+    // F5 — NORMALIZE a self-qualified ref (`ThisLib."X"` inside `ThisLib`) to bare `X`
+    // FIRST: it IS local and MUST get an Interface re-export, else the emitted decision's
+    // `text/cql-identifier` (positive) or negated `text/cql-expression` (`unless`, #224
+    // iii.1) condition references a define the Interface never published → dangles at
+    // `$apply`. Only a GENUINELY FOREIGN qualified ref (`OtherLib."X"`, still qualified
+    // after normalization — cross-library, v0-unsupported) is skipped: stripping it to
+    // bare would mis-look-up a same-named LOCAL concept. Parity with the FHIR lane's
+    // `normalizeLocalRef` (decision.ts) + `collectCaseFeatures` (closureOrchestrator.ts).
+    const normalized = normalizeLocalRef(ref, ast.library.name);
+    if (isQualifiedRef(normalized)) return;
+    const name = getRefName(normalized);
     if (!seen.has(name)) {
       seen.add(name);
       out.push({ name, sourceLayer: maps.concept.get(name) });

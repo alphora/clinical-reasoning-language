@@ -35,7 +35,7 @@ import { buildCRL } from "../index";
 import { parseMetaTag } from "../meta/parseMetaTag";
 import { emitCqlTags, emitsToCql, suppressStatusesOf } from "../meta/registry";
 import { matchNarrative } from "../template-match";
-import { cqlStringLiteral } from "./cqlStrings";
+import { cqlStringLiteral, cqlQuotedIdentifier } from "./cqlStrings";
 import type {
   CanonicalArg,
   CanonicalPatternCall,
@@ -230,9 +230,9 @@ function functionNameFor(canonical: string): string {
 // so the two lanes can't drift (they previously did: this helper escaped only `\`/`'`, missing control chars).
 const cqlString = cqlStringLiteral;
 
-function cqlIdent(s: string): string {
-  return '"' + s.replace(/"/g, '\\"') + '"';
-}
+// Delegate to the shared quoter (cqlStrings) so the CQL lane and the FHIR lane's
+// inline `text/cql-expression` guard can't drift. Escapes `\` first, then `"`.
+const cqlIdent = cqlQuotedIdentifier;
 
 // CQL simple identifier: starts with letter or underscore, then word chars.
 // Library identifiers that match this can be emitted unquoted, EXCEPT when

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type {
   Action,
+  ActionStatement,
   Activity,
   ActivityType,
   BlockBody,
@@ -17,7 +18,7 @@ import type {
   WhenBlock,
   WhenBlockBody,
 } from "../../ast/types";
-import { libraryCanonicalUrl } from "../library";
+import { libraryCanonicalUrl, libraryId } from "../library";
 import {
   type ActivityResolver,
   type CaseFeatureInputResolver,
@@ -68,6 +69,22 @@ function useDec(name: string): UseDecision {
 }
 function leaf(action: Action): WhenBlockBody {
   return { type: "ActionStatement", action, location: LOC };
+}
+// #224 iii.1 — a menu ActionStatement carrying an `unless`/`only when` guard. `guardRef`
+// is bare (string) or qualified (`{libraryName,name}`). `guardLoc` lets a test pin the
+// diagnostic location distinctly from the statement location.
+const GUARD_LOC = { start: { line: 7, column: 3 }, end: { line: 7, column: 3 } } as const;
+function guarded(
+  action: Action,
+  polarity: "unless" | "only-when",
+  guardRef: string | { libraryName: string; name: string },
+): ActionStatement {
+  return {
+    type: "ActionStatement",
+    action,
+    guard: { type: "ActionGuard", polarity, conceptName: guardRef, location: GUARD_LOC },
+    location: LOC,
+  };
 }
 function block(qualifier: BlockQualifier | undefined, statements: BlockBody["statements"]): BlockBody {
   const body: BlockBody = {
@@ -326,6 +343,141 @@ describe("decision — action tree mapping", () => {
     const r = resource!.resource as Record<string, unknown>;
     const outer = (r.action as Array<Record<string, unknown>>)[0]!;
     expect(outer.extension).toBeUndefined();
+  });
+});
+
+/* ─── Per-action guards (`unless` / `only when`) — #224 iii.1 ─────── */
+
+describe("decision — per-action guard emit (#224 iii.1)", () => {
+  // The qualifier the negated form uses = the PD's `library[]` target name. Tests call
+  // emitDecisionPlanDefinition with libraryReferenceSuffix defaulting to undefined, so the
+  // qualifier is the name-keeping Root name for this metadata.
+  const Q = libraryId(METADATA, undefined);
+
+  type Cond = { kind: string; expression: { language: string; expression: string } };
+  // Depth-first find of the first action with the given title in a PlanDefinition tree.
+  function findAction(r: Record<string, unknown>, title: string): Record<string, unknown> | undefined {
+    const stack = [...((r.action as Array<Record<string, unknown>>) ?? [])];
+    while (stack.length) {
+      const a = stack.pop()!;
+      if (a.title === title) return a;
+      if (a.action) stack.push(...(a.action as Array<Record<string, unknown>>));
+    }
+    return undefined;
+  }
+  // A decision whose `when "Top"` body is a one-item `any:` menu holding the guarded action.
+  function guardedMenu(item: ActionStatement): Decision {
+    return decision("D", [when("Top", block("any", [item]))], "first");
+  }
+  function emitGuarded(
+    d: Decision,
+    opts: { concept?: ConceptResolver; input?: CaseFeatureInputResolver; lib?: string } = {},
+  ) {
+    return emitDecisionPlanDefinition(
+      d,
+      opts.lib ?? "Lib",
+      METADATA,
+      opts.concept ?? RESOLVE_ALL,
+      RESOLVE_ACT_OK,
+      RESOLVE_DEC_OK,
+      true,
+      { clock: FIXED_CLOCK },
+      undefined,
+      opts.input ?? (() => []),
+    );
+  }
+
+  it("`only when C` → positive text/cql-identifier (bare, byte-identical to a when atom)", () => {
+    const { resource } = emitGuarded(guardedMenu(guarded(recommend("A"), "only-when", "Eligible")));
+    const cond = (findAction(resource!.resource as Record<string, unknown>, "A")!.condition as Cond[])[0]!;
+    expect(cond.kind).toBe("applicability");
+    expect(cond.expression.language).toBe("text/cql-identifier");
+    expect(cond.expression.expression).toBe("Eligible");
+  });
+
+  it("`unless C` (multi-word) → negated `not Coalesce(\"<Lib>\".\"<name>\", false)`", () => {
+    const { resource } = emitGuarded(
+      guardedMenu(guarded(recommend("A"), "unless", "Has Antihypertensive Contraindication")),
+    );
+    const cond = (findAction(resource!.resource as Record<string, unknown>, "A")!.condition as Cond[])[0]!;
+    expect(cond.kind).toBe("applicability");
+    expect(cond.expression.language).toBe("text/cql-expression");
+    // library-qualified (cqf's synthetic expression library resolves the concept there,
+    // disc 310) + Coalesce (null-safe two-valued, matches CRE — disc 310 round 2).
+    expect(cond.expression.expression).toBe(
+      `not Coalesce("${Q}"."Has Antihypertensive Contraindication", false)`,
+    );
+  });
+
+  it("an UNGUARDED menu action emits no condition[] (byte-unchanged from pre-iii.1)", () => {
+    const { resource } = emitGuarded(decision("D", [when("Top", block("any", [leaf(recommend("A"))]))], "first"));
+    const a = findAction(resource!.resource as Record<string, unknown>, "A")!;
+    expect(a.condition).toBeUndefined();
+    expect(a.definitionCanonical).toBe(RESOLVE_ACT_OK("A"));
+  });
+
+  it("resolves BOTH an unresolved guard AND an unresolved leaf; suppresses the item; guard diag at guard.location", () => {
+    const conceptResolver: ConceptResolver = (ref) => {
+      const name = typeof ref === "string" ? ref : ref.name;
+      return name === "Missing Guard" ? null : name;
+    };
+    const activityResolver: ActivityResolver = (ref) =>
+      (typeof ref === "string" ? ref : ref.name) === "Missing Act" ? null : RESOLVE_ACT_OK(ref);
+    const d = guardedMenu(guarded(recommend("Missing Act"), "unless", "Missing Guard"));
+    const { unmatched } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, conceptResolver, activityResolver, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
+    );
+    const guardIdx = unmatched.findIndex((u) => u.kind === "unresolved-concept" && u.text.includes("Missing Guard"));
+    const leafIdx = unmatched.findIndex((u) => u.text.includes("Missing Act"));
+    expect(guardIdx).toBeGreaterThanOrEqual(0); // report-everything: both surface
+    expect(leafIdx).toBeGreaterThanOrEqual(0);
+    expect(guardIdx).toBeLessThan(leafIdx); // guard resolved (and diagnosed) BEFORE the leaf
+    expect(unmatched[guardIdx]!.line).toBe(GUARD_LOC.start.line); // diagnostic at the guard's own span
+  });
+
+  it("adds the guard concept as action.input[] (case-feature parity with a when atom)", () => {
+    const inputResolver: CaseFeatureInputResolver = (name) =>
+      name === "Has Contraindication"
+        ? [{ name: "Has Contraindication", canonical: "http://example.org/sd/has-contra" }]
+        : [];
+    const { resource } = emitGuarded(
+      guardedMenu(guarded(recommend("A"), "unless", "Has Contraindication")),
+      { input: inputResolver },
+    );
+    const a = findAction(resource!.resource as Record<string, unknown>, "A")!;
+    const inputs = a.input as Array<{ profile: string[] }>;
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]!.profile).toEqual(["http://example.org/sd/has-contra"]);
+  });
+
+  it("self-qualified `unless MyLib.\"C\"` inside MyLib normalizes to bare C (condition parity, F5)", () => {
+    const d = guardedMenu(guarded(recommend("A"), "unless", { libraryName: "MyLib", name: "Contra" }));
+    const { resource } = emitGuarded(d, { lib: "MyLib" });
+    const cond = (findAction(resource!.resource as Record<string, unknown>, "A")!.condition as Cond[])[0]!;
+    // normalized to bare `Contra`, then qualified with the emitting library's PD-target name.
+    expect(cond.expression.expression).toBe(
+      `not Coalesce("${libraryId(METADATA, undefined)}"."Contra", false)`,
+    );
+  });
+
+  it("`only when C` also contributes action.input[] (shared case-feature path)", () => {
+    const inputResolver: CaseFeatureInputResolver = (name) =>
+      name === "Eligible" ? [{ name: "Eligible", canonical: "http://example.org/sd/eligible" }] : [];
+    const { resource } = emitGuarded(guardedMenu(guarded(recommend("A"), "only-when", "Eligible")), {
+      input: inputResolver,
+    });
+    const inputs = (findAction(resource!.resource as Record<string, unknown>, "A")!.input as Array<{
+      profile: string[];
+    }>);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]!.profile).toEqual(["http://example.org/sd/eligible"]);
+  });
+
+  it("a guarded `use decision` member lowers its guard + resolves the sub-decision leaf", () => {
+    const { resource } = emitGuarded(guardedMenu(guarded(useDec("Sub"), "unless", "Blocker")));
+    const a = findAction(resource!.resource as Record<string, unknown>, "Sub")!;
+    expect((a.condition as Cond[])[0]!.expression.expression).toBe(`not Coalesce("${Q}"."Blocker", false)`);
+    expect(a.definitionCanonical).toBe(RESOLVE_DEC_OK("Sub"));
   });
 });
 

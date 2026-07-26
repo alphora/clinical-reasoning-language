@@ -389,15 +389,15 @@ eligible. If every item in the menu is guarded out, the branch produces nothing
 (a runtime diagnostic) — keep at least one always-offered item when a disposition
 is required.
 
-> ⚠ **Emit status (as of this writing):** action guards are honored in CRE /
-> scenario **execution**, but the FHIR emitter does **not yet** lower them — a
-> guarded menu member currently emits into `PlanDefinition` **without** its
-> condition (emit-lowering is a tracked follow-up). Until that lands, do not rely
-> on an `unless` / `only when` guard being enforced by a downstream FHIR engine;
-> a contraindication that must hold in the shipped artifact should be modeled as a
-> branch instead. (Action guards are legal **only** on members of a multi-action
-> `any:` / `all:` block — rejected on an inline `when … then recommend …` action,
-> on an `otherwise` action, and on a single menu-less action; see the don't-case.)
+Action guards **lower to FHIR** (`#224` iii.1): a guarded menu member emits its
+own `PlanDefinition.action.condition[kind="applicability"]`. `only when "C"` emits
+the same positive `text/cql-identifier` a branch atom does; `unless "C"` emits an
+inline `text/cql-expression` `not "<Library>"."C"` — a single negated atom, library-
+qualified so a downstream FHIR engine (`$apply`) resolves the concept in the plan's
+library. The guard concept is also surfaced as a case-feature `input`, exactly like a
+branch atom, so DTR asks for it. (Action guards are legal **only** on members of a
+multi-action `any:` / `all:` block — rejected on an inline `when … then recommend …`
+action, on an `otherwise` action, and on a single menu-less action; see the don't-case.)
 
 ### Nested `first:` and an `otherwise` carrying a body
 A nested `first:` may omit `otherwise` when its branches are exhaustive.

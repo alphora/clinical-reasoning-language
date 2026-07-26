@@ -92,3 +92,63 @@ describe("collectCaseFeatures — foreign-qualified condition does not clobber a
     expect(collection.unionConcepts.map((c) => c.name)).toEqual(["Active Crohns Disease"]);
   });
 });
+
+/**
+ * #224 iii.1 — a concept referenced ONLY by an `unless`/`only when` ACTION guard is a
+ * case feature too. `collectCaseFeatures` must walk action-block members' guards, else
+ * the concept never enters `unionConcepts` (no case-feature SD emitted) and the emit-site
+ * `action.input` dangles. An integrated test (real parse + lower + collect) — a
+ * hand-supplied resolver unit test would pass while the real orchestrator dropped it.
+ */
+const GUARD_ONLY_SOURCE = `library "Guard Only".
+
+concept "Procedure Requested":
+- type is Procedure.
+- code is \`procedure-requested\`.
+
+concept "Has Contraindication":
+- type is Observation.
+- code is \`has-contraindication\`.
+
+activity "Approve":
+- request CPGServiceRequest.
+
+activity "Deny":
+- request CPGServiceRequest.
+
+decision "Coverage":
+first:
+- when "Procedure Requested" then:
+  any:
+  - recommend activity "Approve" unless "Has Contraindication".
+  - recommend activity "Deny".
+  end.
+`;
+
+describe("collectCaseFeatures — a guard-only concept is collected (#224 iii.1)", () => {
+  it("`Has Contraindication`, used ONLY in an `unless` guard, enters unionConcepts + inputsByCondition", () => {
+    const parsed = buildCRL(GUARD_ONLY_SOURCE);
+    if (!parsed.success || !parsed.result) {
+      throw new Error(`parse failed: ${JSON.stringify(parsed.errors)}`);
+    }
+    const ast = parsed.result;
+    const lowered = lowerLocalCodes(ast, {
+      canonicalBase: "http://example.org/crl/guard-only",
+      localDomainId: "guard-only-fixture",
+    });
+    expect(lowered.errors).toEqual([]);
+    const decisions = ast.statements.filter((s): s is Decision => s.type === "Decision");
+
+    const collection = collectCaseFeatures(lowered, decisions, "Guard Only");
+
+    // The guard concept is queryable (drives the emit-site action.input) …
+    const guardInputs = collection.inputsByCondition.get("Has Contraindication");
+    expect(guardInputs).toBeDefined();
+    expect(guardInputs!.map((c) => c.name)).toEqual(["Has Contraindication"]);
+    // … and in the union (drives the emitted case-feature StructureDefinition).
+    expect(collection.unionConcepts.map((c) => c.name).sort()).toEqual([
+      "Has Contraindication",
+      "Procedure Requested",
+    ]);
+  });
+});

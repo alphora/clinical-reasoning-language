@@ -87,8 +87,9 @@ import {
   branchConditionArmCount,
 } from "../ast/branchCondition";
 import { expandGuardOrRecord, type CriterionTable } from "../ast/criterionExpansion";
+import { cqlQuotedIdentifier } from "../cql-emitter/cqlStrings";
 import type { CRLError } from "../types/errors";
-import { libraryCanonicalUrl } from "./library";
+import { libraryCanonicalUrl, libraryId } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
 import { capSlug, pascalCaseName, policyIdBase, slugify } from "./slug";
 import { tarjanSCC } from "./tarjan";
@@ -330,6 +331,13 @@ export function emitDecisionPlanDefinition(
   // expanded gated-by-the-GLOBAL-envelope at `emitWhenBlock` entry. Defaults to empty so
   // cms / unit-test callers with no criteria are byte-unchanged (every guard fast-paths).
   criterionTable: CriterionTable = new Map(),
+  // #224 iii.1 (A″) — the CQL library NAME (`library X` header) of the library the PD's
+  // `library[]` references — the qualifier a negated `unless` guard uses (`not "<name>"."<C>"`,
+  // resolved by cqf's synthetic expression include). The orchestrator threads the manifest
+  // entry's `libraryName` (correct for interface AND name-keeping-Root shapes). A direct
+  // caller/test that omits it falls back to `libraryId(metadata, libraryReferenceSuffix)` —
+  // the pre-A″ value, correct whenever the CQL header == the FHIR id (layered policies).
+  guardQualifierLibraryName: string | undefined = undefined,
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -365,6 +373,8 @@ export function emitDecisionPlanDefinition(
     errors,
     unmatched,
     criterionTable,
+    guardQualifierLibraryName:
+      guardQualifierLibraryName ?? libraryId(metadata, libraryReferenceSuffix),
   };
   const topLevelResults = decision.body.statements.map((branch) =>
     emitBranch(branch, ctx, decision.body.qualifier),
@@ -498,6 +508,12 @@ interface EmitCtx {
   // all see the fully-inlined guard (sole-ref collapse + byte-identity, disc 303 C3). Empty
   // for callers with no criteria (cms / unit tests) → every guard fast-paths to identity.
   criterionTable: CriterionTable;
+  // #224 iii.1 — the CQL library NAME the PlanDefinition's `library[]` targets (the
+  // Interface re-export, or the name-keeping Root). A NEGATED `unless` guard's inline
+  // `text/cql-expression` must LIBRARY-QUALIFY its concept (`not "<Lib>"."<C>"`) so
+  // cqf-fhir-cr's synthetic expression library can resolve it (disc 310). = `libraryId(
+  // metadata, libraryReferenceSuffix)`, matching the emitted Library.id / CQL `library X`.
+  guardQualifierLibraryName: string;
 }
 
 /**
@@ -584,6 +600,59 @@ function atomKey(normalized: ReferenceName): string {
 }
 
 /**
+ * The `condition[kind="applicability"]` entry for a SINGLE guard atom (#224 iii.1).
+ *
+ * `"positive"` → the byte-identical `text/cql-identifier` form the `when` single-ref
+ * path emits: a BARE define name that `$apply` resolves directly against the
+ * PlanDefinition's `library[]`. `"negated"` (`unless`) → an inline `text/cql-expression`
+ * `not "<Lib>"."<name>"`: the MINIMAL structural negation of ONE atom. The
+ * compound-boolean invariant is untouched — there is no compound here.
+ *
+ * ⚠ WHY THE NEGATED FORM IS LIBRARY-QUALIFIED (empirically verified against cqf-fhir-cr
+ * 4.7.0, disc 310). `$apply` compiles a `text/cql-expression` condition as an ISOLATED
+ * synthetic library that INCLUDES the PlanDefinition's primary library under its NAME —
+ * so a bare `not "<name>"` FAILS ("Could not resolve identifier … in the current
+ * library"), while `not "<Lib>"."<name>"` resolves. (The positive `text/cql-identifier`
+ * path resolves bare because that language is a direct define lookup, not a compiled
+ * expression.) `<Lib>` is the PlanDefinition's `library[]` target — the Interface
+ * re-export (or the name-keeping Root) that carries the concept define.
+ *
+ * ⚠ INVARIANT BOUNDARY — do NOT stretch this in iii.3. `text/cql-expression` is
+ * permitted ONLY for `not <single-atom>`. ANY composition (`not (A and B)`, an `or`
+ * of negated atoms, …) MUST De Morgan / DNF into arms FIRST — each arm then carries
+ * positive/negated single-atom conditions. A decision boolean NEVER lowers to one
+ * opaque CQL expression (the load-bearing #224 invariant).
+ *
+ * ⚠ NULL-SAFE by construction — `not Coalesce(<ref>, false)`. Most guard-reachable
+ * Interface defines terminate in `.satisfied()` = `exists(...)` (CaseFeatureCommon.cql),
+ * a TOTAL non-null Boolean. But the guard slot admits ANY concept (`CONCEPT_REF_KINDS`),
+ * and the Interface layer has a "legacy plain re-export" define shape (layeredEmit.ts)
+ * that is not `satisfied()`-wrapped and could be null. `not null` = null → `$apply`
+ * would EXCLUDE the item, DIVERGING from the CRE `evalGuard` semantics (`unless:
+ * excluded = sat`; a missing concept → sat=false → item INCLUDED). Wrapping in
+ * `Coalesce(<ref>, false)` makes the negation two-valued for EVERY define shape and
+ * provably matches CRE (missing/null → false → not → true → INCLUDED). The positive
+ * `only when` form needs no coalesce (null → excluded already matches CRE's missing →
+ * excluded).
+ */
+function guardApplicabilityCondition(
+  polarity: "positive" | "negated",
+  conceptCqlId: string,
+  qualifierLibraryName: string,
+): Record<string, unknown> {
+  const expression =
+    polarity === "negated"
+      ? {
+          language: "text/cql-expression",
+          expression: `not Coalesce(${cqlQuotedIdentifier(qualifierLibraryName)}.${cqlQuotedIdentifier(
+            conceptCqlId,
+          )}, false)`,
+        }
+      : { language: "text/cql-identifier", expression: conceptCqlId };
+  return { kind: "applicability", expression };
+}
+
+/**
  * Recursive WhenBlock → action emit. Returns the tri-state result (1..N actions).
  * A SINGLE-ref guard takes the byte-identical pre-#224 path; a COMPOUND guard
  * (`and`/`or`) lowers structurally via `emitCompoundWhenBlock`. Cascade rules per
@@ -652,12 +721,7 @@ function emitWhenBlock(
     title: refName,
     description: refName,
     code: guidelineCareCode(),
-    condition: [
-      {
-        kind: "applicability",
-        expression: { language: "text/cql-identifier", expression: conceptCqlId },
-      },
-    ],
+    condition: [guardApplicabilityCondition("positive", conceptCqlId, ctx.guardQualifierLibraryName)],
   };
 
   // Action-level `input[]` — skip ONLY when the NORMALIZED ref is still qualified
@@ -920,24 +984,70 @@ function emitBlockStatement(
   if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock")
     return emitBranch(stmt, ctx, enclosingQualifier);
 
-  // ActionStatement at the body level (no enclosing WhenBlock condition).
-  // Per CRL grammar this happens inside a BlockBody with no condition —
-  // emit a bare action with definitionCanonical, no condition[].
+  // ActionStatement at the body level (a BlockBody menu member). It may carry a
+  // per-action guard (`unless` / `only when`, #224 iii.1) that lowers to this
+  // action's `condition[kind=applicability]` — `only when` → the positive
+  // `text/cql-identifier` (byte-identical to a `when` single-ref atom), `unless` →
+  // the negated `text/cql-expression` `not "<name>"` (guardApplicabilityCondition).
   //
-  // TODO (per-action guards — emit-lowering phase): a menu member may carry
-  // `stmt.guard` (an `unless` / `only when` applicability guard). It must lower
-  // to this action's `condition[kind=applicability]` (unless -> not, only when
-  // -> identity), mirroring the `when`-branch condition path in emitBranch.
-  // Guarded members currently emit WITHOUT their condition. See docs/decision-shapes.md.
-  const leafResult = emitLeafAction(stmt.action, ctx);
-  if (leafResult === null) return { kind: "suppressed", reason: "unresolved-ref" };
+  // Resolve the GUARD first, then the leaf, collecting BOTH diagnostics before
+  // suppressing once (report-everything, parity with the compound-guard path at
+  // emitCompoundWhenBlock: an item with an unresolved guard AND an unresolved leaf
+  // surfaces both). An unresolved guard must SUPPRESS the item — never silently
+  // drop the exclusion by emitting the action unconditionally.
+  let unresolved = false;
 
+  let guardCondition: Record<string, unknown> | undefined;
+  let guardInputName: string | undefined;
+  if (stmt.guard) {
+    // Self-qualified `MyLib."C"` inside `MyLib` → bare `C`. A genuinely FOREIGN ref
+    // (still qualified after normalization) is cross-library-unsupported (v0) →
+    // suppress EXPLICITLY rather than leaning on the resolver to null it: a direct
+    // caller's resolver may resolve foreign refs (the activity resolver does), and an
+    // un-suppressed foreign guard would emit a wrong-library qualifier + an F2 input
+    // clobber. Parity with the when single-ref path's `isQualifiedRef` input defense.
+    const normalized = normalizeLocalRef(stmt.guard.conceptName, ctx.libraryName);
+    const cqlId = isQualifiedRef(normalized) ? null : ctx.conceptResolver(normalized);
+    if (cqlId === null) {
+      ctx.unmatched.push({
+        kind: "unresolved-concept",
+        text: refDisplay(stmt.guard.conceptName), // raw ref — parity with the when path
+        line: stmt.guard.location?.start.line,
+        column: stmt.guard.location?.start.column,
+      });
+      unresolved = true;
+    } else {
+      guardCondition = guardApplicabilityCondition(
+        stmt.guard.polarity === "unless" ? "negated" : "positive",
+        cqlId,
+        ctx.guardQualifierLibraryName,
+      );
+      // The guard concept is a case feature (its `code is` closure → an SD + input).
+      // A still-qualified ref never reaches here (it resolved to null above), so no
+      // qualified-skip is needed — buildActionInputs receives a local name.
+      guardInputName = getRefName(normalized);
+    }
+  }
+
+  const leafResult = emitLeafAction(stmt.action, ctx); // pushes its own unresolved-* on null
+  if (leafResult === null) unresolved = true;
+
+  if (unresolved) return { kind: "suppressed", reason: "unresolved-ref" };
+
+  // Field order mirrors the when path: title, description, code, condition?, input?,
+  // definitionCanonical. An UNGUARDED action omits condition/input → byte-identical
+  // to pre-iii.1.
   const action: Record<string, unknown> = {
     title: actionTitle(stmt.action),
     description: actionTitle(stmt.action),
     code: guidelineCareCode(),
-    definitionCanonical: leafResult,
   };
+  if (guardCondition) action.condition = [guardCondition];
+  if (guardInputName) {
+    const inputs = buildActionInputs([guardInputName], ctx);
+    if (inputs) action.input = inputs;
+  }
+  action.definitionCanonical = leafResult;
   return { kind: "emitted", actions: [action] };
 }
 
