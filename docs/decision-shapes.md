@@ -194,11 +194,14 @@ Syntax and semantics:
   don't-case).
 - **A criterion holds only branch-guard logic**, never actions. It cannot
   `recommend` or `use`; it is a boolean condition, not a sub-decision.
-- **It is library-local.** A criterion is referenced **unqualified**; a
-  library-qualified criterion reference (`"OtherLib"."X"`) is rejected as
-  `criterion-misuse` ("cannot be library-qualified"). Criteria are not
-  cross-library exports — to share guard logic across libraries, share a
-  **concept** (which can be qualified) or delegate to a `use decision`.
+- **It is library-local.** Reference a criterion **unqualified** (a same-library
+  self-qualification, `"CurrentLib"."X"`, also resolves — it is treated as the
+  bare ref). What is rejected is a **foreign** library-qualified reference: once
+  the other library is `include`d, `"OtherLib"."X"` where `X` is a criterion
+  there is `criterion-misuse` ("cannot be library-qualified"); before it is
+  included, you get the more basic `external-library-not-included` first.
+  Criteria are not cross-library exports — to share guard logic across libraries,
+  share a **concept** (which can be qualified) or delegate to a `use decision`.
 - **Errors:** a cycle (`A` references `B` references `A`, or a self-reference) is
   rejected (`criterion-cycle`); using a criterion name where only a concept
   belongs — inside `defined as` / `sem-*`, a narrative, or a per-action
