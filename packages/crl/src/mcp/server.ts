@@ -3,7 +3,8 @@
 // bundled server (packages/crl-vscode/src/mcp-server.ts) — both are thin shims that import
 // createServer/main/selfTest from here, so the two can no longer drift. No module-level dispatch:
 // importing this module must NOT start a server (the thin entries own the argv dispatch).
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { basename } from "node:path";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -25,7 +26,7 @@ import { validateAndBuildMvFlagDraft, flagStoreDir, loadFlags, saveFlag, isOpen,
 import type { CreateFlagTarget, MvFlag, MvFlagScope, FlagStatus } from "../index";
 // canonicalize a selector's tag alias — `canonicalFlagTag` (the flag vocab), NOT the `.crl` registry's `canonicalTag`
 // (#212 step 4: flag tags left the registry, so the registry no longer knows them; the store holds the canonical tag).
-import { validateProvenanceFiles, generateProvenanceFiles } from "../provenance";
+import { validateProvenanceFiles, generateProvenanceFiles, buildAnchorArtifact } from "../provenance";
 
 // Caps the CRL SOURCE (input) size. Response size scales with this — there is
 // no separate output cap, but bounding input keeps responses bounded enough.
@@ -854,6 +855,42 @@ export function createServer(): McpServer {
   );
 
   server.registerTool(
+    "canonicalize_source",
+    {
+      title: "Canonicalize a refined-source .docx into the anchor .txt + sidecar",
+      description:
+        "Render a refined-source `.docx` into the CANONICAL anchor-source `.txt` plus a `<name>.anchormeta.json` " +
+        "sidecar — the byte-stable anchor that a provenance artifact's offsets cite into. This is the FIRST step of the " +
+        "provenance flow: `canonicalize_source` (make the anchor) → `generate_provenance` (scaffold clusters against " +
+        "the anchor's bytes) → attribute items → `validate_provenance`. It is the MCP equivalent of the " +
+        "`crl-canonicalize-source` CLI bin, so an MCP-only KE (no CLI) can now produce the anchor those provenance " +
+        "offsets require. Because a `.docx` is BINARY it can't be passed inline — pass `in` (an absolute path to the " +
+        "`.docx`); the tool WRITES two files and returns a summary. `out` (optional) sets the `.txt` path (default: the " +
+        "input path with its extension replaced by `.txt`); the sidecar is always written beside the `.txt` as " +
+        "`<name>.anchormeta.json`. The sidecar carries `textHash` (sha256 over the UTF-8 text — what " +
+        "`generate_provenance` re-hashes for `anchorSource.textHash`), `offsetUnit` (`utf8-byte`), `derivedFromHash`, " +
+        "and canonicalization `warnings`. Returns { success, textPath, metaPath, textHash, offsetUnit, byteLength, " +
+        "warnings }. WARNINGS ARE NON-FATAL — gate on the returned `warnings` array (they are also persisted in the " +
+        "sidecar), not on success alone; a hard/fail-closed canonicalization returns { success:false, error, warnings } " +
+        "and writes nothing. A missing/unreadable/oversized/directory `in` path is a tool error. ⚠ Offsets + `textHash` " +
+        "are comparable only within one canonicalization-rule version — regenerate the anchor if the source changes.",
+      inputSchema: {
+        in: z
+          .string()
+          .min(1)
+          .describe("Absolute path to the refined-source `.docx` to canonicalize."),
+        out: z
+          .string()
+          .optional()
+          .describe(
+            "Absolute path for the canonical `.txt` (default: the input path with its extension replaced by `.txt`). The `<name>.anchormeta.json` sidecar is written beside it.",
+          ),
+      },
+    },
+    (args) => runCanonicalizeSource(args as { in: string; out?: string }),
+  );
+
+  server.registerTool(
     "create_flag",
     {
       title: "Create a review flag (#205 crl-refactors)",
@@ -1014,6 +1051,85 @@ function countsByKind(diags: ReadonlyArray<{ kind: string }>): Record<string, nu
   const out: Record<string, number> = {};
   for (const d of diags) out[d.kind] = (out[d.kind] ?? 0) + 1;
   return out;
+}
+
+/**
+ * `canonicalize_source` — render a refined-source `.docx` into the canonical anchor-source `.txt` +
+ * a `<name>.anchormeta.json` sidecar, the SAME artifact the `crl-canonicalize-source` CLI produces.
+ * This is the anchor that `generate_provenance`'s offsets cite into — an MCP-only KE previously had
+ * no way to make it (the capability lived only in the CLI bin). WRITES the two files (a `.docx` is
+ * binary → it can't be passed inline), then returns a summary. `out` defaults to the input path with
+ * its extension replaced by `.txt`; the sidecar sits beside it as `<name>.anchormeta.json`.
+ */
+function runCanonicalizeSource(args: { in: string; out?: string }): {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+} {
+  const inPath = args.in;
+  // The `.docx` is BINARY — read it as a Buffer (not utf8), with the shared dir/size guards.
+  let input: Buffer;
+  try {
+    const st = statSync(inPath);
+    if (!st.isFile())
+      return { content: [{ type: "text", text: `in path "${inPath}" is not a file.` }], isError: true };
+    if (st.size > MAX_INPUT_BYTES)
+      return {
+        content: [{ type: "text", text: `in file too large: ${st.size} bytes > ${MAX_INPUT_BYTES}.` }],
+        isError: true,
+      };
+    input = readFileSync(inPath);
+  } catch (e) {
+    return {
+      content: [{ type: "text", text: `in path "${inPath}" not readable: ${(e as Error).message}` }],
+      isError: true,
+    };
+  }
+
+  const txtPath = args.out ?? inPath.replace(/\.[^./\\]+$/, "") + ".txt";
+  const metaPath = txtPath.replace(/\.txt$/i, "") + ".anchormeta.json";
+
+  const result = buildAnchorArtifact(input, basename(txtPath), inPath);
+  if (!result.ok) {
+    // A fail-closed canonicalization is a DOMAIN result (mirrors validate_* returning success:false), not a
+    // tool error — but nothing is written, so surface the structured error + any warnings.
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ success: false, error: result.error, warnings: result.warnings }, null, 2),
+        },
+      ],
+    };
+  }
+  try {
+    writeFileSync(txtPath, result.text, "utf8");
+    writeFileSync(metaPath, JSON.stringify(result.meta, null, 2) + "\n", "utf8");
+  } catch (e) {
+    return {
+      content: [{ type: "text", text: `canonicalized OK but failed to persist: ${(e as Error).message}` }],
+      isError: true,
+    };
+  }
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(
+          {
+            success: true,
+            textPath: txtPath,
+            metaPath,
+            textHash: result.meta.textHash,
+            offsetUnit: result.meta.offsetUnit,
+            byteLength: Buffer.byteLength(result.text, "utf8"),
+            warnings: result.meta.warnings,
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+  };
 }
 
 function runGenerateProvenance(args: {

@@ -6,9 +6,45 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { readFileSync, mkdtempSync, writeFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { deflateRawSync } from "node:zlib";
+
+// Minimal real `.docx` (a ZIP with one `word/document.xml`) — enough for the server's canonicalizer.
+function crc32(buf) {
+  let c = ~0 >>> 0;
+  for (let i = 0; i < buf.length; i++) {
+    c ^= buf[i];
+    for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+  }
+  return ~c >>> 0;
+}
+function makeDocx(text) {
+  const name = "word/document.xml";
+  const xml =
+    `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +
+    `<w:body><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:body></w:document>`;
+  const data = Buffer.from(xml, "utf8");
+  const comp = deflateRawSync(data);
+  const crc = crc32(data);
+  const nameB = Buffer.from(name, "utf8");
+  const lh = Buffer.alloc(30);
+  lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(8, 8);
+  lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(comp.length, 18); lh.writeUInt32LE(data.length, 22);
+  lh.writeUInt16LE(nameB.length, 26);
+  const local = Buffer.concat([lh, nameB, comp]);
+  const ch = Buffer.alloc(46);
+  ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(8, 10);
+  ch.writeUInt32LE(crc, 16); ch.writeUInt32LE(comp.length, 20); ch.writeUInt32LE(data.length, 24);
+  ch.writeUInt16LE(nameB.length, 28); ch.writeUInt32LE(0, 42);
+  const central = Buffer.concat([ch, nameB]);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(1, 8); eocd.writeUInt16LE(1, 10);
+  eocd.writeUInt32LE(central.length, 12); eocd.writeUInt32LE(local.length, 16);
+  return Buffer.concat([local, central, eocd]);
+}
 
 const here = dirname(fileURLToPath(import.meta.url));
 const serverPath = resolve(here, "../dist/mcp-server.js");
@@ -35,12 +71,13 @@ afterAll(async () => {
   if (connected) await client.close();
 });
 
-check("MCP tools: 16 registered (+ #205 write-half create_flag / set_flag_status)", async () => {
+check("MCP tools: 17 registered (+ canonicalize_source — the MCP-only anchor maker)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
       "authoring_kit",
       "build_crl_ast",
+      "canonicalize_source",
       "create_flag",
       "emit_cel",
       "emit_cql",
@@ -57,6 +94,32 @@ check("MCP tools: 16 registered (+ #205 write-half create_flag / set_flag_status
       "validate_provenance_worklist",
     ]);
   });
+
+check("canonicalize_source: a missing `in` path → tool error (isError)", async () => {
+  const r = await client.callTool({ name: "canonicalize_source", arguments: { in: "/no/such/file.docx" } });
+  assert.ok(r.isError, "an unreadable `in` path is a tool error");
+  assert.match(r.content[0].text, /not readable|is not a file/);
+});
+
+check("canonicalize_source: a real .docx → writes .txt + .anchormeta.json + returns textHash (round-trip through the BUILT server)", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "canon-"));
+  const docxPath = join(dir, "src.docx");
+  writeFileSync(docxPath, makeDocx("Hello world"));
+  const r = await client.callTool({ name: "canonicalize_source", arguments: { in: docxPath } });
+  assert.ok(!r.isError, `not a tool error: ${r.content?.[0]?.text}`);
+  const out = JSON.parse(r.content[0].text);
+  assert.equal(out.success, true);
+  const txtPath = join(dir, "src.txt");
+  const metaPath = join(dir, "src.anchormeta.json");
+  assert.equal(out.textPath, txtPath, "default .txt path derives from the input");
+  assert.equal(out.metaPath, metaPath, "sidecar sits beside the .txt");
+  assert.ok(existsSync(txtPath) && existsSync(metaPath), "wrote BOTH files");
+  assert.equal(readFileSync(txtPath, "utf8"), "Hello world", "the canonical text");
+  assert.match(out.textHash, /^sha256:[0-9a-f]{64}$/, "sha256 textHash");
+  assert.equal(out.offsetUnit, "utf8-byte");
+  const meta = JSON.parse(readFileSync(metaPath, "utf8"));
+  assert.equal(meta.textHash, out.textHash, "sidecar textHash == summary textHash");
+});
 
 check("authoring_kit (default = cpg base) → PA-free payload + embedded reference validates clean", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: {} });
