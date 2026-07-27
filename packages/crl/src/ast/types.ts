@@ -132,7 +132,7 @@ export interface Decision extends ASTNode {
 //
 // #224 ii: a named, reusable decision-guard sub-expression. `criterion "X": - when
 // ( <cond> ).` — the body is the SAME `BranchCondition` grammar as a `when` guard
-// (monotone and/or over concept/criterion refs; no `not`). A criterion is
+// (`and`/`or`/`not` over concept/criterion refs; #224 iii.3). A criterion is
 // AUTHORING-DRY: it inline-EXPANDS into the guard DNF and has NO FHIR mapping of
 // its own (the emitter emits nothing for it). A `when`/criterion-body ref to a
 // criterion is a distinct `BranchConditionCriterionRef` (below), replaced by this

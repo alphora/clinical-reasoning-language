@@ -200,10 +200,10 @@ case "AC":
     expect(t.operands.map((o) => o.op === "ref" && o.satisfied)).toEqual([true, false]);
   });
 
-  // #224 iii.2 — closed-world negation in the CRE. `runCel` runs NO validation (run.ts:72), so a
-  // `not` guard reaches evalBranchCondition even though the `decision-negation-unsupported` merge
-  // gate rejects it for validated authoring. It must EVALUATE (closed-world `!sat`), never throw.
-  describe("closed-world `not` (#224 iii.2 — unvalidated eval lane)", () => {
+  // #224 iii.2/iii.3 — closed-world negation in the CRE. `not` is a first-class, validated,
+  // emit-capable guard (iii.3); the CRE evaluates it closed-world (`!sat`), matching the emit-side
+  // `not Coalesce(<sat>, false)` two-valued semantics — never throws.
+  describe("closed-world `not` (#224 iii.2/iii.3)", () => {
     const notCrl = `library "GuardLib".
 ${LEAVES}
 decision "D":

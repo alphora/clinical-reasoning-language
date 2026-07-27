@@ -325,7 +325,7 @@ export class CRLAstBuilder
     return null as unknown as BranchBlock;
   }
 
-  // #224 i.2: build the `when` guard from a `branchCondition` — a monotone
+  // #224 i.2/iii.3: build the `when` guard from a `branchCondition` — an `and`/`or`/`not`
   // boolean over concept refs. A homogeneous chain (`A and B and C`) flattens to
   // ONE n-ary node (chain flatten); parens preserve nesting; a single ref stays
   // a ref (its OWN location, for per-operand find-refs). A MIXED bare chain

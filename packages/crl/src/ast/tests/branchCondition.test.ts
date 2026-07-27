@@ -6,7 +6,6 @@ import {
   branchConditionConceptRefsStrict,
   branchConditionDNF,
   branchConditionRefs,
-  collectNegations,
   containsNot,
   describeBranchCondition,
   soleRef,
@@ -314,21 +313,6 @@ describe("#224 iii.2 — `not` / negation-normal-form / signed-literal DNF", () 
   describe("soleRef — a `not` is never the sole-ref fast path", () => {
     it("`not A` → null (routes through DNF, not the single-ref emit path)", () => {
       expect(soleRef(not(ref("A")))).toBeNull();
-    });
-  });
-
-  describe("collectNegations — outermost `not` nodes for the merge gate", () => {
-    it("`A and not B` → one negation", () => {
-      expect(collectNegations(and(ref("A"), not(ref("B"))))).toHaveLength(1);
-    });
-    it("`not A and not B` → two distinct negations", () => {
-      expect(collectNegations(and(not(ref("A")), not(ref("B"))))).toHaveLength(2);
-    });
-    it("`not not A` → ONE (outermost only — does not descend into the negated operand)", () => {
-      expect(collectNegations(not(not(ref("A"))))).toHaveLength(1);
-    });
-    it("no `not` → empty", () => {
-      expect(collectNegations(and(ref("A"), ref("B")))).toEqual([]);
     });
   });
 

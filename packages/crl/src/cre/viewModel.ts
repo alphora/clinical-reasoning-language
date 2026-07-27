@@ -55,8 +55,8 @@ import {
  *  addition is OPTIONAL/additive — existing consumers reading `name`/`conceptRef` are unaffected (no bump). */
 // v2 (#224): `ConditionView.concept` → `ConditionView.expr` (guard expression tree).
 // v3 (#224 iii.2): `BranchConditionView` gains a `{ op: "not" }` variant (decision-guard
-//   negation). An exhaustive decoder must handle it; reachable only via the unvalidated
-//   render lane (the validator merge-gate rejects `not` for authored docs).
+//   negation). An exhaustive decoder must handle it. Now reachable on the VALIDATED lane too
+//   (#224 iii.3 — `not` is a first-class, emit-capable guard; the merge gate is gone).
 export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 3;
 
 type ActionKind = "recommend-activity" | "use-decision";
@@ -137,16 +137,17 @@ export interface ViewNode {
   children?: ViewNode[];
 }
 
-/** #224: a `when` guard is a monotone boolean expression tree. Leaves carry the
+/** #224: a `when` guard is an `and`/`or`/`not` boolean expression tree. Leaves carry the
  *  concept, its per-leaf `satisfied?`, `defined as` `explanation?`, and `facts`;
  *  and/or nodes carry their combined `satisfied?`. A simple guard is a single
  *  `ref`. Rich "which conjunct failed" rendering is i.4; i.2 makes it
  *  compound-SAFE + TRUTHFUL (no first-operand-masquerading-as-the-whole-guard). */
 export type BranchConditionView =
   | { op: "and" | "or"; satisfied?: boolean; operands: BranchConditionView[] }
-  // #224 iii.2: a decision-guard `not`. Structure-faithful so the VM stays total (never
-  // throws) on the unvalidated live-typing lane; `satisfied` is the closed-world negation
-  // from the CRE trace. Rich webview rendering of the negation lands in iii.3.
+  // #224 iii.2/iii.3: a decision-guard `not`. Structure-faithful; `satisfied` is the
+  // closed-world negation from the CRE trace. The flow + questionnaire panes render the `not`
+  // node today; PRECISE frontier/blocking attribution under negation (which negated literal
+  // blocked, vs the current `opaque` fallback) is iii.3b.
   | { op: "not"; satisfied?: boolean; operand: BranchConditionView }
   | { op: "ref"; satisfied?: boolean; concept: ConceptView; explanation?: ExplanationView; facts?: string[] };
 
@@ -742,7 +743,7 @@ export function unsatisfiedFrontier(v: BranchConditionView): Frontier {
 function rawFrontier(v: BranchConditionView): Frontier {
   if (v.op === "ref") return v.satisfied === false ? [{ kind: "ref", concept: v.concept }] : [];
   // #224 iii.2: a false `not` (the negated concept IS established → it blocked) surfaces as an
-  // opaque frontier item; precise "which negated literal" pinpointing is iii.3. A satisfied /
+  // opaque frontier item; precise "which negated literal" pinpointing is iii.3b. A satisfied /
   // unevaluated `not` contributes nothing.
   if (v.op === "not")
     return v.satisfied === false ? [{ kind: "opaque", label: describeConditionView(v) }] : [];

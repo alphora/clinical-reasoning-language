@@ -293,22 +293,24 @@ ${ACTS}`;
   });
 });
 
-// #224 iii.2 — the decision-negation MERGE GATE. `not` parses + lowers structurally (iii.2
-// language), but the emit/eval/display seams land in iii.3; until then the validator rejects any
-// source-side `not` so no half-wired document ships. Non-soft-demotable structural gate.
-describe("#224 iii.2 — `decision-negation-unsupported` merge gate", () => {
-  const negs = (errs: ValidationError[]) => errs.filter((e) => e.kind === "decision-negation-unsupported");
+// #224 iii.3 — branch-guard `not` is a FIRST-CLASS, VALIDATED guard (the iii.2 merge gate is
+// gone; `not` now emits to FHIR). The validator no longer rejects `not`; it ref-checks the
+// negated concept like any other atom (`branchConditionRefs` recurses into the `not` operand).
+describe("#224 iii.3 — `not` validates clean (merge gate removed)", () => {
+  // NOTE: there is no `decision-negation-unsupported` kind to filter for any more (the merge
+  // gate + its error kind are deleted); a clean `not` guard is asserted directly via `errs`
+  // being empty, and the ref-check survival via an `unresolved-reference` on an undeclared atom.
 
-  it("rejects `not` in a decision `when` guard", () => {
+  it("accepts `not` in a decision `when` guard", () => {
     const errs = validate(`library "G".
 ${CONCEPTS}
 decision "D":
 - when "Age Qualifies" and not "Has Diagnosis" then recommend activity "Approve".
 ${ACTS}`);
-    expect(negs(errs)).toHaveLength(1);
+    expect(errs).toHaveLength(0);
   });
 
-  it("rejects `not` in a NESTED `when` guard", () => {
+  it("accepts `not` in a NESTED `when` guard", () => {
     const errs = validate(`library "G".
 ${CONCEPTS}
 decision "D":
@@ -316,55 +318,58 @@ decision "D":
   - when not "Has Diagnosis" then recommend activity "Approve".
   end.
 ${ACTS}`);
-    expect(negs(errs)).toHaveLength(1);
+    expect(errs).toHaveLength(0);
   });
 
-  it("rejects `not` in a criterion BODY (even an unreferenced criterion)", () => {
+  it("accepts `not` in a criterion BODY", () => {
     const errs = validate(`library "G".
 ${CONCEPTS}
 criterion "Excluded":
 - when ( not "Has Diagnosis" ).
 decision "D":
-- when "Age Qualifies" then recommend activity "Approve".
+- when "Age Qualifies" and "Excluded" then recommend activity "Approve".
 ${ACTS}`);
-    expect(negs(errs)).toHaveLength(1);
+    expect(errs).toHaveLength(0);
   });
 
-  it("`not not A` reports ONE (outermost negation only)", () => {
+  it("accepts `not` applied TO a criterion ref (`when not \"Excluded\"`)", () => {
+    // The natural "not <named exclusion>" shape: expansion must recurse through the `Not`
+    // BEFORE `toNNF`; a missed seam would throw `unexpandedCriterion`. Must validate clean.
+    const errs = validate(`library "G".
+${CONCEPTS}
+criterion "Excluded":
+- when ( "Has Diagnosis" ).
+decision "D":
+- when ( "Age Qualifies" and not "Excluded" ) then recommend activity "Approve".
+${ACTS}`);
+    expect(errs).toHaveLength(0);
+  });
+
+  it("accepts `not not A` (double negation)", () => {
     const errs = validate(`library "G".
 ${CONCEPTS}
 decision "D":
 - when not not "Has Diagnosis" then recommend activity "Approve".
 ${ACTS}`);
-    expect(negs(errs)).toHaveLength(1);
+    expect(errs).toHaveLength(0);
   });
 
-  it("stays a hard ERROR under soft mode (non-soft-demotable structural gate)", () => {
-    const src = `library "G".
-${CONCEPTS}
-decision "D":
-- when not "Has Diagnosis" then recommend activity "Approve".
-${ACTS}`;
-    const { errors, warnings } = validateSoft(src);
-    expect(errors.some((e) => e.kind === "decision-negation-unsupported")).toBe(true);
-    expect(warnings.some((e) => e.kind === "decision-negation-unsupported")).toBe(false);
-  });
-
-  it("a positive guard produces NO negation gate error", () => {
+  it("STILL ref-checks the negated concept — `not <undeclared>` → unresolved-reference", () => {
     const errs = validate(`library "G".
 ${CONCEPTS}
 decision "D":
-- when "Age Qualifies" and "Has Diagnosis" then recommend activity "Approve".
+- when not "No Such Concept" then recommend activity "Approve".
 ${ACTS}`);
-    expect(negs(errs)).toHaveLength(0);
+    expect(errs.some((e) => e.kind === "unresolved-reference")).toBe(true);
   });
 
-  it("multi-file: the gate error is STAMPED with the owning source's libraryName + filePath", () => {
+  it("multi-file: an unresolved NEGATED ref carries the owning source's libraryName + filePath", () => {
     // Drive the scoped (multi-file) resolver path directly so the finding carries source attribution.
+    // The negated ref is still resolved, so an undeclared one surfaces with full source stamping.
     const built = buildCRL(`library "G".
 ${CONCEPTS}
 decision "D":
-- when not "Has Diagnosis" then recommend activity "Approve".
+- when not "No Such Concept" then recommend activity "Approve".
 ${ACTS}`);
     if (!built.success || !built.result) throw new Error("build failed");
     const decision = built.result.statements.find((s) => s.type === "Decision") as Decision;
@@ -388,9 +393,9 @@ ${ACTS}`);
       { stmt: decision, entry: { name: "G", filePath: "/proj/g.crl", ast: built.result, isRoot: true, origin: "local" } as RegistryEntry, scope },
     ];
     const errs = new ReferenceResolver().validate(built.result, sources);
-    const neg = errs.find((e) => e.kind === "decision-negation-unsupported");
-    expect(neg).toBeDefined();
-    expect(neg!.libraryName).toBe("G");
-    expect(neg!.filePath).toBe("/proj/g.crl");
+    const unresolved = errs.find((e) => e.kind === "unresolved-reference");
+    expect(unresolved).toBeDefined();
+    expect(unresolved!.libraryName).toBe("G");
+    expect(unresolved!.filePath).toBe("/proj/g.crl");
   });
 });

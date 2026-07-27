@@ -69,6 +69,9 @@ function andC(...operands: BranchCondition[]): BranchCondition {
 function orC(...operands: BranchCondition[]): BranchCondition {
   return { type: "BranchConditionOr", operands, location: LOC };
 }
+function notC(operand: BranchCondition): BranchCondition {
+  return { type: "BranchConditionNot", operand, location: LOC };
+}
 function critRefC(name: string): BranchCondition {
   return { type: "BranchConditionCriterionRef", ref: name, location: LOC };
 }
@@ -209,6 +212,14 @@ describe("#224 ii.2 — emit parity across the shape matrix", () => {
   parity("under all: qualifier", andC(refC("A"), orC(refC("B"), refC("C"))), [], "all");
   parity("under any: qualifier", andC(refC("A"), orC(refC("B"), refC("C"))), [], "any");
 
+  // #224 iii.3 — a criterion body may carry `not`. These prove the FULL pipeline runs on the
+  // expanded criterion body: classify → EXPAND → toNNF → DNF → per-literal polarity emit. The
+  // via-criterion resource must byte-match the hand-inlined negated guard (criterion-free body).
+  parity("negated single `not B`", notC(refC("B")));
+  parity("mixed `A and not B`", andC(refC("A"), notC(refC("B"))));
+  parity("De Morgan in body `not (A and B)`", notC(andC(refC("A"), refC("B"))));
+  parity("De Morgan in body `not (A or B)`", notC(orC(refC("A"), refC("B"))));
+
   // Duplicate-atom + mixed cells CANNOT use the generic helper: their body carries a criterion
   // ref, so the helper's `inl` would ALSO expand it (both sides deduped identically → a green
   // pass while §A5 is false). These use a criterion-FREE hand-inlined twin AND an absolute
@@ -235,6 +246,21 @@ describe("#224 ii.2 — emit parity across the shape matrix", () => {
     const via = decision("Top", [whenC(andC(refC("A"), critRefC("Mix")), leaf(recommend("Act")))]);
     const inl = decision("Top", [whenC(andC(refC("A"), orC(refC("B"), refC("C"))), leaf(recommend("Act")))]);
     const a = emit(via, [mix]);
+    const b = emit(inl); // criterion-FREE
+    expect(a.errors).toEqual([]);
+    expect(b.errors).toEqual([]);
+    expect(a.resource).toEqual(b.resource);
+  });
+
+  it("#224 iii.3 — `not` applied TO a criterion ref `not Elig(=B or C)` — via == criterion-FREE inline", () => {
+    // The "not <named exclusion>" shape: expansion must recurse INTO the `Not` and rebuild it
+    // with the expanded operand (criterionExpansion `materialize`) BEFORE `toNNF` De Morgans
+    // `not (B or C)` → `not B and not C`. A missed seam would throw `unexpandedCriterion` at NNF.
+    const elig = criterion("Elig", orC(refC("B"), refC("C")));
+    const via = decision("Top", [whenC(andC(refC("A"), notC(critRefC("Elig"))), leaf(recommend("Act")))]);
+    // criterion-FREE twin: `A and not (B or C)`.
+    const inl = decision("Top", [whenC(andC(refC("A"), notC(orC(refC("B"), refC("C")))), leaf(recommend("Act")))]);
+    const a = emit(via, [elig]);
     const b = emit(inl); // criterion-FREE
     expect(a.errors).toEqual([]);
     expect(b.errors).toEqual([]);

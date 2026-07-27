@@ -1,7 +1,7 @@
 // Shared traversal for decision branch-condition guards (#224).
 //
-// A `WhenBlock.condition` is a monotone boolean expression over concept refs
-// (`and`/`or`, parens). Every subsystem that reads guard refs MUST go through
+// A `WhenBlock.condition` is a boolean expression over concept refs (`and`/`or`/
+// `not`, parens; #224 iii.3). Every subsystem that reads guard refs MUST go through
 // these helpers so no consumer silently drops operands when the guard is a
 // compound. In slice i.1 the grammar produces only single-ref conditions, but
 // the helpers are written multi-ref-correct so i.2+ need no re-touch.
@@ -218,31 +218,6 @@ export function branchConditionConceptRefsExpanded(
   const g = expandGuardOrRecord(c, table);
   if (!g.ok) return { refs: [], overflow: { status: g.status, detail: g.detail } };
   return { refs: branchConditionConceptRefsStrict(g.cond, where) };
-}
-
-/**
- * #224 iii.2: the OUTERMOST `not` nodes in a SOURCE guard, each with its own `location`. The
- * merge-gate validator (`decision-negation-unsupported`) reports one error per node until the
- * emit/eval/display seams land (iii.3). Descends `and`/`or` but STOPS at the first `not` on any
- * path — so `not not A` reports ONE (the outer), `not A and not B` reports TWO (distinct
- * negations). Tolerant of a malformed editor-buffer node (no `operands` array → skipped),
- * matching `branchConditionRefs`.
- */
-export function collectNegations(c: BranchCondition): BranchConditionNot[] {
-  const out: BranchConditionNot[] = [];
-  const walk = (n: BranchCondition): void => {
-    if (!n || typeof (n as { type?: unknown }).type !== "string") return;
-    if (n.type === "BranchConditionNot") {
-      out.push(n); // outermost — do NOT descend into the negated operand
-      return;
-    }
-    if (n.type === "BranchConditionAnd" || n.type === "BranchConditionOr") {
-      if (Array.isArray(n.operands)) n.operands.forEach(walk);
-    }
-    // Ref / CriterionRef carry no negation.
-  };
-  walk(c);
-  return out;
 }
 
 /** #224 iii.2: does the guard contain any `not` node? The fast-path predicate for `toNNF`

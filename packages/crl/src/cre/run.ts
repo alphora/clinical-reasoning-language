@@ -128,7 +128,8 @@ export type BranchConditionTrace =
   // #224 iii.2: a decision-guard `not`. `satisfied` is the CLOSED-WORLD negation of its
   // operand (`!operand.satisfied`) — "the negated concept is NOT established", which is exactly
   // the emit-side `not Coalesce(<sat>, false)` two-valued semantics (iii.1). NOT three-valued
-  // CQL null-logic. Display of this node lands in iii.3.
+  // CQL null-logic. The flow/questionnaire panes render this node; precise blocking attribution
+  // under negation is iii.3b.
   | { op: "not"; satisfied: boolean; operand: BranchConditionTrace }
   | {
       op: "ref";
@@ -457,11 +458,9 @@ function evalBranchCondition(
     );
   }
   if (cond.type === "BranchConditionNot") {
-    // #224 iii.2: closed-world negation — `not X` is satisfied iff X is NOT established.
-    // This matches the emit-side `not Coalesce(<sat>, false)` (iii.1) two-valued semantics.
-    // Reached only via the UNVALIDATED lanes (`runCel` runs no validation, run.ts:72) — the
-    // `decision-negation-unsupported` merge gate rejects `not` for validated authoring; this
-    // evaluates correctly rather than throwing so a scenario run never crashes mid-typing.
+    // #224 iii.2/iii.3: closed-world negation — `not X` is satisfied iff X is NOT established.
+    // This matches the emit-side `not Coalesce(<sat>, false)` (iii.1) two-valued semantics — NOT
+    // three-valued CQL null-logic. `not` is a first-class guard as of iii.3 (validated + emitted).
     // Facts of the operand ARE the evidence consulted, so they propagate (the reason it holds).
     const inner = evalBranchCondition(cond.operand, ctx, frame);
     return {

@@ -1040,28 +1040,110 @@ const notC = (operand: BranchCondition): BranchCondition => ({
   location: LOC,
 });
 
-describe("decision — #224 iii.2 negated guard is diagnosed + suppressed (interim; real emit = iii.3)", () => {
-  it("`A and not B` → branch SUPPRESSED with a `decision-negation-unemittable` error (never mis-emit)", () => {
+describe("decision — #224 iii.3 negated guard → per-literal FHIR emit", () => {
+  // The negated literal's library qualifier (= the emitted PD `library[]` target id).
+  const Q = libraryId(METADATA, undefined);
+  const condLangs = (a: Act): string[] =>
+    ((a.condition as Array<{ expression: { language: string } }>) ?? []).map(
+      (c) => c.expression.language,
+    );
+
+  it("`A and not B` → ONE arm, positive `A` (cql-identifier) + negated `not Coalesce(...)` (cql-expression)", () => {
     const d = decision(
       "Top",
       [whenC(andC(refC("A"), notC(refC("B"))), leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
       "first",
     );
-    const { errors } = emitTop(d);
-    expect(errors.some((e) => e.kind === "decision-negation-unemittable")).toBe(true);
-    // The negated branch does NOT emit an (always-applicable) unguarded action.
-    const children = acts(rootActions(emitTop(d).resource)[0]);
-    expect(children.some((c) => condExprs(c).includes("A"))).toBe(false);
+    const { resource, errors, unmatched } = emitTop(d);
+    expect(errors).toEqual([]);
+    expect(unmatched).toEqual([]);
+    const children = acts(rootActions(resource)[0]); // [A∧¬B arm, otherwise]
+    expect(children).toHaveLength(2);
+    const arm = children[0]!;
+    expect(arm.title).toBe("A and not B");
+    expect(condExprs(arm)).toEqual(["A", `not Coalesce("${Q}"."B", false)`]);
+    expect(condLangs(arm)).toEqual(["text/cql-identifier", "text/cql-expression"]);
+    expect(children[1]!.title).toBe("otherwise");
   });
 
-  it("a single `not B` guard is also suppressed (not the positive single-ref fast path)", () => {
+  it("a single `when not B` → one action, one negated condition, title `not B` (routes through DNF)", () => {
     const d = decision(
       "Top",
       [whenC(notC(refC("B")), leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
       "first",
     );
-    const { errors } = emitTop(d);
-    expect(errors.some((e) => e.kind === "decision-negation-unemittable")).toBe(true);
+    const { resource, errors } = emitTop(d);
+    expect(errors).toEqual([]);
+    const children = acts(rootActions(resource)[0]);
+    const arm = children[0]!;
+    expect(arm.title).toBe("not B");
+    expect(condExprs(arm)).toEqual([`not Coalesce("${Q}"."B", false)`]);
+    expect(condLangs(arm)).toEqual(["text/cql-expression"]);
+  });
+
+  it("De Morgan: `not (A and B)` → TWO arms of ONE negated literal each (spliced under first:)", () => {
+    const d = decision(
+      "Top",
+      [whenC(notC(andC(refC("A"), refC("B"))), leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
+      "first",
+    );
+    const { resource, errors } = emitTop(d);
+    expect(errors).toEqual([]);
+    const children = acts(rootActions(resource)[0]); // [¬A arm, ¬B arm, otherwise]
+    expect(children.map((c) => c.title)).toEqual(["not A", "not B", "otherwise"]);
+    expect(condExprs(children[0]!)).toEqual([`not Coalesce("${Q}"."A", false)`]);
+    expect(condExprs(children[1]!)).toEqual([`not Coalesce("${Q}"."B", false)`]);
+  });
+
+  it("De Morgan: `not (A or B)` → ONE arm of TWO negated literals (¬A ∧ ¬B)", () => {
+    const d = decision(
+      "Top",
+      [whenC(notC(orC(refC("A"), refC("B"))), leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
+      "first",
+    );
+    const { resource, errors } = emitTop(d);
+    expect(errors).toEqual([]);
+    const children = acts(rootActions(resource)[0]); // [¬A∧¬B arm, otherwise]
+    expect(children[0]!.title).toBe("not A and not B");
+    expect(condExprs(children[0]!)).toEqual([
+      `not Coalesce("${Q}"."A", false)`,
+      `not Coalesce("${Q}"."B", false)`,
+    ]);
+    expect(children[1]!.title).toBe("otherwise");
+  });
+
+  it("De Morgan under flat/no-qualifier: `not (A and B)` → ONE `any` wrapper over the two ¬ arms", () => {
+    const d = decision("Top", [whenC(notC(andC(refC("A"), refC("B"))), leaf(recommend("X")))]); // flat
+    const top = rootActions(emitTop(d).resource);
+    expect(top).toHaveLength(1);
+    expect(hasAnyBehavior(top[0]!)).toBe(true);
+    const arms = acts(top[0]);
+    expect(arms.map((a) => a.title)).toEqual(["not A", "not B"]);
+    expect(condExprs(arms[0]!)).toEqual([`not Coalesce("${Q}"."A", false)`]);
+  });
+
+  it("a negated atom's concept STILL contributes action.input[] (parity with iii.1 `unless`)", () => {
+    const inputResolver: CaseFeatureInputResolver = (name) =>
+      name === "B" ? [cf("B", "urn:B")] : [];
+    const d = decision("Top", [whenC(notC(refC("B")), leaf(recommend("X")))], "first");
+    const arm = acts(rootActions(emitTop(d, inputResolver).resource)[0])[0]!;
+    const profiles = (arm.input as Array<{ profile: string[] }>).map((i) => i.profile[0]);
+    expect(profiles).toEqual(["urn:B"]);
+  });
+
+  it("an unresolved NEGATED atom suppresses the whole guard (parity with positive)", () => {
+    const resolveOnlyA: ConceptResolver = (ref) =>
+      (typeof ref === "string" ? ref : ref.name) === "A" ? "A" : null;
+    const d = decision(
+      "Top",
+      [whenC(andC(refC("A"), notC(refC("B"))), leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
+      "first",
+    );
+    const { unmatched, resource } = emitTop(d, undefined, resolveOnlyA);
+    expect(unmatched.some((u) => u.kind === "unresolved-concept" && u.text === '"B"')).toBe(true);
+    const children = acts(rootActions(resource)[0]);
+    expect(children).toHaveLength(1); // only `otherwise` survives
+    expect(children[0]!.title).toBe("otherwise");
   });
 });
 

@@ -694,8 +694,12 @@ describe("authoring-kit — getAuthoringKit", () => {
     // flipped their "action guards NOT YET lowered to FHIR" caveat: `unless`/`only when` now LOWER to a
     // per-item `condition[applicability]` (`unless` → library-qualified null-safe `not Coalesce(...)`).
     // BOTH hashes move (the `guards` rule is a cpg edge inheriting into prior-auth). KE seats re-sync both pins.
-    expect(cpg.contentHash).toBe("7222c7faece156394a6d6e1a8f4023ac9f8b1c2c0bf1b4964ee4554a0f6bcd3a");
-    expect(priorAuth.contentHash).toBe("24800b7e68f2b01f2524395599066ff12c0e6b4c540daaa087a285c4afc1cbd4");
+    // #224 iii.3 re-pin (content-only) — the `branch-guards` + `criterion` rules flipped their "there is
+    // NO branch `not`" claim: branch `not` now lowers to a per-atom `not Coalesce(...)` applicability
+    // `condition[]` (closed-world), the emit-capable path a menu-only `unless` cannot express. BOTH
+    // hashes move (branch-guards is a cpg edge inheriting into prior-auth). KE seats re-sync both pins.
+    expect(cpg.contentHash).toBe("6add1db58e1d867a0c5f17e71c1d957995e41f99a16be912f6e6e55021d2d6b1");
+    expect(priorAuth.contentHash).toBe("0888d473bb1d1787bf78c3bbee120b188ca0553ee63bd249b04106e33c108de2");
   });
 
   it("no RETIRED positive doctrine survives anywhere in the serialized payload (#224 anti-half-inversion guard)", () => {
@@ -713,6 +717,10 @@ describe("authoring-kit — getAuthoringKit", () => {
         /faithful, provable refinement/i,
         /computed in the inference layer/i,
         /is FAITHFUL when (those criteria|they|all)/i,
+        // #224 iii.3: no "monotone" / "no `not`" branch-guard doctrine survives (negation is
+        // first-class). Catches the retired "a `when` takes a MONOTONE and/or boolean" claim.
+        /\bmonotone\b/i,
+        /no `?not`? at the branch/i,
       ];
       for (const re of retired) {
         expect(blob, `retired doctrine still in ${uc} payload: ${re}`).not.toMatch(re);

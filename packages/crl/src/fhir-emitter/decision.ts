@@ -37,6 +37,12 @@
  * `cqf-applicabilityBehavior` "any" grouping action under `all:`/flat). See
  * `emitCompoundWhenBlock`.
  *
+ * #224 iii.3 NEGATION (`when not X`, `when A and not B`): `toNNF` pushes every `not` to the
+ * ref LEAVES, so each DNF arm is a conjunction of SIGNED literals. A NEGATED literal lowers to
+ * the per-atom `not Coalesce("<Lib>"."<C>", false)` carrier (`guardApplicabilityCondition`,
+ * shared with iii.1's `unless`); a positive one to the bare `text/cql-identifier`. The
+ * decision boolean STILL never lowers to one opaque CQL expression — negation stays per-literal.
+ *
  * Recursive `when...then` nests as `action.action[]`. Leaves use
  * `action.definitionCanonical`: `recommend activity X` →
  * Recommendation PlanDef wrapping X; `use decision Y` → sub-decision Y.
@@ -72,7 +78,7 @@ import type {
   BlockQualifier,
   BranchBlock,
   BranchConditionRef,
-  BranchConditionNegatedLiteral,
+  BranchConditionLiteral,
   Concept,
   Decision,
   OtherwiseBlock,
@@ -274,11 +280,7 @@ type EmitActionResult =
         | "unresolved-ref"
         | "all-children-suppressed"
         | "compound-guard-overflow"
-        | "criterion-overflow"
-        // #224 iii.2 INTERIM: a guard `not` reached emit before its polarity lowering lands
-        // (iii.3). The validator merge-gate is the author-facing reject; this is the emit-lane
-        // defense-in-depth (emit is public/bypassable) — diagnose + suppress, never mis-emit.
-        | "decision-negation-unemittable";
+        | "criterion-overflow";
     };
 
 /* ─── Single-Decision emit ───────────────────────────────────────── */
@@ -779,40 +781,29 @@ function emitCompoundWhenBlock(
     return { kind: "suppressed", reason: "compound-guard-overflow" };
   }
 
-  const literalArms = branchConditionDNF(wb.condition);
+  const arms = branchConditionDNF(wb.condition);
 
-  // #224 iii.2 INTERIM — a NEGATED literal (`not X`) cannot be lowered until iii.3 threads
-  // polarity into `guardApplicabilityCondition` per literal. The validator merge-gate
-  // (`decision-negation-unsupported`) is the author-facing reject; emit is public/bypassable,
-  // so here (defense-in-depth) we DIAGNOSE + SUPPRESS the whole guard rather than mis-emit an
-  // unguarded (always-applicable) action. Never a raw throw — mirrors the unresolved-ref lane.
-  const negated = literalArms
-    .flat()
-    .filter((a): a is BranchConditionNegatedLiteral => a.type === "BranchConditionNot");
-  if (negated.length > 0) {
-    ctx.errors.push({
-      type: "Validation",
-      kind: "decision-negation-unemittable",
-      message: `Decision-guard negation (\`not\`) in \`${describeBranchCondition(
-        wb.condition,
-        getRefName,
-      )}\` is not yet lowered to FHIR (lands in #224 iii.3); the branch was suppressed.`,
-      line: wb.location?.start.line,
-      column: wb.location?.start.column,
-    });
-    return { kind: "suppressed", reason: "decision-negation-unemittable" };
-  }
-  // All arms are POSITIVE from here (the negated scan above returned) — narrow to refs.
-  const arms = literalArms as BranchConditionRef[][];
+  // #224 iii.3 — each DNF arm is a conjunction of SIGNED literals (post-`toNNF`, a literal is a
+  // bare positive ref OR a `not` over a SINGLE ref). `litRef` projects the LOCATED ref node +
+  // polarity: the ref drives resolution/normalization/inputs (polarity-agnostic — `not X`
+  // resolves the SAME concept as `X`), the polarity drives the emitted condition form
+  // (`guardApplicabilityCondition`). The negated operand is type-pinned to a ref by
+  // `BranchConditionNegatedLiteral`, so no cast is needed.
+  const litRef = (a: BranchConditionLiteral): { atom: BranchConditionRef; polarity: "positive" | "negated" } =>
+    a.type === "BranchConditionNot"
+      ? { atom: a.operand, polarity: "negated" }
+      : { atom: a, polarity: "positive" };
 
   // Resolve every DISTINCT atom once (first-seen order across arms). Collect ALL
   // unresolved atoms — each with its OWN location — so the author sees every bad
-  // ref, then suppress the whole guard ONCE (mirrors the single-ref suppression).
+  // ref, then suppress the whole guard ONCE (mirrors the single-ref suppression). A
+  // negated atom resolves + suppresses exactly like a positive one (same concept, same key).
   const resolvedByKey = new Map<string, string>();
   const distinctSeen = new Set<string>();
   const unresolved: BranchConditionRef[] = [];
   for (const arm of arms) {
-    for (const atom of arm) {
+    for (const lit of arm) {
+      const { atom } = litRef(lit);
       const normalized = normalizeLocalRef(atom.ref, ctx.libraryName);
       const key = atomKey(normalized);
       if (distinctSeen.has(key)) continue;
@@ -854,14 +845,26 @@ function emitCompoundWhenBlock(
   }
 
   const armActions: Array<Record<string, unknown>> = arms.map((arm) => {
-    const normalizedAtoms = arm.map((a) => normalizeLocalRef(a.ref, ctx.libraryName));
-    const armLabel = normalizedAtoms.map((n) => getRefName(n)).join(" and ");
-    const conditions = normalizedAtoms.map((n) => ({
-      kind: "applicability",
-      expression: { language: "text/cql-identifier", expression: resolvedByKey.get(atomKey(n))! },
-    }));
-    // Arm-aware `input`: union over the arm's NON-qualified atoms (G15).
-    const armInputNames = normalizedAtoms.filter((n) => !isQualifiedRef(n)).map((n) => getRefName(n));
+    // #224 iii.3 — carry each literal's polarity alongside its normalized ref so the emitted
+    // condition + label reflect it. A negated literal → the null-safe `not Coalesce(...)` carrier
+    // (guardApplicabilityCondition); a positive one → the bare `text/cql-identifier`.
+    const armLits = arm.map((lit) => {
+      const { atom, polarity } = litRef(lit);
+      return { normalized: normalizeLocalRef(atom.ref, ctx.libraryName), polarity };
+    });
+    const armLabel = armLits
+      .map(({ normalized, polarity }) =>
+        polarity === "negated" ? `not ${getRefName(normalized)}` : getRefName(normalized),
+      )
+      .join(" and ");
+    const conditions = armLits.map(({ normalized, polarity }) =>
+      guardApplicabilityCondition(polarity, resolvedByKey.get(atomKey(normalized))!, ctx.guardQualifierLibraryName),
+    );
+    // Arm-aware `input`: union over the arm's NON-qualified atoms, BOTH polarities — a negated
+    // atom's concept is still a case feature (parity with iii.1 `unless`, which inputs its guard).
+    const armInputNames = armLits
+      .filter(({ normalized }) => !isQualifiedRef(normalized))
+      .map(({ normalized }) => getRefName(normalized));
     const inputs = buildActionInputs(armInputNames, ctx);
     return {
       title: armLabel,

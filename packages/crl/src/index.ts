@@ -114,7 +114,6 @@ export {
   // #224 iii.2 — negation-normal-form + the `not` structural helpers.
   toNNF,
   containsNot,
-  collectNegations,
 } from "./ast/branchCondition";
 // DISPLAY-only projection of a PA determination outcome name (`"certify.Met"` → `"Met"`); the cockpit renderers in
 // crl-vscode import this so the outcome shows only the human `<key>`. See dispositions/displayName.ts.

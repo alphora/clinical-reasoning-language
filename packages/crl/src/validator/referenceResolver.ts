@@ -6,7 +6,6 @@ import type {
   Decision,
   Activity,
   BranchBlock,
-  BranchCondition,
   WhenBlockBody,
   BlockBody,
   ActionStatement,
@@ -19,7 +18,7 @@ import type {
   ReferenceName,
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
-import { branchConditionRefs, collectNegations } from "../ast/branchCondition";
+import { branchConditionRefs } from "../ast/branchCondition";
 import type { LibraryScope, SourceContext } from "../imports/scopes";
 import { lookupKnownLibrary } from "../imports/scopes";
 
@@ -339,10 +338,12 @@ export class ReferenceResolver {
     // no condition. Resolve EVERY operand, anchoring each error to the operand's
     // own location (not the whole `when` line).
     if (branch.type === "WhenBlock") {
+      // `branchConditionRefs` recurses into `not` operands, so a negated concept
+      // (`when not X`) is ref-checked here like any other atom (#224 iii.3 — negation
+      // is now a first-class guard: parses, validates, and emits to FHIR).
       for (const atom of branchConditionRefs(branch.condition)) {
         this.checkRef(atom.ref, CONCEPT_REF_KINDS, atom.location, ctx, errors, "when-guard");
       }
-      flagNegations(branch.condition, ctx, errors); // #224 iii.2 merge gate
     }
     this.walkWhenBlockBody(branch.body, ctx, errors);
   }
@@ -409,12 +410,12 @@ export class ReferenceResolver {
   // The slot is `when-guard`: bare local criteria are valid here (and already
   // classified away), but a foreign library-qualified criterion ref is still a misuse.
   private walkCriterion(criterion: Criterion, ctx: WalkContext, errors: ValidationError[]): void {
+    // `branchConditionRefs` recurses into `not` operands, so a negated concept in a
+    // criterion body is ref-checked like any other atom (#224 iii.3 — a criterion body
+    // inline-expands into its host guard and flows through the same NNF/DNF/emit path).
     for (const atom of branchConditionRefs(criterion.condition)) {
       this.checkRef(atom.ref, CONCEPT_REF_KINDS, atom.location, ctx, errors, "when-guard");
     }
-    // #224 iii.2 merge gate: `not` in a criterion body is gated too (even for an unreferenced
-    // criterion — this walker visits every `Criterion` statement in every source).
-    flagNegations(criterion.condition, ctx, errors);
   }
 
   // ---------------------------- ref check -------------------------------
@@ -649,27 +650,6 @@ const SLOT_PHRASE: Record<ConceptOnlySlot, string> = {
   narrative: "a `definition is` narrative",
   "action-guard": "an action guard (`unless` / `only when`)",
 };
-
-// #224 iii.2 MERGE GATE: reject every OUTERMOST `not` in a source guard/criterion body with
-// a `decision-negation-unsupported` error, until the emit/eval/display seams land (iii.3). The
-// LANGUAGE (grammar/AST/DNF/NNF) is live in iii.2, but a half-wired `not` must not ship — this
-// gate is the author-facing reject (the unvalidated eval/display lanes degrade gracefully, and
-// FHIR emit diagnoses+suppresses, as defense-in-depth). Anchored at each `not`'s own location.
-function flagNegations(cond: BranchCondition, ctx: WalkContext, errors: ValidationError[]): void {
-  for (const not of collectNegations(cond)) {
-    errors.push({
-      kind: "decision-negation-unsupported",
-      message:
-        "Decision-guard negation (`not`) is not yet supported — it parses and evaluates (#224 iii.2 " +
-        "language + closed-world CRE), but its FHIR emit (and rich flow/questionnaire display) lands " +
-        "in #224 iii.3. Remove the `not` for now, or use a per-action `unless` guard where that fits.",
-      location: not.location,
-      severity: "error",
-      ...(ctx.libraryName !== undefined ? { libraryName: ctx.libraryName } : {}),
-      ...(ctx.filePath !== undefined ? { filePath: ctx.filePath } : {}),
-    });
-  }
-}
 
 function criterionMisuse(
   name: string,

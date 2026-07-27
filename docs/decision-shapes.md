@@ -77,8 +77,8 @@ Rules:
 ## Branch guards — a `when` can test a compound condition
 
 A `when` branch does not have to test a single concept. Its condition is a
-**monotone boolean** over concept (and `criterion`, below) references — `and`,
-`or`, and parentheses:
+**boolean** over concept (and `criterion`, below) references — `and`, `or`,
+`not`, and parentheses:
 
 ```
 decision "Coverage":
@@ -98,11 +98,16 @@ Syntax and rules:
   parses, but the builder then rejects it — *"mixed 'and'/'or' in a `when` guard
   requires parentheses, e.g. `(A or B) and C`"* — there is no implicit precedence
   to guess at.
-- **There is no `not`.** Negation has no structural lowering at the decision
-  layer (it would collapse a branch to a CQL boolean — see below). Exclude a
-  case by ordering an exclusion branch first under `first:`, or by the
-  per-action `unless` action guard (a different construct — see "Per-action
-  guards").
+- **`not` is supported** (CRL #224 iii.3). Negate a single ref bare
+  (`not "Excluded"`) or a compound with parentheses (`not ( "A" or "B" )`). It
+  lowers *structurally*, not to a CQL boolean: De Morgan pushes every `not` down
+  to the ref leaves, and each **negated literal** emits a per-atom
+  `not Coalesce(<ref>, false)` applicability condition — so a negated atom stays
+  a visible per-criterion `condition[]` like any other. Semantics are
+  **closed-world**: `not "X"` holds when `X` is *not established*. (`not` is the
+  emit-capable way to author a single-determination `first:` exclusion; the
+  per-action `unless` is a different, menu-member-only construct — see "Per-action
+  guards".)
 - **A branch guard lowers to structure, never to CQL.** `and` becomes several
   ANDed applicability conditions on one action. `or` expands to
   disjunctive-normal-form arms whose *placement is context-sensitive*: under an
@@ -177,7 +182,7 @@ Syntax and semantics:
   parentheses are **required on the declaration** (the grammar demands them: they
   give the statement a clean edge, since `.` is also the qualified-ref
   separator). A `when` *branch* does not require parentheses for a single ref or
-  a homogeneous chain. The body is the same monotone `and`/`or` condition a `when`
+  a homogeneous chain. The body is the same `and`/`or`/`not` condition a `when`
   branch takes — including references to *other* criteria.
 - **Reference:** use the name in any branch condition — bare
   (`- when "Meets Coverage Preconditions" then …`) or inside a compound
@@ -491,14 +496,17 @@ mixed chain (*"mixed 'and'/'or' in a `when` guard requires parentheses"*). **Do
 this instead:** parenthesize to say what you mean —
 `when ( ( "A" or "B" ) and "C" )` or `when ( "A" or ( "B" and "C" ) )`.
 
-### ✗ `not` in a branch guard
+### ✓ `not` in a branch guard (CRL #224 iii.3)
 ```
 - when ( "Eligible" and not "Excluded" ) then recommend activity "Approve".
+- when not "Meets Medical Necessity" then recommend activity "Deny".
 ```
-There is no `not` at the decision layer — negation has no structural lowering.
-**Do this instead:** order an exclusion branch first under `first:`
-(`- when "Excluded" then recommend activity "Deny".` ahead of the approval
-branch), or, for a single menu item, use the per-action `unless "Excluded"`.
+`not` is supported and lowers structurally: De Morgan pushes it to the ref
+leaves, and each negated literal emits a per-atom `not Coalesce(<ref>, false)`
+applicability condition (never a compound CQL boolean). Semantics are
+closed-world — `not "X"` holds when `X` is *not established*. This is the
+emit-capable way to author a single-determination `first:` exclusion, which a
+menu-member-only per-action `unless` cannot express.
 
 ### ✗ expect a `criterion` to shrink the emitted arm count
 ```
