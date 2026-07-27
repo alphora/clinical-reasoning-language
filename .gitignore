@@ -53,9 +53,9 @@ temp/
 # your project's normal docs location before cleanup.
 .vibe-tools/
 
-# Agent-managed root files (provisioned per-machine by the CRL + vibe-tools
-# extensions; they hold local paths / generated blocks, not project source).
-/CLAUDE.md
+.claude/agents/vibe-reviewer-*.md
+
+# Holds this machine's extension path.
 /.mcp.json
 # .claude/ holds per-machine provisioned files (settings.local.json, etc.) — ignored —
 # EXCEPT skills/ and agents/, which are versioned CRL-domain project tooling
