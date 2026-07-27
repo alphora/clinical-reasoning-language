@@ -742,6 +742,11 @@ function walkBranches(
     // in `node`). `label`/`viaWhen` = the rendered guard (bare name for a single
     // ref = legacy-identical).
     const nodeId = childId(parentId, `when[${i}]`);
+    // #224 ii.3 — MUST stay marker-BLIND (no `{ markerAware: true }`): this `label` flows to
+    // `ProducedRec.viaWhen` (the EVAL-output path the authoring kit teaches KEs to assert
+    // execution paths against). Name-replacing it would change `viaWhen` from the expansion to the
+    // criterion name — an eval/identity change + silent breakage of existing path assertions. Only
+    // the VM DISPLAY label (viewModel.ts) is marker-aware; the cockpit reads the VM, not this trace.
     const label = describeBranchCondition(b.condition, getRefName);
     const soleR = soleRef(b.condition);
     let sat: boolean;

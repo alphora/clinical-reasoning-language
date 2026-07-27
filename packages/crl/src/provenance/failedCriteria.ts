@@ -263,6 +263,12 @@ function firstBlockerOnPath(
  *  UNSATISFIED case takes the `guard:"compound"` display path instead (see `unsatisfiedWhenNode`). */
 function fcConcept(n: FcViewNode): { name: string; libraryName?: string } {
   const e = n.condition?.expr;
+  // #224 ii.3: a SINGLE-ATOM criterion (`Eligible = Leaf A`, sole-ref collapse) carries the
+  // boundary marker on the ref leaf → show the criterion NAME so the "single"/preemptor header
+  // matches the tree node label (`when Eligible`), not the lone atom `Leaf A`. atoms-stay governs
+  // the COMPOUND frontier ("which conjunct failed"), NOT relabeling a whole named criterion as its
+  // one sub-atom. A COMPOUND criterion preemptor already shows the name via the `n.label` fallback.
+  if (e && e.op === "ref" && e.sourcedFromCriterion) return { name: e.sourcedFromCriterion.name };
   if (e && e.op === "ref" && e.concept) return e.concept;
   return { name: n.label.replace(/^when\s+/, "") };
 }

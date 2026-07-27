@@ -883,6 +883,13 @@ function emitCompoundWhenBlock(
   // Placement. Single arm (pure-`and`) → the one action, no wrapper. >=2 arms:
   // splice under an enclosing `first:`, else one `"any"` grouping wrapper.
   if (armActions.length >= 2 && enclosingQualifier !== "first") {
+    // #224 ii.3 — MUST stay marker-BLIND (no `{ markerAware: true }`): this label is the EMITTED
+    // arm-wrapper `title`/`description` (serialized FHIR bytes), so the ii.2 serialized-bytes emit
+    // parity stays absolute. Name-replacement is a DISPLAY-only concern confined to the VM label.
+    // The other emit-side `describeBranchCondition` sites here likewise stay blind: the action titles
+    // (the `when …` labels above) are emitted bytes; the overflow-diagnostic messages are author-facing
+    // text where the expansion is fine (design v2 flagged them "marker-aware OK" — blind is the
+    // conservative choice, and keeps this display-only slice's diff out of the emitter entirely).
     const guardLabel = describeBranchCondition(wb.condition, getRefName);
     const wrapper: Record<string, unknown> = {
       title: guardLabel,

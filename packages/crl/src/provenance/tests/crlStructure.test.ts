@@ -1,4 +1,5 @@
 import { parseInput } from "../../ast/tests/parseInput";
+import { classifyCriterionRefs } from "../../ast/criterionClassify";
 import { buildCEL } from "../../cel";
 import type { ResolvedCelGraph } from "../../cel/imports/types";
 import { renderScenario, type ViewNode } from "../../cre/viewModel";
@@ -171,6 +172,56 @@ describe("buildCrlStructure — CRL-structure view-model (C2b-1)", () => {
     expect(structLabels.has("when[1]/action[1]")).toBe(true);
     expect(structLabels.has("when[1]/action[1]/otherwise")).toBe(false);
     expect(vmLabels.has("when[1]/action[1]/otherwise")).toBe(true); // the VM DID recurse it
+  });
+
+  // #224 ii.3: the CONVERGENCE pin. Before ii.3 the VM `when` label rendered a criterion's EXPANSION
+  // while the structure label rendered the source name → byte-MISMATCH for any criterion decision (the
+  // latent bug — untested, no criterion fixture existed). ii.3 name-replaces the VM label, re-converging
+  // them. This is the positive fixture: structure label == VM label == `when Eligible` at the criterion node.
+  it("label parity extends to CRITERION boundaries: structure label == VM label == `when Eligible` (ii.3)", () => {
+    const critCrl = `library "CritT".
+concept "Leaf A":
+- type is Condition.
+- code is \`a\`.
+concept "Leaf B":
+- type is Condition.
+- code is \`b\`.
+activity "X":
+- request CPGCommunicationRequest.
+- with \`x\`.
+criterion "Eligible":
+- when ( "Leaf A" and "Leaf B" ).
+decision "D":
+first:
+- when "Eligible" then recommend activity "X".
+- otherwise then recommend activity "X".`;
+    const critCel = `library "CritC".
+covers "CritT".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+case "c":
+- subject is "Pat".
+- result is "D" is "X".`;
+    const classified = classifyCriterionRefs(parseInput(critCrl));
+    const built = buildCEL(critCel);
+    if (!built.success || !built.result) throw new Error("CEL build failed");
+    const graph = {
+      filePath: "inline.cel",
+      cel: built.result,
+      coversTarget: { name: classified.library.name, filePath: "inline.crl", ast: classified, isRoot: true, origin: "root" },
+      crlRegistry: { byNameLocal: new Map(), byNamePackage: new Map() },
+      celParseErrors: [],
+      diagnostics: [],
+    } as unknown as ResolvedCelGraph;
+    const structLabels = new Map<string, string>();
+    flatten(buildCrlStructure(graph).find((x) => x.decision === "D")!.children, structLabels);
+    const vmLabels = new Map<string, string>();
+    flatten(renderScenario(graph).scenarios[0].tree, vmLabels);
+    expect(structLabels.get("when[0]")).toBe("when Eligible");
+    expect(vmLabels.get("when[0]")).toBe("when Eligible"); // name-replacement re-converges the two
+    expect(vmLabels.get("when[0]")).toBe(structLabels.get("when[0]"));
   });
 
   it("actionKind: undefined on when/otherwise, normalized on actions", () => {

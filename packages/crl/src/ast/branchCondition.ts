@@ -448,20 +448,36 @@ export function soleRef(c: BranchCondition): BranchConditionRef | null {
  * names or `refDisplay` for qualified display; the two call sites (cascade labels vs
  * unmatched-ref messages) need different renderings, so it is explicit, never defaulted.
  * Renders the SOURCE tree (pre-`toNNF`), so the author's own `not (...)` spelling is shown.
+ *
+ * #224 ii.3 — `opts.markerAware` (default false → BYTE-SAFE for every existing caller,
+ * incl. the FHIR-emitting decision.ts arm-wrapper title which MUST stay the expansion):
+ * when set, a node carrying `sourcedFromCriterion` renders by the criterion's NAME (via the
+ * caller's `display` convention — a criterion name is library-local, so a bare `string`
+ * `ReferenceName`) and STOPS descending (name-REPLACEMENT). A name-replaced subtree is a
+ * LEAF — the marker check precedes the ref branch (sole-ref-collapse can stamp the marker
+ * onto a Ref leaf), and the `not`/parent-op paren logic treats a marked node as a leaf so
+ * `not <criterion>` reads `not Eligible`, never `not (Eligible)`.
  */
 export function describeBranchCondition(
   c: BranchCondition,
   display: (r: ReferenceName) => string,
+  opts: { markerAware?: boolean } = {},
 ): string {
+  const markerAware = opts.markerAware ?? false;
+  // A marker-bearing node renders as a NAME leaf (no descent, no parens) when marker-aware.
+  const isNameLeaf = (n: BranchCondition): boolean => markerAware && n.sourcedFromCriterion !== undefined;
   const go = (n: BranchCondition, parentOp: "and" | "or" | null): string => {
+    // #224 ii.3: a criterion boundary → its author NAME (replacement). PRECEDES the ref branch.
+    if (isNameLeaf(n)) return display(n.sourcedFromCriterion!.name);
     // A concept ref OR a criterion ref renders via `display` (source-side label; a
     // criterion ref shows the criterion's own name — the name-preserving render).
     if (n.type === "BranchConditionRef" || n.type === "BranchConditionCriterionRef") return display(n.ref);
     // #224 iii.2: `not` binds tighter than `and`/`or`, so `not "A"` needs no parens, but a
-    // compound operand does: `not ("A" or "B")`. Never needs outer parens from a parent op.
+    // compound operand does: `not ("A" or "B")`. A name-replaced operand is a leaf → no parens.
     if (n.type === "BranchConditionNot") {
       const compound =
-        n.operand.type === "BranchConditionAnd" || n.operand.type === "BranchConditionOr";
+        !isNameLeaf(n.operand) &&
+        (n.operand.type === "BranchConditionAnd" || n.operand.type === "BranchConditionOr");
       const inner = go(n.operand, null);
       return `not ${compound ? `(${inner})` : inner}`;
     }

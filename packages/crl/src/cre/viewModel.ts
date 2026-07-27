@@ -57,6 +57,12 @@ import {
 // v3 (#224 iii.2): `BranchConditionView` gains a `{ op: "not" }` variant (decision-guard
 //   negation). An exhaustive decoder must handle it. Now reachable on the VALIDATED lane too
 //   (#224 iii.3 — `not` is a first-class, emit-capable guard; the merge gate is gone).
+// #224 ii.3 — NO bump: `BranchConditionView.sourcedFromCriterion?` is OPTIONAL/additive (no op-
+//   exhaustive decoder breaks; an unaware consumer ignores it). BUT two BEHAVIOR changes ride
+//   along on v3, so a consumer that pins label BYTES must re-baseline: (1) the `when` node `label`
+//   name-REPLACES an expanded criterion boundary with the author's name; (2) a marker may sit on
+//   ANY node and CAN NEST — a renderer name-replaces at the OUTERMOST marked node and stops, so a
+//   nested inner boundary is not double-rendered (outermost-wins, mirroring the AST stamp rule).
 export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 3;
 
 type ActionKind = "recommend-activity" | "use-decision";
@@ -142,14 +148,24 @@ export interface ViewNode {
  *  and/or nodes carry their combined `satisfied?`. A simple guard is a single
  *  `ref`. Rich "which conjunct failed" rendering is i.4; i.2 makes it
  *  compound-SAFE + TRUTHFUL (no first-operand-masquerading-as-the-whole-guard). */
+// #224 ii.3: `sourcedFromCriterion` (name-only) marks a node that is the boundary-root of an
+// EXPANDED `criterion` — the DISPLAY-SAFE projection of the AST `SourcedFromCriterion` (the raw
+// AST `refLocation` is deliberately NOT carried into the stable ScenarioViewModel; this is a pure
+// visual boundary, not a source-navigation handle). It may sit on ANY node kind (and/or/not/ref —
+// a sole-ref criterion `Eligible=A` stamps the marker on the Ref leaf). NESTING: markers can appear
+// on inner nodes; a renderer name-REPLACES at the OUTERMOST marked node it meets and does not
+// descend, so a nested inner boundary is not double-rendered (outermost-wins, mirroring the AST
+// stamp rule). Additive/optional — schemaVersion stays 3 (no op-exhaustive decoder breaks), but the
+// VM label BYTES change at a marked boundary (a consumed-contract behavior change; see :60).
+export type BranchConditionMarker = { name: string };
 export type BranchConditionView =
-  | { op: "and" | "or"; satisfied?: boolean; operands: BranchConditionView[] }
+  | { op: "and" | "or"; satisfied?: boolean; operands: BranchConditionView[]; sourcedFromCriterion?: BranchConditionMarker }
   // #224 iii.2/iii.3/iii.3b: a decision-guard `not`. Structure-faithful; `satisfied` is the
   // closed-world negation from the CRE trace. Flow + questionnaire panes render the `not` node,
   // and iii.3b pins PRECISE blocking attribution under negation: the frontier yields `negated-ref`
   // items (the established literals that blocked) and the questionnaire flags them (parity-aware).
-  | { op: "not"; satisfied?: boolean; operand: BranchConditionView }
-  | { op: "ref"; satisfied?: boolean; concept: ConceptView; explanation?: ExplanationView; facts?: string[] };
+  | { op: "not"; satisfied?: boolean; operand: BranchConditionView; sourcedFromCriterion?: BranchConditionMarker }
+  | { op: "ref"; satisfied?: boolean; concept: ConceptView; explanation?: ExplanationView; facts?: string[]; sourcedFromCriterion?: BranchConditionMarker };
 
 export interface ConditionView {
   /** The guard expression tree (was `concept: ConceptView` before #224). */
@@ -457,7 +473,11 @@ function walkBranchesVM(
     const node: ViewNode = {
       nodeId,
       kind: "when",
-      label: `when ${describeBranchCondition(b.condition, getRefName)}`,
+      // #224 ii.3: marker-AWARE — an expanded criterion boundary renders by the author's NAME
+      // (name-replacement) instead of its inlined body, so `when Meets TAR Documentation Criteria`
+      // replaces an 800-char run-on. The RAW-side label ecosystem (crlStructure, provenance) already
+      // shows the name off the source CriterionRef; this re-converges the VM label with them.
+      label: `when ${describeBranchCondition(b.condition, getRefName, { markerAware: true })}`,
       source: span(b.location, filePath),
       evaluated: !!t,
       condition,
@@ -627,16 +647,28 @@ function buildActionVM(
 // (AST = concept refs/structure, trace = per-node satisfied); `astConditionExpr`
 // is the unevaluated/preempted fallback (no `satisfied`). Trace/AST misalignment
 // degrades to an unevaluated leaf rather than throwing (keeps the VM stable).
+// #224 ii.3: carry the AST criterion-boundary marker onto the built VM node as the DISPLAY-SAFE
+// `{ name }` projection (drops the raw AST `refLocation`). Applied at EVERY builder return so the
+// boundary survives into `BranchConditionView` regardless of which path (trace-zip, single-ref
+// fast path, or the ast-degrade fallback) built it. A `BranchConditionCriterionRef` carries no
+// marker (`?: never`) and never reaches a marked builder in production (expansion runs first).
+function withCriterionMarker<T extends BranchConditionView>(view: T, cond: BranchCondition): T {
+  return cond.sourcedFromCriterion ? { ...view, sourcedFromCriterion: { name: cond.sourcedFromCriterion.name } } : view;
+}
+
 function mapConditionExpr(cond: BranchCondition, t: TraceNode | undefined): BranchConditionView {
   if (t?.conditionTrace) return zipConditionTrace(cond, t.conditionTrace);
   if (t && cond.type === "BranchConditionRef") {
-    return {
-      op: "ref",
-      ...(t.satisfied !== undefined ? { satisfied: t.satisfied } : {}),
-      concept: conceptView(cond.ref),
-      ...(t.composition ? { explanation: mapComposition(t.composition) } : {}),
-      ...(t.facts && t.facts.length > 0 ? { facts: t.facts } : {}),
-    };
+    return withCriterionMarker(
+      {
+        op: "ref",
+        ...(t.satisfied !== undefined ? { satisfied: t.satisfied } : {}),
+        concept: conceptView(cond.ref),
+        ...(t.composition ? { explanation: mapComposition(t.composition) } : {}),
+        ...(t.facts && t.facts.length > 0 ? { facts: t.facts } : {}),
+      },
+      cond,
+    );
   }
   return astConditionExpr(cond);
 }
@@ -659,33 +691,42 @@ function zipConditionTrace(cond: BranchCondition, bt: BranchConditionTrace): Bra
     // cross-lib display, and i.4c blocking-match by concept key all correct in one move.
     // Additive/schema-neutral (a leaf already may carry `libraryName`). Compound-only:
     // a single-ref `when` never produces a `conditionTrace`, so it never reaches here.
-    return {
-      op: "ref",
-      ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
-      concept: { name: bt.concept.name, ...(bt.concept.libraryName ? { libraryName: bt.concept.libraryName } : {}) },
-      ...(bt.composition ? { explanation: mapComposition(bt.composition) } : {}),
-      ...(bt.facts && bt.facts.length > 0 ? { facts: bt.facts } : {}),
-    };
+    return withCriterionMarker(
+      {
+        op: "ref",
+        ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
+        concept: { name: bt.concept.name, ...(bt.concept.libraryName ? { libraryName: bt.concept.libraryName } : {}) },
+        ...(bt.composition ? { explanation: mapComposition(bt.composition) } : {}),
+        ...(bt.facts && bt.facts.length > 0 ? { facts: bt.facts } : {}),
+      },
+      cond,
+    );
   }
   if (cond.type === "BranchConditionNot") {
     // #224 iii.2: keep the negation structure; on any trace-shape mismatch degrade the whole
     // subtree to unevaluated (the VM stability contract — a display oddity, never a throw).
     if (bt.op !== "not") return astConditionExpr(cond);
-    return {
-      op: "not",
-      ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
-      operand: zipConditionTrace(cond.operand, bt.operand),
-    };
+    return withCriterionMarker(
+      {
+        op: "not",
+        ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
+        operand: zipConditionTrace(cond.operand, bt.operand),
+      },
+      cond,
+    );
   }
   const op: "and" | "or" = cond.type === "BranchConditionAnd" ? "and" : "or";
   // Any STRUCTURAL mismatch (operator or arity) → degrade the WHOLE subtree to
   // unevaluated (drop `satisfied` entirely); don't half-trust a mismatched trace.
   if (bt.op !== op || bt.operands.length !== cond.operands.length) return astConditionExpr(cond);
-  return {
-    op,
-    ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
-    operands: cond.operands.map((o, k) => zipConditionTrace(o, bt.operands[k]!)),
-  };
+  return withCriterionMarker(
+    {
+      op,
+      ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
+      operands: cond.operands.map((o, k) => zipConditionTrace(o, bt.operands[k]!)),
+    },
+    cond,
+  );
 }
 
 // #224 ii.2 — test-only export. `zipConditionTrace` is the SOFT-lane degrade ROUTING site: on a
@@ -706,11 +747,11 @@ function astConditionExpr(cond: BranchCondition): BranchConditionView {
   // leaf carrying its name. A criterion ref here is a missed-seam display oddity
   // (the CRE would have thrown); the VM shows the criterion name rather than crash.
   if (cond.type === "BranchConditionRef" || cond.type === "BranchConditionCriterionRef")
-    return { op: "ref", concept: conceptView(cond.ref) };
+    return withCriterionMarker({ op: "ref", concept: conceptView(cond.ref) }, cond);
   if (cond.type === "BranchConditionNot") // #224 iii.2: unevaluated negation (no trace)
-    return { op: "not", operand: astConditionExpr(cond.operand) };
+    return withCriterionMarker({ op: "not", operand: astConditionExpr(cond.operand) }, cond);
   const op: "and" | "or" = cond.type === "BranchConditionAnd" ? "and" : "or";
-  return { op, operands: cond.operands.map(astConditionExpr) };
+  return withCriterionMarker({ op, operands: cond.operands.map(astConditionExpr) }, cond);
 }
 
 // ── #224 i.4b: unsatisfied frontier ("which conjunct failed") ──────────────────
@@ -724,12 +765,19 @@ function astConditionExpr(cond: BranchCondition): BranchConditionView {
  *  construction. When cross-lib concept refs in guards land, qualify iff the leaf's
  *  (now frame-resolved) `libraryName` differs from the frame: a 1-line change here. */
 function describeConditionView(v: BranchConditionView): string {
+  // #224 ii.3: a criterion boundary renders by its author NAME (name-replacement) — a LEAF: no
+  // descent, and (see `leaf` below) never parenthesized by a parent op. UNCONDITIONALLY marker-
+  // aware: this only runs in the frontier/label path, and it MUST stay in step with the marker-
+  // aware VM node label (the `when` label above) or the failed-criterion tooltip would contradict it.
+  if (v.sourcedFromCriterion) return v.sourcedFromCriterion.name;
   if (v.op === "ref") return v.concept.name;
-  // #224 iii.2: `not` binds tightest — bare operand for a ref, parenthesized for a compound.
+  // A ref OR a name-replaced criterion boundary renders as a leaf → no surrounding parens.
+  const leaf = (o: BranchConditionView): boolean => o.op === "ref" || o.sourcedFromCriterion !== undefined;
+  // #224 iii.2: `not` binds tightest — bare operand for a leaf, parenthesized for a compound.
   if (v.op === "not")
-    return `not ${v.operand.op === "ref" ? describeConditionView(v.operand) : `(${describeConditionView(v.operand)})`}`;
+    return `not ${leaf(v.operand) ? describeConditionView(v.operand) : `(${describeConditionView(v.operand)})`}`;
   const joiner = v.op === "and" ? " and " : " or ";
-  const parts = v.operands.map((o) => (o.op === "ref" ? describeConditionView(o) : `(${describeConditionView(o)})`));
+  const parts = v.operands.map((o) => (leaf(o) ? describeConditionView(o) : `(${describeConditionView(o)})`));
   return parts.join(joiner);
 }
 
