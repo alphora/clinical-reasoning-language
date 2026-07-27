@@ -144,10 +144,10 @@ export interface ViewNode {
  *  compound-SAFE + TRUTHFUL (no first-operand-masquerading-as-the-whole-guard). */
 export type BranchConditionView =
   | { op: "and" | "or"; satisfied?: boolean; operands: BranchConditionView[] }
-  // #224 iii.2/iii.3: a decision-guard `not`. Structure-faithful; `satisfied` is the
-  // closed-world negation from the CRE trace. The flow + questionnaire panes render the `not`
-  // node today; PRECISE frontier/blocking attribution under negation (which negated literal
-  // blocked, vs the current `opaque` fallback) is iii.3b.
+  // #224 iii.2/iii.3/iii.3b: a decision-guard `not`. Structure-faithful; `satisfied` is the
+  // closed-world negation from the CRE trace. Flow + questionnaire panes render the `not` node,
+  // and iii.3b pins PRECISE blocking attribution under negation: the frontier yields `negated-ref`
+  // items (the established literals that blocked) and the questionnaire flags them (parity-aware).
   | { op: "not"; satisfied?: boolean; operand: BranchConditionView }
   | { op: "ref"; satisfied?: boolean; concept: ConceptView; explanation?: ExplanationView; facts?: string[] };
 
@@ -170,6 +170,11 @@ export interface ConditionView {
  *  a HEALTHY evaluated-false guard NEVER yields opaque (pinned by test). */
 export type FrontierItem =
   | { kind: "ref"; concept: ConceptView }
+  // #224 iii.3b: a NEGATED literal that blocked — the concept IS established, so `not X` is false.
+  // The dual of `ref` (a positive atom blocks when FALSE; a negated one when established=TRUE).
+  // Only pinned when there is runtime evidence (`satisfied === true`); a zip-degraded leaf under a
+  // false `not` stays `opaque` (the drift-only hatch), never a fabricated "X established" claim.
+  | { kind: "negated-ref"; concept: ConceptView }
   | { kind: "no-alternative"; alternatives: { label: string; frontier: Frontier }[] }
   | { kind: "opaque"; label: string };
 export type Frontier = FrontierItem[];
@@ -740,13 +745,44 @@ export function unsatisfiedFrontier(v: BranchConditionView): Frontier {
   return f;
 }
 
+/**
+ * #224 iii.3b — the ESTABLISHED-leaf witnesses of a view that is TRUE, projected as `negated-ref`
+ * frontier items (used under a false `not`, where the operand is true and each established atom is
+ * a blocker). The dual of `rawFrontier`'s false-`and`/`or` collection:
+ *   - ref  → `[negated-ref]` iff `satisfied === true` (the RUNTIME-EVIDENCE gate — a degraded leaf
+ *            with `satisfied === undefined` contributes nothing, so drift falls back to `opaque`);
+ *   - and  → all conjuncts' witnesses (a true `and` needs every conjunct true);
+ *   - or   → the witnesses of its true disjuncts (a false disjunct's recursion yields `[]`, so a
+ *            non-witnessing established atom elsewhere is NOT over-reported);
+ *   - not  → a TRUE nested `not Y` is witnessed by Y being FALSE, so recurse through `rawFrontier`
+ *            (the polarity flips BACK to positive `ref` items). This makes the two projections
+ *            MUTUALLY RECURSIVE through `not` and keeps the frontier in step with the questionnaire's
+ *            parity flip: `not not X` (X false) → `[ref X]`, `not (A and not B)` → `[negated-ref A,
+ *            ref B]`. (Both are `function` declarations, so the forward reference hoists.)
+ * Duplicates are preserved here and collapsed by the top-level `dedupeFrontier`.
+ */
+function establishedWitness(v: BranchConditionView): Frontier {
+  if (v.op === "ref") return v.satisfied === true ? [{ kind: "negated-ref", concept: v.concept }] : [];
+  if (v.op === "and") return v.satisfied === true ? v.operands.flatMap(establishedWitness) : [];
+  if (v.op === "or") return v.operands.flatMap(establishedWitness);
+  // nested `not` — a TRUE `not Y` is witnessed by Y being FALSE (polarity flips back via rawFrontier).
+  if (v.op === "not") return v.satisfied === true ? rawFrontier(v.operand) : [];
+  return []; // unreachable — ref/and/or/not exhaust BranchConditionView
+
+}
+
 function rawFrontier(v: BranchConditionView): Frontier {
   if (v.op === "ref") return v.satisfied === false ? [{ kind: "ref", concept: v.concept }] : [];
-  // #224 iii.2: a false `not` (the negated concept IS established → it blocked) surfaces as an
-  // opaque frontier item; precise "which negated literal" pinpointing is iii.3b. A satisfied /
-  // unevaluated `not` contributes nothing.
-  if (v.op === "not")
-    return v.satisfied === false ? [{ kind: "opaque", label: describeConditionView(v) }] : [];
+  // #224 iii.3b: a false `not` blocked (the operand is TRUE). Pinpoint the ESTABLISHED leaves
+  // that witness the operand's truth as `negated-ref` items (the dual of a false `and`/`or`
+  // frontier). `not X` → `[X]`; `not (A or B)` → the true disjunct(s); `not (A and B)` → both
+  // conjuncts. Nothing pinpointable (a zip-degraded operand, or a nested `not` whose witness is an
+  // ABSENCE) → `opaque`, the drift hatch. A satisfied / unevaluated `not` contributes nothing.
+  if (v.op === "not") {
+    if (v.satisfied !== false) return [];
+    const witnesses = establishedWitness(v.operand);
+    return witnesses.length > 0 ? witnesses : [{ kind: "opaque", label: describeConditionView(v) }];
+  }
   if (v.op === "and") {
     if (v.satisfied === true) return [];
     const sub = v.operands.flatMap(rawFrontier);
@@ -778,6 +814,9 @@ function rawFrontier(v: BranchConditionView): Frontier {
  *  colliding with `lib`+`AX`. */
 function frontierItemKey(item: FrontierItem): string {
   if (item.kind === "ref") return `r:${item.concept.libraryName ?? ""}\u0001${item.concept.name}`;
+  // #224 iii.3b: DISTINCT prefix `nr:` (not `n:`, which keys `no-alternative`) + the same control
+  // separator, so `not X` dedups apart from a positive `X` and never collides on lib+name splits.
+  if (item.kind === "negated-ref") return `nr:${item.concept.libraryName ?? ""}\u0001${item.concept.name}`;
   if (item.kind === "opaque") return `o:${item.label}`;
   return `n:[${item.alternatives.map((a) => a.frontier.map(frontierItemKey).join(",")).join("|")}]`;
 }
@@ -804,9 +843,11 @@ export function frontierShortLabel(f: Frontier): string {
     .map((item) =>
       item.kind === "ref"
         ? item.concept.name
-        : item.kind === "no-alternative"
-          ? "no alternative held"
-          : item.label,
+        : item.kind === "negated-ref"
+          ? `not ${item.concept.name}` // #224 iii.3b
+          : item.kind === "no-alternative"
+            ? "no alternative held"
+            : item.label,
     )
     .join(", ");
 }
@@ -821,6 +862,8 @@ function frontierItemTooltip(item: FrontierItem): string {
   // A top-level ref reads as "X unmet" so a MIXED frontier (`(A or B) and C` all-false → the OR breakdown
   // followed by the bare conjunct) has no dangling token: "alt 1 (A): unmet; alt 2 (B): unmet; C unmet".
   if (item.kind === "ref") return `${item.concept.name} unmet`;
+  // #224 iii.3b: the concept IS established, which is what falsifies `not X`.
+  if (item.kind === "negated-ref") return `${item.concept.name} established (negated guard)`;
   if (item.kind === "opaque") return item.label;
   return item.alternatives.map((a, i) => `alt ${i + 1} (${a.label}): ${altUnmetDetail(a)}`).join("; ");
 }

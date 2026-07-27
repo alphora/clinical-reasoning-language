@@ -218,6 +218,53 @@ describe("compound-guard display (#224 i.4b) — guardLabel + unsatisfied fronti
   });
 });
 
+// ── #224 iii.3b: negation (real VM). A false `when not X` (X established) blocks the expected branch;
+//    the frontier pinpoints X as a `negated-ref` (never opaque), carrying its frame-resolved lib. ──
+describe("negation frontier (#224 iii.3b) — a false `when not X` [real VM]", () => {
+  it("`when not Contra` false (Contra established) → guard:compound, guardLabel `not Contra`, [negated-ref Contra]", () => {
+    const r = renderScenario(graphFrom(NEG_CRL, NEG_CEL));
+    expect(r.scenarios).toHaveLength(1);
+    const scenario = r.scenarios[0];
+    expect(scenario.status).toBe("fail");
+    expect(scenario.expected).toEqual({ decision: "Main", branch: "Approve" });
+
+    // VM-signal sanity: the `when not Contra` gate evaluated false (Contra established → `not` false).
+    const gate = scenario.tree[0];
+    expect(gate.nodeId).toBe("when[0]");
+    expect(gate.evaluated).toBe(true);
+    expect(gate.condition?.satisfied).toBe(false);
+
+    const got = failedCriterionFrontier(scenario as unknown as FcScenario);
+    expect(got).toHaveLength(1);
+    expect(got[0].reason).toBe("unsatisfied-when");
+    expect(got[0].display).toEqual({
+      reason: "unsatisfied-when",
+      guard: "compound",
+      guardLabel: "not Contra",
+      frontier: [{ kind: "negated-ref", concept: { name: "Contra", libraryName: "NEG" } }],
+    });
+    // NOT opaque — the whole point of iii.3b.
+    if (got[0].display.reason === "unsatisfied-when" && got[0].display.guard === "compound")
+      expect(got[0].display.frontier.some((i) => i.kind === "opaque")).toBe(false);
+  });
+
+  it("`when not ( A or B )` — not-over-COMPOUND, real zip → pinpoints the established disjunct (not opaque)", () => {
+    // The zip walks `BranchConditionNot` over an `or` operand (viewModel `zipConditionTrace`). A established
+    // → `(A or B)` true → `not` false → branch blocked; the frontier must pinpoint A as `negated-ref`, NOT
+    // fall back to opaque. (The criterion-expansion form `when not <criterion=(A or B)>` is covered on the
+    // questionnaire render path, which builds criterion tables; `graphFrom` here is criterion-table-free.)
+    const r = renderScenario(graphFrom(NEGCPD_CRL, NEGCPD_CEL));
+    const scenario = r.scenarios[0];
+    expect(scenario.status).toBe("fail");
+    const got = failedCriterionFrontier(scenario as unknown as FcScenario);
+    expect(got).toHaveLength(1);
+    expect(got[0].reason).toBe("unsatisfied-when");
+    if (got[0].display.reason === "unsatisfied-when" && got[0].display.guard === "compound") {
+      expect(got[0].display.frontier).toEqual([{ kind: "negated-ref", concept: { name: "A", libraryName: "NC" } }]);
+    } else throw new Error(`expected a compound unsatisfied-when, got ${JSON.stringify(got[0].display)}`);
+  });
+});
+
 // ── failedCriterionFrontier — pass/error are empty ───────────────────────────────
 describe("failedCriterionFrontier — self-gating empties", () => {
   it("status==='pass' → empty (the expected fired; nothing blocked it)", () => {
@@ -590,6 +637,71 @@ case "pre":
 - fact is "fEarly".
 - fact is "fLate".
 - result is "Main" is "Slow".`;
+
+const NEG_CRL = `# NEG
+library "NEG".
+concept "Contra":
+- type is Condition.
+- code is \`contra\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "Main":
+first:
+- when not "Contra" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+const NEG_CEL = `# NEGC
+library "NEGC".
+covers "NEG".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fContra":
+- code is "http://example.org|contra".
+- date is "2026-01-01".
+- defined by "Contra".
+case "neg":
+- subject is "Pat".
+- fact is "fContra".
+- result is "Main" is "Approve".`;
+
+const NEGCPD_CRL = `# NC
+library "NC".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "Main":
+first:
+- when not ( "A" or "B" ) then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+const NEGCPD_CEL = `# NCC
+library "NCC".
+covers "NC".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fA":
+- code is "http://example.org|a".
+- date is "2026-01-01".
+- defined by "A".
+case "nc":
+- subject is "Pat".
+- fact is "fA".
+- result is "Main" is "Approve".`;
 
 const DEEP_CRL = `# DEEP
 library "DEEP".

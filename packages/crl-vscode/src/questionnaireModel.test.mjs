@@ -1108,6 +1108,149 @@ first:
   assert.equal(byName.C.answer, "no", "C absent-but-declared → conceptTruth no (never blank/unknown here)");
 });
 
+// ── #224 iii.3b: precise BLOCKING attribution under negation. A `not X` box's leaf blocks when X is
+//    ESTABLISHED (the polarity flip); parity, mixed guards, and the De Morgan `not (A or B)` case. ──
+check("iii.3b: `not A` (A established) → the A leaf under the `not` box is BLOCKING (answer yes)", () => {
+  const { sv, rootLib } = renderCase({ "g.crl": guardCrl(`not "A"`), "g.cel": guardCel(["A"]) }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.expansion.kind, "not", "a `not` box");
+  const la = when.expansion.operand;
+  assert.equal(la.name, "A"); assert.equal(la.answer, "yes", "A IS established");
+  assert.ok(la.blocking, "under `not`, an ESTABLISHED leaf blocks the branch");
+});
+
+check("iii.3b: `not not A` (A false) → parity returns to positive: A blocks when FALSE", () => {
+  const { sv, rootLib } = renderCase({ "g.crl": guardCrl(`not not "A"`), "g.cel": guardCel([]) }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  // not(not(A)) box → not > not > leaf A.
+  const la = when.expansion.operand.operand;
+  assert.equal(la.name, "A"); assert.equal(la.answer, "no", "A not established");
+  assert.ok(la.blocking, "even `not`-parity → ordinary polarity: a FALSE A blocks");
+});
+
+check("iii.3b: `A and not B` (A false, B established) → BOTH block (mixed parity coexist)", () => {
+  const { sv, rootLib } = renderCase({ "g.crl": guardCrl(`"A" and not "B"`), "g.cel": guardCel(["B"]) }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.expansion.kind, "and");
+  const [la, notBox] = when.expansion.operands;
+  assert.equal(la.name, "A"); assert.equal(la.answer, "no"); assert.ok(la.blocking, "positive A false → blocks");
+  assert.equal(notBox.kind, "not");
+  const lb = notBox.operand;
+  assert.equal(lb.name, "B"); assert.equal(lb.answer, "yes"); assert.ok(lb.blocking, "negated B established → blocks");
+});
+
+check("iii.3b: De Morgan `not ( A or B )` (A established, B not) → ONLY the established disjunct A blocks", () => {
+  const { sv, rootLib } = renderCase({ "g.crl": guardCrl(`not ( "A" or "B" )`), "g.cel": guardCel(["A"]) }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.expansion.kind, "not");
+  const orBox = when.expansion.operand;
+  assert.equal(orBox.kind, "or", "the negated compound is an ANY OF box");
+  const [la, lb] = orBox.operands;
+  assert.equal(la.name, "A"); assert.equal(la.answer, "yes"); assert.ok(la.blocking, "the TRUE disjunct witnesses the negation's failure → blocks");
+  assert.equal(lb.name, "B"); assert.equal(lb.answer, "no"); assert.ok(!lb.blocking, "a FALSE disjunct did not contribute → informational");
+});
+
+check("iii.3b: De Morgan `not ( A and B )` (both established) → BOTH leaves block", () => {
+  const { sv, rootLib } = renderCase({ "g.crl": guardCrl(`not ( "A" and "B" )`), "g.cel": guardCel(["A", "B"]) }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.expansion.kind, "not");
+  const andBox = when.expansion.operand;
+  assert.equal(andBox.kind, "and");
+  const [la, lb] = andBox.operands;
+  assert.ok(la.answer === "yes" && la.blocking, "A established → blocks the negation");
+  assert.ok(lb.answer === "yes" && lb.blocking, "B established → blocks the negation");
+});
+
+check("iii.3b: De Morgan SUPPRESSION `not ( ( A and B ) or C )` (A no, B yes, C yes) → ONLY C blocks", () => {
+  // (A and B) is FALSE (A absent) so it did NOT witness the or's truth → its members are informational,
+  // even though B is established. C (the true disjunct) is the sole blocker. Pins the parity-aware
+  // `negated ? op==="and" && satisfied===false` suppression clause.
+  const { sv, rootLib } = renderCase(
+    { "g.crl": guardCrl(`not ( ( "A" and "B" ) or "C" )`), "g.cel": guardCel(["B", "C"]) }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  const orBox = when.expansion.operand; // not > or
+  assert.equal(orBox.kind, "or");
+  const [andBox, lc] = orBox.operands;
+  assert.equal(andBox.kind, "and");
+  const [la, lb] = andBox.operands;
+  assert.ok(!la.blocking, "A (false, inside the false `and`) → informational");
+  assert.ok(lb.answer === "yes" && !lb.blocking, "B established but inside the FALSE `and` (De Morgan dual) → informational, NOT blocking");
+  assert.equal(lc.name, "C"); assert.ok(lc.answer === "yes" && lc.blocking, "C is the true disjunct that blocks the negation");
+});
+
+check("iii.3b: `when not <criterion=(A or B)>` — the negated EXCLUSION criterion expands + pinpoints (A established blocks)", () => {
+  // The canonical PA negation shape (Claude review c3): a negated exclusion criterion. Expansion inlines
+  // `(A or B)` under the `not` BEFORE the zip, so the box is `not > or > [A, B]`; A established → blocks.
+  const crl = `library "G".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+criterion "Excluded":
+- when ( "A" or "B" ).
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "G":
+first:
+- when not "Excluded" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+  // guardCel expects Deny (the produced branch), so the case PASSES; the `when not Excluded` gate is still
+  // EVALUATED-false (Excluded established), so its box renders and its blocking is computed.
+  const { sv, rootLib } = renderCase({ "g.crl": crl, "g.cel": guardCel(["A"]) }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.expansion.kind, "not", "the criterion expanded under the `not`");
+  const orBox = when.expansion.operand;
+  assert.equal(orBox.kind, "or", "criterion body `(A or B)` inlined as an ANY OF box");
+  const [la, lb] = orBox.operands;
+  assert.ok(la.answer === "yes" && la.blocking, "A established → the disjunct that blocks the negation");
+  assert.ok(!lb.blocking, "B (absent) did not witness → informational");
+});
+
+check("iii.3b: a PREEMPTED branch containing `not` marks NOTHING blocking (never evaluated)", () => {
+  const crl = `library "G".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+activity "First":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Second":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "G":
+first:
+- when "A" then recommend activity "First".
+- when not "B" then recommend activity "Second".
+- otherwise then recommend activity "Deny".`;
+  // A present → the `when not B` branch is PREEMPTED (never evaluated), so its box is informational.
+  const cel = guardCel(["A"]).replace(`- result is "G" is "Deny".`, `- result is "G" is "First".`);
+  const { sv, rootLib } = renderCase({ "g.crl": crl, "g.cel": cel }, "g.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const pre = q.questions.find((x) => x.rowKind === "when-preempted");
+  assert.ok(pre, "the `not B` when is preempted by the matched `A`");
+  assert.equal(pre.expansion.kind, "not");
+  assert.ok(!pre.expansion.operand.blocking, "a preempted (never-evaluated) negated guard marks NOTHING blocking");
+});
+
 check("i.4c: a SATISFIED `A or B` (A=yes,B=no) IS boxed — both runtime answers shown, NOTHING blocking", () => {
   const { sv, rootLib } = renderCase({ "g.crl": guardCrl(`"A" or "B"`), "g.cel": guardCel(["A"]).replace(`is "Deny"`, `is "Approve"`) }, "g.cel", "c");
   const q = buildQuestionnaire(sv, booleanResolver, rootLib);

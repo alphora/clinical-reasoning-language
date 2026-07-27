@@ -37,12 +37,16 @@ export type QExpr =
       valueType: ConceptValueType | null;
       /** A named-composite / both-rep operand's OWN `defined as` body, as a nested box (the operand is answerable AND expandable). */
       composite?: QExpr;
-      /** #224 i.4c: a GUARD-box atom that actually BLOCKED the branch (branch-false ∧ this atom RUNTIME-evaluated
-       *  false ∧ no ancestor `or` satisfied). "Runtime-evaluated false" — NOT a `conceptTruth` display fallback: a
-       *  zip-degraded atom (no runtime `satisfied`) is never a blocker, even if its DISPLAYED answer is "no" (mirrors
-       *  i.4b's opaque handling — a degraded node is never a pinpointed blocker). A false-but-non-blocking atom (a
-       *  false conjunct of a satisfied `or`) leaves this unset → renders informational. Computed LOCALLY in
-       *  `buildGuardStruct`. Only ever set on guard-box leaves; a `defined as` expansion leaf never carries it. */
+      /** #224 i.4c / iii.3b: a GUARD-box atom that actually BLOCKED the branch (branch-false ∧ this atom
+       *  RUNTIME-evaluated to its BLOCKING truth ∧ no ancestor-`or`/effective-`or` satisfied). The blocking truth is
+       *  polarity-aware: under EVEN `not`-parity a positive atom blocks when `satisfied === false`; under ODD parity a
+       *  NEGATED atom blocks when `satisfied === true` (a `not X` fails the branch when X is established). "Runtime-
+       *  evaluated" (a defined `satisfied`) — NOT a `conceptTruth` display fallback: a zip-degraded atom (no runtime
+       *  `satisfied`) is never a blocker under either polarity, even if its DISPLAYED answer is "no"/"yes" (mirrors
+       *  i.4b's opaque handling — a degraded node is never a pinpointed blocker). A non-blocking atom (a false member of
+       *  a satisfied `or`, or — under odd parity — a member of a De Morgan-dual FALSE `and`) leaves this unset →
+       *  renders informational. Computed LOCALLY in `buildGuardStruct`. Only ever set on guard-box leaves; a
+       *  `defined as` expansion leaf never carries it. */
       blocking?: boolean;
     }
   | { kind: "external"; name: string; lib: string } // a cross-library operand — NOT evaluated here (distinct from local "unknown")
@@ -259,18 +263,27 @@ export function buildQuestionnaire(
     frameLib: string | undefined,
     branchFalse: boolean,
     underSatisfiedOr: boolean,
+    // #224 iii.3b: parity of `not`s on the path from the guard root. Under ODD parity a leaf blocks
+    // when it is ESTABLISHED (`satisfied === true`) — a `not X` fails the branch when X holds.
+    negated: boolean,
   ): QExpr => {
     if (expr.op === "not") {
-      // #224 iii.2: structure-faithful negation box (never dedups). Recurse the operand;
-      // `branchFalse`/`underSatisfiedOr` propagate unchanged. Precise blocking attribution
-      // under negation (a `not X` blocks when X IS established) is display polish for iii.3b —
-      // this keeps the guard box total + non-crashing (`not` is now a validated, emitted guard).
-      return { kind: "not", operand: buildGuardStruct(expr.operand, frameLib, branchFalse, underSatisfiedOr) };
+      // #224 iii.2/iii.3b: structure-faithful negation box (never dedups). Recurse the operand with
+      // FLIPPED parity; `branchFalse`/`underSatisfiedOr` propagate. This is what pins precise
+      // blocking under negation (a `not X` blocks when X IS established — the leaf flip below).
+      return { kind: "not", operand: buildGuardStruct(expr.operand, frameLib, branchFalse, underSatisfiedOr, !negated) };
     }
     if (expr.op !== "ref") {
-      // A satisfied `or` on the path makes its false members INFORMATIONAL (not blockers) for the whole subtree.
-      const nextUnderSatOr = underSatisfiedOr || (expr.op === "or" && expr.satisfied === true);
-      return { kind: expr.op, operands: expr.operands.map((o) => buildGuardStruct(o, frameLib, branchFalse, nextUnderSatOr)) };
+      // A satisfied `or` (positive parity) makes its false members INFORMATIONAL — and its De Morgan
+      // dual, a FALSE `and` under odd parity, does the same (a `not (A and B)` is false only via a
+      // TRUE conjunct, so a false conjunct there is informational). #224 iii.3b makes it parity-aware.
+      const nextUnderSatOr =
+        underSatisfiedOr ||
+        (negated ? expr.op === "and" && expr.satisfied === false : expr.op === "or" && expr.satisfied === true);
+      return {
+        kind: expr.op,
+        operands: expr.operands.map((o) => buildGuardStruct(o, frameLib, branchFalse, nextUnderSatOr, negated)),
+      };
     }
     const lib = expr.concept.libraryName ?? frameLib ?? "";
     const name = expr.concept.name;
@@ -287,10 +300,12 @@ export function buildQuestionnaire(
       isInferred: shape ? shape.isInferred : false,
       valueType: valueTypes[0] ?? null,
     };
-    // Blocking requires RUNTIME evidence (`expr.satisfied === false`), NOT the displayed `answer`: a zip-degraded
+    // Blocking requires RUNTIME evidence (a defined `expr.satisfied`), NOT the displayed `answer`: a zip-degraded
     // leaf (no runtime `satisfied`) falls to `conceptTruth` for DISPLAY, but an off-trace fallback must never claim
     // "this criterion blocked the branch" (mirrors i.4b's opaque handling — a degraded node is never a pinpointed blocker).
-    if (branchFalse && expr.satisfied === false && !underSatisfiedOr) leaf.blocking = true;
+    // #224 iii.3b: under ODD `not`-parity the polarity flips — a NEGATED leaf blocks when ESTABLISHED (`=== true`).
+    const atomFailed = negated ? expr.satisfied === true : expr.satisfied === false;
+    if (branchFalse && atomFailed && !underSatisfiedOr) leaf.blocking = true;
     // A composite atom (its own `defined as`) is answerable AND expandable → nest its body via the SHARED positional
     // builder (a representation-disjunction — the forced top `or` chip is CORRECT for it, unlike the guard-box top).
     if (opts.defExpr) {
@@ -305,7 +320,7 @@ export function buildQuestionnaire(
   // Attach the guard box to a COMPOUND `when` row. `branchFalse` (the whole guard evaluated false) enables blocking
   // styling; a preempted guard (never evaluated) passes false → informational only.
   const attachGuardStruct = (q: Question, cond: ConditionView, frameLib: string | undefined): void => {
-    q.expansion = buildGuardStruct(cond.expr, frameLib, cond.satisfied === false, false);
+    q.expansion = buildGuardStruct(cond.expr, frameLib, cond.satisfied === false, false, false);
     q.expansionKind = "guard";
   };
 

@@ -34,6 +34,11 @@ const or = (satisfied: boolean | undefined, ...operands: BranchConditionView[]):
   ...(satisfied !== undefined ? { satisfied } : {}),
   operands,
 });
+const not = (satisfied: boolean | undefined, operand: BranchConditionView): BranchConditionView => ({
+  op: "not",
+  ...(satisfied !== undefined ? { satisfied } : {}),
+  operand,
+});
 
 const kinds = (f: Frontier): string[] => f.map((i) => i.kind);
 const hasOpaque = (f: Frontier): boolean =>
@@ -145,6 +150,79 @@ describe("unsatisfiedFrontier — opaque is the DRIFT-only escape hatch", () => 
     const degradedOrRoot: BranchConditionView = { op: "or", operands: [ref("A", undefined), ref("B", undefined)] };
     const f = unsatisfiedFrontier(degradedOrRoot);
     expect(f).toEqual([{ kind: "opaque", label: "A or B" }]);
+  });
+});
+
+// #224 iii.3b — a false `not` pinpoints the ESTABLISHED literal(s) that blocked (`negated-ref`),
+// the dual of the false-`and`/`or` frontier; drift (no runtime evidence) stays `opaque`.
+describe("unsatisfiedFrontier — negation (`negated-ref`)", () => {
+  it("`not X` false (X established) → one `negated-ref` for X (NOT opaque)", () => {
+    const f = unsatisfiedFrontier(not(false, ref("X", true)));
+    expect(f).toEqual([{ kind: "negated-ref", concept: { name: "X" } }]);
+  });
+
+  it("a SATISFIED `not X` (X not established) contributes nothing", () => {
+    expect(unsatisfiedFrontier(not(true, ref("X", false)))).toEqual([]);
+  });
+
+  it("`A and not B` (A false, B established) → both block: [ref A, negated-ref B]", () => {
+    const f = unsatisfiedFrontier(and(false, ref("A", false), not(false, ref("B", true))));
+    expect(f).toEqual([
+      { kind: "ref", concept: { name: "A" } },
+      { kind: "negated-ref", concept: { name: "B" } },
+    ]);
+  });
+
+  it("De Morgan `not (A or B)` false → the TRUE disjunct(s) as `negated-ref` (only the established)", () => {
+    // A established, B not → only A witnesses the `or`'s truth, so only A blocks the negation.
+    const f = unsatisfiedFrontier(not(false, or(true, ref("A", true), ref("B", false))));
+    expect(f).toEqual([{ kind: "negated-ref", concept: { name: "A" } }]);
+  });
+
+  it("De Morgan `not (A and B)` false → BOTH conjuncts (both established) as `negated-ref`", () => {
+    const f = unsatisfiedFrontier(not(false, and(true, ref("A", true), ref("B", true))));
+    expect(f).toEqual([
+      { kind: "negated-ref", concept: { name: "A" } },
+      { kind: "negated-ref", concept: { name: "B" } },
+    ]);
+  });
+
+  it("`not A and not A` dedups to ONE `negated-ref` (distinct from a positive `A` key)", () => {
+    const f = unsatisfiedFrontier(and(false, not(false, ref("A", true)), not(false, ref("A", true))));
+    expect(f).toEqual([{ kind: "negated-ref", concept: { name: "A" } }]);
+  });
+
+  it("DRIFT: false `not` over a zip-degraded ref (no `satisfied`) → opaque, never a fabricated `negated-ref`", () => {
+    const f = unsatisfiedFrontier(not(false, ref("X", undefined)));
+    expect(f).toEqual([{ kind: "opaque", label: "not X" }]);
+  });
+
+  it("DOUBLE NEGATION `not not X` false (X false) → parity flips back to a POSITIVE `ref X` (not opaque)", () => {
+    // Mutual recursion: outer `not` false → witness the inner (true) `not X` → X's FALSE-frontier = [ref X].
+    const f = unsatisfiedFrontier(not(false, not(true, ref("X", false))));
+    expect(f).toEqual([{ kind: "ref", concept: { name: "X" } }]);
+  });
+
+  it("`not (A and not B)` false (A established, B not) → mixed [negated-ref A, ref B]", () => {
+    // The `and` is true (A true, `not B` true since B false). Witness: A established (negated-ref) +
+    // `not B` true → B false-frontier (positive ref B). Proves the polarity flip nests correctly.
+    const f = unsatisfiedFrontier(not(false, and(true, ref("A", true), not(true, ref("B", false)))));
+    expect(f).toEqual([
+      { kind: "negated-ref", concept: { name: "A" } },
+      { kind: "ref", concept: { name: "B" } },
+    ]);
+  });
+
+  it("formatters: `frontierShortLabel([negated-ref X])` = `not X`; tooltip = `X established (negated guard)`", () => {
+    const f: Frontier = [{ kind: "negated-ref", concept: { name: "X" } }];
+    expect(frontierShortLabel(f)).toBe("not X");
+    expect(frontierTooltip(f)).toBe("X established (negated guard)");
+  });
+
+  it("a false `or` alternative that is `not X` → `alt N (not X): unmet` (pinpointed, not opaque)", () => {
+    // `(not X) or B` all-false: `not X` false (X established), B false. The OR breakdown renders each alt.
+    const f = unsatisfiedFrontier(or(false, not(false, ref("X", true)), ref("B", false)));
+    expect(frontierTooltip(f)).toBe("alt 1 (not X): unmet; alt 2 (B): unmet");
   });
 });
 

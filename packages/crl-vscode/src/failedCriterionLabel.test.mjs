@@ -40,6 +40,27 @@ check("unsatisfied-when (compound) → 'when <guardLabel> — unmet: <frontier>'
   );
 });
 
+check("#224 iii.3b: unsatisfied-when negation → 'when not X — unmet: not X' (established literal, not opaque)", () => {
+  assert.equal(
+    failedCriterionLabel(
+      node({ reason: "unsatisfied-when", guard: "compound", guardLabel: "not Contra", frontier: [{ kind: "negated-ref", concept: { name: "Contra" } }] }),
+    ),
+    "when not Contra — unmet: not Contra",
+  );
+  // mixed `A and not B`, both blocking → both rendered
+  assert.equal(
+    failedCriterionLabel(
+      node({
+        reason: "unsatisfied-when",
+        guard: "compound",
+        guardLabel: "A and not B",
+        frontier: [{ kind: "ref", concept: { name: "A" } }, { kind: "negated-ref", concept: { name: "B" } }],
+      }),
+    ),
+    "when A and not B — unmet: A, not B",
+  );
+});
+
 check("guarded-out WITH concept → '<polarity> <concept>'", () => {
   assert.equal(failedCriterionLabel(node({ reason: "guarded-out", polarity: "unless", concept: { name: "Contra" } })), "unless Contra");
   assert.equal(failedCriterionLabel(node({ reason: "guarded-out", polarity: "only-when", concept: { name: "Elig" } })), "only-when Elig");
