@@ -82,6 +82,9 @@ import {
   addNote,
   buildReviewPerCase,
   composeSidecar,
+  criterionProgress,
+  criterionVerdictKey,
+  criterionVerdictState,
   deleteNote,
   deriveAllPassLeaves,
   deriveReviewOverlay,
@@ -90,14 +93,18 @@ import {
   loadSidecar,
   medicalValidationSidecarPath,
   mvComplete,
+  renderCriterionChrome,
   renderFlagChrome,
   renderProgressChrome,
   REVIEW_STATES,
   reviewProgress,
   saveSidecar,
+  setCriterionVerdict,
   setReviewState,
   type FlagChrome,
+  type LiveCriterion,
   type Note,
+  type PersistedCriterionVerdict,
   type PersistedReviewState,
   type ReviewState,
 } from "./medicalValidationStore";
@@ -195,6 +202,10 @@ interface PaneView {
    *  matches open flags → gids off these + posts `.has-flag`. Captured atomically with the anchors; reset each render. */
   conceptOccurrences: { gid: string; lib: string; name: string }[];
   flaggableGids: string[];
+  /** #224 ii.3 Slice 2b (TREE pane only): the flow render's per-single-criterion-`when` substrate — {gid,lib,name,collapsed}.
+   *  `driveCriterionVerdicts` maps a model-level verdict (by `{lib,name}` identity) → these gids + posts `.crit-*`; step C
+   *  rolls a body flag up onto a COLLAPSED box. Captured atomically with the anchors; reset each render, like conceptOccurrences. */
+  criterionOccurrences: { gid: string; lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[] }[];
   /** the start/primary-node gid — carries the chrome-mirror count badge (see driveFlagBadges). */
   startNodeGid?: string;
   disposables: vscode.Disposable[];
@@ -439,6 +450,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let notesByCaseId: Record<string, Note[]> = {};
   let openNotesCaseId: string | undefined;
   let editingNoteId: string | undefined;
+  // #224 ii.3 Slice 2b — model-level CRITERION verdicts (identity `JSON([lib,name])` → `{state,bodyHash}`), loaded from the
+  // SAME sidecar as the other two maps and married by `persistMv` (composeSidecar's 3rd map) so a criterion-verdict change
+  // can never wipe case verdicts / notes nor vice-versa. Verdict identity is library-local (a criterion reviewed ONCE across
+  // all its occurrences + cases); the live render's `criterionOccurrences` + `guardOutlines` supply the bodyHash for staleness.
+  let criterionVerdicts: Record<string, PersistedCriterionVerdict> = {};
   // #211 create-flag drawer — the in-flight flag draft (the resolved target + prefill + the policy identity captured at
   // open), or undefined when the drawer is closed. It lives in a DEDICATED `#flagDrawer` webview region that the render
   // handler never touches, so the drawer + the user's typed text SURVIVE a same-policy tree rebuild; the host clears it
@@ -849,9 +865,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const p = reviewProgress(reviewByCaseId, [...scenarioByCaseId.keys()], scenarios?.scenarios.length ?? 0);
       const resolvedCount = flagsList.filter((f) => f.status === "resolved").length;
       const fc: FlagChrome = { open: flagsList.length - resolvedCount, resolved: resolvedCount, error: flagStateError };
-      progress = mvComplete(p, fc)
+      // #224 ii.3 Slice 2b — the THIRD gate half: model-level criterion verdicts. `criterionProgress` tallies the LIVE
+      // rendered single-criterion identities (a stale-or-changed pass is NOT a pass); it is "" / inert when the policy has
+      // no criteria, so a criterion-free policy's chrome is byte-unchanged. Composed at the DISPLAY level with the other two.
+      const cp = criterionProgress(buildLiveCriterionIdentities(), criterionVerdicts);
+      progress = mvComplete(p, fc, cp)
         ? `<div class="mv-progress mv-progress-done mv-gate-complete">✓ Medical validation complete</div>`
-        : renderProgressChrome(p) + renderFlagChrome(fc);
+        : renderProgressChrome(p) + renderFlagChrome(fc) + renderCriterionChrome(cp);
     }
     const btn = (mode: "blocking" | "all", label: string): string =>
       `<button class="fc-toggle-btn${failedCriteriaMode === mode ? " fc-active" : ""}" data-fc-mode="${mode}">${label}</button>`;
@@ -1475,8 +1495,56 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // The START-NODE COUNT badge is the chrome mirror + catch-all: the TOTAL open count. `unplaced` = open OCCURRENCE flags that
     // lit NO node (moved/removed) — surfaced so a re-homed flag is never a silent aggregate-count-only blocker (the flag list
     // labels which). Per-flag tracked, not a gid-count subtraction.
+    // #224 ii.3 Slice 2b-2: roll a body concept's OPEN flag up onto its COLLAPSED criterion box — else a flag on a concept
+    // referenced ONLY inside a folded criterion body is invisible in the flow (disc 319 [important] 7). Concept-scope open
+    // flags only; matched by (lib,name). An EXPANDED criterion's body concepts render their own badges (no rollup needed).
+    const openConceptKeys = new Set(open.filter((f) => f.anchor.scope === "concept").map((f) => `${f.anchor.library}\u0000${f.anchor.name}`));
+    if (openConceptKeys.size > 0) {
+      for (const occ of tree.criterionOccurrences) {
+        if (!occ.collapsed) continue;
+        if (occ.bodyConcepts.some((bc) => openConceptKeys.has(`${bc.lib}\u0000${bc.name}`))) gids.add(occ.gid);
+      }
+    }
     const resolvedCount = flagsList.length - open.length;
     void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [...gids], startNodeGid: tree.startNodeGid, open: open.length, resolved: resolvedCount, flagError: flagStateError, unplaced });
+  }
+
+  /** #224 ii.3 Slice 2b — the LIVE criterion identities in the current guard outlines: `{lib,name}` identity → its
+   *  `{bodyHash, elided}` (from `soleCriterion`). Deduped (N occurrences of one criterion share ONE body → ONE identity;
+   *  the body is library-local, so the hash is identical across occurrences). The staleness fold + the gate/chrome tally
+   *  read this. Empty when no single-criterion whens are rendered. */
+  function buildLiveCriterionIdentities(): Map<string, LiveCriterion> {
+    const out = new Map<string, LiveCriterion>();
+    for (const go of guardOutlines.values()) {
+      const s = go.soleCriterion;
+      if (!s) continue;
+      const key = criterionVerdictKey(s.lib, s.name);
+      if (!out.has(key)) out.set(key, { bodyHash: s.bodyHash, elided: s.elided === true });
+    }
+    return out;
+  }
+
+  /** #224 ii.3 Slice 2b — paint the model-level criterion VERDICT chips (MIRRORS driveFlagBadges): for each rendered
+   *  criterion occurrence, resolve its effective UI state (`criterionVerdictState` — unreviewed / pass / fail / pending /
+   *  stale) by identity, group gids by state, and post a class-toggle (`.crit-*`) the webview applies WITHOUT a re-render.
+   *  `allGids` lets the webview bulk-clear the 4 classes before re-applying (a verdict change must un-paint prior state).
+   *  Selection-INDEPENDENT + re-driven on the tree ack, like the flag badges. No-op off MV / no tree pane. */
+  function driveCriterionVerdicts(): void {
+    const tree = views.get("tree");
+    if (!tree) return; // tree pane is opt-in
+    const allGids = tree.criterionOccurrences.map((o) => o.gid);
+    const byState: { pass: string[]; fail: string[]; pending: string[]; stale: string[] } = { pass: [], fail: [], pending: [], stale: [] };
+    if (mode === "medical-validation") {
+      const identities = buildLiveCriterionIdentities();
+      for (const occ of tree.criterionOccurrences) {
+        const key = criterionVerdictKey(occ.lib, occ.name);
+        const live = identities.get(key);
+        if (!live) continue; // an occurrence with no live identity (shouldn't happen — an occurrence implies a soleCriterion)
+        const s = criterionVerdictState(criterionVerdicts[key], live);
+        if (s !== "unreviewed") byState[s].push(occ.gid); // unreviewed → no class (the bulk-clear leaves it bare)
+      }
+    }
+    void tree.panel.webview.postMessage({ type: "criterionVerdicts", gen: tree.gen, allGids, byState });
   }
 
   /** Post a gen-stamped `markThisNode` for a set of segment ids in one pane (#177 slice 4), after clearing the prior
@@ -1741,6 +1809,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     v.reveals = {};
     v.leafConcepts = {}; // #187 Todo 5 (tree-only); reset each render, re-set below in the tree branch
     v.conceptOccurrences = []; // #203 Todo 4b Slice A (tree-only); reset each render, re-set in the tree branch
+    v.criterionOccurrences = []; // #224 ii.3 Slice 2b (tree-only); reset each render, re-set in the tree branch
     v.flaggableGids = [];
     v.startNodeGid = undefined;
     if (pane === "source") {
@@ -1810,6 +1879,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.reveals = r.reveals;
       v.leafConcepts = r.leafConcepts; // #187 Todo 5: the def-leaf verdict-join map (captured atomically with the anchors)
       v.conceptOccurrences = r.conceptOccurrences; // #203 Todo 4b Slice A: the flag-badge substrate (captured atomically)
+      v.criterionOccurrences = r.criterionOccurrences; // #224 ii.3 Slice 2b: the criterion-verdict substrate (captured atomically)
       v.flaggableGids = r.flaggableGids;
       v.startNodeGid = r.startNodeGid; // the chrome-mirror count badge's node
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode });
@@ -1929,6 +1999,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.reveals = {};
       v.leafConcepts = {}; // #187 Todo 5
       v.conceptOccurrences = []; // #203 Todo 4b Slice A: reset the flag-badge substrate too (symmetry; no stale tree data)
+      v.criterionOccurrences = []; // #224 ii.3 Slice 2b: reset the criterion-verdict substrate too (symmetry)
       v.flaggableGids = [];
       v.startNodeGid = undefined;
       void v.panel.webview.postMessage({ type: "render", html: `<p class="placeholder">${escapeHtml(message)}</p>`, gen, indexVersion, mode });
@@ -1960,6 +2031,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         // #203 Todo 4b Slice A: a fresh tree render dropped its `.has-flag` classes — re-drive the per-node flag badges
         // (selection-INDEPENDENT, like the review overlay). Uses this render's captured conceptOccurrences/flaggableGids.
         driveFlagBadges();
+        // #224 ii.3 Slice 2b: a fresh tree render dropped its `.crit-*` classes — re-drive the model-level criterion verdict
+        // chips (selection-INDEPENDENT, like the flag badges). Uses this render's captured criterionOccurrences + guardOutlines.
+        driveCriterionVerdicts();
         // #187 Todo 5: a fresh tree render dropped its `.flow-leaf-yes/no` classes (innerHTML replaced) — re-drive the
         // per-case leaf verdict overlay so a tree opened / re-rendered mid-session repaints the focused case's leaf answers.
         // NOTE: unlike the review overlay, this is selection-DEPENDENT — it rings `focusedScenario()`, which exists only in
@@ -2188,7 +2262,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const disposables: vscode.Disposable[] = [
       panel.webview.onDidReceiveMessage((m) => onWebviewMessage(pane, m)),
     ];
-    v = { panel, gen: 0, indexVersion: 0, acked: false, anchors: {}, reveals: {}, leafConcepts: {}, conceptOccurrences: [], flaggableGids: [], disposables };
+    v = { panel, gen: 0, indexVersion: 0, acked: false, anchors: {}, reveals: {}, leafConcepts: {}, conceptOccurrences: [], criterionOccurrences: [], flaggableGids: [], disposables };
     views.set(pane, v);
     panel.onDidDispose(() => {
       for (const d of disposables) d.dispose();
@@ -2345,6 +2419,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // replaced old CEL DOM would resolve a stale worklistActions key + persist against the stale mvSidecarPath.
     reviewByCaseId = {};
     notesByCaseId = {}; // #156 notes: drop the threads + drawer UI-state too (mirror loadReviewSidecar's clearing)
+    criterionVerdicts = {}; // #224 ii.3 Slice 2b: drop criterion verdicts with the rest of the MV state
     openNotesCaseId = undefined;
     editingNoteId = undefined;
     clearFlagDraft("retarget"); // #211/#210: drop the draft + postFlagDrawer + SETTLE any pending agent elicitation (else it hangs)
@@ -2502,6 +2577,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function loadReviewSidecar(): void {
     reviewByCaseId = {};
     notesByCaseId = {}; // #156 notes: reset the threads + drawer UI-state with the rest of the MV state
+    criterionVerdicts = {}; // #224 ii.3 Slice 2b: reset criterion verdicts with the rest of the MV state (retarget)
     openNotesCaseId = undefined;
     editingNoteId = undefined;
     clearFlagDraft("retarget"); // #211/#210: a policy (re)load drops the draft + SETTLES any pending agent elicitation
@@ -2515,6 +2591,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const { sidecar, warning } = loadSidecar(path);
     reviewByCaseId = sidecar.byCaseId;
     notesByCaseId = sidecar.notesByCaseId ?? {}; // loaded from the SAME sidecar (coerce carried them through)
+    criterionVerdicts = sidecar.criterionVerdictsByKey ?? {}; // #224 ii.3 Slice 2b: same sidecar, coerce-carried
     // Warn ONCE per (path, warning): re-opening the SAME corrupt/forward-version sidecar in the same session shouldn't
     // re-nag. A changed path OR a changed warning string (the file was edited) re-warns.
     if (warning && (lastWarnedSidecar?.path !== path || lastWarnedSidecar?.warning !== warning)) {
@@ -2535,10 +2612,16 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  persists, and on success COMMITS both maps in memory (so a failed save leaves disk + memory both untouched — the
    *  caller's re-render then shows the un-changed state). Returns false on failure (after surfacing it). Callers pass the
    *  NEXT value of the map they changed + the CURRENT value of the other. */
-  function persistMv(nextByCaseId: Record<string, PersistedReviewState>, nextNotes: Record<string, Note[]>): boolean {
+  function persistMv(
+    nextByCaseId: Record<string, PersistedReviewState>,
+    nextNotes: Record<string, Note[]>,
+    nextCriterionVerdicts: Record<string, PersistedCriterionVerdict> = criterionVerdicts, // #224 ii.3 Slice 2b: default to
+    // the CURRENT map so every existing 2-arg caller (case verdict / note change) preserves criterion verdicts untouched —
+    // the "next value of the map I changed + current value of the others" discipline, extended to the 3rd map.
+  ): boolean {
     if (!mvSidecarPath) return false;
     try {
-      saveSidecar(mvSidecarPath, composeSidecar(nextByCaseId, nextNotes));
+      saveSidecar(mvSidecarPath, composeSidecar(nextByCaseId, nextNotes, nextCriterionVerdicts));
     } catch (e) {
       void vscode.window.showErrorMessage(
         `Medical Validation: could not save: ${e instanceof Error ? e.message : String(e)}`,
@@ -2547,6 +2630,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
     reviewByCaseId = nextByCaseId; // commit in-memory only AFTER a successful persist
     notesByCaseId = nextNotes;
+    criterionVerdicts = nextCriterionVerdicts;
     return true;
   }
 
@@ -2566,6 +2650,29 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (state.selection) dispatch({ type: "select", selection: state.selection });
     else renderTreeChrome(); // #156 slice 6: the reviewed/pending counts changed → refresh the tree-chrome progress readout
     driveDoneOverlay(); // #156 slice 5: the reviewed set changed → repaint the tree done/error overlay (no tree re-render)
+    return true;
+  }
+
+  /** #224 ii.3 Slice 2b — apply a MODEL-LEVEL criterion verdict (right-click "Criterion encoding"). The identity + live
+   *  bodyHash are RE-RESOLVED from the LIVE `guardOutlines` by nodeKey at APPLY time (never a captured snapshot) — so a
+   *  rebuild that changed the model since the menu opened safely no-ops (the nodeKey no longer maps to a single-criterion
+   *  when → false). On success persists (the 3rd sidecar map), repaints the chips on EVERY occurrence (no tree re-render),
+   *  and refreshes the gate/chrome. `unreviewed` clears the verdict. Returns false (untouched) on any guard/persist failure. */
+  function applyCriterionVerdict(nodeKey: string, value: unknown, expectedBodyHash?: string): boolean {
+    if (mode !== "medical-validation" || !mvSidecarPath) return false; // defensive: MV-only + a sidecar to persist into
+    if (!isReviewState(value)) return false; // trusted-input guard
+    const sole = guardOutlines.get(nodeKey)?.soleCriterion;
+    if (!sole) return false; // no longer a single-criterion when (a rebuild changed the structure) — safe no-op
+    // disc 320 review [important] 1: if the body CHANGED between the menu opening and the pick (a rebuild — e.g. the KE / the
+    // editor agent saved an edit to the criterion body mid-menu), the live hash ≠ the hash the reviewer saw. Storing a FRESH
+    // (non-stale) pass here would pin a "correctly encoded" attestation to a body the reviewer never reviewed — exactly the
+    // false attestation `bodyHash` exists to prevent. Refuse; the caller re-opens the menu on the new body.
+    if (expectedBodyHash !== undefined && expectedBodyHash !== sole.bodyHash) return false;
+    const key = criterionVerdictKey(sole.lib, sole.name);
+    const next = setCriterionVerdict(criterionVerdicts, key, value, sole.bodyHash); // "unreviewed" deletes; else stores {state,liveBodyHash}
+    if (!persistMv(reviewByCaseId, notesByCaseId, next)) return false; // save (all three maps) failed → memory + disk untouched
+    driveCriterionVerdicts(); // repaint the verdict chips on every occurrence (no tree re-render)
+    renderTreeChrome(); // the criteria gate/chrome half changed
     return true;
   }
 
@@ -2608,6 +2715,49 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const caseIds = caseIdsForNodeThroughLit(semanticKey, entries);
     if (caseIds.length === 0) return note("no reviewable cases run through this node");
     await pickVerdictLoop(caseIds, ver, sidecar);
+  }
+
+  /** #224 ii.3 Slice 2b — the right-click MODEL-LEVEL criterion-encoding menu. DISTINCT vocab from the per-case verdict
+   *  ("Correctly encoded / Encoding wrong / Undecided / Clear", never "Needs work") because it judges the criterion's
+   *  ENCODING (one verdict shared across all occurrences + cases), not a single case's outcome. Resolves the nodeKey at
+   *  menu-open; `applyCriterionVerdict` re-resolves the identity + live bodyHash so a rebuild mid-menu safely no-ops. */
+  async function criterionEncodingMenu(revealKey: string): Promise<void> {
+    const note = (msg: string): void => void vscode.window.setStatusBarMessage(`Medical Validation: ${msg}`, 3000);
+    if (mode !== "medical-validation" || !mvSidecarPath) return note("not ready"); // no sidecar → can't persist
+    const tree = views.get("tree");
+    const hit = tree?.reveals[revealKey]; // trusted: opaque-key lookup, not a semantic key from the webview
+    const nodeKey = hit && "nodeKey" in hit ? hit.nodeKey : undefined;
+    const sole = nodeKey ? guardOutlines.get(nodeKey)?.soleCriterion : undefined;
+    if (!nodeKey || !sole) return note("not a criterion node");
+    const openHash = sole.bodyHash; // captured at open — the body the reviewer is judging (disc 320 review [important] 1)
+    const openSidecar = mvSidecarPath; // captured at open — a policy switch during the pick must not write the old target
+    const key = criterionVerdictKey(sole.lib, sole.name);
+    const cur = criterionVerdictState(criterionVerdicts[key], { bodyHash: sole.bodyHash, elided: sole.elided === true });
+    const opt = (label: string, value: ReviewState, desc?: string): vscode.QuickPickItem & { value: ReviewState } => ({
+      label,
+      value,
+      ...(desc ? { description: desc } : {}),
+    });
+    // disc 320 review [nit] 4: an ELIDED criterion (body truncated in this view) can never hold a durable pass — mark the
+    // pass row so the reviewer isn't surprised when "Correctly encoded" immediately paints stale + keeps the gate open.
+    const passDesc = sole.elided ? "body truncated here — will show as stale" : cur === "pass" ? "current" : undefined;
+    const pick = await vscode.window.showQuickPick(
+      [
+        opt("$(pass) Correctly encoded", "pass", passDesc),
+        opt("$(error) Encoding wrong", "fail", cur === "fail" ? "current" : undefined),
+        opt("$(question) Undecided", "pending", cur === "pending" ? "current" : undefined),
+        opt("$(circle-slash) Clear", "unreviewed", cur === "unreviewed" ? "current" : undefined),
+      ],
+      { placeHolder: `Criterion "${sole.name}" — encoding review (all occurrences)` },
+    );
+    if (!pick) return;
+    if (mvSidecarPath !== openSidecar) return note("policy changed — reopen the menu"); // a retarget during the pick
+    if (!applyCriterionVerdict(nodeKey, pick.value, openHash)) return note("couldn't save — the criterion may have changed; reopen the menu");
+    note(
+      pick.value === "unreviewed"
+        ? "criterion verdict cleared"
+        : `criterion "${sole.name}" marked ${pick.value === "pass" ? "correctly encoded" : pick.value === "fail" ? "encoding wrong" : "undecided"}`,
+    );
   }
 
   // ── #203 Todo 4b Slice B: create-flag ────────────────────────────────────────────
@@ -2710,14 +2860,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const hit = tree?.reveals[revealKey];
     if (!tree || !hit) return flagNote("no node here");
     const choices = flagTargetChoices(hit);
-    if (choices.length === 0) return nodeVerdictMenu(revealKey); // otherwise / use-decision → verdict only, unchanged
+    // #224 ii.3 Slice 2b: a SINGLE-criterion `when` (its nodeKey carries a `soleCriterion` outline) additionally offers a
+    // model-level "Criterion encoding…" review. A criterion when has its concept suppressed → flagTargetChoices returns []
+    // for it, so without this it would fall straight through to verdict-only.
+    const critNodeKey = "nodeKey" in hit ? hit.nodeKey : undefined;
+    const isCriterion = critNodeKey !== undefined && guardOutlines.get(critNodeKey)?.soleCriterion !== undefined;
+    if (choices.length === 0 && !isCriterion) return nodeVerdictMenu(revealKey); // otherwise / use-decision → verdict only, unchanged
     const ver = indexVersion; // capture BEFORE the menu — a retarget mid-menu must not act on this (now-old) hit
     const cel = currentCel;
-    // Verdict + one "Add flag on <target>" per choice — a `when` offers BOTH the concept (object) and this condition
-    // (occurrence); a leaf offers just this recommendation; a decision root just the decision.
+    // Verdict + (criterion when) "Criterion encoding" + one "Add flag on <target>" per choice — a `when` offers BOTH the
+    // concept (object) and this condition (occurrence); a leaf offers just this recommendation; a decision root just the decision.
     const pick = await vscode.window.showQuickPick(
       [
         { label: "$(checklist) Set case verdict…", act: "verdict" as const, choice: undefined as FlagTargetChoice | undefined },
+        ...(isCriterion ? [{ label: "$(law) Criterion encoding…", act: "criterion" as const, choice: undefined as FlagTargetChoice | undefined }] : []),
         ...choices.map((c) => ({ label: `$(flag) Add flag on ${c.label}`, act: "flag" as const, choice: c as FlagTargetChoice | undefined })),
       ],
       { placeHolder: "Medical Validation" },
@@ -2725,6 +2881,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!pick) return;
     if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — reopen the menu");
     if (pick.act === "verdict") return nodeVerdictMenu(revealKey); // revealKey is gen-scoped; nodeVerdictMenu re-validates
+    if (pick.act === "criterion") return criterionEncodingMenu(revealKey); // revealKey re-validated inside
     // Option A: the target is chosen HERE (native quick-pick); the drawer opens on the RESOLVED target. The webview never
     // names a target (trusted-input discipline). `openFlagDrawer` is a standalone seam — the editor agent (EPIC #210)
     // resolves the target itself and calls it directly, so the flag command has ONE entry point for both paths.
@@ -3641,7 +3798,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         crlErrors,
         status: {
           progress: { total: progress.total, passed: progress.passed, failed: progress.failed, pending: progress.pending, unreviewable: progress.unreviewable, stale: progress.stale },
-          mvComplete: mvComplete(progress, fc),
+          // #224 ii.3 Slice 2b: the agent's perceived gate must ALSO honor the criterion half (else it reports "complete"
+          // while a criterion encoding is unreviewed/wrong/stale). Same live-identities tally the chrome uses.
+          mvComplete: mvComplete(progress, fc, criterionProgress(buildLiveCriterionIdentities(), criterionVerdicts)),
           cases,
           flags,
           flagStateError: flagStateErrorSnapshot,
@@ -3822,6 +3981,10 @@ function shellHtml(): string {
 .mv-flags-clear{color:var(--vscode-testing-iconPassed,var(--vscode-charts-green,#89d185));opacity:.9}
 .mv-flags-error{color:var(--vscode-testing-iconErrored,var(--vscode-charts-red,#f14c4c));font-weight:bold}
 .mv-flags:hover{text-decoration:underline}
+/* #224 ii.3 Slice 2b: the criterion-encoding readout (the third gate half). Mirrors .mv-progress/.mv-flags spacing so the
+   three halves stack consistently; the all-clean variant gets the same green done treatment as .mv-progress-done. */
+.mv-criteria{padding:2px 2px 4px;font-size:.85em;opacity:.85}
+.mv-criteria-done{color:var(--vscode-testing-iconPassed,var(--vscode-charts-green,#89d185));opacity:1;font-weight:bold}
 ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
@@ -3932,6 +4095,12 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(m.unplaced>0){label+=' · '+m.unplaced+'⚠';}` +
   `var tt=sg.querySelector('title');if(tt)tt.textContent=(m.unplaced>0?m.unplaced+' flag(s) couldn\\'t be placed (target moved/removed) — ':'')+'open review flags — click to review';` +
   `if(st)st.textContent=label;sg.classList.toggle('has-startflag',label!=='');}}` +
+  // #224 ii.3 Slice 2b: the model-level criterion VERDICT chips. Bulk-CLEAR the 4 crit-* classes off every criterion gid
+  // (a verdict change must un-paint prior state), then add `crit-<state>` per byState. `unreviewed` gids are in allGids but
+  // no byState list → they end bare. Gen-guarded + class-toggle only (no re-render), the flagBadges idiom.
+  `else if(m.type==='criterionVerdicts'){if(m.gen!==gen)return;` +
+  `for(const id of (m.allGids||[])){const el=document.getElementById(id);if(el){el.classList.remove('crit-pass');el.classList.remove('crit-fail');el.classList.remove('crit-pending');el.classList.remove('crit-stale');}}` +
+  `var bs=m.byState||{};for(const s of ['pass','fail','pending','stale']){for(const id of (bs[s]||[])){const el=document.getElementById(id);if(el)el.classList.add('crit-'+s);}}}` +
   // #177 slice 4: the "this node" cross-pane marker — a SEPARATE channel from .current, .failed-criterion AND the review
   // overlay. Like the review overlay it is mutated ONLY here (mark/clearThisNode), NEVER by highlight/clearHighlight/clrFC/
   // clrRO — so it SURVIVES a cockpit reveal (the focused question's node stays marked as the clinician clicks around). mark

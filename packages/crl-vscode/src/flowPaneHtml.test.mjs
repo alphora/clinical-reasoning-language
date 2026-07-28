@@ -828,3 +828,57 @@ check("Todo 3 scope: a plain compound guard (NOT in guardOutlines) still dead-en
   const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g9_", guardOutlines: new Map() });
   assert.equal(leafRowsOf(rr.html).length, 0, "a plain compound guard hangs NO outline (still a dead-end box, Slice 1 scope)");
 });
+
+// ── Slice 2b: model-level criterion verdict chip + criterionOccurrences ──────────────────────────
+const critStruct = () => [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+  node("w:crit", "when", "when Elig", ["c:A", "c:B"], [node("a:X", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
+] }];
+const critCs = () => [concept("c:A", "A"), concept("c:B", "B")];
+
+check("Todo 3 Slice 2b: a single-criterion when records ONE criterionOccurrence (identity {lib,name}, collapsed) + a HIDDEN verdict chip on the SAME gid", () => {
+  const guardOutlines = new Map([["w:crit", gout(gand(gleaf("A", "c:A"), gleaf("B", "c:B")), "Elig")]]);
+  const rr = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "gv_", guardOutlines }); // collapsed by default
+  assert.equal(rr.criterionOccurrences.length, 1, "exactly one occurrence for the single criterion when");
+  const occ = rr.criterionOccurrences[0];
+  assert.deepEqual({ lib: occ.lib, name: occ.name, collapsed: occ.collapsed }, { lib: "Pol", name: "Elig", collapsed: true }, "identity + collapsed state");
+  assert.ok(rr.html.includes(`id="${occ.gid}"`), "the occurrence gid is the criterion when's <g> id");
+  // The chip is pre-rendered but HIDDEN (no crit-* class yet); the host reveals it per-occurrence without a re-render.
+  assert.ok(/<g class="flow-crit-verdict">/.test(rr.html), "a criterion when carries a pre-rendered verdict chip");
+  assert.ok(!/class="flow-row[^"]*\bcrit-(pass|fail|pending|stale)\b/.test(rr.html), "no verdict state class is baked into the render (host-driven)");
+});
+
+check("Todo 3 Slice 2b-2: the occurrence carries bodyConcepts (leaf identities from the expr) + a criterion when renders a rollup ⚑ badge", () => {
+  const guardOutlines = new Map([["w:crit", gout(gand(gleaf("A", "c:A"), gleaf("B", "c:B")), "Elig")]]);
+  const rr = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "gvb_", guardOutlines }); // collapsed
+  const occ = rr.criterionOccurrences[0];
+  assert.deepEqual(occ.bodyConcepts.map((c) => `${c.lib}:${c.name}`).sort(), ["Pol:A", "Pol:B"], "body leaf identities collected from the expr");
+  // A rollup ⚑ badge (hidden; the host lights it when collapsed + a body concept has an open flag) is present, and the
+  // criterion when gid is flaggable (so the host's bulk-clear covers it).
+  assert.ok(/flow-flag-badge/.test(rr.html), "a hidden rollup ⚑ badge is rendered on the criterion when");
+  assert.ok(rr.flaggableGids.includes(occ.gid), "the criterion when gid is flaggable (rollup target)");
+});
+
+check("Todo 3 Slice 2b: an EXPANDED criterion reports collapsed:false in its occurrence (step C rolls flags up only on collapsed)", () => {
+  const guardOutlines = new Map([["w:crit", gout(gand(gleaf("A", "c:A"), gleaf("B", "c:B")), "Elig")]]);
+  const rr = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "gv2_", guardOutlines, expandedGuardWhens: new Set(["w:crit"]) });
+  assert.equal(rr.criterionOccurrences.length, 1);
+  assert.equal(rr.criterionOccurrences[0].collapsed, false, "expanded ⇒ collapsed:false");
+});
+
+check("Todo 3 Slice 2b: a compound-with-criterion guard (no soleCriterion) records NO occurrence + NO verdict chip (single-ref scope only)", () => {
+  const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w:cmp", "when", "when A and Meets", ["c:A", "c:B"], [node("a:X", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
+  ] }];
+  const guardOutlines = new Map([["w:cmp", gout(gand(gleaf("A", "c:A"), gleaf("B", "c:B")))]]); // no name ⇒ no soleCriterion
+  const rr = renderFlowPane(struct, { concepts: critCs(), revealPrefix: "gv3_", guardOutlines });
+  assert.equal(rr.criterionOccurrences.length, 0, "no occurrence for a compound-with-criterion guard");
+  assert.ok(!/flow-crit-verdict/.test(rr.html), "no verdict chip on a non-single-criterion guard");
+});
+
+check("Todo 3 Slice 2b: the verdict chip is hidden by default and each state (pass/fail/pending/stale) is revealed by its row class", () => {
+  assert.ok(/\.flow-crit-verdict\{display:none/.test(FLOW_STYLE), "chip hidden by default");
+  for (const s of ["pass", "fail", "pending", "stale"])
+    assert.ok(FLOW_STYLE.includes(`.flow-row.crit-${s} .flow-crit-verdict`), `.crit-${s} reveals the chip`);
+  // The dot color for each state is distinct (the case-verdict TOK_* for pass/fail/pending; a muted grey for stale).
+  assert.ok(/\.flow-row\.crit-stale \.flow-crit-vdot\{fill:var\(--vscode-descriptionForeground/.test(FLOW_STYLE), "stale dot is muted grey (never a settled pass/fail color)");
+});

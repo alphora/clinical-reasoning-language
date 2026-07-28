@@ -70,6 +70,23 @@ export interface MedicalValidationSidecar {
   byCaseId: Record<string, PersistedReviewState>;
   /** Omitted when there are no notes anywhere (keeps a verdict-only sidecar byte-identical to before this feature). */
   notesByCaseId?: Record<string, Note[]>;
+  /** #224 ii.3 Slice 2b — model-level CRITERION verdicts, keyed by criterion IDENTITY `JSON([lib,name])` (a criterion is
+   *  library-local, reviewed ONCE across all its occurrences + all cases). Each entry pins the `bodyHash` the reviewer
+   *  approved so an edit to the criterion body renders the verdict STALE (`criterionVerdictState`). ADDITIVE, still
+   *  schemaVersion 2 (an older reader ignores it, this reader tolerates its absence — the same discipline as `notesByCaseId`).
+   *  Omitted when empty (a criterion-verdict-free policy stays byte-identical). */
+  criterionVerdictsByKey?: Record<string, PersistedCriterionVerdict>;
+}
+
+/** A persisted CRITERION verdict — the reviewer's judgment on whether a criterion is correctly encoded, plus the
+ *  `bodyHash` (from `GuardOutline.soleCriterion`) of the body they approved. If the live body's hash differs (an edit) or
+ *  the body is `elided`, the stored `state` is treated as STALE, never shown as the settled verdict (disc 319 [critical] 1).
+ *  NOTE: `bodyHash` fingerprints the RENDERED OUTLINE expr (`hashExpr` in crl `provenance/guardOutline.ts`), NOT source
+ *  text — so a formatting-only edit does NOT stale a verdict (good), and a change behind an `external`/unresolved-ref stub
+ *  doesn't either (the verdict is over the body AS SHOWN; truncation is separately caught by `elided`). */
+export interface PersistedCriterionVerdict {
+  state: PersistedReviewState;
+  bodyHash: string;
 }
 
 function emptySidecar(): MedicalValidationSidecar {
@@ -82,9 +99,11 @@ function emptySidecar(): MedicalValidationSidecar {
 export function composeSidecar(
   byCaseId: Record<string, PersistedReviewState>,
   notesByCaseId: Record<string, Note[]>,
+  criterionVerdictsByKey: Record<string, PersistedCriterionVerdict> = {},
 ): MedicalValidationSidecar {
   const sidecar: MedicalValidationSidecar = { schemaVersion: 2, byCaseId };
   if (Object.keys(notesByCaseId).length > 0) sidecar.notesByCaseId = notesByCaseId;
+  if (Object.keys(criterionVerdictsByKey).length > 0) sidecar.criterionVerdictsByKey = criterionVerdictsByKey;
   return sidecar;
 }
 
@@ -146,6 +165,25 @@ function coerceNotes(raw: unknown): Record<string, Note[]> | undefined {
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+/** Sanitize a parsed `criterionVerdictsByKey` map (mirrors `coerceNotes`' container discipline): absent → undefined;
+ *  present-but-not-a-plain-object (incl. an array) → dropped entirely (verdicts gone, cases/notes kept); a per-key value
+ *  that isn't `{ state: <known>, bodyHash: <non-empty string> }` → that key dropped (a partially-corrupt map keeps its
+ *  valid entries). A missing/empty bodyHash is dropped — an unfingerprinted verdict can never be checked for staleness, so
+ *  it would be an un-invalidatable attestation. Stale (orphan) keys are PRESERVED; the live-vs-stored fold handles them. */
+function coerceCriterionVerdicts(raw: unknown): Record<string, PersistedCriterionVerdict> | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return undefined;
+  const out: Record<string, PersistedCriterionVerdict> = {};
+  for (const [key, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v !== "object" || v === null) continue;
+    const o = v as Record<string, unknown>;
+    if (!isPersistedState(o.state)) continue;
+    if (typeof o.bodyHash !== "string" || o.bodyHash === "") continue;
+    out[key] = { state: o.state, bodyHash: o.bodyHash };
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** Sanitize a parsed JSON value into a MedicalValidationSidecar, dropping any caseId whose value isn't a known state (so
  *  a partially-corrupt map keeps its valid entries rather than nuking the whole review). `sidecar: undefined` on a shape
  *  that isn't a sidecar at all: not an object, byCaseId missing / non-object / an ARRAY (`["reviewed"]` would otherwise
@@ -162,12 +200,14 @@ function coerceSidecar(parsed: unknown): CoerceResult {
     if (migrated) byCaseId[caseId] = migrated;
   }
   const notesByCaseId = coerceNotes(obj.notesByCaseId); // carried THROUGH the load (else a load→save round-trip loses notes)
+  const criterionVerdictsByKey = coerceCriterionVerdicts(obj.criterionVerdictsByKey); // likewise carried through
   const warning =
     obj.schemaVersion !== 1 && obj.schemaVersion !== 2
       ? `sidecar schemaVersion ${JSON.stringify(obj.schemaVersion)} is not 1 or 2; loaded the known states best-effort`
       : undefined;
   const sidecar: MedicalValidationSidecar = { schemaVersion: 2, byCaseId };
   if (notesByCaseId) sidecar.notesByCaseId = notesByCaseId;
+  if (criterionVerdictsByKey) sidecar.criterionVerdictsByKey = criterionVerdictsByKey;
   return { sidecar, warning };
 }
 
@@ -425,6 +465,112 @@ export function deleteNote(
   return out;
 }
 
+// ── criterion verdicts (#224 ii.3 Slice 2b) ────────────────────────────────────────
+// Model-level verdicts on a CRITERION's encoding, keyed by identity `JSON([lib,name])` (library-local, reviewed once
+// across occurrences + cases). Pure reducers + derivation, mirroring the per-case verdict layer; the host holds the map
+// + the live rendered-criterion facts (bodyHash + elided from `GuardOutline.soleCriterion`) and calls these.
+
+/** The criterion-verdict identity key — `JSON([lib,name])` (collision-proof, matches the other JSON keys here). The host
+ *  builds it from `GuardOutline.soleCriterion.{lib,name}`. Exported so the host + tests key identically. */
+export function criterionVerdictKey(lib: string, name: string): string {
+  return JSON.stringify([lib, name]);
+}
+
+/** The pure criterion-verdict reducer (host-as-authority): `unreviewed` DELETES the entry (absence = To do, never
+ *  stored); a verdict stores `{ state, bodyHash }` — the live body hash at the moment of the judgment. Returns a NEW map
+ *  (swapped in only after a successful save). Caller pre-validates `state` with `isReviewState`. */
+export function setCriterionVerdict(
+  map: Record<string, PersistedCriterionVerdict>,
+  key: string,
+  state: ReviewState,
+  bodyHash: string,
+): Record<string, PersistedCriterionVerdict> {
+  const out = { ...map };
+  if (state === "unreviewed") delete out[key];
+  else out[key] = { state, bodyHash };
+  return out;
+}
+
+/** The LIVE facts about a rendered criterion (from `GuardOutline.soleCriterion`) the staleness fold needs. */
+export interface LiveCriterion {
+  bodyHash: string;
+  elided: boolean;
+}
+
+/** The derived UI state of a criterion verdict: `unreviewed` (no stored verdict), one of the persisted states, or
+ *  `stale` — a stored verdict whose body CHANGED since review (hash mismatch) OR whose body is `elided` (its hash can't be
+ *  trusted, disc 319 review [important] 2). A `stale` verdict is NEVER shown as the settled judgment — it reads as
+ *  "re-review", and it does NOT count toward the gate (so an edit to a reviewed criterion re-opens Medical Validation). */
+export type CriterionVerdictUiState = "unreviewed" | PersistedReviewState | "stale";
+
+export function criterionVerdictState(
+  stored: PersistedCriterionVerdict | undefined,
+  live: LiveCriterion,
+): CriterionVerdictUiState {
+  if (!stored) return "unreviewed";
+  if (live.elided || stored.bodyHash !== live.bodyHash) return "stale";
+  return stored.state;
+}
+
+/** The criterion-review progress readout — tallied over the LIVE rendered single-criterion identities (deduped by key;
+ *  N occurrences of one criterion = ONE identity). `passed` counts only FRESH passes (a stale-or-changed pass is NOT
+ *  passed — it's `stale`). Mirrors `ReviewProgress`'s shape; `total = identities.size`.
+ *
+ *  SCOPE (settled, disc 319 [critical] 2): the identities are ONLY the single-top-level-criterion-ref guards (`soleCriterion`)
+ *  — the reviewable/collapse unit. A criterion referenced EXCLUSIVELY in COMPOUND guards (`when A and criterion C`) yields no
+ *  `soleCriterion`, so it is absent from `identities` → absent from this tally → does NOT gate `mvComplete`. That is the
+ *  deferred compound-with-criterion slice, NOT a silent pass: such a criterion is simply not independently reviewed in 2b. A
+ *  criterion that appears at BOTH single-ref and compound sites IS gated (via its single-ref occurrence, verdict shared). */
+export interface CriterionProgress {
+  total: number;
+  passed: number;
+  failed: number;
+  pending: number;
+  stale: number;
+  unreviewed: number;
+}
+
+export function criterionProgress(
+  identities: ReadonlyMap<string, LiveCriterion>,
+  map: Record<string, PersistedCriterionVerdict>,
+): CriterionProgress {
+  let passed = 0;
+  let failed = 0;
+  let pending = 0;
+  let stale = 0;
+  let unreviewed = 0;
+  for (const [key, live] of identities) {
+    const s = criterionVerdictState(map[key], live);
+    if (s === "pass") passed++;
+    else if (s === "fail") failed++;
+    else if (s === "pending") pending++;
+    else if (s === "stale") stale++;
+    else unreviewed++;
+  }
+  return { total: identities.size, passed, failed, pending, stale, unreviewed };
+}
+
+/** The criteria-half "clean" predicate — EVERY rendered criterion is a FRESH pass (or there are none). A policy with no
+ *  criteria is trivially clean (`total===0 ⇒ passed===total===0`); a stale/failed/pending/unreviewed criterion blocks it. */
+export function mvCriteriaClean(cp: CriterionProgress): boolean {
+  return cp.passed === cp.total;
+}
+
+/**
+ * Render the criteria-half readout as tree-chrome HTML (pure, vscode-free, integers + fixed literals only — no escaping).
+ * "" when there are no criteria (nothing to say). Fully clean (every criterion a fresh pass) → "✓ criteria reviewed".
+ * Otherwise "Criteria N/M" (N = fresh passes) + `· F encoding wrong` (F>0) + `· P undecided` (P>0) + `· S stale` (S>0).
+ */
+export function renderCriterionChrome(cp: CriterionProgress): string {
+  if (cp.total === 0) return "";
+  if (mvCriteriaClean(cp)) return `<div class="mv-criteria mv-criteria-done">✓ criteria reviewed</div>`;
+  const parts: string[] = [`Criteria ${cp.passed}/${cp.total}`];
+  if (cp.failed > 0) parts.push(`${cp.failed} encoding wrong`);
+  if (cp.pending > 0) parts.push(`${cp.pending} undecided`);
+  if (cp.stale > 0) parts.push(`${cp.stale} stale`);
+  return `<div class="mv-criteria">${parts.join(" · ")}</div>`;
+}
+
 // ── worklist progress readout (#156 slice 6) ──────────────────────────────────────
 
 /**
@@ -531,9 +677,12 @@ export interface FlagChrome {
   error: boolean;
 }
 
-/** True only when every case passed AND there are no open flags AND the flags loaded cleanly — the surfaced MV gate. */
-export function mvComplete(p: ReviewProgress, f: FlagChrome): boolean {
-  return mvCasesClean(p) && !f.error && f.open === 0;
+/** True only when every case passed AND there are no open flags AND the flags loaded cleanly AND every rendered criterion
+ *  is a fresh pass — the surfaced MV gate. `cp` is optional for back-compat; ABSENT ⇒ no criteria to gate on (clean). The
+ *  three halves refresh on independent channels (verdicts ← sidecar; flags ← the `.crl`; criteria ← sidecar + live render)
+ *  and are composed only here at the display level (#224 ii.3 Slice 2b — operator-confirmed the criteria gate). */
+export function mvComplete(p: ReviewProgress, f: FlagChrome, cp?: CriterionProgress): boolean {
+  return mvCasesClean(p) && !f.error && f.open === 0 && (cp === undefined || mvCriteriaClean(cp));
 }
 
 /**

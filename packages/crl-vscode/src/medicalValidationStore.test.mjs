@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, deriveAllPassLeaves, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote, mvCasesClean, mvComplete, renderFlagChrome } from "./medicalValidationStore.ts";
+import { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, deriveAllPassLeaves, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote, mvCasesClean, mvComplete, renderFlagChrome, setCriterionVerdict, criterionVerdictState, criterionVerdictKey, criterionProgress, mvCriteriaClean, renderCriterionChrome } from "./medicalValidationStore.ts";
 
 const check = test;
 
@@ -820,3 +820,117 @@ check("renderFlagChrome: a load error → ⚠ flags unreadable (still clickable)
   assert.ok(e.includes("⚠ flags unreadable") && e.includes("data-mv-flags"));
 });
 
+
+// ── #224 ii.3 Slice 2b: model-level CRITERION verdicts ──────────────────────────────
+const KEY = criterionVerdictKey("Lib", "Meets TAR");
+const live = (bodyHash, elided = false) => ({ bodyHash, elided });
+
+check("criterionVerdictKey: JSON([lib,name]) — collision-proof identity", () => {
+  assert.equal(criterionVerdictKey("Lib", "Meets TAR"), '["Lib","Meets TAR"]');
+  assert.notEqual(criterionVerdictKey("A B", "C"), criterionVerdictKey("A", "B C")); // space-join would collide
+});
+
+check("setCriterionVerdict: set stores {state,bodyHash}; unreviewed DELETES; returns a NEW map", () => {
+  const m0 = {};
+  const m1 = setCriterionVerdict(m0, KEY, "pass", "sha256:abc");
+  assert.deepEqual(m1, { [KEY]: { state: "pass", bodyHash: "sha256:abc" } });
+  assert.deepEqual(m0, {}, "input map is not mutated");
+  const m2 = setCriterionVerdict(m1, KEY, "unreviewed", "sha256:abc");
+  assert.deepEqual(m2, {}, "unreviewed deletes the entry (absence = To do)");
+});
+
+check("criterionVerdictState: unreviewed / fresh passthrough / STALE on hash-change / STALE on elided", () => {
+  assert.equal(criterionVerdictState(undefined, live("h1")), "unreviewed");
+  assert.equal(criterionVerdictState({ state: "pass", bodyHash: "h1" }, live("h1")), "pass");
+  assert.equal(criterionVerdictState({ state: "fail", bodyHash: "h1" }, live("h1")), "fail");
+  assert.equal(criterionVerdictState({ state: "pending", bodyHash: "h1" }, live("h1")), "pending");
+  assert.equal(criterionVerdictState({ state: "pass", bodyHash: "h1" }, live("h2")), "stale", "body edited → stale");
+  assert.equal(criterionVerdictState({ state: "pass", bodyHash: "h1" }, live("h1", true)), "stale", "elided body → never trusted");
+});
+
+check("criterionProgress: tallies over LIVE identities (deduped by key); a stale pass is NOT passed", () => {
+  const ids = new Map([
+    [criterionVerdictKey("L", "A"), live("ha")], // pass fresh
+    [criterionVerdictKey("L", "B"), live("hb")], // pass STALE (stored hb-old)
+    [criterionVerdictKey("L", "C"), live("hc")], // fail
+    [criterionVerdictKey("L", "D"), live("hd")], // unreviewed
+  ]);
+  const map = {
+    [criterionVerdictKey("L", "A")]: { state: "pass", bodyHash: "ha" },
+    [criterionVerdictKey("L", "B")]: { state: "pass", bodyHash: "hb-old" },
+    [criterionVerdictKey("L", "C")]: { state: "fail", bodyHash: "hc" },
+  };
+  assert.deepEqual(criterionProgress(ids, map), { total: 4, passed: 1, failed: 1, pending: 0, stale: 1, unreviewed: 1 });
+});
+
+check("criterionProgress: a stored verdict whose identity is NOT live (compound-only / renamed criterion) is NOT tallied — total = identities.size (disc 320 review [important] 2 boundary)", () => {
+  const ids = new Map([[criterionVerdictKey("L", "A"), live("ha")]]); // only ONE live single-ref identity
+  const map = {
+    [criterionVerdictKey("L", "A")]: { state: "pass", bodyHash: "ha" },
+    [criterionVerdictKey("L", "Ghost")]: { state: "pass", bodyHash: "hg" }, // an orphan (renamed, or a compound-only criterion never rendered as sole)
+  };
+  // The orphan neither adds to `total` nor sneaks a pass in — the gate is over LIVE single-ref identities only.
+  assert.deepEqual(criterionProgress(ids, map), { total: 1, passed: 1, failed: 0, pending: 0, stale: 0, unreviewed: 0 });
+});
+
+check("mvCriteriaClean + mvComplete gate: all-fresh-pass clean; a stale/fail/unreviewed criterion BLOCKS", () => {
+  const cleanP = { total: 1, reviewed: 1, passed: 1, failed: 0, pending: 0, unreviewable: 0, stale: 0 };
+  const cleanF = { open: 0, resolved: 0, error: false };
+  assert.equal(mvCriteriaClean({ total: 0, passed: 0, failed: 0, pending: 0, stale: 0, unreviewed: 0 }), true, "no criteria → clean");
+  assert.equal(mvCriteriaClean({ total: 2, passed: 2, failed: 0, pending: 0, stale: 0, unreviewed: 0 }), true);
+  assert.equal(mvCriteriaClean({ total: 2, passed: 1, failed: 0, pending: 0, stale: 1, unreviewed: 0 }), false, "a stale criterion blocks");
+  // the gate ANDs the criteria half
+  assert.equal(mvComplete(cleanP, cleanF, { total: 1, passed: 1, failed: 0, pending: 0, stale: 0, unreviewed: 0 }), true);
+  assert.equal(mvComplete(cleanP, cleanF, { total: 1, passed: 0, failed: 0, pending: 0, stale: 0, unreviewed: 1 }), false, "an unreviewed criterion blocks MV complete");
+  assert.equal(mvComplete(cleanP, cleanF), true, "cp omitted (back-compat) → criteria half is clean");
+});
+
+check("renderCriterionChrome: none → ''; all-fresh-pass → ✓ criteria reviewed; else Criteria N/M + tallies", () => {
+  assert.equal(renderCriterionChrome({ total: 0, passed: 0, failed: 0, pending: 0, stale: 0, unreviewed: 0 }), "");
+  assert.match(renderCriterionChrome({ total: 3, passed: 3, failed: 0, pending: 0, stale: 0, unreviewed: 0 }), /✓ criteria reviewed/);
+  const s = renderCriterionChrome({ total: 4, passed: 1, failed: 1, pending: 1, stale: 1, unreviewed: 0 });
+  assert.match(s, /Criteria 1\/4/);
+  assert.match(s, /1 encoding wrong/);
+  assert.match(s, /1 undecided/);
+  assert.match(s, /1 stale/);
+});
+
+check("sidecar round-trip: criterionVerdictsByKey composes, loads, and a v2 sidecar WITHOUT the field loads clean", () => {
+  const { root, celPath } = makePolicySrc("crit-policy");
+  try {
+    const p = medicalValidationSidecarPath(celPath);
+    const verdicts = { [KEY]: { state: "pass", bodyHash: "sha256:deadbeef" } };
+    saveSidecar(p, composeSidecar({ c1: "pass" }, {}, verdicts));
+    const back = loadSidecar(p).sidecar;
+    assert.deepEqual(back.criterionVerdictsByKey, verdicts, "verdicts round-trip");
+    assert.deepEqual(back.byCaseId, { c1: "pass" }, "cases still present");
+    // a pre-2b v2 sidecar (no criterionVerdictsByKey) loads with the field simply absent — additive, no bump, no warning
+    writeFileSync(p, JSON.stringify({ schemaVersion: 2, byCaseId: { c2: "fail" } }));
+    const older = loadSidecar(p);
+    assert.equal(older.warning, undefined, "no warning — additive field, still schemaVersion 2");
+    assert.equal(older.sidecar.criterionVerdictsByKey, undefined, "absent field → undefined (tolerated)");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+check("coerceCriterionVerdicts (via load): drops entries with a bad state or a missing bodyHash; keeps valid ones", () => {
+  const { root, celPath } = makePolicySrc("crit-coerce");
+  try {
+    const p = medicalValidationSidecarPath(celPath);
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, JSON.stringify({
+      schemaVersion: 2, byCaseId: {},
+      criterionVerdictsByKey: {
+        good: { state: "pass", bodyHash: "h1" },
+        badState: { state: "approved", bodyHash: "h2" }, // unknown state → dropped
+        noHash: { state: "fail" }, // no bodyHash → dropped (un-invalidatable attestation)
+        emptyHash: { state: "fail", bodyHash: "" }, // empty bodyHash → dropped
+      },
+    }));
+    const back = loadSidecar(p).sidecar;
+    assert.deepEqual(back.criterionVerdictsByKey, { good: { state: "pass", bodyHash: "h1" } });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

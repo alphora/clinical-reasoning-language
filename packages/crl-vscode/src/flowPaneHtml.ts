@@ -62,6 +62,11 @@ export interface RenderedFlow {
    *  → badge ALL; matched on (lib,name), never name alone — cross-lib same-name concepts exist). Decision-scope flags reuse
    *  `anchors[decisionNodeKey]`; activity/`otherwise` nodes carry no meta so they never appear here (they can't be flagged). */
   conceptOccurrences: { gid: string; lib: string; name: string }[];
+  /** #224 ii.3 Slice 2b — one entry per single-criterion `when` (collapsed OR expanded), with its `<g>` id, the criterion
+   *  IDENTITY (`{lib,name}`, library-local), and its `collapsed` state. The host maps a model-level criterion verdict
+   *  (keyed by identity) to these gids to paint the hidden verdict chip on EVERY occurrence, and (step C) rolls a body
+   *  flag up onto a COLLAPSED box. A criterion rendered at N sites → N entries sharing one identity. */
+  criterionOccurrences: { gid: string; lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[] }[];
   /** #203 Todo 4b Slice A — the gids of nodes that CAN carry a flag badge (`when` / decision root / def-leaf), so the
    *  webview can bulk-clear `.has-flag` before re-applying (a flag resolve must un-paint its node without a full re-render). */
   flaggableGids: string[];
@@ -94,6 +99,36 @@ const critToggle = (cx: number, cy: number, collapsed: boolean, revealKey: strin
     `<rect class="flow-crit-hit" x="${cx - 7}" y="${cy - 8}" width="16" height="16" rx="3"/>` +
     `<path class="flow-crit-chevron" d="${d}"/></g>`
   );
+};
+
+/** #224 ii.3 Slice 2b — the model-level criterion VERDICT chip: a small circle + a state glyph, HIDDEN by default and
+ *  revealed by the host adding `.crit-pass` / `.crit-fail` / `.crit-pending` / `.crit-stale` to the row (the
+ *  `.flow-allpass-badge` idiom — pre-rendered + class-toggled so a verdict change never re-renders `#root`). All four
+ *  glyphs are pre-rendered; the row class shows exactly one + colors the dot. Informational (`pointer-events:none`) — the
+ *  verdict is SET via the right-click menu, not this chip (disc 319). Sits top-right, where a criterion `when`'s suppressed
+ *  concept leaves the flag slot free. A `stale` verdict (edited-since-review) shows a muted "in-flux" three-dot glyph and
+ *  is NEVER the settled pass/fail. */
+const critVerdictChip = (cx: number, cy: number): string =>
+  `<g class="flow-crit-verdict"><title>criterion review verdict</title>` +
+  `<circle class="flow-crit-vdot" cx="${cx}" cy="${cy}" r="7"/>` +
+  `<path class="flow-crit-g flow-crit-g-pass" d="M${cx - 3.2} ${cy} l2.2 2.4 l4.2 -4.8"/>` +
+  `<path class="flow-crit-g flow-crit-g-fail" d="M${cx - 2.6} ${cy - 2.6} l5.2 5.2 M${cx + 2.6} ${cy - 2.6} l-5.2 5.2"/>` +
+  `<path class="flow-crit-g flow-crit-g-pending" d="M${cx - 3} ${cy} h6"/>` +
+  `<g class="flow-crit-g flow-crit-g-stale"><circle cx="${cx - 2.7}" cy="${cy}" r="0.95"/><circle cx="${cx}" cy="${cy}" r="0.95"/><circle cx="${cx + 2.7}" cy="${cy}" r="0.95"/></g>` +
+  `</g>`;
+
+/** #224 ii.3 Slice 2b-2: collect the ADDRESSABLE leaf-concept identities in a criterion body outline (recursing or/and/not
+ *  and a leaf's own nested `composite`). Used to roll an open flag on a body concept up onto the COLLAPSED criterion box —
+ *  else a flag inside a folded body is invisible in the flow. `external`/`more` stubs have no addressable identity → skipped. */
+const collectLeafIdentities = (e: DefStructExpr, out: { lib: string; name: string }[]): void => {
+  if (e.kind === "leaf") {
+    out.push({ lib: e.lib, name: e.name });
+    if (e.composite) collectLeafIdentities(e.composite, out);
+  } else if (e.kind === "or" || e.kind === "and") {
+    for (const o of e.operands) collectLeafIdentities(o, out);
+  } else if (e.kind === "not") {
+    collectLeafIdentities(e.operand, out);
+  }
 };
 
 /** #208: wrap a label to ≤2 lines for a FIXED-width box (we wrap, never widen — the operator rejected horizontal sprawl).
@@ -176,8 +211,11 @@ interface LaidNode {
   outline?: boolean;
   outlineRow?: "topor" | "op" | "leaf" | "external" | "more";
   /** #224 ii.3 Slice 2: set on a `when` whose guard is a SINGLE criterion ref (the collapse unit) — carries the current
-   *  collapsed/expanded state so the render draws a `▸`/`▾` disclosure. Absent on a compound-guard / non-criterion when. */
-  criterionCollapse?: { collapsed: boolean };
+   *  collapsed/expanded state so the render draws a `▸`/`▾` disclosure, plus the criterion IDENTITY (`lib`/`name` from
+   *  `soleCriterion`) that the model-level verdict chip keys on (Slice 2b). `bodyConcepts` = the addressable leaf-concept
+   *  identities inside the criterion body (Slice 2b-2: an open flag on one rolls up onto the COLLAPSED box, else it's
+   *  invisible while folded). Absent on a compound-guard / non-criterion when. */
+  criterionCollapse?: { collapsed: boolean; lib: string; name: string; bodyConcepts: { lib: string; name: string }[] };
   indent?: number;
   absX?: number;
   depth: number;
@@ -295,8 +333,12 @@ function buildLaid(
     // #224 ii.3 Slice 2: a SINGLE-criterion-ref guard (`soleCriterion` set) is COLLAPSIBLE — default collapsed (the body
     // hidden), expanded only when its nodeKey is in `expandedGuardWhens`. A compound-with-criterion guard has no
     // `soleCriterion` (Slice 2 leaves it expanded — nothing hidden). Collapse changes LAYOUT, so it feeds the layout here.
-    const collapsible = guardOutline?.soleCriterion !== undefined;
+    const sole = guardOutline?.soleCriterion;
+    const collapsible = sole !== undefined;
     const collapsed = collapsible && !opts.expandedGuardWhens?.has(n.nodeKey);
+    // #224 ii.3 Slice 2b-2: the criterion body's addressable leaf identities (for the collapsed-box flag rollup).
+    const critBodyConcepts: { lib: string; name: string }[] = [];
+    if (sole && guardOutline) collectLeafIdentities(guardOutline.expr, critBodyConcepts);
     // #224: only a SINGLE-ref `when` IS one concept (border/peek/outline). A
     // COMPOUND guard (>1 refKey) has no single concept — `refKeys[0]` would
     // masquerade the first operand as the whole guard, so drop the peek/border
@@ -362,7 +404,7 @@ function buildLaid(
     const children = [...structureChildren, ...outlineRoots];
     return {
       nodeKey: n.nodeKey, kind: n.kind, useDecision, guard, label: display, full, depth, y: nodeY, children, ...cf,
-      ...(collapsible ? { criterionCollapse: { collapsed } } : {}),
+      ...(sole ? { criterionCollapse: { collapsed, lib: sole.lib, name: sole.name, bodyConcepts: critBodyConcepts } } : {}),
     };
   };
 
@@ -406,10 +448,11 @@ export function renderFlowPane(
   const reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string }> = {};
   const leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }> = {};
   const conceptOccurrences: { gid: string; lib: string; name: string }[] = []; // #203 Todo 4b Slice A
+  const criterionOccurrences: { gid: string; lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[] }[] = []; // #224 ii.3 Slice 2b
   const flaggableGids: string[] = [];
 
   if (structure.length === 0) {
-    return { html: '<p class="placeholder">No CRL decisions to chart.</p>', anchors, reveals, leafConcepts, conceptOccurrences, flaggableGids };
+    return { html: '<p class="placeholder">No CRL decisions to chart.</p>', anchors, reveals, leafConcepts, conceptOccurrences, criterionOccurrences, flaggableGids };
   }
 
   const conceptMap = new Map(concepts.map((c) => [c.nodeKey, c]));
@@ -603,6 +646,17 @@ export function renderFlowPane(
     const critToggleMarkup = critC ? critToggle(x + 10, y + NODE_H / 2, critC.collapsed, key) : "";
     const labelDx = critC ? 24 : 10;
     const labelMax = critC ? LABEL_MAX - 4 : LABEL_MAX;
+    // #224 ii.3 Slice 2b: a single-criterion `when` records an OCCURRENCE (identity `{lib,name}` — the model-level verdict
+    // is keyed on it, reviewed once across all occurrences + cases) + carries a HIDDEN verdict chip at the top-right (a
+    // criterion `when` has its concept suppressed → no flag badge there, so the slot is free). The host reveals the chip
+    // per-occurrence via `.flow-row.crit-{pass,fail,pending,stale}` without re-render (the flagBadge/allPass idiom).
+    if (critC) criterionOccurrences.push({ gid, lib: critC.lib, name: critC.name, collapsed: critC.collapsed, bodyConcepts: critC.bodyConcepts });
+    const critVerdictMarkup = critC ? critVerdictChip(x + NODE_W - 13, y + 13) : "";
+    // #224 ii.3 Slice 2b-2: a criterion when carries a HIDDEN rollup ⚑ (left of the verdict chip). The host lights it
+    // (`.has-flag`) ONLY when the box is COLLAPSED and a body concept has an open flag (driveFlagBadges) — so a folded body's
+    // flag isn't invisible. `flaggableGids` includes the gid so the host's bulk-clear covers it (the flagBadge idiom).
+    const critFlagMarkup = critC ? flagBadge(x + NODE_W - 30, y + 13) : "";
+    if (critC) flaggableGids.push(gid);
     body +=
       `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
       `<title>${escapeHtml(n.full)}</title>` +
@@ -612,6 +666,8 @@ export function renderFlowPane(
       flowRing(x, y, NODE_W, NODE_H, 2.5, stadium ? (NODE_H + 5) / 2 : 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
       guardTab +
       critToggleMarkup +
+      critVerdictMarkup +
+      critFlagMarkup +
       allPassBadge +
       flagBadgeMarkup +
       startFlagMarkup +
@@ -630,7 +686,7 @@ export function renderFlowPane(
     `<button type="button" data-zoom="reset" class="flow-zoom-pct" title="Reset zoom (or Ctrl+scroll to zoom)" aria-label="Reset zoom">100%</button>` +
     `<button type="button" data-zoom="in" title="Zoom in" aria-label="Zoom in">+</button>` +
     `</div>`;
-  return { html: `<div class="flow-wrap">${svg}</div>${zoom}`, anchors, reveals, leafConcepts, conceptOccurrences, flaggableGids, startNodeGid };
+  return { html: `<div class="flow-wrap">${svg}</div>${zoom}`, anchors, reveals, leafConcepts, conceptOccurrences, criterionOccurrences, flaggableGids, startNodeGid };
 }
 
 // #203 Todo 4b Slice A — the hidden per-node flag badge: a ⚑ glyph grandchild `<g>`, shown when the host adds `.has-flag`
@@ -799,6 +855,23 @@ export const FLOW_STYLE =
   `.flow-row.leaf-allpass .flow-allpass-badge{display:inline}` +
   `.flow-allpass-badge>circle{fill:var(--vscode-testing-iconPassed,#3fb950);stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
   `.flow-allpass-badge>path{fill:none;stroke:#ffffff;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}` +
+  // #224 ii.3 Slice 2b — the model-level criterion VERDICT chip (top-right of a single-criterion `when`). HIDDEN; the host
+  // reveals it per-occurrence by toggling `.crit-{pass,fail,pending,stale}` on the row (no #root re-render — the allpass
+  // idiom). The dot color encodes the state (the same TOK_* the case-verdict wash uses; stale = a muted grey), and exactly
+  // one glyph shows: ✓ pass / ✗ fail / – pending (undecided) / ⋯ stale (edited-since-review, never the settled judgment).
+  `.flow-crit-verdict{display:none;pointer-events:none}` +
+  `.flow-row.crit-pass .flow-crit-verdict,.flow-row.crit-fail .flow-crit-verdict,.flow-row.crit-pending .flow-crit-verdict,.flow-row.crit-stale .flow-crit-verdict{display:inline}` +
+  `.flow-crit-vdot{stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
+  `.flow-row.crit-pass .flow-crit-vdot{fill:${TOK_VERDICT_PASS}}` +
+  `.flow-row.crit-fail .flow-crit-vdot{fill:${TOK_VERDICT_FAIL}}` +
+  `.flow-row.crit-pending .flow-crit-vdot{fill:${TOK_VERDICT_PENDING}}` +
+  `.flow-row.crit-stale .flow-crit-vdot{fill:var(--vscode-descriptionForeground,#8c8c8c)}` +
+  `.flow-crit-g{display:none;fill:none;stroke:#ffffff;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}` +
+  `.flow-crit-g-stale circle{fill:#ffffff;stroke:none}` +
+  `.flow-row.crit-pass .flow-crit-g-pass{display:inline}` +
+  `.flow-row.crit-fail .flow-crit-g-fail{display:inline}` +
+  `.flow-row.crit-pending .flow-crit-g-pending{display:inline}` +
+  `.flow-row.crit-stale .flow-crit-g-stale{display:inline}` +
   // #203 Todo 4b Slice A — the per-node review-flag ⚑ badge. HIDDEN; shown when the host toggles `.has-flag` on the row
   // (a flag resolve un-paints without a #root re-render, preserving the verdict/failed-criterion overlays). The `<g>` is
   // CLICKABLE (`pointer-events:auto`) and carries `data-mv-flag-badge` — the webview intercepts it BEFORE the row's

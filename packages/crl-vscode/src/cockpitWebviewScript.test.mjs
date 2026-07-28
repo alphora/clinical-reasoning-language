@@ -713,6 +713,72 @@ check("#224 ii.3 Slice 2 webview: a criterion chevron ([data-toggle-crit]) is in
   assert.ok(toggleAt > 0 && toggleAt < revealAt, "chevron intercept comes before the data-reveal click routing");
   assert.match(SCRIPT, /closest\('\[data-toggle-crit\]'\);.*postMessage\(\{type:'toggleCriterion',key:[^}]*\}\);return;/s);
 });
+
+// ── #224 ii.3 Slice 2b: model-level criterion verdict chips (webview + host) ──────────────────────
+check("#224 Slice 2b webview: the criterionVerdicts handler bulk-clears crit-* off allGids then sets crit-<state> from byState, gen-gated", () => {
+  assert.match(SCRIPT, /m\.type==='criterionVerdicts'\)\{if\(m\.gen!==gen\)return;/);
+  assert.match(SCRIPT, /m\.allGids\|\|\[\]\)\)\{const el=document\.getElementById\(id\);if\(el\)\{el\.classList\.remove\('crit-pass'\);el\.classList\.remove\('crit-fail'\);el\.classList\.remove\('crit-pending'\);el\.classList\.remove\('crit-stale'\)/);
+  assert.match(SCRIPT, /for\(const s of \['pass','fail','pending','stale'\]\)\{for\(const id of \(bs\[s\]\|\|\[\]\)\)\{const el=document\.getElementById\(id\);if\(el\)el\.classList\.add\('crit-'\+s\)/);
+});
+check("#224 Slice 2b host: buildLiveCriterionIdentities dedups by (lib,name) → {bodyHash,elided} from soleCriterion", () => {
+  assert.match(COCKPIT_SRC, /function buildLiveCriterionIdentities\(\)/);
+  assert.match(COCKPIT_SRC, /const s = go\.soleCriterion/);
+  assert.match(COCKPIT_SRC, /out\.set\(key, \{ bodyHash: s\.bodyHash, elided: s\.elided === true \}\)/);
+});
+check("#224 Slice 2b host: driveCriterionVerdicts groups occurrences by IDENTITY state (criterionVerdictState); unreviewed → no class", () => {
+  assert.match(COCKPIT_SRC, /function driveCriterionVerdicts\(\)/);
+  assert.match(COCKPIT_SRC, /criterionVerdictState\(criterionVerdicts\[key\], live\)/);
+  assert.match(COCKPIT_SRC, /if \(s !== "unreviewed"\) byState\[s\]\.push\(occ\.gid\)/);
+  assert.match(COCKPIT_SRC, /type: "criterionVerdicts", gen: tree\.gen, allGids, byState/);
+});
+check("#224 Slice 2b host: applyCriterionVerdict RE-RESOLVES identity+bodyHash live (stale rebuild no-ops) + persists the 3rd map", () => {
+  assert.match(COCKPIT_SRC, /function applyCriterionVerdict\(nodeKey: string, value: unknown/);
+  assert.match(COCKPIT_SRC, /const sole = guardOutlines\.get\(nodeKey\)\?\.soleCriterion/);
+  assert.match(COCKPIT_SRC, /setCriterionVerdict\(criterionVerdicts, key, value, sole\.bodyHash\)/);
+  assert.match(COCKPIT_SRC, /persistMv\(reviewByCaseId, notesByCaseId, next\)/);
+});
+check("#224 Slice 2b host: applyCriterionVerdict refuses a STALE-body write (expectedBodyHash guard) so a mid-menu edit can't pin a false pass", () => {
+  assert.match(COCKPIT_SRC, /function applyCriterionVerdict\(nodeKey: string, value: unknown, expectedBodyHash\?: string\)/);
+  assert.match(COCKPIT_SRC, /if \(expectedBodyHash !== undefined && expectedBodyHash !== sole\.bodyHash\) return false/);
+  // the menu captures the hash + sidecar at OPEN and threads/guards them across the pick await
+  assert.match(COCKPIT_SRC, /const openHash = sole\.bodyHash;/);
+  assert.match(COCKPIT_SRC, /const openSidecar = mvSidecarPath;/);
+  assert.match(COCKPIT_SRC, /if \(mvSidecarPath !== openSidecar\) return note\("policy changed/);
+  assert.match(COCKPIT_SRC, /applyCriterionVerdict\(nodeKey, pick\.value, openHash\)/);
+});
+check("#224 Slice 2b host: the criterion-encoding menu uses DISTINCT vocab (Correctly encoded / Encoding wrong / Undecided / Clear), never the per-case 'Needs work'", () => {
+  assert.match(COCKPIT_SRC, /function criterionEncodingMenu\(/);
+  const at = COCKPIT_SRC.indexOf("function criterionEncodingMenu");
+  const body = COCKPIT_SRC.slice(at, at + 2400);
+  for (const label of ["Correctly encoded", "Encoding wrong", "Undecided", "Clear"]) assert.ok(body.includes(label), `menu offers "${label}"`);
+  assert.ok(!/Needs work/.test(body), "criterion menu does not reuse a per-case verdict label");
+});
+check("#224 Slice 2b host: nodeMenu offers 'Criterion encoding' ONLY for a soleCriterion node, routing to criterionEncodingMenu", () => {
+  assert.match(COCKPIT_SRC, /guardOutlines\.get\(critNodeKey\)\?\.soleCriterion !== undefined/);
+  assert.match(COCKPIT_SRC, /isCriterion \? \[\{ label: "\$\(law\) Criterion encoding/);
+  assert.match(COCKPIT_SRC, /pick\.act === "criterion"\) return criterionEncodingMenu/);
+});
+check("#224 Slice 2b host: the MV gate + chrome compose the criterion half (criterionProgress → mvComplete + renderCriterionChrome)", () => {
+  assert.match(COCKPIT_SRC, /const cp = criterionProgress\(buildLiveCriterionIdentities\(\), criterionVerdicts\)/);
+  assert.match(COCKPIT_SRC, /mvComplete\(p, fc, cp\)/);
+  assert.match(COCKPIT_SRC, /renderProgressChrome\(p\) \+ renderFlagChrome\(fc\) \+ renderCriterionChrome\(cp\)/);
+});
+check("#224 Slice 2b host: persistMv marries the 3rd map (default = current) so a case/note change preserves criterion verdicts", () => {
+  assert.match(COCKPIT_SRC, /nextCriterionVerdicts: Record<string, PersistedCriterionVerdict> = criterionVerdicts/);
+  assert.match(COCKPIT_SRC, /composeSidecar\(nextByCaseId, nextNotes, nextCriterionVerdicts\)/);
+  assert.match(COCKPIT_SRC, /criterionVerdicts = nextCriterionVerdicts/);
+});
+check("#224 Slice 2b-2 host: driveFlagBadges rolls a body-concept OPEN flag up onto a COLLAPSED criterion box (matched by (lib,name))", () => {
+  assert.match(COCKPIT_SRC, /roll a body concept's OPEN flag up onto its COLLAPSED criterion box/);
+  assert.match(COCKPIT_SRC, /f\.anchor\.scope === "concept"/); // concept-scope open flags only
+  assert.match(COCKPIT_SRC, /if \(!occ\.collapsed\) continue;/); // expanded → body concepts render their own badges
+  assert.match(COCKPIT_SRC, /occ\.bodyConcepts\.some\(\(bc\) => openConceptKeys\.has\([\s\S]*?\)\)\) gids\.add\(occ\.gid\)/);
+});
+check("#224 Slice 2b host: loadReviewSidecar loads criterionVerdictsByKey + resets it on retarget; the tree ack re-drives the chips", () => {
+  assert.match(COCKPIT_SRC, /criterionVerdicts = sidecar\.criterionVerdictsByKey \?\? \{\}/);
+  assert.match(COCKPIT_SRC, /criterionVerdicts = \{\}; \/\/ #224 ii\.3 Slice 2b: reset/);
+  assert.match(COCKPIT_SRC, /driveCriterionVerdicts\(\);/);
+});
 check("#203 host: driveFlagBadges — per-node ⚑ by (lib,name)/anchors + the START-NODE COUNT badge (chrome mirror, catch-all); open-only", () => {
   assert.match(COCKPIT_SRC, /function driveFlagBadges\(\)/);
   assert.match(COCKPIT_SRC, /flagsList\.filter\(\(f\) => isOpen\(f\)\)/); // #212 S3: open-only over MvFlags (matches the gate)
@@ -741,7 +807,7 @@ check("#203 Slice B + GAP 3: nodeMenu offers verdict + one 'Add flag on <target>
   const m = COCKPIT_SRC.match(/async function nodeMenu\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "nodeMenu body");
   assert.match(m[1], /const choices = flagTargetChoices\(hit\)/);
-  assert.match(m[1], /if \(choices\.length === 0\) return nodeVerdictMenu\(revealKey\)/); // not flaggable → verdict only
+  assert.match(m[1], /if \(choices\.length === 0 && !isCriterion\) return nodeVerdictMenu\(revealKey\)/); // not flaggable AND not a criterion → verdict only (#224 Slice 2b)
   assert.match(m[1], /Set case verdict/);
   assert.match(m[1], /choices\.map\(\(c\) =>/); // one menu item per target choice
   assert.match(m[1], /Add flag on \$\{c\.label\}/); // labeled per choice
