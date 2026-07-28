@@ -1138,3 +1138,68 @@ check("slice2: githubTokenSilent never prompts + never latches githubAuthDecline
   assert.ok(!/createIfNone|githubAuthDeclined/.test(m[0]), "no modal prompt + no shared decline latch in the read token path");
 });
 
+
+// ── #(tree-snapshot) Todo 2: the capture round-trip + export command (webview lock + host source-lock + manifest) ──────────
+const PKG = JSON.parse(readFileSync(resolve(here, "..", "package.json"), "utf8"));
+
+check("tree-snapshot webview: requestSnapshot → CLONE + strip the ephemeral rings via classList → reply snapshotDom with the echoed token", () => {
+  assert.match(SCRIPT, /m\.type==='requestSnapshot'\)\{var _c=root\.cloneNode\(true\);/);
+  assert.match(SCRIPT, /_c\.querySelectorAll\('\.current,\.this-node,\.node-focus'\)/, "strips selection + agent-focus rings on the clone (exact, no text-node rewrite)");
+  assert.match(SCRIPT, /_r\[_i\]\.classList\.remove\('current'\)/);
+  assert.match(SCRIPT, /v\.postMessage\(\{type:'snapshotDom',token:m\.token,html:_c\.innerHTML\}\)/, "posts the CLONE's innerHTML");
+});
+
+check("tree-snapshot host: the snapshotDom reply is TREE-only + token-string-gated, coerces html to string, resolves the coordinator", () => {
+  assert.match(COCKPIT_SRC, /msg\.type === "snapshotDom" && pane === "tree" && typeof msg\.token === "string"/);
+  assert.match(COCKPIT_SRC, /snapshotCapture\.resolve\(msg\.token, typeof msg\.html === "string" \? msg\.html : undefined\)/);
+});
+
+check("tree-snapshot host: captureTreeDom gates (no pane / no model / not acked / already pending), freezes+revalidates identity, TOKEN-scoped settle, refuses an empty tree", () => {
+  const m = COCKPIT_SRC.match(/async function captureTreeDom\(\)[\s\S]*?\n  \}/);
+  assert.ok(m, "captureTreeDom body");
+  const b = m[0];
+  assert.match(b, /if \(!tree\) return \{ ok: false, note: "open the tree pane first" \}/);
+  assert.match(b, /if \(!model\) return \{ ok: false, note: "open a policy first/, "no model → refuse (no junk placeholder export)");
+  assert.match(b, /if \(!tree\.acked\)/, "the acked gate (fully-overlaid capture — overlay drives FIFO-ahead)");
+  assert.match(b, /if \(snapshotCapture\.pending\)/, "single-flight");
+  assert.match(b, /const capturedGen = tree\.gen;[\s\S]*const capturedCel = currentCel;/, "freeze gen + cel before the round-trip");
+  // TOKEN-scoped fast-fail + timer (so a slow/late delivery of THIS capture can't abort a LATER one) + a try/catch around post.
+  assert.match(b, /setTimeout\(\(\) => snapshotCapture\.resolve\(token, undefined\), 3000\)/, "3s timeout, token-scoped");
+  assert.match(b, /=== false\) snapshotCapture\.resolve\(token, undefined\)/, "postMessage false → token-scoped settle");
+  assert.match(b, /\} catch \{\s*snapshotCapture\.resolve\(token, undefined\)/, "a synchronous post throw → token-scoped settle (timer installed first)");
+  assert.match(b, /views\.get\("tree"\) !== capturedTree \|\| capturedTree\.gen !== capturedGen \|\| currentCel !== capturedCel/, "re-validate the identity after the await (reject a mid-capture change)");
+  assert.match(b, /screenCapturedDom\(raw\)/, "screen the payload (trust boundary)");
+  assert.match(b, /!screened\.html\.includes\('class="flow-svg"'\)/, "refuse a placeholder / non-flow render");
+  assert.ok(!/stripEphemeralOverlays/.test(b), "the ephemeral strip now runs webview-side (exact classList), not host-side");
+});
+
+check("tree-snapshot host: exportTreeSnapshot builds via Todo 1, save-dialog (cancel silent), UTF-8 write, open-in-browser (checked)", () => {
+  const m = COCKPIT_SRC.match(/async function exportTreeSnapshot\(\)[\s\S]*?\n  \}/);
+  assert.ok(m, "exportTreeSnapshot body");
+  const b = m[0];
+  assert.match(b, /renderFlowSnapshotDocument\(\{ flowHtml: cap\.html, styleCss: FLOW_STYLE, title: `\$\{policyId \?\? "decision"\} — decision tree` \}\)/);
+  assert.match(b, /policyIdFromSrc\(src\) : undefined\) \?\? policyLabel\(\)/, "policy-dir id, else the .cel basename");
+  assert.match(b, /src \?\? \(currentCel \? dirname\(currentCel\) : undefined\)/, "default dir = policy src, else the .cel's dir (NOT the first workspace folder)");
+  assert.match(b, /showSaveDialog/);
+  assert.match(b, /if \(!target\) return;/, "a cancelled save dialog is a silent no-op");
+  assert.match(b, /workspace\.fs\.writeFile\(target, Buffer\.from\(html, "utf8"\)\)/, "UTF-8 write");
+  assert.match(b, /could not save to/, "a write failure surfaces");
+  assert.match(b, /openExternal\(target\)/, "opens via env.openExternal");
+  assert.match(b, /if \(!opened\) void vscode\.window\.showWarningMessage/, "a failed/false open surfaces the saved-but-not-opened warning");
+  // command-level single-flight (no stacked dialogs) + a top-level catch backstop for any unexpected rejection.
+  assert.match(b, /if \(snapshotExporting\) return/, "single-flight guard over the whole export");
+  assert.match(b, /\} finally \{\s*snapshotExporting = false;/, "the guard is always released");
+  assert.match(COCKPIT_SRC, /registerCommand\("crl\.cockpit\.exportTreeSnapshot", \(\) =>\s*void exportTreeSnapshot\(\)\.catch\(/, "top-level catch backstop");
+});
+
+check("tree-snapshot host: the capture settles on pane disposal + cockpit disposal (no 3s hang)", () => {
+  // both the tree-pane onDidDispose and the top-level dispose call settleEmpty
+  assert.ok((COCKPIT_SRC.match(/snapshotCapture\.settleEmpty\(\)/g) || []).length >= 2, "settleEmpty on both disposal paths");
+});
+
+check("tree-snapshot manifest: the command is declared + wired to the navigator toolbar + the command palette", () => {
+  assert.ok(PKG.contributes.commands.some((c) => c.command === "crl.cockpit.exportTreeSnapshot"), "command declared");
+  const menus = PKG.contributes.menus;
+  assert.ok(menus["view/title"].some((e) => e.command === "crl.cockpit.exportTreeSnapshot" && e.when === "view == crlCockpitNavigator"), "navigator toolbar button (view/title, gated on the navigator)");
+  assert.ok(menus.commandPalette.some((e) => e.command === "crl.cockpit.exportTreeSnapshot" && e.when === "crl.active"), "command palette (crl.active)");
+});

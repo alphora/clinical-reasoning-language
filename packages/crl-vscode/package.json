@@ -136,6 +136,11 @@
         "icon": "$(go-to-file)"
       },
       {
+        "command": "crl.cockpit.exportTreeSnapshot",
+        "title": "CRL: Export Decision Tree Snapshot (HTML)",
+        "icon": "$(save-as)"
+      },
+      {
         "command": "crl.cockpit.setPrimary",
         "title": "CRL: Set Navigator Primary Pane (Source / CRL / CEL)",
         "icon": "$(arrow-swap)"
@@ -247,6 +252,11 @@
           "command": "crl.cockpit.toggleKeys",
           "when": "view == crlCockpitNavigator",
           "group": "navigation@4"
+        },
+        {
+          "command": "crl.cockpit.exportTreeSnapshot",
+          "when": "view == crlCockpitNavigator",
+          "group": "navigation@5"
         }
       ],
       "commandPalette": [
@@ -268,6 +278,10 @@
         },
         {
           "command": "crl.medicalValidation.show",
+          "when": "crl.active"
+        },
+        {
+          "command": "crl.cockpit.exportTreeSnapshot",
           "when": "crl.active"
         },
         {

@@ -6,7 +6,7 @@
 // this file is the untested integration per the established split. Design: .vibe-tools/discussions/118-c2a-source-spine.md.
 import { randomBytes, randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
-import { basename, isAbsolute, join, relative, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 
 import {
   buildCockpitModel,
@@ -110,6 +110,8 @@ import {
 } from "./medicalValidationStore";
 import { renderCrlPane } from "./crlPaneHtml";
 import { collectDispositionLeafKeys, FLOW_STYLE, flowLegendChrome, renderFlowPane } from "./flowPaneHtml";
+import { renderFlowSnapshotDocument } from "./flowSnapshotHtml";
+import { SnapshotCapture, screenCapturedDom, snapshotFileName } from "./snapshotCapture";
 import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml";
 import { buildQuestionnaire, collectProducedActions, producedPathDiverterIds, type Questionnaire } from "./questionnaireModel";
 import type { ConceptValueType, ResolveValueTypes, ResolveConceptShape, ResolveDefExpr } from "./questionnaireModel";
@@ -399,6 +401,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let conceptShape: ConceptShapeIndex = new Map(); // #187 Todo 3: per-concept `defined as` shape subtrees (leaf expansion)
   let defExpr: DefExprIndex = new Map(); // #187 Option-3: per-concept `defined as` OPERATOR tree (questionnaire box render)
   let guardOutlines: Map<string, GuardOutline> = new Map(); // #224 ii.3 Todo 3: criterion-when guard outlines (Flow pane)
+  // #(tree-snapshot) Todo 2 — the one-shot host↔webview capture coordinator (the host doesn't hold the tree DOM; it asks the
+  // webview for `#root`). Single-flight, settle-once; the pure state machine lives in snapshotCapture.ts.
+  const snapshotCapture = new SnapshotCapture();
+  let snapshotExporting = false; // command-level single-flight: guards the WHOLE export (capture → dialog → write), so a second toolbar click while the save dialog is open can't stack two dialogs
   // #224 ii.3 Slice 2: nodeKeys of single-criterion `when`s the user has EXPANDED (default: all collapsed). Ephemeral —
   // not persisted (reload → all-collapsed-with-verdict is the desired steady state). NodeKeys are case-independent, so
   // this survives Prev/Next re-renders; reset on doc change like the other render state.
@@ -2008,7 +2014,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   function onWebviewMessage(
     pane: Pane,
-    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string; state?: string; tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown },
+    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string; state?: string; tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown; token?: unknown; html?: unknown },
   ): void {
     const v = views.get(pane);
     if (!v) return;
@@ -2076,6 +2082,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // lookup, never a webview-supplied path), then flip its collapse state + re-render the tree (layout change).
       const hit = v.reveals[msg.key];
       if (hit && "nodeKey" in hit) toggleCriterionExpand(hit.nodeKey);
+    } else if (msg.type === "snapshotDom" && pane === "tree" && typeof msg.token === "string") {
+      // #(tree-snapshot) Todo 2 — the tree webview's reply to `requestSnapshot` (only the TREE pane is a valid source). The
+      // coordinator ignores a stale/late token; the payload is COERCED to string here + fully screened in captureTreeDom.
+      snapshotCapture.resolve(msg.token, typeof msg.html === "string" ? msg.html : undefined);
     } else if (msg.type === "worklistFilterToggle") {
       toggleWorklistFilter(msg.state); // #214: toggle a verdict in/out of the worklist filter (host validates the state)
     } else if (msg.type === "notesToggle" && typeof msg.key === "string") {
@@ -2273,6 +2283,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (pane === "tree") {
         clearFlagDraft("disposed"); // #210 (disc 239): drop the draft + SETTLE any pending agent elicitation (else it hangs)
         flagAnchor = undefined; // #210 Todo C: drop the anchor too — a reopened tree must not resurrect a stale target (B6)
+        snapshotCapture.settleEmpty(); // #(tree-snapshot): a capture in flight against this pane must settle now (no 3s hang)
         cockpitAgentBridge.notifyChanged(); // the tree pane closed → the agent can't perceive/flag; update the chip
       }
     });
@@ -3448,6 +3459,86 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     dispatch({ type: "prev" });
   });
 
+  // #(tree-snapshot) Todo 2 — capture the tree pane's CURRENT painted DOM (WYSIWYG) via a gated round-trip. Returns the
+  // screened + declutter-stripped `#root` markup, or a human `note` for every refusal (no tree / still rendering / already
+  // exporting / timeout / the tree changed mid-capture / a payload our renderer never emits). See disc 323.
+  async function captureTreeDom(): Promise<{ ok: true; html: string } | { ok: false; note: string }> {
+    const tree = views.get("tree");
+    if (!tree) return { ok: false, note: "open the tree pane first" };
+    if (!model) return { ok: false, note: "open a policy first — there's no decision tree to export" };
+    if (!tree.acked) return { ok: false, note: "the tree is still rendering — try again" }; // acked ⇒ the overlay drives have RUN (posted before this request → FIFO-ahead of it), so the captured DOM is fully overlaid — the same host→webview ordering the overlay system relies on
+    if (snapshotCapture.pending) return { ok: false, note: "a snapshot export is already in progress" };
+    // FREEZE the identity so a re-render / policy retarget during the round-trip can't hand back a superseded DOM or mislabel it.
+    const capturedTree = tree;
+    const capturedGen = tree.gen;
+    const capturedCel = currentCel;
+    const token = randomUUID();
+    const done = snapshotCapture.begin(token);
+    // Install the timeout FIRST (so a synchronous postMessage throw can't strand the capture pending), then post. Every
+    // failure path settles by TOKEN (`resolve(token, undefined)`) so a slow/late delivery of THIS capture can't abort a LATER
+    // one — the un-scoped `settleEmpty` is reserved for the disposal aborts (Claude disc 324 [important]).
+    const timer = setTimeout(() => snapshotCapture.resolve(token, undefined), 3000);
+    try {
+      if ((await tree.panel.webview.postMessage({ type: "requestSnapshot", token })) === false) snapshotCapture.resolve(token, undefined);
+    } catch {
+      snapshotCapture.resolve(token, undefined); // a dead webview / synchronous throw → fail fast, don't burn the timeout
+    }
+    const raw = await done;
+    clearTimeout(timer);
+    if (raw === undefined) return { ok: false, note: "couldn't capture the tree (it may still be rendering) — try again" };
+    // The capture must still be OF the tree/policy the user is looking at — a render/retarget mid-round-trip invalidates it.
+    if (views.get("tree") !== capturedTree || capturedTree.gen !== capturedGen || currentCel !== capturedCel) {
+      return { ok: false, note: "the tree changed while capturing — try again" };
+    }
+    const screened = screenCapturedDom(raw); // trust boundary: the payload crossed the webview→host channel into a CSP-inline file
+    if (!screened.ok) return { ok: false, note: screened.reason };
+    // Refuse a placeholder / non-flow render (a failed retarget or a decision-less policy) — don't hand a customer a junk file
+    // titled "…decision tree" holding only a placeholder paragraph (Claude disc 324 [important]).
+    if (!screened.html.includes('class="flow-svg"')) return { ok: false, note: "the tree is empty — nothing to export" };
+    return { ok: true, html: screened.html }; // the webview already stripped the ephemeral rings on its clone
+  }
+
+  /** #(tree-snapshot) Todo 2 — the command: capture the current tree → wrap into a self-contained HTML file (Todo 1) → save
+   *  dialog → write UTF-8 → offer to open in a browser. Every failure surfaces (status bar for a soft refusal, an error
+   *  message for a write/open failure); a cancelled save dialog is a silent no-op. */
+  async function exportTreeSnapshot(): Promise<void> {
+    if (snapshotExporting) return void vscode.window.setStatusBarMessage("Tree snapshot: an export is already in progress", 3000);
+    snapshotExporting = true;
+    try {
+      const cap = await captureTreeDom();
+      if (!cap.ok) return void vscode.window.setStatusBarMessage(`Tree snapshot: ${cap.note}`, 4000);
+      const src = currentCel ? findPolicySrc(currentCel) : undefined;
+      const policyId = (src ? policyIdFromSrc(src) : undefined) ?? policyLabel(); // policy-dir identity, else the .cel basename
+      const html = renderFlowSnapshotDocument({ flowHtml: cap.html, styleCss: FLOW_STYLE, title: `${policyId ?? "decision"} — decision tree` });
+      const defaultDir = src ?? (currentCel ? dirname(currentCel) : undefined); // policy src dir, else the .cel's own dir (multi-root safe — NOT the first workspace folder)
+      const defaultUri = defaultDir ? vscode.Uri.file(join(defaultDir, snapshotFileName(policyId))) : undefined;
+      const target = await vscode.window.showSaveDialog({ defaultUri, filters: { "HTML page": ["html"] }, title: "Export tree snapshot" });
+      if (!target) return; // cancelled — silent
+      try {
+        await vscode.workspace.fs.writeFile(target, Buffer.from(html, "utf8"));
+      } catch (e) {
+        return void vscode.window.showErrorMessage(`Tree snapshot: could not save to ${target.fsPath}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      const pick = await vscode.window.showInformationMessage(`Tree snapshot saved: ${basename(target.fsPath)}`, "Open in browser");
+      if (pick === "Open in browser") {
+        let opened = false;
+        try {
+          opened = await vscode.env.openExternal(target);
+        } catch {
+          opened = false;
+        }
+        if (!opened) void vscode.window.showWarningMessage("Tree snapshot saved, but the browser couldn't be opened.");
+      }
+    } finally {
+      snapshotExporting = false;
+    }
+  }
+  // A top-level catch is the final backstop: any unexpected rejection (a dialog API throw, etc.) surfaces instead of becoming
+  // an unhandled rejection swallowed by `void`.
+  const exportTreeSnapshotCmd = vscode.commands.registerCommand("crl.cockpit.exportTreeSnapshot", () =>
+    void exportTreeSnapshot().catch((e) => vscode.window.showErrorMessage(`Tree snapshot: ${e instanceof Error ? e.message : String(e)}`)),
+  );
+
   const openRawCmd = vscode.commands.registerCommand("crl.cockpit.openRaw", () => {
     // Open the anchor .txt at the clicked span's range when it still matches the selection, else the unit's earliest
     // source range. Locus is always from the trusted model / renderer, never a webview payload.
@@ -3832,12 +3923,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     nextCmd,
     prevCmd,
     openRawCmd,
+    exportTreeSnapshotCmd,
     onSave,
     onConfig,
     {
       dispose: () => {
         watcher?.dispose();
         flagsWatcher?.dispose();
+        snapshotCapture.settleEmpty(); // #(tree-snapshot): a pending capture must not outlive the cockpit
         if (debounce) clearTimeout(debounce); // a pending rebuild/reorder must not fire on disposed panels
         if (flagsDebounce) clearTimeout(flagsDebounce);
         if (orderDebounce) clearTimeout(orderDebounce);
@@ -4043,6 +4136,11 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;applyZoom();` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');if(Object.prototype.hasOwnProperty.call(_d,k)){ta.value=_d[k];if(k===_a){ta.focus();try{ta.setSelectionRange(_s,_e);}catch(_x){}}}}` +
   `v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion});}` +
+  // #(tree-snapshot) Todo 2: reply to the host's snapshot request with the CURRENT `#root` markup (WYSIWYG — the painted
+  // overlay classes are on the rows). Strip the EPHEMERAL rings (selection `.current`/`.this-node`, agent `.node-focus`) off a
+  // CLONE via classList (exact — never rewrites label text) so a customer artifact doesn't carry them; keep verdict/flag/
+  // review state. Echoes the token so the host coordinator matches it; the host still SCREENS the payload (trust boundary).
+  `else if(m.type==='requestSnapshot'){var _c=root.cloneNode(true);var _r=_c.querySelectorAll('.current,.this-node,.node-focus');for(var _i=0;_i<_r.length;_i++){_r[_i].classList.remove('current');_r[_i].classList.remove('this-node');_r[_i].classList.remove('node-focus');}v.postMessage({type:'snapshotDom',token:m.token,html:_c.innerHTML});}` +
   // The at-rest selection channel (.current). Clearing/applying it ALSO wipes the failed-criterion overlay — so the
   // NEXT engine reveal (a new selection / clear) drops the overlay; the SAME selection's failed-criteria mark arrives
   // AFTER this message (a later post) and so survives (#173 overlay lifecycle, disc 159). NEVER calls clrRO (#156 slice 5).
