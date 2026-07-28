@@ -152,7 +152,8 @@ import {
 } from "./cockpitAgentBridge";
 import type { CancelToken, ElicitationCancelReason, ElicitationOutcome } from "./agentDrivableUi";
 import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordinator";
-import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE } from "./provenanceFindings";
+import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE, policyIdFromSrc } from "./provenanceFindings";
+import { flagIssueBody, flagIssueTitle } from "./flagIssueText";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
 
@@ -2918,7 +2919,18 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
             }
             if (!token) issueNote = "not signed in to GitHub";
             else {
-              const args = { owner: repo.owner, repo: repo.repo, title: summary, body: stub };
+              // Make the issue self-describing on GitHub's side: prefix the title with the artifact id (the reviewers'
+              // hand-prefix, now automatic) and prepend a body header naming the artifact + flagged target. `policySrc` is
+              // in fact always defined here (this branch is reached only when `repo` — resolved from it — is truthy); the
+              // ternary is just TS narrowing over its `string | undefined` type. A missing policy id degrades to the bare
+              // summary / target-only header (never a stray " - ").
+              const policyId = policySrc ? policyIdFromSrc(policySrc) : undefined;
+              const args = {
+                owner: repo.owner,
+                repo: repo.repo,
+                title: flagIssueTitle(policyId, summary),
+                body: flagIssueBody(policyId, { kind: target.kind, name: target.name, label: target.label }, stub),
+              };
               try {
                 ref = `#${await createGithubIssue({ ...args, token })}`;
               } catch (e1) {

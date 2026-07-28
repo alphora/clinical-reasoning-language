@@ -17,6 +17,13 @@ import { canonicalize } from "@smile-digital-health/crl/language-services";
 // (discoverProvenance below, medicalValidationStore, provenancePanel, the cockpit) keep importing it from `./provenanceFindings`.
 export { findPolicySrc };
 
+/** The policy/artifact id for a resolved policy `src/` dir: the basename of its PARENT (`<policy>/src` → `<policy>`) — the
+ *  same per-policy identity the sidecar/provenance/flag-store all key on. `undefined` when `src/` sits at the filesystem
+ *  root (no parent identity). Pure (path only). Shared by `medicalValidationSidecarPath` and the flag→issue title/body. */
+export function policyIdFromSrc(policySrc: string): string | undefined {
+  return basename(dirname(policySrc)) || undefined;
+}
+
 /**
  * The authoring surfaces (findings panel + correspondence cockpit) validate in WORKLIST mode: an in-progress scaffold's
  * attribution backlog reads as "remaining work," not a wall of red. FINAL mode is the CLI/MCP gate (deferred judge-lens
