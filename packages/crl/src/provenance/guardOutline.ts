@@ -18,6 +18,8 @@
  * so the host never walks an unbounded DAG. The converter additionally caps criterion-recursion HOPS + operand
  * WIDTH (mirroring `buildDefStruct`) as a render-time backstop.
  */
+import { createHash } from "node:crypto";
+
 import { buildCriterionTable, containsCriterionRef, expandedSize, type CriterionTable } from "../ast/criterionExpansion";
 import { decisionSpine } from "../ast/decisionSpine";
 import type { BranchCondition, ReferenceName, WhenBlock } from "../ast/types";
@@ -40,6 +42,45 @@ import { collectLibs, conceptDeclRef, decisionSubNodeRef, lsLoc, nodeKey } from 
  *  recursing. The per-`when` `expandedSize` gate in `buildGuardOutlines` is the primary guard; this is defence
  *  in depth so the pure converter is bounded even if a caller skips the gate. */
 const GUARD_MAX_CRITERION_HOPS = DEF_MAX_EXPR_DEPTH;
+
+/** #224 ii.3 Slice 2: a `when` guard's render outline plus, WHEN the guard is a SINGLE top-level criterion ref, that
+ *  criterion's identity + a body fingerprint. `soleCriterion` is the COLLAPSE + model-level-VERDICT unit — a compound
+ *  guard that merely CONTAINS a criterion (`when A and Meets X`) has NO `soleCriterion` (it stays expanded, not
+ *  verdict-able, in Slice 2; full compound handling is deferred). Criteria are LIBRARY-LOCAL (operator-confirmed), so a
+ *  criterion ref is always unqualified and its lib is the decision's lib. `bodyHash` fingerprints the CANONICAL rendered
+ *  body so a stored "correctly encoded" verdict goes STALE when the criterion body changes (disc 319 [critical] 1). */
+export interface GuardOutline {
+  expr: DefStructExpr;
+  /** `elided` = the rendered body dropped content to a `…` stub (envelope breach OR a width/hop cap), so `bodyHash`
+   *  CANNOT reliably fingerprint it — a breach stub hashes to a constant, and an edit to an already-truncated operand
+   *  is invisible. 2b treats an elided criterion as NEVER durably "correctly encoded" (always re-review) so a verdict
+   *  can't falsely survive an unseen body change (disc 319 review [important] 2). */
+  soleCriterion?: { lib: string; name: string; bodyHash: string; elided?: true };
+}
+
+/** A stable, short content fingerprint of a rendered guard body — the verdict staleness key. `JSON.stringify` is
+ *  deterministic given the builder's fixed field order (branchConditionToDefStruct / buildDefStruct), so the SAME body
+ *  hashes identically every build and any structural change (a concept added, a composite edited, a cap tripped) flips it. */
+const hashExpr = (e: DefStructExpr): string =>
+  "sha256:" + createHash("sha256").update(JSON.stringify(e), "utf8").digest("hex").slice(0, 16);
+
+/** Does the rendered body contain a `…`/`+N more` elision stub? A `more` node means content was dropped (breach or cap),
+ *  so `bodyHash` is not a faithful fingerprint — see `GuardOutline.soleCriterion.elided`. */
+const exprHasMore = (e: DefStructExpr): boolean => {
+  switch (e.kind) {
+    case "more":
+      return true;
+    case "and":
+    case "or":
+      return e.operands.some(exprHasMore);
+    case "not":
+      return exprHasMore(e.operand);
+    case "leaf":
+      return e.composite !== undefined && exprHasMore(e.composite);
+    case "external":
+      return false;
+  }
+};
 
 /**
  * Convert a `when` guard `BranchCondition` into the shared `DefStructExpr` outline (the flow's `buildOutline`
@@ -120,8 +161,8 @@ export function branchConditionToDefStruct(
  * persist; a parity test pins it). A criterion-free `when` is OMITTED (Slice 1 does not touch single-concept or
  * plain-compound-guard rendering). A guard whose expansion breaches the envelope is OMITTED (host safety).
  */
-export function buildGuardOutlines(graph: ResolvedCelGraph, defExprIndex: DefExprIndex): Map<string, DefStructExpr> {
-  const out = new Map<string, DefStructExpr>();
+export function buildGuardOutlines(graph: ResolvedCelGraph, defExprIndex: DefExprIndex): Map<string, GuardOutline> {
+  const out = new Map<string, GuardOutline>();
   const { libs, coversName } = collectLibs(graph);
   if (!coversName) return out; // no policy anchor → empty (mirrors buildCrlStructure)
   // Resolver over the PASSED index (not the host-side `buildDefExprResolver`), same key rule as the cockpit.
@@ -139,6 +180,17 @@ export function buildGuardOutlines(graph: ResolvedCelGraph, defExprIndex: DefExp
         const cond = (sn.node as WhenBlock).condition;
         if (!containsCriterionRef(cond)) continue; // Slice 1: only criterion-bearing whens
         const key = nodeKey(decisionSubNodeRef(lib, s.name, sn.nodeId));
+        // #224 ii.3 Slice 2: a SINGLE top-level criterion ref is the collapse + verdict unit. Criteria are
+        // library-local, so the criterion's lib is the decision's lib (`getRefLibrary` is always undefined here).
+        const sole = cond.type === "BranchConditionCriterionRef" ? { lib, name: getRefName(cond.ref) } : undefined;
+        const record = (expr: DefStructExpr): void => {
+          out.set(
+            key,
+            sole
+              ? { expr, soleCriterion: { ...sole, bodyHash: hashExpr(expr), ...(exprHasMore(expr) ? { elided: true as const } : {}) } }
+              : { expr },
+          );
+        };
         // Envelope gate (host safety): a breaching/cyclic table would let `branchConditionToDefStruct` walk an
         // unbounded DAG. On a breach we still record an ENTRY — a single `…` elision stub — NOT omit. Omitting
         // would leave `guardOutline` undefined while `refKeysOf` (crlStructure.ts) falls back to the guard's INLINE
@@ -147,10 +199,10 @@ export function buildGuardOutlines(graph: ResolvedCelGraph, defExprIndex: DefExp
         // precedence gate engaged (`guardOutline` truthy ⇒ concept identity suppressed ⇒ neutral box), and the `…`
         // row honestly signals "a criterion body is here but was too complex to expand".
         if (expandedSize(cond, criterionTable).status !== "ok") {
-          out.set(key, { kind: "more", count: 0 });
+          record({ kind: "more", count: 0 });
           continue;
         }
-        out.set(key, branchConditionToDefStruct(cond, criterionTable, resolveDefExpr, lib));
+        record(branchConditionToDefStruct(cond, criterionTable, resolveDefExpr, lib));
       }
     }
   }

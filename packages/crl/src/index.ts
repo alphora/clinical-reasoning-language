@@ -232,6 +232,7 @@ export type {
   DefExprIndex,
   DefStructExpr,
   ResolveDefExprEntry,
+  GuardOutline,
   SpineNode,
   SpineNodeKind,
   ProvNodeRef,

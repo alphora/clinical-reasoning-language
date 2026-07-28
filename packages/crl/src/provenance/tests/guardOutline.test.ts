@@ -83,6 +83,12 @@ describe("buildGuardOutlines — criterion-bearing when → guard outline (Flow 
     expect([...outlines.keys()]).toEqual([eligKey]);
     expect(outlines.has(compoundKey)).toBe(false);
 
+    // The single-criterion-ref when carries its criterion identity + a body fingerprint (the collapse/verdict unit).
+    const sole = outlines.get(eligKey)!.soleCriterion!;
+    expect(sole.lib).toBe("T");
+    expect(sole.name).toBe("Elig");
+    expect(sole.bodyHash).toMatch(/^sha256:[0-9a-f]{16}$/);
+
     // Every key joins a real `when` node of the structure (the load-bearing cross-pane join).
     const structWhenKeys = new Set<string>();
     const walk = (ns: { nodeKey: string; kind: string; children: { nodeKey: string; kind: string; children: unknown[] }[] }[]): void => {
@@ -97,7 +103,7 @@ describe("buildGuardOutlines — criterion-bearing when → guard outline (Flow 
 
   it("renders the criterion body: `and(Inf{composite or(A,B)}, C)` — a `defined as` operand hangs its own composite", () => {
     const graph = graphFrom(CRL, CEL);
-    const outline = buildGuardOutlines(graph, defIndexOf(graph)).get(nodeKey(decisionSubNodeRef("T", "D", "when[0]")))!;
+    const outline = buildGuardOutlines(graph, defIndexOf(graph)).get(nodeKey(decisionSubNodeRef("T", "D", "when[0]")))!.expr;
     expect(outline.kind).toBe("and");
     if (outline.kind !== "and") throw new Error("unreachable");
     expect(outline.operands).toHaveLength(2);
@@ -141,7 +147,27 @@ first:
     const graph = graphFrom(cyc, CEL);
     const outlines = buildGuardOutlines(graph, defIndexOf(graph));
     expect([...outlines.keys()]).toEqual([nodeKey(decisionSubNodeRef("T", "D", "when[0]"))]);
-    expect(outlines.get(nodeKey(decisionSubNodeRef("T", "D", "when[0]")))).toEqual({ kind: "more", count: 0 });
+    // Compound guard (`A and C1`) → no soleCriterion; the whole guard is the `…` elision stub.
+    expect(outlines.get(nodeKey(decisionSubNodeRef("T", "D", "when[0]")))).toEqual({ expr: { kind: "more", count: 0 } });
+  });
+
+  it("a SINGLE-criterion breach → soleCriterion with `elided:true` (bodyHash can't fingerprint a stub — never durably verdictable)", () => {
+    const cyc = `library "T".
+activity "X":
+- request CPGCommunicationRequest.
+- with \`x\`.
+criterion "C1":
+- when "C2".
+criterion "C2":
+- when "C1".
+decision "D":
+first:
+- when "C1" then recommend activity "X".
+- otherwise then recommend activity "X".`;
+    const graph = graphFrom(cyc, CEL);
+    const rec = buildGuardOutlines(graph, defIndexOf(graph)).get(nodeKey(decisionSubNodeRef("T", "D", "when[0]")))!;
+    expect(rec.expr).toEqual({ kind: "more", count: 0 });
+    expect(rec.soleCriterion).toMatchObject({ lib: "T", name: "C1", elided: true });
   });
 });
 

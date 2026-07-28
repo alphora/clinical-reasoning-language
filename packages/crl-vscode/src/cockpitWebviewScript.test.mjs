@@ -705,6 +705,14 @@ check("#203 Slice A webview: a ⚑ badge click is intercepted BEFORE [data-revea
   assert.ok(badgeAt > 0 && badgeAt < revealAt, "badge intercept comes before the data-reveal click routing");
   assert.match(SCRIPT, /closest\('\[data-mv-flag-badge\]'\);.*postMessage\(\{type:'mvFlags'\}\);return;/s);
 });
+check("#224 ii.3 Slice 2 webview: a criterion chevron ([data-toggle-crit]) is intercepted BEFORE [data-reveal] and posts toggleCriterion", () => {
+  assert.match(SCRIPT, /closest\('\[data-toggle-crit\]'\)/);
+  // the chevron intercept + return must precede the data-reveal routing (controls-first) — else a chevron click SELECTS the row
+  const toggleAt = SCRIPT.indexOf("data-toggle-crit");
+  const revealAt = SCRIPT.indexOf("closest('[data-reveal]')");
+  assert.ok(toggleAt > 0 && toggleAt < revealAt, "chevron intercept comes before the data-reveal click routing");
+  assert.match(SCRIPT, /closest\('\[data-toggle-crit\]'\);.*postMessage\(\{type:'toggleCriterion',key:[^}]*\}\);return;/s);
+});
 check("#203 host: driveFlagBadges — per-node ⚑ by (lib,name)/anchors + the START-NODE COUNT badge (chrome mirror, catch-all); open-only", () => {
   assert.match(COCKPIT_SRC, /function driveFlagBadges\(\)/);
   assert.match(COCKPIT_SRC, /flagsList\.filter\(\(f\) => isOpen\(f\)\)/); // #212 S3: open-only over MvFlags (matches the gate)

@@ -9,8 +9,8 @@ import { renderScenario, type RenderScenarioResult } from "../cre";
 
 import { buildCaseIdJoin } from "./caseIdJoin";
 import { buildConceptShapeIndex, type ConceptShapeIndex } from "./conceptShape";
-import { buildDefExprIndex, type DefExprIndex, type DefStructExpr } from "./definedAsExpr";
-import { buildGuardOutlines } from "./guardOutline";
+import { buildDefExprIndex, type DefExprIndex } from "./definedAsExpr";
+import { buildGuardOutlines, type GuardOutline } from "./guardOutline";
 import { buildCorrespondenceModelFromResolved, type CorrespondenceModel } from "./correspondence";
 import { buildCrlConceptLayer, type CrlConceptNode } from "./crlConceptLayer";
 import { buildCrlStructure, type CrlDecisionStructure } from "./crlStructure";
@@ -35,7 +35,7 @@ export interface CockpitModel {
   /** #224 ii.3 Todo 3: guard OUTLINE per criterion-bearing `when`, keyed by the `when`'s structure nodeKey — the
    *  Flow pane hangs it as the `defined as`-style operator outline (so a criterion body is visible, not a dead-end).
    *  Only criterion-bearing whens (and only envelope-safe ones); a single-concept / plain-compound guard is absent. */
-  guardOutlines: Map<string, DefStructExpr>;
+  guardOutlines: Map<string, GuardOutline>;
   /** The full scenario render (cases + status + the success/errors envelope so the CEL pane can show "why" on failure). */
   scenarios: RenderScenarioResult;
   /** Case NAME → frozen caseId — the join between renderScenario (keyed by name) and the correspondence (keyed by the

@@ -19,7 +19,7 @@ import {
   type CrlConceptNode,
   type ConceptShapeIndex,
   type DefExprIndex,
-  type DefStructExpr,
+  type GuardOutline,
   type CrlDecisionStructure,
   type CrlStructureNode,
   type FlagStatus,
@@ -386,7 +386,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let conceptLayer: CrlConceptNode[] = [];
   let conceptShape: ConceptShapeIndex = new Map(); // #187 Todo 3: per-concept `defined as` shape subtrees (leaf expansion)
   let defExpr: DefExprIndex = new Map(); // #187 Option-3: per-concept `defined as` OPERATOR tree (questionnaire box render)
-  let guardOutlines: Map<string, DefStructExpr> = new Map(); // #224 ii.3 Todo 3: criterion-when guard outlines (Flow pane)
+  let guardOutlines: Map<string, GuardOutline> = new Map(); // #224 ii.3 Todo 3: criterion-when guard outlines (Flow pane)
+  // #224 ii.3 Slice 2: nodeKeys of single-criterion `when`s the user has EXPANDED (default: all collapsed). Ephemeral —
+  // not persisted (reload → all-collapsed-with-verdict is the desired steady state). NodeKeys are case-independent, so
+  // this survives Prev/Next re-renders; reset on doc change like the other render state.
+  let expandedGuardWhens: Set<string> = new Set();
   let crlMaps: CrlRevealMaps | undefined;
   let scenarios: RenderScenarioResult | undefined;
   let caseIdByName: Record<string, string> = {};
@@ -1799,6 +1803,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         concepts: conceptLayer,
         defExpr: buildDefExprResolver(), // #187 Option-C: composite → the ANY OF / ALL OF operator OUTLINE (shared builder)
         guardOutlines, // #224 ii.3 Todo 3: a criterion-when hangs its criterion-body outline (no more dead-end)
+        expandedGuardWhens, // #224 ii.3 Slice 2: which single-criterion whens are expanded (default: all collapsed)
       });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
@@ -1991,6 +1996,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       setWorklist(msg.key, msg.value); // #156 slice 4: a worklist dropdown change (MV mode) — host validates + persists it
     } else if (msg.type === "nodeVerdictMenu" && typeof msg.key === "string") {
       void nodeMenu(msg.key); // #217 + #203 Todo 4b Slice B: right-click a flow node (MV) — combined menu (verdict / add-flag); a non-flaggable node routes straight to the verdict pick
+    } else if (msg.type === "toggleCriterion" && typeof msg.key === "string") {
+      // #224 ii.3 Slice 2: the criterion `▸`/`▾` disclosure. Resolve the opaque reveal key → the when's nodeKey (trusted
+      // lookup, never a webview-supplied path), then flip its collapse state + re-render the tree (layout change).
+      const hit = v.reveals[msg.key];
+      if (hit && "nodeKey" in hit) toggleCriterionExpand(hit.nodeKey);
     } else if (msg.type === "worklistFilterToggle") {
       toggleWorklistFilter(msg.state); // #214: toggle a verdict in/out of the worklist filter (host validates the state)
     } else if (msg.type === "notesToggle" && typeof msg.key === "string") {
@@ -2319,6 +2329,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     conceptShape = new Map();
     defExpr = new Map();
     guardOutlines = new Map();
+    expandedGuardWhens = new Set();
     crlMaps = undefined;
     scenarios = undefined;
     caseIdByName = {};
@@ -2446,6 +2457,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     mode = targetMode;
     currentCel = celPath;
     flagAnchor = undefined; // #210 Todo C: a retarget / mode switch drops the prior policy's flag anchor
+    expandedGuardWhens = new Set(); // #224 ii.3 Slice 2: a retarget starts the new policy's criteria all-collapsed (nodeKeys aren't policy-qualified beyond lib/decision, so carry-over could pre-expand a same-named branch)
     cockpitAgentBridge.notifyChanged(); // refresh the agent chip for the new mode/policy (getAppState reads live state)
     const uri = vscode.Uri.file(celPath);
     const section = configSection(mode);
@@ -3236,6 +3248,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (state.selection) dispatch({ type: "select", selection: state.selection }); // restore highlights post-re-render
   }
 
+  /** #224 ii.3 Slice 2: flip a single-criterion `when`'s collapse state (by nodeKey) and re-render the TREE pane only —
+   *  collapse changes the flow LAYOUT (the criterion body appears/disappears), so it needs a re-render, not a CSS
+   *  re-apply like zoom. Mirrors `applyShowKeys`'s tail: the tree ack re-drives every overlay, and re-dispatching the
+   *  selection restores the highlight the innerHTML swap dropped. Ephemeral: `expandedGuardWhens` is not persisted. */
+  function toggleCriterionExpand(nodeKey: string): void {
+    if (expandedGuardWhens.has(nodeKey)) expandedGuardWhens.delete(nodeKey);
+    else expandedGuardWhens.add(nodeKey);
+    renderPane("tree");
+    if (state.selection) dispatch({ type: "select", selection: state.selection });
+  }
+
   const toggleKeysCmd = vscode.commands.registerCommand("crl.cockpit.toggleKeys", () => {
     if (!currentCel) return;
     // Read the LIVE persisted value (not the cached render-state `showKeys`) and write its inverse, to the most-specific
@@ -3973,6 +3996,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // tree zoom control (− / reset / +) — a local view op, no host round-trip. Intercepted BEFORE [data-reveal].
   `const zb=e.target.closest&&e.target.closest('[data-zoom]');` +
   `if(zb){e.preventDefault();e.stopPropagation();const a=zb.getAttribute('data-zoom');setZoom(a==='in'?treeZoom*1.2:a==='out'?treeZoom/1.2:1);return;}` +
+  // #224 ii.3 Slice 2: a criterion collapse chevron (▸/▾) — intercepted BEFORE [data-reveal] (the chevron <g> is nested
+  // in the row's data-reveal); posts the opaque reveal key, the host resolves it → nodeKey and flips collapse + re-renders.
+  `const ct=e.target.closest&&e.target.closest('[data-toggle-crit]');` +
+  `if(ct){e.preventDefault();e.stopPropagation();v.postMessage({type:'toggleCriterion',key:ct.getAttribute('data-toggle-crit')});return;}` +
   `const t=e.target.closest&&e.target.closest('[data-reveal]');` +
   `if(t)v.postMessage({type:'reveal',key:t.getAttribute('data-reveal')});});` +
   // #217: RIGHT-CLICK a flow node → the host opens a verdict quick-pick for the case(s) whose fired path runs through it.

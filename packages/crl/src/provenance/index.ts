@@ -47,6 +47,7 @@ export type { ConceptShapeNode, ConceptShapeIndex } from "./conceptShape";
 export { buildDefExprIndex, collectDefExprLeafKeys, buildDefStruct, DEF_EXPR_CAP, DEF_MAX_EXPR_DEPTH } from "./definedAsExpr";
 export type { DefExpr, DefRef, DefExprEntry, DefExprIndex, DefStructExpr, ResolveDefExprEntry } from "./definedAsExpr";
 export { branchConditionToDefStruct, buildGuardOutlines } from "./guardOutline";
+export type { GuardOutline } from "./guardOutline";
 export { buildCockpitModel, buildCockpitModelFromResolved } from "./cockpitModel";
 export type { CockpitModel } from "./cockpitModel";
 export { checkCockpitCorrespondence } from "./correspondenceCheck";

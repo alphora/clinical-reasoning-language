@@ -745,37 +745,63 @@ check("tree zoom: renders a floating − / reset / + control (the % is filled in
 
 
 // ── #224 ii.3 Todo 3: a criterion-bearing `when` hangs its GUARD OUTLINE (criterion body), keyed by nodeKey ──
-// Guard outlines are ready-made DefStructExpr (crl `buildGuardOutlines`), so the fixtures are direct DefStructExpr.
+// The guardOutlines map VALUE is `{ expr, soleCriterion? }` (Slice 2): `soleCriterion` = a SINGLE-criterion-ref when
+// (collapsible + verdict-able). `gout(expr, name)` sets it; `gout(expr)` (no name) = a compound-with-criterion (always
+// expanded). A single-criterion when defaults to COLLAPSED — pass `expandedGuardWhens` to render its body.
 const gleaf = (name, nodeKey, { isSource = true, isInferred = false, composite } = {}) => ({ kind: "leaf", name, lib: "Pol", nodeKey, isSource, isInferred, ...(composite ? { composite } : {}) });
 const gand = (...operands) => ({ kind: "and", operands });
+const gout = (expr, name) => ({ expr, ...(name ? { soleCriterion: { lib: "Pol", name, bodyHash: "sha256:0000000000000000" } } : {}) });
 
-check("Todo 3: a criterion when (compound guard) hangs its criterion-body outline; the box keeps the CRITERION name", () => {
+check("Todo 3: an EXPANDED single-criterion when hangs its body outline; the box keeps the CRITERION name + a ▾ chevron", () => {
   const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
     node("w:crit", "when", "when Elig", ["c:A", "c:B"], [node("a:X", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
   ] }];
   const cs = [concept("c:A", "A"), concept("c:B", "B")];
-  const guardOutlines = new Map([["w:crit", gand(gleaf("A", "c:A"), gleaf("B", "c:B"))]]);
-  const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g6_", guardOutlines });
-  // The body is now visible: an ALL OF row over two leaf rows (was a dead-end before Todo 3).
+  const guardOutlines = new Map([["w:crit", gout(gand(gleaf("A", "c:A"), gleaf("B", "c:B")), "Elig")]]);
+  const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g6_", guardOutlines, expandedGuardWhens: new Set(["w:crit"]) });
+  // Expanded → the body is visible: an ALL OF row over two leaf rows.
   assert.ok(/class="flow-outline flow-op"><text[^>]*>ALL OF</.test(rr.html), "an ALL OF operator row for the `and` guard body");
-  assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["A", "B"], "the two criterion-body leaves render");
-  // The when box still shows the CRITERION name (not a masqueraded operand), and takes a neutral (non-inferred) border.
-  assert.match(rr.html, /<g id="[^"]*" class="flow-row flow-when flow-greyborder"[^>]*><title>Elig[^<]*<\/title>/, "the when box is neutral grey + titled with the criterion name");
+  assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["A", "B"], "the two criterion-body leaves render when expanded");
+  // The when box shows the CRITERION name (not a masqueraded operand), neutral grey, + a ▾ (collapse) chevron.
+  assert.match(rr.html, /<g id="[^"]*" class="flow-row flow-when flow-greyborder"[^>]*><title>Elig[^<]*<\/title>/, "neutral grey when box, titled with the criterion name");
   assert.ok(/<text[^>]*>Elig<\/text>/.test(rr.html), "the when box label is the criterion name Elig");
-  // The body leaves join the verdict overlay via their owning when (topWhenKey = the criterion when).
-  const entries = Object.entries(rr.leafConcepts);
-  assert.ok(entries.every(([, v]) => v.topWhenKey === "w:crit"), "criterion-body leaves inherit topWhenKey = the criterion when");
+  assert.ok(/class="flow-crit-toggle" data-toggle-crit="[^"]*"><title>collapse criterion body</.test(rr.html), "an expanded criterion carries a ▾ collapse chevron");
+  assert.ok(Object.entries(rr.leafConcepts).every(([, v]) => v.topWhenKey === "w:crit"), "body leaves inherit topWhenKey = the criterion when");
 });
 
-check("Todo 3 [critical 1]: a SOLE-REF criterion (refKeys length 1) does NOT masquerade as its body concept, and does NOT double-hang", () => {
+check("Todo 3 Slice 2: a single-criterion when defaults to COLLAPSED — a ▸ chevron, NO body leaves, a toggle key", () => {
+  const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w:crit", "when", "when Elig", ["c:A", "c:B"], [node("a:X", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
+  ] }];
+  const cs = [concept("c:A", "A"), concept("c:B", "B")];
+  const guardOutlines = new Map([["w:crit", gout(gand(gleaf("A", "c:A"), gleaf("B", "c:B")), "Elig")]]);
+  const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g6c_", guardOutlines }); // no expandedGuardWhens ⇒ collapsed
+  assert.equal(leafRowsOf(rr.html).length, 0, "collapsed ⇒ NO body leaves rendered");
+  assert.ok(!/ALL OF/.test(rr.html), "collapsed ⇒ no operator rows");
+  assert.ok(/class="flow-crit-toggle" data-toggle-crit="[^"]*"><title>expand criterion body</.test(rr.html), "a collapsed criterion carries a ▸ expand chevron with a toggle key");
+  assert.ok(/<text[^>]*>Elig<\/text>/.test(rr.html), "the collapsed box still names the criterion");
+});
+
+check("Todo 3 Slice 2: a compound-with-criterion guard (no soleCriterion) is NOT collapsible — always expanded, no chevron", () => {
+  const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w:cmp", "when", "when A and Meets", ["c:A", "c:B"], [node("a:X", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
+  ] }];
+  const cs = [concept("c:A", "A"), concept("c:B", "B")];
+  const guardOutlines = new Map([["w:cmp", gout(gand(gleaf("A", "c:A"), gleaf("B", "c:B")))]]); // no name ⇒ no soleCriterion
+  const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g6x_", guardOutlines }); // collapsed set empty, yet body shows
+  assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["A", "B"], "a compound-with-criterion guard stays expanded (nothing hidden)");
+  assert.ok(!/flow-crit-toggle/.test(rr.html), "no collapse chevron on a non-single-criterion guard");
+});
+
+check("Todo 3 [critical 1]: a SOLE-REF criterion does NOT masquerade as its body concept, and does NOT double-hang", () => {
   // `criterion Elig: when B` flattens to refKeys=[c:B]; B is `defined as` (would normally hang its OWN outline + purple border).
   const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
     node("w:crit1", "when", "when Elig", ["c:B"], [node("a:X", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
   ] }];
   const cs = [concept("c:B", "B", { definitionKind: "defined-as" })];
   const map = { B: dentry("c:B", "B", dor(dref("L1", "c:L1"), dref("L2", "c:L2"))) }; // B's defined-as outline (must NOT appear)
-  const guardOutlines = new Map([["w:crit1", gand(gleaf("P", "c:P"), gleaf("Q", "c:Q"))]]);
-  const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g7_", defExpr: defExprOf(map), guardOutlines });
+  const guardOutlines = new Map([["w:crit1", gout(gand(gleaf("P", "c:P"), gleaf("Q", "c:Q")), "Elig")]]);
+  const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g7_", defExpr: defExprOf(map), guardOutlines, expandedGuardWhens: new Set(["w:crit1"]) });
   // Only the GUARD outline's leaves — B's defined-as leaves (L1/L2) are suppressed (no double-hang).
   assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["P", "Q"], "only the guard-body leaves render; B's own composite is suppressed");
   assert.ok(!/>L1<|>L2</.test(rr.html), "B's defined-as leaves do NOT appear (precedence: guard outline wins)");

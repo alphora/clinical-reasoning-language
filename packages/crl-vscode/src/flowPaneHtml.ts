@@ -12,7 +12,7 @@
 // nodeKey is a JSON string (quotes/brackets) and cannot be a DOM id; `anchors` is keyed BY nodeKey → the generated id (the
 // cross-pane join, mirroring crlPaneHtml). `id` + `data-reveal` ride the SAME <g> so highlight (getElementById) and click
 // (closest('[data-reveal]')) resolve to one element.
-import { buildDefStruct, displayDetermination, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode, type DefStructExpr, type ResolveDefExprEntry } from "@smile-digital-health/crl";
+import { buildDefStruct, displayDetermination, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode, type DefStructExpr, type GuardOutline, type ResolveDefExprEntry } from "@smile-digital-health/crl";
 
 /** Reserved prefix marking a synthetic outline-row nodeKey — provably disjoint from every structure/concept nodeKey
  *  (those are JSON arrays), so a leaf anchor no-ops against every existing keyset. A concept-operand leaf's key carries
@@ -82,6 +82,19 @@ const truncate = (s: string, n: number): string => (s.length > n ? `${s.slice(0,
 // own identity border (a separate axis). `pointer-events:none` (CSS) so a click falls through to the row's data-reveal.
 const flowRing = (x: number, y: number, w: number, h: number, off: number, rx: number): string =>
   `<g class="flow-ring"><rect x="${x - off}" y="${y - off}" width="${w + 2 * off}" height="${h + 2 * off}" rx="${rx}"/></g>`;
+
+/** #224 ii.3 Slice 2: the criterion COLLAPSE disclosure — a `▸` (collapsed) / `▾` (expanded) triangle, its OWN hit
+ *  surface (`data-toggle-crit`, resolved host-side via the row's reveal key exactly like a peek). A grandchild of the
+ *  when `<g>`, so `closest('[data-toggle-crit]')` wins for a chevron click and `closest('[data-reveal]')` for the box. */
+const critToggle = (cx: number, cy: number, collapsed: boolean, revealKey: string): string => {
+  const d = collapsed ? `M${cx - 3} ${cy - 4} L${cx + 3} ${cy} L${cx - 3} ${cy + 4} Z` : `M${cx - 4} ${cy - 3} L${cx + 4} ${cy - 3} L${cx} ${cy + 3} Z`;
+  return (
+    `<g class="flow-crit-toggle" data-toggle-crit="${escapeHtml(revealKey)}">` +
+    `<title>${collapsed ? "expand criterion body" : "collapse criterion body"}</title>` +
+    `<rect class="flow-crit-hit" x="${cx - 7}" y="${cy - 8}" width="16" height="16" rx="3"/>` +
+    `<path class="flow-crit-chevron" d="${d}"/></g>`
+  );
+};
 
 /** #208: wrap a label to ≤2 lines for a FIXED-width box (we wrap, never widen — the operator rejected horizontal sprawl).
  *  `maxChars` is the per-line char budget (the old single-line limit). Line 1 is GUARANTEED ≤ maxChars — the LONGEST
@@ -162,6 +175,9 @@ interface LaidNode {
    *  are RENDER-ONLY (no anchor, no reveal). `indent` drives x; `absX` is the precomputed left (indent-based). */
   outline?: boolean;
   outlineRow?: "topor" | "op" | "leaf" | "external" | "more";
+  /** #224 ii.3 Slice 2: set on a `when` whose guard is a SINGLE criterion ref (the collapse unit) — carries the current
+   *  collapsed/expanded state so the render draws a `▸`/`▾` disclosure. Absent on a compound-guard / non-criterion when. */
+  criterionCollapse?: { collapsed: boolean };
   indent?: number;
   absX?: number;
   depth: number;
@@ -199,7 +215,7 @@ export function collectDispositionLeafKeys(structure: CrlDecisionStructure[]): S
 function buildLaid(
   structure: CrlDecisionStructure[],
   conceptMap: Map<string, CrlConceptNode>,
-  opts: { defExpr?: ResolveDefExprEntry; guardOutlines?: Map<string, DefStructExpr> } = {},
+  opts: { defExpr?: ResolveDefExprEntry; guardOutlines?: Map<string, GuardOutline>; expandedGuardWhens?: Set<string> } = {},
 ): { roots: LaidNode[]; maxDepth: number } {
   let slot = 0;
   let maxDepth = 0;
@@ -276,6 +292,11 @@ function buildLaid(
     // suppresses the concept identity entirely (neutral border, no peek, the label falls back to the criterion name)
     // and leaves the guard outline the SOLE outline source (disc 318 [critical] 1).
     const guardOutline = n.kind === "when" ? opts.guardOutlines?.get(n.nodeKey) : undefined;
+    // #224 ii.3 Slice 2: a SINGLE-criterion-ref guard (`soleCriterion` set) is COLLAPSIBLE — default collapsed (the body
+    // hidden), expanded only when its nodeKey is in `expandedGuardWhens`. A compound-with-criterion guard has no
+    // `soleCriterion` (Slice 2 leaves it expanded — nothing hidden). Collapse changes LAYOUT, so it feeds the layout here.
+    const collapsible = guardOutline?.soleCriterion !== undefined;
+    const collapsed = collapsible && !opts.expandedGuardWhens?.has(n.nodeKey);
     // #224: only a SINGLE-ref `when` IS one concept (border/peek/outline). A
     // COMPOUND guard (>1 refKey) has no single concept — `refKeys[0]` would
     // masquerade the first operand as the whole guard, so drop the peek/border
@@ -314,10 +335,10 @@ function buildLaid(
     // ALIAS-parity concerns; a guard body is not a Source alias). `topWhenKey = n.nodeKey` so the per-leaf on-path
     // verdict overlay lights the criterion-body leaves exactly as it does a composite's. Mutually exclusive with the
     // single-concept path below: `guardOutline` is set ⇒ `conceptRef`/`cf.conceptName` were suppressed (see above).
-    if (guardOutline) {
+    if (guardOutline && !collapsed) {
       const whenLeft = PAD + depth * COL;
       const cursor = { y: nodeY + (NODE_H * 1.5) / ROW };
-      outlineRoots.push(buildOutline(guardOutline, whenLeft, n.nodeKey, 0, "0", cursor));
+      outlineRoots.push(buildOutline(guardOutline.expr, whenLeft, n.nodeKey, 0, "0", cursor));
       slot = Math.max(slot, cursor.y); // reserve the outline's vertical extent so the next sibling clears it
     } else if (n.kind === "when" && cf.conceptName !== undefined && opts.defExpr) {
       const entry = opts.defExpr(cf.conceptLib ?? "", cf.conceptName);
@@ -339,7 +360,10 @@ function buildLaid(
       }
     }
     const children = [...structureChildren, ...outlineRoots];
-    return { nodeKey: n.nodeKey, kind: n.kind, useDecision, guard, label: display, full, depth, y: nodeY, children, ...cf };
+    return {
+      nodeKey: n.nodeKey, kind: n.kind, useDecision, guard, label: display, full, depth, y: nodeY, children, ...cf,
+      ...(collapsible ? { criterionCollapse: { collapsed } } : {}),
+    };
   };
 
   const roots: LaidNode[] = [];
@@ -370,7 +394,10 @@ export function renderFlowPane(
     defExpr?: ResolveDefExprEntry;
     /** #224 ii.3 Todo 3: guard outline per criterion-bearing `when` (keyed by nodeKey) — hung as the operator
      *  outline so a criterion body is visible instead of a dead-end. Built by `buildGuardOutlines` (crl core). */
-    guardOutlines?: Map<string, DefStructExpr>;
+    guardOutlines?: Map<string, GuardOutline>;
+    /** #224 ii.3 Slice 2: nodeKeys of criterion whens the user has EXPANDED (default: absent ⇒ collapsed). A single-
+     *  criterion-ref when not listed renders `▸ <name>` with its body hidden; listed → `▾` + the Slice-1 body outline. */
+    expandedGuardWhens?: Set<string>;
   } = {},
 ): RenderedFlow {
   const prefix = opts.revealPrefix ?? "";
@@ -386,7 +413,7 @@ export function renderFlowPane(
   }
 
   const conceptMap = new Map(concepts.map((c) => [c.nodeKey, c]));
-  const { roots, maxDepth } = buildLaid(structure, conceptMap, { defExpr: opts.defExpr, guardOutlines: opts.guardOutlines });
+  const { roots, maxDepth } = buildLaid(structure, conceptMap, { defExpr: opts.defExpr, guardOutlines: opts.guardOutlines, expandedGuardWhens: opts.expandedGuardWhens });
   const startNodeKey = roots[0]?.nodeKey; // the PRIMARY/start node — carries the chrome-mirror count badge (see below)
   let startNodeGid: string | undefined;
 
@@ -570,14 +597,21 @@ export function renderFlowPane(
     const isStart = n.kind === "decision" && n.nodeKey === startNodeKey;
     if (isStart) startNodeGid = gid;
     const startFlagMarkup = isStart ? startFlagBadge(x + NODE_W - 48, y - 8) : "";
+    // #224 ii.3 Slice 2: a collapsible criterion `when` reserves a left gutter for its `▸`/`▾` disclosure — the label
+    // shifts right + wraps a few chars sooner (mirrors LEAF_LABEL_MAX reserving badge gutters, disc 319 nit 10).
+    const critC = n.criterionCollapse;
+    const critToggleMarkup = critC ? critToggle(x + 10, y + NODE_H / 2, critC.collapsed, key) : "";
+    const labelDx = critC ? 24 : 10;
+    const labelMax = critC ? LABEL_MAX - 4 : LABEL_MAX;
     body +=
       `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
       `<title>${escapeHtml(n.full)}</title>` +
       `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="${rx}"/>` +
-      // #210: a disposition LEAF (outcome tip) centers its label; interior nodes stay left-aligned at x+10.
-      (isLeafEnd ? labelMarkup(n.label, x, y, NODE_H, LEAF_LABEL_MAX, NODE_W / 2, true) : labelMarkup(n.label, x, y, NODE_H, LABEL_MAX, 10)) +
+      // #210: a disposition LEAF (outcome tip) centers its label; interior nodes stay left-aligned (shifted for a chevron).
+      (isLeafEnd ? labelMarkup(n.label, x, y, NODE_H, LEAF_LABEL_MAX, NODE_W / 2, true) : labelMarkup(n.label, x, y, NODE_H, labelMax, labelDx)) +
       flowRing(x, y, NODE_W, NODE_H, 2.5, stadium ? (NODE_H + 5) / 2 : 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
       guardTab +
+      critToggleMarkup +
       allPassBadge +
       flagBadgeMarkup +
       startFlagMarkup +
@@ -686,6 +720,12 @@ export const FLOW_STYLE =
   `.flow-guard-tab.flow-inferred>rect{stroke:${TOK_INFERRED}}` +
   `.flow-guard-tab>text{fill:var(--vscode-descriptionForeground,#cccccc);font:600 9px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.02em}` +
   `.flow-guard-tab:hover>rect{fill:var(--vscode-toolbar-hoverBackground,#2a2d2e)}` +
+  // #224 ii.3 Slice 2: the criterion collapse chevron — a clickable ▸/▾ triangle with a transparent hit rect.
+  `.flow-crit-toggle{cursor:pointer;pointer-events:auto}` +
+  `.flow-crit-hit{fill:transparent}` +
+  `.flow-crit-chevron{fill:var(--vscode-descriptionForeground,#8c8c8c)}` +
+  `.flow-crit-toggle:hover .flow-crit-hit{fill:var(--vscode-toolbar-hoverBackground,#2a2d2e)}` +
+  `.flow-crit-toggle:hover .flow-crit-chevron{fill:var(--vscode-foreground,#cccccc)}` +
   `.flow-edge{fill:none;stroke:var(--vscode-panel-border,#454545);stroke-width:1.6}` + // slightly thicker — hard to see on Mac (operator feedback)
   // #187 Todo 4: a DEF-LEAF edge — a distinct dashed grey line (definition decomposition, NOT a control-flow branch).
   // Slightly THICKER + less faint so the connector reads on Mac (operator feedback).
