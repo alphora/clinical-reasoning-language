@@ -923,4 +923,12 @@ export const FLOW_STYLE =
   `.fc-legend .fc-sw-fail{background:${TOK_VERDICT_FAIL}}` +
   `.fc-legend .fc-sw-pending{background:${TOK_VERDICT_PENDING}}` +
   `.fc-legend .fc-sw-inferred{border:1.5px solid ${TOK_INFERRED}}` +
-  `.fc-legend .fc-sw-ring{border:1.5px solid ${TOK_RING}}`;
+  `.fc-legend .fc-sw-ring{border:1.5px solid ${TOK_RING}}` +
+  // tree zoom control — a floating control fixed to the pane corner. Co-located HERE with the control's MARKUP (renderFlowPane's
+  // `${zoom}`) so the ONE flow-pane stylesheet owns it: the cockpit shell (which includes FLOW_STYLE) AND the standalone
+  // snapshot export both get it, and they can't drift. ⚠ the background fallback ends in a HEX (not a nested var) so it renders
+  // in a themeless standalone document (the snapshot) — a nested `var(--vscode-editor-background)` with no hex resolves to nothing.
+  `.flow-zoom{position:fixed;bottom:10px;right:14px;z-index:7;display:flex;gap:1px;background:var(--vscode-editorWidget-background,#252526);border:1px solid var(--vscode-panel-border,#454545);border-radius:4px;padding:1px;box-shadow:0 1px 4px rgba(0,0,0,.3)}` +
+  `.flow-zoom button{cursor:pointer;background:none;border:none;color:inherit;font:inherit;padding:1px 6px;min-width:22px;border-radius:3px}` +
+  `.flow-zoom button:hover{background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,.2))}` +
+  `.flow-zoom-pct{font-variant-numeric:tabular-nums;min-width:46px}`;

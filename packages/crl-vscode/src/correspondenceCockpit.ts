@@ -3958,11 +3958,8 @@ function shellHtml(): string {
 .flag-cancel,.flag-insert{cursor:pointer;border:none;border-radius:2px;padding:2px 10px;font-size:.9em}
 .flag-cancel{background:var(--vscode-button-secondaryBackground,#3a3d41);color:var(--vscode-button-secondaryForeground,#fff)}
 .flag-insert{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff)}
-/* tree zoom — a floating control fixed to the pane corner (the zoom LEVEL is webview state re-applied after each render). */
-.flow-zoom{position:fixed;bottom:10px;right:14px;z-index:7;display:flex;gap:1px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background));border:1px solid var(--vscode-panel-border,#454545);border-radius:4px;padding:1px;box-shadow:0 1px 4px rgba(0,0,0,.3)}
-.flow-zoom button{cursor:pointer;background:none;border:none;color:inherit;font:inherit;padding:1px 6px;min-width:22px;border-radius:3px}
-.flow-zoom button:hover{background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,.2))}
-.flow-zoom-pct{font-variant-numeric:tabular-nums;min-width:46px}
+/* tree zoom control — its rules now live in FLOW_STYLE (flowPaneHtml.ts), co-located with the control markup + shared with the
+   standalone snapshot export; the shell picks them up via the ${FLOW_STYLE} include below. */
 .fc-toggle{display:flex;align-items:center;gap:4px;padding:4px 2px 6px;font-size:.85em}
 .fc-toggle-label{opacity:.7;margin-right:2px}
 .fc-toggle-btn{font:inherit;cursor:pointer;padding:1px 8px;border:1px solid var(--vscode-panel-border,#454545);background:var(--vscode-editorWidget-background,#252526);color:var(--vscode-foreground)}
