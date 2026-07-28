@@ -9,7 +9,8 @@ import { renderScenario, type RenderScenarioResult } from "../cre";
 
 import { buildCaseIdJoin } from "./caseIdJoin";
 import { buildConceptShapeIndex, type ConceptShapeIndex } from "./conceptShape";
-import { buildDefExprIndex, type DefExprIndex } from "./definedAsExpr";
+import { buildDefExprIndex, type DefExprIndex, type DefStructExpr } from "./definedAsExpr";
+import { buildGuardOutlines } from "./guardOutline";
 import { buildCorrespondenceModelFromResolved, type CorrespondenceModel } from "./correspondence";
 import { buildCrlConceptLayer, type CrlConceptNode } from "./crlConceptLayer";
 import { buildCrlStructure, type CrlDecisionStructure } from "./crlStructure";
@@ -31,6 +32,10 @@ export interface CockpitModel {
    *  sem-or/and/not tree the MV Questionnaire renders as ANY OF / ALL OF boxes. Its leafEligible leaves are
    *  drift-guarded equal to `conceptShape`'s (`collectDefExprLeafKeys` == `codeIsLeavesPreorder`). */
   defExpr: DefExprIndex;
+  /** #224 ii.3 Todo 3: guard OUTLINE per criterion-bearing `when`, keyed by the `when`'s structure nodeKey — the
+   *  Flow pane hangs it as the `defined as`-style operator outline (so a criterion body is visible, not a dead-end).
+   *  Only criterion-bearing whens (and only envelope-safe ones); a single-concept / plain-compound guard is absent. */
+  guardOutlines: Map<string, DefStructExpr>;
   /** The full scenario render (cases + status + the success/errors envelope so the CEL pane can show "why" on failure). */
   scenarios: RenderScenarioResult;
   /** Case NAME → frozen caseId — the join between renderScenario (keyed by name) and the correspondence (keyed by the
@@ -78,6 +83,8 @@ export function buildCockpitModelFromResolved(
   // #187 Option-3: the operator-PRESERVING projection of the same `defined as` bodies (same inputs), for the MV
   // Questionnaire's ANY OF / ALL OF box render. Its leafEligible leaves are drift-guarded == conceptShape's.
   const defExpr = buildDefExprIndex(libs, conceptLayer, leafEligibleByLib);
+  // #224 ii.3 Todo 3: guard outlines for criterion-bearing whens (Flow pane), resolved against the same defExpr index.
+  const guardOutlines = buildGuardOutlines(r.graph, defExpr);
 
   return {
     correspondence: buildCorrespondenceModelFromResolved(r, { artifactPath, celPath }),
@@ -85,6 +92,7 @@ export function buildCockpitModelFromResolved(
     conceptLayer,
     conceptShape,
     defExpr,
+    guardOutlines,
     scenarios: renderScenario(r.graph),
     caseIdByName,
     caseNameCollisions: frozenCollisions,

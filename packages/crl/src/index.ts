@@ -189,6 +189,8 @@ export {
   buildDefExprIndex,
   collectDefExprLeafKeys,
   buildDefStruct,
+  branchConditionToDefStruct,
+  buildGuardOutlines,
   DEF_EXPR_CAP,
   DEF_MAX_EXPR_DEPTH,
   generateProvenanceScaffold,

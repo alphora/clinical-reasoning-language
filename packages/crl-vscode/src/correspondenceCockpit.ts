@@ -19,6 +19,7 @@ import {
   type CrlConceptNode,
   type ConceptShapeIndex,
   type DefExprIndex,
+  type DefStructExpr,
   type CrlDecisionStructure,
   type CrlStructureNode,
   type FlagStatus,
@@ -385,6 +386,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let conceptLayer: CrlConceptNode[] = [];
   let conceptShape: ConceptShapeIndex = new Map(); // #187 Todo 3: per-concept `defined as` shape subtrees (leaf expansion)
   let defExpr: DefExprIndex = new Map(); // #187 Option-3: per-concept `defined as` OPERATOR tree (questionnaire box render)
+  let guardOutlines: Map<string, DefStructExpr> = new Map(); // #224 ii.3 Todo 3: criterion-when guard outlines (Flow pane)
   let crlMaps: CrlRevealMaps | undefined;
   let scenarios: RenderScenarioResult | undefined;
   let caseIdByName: Record<string, string> = {};
@@ -1796,6 +1798,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         revealPrefix: `g${gen}_`,
         concepts: conceptLayer,
         defExpr: buildDefExprResolver(), // #187 Option-C: composite → the ANY OF / ALL OF operator OUTLINE (shared builder)
+        guardOutlines, // #224 ii.3 Todo 3: a criterion-when hangs its criterion-body outline (no more dead-end)
       });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
@@ -2208,6 +2211,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       conceptLayer = cm.conceptLayer;
       conceptShape = cm.conceptShape; // #187 Todo 3
       defExpr = cm.defExpr; // #187 Option-3
+      guardOutlines = cm.guardOutlines; // #224 ii.3 Todo 3
       scenarios = cm.scenarios;
       caseIdByName = cm.caseIdByName;
       duplicateScenarioNames = cm.duplicateScenarioNames;
@@ -2314,6 +2318,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     conceptLayer = [];
     conceptShape = new Map();
     defExpr = new Map();
+    guardOutlines = new Map();
     crlMaps = undefined;
     scenarios = undefined;
     caseIdByName = {};

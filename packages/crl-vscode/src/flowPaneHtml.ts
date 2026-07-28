@@ -199,7 +199,7 @@ export function collectDispositionLeafKeys(structure: CrlDecisionStructure[]): S
 function buildLaid(
   structure: CrlDecisionStructure[],
   conceptMap: Map<string, CrlConceptNode>,
-  opts: { defExpr?: ResolveDefExprEntry } = {},
+  opts: { defExpr?: ResolveDefExprEntry; guardOutlines?: Map<string, DefStructExpr> } = {},
 ): { roots: LaidNode[]; maxDepth: number } {
   let slot = 0;
   let maxDepth = 0;
@@ -269,11 +269,18 @@ function buildLaid(
     // Only a `when` IS its concept (the box carries its border). An action's guard concept is no longer resolved here —
     // Todo 2 removed the guard peek + colors an action by its DETERMINATION target, not its guard — so resolving it would
     // be dead work (the guard stays visible in the crl pane).
+    // #224 ii.3 Todo 3: a criterion-bearing `when` carries a GUARD OUTLINE (its criterion body, keyed by nodeKey).
+    // It TAKES PRECEDENCE over single-concept resolution: a sole-ref criterion (`criterion C: when A`) flattens to
+    // `refKeys=[A]` (length 1) — resolving `conceptRef` would masquerade the box as concept A (border/peek/label)
+    // AND double-hang A's own `defined as` outline beside the guard outline. Gating `conceptRef` on `!guardOutline`
+    // suppresses the concept identity entirely (neutral border, no peek, the label falls back to the criterion name)
+    // and leaves the guard outline the SOLE outline source (disc 318 [critical] 1).
+    const guardOutline = n.kind === "when" ? opts.guardOutlines?.get(n.nodeKey) : undefined;
     // #224: only a SINGLE-ref `when` IS one concept (border/peek/outline). A
     // COMPOUND guard (>1 refKey) has no single concept — `refKeys[0]` would
     // masquerade the first operand as the whole guard, so drop the peek/border
     // and let the display fall back to the full guard label.
-    const conceptRef = n.kind === "when" && n.refKeys.length === 1 ? n.refKeys[0] : undefined;
+    const conceptRef = n.kind === "when" && !guardOutline && n.refKeys.length === 1 ? n.refKeys[0] : undefined;
     const cf = conceptFields(conceptRef);
     const useDecision = n.kind === "action" && n.actionKind === "use-decision";
     // #187 Todo 2b: a guarded action (`recommend X when <guard>` OR `use decision D when <guard>`) — resolve the guard
@@ -302,7 +309,17 @@ function buildLaid(
     // (mirroring the Questionnaire's forced top-`or`). After the outline, the global `slot` is advanced past its bottom so a
     // following sibling clears it (the outline vertically overlaps the branch body but sits in the node's OWN indented column).
     const outlineRoots: LaidNode[] = [];
-    if (n.kind === "when" && cf.conceptName !== undefined && opts.defExpr) {
+    // #224 ii.3 Todo 3: a criterion-bearing `when` hangs its GUARD OUTLINE (the criterion body, already a
+    // `DefStructExpr`) DIRECTLY — no `isSource` top-`or`, no inferred-`ANY OF` wrap (those are `defined as`
+    // ALIAS-parity concerns; a guard body is not a Source alias). `topWhenKey = n.nodeKey` so the per-leaf on-path
+    // verdict overlay lights the criterion-body leaves exactly as it does a composite's. Mutually exclusive with the
+    // single-concept path below: `guardOutline` is set ⇒ `conceptRef`/`cf.conceptName` were suppressed (see above).
+    if (guardOutline) {
+      const whenLeft = PAD + depth * COL;
+      const cursor = { y: nodeY + (NODE_H * 1.5) / ROW };
+      outlineRoots.push(buildOutline(guardOutline, whenLeft, n.nodeKey, 0, "0", cursor));
+      slot = Math.max(slot, cursor.y); // reserve the outline's vertical extent so the next sibling clears it
+    } else if (n.kind === "when" && cf.conceptName !== undefined && opts.defExpr) {
       const entry = opts.defExpr(cf.conceptLib ?? "", cf.conceptName);
       if (entry?.hasDefinedAs && entry.body) {
         const whenLeft = PAD + depth * COL;
@@ -351,6 +368,9 @@ export function renderFlowPane(
     concepts?: CrlConceptNode[];
     /** #187 Option-C: a composite `when`'s `defined as` OPERATOR tree — the SAME shared builder the Questionnaire uses. */
     defExpr?: ResolveDefExprEntry;
+    /** #224 ii.3 Todo 3: guard outline per criterion-bearing `when` (keyed by nodeKey) — hung as the operator
+     *  outline so a criterion body is visible instead of a dead-end. Built by `buildGuardOutlines` (crl core). */
+    guardOutlines?: Map<string, DefStructExpr>;
   } = {},
 ): RenderedFlow {
   const prefix = opts.revealPrefix ?? "";
@@ -366,7 +386,7 @@ export function renderFlowPane(
   }
 
   const conceptMap = new Map(concepts.map((c) => [c.nodeKey, c]));
-  const { roots, maxDepth } = buildLaid(structure, conceptMap, { defExpr: opts.defExpr });
+  const { roots, maxDepth } = buildLaid(structure, conceptMap, { defExpr: opts.defExpr, guardOutlines: opts.guardOutlines });
   const startNodeKey = roots[0]?.nodeKey; // the PRIMARY/start node — carries the chrome-mirror count badge (see below)
   let startNodeGid: string | undefined;
 
