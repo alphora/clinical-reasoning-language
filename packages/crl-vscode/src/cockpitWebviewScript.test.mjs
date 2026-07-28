@@ -344,7 +344,7 @@ check("disc 164: the diverter on/off toggle round-trips (webview [data-diverter-
 });
 
 check("#218 legend: buildTreeChromeHtml appends flowLegendChrome(mode) AFTER the banner (MV-gating lives in the exported helper)", () => {
-  assert.ok(/return progress \+ toggle \+ diverterToggle \+ banner \+ flowLegendChrome\(mode\);/.test(COCKPIT_SRC), "chrome ends with the legend, after the ⚠ gap banner");
+  assert.ok(/return progress \+ toggle \+ diverterToggle \+ exportBtn \+ banner \+ flowLegendChrome\(mode\);/.test(COCKPIT_SRC), "chrome ends with the legend, after the ⚠ gap banner (export button sits before the banner)");
   assert.ok(/import \{[^}]*flowLegendChrome[^}]*\} from "\.\/flowPaneHtml"/.test(COCKPIT_SRC), "flowLegendChrome imported from flowPaneHtml (co-located with FLOW_STYLE + the shared TOK_* consts)");
 });
 
@@ -1197,9 +1197,21 @@ check("tree-snapshot host: the capture settles on pane disposal + cockpit dispos
   assert.ok((COCKPIT_SRC.match(/snapshotCapture\.settleEmpty\(\)/g) || []).length >= 2, "settleEmpty on both disposal paths");
 });
 
-check("tree-snapshot manifest: the command is declared + wired to the navigator toolbar + the command palette", () => {
+check("tree-snapshot manifest: the command is declared + in the palette, and NOT on the navigator toolbar (operator: in the tree, not the panel)", () => {
   assert.ok(PKG.contributes.commands.some((c) => c.command === "crl.cockpit.exportTreeSnapshot"), "command declared");
   const menus = PKG.contributes.menus;
-  assert.ok(menus["view/title"].some((e) => e.command === "crl.cockpit.exportTreeSnapshot" && e.when === "view == crlCockpitNavigator"), "navigator toolbar button (view/title, gated on the navigator)");
+  assert.ok(!menus["view/title"].some((e) => e.command === "crl.cockpit.exportTreeSnapshot"), "NOT a navigator toolbar button — the trigger lives in the tree pane's own chrome");
   assert.ok(menus.commandPalette.some((e) => e.command === "crl.cockpit.exportTreeSnapshot" && e.when === "crl.active"), "command palette (crl.active)");
+});
+
+check("tree-snapshot: the trigger is an IN-PANE chrome button on the tree pane (host renders it, webview posts, host runs the command)", () => {
+  // host: the tree-chrome builder renders the export button
+  assert.match(COCKPIT_SRC, /class="fc-toggle-btn fc-export" data-export-snapshot/, "the export button is in the tree chrome");
+  assert.match(COCKPIT_SRC, /const exportBtn =/);
+  assert.match(COCKPIT_SRC, /return progress \+ toggle \+ diverterToggle \+ exportBtn \+ banner \+ flowLegendChrome/, "the button is part of the tree chrome");
+  // webview: the fcChrome click delegate posts exportSnapshot
+  assert.match(SCRIPT, /closest\('\[data-export-snapshot\]'\);.*v\.postMessage\(\{type:'exportSnapshot'\}\);return;/s);
+  // host: the exportSnapshot message (tree-only) runs the command with a catch backstop
+  assert.match(COCKPIT_SRC, /msg\.type === "exportSnapshot" && pane === "tree"/);
+  assert.match(COCKPIT_SRC, /void exportTreeSnapshot\(\)\.catch\(/);
 });

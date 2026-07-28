@@ -907,9 +907,16 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       banner =
         `<div class="fc-gaps"><div class="fc-gaps-head">Couldn't locate the CRL row for:</div>${rows}</div>`;
     }
+    // #(tree-snapshot): the export control lives HERE, in the tree pane's OWN chrome (operator: "in the MV tree, not the
+    // [navigator] panel"). A webview PANEL can't take a `view/title` toolbar button, so it's an in-pane button — always
+    // visible whenever the tree is open, in both modes (the command gates on a loaded model, not on mode). data-export-snapshot
+    // is handled by the fcChrome click delegate → posts `exportSnapshot` → the host command.
+    const exportBtn =
+      `<div class="fc-toggle fc-export-row"><button class="fc-toggle-btn fc-export" data-export-snapshot ` +
+      `title="Export this decision tree as a self-contained HTML file — pan + zoom in any browser, no VS Code">⤓ Export snapshot</button></div>`;
     // #218: the color KEY sits AFTER the banner so a transient ⚠ gap alert stays adjacent to the toggles. MV-only (the
     // helper returns "" in cockpit mode — verdict fills only paint in MV, and the operator scoped the legend to MV).
-    return progress + toggle + diverterToggle + banner + flowLegendChrome(mode);
+    return progress + toggle + diverterToggle + exportBtn + banner + flowLegendChrome(mode);
   }
 
   /** Push the current tree-pane chrome (toggle + gap banner) to the tree webview, if open. Does NOT re-render the
@@ -2086,6 +2093,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // #(tree-snapshot) Todo 2 — the tree webview's reply to `requestSnapshot` (only the TREE pane is a valid source). The
       // coordinator ignores a stale/late token; the payload is COERCED to string here + fully screened in captureTreeDom.
       snapshotCapture.resolve(msg.token, typeof msg.html === "string" ? msg.html : undefined);
+    } else if (msg.type === "exportSnapshot" && pane === "tree") {
+      // #(tree-snapshot): the in-pane "⤓ Export snapshot" chrome button (tree pane only) → the host command.
+      void exportTreeSnapshot().catch((e) => vscode.window.showErrorMessage(`Tree snapshot: ${e instanceof Error ? e.message : String(e)}`));
     } else if (msg.type === "worklistFilterToggle") {
       toggleWorklistFilter(msg.state); // #214: toggle a verdict in/out of the worklist filter (host validates the state)
     } else if (msg.type === "notesToggle" && typeof msg.key === "string") {
@@ -4318,6 +4328,9 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(dv){v.postMessage({type:'diverterToggle',on:dv.getAttribute('data-diverter-toggle')});return;}` +
   `const gap=e.target.closest&&e.target.closest('[data-fc-gap]');` +
   `if(gap){v.postMessage({type:'fcOpenSource',idx:Number(gap.getAttribute('data-fc-gap'))});return;}` +
+  // #(tree-snapshot): the in-pane "Export snapshot" button → the host command.
+  `const xs=e.target.closest&&e.target.closest('[data-export-snapshot]');` +
+  `if(xs){v.postMessage({type:'exportSnapshot'});return;}` +
   // #203 Todo 4: the flag badge / mvComplete gate → open the review-flag list.
   `const fl=e.target.closest&&e.target.closest('[data-mv-flags]');` +
   `if(fl)v.postMessage({type:'mvFlags'});});` +

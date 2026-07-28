@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL→CQL + CEL→FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "4.92.10",
+  "version": "4.92.11",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.95.0"
@@ -252,11 +252,6 @@
           "command": "crl.cockpit.toggleKeys",
           "when": "view == crlCockpitNavigator",
           "group": "navigation@4"
-        },
-        {
-          "command": "crl.cockpit.exportTreeSnapshot",
-          "when": "view == crlCockpitNavigator",
-          "group": "navigation@5"
         }
       ],
       "commandPalette": [
