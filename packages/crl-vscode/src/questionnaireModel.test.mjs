@@ -1212,10 +1212,16 @@ first:
   const q = buildQuestionnaire(sv, booleanResolver, rootLib);
   const when = q.questions.find((x) => x.rowKind === "when-evaluated");
   assert.equal(when.expansion.kind, "not", "the criterion expanded under the `not`");
-  const orBox = when.expansion.operand;
-  assert.equal(orBox.kind, "or", "criterion body `(A or B)` inlined as an ANY OF box");
+  // #224 ii.3: the criterion boundary now wraps its body in a COLLAPSIBLE `criterion` node (name + parity-aware
+  // blocking), and the `(A or B)` ANY OF box lives inside its `body`.
+  const crit = when.expansion.operand;
+  assert.equal(crit.kind, "criterion", "the `Excluded` criterion is a named wrapper under the `not`");
+  assert.equal(crit.name, "Excluded");
+  assert.ok(crit.blocking, "the ESTABLISHED criterion (Excluded true) blocks `not Excluded` — collapsed blocker reads red");
+  const orBox = crit.body;
+  assert.equal(orBox.kind, "or", "criterion body `(A or B)` inlined as an ANY OF box inside the wrapper");
   const [la, lb] = orBox.operands;
-  assert.ok(la.answer === "yes" && la.blocking, "A established → the disjunct that blocks the negation");
+  assert.ok(la.answer === "yes" && la.blocking, "A established → the disjunct that blocks the negation (nested red chain)");
   assert.ok(!lb.blocking, "B (absent) did not witness → informational");
 });
 
@@ -1344,4 +1350,177 @@ case "c":
   assert.ok(!byName.Comp.blocking, "Comp held → not blocking");
   assert.ok(byName.Comp.composite.operands.every((o) => !o.blocking), "a `defined as` body never carries guard-blocking marks");
   assert.ok(byName.B.blocking, "B false → the blocking conjunct"); assert.equal(byName.B.answer, "no");
+});
+
+// ── #224 ii.3 — a criterion boundary renders as a COLLAPSIBLE `criterion` node in the guard box ──────────
+const CRIT_CRL = `library "Crit".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+concept "C":
+- type is Condition.
+- code is \`c\`.
+criterion "Eligible":
+- when ( "A" and "B" ).
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "D":
+first:
+- when ( "C" and "Eligible" ) then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+// facts: C + A present, B absent → Eligible=(A and B) false → guard (C and Eligible) false → Deny (otherwise).
+const critCel = (codes) => `library "Cases".
+covers "Crit".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+${codes.map((c) => `fact "f${c}":\n- code is "http://e|${c.toLowerCase()}".\n- date is "2026-01-01".\n- defined by "${c}".`).join("\n")}
+case "c":
+- subject is "Pat".
+${codes.map((c) => `- fact is "f${c}".`).join("\n")}
+- result is "D" is "Deny".`;
+
+check("ii.3: a criterion in a compound guard → a `criterion` wrapper node (name + body atoms), parity-aware blocking", () => {
+  const { sv, rootLib } = renderCase({ "c.crl": CRIT_CRL, "c.cel": critCel(["C", "A"]) }, "c.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.expansionKind, "guard");
+  assert.equal(when.expansion.kind, "and", "top guard `C and Eligible` → ALL OF");
+  const [c, crit] = when.expansion.operands;
+  assert.equal(c.kind, "leaf"); assert.equal(c.name, "C"); assert.ok(!c.blocking, "C satisfied → informational");
+  assert.equal(crit.kind, "criterion", "the `Eligible` criterion is a named collapsible wrapper");
+  assert.equal(crit.name, "Eligible");
+  assert.equal(crit.answer, "no", "Eligible = (A and B) is false");
+  assert.ok(crit.blocking, "Eligible is the false conjunct of the ALL OF → COLLAPSED blocker reads red");
+  assert.equal(crit.body.kind, "and", "criterion body `A and B` stays inside the wrapper");
+  const [la, lb] = crit.body.operands;
+  assert.ok(!la.blocking, "A established → informational"); assert.equal(la.answer, "yes");
+  assert.ok(lb.blocking, "B absent → the nested blocking atom (red chain)"); assert.equal(lb.answer, "no");
+});
+
+check("ii.3: a SINGLE-ATOM sole-ref criterion `when Eligible2` routes through the guard box (row = criterion NAME)", () => {
+  const crl = CRIT_CRL.replace('criterion "Eligible":\n- when ( "A" and "B" ).', 'criterion "Eligible2":\n- when ( "A" ).')
+    .replace('( "C" and "Eligible" )', '"Eligible2"');
+  const { sv, rootLib } = renderCase({ "c.crl": crl, "c.cel": critCel([]) }, "c.cel", "c"); // A absent → Eligible2 false → Deny
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.conceptName, "Eligible2", "the row reads the criterion NAME, not the lone atom A");
+  assert.equal(when.expansionKind, "guard", "a marked sole-ref takes the guard-box path, not attachExpansion");
+  assert.equal(when.expansion.kind, "criterion");
+  assert.equal(when.expansion.name, "Eligible2");
+  assert.equal(when.expansion.body.kind, "leaf", "its one atom lives inside the wrapper");
+  assert.equal(when.expansion.body.name, "A");
+});
+
+check("ii.3: a NESTED criterion wraps recursively (Outer contains Inner)", () => {
+  const crl = `library "Crit".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+concept "C":
+- type is Condition.
+- code is \`c\`.
+criterion "Inner":
+- when ( "A" or "B" ).
+criterion "Outer":
+- when ( "C" and "Inner" ).
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "D":
+first:
+- when "Outer" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+  const { sv, rootLib } = renderCase({ "c.crl": crl, "c.cel": critCel([]) }, "c.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  assert.equal(when.expansion.kind, "criterion"); assert.equal(when.expansion.name, "Outer");
+  assert.equal(when.expansion.body.kind, "and");
+  const inner = when.expansion.body.operands.find((o) => o.kind === "criterion");
+  assert.ok(inner, "Inner is a nested `criterion` wrapper inside Outer's body");
+  assert.equal(inner.name, "Inner");
+  assert.equal(inner.body.kind, "or", "Inner body `A or B` inside the nested wrapper");
+});
+
+check("ii.3: a PREEMPTED criterion guard → answer 'unknown', NEVER blocking (never evaluated)", () => {
+  const crl = `library "Crit".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+criterion "Eligible":
+- when ( "A" and "B" ).
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "D":
+first:
+- when "A" then recommend activity "Approve".
+- when "Eligible" then recommend activity "Deny".
+- otherwise then recommend activity "Deny".`;
+  // A present → branch 0 matches → branch 1 (`when Eligible`) PREEMPTED.
+  const { sv, rootLib } = renderCase({ "c.crl": crl, "c.cel": critCel(["A"]) }, "c.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const preempted = q.questions.find((x) => x.rowKind === "when-preempted");
+  assert.equal(preempted.conceptName, "Eligible");
+  assert.equal(preempted.expansion.kind, "criterion");
+  assert.equal(preempted.expansion.answer, "unknown", "preempted → never evaluated → unknown");
+  assert.ok(!preempted.expansion.blocking, "a preempted criterion is informational, never a blocker");
+});
+
+check("ii.3: a false criterion under a SATISFIED `or` is INFORMATIONAL, never blocking (underSatisfiedOr)", () => {
+  const crl = `library "Crit".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+concept "C":
+- type is Condition.
+- code is \`c\`.
+concept "D2":
+- type is Condition.
+- code is \`d\`.
+criterion "Eligible":
+- when ( "A" and "B" ).
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "D":
+first:
+- when ( ( "C" or "Eligible" ) and "D2" ) then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+  // C present, D2 absent → (C or Eligible) is TRUE via C; D2 false → guard false. Eligible is false UNDER the satisfied
+  // `or` → informational; D2 is the real blocker.
+  const { sv, rootLib } = renderCase({ "c.crl": crl, "c.cel": critCel(["C"]) }, "c.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const when = q.questions.find((x) => x.rowKind === "when-evaluated");
+  const [orBox, d2] = when.expansion.operands;
+  const crit = orBox.operands.find((o) => o.kind === "criterion");
+  assert.equal(crit.name, "Eligible"); assert.equal(crit.answer, "no");
+  assert.ok(!crit.blocking, "Eligible false UNDER a satisfied `or` → informational, NOT a folded red blocker");
+  assert.ok(d2.blocking, "D2 is the actual blocker"); assert.equal(d2.name, "D2");
 });

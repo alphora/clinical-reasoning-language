@@ -866,3 +866,152 @@ case "onlyA":
   assert.match(r.html, /q-box q-box-and/, "A and B → ALL OF box");
   assert.match(r.html, /q-exp-leaf[^"]*q-blocking/, "the blocking false atom is marked");
 });
+
+// ── #224 ii.3 — a criterion boundary renders as a CSP-safe collapsible <details> ─────────────────────────
+test("ii.3 render: a failed criterion → <details class=q-criterion> COLLAPSED, red summary + tooltip, no nested <li>", () => {
+  const crl = `library "Crit".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+concept "C":
+- type is Condition.
+- code is \`c\`.
+criterion "Eligible":
+- when ( "A" and "B" ).
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "D":
+first:
+- when ( "C" and "Eligible" ) then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+  const cel = `library "Cases".
+covers "Crit".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fC":
+- code is "http://e|c".
+- date is "2026-01-01".
+- defined by "C".
+case "c":
+- subject is "Pat".
+- fact is "fC".
+- result is "D" is "Deny".`;
+  const { sv, rootLib } = renderCase({ "c.crl": crl, "c.cel": cel }, "c.cel", "c");
+  const { html } = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g_" });
+  // The criterion is a <details> — COLLAPSED (no `open` attr in the payload).
+  assert.match(html, /<details class="q-criterion q-crit-blocking" title="this criterion blocked the branch">/, "failed criterion → red collapsible with a tooltip");
+  assert.ok(!/<details[^>]*\bopen\b/.test(html), "collapsed by default (no open attr)");
+  // The summary carries the criterion NAME + its answer.
+  assert.match(html, /<summary class="q-crit-summary"><span class="q-prompt"><span class="q-concept">Eligible<\/span>\?<\/span>/, "summary shows the criterion name");
+  // The atoms live INSIDE the details body (not folded away from the DOM — just visually collapsed).
+  assert.match(html, /<div class="q-crit-body">.*<span class="q-concept">A<\/span>/s, "body carries the atoms");
+  // Slicing invariant (STRONG): NO <li> anywhere inside the whole guard-expansion <li> — its own `</li>` is the first
+  // one after the opener (the expansion emits only <details>/<summary>/<div>), so a non-greedy capture is exact here.
+  const gx = html.match(/<li class="q-exp q-guard-exp">([\s\S]*?)<\/li>/);
+  assert.ok(gx, "guard expansion <li> present");
+  assert.ok(!/<li\b/.test(gx[1]), "no <li> anywhere inside the guard-exp <li> (flat q-item slicing can't be reached)");
+});
+
+test("ii.3 render: a NESTED criterion → a <details> INSIDE a <details>, both collapsed", () => {
+  const crl = `library "Crit".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+concept "C":
+- type is Condition.
+- code is \`c\`.
+criterion "Inner":
+- when ( "A" or "B" ).
+criterion "Outer":
+- when ( "C" and "Inner" ).
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "D":
+first:
+- when "Outer" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+  const cel = `library "Cases".
+covers "Crit".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+case "c":
+- subject is "Pat".
+- result is "D" is "Deny".`;
+  const { sv, rootLib } = renderCase({ "c.crl": crl, "c.cel": cel }, "c.cel", "c");
+  const { html } = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g_" });
+  // Outer's <details> body contains Inner's <details> — a nested collapsible. Two criteria total; Inner's opener sits
+  // strictly between Outer's opener and Outer's (last) closer → genuinely nested, not a sibling.
+  const dCount = [...html.matchAll(/<details class="q-criterion/g)].length;
+  assert.equal(dCount, 2, "Outer + Inner → two criterion <details>");
+  const outerOpen = html.indexOf('<details class="q-criterion');
+  const innerOpen = html.indexOf('<details class="q-criterion', outerOpen + 1);
+  const outerClose = html.lastIndexOf("</details>");
+  assert.ok(innerOpen > outerOpen && innerOpen < outerClose, "Inner <details> opens INSIDE Outer (nested)");
+  assert.match(html, /q-concept">Outer[\s\S]*q-concept">Inner/, "Outer named before Inner");
+  assert.ok(!/<details[^>]*\bopen\b/.test(html), "both collapsed by default");
+  const gx = html.match(/<li class="q-exp q-guard-exp">([\s\S]*?)<\/li>/);
+  assert.ok(gx && !/<li\b/.test(gx[1]), "nested details still emit no <li>");
+});
+
+test("ii.3 render: a SATISFIED/informational criterion → plain (not red) collapsed <details>", () => {
+  const crl = `library "Crit".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+criterion "Eligible":
+- when ( "A" and "B" ).
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "D":
+first:
+- when "Eligible" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+  const cel = `library "Cases".
+covers "Crit".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fA":
+- code is "http://e|a".
+- date is "2026-01-01".
+- defined by "A".
+fact "fB":
+- code is "http://e|b".
+- date is "2026-01-01".
+- defined by "B".
+case "c":
+- subject is "Pat".
+- fact is "fA".
+- fact is "fB".
+- result is "D" is "Approve".`;
+  const { sv, rootLib } = renderCase({ "c.crl": crl, "c.cel": cel }, "c.cel", "c");
+  const { html } = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g_" });
+  assert.match(html, /<details class="q-criterion">/, "satisfied criterion → plain collapsible (no q-crit-blocking)");
+  assert.ok(!/q-crit-blocking/.test(html), "a held criterion carries no blocking style");
+});

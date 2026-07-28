@@ -176,6 +176,17 @@ function renderQExpr(e: QExpr): string {
       return `<div class="q-exp-leaf q-external" title="a cross-library concept — not evaluated here"><span class="q-prompt"><span class="q-concept">${escapeHtml(e.name)}</span>?</span><span class="q-ext-mark">(external)</span></div>`;
     case "more":
       return `<div class="q-more">${e.count > 0 ? `+${e.count} more` : "…"}</div>`;
+    case "criterion": {
+      // #224 ii.3: a criterion boundary → a native <details> (COLLAPSED by default — no `open`), CSP-safe (no inline
+      // JS, no nested <li>: <details>/<summary>/<div> only, so the flat q-item slicing can't reach in). The <summary>
+      // is the focusable, keyboard-toggleable header carrying the criterion NAME + its Yes/No answer; a `blocking`
+      // criterion styles the summary red + a tooltip, so a COLLAPSED blocker still reads (the sub-criteria fold away).
+      const cls = e.blocking ? "q-criterion q-crit-blocking" : "q-criterion";
+      const blkTitle = e.blocking ? ` title="this criterion blocked the branch"` : "";
+      const summary =
+        `<summary class="q-crit-summary"><span class="q-prompt"><span class="q-concept">${escapeHtml(e.name)}</span>?</span>${renderExpOpts(e.answer)}</summary>`;
+      return `<details class="${cls}"${blkTitle}>${summary}<div class="q-crit-body">${renderQExpr(e.body)}</div></details>`;
+    }
   }
 }
 
@@ -411,4 +422,20 @@ export const QUESTIONNAIRE_STYLE =
   `.q-layer{display:inline-block;min-width:13px;text-align:center;font:700 9px/1 var(--vscode-editor-font-family,monospace);color:var(--vscode-descriptionForeground,#8c8c8c);background:var(--vscode-editorWidget-background,#2b2b2e);border:1px solid var(--vscode-panel-border,#454545);border-radius:3px;padding:1px 3px;margin-right:7px;vertical-align:middle}` +
   `.q-external{opacity:.75;font-style:italic}` +
   `.q-ext-mark{font-size:.75em;opacity:.7;margin-left:6px}` +
-  `.q-more{font-size:.8em;opacity:.6;font-style:italic;padding:2px 0 2px 2px}`;
+  `.q-more{font-size:.8em;opacity:.6;font-style:italic;padding:2px 0 2px 2px}` +
+  // #224 ii.3: the collapsible CRITERION boundary — a named reusable guard you can open. A `<details>` with a distinct
+  // left rail (so it reads apart from the static ANY OF/ALL OF `.q-box`); the `<summary>` KEEPS `display:list-item` so
+  // the native disclosure triangle (the "openable" affordance) survives — layout is by INLINE elements, never `flex`
+  // on the summary (which would drop the ::marker). Collapsed by default (no `open` attr in the payload).
+  `.q-criterion{margin:4px 0 6px;border:1px solid var(--vscode-panel-border,#454545);border-left:3px solid var(--vscode-charts-blue,#3794ff);border-radius:0 6px 6px 6px;background:var(--vscode-editor-background,#1e1e1e)}` +
+  // `display:list-item` is EXPLICIT (not left to the UA default) so the native disclosure triangle — the "openable"
+  // affordance — cannot be silently dropped by a future CSS reset. No `user-select:none`: the criterion name is a
+  // reviewer-facing string worth copying.
+  `.q-crit-summary{cursor:pointer;padding:3px 6px 3px 8px;display:list-item;list-style-position:inside}` +
+  `.q-crit-summary:focus-visible{outline:1px solid var(--vscode-focusBorder,#3794ff);outline-offset:-1px}` +
+  `.q-crit-summary .q-concept{color:var(--vscode-charts-blue,#3794ff)}` + // the criterion NAME reads as the guard accent, not the purple concept channel
+  `.q-crit-body{padding:3px 8px 5px 14px;border-top:1px solid var(--vscode-panel-border,#454545)}` +
+  // a COLLAPSED blocking criterion: red rail + a red-tinted ANSWER chip (the "No", or the "Yes" under a negated guard)
+  // so the folded blocker is visible without expanding.
+  `.q-crit-blocking{border-left-color:var(--vscode-editorError-foreground,#f14c4c)}` +
+  `.q-crit-blocking>.q-crit-summary .q-opt-answer{background:rgba(241,76,76,.18);border-color:var(--vscode-editorError-foreground,#f14c4c)}`;
