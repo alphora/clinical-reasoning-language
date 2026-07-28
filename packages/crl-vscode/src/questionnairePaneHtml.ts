@@ -177,10 +177,12 @@ function renderQExpr(e: QExpr): string {
     case "more":
       return `<div class="q-more">${e.count > 0 ? `+${e.count} more` : "…"}</div>`;
     case "criterion": {
-      // #224 ii.3: a criterion boundary → a native <details> (COLLAPSED by default — no `open`), CSP-safe (no inline
-      // JS, no nested <li>: <details>/<summary>/<div> only, so the flat q-item slicing can't reach in). The <summary>
-      // is the focusable, keyboard-toggleable header carrying the criterion NAME + its Yes/No answer; a `blocking`
-      // criterion styles the summary red + a tooltip, so a COLLAPSED blocker still reads (the sub-criteria fold away).
+      // #224 ii.3: a criterion boundary → a native <details> COLLAPSED by default. The problem being solved is that a
+      // reused criterion (e.g. `Meets TAR` in 3 branches) expanded inline BURIES the rest of the decision tree below its
+      // tall body — collapse folds it to one row so the following branches show. It stays FOLDABLE (expand to validate
+      // the sub-criteria). CSP-safe (no inline JS; only <details>/<summary>/<div>, so the flat q-item slicing can't reach
+      // in). The <summary> is the focusable, keyboard-toggleable header carrying the criterion NAME + its Yes/No answer;
+      // a `blocking` criterion styles the summary red + a tooltip so a COLLAPSED blocker still reads.
       const cls = e.blocking ? "q-criterion q-crit-blocking" : "q-criterion";
       const blkTitle = e.blocking ? ` title="this criterion blocked the branch"` : "";
       const summary =

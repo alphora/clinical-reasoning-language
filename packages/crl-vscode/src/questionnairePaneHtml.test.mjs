@@ -907,8 +907,8 @@ case "c":
 - result is "D" is "Deny".`;
   const { sv, rootLib } = renderCase({ "c.crl": crl, "c.cel": cel }, "c.cel", "c");
   const { html } = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g_" });
-  // The criterion is a <details> — COLLAPSED (no `open` attr in the payload).
-  assert.match(html, /<details class="q-criterion q-crit-blocking" title="this criterion blocked the branch">/, "failed criterion → red collapsible with a tooltip");
+  // The criterion is a <details> — COLLAPSED by default (folds the reused branch so the rest of the tree shows), foldable.
+  assert.match(html, /<details class="q-criterion q-crit-blocking" title="this criterion blocked the branch">/, "failed criterion → red foldable, collapsed, with a tooltip");
   assert.ok(!/<details[^>]*\bopen\b/.test(html), "collapsed by default (no open attr)");
   // The summary carries the criterion NAME + its answer.
   assert.match(html, /<summary class="q-crit-summary"><span class="q-prompt"><span class="q-concept">Eligible<\/span>\?<\/span>/, "summary shows the criterion name");
@@ -966,7 +966,7 @@ case "c":
   const outerClose = html.lastIndexOf("</details>");
   assert.ok(innerOpen > outerOpen && innerOpen < outerClose, "Inner <details> opens INSIDE Outer (nested)");
   assert.match(html, /q-concept">Outer[\s\S]*q-concept">Inner/, "Outer named before Inner");
-  assert.ok(!/<details[^>]*\bopen\b/.test(html), "both collapsed by default");
+  assert.ok(!/<details[^>]*\bopen\b/.test(html), "collapsed by default; nested details also collapsed");
   const gx = html.match(/<li class="q-exp q-guard-exp">([\s\S]*?)<\/li>/);
   assert.ok(gx && !/<li\b/.test(gx[1]), "nested details still emit no <li>");
 });
@@ -1012,6 +1012,6 @@ case "c":
 - result is "D" is "Approve".`;
   const { sv, rootLib } = renderCase({ "c.crl": crl, "c.cel": cel }, "c.cel", "c");
   const { html } = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g_" });
-  assert.match(html, /<details class="q-criterion">/, "satisfied criterion → plain collapsible (no q-crit-blocking)");
+  assert.match(html, /<details class="q-criterion">/, "satisfied criterion → plain foldable (collapsed, no q-crit-blocking)");
   assert.ok(!/q-crit-blocking/.test(html), "a held criterion carries no blocking style");
 });
