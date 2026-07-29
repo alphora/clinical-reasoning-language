@@ -12,7 +12,11 @@ library CaseFeatureCommon version '1.0.0'
  * and is empty otherwise. Truth-sets compose with CQL's list set operators:
  *   - `sem-or`  → `union`
  *   - `sem-and` → `intersect`
- *   - `sem-not` → `except`
+ *   - `sem-not` → `except` — from a positive base (`A sem-and sem-not B` → `A
+ *     except B`); a NO-BASE `sem-not` (standalone, or a `sem-or` term) negates
+ *     from the unit universe: `sem-not X` → `({ true } except (X))` (#232). On
+ *     singleton/empty truth-sets `except` is exactly closed-world `and not`, so
+ *     `{ true } except X` is `{ true }` iff X is not established.
  * `satisfied` collapses a truth-set back to a boolean for the Interface layer.
  *
  * Both functions are FLUENT, so call sites invoke them method-style

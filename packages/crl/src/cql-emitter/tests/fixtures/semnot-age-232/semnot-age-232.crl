@@ -1,0 +1,26 @@
+library "Semnot Age 232".
+
+// Mirrors the IEHP #232 real artifact: an under-21 gate = sem-not over the
+// sanctioned patient-age both-representation (recency) concept.
+concept "Age 21 Or Older":
+- type is Observation.
+- value type is boolean.
+- code is `age-21-or-older`.
+- definition is age today at least 21 years.
+
+concept "Under Age 21":
+- type is Observation.
+- value type is boolean.
+- defined as ( sem-not "Age 21 Or Older" ).
+
+decision "Eligibility":
+first:
+- when "Under Age 21" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
+
+activity "certify.Approve":
+- request CPGCommunicationRequest.
+- with `Eligibility: APPROVE / under 21.`.
+activity "not-certify.Deny":
+- request CPGCommunicationRequest.
+- with `Eligibility: DENY / 21 or older.`.

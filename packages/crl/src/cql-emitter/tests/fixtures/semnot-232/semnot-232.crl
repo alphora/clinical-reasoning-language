@@ -1,0 +1,42 @@
+# Issue #232 — sem-not lowering in the code-is truth-set lane.
+library "Semnot 232".
+
+concept "Alpha":
+- type is Observation.
+- value type is boolean.
+- code is `alpha`.
+
+concept "Beta":
+- type is Observation.
+- value type is boolean.
+- code is `beta`.
+
+// Standalone no-base sem-not → ({ true } except (Alpha)).
+concept "Not Alpha":
+- type is Observation.
+- value type is boolean.
+- defined as ( sem-not "Alpha" ).
+
+// sem-not as a sem-or term → Beta union ({ true } except (Alpha)).
+concept "Beta Or Not Alpha":
+- type is Observation.
+- value type is boolean.
+- defined as ( "Beta" sem-or sem-not "Alpha" ).
+
+// All-negative sem-and → ({ true } except (Alpha)) intersect ({ true } except (Beta)).
+concept "Neither Alpha Nor Beta":
+- type is Observation.
+- value type is boolean.
+- defined as ( sem-not "Alpha" sem-and sem-not "Beta" ).
+
+// Positive-anchored (regression) → Beta except Alpha (UNCHANGED).
+concept "Beta And Not Alpha":
+- type is Observation.
+- value type is boolean.
+- defined as ( "Beta" sem-and sem-not "Alpha" ).
+
+// Grouped positive-anchored negative (Claude #7) → Beta except Alpha (byte-identical to ungrouped).
+concept "Beta And Grouped Not Alpha":
+- type is Observation.
+- value type is boolean.
+- defined as ( "Beta" sem-and ( sem-not "Alpha" ) ).

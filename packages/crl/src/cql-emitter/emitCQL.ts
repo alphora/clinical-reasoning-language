@@ -619,6 +619,12 @@ class Emitter {
   private readonly conceptBodyKind: Map<string, ConceptDefinition["type"]> = new Map();
   /** For defined-as concepts, the body so we can recurse for shape. */
   private readonly conceptBody: Map<string, ConceptDefinition> = new Map();
+  /**
+   * Issue #232 — the Concept object by name, so the `sem-not` operand-flavor
+   * classifier can read lowering markers (`__bothRepMerge === "recency"` →
+   * patient-age truth-set) that live on the Concept, not its definition.
+   */
+  private readonly conceptByName: Map<string, Concept> = new Map();
   /** Terminology emit name (may differ from CRL name when disambiguated). */
   private readonly terminologyEmitName: Map<string, string> = new Map();
   /**
@@ -651,9 +657,12 @@ class Emitter {
    * The clean error channel reachable from deep in the emit walk (e.g.
    * `emitTerminologyLine` discovering a codesystem decl name bound to two
    * conflicting urls). `emitCQLFromAST` drains this via `getEmitErrors()`
-   * and folds it into `EmitResult.errors`, forcing `success: false`. Unlike
-   * unmatched narratives these carry NO compile-failing sentinel — the
-   * emitted CQL is otherwise well-formed.
+   * and folds it into `EmitResult.errors`, forcing `success: false`. Most of
+   * these carry NO compile-failing sentinel — the emitted CQL is otherwise
+   * well-formed. EXCEPTION: `refuseNegation` (#232) pushes an
+   * `emit-unlowerable-negation` error AND emits a compile-failing
+   * `CRLCommon.UnsupportedNegation(…)` sentinel, since the alternative is a
+   * silently-wrong (unnegated) body.
    */
   private readonly emitErrors: CRLError[] = [];
 
@@ -761,6 +770,7 @@ class Emitter {
     for (const stmt of this.ast.statements) {
       if (stmt.type === "Concept" && stmt.name) {
         this.conceptNames.add(stmt.name);
+        this.conceptByName.set(stmt.name, stmt);
         this.conceptType.set(stmt.name, stmt.conceptType);
         this.conceptValuetype.set(stmt.name, stmt.valueTypes?.[0]);
         if (stmt.definition) {
@@ -1484,12 +1494,16 @@ class Emitter {
       case "CompositionGroup":
         return `(${this.emitComposition(expr.expression, shape)})`;
       case "SemNotExpression":
-        // Standalone sem-not. For boolean: `not (X)`. For refinement: there's
-        // no good standalone meaning ("exclude X from what?"); FIXME comment.
+        // No-base sem-not (standalone, or a `sem-or`/union term — a positive-
+        // anchored `sem-and` negative is unwrapped to `except` in `emitSemAnd`
+        // and never reaches here). Boolean lane: `not (X)`. Refinement lane
+        // (#232): the closed-world complement `({ true } except (X))` when the
+        // operand is a truth-set; loud-refuse otherwise (a resource-list
+        // complement has no universe). See `emitNoBaseNegation`.
         if (shape === "boolean") {
           return `not (${this.emitComposition(expr.expression, shape)})`;
         }
-        return `// FIXME: standalone sem-not in refinement context\n${this.emitComposition(expr.expression, shape)}`;
+        return this.emitNoBaseNegation(expr.expression, expr);
       case "SemAndExpression":
         return this.emitSemAnd(expr.terms, shape);
       case "SemOrExpression":
@@ -1508,17 +1522,181 @@ class Emitter {
         .join("\n  and ");
     }
     const positives: CompositionExpression[] = [];
-    const negatives: CompositionExpression[] = [];
+    const negatives: Array<{ operand: CompositionExpression; node: CompositionExpression }> = [];
     for (const t of terms) {
-      if (t.type === "SemNotExpression") negatives.push(t.expression);
+      // #232 — a `sem-not` term contributes its OPERAND as a negative. Unwrap a
+      // parenthesized `(sem-not B)` (any depth) too, so `A sem-and (sem-not B)`
+      // is byte-identical to `A sem-and sem-not B` (both `A except B`) rather
+      // than recursing the group into the no-base path. `node` is the `sem-not`
+      // itself, for the refusal diagnostic's source location.
+      const neg = asSemNotOperand(t);
+      if (neg !== null) negatives.push(neg);
       else positives.push(t);
     }
-    const pos = positives.length
-      ? positives.map((t) => this.emitComposition(t, shape)).join("\n  intersect ")
-      : "{}";
+    if (positives.length === 0) {
+      // No positive base to `except` from: each negative is the closed-world
+      // complement from the unit universe `{ true }` (`emitNoBaseNegation`
+      // gates truth-set flavor / loud-refuses). AND of complements = intersect.
+      // (Previously `{} except (…)` — always empty, a silent bug.)
+      return negatives
+        .map((n) => this.emitNoBaseNegation(n.operand, n.node))
+        .join("\n  intersect ");
+    }
+    const pos = positives.map((t) => this.emitComposition(t, shape)).join("\n  intersect ");
     if (negatives.length === 0) return pos;
-    const neg = negatives.map((t) => this.emitComposition(t, shape)).join("\n  except ");
+    // Positive-anchored: `except` each negative operand from the base. NOTE: this
+    // path does NOT classify the negative — a resource-list negative emits
+    // `base except R` and fails only downstream at CQL translation (a type error),
+    // without the source-located CRL error the no-base path gives. Pre-existing
+    // asymmetry; tracked by the #235 silent-FIXME audit.
+    const neg = negatives.map((n) => this.emitComposition(n.operand, shape)).join("\n  except ");
     return `${pos}\n  except ${neg}`;
+  }
+
+  /**
+   * Issue #232 — lower a NO-BASE `sem-not` operand to the closed-world truth-set
+   * complement. In the truth-set lane every value is `{ true }` (established) or
+   * `{}` (not established), so `{ true } except (X)` is `{ true }` iff X is not
+   * established — the missing standalone-complement operator, expressed with the
+   * native `except` (no new fluent helper, no shared-library version bump). The
+   * result is PARENTHESISED because `union`/`except`/`intersect` share precedence
+   * and left-associate: as a `sem-or` term, `B union ({ true } except (A))` must
+   * not degrade to `(B union { true }) except A`.
+   *
+   * Loud-refuse when the operand is NOT a truth-set (a `List<Resource>` complement
+   * has no bounded universe): push an `emit-unlowerable-negation` hardError
+   * (forces `success: false`, keeps `result`) AND emit a compile-failing
+   * `CRLCommon.UnsupportedNegation(…)` sentinel — mirroring the #79 unmatched-
+   * narrative mechanism so the artifact can never silently ship inverted.
+   */
+  private emitNoBaseNegation(
+    operand: CompositionExpression,
+    node: CompositionExpression
+  ): string {
+    const flavor = this.classifyNegationOperand(operand);
+    if (flavor !== "truth-set") {
+      return this.refuseNegation(node, flavor);
+    }
+    return `({ true } except (${this.emitComposition(operand, "refinement")}))`;
+  }
+
+  /**
+   * The message distinguishes the two unlowerable flavors — a `resource-list`
+   * (`coded from`) operand genuinely has no complement universe, whereas
+   * `unknown` means the operand's truth-representation could not be established
+   * locally (cross-library/foreign operand, a `definition is` predicate, or a
+   * cyclic definition). Reporting both as "resource-list" would misdescribe the
+   * latter and suggest an irrelevant remedy.
+   */
+  private refuseNegation(
+    node: CompositionExpression,
+    flavor: "resource-list" | "unknown"
+  ): string {
+    const loc = node.location?.start;
+    const cause =
+      flavor === "resource-list"
+        ? "has a resource-list (`coded from`) operand, which has no bounded universe to negate against"
+        : "has an operand whose truth-representation could not be established locally (a cross-library/foreign operand, a `definition is` predicate, or a cyclic definition)";
+    this.emitErrors.push({
+      type: "Validation",
+      kind: "emit-unlowerable-negation",
+      line: loc?.line ?? 0,
+      column: loc?.column ?? 0,
+      message:
+        `\`sem-not\` ${cause}, so this \`defined as\` cannot be lowered to CQL. ` +
+        "Express it as a positive-anchored `A sem-and sem-not B` (list refinement " +
+        "over a base), or move the negation to the decision layer (`not`). The " +
+        "emitted CQL carries a compile-failing CRLCommon.UnsupportedNegation(…) " +
+        "sentinel so it cannot silently ship.",
+    });
+    const note =
+      flavor === "resource-list"
+        ? "resource-list operand has no complement universe"
+        : "operand flavor could not be established";
+    return (
+      `// FIXME: unlowerable sem-not — ${note}\n` +
+      `CRLCommon.UnsupportedNegation('sem-not operand flavor: ${flavor}')`
+    );
+  }
+
+  /**
+   * Issue #232 — classify a `sem-not` operand's truth-representation. PURE: no
+   * diagnostics pushed (unlike `emitTruthSetRef`, whose RecordSource branch
+   * pushes an error), so classification never double-fires or spuriously fires
+   * a mixed-source diagnostic. `truth-set` → complement lowers; anything else →
+   * loud-refuse. Deliberately conservative: an operand whose flavor cannot be
+   * established locally is `unknown` → loud-refuse (never a silent inversion).
+   */
+  private classifyNegationOperand(
+    expr: CompositionExpression,
+    visiting: ReadonlySet<string> = new Set()
+  ): "truth-set" | "resource-list" | "unknown" {
+    switch (expr.type) {
+      case "CompositionRef":
+        return this.classifyRefFlavor(expr.ref, visiting);
+      case "CompositionGroup":
+        return this.classifyNegationOperand(expr.expression, visiting);
+      case "SemNotExpression":
+        // Double negation: complement of a complement — same flavor as the operand.
+        return this.classifyNegationOperand(expr.expression, visiting);
+      case "SemAndExpression":
+      case "SemOrExpression":
+        return combineFlavors(
+          expr.terms.map((t) => this.classifyNegationOperand(t, visiting))
+        );
+    }
+  }
+
+  private classifyRefFlavor(
+    ref: ReferenceName,
+    visiting: ReadonlySet<string>
+  ): "truth-set" | "resource-list" | "unknown" {
+    // No case-feature model (`off` lane): the truth-set representation does not
+    // exist here, so the operand's flavor is unmodeled → `unknown` → loud-refuse.
+    if (this.caseFeature.kind === "off") return "unknown";
+    const cf = this.caseFeature;
+    const name = getRefName(ref);
+    const lib = getRefLibrary(ref);
+    if (lib === null) {
+      // Bare → same-layer Inferred sibling; recurse into its declaration.
+      if (!this.conceptNames.has(name)) return "unknown";
+      return this.classifyConceptFlavor(name, visiting);
+    }
+    if (lib === cf.localSourceLibrary) return "truth-set"; // `.asTruths()` leaf
+    if (lib === cf.inferredLibrary) return this.classifyConceptFlavor(name, visiting);
+    if (cf.recordSourceLibrary !== undefined && lib === cf.recordSourceLibrary) {
+      return "resource-list"; // `coded from` retrieve
+    }
+    // Foreign library — flavor not locally knowable (a cross-library operand
+    // loses its declared-shape info, per the cross-library trap documented at
+    // the `bridgeOperand` fallback in `emitComposition`). A future cross-policy
+    // Interface truth-set operand under `sem-not` will over-refuse here until
+    // target-library flavor is threaded through. Conservative → loud-refuse.
+    return "unknown";
+  }
+
+  private classifyConceptFlavor(
+    name: string,
+    visiting: ReadonlySet<string>
+  ): "truth-set" | "resource-list" | "unknown" {
+    if (visiting.has(name)) return "unknown"; // cycle → loud (never memoize a guess)
+    const c = this.conceptByName.get(name);
+    if (!c) return "unknown";
+    // Patient-age both-representation recency twin lifts to a truth-set.
+    if (c.__bothRepMerge === "recency") return "truth-set";
+    const body = c.definition;
+    if (!body) return "unknown"; // asserted-only concept in this layer
+    const next = new Set(visiting).add(name);
+    switch (body.type) {
+      case "DefinedAsDefinition":
+        return body.body.type === "DefinedAsBareRef"
+          ? this.classifyRefFlavor(body.body.ref, next)
+          : this.classifyNegationOperand(body.body.expression, next);
+      case "CodedFromDefinition":
+        return "resource-list"; // `coded from` → RecordSource retrieve
+      case "DefinitionIsDefinition":
+        return "unknown"; // temporal/count predicate flavor not modeled → loud
+    }
   }
 
   /** sem-or. Boolean: `or`. Refinement: `union`. */
@@ -1648,6 +1826,40 @@ function collectRefs(expr: CompositionExpression, out: string[]): void {
       collectRefs(expr.expression, out);
       return;
   }
+}
+
+/**
+ * Issue #232 — if `t` is a `sem-not` term (bare, or wrapped in ANY depth of
+ * redundant grouping — `(sem-not B)`, `((sem-not B))`, …), return its operand
+ * plus the `sem-not` node (for the refusal diagnostic's location); else null.
+ * Lets `emitSemAnd` treat `A sem-and (sem-not B)` identically to `A sem-and
+ * sem-not B` (both `A except B`). Peeling ALL group levels matters in the
+ * resource-list lane: a doubly-grouped negative left as a "positive" would route
+ * through the no-base complement path and loud-refuse, so parentheses would
+ * otherwise change SUPPORT, not just layout.
+ */
+function asSemNotOperand(
+  t: CompositionExpression
+): { operand: CompositionExpression; node: CompositionExpression } | null {
+  let cur = t;
+  while (cur.type === "CompositionGroup") cur = cur.expression;
+  if (cur.type === "SemNotExpression") return { operand: cur.expression, node: cur };
+  return null;
+}
+
+/**
+ * Issue #232 — combine child truth-representation flavors for a `sem-and` /
+ * `sem-or` operand under classification. Any `unknown` (or a mixed truth-set +
+ * resource-list weave, which is itself unsupported) yields `unknown` so the
+ * no-base negation loud-refuses rather than guessing.
+ */
+function combineFlavors(
+  flavors: Array<"truth-set" | "resource-list" | "unknown">
+): "truth-set" | "resource-list" | "unknown" {
+  if (flavors.length === 0) return "unknown";
+  if (flavors.some((f) => f === "unknown")) return "unknown";
+  const distinct = new Set(flavors);
+  return distinct.size === 1 ? flavors[0] : "unknown";
 }
 
 function hasOnlyValueset(t: Terminology): boolean {

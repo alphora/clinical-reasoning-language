@@ -1,0 +1,12 @@
+{
+  "name": "semnot-232-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Issue #232 — sem-not lowering fixture (code-is truth-set lane)",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/semnot-232",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}

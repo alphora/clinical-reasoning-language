@@ -53,6 +53,15 @@ const CORPORA: Record<string, string> = {
     REPO_ROOT,
     "src/imports/tests/fixtures/code-is-decision/root.crl",
   ),
+  // #232 — `sem-not` lowering in the code-is truth-set lane. Exercises every
+  // no-base position (standalone, `sem-or` term, all-negative `sem-and`) →
+  // `({ true } except (X))`, the positive-anchored `except` regression, and the
+  // grouped-negative byte-stability (`A sem-and (sem-not B)` ≡ `A except B`).
+  "semnot-232": path.join(__dirname, "fixtures", "semnot-232", "semnot-232.crl"),
+  // #232 — the real-artifact shape: an under-21 gate `sem-not` over the patient-
+  // age both-representation (recency) twin. Guards that the operand-flavor
+  // classifier recognises the recency truth-set (lowers) rather than loud-refusing.
+  "semnot-age-232": path.join(__dirname, "fixtures", "semnot-age-232", "semnot-age-232.crl"),
 };
 
 const norm = (s: string): string => s.replace(/\r\n/g, "\n");

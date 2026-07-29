@@ -1,0 +1,19 @@
+library "Semnot Refuse 232".
+
+// A NON-truth-set operand under a NO-BASE sem-not has no complement universe →
+// must LOUD-REFUSE (hardError + compile-failing sentinel), never silently emit
+// the operand unnegated. This single-library `coded from` policy resolves through
+// the off-lane, whose operand flavor is unmodeled (`unknown`); a layered
+// RecordSource operand would classify `resource-list` — both refuse identically.
+terminology "Virtual Encounter Class":
+- valueset is `http://example.org/crl/ValueSet/virtual-encounter`.
+
+concept "Virtual Encounters":
+- type is Encounter.
+- value type is CodeableConcept.
+- coded from "Virtual Encounter Class".
+
+concept "Not Virtual (standalone)":
+- type is Encounter.
+- value type is CodeableConcept.
+- defined as ( sem-not "Virtual Encounters" ).
