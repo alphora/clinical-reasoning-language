@@ -311,6 +311,8 @@ A parameterized umbrella for windowed-from-anchor temporal scopes. Used as the `
 |---|---|---|---|
 | `AgeAt(anchor)` | `age at <anchor>` | `AgeAt(anchor: AnchorExpr)` | `CRLCommon.AgeAt` |
 | `AtLeast(AgeAt(), n)` | `age today at least <n> years` | `AtLeast(AgeAt(), n: Quantity<year>)` | `CRLCommon.AtLeast` + `CRLCommon.AgeAt()` |
+| `AtMost(AgeAt(), n)` | `age today at most <n> years` | `AtMost(AgeAt(), n: Quantity<year>)` | `CRLCommon.AtMost` + `CRLCommon.AgeAt()` |
+| `Below(AgeAt(), n)` | `age today under <n> years` / `age today younger than <n> years` | `Below(AgeAt(), n: Quantity<year>)` | `CRLCommon.Below` + `CRLCommon.AgeAt()` |
 | `Calculate(X)` | `calculated <X>` | `Calculate(X: ConceptRef<Quantity<U>>)` (input-list shape thin; see card) | `CRLCommon.Calculate` |
 | `Lowest(X[, scope])` | `lowest <X>` (optionally `<scope>`) | `Lowest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec])` | `CRLCommon.Lowest` |
 | `Highest(X[, scope])` | `highest <X>` (optionally `<scope>`) | `Highest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec])` | `CRLCommon.Highest` |
@@ -797,6 +799,17 @@ A parameterized umbrella for windowed-from-anchor temporal scopes. Used as the `
 - **maturity** — moderate (new; drives the patient-age both-rep recency merge)
 - **examples** — `Age 18 Or Older` (`age today at least 18 years`), authored alongside `code is` age-18-or-older` as a both-representation concept.
 - **anti-example** — for an age at a specific clinical anchor (e.g. start of the measurement period), use `age at start of <ref> at least <n> years` (`AgeAt(anchor)`), not the live `today` form.
+
+### `age today at most <n> years` / `age today under <n> years` / `age today younger than <n> years`
+- **intent** — the UPPER-bound patient-age predicates (#215), the engine-verified alternative to the incorrect `sem-not "Age N Or Older"` complement (which grants for unknown age under closed-world). `at most` is INCLUSIVE (≤ n); `under` / `younger than` are EXCLUSIVE (< n). Same live-`today`, both-representation recency-merge semantics as `at least`; unknown age evaluates FALSE (both-rep) / does-not-fire (compute-only), never TRUE.
+- **narrative** — `age today at most <n> years` (5 el: `age`/`today`/`at`/`most`/`<Quantity>`); `age today under <n> years` (4 el: `age`/`today`/`under`/`<Quantity>`); `age today younger than <n> years` (5 el: `age`/`today`/`younger`/`than`/`<Quantity>`).
+- **canonical** — `AtMost(AgeAt(), n: Quantity<year>)` (≤); `Below(AgeAt(), n: Quantity<year>)` (< — `under` and `younger than` lower BYTE-IDENTICALLY to `Below`, one canonical semantic with two spellings).
+- **CQL function** — `CRLCommon.AtMost` / `CRLCommon.Below` + `CRLCommon.AgeAt()`. Requires the cross-type `(Integer, System.Quantity)` overloads on `AtMost`/`Below` (added #215; `AgeAt()` returns Integer years, the threshold is a Quantity).
+- **truncation equivalence** — `AgeAt()` truncates to WHOLE years, so `at most 21` ≡ `under 22` (a 21-years-364-days member satisfies `at most 21`). A pediatric "under 21" gate is `under 21`, NOT `at most 21`.
+- **category** — Calculation (predicate form)
+- **maturity** — moderate (new #215; drives the patient-age both-rep recency merge, upper bound)
+- **examples** — `Patient Under Twenty One Years` (`age today under 21 years`), authored alongside a `code is` local assertion as a both-representation concept.
+- **anti-example** — do NOT model "under N" as `sem-not "Age N Or Older"` (produces TRUE, not FALSE, for unknown age — the #215 defect); do NOT use `less than` (unsanctioned spelling — the validator points you to `under`).
 
 ### `Calculate(X)`
 - **intent** — derive a named clinical feature value from raw data (gestational age, boarded time, BMI, score from components)

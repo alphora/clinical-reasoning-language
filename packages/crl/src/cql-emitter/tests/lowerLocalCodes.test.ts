@@ -557,6 +557,158 @@ concept "Age 18 Or Older":
     );
   });
 
+  // ── #215: UPPER-BOUND age predicates (`at most` ≤, `under`/`younger than` <) ──
+  // Same both-rep recency machinery as `at least`, carrying the comparator op.
+  const lowerAgeConcept = (name: string, code: string, predicate: string) =>
+    lowerLocalCodes(
+      parse(
+        lib(`
+concept "${name}":
+- type is Observation.
+- value type is boolean.
+- code is \`${code}\`.
+- definition is ${predicate}.
+`),
+      ),
+    );
+  const recencyTwinOf = (lowered: CRL, name: string) =>
+    lowered.statements.find(
+      (s): s is Concept =>
+        s.type === "Concept" && s.name === name && s.__bothRepMerge === "recency",
+    );
+  const emitRecency = (lowered: CRL, twin: Concept) =>
+    emitCQLFromAST(
+      { ...lowered, statements: [twin] },
+      {
+        libraryName: "T Inferred",
+        caseFeature: { kind: "inferred", localSourceLibrary: "T LocalSource", inferredLibrary: "T Inferred" },
+      },
+    );
+
+  it("`age today at most <n> years` (INCLUSIVE ≤) SPLITS merge:recency carrying op AtMost, emits CRLCommon.AtMost", () => {
+    const { ast: out, errors } = lowerAgeConcept("Age At Most 21", "age-le-21", "age today at most 21 years");
+    expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(false);
+    const twin = recencyTwinOf(out, "Age At Most 21")!;
+    expect(twin).toBeDefined();
+    expect(twin.__bothRepRecencyThreshold).toBe("21 'years'");
+    expect(twin.__bothRepRecencyOp).toBe("AtMost");
+    const r = emitRecency(out, twin);
+    expect(r.success).toBe(true);
+    expect(r.result).toContain("CFH.recencyAgeTruths(");
+    expect(r.result).toContain("CRLCommon.AtMost(CRLCommon.AgeAt(), 21 'years')");
+    expect(r.result).not.toContain("CRLCommon.AtLeast(");
+  });
+
+  it("`age today under <n> years` (EXCLUSIVE <) SPLITS merge:recency carrying op Below, emits CRLCommon.Below", () => {
+    const { ast: out, errors } = lowerAgeConcept("Under 21", "age-under-21", "age today under 21 years");
+    expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(false);
+    const twin = recencyTwinOf(out, "Under 21")!;
+    expect(twin.__bothRepRecencyThreshold).toBe("21 'years'");
+    expect(twin.__bothRepRecencyOp).toBe("Below");
+    const r = emitRecency(out, twin);
+    expect(r.success).toBe(true);
+    expect(r.result).toContain("CRLCommon.Below(CRLCommon.AgeAt(), 21 'years')");
+  });
+
+  it("`younger than` ≡ `under`: both lower to op Below with an IDENTICAL emitted computed arm (one canonical semantic, two spellings)", () => {
+    const under = lowerAgeConcept("Y", "age-y", "age today under 21 years");
+    const younger = lowerAgeConcept("Y", "age-y", "age today younger than 21 years");
+    const tUnder = recencyTwinOf(under.ast, "Y")!;
+    const tYounger = recencyTwinOf(younger.ast, "Y")!;
+    expect(tUnder.__bothRepRecencyOp).toBe("Below");
+    expect(tYounger.__bothRepRecencyOp).toBe("Below");
+    expect(tYounger.__bothRepRecencyThreshold).toBe(tUnder.__bothRepRecencyThreshold);
+    // The ENTIRE emitted Inferred result is byte-identical (same name/code/threshold/op),
+    // so the two spellings are provably one canonical semantic — not merely both-contain-Below.
+    const rUnder = emitRecency(under.ast, tUnder).result;
+    const rYounger = emitRecency(younger.ast, tYounger).result;
+    expect(rYounger).toBe(rUnder);
+    expect(rUnder).toContain("CRLCommon.Below(CRLCommon.AgeAt(), 21 'years')");
+  });
+
+  it("NON-year unit on EVERY upper-bound spelling (both-rep) → emit-mixed-code-and-definition (year-only at the match, per comparator)", () => {
+    for (const pred of [
+      "age today at most 216 months",
+      "age today under 216 months",
+      "age today younger than 216 months",
+    ]) {
+      const { errors } = lowerAgeConcept("Age Months", "age-months", pred);
+      expect(
+        errors.some((e) => e.kind === "emit-mixed-code-and-definition"),
+        `year-guard should fire for "${pred}"`,
+      ).toBe(true);
+    }
+  });
+
+  it("COMPUTE-ONLY NON-year age narrative does NOT silently emit a unit-blind comparator call (#215 [critical] fix)", () => {
+    // Before the matcher year-guard, `age today under 216 months` (no `code is`) would
+    // resolve via the new `Below(Integer, System.Quantity)` overload to a unit-BLIND
+    // `Below(AgeAt(), 216 'months')` ≡ `ageYears < 216` — a silent miscompile. Year-only
+    // at the match means it is NOT a recognized age predicate → soft-compiles unknown →
+    // LOUD sentinel, never a resolved age call.
+    for (const pred of ["age today under 216 months", "age today at most 216 months"]) {
+      const src = `# T\nlibrary "T".\nconcept "Age Gate":\n- type is Observation.\n- value type is boolean.\n- definition is ${pred}.\n`;
+      const r = emitCQL(src, { libraryName: "T" });
+      expect(r.result ?? "").not.toMatch(/CRLCommon\.(Below|AtMost)\(CRLCommon\.AgeAt\(\), 216 'months'\)/);
+      expect(
+        r.success === false || (r.result ?? "").includes("UnmatchedNarrative"),
+        `non-year age narrative "${pred}" must fail loudly, not emit a resolved call`,
+      ).toBe(true);
+    }
+  });
+
+  it("COLLISION GUARD (#215): a `code is X` + generic `<ConceptRef> <at least|at most|below> <Q>` (SAME canonical names, ConceptRef arg[0]) stays emit-mixed-code-and-definition — the AgeAt()-no-arg operand guard blocks a spurious age-recency merge for EVERY comparator", () => {
+    // The generic comparator matchers (atLeast/atMost/below) emit the SAME canonical
+    // names as the age forms but with a ConceptRef at arg[0], not a no-arg AgeAt(). The
+    // gate's arg[0] guard is what keeps each one OUT of the age-recency lane.
+    for (const def of [
+      '"Weight" at least 100 \'kg\'',
+      '"Weight" at most 100 \'kg\'',
+      '"Weight" below 100 \'kg\'',
+    ]) {
+      const ast = parse(
+        lib(`
+concept "Weight":
+- type is Observation.
+- code is \`weight\`.
+
+concept "Heavy":
+- type is Observation.
+- value type is boolean.
+- code is \`heavy\`.
+- definition is ${def}.
+`),
+      );
+      const { ast: out, errors } = lowerLocalCodes(ast);
+      expect(
+        errors.some((e) => e.kind === "emit-mixed-code-and-definition"),
+        `generic "${def}" must NOT be mis-detected as age-recency`,
+      ).toBe(true);
+      expect(
+        out.statements.find((s): s is Concept => s.type === "Concept" && s.name === "Heavy" && s.__bothRepMerge === "recency"),
+        `no spurious recency twin for "${def}"`,
+      ).toBeUndefined();
+    }
+    // (The anchored `age at start of <ref> at least <Q>` form emits AgeAt with ONE arg,
+    // also excluded by the args.length !== 0 leg of the same guard — out of #215 scope.)
+  });
+
+  it("COMPUTE-ONLY (no `code is`): `definition is age today under|at most <n> years` emits the generic comparator call (Below/AtMost), no recency merge", () => {
+    for (const [pred, call] of [
+      ["age today under 21 years", "CRLCommon.Below(CRLCommon.AgeAt(), 21 'years')"],
+      ["age today at most 21 years", "CRLCommon.AtMost(CRLCommon.AgeAt(), 21 'years')"],
+      ["age today younger than 21 years", "CRLCommon.Below(CRLCommon.AgeAt(), 21 'years')"],
+    ] as const) {
+      const src = `# T\nlibrary "T".\nconcept "Age Gate":\n- type is Observation.\n- value type is boolean.\n- definition is ${pred}.\n`;
+      const r = emitCQL(src, { libraryName: "T" });
+      expect(r.success, `compute-only emit should succeed for "${pred}"`).toBe(true);
+      expect(r.result).toContain(call);
+      // scalar comparator, NOT the List<Observation> `exists` overload (guards a
+      // PATTERN_RETURN_SHAPE regression that would wrap the call in `exists`).
+      expect(r.result).not.toContain("exists CRLCommon.");
+    }
+  });
+
   it("empty `code is` + representation → emit-empty-local-code (empty checked BEFORE representation skip)", () => {
     // A representation-bearing concept is normally skipped (out of scope), but
     // an EMPTY code is malformed regardless — the empty check runs first, so the

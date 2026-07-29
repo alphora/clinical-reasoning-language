@@ -440,6 +440,34 @@
       },
       {
         "kind": "completion",
+        "label": "age today at most <n> years",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "age today at most \"${1:n}\" years"
+        },
+        "sortText": "age today at most",
+        "detail": "AtMost(AgeAt(), n: Quantity<year>)",
+        "documentation": {
+          "markdown": "**AtMost(AgeAt(), n)** — *Calculation*\n\nNarrative: `age today at most <n> years`\n\nSignature: `AtMost(AgeAt(), n: Quantity<year>)`\n\nCQL: `CRLCommon.AtMost`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "age today under <n> years",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "age today under \"${1:n}\" years"
+        },
+        "sortText": "age today under",
+        "detail": "Below(AgeAt(), n: Quantity<year>)",
+        "documentation": {
+          "markdown": "**Below(AgeAt(), n)** — *Calculation*\n\nNarrative: `age today under <n> years`\n\nSignature: `Below(AgeAt(), n: Quantity<year>)`\n\nCQL: `CRLCommon.Below`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
         "label": "calculated <X>",
         "itemKind": 14,
         "insertText": {

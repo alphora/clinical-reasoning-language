@@ -515,21 +515,36 @@ export interface Concept extends ASTNode {
    *   - `"union"`   — the historical `code is` + `defined as` fold-in
    *     (`LocalSource."X".asTruths() union (<inference>)`). Every existing
    *     both-rep is "union"; behavior is unchanged.
-   *   - `"recency"` — the `code is` + `definition is age today at least <Q>`
-   *     patient-age merge: RECENCY-SELECT between the newest valid local
-   *     Observation and the live computed age, then lift back to a truth-set.
+   *   - `"recency"` — the `code is` + `definition is age today <cmp> <Q>`
+   *     patient-age merge (`<cmp>` = a sanctioned age comparator, #215):
+   *     RECENCY-SELECT between the newest valid local Observation and the live
+   *     computed age, then lift back to a truth-set.
    * Absent on non-both-rep concepts.
    */
   __bothRepMerge?: "union" | "recency";
   /**
    * SYNTHETIC-EMITTER-ONLY. For a `"recency"` both-rep Inferred twin, the
-   * year threshold of the `age today at least <Q>` computed arm, as an already-
+   * year threshold of the `age today <cmp> <Q>` computed arm, as an already-
    * emitted CQL quantity literal (e.g. `18 'years'`). Carried so the recency
-   * emit renders `CRLCommon.AtLeast(CRLCommon.AgeAt(), <this>)` without
-   * re-matching the narrative. Absent unless `__bothRepMerge === "recency"`.
+   * emit renders `CRLCommon.<op>(CRLCommon.AgeAt(), <this>)` without
+   * re-matching the narrative. Set in LOCK-STEP with `__bothRepRecencyOp`
+   * (both present or both absent). Absent unless `__bothRepMerge === "recency"`.
    */
   __bothRepRecencyThreshold?: string;
+  /**
+   * SYNTHETIC-EMITTER-ONLY. For a `"recency"` both-rep Inferred twin, the age
+   * COMPARATOR op (#215): `"AtLeast"` (≥, `at least`), `"AtMost"` (≤, `at most`),
+   * or `"Below"` (<, `under` / `younger than`). Set in LOCK-STEP with
+   * `__bothRepRecencyThreshold`; the recency emit renders
+   * `CRLCommon.<this>(CRLCommon.AgeAt(), <threshold>)`. Absent unless
+   * `__bothRepMerge === "recency"`.
+   */
+  __bothRepRecencyOp?: AgeRecencyOp;
 }
+
+/** The sanctioned patient-age comparator ops (#215), carried as canonical
+ * pattern names: `AtLeast` (≥), `AtMost` (≤), `Below` (< — `under`/`younger than`). */
+export type AgeRecencyOp = "AtLeast" | "AtMost" | "Below";
 
 // Concept definition has 3 kinds per v0.7:
 //   - CodedFromDefinition    : `coded from "Valueset"`    (asserted; ref is a valueset)

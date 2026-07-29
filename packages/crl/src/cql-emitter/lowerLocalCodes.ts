@@ -95,6 +95,7 @@
  */
 
 import type {
+  AgeRecencyOp,
   CRL,
   Concept,
   CodedFromDefinition,
@@ -108,22 +109,38 @@ import { matchNarrative } from "../template-match";
 import type { CanonicalArg } from "../template-match/canonicalTypes";
 import type { CRLError } from "../types/errors";
 
+/** The sanctioned patient-age comparators (#215): ≥ (`at least`), ≤ (`at most`),
+ * < (`under` / `younger than`). Carried as the canonical PATTERN NAME (`AgeRecencyOp`
+ * lives in ast/types alongside the `__bothRepRecencyOp` marker it sets). */
+const AGE_RECENCY_OPS: readonly AgeRecencyOp[] = ["AtLeast", "AtMost", "Below"];
+
 /**
  * Detect the patient-age RECENCY both-rep computed arm: a `definition is` whose
- * narrative template-matches `age today at least <Q>` → `AtLeast(AgeAt(), Q)`
- * (the no-arg `AgeAt()`). Returns the year-threshold rendered as a CQL quantity
- * literal (e.g. `18 'years'`) when it matches, else null.
+ * narrative template-matches a sanctioned age-today predicate — `age today at least
+ * <Q>` → `AtLeast(AgeAt(), Q)`, `age today at most <Q>` → `AtMost(AgeAt(), Q)`, or
+ * `age today under`/`younger than <Q>` → `Below(AgeAt(), Q)` — all over the no-arg
+ * `AgeAt()`. Returns the year-threshold rendered as a CQL quantity literal (e.g.
+ * `18 'years'`) AND the comparator op when it matches, else null (#215).
  *
  * Detecting at LOWERING time (not in the emitter) keeps the emitter free of
- * pattern-sniffing: the merge policy is fixed on the twin's `__bothRepMerge`
- * marker here and the emitter merely branches on it.
+ * pattern-sniffing: the merge policy + comparator are fixed on the twin's
+ * `__bothRepMerge` / `__bothRepRecencyOp` markers here and the emitter merely
+ * branches on them.
  */
-function ageTodayRecencyThreshold(def: DefinitionIsDefinition): string | null {
+function ageTodayRecencyThreshold(
+  def: DefinitionIsDefinition,
+): { threshold: string; op: AgeRecencyOp } | null {
   const matched = matchNarrative(def.body);
-  if (!matched.known || matched.pattern !== "AtLeast") return null;
+  if (!matched.known) return null;
+  if (!AGE_RECENCY_OPS.includes(matched.pattern as AgeRecencyOp)) return null;
+  const op = matched.pattern as AgeRecencyOp;
   if (matched.args.length !== 2) return null;
   const [ageArg, qArg] = matched.args;
-  // arg[0] must be the NO-ARG AgeAt() nested call (the live-today overload).
+  // arg[0] must be the NO-ARG AgeAt() nested call (the live-today overload). This
+  // guard is LOAD-BEARING (#215): the generic `atMost`/`below` matchers emit the
+  // SAME canonical names for `<ConceptRef> at most|below <Q>`, so without it a
+  // plain `code is X. definition is "Weight" at most 100 kg.` would be mis-detected
+  // as an age-recency merge. Only `age today <cmp> <Q>` yields a no-arg AgeAt() here.
   if (
     ageArg.type !== "NestedPatternArg" ||
     ageArg.pattern.pattern !== "AgeAt" ||
@@ -132,13 +149,15 @@ function ageTodayRecencyThreshold(def: DefinitionIsDefinition): string | null {
     return null;
   }
   if (qArg.type !== "QuantityArg") return null;
-  // UNIT GUARD — `AgeAt()` returns AGE IN YEARS, and `AtLeast(Integer, Quantity)`
-  // (CRLCommon.cql) compares `.value` ONLY (unit-blind). So `age today at least
-  // 18 months` would silently mean `ageYears >= 18`. Require a year unit; any
-  // other unit → null → the caller falls to the hard error (only `age today at
-  // least <n> years` is supported).
+  // UNIT GUARD (defense-in-depth) — the age-today MATCHERS now enforce years at the
+  // match (`isYearQuantity`, #215), so a non-year narrative never becomes a known
+  // AtLeast/AtMost/Below-over-no-arg-AgeAt pattern and this line is not normally
+  // reached. Kept because `AgeAt()` is AGE IN YEARS and the cross-type overloads
+  // `<Op>(Integer, System.Quantity)` are unit-blind (compare `.value` only): were a
+  // future matcher to admit a non-year age pattern, this guard still rejects it →
+  // null → the caller falls to the hard error.
   if (qArg.unit !== "year" && qArg.unit !== "years") return null;
-  return renderQuantityArg(qArg);
+  return { threshold: renderQuantityArg(qArg), op };
 }
 
 function renderQuantityArg(arg: Extract<CanonicalArg, { type: "QuantityArg" }>): string {
@@ -446,24 +465,26 @@ export function lowerLocalCodes(
     //     LocalSource retrieve twin (the direct local code) + an Inferred twin.
     //     Two both-rep flavors are allowed:
     //       - `code is` + `defined as`  → UNION fold-in (historical; unchanged).
-    //       - `code is` + `definition is age today at least <Q>` → RECENCY merge
+    //       - `code is` + `definition is age today <cmp> <Q>` → RECENCY merge
     //         (patient-age: the newest valid local Observation vs the live
-    //         computed age). ONLY the age-today `definition is` narrative is
-    //         allowed; any OTHER `definition is` body stays a hard error.
+    //         computed age), where <cmp> is a sanctioned age comparator
+    //         (`at least` / `at most` / `under` / `younger than`, #215). ONLY the
+    //         age-today `definition is` narrative is allowed; any OTHER `definition
+    //         is` body stays a hard error.
     //     `code is` + `coded from` and any non-age `definition is` remain hard
     //     errors (they don't fold cleanly into the truth-set lane this round).
-    let bothRepRecencyThreshold: string | null = null;
+    let bothRepRecency: { threshold: string; op: AgeRecencyOp } | null = null;
     if (c.definition !== undefined && c.definition.type !== "DefinedAsDefinition") {
       if (c.definition.type === "DefinitionIsDefinition") {
-        bothRepRecencyThreshold = ageTodayRecencyThreshold(c.definition);
+        bothRepRecency = ageTodayRecencyThreshold(c.definition);
       }
-      if (bothRepRecencyThreshold === null) {
+      if (bothRepRecency === null) {
         errors.push(
           mkError(
             "emit-mixed-code-and-definition",
             `Concept "${c.name}" carries BOTH a local \`code is\` and a top-level ` +
               `definition (\`${c.definition.type}\`). Only \`code is\` + \`defined as\` ` +
-              `or \`code is\` + \`definition is age today at least <n> years\` ` +
+              `or \`code is\` + \`definition is age today <at least|at most|under|younger than> <n> years\` ` +
               `(both-representation) is supported; \`code is\` + \`${c.definition.type}\` ` +
               `is out of scope — emit nothing rather than silently drop the local-code ` +
               `source side.`,
@@ -478,7 +499,7 @@ export function lowerLocalCodes(
         ? c.definition
         : undefined;
     const bothRepDefinitionIs =
-      bothRepRecencyThreshold !== null && c.definition?.type === "DefinitionIsDefinition"
+      bothRepRecency !== null && c.definition?.type === "DefinitionIsDefinition"
         ? c.definition
         : undefined;
 
@@ -499,7 +520,7 @@ export function lowerLocalCodes(
         mkError(
           "emit-mixed-code-and-definition",
           `Concept "${c.name}" is a patient-age recency both-representation ` +
-            `(\`code is\` + \`definition is age today at least <n> years\`) but its ` +
+            `(\`code is\` + \`definition is age today <at least|at most|under|younger than> <n> years\`) but its ` +
             `\`type is ${c.conceptType}\`. The recency merge emits an Observation-boolean ` +
             `retrieve, so patient-age recency requires \`type is Observation\`.`,
           loc,
@@ -683,7 +704,8 @@ export function lowerLocalCodes(
     // `buildNameLayerMaps` resolves the name to Inferred (the public determination).
     //   - `defined as` twin → `__bothRepMerge: "union"` (asTruths() union inference).
     //   - age `definition is` twin → `__bothRepMerge: "recency"` (raw-Observation
-    //     recency vs live computed age); the twin also carries the year threshold.
+    //     recency vs live computed age); the twin also carries the year threshold
+    //     AND the comparator op (#215) — set together, in lock-step.
     if (bothRepDefinedAs !== undefined) {
       const inferredTwin: Concept = {
         ...c,
@@ -693,13 +715,14 @@ export function lowerLocalCodes(
       };
       delete inferredTwin.code;
       bothRepInferredTwins.push(inferredTwin);
-    } else if (bothRepDefinitionIs !== undefined && bothRepRecencyThreshold !== null) {
+    } else if (bothRepDefinitionIs !== undefined && bothRepRecency !== null) {
       const inferredTwin: Concept = {
         ...c,
         definition: bothRepDefinitionIs,
         __bothRepFoldInLocalSource: c.name,
         __bothRepMerge: "recency",
-        __bothRepRecencyThreshold: bothRepRecencyThreshold,
+        __bothRepRecencyThreshold: bothRepRecency.threshold,
+        __bothRepRecencyOp: bothRepRecency.op,
       };
       delete inferredTwin.code;
       bothRepInferredTwins.push(inferredTwin);

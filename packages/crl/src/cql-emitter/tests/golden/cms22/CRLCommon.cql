@@ -527,7 +527,11 @@ define function "Abnormal"(X Quantity, lo Quantity, hi Quantity):
  *   - list of values (List<Observation>, List<Observation.Component>) —
  *     existential: "any element in the list satisfies the comparison"
  *   - cross-type (Integer × Quantity) — for year-Integer ages compared
- *     to Quantity-year thresholds.
+ *     to Quantity-year thresholds. Carried on AtLeast (`age today at least`),
+ *     AtMost (`age today at most`), and Below (`age today under`/`younger than`)
+ *     so every sanctioned age-predicate comparator resolves (#215). The overload
+ *     is unit-BLIND (compares `.value` only), so the year-unit guard at the
+ *     lowering gate is load-bearing.
  */
 define function "AtLeast"(value Quantity, target Quantity):
   value >= target
@@ -544,6 +548,8 @@ define function "AtMost"(value Quantity, target Quantity):
   value <= target
 define function "AtMost"(value Integer, target Integer):
   value <= target
+define function "AtMost"(value Integer, target System.Quantity):
+  value <= target.value
 define function "AtMost"(values List<Observation>, target Quantity):
   exists (values) V where (V.value as Quantity) <= target
 define function "AtMost"(values List<System.Quantity>, target System.Quantity):
@@ -572,6 +578,8 @@ define function "Below"(value Quantity, target Quantity):
   value < target
 define function "Below"(value Integer, target Integer):
   value < target
+define function "Below"(value Integer, target System.Quantity):
+  value < target.value
 define function "Below"(values List<Observation>, target Quantity):
   exists (values) V where (V.value as Quantity) < target
 define function "Below"(values List<System.Quantity>, target System.Quantity):

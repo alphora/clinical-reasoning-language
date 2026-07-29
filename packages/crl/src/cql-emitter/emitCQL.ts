@@ -1184,19 +1184,22 @@ class Emitter {
    */
   private emitRecencyMerge(c: Concept): string {
     const foldIn = c.__bothRepFoldInLocalSource!;
-    // INTERNAL-INVARIANT: a `"recency"` twin MUST carry its threshold (set in
-    // lock-step at lowerLocalCodes ~575). A missing threshold here is a compiler
-    // bug, not a defaultable case — fail loudly (matching the co-invariant assert
-    // in lowerLocalCodes), never silently emit a fabricated `18 'years'`.
-    if (c.__bothRepRecencyThreshold === undefined) {
+    // INTERNAL-INVARIANT: a `"recency"` twin MUST carry BOTH its threshold AND its
+    // comparator op (set in lock-step at lowerLocalCodes when the twin is synthesized).
+    // A missing threshold or op here is a compiler bug, not a defaultable case — fail
+    // loudly (matching the co-invariant assert in lowerLocalCodes), never silently emit
+    // a fabricated `18 'years'` or default the comparator to `AtLeast`.
+    if (c.__bothRepRecencyThreshold === undefined || c.__bothRepRecencyOp === undefined) {
       throw new Error(
         `internal invariant violated: recency both-rep twin "${c.name}" has ` +
-          `__bothRepMerge === "recency" but no __bothRepRecencyThreshold. The marker and ` +
-          `threshold are set together in lowerLocalCodes; a recency twin without a ` +
-          `threshold is a compiler bug.`,
+          `__bothRepMerge === "recency" but is missing __bothRepRecencyThreshold ` +
+          `(${c.__bothRepRecencyThreshold}) and/or __bothRepRecencyOp (${c.__bothRepRecencyOp}). ` +
+          `The marker, threshold, and op are set together in lowerLocalCodes; a recency ` +
+          `twin missing either is a compiler bug.`,
       );
     }
     const threshold = c.__bothRepRecencyThreshold;
+    const op = c.__bothRepRecencyOp;
     const localLib =
       this.caseFeature.kind === "inferred" ? this.caseFeature.localSourceLibrary : "";
     // The newest valid local boolean Observation (or null). `.value is FHIR.boolean`
@@ -1220,7 +1223,7 @@ class Emitter {
       `      where O.value is FHIR.boolean\n` +
       `      sort by (effective as FHIR.dateTime).value, id\n` +
       `  )`;
-    const computed = `CRLCommon.AtLeast(CRLCommon.AgeAt(), ${threshold})`;
+    const computed = `CRLCommon.${op}(CRLCommon.AgeAt(), ${threshold})`;
     // `CFH.recencyAgeTruths(newestLocalObservation, computedBoolean)` returns the
     // recency-selected truth-set. It reads `Patient.birthDate` / `Patient.meta.lastUpdated`
     // internally (Patient context), so the call site passes only the two arms.

@@ -159,6 +159,19 @@ function isQuantity(e: NarrativeElement | undefined): e is Quantity {
   return !!e && e.type === "Quantity";
 }
 
+/**
+ * A `Quantity` whose unit is YEARS. The `age today <cmp> <Q>` predicates require it
+ * (#215): `AgeAt()` returns age in whole YEARS and the cross-type comparator overloads
+ * (`<Op>(Integer, System.Quantity)`, CRLCommon.cql) are unit-BLIND (compare `.value`
+ * only), so a non-year threshold would silently mean `ageYears <cmp> <n>`. Enforcing
+ * years AT THE MATCH means a non-year age narrative does NOT match → it soft-compiles
+ * unknown → a LOUD sentinel (compute-only) or `emit-mixed-code-and-definition` (both-rep),
+ * on BOTH lanes uniformly — never a silent unit-blind miscompile.
+ */
+function isYearQuantity(e: NarrativeElement | undefined): e is Quantity {
+  return isQuantity(e) && (e.unit === "year" || e.unit === "years");
+}
+
 function isDisjunction(e: NarrativeElement | undefined): e is NDisjunction {
   return !!e && e.type === "NDisjunction";
 }
@@ -773,9 +786,58 @@ const ageTodayAtLeast: PatternMatcher = (els, loc) => {
   if (!isWord(els[1], "today")) return null;
   if (!isWord(els[2], "at")) return null;
   if (!isWord(els[3], "least")) return null;
-  if (!isQuantity(els[4])) return null;
+  if (!isYearQuantity(els[4])) return null; // #215: year-only at the match (both lanes; no silent unit-blind miscompile)
   const ageAt = makeCall("AgeAt", [], loc);
   return makeCall("AtLeast", [nestedArg(ageAt), quantityArg(els[4] as Quantity)], loc);
+};
+
+/**
+ * `age today at most <Q>` → AtMost(AgeAt(), Q) — the INCLUSIVE upper bound (≤ N,
+ * #215). Symmetric with `ageTodayAtLeast`; 5 elements `[age][today][at][most][Q]`.
+ * `AgeAt()` (Integer years) feeds the `AtMost(Integer, System.Quantity)` overload
+ * (CRLCommon.cql, added for #215). NOTE the truncation equivalence taught in the
+ * kit: `at most 21` ≡ `under 22` because AgeAt truncates to whole years.
+ */
+const ageTodayAtMost: PatternMatcher = (els, loc) => {
+  if (els.length !== 5) return null;
+  if (!isWord(els[0], "age")) return null;
+  if (!isWord(els[1], "today")) return null;
+  if (!isWord(els[2], "at")) return null;
+  if (!isWord(els[3], "most")) return null;
+  if (!isYearQuantity(els[4])) return null; // #215: year-only at the match
+  const ageAt = makeCall("AgeAt", [], loc);
+  return makeCall("AtMost", [nestedArg(ageAt), quantityArg(els[4] as Quantity)], loc);
+};
+
+/**
+ * `age today under <Q>` → Below(AgeAt(), Q) — the EXCLUSIVE upper bound (< N,
+ * #215). 4 elements `[age][today][under][Q]`. This is how pediatric policies read
+ * ("under 21"). `Below(Integer, System.Quantity)` overload (CRLCommon.cql, #215).
+ */
+const ageTodayUnder: PatternMatcher = (els, loc) => {
+  if (els.length !== 4) return null;
+  if (!isWord(els[0], "age")) return null;
+  if (!isWord(els[1], "today")) return null;
+  if (!isWord(els[2], "under")) return null;
+  if (!isYearQuantity(els[3])) return null; // #215: year-only at the match
+  const ageAt = makeCall("AgeAt", [], loc);
+  return makeCall("Below", [nestedArg(ageAt), quantityArg(els[3] as Quantity)], loc);
+};
+
+/**
+ * `age today younger than <Q>` → Below(AgeAt(), Q) — SYNONYM of `under` (< N,
+ * #215): one canonical semantic (`Below`) with two accepted spellings. 5 elements
+ * `[age][today][younger][than][Q]`. Both spellings lower BYTE-IDENTICALLY.
+ */
+const ageTodayYoungerThan: PatternMatcher = (els, loc) => {
+  if (els.length !== 5) return null;
+  if (!isWord(els[0], "age")) return null;
+  if (!isWord(els[1], "today")) return null;
+  if (!isWord(els[2], "younger")) return null;
+  if (!isWord(els[3], "than")) return null;
+  if (!isYearQuantity(els[4])) return null; // #215: year-only at the match
+  const ageAt = makeCall("AgeAt", [], loc);
+  return makeCall("Below", [nestedArg(ageAt), quantityArg(els[4] as Quantity)], loc);
 };
 
 /** Bare ref alone: `<X>` → degenerate; treated as a 1-arg identity wrap. Not registered (single bare ref isn't a pattern call). */
@@ -786,6 +848,9 @@ const PATTERNS: PatternMatcher[] = [
   // Longest / most specific first
   ageAtStartOfAtLeast,             // 8 elements
   ageTodayAtLeast,                 // 5 (age today at least <Q>; BEFORE 3-element ageAt)
+  ageTodayAtMost,                  // 5 (age today at most <Q>; #215 inclusive upper bound)
+  ageTodayYoungerThan,             // 5 (age today younger than <Q>; #215 exclusive, synonym of under)
+  ageTodayUnder,                   // 4 (age today under <Q>; #215 exclusive upper bound)
   lastWithinBeforeStartOf,         // 8
   lastWithinAfterEndOf,            // 8 (T08 / #98)
   lastWithinAfterStartOf,          // 8 (T08 / #98)
