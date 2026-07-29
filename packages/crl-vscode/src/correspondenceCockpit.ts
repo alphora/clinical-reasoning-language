@@ -12,12 +12,15 @@ import {
   buildCockpitModel,
   buildCRL,
   conceptDeclRef,
+  criterionGateIdentities,
   flagTags,
   hasForbiddenGistChars,
   nodeKey,
+  topCriterion,
   type CorrespondenceModel,
   type CrlConceptNode,
   type ConceptShapeIndex,
+  type CriterionIdentity,
   type DefExprIndex,
   type GuardOutline,
   type CrlDecisionStructure,
@@ -140,7 +143,7 @@ import {
   normalizePaneOrder,
   type PaneSpec,
 } from "./paneOrder";
-import { isConceptHit, isCriterionToggleHit, isFactHit, isSubQuestionHit, type RevealHit, type WebviewHit } from "./webviewHit";
+import { isConceptHit, isCriterionOccurrenceHit, isCriterionToggleHit, isFactHit, isSubQuestionHit, type RevealHit, type WebviewHit } from "./webviewHit";
 import {
   caseTokenId,
   cockpitAgentBridge,
@@ -402,6 +405,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let conceptShape: ConceptShapeIndex = new Map(); // #187 Todo 3: per-concept `defined as` shape subtrees (leaf expansion)
   let defExpr: DefExprIndex = new Map(); // #187 Option-3: per-concept `defined as` OPERATOR tree (questionnaire box render)
   let guardOutlines: Map<string, GuardOutline> = new Map(); // #224 ii.3 Todo 3: criterion-when guard outlines (Flow pane)
+  let criterionIdentities: Map<string, CriterionIdentity> = new Map(); // #233 Todo 2b: canonical criterion inventory (gate/verdict identity source)
   // #(tree-snapshot) Todo 2 — the one-shot host↔webview capture coordinator (the host doesn't hold the tree DOM; it asks the
   // webview for `#root`). Single-flight, settle-once; the pure state machine lives in snapshotCapture.ts.
   const snapshotCapture = new SnapshotCapture();
@@ -1523,18 +1527,15 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [...gids], startNodeGid: tree.startNodeGid, open: open.length, resolved: resolvedCount, flagError: flagStateError, unplaced });
   }
 
-  /** #224 ii.3 Slice 2b — the LIVE criterion identities in the current guard outlines: `{lib,name}` identity → its
-   *  `{bodyHash, elided}` (from `soleCriterion`). Deduped (N occurrences of one criterion share ONE body → ONE identity;
-   *  the body is library-local, so the hash is identical across occurrences). The staleness fold + the gate/chrome tally
-   *  read this. Empty when no single-criterion whens are rendered. */
+  /** #224 ii.3 Slice 2b / #233 Todo 2b — the LIVE criterion identities: `{lib,name}` → `{bodyHash, elided}`. The gate set is
+   *  the criteria REACHABLE from the rendered guard outlines (`criterionGateIdentities` — a MODEL-tree walk, collapse-
+   *  INDEPENDENT), mapped to their CANONICAL facts. So a criterion referenced ONLY in a compound/nested position (never sole)
+   *  is STILL gated (the 2→6 growth), and a criterion under a collapsed ancestor still counts — but a criterion DECLARED yet
+   *  never referenced by any guard is EXCLUDED (it renders nowhere → gating it would livelock the gate, disc 330 [critical]).
+   *  Keyed by `criterionKey == criterionVerdictKey`. The staleness fold + the gate/chrome tally read this. */
   function buildLiveCriterionIdentities(): Map<string, LiveCriterion> {
     const out = new Map<string, LiveCriterion>();
-    for (const go of guardOutlines.values()) {
-      const s = go.soleCriterion;
-      if (!s) continue;
-      const key = criterionVerdictKey(s.lib, s.name);
-      if (!out.has(key)) out.set(key, { bodyHash: s.bodyHash, elided: s.elided === true });
-    }
+    for (const [key, id] of criterionGateIdentities(guardOutlines, criterionIdentities)) out.set(key, { bodyHash: id.bodyHash, elided: id.elided });
     return out;
   }
 
@@ -1553,12 +1554,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       for (const occ of tree.criterionOccurrences) {
         const key = criterionVerdictKey(occ.lib, occ.name);
         const live = identities.get(key);
-        // #233 Todo 2a: a NON-ROOT criterion occurrence (a `flow-crit-row`) resolves a live identity ONLY when the SAME
-        // `(lib,name)` is also a SOLE criterion somewhere (`buildLiveCriterionIdentities` is sourced from `soleCriterion`).
-        // A criterion that is non-root everywhere has no live identity here → skipped. A SHARED criterion (sole + non-root)
-        // does resolve, so its non-root gid is pushed to `byState` + gets a `.crit-*` class — visually INERT in 2a (a
-        // crit-row emits no verdict-chip markup and the `.crit-*` selectors are `.flow-row`-scoped, which it is not). Todo 2b
-        // sources identities from the canonical inventory (`buildCriterionIdentities`) + adds the chip so ALL occurrences light.
+        // #233 Todo 2b: identities now come from the CANONICAL inventory, so EVERY rendered criterion occurrence — root
+        // `when` box AND non-root `flow-crit-row` — resolves here and gets its `.crit-*` verdict chip painted (the chip
+        // markup + `.crit-*` CSS now cover both row kinds). A missing `live` would mean a rendered criterion absent from the
+        // canonical inventory (a builder divergence — shouldn't happen); skip defensively rather than paint a phantom chip.
         if (!live) continue;
         const s = criterionVerdictState(criterionVerdicts[key], live);
         if (s !== "unreviewed") byState[s].push(occ.gid); // unreviewed → no class (the bulk-clear leaves it bare)
@@ -2180,9 +2179,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           return;
         }
         // #233 Todo 2a: a criterion collapse chevron resolves to `{criterionToggle}` — it drives ONLY the `toggleCriterion`
-        // message, never a selection. It should never reach here (the chevron posts `toggleCriterion`, and the crit box
-        // body carries no `data-reveal`), but divert defensively so a stray reveal-click is inert, not mis-routed.
+        // message, never a selection. Diverted defensively (the chevron posts `toggleCriterion`, not `reveal`).
         if (isCriterionToggleHit(hit)) return;
+        // #233 Todo 2b: LEFT-click on a non-root criterion box (`{criterionOccurrence}`) is INERT (disc 327 pt 14) — the
+        // criterion is reviewed via RIGHT-click (the encoding menu, `nodeMenu`/`criterionEncodingMenu`), not a case selection.
+        if (isCriterionOccurrenceHit(hit)) return;
         // Otherwise the click sets the selection in the CURRENT primary's space (mapping cross-pane as needed).
         const p = state.primary;
         // record the open-raw locus only for a source-span click while source-primary
@@ -2332,6 +2333,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       conceptShape = cm.conceptShape; // #187 Todo 3
       defExpr = cm.defExpr; // #187 Option-3
       guardOutlines = cm.guardOutlines; // #224 ii.3 Todo 3
+      criterionIdentities = cm.criterionIdentities; // #233 Todo 2b: canonical criterion inventory (gate/verdict source)
       scenarios = cm.scenarios;
       caseIdByName = cm.caseIdByName;
       duplicateScenarioNames = cm.duplicateScenarioNames;
@@ -2439,6 +2441,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     conceptShape = new Map();
     defExpr = new Map();
     guardOutlines = new Map();
+    criterionIdentities = new Map();
     expandedGuardWhens = new Set();
     crlMaps = undefined;
     scenarios = undefined;
@@ -2688,27 +2691,48 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     return true;
   }
 
-  /** #224 ii.3 Slice 2b — apply a MODEL-LEVEL criterion verdict (right-click "Criterion encoding"). The identity + live
-   *  bodyHash are RE-RESOLVED from the LIVE `guardOutlines` by nodeKey at APPLY time (never a captured snapshot) — so a
-   *  rebuild that changed the model since the menu opened safely no-ops (the nodeKey no longer maps to a single-criterion
-   *  when → false). On success persists (the 3rd sidecar map), repaints the chips on EVERY occurrence (no tree re-render),
-   *  and refreshes the gate/chrome. `unreviewed` clears the verdict. Returns false (untouched) on any guard/persist failure. */
-  function applyCriterionVerdict(nodeKey: string, value: unknown, expectedBodyHash?: string): boolean {
+  /** #224 ii.3 Slice 2b / #233 Todo 2b — apply a MODEL-LEVEL criterion verdict (right-click "Criterion encoding"), keyed by
+   *  the criterion IDENTITY `(lib,name)`. The live canonical bodyHash is RE-RESOLVED from `criterionIdentities` at APPLY time
+   *  (never a captured snapshot) — so a rebuild that removed/changed the criterion since the menu opened safely no-ops. On
+   *  success persists (the 3rd sidecar map), repaints the chips on EVERY occurrence (no tree re-render), and refreshes the
+   *  gate/chrome. `unreviewed` clears the verdict. Returns false (untouched) on any guard/persist failure. */
+  function applyCriterionVerdict(lib: string, name: string, value: unknown, expectedBodyHash: string, seenElided: boolean): boolean {
     if (mode !== "medical-validation" || !mvSidecarPath) return false; // defensive: MV-only + a sidecar to persist into
     if (!isReviewState(value)) return false; // trusted-input guard
-    const sole = guardOutlines.get(nodeKey)?.soleCriterion;
-    if (!sole) return false; // no longer a single-criterion when (a rebuild changed the structure) — safe no-op
+    const key = criterionVerdictKey(lib, name);
+    const live = criterionIdentities.get(key); // the LIVE canonical fingerprint (re-resolved at apply time)
+    if (!live) return false; // no such criterion in the current model (a rebuild removed it) — safe no-op
     // disc 320 review [important] 1: if the body CHANGED between the menu opening and the pick (a rebuild — e.g. the KE / the
     // editor agent saved an edit to the criterion body mid-menu), the live hash ≠ the hash the reviewer saw. Storing a FRESH
     // (non-stale) pass here would pin a "correctly encoded" attestation to a body the reviewer never reviewed — exactly the
     // false attestation `bodyHash` exists to prevent. Refuse; the caller re-opens the menu on the new body.
-    if (expectedBodyHash !== undefined && expectedBodyHash !== sole.bodyHash) return false;
-    const key = criterionVerdictKey(sole.lib, sole.name);
-    const next = setCriterionVerdict(criterionVerdicts, key, value, sole.bodyHash); // "unreviewed" deletes; else stores {state,liveBodyHash}
+    if (expectedBodyHash !== live.bodyHash) return false;
+    // disc 330 [critical] (Claude): a "Correctly encoded" pass on a body the reviewer SAW ELIDED (a `…` truncation — an
+    // occurrence inside a breaching guard whose CANONICAL body may still be non-elided, so it would NOT go stale) is a false
+    // attestation of an unseen body. Refuse the PASS (they can attest it where its body is fully shown); fail/pending/clear
+    // are fine (they don't assert correctness). Canonical-elided folds in here too (its occurrences are all elided).
+    if (value === "pass" && seenElided) return false;
+    const next = setCriterionVerdict(criterionVerdicts, key, value, live.bodyHash); // "unreviewed" deletes; else stores {state,bodyHash}
     if (!persistMv(reviewByCaseId, notesByCaseId, next)) return false; // save (all three maps) failed → memory + disk untouched
     driveCriterionVerdicts(); // repaint the verdict chips on every occurrence (no tree re-render)
     renderTreeChrome(); // the criteria gate/chrome half changed
     return true;
+  }
+
+  /** #233 Todo 2b — resolve a right-click reveal hit to the criterion IDENTITY it addresses, or `undefined` if it is not a
+   *  criterion. TWO shapes: a ROOT criterion `when` ({nodeKey} whose guard outline's TOP expr is a criterion → derived via
+   *  `topCriterion`) OR a NON-ROOT `flow-crit-row` ({criterionOccurrence}, identity carried in the reveal). `bodyHash` is the
+   *  body the reviewer SAW (from the render) — the stale-guard baseline `applyCriterionVerdict` compares to the live hash. */
+  function resolveCriterionFromReveal(revealKey: string): { lib: string; name: string; bodyHash: string; elided: boolean } | undefined {
+    const hit = views.get("tree")?.reveals[revealKey];
+    if (!hit) return undefined;
+    if (isCriterionOccurrenceHit(hit)) return { ...hit.criterionOccurrence }; // non-root: identity + in-situ elided carried in the reveal
+    if ("nodeKey" in hit) {
+      const go = guardOutlines.get(hit.nodeKey);
+      const tc = go ? topCriterion(go.expr) : undefined;
+      if (tc) return { lib: tc.lib, name: tc.name, bodyHash: tc.bodyHash, elided: tc.elided === true }; // root: in-situ elided == canonical
+    }
+    return undefined;
   }
 
   function setWorklist(key: string, value: unknown): void {
@@ -2759,23 +2783,28 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   async function criterionEncodingMenu(revealKey: string): Promise<void> {
     const note = (msg: string): void => void vscode.window.setStatusBarMessage(`Medical Validation: ${msg}`, 3000);
     if (mode !== "medical-validation" || !mvSidecarPath) return note("not ready"); // no sidecar → can't persist
-    const tree = views.get("tree");
-    const hit = tree?.reveals[revealKey]; // trusted: opaque-key lookup, not a semantic key from the webview
-    const nodeKey = hit && "nodeKey" in hit ? hit.nodeKey : undefined;
-    const sole = nodeKey ? guardOutlines.get(nodeKey)?.soleCriterion : undefined;
-    if (!nodeKey || !sole) return note("not a criterion node");
-    const openHash = sole.bodyHash; // captured at open — the body the reviewer is judging (disc 320 review [important] 1)
+    // #233 Todo 2b: resolve the criterion identity from EITHER a root `when` ({nodeKey}→topCriterion) or a non-root crit-row
+    // ({criterionOccurrence}). `ident.bodyHash` = the body the reviewer SAW; `live` = the current canonical facts (elided + state).
+    const ident = resolveCriterionFromReveal(revealKey);
+    if (!ident) return note("not a criterion node");
+    const openHash = ident.bodyHash; // captured at open — the body the reviewer is judging (disc 320 review [important] 1)
     const openSidecar = mvSidecarPath; // captured at open — a policy switch during the pick must not write the old target
-    const key = criterionVerdictKey(sole.lib, sole.name);
-    const cur = criterionVerdictState(criterionVerdicts[key], { bodyHash: sole.bodyHash, elided: sole.elided === true });
+    const key = criterionVerdictKey(ident.lib, ident.name);
+    const live = criterionIdentities.get(key); // canonical elided/hash NOW (for the current-state + elided-warning display)
+    // disc 330 [nit] (Claude): a criterion REFERENCED but never DECLARED renders (named, `…`, bodyHash "sha256:missing") yet
+    // has no inventory entry → nothing to attest. Say so, rather than the misleading "the criterion may have changed".
+    if (!live) return note("this criterion isn't defined in the policy — nothing to review");
+    const liveFacts = { bodyHash: live.bodyHash, elided: live.elided };
+    const cur = criterionVerdictState(criterionVerdicts[key], liveFacts);
+    // disc 330 [critical]: the reviewer can't attest a body they SAW ELIDED — this OCCURRENCE's in-situ `…` (e.g. inside a
+    // breaching guard) OR a canonical elision. `applyCriterionVerdict` REFUSES a pass on it; disable the pass row + explain.
+    const seenElided = ident.elided || liveFacts.elided;
     const opt = (label: string, value: ReviewState, desc?: string): vscode.QuickPickItem & { value: ReviewState } => ({
       label,
       value,
       ...(desc ? { description: desc } : {}),
     });
-    // disc 320 review [nit] 4: an ELIDED criterion (body truncated in this view) can never hold a durable pass — mark the
-    // pass row so the reviewer isn't surprised when "Correctly encoded" immediately paints stale + keeps the gate open.
-    const passDesc = sole.elided ? "body truncated here — will show as stale" : cur === "pass" ? "current" : undefined;
+    const passDesc = seenElided ? "body truncated here — review where fully shown" : cur === "pass" ? "current" : undefined;
     const pick = await vscode.window.showQuickPick(
       [
         opt("$(pass) Correctly encoded", "pass", passDesc),
@@ -2783,15 +2812,16 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         opt("$(question) Undecided", "pending", cur === "pending" ? "current" : undefined),
         opt("$(circle-slash) Clear", "unreviewed", cur === "unreviewed" ? "current" : undefined),
       ],
-      { placeHolder: `Criterion "${sole.name}" — encoding review (all occurrences)` },
+      { placeHolder: `Criterion "${ident.name}" — encoding review (all occurrences)` },
     );
     if (!pick) return;
     if (mvSidecarPath !== openSidecar) return note("policy changed — reopen the menu"); // a retarget during the pick
-    if (!applyCriterionVerdict(nodeKey, pick.value, openHash)) return note("couldn't save — the criterion may have changed; reopen the menu");
+    if (pick.value === "pass" && seenElided) return note("can't mark truncated criterion correctly encoded — review it where its body is fully shown");
+    if (!applyCriterionVerdict(ident.lib, ident.name, pick.value, openHash, seenElided)) return note("couldn't save — the criterion may have changed; reopen the menu");
     note(
       pick.value === "unreviewed"
         ? "criterion verdict cleared"
-        : `criterion "${sole.name}" marked ${pick.value === "pass" ? "correctly encoded" : pick.value === "fail" ? "encoding wrong" : "undecided"}`,
+        : `criterion "${ident.name}" marked ${pick.value === "pass" ? "correctly encoded" : pick.value === "fail" ? "encoding wrong" : "undecided"}`,
     );
   }
 
@@ -2895,19 +2925,23 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const hit = tree?.reveals[revealKey];
     if (!tree || !hit) return flagNote("no node here");
     const choices = flagTargetChoices(hit);
-    // #224 ii.3 Slice 2b: a SINGLE-criterion `when` (its nodeKey carries a `soleCriterion` outline) additionally offers a
-    // model-level "Criterion encoding…" review. A criterion when has its concept suppressed → flagTargetChoices returns []
-    // for it, so without this it would fall straight through to verdict-only.
-    const critNodeKey = "nodeKey" in hit ? hit.nodeKey : undefined;
-    const isCriterion = critNodeKey !== undefined && guardOutlines.get(critNodeKey)?.soleCriterion !== undefined;
+    // #224 ii.3 Slice 2b / #233 Todo 2b: a criterion offers a model-level "Criterion encoding…" review. TWO shapes: a ROOT
+    // criterion `when` ({nodeKey} whose guard outline's TOP expr is a criterion, via topCriterion) OR a NON-ROOT crit-row
+    // ({criterionOccurrence}). A root criterion `when` still yields its "this condition" OCCURRENCE flag choice (only the
+    // concept OBJECT choice is suppressed), so `choices` is non-empty and it takes the full menu (verdict + encoding + flag).
+    // A non-root crit-row is NOT a case-bearing node (no fired-path `when`) → it offers ONLY the encoding review.
+    const rootGo = "nodeKey" in hit ? guardOutlines.get(hit.nodeKey) : undefined;
+    const isCriterion = (rootGo !== undefined && topCriterion(rootGo.expr) !== undefined) || isCriterionOccurrenceHit(hit);
+    const hasCaseVerdict = !isCriterionOccurrenceHit(hit);
     if (choices.length === 0 && !isCriterion) return nodeVerdictMenu(revealKey); // otherwise / use-decision → verdict only, unchanged
+    if (choices.length === 0 && isCriterion && !hasCaseVerdict) return criterionEncodingMenu(revealKey); // non-root crit-row → straight to encoding (no single-item menu)
     const ver = indexVersion; // capture BEFORE the menu — a retarget mid-menu must not act on this (now-old) hit
     const cel = currentCel;
-    // Verdict + (criterion when) "Criterion encoding" + one "Add flag on <target>" per choice — a `when` offers BOTH the
+    // Verdict + (criterion) "Criterion encoding" + one "Add flag on <target>" per choice — a `when` offers BOTH the
     // concept (object) and this condition (occurrence); a leaf offers just this recommendation; a decision root just the decision.
     const pick = await vscode.window.showQuickPick(
       [
-        { label: "$(checklist) Set case verdict…", act: "verdict" as const, choice: undefined as FlagTargetChoice | undefined },
+        ...(hasCaseVerdict ? [{ label: "$(checklist) Set case verdict…", act: "verdict" as const, choice: undefined as FlagTargetChoice | undefined }] : []),
         ...(isCriterion ? [{ label: "$(law) Criterion encoding…", act: "criterion" as const, choice: undefined as FlagTargetChoice | undefined }] : []),
         ...choices.map((c) => ({ label: `$(flag) Add flag on ${c.label}`, act: "flag" as const, choice: c as FlagTargetChoice | undefined })),
       ],
@@ -4315,7 +4349,9 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `root.addEventListener('contextmenu',(e)=>{` +
   `if(document.body.dataset.mode!=='medical-validation')return;` +
   `if(!(e.target.closest&&e.target.closest('.flow-svg')))return;` +
-  `const g=e.target.closest('.flow-row[data-reveal]');if(!g)return;` +
+  // #233 Todo 2b: also match a non-root criterion box (`.flow-crit-row[data-reveal]`) — its right-click opens the model-level
+  // criterion-encoding menu (host routes a `{criterionOccurrence}` hit to `criterionEncodingMenu`, never a case verdict).
+  `const g=e.target.closest('.flow-row[data-reveal],.flow-crit-row[data-reveal]');if(!g)return;` +
   `e.preventDefault();e.stopPropagation();v.postMessage({type:'nodeVerdictMenu',key:g.getAttribute('data-reveal')});});` +
   // #156 slice 4: the worklist dropdown's 'change' posts the opaque key + the chosen value; the host validates the value
   // is a known ReviewState and persists it. A native <select> is keyboard- + screen-reader-operable, so no hand-rolled

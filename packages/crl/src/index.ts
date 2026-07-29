@@ -192,6 +192,7 @@ export {
   branchConditionToDefStruct,
   buildGuardOutlines,
   buildCriterionIdentities,
+  criterionGateIdentities,
   topCriterion,
   criterionKey,
   DEF_EXPR_CAP,

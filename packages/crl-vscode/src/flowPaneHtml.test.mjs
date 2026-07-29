@@ -745,12 +745,19 @@ check("tree zoom: renders a floating − / reset / + control (the % is filled in
 
 
 // ── #224 ii.3 Todo 3: a criterion-bearing `when` hangs its GUARD OUTLINE (criterion body), keyed by nodeKey ──
-// The guardOutlines map VALUE is `{ expr, soleCriterion? }` (Slice 2): `soleCriterion` = a SINGLE-criterion-ref when
-// (collapsible + verdict-able). `gout(expr, name)` sets it; `gout(expr)` (no name) = a compound-with-criterion (always
-// expanded). A single-criterion when defaults to COLLAPSED — pass `expandedGuardWhens` to render its body.
+// #233 Todo 2b: the guardOutlines map VALUE is just `{ expr }` (`soleCriterion` RETIRED). A SOLE-criterion `when` has
+// `expr` = a `criterion` node (`gout(expr, name)` wraps it); the sole identity is DERIVED via `topCriterion(expr)`.
+// `gout(expr)` (no name) = a compound-with-criterion. A sole criterion defaults to COLLAPSED — pass `expandedGuardWhens`.
 const gleaf = (name, nodeKey, { isSource = true, isInferred = false, composite } = {}) => ({ kind: "leaf", name, lib: "Pol", nodeKey, isSource, isInferred, ...(composite ? { composite } : {}) });
 const gand = (...operands) => ({ kind: "and", operands });
-const gout = (expr, name) => ({ expr, ...(name ? { soleCriterion: { lib: "Pol", name, bodyHash: "sha256:0000000000000000" } } : {}) });
+// #233: `branchConditionToDefStruct` WRAPS every criterion ref in a `criterion` node; `gcrit` builds one. #233 Todo 2b:
+// `soleCriterion` was RETIRED — a `GuardOutline` is just `{ expr }`, and the sole identity is DERIVED via `topCriterion(expr)`.
+// So a SOLE criterion `when` (`gout(expr, name)`) WRAPS `expr` in a criterion node (the shape `buildGuardOutlines` emits);
+// `goutC` wraps an already-built criterion expr; a nameless `gout(expr)` is a plain compound guard.
+const CRIT_HASH = "sha256:0000000000000000";
+const gcrit = (name, operand, { elided = false } = {}) => ({ kind: "criterion", name, lib: "Pol", bodyHash: CRIT_HASH, operand, ...(elided ? { elided: true } : {}) });
+const goutC = (critExpr) => ({ expr: critExpr });
+const gout = (expr, name) => (name ? goutC(gcrit(name, expr)) : { expr });
 
 check("Todo 3: an EXPANDED single-criterion when hangs its body outline; the box keeps the CRITERION name + a ▾ chevron", () => {
   const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
@@ -875,37 +882,31 @@ check("Todo 3 Slice 2b: a compound-with-criterion guard (no soleCriterion) recor
   assert.ok(!/flow-crit-verdict/.test(rr.html), "no verdict chip on a non-single-criterion guard");
 });
 
-check("Todo 3 Slice 2b: the verdict chip is hidden by default and each state (pass/fail/pending/stale) is revealed by its row class", () => {
+check("Todo 3 Slice 2b / #233 Todo 2b: the verdict chip is hidden by default; `.crit-*` (row-type-agnostic → matches BOTH the root when box and a non-root crit-row) reveals each state", () => {
   assert.ok(/\.flow-crit-verdict\{display:none/.test(FLOW_STYLE), "chip hidden by default");
   for (const s of ["pass", "fail", "pending", "stale"])
-    assert.ok(FLOW_STYLE.includes(`.flow-row.crit-${s} .flow-crit-verdict`), `.crit-${s} reveals the chip`);
+    assert.ok(FLOW_STYLE.includes(`.crit-${s} .flow-crit-verdict`), `.crit-${s} reveals the chip (no .flow-row prefix → covers the crit-row too)`);
   // The dot color for each state is distinct (the case-verdict TOK_* for pass/fail/pending; a muted grey for stale).
-  assert.ok(/\.flow-row\.crit-stale \.flow-crit-vdot\{fill:var\(--vscode-descriptionForeground/.test(FLOW_STYLE), "stale dot is muted grey (never a settled pass/fail color)");
+  assert.ok(/\.crit-stale \.flow-crit-vdot\{fill:var\(--vscode-descriptionForeground/.test(FLOW_STYLE), "stale dot is muted grey (never a settled pass/fail color)");
 });
 
-// ── #233 Todo 2a: criterion-everywhere — a criterion renders as a NAMED collapsible box at EVERY guard position ──
-// `branchConditionToDefStruct` (Todo 1) now WRAPS every criterion ref in a `criterion` DefStructExpr node. `gcrit` builds
-// that node; `goutC` wraps a ROOT criterion into a guard outline with `soleCriterion` DERIVED (mirroring buildGuardOutlines'
-// `topCriterion` — the sole/root case, absorbed into the when box). A NON-ROOT criterion node (a conjunct / nested body ref)
-// draws its OWN named `flow-crit-row` box with an independent, position-keyed chevron.
-const CRIT_HASH = "sha256:0000000000000000";
-const gcrit = (name, operand, { elided = false } = {}) => ({ kind: "criterion", name, lib: "Pol", bodyHash: CRIT_HASH, operand, ...(elided ? { elided: true } : {}) });
-const goutC = (critExpr) => ({ expr: critExpr, soleCriterion: { lib: critExpr.lib, name: critExpr.name, bodyHash: critExpr.bodyHash, ...(critExpr.elided ? { elided: true } : {}) } });
+// ── #233 Todo 2a/2b: criterion-everywhere — a criterion renders as a NAMED collapsible box at EVERY guard position ──
+// (`gcrit`/`goutC`/`gout` are defined at the top of the file — a SOLE criterion `when` wraps its body in a `criterion`
+//  node; a NON-ROOT criterion node draws its OWN named `flow-crit-row` box with an independent, position-keyed chevron.)
 
-check("#233 Todo 2a ROOT-ABSORPTION: a WRAPPED root criterion renders BYTE-IDENTICALLY to the old sidecar shape (sole stays absorbed into the when box; no redundant crit-row)", () => {
-  const body = () => gand(gleaf("A", "c:A"), gleaf("B", "c:B"));
-  const oldShape = new Map([["w:crit", gout(body(), "Elig")]]); // pre-Todo-1: expr = the body, soleCriterion sidecar
-  const newShape = new Map([["w:crit", goutC(gcrit("Elig", body()))]]); // Todo 1: expr = the criterion node wrapping the body
-  const exp = new Set(["w:crit"]);
-  const a = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "z_", guardOutlines: oldShape, expandedGuardWhens: exp });
-  const b = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "z_", guardOutlines: newShape, expandedGuardWhens: exp });
-  assert.equal(b.html, a.html, "EXPANDED: the wrapped root criterion is UNWRAPPED to its body → identical render");
-  assert.ok(!/flow-crit-row/.test(b.html), "the ROOT criterion does NOT draw its own crit-row (absorbed into the when box)");
-  // gpt56 #1: also pin the DEFAULT (collapsed) state — the normal path (no expansion set). Both render only the when box.
-  const ca = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "z_", guardOutlines: oldShape });
-  const cb = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "z_", guardOutlines: newShape });
-  assert.equal(cb.html, ca.html, "COLLAPSED: the wrapped root criterion renders the same collapsed when box as the sidecar shape");
-  assert.ok(!/flow-crit-row/.test(cb.html), "collapsed root criterion still draws no crit-row");
+check("#233 Todo 2a ROOT-ABSORPTION: a SOLE criterion is absorbed into the `when` box (chevron + name + body), NOT a redundant crit-row", () => {
+  const gouts = new Map([["w:crit", gout(gand(gleaf("A", "c:A"), gleaf("B", "c:B")), "Elig")]]); // sole → expr is a criterion node
+  // EXPANDED: the when box carries the criterion name + a ▾ chevron; the body leaves hang; NO separate crit-row for the root.
+  const e = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "z_", guardOutlines: gouts, expandedGuardWhens: new Set(["w:crit"]) });
+  assert.match(e.html, /class="flow-row flow-when flow-greyborder"[^>]*><title>Elig/, "the root criterion is the when box (named Elig), not a crit-row");
+  assert.ok(/<text[^>]*>Elig<\/text>/.test(e.html) && /data-toggle-crit="[^"]*"><title>collapse criterion body</.test(e.html), "when box named Elig + a ▾ chevron");
+  assert.deepEqual(leafRowsOf(e.html).map((l) => l.label).sort(), ["A", "B"], "the body leaves hang below the when box");
+  assert.ok(!/flow-crit-row/.test(e.html), "the ROOT criterion draws NO crit-row (absorbed into the when box)");
+  // COLLAPSED (default): the when box keeps the name + a ▸ chevron; no body, no crit-row.
+  const c = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "z_", guardOutlines: gouts });
+  assert.ok(/data-toggle-crit="[^"]*"><title>expand criterion body</.test(c.html) && /<text[^>]*>Elig<\/text>/.test(c.html), "collapsed: named ▸ when box");
+  assert.equal(leafRowsOf(c.html).length, 0, "collapsed: no body leaves");
+  assert.ok(!/flow-crit-row/.test(c.html), "collapsed root criterion draws no crit-row");
 });
 
 check("#233 Todo 2a: a WRAPPED root criterion's occurrence still collects bodyConcepts — collectLeafIdentities RECURSES the criterion node (else the rollup silently empties)", () => {
@@ -933,13 +934,24 @@ check("#233 Todo 2a: a NON-ROOT criterion conjunct (`when A and CritC`) draws Cr
   assert.deepEqual(rr.criterionOccurrences[0].bodyConcepts.map((c) => `${c.lib}:${c.name}`), ["Pol:B"], "bodyConcepts = the criterion body leaves (rollup substrate)");
 });
 
-check("#233 Todo 2a: a non-root criterion's chevron resolves to a {criterionToggle} reveal (NOT a selectable {nodeKey}); the crit-row is flaggable for the rollup", () => {
+check("#233 Todo 2a/2b: a non-root criterion has TWO channels — a {criterionToggle} chevron + a {criterionOccurrence} box (identity + canonical bodyHash); the crit-row is flaggable", () => {
   const gouts = new Map([["w:cmp", { expr: cmpExpr() }]]);
   const rr = renderFlowPane(cmpStruct(), { concepts: critCs(), revealPrefix: "nrt_", guardOutlines: gouts });
   const togs = Object.values(rr.reveals).filter((h) => "criterionToggle" in h);
-  assert.equal(togs.length, 1, "exactly one {criterionToggle} reveal (the non-root criterion chevron)");
+  assert.equal(togs.length, 1, "exactly one {criterionToggle} reveal (the chevron)");
   assert.ok(togs[0].criterionToggle.startsWith("leaf::"), "the criterionToggle carries the position (leaf::) key, not a structure nodeKey");
+  const occs = Object.values(rr.reveals).filter((h) => "criterionOccurrence" in h);
+  assert.equal(occs.length, 1, "exactly one {criterionOccurrence} reveal (the box body, for right-click encoding)");
+  assert.deepEqual(occs[0].criterionOccurrence, { lib: "Pol", name: "CritC", bodyHash: CRIT_HASH, elided: false }, "the occurrence carries identity + CANONICAL bodyHash (staleness key) + in-situ elided (false here)");
   assert.ok(rr.flaggableGids.includes(rr.criterionOccurrences[0].gid), "the crit-row gid is flaggable (collapsed-body rollup target)");
+});
+
+check("#233 Todo 2b: a NON-ROOT criterion whose in-situ body is ELIDED carries elided:true in its {criterionOccurrence} (drives the pass-refusal)", () => {
+  // A criterion node with an elided body (e.g. a breaching guard converted at hop budget 0) renders a named box + a `…` body.
+  const gouts = new Map([["w:cmp", { expr: gand(gleaf("A", "c:A"), gcrit("CritC", { kind: "more", count: 0 }, { elided: true })) }]]);
+  const rr = renderFlowPane(cmpStruct(), { concepts: critCs(), revealPrefix: "elc_", guardOutlines: gouts });
+  const occ = Object.values(rr.reveals).find((h) => "criterionOccurrence" in h).criterionOccurrence;
+  assert.equal(occ.elided, true, "the reveal carries the occurrence's in-situ elided so the host refuses a sight-unseen pass");
 });
 
 check("#233 Todo 2a: EXPANDING a non-root criterion (its posKey in expandedGuardWhens) reveals its body + flips to a ▾ chevron; collapse is POSITION-keyed", () => {
@@ -957,14 +969,15 @@ check("#233 Todo 2a: the crit-row has its OWN CSS (box + a has-flag rollup rule 
   assert.match(FLOW_STYLE, /\.flow-crit-row\.has-flag \.flow-flag-badge\{display:inline\}/, "the crit-row rollup ⚑ shows on host .has-flag (its own rule — .flow-row wouldn't match)");
 });
 
-check("#233 Todo 2a: the crit-row box carries NO data-reveal (left/right-click inert); only its chevron is interactive (gpt56 #3)", () => {
+check("#233 Todo 2b: the crit-row box carries a {criterionOccurrence} data-reveal (RIGHT-click → encoding menu; LEFT-click inert) + a HIDDEN verdict chip", () => {
   const gouts = new Map([["w:cmp", { expr: cmpExpr() }]]);
   const rr = renderFlowPane(cmpStruct(), { concepts: critCs(), revealPrefix: "ir_", guardOutlines: gouts });
-  // The crit-row GROUP opening tag closes with `>` immediately after `class="..."` — proving NO `data-reveal` attribute on
-  // the box, so `closest('[data-reveal]')` (left-click) and the right-click `.flow-row[data-reveal]` selector both miss it.
-  assert.ok(/<g id="[^"]*" class="flow-outline flow-crit-row">/.test(rr.html), "the crit-row group has no data-reveal (tag ends right after class)");
-  assert.ok(/class="flow-crit-toggle" data-toggle-crit=/.test(rr.html), "only the chevron is interactive (data-toggle-crit)");
-  assert.ok(!/class="flow-row[^"]*flow-crit-row/.test(rr.html), "the crit-row is NOT a .flow-row (so the right-click .flow-row[data-reveal] selector can't catch it)");
+  // The crit-row GROUP now carries a data-reveal (its {criterionOccurrence} key) for the right-click encoding menu; the
+  // chevron has its OWN data-toggle-crit key. A hidden `.flow-crit-verdict` chip is pre-rendered (host reveals per verdict).
+  assert.ok(/<g id="[^"]*" class="flow-outline flow-crit-row" data-reveal="[^"]*">/.test(rr.html), "the crit-row group carries a data-reveal (right-click encoding)");
+  assert.ok(/class="flow-crit-toggle" data-toggle-crit=/.test(rr.html), "the chevron has its own data-toggle-crit (a DISTINCT key)");
+  assert.ok(/<g class="flow-crit-verdict">/.test(rr.html), "a non-root crit-row carries a pre-rendered (hidden) verdict chip");
+  assert.ok(!/class="flow-row[^"]*flow-crit-row/.test(rr.html), "the crit-row is NOT a .flow-row (verdict-fill/ring channels don't touch it)");
 });
 
 check("#233 Todo 2a: nested criterion independence — a criterion INSIDE another criterion's body renders its OWN collapsed row only when the parent is expanded; rollup flows through while folded", () => {

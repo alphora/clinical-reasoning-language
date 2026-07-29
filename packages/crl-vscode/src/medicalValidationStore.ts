@@ -79,7 +79,7 @@ export interface MedicalValidationSidecar {
 }
 
 /** A persisted CRITERION verdict — the reviewer's judgment on whether a criterion is correctly encoded, plus the
- *  `bodyHash` (from `GuardOutline.soleCriterion`) of the body they approved. If the live body's hash differs (an edit) or
+ *  canonical `bodyHash` (from the `buildCriterionIdentities` inventory, #233 Todo 2b) of the body they approved. If the live body's hash differs (an edit) or
  *  the body is `elided`, the stored `state` is treated as STALE, never shown as the settled verdict (disc 319 [critical] 1).
  *  NOTE: `bodyHash` fingerprints the RENDERED OUTLINE expr (`hashExpr` in crl `provenance/guardOutline.ts`), NOT source
  *  text — so a formatting-only edit does NOT stale a verdict (good), and a change behind an `external`/unresolved-ref stub
@@ -468,10 +468,10 @@ export function deleteNote(
 // ── criterion verdicts (#224 ii.3 Slice 2b) ────────────────────────────────────────
 // Model-level verdicts on a CRITERION's encoding, keyed by identity `JSON([lib,name])` (library-local, reviewed once
 // across occurrences + cases). Pure reducers + derivation, mirroring the per-case verdict layer; the host holds the map
-// + the live rendered-criterion facts (bodyHash + elided from `GuardOutline.soleCriterion`) and calls these.
+// + the live criterion facts (bodyHash + elided from the canonical `buildCriterionIdentities` inventory, #233 Todo 2b).
 
-/** The criterion-verdict identity key — `JSON([lib,name])` (collision-proof, matches the other JSON keys here). The host
- *  builds it from `GuardOutline.soleCriterion.{lib,name}`. Exported so the host + tests key identically. */
+/** The criterion-verdict identity key — `JSON([lib,name])` (collision-proof, matches the other JSON keys here — it EQUALS
+ *  `criterionKey` in guardOutline.ts, so a canonical-inventory `.get` joins directly). Exported so host + tests key identically. */
 export function criterionVerdictKey(lib: string, name: string): string {
   return JSON.stringify([lib, name]);
 }
@@ -491,7 +491,8 @@ export function setCriterionVerdict(
   return out;
 }
 
-/** The LIVE facts about a rendered criterion (from `GuardOutline.soleCriterion`) the staleness fold needs. */
+/** The LIVE facts about a criterion (its canonical `bodyHash` + `elided`, from the render-independent
+ *  `buildCriterionIdentities` inventory — #233 Todo 2b) the staleness fold needs. */
 export interface LiveCriterion {
   bodyHash: string;
   elided: boolean;
@@ -516,11 +517,11 @@ export function criterionVerdictState(
  *  N occurrences of one criterion = ONE identity). `passed` counts only FRESH passes (a stale-or-changed pass is NOT
  *  passed — it's `stale`). Mirrors `ReviewProgress`'s shape; `total = identities.size`.
  *
- *  SCOPE (settled, disc 319 [critical] 2): the identities are ONLY the single-top-level-criterion-ref guards (`soleCriterion`)
- *  — the reviewable/collapse unit. A criterion referenced EXCLUSIVELY in COMPOUND guards (`when A and criterion C`) yields no
- *  `soleCriterion`, so it is absent from `identities` → absent from this tally → does NOT gate `mvComplete`. That is the
- *  deferred compound-with-criterion slice, NOT a silent pass: such a criterion is simply not independently reviewed in 2b. A
- *  criterion that appears at BOTH single-ref and compound sites IS gated (via its single-ref occurrence, verdict shared). */
+ *  SCOPE (#233 Todo 2b): the identities are the CANONICAL per-declaration inventory (`buildCriterionIdentities`) — EVERY
+ *  declared criterion the covered libraries reference, render-independent. A criterion referenced ONLY in a compound/nested
+ *  position (`when A and criterion C`), or under a collapsed ancestor, is STILL tallied here → it gates `mvComplete` (the
+ *  morbid-obesity 2→6 growth). A criterion whose CANONICAL body is elided is permanently un-passable (`criterionVerdictState`
+ *  → stale) — gate-livelock BY DESIGN ("can't attest what can't be rendered", disc 327 pt 2). One identity per (lib,name). */
 export interface CriterionProgress {
   total: number;
   passed: number;
@@ -528,6 +529,11 @@ export interface CriterionProgress {
   pending: number;
   stale: number;
   unreviewed: number;
+  /** #233 Todo 2b: how many gated criteria have an ELIDED canonical body — permanently un-passable (a pass immediately
+   *  reads stale, `mvComplete` can never clear on them). OVERLAPS `unreviewed`/`stale` (an elided criterion is one of those
+   *  by verdict state); a SEPARATE informational count so the chrome can name WHY the gate is stuck ("cannot complete"),
+   *  instead of an undifferentiated "N/M" the reviewer chases forever (gpt56 disc 330 [important]). */
+  truncated: number;
 }
 
 export function criterionProgress(
@@ -539,7 +545,9 @@ export function criterionProgress(
   let pending = 0;
   let stale = 0;
   let unreviewed = 0;
+  let truncated = 0;
   for (const [key, live] of identities) {
+    if (live.elided) truncated++; // informational overlay (an elided criterion is also unreviewed-or-stale by state)
     const s = criterionVerdictState(map[key], live);
     if (s === "pass") passed++;
     else if (s === "fail") failed++;
@@ -547,7 +555,7 @@ export function criterionProgress(
     else if (s === "stale") stale++;
     else unreviewed++;
   }
-  return { total: identities.size, passed, failed, pending, stale, unreviewed };
+  return { total: identities.size, passed, failed, pending, stale, unreviewed, truncated };
 }
 
 /** The criteria-half "clean" predicate — EVERY rendered criterion is a FRESH pass (or there are none). A policy with no
@@ -568,6 +576,9 @@ export function renderCriterionChrome(cp: CriterionProgress): string {
   if (cp.failed > 0) parts.push(`${cp.failed} encoding wrong`);
   if (cp.pending > 0) parts.push(`${cp.pending} undecided`);
   if (cp.stale > 0) parts.push(`${cp.stale} stale`);
+  // #233 Todo 2b: an elided-canonical criterion is permanently un-passable — name it as the blocker so the reviewer knows
+  // the gate cannot clear (not an undifferentiated N/M they chase). "cannot complete" makes the by-design livelock legible.
+  if (cp.truncated > 0) parts.push(`${cp.truncated} truncated — cannot complete`);
   return `<div class="mv-criteria">${parts.join(" · ")}</div>`;
 }
 

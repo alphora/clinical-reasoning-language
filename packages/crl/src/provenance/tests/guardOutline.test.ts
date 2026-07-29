@@ -8,7 +8,7 @@ import type { ResolvedCelGraph } from "../../cel/imports/types";
 import { leafEligibleConcepts } from "../../cql-emitter/lowerLocalCodes";
 import { buildCrlConceptLayer } from "../crlConceptLayer";
 import { buildDefExprIndex, DEF_MAX_EXPR_DEPTH, type DefStructExpr, type ResolveDefExprEntry } from "../definedAsExpr";
-import { branchConditionToDefStruct, buildCriterionIdentities, buildGuardOutlines } from "../guardOutline";
+import { branchConditionToDefStruct, buildCriterionIdentities, buildGuardOutlines, criterionGateIdentities, criterionKey, topCriterion } from "../guardOutline";
 import { collectLibs, decisionSubNodeRef, nodeKey } from "../indexer";
 import { buildCrlStructure } from "../crlStructure";
 
@@ -83,8 +83,8 @@ describe("buildGuardOutlines — criterion-bearing when → guard outline (Flow 
     expect([...outlines.keys()]).toEqual([eligKey]);
     expect(outlines.has(compoundKey)).toBe(false);
 
-    // The single-criterion-ref when carries its criterion identity + a body fingerprint (the collapse/verdict unit).
-    const sole = outlines.get(eligKey)!.soleCriterion!;
+    // The single-criterion-ref when's identity + body fingerprint (the collapse/verdict unit) is DERIVED via topCriterion.
+    const sole = topCriterion(outlines.get(eligKey)!.expr)!;
     expect(sole.lib).toBe("T");
     expect(sole.name).toBe("Elig");
     expect(sole.bodyHash).toMatch(/^sha256:[0-9a-f]{16}$/);
@@ -157,8 +157,8 @@ first:
     const outlines = buildGuardOutlines(graph, defIndexOf(graph));
     expect([...outlines.keys()]).toEqual([nodeKey(decisionSubNodeRef("T", "D", "when[0]"))]);
     const rec = outlines.get(nodeKey(decisionSubNodeRef("T", "D", "when[0]")))!;
-    // Compound guard (`A and C1`) → no soleCriterion (top-level is `and`, not a single criterion node).
-    expect(rec.soleCriterion).toBeUndefined();
+    // Compound guard (`A and C1`) → no sole criterion (top-level is `and`, not a single criterion node).
+    expect(topCriterion(rec.expr)).toBeUndefined();
     expect(rec.expr.kind).toBe("and");
     if (rec.expr.kind !== "and") throw new Error("unreachable");
     const [a, c1] = rec.expr.operands;
@@ -171,7 +171,7 @@ first:
     expect(c1.elided).toBe(true);
   });
 
-  it("#233: a SINGLE cyclic criterion → a NAMED `criterion` expr + derived soleCriterion with `elided:true`", () => {
+  it("#233: a SINGLE cyclic criterion → a NAMED `criterion` expr + derived sole identity (topCriterion) with `elided:true`", () => {
     const cyc = `library "T".
 activity "X":
 - request CPGCommunicationRequest.
@@ -186,13 +186,13 @@ first:
 - otherwise then recommend activity "X".`;
     const graph = graphFrom(cyc, CEL);
     const rec = buildGuardOutlines(graph, defIndexOf(graph)).get(nodeKey(decisionSubNodeRef("T", "D", "when[0]")))!;
-    // #233: the sole criterion keeps its NAME (was a bare `{kind:"more"}`); soleCriterion is DERIVED from the node.
+    // #233: the sole criterion keeps its NAME (was a bare `{kind:"more"}`); the sole identity is DERIVED via topCriterion.
     expect(rec.expr.kind).toBe("criterion");
     if (rec.expr.kind !== "criterion") throw new Error("unreachable");
     expect(rec.expr.name).toBe("C1");
     expect(rec.expr.elided).toBe(true);
-    expect(rec.soleCriterion).toMatchObject({ lib: "T", name: "C1", elided: true });
-    expect(rec.soleCriterion!.bodyHash).toMatch(/^sha256:[0-9a-f]{16}$/);
+    expect(topCriterion(rec.expr)).toMatchObject({ lib: "T", name: "C1", elided: true });
+    expect(topCriterion(rec.expr)!.bodyHash).toMatch(/^sha256:[0-9a-f]{16}$/);
   });
 
   it("#233: a COMPOUND `when (A and CritC)` yields an `and` with a NAMED `criterion` node (name preserved, body hung below)", () => {
@@ -214,7 +214,7 @@ first:
 - otherwise then recommend activity "X".`;
     const graph = graphFrom(src, CEL);
     const rec = buildGuardOutlines(graph, defIndexOf(graph)).get(nodeKey(decisionSubNodeRef("T", "D", "when[0]")))!;
-    expect(rec.soleCriterion).toBeUndefined(); // compound guard
+    expect(topCriterion(rec.expr)).toBeUndefined(); // compound guard → no top-level sole criterion
     expect(rec.expr.kind).toBe("and");
     if (rec.expr.kind !== "and") throw new Error("unreachable");
     const [a, crit] = rec.expr.operands;
@@ -456,5 +456,60 @@ criterion "Wide":
     if (out.kind !== "and") throw new Error("unreachable");
     expect(out.operands).toHaveLength(11); // 10 operands + a `more` stub (DEF_EXPR_CAP = 10)
     expect(out.operands[10]).toEqual({ kind: "more", count: 3 });
+  });
+
+  it("#233 Todo 2b GATE: criterionGateIdentities = criteria REACHABLE from guards ONLY — a declared-but-unused criterion is EXCLUDED (no livelock, disc 330)", () => {
+    const src = `library "T".
+concept "A":
+- type is Observation.
+- code is \`a\`.
+concept "B":
+- type is Observation.
+- code is \`b\`.
+activity "X":
+- request CPGCommunicationRequest.
+- with \`x\`.
+criterion "Used":
+- when "A".
+criterion "Orphan":
+- when "B".
+decision "D":
+first:
+- when "Used" then recommend activity "X".
+- otherwise then recommend activity "X".`;
+    const graph = graphFrom(src, CEL);
+    const defIndex = defIndexOf(graph);
+    const identities = buildCriterionIdentities(graph, defIndex);
+    // The CANONICAL inventory stamps EVERY declared criterion — both Used and Orphan.
+    expect([...identities.keys()].sort()).toEqual([criterionKey("T", "Orphan"), criterionKey("T", "Used")].sort());
+    const gate = criterionGateIdentities(buildGuardOutlines(graph, defIndex, identities), identities);
+    // The GATE set has ONLY "Used" (in a decision guard). "Orphan" (declared, never referenced) renders nowhere → EXCLUDED,
+    // so it can never livelock `mvComplete` with an un-findable entry.
+    expect([...gate.keys()]).toEqual([criterionKey("T", "Used")]);
+    expect(gate.get(criterionKey("T", "Used"))).toMatchObject({ lib: "T", name: "Used", elided: false });
+  });
+
+  it("#233 Todo 2b GATE: a criterion reachable ONLY through another criterion's body IS gated; a criterion at multiple sites is deduped", () => {
+    const src = `library "T".
+concept "A":
+- type is Observation.
+- code is \`a\`.
+activity "X":
+- request CPGCommunicationRequest.
+- with \`x\`.
+criterion "Inner":
+- when "A".
+criterion "Outer":
+- when "Inner".
+decision "D":
+first:
+- when ( "Outer" and "Inner" ) then recommend activity "X".
+- otherwise then recommend activity "X".`;
+    const graph = graphFrom(src, CEL);
+    const defIndex = defIndexOf(graph);
+    const identities = buildCriterionIdentities(graph, defIndex);
+    const gate = criterionGateIdentities(buildGuardOutlines(graph, defIndex, identities), identities);
+    // Inner is reachable BOTH directly (a conjunct) AND nested inside Outer's body → gated ONCE; Outer gated too.
+    expect([...gate.keys()].sort()).toEqual([criterionKey("T", "Inner"), criterionKey("T", "Outer")].sort());
   });
 });

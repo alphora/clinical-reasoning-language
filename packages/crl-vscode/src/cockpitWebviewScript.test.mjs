@@ -614,7 +614,7 @@ check("#217 webview: a contextmenu listener gates MV (live data-mode) + .flow-sv
   assert.ok(/addEventListener\('contextmenu',\(e\)=>\{/.test(SCRIPT), "contextmenu listener present");
   assert.ok(/contextmenu'[\s\S]*document\.body\.dataset\.mode!=='medical-validation'\)return/.test(SCRIPT), "MV-only via the LIVE data-mode signal (else native menu preserved)");
   assert.ok(/contextmenu'[\s\S]*closest\('\.flow-svg'\)\)\)return/.test(SCRIPT), "flow/tree pane ONLY (else the shared script would suppress the native menu in other panes)");
-  assert.ok(/contextmenu'[\s\S]*closest\('\.flow-row\[data-reveal\]'\)/.test(SCRIPT), "a rendered structure node (guard tabs are .flow-guard-tab, excluded)");
+  assert.ok(/contextmenu'[\s\S]*closest\('\.flow-row\[data-reveal\],\.flow-crit-row\[data-reveal\]'\)/.test(SCRIPT), "a rendered structure node OR a non-root criterion box (#233 Todo 2b); guard tabs are .flow-guard-tab, excluded");
   assert.ok(/contextmenu'[\s\S]*e\.preventDefault\(\);e\.stopPropagation\(\);v\.postMessage\(\{type:'nodeVerdictMenu',key:g\.getAttribute\('data-reveal'\)\}\)/.test(SCRIPT), "suppresses the native menu + posts the OPAQUE render key");
 });
 check("#217 webview: the render handler stamps the LIVE mode onto document.body.dataset.mode each render", () => {
@@ -720,10 +720,10 @@ check("#224 Slice 2b webview: the criterionVerdicts handler bulk-clears crit-* o
   assert.match(SCRIPT, /m\.allGids\|\|\[\]\)\)\{const el=document\.getElementById\(id\);if\(el\)\{el\.classList\.remove\('crit-pass'\);el\.classList\.remove\('crit-fail'\);el\.classList\.remove\('crit-pending'\);el\.classList\.remove\('crit-stale'\)/);
   assert.match(SCRIPT, /for\(const s of \['pass','fail','pending','stale'\]\)\{for\(const id of \(bs\[s\]\|\|\[\]\)\)\{const el=document\.getElementById\(id\);if\(el\)el\.classList\.add\('crit-'\+s\)/);
 });
-check("#224 Slice 2b host: buildLiveCriterionIdentities dedups by (lib,name) → {bodyHash,elided} from soleCriterion", () => {
+check("#233 Todo 2b host: buildLiveCriterionIdentities = REACHABLE gate set (criterionGateIdentities over the guard outlines), not all declared / soleCriterion", () => {
   assert.match(COCKPIT_SRC, /function buildLiveCriterionIdentities\(\)/);
-  assert.match(COCKPIT_SRC, /const s = go\.soleCriterion/);
-  assert.match(COCKPIT_SRC, /out\.set\(key, \{ bodyHash: s\.bodyHash, elided: s\.elided === true \}\)/);
+  assert.match(COCKPIT_SRC, /for \(const \[key, id\] of criterionGateIdentities\(guardOutlines, criterionIdentities\)\) out\.set\(key, \{ bodyHash: id\.bodyHash, elided: id\.elided \}\)/);
+  assert.ok(!/go\.soleCriterion|\.soleCriterion/.test(COCKPIT_SRC), "no host code reads the retired soleCriterion sidecar");
 });
 check("#224 Slice 2b host: driveCriterionVerdicts groups occurrences by IDENTITY state (criterionVerdictState); unreviewed → no class", () => {
   assert.match(COCKPIT_SRC, /function driveCriterionVerdicts\(\)/);
@@ -731,32 +731,43 @@ check("#224 Slice 2b host: driveCriterionVerdicts groups occurrences by IDENTITY
   assert.match(COCKPIT_SRC, /if \(s !== "unreviewed"\) byState\[s\]\.push\(occ\.gid\)/);
   assert.match(COCKPIT_SRC, /type: "criterionVerdicts", gen: tree\.gen, allGids, byState/);
 });
-check("#224 Slice 2b host: applyCriterionVerdict RE-RESOLVES identity+bodyHash live (stale rebuild no-ops) + persists the 3rd map", () => {
-  assert.match(COCKPIT_SRC, /function applyCriterionVerdict\(nodeKey: string, value: unknown/);
-  assert.match(COCKPIT_SRC, /const sole = guardOutlines\.get\(nodeKey\)\?\.soleCriterion/);
-  assert.match(COCKPIT_SRC, /setCriterionVerdict\(criterionVerdicts, key, value, sole\.bodyHash\)/);
+check("#233 Todo 2b host: applyCriterionVerdict is keyed by (lib,name), RE-RESOLVES the live canonical bodyHash (stale rebuild no-ops) + persists the 3rd map", () => {
+  assert.match(COCKPIT_SRC, /function applyCriterionVerdict\(lib: string, name: string, value: unknown, expectedBodyHash: string, seenElided: boolean\)/);
+  assert.match(COCKPIT_SRC, /const live = criterionIdentities\.get\(key\)/);
+  assert.match(COCKPIT_SRC, /setCriterionVerdict\(criterionVerdicts, key, value, live\.bodyHash\)/);
   assert.match(COCKPIT_SRC, /persistMv\(reviewByCaseId, notesByCaseId, next\)/);
 });
-check("#224 Slice 2b host: applyCriterionVerdict refuses a STALE-body write (expectedBodyHash guard) so a mid-menu edit can't pin a false pass", () => {
-  assert.match(COCKPIT_SRC, /function applyCriterionVerdict\(nodeKey: string, value: unknown, expectedBodyHash\?: string\)/);
-  assert.match(COCKPIT_SRC, /if \(expectedBodyHash !== undefined && expectedBodyHash !== sole\.bodyHash\) return false/);
-  // the menu captures the hash + sidecar at OPEN and threads/guards them across the pick await
-  assert.match(COCKPIT_SRC, /const openHash = sole\.bodyHash;/);
+check("#233 Todo 2b host: applyCriterionVerdict refuses (a) a STALE-body write (expectedBodyHash vs live hash) and (b) a PASS on a SEEN-ELIDED body — no false attestation", () => {
+  assert.match(COCKPIT_SRC, /if \(expectedBodyHash !== live\.bodyHash\) return false/); // expectedBodyHash now REQUIRED (no `!== undefined` guard)
+  assert.match(COCKPIT_SRC, /if \(value === "pass" && seenElided\) return false/); // disc 330 [critical]: can't attest an unseen (…) body
+  // the encoding menu resolves identity + in-situ elided via resolveCriterionFromReveal, captures the seen hash + sidecar at OPEN, guards across the pick await
+  assert.match(COCKPIT_SRC, /const ident = resolveCriterionFromReveal\(revealKey\)/);
+  assert.match(COCKPIT_SRC, /const openHash = ident\.bodyHash;/);
+  assert.match(COCKPIT_SRC, /const seenElided = ident\.elided \|\| liveFacts\.elided/);
   assert.match(COCKPIT_SRC, /const openSidecar = mvSidecarPath;/);
   assert.match(COCKPIT_SRC, /if \(mvSidecarPath !== openSidecar\) return note\("policy changed/);
-  assert.match(COCKPIT_SRC, /applyCriterionVerdict\(nodeKey, pick\.value, openHash\)/);
+  assert.match(COCKPIT_SRC, /applyCriterionVerdict\(ident\.lib, ident\.name, pick\.value, openHash, seenElided\)/);
 });
 check("#224 Slice 2b host: the criterion-encoding menu uses DISTINCT vocab (Correctly encoded / Encoding wrong / Undecided / Clear), never the per-case 'Needs work'", () => {
   assert.match(COCKPIT_SRC, /function criterionEncodingMenu\(/);
   const at = COCKPIT_SRC.indexOf("function criterionEncodingMenu");
-  const body = COCKPIT_SRC.slice(at, at + 2400);
+  const body = COCKPIT_SRC.slice(at, at + 3200);
   for (const label of ["Correctly encoded", "Encoding wrong", "Undecided", "Clear"]) assert.ok(body.includes(label), `menu offers "${label}"`);
   assert.ok(!/Needs work/.test(body), "criterion menu does not reuse a per-case verdict label");
 });
-check("#224 Slice 2b host: nodeMenu offers 'Criterion encoding' ONLY for a soleCriterion node, routing to criterionEncodingMenu", () => {
-  assert.match(COCKPIT_SRC, /guardOutlines\.get\(critNodeKey\)\?\.soleCriterion !== undefined/);
+check("#233 Todo 2b host: nodeMenu offers 'Criterion encoding' for a ROOT criterion (topCriterion) OR a non-root {criterionOccurrence}, routing to criterionEncodingMenu", () => {
+  assert.match(COCKPIT_SRC, /const isCriterion = \(rootGo !== undefined && topCriterion\(rootGo\.expr\) !== undefined\) \|\| isCriterionOccurrenceHit\(hit\)/);
   assert.match(COCKPIT_SRC, /isCriterion \? \[\{ label: "\$\(law\) Criterion encoding/);
+  // a non-root crit-row is NOT case-bearing → straight to the encoding menu (no case-verdict option)
+  assert.match(COCKPIT_SRC, /choices\.length === 0 && isCriterion && !hasCaseVerdict\) return criterionEncodingMenu/);
   assert.match(COCKPIT_SRC, /pick\.act === "criterion"\) return criterionEncodingMenu/);
+});
+check("#233 Todo 2b host: resolveCriterionFromReveal resolves a ROOT when (topCriterion(go.expr)) OR a non-root {criterionOccurrence}; LEFT-click on an occurrence is INERT", () => {
+  assert.match(COCKPIT_SRC, /function resolveCriterionFromReveal\(revealKey: string\)/);
+  assert.match(COCKPIT_SRC, /if \(isCriterionOccurrenceHit\(hit\)\) return \{ \.\.\.hit\.criterionOccurrence \}/);
+  assert.match(COCKPIT_SRC, /const tc = go \? topCriterion\(go\.expr\) : undefined/);
+  // left-click reveal path diverts a criterion-occurrence BEFORE mapHitToPrimary (inert, like the toggle divert)
+  assert.match(COCKPIT_SRC, /if \(isCriterionOccurrenceHit\(hit\)\) return;/);
 });
 check("#224 Slice 2b host: the MV gate + chrome compose the criterion half (criterionProgress → mvComplete + renderCriterionChrome)", () => {
   assert.match(COCKPIT_SRC, /const cp = criterionProgress\(buildLiveCriterionIdentities\(\), criterionVerdicts\)/);

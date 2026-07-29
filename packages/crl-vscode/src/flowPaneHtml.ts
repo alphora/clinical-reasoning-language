@@ -12,7 +12,7 @@
 // nodeKey is a JSON string (quotes/brackets) and cannot be a DOM id; `anchors` is keyed BY nodeKey → the generated id (the
 // cross-pane join, mirroring crlPaneHtml). `id` + `data-reveal` ride the SAME <g> so highlight (getElementById) and click
 // (closest('[data-reveal]')) resolve to one element.
-import { buildDefStruct, displayDetermination, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode, type DefStructExpr, type GuardOutline, type ResolveDefExprEntry } from "@smile-digital-health/crl";
+import { buildDefStruct, displayDetermination, topCriterion, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode, type DefStructExpr, type GuardOutline, type ResolveDefExprEntry } from "@smile-digital-health/crl";
 
 /** Reserved prefix marking a synthetic outline-row nodeKey — provably disjoint from every structure/concept nodeKey
  *  (those are JSON arrays), so a leaf anchor no-ops against every existing keyset. A concept-operand leaf's key carries
@@ -52,7 +52,7 @@ export interface RenderedFlow {
   /** opaque key → a node-body select ({nodeKey}, a crlNode), a concept/guard peek ({conceptNodeKey}), a tree sub-question
    *  ({subQuestionLeafKey}), or a #233 criterion collapse chevron ({criterionToggle}, a `leaf::` position key). The first
    *  two mirror RenderedCrl; the latter two are flow-only and are DIVERTED before the engine-selection path host-side. */
-  reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string } | { criterionToggle: string }>;
+  reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string } | { criterionToggle: string } | { criterionOccurrence: { lib: string; name: string; bodyHash: string; elided: boolean } }>;
   /** #187 Todo 5: def-leaf anchor key (the same `leaf::` key used in `anchors`) → its leaf concept identity + the OWNING
    *  composite `when` structure key. The cockpit joins `{lib,name}` to a case's `conceptTruth` for the yes/no verdict and
    *  gates on `topWhenKey` being on the fired-satisfied path. The `+N more` stub + cross-lib/omitted leaves get NO entry. */
@@ -226,7 +226,7 @@ interface LaidNode {
    *  (collapsed-box flag rollup, like `criterionCollapse.bodyConcepts`), and the POSITION collapse key (`n.nodeKey`, flipped
    *  in `expandedGuardWhens` by the toggle channel). A ROOT criterion is absorbed into the `when` box via `criterionCollapse`
    *  instead (byte-identical sole render), so it never produces a `"crit"` row. */
-  critRow?: { lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[]; posKey: string };
+  critRow?: { lib: string; name: string; bodyHash: string; elided: boolean; collapsed: boolean; bodyConcepts: { lib: string; name: string }[]; posKey: string };
   /** #224 ii.3 Slice 2: set on a `when` whose guard is a SINGLE criterion ref (the collapse unit) — carries the current
    *  collapsed/expanded state so the render draws a `▸`/`▾` disclosure, plus the criterion IDENTITY (`lib`/`name` from
    *  `soleCriterion`) that the model-level verdict chip keys on (Slice 2b). `bodyConcepts` = the addressable leaf-concept
@@ -343,7 +343,7 @@ function buildLaid(
         return {
           ...base, nodeKey: posKey, kind: "leaf", outlineRow: "crit",
           label: s.name, full: `${s.name} — criterion "${s.lib}"`,
-          critRow: { lib: s.lib, name: s.name, collapsed, bodyConcepts, posKey },
+          critRow: { lib: s.lib, name: s.name, bodyHash: s.bodyHash, elided: s.elided === true, collapsed, bodyConcepts, posKey },
           y, children,
         };
       }
@@ -367,10 +367,12 @@ function buildLaid(
     // suppresses the concept identity entirely (neutral border, no peek, the label falls back to the criterion name)
     // and leaves the guard outline the SOLE outline source (disc 318 [critical] 1).
     const guardOutline = n.kind === "when" ? opts.guardOutlines?.get(n.nodeKey) : undefined;
-    // #224 ii.3 Slice 2: a SINGLE-criterion-ref guard (`soleCriterion` set) is COLLAPSIBLE — default collapsed (the body
-    // hidden), expanded only when its nodeKey is in `expandedGuardWhens`. A compound-with-criterion guard has no
-    // `soleCriterion` (Slice 2 leaves it expanded — nothing hidden). Collapse changes LAYOUT, so it feeds the layout here.
-    const sole = guardOutline?.soleCriterion;
+    // #224 ii.3 Slice 2 / #233 Todo 2b: a ROOT-criterion guard (`topCriterion(expr)` defined — the guard's TOP expr IS a
+    // single criterion node) is COLLAPSIBLE via the `when` box — default collapsed, expanded only when its nodeKey is in
+    // `expandedGuardWhens`. A compound guard's top expr is `and`/`or` → no root criterion here (its NON-root criterion
+    // conjuncts collapse independently as `flow-crit-row`s). `sole` is DERIVED from `expr` (the single source — the
+    // `soleCriterion` sidecar was retired disc 330), so the render + the outline-hanging unwrap read ONE fact.
+    const sole = guardOutline ? topCriterion(guardOutline.expr) : undefined;
     const collapsible = sole !== undefined;
     const collapsed = collapsible && !opts.expandedGuardWhens?.has(n.nodeKey);
     // #224 ii.3 Slice 2b-2: the criterion body's addressable leaf identities (for the collapsed-box flag rollup).
@@ -421,12 +423,8 @@ function buildLaid(
       // INTO the `when` box (its name/chevron/verdict live on the box via `criterionCollapse`), so we hang the criterion's
       // BODY (`.operand`), NOT a redundant named `crit` row for the root — keeping the sole render byte-identical to before
       // criterion nodes existed. A compound-root guard (`when A and Meets X`) passes its expr as-is; its NON-root criterion
-      // conjuncts render as named `crit` rows via `buildOutline`'s criterion arm.
-      // ⚠ TRANSITION (disc 329): this `expr.kind === "criterion"` unwrap and the `criterionCollapse`/`collapsed` reads of the
-      // `soleCriterion` SIDECAR (above) are two views of ONE fact — they AGREE BY CONSTRUCTION because `buildGuardOutlines`
-      // derives `soleCriterion = topCriterion(expr)` (guardOutline.ts), so `expr.kind === "criterion" ⟺ soleCriterion set`.
-      // Todo 2b retires the sidecar (host reads → `topCriterion`, then the field) per guardOutline.ts's stated plan, at which
-      // point this becomes a single source; until then the invariant holds for every real `buildGuardOutlines` output.
+      // conjuncts render as named `crit` rows via `buildOutline`'s criterion arm. This unwrap and the `sole` collapse read
+      // above both key on `guardOutline.expr` (via `topCriterion`) — ONE source since `soleCriterion` was retired (disc 330).
       const rootExpr = guardOutline.expr.kind === "criterion" ? guardOutline.expr.operand : guardOutline.expr;
       outlineRoots.push(buildOutline(rootExpr, whenLeft, n.nodeKey, 0, "0", cursor));
       slot = Math.max(slot, cursor.y); // reserve the outline's vertical extent so the next sibling clears it
@@ -493,7 +491,7 @@ export function renderFlowPane(
   const prefix = opts.revealPrefix ?? "";
   const concepts = opts.concepts ?? [];
   const anchors: Record<string, FlowAnchor> = {};
-  const reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string } | { criterionToggle: string }> = {};
+  const reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string } | { criterionToggle: string } | { criterionOccurrence: { lib: string; name: string; bodyHash: string; elided: boolean } }> = {};
   const leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }> = {};
   const conceptOccurrences: { gid: string; lib: string; name: string }[] = []; // #203 Todo 4b Slice A
   const criterionOccurrences: { gid: string; lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[] }[] = []; // #224 ii.3 Slice 2b
@@ -570,22 +568,26 @@ export function renderFlowPane(
     const addressable = !n.outline || n.outlineRow === "leaf";
     if (addressable) anchors[n.nodeKey] = { scrollTo: gid, segmentIds: [gid] };
 
-    // #233 Todo 2a: a NON-ROOT criterion boundary — a NAMED collapsible box with a ▸/▾ chevron (its OWN toggle channel,
-    // resolving `{criterionToggle: posKey}` → `toggleCriterionExpand`), a hidden collapsed-body flag ROLLUP ⚑ (the host
-    // lights `.has-flag` when folded + a body concept has an open flag), and an OCCURRENCE record (Todo 2b lights its
-    // verdict chip + folds it into the gate). NOT an anchor/verdict target in 2a: no `data-reveal` on the box body, so
-    // left-click AND right-click are inert; only the chevron is interactive (disc 327 pt 14 — left-click inert for v1).
+    // #233 Todo 2a/2b: a NON-ROOT criterion boundary — a NAMED collapsible box. TWO channels: a ▸/▾ chevron
+    // (`data-toggle-crit` → `{criterionToggle: posKey}` → `toggleCriterionExpand`), and the box BODY (`data-reveal` →
+    // `{criterionOccurrence}` carrying the criterion identity + canonical bodyHash → RIGHT-click opens the model-level
+    // criterion-encoding menu; LEFT-click is inert, diverted host-side). #233 Todo 2b: the hidden model-level verdict CHIP
+    // (top-right) + a collapsed-body flag ROLLUP ⚑ (host lights `.has-flag` when folded + a body concept has an open flag);
+    // `driveCriterionVerdicts` maps this occurrence's `(lib,name)` verdict → `.crit-*` on the gid (the chip idiom).
     if (n.outline && n.outlineRow === "crit") {
       const cr = n.critRow!;
-      reveals[key] = { criterionToggle: cr.posKey };
+      const togKey = `${prefix}t${gid}`; // the chevron's OWN key (distinct from the box's data-reveal key)
+      reveals[key] = { criterionOccurrence: { lib: cr.lib, name: cr.name, bodyHash: cr.bodyHash, elided: cr.elided } };
+      reveals[togKey] = { criterionToggle: cr.posKey };
       criterionOccurrences.push({ gid, lib: cr.lib, name: cr.name, collapsed: cr.collapsed, bodyConcepts: cr.bodyConcepts });
       flaggableGids.push(gid); // the rollup ⚑ participates in the host's bulk-clear (the flagBadge idiom)
       body +=
-        `<g id="${escapeHtml(gid)}" class="flow-outline flow-crit-row"><title>${escapeHtml(n.full)}</title>` +
+        `<g id="${escapeHtml(gid)}" class="flow-outline flow-crit-row" data-reveal="${escapeHtml(key)}"><title>${escapeHtml(n.full)}</title>` +
         `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
-        labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX - 3, 20) +
-        critToggle(x + 9, y + OUTLINE_H / 2, cr.collapsed, key) +
-        flagBadge(x + OUTLINE_NODE_W - 11, y + 11) +
+        labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX - 5, 20) +
+        critToggle(x + 9, y + OUTLINE_H / 2, cr.collapsed, togKey) +
+        critVerdictChip(x + OUTLINE_NODE_W - 11, y + 9) +
+        flagBadge(x + OUTLINE_NODE_W - 27, y + 11) +
         `</g>`;
       continue;
     }
@@ -931,23 +933,25 @@ export const FLOW_STYLE =
   `.flow-row.leaf-allpass .flow-allpass-badge{display:inline}` +
   `.flow-allpass-badge>circle{fill:var(--vscode-testing-iconPassed,#3fb950);stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
   `.flow-allpass-badge>path{fill:none;stroke:#ffffff;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}` +
-  // #224 ii.3 Slice 2b — the model-level criterion VERDICT chip (top-right of a single-criterion `when`). HIDDEN; the host
-  // reveals it per-occurrence by toggling `.crit-{pass,fail,pending,stale}` on the row (no #root re-render — the allpass
-  // idiom). The dot color encodes the state (the same TOK_* the case-verdict wash uses; stale = a muted grey), and exactly
-  // one glyph shows: ✓ pass / ✗ fail / – pending (undecided) / ⋯ stale (edited-since-review, never the settled judgment).
+  // #224 ii.3 Slice 2b / #233 Todo 2b — the model-level criterion VERDICT chip (top-right of a ROOT criterion `when` box OR
+  // a NON-ROOT `flow-crit-row`). HIDDEN; the host reveals it per-occurrence by toggling `.crit-{pass,fail,pending,stale}` on
+  // the row (no #root re-render — the allpass idiom). The `.crit-*` classes are posted ONLY to criterion rows (both kinds),
+  // so the selectors key on `.crit-*` WITHOUT a row-type prefix → one rule matches the `when` box AND the crit-row. The dot
+  // color encodes the state (the same TOK_* the case-verdict wash uses; stale = a muted grey), and exactly one glyph shows:
+  // ✓ pass / ✗ fail / – pending (undecided) / ⋯ stale (edited-since-review, never the settled judgment).
   `.flow-crit-verdict{display:none;pointer-events:none}` +
-  `.flow-row.crit-pass .flow-crit-verdict,.flow-row.crit-fail .flow-crit-verdict,.flow-row.crit-pending .flow-crit-verdict,.flow-row.crit-stale .flow-crit-verdict{display:inline}` +
+  `.crit-pass .flow-crit-verdict,.crit-fail .flow-crit-verdict,.crit-pending .flow-crit-verdict,.crit-stale .flow-crit-verdict{display:inline}` +
   `.flow-crit-vdot{stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
-  `.flow-row.crit-pass .flow-crit-vdot{fill:${TOK_VERDICT_PASS}}` +
-  `.flow-row.crit-fail .flow-crit-vdot{fill:${TOK_VERDICT_FAIL}}` +
-  `.flow-row.crit-pending .flow-crit-vdot{fill:${TOK_VERDICT_PENDING}}` +
-  `.flow-row.crit-stale .flow-crit-vdot{fill:var(--vscode-descriptionForeground,#8c8c8c)}` +
+  `.crit-pass .flow-crit-vdot{fill:${TOK_VERDICT_PASS}}` +
+  `.crit-fail .flow-crit-vdot{fill:${TOK_VERDICT_FAIL}}` +
+  `.crit-pending .flow-crit-vdot{fill:${TOK_VERDICT_PENDING}}` +
+  `.crit-stale .flow-crit-vdot{fill:var(--vscode-descriptionForeground,#8c8c8c)}` +
   `.flow-crit-g{display:none;fill:none;stroke:#ffffff;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}` +
   `.flow-crit-g-stale circle{fill:#ffffff;stroke:none}` +
-  `.flow-row.crit-pass .flow-crit-g-pass{display:inline}` +
-  `.flow-row.crit-fail .flow-crit-g-fail{display:inline}` +
-  `.flow-row.crit-pending .flow-crit-g-pending{display:inline}` +
-  `.flow-row.crit-stale .flow-crit-g-stale{display:inline}` +
+  `.crit-pass .flow-crit-g-pass{display:inline}` +
+  `.crit-fail .flow-crit-g-fail{display:inline}` +
+  `.crit-pending .flow-crit-g-pending{display:inline}` +
+  `.crit-stale .flow-crit-g-stale{display:inline}` +
   // #203 Todo 4b Slice A — the per-node review-flag ⚑ badge. HIDDEN; shown when the host toggles `.has-flag` on the row
   // (a flag resolve un-paints without a #root re-render, preserving the verdict/failed-criterion overlays). The `<g>` is
   // CLICKABLE (`pointer-events:auto`) and carries `data-mv-flag-badge` — the webview intercepts it BEFORE the row's

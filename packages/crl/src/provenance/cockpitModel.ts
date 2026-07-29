@@ -10,7 +10,7 @@ import { renderScenario, type RenderScenarioResult } from "../cre";
 import { buildCaseIdJoin } from "./caseIdJoin";
 import { buildConceptShapeIndex, type ConceptShapeIndex } from "./conceptShape";
 import { buildDefExprIndex, type DefExprIndex } from "./definedAsExpr";
-import { buildGuardOutlines, type GuardOutline } from "./guardOutline";
+import { buildCriterionIdentities, buildGuardOutlines, type CriterionIdentity, type GuardOutline } from "./guardOutline";
 import { buildCorrespondenceModelFromResolved, type CorrespondenceModel } from "./correspondence";
 import { buildCrlConceptLayer, type CrlConceptNode } from "./crlConceptLayer";
 import { buildCrlStructure, type CrlDecisionStructure } from "./crlStructure";
@@ -36,6 +36,11 @@ export interface CockpitModel {
    *  Flow pane hangs it as the `defined as`-style operator outline (so a criterion body is visible, not a dead-end).
    *  Only criterion-bearing whens (and only envelope-safe ones); a single-concept / plain-compound guard is absent. */
   guardOutlines: Map<string, GuardOutline>;
+  /** #233 Todo 2b: the render-INDEPENDENT canonical criterion inventory — one entry per DECLARED criterion (keyed by
+   *  `criterionKey(lib,name)`), with its canonical body fingerprint + `elided`. The MV criterion-verdict GATE + chip
+   *  identities source from THIS (not rendered occurrences / `soleCriterion`), so a criterion referenced ONLY in a
+   *  compound/nested position — never sole — is still reviewed + gated. Built from the SAME `defExpr` as `guardOutlines`. */
+  criterionIdentities: Map<string, CriterionIdentity>;
   /** The full scenario render (cases + status + the success/errors envelope so the CEL pane can show "why" on failure). */
   scenarios: RenderScenarioResult;
   /** Case NAME → frozen caseId — the join between renderScenario (keyed by name) and the correspondence (keyed by the
@@ -83,8 +88,12 @@ export function buildCockpitModelFromResolved(
   // #187 Option-3: the operator-PRESERVING projection of the same `defined as` bodies (same inputs), for the MV
   // Questionnaire's ANY OF / ALL OF box render. Its leafEligible leaves are drift-guarded == conceptShape's.
   const defExpr = buildDefExprIndex(libs, conceptLayer, leafEligibleByLib);
+  // #233 Todo 2b: the canonical per-declaration criterion inventory (the gate/verdict identity source), same defExpr —
+  // built ONCE and threaded into `buildGuardOutlines` so the criterion nodes' STAMPED bodyHash == the gate's inventory hash
+  // structurally (one value), and a second expansion pass is dropped (disc 330 nit).
+  const criterionIdentities = buildCriterionIdentities(r.graph, defExpr);
   // #224 ii.3 Todo 3: guard outlines for criterion-bearing whens (Flow pane), resolved against the same defExpr index.
-  const guardOutlines = buildGuardOutlines(r.graph, defExpr);
+  const guardOutlines = buildGuardOutlines(r.graph, defExpr, criterionIdentities);
 
   return {
     correspondence: buildCorrespondenceModelFromResolved(r, { artifactPath, celPath }),
@@ -93,6 +102,7 @@ export function buildCockpitModelFromResolved(
     conceptShape,
     defExpr,
     guardOutlines,
+    criterionIdentities,
     scenarios: renderScenario(r.graph),
     caseIdByName,
     caseNameCollisions: frozenCollisions,

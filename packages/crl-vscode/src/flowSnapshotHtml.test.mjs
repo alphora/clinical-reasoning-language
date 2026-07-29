@@ -37,7 +37,7 @@ test("inlines FLOW_STYLE incl. the .flow-zoom control CSS (moved into FLOW_STYLE
   // The zoom control is styled — it lives in FLOW_STYLE now, so the exported control is fixed bottom-right, not in-flow.
   assert.match(FLOW_STYLE, /\.flow-zoom\{position:fixed;bottom:10px;right:14px/, "FLOW_STYLE owns the fixed .flow-zoom control");
   assert.ok(!/var\(--vscode-editor-background\)\)/.test(FLOW_STYLE.match(/\.flow-zoom\{[^}]*\}/)[0]), ".flow-zoom bg fallback ends in a hex (renders themeless), not a nested var");
-  assert.ok(FLOW_STYLE.includes(".flow-row.crit-pass"), "sanity: FLOW_STYLE styles the painted classes the capture carries");
+  assert.ok(FLOW_STYLE.includes(".crit-pass .flow-crit-verdict"), "sanity: FLOW_STYLE styles the painted classes the capture carries (#233 Todo 2b: `.crit-*` is row-type-agnostic)");
 });
 
 test("escapes the title in BOTH the <title> and the caption (no markup injection via the policy name)", () => {

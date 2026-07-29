@@ -43,19 +43,14 @@ import { collectLibs, conceptDeclRef, decisionSubNodeRef, lsLoc, nodeKey } from 
  *  in depth so the pure converter is bounded even if a caller skips the gate. */
 const GUARD_MAX_CRITERION_HOPS = DEF_MAX_EXPR_DEPTH;
 
-/** #224 ii.3 Slice 2: a `when` guard's render outline plus, WHEN the guard is a SINGLE top-level criterion ref, that
- *  criterion's identity + a body fingerprint. `soleCriterion` is the COLLAPSE + model-level-VERDICT unit — a compound
- *  guard that merely CONTAINS a criterion (`when A and Meets X`) has NO `soleCriterion` (it stays expanded, not
- *  verdict-able, in Slice 2; full compound handling is deferred). Criteria are LIBRARY-LOCAL (operator-confirmed), so a
- *  criterion ref is always unqualified and its lib is the decision's lib. `bodyHash` fingerprints the CANONICAL rendered
- *  body so a stored "correctly encoded" verdict goes STALE when the criterion body changes (disc 319 [critical] 1). */
+/** #224 ii.3 Slice 2 / #233 Todo 2b: a `when` guard's render outline. The SOLE-criterion identity (the collapse +
+ *  model-level-VERDICT unit when the guard's TOP expr is a single criterion ref) is DERIVED on demand via
+ *  `topCriterion(expr)` — no longer a stored `soleCriterion` sidecar (retired disc 330: it was a second view of a fact
+ *  `expr` already carries, and the model-level verdict/gate now source from the render-independent `buildCriterionIdentities`
+ *  inventory, which covers compound-only + nested criteria too). Criteria are LIBRARY-LOCAL (operator-confirmed), so a
+ *  criterion ref is always unqualified and its lib is the decision's lib. */
 export interface GuardOutline {
   expr: DefStructExpr;
-  /** `elided` = the rendered body dropped content to a `…` stub (envelope breach OR a width/hop cap), so `bodyHash`
-   *  CANNOT reliably fingerprint it — a breach stub hashes to a constant, and an edit to an already-truncated operand
-   *  is invisible. 2b treats an elided criterion as NEVER durably "correctly encoded" (always re-review) so a verdict
-   *  can't falsely survive an unseen body change (disc 319 review [important] 2). */
-  soleCriterion?: { lib: string; name: string; bodyHash: string; elided?: true };
 }
 
 /** A stable, short content fingerprint of a rendered guard body — the verdict staleness key. `JSON.stringify` is
@@ -65,7 +60,7 @@ const hashExpr = (e: DefStructExpr): string =>
   "sha256:" + createHash("sha256").update(JSON.stringify(e), "utf8").digest("hex").slice(0, 16);
 
 /** Does the rendered body contain a `…`/`+N more` elision stub? A `more` node means content was dropped (breach or cap),
- *  so `bodyHash` is not a faithful fingerprint — see `GuardOutline.soleCriterion.elided`. */
+ *  so `bodyHash` is not a faithful fingerprint — see `CriterionIdentity.elided` + the criterion node's in-situ `elided`. */
 const exprHasMore = (e: DefStructExpr): boolean => {
   switch (e.kind) {
     case "more":
@@ -230,16 +225,20 @@ export function branchConditionToDefStruct(
  * in the authored guard AST. The precedence gate stays engaged: a breaching guard still yields a truthy `guardOutline`
  * (a NAMED criterion node, not a bare `…`), so `refKeysOf` never masquerades the box.
  */
-export function buildGuardOutlines(graph: ResolvedCelGraph, defExprIndex: DefExprIndex): Map<string, GuardOutline> {
+export function buildGuardOutlines(
+  graph: ResolvedCelGraph,
+  defExprIndex: DefExprIndex,
+  // #233 Todo 2b (disc 330 nit): the caller (cockpitModel) builds the canonical inventory ONCE and threads the SAME map
+  // in, so the criterion nodes' STAMPED `bodyHash` and the gate's inventory hash are structurally identical (one value),
+  // not merely parallel-constructed — AND a second full expansion pass is dropped. Defaults to computing it (test/back-compat).
+  criterionIdentities: Map<string, CriterionIdentity> = buildCriterionIdentities(graph, defExprIndex),
+): Map<string, GuardOutline> {
   const out = new Map<string, GuardOutline>();
   const { libs, coversName } = collectLibs(graph);
   if (!coversName) return out; // no policy anchor → empty (mirrors buildCrlStructure)
   // Resolver over the PASSED index (not the host-side `buildDefExprResolver`), same key rule as the cockpit.
   const resolveDefExpr: ResolveDefExprEntry = (lib, name) =>
     lib === undefined ? undefined : defExprIndex.get(nodeKey(conceptDeclRef(lib, name)));
-  // #233: the render-INDEPENDENT canonical identity per declared criterion. Built ONCE, then threaded into the
-  // converter so every criterion NODE (sole, conjunct, nested) is stamped with its occurrence-independent bodyHash.
-  const criterionIdentities = buildCriterionIdentities(graph, defExprIndex);
 
   for (const [lib, info] of libs) {
     const criterionTable = buildCriterionTable(info.entry.ast.statements);
@@ -255,11 +254,9 @@ export function buildGuardOutlines(graph: ResolvedCelGraph, defExprIndex: DefExp
         // Host safety: on a whole-guard envelope BREACH, convert at hop budget 0 (names survive, no DAG expansion).
         const maxHops = expandedSize(cond, criterionTable).status === "ok" ? undefined : 0;
         const expr = branchConditionToDefStruct(cond, criterionTable, resolveDefExpr, lib, criterionIdentities, maxHops);
-        // `soleCriterion` (transition/compat, disc 327 point 9): DERIVED — a guard whose top-level expr IS a
-        // criterion node is the sole case. Its `bodyHash` is the node's CANONICAL fingerprint (hashes the criterion's
-        // body/operand), so a stored verdict still goes stale on a body change. Todo 2 removes host reads then the field.
-        const sole = topCriterion(expr);
-        out.set(key, sole ? { expr, soleCriterion: sole } : { expr });
+        // #233 Todo 2b: `soleCriterion` retired — a guard whose top-level expr IS a criterion node is the sole case, DERIVED
+        // by consumers via `topCriterion(expr)`. The outline stores only `expr` (the single source of the criterion facts).
+        out.set(key, { expr });
       }
     }
   }
@@ -325,5 +322,46 @@ export function buildCriterionIdentities(
       out.set(criterionKey(lib, name), { lib, name, bodyHash: hashExpr(canonicalBody), elided: exprHasMore(canonicalBody) });
     }
   }
+  return out;
+}
+
+/** #233 Todo 2b — the GATE / verdict identity set: the criteria REACHABLE from the rendered guard outlines (each `.expr`
+ *  IS the full model-tree, collapse-INDEPENDENT), mapped to their CANONICAL facts from `criterionIdentities`. A criterion
+ *  DECLARED but never referenced by any decision guard is EXCLUDED — it renders nowhere, so gating it would livelock
+ *  `mvComplete` with an un-findable entry (disc 330 [critical], both arms: reviewable ⇒ gated). Deduped by
+ *  `criterionKey(lib,name)` (a criterion at several sites → ONE entry). Reachability stops where a breaching/hop-capped
+ *  parent elides its body — that parent is itself gated + un-passable (an elided criterion), so the chain is blocked at the
+ *  VISIBLE node and the unreachable descendant is correctly out. This is a MODEL-tree walk (not the collapse-filtered
+ *  rendered occurrences — disc 327 pt 1): a criterion under a collapsed ancestor is still in the ancestor's `.expr`. */
+export function criterionGateIdentities(
+  guardOutlines: ReadonlyMap<string, GuardOutline>,
+  criterionIdentities: ReadonlyMap<string, CriterionIdentity>,
+): Map<string, CriterionIdentity> {
+  const out = new Map<string, CriterionIdentity>();
+  const walk = (e: DefStructExpr): void => {
+    switch (e.kind) {
+      case "criterion": {
+        const key = criterionKey(e.lib, e.name);
+        const id = criterionIdentities.get(key);
+        if (id && !out.has(key)) out.set(key, id);
+        walk(e.operand); // a criterion body may reference further (reachable) criteria
+        return;
+      }
+      case "and":
+      case "or":
+        e.operands.forEach(walk);
+        return;
+      case "not":
+        walk(e.operand);
+        return;
+      case "leaf":
+        if (e.composite) walk(e.composite); // a `defined as` composite carries no criteria, but recurse for completeness
+        return;
+      case "external":
+      case "more":
+        return;
+    }
+  };
+  for (const go of guardOutlines.values()) walk(go.expr);
   return out;
 }

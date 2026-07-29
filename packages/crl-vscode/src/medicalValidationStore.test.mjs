@@ -860,7 +860,22 @@ check("criterionProgress: tallies over LIVE identities (deduped by key); a stale
     [criterionVerdictKey("L", "B")]: { state: "pass", bodyHash: "hb-old" },
     [criterionVerdictKey("L", "C")]: { state: "fail", bodyHash: "hc" },
   };
-  assert.deepEqual(criterionProgress(ids, map), { total: 4, passed: 1, failed: 1, pending: 0, stale: 1, unreviewed: 1 });
+  assert.deepEqual(criterionProgress(ids, map), { total: 4, passed: 1, failed: 1, pending: 0, stale: 1, unreviewed: 1, truncated: 0 });
+});
+
+check("#233 Todo 2b criterionProgress: an ELIDED-canonical identity is tallied as `truncated` (un-passable) + its verdict-state (unreviewed OR stale); the chrome names it 'cannot complete'", () => {
+  const ids = new Map([
+    [criterionVerdictKey("L", "A"), live("ha")], // normal, unreviewed
+    [criterionVerdictKey("L", "T"), live("ht", true)], // ELIDED canonical body → un-passable
+  ]);
+  // A stored "pass" on the elided one reads STALE (never passed); it also counts as `truncated`.
+  const map = { [criterionVerdictKey("L", "T")]: { state: "pass", bodyHash: "ht" } };
+  assert.deepEqual(criterionProgress(ids, map), { total: 2, passed: 0, failed: 0, pending: 0, stale: 1, unreviewed: 1, truncated: 1 });
+  // The chrome NAMES the blocker so the gate's by-design livelock is legible, not an undifferentiated N/M.
+  const s = renderCriterionChrome({ total: 2, passed: 0, failed: 0, pending: 0, stale: 1, unreviewed: 1, truncated: 1 });
+  assert.match(s, /1 truncated — cannot complete/);
+  // `mvCriteriaClean` still gates on passed===total (a truncated criterion is never passed → blocks), no change needed.
+  assert.equal(mvCriteriaClean({ total: 2, passed: 1, failed: 0, pending: 0, stale: 0, unreviewed: 1, truncated: 1 }), false);
 });
 
 check("criterionProgress: a stored verdict whose identity is NOT live (compound-only / renamed criterion) is NOT tallied — total = identities.size (disc 320 review [important] 2 boundary)", () => {
@@ -870,7 +885,7 @@ check("criterionProgress: a stored verdict whose identity is NOT live (compound-
     [criterionVerdictKey("L", "Ghost")]: { state: "pass", bodyHash: "hg" }, // an orphan (renamed, or a compound-only criterion never rendered as sole)
   };
   // The orphan neither adds to `total` nor sneaks a pass in — the gate is over LIVE single-ref identities only.
-  assert.deepEqual(criterionProgress(ids, map), { total: 1, passed: 1, failed: 0, pending: 0, stale: 0, unreviewed: 0 });
+  assert.deepEqual(criterionProgress(ids, map), { total: 1, passed: 1, failed: 0, pending: 0, stale: 0, unreviewed: 0, truncated: 0 });
 });
 
 check("mvCriteriaClean + mvComplete gate: all-fresh-pass clean; a stale/fail/unreviewed criterion BLOCKS", () => {

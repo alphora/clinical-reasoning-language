@@ -2,7 +2,7 @@
 // routed into the engine selection path. vscode-free → imported directly (vitest transforms the .ts).
 import assert from "node:assert/strict";
 
-import { isFactHit, isConceptHit, isSubQuestionHit, isCriterionToggleHit } from "./webviewHit.ts";
+import { isFactHit, isConceptHit, isSubQuestionHit, isCriterionToggleHit, isCriterionOccurrenceHit } from "./webviewHit.ts";
 
 const check = test;
 
@@ -47,5 +47,19 @@ check("#233 Todo 2a a criterion-toggle hit (has criterionToggle) → isCriterion
   assert.equal(isCriterionToggleHit({ subQuestionLeafKey: "leaf::x" }), false);
   assert.equal(isCriterionToggleHit({ conceptNodeKey: "cA" }), false);
   assert.equal(isCriterionToggleHit({ caseId: "c1" }), false);
+});
+
+check("#233 Todo 2b a criterion-occurrence hit (has criterionOccurrence) → isCriterionOccurrenceHit true, DISJOINT from every selectable/peek/toggle hit (right-click encoding; left-click inert)", () => {
+  const occ = { criterionOccurrence: { lib: "Pol", name: "CritC", bodyHash: "sha256:0000000000000000", elided: false } };
+  assert.equal(isCriterionOccurrenceHit(occ), true, "→ criterion-encoding verdict by identity");
+  // DISJOINT both ways.
+  assert.equal(isFactHit(occ), false);
+  assert.equal(isConceptHit(occ), false);
+  assert.equal(isSubQuestionHit(occ), false);
+  assert.equal(isCriterionToggleHit(occ), false, "an occurrence (box) is NOT a toggle (chevron)");
+  assert.equal(isCriterionOccurrenceHit({ nodeKey: "n1" }), false, "a decision {nodeKey} is NOT a criterion occurrence");
+  assert.equal(isCriterionOccurrenceHit({ criterionToggle: "leaf::x" }), false);
+  assert.equal(isCriterionOccurrenceHit({ subQuestionLeafKey: "leaf::x" }), false);
+  assert.equal(isCriterionOccurrenceHit({ caseId: "c1" }), false);
 });
 
