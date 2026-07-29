@@ -170,11 +170,12 @@ first:
 - otherwise then recommend activity "Deny".
 ```
 
-(Note the criterion body composes two *distinct criteria* structurally, and one
-of them — `"Failed Conservative Therapy"` — is itself an inferred fact defined
-with `defined as`. That layering is the whole point: structure composes distinct
-criteria; inference normalizes one criterion's representations. See "Four ways to
-combine conditions".)
+(Note the criterion body composes two *distinct criteria* structurally. One of
+them — `"Failed Conservative Therapy"` — is itself a named `criterion` whose body
+is an `or` over two DISTINCT criteria (failed drug OR failed physical therapy —
+events that can co-occur, so not one fact recorded twice). Criteria compose in
+structure at every level; inference (`defined as`) is only for one criterion's
+representations. See "Four ways to combine conditions".)
 
 Syntax and semantics:
 
@@ -242,12 +243,14 @@ auditable. Never fuse distinct criteria with `defined as ( A sem-and B )` /
 `( A sem-or B )` — that collapses them into one opaque CQL boolean, so the
 decision has **zero** criterion nodes and a reviewer can't see which one failed.
 `defined as` / `sem-*` is inference — it normalizes **one** criterion's
-sub-representations into one fact (e.g. "failed conservative therapy" = failed
-drug OR failed physical therapy); it never joins distinct criteria. The
-operational test: *would a policy reviewer expect to see this disjunct as its own
-criterion line?* If yes, it is a distinct criterion (structure). If the disjuncts
-are two data encodings of a single fact the reviewer audits as one thing, it is
-inference (`defined as`).
+sub-representations into one fact (e.g. "viral suppression documented" = a
+viral-load lab result OR a clinician chart note of the SAME suppression); it never
+joins distinct criteria. The operational test anchors the fact OUTSIDE the label:
+*name the one clinical reality the operands each record, without the composite's
+own name.* Two SEPARATE events (failed drug therapy AND failed physical therapy —
+each occurs independently, so they can hold at once) are DISTINCT criteria →
+structure; alternative records of a SINGLE underlying occurrence (their records may
+themselves coexist) are one fact → inference.
 
 **2. `and` before disjunct-character — where the `or` sits decides the form.**
 When an `or` is a **sub-term of a larger `and`** on one rule
@@ -286,8 +289,8 @@ Given a whole-condition `or` under `first:`, choose:
   `or` to a named `criterion` if it recurs.
 
 ```
-concept "Failed Conservative Therapy":          // INFERENCE: one criterion, two representations
-- defined as ( "Failed Drug Therapy" sem-or "Failed Physical Therapy" ).
+criterion "Failed Conservative Therapy":        // DISTINCT criteria (SEPARATE events) = or-guard
+- when ( "Failed Drug Therapy" or "Failed Physical Therapy" ).
 
 decision "Coverage Determination":              // DISTINCT criteria = structure (branch guard)
 first:

@@ -113,9 +113,17 @@ export interface KitExample {
   title: string;
   language: "crl" | "cel" | "text";
   snippet: string;
-  /** true = author this (validates clean); false = an intentional don't-case the validator rejects. */
+  /**
+   * true  = author this — shape-clean (any residual errors are only `unresolved-reference` for undeclared external decls).
+   * false = a don't-case. TWO kinds (see the examples harness):
+   *   - WITH `expectRule` → MECHANICALLY invalid: the validator raises that decision-shape rule.
+   *   - WITHOUT `expectRule` → a JUDGE-lens violation that is VALIDATOR-CLEAN (e.g. the `hollowed-criteria` vacuity
+   *     trap): it shape-validates cleanly and its only errors are `unresolved-reference`. The grammar cannot see the
+   *     defect — which is the whole reason the judge lens + UNIT ANCHORING exist (#234).
+   */
   valid: boolean;
-  /** For valid:false, the decision-shape rule the validator is expected to raise. */
+  /** For a MECHANICALLY-invalid valid:false case, the decision-shape rule the validator is expected to raise.
+   *  OMIT for a judge-lens-only violation (validator-clean). */
   expectRule?: string;
   note?: string;
 }

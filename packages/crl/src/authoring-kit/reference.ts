@@ -203,10 +203,13 @@ case "hard exclusion -> denied":
 /**
  * Tools-authored criteria-decision reference (Stage 1). The CENTERPIECE for #168:
  * decision composition (combining the policy's DISTINCT criteria) lives in the
- * DECISION TREE — each criterion is its own nested `when` node (nesting = AND) —
- * while `defined as` is INFERENCE that normalizes the sub-representations of ONE
- * criterion into one fact. The kit's unit test materializes this and drives the
- * real CRE over it (criterion-1 node, criterion-2 node, and the inference operand).
+ * DECISION TREE — each criterion is its own `when` node (nesting = AND), and
+ * criteria offered as ALTERNATIVES ("Failed Conservative Therapy" = failed drug OR
+ * failed physical therapy — two SEPARATE events, so DISTINCT criteria) are a named
+ * `criterion` gated by an `or`-guard, NOT a `defined as` composite (they are not one
+ * fact recorded twice). The kit's unit test materializes this and drives the real CRE
+ * over it (criterion-1 node, and the nested criterion `or`-guard resolving on either
+ * distinct criterion). #234.
  */
 export const CRITERIA_DECISION_REFERENCE_CRL = `# Criteria Decision Reference — coverage criteria as DECISION NODES (Stage 1)
 library "Coverage Criteria Reference".
@@ -214,11 +217,14 @@ library "Coverage Criteria Reference".
 /*
 Decision composition (combining the policy's DISTINCT criteria -> a determination)
 lives in the DECISION TREE: each criterion is its own \`when\` node (nesting = AND).
-\`defined as\` is INFERENCE: it normalizes the sub-representations of ONE criterion
-into ONE clinical fact (here, "failed conservative therapy" = failed drug OR
-physical therapy). sem-and/or are SEMANTIC/inference operators, NOT composition,
-and never join distinct criteria. The determination is a configured category.key
-local activity (certify.Approve / not-certify.Deny), validated against crl.dispositions.
+"Failed Conservative Therapy" (failed drug therapy OR failed physical therapy) is a
+named \`criterion\` gated by an \`or\`-guard: failed drug therapy and failed physical
+therapy are two SEPARATE events (each can occur independently, so both may be present
+at once) — DISTINCT criteria the policy offers as alternatives, NOT one fact recorded
+two ways, so they are joined structurally, never fused with \`defined as\`/\`sem-or\` (only
+alternative records of a SINGLE underlying occurrence are rung-1 inference; #234). The
+determination is a configured category.key local activity (certify.Approve /
+not-certify.Deny), validated against crl.dispositions.
 */
 
 concept "Has Qualifying Diagnosis":
@@ -231,14 +237,14 @@ concept "Failed Drug Therapy":
 concept "Failed Physical Therapy":
 - type is Observation.
 - code is \`failed-physical-therapy\`.
-concept "Failed Conservative Therapy":            // INFERENCE: one criterion, two representations
-- defined as ( "Failed Drug Therapy" sem-or "Failed Physical Therapy" ).
+criterion "Failed Conservative Therapy":          // two DISTINCT criteria (SEPARATE events) -> decision-layer or-guard,
+- when ( "Failed Drug Therapy" or "Failed Physical Therapy" ).  // NOT a \`defined as\` composite (not one fact recorded twice)
 
 decision "Coverage Determination":                 // criteria are nested \`when\` NODES
 first:
 - when "Has Qualifying Diagnosis" then:
     first:
-    - when "Failed Conservative Therapy" then recommend activity "certify.Approve".
+    - when ( "Failed Conservative Therapy" ) then recommend activity "certify.Approve".
     - otherwise then recommend activity "not-certify.Deny".
     end.
 - otherwise then recommend activity "not-certify.Deny".
@@ -249,10 +255,10 @@ library "Coverage Criteria Reference Cases".
 covers "Coverage Criteria Reference".
 
 /*
-Each case exercises a decision NODE or the inference operand: criterion-1 (\`when[0]\`),
-criterion-2 (\`when[0]/when[0]\` — a nested NODE, not a composite), and the
-\`defined as\` inference (failed drug OR physical therapy -> one "Failed Conservative
-Therapy" fact). The two approve cases prove the inference resolves on either operand.
+Each case exercises a decision NODE: criterion-1 (\`when[0]\`), and criterion-2
+(\`when[0]/when[0]\` — the failed-conservative-therapy or-guard, a nested NODE, not a
+composite). The two approve cases prove the guard resolves on EITHER distinct
+criterion (failed drug OR failed physical therapy independently satisfies it).
 */
 
 fact "Sample Patient":
@@ -281,7 +287,7 @@ case "diagnosis + failed drug therapy -> approve":
 - fact is "Drug Therapy Failure".
 - result is "Coverage Determination" is "certify.Approve".
 
-case "diagnosis + failed physical therapy -> approve (inference: either representation)":
+case "diagnosis + failed physical therapy -> approve (guard-or: either distinct criterion)":
 - subject is "Sample Patient".
 - fact is "Diagnosis Finding".
 - fact is "Physical Therapy Failure".

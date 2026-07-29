@@ -113,8 +113,24 @@ export type { AuthoringEdge, AuthoringKit, AuthoringStage, AuthoringUseCase, Kit
 //   validator); the 3 flag EXAMPLES became `text` tool-call illustrations (a `.crl` flag tag would now be `meta-unknown-tag`).
 //   `@gap-filed` stays a `.crl` meta tag. Registry companion metadata-registry.json v0.3.4 removed the flag entries + flagModel.
 //   NO payload-shape change. BOTH useCase hashes re-pin.
+// "1.10" → "1.11": CONTENT change (KE #234) — the `decision-composition` invariant was UNFALSIFIABLE: nothing anchored
+//   "one fact," so the composite's own NAME supplied it (name four diseases `Substantial Co Morbidity` → they become its
+//   "representations" → every disjunction is rung-1 → the invariant can never fail). Adds a UNIT ANCHORING invariant clause
+//   (the one fact must be nameable WITHOUT the composite's label; co-occurrence tell: SEPARATE independently-occurring
+//   events are DISTINCT criteria, alternative records of the SAME underlying occurrence are one fact; mechanical corollary: an operand
+//   that is also a guard atom is a distinct criterion), amends the rule `why` + the `hollowed-criteria` judge guidance/4th
+//   checkpoint, and REPLACES the `Failed Conservative Therapy` `defined as` EXAMPLE (an EXPIRED pre-#224 workaround — a `when`
+//   took a single concept ref, so `defined as ( A sem-or B )` was the only way to feed a disjunction into a branch) with the
+//   guard-`or` `criterion` form + adds a genuine rung-1 example (viral suppression) and the vacuity-trap DON'T. PROPAGATION
+//   (the payload MISSED this): the flagship `criteria-decision-reference` artifact committed the exact outlawed pattern —
+//   `Failed Conservative Therapy` re-grounded to a `criterion` (truth-identical, CEL cases unchanged; the artifact now
+//   executes ZERO `defined as` end-to-end — deliberate, the language layer covers inference execution); the `concept-form`
+//   rule + conceptLayerModel `defined as` + model prose + `docs/decision-shapes.md` (cited-by-name) all re-worded off the
+//   FCT-as-inference gloss. Examples-harness contract EXTENDED: `valid:false` + no `expectRule` = a JUDGE-lens violation that
+//   is validator-clean (only `unresolved-reference`). NO payload-shape change. BOTH useCase hashes re-pin (schemaVersion is
+//   hashed AND the cpg-edge rule/examples/judgeLens inherit into prior-auth; the prior-auth-edge artifact reinforces the PA move).
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.10";
+const SCHEMA_VERSION = "1.11";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -199,7 +215,7 @@ const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
   {
     form: "- defined as ( ... sem-and / sem-or / sem-not ... ).",
     meaning:
-      "INFERENCE / semantic normalization: combines the sub-representations or data-components of ONE concept into ONE clinical fact (the only added depth this stage; #126). It is NOT decision composition and NEVER combines distinct decision criteria — that is the decision tree's job (#168). run_decision evaluates it: sem-and = all, sem-or = any, sem-not = not (closed-world). Bare operands resolve within the defining library; cross-library operands must be qualified.",
+      "INFERENCE / semantic normalization: combines the sub-representations or data-components of ONE concept into ONE clinical fact (the only added depth this stage; #126). It is NOT decision composition and NEVER combines distinct decision criteria — that is the decision tree's job (#168). THE TELL (anchor the unit OUTSIDE the label): name the ONE clinical reality the operands each RECORD without using the concept's own name — alternative records of a SINGLE underlying occurrence (a viral-load lab result and/or a chart note attesting the SAME suppression — the records may themselves coexist, that is fine) are one fact. Operands that are SEPARATE underlying events, each independently occurring (a patient can fail drug therapy AND, separately, physical therapy), are DISTINCT criteria → decision layer, NOT `defined as`. The tell is SAME occurrence vs DIFFERENT occurrences, not whether the records coexist. run_decision evaluates it: sem-and = all, sem-or = any, sem-not = not (closed-world). Bare operands resolve within the defining library; cross-library operands must be qualified.",
     scope: "in",
   },
   {
@@ -225,7 +241,7 @@ const RULES: KitRule[] = [
     id: "concept-form",
     edge: "cpg",
     category: "concept-model",
-    rule: "Stage-1 leaf concepts carry `type is` + `code is` (local). A SINGLE criterion stated at a finer data-grain — multiple representations/components of ONE clinical fact — is normalized with `defined as` (INFERENCE) over named local leaves, drop-one-leaf testable (e.g. \"failed conservative therapy\" = failed drug OR physical therapy). The conjunction of DISTINCT criteria (a policy's \"ALL of the following are met\") is decision COMPOSITION (see decision-composition): author it as decision STRUCTURE — a compound branch guard `when ( A and B and C )` (or a named `criterion`) when the criteria share one consequence, sibling `when` branches when they route to DIFFERENT consequences — NEVER as a `defined as`/`sem-*` composite (which ships ONE opaque `condition[]` and asserts a sameness distinct criteria do not have). At the CONCEPT level this stage, `defined as` normalizes ONE concept's sub-representations; joining distinct criteria is a DECISION-level construct, not a concept-model one. Still OUT this stage: `source representation`/`coded from` (external) and `definition is` predicates (count/temporal/value) — the SOLE exception: the patient-age both-rep `definition is age today at least <N> years` (see rule patient-age-both-rep). The boundary is the concept FORM, not the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional.",
+    rule: "Stage-1 leaf concepts carry `type is` + `code is` (local). A SINGLE criterion stated at a finer data-grain — multiple representations/components of ONE clinical fact — is normalized with `defined as` (INFERENCE) over named local leaves. The unit is anchored OUTSIDE the concept's own name: the operands must be alternative records of ONE underlying occurrence (e.g. \"viral suppression documented\" = a viral-load lab result OR a clinician chart note of the SAME suppression), NOT two SEPARATE events (failed drug therapy and failed physical therapy each occur independently — DISTINCT criteria; author them as decision structure, see decision-composition). The conjunction of DISTINCT criteria (a policy's \"ALL of the following are met\") is decision COMPOSITION (see decision-composition): author it as decision STRUCTURE — a compound branch guard `when ( A and B and C )` (or a named `criterion`) when the criteria share one consequence, sibling `when` branches when they route to DIFFERENT consequences — NEVER as a `defined as`/`sem-*` composite (which ships ONE opaque `condition[]` and asserts a sameness distinct criteria do not have). At the CONCEPT level this stage, `defined as` normalizes ONE concept's sub-representations; joining distinct criteria is a DECISION-level construct, not a concept-model one. Still OUT this stage: `source representation`/`coded from` (external) and `definition is` predicates (count/temporal/value) — the SOLE exception: the patient-age both-rep `definition is age today at least <N> years` (see rule patient-age-both-rep). The boundary is the concept FORM, not the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional.",
     why: "Local-source pass proves decision authoring (incl. one-concept `defined as` inference) before external sources and predicate inference are added; keeping one-concept inference distinct from decision composition keeps distinct-criteria logic in the DECISION layer, where each criterion emits as its own visible `condition[]` (#168 — the test is same-fact vs distinct-criteria; distinct criteria are never fused by `defined as`/`sem-*`; see decision-composition).",
     ref: "concept-layer-model; src/tests/fixtures/representation/mammogram-and-bmi.crl",
     clauses: [
@@ -294,7 +310,7 @@ const RULES: KitRule[] = [
     edge: "cpg",
     category: "decision-shape",
     rule: "The COMPOSITION LADDER (§1) — the primitive is decided by the UNIT you are combining: (rung 1) sub-representations of ONE criterion → `defined as` INFERENCE (sem-and/or/not, closed-world; see concept-form); (rung 2) DISTINCT criteria of ONE determination → decision STRUCTURE in all cases: a COMPOUND BRANCH GUARD `when ( A and B and C )` (or a named `criterion`, see branch-guards / criterion) when the criteria share ONE consequence and you want a single gate node; sibling `when` branches under `first:` when they route to DIFFERENT consequences (divergent dispositions / precedence / exclusion-first / per-criterion sub-tree). Distinct criteria are NEVER fused by `defined as`/`sem-*` — that inference collapses them to ONE opaque CQL boolean (the criteria vanish from the emitted PlanDefinition) and asserts a sameness that does not exist; `defined as` is rung-1 only. (rung 3) SEPARATE determinations the SOURCE delegates, OR a GENUINELY-SHARED determination reused across policies/pathways → chained `use decision` (see chaining-necessity — source-delegation OR genuine reuse, NOT fabricated coupling). The tree already expresses AND/OR/NOT, so \"I have boolean logic\" is NOT a chaining signal — almost all of it stays in ONE tree. (`any:` is over ACTIONS only — alternatives WITHIN one matched branch — NEVER an OR over `when` branches; see decision-qualifiers.) A `when` now takes an `and`/`or`/`not` boolean over concept/criterion refs (see branch-guards / criterion), not a single concept. A `defined as` composite over distinct criteria gated as a `when` is a VIOLATION regardless of consequence: the emitted PlanDefinition ships ONE opaque `condition[]` (the distinct criteria are invisible), and `sem-*` over distinct criteria asserts a sameness that does not exist. Each distinct criterion is a visible guard atom (compound branch guard) or its own `when` node (see criteria-decision-reference). Exposing ONE criterion's sub-representations AS `when` nodes (§3) is presumed-faithful: do NOT revert it. AT SCALE, when one determination has many OVERLAPPING pathways with outcome precedence + fall-through, gate each pathway on its FULL conjunction as a compound branch guard and let `first:` branch ORDER carry the precedence (see disposition-arbitration-reference) — every criterion stays a visible guard atom, a partial match falls through (no trap), and NO `sem-not` inference-layer arbitration is needed (that was the retired pre-#224 workaround for single-concept `when`).",
-    why: "The test is SAME-FACT vs DISTINCT-CRITERIA — are the `defined as`/`sem-*` operands alternative representations of ONE clinical fact, or a policy's distinct criteria? Two reasons a composite over DISTINCT criteria is unfaithful. (1) EMIT OPACITY: it lowers to ONE opaque CQL boolean, so the emitted PlanDefinition ships a SINGLE `condition[]` — the distinct criteria are INVISIBLE in the shipped artifact (a downstream reader, and any engine but the CRE, sees one true/false, not which criterion failed). A decision-layer compound branch guard keeps each criterion its OWN `condition[]`. (2) SEMANTIC SAMENESS: `sem-*` asserts its operands are alternative REPRESENTATIONS of ONE fact; distinct criteria are not one fact, so the assertion is false — and now that the decision layer expresses conjunction (`and` guards) and precedence (`first:`) directly, there is a faithful STRUCTURAL home with no reason to reach for inference. So `defined as`/`sem-*` is rung-1 ONLY (one criterion's representations); distinct-criteria composition AND precedence live in the decision layer. (This retires the earlier 'a single-consequence composite is faithful' rule, which rested on the CRE's render-time operand truth-table — an affordance the SHIPPED artifact does not carry — and it lands the whole kit on one rule with no carve-out.)",
+    why: "The test is SAME-FACT vs DISTINCT-CRITERIA (\"one fact\" is ANCHORED OUTSIDE the author's naming — it must be nameable without the composite's own label; see the UNIT ANCHORING clause. Without that anchor this test is unfalsifiable, because the author names the composite and thereby names the fact.) — are the `defined as`/`sem-*` operands alternative representations of ONE clinical fact, or a policy's distinct criteria? Two reasons a composite over DISTINCT criteria is unfaithful. (1) EMIT OPACITY: it lowers to ONE opaque CQL boolean, so the emitted PlanDefinition ships a SINGLE `condition[]` — the distinct criteria are INVISIBLE in the shipped artifact (a downstream reader, and any engine but the CRE, sees one true/false, not which criterion failed). A decision-layer compound branch guard keeps each criterion its OWN `condition[]`. (2) SEMANTIC SAMENESS: `sem-*` asserts its operands are alternative REPRESENTATIONS of ONE fact; distinct criteria are not one fact, so the assertion is false — and now that the decision layer expresses conjunction (`and` guards) and precedence (`first:`) directly, there is a faithful STRUCTURAL home with no reason to reach for inference. So `defined as`/`sem-*` is rung-1 ONLY (one criterion's representations); distinct-criteria composition AND precedence live in the decision layer. (This retires the earlier 'a single-consequence composite is faithful' rule, which rested on the CRE's render-time operand truth-table — an affordance the SHIPPED artifact does not carry — and it lands the whole kit on one rule with no carve-out.)",
     ref: "docs/decision-shapes.md; criteria-decision-reference; disposition-arbitration-reference; chaining-necessity; #168",
     clauses: [
       {
@@ -303,6 +319,11 @@ const RULES: KitRule[] = [
       },
       {
         text: "A `defined as`/`sem-*` composite over a policy's DISTINCT criteria, gated as a `when`, is a VIOLATION regardless of shared consequence. Two reasons: the emitted PlanDefinition ships ONE opaque `condition[]` (the distinct criteria are INVISIBLE in the shipped artifact — the CRE's operand truth-table is a render-time affordance the artifact does not carry), and `sem-*` asserts a SAMENESS (alternative representations of ONE fact) that distinct criteria do not have. The faithful home is decision STRUCTURE: a COMPOUND BRANCH GUARD `when ( A and B and C )` (or a named `criterion`) when the criteria share one consequence — each criterion its own visible `condition[]`; sibling `when` branches when they route to DIFFERENT consequences (divergent dispositions / precedence / exclusion-first / per-criterion sub-tree). Flag and revert (even against a human) a distinct-criteria `defined as`/`sem-*` composite. (The REVERSE — exposing ONE criterion's sub-representations as `when` nodes — is faithful; do NOT revert it. `defined as`/`sem-*` over ONE criterion's representations is rung-1 and stands.)",
+        force: "invariant",
+        test: "judgeLens.composition:hollowed-criteria",
+      },
+      {
+        text: "UNIT ANCHORING — the ONE fact must be identifiable WITHOUT the composite's own label. `sem-` is SEMANTIC: the operator ASSERTS its operands are the same underlying clinical reality RECORDED DIFFERENTLY (a lab value OR a chart note attesting one viral suppression; the local age Observation OR the computed `Patient.birthDate`). A composite's NAME must NEVER be accepted as the fact its operands represent: name seven distinct diseases `Substantial Co Morbidity` and they become 'representations' of it — at which point EVERY disjunction is rung-1 and the distinct-criteria invariant CANNOT BE VIOLATED. A test whose subject the author names is a test the author always passes. Adjudicate by asking: is this ONE clinical event/state that could be RECORDED in more than one place, or are these DIFFERENT states, any of which independently satisfies the rule? Different diseases, expense categories, programmes, diagnoses, clinician types, required plan components are DIFFERENT -> decision STRUCTURE. Source wording offering alternatives ('one or both of the following', 'either of the following', 'such as', 'including') marks ALTERNATIVES the policy presents; it is NOT a licence for `defined as`. Rung-1 inference is NARROW: on a real policy most candidate composites FAIL this test, and a review clearing most of them is itself evidence the label was allowed to stand in for the fact. MECHANICAL COROLLARY, decisive alone and needing no source read: if an operand ALSO appears as a guard atom anywhere in the decision, it is a distinct criterion — the author already had to name it as its own condition.",
         force: "invariant",
         test: "judgeLens.composition:hollowed-criteria",
       },
@@ -624,12 +645,28 @@ const EXAMPLES: KitExample[] = [
     note: "type is + code is only — the Stage-1 leaf concept form.",
   },
   {
-    title: "`defined as` is INFERENCE — normalize ONE criterion's representations",
+    title: "A policy's ALTERNATIVES are joined in the DECISION layer, not by `defined as`",
     language: "crl",
     snippet:
-      'concept "Failed Drug Therapy":\n- type is Observation.\n- code is `failed-drug`.\nconcept "Failed Physical Therapy":\n- type is Observation.\n- code is `failed-pt`.\nconcept "Failed Conservative Therapy":\n- defined as ( "Failed Drug Therapy" sem-or "Failed Physical Therapy" ).',
+      'concept "Failed Drug Therapy":\n- type is Observation.\n- code is `failed-drug`.\nconcept "Failed Physical Therapy":\n- type is Observation.\n- code is `failed-pt`.\ncriterion "Failed Conservative Therapy":\n- when ( "Failed Drug Therapy" or "Failed Physical Therapy" ).',
     valid: true,
-    note: "ONE criterion satisfiable by either representation → one fact (drop-one testable). This is rung-1 INFERENCE over ONE concept's representations — distinct from joining a policy's DISTINCT criteria, which is decision composition in STRUCTURE (a compound branch guard `when ( A and B )` / `criterion` when they share one consequence, sibling `when` branches when they route differently; NEVER a `defined as`/`sem-*` composite over distinct criteria; see decision-composition + criteria-decision-reference). #168.",
+    note: "TWO DISTINCT criteria the policy offers as ALTERNATIVES, joined in the DECISION layer. Each stays its OWN visible `condition[]` in the emitted PlanDefinition, so a downstream reader sees WHICH modality failed. Naming it a `criterion` keeps the decision text unchanged (`when \"Failed Conservative Therapy\"`) while the atoms stay visible. REPLACES the former `defined as` sem-or composite over these same two failures: pre-#224 a `when` took a SINGLE concept reference, so `defined as` was the ONLY way to get a disjunction into a guard — that constraint is gone. The old note ('ONE criterion satisfiable by either representation') was weaker than the rule and was read as licensing any disjunction sitting under a criterion label. #168.",
+  },
+  {
+    title: "GENUINE rung-1 — ONE fact RECORDED two ways",
+    language: "crl",
+    snippet:
+      'concept "Viral Load Below Threshold Lab Result":\n- type is Observation.\n- code is `vl-lab`.\nconcept "Viral Suppression Charted By Clinician":\n- type is Observation.\n- code is `vl-charted`.\nconcept "Viral Suppression Documented":\n- defined as ( "Viral Load Below Threshold Lab Result" sem-or "Viral Suppression Charted By Clinician" ).',
+    valid: true,
+    note: "ONE clinical reality — this patient's viral suppression — RECORDED in two places: a lab result or a clinician's chart note (the two records may themselves coexist; it is still ONE occurrence). The fact is nameable WITHOUT the concept's label, which IS the test. Contrast the criterion example above: failed drug therapy and failed physical therapy are two DIFFERENT events, not one occurrence recorded twice. This is rung-1 INFERENCE over ONE concept's representations. #168.",
+  },
+  {
+    title: "THE VACUITY TRAP — the label supplying \"the one fact\"",
+    language: "crl",
+    snippet:
+      'concept "Substantial Co Morbidity":\n- defined as ( "Life Threatening Cardiovascular Disease" sem-or "Sleep Apnea" sem-or "Uncontrolled Diabetes Mellitus" sem-or "Severe Musculoskeletal Problem" ).',
+    valid: false,
+    note: "Defended as rung-1 because the operands are 'representations of substantial co-morbidity' — but that fact is supplied by the concept's own NAME. Strip the label and there is no single clinical event: cardiovascular disease, sleep apnea, diabetes and a musculoskeletal problem are four DIFFERENT states, any of which independently satisfies the rule (they co-occur). The source's 'such as' marks alternatives, not representations. Faithful form: `criterion \"Substantial Co Morbidity\": - when ( A or B or C or D ).` VALIDATOR-CLEAN — this is a JUDGE-lens (`hollowed-criteria`) violation, not a grammar/shape one (hence no `expectRule`); the grammar cannot see it, which is exactly why UNIT ANCHORING exists.",
   },
   {
     title: "Matched branch with a guarded `any:` menu",
@@ -845,11 +882,18 @@ const JUDGE_LENS: JudgeLens = {
         "sibling `when` branches when they route differently. Flag a distinct-criteria composite even if deliberate; a one-fact " +
         "`defined as` STANDS even if deliberate. (The REVERSE — exposing one criterion's sub-representations as `when` nodes — " +
         "is faithful; do NOT revert it.) NOT behaviour-based: re-grounding a composite to a guard is a zero-behaviour diff — " +
-        "'it changed nothing' is expected (the truth function is preserved), not a defence.",
+        "'it changed nothing' is expected (the truth function is preserved), not a defence. " +
+        "APPLY UNIT ANCHORING FIRST, OR THIS CHECKPOINT CANNOT FAIL: name the single clinical reality the operands each " +
+        "RECORD, WITHOUT using the composite's own label. If you cannot, they are distinct criteria and the faithful home is " +
+        "decision structure. 'The policy groups them under one heading' is evidence of nothing — a heading is a label, not a " +
+        "fact. MECHANICAL COROLLARY (no source read needed): an operand that ALSO appears as a guard atom anywhere in the " +
+        "decision is a distinct criterion; a floor, not a substitute — it catches only the subset the author re-used. EXPECT " +
+        "most composites in a real policy to FAIL; a pass clearing the majority must be re-run against UNIT ANCHORING before it is reported.",
       checkpoints: [
         "Are the `defined as`/`sem-*` operands alternative REPRESENTATIONS of ONE clinical fact, or DISTINCT criteria of the policy? Operational test (from decision-shapes.md): would a policy reviewer expect to see this operand as its OWN criterion line (→ distinct criterion; use structure) or as one of several data forms of a single fact (→ representation; inference is faithful)?",
         "Does the emitted `PlanDefinition.action` show each distinct criterion as its own `condition[]` (compound guard / `when` node), or are they hidden inside ONE opaque composite `condition[]`?",
         "Is precedence among outcomes computed by `first:` branch ORDER (faithful), or by `sem-not` FINAL-* concepts in the inference layer (the retired pre-#224 workaround)?",
+        "Name the ONE clinical reality the operands each RECORD, without using the composite's label. Cannot? -> distinct criteria -> decision structure.",
       ],
     },
     {
@@ -990,7 +1034,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     language: "crl",
     edge: "prior-auth",
     purpose:
-      "The model for #168: a policy's DISTINCT criteria as decision STRUCTURE (each criterion visible/auditable) — nested `when` nodes or a COMPOUND BRANCH GUARD `when ( A and B )` (nesting/`and` = AND), each its own `condition[]` — PLUS one genuine `defined as` INFERENCE (a single criterion satisfiable by either of two representations). Criteria that route to DIFFERENT consequences MUST be separate `when` nodes; a conjunction sharing ONE consequence is a compound branch guard (or a `criterion`). Distinct criteria are NEVER fused into a `defined as`/`sem-*` composite (see decision-composition). `defined as` at the concept level normalizes ONE concept.",
+      "The model for #168: a policy's DISTINCT criteria as decision STRUCTURE (each criterion visible/auditable) — nested `when` nodes or a COMPOUND BRANCH GUARD `when ( A and B )` (nesting/`and` = AND), each its own `condition[]`. \"Failed Conservative Therapy\" (failed drug therapy OR failed physical therapy) is a named `criterion` gated by an `or`-guard, NOT a `defined as`: failed drug therapy and failed physical therapy are two SEPARATE events joined in the DECISION layer. THE TELL — alternative records of a SINGLE underlying occurrence (their records may coexist) are one fact → `defined as`; SEPARATE independently-occurring events are distinct criteria → decision structure. Criteria that route to DIFFERENT consequences MUST be separate `when` nodes; a conjunction sharing ONE consequence is a compound branch guard (or a `criterion`). Distinct criteria are NEVER fused into a `defined as`/`sem-*` composite (see decision-composition). `defined as` at the concept level normalizes ONE concept's representations.",
     source: CRITERIA_DECISION_REFERENCE_CRL,
   },
   {
@@ -998,7 +1042,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     language: "cel",
     edge: "prior-auth",
     purpose:
-      "Companion cases exercising each decision NODE + the inference operand: criterion-1 node, the nested criterion-2 node (its `otherwise` → deny), the inference resolving on either representation (drug OR physical therapy → approve), and the top-level otherwise.",
+      "Companion cases exercising each decision NODE: criterion-1 node (Has Qualifying Diagnosis), the nested criterion-2 node (the failed-conservative-therapy guard-`or` — its `otherwise` → deny), the guard resolving on EITHER distinct criterion (drug OR physical therapy → approve), and the top-level otherwise.",
     source: CRITERIA_DECISION_REFERENCE_CEL,
   },
   {
