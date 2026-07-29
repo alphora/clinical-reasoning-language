@@ -140,7 +140,7 @@ import {
   normalizePaneOrder,
   type PaneSpec,
 } from "./paneOrder";
-import { isConceptHit, isFactHit, isSubQuestionHit, type RevealHit, type WebviewHit } from "./webviewHit";
+import { isConceptHit, isCriterionToggleHit, isFactHit, isSubQuestionHit, type RevealHit, type WebviewHit } from "./webviewHit";
 import {
   caseTokenId,
   cockpitAgentBridge,
@@ -204,9 +204,10 @@ interface PaneView {
    *  matches open flags → gids off these + posts `.has-flag`. Captured atomically with the anchors; reset each render. */
   conceptOccurrences: { gid: string; lib: string; name: string }[];
   flaggableGids: string[];
-  /** #224 ii.3 Slice 2b (TREE pane only): the flow render's per-single-criterion-`when` substrate — {gid,lib,name,collapsed}.
-   *  `driveCriterionVerdicts` maps a model-level verdict (by `{lib,name}` identity) → these gids + posts `.crit-*`; step C
-   *  rolls a body flag up onto a COLLAPSED box. Captured atomically with the anchors; reset each render, like conceptOccurrences. */
+  /** #224 ii.3 Slice 2b / #233 Todo 2a (TREE pane only): the flow render's per-criterion-BOX substrate — {gid,lib,name,
+   *  collapsed,bodyConcepts} for each ROOT criterion `when` AND each NON-ROOT `flow-crit-row`. `driveCriterionVerdicts`
+   *  maps a model-level verdict (by `{lib,name}` identity) → these gids + posts `.crit-*` (non-root rows are inert in 2a —
+   *  see driveCriterionVerdicts); the flag rollup lights a COLLAPSED box. Captured atomically with the anchors; reset each render. */
   criterionOccurrences: { gid: string; lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[] }[];
   /** the start/primary-node gid — carries the chrome-mirror count badge (see driveFlagBadges). */
   startNodeGid?: string;
@@ -1552,7 +1553,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       for (const occ of tree.criterionOccurrences) {
         const key = criterionVerdictKey(occ.lib, occ.name);
         const live = identities.get(key);
-        if (!live) continue; // an occurrence with no live identity (shouldn't happen — an occurrence implies a soleCriterion)
+        // #233 Todo 2a: a NON-ROOT criterion occurrence (a `flow-crit-row`) resolves a live identity ONLY when the SAME
+        // `(lib,name)` is also a SOLE criterion somewhere (`buildLiveCriterionIdentities` is sourced from `soleCriterion`).
+        // A criterion that is non-root everywhere has no live identity here → skipped. A SHARED criterion (sole + non-root)
+        // does resolve, so its non-root gid is pushed to `byState` + gets a `.crit-*` class — visually INERT in 2a (a
+        // crit-row emits no verdict-chip markup and the `.crit-*` selectors are `.flow-row`-scoped, which it is not). Todo 2b
+        // sources identities from the canonical inventory (`buildCriterionIdentities`) + adds the chip so ALL occurrences light.
+        if (!live) continue;
         const s = criterionVerdictState(criterionVerdicts[key], live);
         if (s !== "unreviewed") byState[s].push(occ.gid); // unreviewed → no class (the bulk-clear leaves it bare)
       }
@@ -2085,10 +2092,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     } else if (msg.type === "nodeVerdictMenu" && typeof msg.key === "string") {
       void nodeMenu(msg.key); // #217 + #203 Todo 4b Slice B: right-click a flow node (MV) — combined menu (verdict / add-flag); a non-flaggable node routes straight to the verdict pick
     } else if (msg.type === "toggleCriterion" && typeof msg.key === "string") {
-      // #224 ii.3 Slice 2: the criterion `▸`/`▾` disclosure. Resolve the opaque reveal key → the when's nodeKey (trusted
-      // lookup, never a webview-supplied path), then flip its collapse state + re-render the tree (layout change).
+      // #224 ii.3 Slice 2: the criterion `▸`/`▾` disclosure. Resolve the opaque reveal key → the collapse key (trusted
+      // lookup, never a webview-supplied path), then flip its state + re-render the tree (layout change). #233 Todo 2a:
+      // a ROOT criterion resolves to its `when` nodeKey; a NON-ROOT criterion box resolves to `{criterionToggle: posKey}`.
+      // Both flip a string in `expandedGuardWhens` (disjoint keyspaces — a JSON-array nodeKey vs a `leaf::` position key).
       const hit = v.reveals[msg.key];
       if (hit && "nodeKey" in hit) toggleCriterionExpand(hit.nodeKey);
+      else if (hit && isCriterionToggleHit(hit)) toggleCriterionExpand(hit.criterionToggle);
     } else if (msg.type === "snapshotDom" && pane === "tree" && typeof msg.token === "string") {
       // #(tree-snapshot) Todo 2 — the tree webview's reply to `requestSnapshot` (only the TREE pane is a valid source). The
       // coordinator ignores a stale/late token; the payload is COERCED to string here + fully screened in captureTreeDom.
@@ -2169,6 +2179,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           selectSubQuestionCases(hit.subQuestionLeafKey, crlMaps);
           return;
         }
+        // #233 Todo 2a: a criterion collapse chevron resolves to `{criterionToggle}` — it drives ONLY the `toggleCriterion`
+        // message, never a selection. It should never reach here (the chevron posts `toggleCriterion`, and the crit box
+        // body carries no `data-reveal`), but divert defensively so a stray reveal-click is inert, not mis-routed.
+        if (isCriterionToggleHit(hit)) return;
         // Otherwise the click sets the selection in the CURRENT primary's space (mapping cross-pane as needed).
         const p = state.primary;
         // record the open-raw locus only for a source-span click while source-primary
@@ -3438,13 +3452,15 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (state.selection) dispatch({ type: "select", selection: state.selection }); // restore highlights post-re-render
   }
 
-  /** #224 ii.3 Slice 2: flip a single-criterion `when`'s collapse state (by nodeKey) and re-render the TREE pane only —
-   *  collapse changes the flow LAYOUT (the criterion body appears/disappears), so it needs a re-render, not a CSS
-   *  re-apply like zoom. Mirrors `applyShowKeys`'s tail: the tree ack re-drives every overlay, and re-dispatching the
-   *  selection restores the highlight the innerHTML swap dropped. Ephemeral: `expandedGuardWhens` is not persisted. */
-  function toggleCriterionExpand(nodeKey: string): void {
-    if (expandedGuardWhens.has(nodeKey)) expandedGuardWhens.delete(nodeKey);
-    else expandedGuardWhens.add(nodeKey);
+  /** #224 ii.3 Slice 2 / #233 Todo 2a: flip a criterion's collapse state and re-render the TREE pane only — collapse
+   *  changes the flow LAYOUT (the criterion body appears/disappears), so it needs a re-render, not a CSS re-apply like
+   *  zoom. `collapseKey` is a ROOT criterion's `when` nodeKey (a JSON array) OR a NON-ROOT criterion's `leaf::` position
+   *  key (`{criterionToggle}`); both live in the one `expandedGuardWhens` set (disjoint keyspaces). Mirrors
+   *  `applyShowKeys`'s tail: the tree ack re-drives every overlay, and re-dispatching the selection restores the
+   *  highlight the innerHTML swap dropped. Ephemeral: `expandedGuardWhens` is not persisted. */
+  function toggleCriterionExpand(collapseKey: string): void {
+    if (expandedGuardWhens.has(collapseKey)) expandedGuardWhens.delete(collapseKey);
+    else expandedGuardWhens.add(collapseKey);
     renderPane("tree");
     if (state.selection) dispatch({ type: "select", selection: state.selection });
   }
@@ -4282,8 +4298,9 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // tree zoom control (− / reset / +) — a local view op, no host round-trip. Intercepted BEFORE [data-reveal].
   `const zb=e.target.closest&&e.target.closest('[data-zoom]');` +
   `if(zb){e.preventDefault();e.stopPropagation();const a=zb.getAttribute('data-zoom');setZoom(a==='in'?treeZoom*1.2:a==='out'?treeZoom/1.2:1);return;}` +
-  // #224 ii.3 Slice 2: a criterion collapse chevron (▸/▾) — intercepted BEFORE [data-reveal] (the chevron <g> is nested
-  // in the row's data-reveal); posts the opaque reveal key, the host resolves it → nodeKey and flips collapse + re-renders.
+  // #224 ii.3 Slice 2 / #233 Todo 2a: a criterion collapse chevron (▸/▾) — intercepted BEFORE [data-reveal] (the chevron
+  // <g> is nested in the row's data-reveal); posts the opaque reveal key, the host resolves it → a ROOT criterion's `when`
+  // nodeKey OR a NON-ROOT criterion's `{criterionToggle}` position key, then flips collapse + re-renders.
   `const ct=e.target.closest&&e.target.closest('[data-toggle-crit]');` +
   `if(ct){e.preventDefault();e.stopPropagation();v.postMessage({type:'toggleCriterion',key:ct.getAttribute('data-toggle-crit')});return;}` +
   `const t=e.target.closest&&e.target.closest('[data-reveal]');` +

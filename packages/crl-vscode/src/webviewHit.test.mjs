@@ -2,7 +2,7 @@
 // routed into the engine selection path. vscode-free → imported directly (vitest transforms the .ts).
 import assert from "node:assert/strict";
 
-import { isFactHit, isConceptHit, isSubQuestionHit } from "./webviewHit.ts";
+import { isFactHit, isConceptHit, isSubQuestionHit, isCriterionToggleHit } from "./webviewHit.ts";
 
 const check = test;
 
@@ -35,5 +35,17 @@ check("#216 a sub-question hit (has subQuestionLeafKey) → isSubQuestionHit tru
   assert.equal(isSubQuestionHit({ conceptNodeKey: "cA" }), false);
   assert.equal(isSubQuestionHit({ nodeKey: "n1" }), false);
   assert.equal(isSubQuestionHit({ caseId: "c1" }), false);
+});
+
+check("#233 Todo 2a a criterion-toggle hit (has criterionToggle) → isCriterionToggleHit true, and is DISJOINT from every selectable/peek hit (drives ONLY the toggle channel)", () => {
+  assert.equal(isCriterionToggleHit({ criterionToggle: 'leaf::["w:cmp","0.1","crit"]' }), true, "→ toggleCriterionExpand by position key");
+  // DISJOINT both ways: a toggle hit is not a select/peek/sub-question, and none of those is a toggle hit.
+  assert.equal(isFactHit({ criterionToggle: "leaf::x" }), false);
+  assert.equal(isConceptHit({ criterionToggle: "leaf::x" }), false);
+  assert.equal(isSubQuestionHit({ criterionToggle: "leaf::x" }), false);
+  assert.equal(isCriterionToggleHit({ nodeKey: "n1" }), false, "a decision {nodeKey} is NOT a toggle (it selects/verdicts)");
+  assert.equal(isCriterionToggleHit({ subQuestionLeafKey: "leaf::x" }), false);
+  assert.equal(isCriterionToggleHit({ conceptNodeKey: "cA" }), false);
+  assert.equal(isCriterionToggleHit({ caseId: "c1" }), false);
 });
 

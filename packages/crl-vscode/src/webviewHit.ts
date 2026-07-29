@@ -28,8 +28,17 @@ export interface SubQuestionHit {
   subQuestionLeafKey: string;
 }
 
+/** #233 Todo 2a: a NON-ROOT criterion box's collapse chevron. Carries the criterion occurrence's POSITION key
+ *  (`leaf::[whenKey,opPath,"crit"]`, render-independent), which `toggleCriterionExpand` flips in `expandedGuardWhens`
+ *  (which now holds BOTH root when-nodeKeys and these position keys — disjoint by the `leaf::` prefix). Kept OUT of
+ *  `RevealHit` (it is neither a selection nor a peek — only the toggle channel resolves it). A ROOT criterion's chevron
+ *  still resolves to `{nodeKey}` (the `when` box is the criterion, absorbed), so both toggle paths converge on the flip. */
+export interface CriterionToggleHit {
+  criterionToggle: string;
+}
+
 /** Everything a webview click can resolve to. */
-export type WebviewHit = RevealHit | FactHit | ConceptHit | SubQuestionHit;
+export type WebviewHit = RevealHit | FactHit | ConceptHit | SubQuestionHit | CriterionToggleHit;
 
 /** True for a fact peek (→ peekConcept), false otherwise. */
 export function isFactHit(hit: WebviewHit): hit is FactHit {
@@ -45,4 +54,9 @@ export function isConceptHit(hit: WebviewHit): hit is ConceptHit {
 /** True for a tree sub-question click (→ dynamic on-path case selection); diverted before mapHitToPrimary. */
 export function isSubQuestionHit(hit: WebviewHit): hit is SubQuestionHit {
   return "subQuestionLeafKey" in hit;
+}
+
+/** #233 Todo 2a: true for a non-root criterion collapse chevron (→ toggleCriterionExpand by position key). */
+export function isCriterionToggleHit(hit: WebviewHit): hit is CriterionToggleHit {
+  return "criterionToggle" in hit;
 }

@@ -882,3 +882,118 @@ check("Todo 3 Slice 2b: the verdict chip is hidden by default and each state (pa
   // The dot color for each state is distinct (the case-verdict TOK_* for pass/fail/pending; a muted grey for stale).
   assert.ok(/\.flow-row\.crit-stale \.flow-crit-vdot\{fill:var\(--vscode-descriptionForeground/.test(FLOW_STYLE), "stale dot is muted grey (never a settled pass/fail color)");
 });
+
+// ── #233 Todo 2a: criterion-everywhere — a criterion renders as a NAMED collapsible box at EVERY guard position ──
+// `branchConditionToDefStruct` (Todo 1) now WRAPS every criterion ref in a `criterion` DefStructExpr node. `gcrit` builds
+// that node; `goutC` wraps a ROOT criterion into a guard outline with `soleCriterion` DERIVED (mirroring buildGuardOutlines'
+// `topCriterion` — the sole/root case, absorbed into the when box). A NON-ROOT criterion node (a conjunct / nested body ref)
+// draws its OWN named `flow-crit-row` box with an independent, position-keyed chevron.
+const CRIT_HASH = "sha256:0000000000000000";
+const gcrit = (name, operand, { elided = false } = {}) => ({ kind: "criterion", name, lib: "Pol", bodyHash: CRIT_HASH, operand, ...(elided ? { elided: true } : {}) });
+const goutC = (critExpr) => ({ expr: critExpr, soleCriterion: { lib: critExpr.lib, name: critExpr.name, bodyHash: critExpr.bodyHash, ...(critExpr.elided ? { elided: true } : {}) } });
+
+check("#233 Todo 2a ROOT-ABSORPTION: a WRAPPED root criterion renders BYTE-IDENTICALLY to the old sidecar shape (sole stays absorbed into the when box; no redundant crit-row)", () => {
+  const body = () => gand(gleaf("A", "c:A"), gleaf("B", "c:B"));
+  const oldShape = new Map([["w:crit", gout(body(), "Elig")]]); // pre-Todo-1: expr = the body, soleCriterion sidecar
+  const newShape = new Map([["w:crit", goutC(gcrit("Elig", body()))]]); // Todo 1: expr = the criterion node wrapping the body
+  const exp = new Set(["w:crit"]);
+  const a = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "z_", guardOutlines: oldShape, expandedGuardWhens: exp });
+  const b = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "z_", guardOutlines: newShape, expandedGuardWhens: exp });
+  assert.equal(b.html, a.html, "EXPANDED: the wrapped root criterion is UNWRAPPED to its body → identical render");
+  assert.ok(!/flow-crit-row/.test(b.html), "the ROOT criterion does NOT draw its own crit-row (absorbed into the when box)");
+  // gpt56 #1: also pin the DEFAULT (collapsed) state — the normal path (no expansion set). Both render only the when box.
+  const ca = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "z_", guardOutlines: oldShape });
+  const cb = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "z_", guardOutlines: newShape });
+  assert.equal(cb.html, ca.html, "COLLAPSED: the wrapped root criterion renders the same collapsed when box as the sidecar shape");
+  assert.ok(!/flow-crit-row/.test(cb.html), "collapsed root criterion still draws no crit-row");
+});
+
+check("#233 Todo 2a: a WRAPPED root criterion's occurrence still collects bodyConcepts — collectLeafIdentities RECURSES the criterion node (else the rollup silently empties)", () => {
+  const gouts = new Map([["w:crit", goutC(gcrit("Elig", gand(gleaf("A", "c:A"), gleaf("B", "c:B"))))]]);
+  const rr = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "wc_", guardOutlines: gouts });
+  assert.equal(rr.criterionOccurrences.length, 1);
+  assert.deepEqual(rr.criterionOccurrences[0].bodyConcepts.map((c) => `${c.lib}:${c.name}`).sort(), ["Pol:A", "Pol:B"], "recursing the criterion node's .operand collects the body leaves");
+});
+
+// A COMPOUND guard whose conjunct is a criterion node: `when A and CritC` → expr = and(leaf A, criterion CritC{body: B}).
+const cmpStruct = () => [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+  node("w:cmp", "when", "when A and CritC", ["c:A", "c:B"], [node("a:X", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
+] }];
+const cmpExpr = () => gand(gleaf("A", "c:A"), gcrit("CritC", gand(gleaf("B", "c:B"))));
+
+check("#233 Todo 2a: a NON-ROOT criterion conjunct (`when A and CritC`) draws CritC as a NAMED collapsible crit-row, default COLLAPSED, one occurrence", () => {
+  const gouts = new Map([["w:cmp", { expr: cmpExpr() }]]); // compound root → NO soleCriterion → CritC is non-root
+  const rr = renderFlowPane(cmpStruct(), { concepts: critCs(), revealPrefix: "nr_", guardOutlines: gouts });
+  assert.ok(/class="flow-outline flow-crit-row"/.test(rr.html), "CritC draws a named crit-row box");
+  assert.ok(/<text[^>]*>CritC<\/text>/.test(rr.html), "the crit-row is labelled with the criterion name");
+  assert.ok(/data-toggle-crit="[^"]*"><title>expand criterion body</.test(rr.html), "collapsed by default → a ▸ expand chevron");
+  assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["A"], "the criterion body leaf B is HIDDEN while collapsed; only the plain conjunct A renders as a leaf");
+  assert.equal(rr.criterionOccurrences.length, 1, "one occurrence for the non-root criterion");
+  assert.deepEqual({ lib: rr.criterionOccurrences[0].lib, name: rr.criterionOccurrences[0].name, collapsed: rr.criterionOccurrences[0].collapsed }, { lib: "Pol", name: "CritC", collapsed: true });
+  assert.deepEqual(rr.criterionOccurrences[0].bodyConcepts.map((c) => `${c.lib}:${c.name}`), ["Pol:B"], "bodyConcepts = the criterion body leaves (rollup substrate)");
+});
+
+check("#233 Todo 2a: a non-root criterion's chevron resolves to a {criterionToggle} reveal (NOT a selectable {nodeKey}); the crit-row is flaggable for the rollup", () => {
+  const gouts = new Map([["w:cmp", { expr: cmpExpr() }]]);
+  const rr = renderFlowPane(cmpStruct(), { concepts: critCs(), revealPrefix: "nrt_", guardOutlines: gouts });
+  const togs = Object.values(rr.reveals).filter((h) => "criterionToggle" in h);
+  assert.equal(togs.length, 1, "exactly one {criterionToggle} reveal (the non-root criterion chevron)");
+  assert.ok(togs[0].criterionToggle.startsWith("leaf::"), "the criterionToggle carries the position (leaf::) key, not a structure nodeKey");
+  assert.ok(rr.flaggableGids.includes(rr.criterionOccurrences[0].gid), "the crit-row gid is flaggable (collapsed-body rollup target)");
+});
+
+check("#233 Todo 2a: EXPANDING a non-root criterion (its posKey in expandedGuardWhens) reveals its body + flips to a ▾ chevron; collapse is POSITION-keyed", () => {
+  const gouts = new Map([["w:cmp", { expr: cmpExpr() }]]);
+  const collapsed = renderFlowPane(cmpStruct(), { concepts: critCs(), revealPrefix: "ex_", guardOutlines: gouts });
+  const posKey = Object.values(collapsed.reveals).find((h) => "criterionToggle" in h).criterionToggle;
+  const rr = renderFlowPane(cmpStruct(), { concepts: critCs(), revealPrefix: "ex_", guardOutlines: gouts, expandedGuardWhens: new Set([posKey]) });
+  assert.ok(/data-toggle-crit="[^"]*"><title>collapse criterion body</.test(rr.html), "expanded → a ▾ collapse chevron");
+  assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["A", "B"], "the criterion body leaf B now renders below the crit-row");
+  assert.equal(rr.criterionOccurrences[0].collapsed, false, "the occurrence reports collapsed:false when expanded");
+});
+
+check("#233 Todo 2a: the crit-row has its OWN CSS (box + a has-flag rollup rule distinct from .flow-row)", () => {
+  assert.match(FLOW_STYLE, /\.flow-crit-row>rect\{/, "the crit-row box has its own fill/stroke rule");
+  assert.match(FLOW_STYLE, /\.flow-crit-row\.has-flag \.flow-flag-badge\{display:inline\}/, "the crit-row rollup ⚑ shows on host .has-flag (its own rule — .flow-row wouldn't match)");
+});
+
+check("#233 Todo 2a: the crit-row box carries NO data-reveal (left/right-click inert); only its chevron is interactive (gpt56 #3)", () => {
+  const gouts = new Map([["w:cmp", { expr: cmpExpr() }]]);
+  const rr = renderFlowPane(cmpStruct(), { concepts: critCs(), revealPrefix: "ir_", guardOutlines: gouts });
+  // The crit-row GROUP opening tag closes with `>` immediately after `class="..."` — proving NO `data-reveal` attribute on
+  // the box, so `closest('[data-reveal]')` (left-click) and the right-click `.flow-row[data-reveal]` selector both miss it.
+  assert.ok(/<g id="[^"]*" class="flow-outline flow-crit-row">/.test(rr.html), "the crit-row group has no data-reveal (tag ends right after class)");
+  assert.ok(/class="flow-crit-toggle" data-toggle-crit=/.test(rr.html), "only the chevron is interactive (data-toggle-crit)");
+  assert.ok(!/class="flow-row[^"]*flow-crit-row/.test(rr.html), "the crit-row is NOT a .flow-row (so the right-click .flow-row[data-reveal] selector can't catch it)");
+});
+
+check("#233 Todo 2a: nested criterion independence — a criterion INSIDE another criterion's body renders its OWN collapsed row only when the parent is expanded; rollup flows through while folded", () => {
+  // expr = and(leaf A, Parent{ body: and(leaf P, Child{ body: and(leaf B) }) }) — Child is nested inside Parent's body.
+  const nestedExpr = () => gand(gleaf("A", "c:A"), gcrit("Parent", gand(gleaf("P", "c:P"), gcrit("Child", gand(gleaf("B", "c:B"))))));
+  const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w:n", "when", "when A and Parent", ["c:A", "c:B"], [node("a:X", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
+  ] }];
+  const cs = [concept("c:A", "A"), concept("c:P", "P"), concept("c:B", "B")];
+  const gouts = new Map([["w:n", { expr: nestedExpr() }]]);
+  // 1) All collapsed (default): only Parent draws a row; Child + all body leaves hidden. Parent's bodyConcepts roll up P + B
+  //    (recursing THROUGH Child while folded) so a flag on B is visible on the collapsed Parent box.
+  const c0 = renderFlowPane(struct, { concepts: cs, revealPrefix: "n0_", guardOutlines: gouts });
+  assert.equal((c0.html.match(/flow-crit-row/g) || []).length, 1, "collapsed: exactly ONE crit-row (Parent); Child is hidden inside the folded body");
+  assert.ok(/<text[^>]*>Parent<\/text>/.test(c0.html) && !/<text[^>]*>Child<\/text>/.test(c0.html), "Parent named, Child not yet rendered");
+  assert.deepEqual(c0.criterionOccurrences.map((o) => o.name), ["Parent"], "one occurrence: Parent");
+  assert.deepEqual(c0.criterionOccurrences[0].bodyConcepts.map((c) => `${c.lib}:${c.name}`).sort(), ["Pol:B", "Pol:P"], "Parent's rollup recurses THROUGH the folded Child → P + B");
+  assert.deepEqual(leafRowsOf(c0.html).map((l) => l.label).sort(), ["A"], "no body leaves rendered while all folded (only the plain conjunct A)");
+  // 2) Expand Parent only: Child appears as its OWN collapsed row (independent — NOT auto-expanded); leaf B still hidden.
+  const parentKey = Object.values(c0.reveals).find((h) => "criterionToggle" in h).criterionToggle;
+  const c1 = renderFlowPane(struct, { concepts: cs, revealPrefix: "n1_", guardOutlines: gouts, expandedGuardWhens: new Set([parentKey]) });
+  assert.equal((c1.html.match(/flow-crit-row/g) || []).length, 2, "Parent expanded → Parent + Child rows");
+  assert.ok(/<text[^>]*>Child<\/text>/.test(c1.html), "Child now renders its own named row");
+  assert.ok(/data-toggle-crit="[^"]*"><title>expand criterion body</.test(c1.html), "Child defaults to COLLAPSED (▸) inside the just-expanded Parent — independent, position-keyed");
+  assert.deepEqual(leafRowsOf(c1.html).map((l) => l.label).sort(), ["A", "P"], "Parent's own leaf P shows; Child's leaf B stays hidden (Child folded)");
+  assert.deepEqual(c1.criterionOccurrences.map((o) => o.name).sort(), ["Child", "Parent"], "two occurrences now: Parent + Child");
+  // 3) Expand Child too (its distinct posKey): leaf B finally renders. Parent + Child posKeys are distinct (independent).
+  const childKey = Object.values(c1.reveals).find((h) => "criterionToggle" in h && h.criterionToggle !== parentKey).criterionToggle;
+  assert.notEqual(childKey, parentKey, "Parent and Child carry DISTINCT position keys");
+  const c2 = renderFlowPane(struct, { concepts: cs, revealPrefix: "n2_", guardOutlines: gouts, expandedGuardWhens: new Set([parentKey, childKey]) });
+  assert.deepEqual(leafRowsOf(c2.html).map((l) => l.label).sort(), ["A", "B", "P"], "both expanded → Child's leaf B now renders");
+});

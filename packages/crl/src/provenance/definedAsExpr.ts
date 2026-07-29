@@ -92,6 +92,24 @@ export type DefStructExpr =
       /** A named-composite / both-rep operand's OWN `defined as` body, nested (the operand is a leaf AND expandable). */
       composite?: DefStructExpr;
     }
+  // #233: a first-class CRITERION BOUNDARY node — a named collapsible box at EVERY criterion reference (sole,
+  // compound conjunct, or nested inside another criterion's body), mirroring the questionnaire's `QExpr.criterion`.
+  // INVARIANT: `buildDefStruct` NEVER emits this kind (a `defined as` body has no criteria); ONLY the guard producer
+  // (`branchConditionToDefStruct`, guardOutline.ts) does. So every `buildDefStruct`-fed consumer's `criterion` arm is
+  // UNREACHABLE (e.g. the Questionnaire's `enrich` throws in its arm; only the Flow guard-outline path renders it).
+  | {
+      kind: "criterion";
+      name: string;
+      lib: string;
+      /** CANONICAL body fingerprint — the criterion's body expanded ONCE from hop 0, occurrence-INDEPENDENT.
+       *  The verdict-staleness identity key (same for every occurrence of one (lib,name)). NOT the in-situ body hash. */
+      bodyHash: string;
+      /** IN-SITU render fact: THIS occurrence's rendered operand dropped content to a `…` stub (position-dependent —
+       *  a deep occurrence can elide where a shallow one doesn't). Render-only; identity elision is separate (see canonical map). */
+      elided?: true;
+      /** The criterion's body outline at THIS position (may be a `more` stub if the in-situ expansion tripped a cap). */
+      operand: DefStructExpr;
+    }
   | { kind: "external"; name: string; lib: string } // cross-lib OR location-less local ref — unaddressable, not evaluated
   | { kind: "more"; count: number }; // count>0 ⇒ width truncation (`+N more`); count 0 ⇒ a depth-cap `…` stub
 

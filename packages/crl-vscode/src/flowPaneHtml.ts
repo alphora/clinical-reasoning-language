@@ -49,9 +49,10 @@ export interface RenderedFlow {
    *  the ONLY channel a future Todo-5 worklist-leaf highlight targets. The invariant is "no concept key is an anchor," not
    *  literally "structure-only". */
   anchors: Record<string, FlowAnchor>;
-  /** opaque key → a node-body select ({nodeKey}, a crlNode) OR a concept/guard peek ({conceptNodeKey}). Same shapes as
-   *  RenderedCrl, so the shell needs no new hit kinds. */
-  reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string }>;
+  /** opaque key → a node-body select ({nodeKey}, a crlNode), a concept/guard peek ({conceptNodeKey}), a tree sub-question
+   *  ({subQuestionLeafKey}), or a #233 criterion collapse chevron ({criterionToggle}, a `leaf::` position key). The first
+   *  two mirror RenderedCrl; the latter two are flow-only and are DIVERTED before the engine-selection path host-side. */
+  reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string } | { criterionToggle: string }>;
   /** #187 Todo 5: def-leaf anchor key (the same `leaf::` key used in `anchors`) → its leaf concept identity + the OWNING
    *  composite `when` structure key. The cockpit joins `{lib,name}` to a case's `conceptTruth` for the yes/no verdict and
    *  gates on `topWhenKey` being on the fired-satisfied path. The `+N more` stub + cross-lib/omitted leaves get NO entry. */
@@ -62,10 +63,13 @@ export interface RenderedFlow {
    *  → badge ALL; matched on (lib,name), never name alone — cross-lib same-name concepts exist). Decision-scope flags reuse
    *  `anchors[decisionNodeKey]`; activity/`otherwise` nodes carry no meta so they never appear here (they can't be flagged). */
   conceptOccurrences: { gid: string; lib: string; name: string }[];
-  /** #224 ii.3 Slice 2b — one entry per single-criterion `when` (collapsed OR expanded), with its `<g>` id, the criterion
-   *  IDENTITY (`{lib,name}`, library-local), and its `collapsed` state. The host maps a model-level criterion verdict
-   *  (keyed by identity) to these gids to paint the hidden verdict chip on EVERY occurrence, and (step C) rolls a body
-   *  flag up onto a COLLAPSED box. A criterion rendered at N sites → N entries sharing one identity. */
+  /** #224 ii.3 Slice 2b / #233 Todo 2a — one entry per RENDERED criterion box: a ROOT criterion absorbed into a `when`
+   *  box (the sole case) AND every NON-ROOT `flow-crit-row` (a conjunct / nested criterion, #233). Each carries its `<g>`
+   *  id, the criterion IDENTITY (`{lib,name}`, library-local), its `collapsed` state, and the body leaf identities. The
+   *  host maps a model-level criterion verdict (keyed by identity) to these gids to paint the verdict chip, and rolls a
+   *  body flag up onto a COLLAPSED box. A criterion rendered at N sites → N entries sharing one identity. NOTE (#233 2a):
+   *  a non-root row carries NO verdict-chip markup yet and the `.crit-*` classes are `.flow-row`-scoped, so a shared
+   *  criterion's non-root occurrence receives a (visually inert) verdict class in 2a; the chip + gate land in Todo 2b. */
   criterionOccurrences: { gid: string; lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[] }[];
   /** #203 Todo 4b Slice A — the gids of nodes that CAN carry a flag badge (`when` / decision root / def-leaf), so the
    *  webview can bulk-clear `.has-flag` before re-applying (a flag resolve must un-paint its node without a full re-render). */
@@ -127,6 +131,11 @@ const collectLeafIdentities = (e: DefStructExpr, out: { lib: string; name: strin
   } else if (e.kind === "or" || e.kind === "and") {
     for (const o of e.operands) collectLeafIdentities(o, out);
   } else if (e.kind === "not") {
+    collectLeafIdentities(e.operand, out);
+  } else if (e.kind === "criterion") {
+    // #233: a criterion BOUNDARY hides its body leaves when collapsed — recurse `.operand` so a flag on a concept
+    // referenced ONLY inside a folded criterion (root OR nested) still rolls up onto the visible collapsed box.
+    // (Also the root-criterion rollup at guardOutline.expr now passes through here — Todo 1 wraps the sole guard.)
     collectLeafIdentities(e.operand, out);
   }
 };
@@ -207,9 +216,17 @@ interface LaidNode {
   topWhenKey?: string;
   /** #187 Option-C: an OUTLINE row (hangs below its `when`; x is indent-based, edges are the dashed spine). `outlineRow`
    *  is the row CATEGORY — only `"leaf"` rows are addressable (anchor + peek + verdict); `topor`/`op`/`external`/`more`
-   *  are RENDER-ONLY (no anchor, no reveal). `indent` drives x; `absX` is the precomputed left (indent-based). */
+   *  are RENDER-ONLY (no anchor, no reveal). A `"crit"` row (#233) is a NAMED collapsible criterion boundary — its own
+   *  toggle channel (chevron), an occurrence + collapsed-body flag rollup, but NOT an anchor/verdict target in 2a.
+   *  `indent` drives x; `absX` is the precomputed left (indent-based). */
   outline?: boolean;
-  outlineRow?: "topor" | "op" | "leaf" | "external" | "more";
+  outlineRow?: "topor" | "op" | "leaf" | "external" | "more" | "crit";
+  /** #233 Todo 2a: set on a `"crit"` outline row (a NON-ROOT criterion boundary) — the criterion IDENTITY (`lib`/`name`),
+   *  its `collapsed` state (default collapsed; independent, position-keyed), the addressable leaf identities inside its body
+   *  (collapsed-box flag rollup, like `criterionCollapse.bodyConcepts`), and the POSITION collapse key (`n.nodeKey`, flipped
+   *  in `expandedGuardWhens` by the toggle channel). A ROOT criterion is absorbed into the `when` box via `criterionCollapse`
+   *  instead (byte-identical sole render), so it never produces a `"crit"` row. */
+  critRow?: { lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[]; posKey: string };
   /** #224 ii.3 Slice 2: set on a `when` whose guard is a SINGLE criterion ref (the collapse unit) — carries the current
    *  collapsed/expanded state so the render draws a `▸`/`▾` disclosure, plus the criterion IDENTITY (`lib`/`name` from
    *  `soleCriterion`) that the model-level verdict chip keys on (Slice 2b). `bodyConcepts` = the addressable leaf-concept
@@ -310,6 +327,26 @@ function buildLaid(
           y, children,
         };
       }
+      case "criterion": {
+        // #233 Todo 2a: a NON-ROOT criterion reference — a NAMED collapsible boundary row (mirroring the questionnaire's
+        // named criterion box). A ROOT criterion never reaches here (it is absorbed into the `when` box via
+        // `criterionCollapse` — the outline-hanging branch unwraps a root criterion to its `.operand`). Collapse is
+        // POSITION-keyed (`posKey = (whenKey,opPath)`) + INDEPENDENT (a criterion nested inside a just-expanded parent
+        // appears collapsed), default COLLAPSED. `bodyConcepts` = the addressable leaf identities inside the body (the
+        // collapsed-box flag rollup, model-derived so it is complete whether or not the body is laid out this render).
+        const y = take();
+        const posKey = outlineKey(topWhenKey, opPath, "crit");
+        const collapsed = !(opts.expandedGuardWhens?.has(posKey) ?? false);
+        const bodyConcepts: { lib: string; name: string }[] = [];
+        collectLeafIdentities(s.operand, bodyConcepts);
+        const children = collapsed ? [] : [buildOutline(s.operand, whenLeft, topWhenKey, indent + 1, `${opPath}.b`, cursor)];
+        return {
+          ...base, nodeKey: posKey, kind: "leaf", outlineRow: "crit",
+          label: s.name, full: `${s.name} — criterion "${s.lib}"`,
+          critRow: { lib: s.lib, name: s.name, collapsed, bodyConcepts, posKey },
+          y, children,
+        };
+      }
     }
   };
 
@@ -380,7 +417,18 @@ function buildLaid(
     if (guardOutline && !collapsed) {
       const whenLeft = PAD + depth * COL;
       const cursor = { y: nodeY + (NODE_H * 1.5) / ROW };
-      outlineRoots.push(buildOutline(guardOutline.expr, whenLeft, n.nodeKey, 0, "0", cursor));
+      // #233 Todo 2a ROOT-ABSORPTION: a guard whose TOP expr IS a criterion (the sole case) has that criterion absorbed
+      // INTO the `when` box (its name/chevron/verdict live on the box via `criterionCollapse`), so we hang the criterion's
+      // BODY (`.operand`), NOT a redundant named `crit` row for the root — keeping the sole render byte-identical to before
+      // criterion nodes existed. A compound-root guard (`when A and Meets X`) passes its expr as-is; its NON-root criterion
+      // conjuncts render as named `crit` rows via `buildOutline`'s criterion arm.
+      // ⚠ TRANSITION (disc 329): this `expr.kind === "criterion"` unwrap and the `criterionCollapse`/`collapsed` reads of the
+      // `soleCriterion` SIDECAR (above) are two views of ONE fact — they AGREE BY CONSTRUCTION because `buildGuardOutlines`
+      // derives `soleCriterion = topCriterion(expr)` (guardOutline.ts), so `expr.kind === "criterion" ⟺ soleCriterion set`.
+      // Todo 2b retires the sidecar (host reads → `topCriterion`, then the field) per guardOutline.ts's stated plan, at which
+      // point this becomes a single source; until then the invariant holds for every real `buildGuardOutlines` output.
+      const rootExpr = guardOutline.expr.kind === "criterion" ? guardOutline.expr.operand : guardOutline.expr;
+      outlineRoots.push(buildOutline(rootExpr, whenLeft, n.nodeKey, 0, "0", cursor));
       slot = Math.max(slot, cursor.y); // reserve the outline's vertical extent so the next sibling clears it
     } else if (n.kind === "when" && cf.conceptName !== undefined && opts.defExpr) {
       const entry = opts.defExpr(cf.conceptLib ?? "", cf.conceptName);
@@ -445,7 +493,7 @@ export function renderFlowPane(
   const prefix = opts.revealPrefix ?? "";
   const concepts = opts.concepts ?? [];
   const anchors: Record<string, FlowAnchor> = {};
-  const reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string }> = {};
+  const reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string } | { criterionToggle: string }> = {};
   const leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }> = {};
   const conceptOccurrences: { gid: string; lib: string; name: string }[] = []; // #203 Todo 4b Slice A
   const criterionOccurrences: { gid: string; lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[] }[] = []; // #224 ii.3 Slice 2b
@@ -521,6 +569,26 @@ export function renderFlowPane(
     // an operator / top-OR / external / more row is RENDER-ONLY (no anchor, no reveal — a click resolves to nothing).
     const addressable = !n.outline || n.outlineRow === "leaf";
     if (addressable) anchors[n.nodeKey] = { scrollTo: gid, segmentIds: [gid] };
+
+    // #233 Todo 2a: a NON-ROOT criterion boundary — a NAMED collapsible box with a ▸/▾ chevron (its OWN toggle channel,
+    // resolving `{criterionToggle: posKey}` → `toggleCriterionExpand`), a hidden collapsed-body flag ROLLUP ⚑ (the host
+    // lights `.has-flag` when folded + a body concept has an open flag), and an OCCURRENCE record (Todo 2b lights its
+    // verdict chip + folds it into the gate). NOT an anchor/verdict target in 2a: no `data-reveal` on the box body, so
+    // left-click AND right-click are inert; only the chevron is interactive (disc 327 pt 14 — left-click inert for v1).
+    if (n.outline && n.outlineRow === "crit") {
+      const cr = n.critRow!;
+      reveals[key] = { criterionToggle: cr.posKey };
+      criterionOccurrences.push({ gid, lib: cr.lib, name: cr.name, collapsed: cr.collapsed, bodyConcepts: cr.bodyConcepts });
+      flaggableGids.push(gid); // the rollup ⚑ participates in the host's bulk-clear (the flagBadge idiom)
+      body +=
+        `<g id="${escapeHtml(gid)}" class="flow-outline flow-crit-row"><title>${escapeHtml(n.full)}</title>` +
+        `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
+        labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX - 3, 20) +
+        critToggle(x + 9, y + OUTLINE_H / 2, cr.collapsed, key) +
+        flagBadge(x + OUTLINE_NODE_W - 11, y + 11) +
+        `</g>`;
+      continue;
+    }
 
     // #187 Option-C: OUTLINE render-only rows — an operator/top-OR LABEL (no box) or an external/more STUB box.
     if (n.outline && n.outlineRow !== "leaf") {
@@ -798,6 +866,14 @@ export const FLOW_STYLE =
   `.flow-op>text,.flow-topor>text{fill:var(--vscode-descriptionForeground,#8c8c8c);font:700 9px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.12em}` +
   `.flow-ext>rect,.flow-more>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#6a6a72);stroke-width:1;stroke-dasharray:2 2;opacity:.7}` +
   `.flow-ext>text,.flow-more>text{fill:var(--vscode-descriptionForeground,#8c8c8c);font-size:11px;font-style:italic}` +
+  // #233 Todo 2a: a NON-ROOT criterion boundary box — a SOLID box (like a sub-question leaf) marking a NAMED criterion,
+  // with a left ▸/▾ chevron (`.flow-crit-toggle`, already styled) toggling its body. The collapsed-body flag ROLLUP ⚑
+  // shows via `.has-flag` — this row is `.flow-outline` (NOT `.flow-row`), so it needs its OWN has-flag rule (the shared
+  // `.flow-row.has-flag .flow-flag-badge` selector wouldn't match). The verdict chip + right-click verdict land in 2b.
+  `.flow-crit-row{cursor:default}` +
+  `.flow-crit-row>rect{fill:var(--vscode-editorHoverWidget-background,#2c2c2d);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1.2}` +
+  `.flow-crit-row>text{fill:var(--vscode-foreground,#cccccc);font-size:11px}` +
+  `.flow-crit-row.has-flag .flow-flag-badge{display:inline}` +
   // #187 Todo 3: the on-path RING — a hidden `<rect>` in `.flow-ring`, revealed by `.current` (main path) or
   // `.flow-leaf-yes` (a TRUE operand). Deterministic rect-stroke (NOT a CSS outline), composes with the node's own
   // identity border (a separate axis) — `.current` no longer recolors the base border. NEUTRALIZE every shell `outline`

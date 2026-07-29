@@ -210,6 +210,11 @@ export function buildQuestionnaire(
         return { kind: "external", name: s.name, lib: s.lib };
       case "more":
         return { kind: "more", count: s.count };
+      case "criterion":
+        // #233 INVARIANT: `buildDefStruct` (the ONLY producer feeding `enrich`) NEVER emits a `criterion` node — a
+        // `defined as` body has no criteria; only the guard producer (`branchConditionToDefStruct`) does. The
+        // questionnaire models criterion boundaries via its own `buildGuardStruct`/`QExpr.criterion`, not this path.
+        throw new Error("unreachable: criterion node in a defined-as body (buildDefStruct never emits criterion)");
       case "leaf": {
         const valueTypes = resolveValueTypes(s.lib, s.name);
         const leaf: Extract<QExpr, { kind: "leaf" }> = {

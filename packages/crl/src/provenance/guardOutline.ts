@@ -22,7 +22,7 @@ import { createHash } from "node:crypto";
 
 import { buildCriterionTable, containsCriterionRef, expandedSize, type CriterionTable } from "../ast/criterionExpansion";
 import { decisionSpine } from "../ast/decisionSpine";
-import type { BranchCondition, ReferenceName, WhenBlock } from "../ast/types";
+import type { BranchCondition, BranchConditionCriterionRef, ReferenceName, WhenBlock } from "../ast/types";
 import { getRefLibrary, getRefName, isQualifiedRef, normalizeLocalRef } from "../ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 
@@ -75,6 +75,9 @@ const exprHasMore = (e: DefStructExpr): boolean => {
       return e.operands.some(exprHasMore);
     case "not":
       return exprHasMore(e.operand);
+    case "criterion":
+      // #233: a criterion boundary hides a `…` iff its own body outline dropped content (breach/cap at THIS position).
+      return exprHasMore(e.operand);
     case "leaf":
       return e.composite !== undefined && exprHasMore(e.composite);
     case "external":
@@ -82,19 +85,55 @@ const exprHasMore = (e: DefStructExpr): boolean => {
   }
 };
 
+/** #233: the criterion identity key — `JSON.stringify([lib, name])`, COLLISION-PROOF (CRL library AND criterion
+ *  names routinely contain spaces, e.g. "Generic Medical Policy", so ANY single-char delimiter collides:
+ *  `("A B","C")` vs `("A","B C")`). Matches the repo convention (`criterionVerdictKey` in medicalValidationStore,
+ *  `truthKey` in questionnaireModel) so Todo 2b keys IDENTICALLY. Exported for that reason — do not re-manufacture the
+ *  encoding downstream. (A `JSON.stringify` of an array is not a template literal, so the Edit-tool NUL hazard is moot.) */
+export const criterionKey = (lib: string, name: string): string => JSON.stringify([lib, name]);
+
+/** Stable fingerprint for a criterion whose declaration is absent from the identity map (a genuinely MISSING /
+ *  undefined criterion ref). A constant, so every missing ref shares one identity token — the name still survives. */
+const MISSING_BODY_HASH = "sha256:missing";
+
+/** The identity of a guard whose top-level `expr` IS a single criterion node (the sole-criterion case) — else
+ *  `undefined`. `bodyHash` is the node's CANONICAL fingerprint (occurrence-independent, stamped from the identity
+ *  map); `elided` is the in-situ render fact. At the guard ROOT the two AGREE BY CONSTRUCTION: `buildCriterionIdentities`
+ *  computes each canonical body as the `.operand` of a synthetic ROOT reference routed through the IDENTICAL converter +
+ *  breach pre-gate this sole render uses, so a sole node's `elided` equals its canonical `elided` (no hop off-by-one).
+ *  Todo 2 uses this for root-absorption (the sole render stays byte-identical) and to retire `soleCriterion` host reads. */
+export const topCriterion = (
+  expr: DefStructExpr,
+): { lib: string; name: string; bodyHash: string; elided?: true } | undefined =>
+  expr.kind === "criterion"
+    ? { lib: expr.lib, name: expr.name, bodyHash: expr.bodyHash, ...(expr.elided ? { elided: true as const } : {}) }
+    : undefined;
+
 /**
  * Convert a `when` guard `BranchCondition` into the shared `DefStructExpr` outline (the flow's `buildOutline`
  * consumes it unchanged). `and`/`or`/`not` map 1:1; a concept ref → a `leaf` (with its OWN `defined as` body
- * nested as `.composite`, exactly the single-concept flow path); a criterion ref → its body, spliced inline
- * (cycle- and hop-guarded). A cross-library / unresolved concept, and a missing / cyclic / hop-capped criterion,
- * degrade to a stub (`external` / `more`) — never an unbounded walk. `resolveDefExpr` is the (lib,name) →
- * `DefExprEntry` resolver over the concept layer (built by the caller from a `DefExprIndex`).
+ * nested as `.composite`, exactly the single-concept flow path); a criterion ref → a first-class named `criterion`
+ * BOUNDARY node WRAPPING its body (#233 — at EVERY reference position: sole, compound conjunct, nested), cycle- and
+ * hop-guarded. A cross-library / unresolved concept degrades to an `external` stub; a missing / cyclic / hop-capped
+ * criterion keeps its NAME as a `criterion` node with an `elided` `…` body — never an unbounded walk. `resolveDefExpr`
+ * is the (lib,name) → `DefExprEntry` resolver over the concept layer (built by the caller from a `DefExprIndex`).
+ *
+ * `criterionIdentities` supplies each criterion node's CANONICAL `bodyHash` (from `buildCriterionIdentities`, keyed by
+ * `criterionKey(lib,name)`) — occurrence-INDEPENDENT, so the SAME criterion referenced at two depths carries the same
+ * identity. It is NOT `hashExpr(operand)`: the in-situ operand varies by position (hop budget), while identity must not.
+ *
+ * `maxHops` is the criterion-recursion budget (default `GUARD_MAX_CRITERION_HOPS`). The caller lowers it to `0` on a
+ * host-safety BREACH (`expandedSize` non-"ok"): every criterion ref then degrades to a NAMED elided node with NO body
+ * expansion, so a machine-generated fan-out/doubling guard (whose per-`and`/`or` width caps are defeated by GROUPING)
+ * costs LINEAR in the authored guard AST instead of exploding through criterion recursion (F+F²+…+F^maxHops).
  */
 export function branchConditionToDefStruct(
   cond: BranchCondition,
   criterionTable: CriterionTable,
   resolveDefExpr: ResolveDefExprEntry,
   decisionLib: string,
+  criterionIdentities: ReadonlyMap<string, { bodyHash: string }>,
+  maxHops: number = GUARD_MAX_CRITERION_HOPS,
 ): DefStructExpr {
   const leafOf = (ref: ReferenceName): DefStructExpr => {
     const normalized = normalizeLocalRef(ref, decisionLib);
@@ -139,12 +178,32 @@ export function branchConditionToDefStruct(
       }
       case "BranchConditionCriterionRef": {
         const name = getRefName(c.ref);
+        // Canonical (occurrence-independent) fingerprint from the identity map; a genuinely undefined criterion has
+        // no map entry → a stable MISSING token (the node still keeps its name — #233).
+        const bodyHash = criterionIdentities.get(criterionKey(decisionLib, name))?.bodyHash ?? MISSING_BODY_HASH;
         const crit = criterionTable.get(name);
-        // Missing or cyclic → a benign `external` stub (bounded); never contribute an unbounded walk.
-        if (!crit || visiting.has(name)) return { kind: "external", name, lib: decisionLib };
-        // Hop cap → a `…` depth stub (mirrors `buildDefStruct`'s `DEF_MAX_EXPR_DEPTH` → `{kind:"more",count:0}`).
-        if (hops >= GUARD_MAX_CRITERION_HOPS) return { kind: "more", count: 0 };
-        return go(crit.condition, new Set(visiting).add(name), hops + 1);
+        // #233: WRAP FIRST, then elide — a missing OR cyclic criterion keeps its NAME as a `criterion` node with a
+        // `…` body (was: a name-erasing `external` stub). The `…` honestly signals "a criterion body is here but
+        // can't be shown"; the boundary + name is the whole point of #233.
+        if (!crit || visiting.has(name)) {
+          return { kind: "criterion", name, lib: decisionLib, bodyHash, elided: true, operand: { kind: "more", count: 0 } };
+        }
+        // Hop cap (or a `maxHops: 0` breach budget) → wrap FIRST, THEN cap the body → a NAMED elided node
+        // ("Substantial Co-Morbidity …", not bare "…"). At budget 0 the FIRST ref (hops 0) elides immediately.
+        if (hops >= maxHops) {
+          return { kind: "criterion", name, lib: decisionLib, bodyHash, elided: true, operand: { kind: "more", count: 0 } };
+        }
+        const operand = go(crit.condition, new Set(visiting).add(name), hops + 1);
+        // `elided` is the IN-SITU render fact: this occurrence's body dropped content to a `…` (a nested breach/cap),
+        // computed from the built operand (reusing `exprHasMore`). Identity elision is separate (the canonical map).
+        return {
+          kind: "criterion",
+          name,
+          lib: decisionLib,
+          bodyHash,
+          operand,
+          ...(exprHasMore(operand) ? { elided: true as const } : {}),
+        };
       }
     }
   };
@@ -158,8 +217,18 @@ export function branchConditionToDefStruct(
  * `buildCrlStructure` does — default `collectLibs(graph)`, source-order `statements` filtered to decisions, the
  * same location-less decl/sub-node skips, the non-recursive `decisionSpine`, and the shared `decisionSubNodeRef`
  * key — so every entry joins a real flow node (a walk divergence would silently miss → the dead-end would
- * persist; a parity test pins it). A criterion-free `when` is OMITTED (Slice 1 does not touch single-concept or
- * plain-compound-guard rendering). A guard whose expansion breaches the envelope is OMITTED (host safety).
+ * persist; a parity test pins it). A criterion-free `when` is OMITTED (single-concept + plain-compound-guard
+ * rendering is untouched).
+ *
+ * #233 BREACH-PRESERVING conversion: the former whole-guard `expandedSize` pre-gate collapsed a breaching/cyclic
+ * guard to a single bare `{kind:"more"}`, ERASING every criterion NAME. What erased the names was NOT the gate — it
+ * was the RESPONSE to it (collapse to a bare stub). So the O(table), saturating, non-materializing `expandedSize`
+ * PRE-CHECK STAYS (its 1024-atom hard cap is the host-safety bound — the per-`and`/`or` width cap is defeated by
+ * GROUPING, e.g. `and(g1..g10)` with `gi = and(10 refs)` is 100 refs all under the cap, and criterion recursion then
+ * multiplies F+F²+…+F^hops → OOM on a machine-generated file). But on a breach the RESPONSE changes: convert with a
+ * HOP BUDGET OF 0, so EVERY criterion ref becomes a NAMED elided node (name kept, `…` body, NO expansion) — cost linear
+ * in the authored guard AST. The precedence gate stays engaged: a breaching guard still yields a truthy `guardOutline`
+ * (a NAMED criterion node, not a bare `…`), so `refKeysOf` never masquerades the box.
  */
 export function buildGuardOutlines(graph: ResolvedCelGraph, defExprIndex: DefExprIndex): Map<string, GuardOutline> {
   const out = new Map<string, GuardOutline>();
@@ -168,6 +237,9 @@ export function buildGuardOutlines(graph: ResolvedCelGraph, defExprIndex: DefExp
   // Resolver over the PASSED index (not the host-side `buildDefExprResolver`), same key rule as the cockpit.
   const resolveDefExpr: ResolveDefExprEntry = (lib, name) =>
     lib === undefined ? undefined : defExprIndex.get(nodeKey(conceptDeclRef(lib, name)));
+  // #233: the render-INDEPENDENT canonical identity per declared criterion. Built ONCE, then threaded into the
+  // converter so every criterion NODE (sole, conjunct, nested) is stamped with its occurrence-independent bodyHash.
+  const criterionIdentities = buildCriterionIdentities(graph, defExprIndex);
 
   for (const [lib, info] of libs) {
     const criterionTable = buildCriterionTable(info.entry.ast.statements);
@@ -178,32 +250,79 @@ export function buildGuardOutlines(graph: ResolvedCelGraph, defExprIndex: DefExp
         if (sn.kind !== "when") continue;
         if (!lsLoc(info.entry.filePath, sn.node.location)) continue; // mirror the per-sub-node skip
         const cond = (sn.node as WhenBlock).condition;
-        if (!containsCriterionRef(cond)) continue; // Slice 1: only criterion-bearing whens
+        if (!containsCriterionRef(cond)) continue; // only criterion-bearing whens
         const key = nodeKey(decisionSubNodeRef(lib, s.name, sn.nodeId));
-        // #224 ii.3 Slice 2: a SINGLE top-level criterion ref is the collapse + verdict unit. Criteria are
-        // library-local, so the criterion's lib is the decision's lib (`getRefLibrary` is always undefined here).
-        const sole = cond.type === "BranchConditionCriterionRef" ? { lib, name: getRefName(cond.ref) } : undefined;
-        const record = (expr: DefStructExpr): void => {
-          out.set(
-            key,
-            sole
-              ? { expr, soleCriterion: { ...sole, bodyHash: hashExpr(expr), ...(exprHasMore(expr) ? { elided: true as const } : {}) } }
-              : { expr },
-          );
-        };
-        // Envelope gate (host safety): a breaching/cyclic table would let `branchConditionToDefStruct` walk an
-        // unbounded DAG. On a breach we still record an ENTRY — a single `…` elision stub — NOT omit. Omitting
-        // would leave `guardOutline` undefined while `refKeysOf` (crlStructure.ts) falls back to the guard's INLINE
-        // refs; a `when ("A" and <breaching-criterion>)` then flattens to `refKeys=["A"]` and the flow would
-        // masquerade the box as concept A (disc 318 review [important] 1). Recording the stub keeps the flow's
-        // precedence gate engaged (`guardOutline` truthy ⇒ concept identity suppressed ⇒ neutral box), and the `…`
-        // row honestly signals "a criterion body is here but was too complex to expand".
-        if (expandedSize(cond, criterionTable).status !== "ok") {
-          record({ kind: "more", count: 0 });
-          continue;
-        }
-        record(branchConditionToDefStruct(cond, criterionTable, resolveDefExpr, lib));
+        // Host safety: on a whole-guard envelope BREACH, convert at hop budget 0 (names survive, no DAG expansion).
+        const maxHops = expandedSize(cond, criterionTable).status === "ok" ? undefined : 0;
+        const expr = branchConditionToDefStruct(cond, criterionTable, resolveDefExpr, lib, criterionIdentities, maxHops);
+        // `soleCriterion` (transition/compat, disc 327 point 9): DERIVED — a guard whose top-level expr IS a
+        // criterion node is the sole case. Its `bodyHash` is the node's CANONICAL fingerprint (hashes the criterion's
+        // body/operand), so a stored verdict still goes stale on a body change. Todo 2 removes host reads then the field.
+        const sole = topCriterion(expr);
+        out.set(key, sole ? { expr, soleCriterion: sole } : { expr });
       }
+    }
+  }
+  return out;
+}
+
+/** A criterion's render-INDEPENDENT identity: its CANONICAL body fingerprint + whether that canonical expansion
+ *  itself breached/elided. Keyed in the map by `criterionKey(lib,name)`. Todo 2b's `buildLiveCriterionIdentities`
+ *  consumes THIS (the model-tree inventory) instead of walking rendered occurrences. */
+export interface CriterionIdentity {
+  lib: string;
+  name: string;
+  bodyHash: string;
+  /** The CANONICAL expansion dropped content to a `…` — a criterion permanently un-passable ("can't attest what
+   *  can't be rendered", disc 327 point 2). Occurrence-independent, unlike a node's in-situ `elided`. */
+  elided: boolean;
+}
+
+/**
+ * #233 CANONICAL criterion identities — one render-independent entry per DECLARED criterion in every covered lib.
+ * Each entry's canonical body is the `.operand` of a SYNTHETIC ROOT reference to the criterion, routed through the
+ * IDENTICAL converter + `expandedSize` breach pre-gate a sole `when C` render uses (`bodyHash = hashExpr(canonicalBody)`,
+ * `elided = exprHasMore(canonicalBody)`). Going through a root ref (not the bare condition) matters: a root render wraps
+ * at hop 0 and expands the body at hop 1, so expanding `crit.condition` directly would go ONE hop deeper than any render
+ * can show — a chain hitting exactly the cap would read `elided:false` here while every render shows `…` (disc 327 Fix 3
+ * off-by-one). Routing through the root ref makes identity elision === render elision BY CONSTRUCTION. Occurrence-
+ * INDEPENDENT: keyed by (lib,name), computed once per declaration, so a stored verdict is keyed to the declaration.
+ *
+ * ORDERING (`bodyHash`-of-a-criterion-that-references-another-criterion): `branchConditionToDefStruct` and this function
+ * are mutually dependent (the converter stamps a criterion node's `bodyHash` from this map; this map needs the converter
+ * to expand bodies). Resolved WITHOUT a topological sort (disc 327 step 4): computing a canonical body here passes an
+ * EMPTY identity map, so every NESTED criterion node's `bodyHash` falls back to the CONSTANT `MISSING_BODY_HASH`. The
+ * nested criterion's OPERAND (its expanded body CONTENT) is still present, so a change to a referenced criterion's body
+ * STILL flows into this hash via content; only the child's opaque hash TOKEN is blanked. That makes each criterion's
+ * identity INDEPENDENT of child-hash fill-order (single pass, no cycle-graph topo sort; cycles already degrade to elided
+ * stubs). Cost: a criterion node's stamped `bodyHash` (from the completed map, real child tokens) is not `hashExpr` of
+ * its own operand once nested criteria are present — accepted: the map value is the identity token, never re-derived.
+ */
+export function buildCriterionIdentities(
+  graph: ResolvedCelGraph,
+  defExprIndex: DefExprIndex,
+): Map<string, CriterionIdentity> {
+  const out = new Map<string, CriterionIdentity>();
+  const { libs, coversName } = collectLibs(graph);
+  if (!coversName) return out; // no policy anchor → empty (mirrors buildGuardOutlines / buildCrlStructure)
+  const resolveDefExpr: ResolveDefExprEntry = (lib, name) =>
+    lib === undefined ? undefined : defExprIndex.get(nodeKey(conceptDeclRef(lib, name)));
+  // Empty ⇒ every nested criterion ref falls back to MISSING_BODY_HASH (the blanking that makes identity
+  // fill-order-independent — see ORDERING above). NOT reused across libs' bodies for anything but this blanking.
+  const blankIdentities: ReadonlyMap<string, { bodyHash: string }> = new Map();
+  for (const [lib, info] of libs) {
+    const criterionTable = buildCriterionTable(info.entry.ast.statements);
+    for (const [name, crit] of criterionTable) {
+      // A synthetic ROOT reference to this criterion — the SAME shape a sole `when C` feeds the converter. `go` reads
+      // only `getRefName(ref)` for a criterion ref, so the `location` is inert (carry `crit.location` for tidiness).
+      const rootRef: BranchConditionCriterionRef = { type: "BranchConditionCriterionRef", ref: name, location: crit.location };
+      // Same host-safety gate as buildGuardOutlines: on a breach, hop budget 0 → the root node's body is `…` (bounded).
+      const maxHops = expandedSize(rootRef, criterionTable).status === "ok" ? undefined : 0;
+      const node = branchConditionToDefStruct(rootRef, criterionTable, resolveDefExpr, lib, blankIdentities, maxHops);
+      // `node` is always a `criterion` wrapper (the input is a criterion ref to a declared criterion). Its `.operand`
+      // is the canonical body; `.elided` (== exprHasMore(operand)) is the canonical elision that a root render shows.
+      const canonicalBody = node.kind === "criterion" ? node.operand : node;
+      out.set(criterionKey(lib, name), { lib, name, bodyHash: hashExpr(canonicalBody), elided: exprHasMore(canonicalBody) });
     }
   }
   return out;
