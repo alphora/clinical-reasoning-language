@@ -174,7 +174,7 @@ describe("authoring-kit — reference artifacts", () => {
 
     const run = runCel(resolveCelImports(celPath));
     expect(run.success).toBe(true);
-    expect(run.runs.length).toBe(4); // drug→approve; PT→approve; no-therapy→deny (crit-2 node); no-dx→deny (crit-1 node)
+    expect(run.runs.length).toBe(5); // drug+VL→approve; PT+chart→approve; no-viral→deny (crit-3); no-therapy→deny (crit-2); no-dx→deny (crit-1)
     expect(run.runs.every((r) => r.status === "pass")).toBe(true);
     // "Failed Conservative Therapy" is a `criterion` (failed drug OR failed physical therapy — DISTINCT criteria that
     // can co-occur, #234), NOT a `defined as` composite. Referenced in a `when` it inline-expands to a decision-layer
@@ -203,6 +203,34 @@ describe("authoring-kit — reference artifacts", () => {
     const operand = (nm: string) => guard.conditionTrace!.operands.find((o) => o.concept?.name === nm)!;
     expect(operand("Failed Drug Therapy").satisfied).toBe(false); // drug absent in this case
     expect(operand("Failed Physical Therapy").satisfied).toBe(true); // PT alone satisfies the distinct-criterion `or`
+    // The CONTRAST node (#234 follow-up): "Viral Suppression Documented" is a GENUINE rung-1 `defined as` (one
+    // occurrence recorded two ways). Unlike the or-guard above it rides the tree as a single-concept `when` that
+    // DOES carry a `composition` (sem-or over the two records) — the artifact's end-to-end proof that the
+    // sanctioned `defined as` construct emits + runs. The lab-record approve case satisfies it via the lab arm alone.
+    const approveViaLab = run.runs.find((r) => r.case.includes("lab record"))!;
+    const definedAs = find(approveViaLab.trace as TNode[], (n) => n.concept === "Viral Suppression Documented")!;
+    expect(definedAs).toBeDefined(); // a single-concept `when` on the `defined as` — KEEPS `concept` (not a compound guard)
+    const comp = definedAs.composition as { op: string; satisfied: boolean; operands: { concept: string; satisfied: boolean }[] };
+    expect(comp).toBeDefined(); // and DOES carry a `composition` — the sem-or inference (mirror of the or-guard's omission)
+    expect(comp.op).toBe("sem-or");
+    expect(comp.satisfied).toBe(true);
+    const rec = (nm: string) => comp.operands.find((o) => o.concept === nm)!;
+    expect(rec("Viral Load Below Threshold Lab Result").satisfied).toBe(true); // lab record present
+    expect(rec("Viral Suppression Charted By Clinician").satisfied).toBe(false); // chart note absent — either record satisfies the ONE fact
+    // The OTHER arm, inspected directly (not just diagonally): the chart-record approve case satisfies the SAME
+    // `defined as` via the chart operand with the lab operand FALSE — proving both sem-or arms independently (panel r1).
+    const approveViaChart = run.runs.find((r) => r.case.includes("chart record"))!;
+    const daChart = find(approveViaChart.trace as TNode[], (n) => n.concept === "Viral Suppression Documented")!;
+    const compChart = daChart.composition as { satisfied: boolean; operands: { concept: string; satisfied: boolean }[] };
+    expect(compChart.satisfied).toBe(true);
+    const recChart = (nm: string) => compChart.operands.find((o) => o.concept === nm)!;
+    expect(recChart("Viral Load Below Threshold Lab Result").satisfied).toBe(false); // lab absent this case
+    expect(recChart("Viral Suppression Charted By Clinician").satisfied).toBe(true); // chart alone satisfies the ONE fact
+    // And the crit-3 DENY path, pinned in-trace (the CEL `result is` oracle can't distinguish same-`Deny` nodes): the
+    // no-viral case has dx + failed drug therapy, so ONLY the `defined as` node can fail — assert it does (panel r1).
+    const denyNoViral = run.runs.find((r) => r.case.includes("no documented viral suppression"))!;
+    const daDeny = find(denyNoViral.trace as TNode[], (n) => n.concept === "Viral Suppression Documented")!;
+    expect((daDeny.composition as { satisfied: boolean }).satisfied).toBe(false); // both records absent → the ONE fact is unmet → deny
   });
 
   it("pa-determination-reference.cel + .crl: validate clean and both cases pass via the shared determination lib (real path)", () => {
@@ -328,7 +356,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.11");
+    expect(kit.schemaVersion).toBe("1.12");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -728,8 +756,14 @@ describe("authoring-kit — getAuthoringKit", () => {
     // of one suppression may coexist yet are one fact.) schemaVersion is bumped (the KE's Step-0 re-sync keys off it —
     // the governing convention). BOTH hashes move (cpg-edge rule/examples/judgeLens inherit into prior-auth; the
     // prior-auth-edge artifact reinforces the PA move). KE seats re-sync both pins.
-    expect(cpg.contentHash).toBe("9b251f04e2d02bd3116cfe6a5ba94cdce2e567bede9b3ac1ce347bd74884e4f7");
-    expect(priorAuth.contentHash).toBe("60401b74eb95cfa95141523e71c439c71ab0d1a238347bd843c8bf2c2f1578d6");
+    // KE #234 FOLLOW-UPS (schemaVersion 1.11→1.12): finding 4 (vacuity-trap example declares its 4 operands → fully
+    // validator-clean), finding 2 (the `criteria-decision-reference` artifact regains ONE genuine rung-1 `defined as` —
+    // viral suppression = a lab result OR a chart note of one occurrence — as a third nested `when` node; emits + runs,
+    // 5 CEL cases), finding 1 (a DNF SIZE clause on `decision-composition` flagging #236 load-bearing). Finding 3
+    // resolved: KEEP the schemaVersion-bumps-on-content convention, so this CONTENT change moves schemaVersion. BOTH
+    // hashes move (cpg-edge decision-composition clause + examples inherit into prior-auth; the artifact rides the PA edge).
+    expect(cpg.contentHash).toBe("f5afa16c3a5d2bf74a7756f637b253da5a50f593781ca20d08a45efd60bb7a2c");
+    expect(priorAuth.contentHash).toBe("af5f86a8332afb62fc74fca5312f50b83b3958a2c6f0c636132aaace2ab00597");
   });
 
   it("no RETIRED positive doctrine survives anywhere in the serialized payload (#224 anti-half-inversion guard)", () => {
@@ -802,15 +836,40 @@ describe("authoring-kit — getAuthoringKit", () => {
     const trap = ex.find((e) => /VACUITY TRAP/.test(e.title))!;
     expect(trap.valid).toBe(false);
     expect(trap.expectRule).toBeUndefined(); // judge-lens-only: validator-clean (the examples harness pins this)
-    // the flagship reference artifact re-grounds the distinct criteria to a named `criterion` gated by an
-    // or-guard — no surviving `defined as` composite
+    // finding 4 (kit 1.12): the trap now DECLARES its four operands, so pasting it is fully validator-clean
+    // (ZERO errors, not four unresolved-reference warnings) — the judge-lens defect is its ONLY blemish.
+    expect(trap.snippet).toMatch(/concept "Life Threatening Cardiovascular Disease":/);
+    expect(crlErrors(`# T\nlibrary "T".\n${trap.snippet}`)).toEqual([]);
+    // the flagship reference artifact re-grounds the DISTINCT criteria to a named `criterion` gated by an
+    // or-guard (no `defined as` fusing them) — while carrying ONE genuine rung-1 `defined as` (viral suppression:
+    // one occurrence recorded two ways) as the sanctioned-construct exemplar (finding 2, kit 1.12).
     expect(CRITERIA_DECISION_REFERENCE_CRL).toMatch(/criterion "Failed Conservative Therapy"/);
     expect(CRITERIA_DECISION_REFERENCE_CRL).toMatch(/when \( "Failed Drug Therapy" or "Failed Physical Therapy" \)/);
     expect(CRITERIA_DECISION_REFERENCE_CRL).not.toMatch(/concept "Failed Conservative Therapy"/);
-    expect(CRITERIA_DECISION_REFERENCE_CRL).not.toMatch(/- defined as \(/); // no `defined as` composite CODE survives (prose may mention it)
+    // the distinct criteria are NOT fused by `defined as`; the ONLY surviving `defined as` is the genuine
+    // rung-1 viral-suppression pair (one clinical state attested two ways). Panel r1 [important], both arms: a
+    // negative regex alone doesn't enforce "only" (a renamed/reordered fusion evades it) — so pin the COUNT to exactly
+    // one AND pin that one to the viral pair. Together these make the "only surviving `defined as`" claim true by construction.
+    expect(CRITERIA_DECISION_REFERENCE_CRL.match(/- defined as \(/g)).toHaveLength(1);
+    expect(CRITERIA_DECISION_REFERENCE_CRL).toMatch(
+      /- defined as \( "Viral Load Below Threshold Lab Result" sem-or "Viral Suppression Charted By Clinician" \)/,
+    );
     // the `concept-form` rule no longer endorses the drug/PT disjunction as ONE fact
     const conceptForm = kit.rules.find((r) => r.id === "concept-form")!;
     expect(conceptForm.rule).not.toMatch(/failed drug OR (failed )?physical therapy/i);
+  });
+
+  it("#234 follow-up (kit 1.12, finding 1) — decision-composition carries the DNF SIZE note flagging #236 load-bearing", () => {
+    for (const uc of ["cpg", "prior-auth"] as const) {
+      const dc = getAuthoringKit("local-decision-support", uc).rules.find((r) => r.id === "decision-composition")!;
+      const size = (dc.clauses ?? []).find((c) => /#236/.test(c.text) && /DISJUNCTIVE NORMAL FORM|DNF/.test(c.text));
+      expect(size, `DNF size note missing in ${uc}`).toBeDefined();
+      expect(size!.force).toBe("default"); // mechanics/advisory, not an invariant
+      expect(size!.text).toMatch(/K×\(S\+1\)|MULTIPLICATIVE/); // the expansion is quantified (K arms, not source-disjunct count)
+      expect(size!.text).toMatch(/CARTESIAN/i); // and the and-of-or worst case is named, not just tree-level multiplication
+      expect(size!.text).toMatch(/ONE opaque `condition\[\]`/); // contrasted against the bounded `defined as`
+      expect(size!.text).toMatch(/51×/); // grounded in #236's MEASURED blow-up on a real policy, not a hypothetical
+    }
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
@@ -899,8 +958,9 @@ describe("authoring-kit — examples are validated (no unverified CRL ships)", (
         expect(shape.map((e) => e.rule)).toContain(ex.expectRule);
       } else {
         // JUDGE-lens violation (e.g. the `hollowed-criteria` vacuity trap): VALIDATOR-CLEAN. The grammar
-        // cannot see the defect — this branch DEMONSTRATES it (#234): no decision-shape error, only
-        // unresolved-reference for the undeclared operands. That invisibility is why UNIT ANCHORING exists.
+        // cannot see the defect — this branch DEMONSTRATES it (#234): no decision-shape error. The vacuity
+        // trap is now self-contained (kit 1.12, #234 follow-up finding 4), so it emits ZERO errors; any judge-lens
+        // example that still cites external decls emits only unresolved-reference. Either way, no shape error.
         expect(shape).toEqual([]);
         expect(errors.every((e) => e.kind === "unresolved-reference")).toBe(true);
       }

@@ -129,8 +129,26 @@ export type { AuthoringEdge, AuthoringKit, AuthoringStage, AuthoringUseCase, Kit
 //   FCT-as-inference gloss. Examples-harness contract EXTENDED: `valid:false` + no `expectRule` = a JUDGE-lens violation that
 //   is validator-clean (only `unresolved-reference`). NO payload-shape change. BOTH useCase hashes re-pin (schemaVersion is
 //   hashed AND the cpg-edge rule/examples/judgeLens inherit into prior-auth; the prior-auth-edge artifact reinforces the PA move).
+// "1.11" → "1.12": CONTENT change (KE #234 follow-ups on 1.11). Three fixes, no payload-shape change. (1) FINDING 4 —
+//   the vacuity-trap EXAMPLE now DECLARES its four disease operands, so pasting it is fully validator-clean (ZERO
+//   unresolved-reference noise); the judge-lens `hollowed-criteria` violation is its only blemish, which is the point.
+//   (2) FINDING 2 — 1.11 left the sanctioned rung-1 `defined as` construct with NO end-to-end referenceArtifact (the
+//   FCT conversion removed the last one). The `criteria-decision-reference` artifact regains a GENUINE rung-1 pair
+//   ("Viral Suppression Documented" = a lab result OR a chart note of ONE occurrence) wired as a third nested `when`
+//   node on the approve path — it EMITS (one opaque `condition[]`, the sem-or collapsed in CQL) AND RUNS (5 CEL cases:
+//   approve via the lab arm, approve via the chart arm, deny when neither record is present, + the two prior deny
+//   nodes). DELIBERATE reversal of the 1.11 "no `defined as` survives in the artifact" state — one genuine exemplar
+//   returns. (3) FINDING 1 — a SIZE clause on `decision-composition`: a `when` gated by `or` lowers to the
+//   PlanDefinition in DNF (K arms, the downstream subtree DEEP-CLONED under each — ~K×(S+1) actions, and a mixed
+//   `and`-of-`or` guard multiplies the arm count cartesianly), the transparent-but-unbounded counterpart to `defined
+//   as`'s ONE opaque bounded `condition[]`; flags #236 (which MEASURED a ~51× PlanDefinition blow-up on a real policy)
+//   as load-bearing for the recommended distinct-criteria shape at scale. (Finding 3 — the
+//   schemaVersion-vs-contentHash convention — was RESOLVED by the operator in favour of KEEPING the convention:
+//   schemaVersion bumps on any content change and the change CLASS is read from this version-history tag; hence this
+//   CONTENT bump moves schemaVersion.) BOTH useCase hashes re-pin (the cpg-edge decision-composition clause + examples
+//   inherit into prior-auth; the artifact rides the prior-auth edge).
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.11";
+const SCHEMA_VERSION = "1.12";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -329,6 +347,10 @@ const RULES: KitRule[] = [
       },
       {
         text: "OR-of-PATHWAYS: when a policy offers criteria as ALTERNATIVE multi-criterion pathways ('medically necessary for ANY ONE of the following indications'), give each pathway its OWN sibling `when` branch gated on its FULL conjunction as a COMPOUND BRANCH GUARD (`when ( c1 and c2 and c3 ) then …`), or name that conjunction a `criterion` and gate on the name. This is required for ACCURACY: under `first:` a matched branch COMMITS and `otherwise` is TERMINAL, so gating a pathway on a PARTIAL condition strands a patient who fails it but qualifies under the next pathway — the full-conjunction guard is what makes a partial match FALL THROUGH. The guard's own `condition[]` keeps every criterion visible, so do NOT additionally re-expose them as nested `when` nodes (behaviour-neutral duplication). Do NOT gate the pathway on a `defined as` entry-gate composite — that hides the criteria in one opaque `condition[]` and asserts false sameness (per the invariant above).",
+        force: "default",
+      },
+      {
+        text: "SIZE / #236 (emit mechanics of the recommended shape — load-bearing): a `when` gated by an `or` (a `criterion` gated by `or`, or a compound `or`-guard) lowers to the FHIR PlanDefinition in DISJUNCTIVE NORMAL FORM — the guard expands into K arms (K = the number of DNF terms, NOT necessarily the count of source disjuncts: a mixed `and`-of-`or` guard multiplies the arm count CARTESIANLY, ~2^N in the worst case), and each arm gets its own per-atom `condition[]` AND a DEEP-CLONED copy of the ENTIRE downstream subtree beneath the guard. So K arms over an S-action descendant subtree emit ~K×(S+1) actions. Placement: the arms splice as ordered SIBLINGS under `first:`; under other qualifiers they are wrapped in ONE synthesized `cqf-applicabilityBehavior \"any\"` grouping action. That duplication is the transparency win (every atom is a visible `condition[]`, no hidden disjunction), but it is MULTIPLICATIVE — an `or` high in the tree clones everything below it. Contrast a rung-1 `defined as`, which lowers to ONE opaque `condition[]` — bounded in size but hiding the disjunction (right for one-fact-attested-two-ways, wrong for distinct criteria). So preferring decision STRUCTURE over `defined as` for distinct criteria is correct for fidelity but trades bounded-opacity for transparent-but-unbounded expansion; at scale the recommended shape's tractability depends on #236 (DNF expansion / factoring a criterion into a referenced definition emitted once). #236 MEASURED this on a real prior-auth policy: adopting the distinct-criteria invariant grew one emitted PlanDefinition ~51× (130 KB → 6.7 MB, 2.5k → 122k lines) with no logic change — the expansion is real and load-bearing, not hypothetical.",
         force: "default",
       },
       {
@@ -656,7 +678,7 @@ const EXAMPLES: KitExample[] = [
     title: "GENUINE rung-1 — ONE fact RECORDED two ways",
     language: "crl",
     snippet:
-      'concept "Viral Load Below Threshold Lab Result":\n- type is Observation.\n- code is `vl-lab`.\nconcept "Viral Suppression Charted By Clinician":\n- type is Observation.\n- code is `vl-charted`.\nconcept "Viral Suppression Documented":\n- defined as ( "Viral Load Below Threshold Lab Result" sem-or "Viral Suppression Charted By Clinician" ).',
+      'concept "Viral Load Below Threshold Lab Result":\n- type is Observation.\n- code is `viral-load-lab`.\nconcept "Viral Suppression Charted By Clinician":\n- type is Observation.\n- code is `viral-suppression-charted`.\nconcept "Viral Suppression Documented":\n- defined as ( "Viral Load Below Threshold Lab Result" sem-or "Viral Suppression Charted By Clinician" ).',
     valid: true,
     note: "ONE clinical reality — this patient's viral suppression — RECORDED in two places: a lab result or a clinician's chart note (the two records may themselves coexist; it is still ONE occurrence). The fact is nameable WITHOUT the concept's label, which IS the test. Contrast the criterion example above: failed drug therapy and failed physical therapy are two DIFFERENT events, not one occurrence recorded twice. This is rung-1 INFERENCE over ONE concept's representations. #168.",
   },
@@ -664,9 +686,9 @@ const EXAMPLES: KitExample[] = [
     title: "THE VACUITY TRAP — the label supplying \"the one fact\"",
     language: "crl",
     snippet:
-      'concept "Substantial Co Morbidity":\n- defined as ( "Life Threatening Cardiovascular Disease" sem-or "Sleep Apnea" sem-or "Uncontrolled Diabetes Mellitus" sem-or "Severe Musculoskeletal Problem" ).',
+      'concept "Life Threatening Cardiovascular Disease":\n- type is Condition.\n- code is `cv-disease`.\nconcept "Sleep Apnea":\n- type is Condition.\n- code is `sleep-apnea`.\nconcept "Uncontrolled Diabetes Mellitus":\n- type is Condition.\n- code is `uncontrolled-dm`.\nconcept "Severe Musculoskeletal Problem":\n- type is Condition.\n- code is `msk-problem`.\nconcept "Substantial Co Morbidity":\n- defined as ( "Life Threatening Cardiovascular Disease" sem-or "Sleep Apnea" sem-or "Uncontrolled Diabetes Mellitus" sem-or "Severe Musculoskeletal Problem" ).',
     valid: false,
-    note: "Defended as rung-1 because the operands are 'representations of substantial co-morbidity' — but that fact is supplied by the concept's own NAME. Strip the label and there is no single clinical event: cardiovascular disease, sleep apnea, diabetes and a musculoskeletal problem are four DIFFERENT states, any of which independently satisfies the rule (they co-occur). The source's 'such as' marks alternatives, not representations. Faithful form: `criterion \"Substantial Co Morbidity\": - when ( A or B or C or D ).` VALIDATOR-CLEAN — this is a JUDGE-lens (`hollowed-criteria`) violation, not a grammar/shape one (hence no `expectRule`); the grammar cannot see it, which is exactly why UNIT ANCHORING exists.",
+    note: "Defended as rung-1 because the operands are 'representations of substantial co-morbidity' — but that fact is supplied by the concept's own NAME. Strip the label and there is no single clinical event: cardiovascular disease, sleep apnea, diabetes and a musculoskeletal problem are four DIFFERENT states, any of which independently satisfies the rule (they co-occur). The source's 'such as' marks alternatives, not representations. Faithful form: `criterion \"Substantial Co Morbidity\": - when ( A or B or C or D ).` The four operands are DECLARED, so the snippet is self-contained: pasting it produces ZERO validator output — no unresolved-reference noise to distract from the point. VALIDATOR-CLEAN — this is a JUDGE-lens (`hollowed-criteria`) violation, not a grammar/shape one (hence no `expectRule`); the grammar sees NOTHING wrong, which is exactly why UNIT ANCHORING exists.",
   },
   {
     title: "Matched branch with a guarded `any:` menu",
@@ -1034,7 +1056,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     language: "crl",
     edge: "prior-auth",
     purpose:
-      "The model for #168: a policy's DISTINCT criteria as decision STRUCTURE (each criterion visible/auditable) — nested `when` nodes or a COMPOUND BRANCH GUARD `when ( A and B )` (nesting/`and` = AND), each its own `condition[]`. \"Failed Conservative Therapy\" (failed drug therapy OR failed physical therapy) is a named `criterion` gated by an `or`-guard, NOT a `defined as`: failed drug therapy and failed physical therapy are two SEPARATE events joined in the DECISION layer. THE TELL — alternative records of a SINGLE underlying occurrence (their records may coexist) are one fact → `defined as`; SEPARATE independently-occurring events are distinct criteria → decision structure. Criteria that route to DIFFERENT consequences MUST be separate `when` nodes; a conjunction sharing ONE consequence is a compound branch guard (or a `criterion`). Distinct criteria are NEVER fused into a `defined as`/`sem-*` composite (see decision-composition). `defined as` at the concept level normalizes ONE concept's representations.",
+      "The model for #168: a policy's DISTINCT criteria as decision STRUCTURE (each criterion visible/auditable) — nested `when` nodes or a COMPOUND BRANCH GUARD `when ( A and B )` (nesting/`and` = AND), each its own `condition[]`. \"Failed Conservative Therapy\" (failed drug therapy OR failed physical therapy) is a named `criterion` gated by an `or`-guard, NOT a `defined as`: failed drug therapy and failed physical therapy are two SEPARATE events joined in the DECISION layer. Its CONTRAST — \"Viral Suppression Documented\" (ONE clinical state attested two ways: a lab result OR a chart note) — IS a `defined as ( ... sem-or ... )`, riding the tree as a single-concept `when` node: the artifact's end-to-end proof that the sanctioned rung-1 construct emits + runs. THE TELL — alternative records of a SINGLE underlying occurrence (their records may coexist) are one fact → `defined as`; SEPARATE independently-occurring events are distinct criteria → decision structure. Criteria that route to DIFFERENT consequences MUST be separate `when` nodes; a conjunction sharing ONE consequence is a compound branch guard (or a `criterion`). Distinct criteria are NEVER fused into a `defined as`/`sem-*` composite (see decision-composition). `defined as` at the concept level normalizes ONE concept's representations.",
     source: CRITERIA_DECISION_REFERENCE_CRL,
   },
   {
@@ -1042,7 +1064,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     language: "cel",
     edge: "prior-auth",
     purpose:
-      "Companion cases exercising each decision NODE: criterion-1 node (Has Qualifying Diagnosis), the nested criterion-2 node (the failed-conservative-therapy guard-`or` — its `otherwise` → deny), the guard resolving on EITHER distinct criterion (drug OR physical therapy → approve), and the top-level otherwise.",
+      "Companion cases exercising each decision NODE: criterion-1 node (Has Qualifying Diagnosis), the nested criterion-2 node (the failed-conservative-therapy guard-`or`, resolving on EITHER distinct criterion — drug OR physical therapy), the criterion-3 node (the viral-suppression `defined as`, resolving on EITHER record — lab OR chart note — of the one occurrence, and denying at its `otherwise` when neither is present), and the top-level otherwise.",
     source: CRITERIA_DECISION_REFERENCE_CEL,
   },
   {

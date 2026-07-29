@@ -207,9 +207,13 @@ case "hard exclusion -> denied":
  * criteria offered as ALTERNATIVES ("Failed Conservative Therapy" = failed drug OR
  * failed physical therapy — two SEPARATE events, so DISTINCT criteria) are a named
  * `criterion` gated by an `or`-guard, NOT a `defined as` composite (they are not one
- * fact recorded twice). The kit's unit test materializes this and drives the real CRE
- * over it (criterion-1 node, and the nested criterion `or`-guard resolving on either
- * distinct criterion). #234.
+ * fact recorded twice). Its CONTRAST — "Viral Suppression Documented" (ONE clinical
+ * state attested two ways: a lab result OR a chart note) — is GENUINE rung-1 `defined as`
+ * inference, riding the tree as a single-concept `when` node; it is the kit's ONE
+ * end-to-end `defined as` exemplar, proving the sanctioned rung-1 construct emits and
+ * runs in artifact context (#234 follow-up). The kit's unit test materializes this and
+ * drives the real CRE over it (criterion-1 node, the criterion `or`-guard resolving on
+ * either distinct criterion, and the `defined as` node resolving on either record). #234.
  */
 export const CRITERIA_DECISION_REFERENCE_CRL = `# Criteria Decision Reference — coverage criteria as DECISION NODES (Stage 1)
 library "Coverage Criteria Reference".
@@ -221,8 +225,17 @@ lives in the DECISION TREE: each criterion is its own \`when\` node (nesting = A
 named \`criterion\` gated by an \`or\`-guard: failed drug therapy and failed physical
 therapy are two SEPARATE events (each can occur independently, so both may be present
 at once) — DISTINCT criteria the policy offers as alternatives, NOT one fact recorded
-two ways, so they are joined structurally, never fused with \`defined as\`/\`sem-or\` (only
-alternative records of a SINGLE underlying occurrence are rung-1 inference; #234). The
+two ways, so they are joined structurally, never fused with \`defined as\`/\`sem-or\`.
+
+"Viral Suppression Documented" is the CONTRAST: ONE clinical STATE — this member's
+viral suppression at the determination point — attested two ways (a lab result OR a
+clinician's chart note; the two records may coexist, they still attest the ONE state).
+THAT is rung-1 inference, so it is a \`defined as ( ... sem-or ... )\` over the two
+records and rides the tree as a single-concept \`when\` node. The tell: one-state-attested
+-two-ways -> \`defined as\`; separate independently-occurring events -> distinct criteria
+(#234). NOTE: the three criteria here (qualifying diagnosis, failed conservative therapy,
+documented viral suppression) are combined for PEDAGOGICAL CONTRAST — a distinct-criteria
+or-guard beside a genuine rung-1 \`defined as\` — NOT as a clinically coherent policy. The
 determination is a configured category.key local activity (certify.Approve /
 not-certify.Deny), validated against crl.dispositions.
 */
@@ -240,11 +253,24 @@ concept "Failed Physical Therapy":
 criterion "Failed Conservative Therapy":          // two DISTINCT criteria (SEPARATE events) -> decision-layer or-guard,
 - when ( "Failed Drug Therapy" or "Failed Physical Therapy" ).  // NOT a \`defined as\` composite (not one fact recorded twice)
 
-decision "Coverage Determination":                 // criteria are nested \`when\` NODES
+concept "Viral Load Below Threshold Lab Result":
+- type is Observation.
+- code is \`viral-load-lab\`.
+concept "Viral Suppression Charted By Clinician":
+- type is Observation.
+- code is \`viral-suppression-charted\`.
+concept "Viral Suppression Documented":           // ONE clinical state attested two ways (lab OR chart note) -> GENUINE
+- defined as ( "Viral Load Below Threshold Lab Result" sem-or "Viral Suppression Charted By Clinician" ).  // rung-1 \`defined as\`, NOT distinct criteria
+
+decision "Coverage Determination":                 // criteria are nested \`when\` NODES (nesting = AND)
 first:
 - when "Has Qualifying Diagnosis" then:
     first:
-    - when ( "Failed Conservative Therapy" ) then recommend activity "certify.Approve".
+    - when ( "Failed Conservative Therapy" ) then:
+        first:
+        - when "Viral Suppression Documented" then recommend activity "certify.Approve".
+        - otherwise then recommend activity "not-certify.Deny".
+        end.
     - otherwise then recommend activity "not-certify.Deny".
     end.
 - otherwise then recommend activity "not-certify.Deny".
@@ -255,10 +281,14 @@ library "Coverage Criteria Reference Cases".
 covers "Coverage Criteria Reference".
 
 /*
-Each case exercises a decision NODE: criterion-1 (\`when[0]\`), and criterion-2
+Each case exercises a decision NODE: criterion-1 (\`when[0]\`), criterion-2
 (\`when[0]/when[0]\` — the failed-conservative-therapy or-guard, a nested NODE, not a
-composite). The two approve cases prove the guard resolves on EITHER distinct
-criterion (failed drug OR failed physical therapy independently satisfies it).
+composite), and criterion-3 (\`when[0]/when[0]/when[0]\` — the viral-suppression
+\`defined as\` node). The two approve cases prove the criterion-2 guard resolves on
+EITHER distinct criterion (failed drug OR failed physical therapy independently) AND
+that the criterion-3 \`defined as\` resolves on EITHER record (lab OR chart note) of the
+one occurrence; the no-viral-suppression case proves the \`defined as\` node denies when
+neither record is present.
 */
 
 fact "Sample Patient":
@@ -281,25 +311,46 @@ fact "Physical Therapy Failure":
 - date is "2026-01-01".
 - defined by "Coverage Criteria Reference"."Failed Physical Therapy".
 
-case "diagnosis + failed drug therapy -> approve":
+fact "Viral Load Lab Result":
+- code is "http://example.org/local|viral-load-lab".
+- date is "2026-01-01".
+- defined by "Coverage Criteria Reference"."Viral Load Below Threshold Lab Result".
+
+fact "Viral Suppression Chart Note":
+- code is "http://example.org/local|viral-suppression-charted".
+- date is "2026-01-01".
+- defined by "Coverage Criteria Reference"."Viral Suppression Charted By Clinician".
+
+case "diagnosis + failed drug therapy + viral suppression (lab record) -> approve":
 - subject is "Sample Patient".
 - fact is "Diagnosis Finding".
 - fact is "Drug Therapy Failure".
+- fact is "Viral Load Lab Result".
 - result is "Coverage Determination" is "certify.Approve".
 
-case "diagnosis + failed physical therapy -> approve (guard-or: either distinct criterion)":
+case "diagnosis + failed physical therapy + viral suppression (chart record) -> approve (guard-or + defined-as either record)":
 - subject is "Sample Patient".
 - fact is "Diagnosis Finding".
 - fact is "Physical Therapy Failure".
+- fact is "Viral Suppression Chart Note".
 - result is "Coverage Determination" is "certify.Approve".
 
-case "diagnosis but no conservative-therapy failure -> deny (criterion-2 node otherwise)":
+case "diagnosis + failed conservative therapy but no documented viral suppression -> deny (defined-as node otherwise)":
 - subject is "Sample Patient".
 - fact is "Diagnosis Finding".
+- fact is "Drug Therapy Failure".
+- result is "Coverage Determination" is "not-certify.Deny".
+
+case "diagnosis + viral suppression but no conservative-therapy failure -> deny (criterion-2 node otherwise)":
+- subject is "Sample Patient".
+- fact is "Diagnosis Finding".
+- fact is "Viral Load Lab Result".
 - result is "Coverage Determination" is "not-certify.Deny".
 
 case "no qualifying diagnosis -> deny (criterion-1 node otherwise)":
 - subject is "Sample Patient".
+- fact is "Drug Therapy Failure".
+- fact is "Viral Load Lab Result".
 - result is "Coverage Determination" is "not-certify.Deny".
 `;
 
