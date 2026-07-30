@@ -196,6 +196,7 @@ export {
   topCriterion,
   criterionKey,
   DEF_EXPR_CAP,
+  GUARD_OPERAND_CAP,
   DEF_MAX_EXPR_DEPTH,
   generateProvenanceScaffold,
   mergeScaffold,

@@ -44,7 +44,7 @@ export { buildConceptContainment } from "./conceptContainment";
 export type { ConceptContainment } from "./conceptContainment";
 export { buildConceptShapeIndex, codeIsLeavesPreorder } from "./conceptShape";
 export type { ConceptShapeNode, ConceptShapeIndex } from "./conceptShape";
-export { buildDefExprIndex, collectDefExprLeafKeys, buildDefStruct, DEF_EXPR_CAP, DEF_MAX_EXPR_DEPTH } from "./definedAsExpr";
+export { buildDefExprIndex, collectDefExprLeafKeys, buildDefStruct, DEF_EXPR_CAP, GUARD_OPERAND_CAP, DEF_MAX_EXPR_DEPTH } from "./definedAsExpr";
 export type { DefExpr, DefRef, DefExprEntry, DefExprIndex, DefStructExpr, ResolveDefExprEntry } from "./definedAsExpr";
 export { branchConditionToDefStruct, buildGuardOutlines, buildCriterionIdentities, criterionGateIdentities, topCriterion, criterionKey } from "./guardOutline";
 export type { GuardOutline, CriterionIdentity } from "./guardOutline";

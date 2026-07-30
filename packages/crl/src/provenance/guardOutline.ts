@@ -33,7 +33,7 @@ import type { ResolvedCelGraph } from "../cel/imports/types";
 
 import {
   buildDefStruct,
-  DEF_EXPR_CAP,
+  GUARD_OPERAND_CAP,
   DEF_MAX_EXPR_DEPTH,
   type DefExprIndex,
   type DefStructExpr,
@@ -172,8 +172,12 @@ export function branchConditionToDefStruct(
       case "BranchConditionAnd":
       case "BranchConditionOr": {
         const kind = c.type === "BranchConditionAnd" ? "and" : "or";
-        const operands = c.operands.slice(0, DEF_EXPR_CAP).map((o) => go(o, visiting, hops));
-        if (c.operands.length > DEF_EXPR_CAP) operands.push({ kind: "more", count: c.operands.length - DEF_EXPR_CAP });
+        // #246: a decision-level guard's operand list uses GUARD_OPERAND_CAP (a high render backstop), NOT the low
+        // composite DEF_EXPR_CAP — the questionnaire's `buildGuardStruct` is uncapped, so every realistic guard shows
+        // ALL its operands in the Tree (matching the Questionnaire). A `defined as` composite hung off a leaf still uses
+        // DEF_EXPR_CAP inside `buildDefStruct` (both panes share that, so composites stay in lockstep).
+        const operands = c.operands.slice(0, GUARD_OPERAND_CAP).map((o) => go(o, visiting, hops));
+        if (c.operands.length > GUARD_OPERAND_CAP) operands.push({ kind: "more", count: c.operands.length - GUARD_OPERAND_CAP });
         return { kind, operands };
       }
       case "BranchConditionCriterionRef": {
@@ -350,7 +354,11 @@ export function buildCriterionIdentities(
  *  `criterionKey(lib,name)` (a criterion at several sites → ONE entry). Reachability stops where a breaching/hop-capped
  *  parent elides its body — that parent is itself gated + un-passable (an elided criterion), so the chain is blocked at the
  *  VISIBLE node and the unreachable descendant is correctly out. This is a MODEL-tree walk (not the collapse-filtered
- *  rendered occurrences — disc 327 pt 1): a criterion under a collapsed ancestor is still in the ancestor's `.expr`. */
+ *  rendered occurrences — disc 327 pt 1): a criterion under a collapsed ancestor is still in the ancestor's `.expr`.
+ *  ⚠ GAP (#247, pre-existing): a criterion ref past a `+N more` WIDTH truncation (operand index ≥ GUARD_OPERAND_CAP in an
+ *  `and`/`or`) is sliced off BEFORE it becomes a `criterion` node, so — unlike hop/breach elision — it is NOT gated and the
+ *  `more` stub is NOT un-passable, so `mvComplete` could complete with it hidden. Only reachable past 100 operands (was
+ *  10× easier before #246); tracked in #247. */
 export function criterionGateIdentities(
   guardOutlines: ReadonlyMap<string, GuardOutline>,
   criterionIdentities: ReadonlyMap<string, CriterionIdentity>,

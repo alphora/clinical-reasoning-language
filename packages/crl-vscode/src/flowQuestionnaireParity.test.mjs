@@ -11,8 +11,10 @@
 //
 // WHERE THEY DIVERGE BY CONSTRUCTION (pre-existing, orthogonal to #242 — the flow renderer has host-safety caps the
 // questionnaire lacks; surfaced by this test, NOT introduced by it):
-//   (a) WIDTH CAP — the flow caps an `and`/`or` at DEF_EXPR_CAP (10) operands + a `+N more` stub; the questionnaire is
-//       uncapped. Pinned as an ACCEPTED divergence below (an 11-operand guard).
+//   (a) WIDTH CAP — the flow caps an `and`/`or` guard at GUARD_OPERAND_CAP (100) operands + a `+N more` stub; the
+//       questionnaire is uncapped. #246 raised this from 10 → 100, so every realistic authored guard now AGREES (pinned
+//       below at 11 operands); the residual divergence only bites past 100 (beyond any authored guard — unit-tested in
+//       guardOutline.test.ts, not fixtured here to keep the graph render light).
 //   (b) CROSS-LIBRARY operand — the flow degrades a cross-lib/unresolved ref to an `external` stub; the questionnaire
 //       keeps a plain `leaf`. Noted, not fixtured (needs a multi-lib project — heavier than this suite's scope).
 //   (c) DEEP criterion chains (> DEF_MAX_EXPR_DEPTH hops) — the flow elides with a `…`; the questionnaire recurses.
@@ -213,17 +215,16 @@ check("#242 parity: `not A` — the NOT wrapper SURVIVES on both sides (atom nev
   assert.equal(agree(`not "A"`, ["A"]), `NOT(L["G","A"])`);
 });
 
-// ACCEPTED-DIVERGENCE pin (Claude round-2 [important]): the flow's host-safety WIDTH CAP is real and pre-existing —
-// an 11-operand `and` truncates to 10 + `+1` in the flow but stays 11 leaves in the questionnaire. Pin the divergence
-// so the "identical structure" banner is honest and a future alignment (or a cap change) trips this test deliberately.
-check("#242 KNOWN DIVERGENCE: an 11-operand `and` — flow caps at DEF_EXPR_CAP(10) + `+1`, questionnaire keeps all 11", () => {
+// #246: an 11-operand `and` now AGREES — the flow guard cap was raised 10 → GUARD_OPERAND_CAP(100), so every realistic
+// authored guard shows all its operands in the Tree (matching the uncapped Questionnaire). The >100 ceiling divergence
+// is unit-tested in guardOutline.test.ts (a 101-operand graph render is too heavy for this suite).
+check("#246 parity: an 11-operand `and` — the Tree shows ALL 11 operands (matches the uncapped Questionnaire)", () => {
   const names = Array.from({ length: 11 }, (_, i) => `W${i}`);
   const concepts = names.map((n) => `\nconcept "${n}":\n- type is Condition.\n- code is \`${n.toLowerCase()}\`.`).join("");
   const guard = names.map((n) => `"${n}"`).join(" and ");
-  const { flow, quest } = bothShapes(guard, ["W0"], { extra: concepts }); // W0 holds, rest absent → compound FAILS
-  assert.ok(flow.endsWith(",+1]"), `flow caps at 10 operands + a \`+1\` more stub (got ${flow.slice(-24)})`);
-  assert.ok(!quest.includes("+"), "the questionnaire is uncapped (no `more` stub)");
-  assert.notEqual(flow, quest, "the width-cap boundary is a KNOWN, accepted divergence (see header) — not #242 parity");
+  const flow = agree(guard, ["W0"], { extra: concepts }); // W0 holds, rest absent → compound FAILS; both decompose fully
+  assert.ok(!flow.includes("+"), "no `+N more` stub under the raised cap — all 11 operands render");
+  assert.equal(flow, `AND[${names.map((n) => `L["G","${n}"]`).join(",")}]`, "all 11 operands, in order");
 });
 
 // disc 340 (G1/C2) PIN — the accepted #242 behavior for a single-`not` guard. The atom X migrates onto its own outline

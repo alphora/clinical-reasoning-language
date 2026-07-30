@@ -7,7 +7,7 @@ import { buildCEL } from "../../cel";
 import type { ResolvedCelGraph } from "../../cel/imports/types";
 import { leafEligibleConcepts } from "../../cql-emitter/lowerLocalCodes";
 import { buildCrlConceptLayer } from "../crlConceptLayer";
-import { buildDefExprIndex, DEF_MAX_EXPR_DEPTH, type DefStructExpr, type ResolveDefExprEntry } from "../definedAsExpr";
+import { buildDefExprIndex, DEF_MAX_EXPR_DEPTH, GUARD_OPERAND_CAP, type DefStructExpr, type ResolveDefExprEntry } from "../definedAsExpr";
 import { branchConditionToDefStruct, buildCriterionIdentities, buildGuardOutlines, criterionGateIdentities, criterionKey, topCriterion } from "../guardOutline";
 import { collectLibs, decisionSubNodeRef, nodeKey } from "../indexer";
 import { buildCrlStructure } from "../crlStructure";
@@ -303,9 +303,11 @@ first:
   });
 
   it("#233 host safety (Fix 1): a WIDE-FAN criterion that DEFEATS the width cap by grouping breaches → NAMED elided nodes, terminates fast", () => {
-    // Ck references C(k-1) 20 TIMES via two groups of 10 (`(x…10) and (x…10)`) — 20 > DEF_EXPR_CAP(10), so the per-
-    // `and`/`or` width cap alone does NOT bound it. Fan-out 20 per hop ⇒ atoms 20^k: C1=20, C2=400, C3=8000 > 1024
-    // atom cap ⇒ breach. Without the expandedSize pre-gate + hop-budget-0 response, a root render of `when C3` would
+    // Ck references C(k-1) 20 TIMES via two groups of 10 (`(x…10) and (x…10)`). Boundedness rests on ATOM COUNTING, NOT
+    // any width cap: fan-out 20 per hop ⇒ atoms 20^k: C1=20, C2=400, C3=8000 > 1024 atom cap ⇒ breach. (The grouping is
+    // now vestigial as a cap-defeat — 20 < GUARD_OPERAND_CAP(100), and the guard path no longer consults DEF_EXPR_CAP at
+    // all — but it remains a valid illustration that nesting renders every leaf regardless of any width cap.)
+    // Without the expandedSize pre-gate + hop-budget-0 response, a root render of `when C3` would
     // materialize ~20^4 nodes (hop cap 4). WITH it, C3 elides immediately. The test COMPLETING is the boundedness proof.
     const group10 = (ref: string): string => `( ${Array.from({ length: 10 }, () => `"${ref}"`).join(" and ")} )`;
     const wideBody = (prev: string): string => `( ${group10(prev)} and ${group10(prev)} )`; // 20 refs, width-cap-defeating
@@ -451,18 +453,22 @@ criterion "C2":
     expect(out.operand.operand.operand).toEqual({ kind: "more", count: 0 });
   });
 
-  it("caps operand WIDTH at DEF_EXPR_CAP with a `+N more` stub", () => {
-    const wide = Array.from({ length: 13 }, (_, i) => `"A${i}"`).join(" and ");
-    const src = `library "T".
-${Array.from({ length: 13 }, (_, i) => `concept "A${i}":\n- type is Observation.\n- code is \`a${i}\`.`).join("\n")}
-criterion "Wide":
-- when ( ${wide} ).`;
-    const table = buildCriterionTable(classifyCriterionRefs(parseInput(src)).statements);
-    const out = branchConditionToDefStruct(table.get("Wide")!.condition, table, stubResolve, "T", new Map());
-    expect(out.kind).toBe("and");
-    if (out.kind !== "and") throw new Error("unreachable");
-    expect(out.operands).toHaveLength(11); // 10 operands + a `more` stub (DEF_EXPR_CAP = 10)
-    expect(out.operands[10]).toEqual({ kind: "more", count: 3 });
+  it("#246: a guard operand list is capped at GUARD_OPERAND_CAP (a HIGH backstop, not the low composite DEF_EXPR_CAP)", () => {
+    // A realistic-width guard (13 operands < 100) is NOT truncated any more — the Tree shows all of them (matches the
+    // uncapped Questionnaire). Only a pathological fan-out past GUARD_OPERAND_CAP trips the `+N more` stub.
+    const mk = (n: number) => {
+      const wide = Array.from({ length: n }, (_, i) => `"A${i}"`).join(" and ");
+      const src = `library "T".\n${Array.from({ length: n }, (_, i) => `concept "A${i}":\n- type is Observation.\n- code is \`a${i}\`.`).join("\n")}\ncriterion "Wide":\n- when ( ${wide} ).`;
+      const table = buildCriterionTable(classifyCriterionRefs(parseInput(src)).statements);
+      return branchConditionToDefStruct(table.get("Wide")!.condition, table, stubResolve, "T", new Map());
+    };
+    const under = mk(13);
+    expect(under.kind === "and" && under.operands).toHaveLength(13); // #246: all 13 shown, no `more` stub
+    expect(under.kind === "and" && under.operands.every((o) => o.kind === "external")).toBe(true); // stubResolve → external
+    const over = mk(GUARD_OPERAND_CAP + 2);
+    expect(over.kind === "and" && over.operands).toHaveLength(GUARD_OPERAND_CAP + 1); // GUARD_OPERAND_CAP + a `more` stub
+    if (over.kind !== "and") throw new Error("unreachable");
+    expect(over.operands[GUARD_OPERAND_CAP]).toEqual({ kind: "more", count: 2 });
   });
 
   it("#233 Todo 2b GATE: criterionGateIdentities = criteria REACHABLE from guards ONLY — a declared-but-unused criterion is EXCLUDED (no livelock, disc 330)", () => {
@@ -642,13 +648,40 @@ ${whens}
     expect([...criterionGateIdentities(outlines, identities).keys()]).toEqual([]); // … but it gates no criterion
   });
 
-  it("a WIDE plain compound is width-capped with a `+N more` stub (bounded — no criterion recursion, so linear)", () => {
+  it("#246: a WIDE plain compound (13 operands) is NOT truncated — the Tree shows ALL operands (matches the uncapped Questionnaire)", () => {
     const wide = Array.from({ length: 13 }, (_, i) => `"W${i}"`).join(" and ");
     const concepts = Array.from({ length: 13 }, (_, i) => `concept "W${i}":\n- type is Observation.\n- code is \`w${i}\`.`).join("\n");
     const expr = when0(POL(`- when ( ${wide} ) then recommend activity "X".`, concepts));
     expect(expr.kind).toBe("and");
     if (expr.kind !== "and") throw new Error("unreachable");
-    expect(expr.operands).toHaveLength(11); // DEF_EXPR_CAP(10) operands + a `more` stub
-    expect(expr.operands[10]).toEqual({ kind: "more", count: 3 });
+    expect(expr.operands).toHaveLength(13); // #246: no `more` stub under GUARD_OPERAND_CAP(100)
+    expect(expr.operands.every((o) => o.kind === "leaf")).toBe(true); // all real leaves, none dropped
+  });
+
+  it("#246 host safety: a 100-operand guard each hanging a `defined as` composite is FINITE + terminates fast (the guard-width × composite-size worst case — already rendered identically by the uncapped questionnaire)", () => {
+    // The multiplicative shape gpt56 flagged: GUARD_OPERAND_CAP(100) operands, each a branching composite. Bounded by
+    // construction (guard width × the composite's own DEF_EXPR_CAP 10 × DEF_MAX_EXPR_DEPTH 4 caps); this test COMPLETING
+    // is the termination proof. Not a NEW class — `buildGuardStruct` (questionnaire) renders the identical tree uncapped.
+    const N = 100;
+    const leaves = `concept "L1":\n- type is Observation.\n- code is \`l1\`.\nconcept "L2":\n- type is Observation.\n- code is \`l2\`.\nconcept "L3":\n- type is Observation.\n- code is \`l3\`.`;
+    const defs = Array.from({ length: N }, (_, i) => `concept "D${i}":\n- defined as ( "L1" sem-or "L2" sem-or "L3" ).`).join("\n");
+    const guard = Array.from({ length: N }, (_, i) => `"D${i}"`).join(" and ");
+    const expr = when0(POL(`- when ( ${guard} ) then recommend activity "X".`, `${leaves}\n${defs}`));
+    expect(expr.kind === "and" && expr.operands).toHaveLength(N); // all 100 operands render (no truncation)
+    const count = (e: DefStructExpr): number => {
+      switch (e.kind) {
+        case "leaf":
+          return 1 + (e.composite ? count(e.composite) : 0);
+        case "and":
+        case "or":
+          return 1 + e.operands.reduce((s, o) => s + count(o), 0);
+        case "not":
+        case "criterion":
+          return 1 + count(e.operand);
+        default:
+          return 1; // external | more
+      }
+    };
+    expect(count(expr)).toBeLessThan(N * 20); // ~100 leaves × (leaf + or + 3 reps ≈ 5) ≈ 500 — a loose, FINITE bound
   });
 });

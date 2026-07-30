@@ -71,7 +71,18 @@ export type DefExpr =
  *  composite re-expanded positionally at each reference), so `DEF_MAX_EXPR_DEPTH` counts those hops — NOT inline
  *  `or`/`and`/`not` nesting (a finite authoring-scale tree; deep inline degrades to a wide scrolling chart, never a
  *  clip, because the Tree computes width from actual node extents). */
-export const DEF_EXPR_CAP = 10; // operands per box/level before a `+N more` stub
+export const DEF_EXPR_CAP = 10; // operands per box/level in a `defined as` COMPOSITE (`buildDefStruct`). Shared by BOTH
+// MV panes — the questionnaire enriches the SAME buildDefStruct output — so composites stay in lockstep at this cap.
+/** #246: a decision-level compound GUARD's operand list (flow `branchConditionToDefStruct`) uses a MUCH higher render
+ *  backstop than a composite box. The questionnaire's `buildGuardStruct` is UNCAPPED, so the low composite cap made the
+ *  Tree hide operands the Questionnaire showed (the #242 faithfulness class). 100 covers every realistic authored guard.
+ *  It is a pure RENDER backstop for a pathological flat fan-out — NOT a criterion-safety bound (that is `expandedSize`,
+ *  which counts criterion SUBSTITUTION only and is independent of this cap). NOTE the total render cost is guard-width ×
+ *  composite-size (a guard leaf may still hang a `defined as` composite, itself capped 10×4 by buildDefStruct) — a
+ *  FINITE bound the uncapped questionnaire ALREADY renders identically; authored content never approaches it. `DEF_EXPR_CAP`
+ *  is left at 10 as a deliberate SCOPE choice (composites are out of #246), NOT because raising it would break parity —
+ *  it is one constant in one shared builder, so both panes would move together. */
+export const GUARD_OPERAND_CAP = 100;
 export const DEF_MAX_EXPR_DEPTH = 4; // named-composite expansion HOPS before a `…` stub
 
 /** The POSITIONAL render structure of a `defined as` body — the shared, ANSWER-FREE projection both MV panes build on
