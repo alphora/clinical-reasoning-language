@@ -20,8 +20,10 @@
  * (`C_k := C_{k-1} and C_{k-1}` → 2^k). `buildGuardOutlines` pre-gates each `when` on `expandedSize` exactly
  * as `branchConditionConceptRefsFollowingCriteria` does (branchCondition.ts) — a breaching/cyclic guard records
  * a `…` ELISION STUB (not an omission: omitting would re-open the masquerade, disc 318 review [important] 1),
- * so the host never walks an unbounded DAG. The converter additionally caps criterion-recursion HOPS + operand
- * WIDTH (mirroring `buildDefStruct`) as a render-time backstop.
+ * so the host never walks an unbounded DAG. The converter additionally caps criterion-recursion HOPS as a render-time
+ * backstop. It caps operand WIDTH only for CRITERION-FREE fan-out (`GUARD_OPERAND_CAP`, #246); #247 SURFACES every
+ * distinct criterion past that cap (deduped → bounded by the library's declared criteria) so none escapes the verdict
+ * gate — a repeated/nested criterion ref collapses to one node, so this is not an unbounded-width vector.
  */
 import { createHash } from "node:crypto";
 
@@ -44,8 +46,10 @@ import { collectLibs, conceptDeclRef, decisionSubNodeRef, lsLoc, nodeKey } from 
 /** Criterion-recursion HOP cap — the analog of `DEF_MAX_EXPR_DEPTH` for a criterion guard. A `visiting` cycle
  *  set stops only CYCLES; a shared/diamond criterion re-expands positionally at each reference (the doubling
  *  vector), so recursion is HOP-capped: at the cap a criterion ref degrades to a `…` `more` stub rather than
- *  recursing. The per-`when` `expandedSize` gate in `buildGuardOutlines` is the primary guard; this is defence
- *  in depth so the pure converter is bounded even if a caller skips the gate. */
+ *  recursing. The per-`when` `expandedSize` gate in `buildGuardOutlines` is the primary guard. For a caller that skips
+ *  it, the HOP cap keeps total expansion in the pre-existing F+F²+…+F^maxHops class (in-cap diamond re-expansion is
+ *  UNCHANGED by #247); the #247 dedup only bounds the SURFACED tail list (≤ distinct declared criteria per `and`/`or`),
+ *  so it does not tighten that polynomial — it just stops width truncation from silently dropping a gated criterion. */
 const GUARD_MAX_CRITERION_HOPS = DEF_MAX_EXPR_DEPTH;
 
 /** #224 ii.3 Slice 2 / #233 Todo 2b: a `when` guard's render outline. The SOLE-criterion identity (the collapse +
@@ -108,6 +112,27 @@ export const topCriterion = (
   expr.kind === "criterion"
     ? { lib: expr.lib, name: expr.name, bodyHash: expr.bodyHash, ...(expr.elided ? { elided: true as const } : {}) }
     : undefined;
+
+/** #247: every `BranchConditionCriterionRef` in a guard subtree (recursing `and`/`or`/`not`). Used to SURFACE the distinct
+ *  criteria that fall past the width cap so they stay gated; deduped by the caller, so the count is bounded by the
+ *  library's declared criteria regardless of how many times / how deeply they're referenced. Walks the AST GUARD only —
+ *  NOT into a criterion's expanded body — so a criterion visible only inside a kept criterion's body is not treated as
+ *  "already shown" and may be surfaced again; bounded + gate-idempotent, accepted. */
+function criterionRefsOf(c: BranchCondition): BranchConditionCriterionRef[] {
+  switch (c.type) {
+    case "BranchConditionCriterionRef":
+      return [c];
+    case "BranchConditionRef":
+      return [];
+    case "BranchConditionNot":
+      return criterionRefsOf(c.operand);
+    case "BranchConditionAnd":
+    case "BranchConditionOr":
+      return c.operands.flatMap(criterionRefsOf);
+    default:
+      return ((x: never) => x)(c); // exhaustiveness backstop — a future BranchCondition variant fails at compile time
+  }
+}
 
 /**
  * Convert a `when` guard `BranchCondition` into the shared `DefStructExpr` outline (the flow's `buildOutline`
@@ -176,8 +201,36 @@ export function branchConditionToDefStruct(
         // composite DEF_EXPR_CAP — the questionnaire's `buildGuardStruct` is uncapped, so every realistic guard shows
         // ALL its operands in the Tree (matching the Questionnaire). A `defined as` composite hung off a leaf still uses
         // DEF_EXPR_CAP inside `buildDefStruct` (both panes share that, so composites stay in lockstep).
-        const operands = c.operands.slice(0, GUARD_OPERAND_CAP).map((o) => go(o, visiting, hops));
-        if (c.operands.length > GUARD_OPERAND_CAP) operands.push({ kind: "more", count: c.operands.length - GUARD_OPERAND_CAP });
+        const kept = c.operands.slice(0, GUARD_OPERAND_CAP);
+        const operands = kept.map((o) => go(o, visiting, hops));
+        // #247: a criterion ref PAST the width cap must NOT be silently dropped — `criterionGateIdentities` gates only
+        // rendered `criterion` nodes, so a truncated criterion would escape the MV verdict gate (mvComplete could complete
+        // with it hidden). Surface every DISTINCT criterion that occurs ONLY past the cap, as its own node (via `go`, so it
+        // expands or elides under the SAME maxHops/expandedSize breach budget). Deduped by identity → bounded by the
+        // library's DECLARED criteria: a repeated or deeply-nested tail criterion collapses to ONE node, so a
+        // machine-generated fan-out (`… and C and C … ×N`) can't materialise an unbounded node list. Criterion-FREE tail
+        // operands (the plain concept fan-out the width cap actually targets) are just truncated into the `+N more` stub.
+        const tail = c.operands.slice(GUARD_OPERAND_CAP);
+        if (tail.length > 0) {
+          const seen = new Set(kept.flatMap(criterionRefsOf).map((r) => getRefName(r.ref)));
+          for (const r of tail.flatMap(criterionRefsOf)) {
+            const name = getRefName(r.ref);
+            if (seen.has(name)) continue;
+            seen.add(name);
+            // #247 CAVEAT: a surfaced criterion is lifted OUT of its Boolean context — a tail `not X` / `( … or X )`
+            // renders X as a bare positive operand of THIS `and`/`or`, so polarity + grouping are ERASED. This is
+            // gating fidelity (the verdict is per-criterion), NOT render fidelity — acceptable only because it can
+            // occur solely in a >GUARD_OPERAND_CAP-operand guard (unreachable by authored content). A faithful render
+            // would need a distinct "truncated criteria" summary node (deferred).
+            operands.push(go(r, visiting, hops));
+          }
+          // #247: the `+N more` counts only operands NOT already fully shown — a bare criterion ref IS surfaced above,
+          // so it must NOT also be counted here (else `+1 more` claims something is hidden when nothing is, and
+          // `exprHasMore` would spuriously mark the enclosing criterion `elided`/un-passable — a false mvComplete block).
+          // A plain concept ref, a compound, or a `not(…)` past the cap IS (partly) hidden → counted. Omit the stub at 0.
+          const hiddenCount = tail.filter((o) => o.type !== "BranchConditionCriterionRef").length;
+          if (hiddenCount > 0) operands.push({ kind: "more", count: hiddenCount });
+        }
         return { kind, operands };
       }
       case "BranchConditionCriterionRef": {
@@ -355,10 +408,10 @@ export function buildCriterionIdentities(
  *  parent elides its body — that parent is itself gated + un-passable (an elided criterion), so the chain is blocked at the
  *  VISIBLE node and the unreachable descendant is correctly out. This is a MODEL-tree walk (not the collapse-filtered
  *  rendered occurrences — disc 327 pt 1): a criterion under a collapsed ancestor is still in the ancestor's `.expr`.
- *  ⚠ GAP (#247, pre-existing): a criterion ref past a `+N more` WIDTH truncation (operand index ≥ GUARD_OPERAND_CAP in an
- *  `and`/`or`) is sliced off BEFORE it becomes a `criterion` node, so — unlike hop/breach elision — it is NOT gated and the
- *  `more` stub is NOT un-passable, so `mvComplete` could complete with it hidden. Only reachable past 100 operands (was
- *  10× easier before #246); tracked in #247. */
+ *  #247 (FIXED): width truncation no longer drops criteria. `branchConditionToDefStruct` SURFACES every DISTINCT criterion
+ *  that occurs only PAST `GUARD_OPERAND_CAP` as its own node (deduped by identity → bounded by the library's declared
+ *  criteria; a repeated/nested tail ref collapses to one node), so a width-truncated criterion is gated here exactly like
+ *  an in-cap one. Only criterion-FREE fan-out goes into the `+N more` stub. (Hop/breach elision is orthogonal.) */
 export function criterionGateIdentities(
   guardOutlines: ReadonlyMap<string, GuardOutline>,
   criterionIdentities: ReadonlyMap<string, CriterionIdentity>,

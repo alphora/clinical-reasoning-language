@@ -11,10 +11,11 @@
 //
 // WHERE THEY DIVERGE BY CONSTRUCTION (pre-existing, orthogonal to #242 — the flow renderer has host-safety caps the
 // questionnaire lacks; surfaced by this test, NOT introduced by it):
-//   (a) WIDTH CAP — the flow caps an `and`/`or` guard at GUARD_OPERAND_CAP (100) operands + a `+N more` stub; the
-//       questionnaire is uncapped. #246 raised this from 10 → 100, so every realistic authored guard now AGREES (pinned
-//       below at 11 operands); the residual divergence only bites past 100 (beyond any authored guard — unit-tested in
-//       guardOutline.test.ts, not fixtured here to keep the graph render light).
+//   (a) WIDTH CAP — the flow caps a guard's CRITERION-FREE operand fan at GUARD_OPERAND_CAP (100) + a `+N more` stub;
+//       the questionnaire is uncapped. #246 raised this from 10 → 100, so every realistic authored guard AGREES (pinned
+//       below at 11 operands). Past 100, only criterion-FREE operands diverge — #247 SURFACES every distinct criterion
+//       past the cap in the flow too (so it stays gated), so criteria appear in both panes. Unit-tested in
+//       guardOutline.test.ts, not fixtured here to keep the graph render light.
 //   (b) CROSS-LIBRARY operand — the flow degrades a cross-lib/unresolved ref to an `external` stub; the questionnaire
 //       keeps a plain `leaf`. Noted, not fixtured (needs a multi-lib project — heavier than this suite's scope).
 //   (c) DEEP criterion chains (> DEF_MAX_EXPR_DEPTH hops) — the flow elides with a `…`; the questionnaire recurses.

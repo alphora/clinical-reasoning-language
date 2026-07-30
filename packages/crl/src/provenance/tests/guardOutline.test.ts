@@ -453,7 +453,7 @@ criterion "C2":
     expect(out.operand.operand.operand).toEqual({ kind: "more", count: 0 });
   });
 
-  it("#246: a guard operand list is capped at GUARD_OPERAND_CAP (a HIGH backstop, not the low composite DEF_EXPR_CAP)", () => {
+  it("#246: a guard's CRITERION-FREE operand fan is capped at GUARD_OPERAND_CAP (a HIGH backstop, not the low composite DEF_EXPR_CAP; criteria are surfaced per #247)", () => {
     // A realistic-width guard (13 operands < 100) is NOT truncated any more — the Tree shows all of them (matches the
     // uncapped Questionnaire). Only a pathological fan-out past GUARD_OPERAND_CAP trips the `+N more` stub.
     const mk = (n: number) => {
@@ -683,5 +683,92 @@ ${whens}
       }
     };
     expect(count(expr)).toBeLessThan(N * 20); // ~100 leaves × (leaf + or + 3 reps ≈ 5) ≈ 500 — a loose, FINITE bound
+  });
+
+  // #247: a criterion PAST the width cap is SURFACED (deduped by identity) so it stays gated — else it escapes
+  // `criterionGateIdentities` and mvComplete could hide it. `tail` = the operands past GUARD_OPERAND_CAP(100).
+  const buildWide = (tailGuardParts: string[], extraDecls = "") => {
+    const decls = [
+      ...Array.from({ length: 100 }, (_, i) => `concept "A${i}":\n- type is Observation.\n- code is \`a${i}\`.`),
+      `concept "C":\n- type is Observation.\n- code is \`cc\`.`,
+      `concept "P":\n- type is Observation.\n- code is \`pp\`.`,
+      `criterion "Special":\n- when ( "C" ).`,
+      extraDecls,
+    ].join("\n");
+    const guard = [...Array.from({ length: 100 }, (_, i) => `"A${i}"`), ...tailGuardParts].join(" and ");
+    const src = `library "T".\n${decls}\nactivity "X":\n- request CPGCommunicationRequest.\n- with \`x\`.\ndecision "D":\nfirst:\n- when ( ${guard} ) then recommend activity "X".\n- otherwise then recommend activity "X".`;
+    const graph = graphFrom(src, CEL);
+    const defIndex = defIndexOf(graph);
+    const identities = buildCriterionIdentities(graph, defIndex);
+    const outlines = buildGuardOutlines(graph, defIndex, identities);
+    const expr = outlines.get(nodeKey(decisionSubNodeRef("T", "D", "when[0]")))!.expr;
+    const gate = criterionGateIdentities(outlines, identities);
+    return { expr, gate };
+  };
+
+  it("#247: a bare criterion ref past the cap is surfaced (gated), and the criterion-free tail truncates into `+N more`", () => {
+    // tail = [Special, Z0, Z1, Z2] (4 operands past the cap).
+    const { expr, gate } = buildWide(
+      [`"Special"`, `"Z0"`, `"Z1"`, `"Z2"`],
+      Array.from({ length: 3 }, (_, i) => `concept "Z${i}":\n- type is Observation.\n- code is \`z${i}\`.`).join("\n"),
+    );
+    if (expr.kind !== "and") throw new Error("unreachable");
+    expect(expr.operands).toHaveLength(102); // 100 kept + surfaced Special + one `more`
+    expect(expr.operands[100].kind === "criterion" && expr.operands[100].name).toBe("Special");
+    // `more` counts only the HIDDEN operands (Z0/Z1/Z2) — the bare criterion Special is surfaced above, NOT re-counted.
+    expect(expr.operands[101]).toEqual({ kind: "more", count: 3 });
+    expect(gate.has(criterionKey("T", "Special"))).toBe(true); // reviewable ⇒ gated
+  });
+
+  it("#247 BOUND: a criterion REPEATED past the cap collapses to ONE surfaced node + NO `more` stub (all tail operands are represented)", () => {
+    // tail = Special × 40 — deduped to a SINGLE criterion node (the machine-generated fan-out gpt56 flagged). Every tail
+    // operand is a bare criterion ref (all surfaced/represented) → NO `+N more` stub, so `elided` stays false (nothing hidden).
+    const { expr, gate } = buildWide(Array.from({ length: 40 }, () => `"Special"`));
+    if (expr.kind !== "and") throw new Error("unreachable");
+    const crits = expr.operands.filter((o) => o.kind === "criterion");
+    expect(crits).toHaveLength(1); // deduped: 40 tail refs → 1 node
+    expect(crits[0].kind === "criterion" && crits[0].name).toBe("Special");
+    expect(expr.operands.filter((o) => o.kind === "more")).toHaveLength(0); // nothing hidden → no stub → not elided
+    expect(gate.has(criterionKey("T", "Special"))).toBe(true);
+  });
+
+  it("#247 CAVEAT (accepted): a `not Special` past the cap surfaces Special WITHOUT its `not` — gated, polarity stripped (render-only, >100-operand region)", () => {
+    // tail = [not Special] — the documented caveat: the criterion is lifted out of its Boolean context (the `not` is
+    // erased in the render), but it stays GATED. `not Special` is one operand → surfaced Special + `more(1)` (the `not` wrapper is hidden).
+    const { expr, gate } = buildWide([`not "Special"`]);
+    if (expr.kind !== "and") throw new Error("unreachable");
+    const crit = expr.operands.find((o) => o.kind === "criterion");
+    expect(crit?.kind === "criterion" && crit.name).toBe("Special"); // surfaced as a bare (positive-position) node — polarity gone
+    expect(expr.operands.some((o) => o.kind === "not")).toBe(false); // the `not` context is NOT preserved (accepted caveat)
+    expect(gate.has(criterionKey("T", "Special"))).toBe(true); // still gated — the point of #247
+  });
+
+  it("#247: a criterion in BOTH the kept prefix and the tail is surfaced ONCE (deduped against the prefix)", () => {
+    // Special at index 0 (kept) AND repeated in the tail → the tail occurrences are skipped (seen-seeded from the prefix).
+    const guardParts = [`"Special"`, ...Array.from({ length: 100 }, (_, i) => `"A${i}"`), `"Special"`, `"Special"`];
+    // Build directly: prefix = Special + A0..A98 (100), tail = A99, Special, Special.
+    const decls = [
+      ...Array.from({ length: 100 }, (_, i) => `concept "A${i}":\n- type is Observation.\n- code is \`a${i}\`.`),
+      `concept "C":\n- type is Observation.\n- code is \`cc\`.`,
+      `criterion "Special":\n- when ( "C" ).`,
+    ].join("\n");
+    const src = `library "T".\n${decls}\nactivity "X":\n- request CPGCommunicationRequest.\n- with \`x\`.\ndecision "D":\nfirst:\n- when ( ${guardParts.join(" and ")} ) then recommend activity "X".\n- otherwise then recommend activity "X".`;
+    const graph = graphFrom(src, CEL);
+    const defIndex = defIndexOf(graph);
+    const expr = buildGuardOutlines(graph, defIndex).get(nodeKey(decisionSubNodeRef("T", "D", "when[0]")))!.expr;
+    if (expr.kind !== "and") throw new Error("unreachable");
+    expect(expr.operands.filter((o) => o.kind === "criterion")).toHaveLength(1); // shown once (in the prefix); tail dups skipped
+  });
+
+  it("#247: a COMPOUND tail operand `( P and Special )` surfaces Special (gated); its plain conjunct P rides into the truncation", () => {
+    // tail = one nested compound past the cap. criterionRefsOf recurses it → Special surfaced; P (plain) is not.
+    const { expr, gate } = buildWide([`( "P" and "Special" )`]);
+    if (expr.kind !== "and") throw new Error("unreachable");
+    const crits = expr.operands.filter((o) => o.kind === "criterion");
+    expect(crits).toHaveLength(1);
+    expect(crits[0].kind === "criterion" && crits[0].name).toBe("Special");
+    expect(gate.has(criterionKey("T", "Special"))).toBe(true);
+    // P is NOT surfaced as its own leaf (it rode into the truncated compound) — only criteria are lifted out.
+    expect(expr.operands.every((o) => o.kind !== "leaf" || o.name !== "P")).toBe(true);
   });
 });
