@@ -102,7 +102,7 @@ import {
   REVIEW_STATES,
   reviewProgress,
   saveSidecar,
-  setCriterionVerdict,
+  computeCriterionVerdictUpdate,
   setReviewState,
   type FlagChrome,
   type LiveCriterion,
@@ -2700,20 +2700,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (mode !== "medical-validation" || !mvSidecarPath) return false; // defensive: MV-only + a sidecar to persist into
     if (!isReviewState(value)) return false; // trusted-input guard
     const key = criterionVerdictKey(lib, name);
-    const live = criterionIdentities.get(key); // the LIVE canonical fingerprint (re-resolved at apply time)
-    if (!live) return false; // no such criterion in the current model (a rebuild removed it) — safe no-op
-    // disc 320 review [important] 1: if the body CHANGED between the menu opening and the pick (a rebuild — e.g. the KE / the
-    // editor agent saved an edit to the criterion body mid-menu), the live hash ≠ the hash the reviewer saw. Storing a FRESH
-    // (non-stale) pass here would pin a "correctly encoded" attestation to a body the reviewer never reviewed — exactly the
-    // false attestation `bodyHash` exists to prevent. Refuse; the caller re-opens the menu on the new body.
-    if (expectedBodyHash !== live.bodyHash) return false;
-    // disc 330 [critical] (Claude): a "Correctly encoded" pass on a body the reviewer SAW ELIDED (a `…` truncation — an
-    // occurrence inside a breaching guard whose CANONICAL body may still be non-elided, so it would NOT go stale) is a false
-    // attestation of an unseen body. Refuse the PASS (they can attest it where its body is fully shown); fail/pending/clear
-    // are fine (they don't assert correctness). Canonical-elided folds in here too (its occurrences are all elided).
-    if (value === "pass" && seenElided) return false;
-    const next = setCriterionVerdict(criterionVerdicts, key, value, live.bodyHash); // "unreviewed" deletes; else stores {state,bodyHash}
-    if (!persistMv(reviewByCaseId, notesByCaseId, next)) return false; // save (all three maps) failed → memory + disk untouched
+    // #(bulk-verdict): the guard policy (no such criterion → no-op; body CHANGED mid-menu → refuse ALL, never attest a body
+    // the reviewer didn't see, disc 320; PASS on a SEEN-ELIDED occurrence → refuse, disc 330) lives in the shared pure
+    // `computeCriterionVerdictUpdate` — so the single and bulk paths can't drift. The single path's elision source is the
+    // IN-SITU occurrence the reviewer right-clicked (`seenElided`); the bulk path passes the CURRENT canonical `elided`.
+    const upd = computeCriterionVerdictUpdate(criterionVerdicts, key, value, expectedBodyHash, criterionIdentities.get(key), seenElided);
+    if (!upd.ok) return false;
+    if (!persistMv(reviewByCaseId, notesByCaseId, upd.map)) return false; // save (all three maps) failed → memory + disk untouched
     driveCriterionVerdicts(); // repaint the verdict chips on every occurrence (no tree re-render)
     renderTreeChrome(); // the criteria gate/chrome half changed
     return true;

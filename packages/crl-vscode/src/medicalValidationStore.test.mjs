@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, deriveAllPassLeaves, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote, mvCasesClean, mvComplete, renderFlagChrome, setCriterionVerdict, criterionVerdictState, criterionVerdictKey, criterionProgress, mvCriteriaClean, renderCriterionChrome } from "./medicalValidationStore.ts";
+import { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, deriveAllPassLeaves, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote, mvCasesClean, mvComplete, renderFlagChrome, setCriterionVerdict, criterionVerdictState, criterionVerdictKey, criterionProgress, mvCriteriaClean, renderCriterionChrome, unsettledReviewItems, computeCriterionVerdictUpdate, applyBulkVerdict } from "./medicalValidationStore.ts";
 
 const check = test;
 
@@ -948,4 +948,252 @@ check("coerceCriterionVerdicts (via load): drops entries with a bad state or a m
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// ── Bulk verdict buy-off (the pure model — disc 344) ─────────────────────────────────────────────────────────────────
+const gc = (lib, name, bodyHash, elided = false) => ({ key: criterionVerdictKey(lib, name), lib, name, bodyHash, elided });
+const cv = (state, bodyHash) => ({ state, bodyHash });
+
+check("unsettledReviewItems: excludes settled pass/fail; includes unreviewed/pending/stale criteria + cases + orphans, in order", () => {
+  const criteria = [
+    gc("L", "Unrev", "h"), // no stored verdict → unreviewed
+    gc("L", "Pass", "h"), // fresh pass → EXCLUDED
+    gc("L", "Fail", "h"), // fail → EXCLUDED
+    gc("L", "Pend", "h"), // pending
+    gc("L", "Stale", "hNew"), // stored pass on hOld → stale
+    gc("L", "Elided", "h", true), // elided → stale (un-passable)
+  ];
+  const criterionVerdicts = {
+    [criterionVerdictKey("L", "Pass")]: cv("pass", "h"),
+    [criterionVerdictKey("L", "Fail")]: cv("fail", "h"),
+    [criterionVerdictKey("L", "Pend")]: cv("pending", "h"),
+    [criterionVerdictKey("L", "Stale")]: cv("pass", "hOld"),
+    [criterionVerdictKey("L", "Elided")]: cv("pass", "h"),
+  };
+  const items = unsettledReviewItems({
+    criteria,
+    criterionVerdicts,
+    liveCaseIds: ["cA", "cB", "cC"],
+    reviewByCaseId: { cB: "pass", cC: "pending", orphanX: "fail" },
+    caseLabel: (id) => `case:${id}`,
+  });
+  assert.deepEqual(
+    items.map((i) => (i.kind === "criterion" ? `crit:${i.name}:${i.currentState}:${i.passable}` : `case:${i.id}:${i.currentState}:${i.live}`)),
+    [
+      "crit:Unrev:unreviewed:true",
+      "crit:Pend:pending:true",
+      "crit:Stale:stale:true",
+      "crit:Elided:stale:false", // elided → not passable
+      "case:cA:unreviewed:true", // cA has no stored verdict
+      "case:cC:pending:true", // cB is a fresh pass → excluded
+      "case:orphanX:fail:false", // orphan (not a live case) → clear-only
+    ],
+  );
+  const critUnrev = items.find((i) => i.kind === "criterion" && i.name === "Unrev");
+  assert.equal(critUnrev.expectedBodyHash, "h"); // the concurrency snapshot
+  assert.equal(critUnrev.id, criterionVerdictKey("L", "Unrev"));
+});
+
+check("computeCriterionVerdictUpdate: body-hash mismatch refuses ALL verdicts (not just pass)", () => {
+  for (const v of ["pass", "fail", "pending", "unreviewed"]) {
+    const r = computeCriterionVerdictUpdate({}, "k", v, "hOld", { bodyHash: "hNew", elided: false }, false);
+    assert.deepEqual(r, { ok: false, reason: "body-changed" }, v);
+  }
+});
+
+check("computeCriterionVerdictUpdate: refusePassElided refuses PASS only; fail/pending/clear apply", () => {
+  assert.deepEqual(computeCriterionVerdictUpdate({}, "k", "pass", "h", { bodyHash: "h", elided: true }, true), { ok: false, reason: "elided" });
+  const okFail = computeCriterionVerdictUpdate({}, "k", "fail", "h", { bodyHash: "h", elided: true }, true);
+  assert.equal(okFail.ok, true);
+  assert.deepEqual(okFail.map, { k: { state: "fail", bodyHash: "h" } });
+});
+
+check("computeCriterionVerdictUpdate: not-live when live is undefined; changed accounting + purity", () => {
+  assert.deepEqual(computeCriterionVerdictUpdate({}, "k", "pass", "h", undefined, false), { ok: false, reason: "not-live" });
+  // no-op: same state + hash already stored
+  const map0 = { k: { state: "pass", bodyHash: "h" } };
+  const noop = computeCriterionVerdictUpdate(map0, "k", "pass", "h", { bodyHash: "h", elided: false }, false);
+  assert.equal(noop.ok && noop.changed, false);
+  assert.notEqual(noop.map, map0); // returns a NEW map (pure), input untouched
+  assert.deepEqual(map0, { k: { state: "pass", bodyHash: "h" } });
+  // changed: re-stamping a stale pass (old hash) to the live hash
+  const stalePass = computeCriterionVerdictUpdate({ k: { state: "pass", bodyHash: "hOld" } }, "k", "pass", "h", { bodyHash: "h", elided: false }, false);
+  assert.equal(stalePass.ok && stalePass.changed, true);
+  // clear on an absent entry = no-op; clear on a present entry = changed + deletes
+  assert.equal(computeCriterionVerdictUpdate({}, "k", "unreviewed", "h", { bodyHash: "h", elided: false }, false).changed, false);
+  const cleared = computeCriterionVerdictUpdate({ k: { state: "pass", bodyHash: "h" } }, "k", "unreviewed", "h", { bodyHash: "h", elided: false }, false);
+  assert.equal(cleared.ok && cleared.changed, true);
+  assert.deepEqual(cleared.map, {});
+});
+
+check("applyBulkVerdict: applies to selected criteria + cases in one result; changed counts real moves; input maps untouched", () => {
+  const key = (n) => criterionVerdictKey("L", n);
+  const criterionVerdicts = { [key("Prev")]: cv("pending", "h") };
+  const reviewByCaseId = { c2: "pending" };
+  const selected = [
+    { kind: "criterion", id: key("A"), lib: "L", name: "A", label: "A", currentState: "unreviewed", expectedBodyHash: "h", passable: true },
+    { kind: "criterion", id: key("Prev"), lib: "L", name: "Prev", label: "Prev", currentState: "pending", expectedBodyHash: "h", passable: true },
+    { kind: "case", id: "c1", label: "c1", currentState: "unreviewed", live: true },
+    { kind: "case", id: "c2", label: "c2", currentState: "pending", live: true }, // pending → pass: MOVES
+  ];
+  const r = applyBulkVerdict(selected, "pass", {
+    criterionVerdicts,
+    reviewByCaseId,
+    liveCriteria: new Map([[key("A"), { bodyHash: "h", elided: false }], [key("Prev"), { bodyHash: "h", elided: false }]]),
+    liveCaseIds: new Set(["c1", "c2"]),
+  });
+  assert.equal(r.applied.length, 4); // all eligible processed
+  assert.equal(r.skipped.length, 0);
+  assert.equal(r.changed, 4); // A, Prev, c1, c2 all moved to pass
+  assert.equal(r.criterionVerdicts[key("A")].state, "pass");
+  assert.equal(r.reviewByCaseId.c1, "pass");
+  // purity: inputs untouched
+  assert.deepEqual(criterionVerdicts, { [key("Prev")]: cv("pending", "h") });
+  assert.deepEqual(reviewByCaseId, { c2: "pending" });
+});
+
+check("applyBulkVerdict: skips body-changed / removed criterion / currently-elided pass; a non-live case verdict skips but CLEAR removes the orphan", () => {
+  const key = (n) => criterionVerdictKey("L", n);
+  const selected = [
+    { kind: "criterion", id: key("Moved"), lib: "L", name: "Moved", label: "Moved", currentState: "unreviewed", expectedBodyHash: "hOld", passable: true },
+    { kind: "criterion", id: key("Gone"), lib: "L", name: "Gone", label: "Gone", currentState: "unreviewed", expectedBodyHash: "h", passable: true },
+    { kind: "criterion", id: key("Elided"), lib: "L", name: "Elided", label: "Elided", currentState: "stale", expectedBodyHash: "h", passable: false },
+    { kind: "case", id: "orphan", label: "orphan", currentState: "fail", live: false },
+  ];
+  const ctx = {
+    criterionVerdicts: {},
+    reviewByCaseId: { orphan: "fail" },
+    liveCriteria: new Map([[key("Moved"), { bodyHash: "hNew", elided: false }], [key("Elided"), { bodyHash: "h", elided: true }]]), // "Gone" absent
+    liveCaseIds: new Set(["live1"]), // "orphan" not live
+  };
+  const nameOf = (id) => (id.includes("Moved") ? "Moved" : id.includes("Gone") ? "Gone" : id.includes("Elided") ? "Elided" : id);
+  const pass = applyBulkVerdict(selected, "pass", ctx);
+  assert.deepEqual(
+    pass.skipped.map((s) => `${nameOf(s.ref.id)}:${s.reason}`).sort(),
+    ["Elided:elided", "Gone:not-live", "Moved:body-changed", "orphan:not-live"].sort(),
+  );
+  assert.equal(pass.applied.length, 0);
+  // but CLEAR removes the orphan (unblocks the gate) even though the case is not live
+  const clear = applyBulkVerdict([{ kind: "case", id: "orphan", label: "orphan", currentState: "fail", live: false }], "unreviewed", ctx);
+  assert.deepEqual(clear.applied, [{ kind: "case", id: "orphan" }]);
+  assert.deepEqual(clear.reviewByCaseId, {}); // orphan cleared
+});
+
+check("applyBulkVerdict: dedups by (kind,id); a criterion and a case sharing a textual id are BOTH applied", () => {
+  const shared = "sameId";
+  const selected = [
+    { kind: "criterion", id: shared, lib: "L", name: "X", label: "X", currentState: "unreviewed", expectedBodyHash: "h", passable: true },
+    { kind: "criterion", id: shared, lib: "L", name: "X", label: "X", currentState: "unreviewed", expectedBodyHash: "h", passable: true }, // dup
+    { kind: "case", id: shared, label: "c", currentState: "unreviewed", live: true },
+  ];
+  const r = applyBulkVerdict(selected, "fail", {
+    criterionVerdicts: {},
+    reviewByCaseId: {},
+    liveCriteria: new Map([[shared, { bodyHash: "h", elided: false }]]),
+    liveCaseIds: new Set([shared]),
+  });
+  assert.deepEqual(r.applied, [{ kind: "criterion", id: shared }, { kind: "case", id: shared }]); // dup dropped; both kinds kept
+  assert.equal(r.criterionVerdicts[shared].state, "fail");
+  assert.equal(r.reviewByCaseId[shared], "fail");
+});
+
+// ── #(bulk-verdict) round-2 gap tests (disc 344 matrix + impl panel) ────────────────────────────────────────────────
+check("unsettledReviewItems: a LIVE fail case is excluded (settled); an elided criterion with NO stored verdict is unreviewed + not-passable; orphan pass/pending included", () => {
+  const items = unsettledReviewItems({
+    criteria: [gc("L", "ElidedNew", "h", true)], // elided, NO stored verdict → unreviewed (the !stored check precedes elided) + passable:false
+    criterionVerdicts: {},
+    liveCaseIds: ["live"],
+    reviewByCaseId: { live: "fail", orphA: "pass", orphB: "pending" }, // live fail → excluded; both orphans → included
+    caseLabel: (id) => id,
+  });
+  assert.deepEqual(
+    items.map((i) => (i.kind === "criterion" ? `${i.name}:${i.currentState}:${i.passable}` : `${i.id}:${i.currentState}:${i.live}`)),
+    ["ElidedNew:unreviewed:false", "orphA:pass:false", "orphB:pending:false"],
+  );
+});
+
+check("unsettledReviewItems: a duplicated liveCaseId yields ONE row (deduped by the live set)", () => {
+  const items = unsettledReviewItems({ criteria: [], criterionVerdicts: {}, liveCaseIds: ["c", "c", "c"], reviewByCaseId: {}, caseLabel: (id) => id });
+  assert.equal(items.filter((i) => i.id === "c").length, 1);
+});
+
+check("computeCriterionVerdictUpdate: pending + clear also apply through an elided body (only PASS is refused)", () => {
+  const pend = computeCriterionVerdictUpdate({}, "k", "pending", "h", { bodyHash: "h", elided: true }, true);
+  assert.equal(pend.ok && pend.map.k.state, "pending");
+  const clr = computeCriterionVerdictUpdate({ k: { state: "fail", bodyHash: "h" } }, "k", "unreviewed", "h", { bodyHash: "h", elided: true }, true);
+  assert.deepEqual(clr.ok && clr.map, {});
+});
+
+check("applyBulkVerdict: current-elision MOVED since enumeration — an item enumerated passable now refuses a PASS at apply", () => {
+  const key = criterionVerdictKey("L", "WasFine");
+  const selected = [{ kind: "criterion", id: key, lib: "L", name: "WasFine", label: "WasFine", currentState: "unreviewed", expectedBodyHash: "h", passable: true }];
+  const r = applyBulkVerdict(selected, "pass", {
+    criterionVerdicts: {},
+    reviewByCaseId: {},
+    liveCriteria: new Map([[key, { bodyHash: "h", elided: true }]]), // became elided since the list opened (same hash)
+    liveCaseIds: new Set(),
+  });
+  assert.deepEqual(r.skipped, [{ ref: { kind: "criterion", id: key }, reason: "elided" }]); // apply-time elision honored, not the snapshot
+  assert.equal(r.applied.length, 0);
+});
+
+check("applyBulkVerdict: a case enumerated LIVE that vanished before apply is skipped not-live (a verdict); a MIXED batch applies the rest", () => {
+  const key = criterionVerdictKey("L", "OK");
+  const selected = [
+    { kind: "criterion", id: key, lib: "L", name: "OK", label: "OK", currentState: "unreviewed", expectedBodyHash: "h", passable: true },
+    { kind: "case", id: "gone", label: "gone", currentState: "unreviewed", live: true }, // was live at enum, absent at apply
+    { kind: "case", id: "here", label: "here", currentState: "pending", live: true },
+  ];
+  const r = applyBulkVerdict(selected, "pass", {
+    criterionVerdicts: {},
+    reviewByCaseId: { here: "pending" },
+    liveCriteria: new Map([[key, { bodyHash: "h", elided: false }]]),
+    liveCaseIds: new Set(["here"]), // "gone" no longer live
+  });
+  assert.deepEqual(r.skipped, [{ ref: { kind: "case", id: "gone" }, reason: "not-live" }]);
+  assert.deepEqual(r.applied.map((a) => a.id).sort(), [key, "here"].sort());
+  assert.equal(r.criterionVerdicts[key].state, "pass");
+  assert.equal(r.reviewByCaseId.here, "pass");
+  assert.equal(r.reviewByCaseId.gone, undefined); // NOT minted
+  assert.equal(r.changed, 2);
+});
+
+check("applyBulkVerdict: a case re-applied its stored verdict is applied but changed=false (host messages from changed)", () => {
+  const r = applyBulkVerdict([{ kind: "case", id: "c", label: "c", currentState: "pass", live: true }], "pass", {
+    criterionVerdicts: {},
+    reviewByCaseId: { c: "pass" },
+    liveCriteria: new Map(),
+    liveCaseIds: new Set(["c"]),
+  });
+  assert.deepEqual(r.applied, [{ kind: "case", id: "c" }]);
+  assert.equal(r.changed, 0);
+});
+
+check("COMPOSITION: enumerate → select-all → applyBulkVerdict('pass') → re-enumerate: passable items are bought off; an elided criterion + an orphan case REMAIN", () => {
+  const criteria = [gc("L", "A", "h"), gc("L", "B", "h"), gc("L", "Elided", "h", true)];
+  const liveCriteria = new Map(criteria.map((c) => [c.key, { bodyHash: c.bodyHash, elided: c.elided }]));
+  const criterionVerdicts0 = {};
+  const reviewByCaseId0 = { orphan: "pass" }; // an orphan (not in liveCaseIds)
+  const liveCaseIds = ["case1"];
+  const enumArgs = (cv, rc) => ({ criteria, criterionVerdicts: cv, liveCaseIds, reviewByCaseId: rc, caseLabel: (id) => id });
+
+  const items1 = unsettledReviewItems(enumArgs(criterionVerdicts0, reviewByCaseId0));
+  // unsettled: A, B, Elided (criteria) + case1 (unreviewed) + orphan
+  assert.equal(items1.length, 5);
+
+  const r = applyBulkVerdict(items1, "pass", { criterionVerdicts: criterionVerdicts0, reviewByCaseId: reviewByCaseId0, liveCriteria, liveCaseIds: new Set(liveCaseIds) });
+  // A, B, case1 pass (3 applied+changed); Elided skipped (elided); orphan skipped (not-live for a pass)
+  assert.equal(r.changed, 3);
+  assert.deepEqual(r.skipped.map((s) => s.reason).sort(), ["elided", "not-live"]);
+
+  const items2 = unsettledReviewItems(enumArgs(r.criterionVerdicts, r.reviewByCaseId));
+  // ONLY the un-buy-offable remain: the elided criterion (still stale) + the orphan (still there)
+  assert.deepEqual(
+    items2.map((i) => (i.kind === "criterion" ? `crit:${i.name}` : `case:${i.id}`)).sort(),
+    ["case:orphan", "crit:Elided"],
+  );
+  // and CLEARING the orphan removes it from the queue next time
+  const r2 = applyBulkVerdict([items2.find((i) => i.kind === "case")], "unreviewed", { criterionVerdicts: r.criterionVerdicts, reviewByCaseId: r.reviewByCaseId, liveCriteria, liveCaseIds: new Set(liveCaseIds) });
+  const items3 = unsettledReviewItems(enumArgs(r.criterionVerdicts, r2.reviewByCaseId));
+  assert.deepEqual(items3.map((i) => i.kind === "criterion" ? i.name : i.id), ["Elided"]); // only the elided criterion (un-passable by design) remains
 });

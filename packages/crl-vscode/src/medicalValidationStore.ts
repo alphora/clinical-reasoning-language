@@ -513,6 +513,177 @@ export function criterionVerdictState(
   return stored.state;
 }
 
+// ── Bulk verdict buy-off — the pure model (the "CRL: Review verdicts…" command consumes it) ──────────────────────────
+// A reviewer sets many MV verdicts at once from a multi-select checklist. This is the vscode-free half: enumerate the
+// UNSETTLED items (a work QUEUE — NOT "everything that gates mvComplete": a settled FAIL still gates but is a decision,
+// not a to-do, so an empty queue does NOT imply mvComplete) and compute the new verdict maps for a bulk apply. The host
+// (correspondenceCockpit) persists ONCE via `persistMv` + repaints. Verdicts stay bodyHash-stamped + staleness-aware.
+// The bulk `pass` is a BUY-OFF: the reviewer attests from a label (not an in-situ body) on the presumption they reviewed
+// bodies in the flow — the operator-approved semantic loosening of this feature (the per-criterion right-click stays).
+
+/** A stable, kind-tagged reference to a review item — NOT a bare string (a caseId can equal a criterionVerdictKey). */
+export type ReviewItemRef = { kind: "criterion" | "case"; id: string };
+
+/** Why a bulk selection was NOT applied. `not-live` = the criterion/case left the model since the list opened;
+ *  `body-changed` = a criterion's body moved since the list opened (refuse ALL verdicts — never attest an unseen body,
+ *  disc 320); `elided` = a `pass` on a criterion whose CURRENT canonical body is a `…` (can't attest what can't render). */
+export type BulkSkipReason = "not-live" | "body-changed" | "elided";
+
+/** One checklist row. A criterion carries its concurrency snapshot (`expectedBodyHash` captured at enumeration) + its
+ *  passability; a case its live-ness (`live=false` ⇒ an ORPHAN — a stored verdict whose case left the reviewable set,
+ *  which gates via `stale` and is clear-only). `id` is the pure setter key (criterionVerdictKey / caseId). */
+export type ReviewItem =
+  | {
+      kind: "criterion";
+      id: string;
+      lib: string;
+      name: string;
+      label: string;
+      currentState: CriterionVerdictUiState;
+      expectedBodyHash: string;
+      passable: boolean; // !elided — an elided criterion can't take a `pass`
+    }
+  | {
+      kind: "case";
+      id: string;
+      label: string;
+      currentState: ReviewState;
+      live: boolean; // false ⇒ orphan (case gone; clear-only)
+    };
+
+/** A criterion gate identity as the enumerator needs it — the render-INDEPENDENT `lib`/`name`/canonical `bodyHash`/
+ *  `elided` (i.e. `criterionGateIdentities` flattened to a plain shape, decoupled from the crl package's types). */
+export interface GatedCriterion {
+  key: string; // criterionVerdictKey(lib, name)
+  lib: string;
+  name: string;
+  bodyHash: string;
+  elided: boolean;
+}
+
+/** Enumerate the UNSETTLED review items — the checklist's contents (deterministic order: criteria in the given gate-walk
+ *  order, then live cases in `liveCaseIds` order, then orphans in `reviewByCaseId` key order). Criteria with state
+ *  unreviewed | pending | stale (a fresh pass/fail is settled → excluded); live cases unreviewed | pending; and every
+ *  ORPHAN case verdict (a `reviewByCaseId` key not in `liveCaseIds`) — clear-only, but surfaced so the reviewer can
+ *  unblock the gate it silently holds. An empty result does NOT imply `mvComplete` (a settled fail still gates). */
+export function unsettledReviewItems(input: {
+  criteria: readonly GatedCriterion[];
+  criterionVerdicts: Record<string, PersistedCriterionVerdict>;
+  liveCaseIds: readonly string[];
+  reviewByCaseId: Record<string, PersistedReviewState>;
+  caseLabel: (caseId: string) => string;
+}): ReviewItem[] {
+  const items: ReviewItem[] = [];
+  for (const c of input.criteria) {
+    const state = criterionVerdictState(input.criterionVerdicts[c.key], { bodyHash: c.bodyHash, elided: c.elided });
+    if (state === "pass" || state === "fail") continue; // settled → nothing to buy off
+    items.push({ kind: "criterion", id: c.key, lib: c.lib, name: c.name, label: c.name, currentState: state, expectedBodyHash: c.bodyHash, passable: !c.elided });
+  }
+  const liveSet = new Set(input.liveCaseIds);
+  for (const caseId of liveSet) { // iterate the DEDUPED set (a duplicated liveCaseId must not yield a duplicate row)
+    const state = input.reviewByCaseId[caseId] ?? "unreviewed";
+    if (state === "pass" || state === "fail") continue;
+    items.push({ kind: "case", id: caseId, label: input.caseLabel(caseId), currentState: state, live: true });
+  }
+  for (const caseId of Object.keys(input.reviewByCaseId)) {
+    if (liveSet.has(caseId)) continue; // an orphan: a stored verdict whose case left the reviewable set (gates via `stale`)
+    items.push({ kind: "case", id: caseId, label: input.caseLabel(caseId), currentState: input.reviewByCaseId[caseId], live: false });
+  }
+  return items;
+}
+
+/** The SHARED pure criterion-verdict update — used by BOTH the single right-click path (`applyCriterionVerdict`) and the
+ *  bulk path, so the hash + elision guards live in ONE place. Refuses ALL verdicts on a body-hash mismatch (never attest a
+ *  body the reviewer didn't see, disc 320); refuses a `pass` when `refusePassElided` (single: the in-situ occurrence was
+ *  truncated; bulk: the CURRENT canonical body is elided). `changed` = whether the STORED verdict actually moved. */
+export type CriterionVerdictUpdate =
+  | { ok: true; map: Record<string, PersistedCriterionVerdict>; changed: boolean }
+  | { ok: false; reason: BulkSkipReason };
+export function computeCriterionVerdictUpdate(
+  map: Record<string, PersistedCriterionVerdict>,
+  key: string,
+  verdict: ReviewState,
+  expectedBodyHash: string,
+  live: LiveCriterion | undefined,
+  refusePassElided: boolean,
+): CriterionVerdictUpdate {
+  if (!live) return { ok: false, reason: "not-live" };
+  if (expectedBodyHash !== live.bodyHash) return { ok: false, reason: "body-changed" }; // refuse ALL (precedes the value check)
+  if (verdict === "pass" && refusePassElided) return { ok: false, reason: "elided" };
+  const prev = map[key];
+  const next = setCriterionVerdict(map, key, verdict, live.bodyHash);
+  const changed = verdict === "unreviewed" ? prev !== undefined : prev?.state !== verdict || prev?.bodyHash !== live.bodyHash;
+  return { ok: true, map: next, changed };
+}
+
+export interface BulkVerdictResult {
+  criterionVerdicts: Record<string, PersistedCriterionVerdict>;
+  reviewByCaseId: Record<string, PersistedReviewState>;
+  applied: ReviewItemRef[];
+  skipped: { ref: ReviewItemRef; reason: BulkSkipReason }[];
+  changed: number; // how many items' STORED verdict actually moved (the host uses it to decide persist + messaging)
+}
+
+/** Apply one `verdict` to a SELECTED set of review items — BEST EFFORT: eligible items applied, ineligible returned in
+ *  `skipped[]`. Re-validates against the LIVE model at apply time (not the enumeration snapshot): a criterion absent /
+ *  body-moved / (for a pass) currently elided is skipped; a case verdict on a non-live case is skipped UNLESS it's a
+ *  clear (`unreviewed` deletes an orphan). Deduped by (kind,id). PURE — the caller persists ONCE + repaints.
+ *
+ *  ⚠ The host MUST pass the SAME live sets the queue was enumerated from + `mvComplete` gates on, or single/bulk drift:
+ *    - `liveCriteria` = the GATE set (`criterionGateIdentities` / `buildLiveCriterionIdentities`), NOT the full declared
+ *      inventory — so `not-live` means "left the gate", matching `unsettledReviewItems`/`criterionProgress`.
+ *    - `liveCaseIds` = the REVIEWABLE frozen cases (`scenarioByCaseId` keys, ≡ `reviewProgress`'s set) — passing anything
+ *      broader (unreviewable / ambiguous cases) would let a verdict be written that `reviewProgress` then counts as a
+ *      gate-blocking `stale` orphan: the one way bulk could WORSEN the gate it clears.
+ *  `applied[]` includes value-level NO-OPS (re-applying the stored verdict); the host messages from `changed` (actual
+ *  mutations), NOT `applied.length`. A criterion whose declaration is GONE is refused for EVERY verdict incl. `unreviewed`
+ *  (asymmetric with the case-orphan clear) — deliberate: a deleted criterion doesn't gate (`criterionProgress` tallies
+ *  live identities only) and its stored verdict revives correctly if the criterion returns with the same body. */
+export function applyBulkVerdict(
+  selected: readonly ReviewItem[],
+  verdict: ReviewState,
+  ctx: {
+    criterionVerdicts: Record<string, PersistedCriterionVerdict>;
+    reviewByCaseId: Record<string, PersistedReviewState>;
+    liveCriteria: ReadonlyMap<string, LiveCriterion>; // the GATE set (see above), NOT the full declared inventory
+    liveCaseIds: ReadonlySet<string>; // the REVIEWABLE frozen cases (scenarioByCaseId keys), see above
+  },
+): BulkVerdictResult {
+  let criterionVerdicts = ctx.criterionVerdicts;
+  let reviewByCaseId = ctx.reviewByCaseId;
+  const applied: ReviewItemRef[] = [];
+  const skipped: { ref: ReviewItemRef; reason: BulkSkipReason }[] = [];
+  let changed = 0;
+  const seen = new Set<string>();
+  for (const item of selected) {
+    const dedupKey = JSON.stringify([item.kind, item.id]);
+    if (seen.has(dedupKey)) continue; // dedup by (kind,id), first-selection order
+    seen.add(dedupKey);
+    const ref: ReviewItemRef = { kind: item.kind, id: item.id };
+    if (item.kind === "criterion") {
+      const live = ctx.liveCriteria.get(item.id);
+      const upd = computeCriterionVerdictUpdate(criterionVerdicts, item.id, verdict, item.expectedBodyHash, live, live?.elided ?? false);
+      if (!upd.ok) {
+        skipped.push({ ref, reason: upd.reason });
+        continue;
+      }
+      criterionVerdicts = upd.map;
+      applied.push(ref);
+      if (upd.changed) changed++;
+    } else {
+      if (verdict !== "unreviewed" && !ctx.liveCaseIds.has(item.id)) {
+        skipped.push({ ref, reason: "not-live" }); // a verdict on a vanished case would MINT a gate-blocking orphan
+        continue;
+      }
+      const prev = reviewByCaseId[item.id];
+      reviewByCaseId = setReviewState(reviewByCaseId, item.id, verdict); // "unreviewed" clears (allowed for an orphan)
+      applied.push(ref);
+      if (verdict === "unreviewed" ? prev !== undefined : prev !== verdict) changed++;
+    }
+  }
+  return { criterionVerdicts, reviewByCaseId, applied, skipped, changed };
+}
+
 /** The criterion-review progress readout — tallied over the LIVE rendered single-criterion identities (deduped by key;
  *  N occurrences of one criterion = ONE identity). `passed` counts only FRESH passes (a stale-or-changed pass is NOT
  *  passed — it's `stale`). Mirrors `ReviewProgress`'s shape; `total = identities.size`.

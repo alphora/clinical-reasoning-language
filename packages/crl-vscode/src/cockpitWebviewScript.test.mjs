@@ -731,16 +731,16 @@ check("#224 Slice 2b host: driveCriterionVerdicts groups occurrences by IDENTITY
   assert.match(COCKPIT_SRC, /if \(s !== "unreviewed"\) byState\[s\]\.push\(occ\.gid\)/);
   assert.match(COCKPIT_SRC, /type: "criterionVerdicts", gen: tree\.gen, allGids, byState/);
 });
-check("#233 Todo 2b host: applyCriterionVerdict is keyed by (lib,name), RE-RESOLVES the live canonical bodyHash (stale rebuild no-ops) + persists the 3rd map", () => {
+check("#233/#(bulk-verdict) host: applyCriterionVerdict DELEGATES the guard policy to the SHARED computeCriterionVerdictUpdate (single + bulk share it) + persists the 3rd map with upd.map", () => {
   assert.match(COCKPIT_SRC, /function applyCriterionVerdict\(lib: string, name: string, value: unknown, expectedBodyHash: string, seenElided: boolean\)/);
-  assert.match(COCKPIT_SRC, /const live = criterionIdentities\.get\(key\)/);
-  assert.match(COCKPIT_SRC, /setCriterionVerdict\(criterionVerdicts, key, value, live\.bodyHash\)/);
-  assert.match(COCKPIT_SRC, /persistMv\(reviewByCaseId, notesByCaseId, next\)/);
+  // The hash/elision guards (refuse-ALL on a moved hash; refuse a PASS on a seen-elided body) moved into the shared pure
+  // computeCriterionVerdictUpdate — behaviorally pinned in medicalValidationStore.test.mjs. The single path passes the
+  // live canonical identity + its IN-SITU `seenElided` as the elision source.
+  assert.match(COCKPIT_SRC, /computeCriterionVerdictUpdate\(criterionVerdicts, key, value, expectedBodyHash, criterionIdentities\.get\(key\), seenElided\)/);
+  assert.match(COCKPIT_SRC, /if \(!upd\.ok\) return false/);
+  assert.match(COCKPIT_SRC, /persistMv\(reviewByCaseId, notesByCaseId, upd\.map\)/);
 });
-check("#233 Todo 2b host: applyCriterionVerdict refuses (a) a STALE-body write (expectedBodyHash vs live hash) and (b) a PASS on a SEEN-ELIDED body — no false attestation", () => {
-  assert.match(COCKPIT_SRC, /if \(expectedBodyHash !== live\.bodyHash\) return false/); // expectedBodyHash now REQUIRED (no `!== undefined` guard)
-  assert.match(COCKPIT_SRC, /if \(value === "pass" && seenElided\) return false/); // disc 330 [critical]: can't attest an unseen (…) body
-  // the encoding menu resolves identity + in-situ elided via resolveCriterionFromReveal, captures the seen hash + sidecar at OPEN, guards across the pick await
+check("#233 Todo 2b host: the criterion-encoding menu captures the seen hash + in-situ elided + sidecar at OPEN and guards across the pick await (the guard POLICY is the shared computeCriterionVerdictUpdate)", () => {
   assert.match(COCKPIT_SRC, /const ident = resolveCriterionFromReveal\(revealKey\)/);
   assert.match(COCKPIT_SRC, /const openHash = ident\.bodyHash;/);
   assert.match(COCKPIT_SRC, /const seenElided = ident\.elided \|\| liveFacts\.elided/);
