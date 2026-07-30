@@ -404,7 +404,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let conceptLayer: CrlConceptNode[] = [];
   let conceptShape: ConceptShapeIndex = new Map(); // #187 Todo 3: per-concept `defined as` shape subtrees (leaf expansion)
   let defExpr: DefExprIndex = new Map(); // #187 Option-3: per-concept `defined as` OPERATOR tree (questionnaire box render)
-  let guardOutlines: Map<string, GuardOutline> = new Map(); // #224 ii.3 Todo 3: criterion-when guard outlines (Flow pane)
+  let guardOutlines: Map<string, GuardOutline> = new Map(); // #224 ii.3 Todo 3 / #242: compound-when guard outlines (Flow pane)
   let criterionIdentities: Map<string, CriterionIdentity> = new Map(); // #233 Todo 2b: canonical criterion inventory (gate/verdict identity source)
   // #(tree-snapshot) Todo 2 — the one-shot host↔webview capture coordinator (the host doesn't hold the tree DOM; it asks the
   // webview for `#root`). Single-flight, settle-once; the pure state machine lives in snapshotCapture.ts.

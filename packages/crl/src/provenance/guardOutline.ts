@@ -7,6 +7,11 @@
  * — following criterion refs INTO their bodies — into the SAME `DefStructExpr` the flow already renders, so a
  * criterion body becomes visible with ZERO new render type (`buildOutline` consumes it unchanged).
  *
+ * #242 broadened the producer (`buildGuardOutlines`) from criterion-bearing guards ONLY to EVERY compound guard
+ * (`and`/`or`/`not`) — a plain compound guard of bare refs used to render as one opaque node, hiding structure the
+ * questionnaire pane already decomposes. Same converter, same render type; a criterion-free compound simply yields
+ * an outline with no `criterion` nodes (purely visual — inert for the verdict/gate consumers).
+ *
  * Slice 1 = VISIBILITY: the criterion body renders expanded, INLINED (a nested criterion's body is spliced in
  * with no named sub-group — the questionnaire's first-class named `criterion` wrapper is Slice 2, which will
  * need its own type; do NOT read the "no DefStructExpr variant" choice here as settled beyond Slice 1).
@@ -20,7 +25,7 @@
  */
 import { createHash } from "node:crypto";
 
-import { buildCriterionTable, containsCriterionRef, expandedSize, type CriterionTable } from "../ast/criterionExpansion";
+import { buildCriterionTable, expandedSize, type CriterionTable } from "../ast/criterionExpansion";
 import { decisionSpine } from "../ast/decisionSpine";
 import type { BranchCondition, BranchConditionCriterionRef, ReferenceName, WhenBlock } from "../ast/types";
 import { getRefLibrary, getRefName, isQualifiedRef, normalizeLocalRef } from "../ast/types";
@@ -201,19 +206,27 @@ export function branchConditionToDefStruct(
         };
       }
     }
+    // #242 exhaustiveness backstop: `buildGuardOutlines` now routes EVERY non-single-ref guard here (the closed-world
+    // default flipped from skip→convert), so a future `BranchCondition` variant MUST fail at COMPILE time — not fall
+    // through this switch returning `undefined` (→ `{expr: undefined}` crashing topCriterion/exprHasMore/the flow render;
+    // `noImplicitReturns` is off, so only this `never` assertion catches it).
+    return ((x: never) => x)(c);
   };
 
   return go(cond, new Set(), 0);
 }
 
 /**
- * Guard outlines for every criterion-bearing `when` in the covered policy + registry libraries, keyed by the
- * `when`'s structure nodeKey (join key with the Flow pane's `when` nodes). Walks decisions EXACTLY as
+ * Guard outlines for every COMPOUND (or criterion-bearing) `when` in the covered policy + registry libraries, keyed
+ * by the `when`'s structure nodeKey (join key with the Flow pane's `when` nodes). Walks decisions EXACTLY as
  * `buildCrlStructure` does — default `collectLibs(graph)`, source-order `statements` filtered to decisions, the
  * same location-less decl/sub-node skips, the non-recursive `decisionSpine`, and the shared `decisionSubNodeRef`
  * key — so every entry joins a real flow node (a walk divergence would silently miss → the dead-end would
- * persist; a parity test pins it). A criterion-free `when` is OMITTED (single-concept + plain-compound-guard
- * rendering is untouched).
+ * persist; a parity test pins it). #242: an outline is built for every guard that is NOT a single bare ref
+ * (`and`/`or`/`not`, and a sole `criterion` ref); a single bare `BranchConditionRef` is OMITTED (its single-concept
+ * rendering — branch B — is untouched). A criterion-free compound guard converts with NO criterion nodes, so the
+ * downstream verdict/gate consumers (`criterionGateIdentities`, `topCriterion`) are inert for it — it is a purely
+ * VISUAL decomposition (per-operand `leaf` rows + any `defined as` composite bodies).
  *
  * #233 BREACH-PRESERVING conversion: the former whole-guard `expandedSize` pre-gate collapsed a breaching/cyclic
  * guard to a single bare `{kind:"more"}`, ERASING every criterion NAME. What erased the names was NOT the gate — it
@@ -249,7 +262,12 @@ export function buildGuardOutlines(
         if (sn.kind !== "when") continue;
         if (!lsLoc(info.entry.filePath, sn.node.location)) continue; // mirror the per-sub-node skip
         const cond = (sn.node as WhenBlock).condition;
-        if (!containsCriterionRef(cond)) continue; // only criterion-bearing whens
+        // #242: build an outline for EVERY guard that is not a single bare ref. A single `BranchConditionRef` (Source
+        // OR `defined as`) is skipped here and rendered by the flow's single-concept path (branch B, `refKeys===1`) —
+        // byte-unchanged. Everything else — `and`/`or`/`not` (incl. a `not`-over-single-ref) AND a sole
+        // `BranchConditionCriterionRef` — gets a decomposed outline. (Was: `!containsCriterionRef(cond)` — criterion
+        // keyword only, which collapsed plain compound guards to one opaque node, hiding real decision structure.)
+        if (cond.type === "BranchConditionRef") continue;
         const key = nodeKey(decisionSubNodeRef(lib, s.name, sn.nodeId));
         // Host safety: on a whole-guard envelope BREACH, convert at hop budget 0 (names survive, no DAG expansion).
         const maxHops = expandedSize(cond, criterionTable).status === "ok" ? undefined : 0;

@@ -32,9 +32,11 @@ export interface CockpitModel {
    *  sem-or/and/not tree the MV Questionnaire renders as ANY OF / ALL OF boxes. Its leafEligible leaves are
    *  drift-guarded equal to `conceptShape`'s (`collectDefExprLeafKeys` == `codeIsLeavesPreorder`). */
   defExpr: DefExprIndex;
-  /** #224 ii.3 Todo 3: guard OUTLINE per criterion-bearing `when`, keyed by the `when`'s structure nodeKey — the
-   *  Flow pane hangs it as the `defined as`-style operator outline (so a criterion body is visible, not a dead-end).
-   *  Only criterion-bearing whens (and only envelope-safe ones); a single-concept / plain-compound guard is absent. */
+  /** #224 ii.3 Todo 3 / #242: guard OUTLINE per COMPOUND (or criterion-bearing) `when`, keyed by the `when`'s structure
+   *  nodeKey — the Flow pane hangs it as the `defined as`-style operator outline (so a compound guard's operands + any
+   *  criterion / `defined as` body are visible, not one opaque node). Every guard EXCEPT a single bare ref (which the
+   *  single-concept path renders); a host-safety BREACH still yields a truthy outline (#233 hop-budget-0 named elided
+   *  nodes), never an omission. A criterion-free compound carries no criterion nodes. */
   guardOutlines: Map<string, GuardOutline>;
   /** #233 Todo 2b: the render-INDEPENDENT canonical criterion inventory — one entry per DECLARED criterion (keyed by
    *  `criterionKey(lib,name)`), with its canonical body fingerprint + `elided`. The MV criterion-verdict GATE + chip
@@ -92,7 +94,7 @@ export function buildCockpitModelFromResolved(
   // built ONCE and threaded into `buildGuardOutlines` so the criterion nodes' STAMPED bodyHash == the gate's inventory hash
   // structurally (one value), and a second expansion pass is dropped (disc 330 nit).
   const criterionIdentities = buildCriterionIdentities(r.graph, defExpr);
-  // #224 ii.3 Todo 3: guard outlines for criterion-bearing whens (Flow pane), resolved against the same defExpr index.
+  // #224 ii.3 Todo 3 / #242: guard outlines for every compound (or criterion-bearing) when (Flow pane), same defExpr index.
   const guardOutlines = buildGuardOutlines(r.graph, defExpr, criterionIdentities);
 
   return {

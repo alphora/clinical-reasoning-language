@@ -48,7 +48,7 @@ case "c":
 - result is "D" is "X".`;
 
 // A criterion (`Elig` = `Inf and C`, where `Inf` is a `defined as` composite `A sem-or B`) plus a PLAIN compound
-// guard (`A and C`, no criterion) — so the omit-non-criterion line is exercised in one fixture.
+// guard (`A and C`, no criterion) — #242: the plain compound now ALSO gets an outline (it is no longer omitted).
 const CRL = `library "T".
 concept "A":
 - type is Observation.
@@ -72,22 +72,29 @@ first:
 - when ( "A" and "C" ) then recommend activity "X".
 - otherwise then recommend activity "X".`;
 
-describe("buildGuardOutlines — criterion-bearing when → guard outline (Flow pane, #224 ii.3 Todo 3)", () => {
-  it("keys ONLY criterion-bearing whens, by the structure when-nodeKey (parity with buildCrlStructure)", () => {
+describe("buildGuardOutlines — compound / criterion when → guard outline (Flow pane, #224 ii.3 Todo 3 / #242)", () => {
+  it("keys every compound (or criterion) when — incl. a PLAIN compound guard (#242) — by the structure when-nodeKey; otherwise absent", () => {
     const graph = graphFrom(CRL, CEL);
     const outlines = buildGuardOutlines(graph, defIndexOf(graph));
 
-    // Exactly the criterion when (when[0]); the plain compound guard when[1] and the otherwise are absent.
+    // #242: BOTH the criterion when (when[0]) AND the plain compound guard when[1] (`A and C`) get an outline; the
+    // single-ref whens (there are none here) and the `otherwise` are absent.
     const eligKey = nodeKey(decisionSubNodeRef("T", "D", "when[0]"));
     const compoundKey = nodeKey(decisionSubNodeRef("T", "D", "when[1]"));
-    expect([...outlines.keys()]).toEqual([eligKey]);
-    expect(outlines.has(compoundKey)).toBe(false);
+    expect(new Set(outlines.keys())).toEqual(new Set([eligKey, compoundKey]));
 
-    // The single-criterion-ref when's identity + body fingerprint (the collapse/verdict unit) is DERIVED via topCriterion.
+    // when[0]: the single-criterion-ref when's identity + body fingerprint (collapse/verdict unit) is DERIVED via topCriterion.
     const sole = topCriterion(outlines.get(eligKey)!.expr)!;
     expect(sole.lib).toBe("T");
     expect(sole.name).toBe("Elig");
     expect(sole.bodyHash).toMatch(/^sha256:[0-9a-f]{16}$/);
+
+    // when[1]: the plain compound `A and C` → an `and` of two Source leaves, NO criterion (topCriterion undefined).
+    const compound = outlines.get(compoundKey)!.expr;
+    expect(topCriterion(compound)).toBeUndefined();
+    expect(compound.kind).toBe("and");
+    if (compound.kind !== "and") throw new Error("unreachable");
+    expect(compound.operands.map((o) => (o.kind === "leaf" ? o.name : o.kind))).toEqual(["A", "C"]);
 
     // Every key joins a real `when` node of the structure (the load-bearing cross-pane join).
     const structWhenKeys = new Set<string>();
@@ -511,5 +518,137 @@ first:
     const gate = criterionGateIdentities(buildGuardOutlines(graph, defIndex, identities), identities);
     // Inner is reachable BOTH directly (a conjunct) AND nested inside Outer's body → gated ONCE; Outer gated too.
     expect([...gate.keys()].sort()).toEqual([criterionKey("T", "Inner"), criterionKey("T", "Outer")].sort());
+  });
+});
+
+// #242: a PLAIN compound guard (no `criterion` keyword) is decomposed into an outline just like a criterion-bearing
+// one — the Tree pane must be faithful to the decision structure regardless of KE encoding. A criterion-free outline
+// carries NO criterion nodes, so it is purely VISUAL (inert for the verdict/gate consumers).
+describe("buildGuardOutlines — plain compound guard decomposition (#242, no criterion keyword required)", () => {
+  const CONCEPTS = `concept "A":
+- type is Observation.
+- code is \`a\`.
+concept "B":
+- type is Observation.
+- code is \`b\`.
+concept "Inf":
+- defined as ( "A" sem-or "B" ).`;
+  const POL = (whens: string, concepts = CONCEPTS) => `library "T".
+${concepts}
+activity "X":
+- request CPGCommunicationRequest.
+- with \`x\`.
+decision "D":
+first:
+${whens}
+- otherwise then recommend activity "X".`;
+  const when0 = (crl: string) => {
+    const graph = graphFrom(crl, CEL);
+    return buildGuardOutlines(graph, defIndexOf(graph)).get(nodeKey(decisionSubNodeRef("T", "D", "when[0]")))!.expr;
+  };
+  const names = (ops: DefStructExpr[]) => ops.map((o) => (o.kind === "leaf" ? o.name : o.kind));
+
+  it("a pure-Source compound `(A and B)` → an `and` of two Source leaves (no criterion, no composite)", () => {
+    const expr = when0(POL(`- when ( "A" and "B" ) then recommend activity "X".`));
+    expect(topCriterion(expr)).toBeUndefined();
+    expect(expr.kind).toBe("and");
+    if (expr.kind !== "and") throw new Error("unreachable");
+    expect(names(expr.operands)).toEqual(["A", "B"]);
+    for (const o of expr.operands) {
+      expect(o.kind).toBe("leaf");
+      if (o.kind !== "leaf") throw new Error("unreachable");
+      expect(o.isSource).toBe(true);
+      expect(o.composite).toBeUndefined();
+    }
+  });
+
+  it("single bare refs are STILL omitted — a Source ref AND a `defined as` ref get NO outline (branch B renders them)", () => {
+    const graph = graphFrom(POL(`- when "A" then recommend activity "X".\n- when "Inf" then recommend activity "X".`), CEL);
+    // `when A` (source) and `when Inf` (defined-as) are BOTH single BranchConditionRefs → omitted here (single-concept path).
+    expect(buildGuardOutlines(graph, defIndexOf(graph)).size).toBe(0);
+  });
+
+  it("a mixed compound `(A and Inf)` hangs the `defined as` operand's composite body (bare ref → leaf-with-composite)", () => {
+    const expr = when0(POL(`- when ( "A" and "Inf" ) then recommend activity "X".`));
+    expect(expr.kind).toBe("and");
+    if (expr.kind !== "and") throw new Error("unreachable");
+    const [a, inf] = expr.operands;
+    expect(a.kind === "leaf" && a.isSource).toBe(true);
+    expect(a.kind === "leaf" && a.composite).toBeUndefined();
+    expect(inf.kind).toBe("leaf");
+    if (inf.kind !== "leaf") throw new Error("unreachable");
+    expect(inf.name).toBe("Inf");
+    expect(inf.isInferred).toBe(true);
+    expect(inf.composite?.kind).toBe("or"); // A sem-or B hangs below the leaf
+    const or = inf.composite as Extract<DefStructExpr, { kind: "or" }>;
+    expect(names(or.operands)).toEqual(["A", "B"]);
+  });
+
+  it("an `or` compound → an `or` outline", () => {
+    const expr = when0(POL(`- when ( "A" or "B" ) then recommend activity "X".`));
+    expect(expr.kind).toBe("or");
+    if (expr.kind !== "or") throw new Error("unreachable");
+    expect(names(expr.operands)).toEqual(["A", "B"]);
+  });
+
+  it("a `not X` single-ref negation → a `not` outline (no longer masquerades as the positive concept X)", () => {
+    const expr = when0(POL(`- when not "A" then recommend activity "X".`));
+    expect(topCriterion(expr)).toBeUndefined();
+    expect(expr.kind).toBe("not");
+    if (expr.kind !== "not") throw new Error("unreachable");
+    expect(expr.operand.kind).toBe("leaf");
+    expect(expr.operand.kind === "leaf" && expr.operand.name).toBe("A");
+  });
+
+  it("a `not ( A or B )` guard → not(or(leaf A, leaf B)) — nested Boolean under the negation is decomposed", () => {
+    const expr = when0(POL(`- when not ( "A" or "B" ) then recommend activity "X".`));
+    expect(expr.kind).toBe("not");
+    if (expr.kind !== "not") throw new Error("unreachable");
+    expect(expr.operand.kind).toBe("or");
+    const or = expr.operand as Extract<DefStructExpr, { kind: "or" }>;
+    expect(names(or.operands)).toEqual(["A", "B"]);
+  });
+
+  it("a `not Crit` guard → not(criterion node) — the criterion stays a first-class boundary AND is reached by the verdict gate", () => {
+    const concepts = `${CONCEPTS}\ncriterion "Crit":\n- when "A".`;
+    const graph = graphFrom(POL(`- when not "Crit" then recommend activity "X".`, concepts), CEL);
+    const defIndex = defIndexOf(graph);
+    const identities = buildCriterionIdentities(graph, defIndex);
+    const expr = buildGuardOutlines(graph, defIndex, identities).get(nodeKey(decisionSubNodeRef("T", "D", "when[0]")))!.expr;
+    expect(expr.kind).toBe("not");
+    if (expr.kind !== "not") throw new Error("unreachable");
+    expect(expr.operand.kind).toBe("criterion");
+    expect(expr.operand.kind === "criterion" && expr.operand.name).toBe("Crit");
+    // A criterion under `not` is still gated (criterionGateIdentities recurses the `not` arm) — verdict-able as usual.
+    const gate = criterionGateIdentities(buildGuardOutlines(graph, defIndex, identities), identities);
+    expect([...gate.keys()]).toEqual([criterionKey("T", "Crit")]);
+  });
+
+  it("N5: a compound with a cross-library operand degrades THAT operand to an `external` stub (graceful)", () => {
+    const expr = when0(POL(`- when ( "A" and "Other Lib"."G" ) then recommend activity "X".`));
+    expect(expr.kind).toBe("and");
+    if (expr.kind !== "and") throw new Error("unreachable");
+    const [a, g] = expr.operands;
+    expect(a.kind === "leaf" && a.name).toBe("A");
+    expect(g).toEqual({ kind: "external", name: "G", lib: "Other Lib" });
+  });
+
+  it("criterionGateIdentities is EMPTY for a criterion-free compound — an outline IS built, but NO criterion is gated (mvComplete untouched)", () => {
+    const graph = graphFrom(POL(`- when ( "A" and "B" ) then recommend activity "X".`), CEL);
+    const defIndex = defIndexOf(graph);
+    const identities = buildCriterionIdentities(graph, defIndex);
+    const outlines = buildGuardOutlines(graph, defIndex, identities);
+    expect(outlines.size).toBeGreaterThan(0); // the compound DID get an outline …
+    expect([...criterionGateIdentities(outlines, identities).keys()]).toEqual([]); // … but it gates no criterion
+  });
+
+  it("a WIDE plain compound is width-capped with a `+N more` stub (bounded — no criterion recursion, so linear)", () => {
+    const wide = Array.from({ length: 13 }, (_, i) => `"W${i}"`).join(" and ");
+    const concepts = Array.from({ length: 13 }, (_, i) => `concept "W${i}":\n- type is Observation.\n- code is \`w${i}\`.`).join("\n");
+    const expr = when0(POL(`- when ( ${wide} ) then recommend activity "X".`, concepts));
+    expect(expr.kind).toBe("and");
+    if (expr.kind !== "and") throw new Error("unreachable");
+    expect(expr.operands).toHaveLength(11); // DEF_EXPR_CAP(10) operands + a `more` stub
+    expect(expr.operands[10]).toEqual({ kind: "more", count: 3 });
   });
 });

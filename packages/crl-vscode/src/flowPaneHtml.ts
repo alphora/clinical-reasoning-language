@@ -360,12 +360,16 @@ function buildLaid(
     // Only a `when` IS its concept (the box carries its border). An action's guard concept is no longer resolved here —
     // Todo 2 removed the guard peek + colors an action by its DETERMINATION target, not its guard — so resolving it would
     // be dead work (the guard stays visible in the crl pane).
-    // #224 ii.3 Todo 3: a criterion-bearing `when` carries a GUARD OUTLINE (its criterion body, keyed by nodeKey).
-    // It TAKES PRECEDENCE over single-concept resolution: a sole-ref criterion (`criterion C: when A`) flattens to
-    // `refKeys=[A]` (length 1) — resolving `conceptRef` would masquerade the box as concept A (border/peek/label)
-    // AND double-hang A's own `defined as` outline beside the guard outline. Gating `conceptRef` on `!guardOutline`
-    // suppresses the concept identity entirely (neutral border, no peek, the label falls back to the criterion name)
-    // and leaves the guard outline the SOLE outline source (disc 318 [critical] 1).
+    // #224 ii.3 Todo 3 / #242: a COMPOUND (or criterion-bearing) `when` carries a GUARD OUTLINE (its decomposed
+    // operands, keyed by nodeKey). It TAKES PRECEDENCE over single-concept resolution: a sole-ref criterion
+    // (`criterion C: when A`) OR a `not X` guard flattens to `refKeys=[…]` (length 1) — resolving `conceptRef` would
+    // masquerade the box as that concept (border/peek/label) AND double-hang its `defined as` outline beside the guard
+    // outline. Gating `conceptRef` on `!guardOutline` suppresses the concept identity entirely (neutral border, no peek,
+    // the label falls back to the guard text) and leaves the guard outline the SOLE outline source (disc 318 [critical] 1).
+    // #242 NOTE: this is why a single-ref `not X` intentionally loses its (wrong) positive-concept identity. The CONCEPT
+    // X becomes a `conceptOccurrence` at its new outline leaf, so the concept-object FLAG target migrates there (works).
+    // Its left-click CASE-SELECT, though, is inert under `not` (a satisfied `when not X` has X false → the leaf never
+    // lights `.flow-leaf-yes`; pre-existing negated-leaf semantics). The box's OWN verdict/case path is unchanged.
     const guardOutline = n.kind === "when" ? opts.guardOutlines?.get(n.nodeKey) : undefined;
     // #224 ii.3 Slice 2 / #233 Todo 2b: a ROOT-criterion guard (`topCriterion(expr)` defined — the guard's TOP expr IS a
     // single criterion node) is COLLAPSIBLE via the `when` box — default collapsed, expanded only when its nodeKey is in
@@ -381,7 +385,8 @@ function buildLaid(
     // #224: only a SINGLE-ref `when` IS one concept (border/peek/outline). A
     // COMPOUND guard (>1 refKey) has no single concept — `refKeys[0]` would
     // masquerade the first operand as the whole guard, so drop the peek/border
-    // and let the display fall back to the full guard label.
+    // and let the box label fall back to the full guard text. #242: the compound's
+    // operands are now shown by its GUARD OUTLINE (hung below), not dropped.
     const conceptRef = n.kind === "when" && !guardOutline && n.refKeys.length === 1 ? n.refKeys[0] : undefined;
     const cf = conceptFields(conceptRef);
     const useDecision = n.kind === "action" && n.actionKind === "use-decision";
@@ -480,8 +485,9 @@ export function renderFlowPane(
     concepts?: CrlConceptNode[];
     /** #187 Option-C: a composite `when`'s `defined as` OPERATOR tree — the SAME shared builder the Questionnaire uses. */
     defExpr?: ResolveDefExprEntry;
-    /** #224 ii.3 Todo 3: guard outline per criterion-bearing `when` (keyed by nodeKey) — hung as the operator
-     *  outline so a criterion body is visible instead of a dead-end. Built by `buildGuardOutlines` (crl core). */
+    /** #224 ii.3 Todo 3 / #242: guard outline per COMPOUND (or criterion-bearing) `when` (keyed by nodeKey) — hung as
+     *  the operator outline so a compound guard's operands (and any criterion / `defined as` body) are visible instead
+     *  of one opaque node. Built by `buildGuardOutlines` (crl core); a single bare ref has none (branch B renders it). */
     guardOutlines?: Map<string, GuardOutline>;
     /** #224 ii.3 Slice 2: nodeKeys of criterion whens the user has EXPANDED (default: absent ⇒ collapsed). A single-
      *  criterion-ref when not listed renders `▸ <name>` with its body hidden; listed → `▾` + the Slice-1 body outline. */

@@ -827,13 +827,52 @@ check("Todo 3 scope: a single-concept when NOT in guardOutlines still hangs its 
   assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["L1", "L2"], "the single-concept defined-as outline is unchanged");
 });
 
-check("Todo 3 scope: a plain compound guard (NOT in guardOutlines) still dead-ends — Slice 1 touches only criterion whens", () => {
+check("#242: a plain compound guard (now IN guardOutlines) hangs an ALL OF outline over its operands — no masquerade, no dead-end", () => {
   const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
     node("w:cmp", "when", "when A and B", ["c:A", "c:B"], [node("a:X", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
   ] }];
   const cs = [concept("c:A", "A"), concept("c:B", "B")];
-  const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g9_", guardOutlines: new Map() });
-  assert.equal(leafRowsOf(rr.html).length, 0, "a plain compound guard hangs NO outline (still a dead-end box, Slice 1 scope)");
+  // #242: buildGuardOutlines now emits an outline for a plain compound guard (a bare `and`, NO criterion wrapper).
+  const guardOutlines = new Map([["w:cmp", gout(gand(gleaf("A", "c:A"), gleaf("B", "c:B")))]]);
+  const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g9_", guardOutlines });
+  // The compound decomposes: an ALL OF operator row over two distinct leaf rows (was: a single dead-end box).
+  assert.ok(/class="flow-outline flow-op"><text[^>]*>ALL OF</.test(rr.html), "an ALL OF operator row for the `and` guard");
+  assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["A", "B"], "both operands render as leaf rows");
+  // The when box RETAINS its structure anchor (cross-pane join intact).
+  assert.ok(rr.anchors["w:cmp"], "the compound when keeps its structure anchor");
+  // Two distinct leaf:: anchors + leafConcepts entries, each OWNED by the compound when (topWhenKey).
+  assert.equal(Object.keys(rr.anchors).filter((k) => k.startsWith("leaf::")).length, 2, "two distinct leaf:: anchors");
+  const lc = Object.entries(rr.leafConcepts);
+  assert.equal(lc.length, 2, "two leafConcepts entries (the Todo-5 verdict join surfaces both operands)");
+  assert.ok(lc.every(([, v]) => v.topWhenKey === "w:cmp"), "both leaves are owned by the compound when");
+  assert.deepEqual(lc.map(([, v]) => v.name).sort(), ["A", "B"], "leafConcepts name the two operands");
+  for (const [k] of lc) assert.ok(rr.anchors[k], `leafConcepts key ${k} has a matching anchor`);
+  // No masquerade: the when box gid is NOT registered as a concept occurrence (a compound has no single gating concept).
+  assert.ok(!rr.conceptOccurrences.some((o) => o.gid === rr.anchors["w:cmp"].scrollTo), "the compound when box does not masquerade as concept A");
+});
+
+check("#242: a `not X` single-ref guard hangs a NOT outline; the box no longer masquerades as the positive concept X", () => {
+  const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w:not", "when", "when not A", ["c:A"], [node("a:X", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
+  ] }];
+  const cs = [concept("c:A", "A")];
+  // #242: buildGuardOutlines now emits an outline for a `not` guard (was: refKeys=[A] length 1 → masqueraded as concept A).
+  const guardOutlines = new Map([["w:not", gout({ kind: "not", operand: gleaf("A", "c:A") })]]);
+  const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "gn_", guardOutlines });
+  assert.ok(/class="flow-outline flow-op"><text[^>]*>NOT</.test(rr.html), "a NOT operator row");
+  assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label), ["A"], "the negated operand A renders as a leaf (never dropped)");
+  // conceptRef is SUPPRESSED (guardOutline present) → the box is NOT concept A; A migrates to its outline leaf.
+  assert.ok(!rr.conceptOccurrences.some((o) => o.gid === rr.anchors["w:not"].scrollTo), "the `not` when box is NOT concept A (masquerade removed)");
+  // A is reachable at its new leaf row (a leaf:: anchor + leafConcepts entry owned by the not-when).
+  const lc = Object.entries(rr.leafConcepts);
+  assert.equal(lc.length, 1, "one leafConcepts entry for the negated operand");
+  assert.equal(lc[0][1].name, "A", "the operand leaf names concept A");
+  assert.equal(lc[0][1].topWhenKey, "w:not", "owned by the not-when");
+  // The POSITIVE half of the migration: A IS a rendered concept occurrence (so a concept-object flag can target it) —
+  // now at its outline LEAF gid, NOT the when box. (Its left-click case-select is inert under `not` — pinned in Todo 2.)
+  const aOcc = rr.conceptOccurrences.find((o) => o.name === "A");
+  assert.ok(aOcc, "concept A is a flaggable occurrence at its new leaf");
+  assert.notEqual(aOcc.gid, rr.anchors["w:not"].scrollTo, "A's occurrence is the leaf, not the when box (flag target migrated)");
 });
 
 // ── Slice 2b: model-level criterion verdict chip + criterionOccurrences ──────────────────────────
