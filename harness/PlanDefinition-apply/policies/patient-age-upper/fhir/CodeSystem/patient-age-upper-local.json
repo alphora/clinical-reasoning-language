@@ -1,0 +1,45 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "patient-age-upper-local",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://example.org/crl/patient-age-upper/CodeSystem/patient-age-upper-local",
+  "version": "0.0.0",
+  "name": "PatientAgeUpperLocal",
+  "title": "Patient Age Upper",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-07-30T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Patient Age Upper",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "under-21",
+      "display": "Under Twenty One"
+    },
+    {
+      "code": "at-most-21",
+      "display": "At Most Twenty One"
+    }
+  ]
+}

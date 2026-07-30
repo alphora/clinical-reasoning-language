@@ -1,0 +1,130 @@
+{
+  "resourceType": "PlanDefinition",
+  "id": "patient-age-upper-inclusive-boundary-determination",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://example.org/crl/patient-age-upper/PlanDefinition/patient-age-upper-inclusive-boundary-determination",
+  "version": "0.0.0",
+  "name": "PatientAgeUpperInclusiveBoundaryDetermination",
+  "title": "Inclusive Boundary Determination",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-07-30T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Inclusive Boundary Determination",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/plan-definition-type",
+        "code": "workflow-definition"
+      }
+    ]
+  },
+  "library": [
+    "http://example.org/crl/patient-age-upper/Library/PatientAgeUpperInterface"
+  ],
+  "action": [
+    {
+      "title": "Inclusive Boundary Determination",
+      "description": "Inclusive Boundary Determination",
+      "code": [
+        {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+              "code": "guideline-based-care"
+            }
+          ]
+        }
+      ],
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+          "valueString": "any"
+        }
+      ],
+      "action": [
+        {
+          "title": "At Most Twenty One",
+          "description": "At Most Twenty One",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "At Most Twenty One"
+              }
+            }
+          ],
+          "input": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "At Most Twenty One?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "At Most Twenty One"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/crl/patient-age-upper/StructureDefinition/patient-age-upper-at-most-twenty-one"
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/crl/patient-age-upper/PlanDefinition/patient-age-upper-certify-approve-recommendation"
+        },
+        {
+          "title": "otherwise",
+          "description": "otherwise",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/crl/patient-age-upper/PlanDefinition/patient-age-upper-not-certify-deny-recommendation"
+        }
+      ]
+    }
+  ]
+}

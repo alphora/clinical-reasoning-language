@@ -1,0 +1,53 @@
+library "Patient Age Upper".
+
+// UPPER-BOUND patient-age engine proof (#215). Two both-representation concepts (both
+// comparators) + three decisions (incl. a negated one) let one $apply per (decision,case)
+// prove each matrix cell. The engine-verified alternative to the INCORRECT `sem-not
+// "Age 21 Or Older"` complement: under closed world an unknown age evaluates FALSE (deny).
+//
+// NOTE: the COMPUTE-ONLY lane (a `definition is` with no `code is`) is proven at the CQL
+// emit level (crl unit tests, Todo 1) — a compute-only boolean returns a raw System.Boolean
+// which the layered Interface's `.satisfied()` (defined over a truth-set) cannot wrap; that
+// is a PRE-EXISTING, comparator-agnostic layered-emit limitation (the shipped `at least`
+// compute-only guard hits it identically), orthogonal to #215. So the engine proof here is
+// the BOTH-REP lane — which is exactly the KE's measured case.
+
+// both-rep EXCLUSIVE under-21
+concept "Under Twenty One":
+- type is Observation.
+- value type is boolean.
+- code is `under-21`.
+- definition is age today under 21 years.
+
+// both-rep INCLUSIVE at-most-21 (proves <= vs <: at age 21 this is TRUE, under-21 is FALSE)
+concept "At Most Twenty One":
+- type is Observation.
+- value type is boolean.
+- code is `at-most-21`.
+- definition is age today at most 21 years.
+
+decision "Pediatric Eligibility Determination":
+first:
+- when "Under Twenty One" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
+
+decision "Inclusive Boundary Determination":
+first:
+- when "At Most Twenty One" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
+
+// NEGATED both-rep: for UNKNOWN age the truth-set is empty -> FALSE -> `not FALSE` = TRUE,
+// so a decision-layer `when not <under-21>` FIRES for unknown age (treats unknown as
+// not-under-21). This is the AUTHORED decision-layer negation, distinct from the inference
+// -layer `sem-not` that produced the #215 bug (which emit refuses over a definition-is).
+decision "Negated Both Rep Determination":
+first:
+- when not "Under Twenty One" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
+
+activity "certify.Approve":
+- request CPGCommunicationRequest.
+- with `Eligibility: APPROVE.`.
+activity "not-certify.Deny":
+- request CPGCommunicationRequest.
+- with `Eligibility: DENY.`.

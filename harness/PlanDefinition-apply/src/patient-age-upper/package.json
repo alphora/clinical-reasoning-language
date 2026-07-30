@@ -1,0 +1,14 @@
+{
+  "name": "patient-age-upper",
+  "version": "0.0.0",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/patient-age-upper",
+    "dispositions": {
+      "mode": "standalone",
+      "options": {
+        "certify": { "Approve": { "label": "Approve" } },
+        "not-certify": { "Deny": { "label": "Deny" } }
+      }
+    }
+  }
+}
