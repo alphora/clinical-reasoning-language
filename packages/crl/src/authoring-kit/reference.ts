@@ -671,14 +671,23 @@ library "Patient Age Reference".
 
 /*
 Patient-age BOTH-REPRESENTATION exemplar — the ONE sanctioned \`definition is\`
-exception to Stage-1 "local \`code is\` only". The concept carries BOTH a \`code is\`
-LOCAL age Observation AND a \`definition is age today at least <N> years\` live
-compute over \`Patient.birthDate\`. The Inferred layer RECENCY-MERGES them: newest
-of the local age Observation (\`Observation.issued\`) vs \`Patient.meta.lastUpdated\`
-wins; indeterminate (\`lastUpdated\` absent) -> the session-fresh local-source wins.
+exception to Stage-1 "local \`code is\` only". A concept carries BOTH a \`code is\`
+LOCAL age Observation AND a \`definition is age today <cmp> <N> years\` live compute
+over \`Patient.birthDate\`. The Inferred layer RECENCY-MERGES them: newest of the
+local age Observation (\`Observation.effective\`) vs \`Patient.meta.lastUpdated\` wins;
+indeterminate (\`lastUpdated\` absent) -> the session-fresh local-source wins.
 \`Patient.birthDate\` is a genuine clinical record that can COMPUTE the age, which is
 what earns the carve-out. AGE ONLY — do NOT generalize to other \`definition is\`
-predicates. The \`at least <N>\` unit MUST be \`years\` (AgeAt() is in years).
+predicates. The comparator's unit MUST be \`years\` (AgeAt() is in whole years).
+
+COMPARATORS (#215): a LOWER bound \`at least <N>\` (>=) and the UPPER bounds
+\`at most <N>\` (<=, inclusive) / \`under <N>\` / \`younger than <N>\` (<, exclusive).
+The upper bounds are the engine-verified alternative to the INCORRECT
+\`sem-not "Age N Or Older"\` complement. The exact closed-world cell: with NO usable
+\`Patient.birthDate\` AND no local age assertion, the concept is FALSE (deny) — unlike
+\`sem-not\`, MISSING evidence does not become TRUE (a session-fresh local TRUE assertion
+still wins via recency). Because AgeAt() truncates to whole years, \`at most 21\` ==
+\`under 22\`, so a pediatric "under 21" gate is \`under 21\` (below), NOT \`at most 21\`.
 */
 
 concept "Age 18 Or Older":
@@ -688,15 +697,31 @@ concept "Age 18 Or Older":
 - code is \`age-18-or-older\`.
 - definition is age today at least 18 years.
 
+// UPPER bound (#215) — the pediatric "under 21" gate as ONE positive concept, NOT the
+// wrong \`sem-not "Age 21 Or Older"\` complement. Unknown age recency-merges to FALSE (deny).
+concept "Patient Under Twenty One Years":
+- type is Observation.
+- value type is boolean.
+- meta is \`@business-logic-deferred: the human-assert answer Observation for this age criterion must NOT persist beyond the client session (mechanism deferred — #190); the recency lattice treats it as session-fresh\`.
+- code is \`under-21\`.
+- definition is age today under 21 years.
+
 decision "Adult Eligibility Determination":
 first:
 - when "Age 18 Or Older" then recommend activity "Approve".
 - otherwise then recommend activity "Deny".
 
+decision "Pediatric Eligibility Determination":
+first:
+- when "Patient Under Twenty One Years" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
+
+// Neutral disposition text — the SAME two activities serve BOTH decisions, so the payload
+// must not name a specific population (a pediatric approval must not read "adult").
 activity "Approve":
 - request CPGCommunicationRequest.
-- with \`Eligibility: APPROVE / adult.\`.
+- with \`Eligibility: APPROVE — age criterion met.\`.
 activity "Deny":
 - request CPGCommunicationRequest.
-- with \`Eligibility: DENY / not an adult.\`.
+- with \`Eligibility: DENY — age criterion not met.\`.
 `;

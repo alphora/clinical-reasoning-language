@@ -147,8 +147,25 @@ export type { AuthoringEdge, AuthoringKit, AuthoringStage, AuthoringUseCase, Kit
 //   schemaVersion bumps on any content change and the change CLASS is read from this version-history tag; hence this
 //   CONTENT bump moves schemaVersion.) BOTH useCase hashes re-pin (the cpg-edge decision-composition clause + examples
 //   inherit into prior-auth; the artifact rides the prior-auth edge).
+// "1.12" → "1.13": CONTENT change (#215 — the patient-age UPPER-bound predicate). The `patient-age-both-rep`
+//   rule + its clauses, the `concept-form` carve-out mentions, the conceptLayerModel both-rep entry, and the
+//   `patient-age-both-rep-reference.crl` exemplar all WIDEN from `at least <N>` to the full comparator set:
+//   `at least` (≥) / `at most` (≤) / `under` / `younger than` (<). Teaches: the upper bounds are the engine-verified
+//   alternative to the INCORRECT `sem-not "Age N Or Older"` complement (unknown age → FALSE/deny under closed world,
+//   not TRUE — a measured wrong determination); the truncation equivalence `at most 21` ≡ `under 22`; the anchored
+//   `age at start of <ref> <cmp> <N> years` form; and that `validate_crl` now REJECTS an unsupported comparator
+//   (`less than`) / non-year unit at author time (#215). The reference exemplar gains an `Under Twenty One` (`under
+//   21`) both-rep concept + pediatric decision (both concepts carry the do-not-persist marker; the shared activities
+//   use NEUTRAL payload text so a pediatric approval does not read "adult"). The `value type is boolean` clause is
+//   annotated: enforcement of a non-boolean declaration is tracked (#241). Also CORRECTS a pre-existing prose error the
+//   panel caught: the recency merge keys on `Observation.effective` (DTR/SDC extraction populates it from
+//   QuestionnaireResponse.authored), NOT `Observation.issued` — 5 kit sites fixed. The unknown-age teaching is qualified
+//   to the EXACT closed-world cell (no usable birthDate AND no local assertion → FALSE; a session-fresh local TRUE still
+//   wins), and the anchored `age at start of` form is marked engine-supported but a COMPUTE-ONLY inference OUTSIDE the
+//   both-rep carve-out. NO payload-shape change. BOTH useCase hashes re-pin (schemaVersion is hashed AND the cpg-edge
+//   rule/model/reference inherit into the prior-auth chain).
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.12";
+const SCHEMA_VERSION = "1.13";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -243,11 +260,12 @@ const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
     scope: "out",
   },
   {
-    form: "- code is `age-code`. + - definition is age today at least <N> years.",
+    form: "- code is `age-code`. + - definition is age today <at least | at most | under | younger than> <N> years.",
     meaning:
       "PATIENT-AGE BOTH-REPRESENTATION recency merge — the ONE `definition is` exception (both arms on ONE concept). " +
+      "Both bounds (#215): `at least` (≥) plus the upper `at most` (≤) / `under` / `younger than` (<) — under closed world a member with NO usable birthDate AND no local age assertion is FALSE (deny), the engine-verified alternative to the wrong `sem-not \"Age N Or Older\"` complement (which turns that missing evidence into TRUE). " +
       "`Patient.birthDate` is a genuine clinical record that can COMPUTE the age, which is what earns it. The Inferred " +
-      "layer recency-merges the local age Observation (`Observation.issued`) against the live computed age " +
+      "layer recency-merges the local age Observation (`Observation.effective`) against the live computed age " +
       "(`Patient.meta.lastUpdated`): NEWEST wins; indeterminate (`lastUpdated` absent) → session-fresh local-source " +
       "wins. AGE ONLY — do NOT generalize to other `definition is` predicates (see rule patient-age-both-rep).",
     scope: "in",
@@ -259,12 +277,12 @@ const RULES: KitRule[] = [
     id: "concept-form",
     edge: "cpg",
     category: "concept-model",
-    rule: "Stage-1 leaf concepts carry `type is` + `code is` (local). A SINGLE criterion stated at a finer data-grain — multiple representations/components of ONE clinical fact — is normalized with `defined as` (INFERENCE) over named local leaves. The unit is anchored OUTSIDE the concept's own name: the operands must be alternative records of ONE underlying occurrence (e.g. \"viral suppression documented\" = a viral-load lab result OR a clinician chart note of the SAME suppression), NOT two SEPARATE events (failed drug therapy and failed physical therapy each occur independently — DISTINCT criteria; author them as decision structure, see decision-composition). The conjunction of DISTINCT criteria (a policy's \"ALL of the following are met\") is decision COMPOSITION (see decision-composition): author it as decision STRUCTURE — a compound branch guard `when ( A and B and C )` (or a named `criterion`) when the criteria share one consequence, sibling `when` branches when they route to DIFFERENT consequences — NEVER as a `defined as`/`sem-*` composite (which ships ONE opaque `condition[]` and asserts a sameness distinct criteria do not have). At the CONCEPT level this stage, `defined as` normalizes ONE concept's sub-representations; joining distinct criteria is a DECISION-level construct, not a concept-model one. Still OUT this stage: `source representation`/`coded from` (external) and `definition is` predicates (count/temporal/value) — the SOLE exception: the patient-age both-rep `definition is age today at least <N> years` (see rule patient-age-both-rep). The boundary is the concept FORM, not the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional.",
+    rule: "Stage-1 leaf concepts carry `type is` + `code is` (local). A SINGLE criterion stated at a finer data-grain — multiple representations/components of ONE clinical fact — is normalized with `defined as` (INFERENCE) over named local leaves. The unit is anchored OUTSIDE the concept's own name: the operands must be alternative records of ONE underlying occurrence (e.g. \"viral suppression documented\" = a viral-load lab result OR a clinician chart note of the SAME suppression), NOT two SEPARATE events (failed drug therapy and failed physical therapy each occur independently — DISTINCT criteria; author them as decision structure, see decision-composition). The conjunction of DISTINCT criteria (a policy's \"ALL of the following are met\") is decision COMPOSITION (see decision-composition): author it as decision STRUCTURE — a compound branch guard `when ( A and B and C )` (or a named `criterion`) when the criteria share one consequence, sibling `when` branches when they route to DIFFERENT consequences — NEVER as a `defined as`/`sem-*` composite (which ships ONE opaque `condition[]` and asserts a sameness distinct criteria do not have). At the CONCEPT level this stage, `defined as` normalizes ONE concept's sub-representations; joining distinct criteria is a DECISION-level construct, not a concept-model one. Still OUT this stage: `source representation`/`coded from` (external) and `definition is` predicates (count/temporal/value) — the SOLE exception: the patient-age both-rep `definition is age today <at least | at most | under | younger than> <N> years` (see rule patient-age-both-rep). The boundary is the concept FORM, not the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional.",
     why: "Local-source pass proves decision authoring (incl. one-concept `defined as` inference) before external sources and predicate inference are added; keeping one-concept inference distinct from decision composition keeps distinct-criteria logic in the DECISION layer, where each criterion emits as its own visible `condition[]` (#168 — the test is same-fact vs distinct-criteria; distinct criteria are never fused by `defined as`/`sem-*`; see decision-composition).",
     ref: "concept-layer-model; src/tests/fixtures/representation/mammogram-and-bmi.crl",
     clauses: [
       {
-        text: "A Stage-1 leaf concept carries `type is` + `code is` (local); `source representation`/`coded from` (external) and `definition is` predicates are OUT this stage (the SOLE exception: the patient-age both-rep `definition is age today at least <N> years` — see rule patient-age-both-rep).",
+        text: "A Stage-1 leaf concept carries `type is` + `code is` (local); `source representation`/`coded from` (external) and `definition is` predicates are OUT this stage (the SOLE exception: the patient-age both-rep `definition is age today <at least | at most | under | younger than> <N> years` — see rule patient-age-both-rep).",
         force: "default",
       },
       {
@@ -278,7 +296,7 @@ const RULES: KitRule[] = [
     id: "patient-age-both-rep",
     edge: "cpg",
     category: "concept-model",
-    rule: "PATIENT AGE is the SOLE sanctioned `definition is` exception to Stage-1 'local `code is` only'. A both-representation age concept carries BOTH arms on ONE concept: `- code is `<age-code>`.` (the LOCAL age Observation) AND `- definition is age today at least <N> years.` (a live compute over `Patient.birthDate`). The Inferred layer RECENCY-MERGES the two: newest of the local age Observation (`Observation.issued`) vs `Patient.meta.lastUpdated` wins; indeterminate (`lastUpdated` absent) → the session-fresh local-source wins. Four constraints are engine-enforced (verified at `$r5.apply`, 6 cases incl. the indeterminate-recency cell): the concept is `type is Observation`; `value type is boolean`; the `at least <N>` unit MUST be `years` (`months`/`days` are a hard error — AgeAt() is in years); and the arm combination is semantic — `code is` + `definition is age…` = recency-merge, `code is` alone = local-only, `definition is` alone = compute-only. AGE-ONLY guardrail: this is the ONE `definition is` construct sanctioned this stage — do NOT generalize the carve-out to any other `definition is` predicate. The do-not-persist of a session-asserted age answer is a documentation marker (`@business-logic-deferred` in `meta is`) today; the persistence mechanism is #190 (deferred).",
+    rule: "PATIENT AGE is the SOLE sanctioned `definition is` exception to Stage-1 'local `code is` only'. A both-representation age concept carries BOTH arms on ONE concept: `- code is `<age-code>`.` (the LOCAL age Observation) AND `- definition is age today <at least | at most | under | younger than> <N> years.` (a live compute over `Patient.birthDate`). The Inferred layer RECENCY-MERGES the two: newest of the local age Observation (`Observation.effective`) vs `Patient.meta.lastUpdated` wins; indeterminate (`lastUpdated` absent) → the session-fresh local-source wins. COMPARATORS (#215): `at least <N>` (≥, lower bound) and the UPPER bounds `at most <N>` (≤, inclusive), `under <N>` / `younger than <N>` (<, exclusive). The upper bounds are the engine-verified alternative to the INCORRECT `sem-not \"Age N Or Older\"` complement — the exact closed-world cell: a member with NO usable birthDate AND no local age assertion evaluates FALSE (deny) through the recency truth-set (a session-fresh local TRUE assertion still wins via recency); the complement instead turns that MISSING evidence into TRUE, granting an under-N pathway for unknown age (a measured wrong determination). Because `AgeAt()` truncates to WHOLE years, `at most 21` ≡ `under 22` (a pediatric \"under 21\" gate is `under 21`, not `at most 21`). The anchored `age at start of <ref> <cmp> <N> years` predicate takes the SAME comparators, but it is a COMPUTE-ONLY inference (a measure-context age), NOT this both-rep recency merge — engine-supported, yet OUTSIDE this Stage-1 carve-out, which is specifically `code is` + `definition is age today <cmp> <N> years`. Constraints: the concept is `type is Observation` (emit recency-shape guard); the comparator's unit MUST be `years` (`months`/`days` are a hard error — AgeAt() is in years) AND the comparator must be sanctioned — `validate_crl` REJECTS an unsupported comparator (`less than`) or non-year unit at AUTHOR time (#215), and emit refuses them loudly; `value type is boolean` (author-required; validator/emit enforcement tracked #241); the arm combination is semantic — `code is` + `definition is age…` = recency-merge, `code is` alone = local-only, `definition is` alone = compute-only. Recency behaviour + the upper-bound FALSE-for-unknown are verified at `$r5.apply` (lower bound: 6 cases incl. the indeterminate-recency cell; upper bound: 11 cells incl. unknown→deny, the exclusive/inclusive boundary, and recency — #215). AGE-ONLY guardrail: this is the ONE `definition is` construct sanctioned this stage — do NOT generalize the carve-out to any other `definition is` predicate. The do-not-persist of a session-asserted age answer is a documentation marker (`@business-logic-deferred` in `meta is`) today; the persistence mechanism is #190 (deferred).",
     why: "`Patient.birthDate` is a real clinical record that can COMPUTE the age, so a both-rep age concept has two genuine sources for the same fact; the recency merge lets EITHER the local age assertion OR the live compute answer — newest wins — which is why age (and age alone) earns the `definition is` carve-out the rest of the stage defers.",
     ref: "#190; patient-age recency merge; disc 173",
     clauses: [
@@ -288,12 +306,12 @@ const RULES: KitRule[] = [
         test: "verifyLoop:patient-age-both-rep",
       },
       {
-        text: "The both-rep age concept is `value type is boolean`.",
+        text: "The both-rep age concept is `value type is boolean` (the exemplar demonstrates it; author-time/emit REJECTION of a non-boolean declaration is tracked — #241).",
         force: "invariant",
         test: "verifyLoop:patient-age-both-rep",
       },
       {
-        text: "The `at least <N>` unit MUST be `years` — `months`/`days` are a hard error (AgeAt() is in years).",
+        text: "The age comparator is one of `at least` (≥) / `at most` (≤) / `under` (<) / `younger than` (< synonym), and its unit MUST be `years` — an unsupported comparator (e.g. `less than`) or a `months`/`days` unit is a hard error (AgeAt() is in whole years). `validate_crl` rejects both at author time (#215).",
         force: "invariant",
         test: "verifyLoop:patient-age-both-rep",
       },
@@ -802,7 +820,7 @@ const METHODOLOGY_REQUIREMENTS: VerifyLoop["methodologyRequirements"] = [
   {
     id: "patient-age-both-rep",
     edge: "cpg",
-    text: "PATIENT-AGE both-rep structural checks (the SOLE `definition is` carve-out): the both-rep age concept is `type is Observation` + `value type is boolean`; its `definition is age today at least <N> years` unit is `years` (months/days are a hard error); and the carve-out is NOT generalized to any other `definition is` predicate. The recency-merge EXECUTION (newest of `Observation.issued` vs `Patient.meta.lastUpdated` wins; indeterminate → session-fresh local-source wins) is engine-verified at `$r5.apply` (6 cases incl. the indeterminate-recency cell), not by asserted-only run_decision (#190; disc 173).",
+    text: "PATIENT-AGE both-rep structural checks (the SOLE `definition is` carve-out): the both-rep age concept is `type is Observation` + `value type is boolean`; its `definition is age today <at least | at most | under | younger than> <N> years` unit is `years` (months/days are a hard error); and the carve-out is NOT generalized to any other `definition is` predicate. The recency-merge EXECUTION (newest of `Observation.effective` vs `Patient.meta.lastUpdated` wins; indeterminate → session-fresh local-source wins) is engine-verified at `$r5.apply` (6 cases incl. the indeterminate-recency cell), not by asserted-only run_decision (#190; disc 173).",
   },
   {
     id: "mutual-exclusivity-spans-closure",
@@ -996,7 +1014,7 @@ const JUDGE_LENS: JudgeLens = {
 
 const BOUNDARY_ENTRIES: { text: string; edge: AuthoringEdge }[] = [
   {
-    text: "`definition is` predicates (count / most-recent / temporal / value thresholds — compute over a source); the SOLE exception is the patient-age both-rep `definition is age today at least <N> years` recency merge (see rule patient-age-both-rep)",
+    text: "`definition is` predicates (count / most-recent / temporal / value thresholds — compute over a source); the SOLE exception is the patient-age both-rep `definition is age today <at least | at most | under | younger than> <N> years` recency merge (see rule patient-age-both-rep)",
     edge: "cpg",
   },
   {
@@ -1120,7 +1138,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     language: "crl",
     edge: "cpg",
     purpose:
-      "The patient-age BOTH-REPRESENTATION exemplar — the SOLE `definition is` exception to Stage-1 'local `code is` only' (see rule patient-age-both-rep). ONE concept carries BOTH arms: `code is` (the LOCAL age Observation) + `definition is age today at least <N> years` (a live compute over `Patient.birthDate`). The Inferred layer recency-merges them (newest of the local `Observation.issued` vs `Patient.meta.lastUpdated` wins; indeterminate → session-fresh local-source wins); `Patient.birthDate` being a genuine clinical record that COMPUTES the age is what earns the carve-out. Engine-verified at `$r5.apply` (6 cases incl. the indeterminate-recency cell); the recency EXECUTION is not something asserted-only run_decision proves, so no companion CEL. AGE ONLY — do NOT generalize.",
+      "The patient-age BOTH-REPRESENTATION exemplar — the SOLE `definition is` exception to Stage-1 'local `code is` only' (see rule patient-age-both-rep). ONE concept carries BOTH arms: `code is` (the LOCAL age Observation) + `definition is age today <at least | at most | under | younger than> <N> years` (a live compute over `Patient.birthDate`). The Inferred layer recency-merges them (newest of the local `Observation.effective` vs `Patient.meta.lastUpdated` wins; indeterminate → session-fresh local-source wins); `Patient.birthDate` being a genuine clinical record that COMPUTES the age is what earns the carve-out. Engine-verified at `$r5.apply` (6 cases incl. the indeterminate-recency cell); the recency EXECUTION is not something asserted-only run_decision proves, so no companion CEL. AGE ONLY — do NOT generalize.",
     source: PATIENT_AGE_BOTH_REP_REFERENCE_CRL,
   },
 ];

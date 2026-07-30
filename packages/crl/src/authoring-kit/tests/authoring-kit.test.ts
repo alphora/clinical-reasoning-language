@@ -91,14 +91,23 @@ describe("authoring-kit — reference artifacts", () => {
     expect(built.success).toBe(true);
   });
 
-  it("patient-age-both-rep-reference.crl (the SOLE `definition is` carve-out) validates clean (self-contained)", () => {
-    // The both-rep age concept carries BOTH `code is` (local) and `definition is age today at least <N> years`
-    // (compute over Patient.birthDate) — the one sanctioned `definition is`. It must validate CLEAN embedded.
+  it("patient-age-both-rep-reference.crl (the SOLE `definition is` carve-out) validates clean + teaches BOTH bounds", () => {
+    // Both concepts carry BOTH `code is` (local) and `definition is age today <cmp> <N> years` (compute over
+    // Patient.birthDate) — the one sanctioned `definition is`. It must validate CLEAN embedded.
     expect(crlErrors(PATIENT_AGE_BOTH_REP_REFERENCE_CRL)).toEqual([]);
-    // Guard the both-rep SHAPE: BOTH arms present on the one concept (a regression dropping the compute arm
-    // would silently revert it to a plain local boolean).
+    // Guard the both-rep SHAPE on BOTH the lower- and upper-bound concept (a regression dropping either compute arm
+    // would silently revert it to a plain local boolean — the content hash alone can't catch that, it re-pins on any change).
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/- code is `age-18-or-older`\./);
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/- definition is age today at least 18 years\./);
+    // #215 upper bound: the pediatric `under 21` both-rep concept + decision must survive.
+    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/concept "Patient Under Twenty One Years":/);
+    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/- code is `under-21`\./);
+    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/- definition is age today under 21 years\./);
+    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/when "Patient Under Twenty One Years" then recommend activity "Approve"/);
+    // both concepts carry the do-not-persist marker (symmetry — no unsafe asymmetry, panel r1)
+    expect((PATIENT_AGE_BOTH_REP_REFERENCE_CRL.match(/@business-logic-deferred/g) ?? [])).toHaveLength(2);
+    // neutral disposition text — a pediatric approval must NOT read "adult"
+    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).not.toMatch(/APPROVE \/ adult|DENY \/ not an adult/);
   });
 
   it("a migrated PA artifact validates through the PROJECT path (the config validator IS on the path) with a matching crl.dispositions — and a bogus determination is REJECTED (not a K4 fake-green)", () => {
@@ -356,7 +365,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.12");
+    expect(kit.schemaVersion).toBe("1.13");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -762,8 +771,12 @@ describe("authoring-kit — getAuthoringKit", () => {
     // 5 CEL cases), finding 1 (a DNF SIZE clause on `decision-composition` flagging #236 load-bearing). Finding 3
     // resolved: KEEP the schemaVersion-bumps-on-content convention, so this CONTENT change moves schemaVersion. BOTH
     // hashes move (cpg-edge decision-composition clause + examples inherit into prior-auth; the artifact rides the PA edge).
-    expect(cpg.contentHash).toBe("f5afa16c3a5d2bf74a7756f637b253da5a50f593781ca20d08a45efd60bb7a2c");
-    expect(priorAuth.contentHash).toBe("af5f86a8332afb62fc74fca5312f50b83b3958a2c6f0c636132aaace2ab00597");
+    // #215 (schemaVersion 1.12→1.13): the patient-age both-rep rule/clauses + concept-form carve-out mentions +
+    // conceptLayerModel entry + the reference exemplar WIDEN from `at least <N>` to the full comparator set
+    // (`at least`/`at most`/`under`/`younger than`); the exemplar gains an `Under Twenty One` (`under 21`) both-rep
+    // concept + pediatric decision; the value-type-boolean clause is annotated with #241. BOTH hashes move.
+    expect(cpg.contentHash).toBe("ceae9c884a4b9cdf1790c1b9fb16f3913c83480bbd81d5bb397a7c371701a687");
+    expect(priorAuth.contentHash).toBe("3015d560c64d978ff77401a5f4723468087866f3cef04d262fa0a2f31fd44b56");
   });
 
   it("no RETIRED positive doctrine survives anywhere in the serialized payload (#224 anti-half-inversion guard)", () => {
