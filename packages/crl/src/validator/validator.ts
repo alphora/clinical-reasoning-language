@@ -3,6 +3,7 @@ import type { LibraryDeclaration } from "../ast/types";
 import type { ResolvedDispositionConfig } from "../dispositions/types";
 import type { SourceContext } from "../imports/scopes";
 
+import { AgePredicateValidator } from "./agePredicateValidator";
 import { CycleDetector } from "./cycleDetector";
 import { DecisionShapeValidator } from "./decisionShapeValidator";
 import { DispositionValidator } from "./dispositionValidator";
@@ -62,7 +63,13 @@ export type ValidationErrorKind =
   | "meta-invalid-field"
   | "meta-duplicate-field"
   | "meta-cardinality"
-  | "open-flag";
+  | "open-flag"
+  // #215 — a `definition is age today <cmp> <n> <unit>` that is NOT a sanctioned age
+  // predicate: an unsupported comparator (`less than`, …) or a non-year unit. Sanctioned:
+  // `at least` | `at most` | `under` | `younger than` + a YEARS quantity. Closes the
+  // validate/emit divergence (these emit a loud unmatched sentinel at emit but validated
+  // green). Author error — never soft-demoted.
+  | "age-predicate-unsupported";
 
 /**
  * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
@@ -209,6 +216,13 @@ export interface MetaDiagnostic extends ValidationErrorBase {
     | "open-flag";
 }
 
+// #215 — an attempted `age today <…>` predicate that isn't a sanctioned age predicate
+// (unsupported comparator or non-year unit). `conceptName` names the offending concept.
+export interface AgePredicateUnsupportedError extends ValidationErrorBase {
+  kind: "age-predicate-unsupported";
+  conceptName: string;
+}
+
 export type ValidationError =
   | EmptyNameError
   | DuplicateNameError
@@ -224,6 +238,7 @@ export type ValidationError =
   | DispositionNotConfiguredError
   | DispositionRequestTypeError
   | DispositionNonFinalLeafError
+  | AgePredicateUnsupportedError
   | MetaDiagnostic;
 
 export interface ValidationResult {
@@ -279,6 +294,7 @@ export class Validator {
   private readonly decisionShapeValidator: DecisionShapeValidator;
   private readonly dispositionValidator: DispositionValidator;
   private readonly metaTagValidator: MetaTagValidator;
+  private readonly agePredicateValidator: AgePredicateValidator;
 
   constructor() {
     this.nameUniquenessValidator = new NameUniquenessValidator();
@@ -287,6 +303,7 @@ export class Validator {
     this.decisionShapeValidator = new DecisionShapeValidator();
     this.dispositionValidator = new DispositionValidator();
     this.metaTagValidator = new MetaTagValidator();
+    this.agePredicateValidator = new AgePredicateValidator();
   }
 
   /**
@@ -343,6 +360,11 @@ export class Validator {
 
     // #187 — reserved catalog library names — always an error (never demoted).
     errors.push(...this.validateReservedLibraryNames(ast, sources));
+
+    // #215 — reject unsanctioned `age today <cmp> <n> <unit>` predicates at author time
+    // (unsupported comparator / non-year unit). Always an error (author mistake, never
+    // demoted) — closes the validate/emit divergence for the age carve-out.
+    errors.push(...this.agePredicateValidator.validate(ast, sources));
 
     // #154/#203 — registry-backed @tag metadata enforcement (vocabulary / field / cardinality / open-flag).
     // Routed through pushSplit so open-flag/unknown/malformed WARN (not fail) and meta-missing-field soft-demotes.

@@ -106,13 +106,9 @@ import type {
   Location,
 } from "../ast/types";
 import { matchNarrative } from "../template-match";
+import { sanctionedAgeTodayOp } from "../template-match/agePredicate";
 import type { CanonicalArg } from "../template-match/canonicalTypes";
 import type { CRLError } from "../types/errors";
-
-/** The sanctioned patient-age comparators (#215): ≥ (`at least`), ≤ (`at most`),
- * < (`under` / `younger than`). Carried as the canonical PATTERN NAME (`AgeRecencyOp`
- * lives in ast/types alongside the `__bothRepRecencyOp` marker it sets). */
-const AGE_RECENCY_OPS: readonly AgeRecencyOp[] = ["AtLeast", "AtMost", "Below"];
 
 /**
  * Detect the patient-age RECENCY both-rep computed arm: a `definition is` whose
@@ -122,6 +118,9 @@ const AGE_RECENCY_OPS: readonly AgeRecencyOp[] = ["AtLeast", "AtMost", "Below"];
  * `AgeAt()`. Returns the year-threshold rendered as a CQL quantity literal (e.g.
  * `18 'years'`) AND the comparator op when it matches, else null (#215).
  *
+ * The "is this a sanctioned age-today call" test is the SHARED classifier
+ * `sanctionedAgeTodayOp` (template-match/agePredicate) — the SAME predicate the
+ * author-time validator uses, so the two cannot drift on the sanctioned op set.
  * Detecting at LOWERING time (not in the emitter) keeps the emitter free of
  * pattern-sniffing: the merge policy + comparator are fixed on the twin's
  * `__bothRepMerge` / `__bothRepRecencyOp` markers here and the emitter merely
@@ -131,23 +130,12 @@ function ageTodayRecencyThreshold(
   def: DefinitionIsDefinition,
 ): { threshold: string; op: AgeRecencyOp } | null {
   const matched = matchNarrative(def.body);
-  if (!matched.known) return null;
-  if (!AGE_RECENCY_OPS.includes(matched.pattern as AgeRecencyOp)) return null;
-  const op = matched.pattern as AgeRecencyOp;
-  if (matched.args.length !== 2) return null;
-  const [ageArg, qArg] = matched.args;
-  // arg[0] must be the NO-ARG AgeAt() nested call (the live-today overload). This
-  // guard is LOAD-BEARING (#215): the generic `atMost`/`below` matchers emit the
-  // SAME canonical names for `<ConceptRef> at most|below <Q>`, so without it a
-  // plain `code is X. definition is "Weight" at most 100 kg.` would be mis-detected
-  // as an age-recency merge. Only `age today <cmp> <Q>` yields a no-arg AgeAt() here.
-  if (
-    ageArg.type !== "NestedPatternArg" ||
-    ageArg.pattern.pattern !== "AgeAt" ||
-    ageArg.pattern.args.length !== 0
-  ) {
-    return null;
-  }
+  // SHARED classifier: a sanctioned age-TODAY op over the no-arg `AgeAt()`. The no-arg
+  // guard is LOAD-BEARING (the generic `atMost`/`below` matchers emit the SAME canonical
+  // names for `<ConceptRef> at most|below <Q>`); `sanctionedAgeTodayOp` enforces it.
+  const op = sanctionedAgeTodayOp(matched);
+  if (op === null) return null;
+  const qArg = matched.args[1];
   if (qArg.type !== "QuantityArg") return null;
   // UNIT GUARD (defense-in-depth) — the age-today MATCHERS now enforce years at the
   // match (`isYearQuantity`, #215), so a non-year narrative never becomes a known
