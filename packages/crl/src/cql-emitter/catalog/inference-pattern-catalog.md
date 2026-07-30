@@ -788,7 +788,7 @@ A parameterized umbrella for windowed-from-anchor temporal scopes. Used as the `
 - **maturity** — strong
 - **evidence** — L1: `Patient Age N or Older at Start of Measurement Period` (4), `Aged 35 to 70 at Start of Measurement Period`.
 - **examples** — `CMS2 :: Patient Age 12 Years or Older at Start of Measurement Period` (`age at start of "Measurement Period" at least 12 years`), `CMS1154 :: Aged 35 to 70 at Start of Measurement Period`
-- **anti-example** — for the predicate form (`age at <anchor> at least <n> years`), compose with `AtLeast(...)` — the `AgeAt(...)` call returns a `Quantity<year>` value that feeds the comparator.
+- **anti-example** — for the predicate form, compose the anchored age with a comparator: `age at start of <ref> at least <n> years` → `AtLeast(AgeAt(start of <ref>), n)`, and (upper bound, #215) `at most <n> years` → `AtMost(...)` (≤), `under <n> years` / `younger than <n> years` → `Below(...)` (<). YEAR-only, exactly as the `age today` family: `AgeAt(anchor)` is age in whole years and the comparator overloads are unit-blind, so a non-year unit does NOT match (it soft-compiles unknown → a loud sentinel), never a silent unit-blind compare.
 
 ### `age today at least <n> years`
 - **intent** — the patient's age (in years) as of TODAY is at or above `n` — a live, engine-evaluated age predicate (no clinical anchor concept). Used to author a patient-age criterion as the computed arm of a both-representation concept (`code is` local assertion + this `definition is`), recency-merged in the Inferred layer.

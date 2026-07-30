@@ -763,10 +763,58 @@ const ageAtStartOfAtLeast: PatternMatcher = (els, loc) => {
   if (!isConceptRef(els[after])) return null;
   if (!isWord(els[after + 1], "at")) return null;
   if (!isWord(els[after + 2], "least")) return null;
-  if (!isQuantity(els[after + 3])) return null;
+  if (!isYearQuantity(els[after + 3])) return null; // #215: year-only (AgeAt(anchor) is Integer years; unit-blind overload)
   const startOf = makeCall("StartOf", [conceptRefArg(els[after] as NConceptRef)], loc);
   const ageAt = makeCall("AgeAt", [nestedArg(startOf)], loc);
   return makeCall("AtLeast", [nestedArg(ageAt), quantityArg(els[after + 3] as Quantity)], loc);
+};
+
+/**
+ * ANCHORED UPPER-BOUND (#215) — the `age at start of <X>` counterparts of the age-today
+ * upper bounds: `at most` (≤, AtMost), `under` / `younger than` (<, Below). Same
+ * `AgeAt(StartOf(X))` (Integer years) feeding the same cross-type comparator overloads,
+ * same year-only guard. Compute-only (never the both-rep recency lane — the collision
+ * guard excludes a ONE-arg AgeAt).
+ */
+/** `age at start of <X> at most <Q>` → AtMost(AgeAt(StartOf(X)), Q) */
+const ageAtStartOfAtMost: PatternMatcher = (els, loc) => {
+  if (els.length !== 8) return null;
+  const after = matchWords(els, 0, ["age", "at", "start", "of"]);
+  if (after === null) return null;
+  if (!isConceptRef(els[after])) return null;
+  if (!isWord(els[after + 1], "at")) return null;
+  if (!isWord(els[after + 2], "most")) return null;
+  if (!isYearQuantity(els[after + 3])) return null;
+  const startOf = makeCall("StartOf", [conceptRefArg(els[after] as NConceptRef)], loc);
+  const ageAt = makeCall("AgeAt", [nestedArg(startOf)], loc);
+  return makeCall("AtMost", [nestedArg(ageAt), quantityArg(els[after + 3] as Quantity)], loc);
+};
+
+/** `age at start of <X> under <Q>` → Below(AgeAt(StartOf(X)), Q) */
+const ageAtStartOfUnder: PatternMatcher = (els, loc) => {
+  if (els.length !== 7) return null;
+  const after = matchWords(els, 0, ["age", "at", "start", "of"]);
+  if (after === null) return null;
+  if (!isConceptRef(els[after])) return null;
+  if (!isWord(els[after + 1], "under")) return null;
+  if (!isYearQuantity(els[after + 2])) return null;
+  const startOf = makeCall("StartOf", [conceptRefArg(els[after] as NConceptRef)], loc);
+  const ageAt = makeCall("AgeAt", [nestedArg(startOf)], loc);
+  return makeCall("Below", [nestedArg(ageAt), quantityArg(els[after + 2] as Quantity)], loc);
+};
+
+/** `age at start of <X> younger than <Q>` → Below(AgeAt(StartOf(X)), Q) (synonym of under) */
+const ageAtStartOfYoungerThan: PatternMatcher = (els, loc) => {
+  if (els.length !== 8) return null;
+  const after = matchWords(els, 0, ["age", "at", "start", "of"]);
+  if (after === null) return null;
+  if (!isConceptRef(els[after])) return null;
+  if (!isWord(els[after + 1], "younger")) return null;
+  if (!isWord(els[after + 2], "than")) return null;
+  if (!isYearQuantity(els[after + 3])) return null;
+  const startOf = makeCall("StartOf", [conceptRefArg(els[after] as NConceptRef)], loc);
+  const ageAt = makeCall("AgeAt", [nestedArg(startOf)], loc);
+  return makeCall("Below", [nestedArg(ageAt), quantityArg(els[after + 3] as Quantity)], loc);
 };
 
 /**
@@ -847,6 +895,9 @@ const ageTodayYoungerThan: PatternMatcher = (els, loc) => {
 const PATTERNS: PatternMatcher[] = [
   // Longest / most specific first
   ageAtStartOfAtLeast,             // 8 elements
+  ageAtStartOfAtMost,              // 8 (age at start of <X> at most <Q>; #215 anchored inclusive)
+  ageAtStartOfYoungerThan,         // 8 (age at start of <X> younger than <Q>; #215 anchored exclusive synonym)
+  ageAtStartOfUnder,               // 7 (age at start of <X> under <Q>; #215 anchored exclusive)
   ageTodayAtLeast,                 // 5 (age today at least <Q>; BEFORE 3-element ageAt)
   ageTodayAtMost,                  // 5 (age today at most <Q>; #215 inclusive upper bound)
   ageTodayYoungerThan,             // 5 (age today younger than <Q>; #215 exclusive, synonym of under)

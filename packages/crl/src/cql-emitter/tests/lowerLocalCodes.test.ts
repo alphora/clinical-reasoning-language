@@ -709,6 +709,35 @@ concept "Heavy":
     }
   });
 
+  it("ANCHORED upper-bound (#215): `age at start of <X> at most|under|younger than <n> years` emits AtMost/Below over AgeAt(start of …)", () => {
+    for (const [pred, call] of [
+      ['age at start of "Measurement Period" at most 65 years', `CRLCommon.AtMost(CRLCommon.AgeAt(start of "Measurement Period"), 65 'years')`],
+      ['age at start of "Measurement Period" under 65 years', `CRLCommon.Below(CRLCommon.AgeAt(start of "Measurement Period"), 65 'years')`],
+      ['age at start of "Measurement Period" younger than 65 years', `CRLCommon.Below(CRLCommon.AgeAt(start of "Measurement Period"), 65 'years')`],
+    ] as const) {
+      const src = `# T\nlibrary "T".\nconcept "Age Gate":\n- type is Observation.\n- value type is boolean.\n- definition is ${pred}.\n`;
+      const r = emitCQL(src, { libraryName: "T" });
+      expect(r.success, `anchored emit should succeed for "${pred}"`).toBe(true);
+      expect(r.result).toContain(call);
+    }
+  });
+
+  it("ANCHORED NON-year (#215): `age at start of <X> <cmp> <n> months` does NOT silently emit a unit-blind call (year-only at the match — also fixes the pre-existing `at least`)", () => {
+    for (const pred of [
+      'age at start of "Measurement Period" at least 65 months',
+      'age at start of "Measurement Period" at most 65 months',
+      'age at start of "Measurement Period" under 65 months',
+    ]) {
+      const src = `# T\nlibrary "T".\nconcept "Age Gate":\n- type is Observation.\n- value type is boolean.\n- definition is ${pred}.\n`;
+      const r = emitCQL(src, { libraryName: "T" });
+      expect(r.result ?? "").not.toMatch(/CRLCommon\.(AtLeast|AtMost|Below)\(CRLCommon\.AgeAt\(start of[^)]*\), 65 'months'\)/);
+      expect(
+        r.success === false || (r.result ?? "").includes("UnmatchedNarrative"),
+        `non-year anchored "${pred}" must fail loudly, not emit a resolved call`,
+      ).toBe(true);
+    }
+  });
+
   it("empty `code is` + representation → emit-empty-local-code (empty checked BEFORE representation skip)", () => {
     // A representation-bearing concept is normally skipped (out of scope), but
     // an EMPTY code is malformed regardless — the empty check runs first, so the
