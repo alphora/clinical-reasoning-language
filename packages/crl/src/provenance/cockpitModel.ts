@@ -17,6 +17,7 @@ import { buildCrlStructure, type CrlDecisionStructure } from "./crlStructure";
 import { collectLibs } from "./indexer";
 import { resolveProvenance, type ResolveProvenanceResult } from "./validateFiles";
 import type { ProvenanceValidationMode } from "./validators";
+import type { ResolvedCelGraph } from "../cel/imports/types";
 
 export interface CockpitModel {
   correspondence: CorrespondenceModel;
@@ -58,6 +59,30 @@ export interface CockpitModel {
   duplicateScenarioNames: Set<string>;
 }
 
+/** #242: the shared concept-projection assembly from a resolved graph — the `conceptLayer`, its `defined as` SHAPE
+ *  index (`$apply` projection) and OPERATOR index (questionnaire ANY OF/ALL OF + flow guard outlines). `conceptShape`
+ *  and `defExpr` are built from ONE `collectLibs` + one `leafEligibleConcepts`-per-lib pass here, so they are mutually
+ *  drift-guarded equal. (`conceptLayer` runs its OWN `collectLibs` inside `buildCrlConceptLayer` — this preserves the
+ *  cockpit's prior sequence exactly; it is not a single filesystem snapshot across all three.) Extracted so the cockpit
+ *  AND the flow↔questionnaire parity test consume the SAME assembly — the parity test used to hand-copy these lines,
+ *  which silently went stale if the cockpit changed its inputs (a false-green vector). */
+export function assembleConceptProjections(graph: ResolvedCelGraph): {
+  conceptLayer: CrlConceptNode[];
+  conceptShape: ConceptShapeIndex;
+  defExpr: DefExprIndex;
+} {
+  const conceptLayer = buildCrlConceptLayer(graph);
+  const { libs } = collectLibs(graph);
+  const leafEligibleByLib = new Map<string, Set<string>>();
+  for (const [lib, info] of libs) leafEligibleByLib.set(lib, leafEligibleConcepts(info.entry.ast));
+  // Pass the SAME collected `libs` (no re-collect) so the shape builder's lib set matches `conceptLayer`'s.
+  const conceptShape = buildConceptShapeIndex(libs, conceptLayer, leafEligibleByLib);
+  // #187 Option-3: the operator-PRESERVING projection of the same `defined as` bodies (same inputs). Its leafEligible
+  // leaves are drift-guarded == conceptShape's.
+  const defExpr = buildDefExprIndex(libs, conceptLayer, leafEligibleByLib);
+  return { conceptLayer, conceptShape, defExpr };
+}
+
 export function buildCockpitModel(
   artifactPath: string,
   celPath: string,
@@ -81,15 +106,9 @@ export function buildCockpitModelFromResolved(
   // #187 Todo 1b: the per-concept shape index. Leaf-eligibility is the emitter's own lowering
   // (`leafEligibleConcepts`, fail-closed on lowering errors) computed per source library HERE — the impure
   // step — and passed into the PURE `buildConceptShapeIndex` (keeps `cql-emitter` out of the shape builder).
-  const conceptLayer = buildCrlConceptLayer(r.graph);
-  const { libs } = collectLibs(r.graph);
-  const leafEligibleByLib = new Map<string, Set<string>>();
-  for (const [lib, info] of libs) leafEligibleByLib.set(lib, leafEligibleConcepts(info.entry.ast));
-  // Pass the SAME collected `libs` (no re-collect) so the shape builder's lib set matches `conceptLayer`'s.
-  const conceptShape = buildConceptShapeIndex(libs, conceptLayer, leafEligibleByLib);
-  // #187 Option-3: the operator-PRESERVING projection of the same `defined as` bodies (same inputs), for the MV
-  // Questionnaire's ANY OF / ALL OF box render. Its leafEligible leaves are drift-guarded == conceptShape's.
-  const defExpr = buildDefExprIndex(libs, conceptLayer, leafEligibleByLib);
+  // #242: the shared assembly (also consumed by the flow↔questionnaire parity test) — one collectLibs + one
+  // leafEligible pass yields conceptLayer + the drift-guarded-equal conceptShape ($apply) and defExpr (operator tree).
+  const { conceptLayer, conceptShape, defExpr } = assembleConceptProjections(r.graph);
   // #233 Todo 2b: the canonical per-declaration criterion inventory (the gate/verdict identity source), same defExpr —
   // built ONCE and threaded into `buildGuardOutlines` so the criterion nodes' STAMPED bodyHash == the gate's inventory hash
   // structurally (one value), and a second expansion pass is dropped (disc 330 nit).

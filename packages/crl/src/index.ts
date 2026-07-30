@@ -202,6 +202,7 @@ export {
   decisionSpine,
   nodeKey,
   conceptDeclRef,
+  assembleConceptProjections,
 } from "./provenance";
 export type {
   CorrespondenceModel,

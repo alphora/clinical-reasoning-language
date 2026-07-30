@@ -88,9 +88,10 @@ export interface Question {
   isNavStop: boolean;
   /** An evaluated on-path `when` — the ONLY rows `producedPathDiverterIds` may light (never a leaf/preempted row). */
   diverterEligible: boolean;
-  /** #187 Option-3: on an ON-PATH-SATISFIED composite `when`, its `defined as` operator tree (ANY OF / ALL OF boxes).
-   *  #224 i.4c: ALSO the per-atom case-feature box of a COMPOUND guard (a failed / preempted compound `when`).
-   *  Absent for a non-composite single-ref / an on-path-satisfied compound / off-path when (those stay flat rows). */
+  /** #187 Option-3: on an ON-PATH-SATISFIED composite (single-ref `defined as`) `when`, its `defined as` operator tree
+   *  (ANY OF / ALL OF boxes). #224 i.4c: ALSO the per-atom case-feature box of a COMPOUND guard at EVERY evaluated
+   *  state — satisfied, failed, OR preempted (blocking styling only when it failed; satisfied/preempted read
+   *  informational). Absent for a non-composite single-ref / an off-path when (those stay flat rows). */
   expansion?: QExpr;
   /** #224 i.4c: which KIND of `expansion` this is — a `defined as` representation-disjunction ("defined-as", the
    *  default, gets a forced top `or` chip) vs a decision guard's boolean tree ("guard", rendered with NO forced `or`

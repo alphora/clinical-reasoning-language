@@ -48,7 +48,7 @@ export { buildDefExprIndex, collectDefExprLeafKeys, buildDefStruct, DEF_EXPR_CAP
 export type { DefExpr, DefRef, DefExprEntry, DefExprIndex, DefStructExpr, ResolveDefExprEntry } from "./definedAsExpr";
 export { branchConditionToDefStruct, buildGuardOutlines, buildCriterionIdentities, criterionGateIdentities, topCriterion, criterionKey } from "./guardOutline";
 export type { GuardOutline, CriterionIdentity } from "./guardOutline";
-export { buildCockpitModel, buildCockpitModelFromResolved } from "./cockpitModel";
+export { buildCockpitModel, buildCockpitModelFromResolved, assembleConceptProjections } from "./cockpitModel";
 export type { CockpitModel } from "./cockpitModel";
 export { checkCockpitCorrespondence } from "./correspondenceCheck";
 export type {
