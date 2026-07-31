@@ -1259,14 +1259,15 @@ check("bulk-verdict: the apply message envelope is validated before any derefere
   assert.match(COCKPIT_SRC, /if \(typeof raw !== "object" \|\| raw === null\) return;/);
 });
 
-check("pass-all: the node-verdict picker offers a 'Pass all' item that sets every LIVE case to Pass in ONE persist", () => {
+check("pass-all: the node-verdict picker offers a NON-destructive 'Pass all' — passes only UNREVIEWED live cases, in ONE persist", () => {
   // a DISCRIMINANT field (not an overloaded sentinel caseId) routes the pick to passAll — collision-proof against any real caseId
   assert.match(COCKPIT_SRC, /const passAllItem = \{ label: `\$\(check-all\) Pass all`,[^\n]*passAll: true as const \};/);
-  assert.match(COCKPIT_SRC, /showQuickPick\(\[passAllItem, \.\.\.rows\]/);
+  // the item is offered ONLY when something is actually unreviewed (no dead item when everything's decided)
+  assert.match(COCKPIT_SRC, /const items = todo > 0 \? \[passAllItem, \.\.\.rows\] : rows;/);
   assert.match(COCKPIT_SRC, /if \("passAll" in pick\) \{\s*\n\s*passAll\(\);/);
-  // passAll: LIVE-filter → one setAllReviewState → one persistMv → repaint tail (mirrors applyVerdict), skip persist when nothing moved
-  assert.match(COCKPIT_SRC, /const live = caseIds\.filter\(\(caseId\) => scenarioByCaseId\.has\(caseId\)\);/);
-  assert.match(COCKPIT_SRC, /const \{ map, changed \} = setAllReviewState\(reviewByCaseId, live, "pass"\);/);
+  // the target set = live AND unreviewed (a deliberate Fail/Pending is left untouched); one setAllReviewState → one persistMv → repaint
+  assert.match(COCKPIT_SRC, /caseIds\.filter\(\(caseId\) => scenarioByCaseId\.has\(caseId\) && !\(caseId in reviewByCaseId\)\)/);
+  assert.match(COCKPIT_SRC, /const \{ map, changed \} = setAllReviewState\(reviewByCaseId, unreviewedLive\(\), "pass"\);/);
   assert.match(COCKPIT_SRC, /if \(changed === 0\) return;[\s\S]*?if \(!persistMv\(map, notesByCaseId\)\) return;/);
 });
 
