@@ -67,6 +67,7 @@ import { failedCriterionLabel } from "./failedCriterionLabel";
 import { buildIssueUrl, githubIssuesBaseFromRemote, githubRepoFromRemote, issueRefOf, sanitizeIssueBase } from "./issueLink";
 import { createGithubIssue, getGithubIssue, IssueCreateError, issueCreateErrorLabel } from "./githubIssue";
 import { renderFlagDrawer } from "./flagDrawerHtml";
+import { renderFlagActionDrawer, type FlagActionField } from "./flagActionDrawerHtml";
 import { countEmbeddedFlags } from "./embeddedFlagDetect"; // #212 S3: the un-migrated-flag safety-net detector (pure)
 // #212: the flag store model now lives in core (packages/crl) so the cockpit AND the MCP flag tools share it.
 import {
@@ -480,6 +481,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // handler never touches, so the drawer + the user's typed text SURVIVE a same-policy tree rebuild; the host clears it
   // (posting an empty region) on retarget / mode reset. `FlagDraftState` is declared with `FlagTargetChoice` below.
   let flagDraft: FlagDraftState | undefined;
+  // Flag-ACTION drawer — the read-only "act on one flag" flyout, MUTUALLY EXCLUSIVE with the create drawer (both live in the
+  // one `#flagDrawer` region; `postFlagDrawer` is the dispatcher — create wins, else action, else empty). `flag` is the
+  // host-captured record the webview's opaque `flagActionResolve/OpenIssue/Close` intents act on (never named by the webview);
+  // `ver`/`cel` are the policy identity captured at open (action-time revalidation). Re-found by id from the refreshed
+  // `flagsList` after any status write / external store change (`refreshFlagActionDrawer`) — so the drawer never toggles off a
+  // stale status snapshot. Cleared alongside `flagDraft` on every lifecycle drop (`clearFlagDraft`).
+  let flagActionView: { flag: MvFlag; ver: number; cel: string | undefined } | undefined;
+  let flagActionBusy = false; // single-flight for the drawer's async actions (a rapid 2nd click must not overlap a write / stale open-issue)
   // #210 (disc 239) — the AGENT elicitation resolver for a BLOCKING open_flag_drawer. Installed ONLY by beginFlagDrawer;
   // settled EXACTLY ONCE by `settleDrawer` on every terminal (Insert-filed / Cancel / token / retarget / dispose / replace).
   // Idempotent: `settleDrawer` nulls it before resolving, so a Stop racing an Insert can't double-resolve. No-op when a human
@@ -511,6 +520,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // CRL structure the anchor resolver matches a flag's stored target against (assembled in rebuild). All cleared on retarget/reset.
   let flagsList: MvFlag[] = [];
   let flagStateError = false;
+  // DISTINCT from flagStateError (which ALSO absorbs `.crl`-parse failures + un-migrated-flag counts): true ONLY when the
+  // `.crl/flags/` STORE read itself was partial/unreadable (a corrupt record OR a non-ENOENT readdir failure — EACCES/AV lock).
+  // The long-lived action drawer uses THIS (not flagStateError) to tell "the open flag's record is momentarily unknown" (keep it,
+  // don't close) from "the flag was genuinely deleted" (close) — else an unparseable-`.crl` policy would never close a real deletion.
+  let flagStoreWarning = false;
   // #212 S3: the SPECIFIC reason flag state is unknown (e.g. "N un-migrated `.crl` flags — migrate to the store"), so a blocked
   // gate has a real remediation instead of the generic "a source could not be read". Set alongside flagStateError.
   let flagStateNote: string | undefined;
@@ -987,6 +1001,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function reloadReviewFlags(): void {
     flagsList = [];
     flagStateError = false;
+    flagStoreWarning = false;
     flagStateNote = undefined;
     anchorCtx = undefined;
     if (mode !== "medical-validation" || !currentCel) return;
@@ -1028,6 +1043,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const loaded = loadStoredFlags(storeDir);
       if (loaded.warning) {
         flagStateError = true; // a corrupt/unreadable store record → flag state partially UNKNOWN → block the gate
+        flagStoreWarning = true; // …AND specifically a STORE read problem → the action drawer keeps its record rather than closing it
         flagStateNote = flagStateNote ?? loaded.warning;
       }
       flagsList = loaded.flags;
@@ -1044,34 +1060,39 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   const flagNote = (m: string): void => void vscode.window.setStatusBarMessage(`Medical Validation: ${m}`, 3000);
 
-  /** Open the review-flag list (mirrors the verdict quick-pick idiom). Re-entrant: after a toggle the list re-opens over the
-   *  REFRESHED `flagsList` (reloadReviewFlags re-reads the store, so a stale record is never reused across two edits). Esc, or a
-   *  reveal (which navigates away), ends the loop. */
+  /** Open the review-flag list (mirrors the verdict quick-pick idiom). Picking a flag opens the read-only ACTION DRAWER (a
+   *  right flyout — tree + questionnaire stay in view) and ENDS the list: the drawer, not the list, is the action surface now
+   *  (design 354). Until Todo 2's node-filtered entry, a multi-flag policy is list → drawer → badge → list (one extra click per
+   *  flag) — a documented, transitional cost. Esc closes the list. */
   async function openFlagList(): Promise<void> {
     if (mode !== "medical-validation") return;
-    const ver = indexVersion; // retarget/rebuild guard: a policy switch while a picker is open must not write the old .crl
+    const ver = indexVersion; // retarget/rebuild guard: a policy switch while a picker is open must not act on the old policy
     const cel = currentCel;
-    for (;;) {
-      if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return; // policy changed underneath
-      if (flagsList.length === 0) return flagNote(flagStateError ? flagStateNote ?? "flag state is unknown (a source could not be read)" : "no review flags");
-      // Embed the MvFlag on the item (not an index) so a rebuild that reloads `flagsList` during the pick can't make us act on
-      // a different flag at the same position (Claude impl review). The `ver` guard also aborts on rebuild. #212 S3: if the gate
-      // is blocked by an un-migrated `.crl` flag (store list may be non-empty), still surface the note.
-      if (flagStateNote) flagNote(flagStateNote);
-      const items = flagsList.map((f) => {
-        const a = f.anchor;
-        return {
-          label: `${f.status === "resolved" ? "✓" : "⚑"} ${f.tag}${f.gist ? " — " + f.gist : ""}`,
-          // GAP 3: an occurrence flag (a keyed decision flag) shows its node signature — `decision:D · <guard→activity> · open`
-          // — so it reads as a specific node, not the whole decision.
-          description: `${a.scope}:${a.name}${a.occurrenceKey ? " · " + parseOccurrenceKey(a.occurrenceKey).signature : ""} · ${f.status}${f.fields.ref ? " · " + f.fields.ref : ""}`,
-          flag: f,
-        };
-      });
-      const pick = await vscode.window.showQuickPick(items, { placeHolder: "Review flags — pick one (Esc to finish)" });
-      if (!pick) return; // Esc — done
-      if ((await flagActionMenu(pick.flag, ver, cel)) === "closed") return; // a reveal navigated away
-    }
+    if (flagsList.length === 0) return flagNote(flagStateError ? flagStateNote ?? "flag state is unknown (a source could not be read)" : "no review flags");
+    if (flagStateNote) flagNote(flagStateNote);
+    // Embed the MvFlag on the item (not an index) so a rebuild that reloads `flagsList` during the pick can't make us act on a
+    // different flag at the same position. #212 S3: if the gate is blocked by an un-migrated `.crl` flag, still surface the note.
+    const items = flagsList.map((f) => {
+      const a = f.anchor;
+      return {
+        label: `${f.status === "resolved" ? "✓" : "⚑"} ${f.tag}${f.gist ? " — " + f.gist : ""}`,
+        // GAP 3: an occurrence flag (a keyed decision flag) shows its node signature — `decision:D · <guard→activity> · open`
+        // — so it reads as a specific node, not the whole decision.
+        description: `${a.scope}:${a.name}${a.occurrenceKey ? " · " + parseOccurrenceKey(a.occurrenceKey).signature : ""} · ${f.status}${f.fields.ref ? " · " + f.fields.ref : ""}`,
+        flag: f,
+      };
+    });
+    const pick = await vscode.window.showQuickPick(items, { placeHolder: "Review flags — pick one (Esc to close)" });
+    if (!pick) return; // Esc — done
+    // Post-pick stale guard (design 354): the `showQuickPick` await can span a retarget, so re-validate BEFORE opening the drawer
+    // over a now-different policy (the lifecycle clear already fired for the old one and won't fire again).
+    if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — reopen the flags");
+    // Re-find by id from the (possibly reloaded) list so the first render is fresh; the drawer re-finds on every action too.
+    // Disc 355 [important]: if the watcher deleted it during the pick (a CLEAN store, indexVersion unchanged), don't open a ghost
+    // over the dead snapshot — note + return. A store WARNING (state unknown) → keep the snapshot (matches refreshFlagActionDrawer).
+    const live = flagsList.find((f) => f.id === pick.flag.id);
+    if (!live && !flagStoreWarning) return flagNote("the flag changed on disk — reopen it");
+    openFlagActionView(live ?? pick.flag, ver, cel);
   }
 
   /** #203 Todo 4b Slice C — resolve the issue-tracker collection base for the link-out. `crl.issueBaseUrl`, USER-scope
@@ -1192,54 +1213,6 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     return detectIssueBaseFromGit(fileUri);
   }
 
-  /** The per-flag action menu — the status toggle (the crl-refactors write-back) + reveal-in-source + (Slice C) the issue
-   *  link-out when the flag carries a numeric `; ref #N`. `ver`/`cel` are the policy-identity captured at list-open; the
-   *  write-back + the open both revalidate them so a retarget mid-menu can't patch the old `.crl` / open a stale link. */
-  async function flagActionMenu(flag: MvFlag, ver: number, cel: string | undefined): Promise<"continue" | "closed"> {
-    const actions: { label: string; act: "toggle" | "reveal" | "issue" | "config" }[] = [
-      { label: flag.status === "resolved" ? "↻ Reopen flag" : "✓ Mark resolved", act: "toggle" },
-      { label: "→ Reveal in source", act: "reveal" },
-    ];
-    // The file URI whose git origin resolves the issue base: a store flag has no source file, so it uses the policy `src/crl`
-    // dir (the same resolution bridgeReadReviewContext uses — a nested/submodule policy → its own repo's origin).
-    const repoFileUri = flagRepoFileUri();
-    // Slice C: offer the issue link ONLY for a numeric ref (the injection guard). A resolvable base → open; a trusted
-    // workspace with no base yet → a discoverable "set the setting" item (never silently hide the config path); an
-    // untrusted workspace or a non-numeric ref → no item. The base is re-resolved at click, so this is just for display.
-    const issueNo = issueRefOf(flag.fields.ref);
-    if (issueNo) {
-      // Menu build is READ-ONLY (never touches git / writes config — that would fire on merely opening the menu). A
-      // configured base → open directly; else a trusted workspace → offer "from git origin" (the click detects+persists);
-      // else the manual setting. Detection happens ONLY on the explicit click (below).
-      if (buildIssueUrl(resolveIssueBase(), issueNo)) actions.push({ label: `↗ Open issue #${issueNo}`, act: "issue" });
-      else if (vscode.workspace.isTrusted && repoFileUri) actions.push({ label: `↗ Open issue #${issueNo} (from git origin)`, act: "issue" });
-      else if (vscode.workspace.isTrusted) actions.push({ label: `⚙ Set crl.issueBaseUrl to open issue #${issueNo}…`, act: "config" });
-    }
-    const pick = await vscode.window.showQuickPick(actions, { placeHolder: `${flag.tag} — ${flag.gist}` });
-    if (!pick) return "continue"; // Esc → back to the list
-    if (pick.act === "reveal") {
-      await revealFlag(flag);
-      return "closed";
-    }
-    if (pick.act === "config") {
-      await vscode.commands.executeCommand("workbench.action.openSettings", "crl.issueBaseUrl");
-      return "continue";
-    }
-    if (pick.act === "issue") {
-      if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return "continue";
-      // Resolve at click: config wins; else auto-detect + persist from the flag's repo origin (the operator workflow).
-      const url = buildIssueUrl(await resolveOrDetectIssueBase(repoFileUri), issueNo);
-      if (!url) {
-        flagNote("no issue base and none derivable from git — set crl.issueBaseUrl");
-        return "continue";
-      }
-      if (!(await vscode.env.openExternal(vscode.Uri.parse(url)))) flagNote(`could not open issue #${issueNo}`);
-      return "continue";
-    }
-    await writeFlagStatus(flag, flag.status === "resolved" ? "open" : "resolved", ver, cel);
-    return "continue";
-  }
-
   /** The file URI whose git origin resolves the issue base — the policy `src/crl` dir (a store flag has no source file of its
    *  own; a nested/submodule policy → its own repo's origin). The same resolution bridgeReadReviewContext uses. */
   function flagRepoFileUri(): vscode.Uri | undefined {
@@ -1259,13 +1232,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       driveFlagBadges(); // the node badges track the (re)loaded flag state
       flagNote(m);
     };
-    if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return stale("policy changed — reopen the flags");
+    if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return stale("policy changed — reopen the flag");
     const dir = currentCel ? flagStoreDir(currentCel) : undefined;
     if (!dir) return flagNote("no flag store for this policy");
     const loaded = loadStoredFlags(dir);
     if (loaded.warning) return stale("flag store unreadable — repair the corrupt record first"); // a partially-unknown store must not be written into (parity with the MCP tool)
     const current = loaded.flags.find((f) => f.id === flag.id);
-    if (!current) return stale("flags changed — reopen the list"); // deleted/renamed on disk → don't recreate a stale snapshot
+    if (!current) return stale("the flag changed on disk — reopen it"); // deleted/renamed on disk → don't recreate a stale snapshot
     if (current.status === next) {
       // already at the target (a concurrent toggle won the race) — refresh so the list reflects disk; no redundant write.
       reloadReviewFlags();
@@ -1284,17 +1257,63 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     flagNote(next === "resolved" ? "flag resolved" : "flag reopened");
   }
 
-  /** Reveal a store flag: it has no textual home, so reveal the policy `.cel` (the tree ⚑ badge — driveFlagBadges places it on
-   *  the anchored node — already conveys WHICH node an occurrence flag is about). Precise tree-node scroll-on-reveal is a
-   *  follow-up (it needs a standalone tree scroll channel that won't collide with the selection highlight). */
-  async function revealFlag(_flag: MvFlag): Promise<void> {
-    if (!currentCel) return flagNote("could not reveal the flag");
+  /** The action drawer's Resolve/Reopen. Single-flight (a rapid 2nd click must not overlap the write). Writes via
+   *  `writeFlagStatus` (which reloads `flagsList` on every path), then reconciles the drawer against the refreshed list
+   *  (`refreshFlagActionDrawer` re-finds by id → replaces the captured record + re-renders, or closes if gone) — so the button
+   *  flips off the FRESH status, never the pre-write snapshot. */
+  async function flagActionToggle(): Promise<void> {
+    const view = flagActionView;
+    if (!view || flagActionBusy) return;
+    flagActionBusy = true;
     try {
-      const doc = await vscode.workspace.openTextDocument(currentCel);
-      await vscode.window.showTextDocument(doc);
-    } catch {
-      flagNote("could not reveal the flag");
+      await writeFlagStatus(view.flag, view.flag.status === "resolved" ? "open" : "resolved", view.ver, view.cel);
+    } finally {
+      flagActionBusy = false;
     }
+    refreshFlagActionDrawer();
+  }
+
+  /** The action drawer's Open-issue #N. Single-flight + async-guarded: re-find the record by id and re-derive its numeric ref
+   *  from the CURRENT store, then — AFTER `resolveOrDetectIssueBase` (git detection can span a retarget) and BEFORE
+   *  `openExternal` — re-check the same drawer is still active on the same policy, so a retarget / drawer swap can't open the
+   *  old flag's issue. No derivable base → a persistent Open-Settings warning (not a transient note). */
+  async function flagActionOpenIssue(): Promise<void> {
+    const view = flagActionView;
+    if (!view || flagActionBusy) return;
+    if (!issueRefOf(view.flag.fields.ref)) return flagNote("this flag has no linked issue"); // entry check off the captured record
+    flagActionBusy = true;
+    try {
+      const base = await resolveOrDetectIssueBase(flagRepoFileUri());
+      // Re-validate the drawer identity by (id, ver, cel) — stable across a `refreshFlagActionDrawer` object-replacement (it
+      // re-stamps the SAME id/ver/cel), but false on a close / retarget / rebuild (ver) / different-flag drawer (disc 355 [reject]:
+      // a close→reopen of the SAME flag opening its SAME issue is correct, so no epoch token is needed).
+      if (!flagActionView || flagActionView.flag.id !== view.flag.id || indexVersion !== view.ver || currentCel !== view.cel || mode !== "medical-validation") return;
+      // Re-derive the numeric ref from the CURRENT record (disc 355 [important]): an external `ref` edit during git detection
+      // must not open the pre-await number. Gone/non-numeric now → abort.
+      const issueNo = issueRefOf(flagActionView.flag.fields.ref);
+      if (!issueNo) return;
+      const url = buildIssueUrl(base, issueNo);
+      if (!url) return promptSetIssueBase(issueNo);
+      // openExternal is a Thenable that can REJECT (platform handler failure) — catch so a `void`-launched call never leaks an
+      // unhandled rejection (disc 355 [important]); a false RESULT and a rejection get the same honest note.
+      try {
+        if (!(await vscode.env.openExternal(vscode.Uri.parse(url)))) flagNote(`could not open issue #${issueNo}`);
+      } catch {
+        flagNote(`could not open issue #${issueNo}`);
+      }
+    } finally {
+      flagActionBusy = false;
+    }
+  }
+
+  /** No derivable issue base for #N — a PERSISTENT warning with a one-click Open-Settings (relocates the old menu's ⚙ item to
+   *  the failure moment; a 3s status-bar note is too easy to miss). In an untrusted workspace `resolveIssueBase` ignores the
+   *  workspace value, so steer to a User-scope setting. */
+  function promptSetIssueBase(issueNo: string): void {
+    const hint = vscode.workspace.isTrusted ? "" : " — set it in your User settings (a workspace value is ignored in an untrusted workspace)";
+    void vscode.window.showWarningMessage(`No issue tracker is configured to open issue #${issueNo}${hint}.`, "Open Settings").then((a) => {
+      if (a) void vscode.commands.executeCommand("workbench.action.openSettings", "crl.issueBaseUrl");
+    });
   }
 
   /**
@@ -2171,6 +2190,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     } else if (msg.type === "flagDraftCancel") {
       settleDrawer({ status: "cancelled", reason: "cancelled" }); // #210 (disc 239): the human cancelled the agent's request
       closeFlagDrawer();
+    } else if (msg.type === "flagActionToggle") {
+      void flagActionToggle(); // the action drawer's Resolve/Reopen (host acts on the host-captured flagActionView.flag — the msg carries no id)
+    } else if (msg.type === "flagActionIssue") {
+      void flagActionOpenIssue(); // the action drawer's Open-issue #N
+    } else if (msg.type === "flagActionClose") {
+      closeFlagActionView(); // the action drawer's ✕ (UI clear — no agent elicitation)
     } else if (msg.type === "reveal" && typeof msg.key === "string") {
       const hit = v.reveals[msg.key]; // trusted: looked up by opaque key, not a path/range from the webview
       if (!hit) return;
@@ -2433,6 +2458,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // per-node badges read `flagsList`, so loading AFTER the render (as it was) left both a rebuild stale (gpt55/Claude
     // review). Independent of the correspondence model (reads the `.crl` directly); inert in cockpit mode (MV-only).
     reloadReviewFlags();
+    refreshFlagActionDrawer(); // disc 355 [critical]: a same-policy rebuild bumped indexVersion — re-stamp the surviving action drawer's ver (else its actions fail a stale guard forever)
     for (const pane of PANES) coord.clearPending(pane);
     dispatch({ type: "setInputs", index: toIndex(model, crlStructure, toCelNav(scenarios, caseIdByName, duplicateScenarioNames), indexVersion) });
     updateNavMessage();
@@ -2549,6 +2575,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           reloadReviewFlags();
           renderTreeChrome();
           driveFlagBadges();
+          refreshFlagActionDrawer(); // an open action drawer is long-lived — reconcile it against the externally-changed store (or close if the flag is gone)
         }, 150);
       };
       flagsWatcher.onDidCreate(onFlags);
@@ -3133,8 +3160,87 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!tree) return;
     // Only the human MV "Type" tags (a `displayName`) are offered — the AI-authoring extraction tags are hidden from the drawer.
     const mvTypes = flagTags().filter((t) => t.displayName !== undefined);
-    const html = flagDraft ? renderFlagDrawer({ targetLabel: flagDraft.target.shortLabel, targetTitle: flagDraft.target.label, tags: mvTypes, tag: flagDraft.tag, summary: flagDraft.summary, stub: flagDraft.stub, fields: flagDraft.fields, focus: flagDraft.focus }) : "";
+    // One-slot dispatcher (design 354): the create drawer wins, else the action drawer, else an empty region. Never both set
+    // (each open clears the other) — this precedence is just a total order for the "both somehow set" impossibility.
+    const html = flagDraft
+      ? renderFlagDrawer({ targetLabel: flagDraft.target.shortLabel, targetTitle: flagDraft.target.label, tags: mvTypes, tag: flagDraft.tag, summary: flagDraft.summary, stub: flagDraft.stub, fields: flagDraft.fields, focus: flagDraft.focus })
+      : flagActionView
+        ? renderFlagActionDrawer(flagActionViewModel(flagActionView.flag))
+        : "";
     void tree.panel.webview.postMessage({ type: "flagDrawer", html });
+  }
+
+  // The plumbing field keys the action drawer's read-only view never lists as an extra field: `ref` is rendered specially (the
+  // Ref row + the Open-issue affordance), the rest are host/derived internals. UNLIKE flagDrawerHtml's HOST_MANAGED_FIELDS this
+  // does NOT include `kind` — the read-only view SHOWS kind (+ any other discriminator field) per design 354 accept #7; the
+  // create drawer hides it (AI-only authoring), but reading a filed flag should surface everything it carries.
+  const FLAG_VIEW_PLUMBING = new Set(["ref", "key", "status", "system"]);
+
+  /** Build the read-only view model the action drawer renders from a stored `MvFlag`. Derives the display-only bits here (Type
+   *  via `flagDisplayNameOf` with a raw-tag fallback, the occurrence signature via `parseOccurrenceKey`, the numeric issue no
+   *  via `issueRefOf`) so the renderer stays pure. */
+  function flagActionViewModel(flag: MvFlag): Parameters<typeof renderFlagActionDrawer>[0] {
+    const a = flag.anchor;
+    const anchorAddress = `${a.scope}:${a.name}${a.library ? ` "${a.library}"` : ""}`;
+    const occurrenceSignature = a.occurrenceKey ? parseOccurrenceKey(a.occurrenceKey).signature : undefined;
+    const fields: FlagActionField[] = Object.entries(flag.fields)
+      .filter(([k, v]) => !FLAG_VIEW_PLUMBING.has(k) && v !== "")
+      .map(([key, value]) => ({ key, value }));
+    const issueNoStr = issueRefOf(flag.fields.ref);
+    return {
+      typeLabel: flagDisplayNameOf(flag.tag) ?? flag.tag, // extraction/legacy tags have no displayName → the raw tag id
+      category: flag.category,
+      status: flag.status,
+      targetLabel: a.label,
+      targetTitle: a.label,
+      anchorAddress,
+      occurrenceSignature,
+      summary: flag.gist,
+      description: flag.description,
+      fields,
+      issueRef: flag.fields.ref,
+      issueNo: issueNoStr ? Number(issueNoStr) : undefined,
+      createdAt: flag.createdAt,
+      editedAt: flag.editedAt,
+    };
+  }
+
+  /** Open the flag-ACTION drawer on a host-captured record. Routes through the settle choke-point (design 354 [critical]): a
+   *  create drawer may have a BLOCKING agent elicitation pending, so settle it `{replaced}` + drop the draft before showing the
+   *  action drawer — a bare `flagDraft = undefined` would hang the agent. Mutual exclusion enforced here (one of the two open sites). */
+  function openFlagActionView(flag: MvFlag, ver: number, cel: string | undefined): void {
+    if (mode !== "medical-validation") return;
+    settleDrawer({ status: "cancelled", reason: "replaced" }); // a new flyout supersedes any pending create elicitation
+    flagDraft = undefined;
+    flagActionView = { flag, ver, cel };
+    postFlagDrawer();
+  }
+
+  /** Close the action drawer (UI clear only — it carries no agent elicitation). No-op when already closed. */
+  function closeFlagActionView(): void {
+    if (!flagActionView) return;
+    flagActionView = undefined;
+    postFlagDrawer(); // empty region
+  }
+
+  /** Reconcile the open action drawer against the current `flagsList` (design 354 [important]): re-find the record by id and
+   *  REPLACE the host-captured `flag` (not just the HTML) — else a stale status snapshot makes the next toggle a no-op — then
+   *  re-render. RE-STAMPS `ver`/`cel` to the live policy identity (disc 355 [critical]): every call site is same-policy by
+   *  construction (retarget/reset run clearFlagDraft first; the watcher checks watchedCel===currentCel), so a same-policy
+   *  `rebuild()` that bumped `indexVersion` doesn't leave the drawer's actions failing a stale `ver` guard forever. Absence:
+   *  a CLEAN store → genuine deletion → close with a note; a store WARNING (a transient/partial read — disc 355 [important]) →
+   *  KEEP the record + re-render (state is UNKNOWN, not "changed"), mirroring writeFlagStatus's warning-blocks-the-write parity. */
+  function refreshFlagActionDrawer(): void {
+    if (!flagActionView) return;
+    const live = flagsList.find((f) => f.id === flagActionView!.flag.id);
+    if (!live) {
+      if (flagStoreWarning) return postFlagDrawer(); // partial/unreadable store → keep the captured record (don't assert "deleted")
+      closeFlagActionView();
+      flagNote("the flag changed on disk — reopen it");
+      return;
+    }
+    flagActionView = { flag: live, ver: indexVersion, cel: currentCel };
+    postFlagDrawer();
   }
 
   /** #211 — open the create-flag drawer on a RESOLVED target (the ONE agent seam). Captures the policy identity for the
@@ -3143,6 +3249,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function openFlagDrawer(prefill: FlagDraftPrefill): void {
     if (mode !== "medical-validation") return;
     settleDrawer({ status: "cancelled", reason: "replaced" }); // #210 (disc 239): a NEW drawer supersedes any pending elicitation
+    flagActionView = undefined; // mutual exclusion: the create drawer supersedes an open action drawer (one `#flagDrawer` slot)
     flagDraft = { ...prefill, cel: currentCel };
     postFlagDrawer();
   }
@@ -3171,6 +3278,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function clearFlagDraft(reason: ElicitationCancelReason): void {
     settleDrawer({ status: "cancelled", reason });
     flagDraft = undefined;
+    flagActionView = undefined; // a lifecycle drop (retarget / reset / dispose) clears the action drawer too — same `#flagDrawer` slot
     postFlagDrawer();
   }
   /** The drawer element to ring — AUTHORITATIVELY derived from the live prefill (the agent supplies no override): the first
@@ -4337,6 +4445,19 @@ body:has(.flag-drawer) .flow-zoom{display:none}
 .flag-cancel,.flag-insert{cursor:pointer;border:none;border-radius:2px;padding:2px 10px;font-size:.9em}
 .flag-cancel{background:var(--vscode-button-secondaryBackground,#3a3d41);color:var(--vscode-button-secondaryForeground,#fff)}
 .flag-insert{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff)}
+/* flag-ACTION drawer (read-only view) — shares .flag-drawer chrome; the body is a scrolling label/value list, actions pin bottom. */
+.fa-body{display:flex;flex-direction:column;gap:6px;flex:1;overflow-y:auto;padding-top:2px}
+.fa-row{display:flex;gap:8px;align-items:baseline}
+.fa-key{flex:0 0 74px;opacity:.7;font-size:.82em;text-transform:uppercase;letter-spacing:.02em}
+.fa-val{flex:1;min-width:0;overflow-wrap:anywhere}
+.fa-pre{white-space:pre-wrap}
+.fa-em{opacity:.5}
+.fa-addr{display:block;opacity:.7;font-size:.85em;font-family:var(--vscode-editor-font-family,monospace);margin-top:1px}
+.fa-status{font-weight:600}
+.fa-status-open{color:var(--vscode-charts-orange,#d18616)}
+.fa-status-resolved{color:var(--vscode-charts-green,#89d185)}
+.fa-btn{cursor:pointer;border:none;border-radius:2px;padding:2px 10px;font-size:.9em;background:var(--vscode-button-secondaryBackground,#3a3d41);color:var(--vscode-button-secondaryForeground,#fff)}
+.fa-btn.fa-primary{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff)}
 /* tree zoom control — its rules now live in FLOW_STYLE (flowPaneHtml.ts), co-located with the control markup + shared with the
    standalone snapshot export; the shell picks them up via the ${FLOW_STYLE} include below. */
 .fc-toggle{display:flex;align-items:center;gap:4px;padding:4px 2px 6px;font-size:.85em}
@@ -4618,7 +4739,12 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(fl)v.postMessage({type:'mvFlags'});});` +
   // #211: the create-flag drawer's controls (its OWN region → a separate listener). Close/Cancel drops the draft; Insert
   // collects the tag + summary + stub + the VISIBLE tag's field values and posts them (the host uses the captured target).
+  // The flag-ACTION drawer shares this region (mutually exclusive with create) but uses DISTINCT `data-flag-action-*` intents
+  // so its ✕ never posts the create `flagDraftCancel` (which no-ops when there's no draft). It carries no flag id — the host
+  // acts on its captured `flagActionView.flag` (trusted-input discipline).
   `fld.addEventListener('click',(e)=>{` +
+  `const ac=e.target.closest&&e.target.closest('[data-flag-action-toggle],[data-flag-action-issue],[data-flag-action-close]');` +
+  `if(ac){e.preventDefault();e.stopPropagation();v.postMessage({type:ac.hasAttribute('data-flag-action-toggle')?'flagActionToggle':ac.hasAttribute('data-flag-action-issue')?'flagActionIssue':'flagActionClose'});return;}` +
   `const cx=e.target.closest&&e.target.closest('[data-flag-close],[data-flag-cancel]');` +
   `if(cx){e.preventDefault();v.postMessage({type:'flagDraftCancel'});return;}` +
   `const ins=e.target.closest&&e.target.closest('[data-flag-insert]');` +

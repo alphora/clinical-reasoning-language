@@ -871,12 +871,8 @@ check("#212 S3: writeFlagStatus is STORE-ONLY (no origin dispatch) — read-modi
   assert.match(m[1], /loaded\.flags\.find\(\(f\) => f\.id === flag\.id\)/); // re-read the current record by id
   assert.match(m[1], /saveFlag\(dir, \{ \.\.\.current, status: next, editedAt: new Date\(\)\.toISOString\(\) \}\)/); // merge onto CURRENT
 });
-check("#212 S3: revealFlag is STORE-ONLY — reveals the policy `.cel` (the ⚑ badge marks the node); no legacy meta-line branch", () => {
-  const m = COCKPIT_SRC.match(/async function revealFlag\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
-  assert.ok(m, "revealFlag body");
-  assert.doesNotMatch(m[1], /rf\.origin|rf\.src/); // the legacy branch is GONE
-  assert.match(m[1], /openTextDocument\(currentCel\)/); // the policy `.cel`
-});
+// (design 354) `revealFlag` DELETED — "Reveal in source" only re-opened the `.cel` (near-useless); the non-modal action drawer
+// + the anchor signature it renders are the legibility replacement. Its removal is locked by the "'Reveal in source' is GONE" test.
 check("#212 S2 (I6): a FileSystemWatcher covers the `.crl/flags/` store (outside the src-scoped watcher); a change does a LIGHT refresh, not a rebuild", () => {
   const m = COCKPIT_SRC.match(/function setupWatcher\(\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "setupWatcher body");
@@ -994,10 +990,14 @@ check("#211: the message router wires flagDraftInsert → commitFlagDraft and fl
 // ── #210 (disc 239): the settle-once choke-point — the elicitation lifecycle rigor (the races aren't runtime-testable, so
 //    the goldens guard that every terminal routes through settleDrawer exactly once, keyed on the flagDraft transition). ──
 check("#210 (disc 239): EVERY flagDraft clear routes through the settle-once choke-point (no direct assignment strands a blocking elicitation)", () => {
-  // `flagDraft = undefined` must appear ONLY in closeFlagDrawer + clearFlagDraft — the lifecycle sites (tree-dispose /
-  // resetToEmpty / policy-reload / openPanel) route through clearFlagDraft, which SETTLES any pending agent elicitation.
-  const clears = (COCKPIT_SRC.match(/flagDraft = undefined/g) || []).length;
-  assert.equal(clears, 2, "flagDraft = undefined is confined to closeFlagDrawer + clearFlagDraft");
+  // `flagDraft = undefined` appears ONLY in closeFlagDrawer + clearFlagDraft + openFlagActionView (design 354) — the lifecycle
+  // sites route through clearFlagDraft; openFlagActionView (the create→action cross-open) SETTLES {replaced} BEFORE its clear.
+  // Each is settle-safe, so no blocking elicitation strands. (Assignment-precise regex — the doc comment's backticked mention
+  // has no `;` and isn't line-leading, so it's excluded.)
+  const clears = (COCKPIT_SRC.match(/\n\s*flagDraft = undefined;/g) || []).length;
+  assert.equal(clears, 3, "flagDraft = undefined is confined to closeFlagDrawer + clearFlagDraft + openFlagActionView");
+  // openFlagActionView settles the pending create elicitation {replaced} before dropping the draft (else the agent hangs).
+  assert.match(COCKPIT_SRC, /function openFlagActionView[\s\S]*?settleDrawer\(\{ status: "cancelled", reason: "replaced" \}\);[\s\S]*?flagDraft = undefined;/);
   // settleDrawer is idempotent: nulls the resolver BEFORE resolving (a Stop racing an Insert can't double-resolve).
   assert.match(COCKPIT_SRC, /function settleDrawer[\s\S]*?pendingDrawer = undefined;[\s\S]*?p\.settle\(outcome\)/);
   assert.match(COCKPIT_SRC, /function clearFlagDraft[\s\S]*?settleDrawer\(\{ status: "cancelled", reason \}\)/);
@@ -1022,21 +1022,13 @@ check("#203 Slice C: resolveIssueBase prefers the USER (global) value; a workspa
   assert.match(m[1], /if \(!vscode\.workspace\.isTrusted\) return undefined/); // repo value needs trust
   assert.match(m[1], /sanitizeIssueBase\(info\?\.workspaceValue\)/);
 });
-check("#203 Slice C: flagActionMenu offers Open-issue only for a numeric ref; a discoverable config item when trusted+no-base; re-resolve+guard at click", () => {
-  const m = COCKPIT_SRC.match(/async function flagActionMenu\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
-  assert.ok(m, "flagActionMenu body");
-  assert.match(m[1], /const issueNo = issueRefOf\(flag\.fields\.ref\)/); // #212 S2: numeric-only guard off the MvFlag Record
-  // MENU BUILD is READ-ONLY (resolveIssueBase, config-only — never detects/writes on menu-open); a trusted+no-config
-  // node offers "from git origin" (the click detects), else the manual-setting item.
-  assert.match(m[1], /buildIssueUrl\(resolveIssueBase\(\), issueNo\)/); // configured base → open item
-  assert.match(m[1], /isTrusted && repoFileUri\) actions\.push\(\{ label: `↗ Open issue #\$\{issueNo\} \(from git origin\)`/); // detect-on-click item
-  assert.match(m[1], /vscode\.workspace\.isTrusted\) actions\.push\(\{ label: `⚙ Set crl\.issueBaseUrl/); // discoverable config item
-  // open path: identity guard, then RESOLVE-OR-DETECT at click (config wins; else auto-detect+persist from the flag's repo)
-  assert.match(m[1], /if \(pick\.act === "issue"\)/);
-  assert.match(m[1], /indexVersion !== ver \|\| currentCel !== cel \|\| mode !== "medical-validation"\) return "continue"/);
-  assert.match(m[1], /const repoFileUri = flagRepoFileUri\(\)/); // #212 S3: store-only → the policy src/crl
-  assert.match(m[1], /buildIssueUrl\(await resolveOrDetectIssueBase\(repoFileUri\), issueNo\)/); // config-first, else detect
-  assert.match(m[1], /await vscode\.env\.openExternal\(vscode\.Uri\.parse\(url\)\)\)\) flagNote\(`could not open issue/);
+// (design 354) `flagActionMenu`'s Open-issue behavior moved to the flag-ACTION drawer's `flagActionOpenIssue` — the numeric-ref
+// guard, the resolve-or-detect at click, and the identity re-check are locked by the "Open-issue re-validates …" test above; the
+// no-base case is now a persistent Open-Settings warning (`promptSetIssueBase`) instead of the old read-only ⚙ menu item.
+check("#203 Slice C: the read-only issue-base resolver stays intact for the drawer's Open-issue path", () => {
+  assert.match(COCKPIT_SRC, /buildIssueUrl\(base, issueNo\)/); // the drawer resolves at click via resolveOrDetectIssueBase → buildIssueUrl
+  assert.match(COCKPIT_SRC, /function promptSetIssueBase\(issueNo: string\): void/); // no-base → a discoverable Open-Settings warning
+  assert.match(COCKPIT_SRC, /"workbench\.action\.openSettings", "crl\.issueBaseUrl"/); // the settings shortcut, relocated to the failure moment
 });
 check("#204/#211: gitRepositoryForFile is the SHARED, side-effect-free git-ext access (activate; getRepository, not repositories[0]); total", () => {
   const m = COCKPIT_SRC.match(/async function gitRepositoryForFile\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
@@ -1305,4 +1297,89 @@ check("bulk-verdict: enumeration uses the SAME reachable gate + reviewable-case 
   assert.match(COCKPIT_SRC, /criterionGateIdentities\(guardOutlines, criterionIdentities\)/, "criteria from the gate walk");
   assert.match(COCKPIT_SRC, /liveCaseIds: \[\.\.\.scenarioByCaseId\.keys\(\)\]/, "cases from the reviewable frozen set");
   assert.match(COCKPIT_SRC, /liveCriteria: buildLiveCriterionIdentities\(\),[\s\S]*?liveCaseIds: new Set\(scenarioByCaseId\.keys\(\)\)/, "apply ctx uses the SAME gate + reviewable sets");
+});
+
+// ── flag-action drawer foundation (design 354) — host wiring locks ─────────────────────────────────────────────────────
+check("flag-action drawer: postFlagDrawer is the one-slot dispatcher (create → action → empty)", () => {
+  assert.match(COCKPIT_SRC, /flagDraft\s*\n\s*\?\s*renderFlagDrawer\(/, "create wins");
+  assert.match(COCKPIT_SRC, /:\s*flagActionView\s*\n\s*\?\s*renderFlagActionDrawer\(flagActionViewModel\(flagActionView\.flag\)\)/, "else the action drawer");
+  assert.match(COCKPIT_SRC, /renderFlagActionDrawer\(flagActionViewModel\(flagActionView\.flag\)\)\s*\n\s*:\s*"";/, "else an empty region");
+});
+
+check("flag-action drawer: opening either flyout routes through the settle choke-point (mutual exclusion, no agent hang)", () => {
+  // openFlagActionView settles the pending create elicitation {replaced} + drops the draft BEFORE showing the action drawer
+  assert.match(COCKPIT_SRC, /function openFlagActionView\([^)]*\): void \{[\s\S]*?settleDrawer\(\{ status: "cancelled", reason: "replaced" \}\);[\s\S]*?flagDraft = undefined;[\s\S]*?flagActionView = \{ flag, ver, cel \};/);
+  // openFlagDrawer (create) clears any open action drawer — the other open site
+  assert.match(COCKPIT_SRC, /function openFlagDrawer\([\s\S]*?flagActionView = undefined;[\s\S]*?flagDraft = \{ \.\.\.prefill/);
+  // clearFlagDraft (retarget/reset/dispose) clears the action drawer too
+  assert.match(COCKPIT_SRC, /function clearFlagDraft\([\s\S]*?flagDraft = undefined;\s*\n\s*flagActionView = undefined;/);
+});
+
+check("flag-action drawer: refreshFlagActionDrawer re-finds by id, RE-STAMPS ver/cel, keeps on store-warning, closes only on clean deletion; wired to watcher + rebuild", () => {
+  assert.match(COCKPIT_SRC, /function refreshFlagActionDrawer\(\): void \{[\s\S]*?flagsList\.find\(\(f\) => f\.id === flagActionView!\.flag\.id\)/);
+  // disc 355 [important]: absent + store WARNING → keep the captured record (re-render), never assert "deleted"
+  assert.match(COCKPIT_SRC, /if \(!live\) \{\s*\n\s*if \(flagStoreWarning\) return postFlagDrawer\(\);[\s\S]*?closeFlagActionView\(\);[\s\S]*?flagNote\(/);
+  // disc 355 [critical]: present → REPLACE the record AND re-stamp ver/cel to the live policy (survives a same-policy rebuild's indexVersion bump)
+  assert.match(COCKPIT_SRC, /flagActionView = \{ flag: live, ver: indexVersion, cel: currentCel \};/);
+  // reconciled on external store change (watcher) AND on a same-policy rebuild (both same-policy by construction)
+  assert.match(COCKPIT_SRC, /driveFlagBadges\(\);\s*\n\s*refreshFlagActionDrawer\(\); \/\/ an open action drawer/);
+  assert.match(COCKPIT_SRC, /reloadReviewFlags\(\);\s*\n\s*refreshFlagActionDrawer\(\); \/\/ disc 355 \[critical\]: a same-policy rebuild/);
+  // flagStoreWarning is DISTINCT from flagStateError (set only on a STORE read problem, not on `.crl`-parse / un-migrated)
+  assert.match(COCKPIT_SRC, /flagStoreWarning = true; \/\/ …AND specifically a STORE read problem/);
+});
+
+check("flag-action drawer: Resolve/Reopen is single-flight, writes via writeFlagStatus, then reconciles off the FRESH status", () => {
+  const m = COCKPIT_SRC.match(/async function flagActionToggle\(\): Promise<void> \{([\s\S]*?)\n  \}/);
+  assert.ok(m, "flagActionToggle body");
+  assert.match(m[1], /if \(!view \|\| flagActionBusy\) return;/, "single-flight guard");
+  assert.match(m[1], /flagActionBusy = true;/);
+  assert.match(m[1], /await writeFlagStatus\(view\.flag, view\.flag\.status === "resolved" \? "open" : "resolved", view\.ver, view\.cel\);/);
+  assert.match(m[1], /refreshFlagActionDrawer\(\);/, "reconcile AFTER the write so the button flips off fresh status");
+});
+
+check("flag-action drawer: Open-issue re-validates identity AFTER the async detect, RE-DERIVES the ref, catches openExternal rejection", () => {
+  const m = COCKPIT_SRC.match(/async function flagActionOpenIssue\(\): Promise<void> \{([\s\S]*?)\n  \}/);
+  assert.ok(m, "flagActionOpenIssue body");
+  assert.match(m[1], /const base = await resolveOrDetectIssueBase\(flagRepoFileUri\(\)\);/);
+  assert.match(m[1], /if \(!flagActionView \|\| flagActionView\.flag\.id !== view\.flag\.id \|\| indexVersion !== view\.ver \|\| currentCel !== view\.cel \|\| mode !== "medical-validation"\) return;/);
+  // disc 355 [important]: re-derive the numeric ref from the CURRENT record AFTER the await (a concurrent ref edit must not open the old #)
+  assert.match(m[1], /const issueNo = issueRefOf\(flagActionView\.flag\.fields\.ref\);\s*\n\s*if \(!issueNo\) return;/);
+  assert.match(m[1], /if \(!url\) return promptSetIssueBase\(issueNo\);/, "no base → persistent Open-Settings warning, not a lost note");
+  // disc 355 [important]: openExternal is a Thenable that can REJECT — a catch so the void-launched call never leaks an unhandled rejection
+  assert.match(m[1], /try \{\s*\n\s*if \(!\(await vscode\.env\.openExternal[\s\S]*?\} catch \{\s*\n\s*flagNote\(`could not open issue/);
+});
+
+check("flag-action drawer: openFlagList doesn't open a GHOST — clean deletion during the pick → note+return; store-warning → keep the snapshot", () => {
+  const m = COCKPIT_SRC.match(/async function openFlagList\(\): Promise<void> \{([\s\S]*?)\n  \}/);
+  assert.ok(m, "openFlagList body");
+  assert.match(m[1], /const live = flagsList\.find\(\(f\) => f\.id === pick\.flag\.id\);/);
+  assert.match(m[1], /if \(!live && !flagStoreWarning\) return flagNote\("the flag changed on disk/);
+  assert.match(m[1], /openFlagActionView\(live \?\? pick\.flag, ver, cel\);/);
+});
+
+check("flag-action drawer: the flag list opens the drawer (ends the loop) with a post-pick stale guard; no re-entrant action QuickPick", () => {
+  const m = COCKPIT_SRC.match(/async function openFlagList\(\): Promise<void> \{([\s\S]*?)\n  \}/);
+  assert.ok(m, "openFlagList body");
+  assert.ok(!/for \(;;\)/.test(m[1]), "no re-entrant loop");
+  assert.match(m[1], /if \(indexVersion !== ver \|\| currentCel !== cel \|\| mode !== "medical-validation"\) return flagNote\("policy changed/, "post-pick stale guard");
+  assert.match(m[1], /openFlagActionView\(live \?\? pick\.flag, ver, cel\);/);
+});
+
+check("flag-action drawer: 'Reveal in source' is GONE (revealFlag + flagActionMenu removed)", () => {
+  assert.ok(!/function revealFlag\b/.test(COCKPIT_SRC), "revealFlag deleted");
+  assert.ok(!/function flagActionMenu\b/.test(COCKPIT_SRC), "flagActionMenu deleted");
+  assert.ok(!/Reveal in source/.test(COCKPIT_SRC), "no reveal-in-source label");
+});
+
+check("flag-action drawer: the webview listener posts DISTINCT data-flag-action-* intents (no create-drawer collision) + carries no id", () => {
+  assert.match(SCRIPT, /\[data-flag-action-toggle\],\[data-flag-action-issue\],\[data-flag-action-close\]/);
+  assert.match(SCRIPT, /type:ac\.hasAttribute\('data-flag-action-toggle'\)\?'flagActionToggle':ac\.hasAttribute\('data-flag-action-issue'\)\?'flagActionIssue':'flagActionClose'/);
+  // the create-drawer close intent must still be distinct (matches data-flag-close/cancel only)
+  assert.match(SCRIPT, /closest\('\[data-flag-close\],\[data-flag-cancel\]'\)/);
+});
+
+check("flag-action drawer: the host handlers act on the captured flagActionView (msgs carry no flag id)", () => {
+  assert.match(COCKPIT_SRC, /else if \(msg\.type === "flagActionToggle"\) \{\s*\n\s*void flagActionToggle\(\);/);
+  assert.match(COCKPIT_SRC, /else if \(msg\.type === "flagActionIssue"\) \{\s*\n\s*void flagActionOpenIssue\(\);/);
+  assert.match(COCKPIT_SRC, /else if \(msg\.type === "flagActionClose"\) \{\s*\n\s*closeFlagActionView\(\);/);
 });
