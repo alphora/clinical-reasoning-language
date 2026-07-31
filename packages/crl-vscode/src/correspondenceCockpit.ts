@@ -4700,7 +4700,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `const fb=e.target.closest&&e.target.closest('[data-mv-flag-badge]');` +
   // Todo 2 (disc 356): a PER-NODE badge carries data-node-flag-gid (read off the MATCHED badge <g>, NOT a second closest — the
   // start pill is its SIBLING in the same row) → node-filtered; the start-count pill has none → the whole-policy list.
-  `if(fb){e.preventDefault();e.stopPropagation();var ng=fb.getAttribute('data-node-flag-gid');if(ng)v.postMessage({type:'nodeFlags',gid:ng});else v.postMessage({type:'mvFlags'});return;}` +
+  `if(fb){e.preventDefault();e.stopPropagation();var nfg=fb.getAttribute('data-node-flag-gid');if(nfg)v.postMessage({type:'nodeFlags',gid:nfg});else v.postMessage({type:'mvFlags'});return;}` +
   // tree zoom control (− / reset / +) — a local view op, no host round-trip. Intercepted BEFORE [data-reveal].
   `const zb=e.target.closest&&e.target.closest('[data-zoom]');` +
   `if(zb){e.preventDefault();e.stopPropagation();const a=zb.getAttribute('data-zoom');setZoom(a==='in'?treeZoom*1.2:a==='out'?treeZoom/1.2:1);return;}` +

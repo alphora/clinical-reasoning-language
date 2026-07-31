@@ -23,6 +23,15 @@ const FLAGPLACEMENT_SRC = readFileSync(resolve(here, "flagPlacement.ts"), "utf8"
 
 const check = test;
 
+// CRITICAL executable guard (added after the 4.97.0 `Identifier 'ng' has already been declared` incident — a Todo 2 `var ng`
+// collided with the notes-toggle `const ng` in the shared click handler, which made the ENTIRE webview script fail to parse →
+// every MV pane rendered blank). The source-greps couldn't catch it because they don't PARSE the script. `new Function(body)`
+// compiles the script body (throwing SyntaxError on a duplicate declaration or any syntax error) WITHOUT executing it — so it
+// needs no DOM/vscode globals. This locks the whole concatenated string as syntactically valid JS.
+check("the webview SCRIPT is syntactically valid JS (parses — no duplicate declarations / stray syntax errors)", () => {
+  assert.doesNotThrow(() => new Function(SCRIPT), "COCKPIT_WEBVIEW_SCRIPT must parse as a function body");
+});
+
 // Helper: extract a single message handler body `else if(m.type==='<type>'){...}` (or the leading `if(...)` for render).
 // The script is one big concatenation; each handler is delimited by the next `else if(m.type===` / `}});`.
 function handlerBody(type) {
@@ -710,7 +719,7 @@ check("#203 Slice A webview: a ⚑ badge click is intercepted BEFORE [data-revea
   const revealAt = SCRIPT.indexOf("closest('[data-reveal]')");
   assert.ok(badgeAt > 0 && badgeAt < revealAt, "badge intercept comes before the data-reveal click routing");
   // Todo 2 (disc 356): read data-node-flag-gid off the MATCHED badge element (fb) — present → nodeFlags(gid), absent → mvFlags
-  assert.match(SCRIPT, /var ng=fb\.getAttribute\('data-node-flag-gid'\);if\(ng\)v\.postMessage\(\{type:'nodeFlags',gid:ng\}\);else v\.postMessage\(\{type:'mvFlags'\}\);return;/);
+  assert.match(SCRIPT, /var nfg=fb\.getAttribute\('data-node-flag-gid'\);if\(nfg\)v\.postMessage\(\{type:'nodeFlags',gid:nfg\}\);else v\.postMessage\(\{type:'mvFlags'\}\);return;/);
 });
 check("#224 ii.3 Slice 2 webview: a criterion chevron ([data-toggle-crit]) is intercepted BEFORE [data-reveal] and posts toggleCriterion", () => {
   assert.match(SCRIPT, /closest\('\[data-toggle-crit\]'\)/);
@@ -1429,5 +1438,5 @@ check("node-filter: the per-node message routes to openNodeFlags(gid); the start
   assert.match(COCKPIT_SRC, /else if \(msg\.type === "mvFlags"\) \{\s*\n\s*void openFlagList\(\);/);
   assert.match(COCKPIT_SRC, /gid\?: string;/, "the incoming-message type carries an optional gid");
   // the webview reads data-node-flag-gid off the MATCHED badge (per-node → nodeFlags, start pill → mvFlags)
-  assert.match(SCRIPT, /var ng=fb\.getAttribute\('data-node-flag-gid'\);if\(ng\)v\.postMessage\(\{type:'nodeFlags',gid:ng\}\);else v\.postMessage\(\{type:'mvFlags'\}\);/);
+  assert.match(SCRIPT, /var nfg=fb\.getAttribute\('data-node-flag-gid'\);if\(nfg\)v\.postMessage\(\{type:'nodeFlags',gid:nfg\}\);else v\.postMessage\(\{type:'mvFlags'\}\);/);
 });
