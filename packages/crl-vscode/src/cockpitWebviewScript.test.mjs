@@ -800,7 +800,7 @@ check("#224 Slice 2b-2: a body-concept OPEN flag rolls up onto a COLLAPSED crite
   assert.match(FLAGPLACEMENT_SRC, /concept scope[\s\S]*?conceptOccurrences[\s\S]*?\(lib, name\)/); // concept match by (lib,name)
   assert.match(FLAGPLACEMENT_SRC, /if \(!occ\.collapsed\) continue;/); // expanded → body concepts render their own badges
   // per-flag rollup via place(occ.gid, f) — a Set of keys couldn't record WHICH flag lit the rollup gid
-  assert.match(FLAGPLACEMENT_SRC, /for \(const f of openConceptFlags\) if \(bodyKeys\.has\([\s\S]*?\)\) place\(occ\.gid, f\)/);
+  assert.match(FLAGPLACEMENT_SRC, /for \(const f of conceptFlags\) if \(bodyKeys\.has\([\s\S]*?\)\) place\(occ\.gid, f\)/);
 });
 check("#224 Slice 2b host: loadReviewSidecar loads criterionVerdictsByKey + resets it on retarget; the tree ack re-drives the chips", () => {
   assert.match(COCKPIT_SRC, /criterionVerdicts = sidecar\.criterionVerdictsByKey \?\? \{\}/);
@@ -854,13 +854,13 @@ check("#203 GAP 3: flagTargetChoices — decision root → object-decision; a `w
   assert.match(m[1], /label: `\$\{short\} \(\$\{occ\.signature\}\)`, shortLabel: short/);
 });
 check("#203 GAP 3 / #212 S2: the occurrence-liveness callback (resolveAnchor → ONE node gid) + the per-flag unplaced count", () => {
-  const m = COCKPIT_SRC.match(/function driveFlagBadges\(\)[^{]*\{([\s\S]*?)\n  \}/);
-  assert.ok(m, "driveFlagBadges body");
-  // the occurrence-liveness lookup stays in the host (needs anchorCtx + the live tree) — passed to computeFlagPlacement as a callback
+  // the occurrence-liveness lookup lives in `flagPlacementFor` (disc 359 — shared by driveFlagBadges + the gold node-link)
+  const m = COCKPIT_SRC.match(/function flagPlacementFor\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "flagPlacementFor body");
   assert.match(m[1], /const cls = resolveAnchor\(a, anchorCtx\)/); // #212 S2: resolveAnchor does the occurrence nodeId+signature verify
   assert.match(m[1], /cls\.state === "live" && cls\.nodeKey \? tree\.anchors\[cls\.nodeKey\]\?\.scrollTo : undefined/); // placed → the ONE node's gid; moved/orphan → undefined
-  assert.match(m[1], /open: open\.length, resolved: resolvedCount, flagError: flagStateError, unplaced/); // posts the unplaced count
-  // the "only a genuine moved OCCURRENCE counts unplaced" rule now lives in the pure module
+  assert.match(COCKPIT_SRC, /open: open\.length, resolved: resolvedCount, flagError: flagStateError, unplaced/); // driveFlagBadges posts the unplaced count
+  // the "only a genuine moved OCCURRENCE counts unplaced" rule lives in the pure module
   assert.match(FLAGPLACEMENT_SRC, /if \(matched\.length === 0 && a\.scope === "decision" && a\.occurrenceKey\) unplaced\+\+/);
 });
 
@@ -1166,7 +1166,7 @@ const PKG = JSON.parse(readFileSync(resolve(here, "..", "package.json"), "utf8")
 
 check("tree-snapshot webview: requestSnapshot → CLONE + strip the ephemeral rings via classList → reply snapshotDom with the echoed token", () => {
   assert.match(SCRIPT, /m\.type==='requestSnapshot'\)\{var _c=root\.cloneNode\(true\);/);
-  assert.match(SCRIPT, /_c\.querySelectorAll\('\.current,\.this-node,\.node-focus'\)/, "strips selection + agent-focus rings on the clone (exact, no text-node rewrite)");
+  assert.match(SCRIPT, /_c\.querySelectorAll\('\.current,\.this-node,\.node-focus,\.flag-current'\)/, "strips selection + agent-focus + the gold flag-link rings on the clone (disc 359)");
   assert.match(SCRIPT, /_r\[_i\]\.classList\.remove\('current'\)/);
   assert.match(SCRIPT, /v\.postMessage\(\{type:'snapshotDom',token:m\.token,html:_c\.innerHTML\}\)/, "posts the CLONE's innerHTML");
 });
@@ -1370,7 +1370,7 @@ check("flag-action drawer: openFlagList doesn't open a GHOST — clean deletion 
   assert.ok(m, "openFlagList body");
   assert.match(m[1], /const live = flagsList\.find\(\(f\) => f\.id === pick\.flag\.id\);/);
   assert.match(m[1], /if \(!live && !flagStoreWarning\) return flagNote\("the flag changed on disk/);
-  assert.match(m[1], /openFlagActionView\(live \?\? pick\.flag, ver, cel\);/);
+  assert.match(m[1], /toggleFlagActionView\(live \?\? pick\.flag, ver, cel\);/); // disc 359: reclick-same closes, different switches
 });
 
 check("flag-action drawer: the flag list opens the drawer (ends the loop) with a post-pick stale guard; no re-entrant action QuickPick", () => {
@@ -1378,7 +1378,7 @@ check("flag-action drawer: the flag list opens the drawer (ends the loop) with a
   assert.ok(m, "openFlagList body");
   assert.ok(!/for \(;;\)/.test(m[1]), "no re-entrant loop");
   assert.match(m[1], /if \(indexVersion !== ver \|\| currentCel !== cel \|\| mode !== "medical-validation"\) return flagNote\("policy changed/, "post-pick stale guard");
-  assert.match(m[1], /openFlagActionView\(live \?\? pick\.flag, ver, cel\);/);
+  assert.match(m[1], /toggleFlagActionView\(live \?\? pick\.flag, ver, cel\);/); // disc 359: reclick-same closes, different switches
 });
 
 check("flag-action drawer: 'Reveal in source' is GONE (revealFlag + flagActionMenu removed)", () => {
@@ -1404,7 +1404,8 @@ check("flag-action drawer: the host handlers act on the captured flagActionView 
 check("node-filter: driveFlagBadges delegates to the PURE computeFlagPlacement + swaps the map wholesale; cleared on every no-badge path", () => {
   // the reverse-map ASSEMBLY (dedup / order / rollup) is executably tested in flagPlacement.test.mjs; here we lock the host wiring
   assert.match(COCKPIT_SRC, /import \{ computeFlagPlacement \} from "\.\/flagPlacement";/);
-  assert.match(COCKPIT_SRC, /const placement = computeFlagPlacement\(\s*\n\s*open,/);
+  assert.match(COCKPIT_SRC, /const placement = flagPlacementFor\(tree, open\);/);
+  assert.match(COCKPIT_SRC, /function flagPlacementFor\(tree: PaneView, flags: MvFlag\[\]\)/); // the shared placement wiring (disc 359)
   assert.match(COCKPIT_SRC, /conceptOccurrences: tree\.conceptOccurrences, criterionOccurrences: tree\.criterionOccurrences/);
   // the two host-state lookups passed as callbacks: decision-object segments + live-occurrence gid
   assert.match(COCKPIT_SRC, /crlStructure\.find\(\(sc\) => sc\.decision === a\.name && sc\.lib === a\.library\)[\s\S]*?segmentsFor\(tree, \[dec\.nodeKey\]\)\.segmentIds/);
@@ -1426,7 +1427,7 @@ check("node-filter: openNodeFlags — single-skip on length===1, >1 filtered pic
   // openOne re-finds by id (ghost guard + store-warning keep — disc 355), used by BOTH the skip and the picker paths
   assert.match(m[1], /const live = flagsList\.find\(\(f\) => f\.id === snap\.id\);/);
   assert.match(m[1], /if \(!live && !flagStoreWarning\) return flagNote\("the flag changed on disk/);
-  assert.match(m[1], /openFlagActionView\(live \?\? snap, ver, cel\);/);
+  assert.match(m[1], /toggleFlagActionView\(live \?\? snap, ver, cel\);/); // disc 359: reclick-same closes, different switches
   // >1 → a filtered QuickPick with a post-pick stale guard + a shared flagPickItem
   assert.match(m[1], /const items = flags\.map\(flagPickItem\);/);
   assert.match(m[1], /showQuickPick\(items, \{ placeHolder: "Flags on this node/);
@@ -1439,4 +1440,54 @@ check("node-filter: the per-node message routes to openNodeFlags(gid); the start
   assert.match(COCKPIT_SRC, /gid\?: string;/, "the incoming-message type carries an optional gid");
   // the webview reads data-node-flag-gid off the MATCHED badge (per-node → nodeFlags, start pill → mvFlags)
   assert.match(SCRIPT, /var nfg=fb\.getAttribute\('data-node-flag-gid'\);if\(nfg\)v\.postMessage\(\{type:'nodeFlags',gid:nfg\}\);else v\.postMessage\(\{type:'mvFlags'\}\);/);
+});
+
+// ── Todo 2.5 (disc 359) — drawer UX revision: gold node-link, toggle, picker glyph color ──────────────────────────────
+check("gold-link: driveFlagNodeHighlight posts the open flag's gids (via gidsForFlag) and is driven from the postFlagDrawer choke-point + driveFlagBadges re-drive", () => {
+  const m = COCKPIT_SRC.match(/function driveFlagNodeHighlight\(\): void \{([\s\S]*?)\n  \}/);
+  assert.ok(m, "driveFlagNodeHighlight body");
+  assert.match(m[1], /const gids = flagActionView \? gidsForFlag\(flagActionView\.flag\) : \[\];/); // open drawer → its flag's gids; else clear
+  assert.match(m[1], /type: "flagHl", gen: tree\.gen, gids/);
+  // driven from postFlagDrawer (EVERY flagActionView mutation funnels there) + driveFlagBadges (re-render survival)
+  assert.match(COCKPIT_SRC, /driveFlagNodeHighlight\(\); \/\/ disc 359: EVERY flagActionView mutation funnels here/);
+  assert.match(COCKPIT_SRC, /driveFlagNodeHighlight\(\); \/\/ disc 359: a fresh render lost `\.flag-current`/);
+  // gidsForFlag reuses the shared flagPlacementFor for a SINGLE flag (open or resolved)
+  assert.match(COCKPIT_SRC, /function gidsForFlag\(flag: MvFlag\): string\[\] \{[\s\S]*?flagPlacementFor\(tree, \[flag\]\)\.gids/);
+});
+
+check("gold-link: the flagHl webview handler is gen-guarded, clears via querySelectorAll, adds to gids, scrolls only on a CHANGED set", () => {
+  assert.match(SCRIPT, /else if\(m\.type==='flagHl'\)\{if\(m\.gen!==gen\)return;/);
+  assert.match(SCRIPT, /for\(const fe of document\.querySelectorAll\('\.flag-current'\)\)fe\.classList\.remove\('flag-current'\);/); // clear (no flaggableGids needed)
+  assert.match(SCRIPT, /el\.classList\.add\('flag-current'\);if\(!ffn\)ffn=el;/); // add + remember the first
+  // scroll the first node into view ONLY when the gid set changed (open/switch) — not on an ack re-drive (same set)
+  assert.match(SCRIPT, /if\(fgk!==fhl\)\{fhl=fgk;if\(ffn&&ffn\.scrollIntoView\)ffn\.scrollIntoView\(/);
+  assert.match(SCRIPT, /let gen=-1;let fhl='';/); // the last-set tracker is script-scoped
+  // the channel is NEVER touched by highlight/clearHighlight (survives selection) — clearHighlight only strips `.current`
+  const ch = SCRIPT.match(/m\.type==='clearHighlight'\)\{([\s\S]*?)\}/);
+  assert.ok(ch && !/flag-current/.test(ch[1]), "clearHighlight must not touch .flag-current");
+});
+
+check("gold-link: flagActionViewModel carries id + targetPresent (zero-placement → Details auto-opens)", () => {
+  assert.match(COCKPIT_SRC, /id: flag\.id,/);
+  assert.match(COCKPIT_SRC, /targetPresent: gidsForFlag\(flag\)\.length > 0,/);
+});
+
+check("gold-link CSS: `.flag-current` reuses `.flow-ring` (gold, coexists with the base >rect overlays) + a crit-row rect rule", () => {
+  assert.match(FLOW_STYLE, /\.flow-row\.flag-current \.flow-ring,\.flow-outline\.flag-current \.flow-ring\{display:inline\}/);
+  assert.match(FLOW_STYLE, /\.flag-current \.flow-ring>rect\{stroke:var\(--vscode-charts-yellow,#cca700\);stroke-width:3\}/);
+  assert.match(FLOW_STYLE, /\.flow-crit-row\.flag-current>rect\{stroke:var\(--vscode-charts-yellow,#cca700\)/);
+});
+
+check("toggle: reclicking the same flag closes; a different flag switches (entry paths only, NOT openFlagActionView)", () => {
+  const m = COCKPIT_SRC.match(/function toggleFlagActionView\([^)]*\): void \{([\s\S]*?)\n  \}/);
+  assert.ok(m, "toggleFlagActionView body");
+  assert.match(m[1], /if \(flagActionView && flagActionView\.flag\.id === flag\.id\) return closeFlagActionView\(\);/); // reclick same → close
+  assert.match(m[1], /openFlagActionView\(flag, ver, cel\);/); // else open/switch
+});
+
+check("picker: flagPickItem colors the glyph by status via a ThemeIcon+ThemeColor (open=charts.orange, resolved=charts.green); no emoji in the label", () => {
+  const m = COCKPIT_SRC.match(/const flagPickItem = \(f: MvFlag\)[\s\S]*?\n  \};/);
+  assert.ok(m, "flagPickItem body");
+  assert.match(m[0], /iconPath: new vscode\.ThemeIcon\(resolved \? "pass" : "flag", new vscode\.ThemeColor\(resolved \? "charts\.green" : "charts\.orange"\)\)/);
+  assert.ok(!/["`]✓["` ]|⚑/.test(m[0]) || !m[0].includes("? \"✓\""), "no status emoji baked into the label");
 });

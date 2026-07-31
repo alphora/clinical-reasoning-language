@@ -44,6 +44,11 @@ export interface FlagActionView {
   issueNo?: number;
   createdAt: string;
   editedAt?: string;
+  /** the stable record id — shown in the collapsed Details (disc 359). */
+  id: string;
+  /** whether the flag's anchor resolves to at least one node in the CURRENT tree render. false → the gold node-link can't be
+   *  drawn, so the drawer auto-opens Details + notes it (a moved occurrence / library-wide / concept drawn nowhere). */
+  targetPresent: boolean;
 }
 
 /** A labelled read-only row: `<span class="fa-key">…</span><span class="fa-val">…</span>`. `pre` keeps a multiline body's
@@ -57,21 +62,32 @@ function row(key: string, valueHtml: string, pre = false): string {
  *  later todos (deliberately absent, not disabled). Carries `data-flag-action-drawer`. */
 export function renderFlagActionDrawer(v: FlagActionView): string {
   const em = `<span class="fa-em">—</span>`;
-  const target = v.occurrenceSignature
-    ? `${escapeHtml(v.anchorAddress)} · ${escapeHtml(v.occurrenceSignature)}`
-    : escapeHtml(v.anchorAddress);
+  // The header IS the summary now (disc 359 — the target label was too long + duplicated the Target row); an empty gist
+  // (extraction/legacy flags) falls back to the Type so the header is never a bare "Flag —".
+  const headerText = v.summary || v.typeLabel;
   const refHtml = v.issueRef ? escapeHtml(v.issueRef) : em;
   const rows =
     row("Type", escapeHtml(v.typeLabel)) +
     row("Origin", escapeHtml(v.category)) +
     row("Status", `<span class="fa-status fa-status-${v.status}">${v.status === "resolved" ? "resolved" : "open"}</span>`) +
-    row("Target", `${escapeHtml(v.targetLabel)}<span class="fa-addr">${target}</span>`) +
-    row("Summary", v.summary ? escapeHtml(v.summary) : em) +
     row("Description", v.description ? escapeHtml(v.description) : em, true) +
     v.fields.map((f) => row(f.key, escapeHtml(f.value))).join("") +
     row("Ref", refHtml) +
     row("Created", escapeHtml(v.createdAt)) +
     (v.editedAt ? row("Edited", escapeHtml(v.editedAt)) : "");
+
+  // The technical "which exact node" address is buried in a collapsible Details (the gold node-link answers "which node?"
+  // visually). It AUTO-OPENS + notes when the target isn't drawn in the current tree (no gold node to point at).
+  const target = v.occurrenceSignature
+    ? `${escapeHtml(v.anchorAddress)} · ${escapeHtml(v.occurrenceSignature)}`
+    : escapeHtml(v.anchorAddress);
+  const missingNote = v.targetPresent ? "" : `<div class="fa-row fa-note">This flag's target isn't drawn in the current tree (a moved occurrence, or a library-wide flag).</div>`;
+  const details =
+    `<details class="fa-details"${v.targetPresent ? "" : " open"}><summary>Details</summary>` +
+    missingNote +
+    row("Target", `${escapeHtml(v.targetLabel)}<span class="fa-addr">${target}</span>`) +
+    row("Id", escapeHtml(v.id)) +
+    `</details>`;
 
   const toggle =
     v.status === "resolved"
@@ -84,9 +100,9 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
 
   return (
     `<div class="flag-drawer flag-action-drawer" data-flag-action-drawer>` +
-    `<div class="flag-head"><span class="flag-title" title="${escapeHtml(v.targetTitle ?? v.targetLabel)}">Flag — ${escapeHtml(v.targetLabel)}</span>` +
+    `<div class="flag-head"><span class="flag-title" title="${escapeHtml(headerText)}">Flag — ${escapeHtml(headerText)}</span>` +
     `<button type="button" class="flag-close" data-flag-action-close aria-label="Close">✕</button></div>` +
-    `<div class="fa-body">${rows}</div>` +
+    `<div class="fa-body">${rows}${details}</div>` +
     `<div class="flag-actions">${issue}${toggle}</div>` +
     `</div>`
   );

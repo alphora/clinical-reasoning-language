@@ -29,7 +29,10 @@ export interface FlagPlacementResult {
 const conceptKey = (lib: string | undefined, name: string): string => JSON.stringify([lib ?? null, name]);
 
 /**
- * Match each OPEN flag to the render node(s) it belongs on and build both the lit-gid set and the reverse `gid → flags` map.
+ * Match each flag in `flags` to the render node(s) it belongs on and build both the lit-gid set and the reverse `gid → flags`
+ * map. STATUS-AGNOSTIC: the caller decides the status filter — `driveFlagBadges` passes the OPEN set (badges are open-only);
+ * `driveFlagNodeHighlight` passes a single flag regardless of status (a resolved flag's drawer still lights its node). Do NOT
+ * add an `isOpen` filter here — that would silently kill the resolved-flag highlight (disc 359 [important]).
  *
  * Matching (unchanged from the prior `driveFlagBadges` inline pass — Claude verified equivalence):
  *  - concept scope → every `conceptOccurrences` entry with the same `(lib, name)` (NEVER name alone — cross-lib collisions).
@@ -37,14 +40,14 @@ const conceptKey = (lib: string | undefined, name: string): string => JSON.strin
  *  - decision scope, no key (a decision-OBJECT flag) → every segment gid from `decisionObjectGids(anchor)`.
  *  - library scope / a concept drawn nowhere → no per-node gid (the start-badge count is the catch-all); NOT counted `unplaced`
  *    (only a genuine moved OCCURRENCE dilutes that signal).
- *  - a COLLAPSED criterion rolls each open CONCEPT flag whose `(lib,name)` is in its `bodyConcepts` onto its own gid (so a flag
- *    on a concept referenced only inside a folded body isn't invisible).
+ *  - a COLLAPSED criterion rolls each CONCEPT flag whose `(lib,name)` is in its `bodyConcepts` onto its own gid (so a flag on a
+ *    concept referenced only inside a folded body isn't invisible) — applies to whatever `flags` are passed (resolved included).
  *
- * Bucket ordering: each bucket is in `open` order WITHIN each phase — the per-flag matching loop first, then the rollup — so on
- * a gid shared by both phases the matching-loop flags precede the rolled-up ones. `place` dedups by flag id.
+ * Bucket ordering: each bucket is in `flags` order WITHIN each phase — the per-flag matching loop first, then the rollup — so
+ * on a gid shared by both phases the matching-loop flags precede the rolled-up ones. `place` dedups by flag id.
  */
 export function computeFlagPlacement(
-  open: readonly MvFlag[],
+  flags: readonly MvFlag[],
   substrate: FlagPlacementSubstrate,
   decisionObjectGids: (anchor: MvFlagAnchor) => readonly string[],
   occurrenceGid: (anchor: MvFlagAnchor) => string | undefined,
@@ -59,7 +62,7 @@ export function computeFlagPlacement(
   };
 
   let unplaced = 0;
-  for (const f of open) {
+  for (const f of flags) {
     const a = f.anchor;
     let matched: readonly string[] = [];
     if (a.scope === "concept") {
@@ -77,12 +80,12 @@ export function computeFlagPlacement(
   }
 
   // Collapsed-criterion rollup — per flag (so the bucket records WHICH flag lit the rollup gid; a Set of keys couldn't).
-  const openConceptFlags = open.filter((f) => f.anchor.scope === "concept");
-  if (openConceptFlags.length > 0) {
+  const conceptFlags = flags.filter((f) => f.anchor.scope === "concept");
+  if (conceptFlags.length > 0) {
     for (const occ of substrate.criterionOccurrences) {
       if (!occ.collapsed) continue;
       const bodyKeys = new Set(occ.bodyConcepts.map((bc) => conceptKey(bc.lib, bc.name)));
-      for (const f of openConceptFlags) if (bodyKeys.has(conceptKey(f.anchor.library, f.anchor.name))) place(occ.gid, f);
+      for (const f of conceptFlags) if (bodyKeys.has(conceptKey(f.anchor.library, f.anchor.name))) place(occ.gid, f);
     }
   }
 

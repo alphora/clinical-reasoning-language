@@ -908,6 +908,14 @@ export const FLOW_STYLE =
   `.flow-row.current>rect{stroke-width:2.5}` +
   `.flow-row.flow-leaf-yes>rect{stroke-width:2}` +
   `.flow-greyborder.current>rect,.flow-greyborder.flow-leaf-yes>rect{stroke:transparent}` +
+  // disc 359: the GOLD node-link for the OPEN flag-action drawer's flag — reuses the `.flow-ring` element (a distinct axis from
+  // the base `>rect` overlay chain, so it COEXISTS with `.this-node`/`.failed-criterion`/`.diverter`). Higher specificity than
+  // the blue `.flow-ring>rect`, so it recolors gold + thickens (distinct even when a node is BOTH selected and flag-linked —
+  // gold wins, the drawer being open = flag focus). Crit-rows have no `.flow-ring` → their own `>rect` rule. GOLD regardless of
+  // the flag's open/resolved status — the channel means "this drawer's target", not "open ⚑ here".
+  `.flow-row.flag-current .flow-ring,.flow-outline.flag-current .flow-ring{display:inline}` +
+  `.flag-current .flow-ring>rect{stroke:var(--vscode-charts-yellow,#cca700);stroke-width:3}` +
+  `.flow-crit-row.flag-current>rect{stroke:var(--vscode-charts-yellow,#cca700);stroke-width:2.5}` +
   // disc 164: the produced-path DIVERTER overlay on the SVG rect (the shell's HTML `.diverter` outline does not paint on
   // a <g>, same as the channels below). A neutral teal DOTTED stroke for the evaluated-false `when`s that routed the case
   // to its produced disposition (the Adult gate for a not-adult deny). Ordered BEFORE `.failed-criterion` so a blocker

@@ -1070,12 +1070,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  (`openNodeFlags`) so their labels stay structurally identical (disc 357 [nit]). GAP 3: an occurrence flag shows its node
    *  signature so it reads as a specific node, not the whole decision. (The `✓` arm is dead in the open-only node list; live in
    *  the whole-policy list, which includes resolved flags.) */
-  const flagPickItem = (f: MvFlag): { label: string; description: string; flag: MvFlag } => {
+  const flagPickItem = (f: MvFlag): { label: string; description: string; flag: MvFlag; iconPath: vscode.ThemeIcon } => {
     const a = f.anchor;
+    const resolved = f.status === "resolved";
     return {
-      label: `${f.status === "resolved" ? "✓" : "⚑"} ${f.tag}${f.gist ? " — " + f.gist : ""}`,
+      label: `${f.tag}${f.gist ? " — " + f.gist : ""}`,
       description: `${a.scope}:${a.name}${a.occurrenceKey ? " · " + parseOccurrenceKey(a.occurrenceKey).signature : ""} · ${f.status}${f.fields.ref ? " · " + f.fields.ref : ""}`,
       flag: f,
+      // disc 359: color the glyph by status — open = charts.orange (the "open" brown/red), resolved = charts.green — matching the
+      // drawer's status text. NOTE: a ThemeColor on a QuickPick iconPath is version-dependent (historically tree-item only); if it
+      // renders monochrome, the fallback is bundled colored SVGs (a monochrome codicon would be worse than the ⚑/✓ emoji it replaced).
+      iconPath: new vscode.ThemeIcon(resolved ? "pass" : "flag", new vscode.ThemeColor(resolved ? "charts.green" : "charts.orange")),
     };
   };
 
@@ -1102,7 +1107,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // over the dead snapshot — note + return. A store WARNING (state unknown) → keep the snapshot (matches refreshFlagActionDrawer).
     const live = flagsList.find((f) => f.id === pick.flag.id);
     if (!live && !flagStoreWarning) return flagNote("the flag changed on disk — reopen it");
-    openFlagActionView(live ?? pick.flag, ver, cel);
+    toggleFlagActionView(live ?? pick.flag, ver, cel); // disc 359: reclicking the same flag closes; a different one switches
   }
 
   /** Todo 2 (disc 356): the per-node ⚑ badge entry — open the ACTION DRAWER filtered to THIS node's OPEN flags. `gid` is a
@@ -1122,7 +1127,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const openOne = (snap: MvFlag): void => {
       const live = flagsList.find((f) => f.id === snap.id);
       if (!live && !flagStoreWarning) return flagNote("the flag changed on disk — reopen it");
-      openFlagActionView(live ?? snap, ver, cel);
+      toggleFlagActionView(live ?? snap, ver, cel); // disc 359: reclicking the same flag closes; a different one switches
     };
     if (flags.length === 1) return openOne(flags[0]); // single-skip (disc 356: skip predicate = length === 1)
     // >1 → a filtered QuickPick, structurally identical to openFlagList (shared flagPickItem), scoped to this node, then the drawer.
@@ -1567,28 +1572,51 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       return;
     }
     const open = flagsList.filter((f) => isOpen(f)); // the blocking set (matches openFlags / the gate)
-    // Todo 2 (disc 356/357): the flag->node placement, extracted PURE (flagPlacement.ts) so the reverse-map assembly (dedup /
-    // order / rollup / moved-occurrence exclusion) is unit-tested. `flagsByGid` (WHICH open flags lit each gid) drives the
-    // node-filtered entry; `gids` LIGHT the per-node badges. The two crlStructure/resolveAnchor lookups stay here (host state)
-    // as callbacks; the matching itself is UNCHANGED from the prior inline pass (Claude-verified equivalent, disc 357).
-    const placement = computeFlagPlacement(
-      open,
-      { conceptOccurrences: tree.conceptOccurrences, criterionOccurrences: tree.criterionOccurrences },
-      // a decision-OBJECT flag (no occurrence key) -> every segment gid of the whole decision.
-      (a) => {
-        const dec = crlStructure.find((sc) => sc.decision === a.name && sc.lib === a.library);
-        return dec ? segmentsFor(tree, [dec.nodeKey]).segmentIds : [];
-      },
-      // a decision OCCURRENCE -> the ONE keyed node when it still resolves LIVE (moved/orphan -> undefined -> unplaced).
-      (a) => {
-        const cls = resolveAnchor(a, anchorCtx);
-        return cls.state === "live" && cls.nodeKey ? tree.anchors[cls.nodeKey]?.scrollTo : undefined;
-      },
-    );
+    // Todo 2 (disc 356/357): the flag->node placement, extracted PURE (flagPlacement.ts) so the reverse-map assembly is
+    // unit-tested. `flagsByGid` (WHICH open flags lit each gid) drives the node-filtered entry; `gids` LIGHT the per-node badges.
+    // The crlStructure/resolveAnchor lookups are wired in `flagPlacementFor` (shared with the gold node-link, disc 359).
+    const placement = flagPlacementFor(tree, open);
     const { gids, unplaced } = placement;
     flagsByGid = placement.byGid; // wholesale swap - only the CURRENT render's gids stay (lockstep with the painted badges)
     const resolvedCount = flagsList.length - open.length;
     void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids, startNodeGid: tree.startNodeGid, open: open.length, resolved: resolvedCount, flagError: flagStateError, unplaced });
+    driveFlagNodeHighlight(); // disc 359: a fresh render lost `.flag-current` — re-drive the gold link for any open action drawer
+  }
+
+  /** The flag→node placement wired against the LIVE tree substrate + host state — SHARED by `driveFlagBadges` (the open set →
+   *  badges + `flagsByGid`) and the gold node-link (`gidsForFlag`, a single flag). The two crlStructure/`resolveAnchor`-dependent
+   *  lookups (decision-object segments, live-occurrence gid) live here so both callers agree; the pure assembly is `flagPlacement.ts`. */
+  function flagPlacementFor(tree: PaneView, flags: MvFlag[]): ReturnType<typeof computeFlagPlacement> {
+    return computeFlagPlacement(
+      flags,
+      { conceptOccurrences: tree.conceptOccurrences, criterionOccurrences: tree.criterionOccurrences },
+      (a) => {
+        const dec = crlStructure.find((sc) => sc.decision === a.name && sc.lib === a.library);
+        return dec ? segmentsFor(tree, [dec.nodeKey]).segmentIds : []; // decision-OBJECT → the whole decision's segments
+      },
+      (a) => {
+        const cls = resolveAnchor(a, anchorCtx); // decision OCCURRENCE → the ONE live keyed node (moved/orphan → undefined)
+        return cls.state === "live" && cls.nodeKey ? tree.anchors[cls.nodeKey]?.scrollTo : undefined;
+      },
+    );
+  }
+
+  /** The render gid(s) a single flag (open OR resolved) draws as, in the CURRENT tree — the gold node-link + the drawer's
+   *  `targetPresent`. Empty = the target isn't charted (a moved occurrence / library-wide / concept drawn nowhere). */
+  function gidsForFlag(flag: MvFlag): string[] {
+    const tree = views.get("tree");
+    return tree ? flagPlacementFor(tree, [flag]).gids : [];
+  }
+
+  /** Paint the GOLD node-link for the OPEN action drawer's flag (disc 359) — a class-toggle channel (gen-guarded, survives a
+   *  re-render via the tree ack) modeled on `driveFlagBadges`. Driven ONLY from `postFlagDrawer` (every `flagActionView` mutation
+   *  funnels through it) + the tree ack — so no drive site can be missed. Empty gids when no action drawer is open → clears.
+   *  Gold means "this drawer's target", regardless of the flag's open/resolved status. */
+  function driveFlagNodeHighlight(): void {
+    const tree = views.get("tree");
+    if (!tree) return; // no tree webview to highlight (the drawer lives in it; a fresh render starts classless + the ack re-drives)
+    const gids = flagActionView ? gidsForFlag(flagActionView.flag) : [];
+    void tree.panel.webview.postMessage({ type: "flagHl", gen: tree.gen, gids });
   }
 
   /** #224 ii.3 Slice 2b / #233 Todo 2b — the LIVE criterion identities: `{lib,name}` → `{bodyHash, elided}`. The gate set is
@@ -3191,6 +3219,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         ? renderFlagActionDrawer(flagActionViewModel(flagActionView.flag))
         : "";
     void tree.panel.webview.postMessage({ type: "flagDrawer", html });
+    driveFlagNodeHighlight(); // disc 359: EVERY flagActionView mutation funnels here → the gold node-link stays lockstep with the drawer
   }
 
   // The plumbing field keys the action drawer's read-only view never lists as an extra field: `ref` is rendered specially (the
@@ -3225,6 +3254,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       issueNo: issueNoStr ? Number(issueNoStr) : undefined,
       createdAt: flag.createdAt,
       editedAt: flag.editedAt,
+      id: flag.id,
+      targetPresent: gidsForFlag(flag).length > 0, // disc 359: no charted node → auto-open Details + a note (the gold link can't point)
     };
   }
 
@@ -3244,6 +3275,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!flagActionView) return;
     flagActionView = undefined;
     postFlagDrawer(); // empty region
+  }
+
+  /** The ENTRY toggle (disc 359): reclicking the flag whose drawer is already open CLOSES it; a different flag SWITCHES. Used by
+   *  the node-badge + list entry paths ONLY — NOT `openFlagActionView` itself (Todo 3's Cancel→return-to-view calls that directly
+   *  and must not toggle-close). (Todo 3: a "lose changes" guard will gate the switch/close when an edit has unsaved text.) */
+  function toggleFlagActionView(flag: MvFlag, ver: number, cel: string | undefined): void {
+    if (flagActionView && flagActionView.flag.id === flag.id) return closeFlagActionView();
+    openFlagActionView(flag, ver, cel);
   }
 
   /** Reconcile the open action drawer against the current `flagsList` (design 354 [important]): re-find the record by id and
@@ -4481,6 +4520,14 @@ body:has(.flag-drawer) .flow-zoom{display:none}
 .fa-status-resolved{color:var(--vscode-charts-green,#89d185)}
 .fa-btn{cursor:pointer;border:none;border-radius:2px;padding:2px 10px;font-size:.9em;background:var(--vscode-button-secondaryBackground,#3a3d41);color:var(--vscode-button-secondaryForeground,#fff)}
 .fa-btn.fa-primary{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff)}
+/* disc 359: the header carries a GOLD accent linking it to the gold-ringed node in the tree ("which thing is this flag for?"). */
+.flag-action-drawer .flag-head{border-bottom:2px solid var(--vscode-charts-yellow,#cca700)}
+.flag-action-drawer .flag-title{color:var(--vscode-charts-yellow,#cca700)}
+/* the technical Target address + id live in a collapsed Details (auto-opened when the target isn't drawn in the tree). */
+.fa-details{font-size:.92em}
+.fa-details>summary{cursor:pointer;opacity:.7;font-size:.82em;text-transform:uppercase;letter-spacing:.02em;padding:2px 0}
+.fa-details[open]>summary{margin-bottom:4px}
+.fa-note{opacity:.85;font-style:italic}
 /* tree zoom control — its rules now live in FLOW_STYLE (flowPaneHtml.ts), co-located with the control markup + shared with the
    standalone snapshot export; the shell picks them up via the ${FLOW_STYLE} include below. */
 .fc-toggle{display:flex;align-items:center;gap:4px;padding:4px 2px 6px;font-size:.85em}
@@ -4523,7 +4570,7 @@ ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}`;
  *  the markReviewOverlay handler paints error-over-pass (skips .review-pass for ids in the error set) + the disjoint
  *  .review-fail/.review-pending sets + the all-pass .leaf-allpass badge (#210). */
 export const COCKPIT_WEBVIEW_SCRIPT =
-  `const v=acquireVsCodeApi();const root=document.getElementById('root');const fcc=document.getElementById('fcChrome');const fld=document.getElementById('flagDrawer');let gen=-1;` +
+  `const v=acquireVsCodeApi();const root=document.getElementById('root');const fcc=document.getElementById('fcChrome');const fld=document.getElementById('flagDrawer');let gen=-1;let fhl='';` +
   // #211: show ONLY the selected flag tag's field group (client-side; no host round-trip). Called after the drawer is
   // injected and on a tag-select change. Safe no-op when the drawer is empty.
   `const aff=()=>{const ts=fld.querySelector('[data-flag-tag]');if(!ts)return;const tg=ts.value;for(const g of fld.querySelectorAll('[data-flag-field-for]')){g.hidden=g.getAttribute('data-flag-field-for')!==tg;}};` +
@@ -4570,7 +4617,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // overlay classes are on the rows). Strip the EPHEMERAL rings (selection `.current`/`.this-node`, agent `.node-focus`) off a
   // CLONE via classList (exact — never rewrites label text) so a customer artifact doesn't carry them; keep verdict/flag/
   // review state. Echoes the token so the host coordinator matches it; the host still SCREENS the payload (trust boundary).
-  `else if(m.type==='requestSnapshot'){var _c=root.cloneNode(true);var _r=_c.querySelectorAll('.current,.this-node,.node-focus');for(var _i=0;_i<_r.length;_i++){_r[_i].classList.remove('current');_r[_i].classList.remove('this-node');_r[_i].classList.remove('node-focus');}v.postMessage({type:'snapshotDom',token:m.token,html:_c.innerHTML});}` +
+  `else if(m.type==='requestSnapshot'){var _c=root.cloneNode(true);var _r=_c.querySelectorAll('.current,.this-node,.node-focus,.flag-current');for(var _i=0;_i<_r.length;_i++){_r[_i].classList.remove('current');_r[_i].classList.remove('this-node');_r[_i].classList.remove('node-focus');_r[_i].classList.remove('flag-current');}v.postMessage({type:'snapshotDom',token:m.token,html:_c.innerHTML});}` +
   // The at-rest selection channel (.current). Clearing/applying it ALSO wipes the failed-criterion overlay — so the
   // NEXT engine reveal (a new selection / clear) drops the overlay; the SAME selection's failed-criteria mark arrives
   // AFTER this message (a later post) and so survives (#173 overlay lifecycle, disc 159). NEVER calls clrRO (#156 slice 5).
@@ -4620,6 +4667,16 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(m.unplaced>0){label+=' · '+m.unplaced+'⚠';}` +
   `var tt=sg.querySelector('title');if(tt)tt.textContent=(m.unplaced>0?m.unplaced+' flag(s) couldn\\'t be placed (target moved/removed) — ':'')+'open review flags — click to review';` +
   `if(st)st.textContent=label;sg.classList.toggle('has-startflag',label!=='');}}` +
+  // disc 359: the GOLD node-link for the open action drawer's flag — its own class-toggle channel (NEVER touched by
+  // highlight/clearHighlight, so it survives a selection change). Clear via querySelectorAll (the webview has no flaggableGids
+  // list), then add to the posted gids. Scroll the FIRST node into view ONLY when the gid SET changed (open/switch) — not on an
+  // ack re-drive (same set) so a re-render can't yank the viewport. `fhl` (script-scoped) tracks the last set. UNIQUE var names
+  // (post the 4.97.0 `ng` collision — the `new Function(SCRIPT)` guard now also parses this).
+  `else if(m.type==='flagHl'){if(m.gen!==gen)return;` +
+  `for(const fe of document.querySelectorAll('.flag-current'))fe.classList.remove('flag-current');` +
+  `var fgk=(m.gids||[]).join(',');var ffn=null;` +
+  `for(const id of (m.gids||[])){const el=document.getElementById(id);if(el){el.classList.add('flag-current');if(!ffn)ffn=el;}}` +
+  `if(fgk!==fhl){fhl=fgk;if(ffn&&ffn.scrollIntoView)ffn.scrollIntoView({block:'center',inline:'center'});}}` +
   // #224 ii.3 Slice 2b: the model-level criterion VERDICT chips. Bulk-CLEAR the 4 crit-* classes off every criterion gid
   // (a verdict change must un-paint prior state), then add `crit-<state>` per byState. `unreviewed` gids are in allGids but
   // no byState list → they end bare. Gen-guarded + class-toggle only (no re-render), the flagBadges idiom.

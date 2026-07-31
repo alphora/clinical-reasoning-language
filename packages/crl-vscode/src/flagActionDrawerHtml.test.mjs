@@ -1,10 +1,11 @@
-// Flag-ACTION drawer — renderFlagActionDrawer: the read-only view shell, the full field render (Type/Origin/Status/Target/
-// Summary/Description/extra fields/Ref/timestamps), the status-toggle + open-issue affordances, and escaping. Pure HTML; no vscode.
+// Flag-ACTION drawer — renderFlagActionDrawer: the read-only view. Post disc-359: the HEADER is the summary (not the long
+// target label); Target + id live in a collapsible Details (auto-opened + noted when the target isn't in the current tree).
+// Pure HTML; no vscode.
 import assert from "node:assert/strict";
 
 import { renderFlagActionDrawer } from "./flagActionDrawerHtml.ts";
 
-/** A representative OPEN validation flag with an occurrence signature, an extra `kind` field, and a numeric issue ref. */
+/** A representative OPEN validation flag with an occurrence signature, an extra `kind` field, a numeric issue ref, a present target. */
 const OPEN_VIEW = {
   typeLabel: "CRL vs customer intent",
   category: "validation",
@@ -20,6 +21,8 @@ const OPEN_VIEW = {
   issueNo: 42,
   createdAt: "2026-07-31T10:00:00.000Z",
   editedAt: "2026-07-31T11:00:00.000Z",
+  id: "flag-abc123",
+  targetPresent: true,
 };
 
 test("renderFlagActionDrawer: the shell — data-flag-action-drawer + distinct action intents (NOT the create drawer's)", () => {
@@ -28,48 +31,73 @@ test("renderFlagActionDrawer: the shell — data-flag-action-drawer + distinct a
   assert.match(h, /data-flag-action-close/);
   assert.match(h, /data-flag-action-toggle/);
   assert.match(h, /data-flag-action-issue/);
-  // it reuses the shared .flag-drawer chrome (so the flow-zoom-hide + right-flyout layout apply)
   assert.match(h, /class="flag-drawer flag-action-drawer"/);
-  // it must NOT carry the create drawer's intents (they'd collide in the shared #flagDrawer region listener)
   for (const create of ["data-flag-insert", "data-flag-cancel", 'data-flag-close"', "data-flag-tag", "data-flag-summary", "data-flag-stub"]) {
     assert.ok(!h.includes(create), `${create} must not appear in the action drawer`);
   }
 });
 
-test("renderFlagActionDrawer: renders the full record — Type, Origin, Status, Target(+signature), Summary, Description, extra fields, Ref, timestamps", () => {
+test("renderFlagActionDrawer: the HEADER is the summary (disc 359), not the target label; no separate Summary/Target rows in the body", () => {
   const h = renderFlagActionDrawer(OPEN_VIEW);
-  assert.match(h, /CRL vs customer intent/); // Type
-  assert.match(h, />Origin<\/span><span class="fa-val[^"]*">validation</); // category/provenance
+  assert.match(h, /<span class="flag-title" title="the age gate is inverted">Flag — the age gate is inverted<\/span>/);
+  // the old header (target label) is gone from the header; the target label now only appears inside Details
+  assert.ok(!/Flag — this condition/.test(h), "header must be the summary, not the target label");
+  assert.ok(!/>Summary<\/span>/.test(h), "no standalone Summary row (it's the header now)");
+  // the Target row is INSIDE <details>, not a top-level body row
+  const body = h.slice(h.indexOf('class="fa-body"'), h.indexOf("fa-details"));
+  assert.ok(!/>Target<\/span>/.test(body), "Target is not a top-level body row — it's in Details");
+});
+
+test("renderFlagActionDrawer: empty gist → the header falls back to the Type (never a bare 'Flag —')", () => {
+  const h = renderFlagActionDrawer({ ...OPEN_VIEW, summary: "" });
+  assert.match(h, /Flag — CRL vs customer intent</);
+});
+
+test("renderFlagActionDrawer: the visible body rows — Type, Origin, Status, Description, extra fields, Ref, timestamps", () => {
+  const h = renderFlagActionDrawer(OPEN_VIEW);
+  assert.match(h, />Type<\/span><span class="fa-val[^"]*">CRL vs customer intent</);
+  assert.match(h, />Origin<\/span><span class="fa-val[^"]*">validation</);
   assert.match(h, /fa-status fa-status-open">open</);
-  assert.match(h, /this condition/); // target label
-  assert.match(h, /decision:D &quot;Lib&quot;/); // anchor address (escaped quotes)
-  assert.match(h, /guard→activity/); // occurrence signature
-  assert.match(h, /the age gate is inverted/); // summary
   assert.match(h, /line one\nline two/); // multiline description preserved (fa-pre → pre-wrap)
-  assert.match(h, />kind<\/span><span class="fa-val[^"]*">intent-divergence</); // extra field
+  assert.match(h, />kind<\/span><span class="fa-val[^"]*">intent-divergence</);
   assert.match(h, />Ref<\/span><span class="fa-val[^"]*">#42</);
   assert.match(h, /2026-07-31T10:00:00\.000Z/); // created
-  assert.match(h, />Edited<\/span>/); // edited row present when editedAt set
+  assert.match(h, />Edited<\/span>/);
 });
 
-test("renderFlagActionDrawer: OPEN flag → the primary Resolve button; RESOLVED → a Reopen button (no primary)", () => {
+test("renderFlagActionDrawer: Target + id live in a Details (collapsed when the target IS present)", () => {
+  const h = renderFlagActionDrawer(OPEN_VIEW);
+  assert.match(h, /<details class="fa-details"><summary>Details<\/summary>/); // collapsed (no `open` attr) when present
+  const details = h.slice(h.indexOf("fa-details"));
+  assert.match(details, />Target<\/span>/);
+  assert.match(details, /this condition/); // the label
+  assert.match(details, /decision:D &quot;Lib&quot;/); // escaped anchor address
+  assert.match(details, /guard→activity/); // occurrence signature
+  assert.match(details, />Id<\/span><span class="fa-val[^"]*">flag-abc123</);
+  assert.ok(!details.includes("fa-note"), "no missing-target note when the target is present");
+});
+
+test("renderFlagActionDrawer: target NOT present → Details AUTO-OPENS + a note (disc 359 zero-placement)", () => {
+  const h = renderFlagActionDrawer({ ...OPEN_VIEW, targetPresent: false });
+  assert.match(h, /<details class="fa-details" open><summary>Details<\/summary>/); // auto-opened
+  assert.match(h, /fa-note">This flag's target isn't drawn in the current tree/);
+});
+
+test("renderFlagActionDrawer: OPEN → primary Resolve; RESOLVED → Reopen (no primary); Open-issue only with a numeric issueNo", () => {
   const open = renderFlagActionDrawer(OPEN_VIEW);
   assert.match(open, /class="fa-btn fa-toggle fa-primary" data-flag-action-toggle>✓ Resolve flag</);
+  assert.match(open, /data-flag-action-issue>↗ Open issue #42</);
   const resolved = renderFlagActionDrawer({ ...OPEN_VIEW, status: "resolved" });
   assert.match(resolved, /class="fa-btn fa-toggle" data-flag-action-toggle>↻ Reopen flag</);
-  assert.ok(!resolved.includes("fa-primary"), "a resolved flag's toggle is not the primary action");
-});
-
-test("renderFlagActionDrawer: the Open-issue button appears ONLY with a numeric issueNo", () => {
-  assert.match(renderFlagActionDrawer(OPEN_VIEW), /data-flag-action-issue>↗ Open issue #42</);
+  assert.ok(!resolved.includes("fa-primary"));
   const noNumeric = renderFlagActionDrawer({ ...OPEN_VIEW, issueNo: undefined, issueRef: "see PR" });
-  assert.ok(!noNumeric.includes("data-flag-action-issue"), "no numeric ref → no open-issue affordance");
-  assert.match(noNumeric, />Ref<\/span><span class="fa-val[^"]*">see PR</); // …but the raw ref still shows, legibly
+  assert.ok(!noNumeric.includes("data-flag-action-issue"));
+  assert.match(noNumeric, />Ref<\/span><span class="fa-val[^"]*">see PR</);
 });
 
-test("renderFlagActionDrawer: absent optional data (no signature / description / editedAt / ref) renders em dashes, no Edited row, no issue button", () => {
+test("renderFlagActionDrawer: absent optional data (no signature / description / editedAt / ref) → em dashes, no Edited row, no issue button", () => {
   const min = renderFlagActionDrawer({
-    typeLabel: "fidelity-defect", // an extraction tag with no displayName → the host passes the raw tag id
+    typeLabel: "fidelity-defect",
     category: "extraction",
     status: "open",
     targetLabel: 'the concept "x"',
@@ -77,16 +105,18 @@ test("renderFlagActionDrawer: absent optional data (no signature / description /
     summary: "",
     fields: [],
     createdAt: "2026-07-31T10:00:00.000Z",
+    id: "f1",
+    targetPresent: true,
   });
-  assert.match(min, /fidelity-defect/); // raw-tag fallback rendered as Type
+  assert.match(min, /Flag — fidelity-defect</); // empty gist → Type in the header
   assert.match(min, /fa-status-open/);
   assert.ok(!min.includes("guard→"), "no occurrence signature");
   assert.ok(!min.includes(">Edited<"), "no Edited row when editedAt absent");
   assert.ok(!min.includes("data-flag-action-issue"), "no issue button when no ref");
-  assert.match(min, /class="fa-em">—<\/span>/); // summary/description/ref rendered as em dashes
+  assert.match(min, /class="fa-em">—<\/span>/); // description/ref rendered as em dashes
 });
 
-test("renderFlagActionDrawer: all interpolated text is escaped (label / address / summary / description / field / ref)", () => {
+test("renderFlagActionDrawer: all interpolated text is escaped (header / address / description / field / ref / id)", () => {
   const h = renderFlagActionDrawer({
     typeLabel: "<script>t</script>",
     category: "<b>x</b>",
@@ -99,8 +129,10 @@ test("renderFlagActionDrawer: all interpolated text is escaped (label / address 
     fields: [{ key: "<u>k</u>", value: "</span><script>v</script>" }],
     issueRef: "<script>r</script>",
     createdAt: "<x>",
+    id: "</details><script>id</script>",
+    targetPresent: true,
   });
-  for (const raw of ["<script>t</script>", "<script>a</script>", '"><img>', "<i>s</i>", "<script>b</script>", "<script>c</script>", "<u>k</u>", "<script>v</script>", "<script>r</script>"]) {
+  for (const raw of ["<script>t</script>", "<script>a</script>", '"><img>', "<i>s</i>", "<script>b</script>", "<script>c</script>", "<u>k</u>", "<script>v</script>", "<script>r</script>", "<script>id</script>"]) {
     assert.ok(!h.includes(raw), `must escape: ${raw}`);
   }
   assert.match(h, /&lt;script&gt;/);
