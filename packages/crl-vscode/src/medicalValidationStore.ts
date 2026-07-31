@@ -416,6 +416,27 @@ export function setReviewState(
   return out;
 }
 
+/** Set the SAME verdict on MANY cases in one shot (the "Pass all" affordance on the node-verdict picker). Skips a case
+ *  already at `state` (so `changed` reflects real movement + a wholly-redundant call is a no-op the caller can drop before
+ *  persisting). Returns a NEW map only if something moved (else the input ref, so `changed===0` ⇒ `map===byCaseId`). The
+ *  caller passes only LIVE caseIds (a vanished case must not be re-minted). Pure; caller pre-validates `state`. */
+export function setAllReviewState(
+  byCaseId: Record<string, PersistedReviewState>,
+  caseIds: readonly string[],
+  state: ReviewState,
+): { map: Record<string, PersistedReviewState>; changed: number } {
+  let map = byCaseId; // clone LAZILY, once (a caller may pass many caseIds — don't clone per change)
+  let changed = 0;
+  for (const caseId of caseIds) {
+    if ((map[caseId] ?? "unreviewed") === state) continue; // compare the EVOLVING map (so a duplicate caseId is a no-op the 2nd time)
+    if (map === byCaseId) map = { ...byCaseId }; // first real change → detach from the input (never mutate the caller's map)
+    if (state === "unreviewed") delete map[caseId];
+    else map[caseId] = state;
+    changed++;
+  }
+  return { map, changed };
+}
+
 // ── notes CRUD (pure reducers) ──────────────────────────────────────────────────────
 // Host-as-authority: the host generates the note `id` (crypto.randomUUID) + stamps `created`/`edited` (Date.now) and passes
 // them in, so these stay deterministic + unit-testable (the clock/RNG never enters the pure layer). Each returns a NEW map

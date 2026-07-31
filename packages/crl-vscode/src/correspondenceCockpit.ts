@@ -104,6 +104,7 @@ import {
   saveSidecar,
   computeCriterionVerdictUpdate,
   setReviewState,
+  setAllReviewState,
   unsettledReviewItems,
   reviewGridViewModel,
   applyGridAssignments,
@@ -3428,13 +3429,40 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (stale() || !scenarioByCaseId.has(caseId)) return staleNote();
       applyVerdict(caseId, pick.state);
     };
+    // #(pass-all): set EVERY case in the loop to Pass in ONE persist (operator ask). Overwrites a case already Fail/Pending
+    // (the re-shown list makes any such flip visible + individually fixable); skips ones already Pass; only LIVE cases.
+    const passAll = (): void => {
+      const live = caseIds.filter((caseId) => scenarioByCaseId.has(caseId));
+      const { map, changed } = setAllReviewState(reviewByCaseId, live, "pass");
+      if (changed === 0) return; // all already Pass (or none live) → nothing to persist
+      if (!persistMv(map, notesByCaseId)) return; // save failed → memory + disk untouched (persistMv surfaced the error)
+      renderPane("worklist");
+      if (state.selection) dispatch({ type: "select", selection: state.selection });
+      else renderTreeChrome();
+      driveDoneOverlay(); // the reviewed set changed → repaint the tree done overlay
+    };
     if (caseIds.length === 1) return pickVerdict(caseIds[0]);
     for (;;) {
       if (stale()) return staleNote();
-      const items = caseIds.map((caseId) => ({ label: nameOf(caseId), description: `verdict: ${verdictLabel(caseId)}`, caseId }));
-      const pick = await vscode.window.showQuickPick(items, { placeHolder: "Pick a case to set its verdict (Esc to finish)" });
+      const rows = caseIds.map((caseId) => ({ label: nameOf(caseId), description: `verdict: ${verdictLabel(caseId)}`, caseId }));
+      // A DISCRIMINANT field (not an overloaded sentinel caseId) routes the pick — collision-proof against any real caseId.
+      // Make the DESTRUCTIVE effect visible up front (no modal — operator's call): Pass-all overwrites any Fail/Pending too.
+      let fails = 0, pends = 0;
+      for (const caseId of caseIds) {
+        const v = reviewByCaseId[caseId] ?? "unreviewed";
+        if (v === "fail") fails++;
+        else if (v === "pending") pends++;
+      }
+      const overwrite = fails || pends ? ` (overwrites ${[fails && `${fails} ${REVIEW_LABEL.fail}`, pends && `${pends} ${REVIEW_LABEL.pending}`].filter(Boolean).join(", ")})` : "";
+      const passAllItem = { label: `$(check-all) Pass all`, description: `set all ${caseIds.length} cases to ${REVIEW_LABEL.pass}${overwrite}`, passAll: true as const };
+      const pick = await vscode.window.showQuickPick([passAllItem, ...rows], { placeHolder: "Pick a case to set its verdict (Esc to finish)" });
       if (!pick) return; // Esc ends the loop — deliberate cancel, no note
-      if (stale() || !scenarioByCaseId.has(pick.caseId)) return staleNote(); // revalidate BEFORE opening the verdict picker (don't drive a stale second picker)
+      if (stale()) return staleNote();
+      if ("passAll" in pick) {
+        passAll();
+        continue; // re-show the list (now all Pass) so the operator sees the result + can Esc or tweak
+      }
+      if (!scenarioByCaseId.has(pick.caseId)) return staleNote(); // revalidate BEFORE opening the verdict picker (don't drive a stale second picker)
       await pickVerdict(pick.caseId);
     }
   }

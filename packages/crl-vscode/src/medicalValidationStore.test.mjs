@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, deriveAllPassLeaves, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote, mvCasesClean, mvComplete, renderFlagChrome, setCriterionVerdict, criterionVerdictState, criterionVerdictKey, criterionProgress, mvCriteriaClean, renderCriterionChrome, unsettledReviewItems, computeCriterionVerdictUpdate, applyBulkVerdict, reviewGridViewModel, applyGridAssignments } from "./medicalValidationStore.ts";
+import { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, deriveAllPassLeaves, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote, mvCasesClean, mvComplete, renderFlagChrome, setCriterionVerdict, criterionVerdictState, criterionVerdictKey, criterionProgress, mvCriteriaClean, renderCriterionChrome, unsettledReviewItems, computeCriterionVerdictUpdate, applyBulkVerdict, reviewGridViewModel, applyGridAssignments, setAllReviewState } from "./medicalValidationStore.ts";
 
 const check = test;
 
@@ -1281,6 +1281,36 @@ check("applyGridAssignments: uses the CAPTURED expectedBodyHash — a moved body
   assert.deepEqual(r.skipped, [{ ref: { kind: "criterion", id: kA }, reason: "body-changed" }]);
   assert.equal(r.changed, 0);
   assert.equal(Object.keys(r.criterionVerdicts).length, 0);
+});
+
+check("setAllReviewState: sets the same verdict on many cases in one map; skips already-there; changed counts real movement", () => {
+  const before = { c2: "fail", c3: "pass" };
+  const { map, changed } = setAllReviewState(before, ["c1", "c2", "c3"], "pass");
+  assert.equal(changed, 2); // c1 (unreviewed→pass) + c2 (fail→pass); c3 already pass → skipped
+  assert.deepEqual(map, { c1: "pass", c2: "pass", c3: "pass" });
+  assert.deepEqual(before, { c2: "fail", c3: "pass" }, "input not mutated");
+});
+
+check("setAllReviewState: a wholly-redundant call is a no-op — changed 0 AND the SAME map ref (caller can skip persist)", () => {
+  const before = { c1: "pass", c2: "pass" };
+  const r = setAllReviewState(before, ["c1", "c2"], "pass");
+  assert.equal(r.changed, 0);
+  assert.equal(r.map, before); // same ref → persistMv/mvRevision correctly untouched
+});
+
+check("setAllReviewState: empty caseIds → no-op same ref", () => {
+  const before = { c1: "fail" };
+  const r = setAllReviewState(before, [], "pass");
+  assert.equal(r.changed, 0);
+  assert.equal(r.map, before);
+});
+
+check("setAllReviewState: a DUPLICATE caseId counts as ONE change (compares the evolving map, not the input)", () => {
+  const before = {};
+  const r = setAllReviewState(before, ["a", "a", "a"], "pass");
+  assert.equal(r.changed, 1); // not 3 — the 2nd/3rd see the already-set evolving map
+  assert.deepEqual(r.map, { a: "pass" });
+  assert.deepEqual(before, {}, "input not mutated");
 });
 
 check("applyGridAssignments: empty assignments → no-op (changed 0, maps returned untouched)", () => {

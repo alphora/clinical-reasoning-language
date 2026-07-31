@@ -651,7 +651,9 @@ check("#217 host: the verdict pick is stale-guarded (indexVersion + sidecar + sc
   assert.ok(/indexVersion !== ver \|\| mvSidecarPath !== sidecar \|\| mode !== "medical-validation"/.test(m[1]), "stale guard = model version + sidecar + mode");
   assert.ok(/stale\(\) \|\| !scenarioByCaseId\.has\(caseId\)\) return staleNote\(\)/.test(m[1]), "verdict pick revalidates the case + notes on stale (no silent dead click)");
   assert.ok(/for \(;;\) \{\s*if \(stale\(\)\) return staleNote\(\)/.test(m[1]), "the multi-case loop-top stale exit ALSO notes (not a silent return)");
-  assert.ok(/stale\(\) \|\| !scenarioByCaseId\.has\(pick\.caseId\)\) return staleNote\(\)[\s\S]*await pickVerdict\(pick\.caseId\)/.test(m[1]), "revalidates immediately after the case-list pick, BEFORE opening the verdict picker");
+  // after the case-list pick: stale-check, then route a PASS_ALL sentinel to passAll (continue), then revalidate the real case BEFORE the verdict picker
+  assert.ok(/if \("passAll" in pick\) \{\s*passAll\(\);\s*continue;/.test(m[1]), "a Pass-all pick routes to passAll + re-shows, not the per-case verdict picker");
+  assert.ok(/!scenarioByCaseId\.has\(pick\.caseId\)\) return staleNote\(\);\s*\/\/[^\n]*\n\s*await pickVerdict\(pick\.caseId\)/.test(m[1]), "revalidates the picked case immediately BEFORE opening the verdict picker");
   assert.ok(/caseIds\.length === 1\) return pickVerdict/.test(m[1]), "single case → straight to the verdict pick");
   // an Esc/cancel (`if (!pick) return;`) is a DELIBERATE dismissal — it must NOT emit a note (only stale exits do).
   assert.ok(/if \(!pick\) return; \/\/ Esc/.test(m[1]), "an Esc cancel returns without a note");
@@ -1255,6 +1257,17 @@ check("bulk-verdict: a retarget/reset CLOSES an open grid (a policy-A queue must
 check("bulk-verdict: the apply message envelope is validated before any dereference (untrusted webview)", () => {
   assert.match(COCKPIT_SRC, /function onReviewGridMessage\(raw: unknown\): void \{/);
   assert.match(COCKPIT_SRC, /if \(typeof raw !== "object" \|\| raw === null\) return;/);
+});
+
+check("pass-all: the node-verdict picker offers a 'Pass all' item that sets every LIVE case to Pass in ONE persist", () => {
+  // a DISCRIMINANT field (not an overloaded sentinel caseId) routes the pick to passAll — collision-proof against any real caseId
+  assert.match(COCKPIT_SRC, /const passAllItem = \{ label: `\$\(check-all\) Pass all`,[^\n]*passAll: true as const \};/);
+  assert.match(COCKPIT_SRC, /showQuickPick\(\[passAllItem, \.\.\.rows\]/);
+  assert.match(COCKPIT_SRC, /if \("passAll" in pick\) \{\s*\n\s*passAll\(\);/);
+  // passAll: LIVE-filter → one setAllReviewState → one persistMv → repaint tail (mirrors applyVerdict), skip persist when nothing moved
+  assert.match(COCKPIT_SRC, /const live = caseIds\.filter\(\(caseId\) => scenarioByCaseId\.has\(caseId\)\);/);
+  assert.match(COCKPIT_SRC, /const \{ map, changed \} = setAllReviewState\(reviewByCaseId, live, "pass"\);/);
+  assert.match(COCKPIT_SRC, /if \(changed === 0\) return;[\s\S]*?if \(!persistMv\(map, notesByCaseId\)\) return;/);
 });
 
 check("bulk-verdict: apply is guarded — single-flight, then RETARGET (policy/mode/cel), then REVISION, before the pure apply", () => {
