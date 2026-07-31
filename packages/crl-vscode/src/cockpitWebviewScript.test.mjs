@@ -1445,16 +1445,19 @@ check("node-filter: the per-node message routes to openNodeFlags(gid); the start
 });
 
 // ── Todo 2.5 (disc 359) — drawer UX revision: gold node-link, toggle, picker glyph color ──────────────────────────────
-check("gold-link: driveFlagNodeHighlight posts the open flag's gids (via gidsForFlag) and is driven from the postFlagDrawer choke-point + driveFlagBadges re-drive", () => {
+check("gold-link: driveFlagNodeHighlight posts the OPEN DRAWER's target gids (create OR action), mirroring the postFlagDrawer precedence, driven from the choke-point + driveFlagBadges re-drive", () => {
   const m = COCKPIT_SRC.match(/function driveFlagNodeHighlight\(\): void \{([\s\S]*?)\n  \}/);
   assert.ok(m, "driveFlagNodeHighlight body");
-  assert.match(m[1], /const gids = flagActionView \? gidsForFlag\(flagActionView\.flag\) : \[\];/); // open drawer → its flag's gids; else clear
+  // disc 361: create draft wins (its target), else the action drawer's flag, else clear — MIRRORS the postFlagDrawer dispatcher.
+  assert.match(m[1], /const gids = flagDraft[\s\S]*?\?\s*gidsForTargetChoice\(flagDraft\.target\)[\s\S]*?:\s*flagActionView[\s\S]*?\?\s*gidsForFlag\(flagActionView\.flag\)[\s\S]*?:\s*\[\];/);
   assert.match(m[1], /type: "flagHl", gen: tree\.gen, gids/);
-  // driven from postFlagDrawer (EVERY flagActionView mutation funnels there) + driveFlagBadges (re-render survival)
-  assert.match(COCKPIT_SRC, /driveFlagNodeHighlight\(\); \/\/ disc 359: EVERY flagActionView mutation funnels here/);
+  // driven from postFlagDrawer (EVERY drawer mutation funnels there) + driveFlagBadges (re-render survival)
+  assert.match(COCKPIT_SRC, /driveFlagNodeHighlight\(\); \/\/ disc 359\/361: EVERY drawer mutation \(create \+ action\) funnels here/);
   assert.match(COCKPIT_SRC, /driveFlagNodeHighlight\(\); \/\/ disc 359: a fresh render lost `\.flag-current`/);
-  // gidsForFlag reuses the shared flagPlacementFor for a SINGLE flag (open or resolved)
+  // gidsForFlag reuses the shared flagPlacementFor for a SINGLE filed flag (open or resolved)
   assert.match(COCKPIT_SRC, /function gidsForFlag\(flag: MvFlag\): string\[\] \{[\s\S]*?flagPlacementFor\(tree, \[flag\]\)\.gids/);
+  // disc 361: gidsForTargetChoice synthesizes the anchor the flag WILL carry (kind->scope, key->occurrenceKey) → the SAME placement.
+  assert.match(COCKPIT_SRC, /function gidsForTargetChoice\(target: FlagTargetChoice\): string\[\] \{[\s\S]*?scope: target\.kind,[\s\S]*?flagPlacementFor\(tree, \[synthetic\]\)\.gids/);
 });
 
 check("gold-link: the flagHl webview handler is gen-guarded, clears via querySelectorAll, adds to gids, scrolls only when the HOST says (m.scroll)", () => {
@@ -1489,6 +1492,14 @@ check("gold-link CSS (revised 361): a GOLD HALO (drop-shadow glow) on the node's
   assert.match(FLOW_STYLE, /\.flow-row\.node-focus\.flag-current>rect\{filter:drop-shadow\(0 0 4px var\(--vscode-charts-yellow,#cca700\)\) drop-shadow\(0 0 4px var\(--vscode-charts-yellow,#cca700\)\) drop-shadow\(0 0 8px #ffffff\)\}/);
   // THEME-ADAPTIVE: the combined fringe swaps white→black on light themes, mirroring `.node-focus`.
   assert.match(FLOW_STYLE, /body\.vscode-light \.flow-row\.node-focus\.flag-current>rect[^{]*\{filter:drop-shadow\([^}]*drop-shadow\(0 0 8px #000000\)\}/);
+});
+
+check("drawer gold accent (disc 361): the GOLD header accent is on `.flag-drawer` (shared chrome) so BOTH the create + action drawers show it", () => {
+  // the create drawer highlights its target node too (disc 361), so its header accent must match the node — scoped to the
+  // shared `.flag-drawer`, NOT only `.flag-action-drawer`.
+  assert.match(COCKPIT_SRC, /\.flag-drawer \.flag-head\{border-bottom:2px solid var\(--vscode-charts-yellow,#cca700\)\}/);
+  assert.match(COCKPIT_SRC, /\.flag-drawer \.flag-title\{color:var\(--vscode-charts-yellow,#cca700\)\}/);
+  assert.ok(!/\.flag-action-drawer \.flag-head\{/.test(COCKPIT_SRC), "the accent is no longer action-drawer-only (create drawer needs it too)");
 });
 
 check("toggle: reclicking the same flag closes; a different flag switches (entry paths only, NOT openFlagActionView)", () => {

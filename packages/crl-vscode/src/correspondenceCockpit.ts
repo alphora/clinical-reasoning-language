@@ -1613,14 +1613,47 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     return tree ? flagPlacementFor(tree, [flag]).gids : [];
   }
 
-  /** Paint the GOLD node-link for the OPEN action drawer's flag (disc 359) — a class-toggle channel (gen-guarded, survives a
-   *  re-render via the tree ack) modeled on `driveFlagBadges`. Driven ONLY from `postFlagDrawer` (every `flagActionView` mutation
-   *  funnels through it) + the tree ack — so no drive site can be missed. Empty gids when no action drawer is open → clears.
-   *  Gold means "this drawer's target", regardless of the flag's open/resolved status. */
+  /** The render gid(s) a CREATE draft's target draws as — so the gold node-link answers "which node am I flagging?" WHILE the
+   *  Add-flag drawer is open (not just for an existing flag, disc 361). Synthesize the anchor the flag WILL carry once created
+   *  (buildFlagDraft's mapping: `kind`→scope, `lib`→library, an occurrence `key`→occurrenceKey) and run the SAME placement, so
+   *  the draft highlights exactly the node(s) the filed flag would. `computeFlagPlacement` reads only `anchor.{scope,name,library,
+   *  occurrenceKey}` + `id`, so this throwaway record needs nothing else; nothing is stored. */
+  function gidsForTargetChoice(target: FlagTargetChoice): string[] {
+    const tree = views.get("tree");
+    if (!tree) return [];
+    const synthetic: MvFlag = {
+      schemaVersion: 1,
+      id: "__draft__",
+      category: "validation",
+      tag: "__draft__",
+      gist: "",
+      status: "open",
+      fields: {},
+      createdAt: "",
+      anchor: {
+        scope: target.kind,
+        name: target.name,
+        label: target.label,
+        ...(target.lib ? { library: target.lib } : {}),
+        ...(target.key ? { occurrenceKey: target.key } : {}),
+      },
+    };
+    return flagPlacementFor(tree, [synthetic]).gids;
+  }
+
+  /** Paint the GOLD node-link for the OPEN drawer's target (disc 359; disc 361: create drawer too) — a class-toggle channel
+   *  (gen-guarded, survives a re-render via the tree ack) modeled on `driveFlagBadges`. Driven ONLY from `postFlagDrawer` (every
+   *  drawer mutation funnels through it) + the tree ack — so no drive site can be missed. Precedence MIRRORS the postFlagDrawer
+   *  dispatcher (create wins, then action) so the highlighted node is always the drawer that's actually showing. Empty gids when
+   *  no drawer is open → clears. Gold means "this drawer's target", regardless of a filed flag's open/resolved status. */
   function driveFlagNodeHighlight(): void {
     const tree = views.get("tree");
     if (!tree) return; // no tree webview to highlight (the drawer lives in it; a fresh render starts classless + the ack re-drives)
-    const gids = flagActionView ? gidsForFlag(flagActionView.flag) : [];
+    const gids = flagDraft
+      ? gidsForTargetChoice(flagDraft.target) // the create draft's target — "which node am I flagging?" while authoring (disc 361)
+      : flagActionView
+        ? gidsForFlag(flagActionView.flag)
+        : [];
     const scroll = flagHlScrollPending; // true ONLY for a genuine open/switch — a re-render/ack/refresh drive never scrolls
     flagHlScrollPending = false;
     void tree.panel.webview.postMessage({ type: "flagHl", gen: tree.gen, gids, scroll });
@@ -3229,7 +3262,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         ? renderFlagActionDrawer(flagActionViewModel(flagActionView.flag))
         : "";
     void tree.panel.webview.postMessage({ type: "flagDrawer", html });
-    driveFlagNodeHighlight(); // disc 359: EVERY flagActionView mutation funnels here → the gold node-link stays lockstep with the drawer
+    driveFlagNodeHighlight(); // disc 359/361: EVERY drawer mutation (create + action) funnels here → the gold node-link stays lockstep with the drawer
   }
 
   // The plumbing field keys the action drawer's read-only view never lists as an extra field: `ref` is rendered specially (the
@@ -4531,9 +4564,11 @@ body:has(.flag-drawer) .flow-zoom{display:none}
 .fa-status-resolved{color:var(--vscode-charts-green,#89d185)}
 .fa-btn{cursor:pointer;border:none;border-radius:2px;padding:2px 10px;font-size:.9em;background:var(--vscode-button-secondaryBackground,#3a3d41);color:var(--vscode-button-secondaryForeground,#fff)}
 .fa-btn.fa-primary{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff)}
-/* disc 359: the header carries a GOLD accent linking it to the gold-ringed node in the tree ("which thing is this flag for?"). */
-.flag-action-drawer .flag-head{border-bottom:2px solid var(--vscode-charts-yellow,#cca700)}
-.flag-action-drawer .flag-title{color:var(--vscode-charts-yellow,#cca700)}
+/* disc 359/361: the header carries a GOLD accent linking it to the gold-haloed node in the tree (which thing is this flag
+   for?). Scoped to .flag-drawer (the shared chrome), so BOTH the create (Add-flag) AND the action drawer show it — the create
+   drawer highlights its target node too (disc 361), so its header must match. */
+.flag-drawer .flag-head{border-bottom:2px solid var(--vscode-charts-yellow,#cca700)}
+.flag-drawer .flag-title{color:var(--vscode-charts-yellow,#cca700)}
 /* the technical Target address + id live in a collapsed Details (auto-opened when the target isn't drawn in the tree). */
 .fa-details{font-size:.92em}
 .fa-details>summary{cursor:pointer;opacity:.7;font-size:.82em;text-transform:uppercase;letter-spacing:.02em;padding:2px 0}
