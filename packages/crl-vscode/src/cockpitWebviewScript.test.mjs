@@ -987,7 +987,9 @@ check("#211: the drawer lives in a DEDICATED #flagDrawer region the render handl
   // the render swap clears #root + #fcChrome but NOT #flagDrawer
   const render = SCRIPT.slice(SCRIPT.indexOf("if(m.type==='render')"), SCRIPT.indexOf("v.postMessage({type:'ready'"));
   assert.ok(!/fld\.innerHTML/.test(render), "the render handler must NOT touch #flagDrawer");
-  assert.match(SCRIPT, /else if\(m\.type==='flagDrawer'\)\{fld\.innerHTML=m\.html;if\(m\.html\)aff\(\);\}/); // its own channel + field-toggle
+  assert.match(SCRIPT, /else if\(m\.type==='flagDrawer'\)\{fld\.innerHTML=m\.html;if\(m\.html\)\{aff\(\);/); // its own channel + field-toggle (Todo 5 also focuses a grid inject here)
+  // Todo 5: on a GRID inject the handler moves focus into the grid (keyboard entry — the drawer is last in DOM)
+  assert.match(SCRIPT, /var rg=fld\.querySelector\('\[data-review-grid\]'\);if\(rg\)\{var f0=rg\.querySelector\('\.rvg-all,input\[type=radio\]:not\(\[disabled\]\)'\);if\(f0&&f0\.focus\)f0\.focus\(\);\}/);
   // only the SELECTED tag's field group shows — a `.flag-fieldgroup` display rule must NOT beat the `[hidden]` attribute
   assert.match(COCKPIT_SRC, /\.flag-fieldgroup\[hidden\]\{display:none\}/);
 });
@@ -1008,14 +1010,16 @@ check("#211: the message router wires flagDraftInsert → commitFlagDraft and fl
 // ── #210 (disc 239): the settle-once choke-point — the elicitation lifecycle rigor (the races aren't runtime-testable, so
 //    the goldens guard that every terminal routes through settleDrawer exactly once, keyed on the flagDraft transition). ──
 check("#210 (disc 239): EVERY flagDraft clear routes through the settle-once choke-point (no direct assignment strands a blocking elicitation)", () => {
-  // `flagDraft = undefined` appears ONLY in closeFlagDrawer + clearFlagDraft + openFlagActionView + openFlagEditDraft (Todo 3) —
-  // the lifecycle sites route through clearFlagDraft; the two cross-open sites SETTLE {replaced} BEFORE their clear. Each is
-  // settle-safe, so no blocking elicitation strands. (Assignment-precise regex; `flagEditDraft = undefined` does NOT match.)
+  // `flagDraft = undefined` appears ONLY in closeFlagDrawer + clearFlagDraft + openFlagActionView + openFlagEditDraft (Todo 3)
+  // + openReviewGrid (Todo 5) — the lifecycle sites route through clearFlagDraft; the cross-open sites SETTLE {replaced} BEFORE
+  // their clear. Each is settle-safe, so no blocking elicitation strands. (Assignment-precise regex; `flagEditDraft = undefined`
+  // does NOT match.)
   const clears = (COCKPIT_SRC.match(/\n\s*flagDraft = undefined;/g) || []).length;
-  assert.equal(clears, 4, "flagDraft = undefined is confined to closeFlagDrawer + clearFlagDraft + openFlagActionView + openFlagEditDraft");
-  // openFlagActionView + openFlagEditDraft each settle the pending create elicitation {replaced} before dropping the draft.
+  assert.equal(clears, 5, "flagDraft = undefined is confined to closeFlagDrawer + clearFlagDraft + openFlagActionView + openFlagEditDraft + openReviewGrid");
+  // openFlagActionView + openFlagEditDraft + openReviewGrid each settle the pending create elicitation {replaced} before the clear.
   assert.match(COCKPIT_SRC, /function openFlagActionView[\s\S]*?settleDrawer\(\{ status: "cancelled", reason: "replaced" \}\);[\s\S]*?flagDraft = undefined;/);
   assert.match(COCKPIT_SRC, /function openFlagEditDraft[\s\S]*?settleDrawer\(\{ status: "cancelled", reason: "replaced" \}\);[\s\S]*?flagDraft = undefined;/);
+  assert.match(COCKPIT_SRC, /async function openReviewGrid[\s\S]*?settleDrawer\(\{ status: "cancelled", reason: "replaced" \}\);[\s\S]*?flagDraft = undefined;/);
   // settleDrawer is idempotent: nulls the resolver BEFORE resolving (a Stop racing an Insert can't double-resolve).
   assert.match(COCKPIT_SRC, /function settleDrawer[\s\S]*?pendingDrawer = undefined;[\s\S]*?p\.settle\(outcome\)/);
   assert.match(COCKPIT_SRC, /function clearFlagDraft[\s\S]*?settleDrawer\(\{ status: "cancelled", reason \}\)/);
@@ -1240,18 +1244,20 @@ check("tree-snapshot: the trigger is an IN-PANE chrome button on the tree pane (
   assert.match(COCKPIT_SRC, /void exportTreeSnapshot\(\)\.catch\(/);
 });
 
-// ── #(bulk-verdict) Todo 2b — the "CRL · Review verdicts" grid host wiring (source-text / webview-channel locks) ──────
+// ── #(bulk-verdict) Todo 5 (disc 366) — the "Review verdicts" bulk grid as the 4th #flagDrawer mode (host wiring locks) ────
 check("bulk-verdict: the tree-chrome 'Review verdicts' button is MV-ONLY + posts openReviewGrid; host handles it on the tree pane", () => {
   assert.match(COCKPIT_SRC, /mode === "medical-validation"\s*\?\s*`<div class="fc-toggle fc-review-verdicts-row">/, "the button renders only in MV mode");
   assert.match(COCKPIT_SRC, /data-review-verdicts/);
   assert.match(SCRIPT, /closest\('\[data-review-verdicts\]'\);.*v\.postMessage\(\{type:'openReviewGrid'\}\);return;/s, "the fcChrome delegate posts openReviewGrid");
-  assert.match(COCKPIT_SRC, /msg\.type === "openReviewGrid" && pane === "tree"\)\s*\{\s*\n\s*\/\/[^\n]*\n\s*openReviewGrid\(\);/, "host opens the grid only from the tree pane");
+  assert.match(COCKPIT_SRC, /msg\.type === "openReviewGrid" && pane === "tree"\)\s*\{\s*\n\s*\/\/[^\n]*\n\s*void openReviewGrid\(\);/, "host opens the grid only from the tree pane (async, fire-and-forget)");
 });
 
-check("bulk-verdict: the command is registered + palette-gated + disposed with the cockpit", () => {
-  assert.match(COCKPIT_SRC, /registerCommand\("crl\.cockpit\.reviewVerdicts", \(\) => openReviewGrid\(\)\)/);
+check("bulk-verdict: the command is registered + palette-gated; the grid state dies with the cockpit via clearFlagDraft (no separate panel)", () => {
+  assert.match(COCKPIT_SRC, /registerCommand\("crl\.cockpit\.reviewVerdicts", \(\) => void openReviewGrid\(\)\)/);
   assert.match(COCKPIT_SRC, /reviewVerdictsCmd,/, "pushed onto context.subscriptions");
-  assert.match(COCKPIT_SRC, /reviewGridPanel\?\.dispose\(\);/, "the transient panel is disposed on cockpit teardown");
+  assert.doesNotMatch(COCKPIT_SRC, /reviewGridPanel/, "no separate webview panel survives — the grid is a #flagDrawer mode");
+  // dispose routes through clearFlagDraft("disposed"), which now folds in clearReviewGridState (grid dies with the tree pane).
+  assert.match(COCKPIT_SRC, /function clearFlagDraft[\s\S]*?clearReviewGridState\(\);/);
 });
 
 check("bulk-verdict: mvRevision bumps inside persistMv ONLY when a verdict map moved — a notes-only save must not stale the grid", () => {
@@ -1259,15 +1265,25 @@ check("bulk-verdict: mvRevision bumps inside persistMv ONLY when a verdict map m
   assert.match(COCKPIT_SRC, /if \(nextByCaseId !== reviewByCaseId \|\| nextCriterionVerdicts !== criterionVerdicts\) mvRevision\+\+;\s*\n\s*reviewByCaseId = nextByCaseId;/);
 });
 
-check("bulk-verdict: a retarget/reset CLOSES an open grid (a policy-A queue must not survive into policy B) — retarget-only, not per-rebuild", () => {
-  assert.match(COCKPIT_SRC, /function closeReviewGrid\(\): void \{\s*\n\s*reviewGridPanel\?\.dispose\(\);/);
-  // called from BOTH MV-state reset paths (loadReviewSidecar's retarget clear + the failed-rebuild reset), each next to clearFlagDraft
-  assert.equal((COCKPIT_SRC.match(/closeReviewGrid\(\);/g) || []).length, 2, "closeReviewGrid is called from both retarget/reset paths");
+check("bulk-verdict: a retarget/reset/tree-dispose stales the grid — clearReviewGridState is folded into the ONE clearFlagDraft choke-point", () => {
+  // Todo 5: the old panel-dispose closeReviewGrid is gone; clearFlagDraft (retarget/reset/dispose) clears the grid's 3 fields.
+  assert.match(COCKPIT_SRC, /function clearReviewGridState\(\): void \{\s*\n\s*reviewGridSnapshot = undefined;\s*\n\s*reviewGridApplying = false;\s*\n\s*reviewGridDirty = false;/);
+  assert.doesNotMatch(COCKPIT_SRC, /closeReviewGrid/, "the panel-era close is removed (no-legacy)");
+  assert.match(COCKPIT_SRC, /function clearFlagDraft[\s\S]*?clearReviewGridState\(\);[^\n]*\n\s*postFlagDrawer\(\);/, "clearFlagDraft clears the grid then posts the (now empty) drawer");
 });
 
-check("bulk-verdict: the apply message envelope is validated before any dereference (untrusted webview)", () => {
-  assert.match(COCKPIT_SRC, /function onReviewGridMessage\(raw: unknown\): void \{/);
-  assert.match(COCKPIT_SRC, /if \(typeof raw !== "object" \|\| raw === null\) return;/);
+check("bulk-verdict: the apply payload is untrusted — pane+mode gated in the router, resolved against the CAPTURED snapshot", () => {
+  // the message router gates on pane==="tree" AND an active snapshot before touching the untrusted assignments…
+  assert.match(COCKPIT_SRC, /msg\.type === "reviewGridApply" && pane === "tree"\)\s*\{[\s\S]*?if \(reviewGridSnapshot\) applyReviewGrid\(msg\.assignments, msg\.epoch\);/);
+  // …and applyReviewGrid hands the RAW payload to the pure applyGridAssignments (which owns the whole boundary), never trusting it.
+  assert.match(COCKPIT_SRC, /function applyReviewGrid\(raw: unknown, epoch: unknown\): void \{/);
+  assert.match(COCKPIT_SRC, /if \(Number\(epoch\) !== snap\.epoch\) return;/, "a delayed apply from a torn-down session is dropped (epoch gate)");
+  assert.match(COCKPIT_SRC, /applyGridAssignments\(raw, snap\.items, \{/);
+});
+
+check("bulk-verdict: the dirty mirror + Cancel are pane+mode scoped (a non-tree webview / no active grid never mutates host state)", () => {
+  assert.match(COCKPIT_SRC, /msg\.type === "reviewGridDirty" && pane === "tree"\)\s*\{[\s\S]*?Number\(msg\.epoch\) === reviewGridSnapshot\.epoch\) reviewGridDirty = msg\.dirty === true;/, "two-way dirty mirror, epoch-gated + boolean-coerced");
+  assert.match(COCKPIT_SRC, /msg\.type === "reviewGridCancel" && pane === "tree"\)\s*\{[\s\S]*?cancelReviewGrid\(msg\.epoch\);/);
 });
 
 check("flag-drawer: the create-flag drawer sits ABOVE the flow-zoom control + hides it while open (the zoom must not overlap Insert/Cancel)", () => {
@@ -1290,25 +1306,43 @@ check("pass-all: the node-verdict picker offers a NON-destructive 'Pass all' —
   assert.match(COCKPIT_SRC, /if \(changed === 0\) return;[\s\S]*?if \(!persistMv\(map, notesByCaseId\)\) return;/);
 });
 
-check("bulk-verdict: apply is guarded — single-flight, then RETARGET (policy/mode/cel), then REVISION, before the pure apply", () => {
-  assert.match(COCKPIT_SRC, /if \(m\.type !== "apply" \|\| reviewGridApplying\) return;/, "single-flight + only apply");
+check("bulk-verdict: apply is guarded — present+single-flight, then RETARGET (policy/mode/cel), then REVISION, before the pure apply", () => {
+  assert.match(COCKPIT_SRC, /function applyReviewGrid\(raw: unknown, epoch: unknown\): void \{\s*\n\s*const snap = reviewGridSnapshot;\s*\n\s*if \(!snap \|\| reviewGridApplying\) return;/, "present + single-flight");
   assert.match(COCKPIT_SRC, /snap\.sidecarPath !== mvSidecarPath \|\| snap\.mode !== mode \|\| snap\.cel !== currentCel/, "retarget guard axes");
-  assert.match(COCKPIT_SRC, /snap\.revision !== mvRevision\)\s*\{[\s\S]*?The review changed since Review verdicts opened/, "revision guard aborts + tells reopen");
-  assert.match(COCKPIT_SRC, /applyGridAssignments\(m\.assignments, snap\.items, \{/, "resolves the untrusted payload against the CAPTURED snapshot");
+  assert.match(COCKPIT_SRC, /snap\.revision !== mvRevision\)\s*\{[\s\S]*?The review changed since Review verdicts opened[\s\S]*?your unsaved picks were discarded/, "revision guard aborts, NAMES the consequence, tells reopen");
+  assert.match(COCKPIT_SRC, /applyGridAssignments\(raw, snap\.items, \{/, "resolves the untrusted payload against the CAPTURED snapshot");
 });
 
-check("bulk-verdict: apply persists ONCE + repaints both halves + notifies once; persist-fail keeps the panel open", () => {
-  assert.match(COCKPIT_SRC, /if \(result\.changed === 0\)\s*\{[\s\S]*?reviewGridPanel\.dispose\(\);/, "nothing changed → report + close, no persist");
-  assert.match(COCKPIT_SRC, /if \(!persistMv\(result\.reviewByCaseId, notesByCaseId, result\.criterionVerdicts\)\)\s*\{[\s\S]*?type: "reenable"/, "persist-fail re-enables (panel stays open)");
-  // chrome is posted ONCE (via the select dispatch or the else), then BOTH overlays re-drive, then one bridge notify — no trailing double-chrome
+check("bulk-verdict: apply persists ONCE + repaints both halves + notifies once; success empties the drawer, persist-fail keeps it open", () => {
+  assert.match(COCKPIT_SRC, /if \(result\.changed === 0\)\s*\{\s*\n\s*clearReviewGridState\(\);\s*\n\s*postFlagDrawer\(\);/, "nothing changed → clear + empty the drawer, no persist");
+  assert.match(COCKPIT_SRC, /if \(!persistMv\(result\.reviewByCaseId, notesByCaseId, result\.criterionVerdicts\)\)\s*\{[\s\S]*?type: "reviewGridReenable"/, "persist-fail posts reviewGridReenable (drawer stays open, picks survive)");
+  // success re-checks the snapshot is still ours, clears + empties the drawer, THEN chrome once, both overlays, one bridge notify.
+  assert.match(COCKPIT_SRC, /if \(reviewGridSnapshot === snap\)\s*\{\s*\n\s*clearReviewGridState\(\);\s*\n\s*postFlagDrawer\(\);/, "success-clear is conditional on the grid still being current");
   assert.match(COCKPIT_SRC, /else renderTreeChrome\(\);[\s\S]*?driveDoneOverlay\(\);[\s\S]*?driveCriterionVerdicts\(\);[\s\S]*?cockpitAgentBridge\.notifyChanged\(\);/, "chrome once, both overlays, then one bridge notify");
 });
 
-check("bulk-verdict: the grid shell is CSP-nonced + self-contained (REVIEW_GRID_STYLE/SCRIPT, no external resources)", () => {
-  assert.match(COCKPIT_SRC, /function reviewGridShellHtml\(body: string\): string \{/);
-  assert.match(COCKPIT_SRC, /default-src 'none'; style-src 'nonce-\$\{styleNonce\}'; script-src 'nonce-\$\{nonce\}';/);
-  assert.match(COCKPIT_SRC, /<style nonce="\$\{styleNonce\}">\$\{REVIEW_GRID_STYLE\}<\/style>/);
-  assert.match(COCKPIT_SRC, /<script nonce="\$\{nonce\}">\$\{REVIEW_GRID_SCRIPT\}<\/script>/);
+check("bulk-verdict: the grid is a #flagDrawer MODE — its style/script fold into the cockpit shell, no separate panel shell", () => {
+  assert.doesNotMatch(COCKPIT_SRC, /reviewGridShellHtml/, "the panel-era shell is removed (no-legacy)");
+  // the drawer style/script are concatenated into the ONE cockpit shell + COCKPIT_WEBVIEW_SCRIPT (CSP-nonced there).
+  assert.match(COCKPIT_SRC, /\$\{QUESTIONNAIRE_STYLE\}\$\{REVIEW_GRID_DRAWER_STYLE\}/, "drawer CSS folded into the cockpit <style>");
+  assert.match(COCKPIT_SRC, /REVIEW_GRID_DRAWER_SCRIPT;/, "drawer IIFE appended to COCKPIT_WEBVIEW_SCRIPT (reuses fld/v; one acquireVsCodeApi)");
+  // the grid body is posted via the SAME flagDrawer message (innerHTML) — rendered FROM the snapshot (the one render authority).
+  assert.match(COCKPIT_SRC, /reviewGridSnapshot\s*\n\s*\?\s*reviewGridHtml\(reviewGridViewModel\(reviewGridSnapshot\.items\), reviewGridSnapshot\.epoch\)/);
+});
+
+check("bulk-verdict: openReviewGrid requires a LIVE tree pane (no invisible grid) + reveals it before capturing a snapshot", () => {
+  // accept #2: the drawer lives in the tree webview — no tree = no UI; require it (a note) BEFORE enumerating/snapshotting.
+  assert.match(COCKPIT_SRC, /async function openReviewGrid[\s\S]*?const tree = views\.get\("tree"\);\s*\n\s*if \(!tree\) \{[\s\S]*?Open the Medical Validation tree pane/);
+  assert.match(COCKPIT_SRC, /async function openReviewGrid[\s\S]*?const liveTree = views\.get\("tree"\);[\s\S]*?liveTree\.panel\.reveal\([\s\S]*?reviewGridSnapshot = \{ items,/, "RE-acquire the tree after the await, reveal it, THEN capture the snapshot");
+});
+
+check("bulk-verdict: a 2nd invoke toggle-CLOSES (Q1 union) — gated by the discard guard, never while applying", () => {
+  assert.match(COCKPIT_SRC, /if \(reviewGridSnapshot\) \{\s*\n\s*if \(reviewGridApplying\) return;\s*\n\s*if \(!\(await guardDrawerDiscard\(\)\)\) return;[\s\S]*?clearReviewGridState\(\);\s*\n\s*postFlagDrawer\(\);/);
+});
+
+check("bulk-verdict: the agent flag seams REFUSE while the grid holds unsaved picks (parity with the dirty-edit refusal, no silent clobber)", () => {
+  assert.match(COCKPIT_SRC, /bridgeBeginFlagDrawer[\s\S]*?if \(reviewGridSnapshot && reviewGridDirty\) return \{ error:[^\n]*unsaved verdict picks/);
+  assert.match(COCKPIT_SRC, /bridgeSubmitFlag[\s\S]*?if \(reviewGridSnapshot && reviewGridDirty\) return \{ ok: false, reason:[^\n]*unsaved verdict picks/);
 });
 
 check("bulk-verdict: enumeration uses the SAME reachable gate + reviewable-case sets as the live gate (no single/bulk drift)", () => {
@@ -1318,10 +1352,11 @@ check("bulk-verdict: enumeration uses the SAME reachable gate + reviewable-case 
 });
 
 // ── flag-action drawer foundation (design 354) — host wiring locks ─────────────────────────────────────────────────────
-check("flag-action drawer: postFlagDrawer is the one-slot dispatcher (create → action → empty)", () => {
+check("flag-action drawer: postFlagDrawer is the one-slot dispatcher (create → edit → action → grid → empty)", () => {
   assert.match(COCKPIT_SRC, /flagDraft\s*\n\s*\?\s*renderFlagDrawer\(/, "create wins");
-  assert.match(COCKPIT_SRC, /:\s*flagActionView\s*\n\s*\?\s*renderFlagActionDrawer\(flagActionViewModel\(flagActionView\.flag\)\)/, "else the action drawer");
-  assert.match(COCKPIT_SRC, /renderFlagActionDrawer\(flagActionViewModel\(flagActionView\.flag\)\)\s*\n\s*:\s*"";/, "else an empty region");
+  assert.match(COCKPIT_SRC, /:\s*flagActionView\s*\n\s*\?\s*renderFlagActionDrawer\(flagActionViewModel\(flagActionView\.flag\)\)/, "…else the action drawer");
+  // Todo 5: the bulk grid is the 4th mode — rendered FROM the snapshot (the one render authority), then an empty region.
+  assert.match(COCKPIT_SRC, /reviewGridSnapshot\s*\n\s*\?\s*reviewGridHtml\(reviewGridViewModel\(reviewGridSnapshot\.items\), reviewGridSnapshot\.epoch\)\s*\n\s*:\s*"";/, "…else the grid, else an empty region");
 });
 
 check("flag-action drawer: opening either flyout routes through the settle choke-point (mutual exclusion, no agent hang)", () => {
@@ -1565,15 +1600,17 @@ check("edit: cancelFlagEdit returns to the action VIEW (re-found by id; warning�
   assert.match(m[1], /if \(live\) return openFlagActionView\(live, indexVersion, currentCel\);/);
   assert.match(m[1], /if \(flagStoreWarning\) return openFlagActionView\(draft\.flag/); // unknown, not gone
 });
-check("edit: guardEditDiscard prompts ONLY when an edit is open AND dirty; gates the switch entries (list/node/create)", () => {
-  const m = COCKPIT_SRC.match(/async function guardEditDiscard\(\): Promise<boolean> \{([\s\S]*?)\n  \}/);
-  assert.ok(m, "guardEditDiscard body");
-  assert.match(m[1], /if \(!flagEditDraft \|\| !flagEditDirty\) return true;/); // no edit / not dirty → proceed silently
-  assert.match(m[1], /showWarningMessage\("Discard your unsaved flag edits\?", \{ modal: true \}, "Discard"\)/);
-  // wired into every implicit-switch entry
-  assert.match(COCKPIT_SRC, /async function openFlagList\(\): Promise<void> \{\s*\n\s*if \(mode[^\n]*\n\s*if \(!\(await guardEditDiscard\(\)\)\) return;/);
-  assert.match(COCKPIT_SRC, /async function openNodeFlags\([^)]*\): Promise<void> \{\s*\n\s*if \(mode[^\n]*\n\s*if \(!\(await guardEditDiscard\(\)\)\) return;/);
-  assert.match(COCKPIT_SRC, /if \(pick\.choice\) \{\s*\n\s*if \(!\(await guardEditDiscard\(\)\)\) return;[\s\S]*?openFlagDrawer/);
+check("edit/grid: guardDrawerDiscard prompts on a dirty EDIT or a dirty GRID; gates the switch entries (list/node/create)", () => {
+  const m = COCKPIT_SRC.match(/async function guardDrawerDiscard\(\): Promise<boolean> \{([\s\S]*?)\n  \}/);
+  assert.ok(m, "guardDrawerDiscard body");
+  assert.match(m[1], /if \(flagEditDraft && flagEditDirty\) \{[\s\S]*?showWarningMessage\("Discard your unsaved flag edits\?", \{ modal: true \}, "Discard"\)/); // edit clause
+  assert.match(m[1], /if \(reviewGridSnapshot && reviewGridDirty\) \{[\s\S]*?showWarningMessage\("Discard your unsaved verdict picks\?", \{ modal: true \}, "Discard"\)/); // Todo 5 grid clause
+  assert.match(m[1], /return true;/); // no unsaved work → proceed silently
+  // wired into every implicit-switch entry (list / node / create) — one guard now covers both drawer modes
+  assert.match(COCKPIT_SRC, /async function openFlagList\(\): Promise<void> \{\s*\n\s*if \(mode[^\n]*\n\s*if \(!\(await guardDrawerDiscard\(\)\)\) return;/);
+  assert.match(COCKPIT_SRC, /async function openNodeFlags\([^)]*\): Promise<void> \{\s*\n\s*if \(mode[^\n]*\n\s*if \(!\(await guardDrawerDiscard\(\)\)\) return;/);
+  assert.match(COCKPIT_SRC, /if \(pick\.choice\) \{\s*\n\s*if \(!\(await guardDrawerDiscard\(\)\)\) return;[\s\S]*?openFlagDrawer/);
+  assert.doesNotMatch(COCKPIT_SRC, /guardEditDiscard/, "the edit-only guard is fully superseded by guardDrawerDiscard");
 });
 check("edit: saveFlagEdit — cel+mode guard (NOT ver), single-flight, clean re-read, field-ownership merge, local-save-FIRST, then relabel", () => {
   const m = COCKPIT_SRC.match(/async function saveFlagEdit\([\s\S]*?\n  \}\n\n  \/\*\* Todo 3 — re-sync/);

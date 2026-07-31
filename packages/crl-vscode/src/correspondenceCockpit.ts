@@ -125,7 +125,7 @@ import {
   type ReviewItem,
   type ReviewState,
 } from "./medicalValidationStore";
-import { reviewGridHtml, REVIEW_GRID_STYLE, REVIEW_GRID_SCRIPT } from "./reviewGridHtml";
+import { reviewGridHtml, REVIEW_GRID_DRAWER_STYLE, REVIEW_GRID_DRAWER_SCRIPT } from "./reviewGridHtml";
 import { renderCrlPane } from "./crlPaneHtml";
 import { collectDispositionLeafKeys, FLOW_STYLE, flowLegendChrome, renderFlowPane } from "./flowPaneHtml";
 import { renderFlowSnapshotDocument } from "./flowSnapshotHtml";
@@ -519,16 +519,22 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // `cel` binds it to the policy so a coincidental nodeKey collision in another policy can't resolve it.
   let flagAnchor: { hit: WebviewHit; cel: string | undefined } | undefined;
   let mvSidecarPath: string | undefined;
-  // #(bulk-verdict) Todo 2b — the "CRL · Review verdicts" grid: a SINGLETON transient webview panel that buys off many
-  // case/criterion verdicts at once. `reviewGridPanel` is the live panel (a 2nd invoke reveals it, never a 2nd snapshot).
-  // `reviewGridSnapshot` is the OPEN-TIME capture the host resolves an apply against (the webview is untrusted): the frozen
-  // `ReviewItem[]` + the retarget-guard axes (`sidecarPath`/`mode`/`cel`) + `revision` (see `mvRevision`). `reviewGridApplying`
-  // serialises apply (a 2nd apply must not race the one persist). `mvRevision` bumps on EVERY successful `persistMv` (disc 347):
-  // if it moved while the grid was open (a worklist/right-click/agent/prior-apply verdict change), the grid's snapshot is stale
-  // and apply ABORTS — the fail-closed backstop per-item revalidation can't cover for value-only case changes.
-  let reviewGridPanel: vscode.WebviewPanel | undefined;
-  let reviewGridSnapshot: { items: ReviewItem[]; sidecarPath: string; mode: "medical-validation"; cel: string | undefined; revision: number } | undefined; // openReviewGrid guards MV before capture, so the mode is always the literal
+  // #(bulk-verdict) Todo 5 (disc 366) — the "Review verdicts" bulk grid, now the 4th `#flagDrawer` content mode (was its own
+  // `crlReviewGrid` webview tab). `reviewGridSnapshot` is BOTH the mode token (grid mode is active ⟺ it's set) AND the OPEN-TIME
+  // capture the host resolves an apply against (the webview is untrusted): the frozen `ReviewItem[]` + the retarget-guard axes
+  // (`sidecarPath`/`mode`/`cel`) + `revision` (see `mvRevision`). One authority — the drawer HTML renders FROM the snapshot, so
+  // dispatcher render + apply-validation can't diverge. `reviewGridApplying` serialises apply (a 2nd apply must not race the one
+  // persist); `reviewGridDirty` mirrors the webview's 0↔≥1 picks so the discard guard knows unsaved picks exist (both DOM-derived
+  // there, host-mirrored here). `mvRevision` bumps on EVERY successful `persistMv` (disc 347): if it moved while the grid was open
+  // (a worklist/right-click/agent/prior-apply verdict change), the snapshot is stale and apply ABORTS — the fail-closed backstop
+  // per-item revalidation can't cover for value-only case changes.
+  let reviewGridSnapshot: { items: ReviewItem[]; sidecarPath: string; mode: "medical-validation"; cel: string | undefined; revision: number; epoch: number } | undefined; // openReviewGrid guards MV before capture, so the mode is always the literal
   let reviewGridApplying = false;
+  let reviewGridDirty = false;
+  // The grid-SESSION id (impl-review [critical]): bumped on every open, stamped into the snapshot + the rendered root's data-epoch,
+  // echoed by the webview on every message. `revision` guards against a PERSIST since open; `epoch` distinguishes two same-policy
+  // sessions with no persist between (a delayed message from a torn-down session must not act on a later reopen's snapshot).
+  let reviewGridEpoch = 0;
   let mvRevision = 0;
   // #203 Todo 4 / #212 S3 — the review-flag surface. `flagsList` = ALL flags (open + resolved) as `MvFlag`s, read from the
   // `.crl/flags/` STORE (the single flag home; the S2 dual-read is gone), refreshed in reloadReviewFlags(). `flagStateError`
@@ -1106,7 +1112,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  flag) — a documented, transitional cost. Esc closes the list. */
   async function openFlagList(): Promise<void> {
     if (mode !== "medical-validation") return;
-    if (!(await guardEditDiscard())) return; // Todo 3: browsing to another flag would abandon an in-progress edit — confirm first
+    if (!(await guardDrawerDiscard())) return; // Todo 3/5: browsing to another flag would abandon an in-progress edit OR the grid's picks — confirm first
     const ver = indexVersion; // retarget/rebuild guard: a policy switch while a picker is open must not act on the old policy
     const cel = currentCel;
     if (flagsList.length === 0) return flagNote(flagStateError ? flagStateNote ?? "flag state is unknown (a source could not be read)" : "no review flags");
@@ -1135,7 +1141,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  → keep). The START-node count pill is a DIFFERENT channel (`mvFlags` → the full list) — untouched. */
   async function openNodeFlags(gid: string): Promise<void> {
     if (mode !== "medical-validation") return;
-    if (!(await guardEditDiscard())) return; // Todo 3: switching to this node's flag would abandon an in-progress edit — confirm first
+    if (!(await guardDrawerDiscard())) return; // Todo 3/5: switching to this node's flag would abandon an in-progress edit OR the grid's picks — confirm first
     const ver = indexVersion;
     const cel = currentCel;
     const flags = flagsByGid.get(gid) ?? []; // OPEN-only (driveFlagBadges builds it over `open`) — matches what the badge counts
@@ -1668,7 +1674,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         ? gidsForFlag(flagEditDraft.flag) // Todo 3: the edit form's flag stays gold-linked while editing
         : flagActionView
           ? gidsForFlag(flagActionView.flag)
-          : [];
+          : []; // Todo 5 (D6): the bulk grid has no single target node → no gold link (falls through here, grid mode is mutually exclusive with the three above)
     const scroll = flagHlScrollPending; // true ONLY for a genuine open/switch — a re-render/ack/refresh drive never scrolls
     flagHlScrollPending = false;
     void tree.panel.webview.postMessage({ type: "flagHl", gen: tree.gen, gids, scroll });
@@ -2174,7 +2180,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   function onWebviewMessage(
     pane: Pane,
-    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string; state?: string; gid?: string; tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown; token?: unknown; html?: unknown },
+    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string; state?: string; gid?: string; tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown; token?: unknown; html?: unknown; assignments?: unknown; dirty?: unknown; epoch?: unknown },
   ): void {
     const v = views.get(pane);
     if (!v) return;
@@ -2255,8 +2261,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // #(tree-snapshot): the in-pane "⤓ Export snapshot" chrome button (tree pane only) → the host command.
       void exportTreeSnapshot().catch((e) => vscode.window.showErrorMessage(`Tree snapshot: ${e instanceof Error ? e.message : String(e)}`));
     } else if (msg.type === "openReviewGrid" && pane === "tree") {
-      // #(bulk-verdict) Todo 2b: the in-pane "☑ Review verdicts…" chrome button (tree pane only) → open the bulk grid.
-      openReviewGrid();
+      // #(bulk-verdict) Todo 5: the in-pane "☑ Review verdicts…" chrome button (tree pane only) → open (or toggle-close) the drawer grid.
+      void openReviewGrid();
+    } else if (msg.type === "reviewGridApply" && pane === "tree") {
+      // Todo 5: the grid drawer's Apply — pane+mode scoped (a non-tree webview / no active grid never applies). The untrusted
+      // `assignments` payload is resolved against the CAPTURED snapshot inside applyReviewGrid (the trust boundary); the epoch
+      // gates out a delayed message from a torn-down session.
+      if (reviewGridSnapshot) applyReviewGrid(msg.assignments, msg.epoch);
+    } else if (msg.type === "reviewGridCancel" && pane === "tree") {
+      if (reviewGridSnapshot) cancelReviewGrid(msg.epoch); // Todo 5: the grid drawer's Cancel/✕ — deliberate discard (epoch-gated)
+    } else if (msg.type === "reviewGridDirty" && pane === "tree") {
+      if (reviewGridSnapshot && Number(msg.epoch) === reviewGridSnapshot.epoch) reviewGridDirty = msg.dirty === true; // Todo 5: mirror the webview's 0↔≥1 picks (epoch-gated, two-way)
     } else if (msg.type === "worklistFilterToggle") {
       toggleWorklistFilter(msg.state); // #214: toggle a verdict in/out of the worklist filter (host validates the state)
     } else if (msg.type === "notesToggle" && typeof msg.key === "string") {
@@ -2633,8 +2648,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     criterionVerdicts = {}; // #224 ii.3 Slice 2b: drop criterion verdicts with the rest of the MV state
     openNotesCaseId = undefined;
     editingNoteId = undefined;
-    clearFlagDraft("retarget"); // #211/#210: drop the draft + postFlagDrawer + SETTLE any pending agent elicitation (else it hangs)
-    closeReviewGrid(); // #(bulk-verdict) Todo 2b: a bulk grid enumerated from the old policy must not survive the reset
+    clearFlagDraft("retarget"); // #211/#210: drop the draft + postFlagDrawer + SETTLE any pending agent elicitation (else it hangs) — Todo 5: also stales the bulk grid
     flagAnchor = undefined; // #210 Todo C: drop the agent flag anchor too (a stale anchor must not survive a failed retarget)
     mvSidecarPath = undefined;
     flagsList = []; // #203 Todo 4: drop the review-flag state too (a stale flag list/gate must not survive a failed retarget)
@@ -2795,8 +2809,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     criterionVerdicts = {}; // #224 ii.3 Slice 2b: reset criterion verdicts with the rest of the MV state (retarget)
     openNotesCaseId = undefined;
     editingNoteId = undefined;
-    clearFlagDraft("retarget"); // #211/#210: a policy (re)load drops the draft + SETTLES any pending agent elicitation
-    closeReviewGrid(); // #(bulk-verdict) Todo 2b: a policy (re)load stales any open bulk grid — close it (retarget-only, not per-rebuild)
+    clearFlagDraft("retarget"); // #211/#210: a policy (re)load drops the draft + SETTLES any pending agent elicitation — Todo 5: also stales the bulk grid (retarget-only, not per-rebuild)
     mvSidecarPath = undefined;
     worklistActions = {};
     worklistFilter = new Set(REVIEW_STATES); // #214: reset the verdict filter to all-shown on retarget (policy A's filter must not hide policy B)
@@ -2894,15 +2907,16 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     return true;
   }
 
-  // ── #(bulk-verdict) Todo 2b — the "CRL · Review verdicts" grid: open, apply, report ──────────────────────────────────
+  // ── #(bulk-verdict) Todo 5 (disc 366) — the "Review verdicts" bulk grid, now a `#flagDrawer` mode: open, apply, report ────
 
-  /** Close the bulk grid if open (its `onDidDispose` nulls the snapshot). Called on RETARGET/reset — a grid enumerated from
-   *  policy A must not survive into policy B: a `reveal()` would show A's queue under the same title, and the fail-closed
-   *  apply guards would then discard the reviewer's work. RETARGET-ONLY (`loadReviewSidecar` / the reset path have a single
-   *  caller each — a policy/mode (re)load, NOT a same-policy background rebuild, which the grid is built to survive). Also
-   *  closes the round-trip A→B→A hole: the retarget triple alone can't tell A-reloaded-from-disk from the original A. */
-  function closeReviewGrid(): void {
-    reviewGridPanel?.dispose();
+  /** Clear the grid's host state (snapshot = the mode token, applying, dirty). Does NOT post — the caller decides (a mode
+   *  switch posts the new mode; `clearFlagDraft` posts empty). Folded into `clearFlagDraft` so RETARGET/reset/tree-pane-dispose
+   *  drop the grid too — a queue enumerated from policy A must not survive into policy B (the fail-closed apply guards would
+   *  otherwise discard the reviewer's work), and the drawer dies with a disposed tree pane (the old separate panel didn't). */
+  function clearReviewGridState(): void {
+    reviewGridSnapshot = undefined;
+    reviewGridApplying = false;
+    reviewGridDirty = false;
   }
 
   /** Build the OPEN-TIME work queue: the unsettled case + criterion review items (the pure enumerator). Criteria come from
@@ -2925,96 +2939,123 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     });
   }
 
-  /** Open (or reveal) the bulk-verdict grid. MV-only + a saved sidecar (persistence-ready, like `applyVerdict`); an empty
-   *  queue does NOT open (nothing to buy off — not the same as `mvComplete`). Captures the enumerated items + the retarget
-   *  guard axes + `mvRevision` so a later apply resolves against THIS snapshot, never live webview identity. Singleton. */
-  function openReviewGrid(): void {
+  /** Open (Q1: or toggle-CLOSE) the bulk-verdict grid in the `#flagDrawer` right flyout. MV-only + a saved sidecar +
+   *  (accept #2) a LIVE tree view — the drawer lives in the tree webview, so no tree = no UI; we require it (else a note) and
+   *  `reveal()` the tree pane, never capturing a snapshot until it's guaranteed. An empty queue does NOT open. A 2nd invoke
+   *  toggle-CLOSES (union of the Q1 split: gated by the discard guard, never while applying — a re-open re-enumerates fresh,
+   *  beating a stale-snapshot reveal). Opening clears the other three modes via the settle choke-point (a pending create
+   *  elicitation is settled `{replaced}`) after `guardDrawerDiscard` (Claude #2: opening the grid over a dirty edit confirms
+   *  first). Captures the items + retarget axes + `mvRevision` as the snapshot the apply resolves against (the mode token too). */
+  async function openReviewGrid(): Promise<void> {
     if (mode !== "medical-validation" || !mvSidecarPath) {
       void vscode.window.showInformationMessage("Review verdicts is available in Medical Validation with a saved policy.");
       return;
     }
-    if (reviewGridPanel) {
-      reviewGridPanel.reveal();
+    const tree = views.get("tree");
+    if (!tree) {
+      void vscode.window.showInformationMessage("Open the Medical Validation tree pane, then try Review verdicts again.");
       return;
     }
+    // Q1 union: a 2nd invoke while the grid is showing toggle-CLOSES — but NEVER mid-apply, and only after the discard guard.
+    if (reviewGridSnapshot) {
+      if (reviewGridApplying) return;
+      if (!(await guardDrawerDiscard())) return;
+      if (!reviewGridSnapshot) return; // a concurrent retarget/reset cleared it during the modal await
+      clearReviewGridState();
+      postFlagDrawer(); // empty region (grid was the open mode)
+      return;
+    }
+    if (!(await guardDrawerDiscard())) return; // a dirty edit form must confirm before the grid clobbers it (one slot)
+    // Re-validate after the (possibly modal) guard await — a retarget could have moved the world, or a concurrent invoke could
+    // have already opened the grid (impl-review [important]: close the double-invoke residue — don't double-post the snapshot).
+    if (mode !== "medical-validation" || !mvSidecarPath || reviewGridSnapshot) return;
+    const liveTree = views.get("tree"); // RE-acquire (impl-review): the pre-await `tree` may be a disposed pane after a modal
+    if (!liveTree) return;
     const items = enumerateReviewItems();
     if (items.length === 0) {
       void vscode.window.showInformationMessage("No unsettled case or criterion verdicts.");
       return;
     }
-    reviewGridSnapshot = { items, sidecarPath: mvSidecarPath, mode, cel: currentCel, revision: mvRevision };
+    liveTree.panel.reveal(liveTree.panel.viewColumn ?? vscode.ViewColumn.One, true); // bring the tree pane forward so the drawer is visible (no focus steal)
+    settleDrawer({ status: "cancelled", reason: "replaced" }); // supersede any pending create elicitation (one slot)
+    flagDraft = undefined;
+    flagEditDraft = undefined;
+    flagEditDirty = false;
+    flagActionView = undefined;
+    reviewGridSnapshot = { items, sidecarPath: mvSidecarPath, mode, cel: currentCel, revision: mvRevision, epoch: ++reviewGridEpoch };
     reviewGridApplying = false;
-    const panel = vscode.window.createWebviewPanel(
-      "crlReviewGrid",
-      "CRL · Review verdicts",
-      { viewColumn: vscode.ViewColumn.Active, preserveFocus: false },
-      { enableScripts: true, retainContextWhenHidden: true },
-    );
-    panel.webview.html = reviewGridShellHtml(reviewGridHtml(reviewGridViewModel(items)));
-    panel.webview.onDidReceiveMessage((m) => onReviewGridMessage(m));
-    panel.onDidDispose(() => {
-      reviewGridPanel = undefined;
-      reviewGridSnapshot = undefined;
-      reviewGridApplying = false;
-    });
-    reviewGridPanel = panel;
+    reviewGridDirty = false;
+    flagHlScrollPending = false; // the grid has no gold target node
+    postFlagDrawer();
   }
 
-  /** Handle the grid webview's messages. `cancel` closes; `apply` resolves the untrusted `{kind,id,state}[]` against the
-   *  captured snapshot. Guards, in order: single-flight (`reviewGridApplying`); RETARGET (policy/mode/cel moved → the maps are
-   *  a different policy's → abort + reopen, disc 347); REVISION (any MV persist since open → snapshot stale → abort + reopen).
-   *  Then the pure `applyGridAssignments` (best-effort). `changed===0` → nothing to persist (report + close). On persist SUCCESS
-   *  → repaint (worklist + selection + both overlays + chrome) + one bridge notify + close + report. On persist FAILURE → keep
-   *  the panel OPEN (re-enable, picks survive), the error already surfaced by `persistMv`. */
-  function onReviewGridMessage(raw: unknown): void {
-    if (!reviewGridPanel || !reviewGridSnapshot) return;
-    if (typeof raw !== "object" || raw === null) return; // the webview envelope is untrusted — a non-object never dereferenced
-    const m = raw as { type?: unknown; assignments?: unknown };
-    if (m.type === "cancel") {
-      reviewGridPanel.dispose();
-      return;
-    }
-    if (m.type !== "apply" || reviewGridApplying) return;
+  /** Cancel the grid drawer (its ✕/Cancel) — a deliberate discard (no confirm), clear + empty the region. Epoch-gated so a
+   *  delayed Cancel from a torn-down session can't close a later reopen. */
+  function cancelReviewGrid(epoch: unknown): void {
+    if (!reviewGridSnapshot || reviewGridApplying || Number(epoch) !== reviewGridSnapshot.epoch) return;
+    clearReviewGridState();
+    postFlagDrawer();
+  }
+
+  /** Apply the grid's picks. The untrusted `{kind,id,state}[]` resolves against the captured snapshot. Guards, in order:
+   *  mode/snapshot present; single-flight (`reviewGridApplying`); RETARGET (policy/mode/cel moved → a different policy's maps →
+   *  abort + close, disc 347); REVISION (any MV persist since open → snapshot stale → abort + close). Then the pure
+   *  `applyGridAssignments` (best-effort). `changed===0` → nothing to persist (report + close). On persist SUCCESS → clear +
+   *  empty the drawer, repaint (worklist + selection + both overlays + chrome) + one bridge notify + report. On persist FAILURE
+   *  → keep the drawer OPEN, post `reviewGridReenable` (clears the DOM `data-applying` so the picks survive), error already
+   *  surfaced by `persistMv`. A retarget/revision abort NAMES the consequence (the unsaved picks are discarded). */
+  function applyReviewGrid(raw: unknown, epoch: unknown): void {
     const snap = reviewGridSnapshot;
+    if (!snap || reviewGridApplying) return;
+    if (Number(epoch) !== snap.epoch) return; // impl-review [critical]: a delayed Apply from a torn-down session must not act on THIS snapshot
+    const tree = views.get("tree");
+    if (!tree) return; // no drawer to act on
     if (mode !== "medical-validation" || !mvSidecarPath || snap.sidecarPath !== mvSidecarPath || snap.mode !== mode || snap.cel !== currentCel) {
-      reviewGridPanel.dispose();
-      void vscode.window.showWarningMessage("The policy changed since Review verdicts opened — reopen it.");
+      clearReviewGridState();
+      postFlagDrawer();
+      void vscode.window.showWarningMessage("The policy changed since Review verdicts opened — your unsaved picks were discarded. Reopen it.");
       return;
     }
     if (snap.revision !== mvRevision) {
-      reviewGridPanel.dispose();
-      void vscode.window.showWarningMessage("The review changed since Review verdicts opened — reopen it.");
+      clearReviewGridState();
+      postFlagDrawer();
+      void vscode.window.showWarningMessage("The review changed since Review verdicts opened — your unsaved picks were discarded. Reopen it.");
       return;
     }
     reviewGridApplying = true;
-    const result = applyGridAssignments(m.assignments, snap.items, {
+    const result = applyGridAssignments(raw, snap.items, {
       criterionVerdicts,
       reviewByCaseId,
       liveCriteria: buildLiveCriterionIdentities(), // the GATE set, matching the enumeration + mvComplete
       liveCaseIds: new Set(scenarioByCaseId.keys()), // the reviewable frozen set
     });
     if (result.changed === 0) {
-      reviewGridApplying = false;
-      reviewGridPanel.dispose();
+      clearReviewGridState();
+      postFlagDrawer();
       void vscode.window.showInformationMessage(reviewGridReport(result));
       return;
     }
     if (!persistMv(result.reviewByCaseId, notesByCaseId, result.criterionVerdicts)) {
-      reviewGridApplying = false; // persistMv already surfaced the error; keep the panel open so the picks survive
-      void reviewGridPanel.webview.postMessage({ type: "reenable", note: "Not saved — try again." });
+      reviewGridApplying = false; // persistMv already surfaced the error; keep the drawer open so the picks survive
+      void tree.panel.webview.postMessage({ type: "reviewGridReenable", epoch: snap.epoch, note: "Not saved — try again." });
       return;
     }
-    // Persisted (mvRevision bumped inside persistMv). Repaint BOTH halves — a bulk apply can touch cases AND criteria.
+    // Persisted (mvRevision bumped inside persistMv). Clear the grid + empty the drawer, THEN repaint BOTH halves (a bulk
+    // apply can touch cases AND criteria). Success-clear is unconditional here (the persist is synchronous, so no mode switch
+    // can interleave), but we re-check the snapshot is still ours first (parity with the webview's top guard, cheap insurance).
+    if (reviewGridSnapshot === snap) {
+      clearReviewGridState();
+      postFlagDrawer();
+    } else {
+      reviewGridApplying = false;
+    }
     renderPane("worklist"); // no-op when the worklist pane is closed
     if (state.selection) dispatch({ type: "select", selection: state.selection }); // renders chrome (incl. the new gate/progress)…
     else renderTreeChrome(); // …else render it directly — either way chrome is posted ONCE, post-commit (no double-post, cf. applyVerdict)
     driveDoneOverlay(); // re-drive AFTER the select's possible tree re-render: the reviewed case set changed
     driveCriterionVerdicts(); // …and the criterion verdict chips changed
     cockpitAgentBridge.notifyChanged(); // #210: a bulk verdict/gate change must notify CRL Assist once
-    reviewGridApplying = false;
-    const report = reviewGridReport(result);
-    reviewGridPanel.dispose();
-    void vscode.window.showInformationMessage(report);
+    void vscode.window.showInformationMessage(reviewGridReport(result));
   }
 
   /** A human report from a bulk apply: how many verdicts actually MOVED (`changed`, not `applied.length` — a re-applied
@@ -3269,7 +3310,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // names a target (trusted-input discipline). `openFlagDrawer` is a standalone seam — the editor agent (EPIC #210)
     // resolves the target itself and calls it directly, so the flag command has ONE entry point for both paths.
     if (pick.choice) {
-      if (!(await guardEditDiscard())) return; // Todo 3: a new create drawer would abandon an in-progress edit — confirm first
+      if (!(await guardDrawerDiscard())) return; // Todo 3/5: a new create drawer would abandon an in-progress edit OR the grid's picks — confirm first
       openFlagDrawer({ target: pick.choice });
     }
   }
@@ -3295,7 +3336,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           renderFlagDrawer({ targetLabel: editFlag.anchor.label, targetTitle: editFlag.anchor.label, tags: mvTypes, tag: editFlag.tag, summary: editFlag.gist.replace(/[\r\n]+/g, " "), stub: editFlag.description, fields: editFlag.fields, edit: true, descriptionOnly: flagEditDraft!.descriptionOnly })
         : flagActionView
           ? renderFlagActionDrawer(flagActionViewModel(flagActionView.flag))
-          : "";
+          : // Todo 5 (disc 366): the bulk-verdict grid — the 4th mode. Renders FROM the snapshot (the one render authority, so the
+            // dispatcher HTML and the apply-validation set can't diverge). INVARIANT: the grid HTML is posted exactly once per grid
+            // session — no unconditional `postFlagDrawer` may re-post it (a re-post rebuilds the grid DOM, wiping the DOM-only picks;
+            // every call site is a deliberate mode switch or a guarded no-op refresh, cf. `refreshFlagActionDrawer`).
+            reviewGridSnapshot
+            ? reviewGridHtml(reviewGridViewModel(reviewGridSnapshot.items), reviewGridSnapshot.epoch)
+            : "";
     void tree.panel.webview.postMessage({ type: "flagDrawer", html });
     driveFlagNodeHighlight(); // disc 359/361: EVERY drawer mutation (create + action) funnels here → the gold node-link stays lockstep with the drawer
   }
@@ -3352,6 +3399,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     flagDraft = undefined;
     flagEditDraft = undefined; // Todo 3: opening the action view supersedes an edit form (one slot)
     flagEditDirty = false;
+    clearReviewGridState(); // Todo 5: …and the bulk grid (one slot). The list/node paths that reach here already ran guardDrawerDiscard.
     flagActionView = { flag, ver, cel };
     flagHlScrollPending = true; // an OPEN/SWITCH scrolls the gold-linked node into view once (postFlagDrawer→driveFlagNodeHighlight consumes it)
     postFlagDrawer();
@@ -3385,6 +3433,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     settleDrawer({ status: "cancelled", reason: "replaced" });
     flagDraft = undefined;
     flagActionView = undefined;
+    clearReviewGridState(); // Todo 5: Edit is reached only from the action view (grid can't be open) — belt-and-braces one-slot exclusion
     flagEditDirty = false;
     flagEditDraft = { flag: view.flag, cel: view.cel, descriptionOnly };
     flagHlScrollPending = true; // keep the target scrolled into view on the mode switch
@@ -3393,7 +3442,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   /** Todo 3: Cancel/✕ from the edit form → back to the action VIEW for the same flag (re-found by id in the refreshed list; a
    *  clean deletion → empty region + note; a store WARNING → keep the captured record). A deliberate discard — NO lose-changes
-   *  prompt (that gates only an implicit SWITCH away, `guardEditDiscard`). */
+   *  prompt (that gates only an implicit SWITCH away, `guardDrawerDiscard`). */
   function cancelFlagEdit(): void {
     const draft = flagEditDraft;
     if (!draft || flagActionBusy) return;
@@ -3406,13 +3455,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     flagNote("the flag changed on disk — reopen it");
   }
 
-  /** Todo 3 — the "lose changes" gate: when an implicit SWITCH (a different flag / node badge / new create drawer) would abandon
-   *  an edit form with UNSAVED text, confirm first (the operator's "blocked by lose-changes, if needed"). No edit open, or none
-   *  dirty → proceed immediately. Returns whether to proceed. */
-  async function guardEditDiscard(): Promise<boolean> {
-    if (!flagEditDraft || !flagEditDirty) return true;
-    const pick = await vscode.window.showWarningMessage("Discard your unsaved flag edits?", { modal: true }, "Discard");
-    return pick === "Discard";
+  /** Todo 3 / Todo 5 — the drawer "lose changes" gate: when an implicit SWITCH away (a different flag / node badge / new create
+   *  drawer / the grid) would abandon UNSAVED work, confirm first. Covers BOTH one-slot drawer modes that hold unsaved state: a
+   *  dirty edit FORM (typed text) and a dirty verdict GRID (picks). At most one is open at a time (mutual exclusion), so one
+   *  prompt at most. No unsaved work → proceed immediately. Returns whether to proceed. */
+  async function guardDrawerDiscard(): Promise<boolean> {
+    if (flagEditDraft && flagEditDirty) {
+      const pick = await vscode.window.showWarningMessage("Discard your unsaved flag edits?", { modal: true }, "Discard");
+      return pick === "Discard";
+    }
+    if (reviewGridSnapshot && reviewGridDirty) {
+      const pick = await vscode.window.showWarningMessage("Discard your unsaved verdict picks?", { modal: true }, "Discard");
+      return pick === "Discard";
+    }
+    return true;
   }
 
   /** Todo 3 — write an edited flag back to the store (disc 358). Order (accept #8): validate → clean re-read (reject store-
@@ -3721,6 +3777,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     flagActionView = undefined; // mutual exclusion: the create drawer supersedes an open action drawer (one `#flagDrawer` slot)
     flagEditDraft = undefined; // …and an open edit form (Todo 3)
     flagEditDirty = false;
+    clearReviewGridState(); // …and the bulk grid (Todo 5). Human path guards (guardDrawerDiscard @ right-click); the agent seam REFUSES a dirty grid first.
     flagDraft = { ...prefill, cel: currentCel };
     postFlagDrawer();
   }
@@ -3752,6 +3809,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     flagActionView = undefined; // a lifecycle drop (retarget / reset / dispose) clears the action drawer too — same `#flagDrawer` slot
     flagEditDraft = undefined; // …and the edit form (Todo 3) — a retarget/reset abandons an in-progress edit
     flagEditDirty = false;
+    // Todo 5 (impl-review refine of design accept #1): a policy switch/reset with staged verdict picks discards them — NAME the
+    // consequence (the design promised the abort tells the user). Skipped on "disposed" (the whole cockpit is closing → a toast is noise).
+    if (reviewGridSnapshot && reviewGridDirty && reason !== "disposed") void vscode.window.showInformationMessage("The policy changed — your unsaved verdict picks were discarded.");
+    clearReviewGridState(); // …and the bulk grid (Todo 5) — a retarget/reset/tree-pane-dispose stales the snapshot (the drawer dies with the pane)
     postFlagDrawer();
   }
   /** The drawer element to ring — AUTHORITATIVELY derived from the live prefill (the agent supplies no override): the first
@@ -4382,7 +4443,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     void exportTreeSnapshot().catch((e) => vscode.window.showErrorMessage(`Tree snapshot: ${e instanceof Error ? e.message : String(e)}`)),
   );
   // #(bulk-verdict) Todo 2b: the palette + tree-chrome entry to the bulk verdict grid (guards MV/sidecar/empty inside).
-  const reviewVerdictsCmd = vscode.commands.registerCommand("crl.cockpit.reviewVerdicts", () => openReviewGrid());
+  const reviewVerdictsCmd = vscode.commands.registerCommand("crl.cockpit.reviewVerdicts", () => void openReviewGrid());
 
   const openRawCmd = vscode.commands.registerCommand("crl.cockpit.openRaw", () => {
     // Open the anchor .txt at the clicked span's range when it still matches the selection, else the unit's earliest
@@ -4553,9 +4614,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // drawer, no banner — the tool surfaces a recoverable isError); success opens the drawer (auto-deriving the purple focus
   // ring + the banner), installs the resolver (settled EXACTLY ONCE on every terminal), and returns `{wait, purpose}`.
   const bridgeBeginFlagDrawer = (args: OpenFlagDrawerArgs, token: CancelToken): BeginFlagDrawer => {
-    // impl-review (both arms): the agent's `openFlagDrawer` bypasses the human `guardEditDiscard`, so REFUSE while a human has
-    // unsaved edits rather than silently clobbering the typed text — the agent reports this back instead of destroying work.
+    // impl-review (both arms): the agent's `openFlagDrawer` bypasses the human `guardDrawerDiscard`, so REFUSE while a human has
+    // unsaved edits OR unsaved verdict picks rather than silently clobbering the work — the agent reports this back instead.
     if (flagEditDraft && flagEditDirty) return { error: "the validator has unsaved flag edits — try again after they save or cancel" };
+    if (reviewGridSnapshot && reviewGridDirty) return { error: "the validator has unsaved verdict picks — try again after they apply or cancel" }; // Todo 5
     const r = resolveFlagPrefill(args);
     if ("error" in r) return { error: r.error };
     const focus = deriveFlagFocus(r.prefill); // AUTHORITATIVE (first empty of summary→description, else "submit")
@@ -4572,6 +4634,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   };
   const bridgeSubmitFlag = async (args: OpenFlagDrawerArgs): Promise<SubmitFlagResult> => {
     if (flagEditDraft && flagEditDirty) return { ok: false, reason: "the validator has unsaved flag edits — try again after they save or cancel" };
+    if (reviewGridSnapshot && reviewGridDirty) return { ok: false, reason: "the validator has unsaved verdict picks — try again after they apply or cancel" }; // Todo 5
     const r = resolveFlagPrefill(args);
     if ("error" in r) return { ok: false, reason: r.error };
     const summary = args.summary?.trim();
@@ -4780,30 +4843,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       dispose: () => {
         watcher?.dispose();
         flagsWatcher?.dispose();
-        reviewGridPanel?.dispose(); // #(bulk-verdict) Todo 2b: the transient grid panel must not outlive the cockpit
         snapshotCapture.settleEmpty(); // #(tree-snapshot): a pending capture must not outlive the cockpit
         if (debounce) clearTimeout(debounce); // a pending rebuild/reorder must not fire on disposed panels
         if (flagsDebounce) clearTimeout(flagsDebounce);
         if (orderDebounce) clearTimeout(orderDebounce);
       },
     },
-  );
-}
-
-/** #(bulk-verdict) Todo 2b — the hermetic shell for the "CRL · Review verdicts" grid panel: same strict CSP + nonce idiom as
- *  `shellHtml`, but wraps the pure `reviewGridHtml(rows)` body with `REVIEW_GRID_STYLE`/`REVIEW_GRID_SCRIPT` (self-contained,
- *  no external resources). The body is trusted (host-built from escaped rows); the script's outbound messages are not — the
- *  host re-validates every assignment against its captured snapshot in `onReviewGridMessage`. */
-function reviewGridShellHtml(body: string): string {
-  const nonce = randomBytes(16).toString("base64");
-  const styleNonce = randomBytes(16).toString("base64");
-  const csp = `default-src 'none'; style-src 'nonce-${styleNonce}'; script-src 'nonce-${nonce}';`;
-  return (
-    `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
-    `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
-    `<style nonce="${styleNonce}">${REVIEW_GRID_STYLE}</style></head><body>` +
-    body +
-    `<script nonce="${nonce}">${REVIEW_GRID_SCRIPT}</script></body></html>`
   );
 }
 
@@ -4973,7 +5018,7 @@ body:has(.flag-drawer) .flow-zoom{display:none}
    three halves stack consistently; the all-clean variant gets the same green done treatment as .mv-progress-done. */
 .mv-criteria{padding:2px 2px 4px;font-size:.85em;opacity:.85}
 .mv-criteria-done{color:var(--vscode-testing-iconPassed,var(--vscode-charts-green,#89d185));opacity:1;font-weight:bold}
-${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}`;
+${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
@@ -5136,7 +5181,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `else if(m.type==='fcChrome'){fcc.innerHTML=m.html;}` +
   // #211: the create-flag drawer's OWN region — set (or clear with '') its html. The render handler never touches it, so a
   // same-policy tree rebuild leaves the drawer + the user's typed text intact. aff() shows the selected tag's fields.
-  `else if(m.type==='flagDrawer'){fld.innerHTML=m.html;if(m.html)aff();}});` +
+  // Todo 5 (impl-review [important]): the drawer is last in DOM + revealed preserveFocus, so a keyboard user would tab through
+  // all chrome + the flowchart before reaching it. On a GRID inject, move focus to its first enabled control (parity with the
+  // create drawer's autofocus). Scoped to the grid so the create/edit/action forms keep their own focus behavior (aff()).
+  `else if(m.type==='flagDrawer'){fld.innerHTML=m.html;if(m.html){aff();var rg=fld.querySelector('[data-review-grid]');if(rg){var f0=rg.querySelector('.rvg-all,input[type=radio]:not([disabled])');if(f0&&f0.focus)f0.focus();}}}});` +
   // #156 slice 4: a worklist review <select> sits INSIDE the .cel-case block (itself a data-reveal target). A CLICK on the
   // select must open the native dropdown WITHOUT selecting the case, so we stopPropagation (block the reveal) but do NOT
   // preventDefault (let the dropdown open). The state change rides the separate 'change' listener below. A DISABLED select
@@ -5275,4 +5323,8 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `fld.addEventListener('change',(e)=>{const ts=e.target.closest&&e.target.closest('[data-flag-tag]');if(ts){aff();}});` +
   // Todo 3: on the FIRST edit of the edit form, tell the host it's dirty (arms the lose-changes gate for an implicit switch). The
   // `data-dirty` marker de-dupes to one message per edit session (the form isn't re-rendered while open, so it persists).
-  `fld.addEventListener('input',()=>{const ed=fld.querySelector('.flag-edit-drawer');if(ed&&!ed.hasAttribute('data-dirty')){ed.setAttribute('data-dirty','1');v.postMessage({type:'flagEditDirty'});}});`;
+  `fld.addEventListener('input',()=>{const ed=fld.querySelector('.flag-edit-drawer');if(ed&&!ed.hasAttribute('data-dirty')){ed.setAttribute('data-dirty','1');v.postMessage({type:'flagEditDirty'});}});` +
+  // Todo 5 (disc 366): the bulk-verdict grid's OWN delegated listeners on `#flagDrawer`, an isolated IIFE (rg-prefixed, DOM-
+  // resident state) that reuses the `fld`/`v` in this scope — see reviewGridHtml.ts. Appended LAST so the grid session's picks
+  // live entirely in the drawer DOM (an innerHTML swap to another mode resets them; no cross-session closure deadlock).
+  REVIEW_GRID_DRAWER_SCRIPT;

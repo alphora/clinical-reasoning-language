@@ -1,9 +1,11 @@
-// Unit tests for the bulk-verdict GRID renderer (Todo 2a, disc 347). vscode-free → imported directly (esbuild→CJS→node).
-// Covers the static table body (columns, per-row radio groups, data-* refs, disabled Pass, aria, escaping, empty state)
-// and smoke-checks the CSP-injected STYLE + SCRIPT strings. The host wiring (Todo 2b) is tested separately.
+// Unit tests for the bulk-verdict GRID renderer (Todo 5, disc 366). vscode-free → imported directly (esbuild→CJS→node).
+// Todo 5 moved the grid from its own webview TAB into the shared `#flagDrawer` right flyout: the body is now a VERTICAL list
+// of per-item native-radio groups (2×2 segmented control), not a 5-column table. Covers the body (per-item radio groups,
+// data-* refs, disabled Pass, aria, escaping, empty state, `data-review-grid`/`data-dirty` scope) and smoke-checks the
+// CSP-injected DRAWER STYLE + SCRIPT strings. The host wiring is tested in cockpitWebviewScript.test.mjs.
 import assert from "node:assert/strict";
 
-import { reviewGridHtml, REVIEW_GRID_STYLE, REVIEW_GRID_SCRIPT } from "./reviewGridHtml.ts";
+import { reviewGridHtml, REVIEW_GRID_DRAWER_STYLE, REVIEW_GRID_DRAWER_SCRIPT } from "./reviewGridHtml.ts";
 
 const check = test;
 
@@ -12,34 +14,41 @@ const row = (over = {}) => ({
   enabled: { unreviewed: true, pending: true, pass: true, fail: true }, ...over,
 });
 
-check("reviewGridHtml: empty rows → the 'No unsettled…' empty state (host never opens the panel, but render defensively)", () => {
+check("reviewGridHtml: empty rows → the 'No unsettled…' empty state (host never opens the drawer, but render defensively)", () => {
   const html = reviewGridHtml([]);
   assert.match(html, /No unsettled case or criterion verdicts/);
-  assert.doesNotMatch(html, /<table/); // no grid at all
+  assert.match(html, /class="flag-drawer rvg" data-review-grid data-dirty="0"/); // still the flyout scope root
+  assert.doesNotMatch(html, /rvg-item/); // no item blocks
 });
 
-check("reviewGridHtml: 4 column headers (To do / Pending / Pass / Fail) each with an 'all' button carrying its state", () => {
-  const html = reviewGridHtml([row()]);
-  for (const label of ["To do", "Pending", "Pass", "Fail"]) assert.ok(html.includes(`>${label}<`), `missing column ${label}`);
-  for (const st of ["unreviewed", "pending", "pass", "fail"]) assert.match(html, new RegExp(`class="rv-all" data-all="${st}"`), `missing all-button ${st}`);
+check("reviewGridHtml: the grid root carries the FLYOUT class (flag-drawer) + data-review-grid + data-dirty=0 + data-epoch", () => {
+  const html = reviewGridHtml([row()], 7);
+  // impl-review [critical]: without `flag-drawer` the grid renders in-flow, not as a right flyout (the other 3 modes carry it).
+  assert.match(html, /<div class="flag-drawer rvg" data-review-grid data-dirty="0" data-epoch="7">/);
 });
 
-check("reviewGridHtml: a row is one radio group (per-row name) with the (kind,id) on data-* and 4 value radios", () => {
+check("reviewGridHtml: a 'Set all' header offers all 4 states, each carrying data-rvg-all=<state>", () => {
   const html = reviewGridHtml([row()]);
-  assert.match(html, /data-kind="criterion"/);
-  assert.match(html, /data-id="\[&quot;L&quot;,&quot;A&quot;\]"/); // id JSON-escaped into the attribute
-  // one shared per-row name across the 4 radios (match on the radio, not the row's data-name attr)
-  const names = [...html.matchAll(/type="radio" name="(rv-row-\d+)"/g)].map((m) => m[1]);
+  assert.match(html, /Set all:/);
+  for (const st of ["unreviewed", "pending", "pass", "fail"]) assert.match(html, new RegExp(`class="rvg-all" data-rvg-all="${st}"`), `missing set-all ${st}`);
+  for (const label of ["To do", "Pending", "Pass", "Fail"]) assert.ok(html.includes(`>${label}<`), `missing state label ${label}`);
+});
+
+check("reviewGridHtml: an item is one radio group (per-item name) with the (kind,id) on data-* and 4 value radios", () => {
+  const html = reviewGridHtml([row()]);
+  assert.match(html, /<fieldset class="rvg-item" data-kind="criterion" data-id="\[&quot;L&quot;,&quot;A&quot;\]">/); // id JSON-escaped into the attribute
+  const names = [...html.matchAll(/type="radio" name="(rvg-row-\d+)"/g)].map((m) => m[1]);
   assert.equal(names.length, 4);
-  assert.equal(new Set(names).size, 1);
-  for (const v of ["unreviewed", "pending", "pass", "fail"]) assert.match(html, new RegExp(`type="radio" name="rv-row-0" value="${v}"`));
+  assert.equal(new Set(names).size, 1); // one shared per-item group name across the 4 radios
+  for (const v of ["unreviewed", "pending", "pass", "fail"]) assert.match(html, new RegExp(`type="radio" name="rvg-row-0" value="${v}"`));
 });
 
-check("reviewGridHtml: an elided criterion → the Pass radio is disabled (the only refused cell); the others stay enabled", () => {
+check("reviewGridHtml: an elided criterion → the Pass radio is disabled (the only refused option); the others stay enabled", () => {
   const html = reviewGridHtml([row({ enabled: { unreviewed: true, pending: true, pass: false, fail: true }, hint: "truncated — can't mark Pass" })]);
   assert.match(html, /value="pass"[^>]*disabled/);
   assert.doesNotMatch(html, /value="fail"[^>]*disabled/);
   assert.match(html, /truncated/); // the hint is surfaced
+  assert.match(html, /aria-describedby="rvg-hint-0"/); // the disabled reason is exposed to a11y, not only via title
 });
 
 check("reviewGridHtml: an orphan case → only 'To do' enabled (Pending/Pass/Fail disabled), orphaned hint shown", () => {
@@ -51,13 +60,13 @@ check("reviewGridHtml: an orphan case → only 'To do' enabled (Pending/Pass/Fai
   assert.match(html, /orphaned/);
 });
 
-check("reviewGridHtml: criterion Pass/Fail cells read 'Correctly encoded'/'Encoding wrong' via aria (per-kind vocabulary)", () => {
+check("reviewGridHtml: criterion Pass/Fail options read 'Correctly encoded'/'Encoding wrong' via aria (per-kind vocabulary)", () => {
   const html = reviewGridHtml([row()]);
   assert.match(html, /aria-label="A: Correctly encoded"/);
   assert.match(html, /aria-label="A: Encoding wrong"/);
 });
 
-check("reviewGridHtml: a case Pass cell reads 'Pass' via aria (NOT the criterion vocabulary)", () => {
+check("reviewGridHtml: a case Pass option reads 'Pass' via aria (NOT the criterion vocabulary)", () => {
   const html = reviewGridHtml([{ kind: "case", id: "c1", label: "Case 1", currentLabel: "To do", enabled: { unreviewed: true, pending: true, pass: true, fail: true } }]);
   assert.match(html, /aria-label="Case 1: Pass"/);
 });
@@ -76,37 +85,50 @@ check("reviewGridHtml: a hostile id stays wholly INSIDE the quoted data-id attri
   assert.match(html, /data-id="&quot; onmouseover=&quot;x"/); // both quotes entity-encoded, still one attribute
 });
 
-check("reviewGridHtml: Apply (disabled at load) + Cancel + Clear-all controls", () => {
+check("reviewGridHtml: Apply (disabled at load) + Cancel + Clear controls carry data-rvg-* intents", () => {
   const html = reviewGridHtml([row()]);
-  assert.match(html, /id="rv-apply" disabled/);
-  assert.match(html, /id="rv-cancel"/);
-  assert.match(html, /id="rv-clear"/);
+  assert.match(html, /data-rvg-apply disabled/);
+  assert.match(html, /data-rvg-cancel/);
+  assert.match(html, /data-rvg-clear/);
+  assert.match(html, /data-rvg-status role="status" aria-live="polite"/); // the live status region survives the move
 });
 
-check("REVIEW_GRID_STYLE / REVIEW_GRID_SCRIPT: non-empty, CSP-safe (theme vars; no external URLs; posts apply/cancel; re-enables on 'reenable')", () => {
-  assert.ok(REVIEW_GRID_STYLE.length > 100);
-  assert.match(REVIEW_GRID_STYLE, /var\(--vscode-/); // theme-aware
-  assert.ok(REVIEW_GRID_SCRIPT.length > 100);
-  assert.doesNotMatch(REVIEW_GRID_SCRIPT, /https?:\/\//); // no external resources
-  assert.match(REVIEW_GRID_SCRIPT, /type:'apply'/);
-  assert.match(REVIEW_GRID_SCRIPT, /type:'cancel'/);
-  assert.match(REVIEW_GRID_SCRIPT, /reenable/);
+check("REVIEW_GRID_DRAWER_STYLE / SCRIPT: non-empty, CSP-safe (theme vars; no external URLs; posts apply/cancel; reuses outer vscode api)", () => {
+  assert.ok(REVIEW_GRID_DRAWER_STYLE.length > 100);
+  assert.match(REVIEW_GRID_DRAWER_STYLE, /var\(--vscode-/); // theme-aware
+  assert.ok(REVIEW_GRID_DRAWER_SCRIPT.length > 100);
+  assert.doesNotMatch(REVIEW_GRID_DRAWER_SCRIPT, /https?:\/\//); // no external resources
+  assert.doesNotMatch(REVIEW_GRID_DRAWER_SCRIPT, /acquireVsCodeApi/); // reuses the enclosing COCKPIT_WEBVIEW_SCRIPT `v` (one api per webview)
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /type:'reviewGridApply'/);
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /type:'reviewGridCancel'/);
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /reviewGridReenable/);
+  // every outbound message carries the grid-session epoch (impl-review [critical]) + reenable is epoch-gated
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /epoch:rgEpoch\(r\)/);
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /String\(m\.epoch\)!==rgEpoch\(r\)/);
 });
 
-check("REVIEW_GRID_SCRIPT: guards a 2nd apply while one is in flight — an `applying` flag Apply/all/clear all respect (gpt56 R1 [critical])", () => {
-  assert.match(REVIEW_GRID_SCRIPT, /var applying=false/);
-  assert.match(REVIEW_GRID_SCRIPT, /applying=true;apply\.disabled=true/); // set on Apply click
-  assert.match(REVIEW_GRID_SCRIPT, /apply\.disabled=applying\|\|n===0/); // refresh can't re-enable while applying
-  assert.match(REVIEW_GRID_SCRIPT, /if\(m&&m\.type==='reenable'\)\{applying=false/); // only reenable clears it
+check("REVIEW_GRID_DRAWER_SCRIPT: state is DOM-resident (data-applying on the grid root), scoped to [data-review-grid], its own IIFE", () => {
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /^\(function\(\)\{/); // isolated IIFE (no cross-session closure state)
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /fld\.querySelector\('\[data-review-grid\]'\)/); // scoped to the grid root, not document
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /setAttribute\('data-applying','1'\)/); // applying lives in the DOM (swap-atomic reset)
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /ab\.disabled=ap\|\|n===0/); // refresh can't re-enable Apply while applying
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /removeAttribute\('data-applying'\)/); // only reviewGridReenable clears it
 });
 
-check("REVIEW_GRID_SCRIPT: column-all skips DISABLED cells and reports the ineligible count (disc 347 pt 11)", () => {
-  assert.match(REVIEW_GRID_SCRIPT, /if\(r&&!r\.disabled\)\{r\.checked=true;set\+\+;\}else\{skip\+\+;\}/); // eligible-only + count skips
-  assert.match(REVIEW_GRID_SCRIPT, /ineligible skipped/); // surfaced to the reviewer
+check("REVIEW_GRID_DRAWER_SCRIPT: column set-all skips DISABLED options and reports the ineligible count (disc 347 pt 11)", () => {
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /if\(rb&&!rb\.disabled\)\{rb\.checked=true;set\+\+;\}else\{skip\+\+;\}/); // eligible-only + count skips
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /ineligible skipped/); // surfaced to the reviewer
 });
 
-check("REVIEW_GRID_SCRIPT: a picked row can be returned to 'leave unchanged' — clear-all + per-row toggle-OFF (Claude R1 [important])", () => {
-  assert.match(REVIEW_GRID_SCRIPT, /getElementById\('rv-clear'\)/);
-  assert.match(REVIEW_GRID_SCRIPT, /_wc/); // mousedown records prior checked-state; a click on an already-checked radio unchecks it
-  assert.match(REVIEW_GRID_SCRIPT, /e\.target\.checked=false/);
+check("REVIEW_GRID_DRAWER_SCRIPT: an item can be returned to 'leave unchanged' — Clear + per-item toggle-OFF via the SEGMENT (not just the radio circle)", () => {
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /data-rvg-clear/);
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /_rgwc/); // mousedown records prior checked-state; a click on an already-checked option unchecks it
+  // impl-review [important]: resolve the radio via the enclosing .rvg-opt so a click on the LABEL TEXT (most of the hit area) counts
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /closest\('\[data-review-grid\] \.rvg-opt'\)/);
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /toff\.checked=false/);
+});
+
+check("REVIEW_GRID_DRAWER_SCRIPT: a TWO-WAY dirty signal (0↔≥1 picks) so the host discard guard clears when picks are cleared", () => {
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /type:'reviewGridDirty',epoch:rgEpoch\(r\),dirty:n>0/);
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /setAttribute\('data-dirty',d\)/); // deduped to one message per transition
 });
