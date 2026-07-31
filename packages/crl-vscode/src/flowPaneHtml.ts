@@ -92,14 +92,6 @@ const truncate = (s: string, n: number): string => (s.length > n ? `${s.slice(0,
 const flowRing = (x: number, y: number, w: number, h: number, off: number, rx: number): string =>
   `<g class="flow-ring"><rect x="${x - off}" y="${y - off}" width="${w + 2 * off}" height="${h + 2 * off}" rx="${rx}"/></g>`;
 
-// disc 359/360: the GOLD flag-link ring — a DEDICATED grandchild (own axis, like `.flow-ring`), so it COEXISTS with the blue
-// selection/on-path `.flow-ring` (two visible signals when a node is BOTH selected and the open drawer's target — the impl
-// review's ask) AND with the base-`>rect` overlays (`.this-node`/`.failed-criterion`). Emitted (hidden) at each flaggable node;
-// shown via `.flag-current`. off=1.25 — just outside the node rect, INSIDE the blue ring (leaf 1.5 / struct 2.5), no gap overflow;
-// a DECIMAL offset (like `.flow-ring`'s) so its rect coords are non-integer + excluded from the integer-coordinate layout tests.
-const flowFlagRing = (x: number, y: number, w: number, h: number, rx: number): string =>
-  `<g class="flow-flag-ring"><rect x="${x - 1.25}" y="${y - 1.25}" width="${w + 2.5}" height="${h + 2.5}" rx="${rx}"/></g>`;
-
 /** #224 ii.3 Slice 2: the criterion COLLAPSE disclosure — a `▸` (collapsed) / `▾` (expanded) triangle, its OWN hit
  *  surface (`data-toggle-crit`, resolved host-side via the row's reveal key exactly like a peek). A grandchild of the
  *  when `<g>`, so `closest('[data-toggle-crit]')` wins for a chevron click and `closest('[data-reveal]')` for the box. */
@@ -598,7 +590,6 @@ export function renderFlowPane(
       body +=
         `<g id="${escapeHtml(gid)}" class="flow-outline flow-crit-row" data-reveal="${escapeHtml(key)}"><title>${escapeHtml(n.full)}</title>` +
         `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
-        flowFlagRing(x, y, OUTLINE_NODE_W, OUTLINE_H, 7) + // disc 359/360: the gold flag-link ring (collapsed-criterion rollup row)
         labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX - 5, 20) +
         critToggle(x + 9, y + OUTLINE_H / 2, cr.collapsed, togKey) +
         critVerdictChip(x + OUTLINE_NODE_W - 11, y + 9) +
@@ -654,7 +645,6 @@ export function renderFlowPane(
         `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
         labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX, 9) +
         flowRing(x, y, OUTLINE_NODE_W, OUTLINE_H, 1.5, 7) +
-        (leafConcept ? flowFlagRing(x, y, OUTLINE_NODE_W, OUTLINE_H, 7) : "") + // disc 359/360: the gold flag-link ring (def-leaf)
         (leafConcept ? flagBadge(x + OUTLINE_NODE_W - 11, y + 11, gid) : "") +
         `</g>`;
       continue;
@@ -750,7 +740,6 @@ export function renderFlowPane(
       // #210: a disposition LEAF (outcome tip) centers its label; interior nodes stay left-aligned (shifted for a chevron).
       (isLeafEnd ? labelMarkup(n.label, x, y, NODE_H, LEAF_LABEL_MAX, NODE_W / 2, true) : labelMarkup(n.label, x, y, NODE_H, labelMax, labelDx)) +
       flowRing(x, y, NODE_W, NODE_H, 2.5, stadium ? (NODE_H + 5) / 2 : 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
-      (flaggable || critC ? flowFlagRing(x, y, NODE_W, NODE_H, stadium ? (NODE_H + 5) / 2 : 8) : "") + // disc 359/360: the gold flag-link ring (hidden; shown on .flag-current) — INSIDE the blue ring, coexists
       guardTab +
       critToggleMarkup +
       critVerdictMarkup +
@@ -919,14 +908,16 @@ export const FLOW_STYLE =
   `.flow-row.current>rect{stroke-width:2.5}` +
   `.flow-row.flow-leaf-yes>rect{stroke-width:2}` +
   `.flow-greyborder.current>rect,.flow-greyborder.flow-leaf-yes>rect{stroke:transparent}` +
-  // disc 359/360: the GOLD node-link for the OPEN flag-action drawer's flag — a DEDICATED `.flow-flag-ring` grandchild (its own
-  // axis, INSIDE the blue `.flow-ring` at off=1), so a node that is BOTH selected/on-path AND the drawer's target shows BOTH the
-  // blue ring and the gold ring (the two-signal ask), and it also coexists with the base-`>rect` overlays (`.this-node`/
-  // `.failed-criterion`/`.diverter`). Hidden by default; shown on `.flag-current`. GOLD regardless of the flag's open/resolved
-  // status — the channel means "this drawer's target", not "open ⚑ here".
-  `.flow-flag-ring{display:none}` +
-  `.flag-current .flow-flag-ring{display:inline}` +
-  `.flow-flag-ring>rect{fill:none;stroke:var(--vscode-charts-yellow,#cca700);stroke-width:2;pointer-events:none}` +
+  // disc 359/360 (revised 361): the GOLD node-link for the OPEN flag-action drawer's flag — a HALO (drop-shadow glow) on the
+  // node's OWN border rect, mirroring the `.node-focus` focus glow the operator pointed at. A glow is a SEPARATE visual axis:
+  // it leaves the node's identity border its ORIGINAL colour (the operator's ask — the earlier gold RING read as a recoloured
+  // border) AND coexists with the blue `.flow-ring` (a node that is BOTH selected/on-path AND the drawer's target shows the
+  // blue ring AND the gold halo — the two-signal ask) + the base-`>rect` overlays. Applied to the FIRST `>rect` (the border box)
+  // of the id-bearing `<g>`, present on all three flaggable kinds (struct/def-leaf/crit-row); crit-row is NOT `.flow-row`, so
+  // this class-agnostic selector reaches it where `.node-focus` (row-only) could not. GOLD regardless of the flag's open/resolved
+  // status — the channel means "this drawer's target". Single gold (mid-tone, reads on light + dark), so no theme swap. On a node
+  // that is ALSO `.node-focus`, that higher-specificity white/black glow wins — an acceptable rare overlap (agent-focus is primary).
+  `.flag-current>rect{filter:drop-shadow(0 0 5px var(--vscode-charts-yellow,#cca700)) drop-shadow(0 0 2px var(--vscode-charts-yellow,#cca700))}` +
   // disc 164: the produced-path DIVERTER overlay on the SVG rect (the shell's HTML `.diverter` outline does not paint on
   // a <g>, same as the channels below). A neutral teal DOTTED stroke for the evaluated-false `when`s that routed the case
   // to its produced disposition (the Adult gate for a not-adult deny). Ordered BEFORE `.failed-criterion` so a blocker

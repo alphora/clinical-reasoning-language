@@ -1478,12 +1478,12 @@ check("gold-link: flagActionViewModel carries id + targetPresent (zero-placement
   assert.match(COCKPIT_SRC, /targetPresent: gidsForFlag\(flag\)\.length > 0,/);
 });
 
-check("gold-link CSS: a DEDICATED `.flow-flag-ring` (gold, INSIDE the blue ring → two signals coexist) shown on `.flag-current`", () => {
-  assert.match(FLOW_STYLE, /\.flow-flag-ring\{display:none\}/);
-  assert.match(FLOW_STYLE, /\.flag-current \.flow-flag-ring\{display:inline\}/);
-  assert.match(FLOW_STYLE, /\.flow-flag-ring>rect\{fill:none;stroke:var\(--vscode-charts-yellow,#cca700\);stroke-width:2;pointer-events:none\}/);
-  // the dedicated ring is emitted at all three flaggable node kinds (structure/def-leaf/crit-row) via flowFlagRing
-  assert.ok((FLOW_STYLE.match(/flow-flag-ring/g) || []).length >= 3, "dedicated flag-ring styled");
+check("gold-link CSS (revised 361): a GOLD HALO (drop-shadow glow) on the node's OWN `>rect`, shown on `.flag-current` — NOT a border recolour", () => {
+  // the gold link is now a drop-shadow HALO on the border rect (like `.node-focus`), leaving the border's own colour intact.
+  assert.match(FLOW_STYLE, /\.flag-current>rect\{filter:drop-shadow\(0 0 5px var\(--vscode-charts-yellow,#cca700\)\) drop-shadow\(0 0 2px var\(--vscode-charts-yellow,#cca700\)\)\}/);
+  // the halo NEVER recolours the base rect stroke (a separate visual axis — the operator's ask); the old ring mechanism is gone.
+  assert.ok(!/\.flag-current>rect\{[^}]*stroke:/.test(FLOW_STYLE), ".flag-current halo must not recolour the border stroke");
+  assert.ok(!/flow-flag-ring/.test(FLOW_STYLE), "the old gold RING mechanism is retired");
 });
 
 check("toggle: reclicking the same flag closes; a different flag switches (entry paths only, NOT openFlagActionView)", () => {
