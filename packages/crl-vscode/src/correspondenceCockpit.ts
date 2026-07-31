@@ -490,6 +490,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // stale status snapshot. Cleared alongside `flagDraft` on every lifecycle drop (`clearFlagDraft`).
   let flagActionView: { flag: MvFlag; ver: number; cel: string | undefined } | undefined;
   let flagActionBusy = false; // single-flight for the drawer's async actions (a rapid 2nd click must not overlap a write / stale open-issue)
+  // disc 359/360: request a ONE-TIME scroll of the gold-linked node into view — set ONLY by a genuine drawer OPEN/SWITCH
+  // (`openFlagActionView`), consumed by the next `driveFlagNodeHighlight`. A rebuild/ack/refresh re-drive never sets it, so a
+  // re-render can't yank the viewport (the impl-review [critical]: gids are gen-prefixed, so a webview set-comparison can't tell
+  // an open from a re-render). Off = no scroll.
+  let flagHlScrollPending = false;
   // #210 (disc 239) — the AGENT elicitation resolver for a BLOCKING open_flag_drawer. Installed ONLY by beginFlagDrawer;
   // settled EXACTLY ONCE by `settleDrawer` on every terminal (Insert-filed / Cancel / token / retarget / dispose / replace).
   // Idempotent: `settleDrawer` nulls it before resolving, so a Stop racing an Insert can't double-resolve. No-op when a human
@@ -1616,7 +1621,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const tree = views.get("tree");
     if (!tree) return; // no tree webview to highlight (the drawer lives in it; a fresh render starts classless + the ack re-drives)
     const gids = flagActionView ? gidsForFlag(flagActionView.flag) : [];
-    void tree.panel.webview.postMessage({ type: "flagHl", gen: tree.gen, gids });
+    const scroll = flagHlScrollPending; // true ONLY for a genuine open/switch — a re-render/ack/refresh drive never scrolls
+    flagHlScrollPending = false;
+    void tree.panel.webview.postMessage({ type: "flagHl", gen: tree.gen, gids, scroll });
   }
 
   /** #224 ii.3 Slice 2b / #233 Todo 2b — the LIVE criterion identities: `{lib,name}` → `{bodyHash, elided}`. The gate set is
@@ -2507,7 +2514,6 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // per-node badges read `flagsList`, so loading AFTER the render (as it was) left both a rebuild stale (gpt55/Claude
     // review). Independent of the correspondence model (reads the `.crl` directly); inert in cockpit mode (MV-only).
     reloadReviewFlags();
-    refreshFlagActionDrawer(); // disc 355 [critical]: a same-policy rebuild bumped indexVersion — re-stamp the surviving action drawer's ver (else its actions fail a stale guard forever)
     for (const pane of PANES) coord.clearPending(pane);
     dispatch({ type: "setInputs", index: toIndex(model, crlStructure, toCelNav(scenarios, caseIdByName, duplicateScenarioNames), indexVersion) });
     updateNavMessage();
@@ -2515,6 +2521,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // currently open — the MV-only questionnaire in cockpit mode, or a pane dropped on a mode switch whose onDidDispose
     // hasn't pruned `views` yet — is a clean no-op (no render to a stale/disposing webview). Same for applyShowKeys below.
     for (const pane of PANES) renderPane(pane);
+    // disc 355 [critical]: a same-policy rebuild bumped indexVersion — re-stamp the surviving action drawer's ver (else its
+    // actions fail a stale guard forever). AFTER the render loop (disc 360 [important]): the drawer's `targetPresent` reads the
+    // tree substrate `renderPane` just refreshed, so it can't disagree with the (post-render) gold node-link.
+    refreshFlagActionDrawer();
     // #156 slice 5: the model/segments just rebuilt (new segment ids) — re-drive the MV done/error overlay so the freshly
     // rendered tree paints its at-rest review state. (The tree render is async; the post here lands gen-stamped and the
     // webview drops it if superseded — but the tree's own ack re-drives via driveDoneOverlay below, so a race self-heals.)
@@ -3267,6 +3277,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     settleDrawer({ status: "cancelled", reason: "replaced" }); // a new flyout supersedes any pending create elicitation
     flagDraft = undefined;
     flagActionView = { flag, ver, cel };
+    flagHlScrollPending = true; // an OPEN/SWITCH scrolls the gold-linked node into view once (postFlagDrawer→driveFlagNodeHighlight consumes it)
     postFlagDrawer();
   }
 
@@ -4570,7 +4581,7 @@ ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}`;
  *  the markReviewOverlay handler paints error-over-pass (skips .review-pass for ids in the error set) + the disjoint
  *  .review-fail/.review-pending sets + the all-pass .leaf-allpass badge (#210). */
 export const COCKPIT_WEBVIEW_SCRIPT =
-  `const v=acquireVsCodeApi();const root=document.getElementById('root');const fcc=document.getElementById('fcChrome');const fld=document.getElementById('flagDrawer');let gen=-1;let fhl='';` +
+  `const v=acquireVsCodeApi();const root=document.getElementById('root');const fcc=document.getElementById('fcChrome');const fld=document.getElementById('flagDrawer');let gen=-1;` +
   // #211: show ONLY the selected flag tag's field group (client-side; no host round-trip). Called after the drawer is
   // injected and on a tag-select change. Safe no-op when the drawer is empty.
   `const aff=()=>{const ts=fld.querySelector('[data-flag-tag]');if(!ts)return;const tg=ts.value;for(const g of fld.querySelectorAll('[data-flag-field-for]')){g.hidden=g.getAttribute('data-flag-field-for')!==tg;}};` +
@@ -4667,16 +4678,17 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(m.unplaced>0){label+=' · '+m.unplaced+'⚠';}` +
   `var tt=sg.querySelector('title');if(tt)tt.textContent=(m.unplaced>0?m.unplaced+' flag(s) couldn\\'t be placed (target moved/removed) — ':'')+'open review flags — click to review';` +
   `if(st)st.textContent=label;sg.classList.toggle('has-startflag',label!=='');}}` +
-  // disc 359: the GOLD node-link for the open action drawer's flag — its own class-toggle channel (NEVER touched by
+  // disc 359/360: the GOLD node-link for the open action drawer's flag — its own class-toggle channel (NEVER touched by
   // highlight/clearHighlight, so it survives a selection change). Clear via querySelectorAll (the webview has no flaggableGids
-  // list), then add to the posted gids. Scroll the FIRST node into view ONLY when the gid SET changed (open/switch) — not on an
-  // ack re-drive (same set) so a re-render can't yank the viewport. `fhl` (script-scoped) tracks the last set. UNIQUE var names
-  // (post the 4.97.0 `ng` collision — the `new Function(SCRIPT)` guard now also parses this).
+  // list), then add to the posted gids. Scroll the FIRST node into view ONLY when the HOST says so (`m.scroll` — a genuine
+  // open/switch); a re-render/ack/refresh drive posts scroll=false so it can't yank the viewport (gids are gen-prefixed, so a
+  // webview set-comparison couldn't tell an open from a re-render — impl-review [critical]). UNIQUE var names (post the 4.97.0
+  // `ng` collision — the `new Function(SCRIPT)` guard also parses this).
   `else if(m.type==='flagHl'){if(m.gen!==gen)return;` +
   `for(const fe of document.querySelectorAll('.flag-current'))fe.classList.remove('flag-current');` +
-  `var fgk=(m.gids||[]).join(',');var ffn=null;` +
+  `var ffn=null;` +
   `for(const id of (m.gids||[])){const el=document.getElementById(id);if(el){el.classList.add('flag-current');if(!ffn)ffn=el;}}` +
-  `if(fgk!==fhl){fhl=fgk;if(ffn&&ffn.scrollIntoView)ffn.scrollIntoView({block:'center',inline:'center'});}}` +
+  `if(m.scroll&&ffn&&ffn.scrollIntoView)ffn.scrollIntoView({block:'center',inline:'center'});}` +
   // #224 ii.3 Slice 2b: the model-level criterion VERDICT chips. Bulk-CLEAR the 4 crit-* classes off every criterion gid
   // (a verdict change must un-paint prior state), then add `crit-<state>` per byState. `unreviewed` gids are in allGids but
   // no byState list → they end bare. Gen-guarded + class-toggle only (no re-render), the flagBadges idiom.

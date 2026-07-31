@@ -1339,7 +1339,9 @@ check("flag-action drawer: refreshFlagActionDrawer re-finds by id, RE-STAMPS ver
   assert.match(COCKPIT_SRC, /flagActionView = \{ flag: live, ver: indexVersion, cel: currentCel \};/);
   // reconciled on external store change (watcher) AND on a same-policy rebuild (both same-policy by construction)
   assert.match(COCKPIT_SRC, /driveFlagBadges\(\);\s*\n\s*refreshFlagActionDrawer\(\); \/\/ an open action drawer/);
-  assert.match(COCKPIT_SRC, /reloadReviewFlags\(\);\s*\n\s*refreshFlagActionDrawer\(\); \/\/ disc 355 \[critical\]: a same-policy rebuild/);
+  // rebuild re-stamps ver AFTER the render loop (disc 360) so `targetPresent` reads the fresh tree substrate
+  assert.match(COCKPIT_SRC, /for \(const pane of PANES\) renderPane\(pane\);[\s\S]*?refreshFlagActionDrawer\(\);/);
+  assert.match(COCKPIT_SRC, /AFTER the render loop \(disc 360 \[important\]\): the drawer's `targetPresent` reads the/);
   // flagStoreWarning is DISTINCT from flagStateError (set only on a STORE read problem, not on `.crl`-parse / un-migrated)
   assert.match(COCKPIT_SRC, /flagStoreWarning = true; \/\/ …AND specifically a STORE read problem/);
 });
@@ -1455,13 +1457,17 @@ check("gold-link: driveFlagNodeHighlight posts the open flag's gids (via gidsFor
   assert.match(COCKPIT_SRC, /function gidsForFlag\(flag: MvFlag\): string\[\] \{[\s\S]*?flagPlacementFor\(tree, \[flag\]\)\.gids/);
 });
 
-check("gold-link: the flagHl webview handler is gen-guarded, clears via querySelectorAll, adds to gids, scrolls only on a CHANGED set", () => {
+check("gold-link: the flagHl webview handler is gen-guarded, clears via querySelectorAll, adds to gids, scrolls only when the HOST says (m.scroll)", () => {
   assert.match(SCRIPT, /else if\(m\.type==='flagHl'\)\{if\(m\.gen!==gen\)return;/);
   assert.match(SCRIPT, /for\(const fe of document\.querySelectorAll\('\.flag-current'\)\)fe\.classList\.remove\('flag-current'\);/); // clear (no flaggableGids needed)
   assert.match(SCRIPT, /el\.classList\.add\('flag-current'\);if\(!ffn\)ffn=el;/); // add + remember the first
-  // scroll the first node into view ONLY when the gid set changed (open/switch) — not on an ack re-drive (same set)
-  assert.match(SCRIPT, /if\(fgk!==fhl\)\{fhl=fgk;if\(ffn&&ffn\.scrollIntoView\)ffn\.scrollIntoView\(/);
-  assert.match(SCRIPT, /let gen=-1;let fhl='';/); // the last-set tracker is script-scoped
+  // disc 360 [critical]: scroll ONLY when the host flags it (open/switch), NOT on a re-render/ack (gids are gen-prefixed, so a
+  // webview set-comparison couldn't tell them apart → a rebuild would yank the viewport). The host `flagHlScrollPending` gates it.
+  assert.match(SCRIPT, /if\(m\.scroll&&ffn&&ffn\.scrollIntoView\)ffn\.scrollIntoView\(/);
+  assert.ok(!/let fhl=/.test(SCRIPT), "the defeated fhl set-comparison heuristic is gone");
+  // host side: only openFlagActionView sets the pending scroll; driveFlagNodeHighlight consumes it (posts scroll + clears)
+  assert.match(COCKPIT_SRC, /flagHlScrollPending = true; \/\/ an OPEN\/SWITCH scrolls/);
+  assert.match(COCKPIT_SRC, /const scroll = flagHlScrollPending;[\s\S]*?flagHlScrollPending = false;[\s\S]*?type: "flagHl", gen: tree\.gen, gids, scroll/);
   // the channel is NEVER touched by highlight/clearHighlight (survives selection) — clearHighlight only strips `.current`
   const ch = SCRIPT.match(/m\.type==='clearHighlight'\)\{([\s\S]*?)\}/);
   assert.ok(ch && !/flag-current/.test(ch[1]), "clearHighlight must not touch .flag-current");
@@ -1472,10 +1478,12 @@ check("gold-link: flagActionViewModel carries id + targetPresent (zero-placement
   assert.match(COCKPIT_SRC, /targetPresent: gidsForFlag\(flag\)\.length > 0,/);
 });
 
-check("gold-link CSS: `.flag-current` reuses `.flow-ring` (gold, coexists with the base >rect overlays) + a crit-row rect rule", () => {
-  assert.match(FLOW_STYLE, /\.flow-row\.flag-current \.flow-ring,\.flow-outline\.flag-current \.flow-ring\{display:inline\}/);
-  assert.match(FLOW_STYLE, /\.flag-current \.flow-ring>rect\{stroke:var\(--vscode-charts-yellow,#cca700\);stroke-width:3\}/);
-  assert.match(FLOW_STYLE, /\.flow-crit-row\.flag-current>rect\{stroke:var\(--vscode-charts-yellow,#cca700\)/);
+check("gold-link CSS: a DEDICATED `.flow-flag-ring` (gold, INSIDE the blue ring → two signals coexist) shown on `.flag-current`", () => {
+  assert.match(FLOW_STYLE, /\.flow-flag-ring\{display:none\}/);
+  assert.match(FLOW_STYLE, /\.flag-current \.flow-flag-ring\{display:inline\}/);
+  assert.match(FLOW_STYLE, /\.flow-flag-ring>rect\{fill:none;stroke:var\(--vscode-charts-yellow,#cca700\);stroke-width:2;pointer-events:none\}/);
+  // the dedicated ring is emitted at all three flaggable node kinds (structure/def-leaf/crit-row) via flowFlagRing
+  assert.ok((FLOW_STYLE.match(/flow-flag-ring/g) || []).length >= 3, "dedicated flag-ring styled");
 });
 
 check("toggle: reclicking the same flag closes; a different flag switches (entry paths only, NOT openFlagActionView)", () => {
