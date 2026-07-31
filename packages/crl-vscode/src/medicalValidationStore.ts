@@ -706,9 +706,10 @@ export function applyBulkVerdict(
 }
 
 /** A grid ROW's presentation model — a `ReviewItem` projected for `reviewGridHtml`: the current-state CHIP text, which of
- *  the 4 columns (To do / Pending / Pass / Fail) the reviewer MAY pick (per the model's apply rules), and a hint. NO
- *  pre-selection: an empty row means "leave unchanged"; an assignment is a row the reviewer EXPLICITLY picked. `(kind,id)`
- *  is the stable ref the host resolves an assignment back to its captured `ReviewItem` (which carries `expectedBodyHash`). */
+ *  the 4 columns (Todo / Pend / Pass / Fail) the reviewer MAY pick (per the model's apply rules), the state to PRE-SELECT
+ *  (`current`, the live verdict), and a hint. The grid opens showing `current`; Apply persists only rows whose pick DIFFERS
+ *  from it. `(kind,id)` is the stable ref the host resolves an assignment back to its captured `ReviewItem` (which carries
+ *  `expectedBodyHash`). */
 export interface ReviewGridRow {
   kind: "criterion" | "case";
   id: string;
@@ -716,6 +717,7 @@ export interface ReviewGridRow {
   lib?: string; // criterion library — names are library-local, so the row disambiguates by lib
   currentLabel: string; // the current-state chip ("To do" | "Pending" | "Pass" | "Fail" | "Stale" [+ " (orphaned)"])
   enabled: { unreviewed: boolean; pending: boolean; pass: boolean; fail: boolean }; // which columns the reviewer may pick
+  current: "unreviewed" | "pending" | "pass" | "fail" | null; // the state to PRE-SELECT (the item's live verdict) — null when it isn't a pickable column (a stale criterion / an orphan already in a disabled state → the row opens blank + the hint explains). Apply persists only rows whose pick DIFFERS from `current`.
   hint?: string; // "truncated — can't mark Pass" | "orphaned — case no longer in the policy (clear only)"
 }
 
@@ -730,26 +732,36 @@ const GRID_STATE_LABEL: Record<CriterionVerdictUiState, string> = {
 /** Project the unsettled items into grid rows — cell enablement per the model's apply rules (an elided criterion can't
  *  take Pass; an orphan case is clear-only; everything else all four), the current-state chip, and lib/hints. */
 export function reviewGridViewModel(items: readonly ReviewItem[]): ReviewGridRow[] {
+  // The row PRE-SELECTS its live verdict (`current`) so the grid opens showing where each item stands (a reviewer edits the
+  // diff, not a blank slate). `current` is the item's `currentState` iff that maps to an ENABLED column — a "stale" criterion
+  // (no column) and an orphan case already in a now-disabled state (e.g. Pass) have no pickable current, so they open blank +
+  // rely on the hint. Apply persists only rows whose pick differs from `current`.
+  const preselect = (cs: CriterionVerdictUiState, enabled: ReviewGridRow["enabled"]): ReviewGridRow["current"] =>
+    cs !== "stale" && enabled[cs] ? cs : null;
   return items.map((it): ReviewGridRow => {
     if (it.kind === "criterion") {
+      const enabled = { unreviewed: true, pending: true, pass: it.passable, fail: true };
       return {
         kind: "criterion",
         id: it.id,
         label: it.name,
         lib: it.lib,
         currentLabel: GRID_STATE_LABEL[it.currentState],
-        enabled: { unreviewed: true, pending: true, pass: it.passable, fail: true },
+        enabled,
+        current: preselect(it.currentState, enabled),
         ...(it.passable ? {} : { hint: "truncated — can't mark Pass" }),
       };
     }
+    const enabled = it.live
+      ? { unreviewed: true, pending: true, pass: true, fail: true }
+      : { unreviewed: true, pending: false, pass: false, fail: false }; // orphan → clear-only
     return {
       kind: "case",
       id: it.id,
       label: it.label,
       currentLabel: GRID_STATE_LABEL[it.currentState] + (it.live ? "" : " (orphaned)"),
-      enabled: it.live
-        ? { unreviewed: true, pending: true, pass: true, fail: true }
-        : { unreviewed: true, pending: false, pass: false, fail: false }, // orphan → clear-only
+      enabled,
+      current: preselect(it.currentState, enabled),
       ...(it.live ? {} : { hint: "orphaned — case no longer in the policy (clear only)" }),
     };
   });

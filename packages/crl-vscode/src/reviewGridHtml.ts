@@ -2,8 +2,10 @@
 // Slice 5 moved the grid out of its own `crlReviewGrid` webview TAB into the shared `#flagDrawer` right flyout (the pattern
 // slices 1–4 use), so the tree + questionnaire stay in context. The drawer is narrow (`width:min(360px,70%)`), so the old
 // 5-column TABLE is reshaped into a VERTICAL list: one block per item, each a native-radio group laid out as a 2×2 segmented
-// control (To do / Pending / Pass / Fail). NO pre-selection — an untouched item means "leave unchanged"; Apply posts only the
-// items the reviewer explicitly picked.
+// control (Todo / Pend / Pass / Fail). Each item opens PRE-SELECTED to its live verdict (`current`) so the grid shows where
+// every item stands (operator, 2026-07-31); Apply persists only the rows whose selection DIFFERS from `current` (the diffs).
+// A row whose current isn't a pickable column (a stale criterion / a disabled-orphan case) opens BLANK + is per-row toggle-able
+// back to blank; a definite-state row always shows one selection. Revert restores every row to its opening `current`.
 //
 // The HOST injects this body into `#flagDrawer` via the `flagDrawer` message (innerHTML), concatenates REVIEW_GRID_DRAWER_STYLE
 // into the cockpit shell's nonced <style>, and concatenates REVIEW_GRID_DRAWER_SCRIPT (an isolated IIFE) into the tree webview's
@@ -17,18 +19,22 @@ import type { ReviewGridRow } from "./medicalValidationStore";
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => ESC[c]);
 
+// Segment labels are the SHORT forms (Todo / Pend / Pass / Fail) so the 2×2 control's columns align (operator, 2026-07-31);
+// the full words live in `CELL_ARIA` for screen readers + the current-state chip's `currentLabel` (from GRID_STATE_LABEL).
 const COLS: { state: "unreviewed" | "pending" | "pass" | "fail"; label: string }[] = [
-  { state: "unreviewed", label: "To do" },
-  { state: "pending", label: "Pending" },
+  { state: "unreviewed", label: "Todo" },
+  { state: "pending", label: "Pend" },
   { state: "pass", label: "Pass" },
   { state: "fail", label: "Fail" },
 ];
 
 /** The criterion verdict vocabulary differs from the case one (disc 346): a criterion "Pass"/"Fail" attests
  *  "Correctly encoded"/"Encoding wrong". We keep the neutral segment labels but disambiguate per option via aria/title. */
+// unreviewed reads "Todo" (matching the visible segment) so the accessible name CONTAINS the visible label — WCAG 2.5.3
+// Label-in-Name, so voice-control "click Todo" matches (the "To do" chip/GRID_STATE_LABEL keeps the spaced prose form).
 const CELL_ARIA: Record<string, Record<string, string>> = {
-  criterion: { unreviewed: "To do", pending: "Undecided", pass: "Correctly encoded", fail: "Encoding wrong" },
-  case: { unreviewed: "To do", pending: "Pending", pass: "Pass", fail: "Fail" },
+  criterion: { unreviewed: "Todo", pending: "Undecided", pass: "Correctly encoded", fail: "Encoding wrong" },
+  case: { unreviewed: "Todo", pending: "Pending", pass: "Pass", fail: "Fail" },
 };
 
 /** Render the grid BODY (the host injects the style + IIFE). Empty `rows` is a caller error — the host shows the "No
@@ -61,20 +67,22 @@ export function reviewGridHtml(rows: readonly ReviewGridRow[], epoch = 0): strin
         const aria = `${esc(r.label)}: ${esc(CELL_ARIA[r.kind][c.state])}`;
         const dis = enabled ? "" : ` disabled aria-disabled="true"${r.hint ? ` aria-describedby="${hintId}"` : ""}`;
         const disTitle = enabled ? "" : r.hint ? ` title="${esc(r.hint)}"` : "";
-        return `<label class="rvg-opt"><input type="radio" name="${name}" value="${c.state}" aria-label="${aria}"${dis}${disTitle}><span>${esc(c.label)}</span></label>`;
+        const checked = c.state === r.current ? " checked" : ""; // PRE-SELECT the item's live verdict (current is only set when its column is enabled)
+        return `<label class="rvg-opt"><input type="radio" name="${name}" value="${c.state}" aria-label="${aria}"${checked}${dis}${disTitle}><span>${esc(c.label)}</span></label>`;
       }).join("");
-      // A <fieldset>/<legend> gives the radio group an accessible name; the segment div is the 2×2 flex control.
-      return `<fieldset class="rvg-item" data-kind="${esc(r.kind)}" data-id="${esc(r.id)}"><legend class="rvg-legend">${head}</legend><div class="rvg-seg">${opts}</div></fieldset>`;
+      // A <fieldset>/<legend> gives the radio group an accessible name; the segment div is the 2×2 flex control. `data-current`
+      // is the pre-selected live verdict — the webview counts an item as a "pick" only when its selection DIFFERS from this.
+      return `<fieldset class="rvg-item" data-kind="${esc(r.kind)}" data-id="${esc(r.id)}" data-current="${esc(r.current ?? "")}"><legend class="rvg-legend">${head}</legend><div class="rvg-seg">${opts}</div></fieldset>`;
     })
     .join("");
 
   return (
     `<div class="flag-drawer rvg" data-review-grid data-dirty="0" data-epoch="${esc(ep)}">` +
-    `<div class="rvg-intro-wrap"><p class="rvg-intro">Set a verdict on any items you've reviewed, then Apply. Untouched items are left unchanged. ` +
+    `<div class="rvg-intro-wrap"><p class="rvg-intro">Each item shows its verdict when this list opened. Change any, then Apply — only what you changed is saved. ` +
     `A criterion Pass means "correctly encoded"; a disabled option explains why.</p>${setAll}</div>` +
     `<div class="rvg-list">${list}</div>` +
     `<div class="rvg-actions"><span class="rvg-status" data-rvg-status role="status" aria-live="polite"></span>` +
-    `<button type="button" class="rvg-secondary" data-rvg-clear>Clear</button>` +
+    `<button type="button" class="rvg-secondary" data-rvg-clear>Revert</button>` +
     `<button type="button" class="rvg-secondary" data-rvg-cancel>Cancel</button>` +
     `<button type="button" data-rvg-apply disabled>Apply</button></div>` +
     `</div>`
@@ -117,37 +125,45 @@ export const REVIEW_GRID_DRAWER_STYLE =
  *  vscode api in the enclosing scope). Isolated in its own function scope with `rg`-prefixed identifiers (the 4.97.0 SEV-1 was
  *  a variable COLLISION, which parses fine — isolation, not the `new Function` parse guard, is what prevents it). Delegated
  *  listeners on `fld`, every selector scoped to `[data-review-grid]`; state is DOM-resident (`data-applying`/`data-dirty` on
- *  the grid root), so an innerHTML swap to another drawer mode or another grid session resets it atomically. Mirrors the old
- *  panel script: per-row toggle-OFF (radios don't natively deselect — click a checked option to return the item to "leave
- *  unchanged"), Set-all (skips disabled + reports ineligible), Clear, Apply (posts the picks; disabled while applying), and a
- *  two-way dirty signal so the host's discard guard knows when picks exist. `reviewGridReenable` (host→webview, on a persist
+ *  the grid root), so an innerHTML swap to another drawer mode or another grid session resets it atomically. Behavior: a "pick"
+ *  is a row whose selection DIFFERS from its pre-selected `data-current` (untouched rows aren't picks); Set-all (skips disabled +
+ *  reports ineligible), Revert (restores every row to its `data-current`), Apply (posts only the diffs; disabled while applying),
+ *  a per-row toggle-OFF for BLANK-open rows only (data-current="" — a stale/disabled-orphan row can return to blank), and a
+ *  two-way dirty signal so the host's discard guard knows when diffs exist. `reviewGridReenable` (host→webview, on a persist
  *  failure) clears `data-applying` so the picks survive a retry. */
 export const REVIEW_GRID_DRAWER_SCRIPT =
   `(function(){` +
   `function rgRoot(){return fld.querySelector('[data-review-grid]');}` +
   `function rgEpoch(r){return r.getAttribute('data-epoch');}` + // the grid-session id echoed on every outbound message
+  `function rgRadio(t){return t&&t.matches&&t.matches('[data-review-grid] input[type=radio]');}` +
   `function rgOptInput(t){var o=t&&t.closest&&t.closest('[data-review-grid] .rvg-opt');return o?o.querySelector('input[type=radio]'):null;}` +
-  `function rgPicks(r){var out=[];var it=r.querySelectorAll('[data-kind]');for(var i=0;i<it.length;i++){var sel=it[i].querySelector('input[type=radio]:checked');if(sel)out.push({kind:it[i].getAttribute('data-kind'),id:it[i].getAttribute('data-id'),state:sel.value});}return out;}` +
+  `function rgBlank(inp){var fs=inp&&inp.closest&&inp.closest('[data-kind]');return !!fs&&(fs.getAttribute('data-current')||'')==='';}` +
+  // a "pick" is an item whose SELECTED verdict DIFFERS from its pre-selected current (data-current). Untouched items — still on
+  // their current — are NOT picks, so Apply persists only the diffs.
+  `function rgPicks(r){var out=[];var it=r.querySelectorAll('[data-kind]');for(var i=0;i<it.length;i++){var fs=it[i];var sel=fs.querySelector('input[type=radio]:checked');var cur=fs.getAttribute('data-current')||'';var val=sel?sel.value:'';if(val&&val!==cur)out.push({kind:fs.getAttribute('data-kind'),id:fs.getAttribute('data-id'),state:val});}return out;}` +
   `function rgRefresh(note){var r=rgRoot();if(!r)return;var ap=r.hasAttribute('data-applying');var n=rgPicks(r).length;` +
   `var ab=r.querySelector('[data-rvg-apply]');if(ab)ab.disabled=ap||n===0;` +
-  `var st=r.querySelector('[data-rvg-status]');if(st&&!ap)st.textContent=note!==undefined?note:(n?(n+' item'+(n===1?'':'s')+' set'):'');` +
+  `var st=r.querySelector('[data-rvg-status]');if(st&&!ap)st.textContent=note!==undefined?note:(n?(n+' change'+(n===1?'':'s')):'');` +
   `var d=n>0?'1':'0';if(r.getAttribute('data-dirty')!==d){r.setAttribute('data-dirty',d);v.postMessage({type:'reviewGridDirty',epoch:rgEpoch(r),dirty:n>0});}}` +
-  // per-option toggle-OFF: on mousedown record the checked state of the segment's radio (resolved via the .rvg-opt, so a click
-  // on the label TEXT — most of the hit area — counts, not only a direct hit on the ~14px radio circle); undo it on the click.
-  `fld.addEventListener('mousedown',function(e){var inp=rgOptInput(e.target);if(inp)inp._rgwc=inp.checked;});` +
+  // Per-row toggle-OFF, ONLY for a BLANK-OPEN row (data-current="" — a stale criterion / disabled-orphan case that opens with no
+  // pre-selection): those legitimately have a blank state, so a mis-click must be undoable to blank per-row (not only via Revert,
+  // which reverts everything). Definite-state rows (a real current) always show one selection — no toggle-off. Record the prior
+  // checked state on mousedown (resolved via .rvg-opt so a label-TEXT click counts), undo it on the click.
+  `fld.addEventListener('mousedown',function(e){var inp=rgOptInput(e.target);if(inp)inp._rgwc=(rgBlank(inp)&&inp.checked);});` +
   `fld.addEventListener('click',function(e){var r=rgRoot();if(!r)return;var ap=r.hasAttribute('data-applying');` +
   `var toff=rgOptInput(e.target);if(toff&&toff._rgwc){toff.checked=false;toff._rgwc=false;rgRefresh();return;}` +
   `var all=e.target.closest&&e.target.closest('[data-rvg-all]');` +
   `if(all){if(ap)return;var stt=all.getAttribute('data-rvg-all');var set=0,skip=0;var it=r.querySelectorAll('[data-kind]');` +
   `for(var i=0;i<it.length;i++){var rb=it[i].querySelector('input[value="'+stt+'"]');if(rb&&!rb.disabled){rb.checked=true;set++;}else{skip++;}}` +
-  `rgRefresh(set+' item'+(set===1?'':'s')+' set'+(skip?' — '+skip+' ineligible skipped':''));return;}` +
+  `rgRefresh(skip?(skip+' ineligible skipped'):undefined);return;}` +
+  // Clear = REVERT every item to its pre-selected current (data-current) — the diff-model's "undo my changes", not "blank".
   `var clr=e.target.closest&&e.target.closest('[data-rvg-clear]');` +
-  `if(clr){if(ap)return;var ch=r.querySelectorAll('input[type=radio]:checked');for(var j=0;j<ch.length;j++)ch[j].checked=false;rgRefresh('');return;}` +
+  `if(clr){if(ap)return;var ci=r.querySelectorAll('[data-kind]');for(var j=0;j<ci.length;j++){var fs=ci[j];var cur=fs.getAttribute('data-current')||'';var rbs=fs.querySelectorAll('input[type=radio]');for(var k=0;k<rbs.length;k++){rbs[k].checked=(cur!==''&&rbs[k].value===cur);}}rgRefresh('');return;}` +
   `var cn=e.target.closest&&e.target.closest('[data-rvg-cancel]');` +
   `if(cn){if(ap)return;v.postMessage({type:'reviewGridCancel',epoch:rgEpoch(r)});return;}` +
   `var apb=e.target.closest&&e.target.closest('[data-rvg-apply]');` +
   `if(apb){if(ap)return;var a=rgPicks(r);if(!a.length)return;r.setAttribute('data-applying','1');apb.disabled=true;var st=r.querySelector('[data-rvg-status]');if(st)st.textContent='Applying…';v.postMessage({type:'reviewGridApply',epoch:rgEpoch(r),assignments:a});return;}});` +
-  `fld.addEventListener('change',function(e){if(rgOptInput(e.target))rgRefresh();});` +
+  `fld.addEventListener('change',function(e){if(rgRadio(e.target))rgRefresh();});` +
   // reenable (host→webview on a persist failure) — act ONLY on the SAME session (epoch match) so a delayed reenable from a
   // torn-down session can't un-freeze a later grid's apply.
   `window.addEventListener('message',function(e){var m=e.data;if(!m||m.type!=='reviewGridReenable')return;var r=rgRoot();if(!r||String(m.epoch)!==rgEpoch(r))return;r.removeAttribute('data-applying');rgRefresh(m.note||'Not saved — try again.');});` +

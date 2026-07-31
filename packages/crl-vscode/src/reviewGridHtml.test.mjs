@@ -11,7 +11,7 @@ const check = test;
 
 const row = (over = {}) => ({
   kind: "criterion", id: '["L","A"]', label: "A", lib: "L", currentLabel: "To do",
-  enabled: { unreviewed: true, pending: true, pass: true, fail: true }, ...over,
+  enabled: { unreviewed: true, pending: true, pass: true, fail: true }, current: null, ...over,
 });
 
 check("reviewGridHtml: empty rows → the 'No unsettled…' empty state (host never opens the drawer, but render defensively)", () => {
@@ -27,20 +27,27 @@ check("reviewGridHtml: the grid root carries the FLYOUT class (flag-drawer) + da
   assert.match(html, /<div class="flag-drawer rvg" data-review-grid data-dirty="0" data-epoch="7">/);
 });
 
-check("reviewGridHtml: a 'Set all' header offers all 4 states, each carrying data-rvg-all=<state>", () => {
+check("reviewGridHtml: a 'Set all' header offers all 4 states (SHORT labels Todo/Pend so the 2×2 columns align), each carrying data-rvg-all=<state>", () => {
   const html = reviewGridHtml([row()]);
   assert.match(html, /Set all:/);
   for (const st of ["unreviewed", "pending", "pass", "fail"]) assert.match(html, new RegExp(`class="rvg-all" data-rvg-all="${st}"`), `missing set-all ${st}`);
-  for (const label of ["To do", "Pending", "Pass", "Fail"]) assert.ok(html.includes(`>${label}<`), `missing state label ${label}`);
+  for (const label of ["Todo", "Pend", "Pass", "Fail"]) assert.ok(html.includes(`>${label}<`), `missing state label ${label}`);
 });
 
-check("reviewGridHtml: an item is one radio group (per-item name) with the (kind,id) on data-* and 4 value radios", () => {
+check("reviewGridHtml: an item is one radio group (per-item name) with the (kind,id) + data-current on data-* and 4 value radios", () => {
   const html = reviewGridHtml([row()]);
-  assert.match(html, /<fieldset class="rvg-item" data-kind="criterion" data-id="\[&quot;L&quot;,&quot;A&quot;\]">/); // id JSON-escaped into the attribute
+  assert.match(html, /<fieldset class="rvg-item" data-kind="criterion" data-id="\[&quot;L&quot;,&quot;A&quot;\]" data-current="">/); // id JSON-escaped; current="" (row() has no current)
   const names = [...html.matchAll(/type="radio" name="(rvg-row-\d+)"/g)].map((m) => m[1]);
   assert.equal(names.length, 4);
   assert.equal(new Set(names).size, 1); // one shared per-item group name across the 4 radios
   for (const v of ["unreviewed", "pending", "pass", "fail"]) assert.match(html, new RegExp(`type="radio" name="rvg-row-0" value="${v}"`));
+});
+
+check("reviewGridHtml: the row PRE-SELECTS its current verdict (checked radio + data-current) so the grid opens showing where each item stands", () => {
+  const html = reviewGridHtml([row({ current: "pending" })]);
+  assert.match(html, /data-current="pending"/);
+  assert.match(html, /value="pending" aria-label="[^"]*" checked/); // the pending radio opens checked
+  assert.doesNotMatch(html, /value="pass"[^>]*checked/); // only the current one
 });
 
 check("reviewGridHtml: an elided criterion → the Pass radio is disabled (the only refused option); the others stay enabled", () => {
@@ -120,12 +127,16 @@ check("REVIEW_GRID_DRAWER_SCRIPT: column set-all skips DISABLED options and repo
   assert.match(REVIEW_GRID_DRAWER_SCRIPT, /ineligible skipped/); // surfaced to the reviewer
 });
 
-check("REVIEW_GRID_DRAWER_SCRIPT: an item can be returned to 'leave unchanged' — Clear + per-item toggle-OFF via the SEGMENT (not just the radio circle)", () => {
+check("REVIEW_GRID_DRAWER_SCRIPT: the DIFF model — a pick differs from data-current; Revert restores current; toggle-OFF only for BLANK rows", () => {
+  // a pick = selected value present AND != the item's pre-selected current (untouched items stay on current → not sent)
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /var cur=fs\.getAttribute\('data-current'\)\|\|'';var val=sel\?sel\.value:'';if\(val&&val!==cur\)/);
+  // Revert (data-rvg-clear) restores each item's radio to its data-current (the diff-model "undo my changes"), never to blank
   assert.match(REVIEW_GRID_DRAWER_SCRIPT, /data-rvg-clear/);
-  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /_rgwc/); // mousedown records prior checked-state; a click on an already-checked option unchecks it
-  // impl-review [important]: resolve the radio via the enclosing .rvg-opt so a click on the LABEL TEXT (most of the hit area) counts
-  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /closest\('\[data-review-grid\] \.rvg-opt'\)/);
-  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /toff\.checked=false/);
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /rbs\[k\]\.checked=\(cur!==''&&rbs\[k\]\.value===cur\)/);
+  // per-row toggle-OFF is SCOPED to blank-open rows only (data-current="") — a definite-state row always shows one selection
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /function rgBlank\(inp\)\{[^}]*data-current[^}]*===''/);
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /inp\._rgwc=\(rgBlank\(inp\)&&inp\.checked\)/); // only a blank row records a prior-checked for toggle-off
+  assert.match(REVIEW_GRID_DRAWER_SCRIPT, /if\(toff&&toff\._rgwc\)\{toff\.checked=false/);
 });
 
 check("REVIEW_GRID_DRAWER_SCRIPT: a TWO-WAY dirty signal (0↔≥1 picks) so the host discard guard clears when picks are cleared", () => {

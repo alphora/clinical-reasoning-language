@@ -1209,17 +1209,19 @@ check("reviewGridViewModel: passable criterion → all 4; elided criterion → P
     { kind: "case", id: "orph", label: "orph", currentState: "pass", live: false },
   ];
   const rows = reviewGridViewModel(items);
-  // passable criterion → all four, lib carried, Stale chip, NO hint key
-  assert.deepEqual(rows[0], { kind: "criterion", id: kA, label: "A", lib: "L", currentLabel: "Stale", enabled: { unreviewed: true, pending: true, pass: true, fail: true } });
-  // elided criterion → Pass column disabled + hint (the ONE cell the model refuses)
+  // passable criterion → all four, lib carried, Stale chip, NO hint key; a STALE current isn't a pickable column → current:null
+  assert.deepEqual(rows[0], { kind: "criterion", id: kA, label: "A", lib: "L", currentLabel: "Stale", enabled: { unreviewed: true, pending: true, pass: true, fail: true }, current: null });
+  // elided criterion → Pass column disabled + hint (the ONE cell the model refuses); current (unreviewed) is enabled → pre-selected
   assert.deepEqual(rows[1].enabled, { unreviewed: true, pending: true, pass: false, fail: true });
   assert.equal(rows[1].hint, "truncated — can't mark Pass");
-  // live case → all four, no hint
-  assert.deepEqual(rows[2], { kind: "case", id: "c1", label: "Case 1", currentLabel: "Pending", enabled: { unreviewed: true, pending: true, pass: true, fail: true } });
-  // orphan case → clear-only, "(orphaned)" chip, hint
+  assert.equal(rows[1].current, "unreviewed");
+  // live case → all four, no hint; current (pending) is enabled → pre-selected
+  assert.deepEqual(rows[2], { kind: "case", id: "c1", label: "Case 1", currentLabel: "Pending", enabled: { unreviewed: true, pending: true, pass: true, fail: true }, current: "pending" });
+  // orphan case → clear-only, "(orphaned)" chip, hint; current (pass) is DISABLED for an orphan → current:null (opens blank)
   assert.deepEqual(rows[3].enabled, { unreviewed: true, pending: false, pass: false, fail: false });
   assert.equal(rows[3].currentLabel, "Pass (orphaned)");
   assert.match(rows[3].hint, /orphaned/);
+  assert.equal(rows[3].current, null);
 });
 
 check("applyGridAssignments: resolves to captured items + groups by state + threads maps — Pass some rows, Fail others, in one apply", () => {
