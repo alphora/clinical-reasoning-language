@@ -1392,9 +1392,9 @@ check("flag-action drawer: 'Reveal in source' is GONE (revealFlag + flagActionMe
 });
 
 check("flag-action drawer: the webview listener posts DISTINCT data-flag-action-* intents (no create-drawer collision) + carries no id", () => {
-  // Todo 3 adds data-flag-action-edit to the action set.
-  assert.match(SCRIPT, /\[data-flag-action-toggle\],\[data-flag-action-issue\],\[data-flag-action-edit\],\[data-flag-action-close\]/);
-  assert.match(SCRIPT, /type:ac\.hasAttribute\('data-flag-action-toggle'\)\?'flagActionToggle':ac\.hasAttribute\('data-flag-action-issue'\)\?'flagActionIssue':ac\.hasAttribute\('data-flag-action-edit'\)\?'flagActionEdit':'flagActionClose'/);
+  // Todo 3 adds data-flag-action-edit; Todo 4 adds data-flag-action-delete to the action set.
+  assert.match(SCRIPT, /\[data-flag-action-toggle\],\[data-flag-action-issue\],\[data-flag-action-edit\],\[data-flag-action-delete\],\[data-flag-action-close\]/);
+  assert.match(SCRIPT, /type:ac\.hasAttribute\('data-flag-action-toggle'\)\?'flagActionToggle':ac\.hasAttribute\('data-flag-action-issue'\)\?'flagActionIssue':ac\.hasAttribute\('data-flag-action-edit'\)\?'flagActionEdit':ac\.hasAttribute\('data-flag-action-delete'\)\?'flagActionDelete':'flagActionClose'/);
   // the create-drawer close intent must still be distinct (matches data-flag-close/cancel only)
   assert.match(SCRIPT, /closest\('\[data-flag-close\],\[data-flag-cancel\]'\)/);
 });
@@ -1623,4 +1623,50 @@ check("edit: the message router + webview wire the edit intents (action-edit / e
 check("edit: the gold node-link + view model — driveFlagNodeHighlight has an edit branch; the view model carries descriptionOnly", () => {
   assert.match(COCKPIT_SRC, /: flagEditDraft\s*\n?\s*\?\s*gidsForFlag\(flagEditDraft\.flag\)/);
   assert.match(COCKPIT_SRC, /descriptionOnly: flagDisplayNameOf\(flag\.tag\) === undefined,/);
+});
+
+// ── Todo 4 (disc 363): delete a flag + close its issue as not-planned ──────────────────────────────────────────────────
+check("delete: the webview posts data-flag-action-delete → flagActionDelete → deleteFlagFromDrawer", () => {
+  assert.match(SCRIPT, /\[data-flag-action-delete\]/);
+  assert.match(SCRIPT, /ac\.hasAttribute\('data-flag-action-delete'\)\?'flagActionDelete'/);
+  assert.match(COCKPIT_SRC, /else if \(msg\.type === "flagActionDelete"\) \{\s*\n\s*void deleteFlagFromDrawer\(\);/);
+});
+check("delete: deleteFlagFromDrawer — upfront guard, busy-before-modal, PURE eligibility off the FRESH load, RECOMPUTE post-confirm, local-delete-FIRST, localCommitted refresh", () => {
+  const m = COCKPIT_SRC.match(/async function deleteFlagFromDrawer\(\): Promise<void> \{([\s\S]*?)\n  \}/);
+  assert.ok(m, "deleteFlagFromDrawer body");
+  const b = m[1];
+  assert.match(b, /if \(!view \|\| flagActionBusy\) return;/);
+  assert.match(b, /if \(currentCel !== cel \|\| mode !== "medical-validation"\) return flagNote\("policy changed[^"]*"\); \/\/ upfront/); // Claude nit
+  assert.match(b, /flagActionBusy = true; \/\/ set BEFORE the modal/); // no stacked confirmations
+  // eligibility via the PURE helper over the FRESH load (NOT cached flagsList) — impl-review gpt56 #1 / Claude #2
+  assert.match(b, /const elig1 = flagCloseEligibility\(load1\.flags, Boolean\(load1\.warning\), view\.flag\.id\);/);
+  assert.ok(!/flagsList\.some\(/.test(b), "the 1b sharing scan must NOT read the cached flagsList");
+  assert.match(b, /showWarningMessage\(`Delete "\$\{summaryLabel\}"\?[\s\S]*?\{ modal: true \}, "Delete flag"\)/);
+  assert.match(b, /if \(pick !== "Delete flag"\) return;/);
+  // post-confirm identity re-check + RECOMPUTE eligibility off the FINAL record (a resolve/new-share during the modal flips willClose)
+  assert.match(b, /if \(!flagActionView \|\| flagActionView\.flag\.id !== view\.flag\.id \|\| currentCel !== cel \|\| mode !== "medical-validation"\) return/);
+  assert.match(b, /const elig2 = flagCloseEligibility\(load2\.flags, Boolean\(load2\.warning\), view\.flag\.id\);/);
+  assert.match(b, /if \(elig2\.refStr !== elig1\.refStr\) return/); // the named issue moved under us
+  // local delete FIRST (throw → note, no GitHub); then the localCommitted-phased refresh in try/catch; then the eligible close
+  assert.match(b, /removeFlag\(dir, view\.flag\.id\);/);
+  assert.match(b, /catch \(e\) \{\s*\n\s*return flagNote\(`could not delete the flag/);
+  assert.match(b, /try \{\s*\n\s*closeFlagActionView\(\);[\s\S]*?driveFlagBadges\(\);\s*\n\s*\} catch \{[\s\S]*?\}\s*\n\s*flagNote\("flag deleted"\);/); // finding #8
+  assert.match(b, /if \(elig2\.willClose && elig2\.issueNo !== undefined && elig2\.refStr !== undefined && vscode\.workspace\.isTrusted\) \{\s*\n\s*await closeIssueAsNotPlanned\(elig2\.issueNo, elig2\.refStr, cel, view\.flag\.id\);/);
+});
+check("delete: closeIssueAsNotPlanned — warning fail-closed, resurrection + sharing re-check, PR skip, GET-first-skip-if-closed, 401 retry, cel-bound warning", () => {
+  const m = COCKPIT_SRC.match(/async function closeIssueAsNotPlanned\([\s\S]*?\n  \}/);
+  assert.ok(m, "closeIssueAsNotPlanned body");
+  const b = m[0];
+  assert.match(b, /async function closeIssueAsNotPlanned\(issueNo: number, refStr: string, cel: string \| undefined, deletedId: string\)/);
+  assert.match(b, /if \(reload\.warning\) return flagNote\(`flag deleted; issue #\$\{issueNo\} left open — the flag store is unreadable`\);/); // fail closed
+  assert.match(b, /reload\.flags\.some\(\(f\) => f\.id === deletedId\)\) return flagNote\(`flag deleted, but issue #\$\{issueNo\} left open — the flag reappeared/); // resurrection
+  assert.match(b, /reload\.flags\.some\(\(f\) => issueRefOf\(f\.fields\.ref\) === refStr\)\) return flagNote\(`flag deleted; issue #\$\{issueNo\} left open — another flag still references it`\);/); // late share
+  assert.match(b, /if \(got\.issue\.isPullRequest\) return \{ ok: true, skipped: "pr" \};/); // never close a PR
+  assert.match(b, /if \(got\.issue\.state === "closed"\) return \{ ok: true, skipped: "closed" \};/); // don't clobber a human's completed
+  assert.match(b, /updateGithubIssue\(\{ owner: repo\.owner, repo: repo\.repo, number: issueNo, token, state: "closed", stateReason: "not_planned" \}\)/);
+  assert.match(b, /if \(!res\.ok && res\.status === 401\) \{[\s\S]*?githubToken\(true\)/);
+  assert.match(b, /else reportPartialClose\(issueNo, cel, res\.reason\);/);
+  // the partial-close warning is PERSISTENT + its Open-issue recovery is bound to the CAPTURED cel (not the live currentCel)
+  assert.match(COCKPIT_SRC, /function reportPartialClose\(issueNo: number, cel: string \| undefined, why: string\): void \{[\s\S]*?showWarningMessage\([\s\S]*?`Open issue #\$\{issueNo\}`\)[\s\S]*?openIssueNumber\(issueNo, cel\)/);
+  assert.match(COCKPIT_SRC, /async function openIssueNumber\(issueNo: number, cel: string \| undefined\)[\s\S]*?const src = cel \? findPolicySrc\(cel\) : undefined;/);
 });

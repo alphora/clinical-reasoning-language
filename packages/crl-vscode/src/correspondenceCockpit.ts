@@ -71,6 +71,7 @@ import { createGithubIssue, getGithubIssue, IssueCreateError, issueCreateErrorLa
 import { renderFlagDrawer } from "./flagDrawerHtml";
 import { renderFlagActionDrawer, type FlagActionField } from "./flagActionDrawerHtml";
 import { computeFlagPlacement } from "./flagPlacement";
+import { flagCloseEligibility } from "./flagCloseEligibility";
 import { countEmbeddedFlags } from "./embeddedFlagDetect"; // #212 S3: the un-migrated-flag safety-net detector (pure)
 // #212: the flag store model now lives in core (packages/crl) so the cockpit AND the MCP flag tools share it.
 import {
@@ -81,6 +82,7 @@ import {
   flagStoreDir,
   loadFlags as loadStoredFlags,
   saveFlag,
+  removeFlag,
   validateAndBuildMvFlagDraft,
   resolveAnchor,
   type OccurrenceRef,
@@ -2297,6 +2299,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       void flagActionOpenIssue(); // the action drawer's Open-issue #N
     } else if (msg.type === "flagActionEdit") {
       openFlagEditDraft(); // Todo 3/3.5: the action drawer's Edit → the edit form (full for a human MV Type; description-only for AI)
+    } else if (msg.type === "flagActionDelete") {
+      void deleteFlagFromDrawer(); // Todo 4: the action drawer's Delete → confirm → remove local record + best-effort close issue not-planned
     } else if (msg.type === "flagActionClose") {
       closeFlagActionView(); // the action drawer's ✕ (UI clear — no agent elicitation)
     } else if (msg.type === "flagEditSave") {
@@ -3551,6 +3555,143 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     else noteFail(res.reason);
   }
 
+  /** Todo 4 (disc 363) — the action drawer's Delete: remove the local `.crl/flags/<id>.json` record and (best-effort) close its
+   *  born-together GitHub issue as NOT PLANNED. Order (panel): take busy → clean re-read → derive close eligibility off the FINAL
+   *  on-disk record (accept #7) → confirm (consequence-naming, honest) → post-confirm re-check + re-read → LOCAL delete → refresh →
+   *  best-effort close. A local-delete failure keeps the flag + does NOT touch GitHub. Close eligibility: a numeric `ref`, the flag
+   *  is NOT resolved (operator 2b — a resolved flag's work was done, `not_planned` would mislabel it), and NO other live flag
+   *  references the same issue (operator 1b — several flags can share one AI/kit-created tracking issue). */
+  async function deleteFlagFromDrawer(): Promise<void> {
+    const view = flagActionView;
+    if (!view || flagActionBusy) return;
+    const cel = view.cel;
+    if (currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — reopen the flag"); // upfront guard (Claude nit, mirrors saveFlagEdit)
+    flagActionBusy = true; // set BEFORE the modal (impl-review gpt56 #4: rapid clicks can't stack confirmations)
+    try {
+      const dir = currentCel ? flagStoreDir(currentCel) : undefined;
+      if (!dir) return flagNote("no flag store for this policy");
+      // Clean re-read: eligibility comes from the FRESH on-disk load via the PURE helper — NOT the cached `flagsList` (impl-review
+      // gpt56 #1 / Claude #2: a cached list lags the watcher, so a just-added sharing flag would be missed → a wrongful close).
+      const load1 = loadStoredFlags(dir);
+      const elig1 = flagCloseEligibility(load1.flags, Boolean(load1.warning), view.flag.id);
+      if (!elig1.present) {
+        // absent + warning → the target is among the unreadable set → block (repair first, disc 363 finding B); else already gone.
+        if (load1.warning) return flagNote("flag store unreadable — repair the corrupt record first");
+        closeFlagActionView();
+        reloadReviewFlags();
+        renderTreeChrome();
+        driveFlagBadges();
+        return flagNote("the flag was already removed");
+      }
+      const current = load1.flags.find((f) => f.id === view.flag.id)!;
+      const summaryLabel = current.gist || flagDisplayNameOf(current.tag) || current.tag;
+      // Name the exact remote consequence; be honest when the workspace-trust gate is already known-failed (disc 363 finding #6).
+      const closeLine = !elig1.willClose
+        ? ""
+        : vscode.workspace.isTrusted
+          ? ` CRL will also try to close linked issue #${elig1.issueNo} as not planned.`
+          : ` (Its linked issue #${elig1.issueNo} won't be closed — the workspace isn't trusted.)`;
+      const pick = await vscode.window.showWarningMessage(`Delete "${summaryLabel}"? The local flag can't be restored.${closeLine}`, { modal: true }, "Delete flag");
+      if (pick !== "Delete flag") return; // Cancel / Esc → no-op (busy released in finally)
+      // Post-confirm: the modal spanned an await — re-check identity + RECOMPUTE eligibility off the FINAL record (impl-review both:
+      // a flag resolved / a sharing flag added DURING the modal must flip `willClose`, else 1b/2b are violated on the final record).
+      if (!flagActionView || flagActionView.flag.id !== view.flag.id || currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — reopen the flag");
+      const load2 = loadStoredFlags(dir);
+      const elig2 = flagCloseEligibility(load2.flags, Boolean(load2.warning), view.flag.id);
+      if (!elig2.present) {
+        if (load2.warning) return flagNote("flag store unreadable — repair the corrupt record first");
+        closeFlagActionView(); // vanished during the modal → already-deleted (never close an issue on a vanished record's snapshot)
+        reloadReviewFlags();
+        renderTreeChrome();
+        driveFlagBadges();
+        return flagNote("the flag was already removed");
+      }
+      if (elig2.refStr !== elig1.refStr) return flagNote("the flag changed on disk — reopen it"); // the named issue moved under us → reconfirm
+      // LOCAL DELETE first (disc 363 finding #4/#8): a throw → note + drawer stays + GitHub is NEVER touched.
+      try {
+        removeFlag(dir, view.flag.id);
+      } catch (e) {
+        return flagNote(`could not delete the flag: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      // localCommitted (disc 363 finding #8): the unlink succeeded — a THROW in the best-effort UI refresh must NOT skip the close +
+      // its partial-close warning. Isolate the refresh; the store watcher reconciles a swallowed one.
+      try {
+        closeFlagActionView();
+        reloadReviewFlags();
+        renderTreeChrome();
+        driveFlagBadges();
+      } catch {
+        /* best-effort UI refresh — the store watcher will reconcile; never suppress the close below */
+      }
+      flagNote("flag deleted");
+      if (elig2.willClose && elig2.issueNo !== undefined && elig2.refStr !== undefined && vscode.workspace.isTrusted) {
+        await closeIssueAsNotPlanned(elig2.issueNo, elig2.refStr, cel, view.flag.id);
+      }
+    } finally {
+      flagActionBusy = false;
+    }
+  }
+
+  /** Todo 4 — best-effort close of a deleted flag's born-together issue as NOT PLANNED (the local delete already succeeded).
+   *  Guards (impl-review both arms): FAIL CLOSED on a store warning (sole ownership unprovable); leave the issue open if the
+   *  record RESURFACED (finding #7) or ANOTHER flag now shares the ref (a sharing flag added after `load2`); never close a PULL
+   *  REQUEST (a hand-entered PR ref); GET-first-skip-if-already-closed (finding #3 — don't clobber a human's `completed`). Same
+   *  trust/origin/token gates + 401 retry as the relabel. A real failure → a PERSISTENT partial-close warning (the ref is gone). */
+  async function closeIssueAsNotPlanned(issueNo: number, refStr: string, cel: string | undefined, deletedId: string): Promise<void> {
+    const dir = cel ? flagStoreDir(cel) : undefined;
+    if (dir) {
+      const reload = loadStoredFlags(dir);
+      if (reload.warning) return flagNote(`flag deleted; issue #${issueNo} left open — the flag store is unreadable`); // fail closed
+      if (reload.flags.some((f) => f.id === deletedId)) return flagNote(`flag deleted, but issue #${issueNo} left open — the flag reappeared on disk`);
+      if (reload.flags.some((f) => issueRefOf(f.fields.ref) === refStr)) return flagNote(`flag deleted; issue #${issueNo} left open — another flag still references it`);
+    }
+    const policySrc = cel ? findPolicySrc(cel) : undefined;
+    const repo = policySrc ? await githubRepoForFile(vscode.Uri.file(join(policySrc, "crl"))) : undefined;
+    if (!repo) return reportPartialClose(issueNo, cel, "no GitHub origin");
+    const attempt = async (token: string): Promise<{ ok: true; skipped?: "closed" | "pr" } | { ok: false; status: number; reason: string }> => {
+      const got = await getGithubIssue({ owner: repo.owner, repo: repo.repo, number: issueNo, token });
+      if (!got.ok) return got;
+      if (got.issue.isPullRequest) return { ok: true, skipped: "pr" }; // a hand-entered PR ref — NEVER PATCH-close someone's PR
+      if (got.issue.state === "closed") return { ok: true, skipped: "closed" }; // already closed (a human's `completed`) → don't clobber
+      return updateGithubIssue({ owner: repo.owner, repo: repo.repo, number: issueNo, token, state: "closed", stateReason: "not_planned" });
+    };
+    const token = await githubToken();
+    if (!token) return reportPartialClose(issueNo, cel, "not signed in to GitHub");
+    let res = await attempt(token);
+    if (!res.ok && res.status === 401) {
+      const fresh = await githubToken(true);
+      if (fresh) res = await attempt(fresh);
+    }
+    if (res.ok) {
+      flagNote(res.skipped === "pr" ? `flag deleted; #${issueNo} is a pull request — left open` : res.skipped === "closed" ? `flag deleted; issue #${issueNo} was already closed` : `flag deleted; issue #${issueNo} closed as not planned`);
+    } else reportPartialClose(issueNo, cel, res.reason);
+  }
+
+  /** Todo 4 — a PERSISTENT partial-close warning (disc 363 finding #6): after the delete the `ref` is gone from the flag UI, so a
+   *  3s note is inadequate — surface the issue number with a one-click Open bound to the CAPTURED policy `cel` (impl-review both:
+   *  the warning outlives a retarget, so its recovery must not resolve #N against a DIFFERENT policy's tracker). */
+  function reportPartialClose(issueNo: number, cel: string | undefined, why: string): void {
+    void vscode.window.showWarningMessage(`Flag deleted, but issue #${issueNo} could not be closed (${why}).`, `Open issue #${issueNo}`).then((a) => {
+      if (a) void openIssueNumber(issueNo, cel);
+    });
+  }
+
+  /** Todo 4 — open a bare issue number in the tracker (the partial-close warning's recovery action). Resolves the base from the
+   *  CAPTURED policy's `src/crl` (NOT the live `currentCel`, which may have retargeted since the warning appeared); no base → the
+   *  settings prompt. */
+  async function openIssueNumber(issueNo: number, cel: string | undefined): Promise<void> {
+    const src = cel ? findPolicySrc(cel) : undefined;
+    const fileUri = src ? vscode.Uri.file(join(src, "crl")) : flagRepoFileUri();
+    const base = await resolveOrDetectIssueBase(fileUri);
+    const url = buildIssueUrl(base, String(issueNo));
+    if (!url) return promptSetIssueBase(String(issueNo));
+    try {
+      if (!(await vscode.env.openExternal(vscode.Uri.parse(url)))) flagNote(`could not open issue #${issueNo}`);
+    } catch {
+      flagNote(`could not open issue #${issueNo}`);
+    }
+  }
+
   /** Reconcile the open action drawer against the current `flagsList` (design 354 [important]): re-find the record by id and
    *  REPLACE the host-captured `flag` (not just the HTML) — else a stale status snapshot makes the next toggle a no-op — then
    *  re-render. RE-STAMPS `ver`/`cel` to the live policy identity (disc 355 [critical]): every call site is same-policy by
@@ -4796,6 +4937,8 @@ body:has(.flag-drawer) .flow-zoom{display:none}
 .fa-status-resolved{color:var(--vscode-charts-green,#89d185)}
 .fa-btn{cursor:pointer;border:none;border-radius:2px;padding:2px 10px;font-size:.9em;background:var(--vscode-button-secondaryBackground,#3a3d41);color:var(--vscode-button-secondaryForeground,#fff)}
 .fa-btn.fa-primary{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff)}
+/* Todo 4: the destructive Delete affordance — a red-tinted text button (the modal confirm is the real guard). */
+.fa-btn.fa-danger{color:var(--vscode-errorForeground,#f48771)}
 /* disc 359/361: the header carries a GOLD accent linking it to the gold-haloed node in the tree (which thing is this flag
    for?). Scoped to .flag-drawer (the shared chrome), so BOTH the create (Add-flag) AND the action drawer show it — the create
    drawer highlights its target node too (disc 361), so its header must match. */
@@ -5115,8 +5258,8 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(grp){for(const c of grp.querySelectorAll('[data-flag-field]')){const k=c.getAttribute('data-flag-field');const val=c.value;if(val&&val.trim()!=='')fields[k]=val;}}` +
   `return{tag:tg,summary:su?su.value:'',stub:st?st.value:'',fields:fields};}` +
   `fld.addEventListener('click',(e)=>{` +
-  `const ac=e.target.closest&&e.target.closest('[data-flag-action-toggle],[data-flag-action-issue],[data-flag-action-edit],[data-flag-action-close]');` +
-  `if(ac){e.preventDefault();e.stopPropagation();v.postMessage({type:ac.hasAttribute('data-flag-action-toggle')?'flagActionToggle':ac.hasAttribute('data-flag-action-issue')?'flagActionIssue':ac.hasAttribute('data-flag-action-edit')?'flagActionEdit':'flagActionClose'});return;}` +
+  `const ac=e.target.closest&&e.target.closest('[data-flag-action-toggle],[data-flag-action-issue],[data-flag-action-edit],[data-flag-action-delete],[data-flag-action-close]');` +
+  `if(ac){e.preventDefault();e.stopPropagation();v.postMessage({type:ac.hasAttribute('data-flag-action-toggle')?'flagActionToggle':ac.hasAttribute('data-flag-action-issue')?'flagActionIssue':ac.hasAttribute('data-flag-action-edit')?'flagActionEdit':ac.hasAttribute('data-flag-action-delete')?'flagActionDelete':'flagActionClose'});return;}` +
   // Todo 3: the edit form's Cancel/✕ + Save carry DISTINCT `data-flag-edit-*` intents (checked BEFORE the create close/insert,
   // whose handlers no-op when only flagEditDraft is set). Save reuses flagCollect().
   `const ec=e.target.closest&&e.target.closest('[data-flag-edit-cancel]');` +

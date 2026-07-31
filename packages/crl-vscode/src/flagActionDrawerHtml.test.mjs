@@ -153,6 +153,14 @@ test("edit button: always rendered; label 'Edit flag' for a human Type, 'Edit de
   assert.match(ai, /Edit description/);
   assert.ok(!/Edit flag/.test(ai), "an AI flag says 'Edit description', not 'Edit flag'");
 });
+test("delete button (Todo 4): always rendered with data-flag-action-delete, destructive styling, for every flag", () => {
+  const human = renderFlagActionDrawer(OPEN_VIEW);
+  assert.match(human, /data-flag-action-delete/);
+  assert.match(human, /fa-danger/);
+  assert.match(human, /Delete flag/);
+  const ai = renderFlagActionDrawer({ ...OPEN_VIEW, descriptionOnly: true });
+  assert.match(ai, /data-flag-action-delete/); // offered for an AI flag too
+});
 test("description row: ALWAYS shown (operator — human-editable on AI flags), em-dash when empty; Ref omitted when empty", () => {
   const noDesc = renderFlagActionDrawer({ ...OPEN_VIEW, description: undefined });
   assert.match(noDesc, />Description<\/span><span class="fa-val fa-pre"><span class="fa-em">—/); // Description row present with em-dash

@@ -175,6 +175,11 @@ export interface UpdateGithubIssueArgs {
   labels?: readonly string[];
   /** the full replacement body. Sent only when defined. */
   body?: string;
+  /** Todo 4: the issue state — "closed" (delete-a-flag close) or "open" (reopen). Sent only when defined. */
+  state?: "open" | "closed";
+  /** Todo 4: the close reason — mapped to GitHub's `state_reason` (e.g. "not_planned" | "completed" | "reopened"). Sent only
+   *  when defined. Meaningful with `state:"closed"` ("not_planned" = the flag was dismissed, not fixed). */
+  stateReason?: "not_planned" | "completed" | "reopened";
   signal?: AbortSignal;
   fetchImpl?: typeof fetch;
 }
@@ -187,9 +192,11 @@ export type UpdateGithubIssueResult = { ok: true } | { ok: false; status: number
 export async function updateGithubIssue(args: UpdateGithubIssueArgs): Promise<UpdateGithubIssueResult> {
   const f = args.fetchImpl ?? fetch;
   const url = `https://api.github.com/repos/${encodeURIComponent(args.owner)}/${encodeURIComponent(args.repo)}/issues/${encodeURIComponent(String(args.number))}`;
-  const payload: { labels?: readonly string[]; body?: string } = {};
+  const payload: { labels?: readonly string[]; body?: string; state?: string; state_reason?: string } = {};
   if (args.labels !== undefined) payload.labels = args.labels;
   if (args.body !== undefined) payload.body = args.body;
+  if (args.state !== undefined) payload.state = args.state;
+  if (args.stateReason !== undefined) payload.state_reason = args.stateReason; // GitHub's snake_case field
   let res: Awaited<ReturnType<typeof fetch>>;
   try {
     res = await f(url, {

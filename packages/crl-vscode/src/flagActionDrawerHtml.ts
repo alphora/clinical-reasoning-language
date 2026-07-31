@@ -106,13 +106,15 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
   // Todo 3.5: Edit is offered for EVERY flag — a human MV Type edits the whole flag; an AI/extraction flag edits only its
   // Description (the label + the form mode follow `descriptionOnly`).
   const edit = `<button type="button" class="fa-btn" data-flag-action-edit>✎ Edit ${v.descriptionOnly ? "description" : "flag"}</button>`;
+  // Todo 4: Delete — offered for EVERY flag (a reviewer may dismiss any finding); destructive styling, leftmost, host-confirmed.
+  const del = `<button type="button" class="fa-btn fa-danger" data-flag-action-delete>🗑 Delete flag</button>`;
 
   return (
     `<div class="flag-drawer flag-action-drawer" data-flag-action-drawer>` +
     `<div class="flag-head"><span class="flag-title" title="${escapeHtml(headerText)}">Flag — ${escapeHtml(headerText)}</span>` +
     `<button type="button" class="flag-close" data-flag-action-close aria-label="Close">✕</button></div>` +
     `<div class="fa-body">${rows}${details}</div>` +
-    `<div class="flag-actions">${issue}${edit}${toggle}</div>` +
+    `<div class="flag-actions">${del}${issue}${edit}${toggle}</div>` +
     `</div>`
   );
 }

@@ -182,6 +182,13 @@ test("updateGithubIssue: omitted labels/body are NOT sent (never blanks a field 
   assert.deepEqual(JSON.parse(seen.body), { labels: [] }); // an explicit [] IS sent (clears labels)
 });
 
+test("updateGithubIssue: Todo 4 close — state + stateReason map to GitHub {state, state_reason}, sent only when provided", async () => {
+  let seen;
+  const fetchImpl = async (url, init) => { seen = init; return rget(true, 200, {}); };
+  await updateGithubIssue({ owner: "o", repo: "r", number: 3, token: "t", state: "closed", stateReason: "not_planned", fetchImpl });
+  assert.deepEqual(JSON.parse(seen.body), { state: "closed", state_reason: "not_planned" }); // snake_case field; no labels/body keys
+});
+
 test("updateGithubIssue: a non-2xx → {ok:false} with a classified reason (never throws)", async () => {
   const fetchImpl = async () => rget(false, 403, {});
   const res = await updateGithubIssue({ owner: "o", repo: "r", number: 1, token: "t", labels: ["x"], fetchImpl });
