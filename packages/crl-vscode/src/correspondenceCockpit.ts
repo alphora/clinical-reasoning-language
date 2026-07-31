@@ -4306,8 +4306,11 @@ function shellHtml(): string {
 #fcChrome:empty{display:none}
 #flagDrawer:empty{display:none}
 /* #211 create-flag drawer — a fixed right-side panel (mirrors .cel-notes-drawer), in its OWN #flagDrawer region so a
-   tree re-render never wipes it. Column layout; the fields scroll; the actions pin to the bottom. */
-.flag-drawer{position:fixed;top:0;right:0;bottom:0;width:min(360px,70%);z-index:6;display:flex;flex-direction:column;gap:6px;padding:8px;box-sizing:border-box;background:var(--vscode-editorWidget-background,var(--vscode-editor-background));border-left:1px solid var(--vscode-panel-border,#454545);box-shadow:-2px 0 6px rgba(0,0,0,.25);overflow-y:auto}
+   tree re-render never wipes it. Column layout; the fields scroll; the actions pin to the bottom. z-index sits ABOVE the
+   .flow-zoom control (7) so the drawer's Insert/Cancel row is never overlapped by it (the zoom is bottom-right, same spot). */
+.flag-drawer{position:fixed;top:0;right:0;bottom:0;width:min(360px,70%);z-index:8;display:flex;flex-direction:column;gap:6px;padding:8px;box-sizing:border-box;background:var(--vscode-editorWidget-background,var(--vscode-editor-background));border-left:1px solid var(--vscode-panel-border,#454545);box-shadow:-2px 0 6px rgba(0,0,0,.25);overflow-y:auto}
+/* …and while the drawer is open, hide the zoom entirely (you don't zoom the tree while authoring a flag; the drawer covers it). */
+body:has(.flag-drawer) .flow-zoom{display:none}
 .flag-head{display:flex;align-items:center;justify-content:space-between;font-weight:bold;padding-bottom:6px;border-bottom:1px solid var(--vscode-panel-border,#454545)}
 .flag-title{overflow:hidden;text-overflow:ellipsis;white-space:normal}
 .flag-close{cursor:pointer;background:none;border:none;color:inherit;font-size:1.1em;padding:0 4px}

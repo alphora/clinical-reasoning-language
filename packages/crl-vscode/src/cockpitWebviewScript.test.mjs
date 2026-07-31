@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { COCKPIT_WEBVIEW_SCRIPT as SCRIPT, leafMarkBuckets, leafBucketsFromQuestionnaire, resolveProducedLeafKeys, shouldWidenFilterForSelection, caseIdsForNodeThroughLit } from "./correspondenceCockpit.ts";
+import { FLOW_STYLE } from "./flowPaneHtml.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // The cockpit SHELL source text — for the HOST-side lifecycle wiring that lives outside the bundled webview SCRIPT string
@@ -1257,6 +1258,14 @@ check("bulk-verdict: a retarget/reset CLOSES an open grid (a policy-A queue must
 check("bulk-verdict: the apply message envelope is validated before any dereference (untrusted webview)", () => {
   assert.match(COCKPIT_SRC, /function onReviewGridMessage\(raw: unknown\): void \{/);
   assert.match(COCKPIT_SRC, /if \(typeof raw !== "object" \|\| raw === null\) return;/);
+});
+
+check("flag-drawer: the create-flag drawer sits ABOVE the flow-zoom control + hides it while open (the zoom must not overlap Insert/Cancel)", () => {
+  // the drawer z-index (8) is above .flow-zoom's (7, in flowPaneHtml FLOW_STYLE) so the Insert/Cancel row is never overlapped
+  assert.match(COCKPIT_SRC, /\.flag-drawer\{[^}]*z-index:8[;}]/);
+  assert.match(FLOW_STYLE, /\.flow-zoom\{[^}]*z-index:7[;}]/); // the control the drawer must clear
+  // …and while the drawer is open the zoom is hidden outright
+  assert.match(COCKPIT_SRC, /body:has\(\.flag-drawer\) \.flow-zoom\{display:none\}/);
 });
 
 check("pass-all: the node-verdict picker offers a NON-destructive 'Pass all' — passes only UNREVIEWED live cases, in ONE persist", () => {
