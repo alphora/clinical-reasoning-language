@@ -12,7 +12,9 @@ export type MvFlagStatus = "open" | "resolved";
 /** The status lifecycle a flag SURFACE (cockpit / MCP tool) types against — an alias of `MvFlagStatus`, re-homed here from the
  *  deleted `rewriteMetaStatus` (#212 step 4) so both callers keep the `FlagStatus` name without depending on `.crl` refactors. */
 export type FlagStatus = MvFlagStatus;
-/** Provenance: who/when raised it — `extraction` = AI, during KE authoring; `validation` = human, in MV. Both are MV concerns. */
+/** Step PROVENANCE (the review STEP it belongs to, NOT the author): `extraction` = raised at KE-authoring time; `validation` =
+ *  raised at MV-review time. Not "who" — the #210 cockpit agent files `validation` flags autonomously. The concern TYPE is the
+ *  `tag` (+ its `displayName` for the human MV Types); this axis stays orthogonal to it. Both are MV concerns. */
 export type MvFlagCategory = "extraction" | "validation";
 export type MvFlagScope = "concept" | "decision" | "library";
 
@@ -35,7 +37,8 @@ export interface MvFlag {
   /** stable record identity, host-generated at creation (crypto.randomUUID); INDEPENDENT of the anchor, so an orphaned flag keeps its id. */
   id: string;
   category: MvFlagCategory;
-  /** the concern type (the former flag tag: customer-confirmable / internal-inconsistency / open-fork / fidelity-defect / validation-concern). */
+  /** the concern TYPE (the flag tag). Human MV Types (a `displayName` in flagVocab): validation-concern / narrative-defect /
+   *  tooling-bug / other. AI-authoring tags: customer-confirmable / internal-inconsistency / open-fork / fidelity-defect. */
   tag: string;
   gist: string;
   description?: string;

@@ -1,13 +1,17 @@
-// #212 step 4 — the CORE-owned review-flag VOCABULARY + a PURE flag-draft field validator. Flags have left `.crl` (they now
-// live as structured records under `.crl/flags/`), so their schema — the five tags, their field rules, aliases, categories,
-// and enums — moves OUT of the `.crl` meta-registry (`spec/metadata-registry.json`) into this first-class core module. This is
-// the SINGLE source of the flag vocabulary for BOTH the MCP `create_flag`/`set_flag_status` tools AND the cockpit drawer.
+// #212 step 4 — the CORE-owned review-flag VOCABULARY + a PURE flag-draft field validator. Flags left `.crl` (they now live as
+// structured records under `.crl/flags/`), so their schema — the tags, field rules, aliases, categories, enums, and the human
+// MV Type `displayName`s + `mv:*` labels — lives in this first-class core module. It is the SINGLE source of the flag vocabulary
+// (AND the MV label set) for the MCP `create_flag`/`set_flag_status` tools, the cockpit drawer, the issue emit, and the
+// content-repo label creation. The `.crl` meta-registry (`spec/metadata-registry.json`) stripped its flag entries in v0.3.4, so
+// this module is now the sole home (the former 4a equivalence test is gone with them).
 //
-// PURE by construction: it imports only the record model (`mvFlag`) — NEVER the barrel (`../index` would form a cycle:
-// index → flagVocab → index) and never the `.crl` registry/parser. The vocab data below is ported verbatim from the registry
-// flag entries; the 4a equivalence test (`flagVocab.equivalence.test.ts`) asserts parity against the registry for as long as
-// both exist, so a hand-transcription drop (a missing alias/enum/category) fails the build. After 4b strips the registry flag
-// entries, this module is the sole home.
+// PURE by construction: imports only the record model (`mvFlag`) — NEVER the barrel (`../index` would cycle: index → flagVocab
+// → index) and never the `.crl` registry/parser.
+//
+// Two axes, kept orthogonal: `category` = step PROVENANCE (extraction = KE-authoring-time; validation = MV-review-time) — NOT
+// "who" (the #210 cockpit agent files validation-category flags autonomously). `tag` = WHAT (the human MV Type, for the four
+// `displayName`d validation tags; the AI's finer authoring vocabulary, for the extraction tags). The optional `kind` on
+// validation-concern is AI-only finer metadata — descriptive, never gate/label-affecting.
 import type { FlagStatus, MvFlagCategory } from "./mvFlag";
 
 export type { FlagStatus } from "./mvFlag"; // re-home point: the flag surfaces import `FlagStatus` from the vocab (or the barrel)
@@ -21,12 +25,26 @@ export interface FieldRule {
   values?: readonly string[];
 }
 
-/** A flag tag's authoring info (id + category + field rules) — the shape the cockpit drawer + `flagTags()` consume. Mirrors
- *  the registry's `FlagTagInfo`. */
+/** A flag tag's authoring info (id + category + field rules) — the shape the cockpit drawer + `flagTags()` consume. A
+ *  `displayName` marks a tag as a human MV "Type": it is the SINGLE source of the human string for the drawer choice, the
+ *  issue-body Type line, and the GitHub-label description (so no surface hand-transcribes it). Tags WITHOUT a `displayName`
+ *  (the extraction tags) are AI-authoring-only and never appear in the human drawer. */
 export interface FlagTagInfo {
   id: string;
   category: MvFlagCategory;
+  /** the human "Type" label; present ⇒ the tag is an MV-drawer Type (absent ⇒ AI-authoring-only, hidden from the drawer). */
+  displayName?: string;
   fields: FieldRule[];
+}
+
+/** A GitHub label for an MV flag Type — created in each content repo (Todo 4) + attached to the issue at create time
+ *  (Todo 3). `flagVocab` is the SINGLE source of truth for the MV label set; the content-repo labels are derived from it. */
+export interface FlagLabel {
+  /** the label name, e.g. `mv:crl-vs-narrative`. */
+  name: string;
+  /** 6 hex digits, no leading `#` (GitHub's label color format). */
+  color: string;
+  description: string;
 }
 
 /** A flag target for the create seam (the concept/decision/library the flag is about). Re-homed from `createFlag` (same name
@@ -50,17 +68,20 @@ export interface CreateFlagInput {
   status?: string;
 }
 
-// ── the vocabulary (ported verbatim from spec/metadata-registry.json flag entries; equivalence-guarded) ─────────────────────
+// ── the vocabulary (the sole home; the registry's flag entries were stripped in v0.3.4) ─────────────────────────────────────
 const STATUS: FieldRule = { key: "status", required: false, values: ["open", "resolved"] };
 const KEY: FieldRule = { key: "key", required: false };
 const REF: FieldRule = { key: "ref", required: false };
 
-/** The internal tag record. `fields` is in the registry's `fieldRulesOf` order (extraFields insertion order, `system` excluded)
- *  so the equivalence test can compare field arrays positionally. */
+/** The internal tag record. `fields` is authoring order (`status` first, then the tag's discriminators, then `ref`). */
 interface FlagTagDef {
   id: string;
   aliases: readonly string[];
   category: MvFlagCategory;
+  displayName?: string; // present ⇒ a human MV Type (shown in the drawer); absent ⇒ AI-authoring-only
+  /** the GitHub label for this MV Type (present iff `displayName` is). `blurb` is the one-line gloss; the label DESCRIPTION is
+   *  DERIVED as `${displayName} — ${blurb}`, so the human "CRL vs …" string lives in exactly one place (no drift). */
+  label?: { name: string; color: string; blurb: string };
   fields: readonly FieldRule[];
 }
 
@@ -89,13 +110,50 @@ const FLAG_TAGS: readonly FlagTagDef[] = [
     category: "extraction",
     fields: [STATUS, { key: "direction", required: true, values: ["over-reach", "criterion-drop"] }, KEY, REF],
   },
+  // ── the human MV "Type" tags (validation category, `displayName` present → shown in the drawer). All four create a GitHub
+  //    issue when a human (or the cockpit agent, for validation-concern) files them; each carries a colocated `mv:*` label.
   {
     id: "validation-concern",
     aliases: [],
     category: "validation",
+    displayName: "CRL vs customer intent", // the narrative is right; the CRL isn't what the customer wanted
+    label: { name: "mv:crl-vs-intent", color: "5319e7", blurb: "the narrative is right but the CRL isn't what the customer wanted" },
+    // `kind` is retained for the AI (the cockpit agent may set a finer flavor); the human drawer HIDES it (Todo 2). NEVER
+    // drives a label — the Type (tag) is the authoritative axis, so an agent-set kind can't mislabel the intent issue.
     fields: [STATUS, { key: "kind", required: false, values: ["underspecified", "narrative-error", "intent-divergence", "context-conflict"] }, REF],
   },
+  {
+    id: "narrative-defect", // NOT "narrative-error" — that name is a `kind` value (validation-concern), kept distinct on purpose
+    aliases: [],
+    category: "validation",
+    displayName: "CRL vs narrative", // the CRL is faithful; the source policy narrative is wrong
+    label: { name: "mv:crl-vs-narrative", color: "1d76db", blurb: "the CRL is faithful but the source policy narrative is wrong" },
+    fields: [STATUS, REF],
+  },
+  {
+    id: "tooling-bug",
+    aliases: [],
+    category: "validation",
+    displayName: "Tooling bug", // a defect in the CRL tooling itself, hit while validating (anchors to the current node)
+    label: { name: "mv:tooling-bug", color: "d73a4a", blurb: "a defect in the CRL tooling, seen while validating" },
+    fields: [STATUS, REF],
+  },
+  {
+    id: "other",
+    aliases: [],
+    category: "validation",
+    displayName: "Other", // a concern that doesn't fit the first three — explained in the description
+    label: { name: "mv:other", color: "6a737d", blurb: "a concern that doesn't fit the other types (see the issue body)" },
+    fields: [STATUS, REF],
+  },
 ];
+
+/** Build the public `FlagLabel` for a tag def whose `label` is present — the description is DERIVED from `displayName` +
+ *  `blurb` (single source; ≤100 chars — GitHub's label-description cap). Returns a FRESH object (no registry aliasing). */
+function labelOfDef(t: FlagTagDef): FlagLabel | undefined {
+  if (!t.label || t.displayName === undefined) return undefined;
+  return { name: t.label.name, color: t.label.color, description: `${t.displayName} — ${t.label.blurb}` };
+}
 
 const ALIAS_TO_CANONICAL = new Map<string, string>();
 for (const t of FLAG_TAGS) {
@@ -124,14 +182,41 @@ export function flagCategoryOf(rawTag: string): MvFlagCategory | undefined {
   return defOf(rawTag)?.category;
 }
 
+/** The human "Type" display name for a flag tag (canonical or alias), or undefined if the tag is AI-authoring-only (no
+ *  `displayName`) or unknown. The single source of the human string for the drawer, the issue-body Type, + the label desc. */
+export function flagDisplayNameOf(rawTag: string): string | undefined {
+  return defOf(rawTag)?.displayName;
+}
+
+/** The GitHub label for a flag tag (canonical or alias), or undefined when the tag has no MV label (an extraction tag, or an
+ *  unknown/stale tag). Callers MUST treat the lookup as PARTIAL — a missing label means "create the issue with no MV label +
+ *  name the Type in the body", never an error (a stored tag is not enum-validated on load, so unknowns reach the emit path). */
+export function flagLabelOf(rawTag: string): FlagLabel | undefined {
+  const def = defOf(rawTag);
+  return def ? labelOfDef(def) : undefined; // fresh object per call (labelOfDef) — the registry can't be mutated through it
+}
+
+/** Every MV label, for the content-repo label creation (Todo 4). The `flagVocab` set is authoritative; the repos derive from it. */
+export function allFlagLabels(): FlagLabel[] {
+  return FLAG_TAGS.map(labelOfDef).filter((l): l is FlagLabel => l !== undefined);
+}
+
 /** The field rules for a flag tag (canonical or alias), in registry order; empty for a non-flag tag. */
 export function flagFieldRulesOf(rawTag: string): FieldRule[] {
   return defOf(rawTag)?.fields.map((f) => ({ ...f })) ?? [];
 }
 
-/** Every flag tag's authoring info (id + category + fields) — the cockpit drawer + `flagTags()` source. */
+/** Every flag tag's authoring info (id + category + displayName + fields) — the cockpit drawer + `flagTags()` source. The
+ *  drawer filters to the human MV Types via `displayName` presence (the extraction tags have none → never shown). */
 export function flagTags(): FlagTagInfo[] {
-  return FLAG_TAGS.map((t) => ({ id: t.id, category: t.category, fields: t.fields.map((f) => ({ ...f })) }));
+  // OMIT `displayName` when absent (don't emit `displayName: undefined`) so `"displayName" in tag` / `Object.hasOwn` is a true
+  // "is this an MV Type?" test, not just truthiness.
+  return FLAG_TAGS.map((t) => ({
+    id: t.id,
+    category: t.category,
+    ...(t.displayName !== undefined ? { displayName: t.displayName } : {}),
+    fields: t.fields.map((f) => ({ ...f })),
+  }));
 }
 
 // ── the pure field validator (ports createFlag steps 1–4, WITHOUT any `.crl` splicing) ──────────────────────────────────────

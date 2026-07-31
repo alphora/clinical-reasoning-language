@@ -1,23 +1,81 @@
-// #212 step 4 — the CORE-owned flag vocabulary + the PURE field validator (flagVocab.ts). Covers the accessors + every
-// validateFlagFields reason. (Its equivalence-with-the-registry is asserted separately in flagVocab.equivalence.test.ts,
-// which is deleted in 4b when the registry flag entries are stripped.)
+// #212 step 4 — the CORE-owned flag vocabulary + the PURE field validator (flagVocab.ts). Covers the accessors (tags,
+// categories, the human MV Type `displayName`s + `mv:*` labels) + every validateFlagFields reason. The registry's flag
+// entries were stripped in v0.3.4, so flagVocab is the sole home (the former equivalence test is gone).
 import {
+  allFlagLabels,
   canonicalFlagTag,
   flagCategoryOf,
+  flagDisplayNameOf,
   flagFieldRulesOf,
+  flagLabelOf,
   flagTags,
   isFlagTag,
   validateFlagFields,
 } from "../flagVocab";
 
 describe("flagVocab accessors", () => {
-  test("flagTags() returns the five flag tags with their categories", () => {
+  test("flagTags() returns the eight flag tags with their categories", () => {
     const byId = new Map(flagTags().map((t) => [t.id, t]));
-    expect([...byId.keys()].sort()).toEqual(
-      ["customer-confirmable", "fidelity-defect", "internal-inconsistency", "open-fork", "validation-concern"],
-    );
+    expect([...byId.keys()].sort()).toEqual([
+      "customer-confirmable",
+      "fidelity-defect",
+      "internal-inconsistency",
+      "narrative-defect",
+      "open-fork",
+      "other",
+      "tooling-bug",
+      "validation-concern",
+    ]);
     expect(byId.get("validation-concern")!.category).toBe("validation");
     expect(byId.get("fidelity-defect")!.category).toBe("extraction");
+    // the three new MV Types are all validation-category
+    for (const id of ["narrative-defect", "tooling-bug", "other"]) expect(byId.get(id)!.category).toBe("validation");
+  });
+
+  test("displayName marks EXACTLY the four human MV Types (extraction tags OMIT the property, not set it undefined)", () => {
+    const byId = new Map(flagTags().map((t) => [t.id, t]));
+    const named = flagTags().filter((t) => t.displayName).map((t) => t.id).sort();
+    expect(named).toEqual(["narrative-defect", "other", "tooling-bug", "validation-concern"]);
+    expect(byId.get("validation-concern")!.displayName).toBe("CRL vs customer intent");
+    expect(byId.get("narrative-defect")!.displayName).toBe("CRL vs narrative");
+    // an AI-authoring tag: the property is ABSENT (so `in` / hasOwn is a true "is-a-Type" test, not just truthiness)
+    expect(Object.hasOwn(byId.get("fidelity-defect")!, "displayName")).toBe(false);
+    expect(Object.hasOwn(byId.get("validation-concern")!, "displayName")).toBe(true);
+    expect(flagDisplayNameOf("validation-concern")).toBe("CRL vs customer intent");
+    expect(flagDisplayNameOf("fidelity-defect")).toBeUndefined();
+  });
+
+  test("flagLabelOf: only the MV Types carry an mv:* label; the lookup is partial (extraction/unknown → undefined)", () => {
+    expect(flagLabelOf("validation-concern")).toMatchObject({ name: "mv:crl-vs-intent" });
+    expect(flagLabelOf("narrative-defect")!.name).toBe("mv:crl-vs-narrative");
+    expect(flagLabelOf("tooling-bug")!.name).toBe("mv:tooling-bug");
+    expect(flagLabelOf("other")!.name).toBe("mv:other");
+    expect(flagLabelOf("fidelity-defect")).toBeUndefined(); // AI-authoring tag → no MV label
+    expect(flagLabelOf("not-a-tag")).toBeUndefined();
+    // the derived description leads with the displayName (single source) — no drift
+    expect(flagLabelOf("narrative-defect")!.description.startsWith("CRL vs narrative — ")).toBe(true);
+    // every label is a valid GitHub label: 6-hex color, non-empty name, description within GitHub's 100-char cap; names unique
+    const labels = allFlagLabels();
+    expect(labels).toHaveLength(4);
+    expect(new Set(labels.map((l) => l.name)).size).toBe(4);
+    for (const l of labels) {
+      expect(l.color).toMatch(/^[0-9a-f]{6}$/);
+      expect(l.name.length).toBeGreaterThan(0);
+      expect(l.description.length).toBeGreaterThan(0);
+      expect(l.description.length).toBeLessThanOrEqual(100); // GitHub label-description cap
+    }
+  });
+
+  test("label INVARIANT: a tag has an mv:* label IFF it is an MV Type (displayName present) — no drawer Type emits label-less, no AI tag gets one", () => {
+    for (const t of flagTags()) {
+      expect(flagLabelOf(t.id) !== undefined).toBe(t.displayName !== undefined);
+    }
+  });
+
+  test("flagLabelOf returns a FRESH object — a caller can't corrupt the registry", () => {
+    const a = flagLabelOf("validation-concern")!;
+    a.name = "mutated";
+    expect(flagLabelOf("validation-concern")!.name).toBe("mv:crl-vs-intent"); // unaffected
   });
 
   test("canonicalFlagTag resolves canonical ids AND aliases; isFlagTag agrees", () => {

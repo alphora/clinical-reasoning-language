@@ -347,8 +347,8 @@ export type { ParseMetaResult, ParsedMetaTag } from "./meta/parseMetaTag";
 // #212 step 4 — the CORE-owned flag VOCABULARY (moved OUT of the `.crl` meta-registry; flags left `.crl`). The single source
 // of the flag tags/fields/aliases/categories/enums for the cockpit drawer, the MCP flag tools, and the create seam. Plus the
 // pure field validator + the forbidden-char rules + the create-seam target/input types.
-export { flagTags, isFlagTag, canonicalFlagTag, flagCategoryOf, flagFieldRulesOf, validateFlagFields, FORBIDDEN_FLAG_CHARS, hasForbiddenFlagChars, FORBIDDEN_GIST_CHARS, hasForbiddenGistChars } from "./flags/flagVocab";
-export type { FlagTagInfo, FieldRule, FlagStatus, CreateFlagTarget, CreateFlagInput, ValidateFlagFieldsResult, FlagFieldsFailure } from "./flags/flagVocab";
+export { flagTags, isFlagTag, canonicalFlagTag, flagCategoryOf, flagDisplayNameOf, flagLabelOf, allFlagLabels, flagFieldRulesOf, validateFlagFields, FORBIDDEN_FLAG_CHARS, hasForbiddenFlagChars, FORBIDDEN_GIST_CHARS, hasForbiddenGistChars } from "./flags/flagVocab";
+export type { FlagTagInfo, FlagLabel, FieldRule, FlagStatus, CreateFlagTarget, CreateFlagInput, ValidateFlagFieldsResult, FlagFieldsFailure } from "./flags/flagVocab";
 
 // #212 — the `.crl/flags/` STORE model (moved from crl-vscode so BOTH the cockpit AND the MCP flag tools share it). The
 // single home for review flags: a pure record model + per-flag JSON store + a navigation anchor resolver. See discussions/248.
