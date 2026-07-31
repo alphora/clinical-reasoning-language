@@ -496,7 +496,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // refresh must not re-render it, so there's no ver to go stale; Save re-reads by id at write time — accept #1/#10). Mutually
   // exclusive with the other two (opening any clears the rest via the settle choke-point). `flagEditDirty` gates the discard
   // confirm on a switch/close while the form has unsaved edits (the operator's "blocked by lose-changes, if needed").
-  let flagEditDraft: { flag: MvFlag; cel: string | undefined } | undefined;
+  let flagEditDraft: { flag: MvFlag; cel: string | undefined; descriptionOnly: boolean } | undefined;
   let flagEditDirty = false;
   let flagActionBusy = false; // single-flight for the drawer's async actions (a rapid 2nd click must not overlap a write / stale open-issue)
   // disc 359/360: request a ONE-TIME scroll of the gold-linked node into view — set ONLY by a genuine drawer OPEN/SWITCH
@@ -2296,7 +2296,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     } else if (msg.type === "flagActionIssue") {
       void flagActionOpenIssue(); // the action drawer's Open-issue #N
     } else if (msg.type === "flagActionEdit") {
-      openFlagEditDraft(); // Todo 3: the action drawer's Edit → the edit form (host-gated to human MV Types)
+      openFlagEditDraft(); // Todo 3/3.5: the action drawer's Edit → the edit form (full for a human MV Type; description-only for AI)
     } else if (msg.type === "flagActionClose") {
       closeFlagActionView(); // the action drawer's ✕ (UI clear — no agent elicitation)
     } else if (msg.type === "flagEditSave") {
@@ -3287,7 +3287,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         ? // A gist CAN be multi-line (validateFlagFields permits it; the MCP create_flag path can file one) but the summary is a
           // single-line <input> whose value-sanitization would STRIP newlines — silently CONCATENATING words on save (impl-review
           // Claude #2). Normalize newlines → a space at prefill so the user SEES + saves exactly the single line that survives.
-          renderFlagDrawer({ targetLabel: editFlag.anchor.label, targetTitle: editFlag.anchor.label, tags: mvTypes, tag: editFlag.tag, summary: editFlag.gist.replace(/[\r\n]+/g, " "), stub: editFlag.description, fields: editFlag.fields, edit: true })
+          // Todo 3.5: `descriptionOnly` (an AI flag) renders the trimmed description-only form instead of the full edit form.
+          renderFlagDrawer({ targetLabel: editFlag.anchor.label, targetTitle: editFlag.anchor.label, tags: mvTypes, tag: editFlag.tag, summary: editFlag.gist.replace(/[\r\n]+/g, " "), stub: editFlag.description, fields: editFlag.fields, edit: true, descriptionOnly: flagEditDraft!.descriptionOnly })
         : flagActionView
           ? renderFlagActionDrawer(flagActionViewModel(flagActionView.flag))
           : "";
@@ -3334,7 +3335,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       editedAt: flag.editedAt,
       id: flag.id,
       targetPresent: gidsForFlag(flag).length > 0, // disc 359: no charted node → auto-open Details + a note (the gold link can't point)
-      canEdit: flagDisplayNameOf(flag.tag) !== undefined, // Todo 3: Edit only for a human MV Type (extraction/legacy stays read-only)
+      descriptionOnly: flagDisplayNameOf(flag.tag) === undefined, // Todo 3.5: an AI/extraction flag edits ONLY its description (no retype)
     };
   }
 
@@ -3367,18 +3368,21 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     openFlagActionView(flag, ver, cel);
   }
 
-  /** Todo 3 (disc 358): enter the EDIT form for the open action drawer's flag. Host-gated to human MV Types (accept #4 — the
-   *  drawer only shows the Edit button when `canEdit`, but re-enforce here since the webview is untrusted). Routes through the
-   *  settle choke-point + clears the other modes (one slot). Captures `cel` only (no ver — the form survives a same-policy rebuild). */
+  /** Todo 3 / 3.5: enter the EDIT form for the open action drawer's flag. EVERY flag is editable — a human MV Type edits the
+   *  whole flag; an AI/extraction (no `displayName`) or legacy tag edits ONLY its description (mode captured HERE from the tag,
+   *  never from the untrusted payload, so a forged Save can't retype). Routes through the settle choke-point + clears the other
+   *  modes (one slot). Captures `cel` + the mode only (no ver — the form survives a same-policy rebuild). */
   function openFlagEditDraft(): void {
     const view = flagActionView;
     if (!view || flagActionBusy) return;
-    if (flagDisplayNameOf(view.flag.tag) === undefined) return flagNote("this flag type is read-only"); // extraction/legacy → no edit
+    // Todo 3.5: EVERY flag is editable — a human MV Type edits the whole flag; an AI/extraction (no `displayName`) or legacy tag
+    // edits ONLY its description (no silent retype). The mode is captured here so the form + the save agree.
+    const descriptionOnly = flagDisplayNameOf(view.flag.tag) === undefined;
     settleDrawer({ status: "cancelled", reason: "replaced" });
     flagDraft = undefined;
     flagActionView = undefined;
     flagEditDirty = false;
-    flagEditDraft = { flag: view.flag, cel: view.cel };
+    flagEditDraft = { flag: view.flag, cel: view.cel, descriptionOnly };
     flagHlScrollPending = true; // keep the target scrolled into view on the mode switch
     postFlagDrawer();
   }
@@ -3423,9 +3427,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (payload.fields && typeof payload.fields === "object") {
       for (const [k, val] of Object.entries(payload.fields as Record<string, unknown>)) if (typeof val === "string" && val.trim() !== "") payloadFields[k] = val.trim();
     }
-    if (rawTag === "") return fail("a type is required");
-    if (summary === "") return fail("a summary is required");
-    if (/[\r\n]/.test(summary)) return fail("the summary must be a single line");
+    // Todo 3.5: the description-only form (an AI flag) posts no tag/summary — those guards apply to the FULL edit only.
+    if (!draft.descriptionOnly) {
+      if (rawTag === "") return fail("a type is required");
+      if (summary === "") return fail("a summary is required");
+      if (/[\r\n]/.test(summary)) return fail("the summary must be a single line");
+    }
     if (currentCel !== cel || mode !== "medical-validation") return fail("policy changed — reopen the flag");
 
     flagActionBusy = true;
@@ -3445,9 +3452,31 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         postFlagDrawer();
         return void flagNote("the flag changed on disk — reopen it");
       }
+      // Todo 3.5: the DESCRIPTION-ONLY save (an AI flag) — write ONLY the description; PRESERVE tag/gist/fields/status verbatim.
+      // No `validateFlagFields` (nothing to validate), no field-ownership merge, no eligibility re-gate (an AI flag is expected to
+      // be non-MV), no relabel (the Type didn't change). The description is free text — the store holds newlines fine.
+      if (draft.descriptionOnly) {
+        const desc = stub.trim();
+        const updated: MvFlag = { ...current, editedAt: new Date().toISOString() };
+        if (desc) updated.description = desc;
+        else delete updated.description;
+        try {
+          saveFlag(dir, updated);
+        } catch (e) {
+          return fail(`could not write the flag: ${e instanceof Error ? e.message : String(e)}`);
+        }
+        reloadReviewFlags();
+        renderTreeChrome();
+        driveFlagBadges();
+        flagEditDraft = undefined;
+        flagEditDirty = false;
+        openFlagActionView(flagsList.find((f) => f.id === updated.id) ?? updated, indexVersion, currentCel);
+        return;
+      }
       // Re-gate eligibility on the RE-READ record (accept #4; impl-review gpt56 #2): an external writer may have retyped this
-      // flag to an extraction/legacy tag since the form opened — saving would then retype a now-read-only record to an MV Type.
-      if (flagDisplayNameOf(current.tag) === undefined) return fail("this flag is no longer editable — reopen it");
+      // flag to an extraction/legacy tag since the FULL form opened — saving would then retype a now-non-MV record back to an MV
+      // Type. (Todo 3.5: the flag IS still editable after reopening — as the description-only form; hence "reopen", not "read-only".)
+      if (flagDisplayNameOf(current.tag) === undefined) return fail("the flag type changed on disk — reopen it to edit");
       // Field ownership (accept #3): the form owns ONLY the NEW tag's VISIBLE discriminators (registry minus host-managed). The
       // untrusted payload is restricted to those keys HERE (not via the <select>). validateFlagFields (accept #6) canonicalizes
       // the tag + validates gist/fields; then PRESERVE the host/hidden fields + any field unknown to BOTH registries; DROP the
@@ -4737,6 +4766,8 @@ function shellHtml(): string {
 body:has(.flag-drawer) .flow-zoom{display:none}
 .flag-head{display:flex;align-items:center;justify-content:space-between;font-weight:bold;padding-bottom:6px;border-bottom:1px solid var(--vscode-panel-border,#454545)}
 .flag-title{overflow:hidden;text-overflow:ellipsis;white-space:normal}
+/* Todo 3.5: the read-only summary context line in the description-only edit form (which AI finding you're annotating). */
+.flag-ctx{opacity:.7;font-size:.9em;font-style:italic;overflow-wrap:anywhere}
 .flag-close{cursor:pointer;background:none;border:none;color:inherit;font-size:1.1em;padding:0 4px}
 .flag-row{display:flex;align-items:center;gap:6px}
 .flag-col{display:flex;flex-direction:column;gap:2px;flex:1;min-height:60px}

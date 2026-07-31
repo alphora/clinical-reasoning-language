@@ -49,9 +49,10 @@ export interface FlagActionView {
   /** whether the flag's anchor resolves to at least one node in the CURRENT tree render. false → the gold node-link can't be
    *  drawn, so the drawer auto-opens Details + notes it (a moved occurrence / library-wide / concept drawn nowhere). */
   targetPresent: boolean;
-  /** Todo 3 (disc 358): whether Edit is offered — TRUE only for a human MV Type (`flagDisplayNameOf(tag)` exists). An
-   *  extraction/legacy tag (no displayName) stays read-only, so the edit form can't silently retype it to validation-concern. */
-  canEdit: boolean;
+  /** Todo 3.5 (operator): EVERY flag is editable now — a human MV Type gets the FULL form; an AI/extraction (or legacy) flag
+   *  gets a DESCRIPTION-ONLY form (a human may add/fix the description; the Type/summary/fields stay the AI's, so no silent
+   *  retype). `descriptionOnly` drives the button label + the edit-form mode. */
+  descriptionOnly: boolean;
 }
 
 /** A labelled read-only row: `<span class="fa-key">…</span><span class="fa-val">…</span>`. `pre` keeps a multiline body's
@@ -68,14 +69,16 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
   // The header IS the summary now (disc 359 — the target label was too long + duplicated the Target row); an empty gist
   // (extraction/legacy flags) falls back to the Type so the header is never a bare "Flag —".
   const headerText = v.summary || v.typeLabel;
-  const refHtml = v.issueRef ? escapeHtml(v.issueRef) : em;
+  // Description is ALWAYS shown (an em-dash when empty) — even on an AI flag with no description — because a human can EDIT it
+  // (operator: don't omit it; it's the one editable field on an AI flag, so an empty one is a visible add-target). Ref, by
+  // contrast, is NOT editable, so an empty Ref row is pure noise → omitted. Type/Origin/Status/Created always have a value.
   const rows =
     row("Type", escapeHtml(v.typeLabel)) +
     row("Origin", escapeHtml(v.category)) +
     row("Status", `<span class="fa-status fa-status-${v.status}">${v.status === "resolved" ? "resolved" : "open"}</span>`) +
-    row("Description", v.description ? escapeHtml(v.description) : em, true) +
+    row("Description", v.description?.trim() ? escapeHtml(v.description) : em, true) + // .trim(): a whitespace-only value reads as empty (em-dash)
     v.fields.map((f) => row(f.key, escapeHtml(f.value))).join("") +
-    row("Ref", refHtml) +
+    (v.issueRef?.trim() ? row("Ref", escapeHtml(v.issueRef)) : "") +
     row("Created", escapeHtml(v.createdAt)) +
     (v.editedAt ? row("Edited", escapeHtml(v.editedAt)) : "");
 
@@ -100,8 +103,9 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
     v.issueNo !== undefined
       ? `<button type="button" class="fa-btn" data-flag-action-issue>↗ Open issue #${escapeHtml(String(v.issueNo))}</button>`
       : "";
-  // Todo 3: Edit is offered ONLY for a human MV Type (canEdit); an extraction/legacy flag stays read-only.
-  const edit = v.canEdit ? `<button type="button" class="fa-btn" data-flag-action-edit>✎ Edit flag</button>` : "";
+  // Todo 3.5: Edit is offered for EVERY flag — a human MV Type edits the whole flag; an AI/extraction flag edits only its
+  // Description (the label + the form mode follow `descriptionOnly`).
+  const edit = `<button type="button" class="fa-btn" data-flag-action-edit>✎ Edit ${v.descriptionOnly ? "description" : "flag"}</button>`;
 
   return (
     `<div class="flag-drawer flag-action-drawer" data-flag-action-drawer>` +

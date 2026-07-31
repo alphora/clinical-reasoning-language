@@ -23,7 +23,7 @@ const OPEN_VIEW = {
   editedAt: "2026-07-31T11:00:00.000Z",
   id: "flag-abc123",
   targetPresent: true,
-  canEdit: true,
+  descriptionOnly: false,
 };
 
 test("renderFlagActionDrawer: the shell — data-flag-action-drawer + distinct action intents (NOT the create drawer's)", () => {
@@ -96,7 +96,7 @@ test("renderFlagActionDrawer: OPEN → primary Resolve; RESOLVED → Reopen (no 
   assert.match(noNumeric, />Ref<\/span><span class="fa-val[^"]*">see PR</);
 });
 
-test("renderFlagActionDrawer: absent optional data (no signature / description / editedAt / ref) → em dashes, no Edited row, no issue button", () => {
+test("renderFlagActionDrawer: absent optional data (no signature / description / editedAt / ref) → those ROWS omitted, no issue button", () => {
   const min = renderFlagActionDrawer({
     typeLabel: "fidelity-defect",
     category: "extraction",
@@ -108,13 +108,16 @@ test("renderFlagActionDrawer: absent optional data (no signature / description /
     createdAt: "2026-07-31T10:00:00.000Z",
     id: "f1",
     targetPresent: true,
+    descriptionOnly: true, // an extraction flag (fidelity-defect) → "Edit description"
   });
   assert.match(min, /Flag — fidelity-defect</); // empty gist → Type in the header
   assert.match(min, /fa-status-open/);
   assert.ok(!min.includes("guard→"), "no occurrence signature");
   assert.ok(!min.includes(">Edited<"), "no Edited row when editedAt absent");
   assert.ok(!min.includes("data-flag-action-issue"), "no issue button when no ref");
-  assert.match(min, /class="fa-em">—<\/span>/); // description/ref rendered as em dashes
+  // operator: Description is ALWAYS shown (em-dash when empty — it's human-editable); Ref is omitted when empty (not editable)
+  assert.match(min, />Description<\/span><span class="fa-val fa-pre"><span class="fa-em">—/); // Description row present, em-dash value
+  assert.ok(!min.includes(">Ref<"), "no Ref row when ref absent");
 });
 
 test("renderFlagActionDrawer: all interpolated text is escaped (header / address / description / field / ref / id)", () => {
@@ -132,6 +135,7 @@ test("renderFlagActionDrawer: all interpolated text is escaped (header / address
     createdAt: "<x>",
     id: "</details><script>id</script>",
     targetPresent: true,
+    descriptionOnly: false,
   });
   for (const raw of ["<script>t</script>", "<script>a</script>", '"><img>', "<i>s</i>", "<script>b</script>", "<script>c</script>", "<u>k</u>", "<script>v</script>", "<script>r</script>", "<script>id</script>"]) {
     assert.ok(!h.includes(raw), `must escape: ${raw}`);
@@ -139,15 +143,21 @@ test("renderFlagActionDrawer: all interpolated text is escaped (header / address
   assert.match(h, /&lt;script&gt;/);
 });
 
-// ── Todo 3 (disc 358): the Edit button — shown ONLY for a human MV Type (canEdit) ──
-test("edit button: rendered with data-flag-action-edit when canEdit; absent when not (extraction/legacy read-only)", () => {
-  const yes = renderFlagActionDrawer(OPEN_VIEW);
-  assert.match(yes, /data-flag-action-edit/);
-  assert.match(yes, /Edit flag/);
-  const no = renderFlagActionDrawer({ ...OPEN_VIEW, canEdit: false });
-  assert.ok(!/data-flag-action-edit/.test(no), "no Edit button for a read-only flag");
-  // the other actions are unaffected either way
-  assert.match(no, /data-flag-action-toggle/);
+// ── Todo 3.5 (operator): Edit is offered for EVERY flag — "Edit flag" (human MV Type) vs "Edit description" (AI/extraction) ──
+test("edit button: always rendered; label 'Edit flag' for a human Type, 'Edit description' for an AI/extraction flag", () => {
+  const human = renderFlagActionDrawer(OPEN_VIEW); // descriptionOnly:false
+  assert.match(human, /data-flag-action-edit/);
+  assert.match(human, /Edit flag/);
+  const ai = renderFlagActionDrawer({ ...OPEN_VIEW, descriptionOnly: true });
+  assert.match(ai, /data-flag-action-edit/); // still editable (description only)
+  assert.match(ai, /Edit description/);
+  assert.ok(!/Edit flag/.test(ai), "an AI flag says 'Edit description', not 'Edit flag'");
+});
+test("description row: ALWAYS shown (operator — human-editable on AI flags), em-dash when empty; Ref omitted when empty", () => {
+  const noDesc = renderFlagActionDrawer({ ...OPEN_VIEW, description: undefined });
+  assert.match(noDesc, />Description<\/span><span class="fa-val fa-pre"><span class="fa-em">—/); // Description row present with em-dash
+  const noRef = renderFlagActionDrawer({ ...OPEN_VIEW, issueRef: undefined, issueNo: undefined });
+  assert.ok(!/>Ref</.test(noRef), "no Ref row when ref absent");
 });
 
 console.log("flagActionDrawerHtml.test: ok");

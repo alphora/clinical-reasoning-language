@@ -1529,12 +1529,34 @@ check("edit: the dispatcher renders create → edit → action → empty (edit r
   assert.match(m[0], /tag: editFlag\.tag, summary: editFlag\.gist\.replace\(\/\[\\r\\n\]\+\/g, " "\), stub: editFlag\.description, fields: editFlag\.fields/);
   assert.match(m[0], /: flagActionView\s*\n?\s*\?\s*renderFlagActionDrawer/); // action still after edit
 });
-check("edit: openFlagEditDraft is host-gated to human MV Types, settles+clears the other modes, captures cel (no ver)", () => {
+check("edit: openFlagEditDraft opens for EVERY flag, captures the descriptionOnly mode + cel (no ver), settles+clears the other modes", () => {
   const m = COCKPIT_SRC.match(/function openFlagEditDraft\(\): void \{([\s\S]*?)\n  \}/);
   assert.ok(m, "openFlagEditDraft body");
-  assert.match(m[1], /if \(flagDisplayNameOf\(view\.flag\.tag\) === undefined\) return flagNote/); // read-only tags rejected host-side
+  // Todo 3.5: no human-only gate — the mode is descriptionOnly for a non-MV tag (AI/extraction/legacy)
+  assert.match(m[1], /const descriptionOnly = flagDisplayNameOf\(view\.flag\.tag\) === undefined;/);
+  assert.ok(!/return flagNote\("this flag type is read-only"\)/.test(m[1]), "the read-only gate is gone (every flag is editable)");
   assert.match(m[1], /settleDrawer\(\{ status: "cancelled", reason: "replaced" \}\)/);
-  assert.match(m[1], /flagEditDraft = \{ flag: view\.flag, cel: view\.cel \};/); // no ver — survives a rebuild
+  assert.match(m[1], /flagEditDraft = \{ flag: view\.flag, cel: view\.cel, descriptionOnly \};/); // no ver — survives a rebuild
+});
+check("edit: saveFlagEdit descriptionOnly branch — writes ONLY the description, preserves everything else, PAYLOAD-ISOLATED, no validate/relabel", () => {
+  const m = COCKPIT_SRC.match(/async function saveFlagEdit\([\s\S]*?\n  \}\n\n  \/\*\* Todo 3 — re-sync/);
+  assert.ok(m, "saveFlagEdit body");
+  const b = m[0];
+  // the type/summary guards apply to the FULL edit only (mode is host state, not the payload)
+  assert.match(b, /if \(!draft\.descriptionOnly\) \{\s*\n\s*if \(rawTag === ""\) return fail/);
+  // the descriptionOnly write: preserve the RE-READ record, set only description + editedAt, return BEFORE the full path
+  assert.match(b, /if \(draft\.descriptionOnly\) \{[\s\S]*?const updated: MvFlag = \{ \.\.\.current, editedAt: [\s\S]*?\};[\s\S]*?saveFlag\(dir, updated\);[\s\S]*?openFlagActionView\([\s\S]*?return;\s*\n\s*\}/);
+  // PAYLOAD ISOLATION (impl-review gpt56 #2 — the load-bearing "an AI flag can't be retyped" property): the branch body reads
+  // ONLY `stub`; it must NOT touch the untrusted `rawTag`/`summary`/`payloadFields` nor the full-path `val`/`validateFlagFields`.
+  const branch = b.match(/if \(draft\.descriptionOnly\) \{([\s\S]*?)\n {8}return;\n {6}\}/);
+  assert.ok(branch, "descriptionOnly branch body");
+  for (const forbidden of ["rawTag", "summary", "payloadFields", "validateFlagFields", "flagFieldRulesOf", "relabelIssueForTypeChange", "val."]) {
+    assert.ok(!branch[1].includes(forbidden), `descriptionOnly branch must not reference ${forbidden} (payload isolation / no retype / no relabel)`);
+  }
+  assert.match(branch[1], /const desc = stub\.trim\(\);/); // the ONLY payload field it reads
+  assert.match(branch[1], /if \(desc\) updated\.description = desc;\s*\n\s*else delete updated\.description;/); // set-or-drop
+  // and the whole branch precedes the eligibility re-gate + validateFlagFields (the AI path must NOT hit them)
+  assert.ok(b.indexOf("if (draft.descriptionOnly)") < b.indexOf("validateFlagFields("), "descriptionOnly branch is before the full-edit validation");
 });
 check("edit: cancelFlagEdit returns to the action VIEW (re-found by id; warning→keep; gone→note)", () => {
   const m = COCKPIT_SRC.match(/function cancelFlagEdit\(\): void \{([\s\S]*?)\n  \}/);
@@ -1563,7 +1585,7 @@ check("edit: saveFlagEdit — cel+mode guard (NOT ver), single-flight, clean re-
   assert.match(b, /const loaded = loadStoredFlags\(dir\);/);
   assert.match(b, /if \(loaded\.warning\) return fail/); // store-warning blocks the write
   // impl-review gpt56 #2: re-gate eligibility on the RE-READ record (an external retype-to-non-MV can't be saved back to MV)
-  assert.match(b, /if \(flagDisplayNameOf\(current\.tag\) === undefined\) return fail\("this flag is no longer editable/);
+  assert.match(b, /if \(flagDisplayNameOf\(current\.tag\) === undefined\) return fail\("the flag type changed on disk — reopen it to edit"\)/);
   // field ownership: form owns only the NEW tag's visible discriminators; validateFlagFields; preserve host/hidden + unknown-to-both
   assert.match(b, /const newRuleKeys = new Set\(flagFieldRulesOf\(rawTag\)\.map\(\(r\) => r\.key\)\);/);
   assert.match(b, /if \(newRuleKeys\.has\(k\) && !EDIT_PRESERVED_FIELDS\.has\(k\)\) formFields\[k\] = v;/);
@@ -1598,7 +1620,7 @@ check("edit: the message router + webview wire the edit intents (action-edit / e
   assert.match(SCRIPT, /\[data-flag-edit-save\]'\);[\s\S]*?const p=flagCollect\(\);v\.postMessage\(\{type:'flagEditSave',tag:p\.tag/);
   assert.match(SCRIPT, /querySelector\('\.flag-edit-drawer'\);if\(ed&&!ed\.hasAttribute\('data-dirty'\)\)\{ed\.setAttribute\('data-dirty','1'\);v\.postMessage\(\{type:'flagEditDirty'\}\)/);
 });
-check("edit: the gold node-link + view model — driveFlagNodeHighlight has an edit branch; the view model carries canEdit", () => {
+check("edit: the gold node-link + view model — driveFlagNodeHighlight has an edit branch; the view model carries descriptionOnly", () => {
   assert.match(COCKPIT_SRC, /: flagEditDraft\s*\n?\s*\?\s*gidsForFlag\(flagEditDraft\.flag\)/);
-  assert.match(COCKPIT_SRC, /canEdit: flagDisplayNameOf\(flag\.tag\) !== undefined,/);
+  assert.match(COCKPIT_SRC, /descriptionOnly: flagDisplayNameOf\(flag\.tag\) === undefined,/);
 });

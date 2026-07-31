@@ -41,6 +41,10 @@ export interface FlagDrawerOptions {
    *  Save/Cancel/✕ intents to DISTINCT `data-flag-edit-{save,cancel}` (the create `data-flag-{insert,cancel,close}` route to the
    *  create-only `commitFlagDraft`/`closeFlagDrawer`, dead when only `flagEditDraft` is set — disc 358 accept #2). */
   edit?: boolean;
+  /** Todo 3.5 (operator): the DESCRIPTION-ONLY edit form for an AI/extraction flag — a human may fix only the description; the
+   *  Type/summary/fields stay the AI's (no silent retype). Renders JUST the Description textarea (+ a read-only summary for
+   *  context) with the edit intents. Implies `edit`. */
+  descriptionOnly?: boolean;
 }
 
 /** Render the create-flag drawer: a tag `<select>` (validation-concern first) + each tag's registry field controls (only
@@ -49,6 +53,25 @@ export interface FlagDrawerOptions {
 export function renderFlagDrawer(opts: FlagDrawerOptions): string {
   // #210 (disc 239) — the CRL Assist purple focus ring: ` flag-focus` on the element the agent-open path derived as needed.
   const ring = (key: string): string => (opts.focus === key ? " flag-focus" : "");
+
+  // Todo 3.5: the DESCRIPTION-ONLY edit form (an AI/extraction flag). No Type select / fields / summary input — just a read-only
+  // summary line (context) + the editable Description, with the edit intents. `flagCollect()` finds no tag/summary/field controls,
+  // so it posts tag:''/summary:''/fields:{} + the stub — `saveFlagEdit` (descriptionOnly) ignores those and writes only the description.
+  if (opts.descriptionOnly) {
+    const ctx = opts.summary ? `<div class="flag-ctx" title="${escapeHtml(opts.summary)}">${escapeHtml(opts.summary)}</div>` : "";
+    return (
+      `<div class="flag-drawer flag-edit-drawer" data-flag-drawer>` +
+      `<div class="flag-head"><span class="flag-title" title="${escapeHtml(opts.targetTitle ?? opts.targetLabel)}">Edit description — ${escapeHtml(opts.targetLabel)}</span>` +
+      `<button type="button" class="flag-close" data-flag-edit-cancel aria-label="Close">✕</button></div>` +
+      ctx +
+      `<label class="flag-col"><span class="flag-label">Description</span>` +
+      `<textarea class="flag-input${ring("description")}" data-flag-stub placeholder="add a note for this AI finding" aria-label="Description">${escapeHtml(opts.stub ?? "")}</textarea></label>` +
+      `<div class="flag-actions">` +
+      `<button type="button" class="flag-cancel" data-flag-edit-cancel>Cancel</button>` +
+      `<button type="button" class="flag-save${ring("submit")}" data-flag-edit-save>Save changes</button>` +
+      `</div></div>`
+    );
+  }
   // validation-concern first (the usual MV concern), the rest in the given (registry) order.
   const ordered = [...opts.tags].sort((a, b) => (a.id === "validation-concern" ? -1 : b.id === "validation-concern" ? 1 : 0));
   // A prefill `tag` not in the offered set (absent, or a non-MV/extraction tag) falls back to the first Type (validation-concern,

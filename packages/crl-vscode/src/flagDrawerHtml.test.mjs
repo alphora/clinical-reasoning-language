@@ -146,4 +146,21 @@ test("renderFlagDrawer create (default): keeps the create intents; no edit marke
   assert.ok(!/data-flag-edit-/.test(h) && !/flag-edit-drawer/.test(h), "no edit markers on the create form");
 });
 
+// ── Todo 3.5 (operator): the DESCRIPTION-ONLY edit form (an AI/extraction flag) — only the Description is editable ──
+test("renderFlagDrawer descriptionOnly: 'Edit description —' heading, NO Type/summary/field controls, editable Description, edit intents", () => {
+  const h = renderFlagDrawer({ targetLabel: "the concept \"x\"", tags: TAGS, tag: "fidelity-defect", summary: "AI found a gap", stub: "prior note", descriptionOnly: true });
+  assert.match(h, /Edit description — the concept/);
+  assert.match(h, /flag-edit-drawer/); // dirty-tracking + gold accent
+  assert.match(h, /data-flag-stub/); // the Description textarea is present + editable
+  assert.match(h, /prior note<\/textarea>/); // prefilled
+  assert.match(h, /class="flag-ctx"[^>]*>AI found a gap</); // the summary is shown READ-ONLY for context
+  assert.match(h, /data-flag-edit-save/);
+  assert.equal((h.match(/data-flag-edit-cancel/g) || []).length, 2, "Cancel + ✕");
+  // the full-edit controls are ABSENT — an AI flag can't retype/re-summarize/re-field
+  assert.ok(!/data-flag-tag/.test(h), "no Type select");
+  assert.ok(!/data-flag-summary/.test(h), "no Summary input");
+  assert.ok(!/data-flag-field(?!-)/.test(h) && !/data-flag-field-for/.test(h), "no field controls");
+  assert.ok(!/data-flag-insert/.test(h), "no create Insert intent");
+});
+
 console.log("flagDrawerHtml.test: ok");
