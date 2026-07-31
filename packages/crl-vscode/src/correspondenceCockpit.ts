@@ -3129,7 +3129,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function postFlagDrawer(): void {
     const tree = views.get("tree");
     if (!tree) return;
-    const html = flagDraft ? renderFlagDrawer({ targetLabel: flagDraft.target.shortLabel, targetTitle: flagDraft.target.label, tags: flagTags(), tag: flagDraft.tag, summary: flagDraft.summary, stub: flagDraft.stub, fields: flagDraft.fields, focus: flagDraft.focus }) : "";
+    // Only the human MV "Type" tags (a `displayName`) are offered — the AI-authoring extraction tags are hidden from the drawer.
+    const mvTypes = flagTags().filter((t) => t.displayName !== undefined);
+    const html = flagDraft ? renderFlagDrawer({ targetLabel: flagDraft.target.shortLabel, targetTitle: flagDraft.target.label, tags: mvTypes, tag: flagDraft.tag, summary: flagDraft.summary, stub: flagDraft.stub, fields: flagDraft.fields, focus: flagDraft.focus }) : "";
     void tree.panel.webview.postMessage({ type: "flagDrawer", html });
   }
 

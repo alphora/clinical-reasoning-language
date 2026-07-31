@@ -94,15 +94,20 @@ export function buildSystemPrompt(state: CockpitAppState | undefined): string {
   return BASE_PROMPT + appStateBlock(state);
 }
 
-/** The shared property set for both flag tools. `validation_kind` is enumerated from the live registry (else the constant). */
-function flagProps(validationKinds: string[]): Record<string, unknown> {
-  const kinds = validationKinds.length ? validationKinds : DEFAULT_VALIDATION_KINDS;
-  return {
+/** The shared property set for the flag tools. `validation_kind` (AI-only finer metadata, enumerated from the live registry)
+ *  is included ONLY when `withKind` — i.e. for `submit_flag`, which stores it directly. It is OMITTED from `open_flag_drawer`:
+ *  that tool hands off to the human, whose drawer HIDES kind, so a prefilled kind would silently vanish on their submit. */
+function flagProps(validationKinds: string[], withKind: boolean): Record<string, unknown> {
+  const props: Record<string, unknown> = {
     target_id: { type: "string", description: "The id of the flag target (from the [cockpit] flag-targets list)." },
-    validation_kind: { type: "string", enum: kinds, description: "The kind of validation concern, when it is clear." },
     summary: { type: "string", description: "A one-line summary of the concern (becomes the issue title + the flag gist)." },
     description: { type: "string", description: "The fuller concern text (becomes the flag's GitHub issue body). Fill this from what the validator tells you." },
   };
+  if (withKind) {
+    const kinds = validationKinds.length ? validationKinds : DEFAULT_VALIDATION_KINDS;
+    props.validation_kind = { type: "string", enum: kinds, description: "The kind of validation concern, when it is clear (recorded on the flag; not shown to the validator)." };
+  }
+  return props;
 }
 
 /** The `open_flag_drawer` tool (the DEFAULT) — opens the drawer prefilled for the validator to review + submit themselves. */
@@ -112,9 +117,9 @@ export function openFlagDrawerTool(validationKinds: string[]): ToolSpec {
     description:
       "The DEFAULT flag action: open the review-flag drawer prefilled and WAIT while the validator completes + submits it in " +
       "the cockpit (the drawer asks for anything still missing — you do NOT prompt in chat). Pass the target_id (from the " +
-      "[cockpit] flag-targets list) plus whatever summary/description/kind you have. Returns the outcome when they finish. " +
+      "[cockpit] flag-targets list) plus whatever summary/description you have. Returns the outcome when they finish. " +
       "Use this whenever the validator did NOT explicitly ask you to submit/file.",
-    inputSchema: { type: "object", properties: flagProps(validationKinds), required: ["target_id"] },
+    inputSchema: { type: "object", properties: flagProps(validationKinds, false), required: ["target_id"] },
   };
 }
 
@@ -128,7 +133,7 @@ export function submitFlagTool(validationKinds: string[]): ToolSpec {
       `validator EXPLICITLY asked to submit/file (otherwise use ${OPEN_FLAG_DRAWER} and let them submit). Requires ` +
       "target_id + a one-line summary; include the description + kind when known. Ask for anything missing first, and state " +
       "what you're filing before you call this.",
-    inputSchema: { type: "object", properties: flagProps(validationKinds), required: ["target_id", "summary"] },
+    inputSchema: { type: "object", properties: flagProps(validationKinds, true), required: ["target_id", "summary"] },
   };
 }
 

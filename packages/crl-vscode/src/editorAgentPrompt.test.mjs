@@ -95,7 +95,7 @@ test("buildSystemPrompt: teaches where-do-we-stand — call read_review_context 
   assert.match(p, /READ-ONLY/);
 });
 
-test("submitFlagTool: the default flag action — requires target_id + summary; enumerates the kinds", () => {
+test("submitFlagTool: files directly — requires target_id + summary; carries validation_kind (stored on the flag)", () => {
   const t = submitFlagTool(["underspecified", "narrative-error"]);
   assert.equal(t.name, SUBMIT_FLAG);
   assert.deepEqual(t.inputSchema.required, ["target_id", "summary"]);
@@ -103,16 +103,17 @@ test("submitFlagTool: the default flag action — requires target_id + summary; 
   assert.ok(t.inputSchema.properties.description, "carries a description property (→ the issue body)");
 });
 
-test("openFlagDrawerTool: the review-first exception — only target_id required; enumerates the kinds", () => {
+test("openFlagDrawerTool: the review-first default — only target_id required; OMITS validation_kind (the human drawer hides kind)", () => {
   const t = openFlagDrawerTool(["underspecified", "narrative-error"]);
   assert.equal(t.name, OPEN_FLAG_DRAWER);
-  assert.deepEqual(t.inputSchema.properties.validation_kind.enum, ["underspecified", "narrative-error"]);
+  assert.equal(t.inputSchema.properties.validation_kind, undefined, "no validation_kind — it would silently vanish on the human's submit");
   assert.deepEqual(t.inputSchema.required, ["target_id"]);
+  assert.ok(t.inputSchema.properties.summary && t.inputSchema.properties.description, "still carries summary + description");
 });
 
-test("flag tools: empty kinds → fall back to DEFAULT_VALIDATION_KINDS (schema stays meaningful)", () => {
+test("flag tools: submit's empty kinds → fall back to DEFAULT_VALIDATION_KINDS (schema stays meaningful); open has none", () => {
   assert.deepEqual(submitFlagTool([]).inputSchema.properties.validation_kind.enum, DEFAULT_VALIDATION_KINDS);
-  assert.deepEqual(openFlagDrawerTool([]).inputSchema.properties.validation_kind.enum, DEFAULT_VALIDATION_KINDS);
+  assert.equal(openFlagDrawerTool([]).inputSchema.properties.validation_kind, undefined);
 });
 
 console.log("editorAgentPrompt.test: ok");

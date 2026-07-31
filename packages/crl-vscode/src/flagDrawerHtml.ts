@@ -11,13 +11,15 @@ const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (c) => ESC[c]);
 export interface FlagDrawerTag {
   id: string;
   category?: string;
+  /** the human "Type" label — the drawer shows ONLY tags that have one (the MV Types); the option text IS this string. */
+  displayName?: string;
   fields: { key: string; required: boolean; values?: readonly string[] }[];
 }
 
-/** Field keys the HOST manages — never author-input in the drawer: `ref` (auto from the created issue), `key` (the GAP-3
+/** Field keys NEVER author-input in the drawer. Host plumbing: `ref` (auto from the created issue), `key` (the GAP-3
  *  occurrence address), `status` (always `open` for a new flag; `createFlag` rejects a `fields.status`), `system` (derived).
- *  The drawer surfaces only a tag's genuine discriminators (e.g. `kind`, `direction`). */
-const HOST_MANAGED_FIELDS = new Set(["ref", "key", "status", "system"]);
+ *  Plus `kind` — AI-only finer metadata (the cockpit agent may set it), hidden from the human MV drawer (the Type is the tag). */
+const HOST_MANAGED_FIELDS = new Set(["ref", "key", "status", "system", "kind"]);
 
 export interface FlagDrawerOptions {
   /** The resolved target's SHORT human label (e.g. `this condition`, `the concept "diabetes" (every use)`) — the header. */
@@ -44,12 +46,16 @@ export function renderFlagDrawer(opts: FlagDrawerOptions): string {
   const ring = (key: string): string => (opts.focus === key ? " flag-focus" : "");
   // validation-concern first (the usual MV concern), the rest in the given (registry) order.
   const ordered = [...opts.tags].sort((a, b) => (a.id === "validation-concern" ? -1 : b.id === "validation-concern" ? 1 : 0));
+  // A prefill `tag` not in the offered set (absent, or a non-MV/extraction tag) falls back to the first Type (validation-concern,
+  // floated above) — intentional: the human right-click passes no tag, and both agent paths force validation-concern, so this
+  // only guards a future non-MV prefill, which should default to the canonical MV Type rather than render an empty select.
   const selTag = ordered.some((t) => t.id === opts.tag) ? (opts.tag as string) : ordered[0]?.id;
 
   const tagOptions = ordered
     .map((t) => {
-      const kind = t.category === "validation" ? "validation — CRL vs customer intent" : "extraction — CRL vs narrative";
-      return `<option value="${escapeHtml(t.id)}"${t.id === selTag ? " selected" : ""}>@${escapeHtml(t.id)} — ${escapeHtml(kind)}</option>`;
+      // the option text is the human "Type" (displayName); the drawer only receives displayName-bearing tags (the MV Types).
+      const label = t.displayName ?? t.id;
+      return `<option value="${escapeHtml(t.id)}"${t.id === selTag ? " selected" : ""}>${escapeHtml(label)}</option>`;
     })
     .join("");
 
