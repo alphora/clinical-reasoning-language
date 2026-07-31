@@ -1484,6 +1484,11 @@ check("gold-link CSS (revised 361): a GOLD HALO (drop-shadow glow) on the node's
   // the halo NEVER recolours the base rect stroke (a separate visual axis — the operator's ask); the old ring mechanism is gone.
   assert.ok(!/\.flag-current>rect\{[^}]*stroke:/.test(FLOW_STYLE), ".flag-current halo must not recolour the border stroke");
   assert.ok(!/flow-flag-ring/.test(FLOW_STYLE), "the old gold RING mechanism is retired");
+  // disc 361 fix: a drawer-target node is ALSO `.node-focus` (the anchor) → a COMBINED rule (higher specificity than either
+  // single glow) so gold WINS with a white fringe still visible: gold core (doubled) + a wider white shadow behind it.
+  assert.match(FLOW_STYLE, /\.flow-row\.node-focus\.flag-current>rect\{filter:drop-shadow\(0 0 4px var\(--vscode-charts-yellow,#cca700\)\) drop-shadow\(0 0 4px var\(--vscode-charts-yellow,#cca700\)\) drop-shadow\(0 0 8px #ffffff\)\}/);
+  // THEME-ADAPTIVE: the combined fringe swaps white→black on light themes, mirroring `.node-focus`.
+  assert.match(FLOW_STYLE, /body\.vscode-light \.flow-row\.node-focus\.flag-current>rect[^{]*\{filter:drop-shadow\([^}]*drop-shadow\(0 0 8px #000000\)\}/);
 });
 
 check("toggle: reclicking the same flag closes; a different flag switches (entry paths only, NOT openFlagActionView)", () => {

@@ -915,9 +915,18 @@ export const FLOW_STYLE =
   // blue ring AND the gold halo — the two-signal ask) + the base-`>rect` overlays. Applied to the FIRST `>rect` (the border box)
   // of the id-bearing `<g>`, present on all three flaggable kinds (struct/def-leaf/crit-row); crit-row is NOT `.flow-row`, so
   // this class-agnostic selector reaches it where `.node-focus` (row-only) could not. GOLD regardless of the flag's open/resolved
-  // status — the channel means "this drawer's target". Single gold (mid-tone, reads on light + dark), so no theme swap. On a node
-  // that is ALSO `.node-focus`, that higher-specificity white/black glow wins — an acceptable rare overlap (agent-focus is primary).
+  // status — the channel means "this drawer's target". Single gold (mid-tone, reads on light + dark), so no theme swap.
   `.flag-current>rect{filter:drop-shadow(0 0 5px var(--vscode-charts-yellow,#cca700)) drop-shadow(0 0 2px var(--vscode-charts-yellow,#cca700))}` +
+  // disc 361 fix: the drawer target is ALSO the flag anchor (`driveNodeFocus` marks the clicked flag node `.node-focus`), so
+  // a drawer-target node is ALWAYS both `.node-focus` (white glow) and `.flag-current` (gold glow) — NOT the "rare overlap" the
+  // first pass assumed. The white glow's higher specificity was winning, hiding the gold. The operator wants gold to win, ideally
+  // WITH the white still visible. This COMBINED rule (higher specificity than either single glow) chains BOTH: a punchy GOLD core
+  // (front, doubled) + a wider WHITE fringe (behind, peeks beyond the gold) → "gold node with a white outer halo". Order matters:
+  // drop-shadow chains render each shadow BEHIND the prior result, so the LAST (white, widest) sits furthest back. THEME-ADAPTIVE
+  // like `.node-focus`: white on dark, black on light (`body.vscode-light`/`-high-contrast-light`). Only for `.flow-row` — the
+  // white `.node-focus` rule is row-only, so a crit-row never has a white glow to fight (gold wins there via the base rule).
+  `.flow-row.node-focus.flag-current>rect{filter:drop-shadow(0 0 4px var(--vscode-charts-yellow,#cca700)) drop-shadow(0 0 4px var(--vscode-charts-yellow,#cca700)) drop-shadow(0 0 8px #ffffff)}` +
+  `body.vscode-light .flow-row.node-focus.flag-current>rect,body.vscode-high-contrast-light .flow-row.node-focus.flag-current>rect{filter:drop-shadow(0 0 4px var(--vscode-charts-yellow,#cca700)) drop-shadow(0 0 4px var(--vscode-charts-yellow,#cca700)) drop-shadow(0 0 8px #000000)}` +
   // disc 164: the produced-path DIVERTER overlay on the SVG rect (the shell's HTML `.diverter` outline does not paint on
   // a <g>, same as the channels below). A neutral teal DOTTED stroke for the evaluated-false `when`s that routed the case
   // to its produced disposition (the Adult gate for a not-adult deny). Ordered BEFORE `.failed-criterion` so a blocker
