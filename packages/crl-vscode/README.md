@@ -105,6 +105,25 @@ Open the Command Palette with **Ctrl+Shift+P** and type:
 
 If your existing user settings already have a token color for a CRL scope (e.g. you customized `entity.name.type.crl`), the extension prompts you per scope on first run: **Replace**, **Keep mine**, or **Don't ask again**. Choices persist in the extension's global state, so subsequent activations don't re-ask. **CRL: Remove tools** clears nothing of yours; the persisted preferences just stop being consulted.
 
+## Medical Validation review flags → GitHub labels
+
+When a reviewer files a flag in the Medical Validation cockpit, the extension opens a **GitHub issue** in the policy's content repo (resolved from its `origin` remote) and tags it with a **Type** label. The four Types and their labels:
+
+| Type (in the drawer) | Label | Meaning |
+|---|---|---|
+| CRL vs customer intent | `mv:crl-vs-intent` | the narrative is right, but the CRL isn't what the customer wanted |
+| CRL vs narrative | `mv:crl-vs-narrative` | the CRL is faithful, but the source policy narrative is wrong |
+| Tooling bug | `mv:tooling-bug` | a defect in the CRL tooling, seen while validating |
+| Other | `mv:other` | doesn't fit the above — explained in the issue body |
+
+**One-time per content repo:** create the labels so issues land with the right color/description (otherwise GitHub auto-creates them plain grey). The set is derived from the CRL flag vocabulary (`allFlagLabels()` — the single source of truth), so run the bundled script rather than hand-maintaining a list:
+
+```
+node packages/crl-vscode/scripts/create-mv-labels.mjs <owner>/<repo>
+```
+
+Requires the GitHub CLI (`gh`) authenticated with push access to the repo. It's idempotent (`--force` updates existing labels), and `--dry-run` prints without creating. Re-run it after any Type is added/renamed in the vocabulary to re-sync. The Type is also named in the issue **body** (`**Type:** …`), so an issue is triageable even before its label exists.
+
 ## Commands and settings
 
 - **CRL: Set up tools** — run setup manually (e.g. if automatic setup is turned off).
