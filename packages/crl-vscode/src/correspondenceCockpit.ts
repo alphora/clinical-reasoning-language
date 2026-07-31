@@ -104,13 +104,19 @@ import {
   saveSidecar,
   computeCriterionVerdictUpdate,
   setReviewState,
+  unsettledReviewItems,
+  reviewGridViewModel,
+  applyGridAssignments,
+  type BulkVerdictResult,
   type FlagChrome,
   type LiveCriterion,
   type Note,
   type PersistedCriterionVerdict,
   type PersistedReviewState,
+  type ReviewItem,
   type ReviewState,
 } from "./medicalValidationStore";
+import { reviewGridHtml, REVIEW_GRID_STYLE, REVIEW_GRID_SCRIPT } from "./reviewGridHtml";
 import { renderCrlPane } from "./crlPaneHtml";
 import { collectDispositionLeafKeys, FLOW_STYLE, flowLegendChrome, renderFlowPane } from "./flowPaneHtml";
 import { renderFlowSnapshotDocument } from "./flowSnapshotHtml";
@@ -484,6 +490,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // `cel` binds it to the policy so a coincidental nodeKey collision in another policy can't resolve it.
   let flagAnchor: { hit: WebviewHit; cel: string | undefined } | undefined;
   let mvSidecarPath: string | undefined;
+  // #(bulk-verdict) Todo 2b — the "CRL · Review verdicts" grid: a SINGLETON transient webview panel that buys off many
+  // case/criterion verdicts at once. `reviewGridPanel` is the live panel (a 2nd invoke reveals it, never a 2nd snapshot).
+  // `reviewGridSnapshot` is the OPEN-TIME capture the host resolves an apply against (the webview is untrusted): the frozen
+  // `ReviewItem[]` + the retarget-guard axes (`sidecarPath`/`mode`/`cel`) + `revision` (see `mvRevision`). `reviewGridApplying`
+  // serialises apply (a 2nd apply must not race the one persist). `mvRevision` bumps on EVERY successful `persistMv` (disc 347):
+  // if it moved while the grid was open (a worklist/right-click/agent/prior-apply verdict change), the grid's snapshot is stale
+  // and apply ABORTS — the fail-closed backstop per-item revalidation can't cover for value-only case changes.
+  let reviewGridPanel: vscode.WebviewPanel | undefined;
+  let reviewGridSnapshot: { items: ReviewItem[]; sidecarPath: string; mode: "medical-validation"; cel: string | undefined; revision: number } | undefined; // openReviewGrid guards MV before capture, so the mode is always the literal
+  let reviewGridApplying = false;
+  let mvRevision = 0;
   // #203 Todo 4 / #212 S3 — the review-flag surface. `flagsList` = ALL flags (open + resolved) as `MvFlag`s, read from the
   // `.crl/flags/` STORE (the single flag home; the S2 dual-read is gone), refreshed in reloadReviewFlags(). `flagStateError`
   // (+ a specific `flagStateNote`) = flag state is UNKNOWN — a corrupt store record, an unreadable `.crl`, OR a still-embedded
@@ -919,9 +936,16 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const exportBtn =
       `<div class="fc-toggle fc-export-row"><button class="fc-toggle-btn fc-export" data-export-snapshot ` +
       `title="Export this decision tree as a self-contained HTML file — pan + zoom in any browser, no VS Code">⤓ Export snapshot</button></div>`;
+    // #(bulk-verdict) Todo 2b: the bulk "Review verdicts" opener — MV-ONLY (verdicts only exist in MV; the operator scoped the
+    // clinical-reviewer surface to the tree chrome, not Ctrl+Shift+P). data-review-verdicts → fcChrome click delegate → command.
+    const reviewVerdictsBtn =
+      mode === "medical-validation"
+        ? `<div class="fc-toggle fc-review-verdicts-row"><button class="fc-toggle-btn fc-review-verdicts" data-review-verdicts ` +
+          `title="Set case + criterion verdicts on many rows at once">☑ Review verdicts…</button></div>`
+        : "";
     // #218: the color KEY sits AFTER the banner so a transient ⚠ gap alert stays adjacent to the toggles. MV-only (the
     // helper returns "" in cockpit mode — verdict fills only paint in MV, and the operator scoped the legend to MV).
-    return progress + toggle + diverterToggle + exportBtn + banner + flowLegendChrome(mode);
+    return progress + toggle + diverterToggle + exportBtn + reviewVerdictsBtn + banner + flowLegendChrome(mode);
   }
 
   /** Push the current tree-pane chrome (toggle + gap banner) to the tree webview, if open. Does NOT re-render the
@@ -2105,6 +2129,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     } else if (msg.type === "exportSnapshot" && pane === "tree") {
       // #(tree-snapshot): the in-pane "⤓ Export snapshot" chrome button (tree pane only) → the host command.
       void exportTreeSnapshot().catch((e) => vscode.window.showErrorMessage(`Tree snapshot: ${e instanceof Error ? e.message : String(e)}`));
+    } else if (msg.type === "openReviewGrid" && pane === "tree") {
+      // #(bulk-verdict) Todo 2b: the in-pane "☑ Review verdicts…" chrome button (tree pane only) → open the bulk grid.
+      openReviewGrid();
     } else if (msg.type === "worklistFilterToggle") {
       toggleWorklistFilter(msg.state); // #214: toggle a verdict in/out of the worklist filter (host validates the state)
     } else if (msg.type === "notesToggle" && typeof msg.key === "string") {
@@ -2461,6 +2488,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     openNotesCaseId = undefined;
     editingNoteId = undefined;
     clearFlagDraft("retarget"); // #211/#210: drop the draft + postFlagDrawer + SETTLE any pending agent elicitation (else it hangs)
+    closeReviewGrid(); // #(bulk-verdict) Todo 2b: a bulk grid enumerated from the old policy must not survive the reset
     flagAnchor = undefined; // #210 Todo C: drop the agent flag anchor too (a stale anchor must not survive a failed retarget)
     mvSidecarPath = undefined;
     flagsList = []; // #203 Todo 4: drop the review-flag state too (a stale flag list/gate must not survive a failed retarget)
@@ -2619,6 +2647,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     openNotesCaseId = undefined;
     editingNoteId = undefined;
     clearFlagDraft("retarget"); // #211/#210: a policy (re)load drops the draft + SETTLES any pending agent elicitation
+    closeReviewGrid(); // #(bulk-verdict) Todo 2b: a policy (re)load stales any open bulk grid — close it (retarget-only, not per-rebuild)
     mvSidecarPath = undefined;
     worklistActions = {};
     worklistFilter = new Set(REVIEW_STATES); // #214: reset the verdict filter to all-shown on retarget (policy A's filter must not hide policy B)
@@ -2666,6 +2695,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       );
       return false;
     }
+    // #(bulk-verdict) Todo 2b: stale an open grid ONLY when a VERDICT map actually moved (a new map ref, per the "next value
+    // of the map I changed + current value of the others" discipline) — a notes-only save keeps both refs, so it must NOT
+    // trash the reviewer's picks with a false "the review changed" abort. Computed BEFORE the commit (compares to the current refs).
+    if (nextByCaseId !== reviewByCaseId || nextCriterionVerdicts !== criterionVerdicts) mvRevision++;
     reviewByCaseId = nextByCaseId; // commit in-memory only AFTER a successful persist
     notesByCaseId = nextNotes;
     criterionVerdicts = nextCriterionVerdicts;
@@ -2710,6 +2743,145 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     driveCriterionVerdicts(); // repaint the verdict chips on every occurrence (no tree re-render)
     renderTreeChrome(); // the criteria gate/chrome half changed
     return true;
+  }
+
+  // ── #(bulk-verdict) Todo 2b — the "CRL · Review verdicts" grid: open, apply, report ──────────────────────────────────
+
+  /** Close the bulk grid if open (its `onDidDispose` nulls the snapshot). Called on RETARGET/reset — a grid enumerated from
+   *  policy A must not survive into policy B: a `reveal()` would show A's queue under the same title, and the fail-closed
+   *  apply guards would then discard the reviewer's work. RETARGET-ONLY (`loadReviewSidecar` / the reset path have a single
+   *  caller each — a policy/mode (re)load, NOT a same-policy background rebuild, which the grid is built to survive). Also
+   *  closes the round-trip A→B→A hole: the retarget triple alone can't tell A-reloaded-from-disk from the original A. */
+  function closeReviewGrid(): void {
+    reviewGridPanel?.dispose();
+  }
+
+  /** Build the OPEN-TIME work queue: the unsettled case + criterion review items (the pure enumerator). Criteria come from
+   *  the SAME reachable gate walk `mvComplete`/`driveCriterionVerdicts` use (`criterionGateIdentities`); live cases from the
+   *  reviewable frozen set (`scenarioByCaseId` keys, ≡ `reviewProgress`'s set); orphans fall out of `unsettledReviewItems`. */
+  function enumerateReviewItems(): ReviewItem[] {
+    const criteria = [...criterionGateIdentities(guardOutlines, criterionIdentities)].map(([key, id]) => ({
+      key,
+      lib: id.lib,
+      name: id.name,
+      bodyHash: id.bodyHash,
+      elided: id.elided,
+    }));
+    return unsettledReviewItems({
+      criteria,
+      criterionVerdicts,
+      liveCaseIds: [...scenarioByCaseId.keys()],
+      reviewByCaseId,
+      caseLabel: (caseId) => labelInPrimary(caseId, "cel").label, // an orphan's caseId isn't in celNav → falls back to the raw id
+    });
+  }
+
+  /** Open (or reveal) the bulk-verdict grid. MV-only + a saved sidecar (persistence-ready, like `applyVerdict`); an empty
+   *  queue does NOT open (nothing to buy off — not the same as `mvComplete`). Captures the enumerated items + the retarget
+   *  guard axes + `mvRevision` so a later apply resolves against THIS snapshot, never live webview identity. Singleton. */
+  function openReviewGrid(): void {
+    if (mode !== "medical-validation" || !mvSidecarPath) {
+      void vscode.window.showInformationMessage("Review verdicts is available in Medical Validation with a saved policy.");
+      return;
+    }
+    if (reviewGridPanel) {
+      reviewGridPanel.reveal();
+      return;
+    }
+    const items = enumerateReviewItems();
+    if (items.length === 0) {
+      void vscode.window.showInformationMessage("No unsettled case or criterion verdicts.");
+      return;
+    }
+    reviewGridSnapshot = { items, sidecarPath: mvSidecarPath, mode, cel: currentCel, revision: mvRevision };
+    reviewGridApplying = false;
+    const panel = vscode.window.createWebviewPanel(
+      "crlReviewGrid",
+      "CRL · Review verdicts",
+      { viewColumn: vscode.ViewColumn.Active, preserveFocus: false },
+      { enableScripts: true, retainContextWhenHidden: true },
+    );
+    panel.webview.html = reviewGridShellHtml(reviewGridHtml(reviewGridViewModel(items)));
+    panel.webview.onDidReceiveMessage((m) => onReviewGridMessage(m));
+    panel.onDidDispose(() => {
+      reviewGridPanel = undefined;
+      reviewGridSnapshot = undefined;
+      reviewGridApplying = false;
+    });
+    reviewGridPanel = panel;
+  }
+
+  /** Handle the grid webview's messages. `cancel` closes; `apply` resolves the untrusted `{kind,id,state}[]` against the
+   *  captured snapshot. Guards, in order: single-flight (`reviewGridApplying`); RETARGET (policy/mode/cel moved → the maps are
+   *  a different policy's → abort + reopen, disc 347); REVISION (any MV persist since open → snapshot stale → abort + reopen).
+   *  Then the pure `applyGridAssignments` (best-effort). `changed===0` → nothing to persist (report + close). On persist SUCCESS
+   *  → repaint (worklist + selection + both overlays + chrome) + one bridge notify + close + report. On persist FAILURE → keep
+   *  the panel OPEN (re-enable, picks survive), the error already surfaced by `persistMv`. */
+  function onReviewGridMessage(raw: unknown): void {
+    if (!reviewGridPanel || !reviewGridSnapshot) return;
+    if (typeof raw !== "object" || raw === null) return; // the webview envelope is untrusted — a non-object never dereferenced
+    const m = raw as { type?: unknown; assignments?: unknown };
+    if (m.type === "cancel") {
+      reviewGridPanel.dispose();
+      return;
+    }
+    if (m.type !== "apply" || reviewGridApplying) return;
+    const snap = reviewGridSnapshot;
+    if (mode !== "medical-validation" || !mvSidecarPath || snap.sidecarPath !== mvSidecarPath || snap.mode !== mode || snap.cel !== currentCel) {
+      reviewGridPanel.dispose();
+      void vscode.window.showWarningMessage("The policy changed since Review verdicts opened — reopen it.");
+      return;
+    }
+    if (snap.revision !== mvRevision) {
+      reviewGridPanel.dispose();
+      void vscode.window.showWarningMessage("The review changed since Review verdicts opened — reopen it.");
+      return;
+    }
+    reviewGridApplying = true;
+    const result = applyGridAssignments(m.assignments, snap.items, {
+      criterionVerdicts,
+      reviewByCaseId,
+      liveCriteria: buildLiveCriterionIdentities(), // the GATE set, matching the enumeration + mvComplete
+      liveCaseIds: new Set(scenarioByCaseId.keys()), // the reviewable frozen set
+    });
+    if (result.changed === 0) {
+      reviewGridApplying = false;
+      reviewGridPanel.dispose();
+      void vscode.window.showInformationMessage(reviewGridReport(result));
+      return;
+    }
+    if (!persistMv(result.reviewByCaseId, notesByCaseId, result.criterionVerdicts)) {
+      reviewGridApplying = false; // persistMv already surfaced the error; keep the panel open so the picks survive
+      void reviewGridPanel.webview.postMessage({ type: "reenable", note: "Not saved — try again." });
+      return;
+    }
+    // Persisted (mvRevision bumped inside persistMv). Repaint BOTH halves — a bulk apply can touch cases AND criteria.
+    renderPane("worklist"); // no-op when the worklist pane is closed
+    if (state.selection) dispatch({ type: "select", selection: state.selection }); // renders chrome (incl. the new gate/progress)…
+    else renderTreeChrome(); // …else render it directly — either way chrome is posted ONCE, post-commit (no double-post, cf. applyVerdict)
+    driveDoneOverlay(); // re-drive AFTER the select's possible tree re-render: the reviewed case set changed
+    driveCriterionVerdicts(); // …and the criterion verdict chips changed
+    cockpitAgentBridge.notifyChanged(); // #210: a bulk verdict/gate change must notify CRL Assist once
+    reviewGridApplying = false;
+    const report = reviewGridReport(result);
+    reviewGridPanel.dispose();
+    void vscode.window.showInformationMessage(report);
+  }
+
+  /** A human report from a bulk apply: how many verdicts actually MOVED (`changed`, not `applied.length` — a re-applied
+   *  verdict is a no-op) + a per-reason breakdown of what was skipped (a row that went stale/gone/truncated since open). */
+  function reviewGridReport(result: BulkVerdictResult): string {
+    const parts: string[] = [result.changed ? `${result.changed} verdict${result.changed === 1 ? "" : "s"} updated` : "No verdicts changed"];
+    if (result.skipped.length) {
+      const by = { "body-changed": 0, "not-live": 0, elided: 0 };
+      for (const s of result.skipped) by[s.reason]++;
+      const desc: string[] = [];
+      if (by["body-changed"]) desc.push(`${by["body-changed"]} edited since opening`);
+      if (by["not-live"]) desc.push(`${by["not-live"]} no longer in review scope`); // a case left the reviewable set OR a criterion left the reachable gate (not necessarily deleted)
+      if (by.elided) desc.push(`${by.elided} truncated`);
+      parts.push(`${result.skipped.length} skipped (${desc.join(", ")})`);
+    }
+    return `Review verdicts: ${parts.join("; ")}.`;
   }
 
   /** #233 Todo 2b — resolve a right-click reveal hit to the criterion IDENTITY it addresses, or `undefined` if it is not a
@@ -3591,6 +3763,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   const exportTreeSnapshotCmd = vscode.commands.registerCommand("crl.cockpit.exportTreeSnapshot", () =>
     void exportTreeSnapshot().catch((e) => vscode.window.showErrorMessage(`Tree snapshot: ${e instanceof Error ? e.message : String(e)}`)),
   );
+  // #(bulk-verdict) Todo 2b: the palette + tree-chrome entry to the bulk verdict grid (guards MV/sidecar/empty inside).
+  const reviewVerdictsCmd = vscode.commands.registerCommand("crl.cockpit.reviewVerdicts", () => openReviewGrid());
 
   const openRawCmd = vscode.commands.registerCommand("crl.cockpit.openRaw", () => {
     // Open the anchor .txt at the clicked span's range when it still matches the selection, else the unit's earliest
@@ -3977,18 +4151,37 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     prevCmd,
     openRawCmd,
     exportTreeSnapshotCmd,
+    reviewVerdictsCmd,
     onSave,
     onConfig,
     {
       dispose: () => {
         watcher?.dispose();
         flagsWatcher?.dispose();
+        reviewGridPanel?.dispose(); // #(bulk-verdict) Todo 2b: the transient grid panel must not outlive the cockpit
         snapshotCapture.settleEmpty(); // #(tree-snapshot): a pending capture must not outlive the cockpit
         if (debounce) clearTimeout(debounce); // a pending rebuild/reorder must not fire on disposed panels
         if (flagsDebounce) clearTimeout(flagsDebounce);
         if (orderDebounce) clearTimeout(orderDebounce);
       },
     },
+  );
+}
+
+/** #(bulk-verdict) Todo 2b — the hermetic shell for the "CRL · Review verdicts" grid panel: same strict CSP + nonce idiom as
+ *  `shellHtml`, but wraps the pure `reviewGridHtml(rows)` body with `REVIEW_GRID_STYLE`/`REVIEW_GRID_SCRIPT` (self-contained,
+ *  no external resources). The body is trusted (host-built from escaped rows); the script's outbound messages are not — the
+ *  host re-validates every assignment against its captured snapshot in `onReviewGridMessage`. */
+function reviewGridShellHtml(body: string): string {
+  const nonce = randomBytes(16).toString("base64");
+  const styleNonce = randomBytes(16).toString("base64");
+  const csp = `default-src 'none'; style-src 'nonce-${styleNonce}'; script-src 'nonce-${nonce}';`;
+  return (
+    `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
+    `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
+    `<style nonce="${styleNonce}">${REVIEW_GRID_STYLE}</style></head><body>` +
+    body +
+    `<script nonce="${nonce}">${REVIEW_GRID_SCRIPT}</script></body></html>`
   );
 }
 
@@ -4377,6 +4570,9 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #(tree-snapshot): the in-pane "Export snapshot" button → the host command.
   `const xs=e.target.closest&&e.target.closest('[data-export-snapshot]');` +
   `if(xs){v.postMessage({type:'exportSnapshot'});return;}` +
+  // #(bulk-verdict) Todo 2b: the in-pane "Review verdicts" button → open the bulk grid.
+  `const rv=e.target.closest&&e.target.closest('[data-review-verdicts]');` +
+  `if(rv){v.postMessage({type:'openReviewGrid'});return;}` +
   // #203 Todo 4: the flag badge / mvComplete gate → open the review-flag list.
   `const fl=e.target.closest&&e.target.closest('[data-mv-flags]');` +
   `if(fl)v.postMessage({type:'mvFlags'});});` +

@@ -344,7 +344,7 @@ check("disc 164: the diverter on/off toggle round-trips (webview [data-diverter-
 });
 
 check("#218 legend: buildTreeChromeHtml appends flowLegendChrome(mode) AFTER the banner (MV-gating lives in the exported helper)", () => {
-  assert.ok(/return progress \+ toggle \+ diverterToggle \+ exportBtn \+ banner \+ flowLegendChrome\(mode\);/.test(COCKPIT_SRC), "chrome ends with the legend, after the ⚠ gap banner (export button sits before the banner)");
+  assert.ok(/return progress \+ toggle \+ diverterToggle \+ exportBtn \+ reviewVerdictsBtn \+ banner \+ flowLegendChrome\(mode\);/.test(COCKPIT_SRC), "chrome ends with the legend, after the ⚠ gap banner (export + review-verdicts buttons sit before the banner)");
   assert.ok(/import \{[^}]*flowLegendChrome[^}]*\} from "\.\/flowPaneHtml"/.test(COCKPIT_SRC), "flowLegendChrome imported from flowPaneHtml (co-located with FLOW_STYLE + the shared TOK_* consts)");
 });
 
@@ -1219,10 +1219,67 @@ check("tree-snapshot: the trigger is an IN-PANE chrome button on the tree pane (
   // host: the tree-chrome builder renders the export button
   assert.match(COCKPIT_SRC, /class="fc-toggle-btn fc-export" data-export-snapshot/, "the export button is in the tree chrome");
   assert.match(COCKPIT_SRC, /const exportBtn =/);
-  assert.match(COCKPIT_SRC, /return progress \+ toggle \+ diverterToggle \+ exportBtn \+ banner \+ flowLegendChrome/, "the button is part of the tree chrome");
+  assert.match(COCKPIT_SRC, /return progress \+ toggle \+ diverterToggle \+ exportBtn \+ reviewVerdictsBtn \+ banner \+ flowLegendChrome/, "the button is part of the tree chrome");
   // webview: the fcChrome click delegate posts exportSnapshot
   assert.match(SCRIPT, /closest\('\[data-export-snapshot\]'\);.*v\.postMessage\(\{type:'exportSnapshot'\}\);return;/s);
   // host: the exportSnapshot message (tree-only) runs the command with a catch backstop
   assert.match(COCKPIT_SRC, /msg\.type === "exportSnapshot" && pane === "tree"/);
   assert.match(COCKPIT_SRC, /void exportTreeSnapshot\(\)\.catch\(/);
+});
+
+// ── #(bulk-verdict) Todo 2b — the "CRL · Review verdicts" grid host wiring (source-text / webview-channel locks) ──────
+check("bulk-verdict: the tree-chrome 'Review verdicts' button is MV-ONLY + posts openReviewGrid; host handles it on the tree pane", () => {
+  assert.match(COCKPIT_SRC, /mode === "medical-validation"\s*\?\s*`<div class="fc-toggle fc-review-verdicts-row">/, "the button renders only in MV mode");
+  assert.match(COCKPIT_SRC, /data-review-verdicts/);
+  assert.match(SCRIPT, /closest\('\[data-review-verdicts\]'\);.*v\.postMessage\(\{type:'openReviewGrid'\}\);return;/s, "the fcChrome delegate posts openReviewGrid");
+  assert.match(COCKPIT_SRC, /msg\.type === "openReviewGrid" && pane === "tree"\)\s*\{\s*\n\s*\/\/[^\n]*\n\s*openReviewGrid\(\);/, "host opens the grid only from the tree pane");
+});
+
+check("bulk-verdict: the command is registered + palette-gated + disposed with the cockpit", () => {
+  assert.match(COCKPIT_SRC, /registerCommand\("crl\.cockpit\.reviewVerdicts", \(\) => openReviewGrid\(\)\)/);
+  assert.match(COCKPIT_SRC, /reviewVerdictsCmd,/, "pushed onto context.subscriptions");
+  assert.match(COCKPIT_SRC, /reviewGridPanel\?\.dispose\(\);/, "the transient panel is disposed on cockpit teardown");
+});
+
+check("bulk-verdict: mvRevision bumps inside persistMv ONLY when a verdict map moved — a notes-only save must not stale the grid", () => {
+  // the bump compares the incoming maps to the current refs BEFORE the commit — a notes-only save keeps both verdict refs → no bump
+  assert.match(COCKPIT_SRC, /if \(nextByCaseId !== reviewByCaseId \|\| nextCriterionVerdicts !== criterionVerdicts\) mvRevision\+\+;\s*\n\s*reviewByCaseId = nextByCaseId;/);
+});
+
+check("bulk-verdict: a retarget/reset CLOSES an open grid (a policy-A queue must not survive into policy B) — retarget-only, not per-rebuild", () => {
+  assert.match(COCKPIT_SRC, /function closeReviewGrid\(\): void \{\s*\n\s*reviewGridPanel\?\.dispose\(\);/);
+  // called from BOTH MV-state reset paths (loadReviewSidecar's retarget clear + the failed-rebuild reset), each next to clearFlagDraft
+  assert.equal((COCKPIT_SRC.match(/closeReviewGrid\(\);/g) || []).length, 2, "closeReviewGrid is called from both retarget/reset paths");
+});
+
+check("bulk-verdict: the apply message envelope is validated before any dereference (untrusted webview)", () => {
+  assert.match(COCKPIT_SRC, /function onReviewGridMessage\(raw: unknown\): void \{/);
+  assert.match(COCKPIT_SRC, /if \(typeof raw !== "object" \|\| raw === null\) return;/);
+});
+
+check("bulk-verdict: apply is guarded — single-flight, then RETARGET (policy/mode/cel), then REVISION, before the pure apply", () => {
+  assert.match(COCKPIT_SRC, /if \(m\.type !== "apply" \|\| reviewGridApplying\) return;/, "single-flight + only apply");
+  assert.match(COCKPIT_SRC, /snap\.sidecarPath !== mvSidecarPath \|\| snap\.mode !== mode \|\| snap\.cel !== currentCel/, "retarget guard axes");
+  assert.match(COCKPIT_SRC, /snap\.revision !== mvRevision\)\s*\{[\s\S]*?The review changed since Review verdicts opened/, "revision guard aborts + tells reopen");
+  assert.match(COCKPIT_SRC, /applyGridAssignments\(m\.assignments, snap\.items, \{/, "resolves the untrusted payload against the CAPTURED snapshot");
+});
+
+check("bulk-verdict: apply persists ONCE + repaints both halves + notifies once; persist-fail keeps the panel open", () => {
+  assert.match(COCKPIT_SRC, /if \(result\.changed === 0\)\s*\{[\s\S]*?reviewGridPanel\.dispose\(\);/, "nothing changed → report + close, no persist");
+  assert.match(COCKPIT_SRC, /if \(!persistMv\(result\.reviewByCaseId, notesByCaseId, result\.criterionVerdicts\)\)\s*\{[\s\S]*?type: "reenable"/, "persist-fail re-enables (panel stays open)");
+  // chrome is posted ONCE (via the select dispatch or the else), then BOTH overlays re-drive, then one bridge notify — no trailing double-chrome
+  assert.match(COCKPIT_SRC, /else renderTreeChrome\(\);[\s\S]*?driveDoneOverlay\(\);[\s\S]*?driveCriterionVerdicts\(\);[\s\S]*?cockpitAgentBridge\.notifyChanged\(\);/, "chrome once, both overlays, then one bridge notify");
+});
+
+check("bulk-verdict: the grid shell is CSP-nonced + self-contained (REVIEW_GRID_STYLE/SCRIPT, no external resources)", () => {
+  assert.match(COCKPIT_SRC, /function reviewGridShellHtml\(body: string\): string \{/);
+  assert.match(COCKPIT_SRC, /default-src 'none'; style-src 'nonce-\$\{styleNonce\}'; script-src 'nonce-\$\{nonce\}';/);
+  assert.match(COCKPIT_SRC, /<style nonce="\$\{styleNonce\}">\$\{REVIEW_GRID_STYLE\}<\/style>/);
+  assert.match(COCKPIT_SRC, /<script nonce="\$\{nonce\}">\$\{REVIEW_GRID_SCRIPT\}<\/script>/);
+});
+
+check("bulk-verdict: enumeration uses the SAME reachable gate + reviewable-case sets as the live gate (no single/bulk drift)", () => {
+  assert.match(COCKPIT_SRC, /criterionGateIdentities\(guardOutlines, criterionIdentities\)/, "criteria from the gate walk");
+  assert.match(COCKPIT_SRC, /liveCaseIds: \[\.\.\.scenarioByCaseId\.keys\(\)\]/, "cases from the reviewable frozen set");
+  assert.match(COCKPIT_SRC, /liveCriteria: buildLiveCriterionIdentities\(\),[\s\S]*?liveCaseIds: new Set\(scenarioByCaseId\.keys\(\)\)/, "apply ctx uses the SAME gate + reviewable sets");
 });

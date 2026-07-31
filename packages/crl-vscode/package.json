@@ -141,6 +141,11 @@
         "icon": "$(save-as)"
       },
       {
+        "command": "crl.cockpit.reviewVerdicts",
+        "title": "CRL: Review Verdicts (bulk)",
+        "icon": "$(checklist)"
+      },
+      {
         "command": "crl.cockpit.setPrimary",
         "title": "CRL: Set Navigator Primary Pane (Source / CRL / CEL)",
         "icon": "$(arrow-swap)"
@@ -277,6 +282,10 @@
         },
         {
           "command": "crl.cockpit.exportTreeSnapshot",
+          "when": "crl.active"
+        },
+        {
+          "command": "crl.cockpit.reviewVerdicts",
           "when": "crl.active"
         },
         {
