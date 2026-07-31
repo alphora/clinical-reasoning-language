@@ -68,6 +68,7 @@ import { buildIssueUrl, githubIssuesBaseFromRemote, githubRepoFromRemote, issueR
 import { createGithubIssue, getGithubIssue, IssueCreateError, issueCreateErrorLabel } from "./githubIssue";
 import { renderFlagDrawer } from "./flagDrawerHtml";
 import { renderFlagActionDrawer, type FlagActionField } from "./flagActionDrawerHtml";
+import { computeFlagPlacement } from "./flagPlacement";
 import { countEmbeddedFlags } from "./embeddedFlagDetect"; // #212 S3: the un-migrated-flag safety-net detector (pure)
 // #212: the flag store model now lives in core (packages/crl) so the cockpit AND the MCP flag tools share it.
 import {
@@ -519,6 +520,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // `.crl` flag the safety net caught → the mvComplete gate conservatively does NOT report complete. `anchorCtx` = the current
   // CRL structure the anchor resolver matches a flag's stored target against (assembled in rebuild). All cleared on retarget/reset.
   let flagsList: MvFlag[] = [];
+  // Todo 2 (disc 356): the node ⚑ → its OPEN flags reverse map, keyed by the render GID (gen-prefixed, so a stale-render click's
+  // gid can't collide with the current map). REBUILT WHOLESALE every `driveFlagBadges` (never incremental) so it stays in lockstep
+  // with the painted per-node badges; each bucket is in `flagsList` (open) order for QuickPick parity with `openFlagList`. A
+  // per-node badge click posts `{nodeFlags, gid}`; `openNodeFlags` looks the gid up here (an unknown/stale gid → a no-op note).
+  let flagsByGid = new Map<string, MvFlag[]>();
   let flagStateError = false;
   // DISTINCT from flagStateError (which ALSO absorbs `.crl`-parse failures + un-migrated-flag counts): true ONLY when the
   // `.crl/flags/` STORE read itself was partial/unreadable (a corrupt record OR a non-ENOENT readdir failure — EACCES/AV lock).
@@ -1060,6 +1066,19 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   const flagNote = (m: string): void => void vscode.window.setStatusBarMessage(`Medical Validation: ${m}`, 3000);
 
+  /** The QuickPick row for one flag — SHARED by the whole-policy list (`openFlagList`) and the node-filtered list
+   *  (`openNodeFlags`) so their labels stay structurally identical (disc 357 [nit]). GAP 3: an occurrence flag shows its node
+   *  signature so it reads as a specific node, not the whole decision. (The `✓` arm is dead in the open-only node list; live in
+   *  the whole-policy list, which includes resolved flags.) */
+  const flagPickItem = (f: MvFlag): { label: string; description: string; flag: MvFlag } => {
+    const a = f.anchor;
+    return {
+      label: `${f.status === "resolved" ? "✓" : "⚑"} ${f.tag}${f.gist ? " — " + f.gist : ""}`,
+      description: `${a.scope}:${a.name}${a.occurrenceKey ? " · " + parseOccurrenceKey(a.occurrenceKey).signature : ""} · ${f.status}${f.fields.ref ? " · " + f.fields.ref : ""}`,
+      flag: f,
+    };
+  };
+
   /** Open the review-flag list (mirrors the verdict quick-pick idiom). Picking a flag opens the read-only ACTION DRAWER (a
    *  right flyout — tree + questionnaire stay in view) and ENDS the list: the drawer, not the list, is the action surface now
    *  (design 354). Until Todo 2's node-filtered entry, a multi-flag policy is list → drawer → badge → list (one extra click per
@@ -1070,18 +1089,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const cel = currentCel;
     if (flagsList.length === 0) return flagNote(flagStateError ? flagStateNote ?? "flag state is unknown (a source could not be read)" : "no review flags");
     if (flagStateNote) flagNote(flagStateNote);
-    // Embed the MvFlag on the item (not an index) so a rebuild that reloads `flagsList` during the pick can't make us act on a
-    // different flag at the same position. #212 S3: if the gate is blocked by an un-migrated `.crl` flag, still surface the note.
-    const items = flagsList.map((f) => {
-      const a = f.anchor;
-      return {
-        label: `${f.status === "resolved" ? "✓" : "⚑"} ${f.tag}${f.gist ? " — " + f.gist : ""}`,
-        // GAP 3: an occurrence flag (a keyed decision flag) shows its node signature — `decision:D · <guard→activity> · open`
-        // — so it reads as a specific node, not the whole decision.
-        description: `${a.scope}:${a.name}${a.occurrenceKey ? " · " + parseOccurrenceKey(a.occurrenceKey).signature : ""} · ${f.status}${f.fields.ref ? " · " + f.fields.ref : ""}`,
-        flag: f,
-      };
-    });
+    // Embed the MvFlag on the item (via flagPickItem) so a rebuild that reloads `flagsList` during the pick can't make us act on
+    // a different flag at the same position. #212 S3: if the gate is blocked by an un-migrated `.crl` flag, still surface the note.
+    const items = flagsList.map(flagPickItem);
     const pick = await vscode.window.showQuickPick(items, { placeHolder: "Review flags — pick one (Esc to close)" });
     if (!pick) return; // Esc — done
     // Post-pick stale guard (design 354): the `showQuickPick` await can span a retarget, so re-validate BEFORE opening the drawer
@@ -1093,6 +1103,34 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const live = flagsList.find((f) => f.id === pick.flag.id);
     if (!live && !flagStoreWarning) return flagNote("the flag changed on disk — reopen it");
     openFlagActionView(live ?? pick.flag, ver, cel);
+  }
+
+  /** Todo 2 (disc 356): the per-node ⚑ badge entry — open the ACTION DRAWER filtered to THIS node's OPEN flags. `gid` is a
+   *  host-issued render key (gen-prefixed) looked up in `flagsByGid` — an unknown/stale gid (a click from a torn-down render, or
+   *  a forged message) simply isn't in the current map → the empty branch → a no-op note. 1 flag → skip straight to the drawer
+   *  (the operator's "skip the list, go to the action UI"); >1 → a filtered QuickPick (the `openFlagList` idiom, scoped) → pick →
+   *  drawer. Every open re-finds by id (disc 355: never hand the drawer a stale map snapshot; clean deletion → note; store-warning
+   *  → keep). The START-node count pill is a DIFFERENT channel (`mvFlags` → the full list) — untouched. */
+  async function openNodeFlags(gid: string): Promise<void> {
+    if (mode !== "medical-validation") return;
+    const ver = indexVersion;
+    const cel = currentCel;
+    const flags = flagsByGid.get(gid) ?? []; // OPEN-only (driveFlagBadges builds it over `open`) — matches what the badge counts
+    if (flags.length === 0) return flagNote("no open flags on this node"); // unknown/stale gid OR a concurrent resolve/delete emptied it
+    if (flagStateNote) flagNote(flagStateNote);
+    // Re-find by id from the LIVE list so the drawer never opens over a stale map snapshot when a live record exists.
+    const openOne = (snap: MvFlag): void => {
+      const live = flagsList.find((f) => f.id === snap.id);
+      if (!live && !flagStoreWarning) return flagNote("the flag changed on disk — reopen it");
+      openFlagActionView(live ?? snap, ver, cel);
+    };
+    if (flags.length === 1) return openOne(flags[0]); // single-skip (disc 356: skip predicate = length === 1)
+    // >1 → a filtered QuickPick, structurally identical to openFlagList (shared flagPickItem), scoped to this node, then the drawer.
+    const items = flags.map(flagPickItem);
+    const pick = await vscode.window.showQuickPick(items, { placeHolder: "Flags on this node — pick one (Esc to close)" });
+    if (!pick) return; // Esc
+    if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — reopen the flags");
+    openOne(pick.flag);
   }
 
   /** #203 Todo 4b Slice C — resolve the issue-tracker collection base for the link-out. `crl.issueBaseUrl`, USER-scope
@@ -1519,58 +1557,38 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  (resolved flags never badge a node; the count badge shows `✓` when all resolved). */
   function driveFlagBadges(): void {
     const tree = views.get("tree");
-    if (!tree) return; // tree pane is opt-in
+    if (!tree) {
+      flagsByGid = new Map(); // no tree → no badges → no node map (keeps the "rebuilt wholesale every drive" invariant true, disc 357)
+      return; // tree pane is opt-in
+    }
     if (mode !== "medical-validation") {
+      flagsByGid = new Map(); // lockstep: the painted badges are cleared here, so the node→flags map must be too (disc 356)
       void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [], startNodeGid: tree.startNodeGid, open: 0, resolved: 0, flagError: false, unplaced: 0 });
       return;
     }
     const open = flagsList.filter((f) => isOpen(f)); // the blocking set (matches openFlags / the gate)
-    const gids = new Set<string>();
-    let unplaced = 0; // PER-FLAG: how many open flags matched ZERO nodes (orphaned/moved occurrence, or a concept drawn nowhere)
-    for (const f of open) {
-      const a = f.anchor;
-      // Placement is SELF-VERIFYING against the tree render (a concept/decision drawn nowhere simply matches no gid), so it is
-      // NOT gated on resolveAnchor's liveness — that gate would only SUPPRESS a legit badge (e.g. a concept duplicated across
-      // asserted/inferred/interface layers → resolveAnchor `>1 ⇒ orphaned`, but it's clearly drawn; gpt55/Claude). resolveAnchor
-      // is used ONLY for the OCCURRENCE resolution (the nodeId + signature verify that decides placed vs moved/orphaned).
-      let matched: string[] = [];
-      if (a.scope === "concept") {
-        // (lib,name) — NEVER name alone (cross-lib same-name concepts). Lights every `when`/leaf the concept draws as.
-        matched = tree.conceptOccurrences.filter((o) => o.name === a.name && o.lib === a.library).map((o) => o.gid);
-      } else if (a.scope === "decision") {
-        if (a.occurrenceKey) {
-          // GAP 3: an occurrence anchor → the ONE keyed node when it still resolves LIVE (placed); moved/orphan → [] → unplaced.
-          const cls = resolveAnchor(a, anchorCtx);
-          const g = cls.state === "live" && cls.nodeKey ? tree.anchors[cls.nodeKey]?.scrollTo : undefined;
-          if (g) matched = [g];
-        } else {
-          // a decision-OBJECT flag (no occurrence key) → the whole decision.
-          const dec = crlStructure.find((s) => s.decision === a.name && s.lib === a.library);
-          if (dec) matched = segmentsFor(tree, [dec.nodeKey]).segmentIds;
-        }
-      }
-      // library scope: drawn nowhere → no per-node ⚑ (the start-node count is its catch-all).
-      // "unplaced" means ONLY a genuine OCCURRENCE flag whose target moved/removed (an occurrence anchor that didn't place). An
-      // OBJECT flag drawn nowhere (a library flag, or a concept used only as decision-input / inside a collapsed composite) is
-      // "not charted" — expected, NOT "moved/removed" — so it must NOT dilute this signal (Claude).
-      if (matched.length === 0 && a.scope === "decision" && a.occurrenceKey) unplaced++;
-      for (const g of matched) gids.add(g);
-    }
-    // The START-NODE COUNT badge is the chrome mirror + catch-all: the TOTAL open count. `unplaced` = open OCCURRENCE flags that
-    // lit NO node (moved/removed) — surfaced so a re-homed flag is never a silent aggregate-count-only blocker (the flag list
-    // labels which). Per-flag tracked, not a gid-count subtraction.
-    // #224 ii.3 Slice 2b-2: roll a body concept's OPEN flag up onto its COLLAPSED criterion box — else a flag on a concept
-    // referenced ONLY inside a folded criterion body is invisible in the flow (disc 319 [important] 7). Concept-scope open
-    // flags only; matched by (lib,name). An EXPANDED criterion's body concepts render their own badges (no rollup needed).
-    const openConceptKeys = new Set(open.filter((f) => f.anchor.scope === "concept").map((f) => `${f.anchor.library}\u0000${f.anchor.name}`));
-    if (openConceptKeys.size > 0) {
-      for (const occ of tree.criterionOccurrences) {
-        if (!occ.collapsed) continue;
-        if (occ.bodyConcepts.some((bc) => openConceptKeys.has(`${bc.lib}\u0000${bc.name}`))) gids.add(occ.gid);
-      }
-    }
+    // Todo 2 (disc 356/357): the flag->node placement, extracted PURE (flagPlacement.ts) so the reverse-map assembly (dedup /
+    // order / rollup / moved-occurrence exclusion) is unit-tested. `flagsByGid` (WHICH open flags lit each gid) drives the
+    // node-filtered entry; `gids` LIGHT the per-node badges. The two crlStructure/resolveAnchor lookups stay here (host state)
+    // as callbacks; the matching itself is UNCHANGED from the prior inline pass (Claude-verified equivalent, disc 357).
+    const placement = computeFlagPlacement(
+      open,
+      { conceptOccurrences: tree.conceptOccurrences, criterionOccurrences: tree.criterionOccurrences },
+      // a decision-OBJECT flag (no occurrence key) -> every segment gid of the whole decision.
+      (a) => {
+        const dec = crlStructure.find((sc) => sc.decision === a.name && sc.lib === a.library);
+        return dec ? segmentsFor(tree, [dec.nodeKey]).segmentIds : [];
+      },
+      // a decision OCCURRENCE -> the ONE keyed node when it still resolves LIVE (moved/orphan -> undefined -> unplaced).
+      (a) => {
+        const cls = resolveAnchor(a, anchorCtx);
+        return cls.state === "live" && cls.nodeKey ? tree.anchors[cls.nodeKey]?.scrollTo : undefined;
+      },
+    );
+    const { gids, unplaced } = placement;
+    flagsByGid = placement.byGid; // wholesale swap - only the CURRENT render's gids stay (lockstep with the painted badges)
     const resolvedCount = flagsList.length - open.length;
-    void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [...gids], startNodeGid: tree.startNodeGid, open: open.length, resolved: resolvedCount, flagError: flagStateError, unplaced });
+    void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids, startNodeGid: tree.startNodeGid, open: open.length, resolved: resolvedCount, flagError: flagStateError, unplaced });
   }
 
   /** #224 ii.3 Slice 2b / #233 Todo 2b — the LIVE criterion identities: `{lib,name}` → `{bodyHash, elided}`. The gate set is
@@ -2073,7 +2091,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   function onWebviewMessage(
     pane: Pane,
-    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string; state?: string; tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown; token?: unknown; html?: unknown },
+    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string; state?: string; gid?: string; tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown; token?: unknown; html?: unknown },
   ): void {
     const v = views.get(pane);
     if (!v) return;
@@ -2129,7 +2147,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     } else if (msg.type === "fcOpenSource" && typeof msg.idx === "number") {
       openFailedCriterionSource(msg.idx); // a gap row's "Open CRL source"
     } else if (msg.type === "mvFlags") {
-      void openFlagList(); // #203 Todo 4: the tree-chrome flag badge → open the review-flag list (MV)
+      void openFlagList(); // #203 Todo 4: the tree-chrome flag badge / START-node count pill → the WHOLE-policy review-flag list (MV)
+    } else if (msg.type === "nodeFlags" && typeof msg.gid === "string") {
+      void openNodeFlags(msg.gid); // Todo 2 (disc 356): a PER-NODE ⚑ badge → the drawer/list filtered to THIS node (gid re-validated against flagsByGid)
     } else if (msg.type === "questionNav" && (msg.dir === "prev" || msg.dir === "next")) {
       navigateQuestion(msg.dir); // #177 slice 5: the questionnaire pane's prev/next sub-nav — moves currentQuestionIndex
     } else if (msg.type === "worklistSet" && typeof msg.key === "string") {
@@ -2362,6 +2382,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // draft too (else `flagDraft` lingers invisible + uncommittable; a fresh tree panel wouldn't re-show it).
       if (pane === "tree") {
         clearFlagDraft("disposed"); // #210 (disc 239): drop the draft + SETTLE any pending agent elicitation (else it hangs)
+        flagsByGid = new Map(); // Todo 2 (disc 357): drop the node→flags map — a reopened tree resets `gen` to 1, so a stale `g1_` bucket must not survive
         flagAnchor = undefined; // #210 Todo C: drop the anchor too — a reopened tree must not resurrect a stale target (B6)
         snapshotCapture.settleEmpty(); // #(tree-snapshot): a capture in flight against this pane must settle now (no 3s hang)
         cockpitAgentBridge.notifyChanged(); // the tree pane closed → the agent can't perceive/flag; update the chip
@@ -2521,7 +2542,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     flagAnchor = undefined; // #210 Todo C: drop the agent flag anchor too (a stale anchor must not survive a failed retarget)
     mvSidecarPath = undefined;
     flagsList = []; // #203 Todo 4: drop the review-flag state too (a stale flag list/gate must not survive a failed retarget)
+    flagsByGid = new Map(); // Todo 2 (disc 356): drop the node→flags map with it (a stale gid must never resolve the next policy's flags)
     flagStateError = false;
+    flagStoreWarning = false;
     flagStateNote = undefined; // #212 S3: drop the un-migrated note too
     anchorCtx = undefined; // #212 S2: drop the anchor context with the structure (a stale ctx must not resolve the next policy's flags)
     worklistActions = {};
@@ -4675,7 +4698,9 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #203 Todo 4b Slice A: a click on a per-node ⚑ flag badge — intercepted BEFORE [data-reveal] ("controls first") since
   // the badge <g> is nested inside the row's data-reveal; opens the flag list (the same channel as the chrome badge).
   `const fb=e.target.closest&&e.target.closest('[data-mv-flag-badge]');` +
-  `if(fb){e.preventDefault();e.stopPropagation();v.postMessage({type:'mvFlags'});return;}` +
+  // Todo 2 (disc 356): a PER-NODE badge carries data-node-flag-gid (read off the MATCHED badge <g>, NOT a second closest — the
+  // start pill is its SIBLING in the same row) → node-filtered; the start-count pill has none → the whole-policy list.
+  `if(fb){e.preventDefault();e.stopPropagation();var ng=fb.getAttribute('data-node-flag-gid');if(ng)v.postMessage({type:'nodeFlags',gid:ng});else v.postMessage({type:'mvFlags'});return;}` +
   // tree zoom control (− / reset / +) — a local view op, no host round-trip. Intercepted BEFORE [data-reveal].
   `const zb=e.target.closest&&e.target.closest('[data-zoom]');` +
   `if(zb){e.preventDefault();e.stopPropagation();const a=zb.getAttribute('data-zoom');setZoom(a==='in'?treeZoom*1.2:a==='out'?treeZoom/1.2:1);return;}` +

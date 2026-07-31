@@ -736,6 +736,16 @@ check("#203 Slice A + GAP 3: renders a HIDDEN, clickable ⚑ flag badge on each 
   assert.match(FLOW_STYLE, /\.flow-flag-badge\{display:none;/); // hidden by default
   assert.match(FLOW_STYLE, /\.flow-row\.has-flag \.flow-flag-badge\{display:inline\}/); // shown on host toggle
 });
+check("Todo 2 (disc 356): each per-node ⚑ carries data-node-flag-gid == its enclosing row id (the node-filter token); the START pill has none", () => {
+  // every per-node badge's gid is a REAL row id (so the host's flagsByGid lookup can resolve it)
+  const badges = [...r.html.matchAll(/<g class="flow-flag-badge" data-mv-flag-badge="1" data-node-flag-gid="([^"]+)">/g)].map((m) => m[1]);
+  assert.equal(badges.length, 6, "all six per-node badges carry a node-flag gid");
+  for (const gid of badges) assert.ok(r.html.includes(`<g id="${gid}"`), `badge gid ${gid} matches a rendered row id`);
+  // the per-node gids ARE the flaggable row gids
+  assert.deepEqual([...badges].sort(), [...r.flaggableGids].sort());
+  // the start-count pill is a DIFFERENT channel (whole-policy list) — it must NOT carry a node gid
+  assert.doesNotMatch(r.html, /flow-startflag-badge[^>]*data-node-flag-gid/);
+});
 
 check("tree zoom: renders a floating − / reset / + control (the % is filled in by the webview's applyZoom)", () => {
   assert.match(r.html, /class="flow-zoom" data-flow-zoom/);

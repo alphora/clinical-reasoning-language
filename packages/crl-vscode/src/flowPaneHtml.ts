@@ -593,7 +593,7 @@ export function renderFlowPane(
         labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX - 5, 20) +
         critToggle(x + 9, y + OUTLINE_H / 2, cr.collapsed, togKey) +
         critVerdictChip(x + OUTLINE_NODE_W - 11, y + 9) +
-        flagBadge(x + OUTLINE_NODE_W - 27, y + 11) +
+        flagBadge(x + OUTLINE_NODE_W - 27, y + 11, gid) +
         `</g>`;
       continue;
     }
@@ -645,7 +645,7 @@ export function renderFlowPane(
         `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
         labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX, 9) +
         flowRing(x, y, OUTLINE_NODE_W, OUTLINE_H, 1.5, 7) +
-        (leafConcept ? flagBadge(x + OUTLINE_NODE_W - 11, y + 11) : "") +
+        (leafConcept ? flagBadge(x + OUTLINE_NODE_W - 11, y + 11, gid) : "") +
         `</g>`;
       continue;
     }
@@ -709,7 +709,7 @@ export function renderFlowPane(
     if (isWhenConcept) conceptOccurrences.push({ gid, lib: n.conceptLib!, name: n.conceptName! });
     // Badge position: a LEAF mirrors its all-pass ✓ — ⚑ at LEFT-center, ✓ at right-center, label centered between (they
     // no longer collide, GAP 3 / Claude I3); a decision stadium → left of its rounded end; a `when` rect → top-right.
-    const flagBadgeMarkup = flaggable ? flagBadge(isLeafEnd ? x + 13 : stadium ? x + NODE_W - 30 : x + NODE_W - 14, isLeafEnd ? y + NODE_H / 2 : y + 13) : "";
+    const flagBadgeMarkup = flaggable ? flagBadge(isLeafEnd ? x + 13 : stadium ? x + NODE_W - 30 : x + NODE_W - 14, isLeafEnd ? y + NODE_H / 2 : y + 13, gid) : "";
     // The PRIMARY/start node (first decision root) additionally carries the chrome-mirror COUNT badge — a pill showing the
     // total open-flag count (`⚑ N`), the catch-all click target (see driveFlagBadges). Pre-rendered hidden; the host sets
     // its text + `.has-startflag`. Sits at the top-right, straddling the node's top edge (within the PAD, no clip).
@@ -731,7 +731,7 @@ export function renderFlowPane(
     // #224 ii.3 Slice 2b-2: a criterion when carries a HIDDEN rollup ⚑ (left of the verdict chip). The host lights it
     // (`.has-flag`) ONLY when the box is COLLAPSED and a body concept has an open flag (driveFlagBadges) — so a folded body's
     // flag isn't invisible. `flaggableGids` includes the gid so the host's bulk-clear covers it (the flagBadge idiom).
-    const critFlagMarkup = critC ? flagBadge(x + NODE_W - 30, y + 13) : "";
+    const critFlagMarkup = critC ? flagBadge(x + NODE_W - 30, y + 13, gid) : "";
     if (critC) flaggableGids.push(gid);
     body +=
       `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
@@ -768,10 +768,15 @@ export function renderFlowPane(
 // #203 Todo 4b Slice A — the hidden per-node flag badge: a ⚑ glyph grandchild `<g>`, shown when the host adds `.has-flag`
 // to the row (the `.flow-allpass-badge` idiom — pre-rendered + class-toggled so a flag change never re-renders `#root` and
 // clobbers the painted verdict/failed-criterion overlays). Clickable (`pointer-events:auto` + `data-mv-flag-badge`, the
-// webview intercepts it BEFORE the row's `data-reveal`) → opens the flag list. Top-RIGHT interior (clears the left label +
-// the top guard-tab band; leaves never carry both an all-pass ✓ [right-center] and a flag [top-right]).
-const flagBadge = (bx: number, by: number): string =>
-  `<g class="flow-flag-badge" data-mv-flag-badge="1"><title>review flag(s) on this node — click to open the flag list</title>` +
+// webview intercepts it BEFORE the row's `data-reveal`). Top-RIGHT interior (clears the left label + the top guard-tab band;
+// leaves never carry both an all-pass ✓ [right-center] and a flag [top-right]).
+//
+// Todo 2 (disc 356): the per-node badge carries `data-node-flag-gid="${gid}"` on the badge `<g>` ITSELF (NOT the row) → the
+// webview posts `{nodeFlags, gid}` so the host filters to THIS node's flags. CRITICAL that it's on the badge, not the row: on
+// the start node the per-node ⚑ and the start-count pill are SIBLINGS in one row `<g>`, so a row-level attribute would make a
+// start-pill click resolve it too and break "root → full list". The START pill (startFlagBadge) has NO gid → still `mvFlags`.
+const flagBadge = (bx: number, by: number, gid: string): string =>
+  `<g class="flow-flag-badge" data-mv-flag-badge="1" data-node-flag-gid="${escapeHtml(gid)}"><title>review flag(s) on this node — click to review</title>` +
   `<circle cx="${bx}" cy="${by}" r="7"/><text class="flow-flag-glyph" x="${bx}" y="${by + 3.5}">⚑</text></g>`;
 
 // The start-node COUNT badge — a copy of the tree chrome (`⚑ N open flags`) pinned to the primary/start node: a pill with
