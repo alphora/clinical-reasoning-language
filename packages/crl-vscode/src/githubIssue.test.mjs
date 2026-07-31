@@ -22,6 +22,16 @@ test("createGithubIssue: POSTs to the repo issues endpoint with auth + body, ret
   assert.deepEqual(JSON.parse(seen.init.body), { title: "T", body: "B" });
 });
 
+test("createGithubIssue: labels are sent when present; omitted when absent/empty", async () => {
+  let seen;
+  const fetchImpl = async (url, init) => { seen = init; return resp(true, 201, { number: 7 }); };
+  await createGithubIssue({ owner: "o", repo: "r", title: "T", body: "B", token: "t", labels: ["mv:crl-vs-narrative"], fetchImpl });
+  assert.deepEqual(JSON.parse(seen.body), { title: "T", body: "B", labels: ["mv:crl-vs-narrative"] });
+  // an empty labels array must NOT add a `labels` key (an unlabeled tag → no label)
+  await createGithubIssue({ owner: "o", repo: "r", title: "T", body: "B", token: "t", labels: [], fetchImpl });
+  assert.deepEqual(JSON.parse(seen.body), { title: "T", body: "B" });
+});
+
 test("createGithubIssue: owner/repo are URL-encoded (no path injection)", async () => {
   let url;
   const fetchImpl = async (u) => { url = u; return resp(true, 201, { number: 1 }); };

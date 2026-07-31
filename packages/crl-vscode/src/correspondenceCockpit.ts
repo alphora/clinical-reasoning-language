@@ -14,6 +14,8 @@ import {
   conceptDeclRef,
   criterionGateIdentities,
   flagTags,
+  flagLabelOf,
+  flagDisplayNameOf,
   hasForbiddenGistChars,
   nodeKey,
   topCriterion,
@@ -3319,11 +3321,16 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
               // ternary is just TS narrowing over its `string | undefined` type. A missing policy id degrades to the bare
               // summary / target-only header (never a stray " - ").
               const policyId = policySrc ? policyIdFromSrc(policySrc) : undefined;
+              // The MV Type (drives the issue LABEL + a `**Type:**` body line). PARTIAL lookup: an unlabeled/unknown tag → no
+              // label + no Type line (never an error). `labels` is omitted when there's no MV label (createGithubIssue drops it).
+              const typeName = flagDisplayNameOf(tag);
+              const label = flagLabelOf(tag);
               const args = {
                 owner: repo.owner,
                 repo: repo.repo,
                 title: flagIssueTitle(policyId, summary),
-                body: flagIssueBody(policyId, { kind: target.kind, name: target.name, label: target.label }, stub),
+                body: flagIssueBody(policyId, { kind: target.kind, name: target.name, label: target.label }, stub, typeName),
+                ...(label ? { labels: [label.name] } : {}),
               };
               try {
                 ref = `#${await createGithubIssue({ ...args, token })}`;

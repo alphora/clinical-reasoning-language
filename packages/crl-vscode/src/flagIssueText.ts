@@ -27,12 +27,15 @@ export function flagIssueTitle(policyId: string | undefined, summary: string): s
   return `${full.slice(0, TITLE_MAX - 1).trimEnd()}…`;
 }
 
-/** The issue BODY: a self-describing header naming the artifact + flagged target, then the reviewer's stub. The header is
- *  markdown (`**Artifact:** \`id\` · <kind> "<name>"`); with no policy id it degrades to just the target descriptor.
- *  An empty stub yields the header alone (the body was empty before this change). */
-export function flagIssueBody(policyId: string | undefined, target: FlagIssueTarget, stub: string): string {
+/** The issue BODY: a self-describing header naming the artifact + flagged target (+ the MV Type when known), then the
+ *  reviewer's stub. The header is markdown (`**Artifact:** \`id\` · <kind> "<name>"`, then a `**Type:** <typeName>` line);
+ *  with no policy id it degrades to just the target descriptor. `typeName` is the flag's human Type (e.g. "CRL vs narrative")
+ *  — named in the body so the issue is triageable even if the `mv:*` label is missing (a partial-lookup / unlabeled tag). An
+ *  empty stub yields the header alone. */
+export function flagIssueBody(policyId: string | undefined, target: FlagIssueTarget, stub: string, typeName?: string): string {
   const desc = (target.label ?? "").trim() || `${target.kind} "${target.name}"`;
-  const header = policyId ? `**Artifact:** \`${policyId}\` · ${desc}` : desc;
+  const artifact = policyId ? `**Artifact:** \`${policyId}\` · ${desc}` : desc;
+  const header = typeName ? `${artifact}\n**Type:** ${typeName}` : artifact;
   const rest = stub.trim();
   return rest ? `${header}\n\n${rest}` : header;
 }

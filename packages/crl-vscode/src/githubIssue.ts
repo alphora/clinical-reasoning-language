@@ -20,6 +20,9 @@ export interface CreateGithubIssueArgs {
   title: string;
   body: string;
   token: string;
+  /** labels to attach (the MV Type `mv:*` label). Sent only when non-empty; absent/[] posts no `labels` key. GitHub creates
+   *  a missing label on the fly, but we pre-create them (Todo 4) so the color/description are ours. */
+  labels?: readonly string[];
   /** injected for tests; defaults to the global `fetch` (present in the VS Code extension-host Node ≥18). */
   fetchImpl?: typeof fetch;
 }
@@ -41,7 +44,7 @@ export async function createGithubIssue(args: CreateGithubIssueArgs): Promise<nu
         "User-Agent": "crl-vscode",
         "X-GitHub-Api-Version": "2022-11-28",
       },
-      body: JSON.stringify({ title: args.title, body: args.body }),
+      body: JSON.stringify(args.labels && args.labels.length ? { title: args.title, body: args.body, labels: args.labels } : { title: args.title, body: args.body }),
     });
   } catch (e) {
     throw new IssueCreateError(0, `network error: ${e instanceof Error ? e.message : String(e)}`);

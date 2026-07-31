@@ -34,6 +34,15 @@ test("flagIssueBody: header names the artifact + target, then the stub", () => {
   assert.equal(b, '**Artifact:** `sur716-011` · decision "Meets criteria"\n\nThe encoded threshold is 35 but policy says 40.');
 });
 
+test("flagIssueBody: a Type name adds a `**Type:**` line under the artifact (so the issue is triageable without a label)", () => {
+  const b = flagIssueBody("sur716-011", T, "note", "CRL vs narrative");
+  assert.equal(b, '**Artifact:** `sur716-011` · decision "Meets criteria"\n**Type:** CRL vs narrative\n\nnote');
+  // empty stub → header (with the Type line) alone
+  assert.equal(flagIssueBody("sur716-011", T, "", "Tooling bug"), '**Artifact:** `sur716-011` · decision "Meets criteria"\n**Type:** Tooling bug');
+  // no Type name (an unlabeled/unknown tag) → no Type line (unchanged shape)
+  assert.equal(flagIssueBody("sur716-011", T, "note"), '**Artifact:** `sur716-011` · decision "Meets criteria"\n\nnote');
+});
+
 test("flagIssueBody: empty stub → header alone (body was empty before)", () => {
   assert.equal(flagIssueBody("sur716-011", T, ""), '**Artifact:** `sur716-011` · decision "Meets criteria"');
   assert.equal(flagIssueBody("sur716-011", T, "   "), '**Artifact:** `sur716-011` · decision "Meets criteria"');
