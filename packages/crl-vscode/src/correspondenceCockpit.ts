@@ -16,6 +16,8 @@ import {
   flagTags,
   flagLabelOf,
   flagDisplayNameOf,
+  flagFieldRulesOf,
+  validateFlagFields,
   hasForbiddenGistChars,
   nodeKey,
   topCriterion,
@@ -65,7 +67,7 @@ import {
 import { resolveThisNode } from "./thisNodeMarker";
 import { failedCriterionLabel } from "./failedCriterionLabel";
 import { buildIssueUrl, githubIssuesBaseFromRemote, githubRepoFromRemote, issueRefOf, sanitizeIssueBase } from "./issueLink";
-import { createGithubIssue, getGithubIssue, IssueCreateError, issueCreateErrorLabel } from "./githubIssue";
+import { createGithubIssue, getGithubIssue, IssueCreateError, issueCreateErrorLabel, updateGithubIssue } from "./githubIssue";
 import { renderFlagDrawer } from "./flagDrawerHtml";
 import { renderFlagActionDrawer, type FlagActionField } from "./flagActionDrawerHtml";
 import { computeFlagPlacement } from "./flagPlacement";
@@ -176,7 +178,7 @@ import {
 import type { CancelToken, ElicitationCancelReason, ElicitationOutcome } from "./agentDrivableUi";
 import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordinator";
 import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE, policyIdFromSrc } from "./provenanceFindings";
-import { flagIssueBody, flagIssueTitle } from "./flagIssueText";
+import { flagIssueBody, flagIssueTitle, replaceIssueTypeLine } from "./flagIssueText";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
 
@@ -489,6 +491,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // `flagsList` after any status write / external store change (`refreshFlagActionDrawer`) — so the drawer never toggles off a
   // stale status snapshot. Cleared alongside `flagDraft` on every lifecycle drop (`clearFlagDraft`).
   let flagActionView: { flag: MvFlag; ver: number; cel: string | undefined } | undefined;
+  // Todo 3 (disc 358): the EDIT form — the third `#flagDrawer` content mode (create → edit → view → empty). Carries the flag
+  // being edited + the policy `cel` captured at open; NO `ver` (the typed form must SURVIVE a same-policy rebuild — the watcher/
+  // refresh must not re-render it, so there's no ver to go stale; Save re-reads by id at write time — accept #1/#10). Mutually
+  // exclusive with the other two (opening any clears the rest via the settle choke-point). `flagEditDirty` gates the discard
+  // confirm on a switch/close while the form has unsaved edits (the operator's "blocked by lose-changes, if needed").
+  let flagEditDraft: { flag: MvFlag; cel: string | undefined } | undefined;
+  let flagEditDirty = false;
   let flagActionBusy = false; // single-flight for the drawer's async actions (a rapid 2nd click must not overlap a write / stale open-issue)
   // disc 359/360: request a ONE-TIME scroll of the gold-linked node into view — set ONLY by a genuine drawer OPEN/SWITCH
   // (`openFlagActionView`), consumed by the next `driveFlagNodeHighlight`. A rebuild/ack/refresh re-drive never sets it, so a
@@ -1095,6 +1104,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  flag) — a documented, transitional cost. Esc closes the list. */
   async function openFlagList(): Promise<void> {
     if (mode !== "medical-validation") return;
+    if (!(await guardEditDiscard())) return; // Todo 3: browsing to another flag would abandon an in-progress edit — confirm first
     const ver = indexVersion; // retarget/rebuild guard: a policy switch while a picker is open must not act on the old policy
     const cel = currentCel;
     if (flagsList.length === 0) return flagNote(flagStateError ? flagStateNote ?? "flag state is unknown (a source could not be read)" : "no review flags");
@@ -1123,6 +1133,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  → keep). The START-node count pill is a DIFFERENT channel (`mvFlags` → the full list) — untouched. */
   async function openNodeFlags(gid: string): Promise<void> {
     if (mode !== "medical-validation") return;
+    if (!(await guardEditDiscard())) return; // Todo 3: switching to this node's flag would abandon an in-progress edit — confirm first
     const ver = indexVersion;
     const cel = currentCel;
     const flags = flagsByGid.get(gid) ?? []; // OPEN-only (driveFlagBadges builds it over `open`) — matches what the badge counts
@@ -1651,9 +1662,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!tree) return; // no tree webview to highlight (the drawer lives in it; a fresh render starts classless + the ack re-drives)
     const gids = flagDraft
       ? gidsForTargetChoice(flagDraft.target) // the create draft's target — "which node am I flagging?" while authoring (disc 361)
-      : flagActionView
-        ? gidsForFlag(flagActionView.flag)
-        : [];
+      : flagEditDraft
+        ? gidsForFlag(flagEditDraft.flag) // Todo 3: the edit form's flag stays gold-linked while editing
+        : flagActionView
+          ? gidsForFlag(flagActionView.flag)
+          : [];
     const scroll = flagHlScrollPending; // true ONLY for a genuine open/switch — a re-render/ack/refresh drive never scrolls
     flagHlScrollPending = false;
     void tree.panel.webview.postMessage({ type: "flagHl", gen: tree.gen, gids, scroll });
@@ -2282,8 +2295,16 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       void flagActionToggle(); // the action drawer's Resolve/Reopen (host acts on the host-captured flagActionView.flag — the msg carries no id)
     } else if (msg.type === "flagActionIssue") {
       void flagActionOpenIssue(); // the action drawer's Open-issue #N
+    } else if (msg.type === "flagActionEdit") {
+      openFlagEditDraft(); // Todo 3: the action drawer's Edit → the edit form (host-gated to human MV Types)
     } else if (msg.type === "flagActionClose") {
       closeFlagActionView(); // the action drawer's ✕ (UI clear — no agent elicitation)
+    } else if (msg.type === "flagEditSave") {
+      void saveFlagEdit({ tag: msg.tag, summary: msg.summary, stub: msg.stub, fields: msg.fields }); // Todo 3: the edit form's Save
+    } else if (msg.type === "flagEditCancel") {
+      cancelFlagEdit(); // Todo 3: the edit form's Cancel/✕ → back to the action view
+    } else if (msg.type === "flagEditDirty") {
+      if (flagEditDraft) flagEditDirty = true; // Todo 3: the form was modified → the lose-changes gate now applies to a switch
     } else if (msg.type === "reveal" && typeof msg.key === "string") {
       const hit = v.reveals[msg.key]; // trusted: looked up by opaque key, not a path/range from the webview
       if (!hit) return;
@@ -3243,7 +3264,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // Option A: the target is chosen HERE (native quick-pick); the drawer opens on the RESOLVED target. The webview never
     // names a target (trusted-input discipline). `openFlagDrawer` is a standalone seam — the editor agent (EPIC #210)
     // resolves the target itself and calls it directly, so the flag command has ONE entry point for both paths.
-    if (pick.choice) openFlagDrawer({ target: pick.choice });
+    if (pick.choice) {
+      if (!(await guardEditDiscard())) return; // Todo 3: a new create drawer would abandon an in-progress edit — confirm first
+      openFlagDrawer({ target: pick.choice });
+    }
   }
 
   /** Post the current `flagDraft` to the tree pane's dedicated `#flagDrawer` region (or an EMPTY region to clear it). The
@@ -3254,13 +3278,19 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!tree) return;
     // Only the human MV "Type" tags (a `displayName`) are offered — the AI-authoring extraction tags are hidden from the drawer.
     const mvTypes = flagTags().filter((t) => t.displayName !== undefined);
-    // One-slot dispatcher (design 354): the create drawer wins, else the action drawer, else an empty region. Never both set
-    // (each open clears the other) — this precedence is just a total order for the "both somehow set" impossibility.
+    // One-slot dispatcher (design 354; Todo 3 adds edit): create → edit → action → empty. Never more than one set (each open
+    // clears the others via the settle choke-point) — this precedence is just a total order for the "both somehow set" impossibility.
+    const editFlag = flagEditDraft?.flag;
     const html = flagDraft
       ? renderFlagDrawer({ targetLabel: flagDraft.target.shortLabel, targetTitle: flagDraft.target.label, tags: mvTypes, tag: flagDraft.tag, summary: flagDraft.summary, stub: flagDraft.stub, fields: flagDraft.fields, focus: flagDraft.focus })
-      : flagActionView
-        ? renderFlagActionDrawer(flagActionViewModel(flagActionView.flag))
-        : "";
+      : editFlag
+        ? // A gist CAN be multi-line (validateFlagFields permits it; the MCP create_flag path can file one) but the summary is a
+          // single-line <input> whose value-sanitization would STRIP newlines — silently CONCATENATING words on save (impl-review
+          // Claude #2). Normalize newlines → a space at prefill so the user SEES + saves exactly the single line that survives.
+          renderFlagDrawer({ targetLabel: editFlag.anchor.label, targetTitle: editFlag.anchor.label, tags: mvTypes, tag: editFlag.tag, summary: editFlag.gist.replace(/[\r\n]+/g, " "), stub: editFlag.description, fields: editFlag.fields, edit: true })
+        : flagActionView
+          ? renderFlagActionDrawer(flagActionViewModel(flagActionView.flag))
+          : "";
     void tree.panel.webview.postMessage({ type: "flagDrawer", html });
     driveFlagNodeHighlight(); // disc 359/361: EVERY drawer mutation (create + action) funnels here → the gold node-link stays lockstep with the drawer
   }
@@ -3270,6 +3300,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // does NOT include `kind` — the read-only view SHOWS kind (+ any other discriminator field) per design 354 accept #7; the
   // create drawer hides it (AI-only authoring), but reading a filed flag should surface everything it carries.
   const FLAG_VIEW_PLUMBING = new Set(["ref", "key", "status", "system"]);
+
+  // Todo 3 (disc 358 accept #3): the fields the EDIT form NEVER owns — host plumbing (ref/key/status/system) + `kind` (AI-only,
+  // hidden from the drawer). On save these are PRESERVED verbatim from the on-disk record (mirrors flagDrawerHtml's
+  // HOST_MANAGED_FIELDS, incl. kind — unlike FLAG_VIEW_PLUMBING). The form supplies only the NEW tag's VISIBLE discriminators.
+  const EDIT_PRESERVED_FIELDS = new Set(["ref", "key", "status", "system", "kind"]);
 
   /** Build the read-only view model the action drawer renders from a stored `MvFlag`. Derives the display-only bits here (Type
    *  via `flagDisplayNameOf` with a raw-tag fallback, the occurrence signature via `parseOccurrenceKey`, the numeric issue no
@@ -3299,6 +3334,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       editedAt: flag.editedAt,
       id: flag.id,
       targetPresent: gidsForFlag(flag).length > 0, // disc 359: no charted node → auto-open Details + a note (the gold link can't point)
+      canEdit: flagDisplayNameOf(flag.tag) !== undefined, // Todo 3: Edit only for a human MV Type (extraction/legacy stays read-only)
     };
   }
 
@@ -3309,6 +3345,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (mode !== "medical-validation") return;
     settleDrawer({ status: "cancelled", reason: "replaced" }); // a new flyout supersedes any pending create elicitation
     flagDraft = undefined;
+    flagEditDraft = undefined; // Todo 3: opening the action view supersedes an edit form (one slot)
+    flagEditDirty = false;
     flagActionView = { flag, ver, cel };
     flagHlScrollPending = true; // an OPEN/SWITCH scrolls the gold-linked node into view once (postFlagDrawer→driveFlagNodeHighlight consumes it)
     postFlagDrawer();
@@ -3327,6 +3365,161 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function toggleFlagActionView(flag: MvFlag, ver: number, cel: string | undefined): void {
     if (flagActionView && flagActionView.flag.id === flag.id) return closeFlagActionView();
     openFlagActionView(flag, ver, cel);
+  }
+
+  /** Todo 3 (disc 358): enter the EDIT form for the open action drawer's flag. Host-gated to human MV Types (accept #4 — the
+   *  drawer only shows the Edit button when `canEdit`, but re-enforce here since the webview is untrusted). Routes through the
+   *  settle choke-point + clears the other modes (one slot). Captures `cel` only (no ver — the form survives a same-policy rebuild). */
+  function openFlagEditDraft(): void {
+    const view = flagActionView;
+    if (!view || flagActionBusy) return;
+    if (flagDisplayNameOf(view.flag.tag) === undefined) return flagNote("this flag type is read-only"); // extraction/legacy → no edit
+    settleDrawer({ status: "cancelled", reason: "replaced" });
+    flagDraft = undefined;
+    flagActionView = undefined;
+    flagEditDirty = false;
+    flagEditDraft = { flag: view.flag, cel: view.cel };
+    flagHlScrollPending = true; // keep the target scrolled into view on the mode switch
+    postFlagDrawer();
+  }
+
+  /** Todo 3: Cancel/✕ from the edit form → back to the action VIEW for the same flag (re-found by id in the refreshed list; a
+   *  clean deletion → empty region + note; a store WARNING → keep the captured record). A deliberate discard — NO lose-changes
+   *  prompt (that gates only an implicit SWITCH away, `guardEditDiscard`). */
+  function cancelFlagEdit(): void {
+    const draft = flagEditDraft;
+    if (!draft || flagActionBusy) return;
+    flagEditDraft = undefined;
+    flagEditDirty = false;
+    const live = flagsList.find((f) => f.id === draft.flag.id);
+    if (live) return openFlagActionView(live, indexVersion, currentCel);
+    if (flagStoreWarning) return openFlagActionView(draft.flag, indexVersion, currentCel); // unknown, not gone — keep the captured record
+    postFlagDrawer(); // genuinely gone → empty region
+    flagNote("the flag changed on disk — reopen it");
+  }
+
+  /** Todo 3 — the "lose changes" gate: when an implicit SWITCH (a different flag / node badge / new create drawer) would abandon
+   *  an edit form with UNSAVED text, confirm first (the operator's "blocked by lose-changes, if needed"). No edit open, or none
+   *  dirty → proceed immediately. Returns whether to proceed. */
+  async function guardEditDiscard(): Promise<boolean> {
+    if (!flagEditDraft || !flagEditDirty) return true;
+    const pick = await vscode.window.showWarningMessage("Discard your unsaved flag edits?", { modal: true }, "Discard");
+    return pick === "Discard";
+  }
+
+  /** Todo 3 — write an edited flag back to the store (disc 358). Order (accept #8): validate → clean re-read (reject store-
+   *  warning / deletion) → field-ownership merge → `saveFlag` LOCAL → reload/badges/return-to-view → THEN best-effort GitHub
+   *  relabel on a Type change. A form/store error keeps the edit form OPEN (typed text preserved); a vanished record closes it.
+   *  Guard = `cel`+mode ONLY (accept #1 — the form survived a rebuild, so `ver` would be spuriously stale); Save re-reads by id. */
+  async function saveFlagEdit(payload: { tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown }): Promise<void> {
+    const draft = flagEditDraft;
+    if (!draft || flagActionBusy) return;
+    const fail = (m: string): void => flagNote(m); // keeps the edit form OPEN (no state change) so the user's text isn't lost
+    const cel = draft.cel;
+    const rawTag = typeof payload.tag === "string" ? payload.tag : "";
+    const summary = typeof payload.summary === "string" ? payload.summary.trim() : "";
+    const stub = typeof payload.stub === "string" ? payload.stub : "";
+    const payloadFields: Record<string, string> = {};
+    if (payload.fields && typeof payload.fields === "object") {
+      for (const [k, val] of Object.entries(payload.fields as Record<string, unknown>)) if (typeof val === "string" && val.trim() !== "") payloadFields[k] = val.trim();
+    }
+    if (rawTag === "") return fail("a type is required");
+    if (summary === "") return fail("a summary is required");
+    if (/[\r\n]/.test(summary)) return fail("the summary must be a single line");
+    if (currentCel !== cel || mode !== "medical-validation") return fail("policy changed — reopen the flag");
+
+    flagActionBusy = true;
+    try {
+      const dir = currentCel ? flagStoreDir(currentCel) : undefined;
+      if (!dir) return fail("no flag store for this policy");
+      const loaded = loadStoredFlags(dir);
+      if (loaded.warning) return fail("flag store unreadable — repair the corrupt record first"); // parity with writeFlagStatus/create
+      const current = loaded.flags.find((f) => f.id === draft.flag.id);
+      if (!current) {
+        // gone on disk → close the edit form (typed text lost, accepted — accept #13) + refresh.
+        flagEditDraft = undefined;
+        flagEditDirty = false;
+        reloadReviewFlags();
+        renderTreeChrome();
+        driveFlagBadges();
+        postFlagDrawer();
+        return void flagNote("the flag changed on disk — reopen it");
+      }
+      // Re-gate eligibility on the RE-READ record (accept #4; impl-review gpt56 #2): an external writer may have retyped this
+      // flag to an extraction/legacy tag since the form opened — saving would then retype a now-read-only record to an MV Type.
+      if (flagDisplayNameOf(current.tag) === undefined) return fail("this flag is no longer editable — reopen it");
+      // Field ownership (accept #3): the form owns ONLY the NEW tag's VISIBLE discriminators (registry minus host-managed). The
+      // untrusted payload is restricted to those keys HERE (not via the <select>). validateFlagFields (accept #6) canonicalizes
+      // the tag + validates gist/fields; then PRESERVE the host/hidden fields + any field unknown to BOTH registries; DROP the
+      // old tag's discriminators absent from the new tag.
+      const newRuleKeys = new Set(flagFieldRulesOf(rawTag).map((r) => r.key)); // flagFieldRulesOf accepts an alias
+      const oldRuleKeys = new Set(flagFieldRulesOf(current.tag).map((r) => r.key));
+      const formFields: Record<string, string> = {};
+      for (const [k, v] of Object.entries(payloadFields)) if (newRuleKeys.has(k) && !EDIT_PRESERVED_FIELDS.has(k)) formFields[k] = v;
+      const val = validateFlagFields({ tag: rawTag, gist: summary, status: current.status, fields: formFields });
+      if (!val.ok) return fail(`can't save: ${val.message}`);
+      if (flagDisplayNameOf(val.canon) === undefined) return fail("that flag type can't be set here"); // never retype to a non-MV tag
+      const preserved: Record<string, string> = {};
+      for (const [k, v] of Object.entries(current.fields)) if (EDIT_PRESERVED_FIELDS.has(k) || (!oldRuleKeys.has(k) && !newRuleKeys.has(k))) preserved[k] = v;
+      const mergedFields = { ...preserved, ...val.fields };
+      const desc = stub.trim();
+      const updated: MvFlag = { ...current, tag: val.canon, category: val.category, gist: val.gist, fields: mergedFields, editedAt: new Date().toISOString() };
+      if (desc) updated.description = desc;
+      else delete updated.description;
+      try {
+        saveFlag(dir, updated);
+      } catch (e) {
+        return fail(`could not write the flag: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      reloadReviewFlags();
+      renderTreeChrome();
+      driveFlagBadges();
+      const refStr = issueRefOf(current.fields.ref);
+      const issueNo = refStr ? Number(refStr) : undefined;
+      // Return to the action VIEW for the saved flag (re-found by id; falls back to the just-built record). Clears flagEditDraft.
+      flagEditDraft = undefined;
+      flagEditDirty = false;
+      openFlagActionView(flagsList.find((f) => f.id === updated.id) ?? updated, indexVersion, currentCel);
+      // Best-effort Type-relabel — INSIDE the busy try (impl-review gpt56 #1 [critical]): holding `flagActionBusy` through the
+      // GitHub round-trip means a second Save can't start an OVERLAPPING relabel whose out-of-order PATCH would leave the issue
+      // on an older Type than the store. Only a REAL Type change with a numeric ref (local save already succeeded regardless).
+      if (val.canon !== current.tag && issueNo !== undefined) await relabelIssueForTypeChange(issueNo, val.canon, cel);
+    } finally {
+      flagActionBusy = false;
+    }
+  }
+
+  /** Todo 3 — re-sync a flag's born-together GitHub issue after a Type change (best-effort; the local save already succeeded).
+   *  Same trust/origin/token gates as create (incl. the 401 forced-refresh). A PATCH replaces the WHOLE label set, so GET the
+   *  current labels + body, swap ONLY the `mv:*` label (never erase human/bot labels), re-sync the body's `**Type:**` line, PATCH.
+   *  Any failure → a "flag saved; issue not updated (…)" note (never re-opens the drawer / never reverts the local save). */
+  async function relabelIssueForTypeChange(issueNo: number, newTag: string, cel: string | undefined): Promise<void> {
+    const noteFail = (why: string): void => flagNote(`flag saved; issue #${issueNo} not updated (${why})`);
+    if (!vscode.workspace.isTrusted) return noteFail("workspace not trusted");
+    const policySrc = cel ? findPolicySrc(cel) : undefined;
+    const repo = policySrc ? await githubRepoForFile(vscode.Uri.file(join(policySrc, "crl"))) : undefined;
+    if (!repo) return noteFail("no GitHub origin");
+    const newLabel = flagLabelOf(newTag);
+    const typeName = flagDisplayNameOf(newTag);
+    // ONE relabel attempt with a given token — GET the current issue, swap the mv:* label + re-sync the Type line, PATCH.
+    const attempt = async (token: string): Promise<{ ok: true } | { ok: false; status: number; reason: string }> => {
+      const got = await getGithubIssue({ owner: repo.owner, repo: repo.repo, number: issueNo, token });
+      if (!got.ok) return got;
+      const labels = got.issue.labels.filter((l) => !l.startsWith("mv:")); // preserve every non-MV label; drop the old mv:* one
+      if (newLabel) labels.push(newLabel.name);
+      const body = typeName ? replaceIssueTypeLine(got.issue.body, typeName) : got.issue.body;
+      return updateGithubIssue({ owner: repo.owner, repo: repo.repo, number: issueNo, token, labels, body });
+    };
+    const token = await githubToken();
+    if (!token) return noteFail("not signed in to GitHub");
+    let res = await attempt(token);
+    if (!res.ok && res.status === 401) {
+      // a stale cached token — force a fresh session + retry ONCE (the create path's contract).
+      const fresh = await githubToken(true);
+      if (fresh) res = await attempt(fresh);
+    }
+    if (res.ok) flagNote(`flag saved; issue #${issueNo} re-labeled`);
+    else noteFail(res.reason);
   }
 
   /** Reconcile the open action drawer against the current `flagsList` (design 354 [important]): re-find the record by id and
@@ -3356,6 +3549,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (mode !== "medical-validation") return;
     settleDrawer({ status: "cancelled", reason: "replaced" }); // #210 (disc 239): a NEW drawer supersedes any pending elicitation
     flagActionView = undefined; // mutual exclusion: the create drawer supersedes an open action drawer (one `#flagDrawer` slot)
+    flagEditDraft = undefined; // …and an open edit form (Todo 3)
+    flagEditDirty = false;
     flagDraft = { ...prefill, cel: currentCel };
     postFlagDrawer();
   }
@@ -3385,6 +3580,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     settleDrawer({ status: "cancelled", reason });
     flagDraft = undefined;
     flagActionView = undefined; // a lifecycle drop (retarget / reset / dispose) clears the action drawer too — same `#flagDrawer` slot
+    flagEditDraft = undefined; // …and the edit form (Todo 3) — a retarget/reset abandons an in-progress edit
+    flagEditDirty = false;
     postFlagDrawer();
   }
   /** The drawer element to ring — AUTHORITATIVELY derived from the live prefill (the agent supplies no override): the first
@@ -4186,6 +4383,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // drawer, no banner — the tool surfaces a recoverable isError); success opens the drawer (auto-deriving the purple focus
   // ring + the banner), installs the resolver (settled EXACTLY ONCE on every terminal), and returns `{wait, purpose}`.
   const bridgeBeginFlagDrawer = (args: OpenFlagDrawerArgs, token: CancelToken): BeginFlagDrawer => {
+    // impl-review (both arms): the agent's `openFlagDrawer` bypasses the human `guardEditDiscard`, so REFUSE while a human has
+    // unsaved edits rather than silently clobbering the typed text — the agent reports this back instead of destroying work.
+    if (flagEditDraft && flagEditDirty) return { error: "the validator has unsaved flag edits — try again after they save or cancel" };
     const r = resolveFlagPrefill(args);
     if ("error" in r) return { error: r.error };
     const focus = deriveFlagFocus(r.prefill); // AUTHORITATIVE (first empty of summary→description, else "submit")
@@ -4201,6 +4401,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     return { wait, purpose };
   };
   const bridgeSubmitFlag = async (args: OpenFlagDrawerArgs): Promise<SubmitFlagResult> => {
+    if (flagEditDraft && flagEditDirty) return { ok: false, reason: "the validator has unsaved flag edits — try again after they save or cancel" };
     const r = resolveFlagPrefill(args);
     if ("error" in r) return { ok: false, reason: r.error };
     const summary = args.summary?.trim();
@@ -4548,9 +4749,9 @@ body:has(.flag-drawer) .flow-zoom{display:none}
 .flag-drawer textarea{min-height:56px;resize:vertical;flex:1}
 .flag-drawer select{background:var(--vscode-dropdown-background);color:var(--vscode-dropdown-foreground);border-color:var(--vscode-dropdown-border,#3c3c3c)}
 .flag-actions{display:flex;justify-content:flex-end;gap:6px;padding-top:6px;border-top:1px solid var(--vscode-panel-border,#454545)}
-.flag-cancel,.flag-insert{cursor:pointer;border:none;border-radius:2px;padding:2px 10px;font-size:.9em}
+.flag-cancel,.flag-insert,.flag-save{cursor:pointer;border:none;border-radius:2px;padding:2px 10px;font-size:.9em}
 .flag-cancel{background:var(--vscode-button-secondaryBackground,#3a3d41);color:var(--vscode-button-secondaryForeground,#fff)}
-.flag-insert{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff)}
+.flag-insert,.flag-save{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff)}
 /* flag-ACTION drawer (read-only view) — shares .flag-drawer chrome; the body is a scrolling label/value list, actions pin bottom. */
 .fa-body{display:flex;flex-direction:column;gap:6px;flex:1;overflow-y:auto;padding-top:2px}
 .fa-row{display:flex;gap:8px;align-items:baseline}
@@ -4871,20 +5072,33 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // The flag-ACTION drawer shares this region (mutually exclusive with create) but uses DISTINCT `data-flag-action-*` intents
   // so its ✕ never posts the create `flagDraftCancel` (which no-ops when there's no draft). It carries no flag id — the host
   // acts on its captured `flagActionView.flag` (trusted-input discipline).
-  `fld.addEventListener('click',(e)=>{` +
-  `const ac=e.target.closest&&e.target.closest('[data-flag-action-toggle],[data-flag-action-issue],[data-flag-action-close]');` +
-  `if(ac){e.preventDefault();e.stopPropagation();v.postMessage({type:ac.hasAttribute('data-flag-action-toggle')?'flagActionToggle':ac.hasAttribute('data-flag-action-issue')?'flagActionIssue':'flagActionClose'});return;}` +
-  `const cx=e.target.closest&&e.target.closest('[data-flag-close],[data-flag-cancel]');` +
-  `if(cx){e.preventDefault();v.postMessage({type:'flagDraftCancel'});return;}` +
-  `const ins=e.target.closest&&e.target.closest('[data-flag-insert]');` +
-  `if(ins){e.preventDefault();` +
+  // Collect the drawer form's {tag, summary, stub, fields} — SHARED by the create Insert + the Todo-3 edit Save (the edit form
+  // reuses the SAME `data-flag-*` control attributes). Only the SELECTED tag's visible field group is read (a Type change swaps
+  // the group; the create field-drop + the edit field-ownership both drop non-current-group values).
+  `function flagCollect(){` +
   `const ts=fld.querySelector('[data-flag-tag]');const tg=ts?ts.value:'';` +
   `const su=fld.querySelector('[data-flag-summary]');const st=fld.querySelector('[data-flag-stub]');` +
   // find the SELECTED tag's field group by iterating + comparing (NOT selector interpolation — a tag id with a quote/]
   // would throw a SyntaxError and abort the click; matches aff()'s approach).
   `const fields={};let grp=null;for(const g of fld.querySelectorAll('[data-flag-field-for]')){if(g.getAttribute('data-flag-field-for')===tg){grp=g;break;}}` +
   `if(grp){for(const c of grp.querySelectorAll('[data-flag-field]')){const k=c.getAttribute('data-flag-field');const val=c.value;if(val&&val.trim()!=='')fields[k]=val;}}` +
-  `v.postMessage({type:'flagDraftInsert',tag:tg,summary:su?su.value:'',stub:st?st.value:'',fields:fields});return;}` +
+  `return{tag:tg,summary:su?su.value:'',stub:st?st.value:'',fields:fields};}` +
+  `fld.addEventListener('click',(e)=>{` +
+  `const ac=e.target.closest&&e.target.closest('[data-flag-action-toggle],[data-flag-action-issue],[data-flag-action-edit],[data-flag-action-close]');` +
+  `if(ac){e.preventDefault();e.stopPropagation();v.postMessage({type:ac.hasAttribute('data-flag-action-toggle')?'flagActionToggle':ac.hasAttribute('data-flag-action-issue')?'flagActionIssue':ac.hasAttribute('data-flag-action-edit')?'flagActionEdit':'flagActionClose'});return;}` +
+  // Todo 3: the edit form's Cancel/✕ + Save carry DISTINCT `data-flag-edit-*` intents (checked BEFORE the create close/insert,
+  // whose handlers no-op when only flagEditDraft is set). Save reuses flagCollect().
+  `const ec=e.target.closest&&e.target.closest('[data-flag-edit-cancel]');` +
+  `if(ec){e.preventDefault();v.postMessage({type:'flagEditCancel'});return;}` +
+  `const es=e.target.closest&&e.target.closest('[data-flag-edit-save]');` +
+  `if(es){e.preventDefault();const p=flagCollect();v.postMessage({type:'flagEditSave',tag:p.tag,summary:p.summary,stub:p.stub,fields:p.fields});return;}` +
+  `const cx=e.target.closest&&e.target.closest('[data-flag-close],[data-flag-cancel]');` +
+  `if(cx){e.preventDefault();v.postMessage({type:'flagDraftCancel'});return;}` +
+  `const ins=e.target.closest&&e.target.closest('[data-flag-insert]');` +
+  `if(ins){e.preventDefault();const p=flagCollect();v.postMessage({type:'flagDraftInsert',tag:p.tag,summary:p.summary,stub:p.stub,fields:p.fields});return;}` +
   `});` +
   // The tag select's change toggles the visible field group (client-side; no host round-trip).
-  `fld.addEventListener('change',(e)=>{const ts=e.target.closest&&e.target.closest('[data-flag-tag]');if(ts){aff();}});`;
+  `fld.addEventListener('change',(e)=>{const ts=e.target.closest&&e.target.closest('[data-flag-tag]');if(ts){aff();}});` +
+  // Todo 3: on the FIRST edit of the edit form, tell the host it's dirty (arms the lose-changes gate for an implicit switch). The
+  // `data-dirty` marker de-dupes to one message per edit session (the form isn't re-rendered while open, so it persists).
+  `fld.addEventListener('input',()=>{const ed=fld.querySelector('.flag-edit-drawer');if(ed&&!ed.hasAttribute('data-dirty')){ed.setAttribute('data-dirty','1');v.postMessage({type:'flagEditDirty'});}});`;

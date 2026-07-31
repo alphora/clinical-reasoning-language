@@ -36,6 +36,11 @@ export interface FlagDrawerOptions {
   /** #210 (disc 239) — the element to RING in CRL Assist purple ("summary" | "description" | "submit"), auto-derived by the
    *  agent-open path to draw the validator's eye to what's needed. Undefined for the human right-click (no ring). */
   focus?: string;
+  /** Todo 3 (disc 358): render as the EDIT form for an existing flag, not the create form. Changes the heading ("Edit flag —"),
+   *  the submit copy ("Save changes"), the description placeholder (no "becomes the GitHub issue body"), and — CRITICALLY — the
+   *  Save/Cancel/✕ intents to DISTINCT `data-flag-edit-{save,cancel}` (the create `data-flag-{insert,cancel,close}` route to the
+   *  create-only `commitFlagDraft`/`closeFlagDrawer`, dead when only `flagEditDraft` is set — disc 358 accept #2). */
+  edit?: boolean;
 }
 
 /** Render the create-flag drawer: a tag `<select>` (validation-concern first) + each tag's registry field controls (only
@@ -83,20 +88,31 @@ export function renderFlagDrawer(opts: FlagDrawerOptions): string {
     })
     .join("");
 
+  // Todo 3: the edit form carries DISTINCT intents so its Save/Cancel/✕ don't hit the create-only handlers (dead in edit mode).
+  const heading = opts.edit ? "Edit flag" : "Add flag";
+  const closeIntent = opts.edit ? "data-flag-edit-cancel" : "data-flag-close"; // ✕ → Cancel-back-to-view in edit; drop-draft in create
+  const cancelIntent = opts.edit ? "data-flag-edit-cancel" : "data-flag-cancel";
+  const submitIntent = opts.edit ? "data-flag-edit-save" : "data-flag-insert";
+  const submitClass = opts.edit ? "flag-save" : "flag-insert";
+  const submitLabel = opts.edit ? "Save changes" : "Insert flag + create issue";
+  // The create form tells the author the description becomes the issue body; on edit that framing is wrong (the body only
+  // re-syncs on a Type change), so use a neutral placeholder.
+  const descPlaceholder = opts.edit ? "the concern in a couple of lines" : "the concern in a couple of lines — becomes the GitHub issue body";
+
   return (
-    `<div class="flag-drawer" data-flag-drawer>` +
-    `<div class="flag-head"><span class="flag-title" title="${escapeHtml(opts.targetTitle ?? opts.targetLabel)}">Add flag — ${escapeHtml(opts.targetLabel)}</span>` +
-    `<button type="button" class="flag-close" data-flag-close aria-label="Close">✕</button></div>` +
+    `<div class="flag-drawer${opts.edit ? " flag-edit-drawer" : ""}" data-flag-drawer>` +
+    `<div class="flag-head"><span class="flag-title" title="${escapeHtml(opts.targetTitle ?? opts.targetLabel)}">${heading} — ${escapeHtml(opts.targetLabel)}</span>` +
+    `<button type="button" class="flag-close" ${closeIntent} aria-label="Close">✕</button></div>` +
     `<label class="flag-row"><span class="flag-label">Type</span>` +
     `<select data-flag-tag aria-label="Flag type">${tagOptions}</select></label>` +
     `<div class="flag-fields">${fieldGroups}</div>` +
     `<label class="flag-row"><span class="flag-label">Summary</span>` +
     `<input type="text" class="flag-input${ring("summary")}" data-flag-summary value="${escapeHtml(opts.summary ?? "")}" placeholder="one line — the issue title & the flag" aria-label="Summary"></label>` +
     `<label class="flag-col"><span class="flag-label">Description</span>` +
-    `<textarea class="flag-input${ring("description")}" data-flag-stub placeholder="the concern in a couple of lines — becomes the GitHub issue body" aria-label="Description">${escapeHtml(opts.stub ?? "")}</textarea></label>` +
+    `<textarea class="flag-input${ring("description")}" data-flag-stub placeholder="${escapeHtml(descPlaceholder)}" aria-label="Description">${escapeHtml(opts.stub ?? "")}</textarea></label>` +
     `<div class="flag-actions">` +
-    `<button type="button" class="flag-cancel" data-flag-cancel>Cancel</button>` +
-    `<button type="button" class="flag-insert${ring("submit")}" data-flag-insert>Insert flag + create issue</button>` +
+    `<button type="button" class="flag-cancel" ${cancelIntent}>Cancel</button>` +
+    `<button type="button" class="${submitClass}${ring("submit")}" ${submitIntent}>${submitLabel}</button>` +
     `</div></div>`
   );
 }

@@ -23,6 +23,7 @@ const OPEN_VIEW = {
   editedAt: "2026-07-31T11:00:00.000Z",
   id: "flag-abc123",
   targetPresent: true,
+  canEdit: true,
 };
 
 test("renderFlagActionDrawer: the shell — data-flag-action-drawer + distinct action intents (NOT the create drawer's)", () => {
@@ -136,6 +137,17 @@ test("renderFlagActionDrawer: all interpolated text is escaped (header / address
     assert.ok(!h.includes(raw), `must escape: ${raw}`);
   }
   assert.match(h, /&lt;script&gt;/);
+});
+
+// ── Todo 3 (disc 358): the Edit button — shown ONLY for a human MV Type (canEdit) ──
+test("edit button: rendered with data-flag-action-edit when canEdit; absent when not (extraction/legacy read-only)", () => {
+  const yes = renderFlagActionDrawer(OPEN_VIEW);
+  assert.match(yes, /data-flag-action-edit/);
+  assert.match(yes, /Edit flag/);
+  const no = renderFlagActionDrawer({ ...OPEN_VIEW, canEdit: false });
+  assert.ok(!/data-flag-action-edit/.test(no), "no Edit button for a read-only flag");
+  // the other actions are unaffected either way
+  assert.match(no, /data-flag-action-toggle/);
 });
 
 console.log("flagActionDrawerHtml.test: ok");

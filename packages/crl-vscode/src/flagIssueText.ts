@@ -39,3 +39,19 @@ export function flagIssueBody(policyId: string | undefined, target: FlagIssueTar
   const rest = stub.trim();
   return rest ? `${header}\n\n${rest}` : header;
 }
+
+/** Todo 3 (disc 358): re-sync an existing issue body's `**Type:**` line to `typeName` after a flag Type change — surgical (the
+ *  reviewer may have edited the rest of the body, so regenerating the whole body would clobber their prose). Replaces the FIRST
+ *  `**Type:** …` line in place; if none exists (the flag was filed under an unlabeled/unknown tag), inserts the line right after
+ *  the first body line (the Artifact header) — or appends it to a single-line body. Pure + node-testable. */
+export function replaceIssueTypeLine(body: string, typeName: string): string {
+  const line = `**Type:** ${typeName}`;
+  // `[^\r\n]*` (NOT `.*$`) so a CRLF body matches too: `.`/`$` stop before `\n` but leave the `\r`, so `.*$` would MISS a
+  // `**Type:** Old\r\n` line and duplicate it (impl-review gpt56 #6). No `$` — the match ends before `\r`/`\n`, so the replace
+  // preserves the original line ending.
+  const typeLine = /^\*\*Type:\*\* [^\r\n]*/m;
+  if (typeLine.test(body)) return body.replace(typeLine, line);
+  const nl = body.indexOf("\n");
+  if (nl === -1) return body === "" ? line : `${body}\n${line}`;
+  return `${body.slice(0, nl)}\n${line}${body.slice(nl)}`;
+}

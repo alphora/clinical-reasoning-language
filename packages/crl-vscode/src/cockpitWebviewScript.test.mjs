@@ -995,7 +995,9 @@ check("#211 webview: Insert collects the tag + summary + stub + the VISIBLE tag'
   assert.match(SCRIPT, /data-flag-close.*data-flag-cancel/); // close/cancel → flagDraftCancel
   assert.match(SCRIPT, /v\.postMessage\(\{type:'flagDraftCancel'\}\)/);
   assert.match(SCRIPT, /for\(const g of fld\.querySelectorAll\('\[data-flag-field-for\]'\)\)\{if\(g\.getAttribute\('data-flag-field-for'\)===tg\)\{grp=g;break;\}\}/); // collect the SELECTED group by iterating (no selector interpolation)
-  assert.match(SCRIPT, /v\.postMessage\(\{type:'flagDraftInsert',tag:tg,summary:[^,]+,stub:[^,]+,fields:fields\}\)/);
+  // Todo 3: the collection is factored into flagCollect() (shared by Insert + edit Save); Insert posts its result.
+  assert.match(SCRIPT, /function flagCollect\(\)\{/);
+  assert.match(SCRIPT, /v\.postMessage\(\{type:'flagDraftInsert',tag:p\.tag,summary:p\.summary,stub:p\.stub,fields:p\.fields\}\)/);
   assert.match(SCRIPT, /const aff=\(\)=>\{[\s\S]*?g\.getAttribute\('data-flag-field-for'\)!==tg/); // client-side field-group toggle
 });
 check("#211: the message router wires flagDraftInsert → commitFlagDraft and flagDraftCancel → closeFlagDrawer", () => {
@@ -1006,14 +1008,14 @@ check("#211: the message router wires flagDraftInsert → commitFlagDraft and fl
 // ── #210 (disc 239): the settle-once choke-point — the elicitation lifecycle rigor (the races aren't runtime-testable, so
 //    the goldens guard that every terminal routes through settleDrawer exactly once, keyed on the flagDraft transition). ──
 check("#210 (disc 239): EVERY flagDraft clear routes through the settle-once choke-point (no direct assignment strands a blocking elicitation)", () => {
-  // `flagDraft = undefined` appears ONLY in closeFlagDrawer + clearFlagDraft + openFlagActionView (design 354) — the lifecycle
-  // sites route through clearFlagDraft; openFlagActionView (the create→action cross-open) SETTLES {replaced} BEFORE its clear.
-  // Each is settle-safe, so no blocking elicitation strands. (Assignment-precise regex — the doc comment's backticked mention
-  // has no `;` and isn't line-leading, so it's excluded.)
+  // `flagDraft = undefined` appears ONLY in closeFlagDrawer + clearFlagDraft + openFlagActionView + openFlagEditDraft (Todo 3) —
+  // the lifecycle sites route through clearFlagDraft; the two cross-open sites SETTLE {replaced} BEFORE their clear. Each is
+  // settle-safe, so no blocking elicitation strands. (Assignment-precise regex; `flagEditDraft = undefined` does NOT match.)
   const clears = (COCKPIT_SRC.match(/\n\s*flagDraft = undefined;/g) || []).length;
-  assert.equal(clears, 3, "flagDraft = undefined is confined to closeFlagDrawer + clearFlagDraft + openFlagActionView");
-  // openFlagActionView settles the pending create elicitation {replaced} before dropping the draft (else the agent hangs).
+  assert.equal(clears, 4, "flagDraft = undefined is confined to closeFlagDrawer + clearFlagDraft + openFlagActionView + openFlagEditDraft");
+  // openFlagActionView + openFlagEditDraft each settle the pending create elicitation {replaced} before dropping the draft.
   assert.match(COCKPIT_SRC, /function openFlagActionView[\s\S]*?settleDrawer\(\{ status: "cancelled", reason: "replaced" \}\);[\s\S]*?flagDraft = undefined;/);
+  assert.match(COCKPIT_SRC, /function openFlagEditDraft[\s\S]*?settleDrawer\(\{ status: "cancelled", reason: "replaced" \}\);[\s\S]*?flagDraft = undefined;/);
   // settleDrawer is idempotent: nulls the resolver BEFORE resolving (a Stop racing an Insert can't double-resolve).
   assert.match(COCKPIT_SRC, /function settleDrawer[\s\S]*?pendingDrawer = undefined;[\s\S]*?p\.settle\(outcome\)/);
   assert.match(COCKPIT_SRC, /function clearFlagDraft[\s\S]*?settleDrawer\(\{ status: "cancelled", reason \}\)/);
@@ -1390,8 +1392,9 @@ check("flag-action drawer: 'Reveal in source' is GONE (revealFlag + flagActionMe
 });
 
 check("flag-action drawer: the webview listener posts DISTINCT data-flag-action-* intents (no create-drawer collision) + carries no id", () => {
-  assert.match(SCRIPT, /\[data-flag-action-toggle\],\[data-flag-action-issue\],\[data-flag-action-close\]/);
-  assert.match(SCRIPT, /type:ac\.hasAttribute\('data-flag-action-toggle'\)\?'flagActionToggle':ac\.hasAttribute\('data-flag-action-issue'\)\?'flagActionIssue':'flagActionClose'/);
+  // Todo 3 adds data-flag-action-edit to the action set.
+  assert.match(SCRIPT, /\[data-flag-action-toggle\],\[data-flag-action-issue\],\[data-flag-action-edit\],\[data-flag-action-close\]/);
+  assert.match(SCRIPT, /type:ac\.hasAttribute\('data-flag-action-toggle'\)\?'flagActionToggle':ac\.hasAttribute\('data-flag-action-issue'\)\?'flagActionIssue':ac\.hasAttribute\('data-flag-action-edit'\)\?'flagActionEdit':'flagActionClose'/);
   // the create-drawer close intent must still be distinct (matches data-flag-close/cancel only)
   assert.match(SCRIPT, /closest\('\[data-flag-close\],\[data-flag-cancel\]'\)/);
 });
@@ -1399,6 +1402,7 @@ check("flag-action drawer: the webview listener posts DISTINCT data-flag-action-
 check("flag-action drawer: the host handlers act on the captured flagActionView (msgs carry no flag id)", () => {
   assert.match(COCKPIT_SRC, /else if \(msg\.type === "flagActionToggle"\) \{\s*\n\s*void flagActionToggle\(\);/);
   assert.match(COCKPIT_SRC, /else if \(msg\.type === "flagActionIssue"\) \{\s*\n\s*void flagActionOpenIssue\(\);/);
+  assert.match(COCKPIT_SRC, /else if \(msg\.type === "flagActionEdit"\) \{\s*\n\s*openFlagEditDraft\(\);/);
   assert.match(COCKPIT_SRC, /else if \(msg\.type === "flagActionClose"\) \{\s*\n\s*closeFlagActionView\(\);/);
 });
 
@@ -1514,4 +1518,87 @@ check("picker: flagPickItem colors the glyph by status via a ThemeIcon+ThemeColo
   assert.ok(m, "flagPickItem body");
   assert.match(m[0], /iconPath: new vscode\.ThemeIcon\(resolved \? "pass" : "flag", new vscode\.ThemeColor\(resolved \? "charts\.green" : "charts\.orange"\)\)/);
   assert.ok(!/["`]✓["` ]|⚑/.test(m[0]) || !m[0].includes("? \"✓\""), "no status emoji baked into the label");
+});
+
+// ── Todo 3 (disc 358): edit a flag from the drawer ────────────────────────────────────────────────────────────────────
+check("edit: the dispatcher renders create → edit → action → empty (edit reuses renderFlagDrawer with edit:true, prefilled)", () => {
+  const m = COCKPIT_SRC.match(/const editFlag = flagEditDraft\?\.flag;\s*\n\s*const html = flagDraft[\s\S]*?: "";/);
+  assert.ok(m, "postFlagDrawer edit dispatch");
+  assert.match(m[0], /: editFlag\s*\n?\s*\?[\s\S]*?renderFlagDrawer\(\{[^}]*edit: true[^}]*\}\)/);
+  // the gist is newline-normalized at prefill (impl-review Claude #2 — the single-line input would otherwise concatenate words)
+  assert.match(m[0], /tag: editFlag\.tag, summary: editFlag\.gist\.replace\(\/\[\\r\\n\]\+\/g, " "\), stub: editFlag\.description, fields: editFlag\.fields/);
+  assert.match(m[0], /: flagActionView\s*\n?\s*\?\s*renderFlagActionDrawer/); // action still after edit
+});
+check("edit: openFlagEditDraft is host-gated to human MV Types, settles+clears the other modes, captures cel (no ver)", () => {
+  const m = COCKPIT_SRC.match(/function openFlagEditDraft\(\): void \{([\s\S]*?)\n  \}/);
+  assert.ok(m, "openFlagEditDraft body");
+  assert.match(m[1], /if \(flagDisplayNameOf\(view\.flag\.tag\) === undefined\) return flagNote/); // read-only tags rejected host-side
+  assert.match(m[1], /settleDrawer\(\{ status: "cancelled", reason: "replaced" \}\)/);
+  assert.match(m[1], /flagEditDraft = \{ flag: view\.flag, cel: view\.cel \};/); // no ver — survives a rebuild
+});
+check("edit: cancelFlagEdit returns to the action VIEW (re-found by id; warning→keep; gone→note)", () => {
+  const m = COCKPIT_SRC.match(/function cancelFlagEdit\(\): void \{([\s\S]*?)\n  \}/);
+  assert.ok(m, "cancelFlagEdit body");
+  assert.match(m[1], /const live = flagsList\.find\(\(f\) => f\.id === draft\.flag\.id\);/);
+  assert.match(m[1], /if \(live\) return openFlagActionView\(live, indexVersion, currentCel\);/);
+  assert.match(m[1], /if \(flagStoreWarning\) return openFlagActionView\(draft\.flag/); // unknown, not gone
+});
+check("edit: guardEditDiscard prompts ONLY when an edit is open AND dirty; gates the switch entries (list/node/create)", () => {
+  const m = COCKPIT_SRC.match(/async function guardEditDiscard\(\): Promise<boolean> \{([\s\S]*?)\n  \}/);
+  assert.ok(m, "guardEditDiscard body");
+  assert.match(m[1], /if \(!flagEditDraft \|\| !flagEditDirty\) return true;/); // no edit / not dirty → proceed silently
+  assert.match(m[1], /showWarningMessage\("Discard your unsaved flag edits\?", \{ modal: true \}, "Discard"\)/);
+  // wired into every implicit-switch entry
+  assert.match(COCKPIT_SRC, /async function openFlagList\(\): Promise<void> \{\s*\n\s*if \(mode[^\n]*\n\s*if \(!\(await guardEditDiscard\(\)\)\) return;/);
+  assert.match(COCKPIT_SRC, /async function openNodeFlags\([^)]*\): Promise<void> \{\s*\n\s*if \(mode[^\n]*\n\s*if \(!\(await guardEditDiscard\(\)\)\) return;/);
+  assert.match(COCKPIT_SRC, /if \(pick\.choice\) \{\s*\n\s*if \(!\(await guardEditDiscard\(\)\)\) return;[\s\S]*?openFlagDrawer/);
+});
+check("edit: saveFlagEdit — cel+mode guard (NOT ver), single-flight, clean re-read, field-ownership merge, local-save-FIRST, then relabel", () => {
+  const m = COCKPIT_SRC.match(/async function saveFlagEdit\([\s\S]*?\n  \}\n\n  \/\*\* Todo 3 — re-sync/);
+  assert.ok(m, "saveFlagEdit body");
+  const b = m[0];
+  assert.match(b, /if \(currentCel !== cel \|\| mode !== "medical-validation"\) return fail/); // cel+mode, not ver
+  assert.ok(!/indexVersion !== /.test(b.split("openFlagActionView")[0]), "no ver staleness guard before the write");
+  assert.match(b, /flagActionBusy = true;/);
+  assert.match(b, /const loaded = loadStoredFlags\(dir\);/);
+  assert.match(b, /if \(loaded\.warning\) return fail/); // store-warning blocks the write
+  // impl-review gpt56 #2: re-gate eligibility on the RE-READ record (an external retype-to-non-MV can't be saved back to MV)
+  assert.match(b, /if \(flagDisplayNameOf\(current\.tag\) === undefined\) return fail\("this flag is no longer editable/);
+  // field ownership: form owns only the NEW tag's visible discriminators; validateFlagFields; preserve host/hidden + unknown-to-both
+  assert.match(b, /const newRuleKeys = new Set\(flagFieldRulesOf\(rawTag\)\.map\(\(r\) => r\.key\)\);/);
+  assert.match(b, /if \(newRuleKeys\.has\(k\) && !EDIT_PRESERVED_FIELDS\.has\(k\)\) formFields\[k\] = v;/);
+  assert.match(b, /validateFlagFields\(\{ tag: rawTag, gist: summary, status: current\.status, fields: formFields \}\)/);
+  assert.match(b, /if \(EDIT_PRESERVED_FIELDS\.has\(k\) \|\| \(!oldRuleKeys\.has\(k\) && !newRuleKeys\.has\(k\)\)\) preserved\[k\] = v;/);
+  assert.match(b, /const mergedFields = \{ \.\.\.preserved, \.\.\.val\.fields \};/);
+  // local save FIRST, then reload/badges/return-to-view; relabel is INSIDE the busy try (impl-review gpt56 #1: no overlapping relabel)
+  assert.match(b, /saveFlag\(dir, updated\);[\s\S]*?reloadReviewFlags\(\);[\s\S]*?openFlagActionView\([\s\S]*?if \(val\.canon !== current\.tag && issueNo !== undefined\) await relabelIssueForTypeChange\(issueNo, val\.canon, cel\);/);
+  assert.match(b, /await relabelIssueForTypeChange\([\s\S]*?\} finally \{\s*\n\s*flagActionBusy = false;/); // relabel awaited BEFORE the finally releases the guard
+});
+check("edit: the agent bridges REFUSE while a human has unsaved edits (impl-review both arms) — no silent clobber", () => {
+  assert.match(COCKPIT_SRC, /const bridgeBeginFlagDrawer = [\s\S]*?if \(flagEditDraft && flagEditDirty\) return \{ error: "the validator has unsaved flag edits/);
+  assert.match(COCKPIT_SRC, /const bridgeSubmitFlag = [\s\S]*?if \(flagEditDraft && flagEditDirty\) return \{ ok: false, reason: "the validator has unsaved flag edits/);
+});
+check("edit: relabelIssueForTypeChange — trust/origin/token gates, PATCH preserves non-mv: labels + re-syncs the Type line, 401 retry", () => {
+  const m = COCKPIT_SRC.match(/async function relabelIssueForTypeChange\([\s\S]*?\n  \}/);
+  assert.ok(m, "relabelIssueForTypeChange body");
+  const b = m[0];
+  assert.match(b, /if \(!vscode\.workspace\.isTrusted\) return noteFail\("workspace not trusted"\)/);
+  assert.match(b, /const labels = got\.issue\.labels\.filter\(\(l\) => !l\.startsWith\("mv:"\)\);/); // preserve non-mv: labels
+  assert.match(b, /if \(newLabel\) labels\.push\(newLabel\.name\);/); // swap in the new mv: label
+  assert.match(b, /replaceIssueTypeLine\(got\.issue\.body, typeName\)/); // body Type line re-synced
+  assert.match(b, /updateGithubIssue\(\{ owner: repo\.owner, repo: repo\.repo, number: issueNo, token, labels, body \}\)/);
+  assert.match(b, /if \(!res\.ok && res\.status === 401\) \{[\s\S]*?githubToken\(true\)/); // forced-refresh retry
+});
+check("edit: the message router + webview wire the edit intents (action-edit / edit-save / edit-cancel / edit-dirty)", () => {
+  assert.match(COCKPIT_SRC, /else if \(msg\.type === "flagEditSave"\) \{\s*\n\s*void saveFlagEdit\(\{ tag: msg\.tag, summary: msg\.summary, stub: msg\.stub, fields: msg\.fields \}\)/);
+  assert.match(COCKPIT_SRC, /else if \(msg\.type === "flagEditCancel"\) \{\s*\n\s*cancelFlagEdit\(\)/);
+  assert.match(COCKPIT_SRC, /else if \(msg\.type === "flagEditDirty"\) \{\s*\n\s*if \(flagEditDraft\) flagEditDirty = true;/);
+  // webview: the edit form's Save reuses flagCollect(); Cancel/✕ post edit-cancel; first input posts edit-dirty once
+  assert.match(SCRIPT, /\[data-flag-edit-cancel\]'\);[\s\S]*?v\.postMessage\(\{type:'flagEditCancel'\}\)/);
+  assert.match(SCRIPT, /\[data-flag-edit-save\]'\);[\s\S]*?const p=flagCollect\(\);v\.postMessage\(\{type:'flagEditSave',tag:p\.tag/);
+  assert.match(SCRIPT, /querySelector\('\.flag-edit-drawer'\);if\(ed&&!ed\.hasAttribute\('data-dirty'\)\)\{ed\.setAttribute\('data-dirty','1'\);v\.postMessage\(\{type:'flagEditDirty'\}\)/);
+});
+check("edit: the gold node-link + view model — driveFlagNodeHighlight has an edit branch; the view model carries canEdit", () => {
+  assert.match(COCKPIT_SRC, /: flagEditDraft\s*\n?\s*\?\s*gidsForFlag\(flagEditDraft\.flag\)/);
+  assert.match(COCKPIT_SRC, /canEdit: flagDisplayNameOf\(flag\.tag\) !== undefined,/);
 });

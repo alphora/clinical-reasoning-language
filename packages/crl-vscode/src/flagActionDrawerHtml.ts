@@ -49,6 +49,9 @@ export interface FlagActionView {
   /** whether the flag's anchor resolves to at least one node in the CURRENT tree render. false → the gold node-link can't be
    *  drawn, so the drawer auto-opens Details + notes it (a moved occurrence / library-wide / concept drawn nowhere). */
   targetPresent: boolean;
+  /** Todo 3 (disc 358): whether Edit is offered — TRUE only for a human MV Type (`flagDisplayNameOf(tag)` exists). An
+   *  extraction/legacy tag (no displayName) stays read-only, so the edit form can't silently retype it to validation-concern. */
+  canEdit: boolean;
 }
 
 /** A labelled read-only row: `<span class="fa-key">…</span><span class="fa-val">…</span>`. `pre` keeps a multiline body's
@@ -97,13 +100,15 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
     v.issueNo !== undefined
       ? `<button type="button" class="fa-btn" data-flag-action-issue>↗ Open issue #${escapeHtml(String(v.issueNo))}</button>`
       : "";
+  // Todo 3: Edit is offered ONLY for a human MV Type (canEdit); an extraction/legacy flag stays read-only.
+  const edit = v.canEdit ? `<button type="button" class="fa-btn" data-flag-action-edit>✎ Edit flag</button>` : "";
 
   return (
     `<div class="flag-drawer flag-action-drawer" data-flag-action-drawer>` +
     `<div class="flag-head"><span class="flag-title" title="${escapeHtml(headerText)}">Flag — ${escapeHtml(headerText)}</span>` +
     `<button type="button" class="flag-close" data-flag-action-close aria-label="Close">✕</button></div>` +
     `<div class="fa-body">${rows}${details}</div>` +
-    `<div class="flag-actions">${issue}${toggle}</div>` +
+    `<div class="flag-actions">${issue}${edit}${toggle}</div>` +
     `</div>`
   );
 }

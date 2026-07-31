@@ -2,7 +2,7 @@
 // success → the number; every failure mode → an IssueCreateError the cockpit turns into "flag saved without a link".
 import assert from "node:assert/strict";
 
-import { createGithubIssue, getGithubIssue, issueReadErrorLabel, IssueCreateError, issueCreateErrorLabel } from "./githubIssue.ts";
+import { createGithubIssue, getGithubIssue, updateGithubIssue, issueReadErrorLabel, IssueCreateError, issueCreateErrorLabel } from "./githubIssue.ts";
 
 // A minimal Response-ish stub for the injected fetch.
 const resp = (ok, status, json) => ({ ok, status, json: async () => (json instanceof Error ? (() => { throw json; })() : json) });
@@ -89,7 +89,7 @@ test("getGithubIssue: GETs the issue endpoint with auth, returns {ok, issue} (bo
   const fetchImpl = async (url, init) => { seen = { url, init }; return rget(true, 200, { number: 5, title: "T", body: null, state: "open", html_url: "u" }); };
   const r = await getGithubIssue({ owner: "acme", repo: "pol", number: 5, token: "tok", fetchImpl });
   assert.equal(r.ok, true);
-  assert.deepEqual(r.issue, { number: 5, title: "T", body: "", state: "open", htmlUrl: "u", isPullRequest: false });
+  assert.deepEqual(r.issue, { number: 5, title: "T", body: "", state: "open", htmlUrl: "u", isPullRequest: false, labels: [] });
   assert.equal(seen.url, "https://api.github.com/repos/acme/pol/issues/5");
   assert.equal(seen.init.method, "GET");
   assert.equal(seen.init.headers.Authorization, "Bearer tok");
@@ -143,6 +143,58 @@ test("issueReadErrorLabel: 404 = 'issue not found', distinct from a network/offl
   assert.equal(issueReadErrorLabel(404), "issue not found");
   assert.equal(issueReadErrorLabel(401), "not authorized");
   assert.equal(issueReadErrorLabel(429), "rate limited");
+});
+
+// ── Todo 3 (disc 358): getGithubIssue now returns `labels`; updateGithubIssue PATCHes labels + body (the Type-relabel) ──
+test("getGithubIssue: normalizes labels — GitHub {name} objects, bare strings, and missing → []", async () => {
+  const withObjs = async () => rget(true, 200, { number: 1, labels: [{ name: "mv:crl-vs-narrative" }, { name: "bug" }, { color: "no name" }, "raw-string"] });
+  const r1 = await getGithubIssue({ owner: "o", repo: "r", number: 1, token: "t", fetchImpl: withObjs });
+  assert.deepEqual(r1.issue.labels, ["mv:crl-vs-narrative", "bug", "raw-string"]); // the nameless object is dropped
+  const noLabels = async () => rget(true, 200, { number: 1 });
+  const r2 = await getGithubIssue({ owner: "o", repo: "r", number: 1, token: "t", fetchImpl: noLabels });
+  assert.deepEqual(r2.issue.labels, []);
+});
+
+test("getGithubIssue: a present-but-non-array `labels` FAILS CLOSED (a destructive whole-set relabel must not run on lost labels)", async () => {
+  const fetchImpl = async () => rget(true, 200, { number: 1, labels: "oops-not-an-array" });
+  const r = await getGithubIssue({ owner: "o", repo: "r", number: 1, token: "t", fetchImpl });
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /label data/);
+});
+
+test("updateGithubIssue: PATCHes the issue endpoint with auth; sends only the provided keys; ok on 2xx", async () => {
+  let seen;
+  const fetchImpl = async (url, init) => { seen = { url, init }; return rget(true, 200, {}); };
+  const res = await updateGithubIssue({ owner: "acme", repo: "pol", number: 9, token: "tok", labels: ["mv:tooling-bug", "bug"], body: "new body", fetchImpl });
+  assert.deepEqual(res, { ok: true });
+  assert.equal(seen.url, "https://api.github.com/repos/acme/pol/issues/9");
+  assert.equal(seen.init.method, "PATCH");
+  assert.equal(seen.init.headers.Authorization, "Bearer tok");
+  assert.deepEqual(JSON.parse(seen.init.body), { labels: ["mv:tooling-bug", "bug"], body: "new body" });
+});
+
+test("updateGithubIssue: omitted labels/body are NOT sent (never blanks a field the caller left out)", async () => {
+  let seen;
+  const fetchImpl = async (url, init) => { seen = init; return rget(true, 200, {}); };
+  await updateGithubIssue({ owner: "o", repo: "r", number: 1, token: "t", body: "b only", fetchImpl });
+  assert.deepEqual(JSON.parse(seen.body), { body: "b only" }); // no `labels` key
+  await updateGithubIssue({ owner: "o", repo: "r", number: 1, token: "t", labels: [], fetchImpl });
+  assert.deepEqual(JSON.parse(seen.body), { labels: [] }); // an explicit [] IS sent (clears labels)
+});
+
+test("updateGithubIssue: a non-2xx → {ok:false} with a classified reason (never throws)", async () => {
+  const fetchImpl = async () => rget(false, 403, {});
+  const res = await updateGithubIssue({ owner: "o", repo: "r", number: 1, token: "t", labels: ["x"], fetchImpl });
+  assert.equal(res.ok, false);
+  assert.equal(res.status, 403);
+  assert.equal(res.reason, "not authorized");
+});
+
+test("updateGithubIssue: a transport failure → {ok:false, status:0} (never throws)", async () => {
+  const fetchImpl = async () => { throw new Error("boom"); };
+  const res = await updateGithubIssue({ owner: "o", repo: "r", number: 1, token: "t", body: "b", fetchImpl });
+  assert.equal(res.ok, false);
+  assert.equal(res.status, 0);
 });
 
 console.log("githubIssue.test: ok");

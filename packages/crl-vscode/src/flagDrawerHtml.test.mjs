@@ -123,4 +123,27 @@ test("renderFlagDrawer: all interpolated text is escaped (no breakout via label 
   assert.match(h, /&lt;script&gt;/);
 });
 
+// ── Todo 3 (disc 358): the EDIT form — same shell, DISTINCT intents + copy so it doesn't hit the create-only handlers ──
+test("renderFlagDrawer edit: 'Edit flag —' heading, distinct data-flag-edit-{save,cancel} intents, 'Save changes', neutral placeholder", () => {
+  const h = renderFlagDrawer({ targetLabel: "this condition", tags: TAGS, tag: "tooling-bug", summary: "s", stub: "d", edit: true });
+  assert.match(h, /Edit flag — this condition/);
+  assert.match(h, /flag-edit-drawer/); // the container marker (webview dirty-tracking + gold accent)
+  assert.match(h, /data-flag-edit-save/);
+  assert.match(h, /data-flag-edit-cancel/); // BOTH Cancel + ✕ carry it
+  assert.equal((h.match(/data-flag-edit-cancel/g) || []).length, 2, "Cancel + ✕ both → edit-cancel");
+  assert.match(h, />Save changes</);
+  // the create-only intents must be ABSENT (dead in edit mode)
+  assert.ok(!/data-flag-insert/.test(h), "no create Insert intent");
+  assert.ok(!/data-flag-close(?!-)/.test(h) && !/data-flag-cancel(?!-)/.test(h), "no create close/cancel intents");
+  assert.ok(!/becomes the GitHub issue body/.test(h), "the create-only placebo is dropped on edit");
+  // the selected tag is prefilled + its field group visible (reuses the create field machinery)
+  assert.match(h, /<option value="tooling-bug" selected>/);
+});
+test("renderFlagDrawer create (default): keeps the create intents; no edit markers", () => {
+  const h = renderFlagDrawer({ targetLabel: "x", tags: TAGS });
+  assert.match(h, /Add flag — x/);
+  assert.match(h, /data-flag-insert/);
+  assert.ok(!/data-flag-edit-/.test(h) && !/flag-edit-drawer/.test(h), "no edit markers on the create form");
+});
+
 console.log("flagDrawerHtml.test: ok");
