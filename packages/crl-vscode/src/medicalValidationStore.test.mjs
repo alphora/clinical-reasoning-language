@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, deriveAllPassLeaves, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote, mvCasesClean, mvComplete, renderFlagChrome, setCriterionVerdict, criterionVerdictState, criterionVerdictKey, criterionProgress, mvCriteriaClean, renderCriterionChrome, unsettledReviewItems, computeCriterionVerdictUpdate, applyBulkVerdict } from "./medicalValidationStore.ts";
+import { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, deriveAllPassLeaves, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote, mvCasesClean, mvComplete, renderFlagChrome, setCriterionVerdict, criterionVerdictState, criterionVerdictKey, criterionProgress, mvCriteriaClean, renderCriterionChrome, unsettledReviewItems, computeCriterionVerdictUpdate, applyBulkVerdict, reviewGridViewModel, applyGridAssignments } from "./medicalValidationStore.ts";
 
 const check = test;
 
@@ -1196,4 +1196,111 @@ check("COMPOSITION: enumerate → select-all → applyBulkVerdict('pass') → re
   const r2 = applyBulkVerdict([items2.find((i) => i.kind === "case")], "unreviewed", { criterionVerdicts: r.criterionVerdicts, reviewByCaseId: r.reviewByCaseId, liveCriteria, liveCaseIds: new Set(liveCaseIds) });
   const items3 = unsettledReviewItems(enumArgs(r.criterionVerdicts, r2.reviewByCaseId));
   assert.deepEqual(items3.map((i) => i.kind === "criterion" ? i.name : i.id), ["Elided"]); // only the elided criterion (un-passable by design) remains
+});
+
+// ── Bulk verdict GRID — the pure seam (Todo 2a, disc 347): reviewGridViewModel + applyGridAssignments ────────────────
+check("reviewGridViewModel: passable criterion → all 4; elided criterion → Pass disabled + hint; live case → all 4; orphan → clear-only + '(orphaned)' chip", () => {
+  const kA = criterionVerdictKey("L", "A");
+  const kT = criterionVerdictKey("L", "T");
+  const items = [
+    { kind: "criterion", id: kA, lib: "L", name: "A", label: "A", currentState: "stale", expectedBodyHash: "h", passable: true },
+    { kind: "criterion", id: kT, lib: "L", name: "T", label: "T", currentState: "unreviewed", expectedBodyHash: "ht", passable: false },
+    { kind: "case", id: "c1", label: "Case 1", currentState: "pending", live: true },
+    { kind: "case", id: "orph", label: "orph", currentState: "pass", live: false },
+  ];
+  const rows = reviewGridViewModel(items);
+  // passable criterion → all four, lib carried, Stale chip, NO hint key
+  assert.deepEqual(rows[0], { kind: "criterion", id: kA, label: "A", lib: "L", currentLabel: "Stale", enabled: { unreviewed: true, pending: true, pass: true, fail: true } });
+  // elided criterion → Pass column disabled + hint (the ONE cell the model refuses)
+  assert.deepEqual(rows[1].enabled, { unreviewed: true, pending: true, pass: false, fail: true });
+  assert.equal(rows[1].hint, "truncated — can't mark Pass");
+  // live case → all four, no hint
+  assert.deepEqual(rows[2], { kind: "case", id: "c1", label: "Case 1", currentLabel: "Pending", enabled: { unreviewed: true, pending: true, pass: true, fail: true } });
+  // orphan case → clear-only, "(orphaned)" chip, hint
+  assert.deepEqual(rows[3].enabled, { unreviewed: true, pending: false, pass: false, fail: false });
+  assert.equal(rows[3].currentLabel, "Pass (orphaned)");
+  assert.match(rows[3].hint, /orphaned/);
+});
+
+check("applyGridAssignments: resolves to captured items + groups by state + threads maps — Pass some rows, Fail others, in one apply", () => {
+  const kA = criterionVerdictKey("L", "A"), kB = criterionVerdictKey("L", "B");
+  const items = [
+    { kind: "criterion", id: kA, lib: "L", name: "A", label: "A", currentState: "unreviewed", expectedBodyHash: "h", passable: true },
+    { kind: "criterion", id: kB, lib: "L", name: "B", label: "B", currentState: "unreviewed", expectedBodyHash: "h", passable: true },
+    { kind: "case", id: "c1", label: "c1", currentState: "unreviewed", live: true },
+  ];
+  const ctx = {
+    criterionVerdicts: {}, reviewByCaseId: {},
+    liveCriteria: new Map([[kA, { bodyHash: "h", elided: false }], [kB, { bodyHash: "h", elided: false }]]),
+    liveCaseIds: new Set(["c1"]),
+  };
+  const r = applyGridAssignments([
+    { kind: "criterion", id: kA, state: "pass" },
+    { kind: "criterion", id: kB, state: "fail" },
+    { kind: "case", id: "c1", state: "pending" },
+  ], items, ctx);
+  assert.equal(r.criterionVerdicts[kA].state, "pass");
+  assert.equal(r.criterionVerdicts[kB].state, "fail");
+  assert.equal(r.reviewByCaseId.c1, "pending");
+  assert.equal(r.changed, 3);
+  assert.equal(r.skipped.length, 0);
+});
+
+check("applyGridAssignments: drops unknown/kind-mismatch/invalid-state + dedups (kind,id) across the WHOLE array before grouping (first wins, changed never double-counts)", () => {
+  const kA = criterionVerdictKey("L", "A");
+  const items = [
+    { kind: "criterion", id: kA, lib: "L", name: "A", label: "A", currentState: "unreviewed", expectedBodyHash: "h", passable: true },
+    { kind: "case", id: "c1", label: "c1", currentState: "unreviewed", live: true },
+  ];
+  const ctx = {
+    criterionVerdicts: {}, reviewByCaseId: {},
+    liveCriteria: new Map([[kA, { bodyHash: "h", elided: false }]]),
+    liveCaseIds: new Set(["c1"]),
+  };
+  const r = applyGridAssignments([
+    { kind: "criterion", id: kA, state: "pass" },   // wins
+    { kind: "criterion", id: kA, state: "fail" },   // DUP across state-group → dropped
+    { kind: "criterion", id: "nope", state: "pass" }, // unknown id → dropped
+    { kind: "case", id: kA, state: "pass" },        // kind mismatch (kA is a criterion id) → dropped
+    { kind: "criterion", id: kA, state: "bogus" },  // invalid state → dropped (doesn't consume the dedup slot)
+    { kind: "widget", id: "c1", state: "pass" },    // invalid kind → dropped
+  ], items, ctx);
+  assert.equal(r.criterionVerdicts[kA].state, "pass"); // FIRST assignment won, not the later fail
+  assert.equal(r.changed, 1);
+  assert.equal(r.skipped.length, 0);
+  assert.deepEqual(r.applied, [{ kind: "criterion", id: kA }]);
+});
+
+check("applyGridAssignments: uses the CAPTURED expectedBodyHash — a moved body → body-changed skip (the webview supplies no hash)", () => {
+  const kA = criterionVerdictKey("L", "A");
+  const items = [{ kind: "criterion", id: kA, lib: "L", name: "A", label: "A", currentState: "unreviewed", expectedBodyHash: "hOld", passable: true }];
+  const r = applyGridAssignments([{ kind: "criterion", id: kA, state: "pass" }], items, {
+    criterionVerdicts: {}, reviewByCaseId: {},
+    liveCriteria: new Map([[kA, { bodyHash: "hNew", elided: false }]]), liveCaseIds: new Set(),
+  });
+  assert.deepEqual(r.skipped, [{ ref: { kind: "criterion", id: kA }, reason: "body-changed" }]);
+  assert.equal(r.changed, 0);
+  assert.equal(Object.keys(r.criterionVerdicts).length, 0);
+});
+
+check("applyGridAssignments: empty assignments → no-op (changed 0, maps returned untouched)", () => {
+  const before = { [criterionVerdictKey("L", "A")]: { state: "pass", bodyHash: "h" } };
+  const r = applyGridAssignments([], [], { criterionVerdicts: before, reviewByCaseId: {}, liveCriteria: new Map(), liveCaseIds: new Set() });
+  assert.equal(r.changed, 0);
+  assert.equal(r.criterionVerdicts, before); // same ref — nothing threaded
+});
+
+check("applyGridAssignments: owns the whole untrusted boundary — a non-array payload / null / primitive entries are DROPPED, never thrown on", () => {
+  const kA = criterionVerdictKey("L", "A");
+  const items = [{ kind: "criterion", id: kA, lib: "L", name: "A", label: "A", currentState: "unreviewed", expectedBodyHash: "h", passable: true }];
+  const ctx = { criterionVerdicts: {}, reviewByCaseId: {}, liveCriteria: new Map([[kA, { bodyHash: "h", elided: false }]]), liveCaseIds: new Set() };
+  for (const bad of [undefined, null, "x", 5, {}, { assignments: [] }]) {
+    const r = applyGridAssignments(bad, items, ctx); // a non-array payload → dropped wholesale
+    assert.equal(r.changed, 0, `payload ${JSON.stringify(bad)}`);
+  }
+  // an array whose ENTRIES are null / primitive / missing-field: each entry dropped, the one valid entry still applies
+  const r = applyGridAssignments([null, 5, "x", {}, { kind: "criterion" }, { kind: "criterion", id: kA, state: "pass" }], items, ctx);
+  assert.equal(r.criterionVerdicts[kA].state, "pass");
+  assert.equal(r.changed, 1);
+  assert.equal(r.skipped.length, 0);
 });

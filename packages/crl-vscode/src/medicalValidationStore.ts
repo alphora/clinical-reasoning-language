@@ -684,6 +684,106 @@ export function applyBulkVerdict(
   return { criterionVerdicts, reviewByCaseId, applied, skipped, changed };
 }
 
+/** A grid ROW's presentation model — a `ReviewItem` projected for `reviewGridHtml`: the current-state CHIP text, which of
+ *  the 4 columns (To do / Pending / Pass / Fail) the reviewer MAY pick (per the model's apply rules), and a hint. NO
+ *  pre-selection: an empty row means "leave unchanged"; an assignment is a row the reviewer EXPLICITLY picked. `(kind,id)`
+ *  is the stable ref the host resolves an assignment back to its captured `ReviewItem` (which carries `expectedBodyHash`). */
+export interface ReviewGridRow {
+  kind: "criterion" | "case";
+  id: string;
+  label: string;
+  lib?: string; // criterion library — names are library-local, so the row disambiguates by lib
+  currentLabel: string; // the current-state chip ("To do" | "Pending" | "Pass" | "Fail" | "Stale" [+ " (orphaned)"])
+  enabled: { unreviewed: boolean; pending: boolean; pass: boolean; fail: boolean }; // which columns the reviewer may pick
+  hint?: string; // "truncated — can't mark Pass" | "orphaned — case no longer in the policy (clear only)"
+}
+
+const GRID_STATE_LABEL: Record<CriterionVerdictUiState, string> = {
+  unreviewed: "To do",
+  pending: "Pending",
+  pass: "Pass",
+  fail: "Fail",
+  stale: "Stale",
+};
+
+/** Project the unsettled items into grid rows — cell enablement per the model's apply rules (an elided criterion can't
+ *  take Pass; an orphan case is clear-only; everything else all four), the current-state chip, and lib/hints. */
+export function reviewGridViewModel(items: readonly ReviewItem[]): ReviewGridRow[] {
+  return items.map((it): ReviewGridRow => {
+    if (it.kind === "criterion") {
+      return {
+        kind: "criterion",
+        id: it.id,
+        label: it.name,
+        lib: it.lib,
+        currentLabel: GRID_STATE_LABEL[it.currentState],
+        enabled: { unreviewed: true, pending: true, pass: it.passable, fail: true },
+        ...(it.passable ? {} : { hint: "truncated — can't mark Pass" }),
+      };
+    }
+    return {
+      kind: "case",
+      id: it.id,
+      label: it.label,
+      currentLabel: GRID_STATE_LABEL[it.currentState] + (it.live ? "" : " (orphaned)"),
+      enabled: it.live
+        ? { unreviewed: true, pending: true, pass: true, fail: true }
+        : { unreviewed: true, pending: false, pass: false, fail: false }, // orphan → clear-only
+      ...(it.live ? {} : { hint: "orphaned — case no longer in the policy (clear only)" }),
+    };
+  });
+}
+
+/** Resolve + apply a grid's per-row assignments — the pure host-side seam (the WEBVIEW IS UNTRUSTED). Each `{kind,id,state}`
+ *  is validated (`isReviewState`), resolved against the host's OWN captured `items` snapshot by `(kind,id)` — so the captured
+ *  `expectedBodyHash` is used, NEVER a webview-supplied one — and DEDUPED by `(kind,id)` across the WHOLE array (first wins)
+ *  BEFORE grouping. That last part is load-bearing: `applyBulkVerdict` dedups only WITHIN one call, and this folds one call
+ *  PER target state (threading the maps), so a duplicate across two state-groups would otherwise be applied twice (later
+ *  group wins, `changed` inflates). Unknown / kind-mismatched / invalid-state rows are dropped. */
+export function applyGridAssignments(
+  assignments: unknown, // the RAW webview payload — this seam owns the whole boundary (a non-array / null / primitive entry is dropped, never thrown on)
+  items: readonly ReviewItem[],
+  ctx: {
+    criterionVerdicts: Record<string, PersistedCriterionVerdict>;
+    reviewByCaseId: Record<string, PersistedReviewState>;
+    liveCriteria: ReadonlyMap<string, LiveCriterion>;
+    liveCaseIds: ReadonlySet<string>;
+  },
+): BulkVerdictResult {
+  const byRef = new Map<string, ReviewItem>();
+  for (const it of items) byRef.set(JSON.stringify([it.kind, it.id]), it); // assumes UNIQUE items (unsettledReviewItems dedups); last-wins if a future enumerator ever emits a dup
+  const seen = new Set<string>();
+  const groups = new Map<ReviewState, ReviewItem[]>();
+  const list = Array.isArray(assignments) ? assignments : []; // a non-array payload is dropped wholesale (untrusted)
+  for (const a of list) {
+    if (typeof a !== "object" || a === null) continue; // drop null / primitive entries BEFORE any field access
+    const { kind, id, state } = a as { kind?: unknown; id?: unknown; state?: unknown };
+    if (!isReviewState(state)) continue; // untrusted-input guard
+    if ((kind !== "criterion" && kind !== "case") || typeof id !== "string") continue;
+    const rk = JSON.stringify([kind, id]);
+    const item = byRef.get(rk); // resolve to the CAPTURED item (kind must match too)
+    if (!item || seen.has(rk)) continue;
+    seen.add(rk);
+    const g = groups.get(state) ?? [];
+    g.push(item);
+    groups.set(state, g);
+  }
+  let criterionVerdicts = ctx.criterionVerdicts;
+  let reviewByCaseId = ctx.reviewByCaseId;
+  const applied: ReviewItemRef[] = [];
+  const skipped: { ref: ReviewItemRef; reason: BulkSkipReason }[] = [];
+  let changed = 0;
+  for (const [state, groupItems] of groups) {
+    const r = applyBulkVerdict(groupItems, state, { criterionVerdicts, reviewByCaseId, liveCriteria: ctx.liveCriteria, liveCaseIds: ctx.liveCaseIds });
+    criterionVerdicts = r.criterionVerdicts; // thread the maps through each state-group
+    reviewByCaseId = r.reviewByCaseId;
+    applied.push(...r.applied);
+    skipped.push(...r.skipped);
+    changed += r.changed;
+  }
+  return { criterionVerdicts, reviewByCaseId, applied, skipped, changed };
+}
+
 /** The criterion-review progress readout — tallied over the LIVE rendered single-criterion identities (deduped by key;
  *  N occurrences of one criterion = ONE identity). `passed` counts only FRESH passes (a stale-or-changed pass is NOT
  *  passed — it's `stale`). Mirrors `ReviewProgress`'s shape; `total = identities.size`.
