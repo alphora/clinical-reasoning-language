@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { claudeCodeTarget, type ProvisionContext } from "./provision";
+import { claudeCodeTarget, resolveAutoProvisionMode, decideProvisioning, isProvisionedByPath, type ProvisionContext, type ProvisionDecision } from "./provision";
 import { stageStableServer } from "./stableServer";
 import {
   applyHighlight,
@@ -181,12 +181,25 @@ function registerLanguageFeatures(
 export function activate(context: vscode.ExtensionContext): void {
   // Register commands FIRST so they survive a provisioning failure.
   context.subscriptions.push(
-    vscode.commands.registerCommand("crl.setup", () =>
-      provisionAll(context, true).catch((e) => vscode.window.showErrorMessage(`CRL: ${messageOf(e)}`))
-    ),
-    vscode.commands.registerCommand("crl.remove", () =>
-      removeAll(context).catch((e) => vscode.window.showErrorMessage(`CRL: ${messageOf(e)}`))
-    )
+    vscode.commands.registerCommand("crl.setup", async () => {
+      try {
+        const root = workspaceRoot();
+        // Persist consent BEFORE provisioning — provisionAll may reloadWindow, terminating the host before the memento lands.
+        if (root) await setProvisionDecision(context, root, "installed"); // manual setup = an explicit per-workspace consent
+        await provisionAll(context, true, root);
+      } catch (e) {
+        vscode.window.showErrorMessage(`CRL: ${messageOf(e)}`);
+      }
+    }),
+    vscode.commands.registerCommand("crl.remove", async () => {
+      try {
+        const root = workspaceRoot();
+        await removeAll(context);
+        if (root) await setProvisionDecision(context, root, "never"); // a deliberate removal → don't re-offer (wins over mode "always")
+      } catch (e) {
+        vscode.window.showErrorMessage(`CRL: ${messageOf(e)}`);
+      }
+    })
   );
 
   // Agent (editor-agent Todo A) commands register EARLY too — key handling + the provider round-trip proof must survive a
@@ -220,24 +233,126 @@ export function activate(context: vscode.ExtensionContext): void {
   // ordering is only load-bearing for the FIRST activation post-upgrade —
   // subsequent activations are clean either way. Kept the ordering anyway
   // because explicit > implicit.
-  const auto = vscode.workspace.getConfiguration("crl").get<boolean>("autoProvision", true);
-  const wantProvision = auto && (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
+  const provisionRoot = workspaceRoot();
   void (async () => {
     try {
-      await clearStaleAssociationsAtActivation();
-    } catch (e) {
-      // Migration failure is unactionable for the user (settings may be
-      // managed/readonly). Log to output channel; don't pop up an error.
-      getOutputChannel().appendLine(`CRL migration: ${messageOf(e)}`);
-    }
-    if (wantProvision) {
+      // The stable MCP-server refresh (a copy into the extension's own globalStorage) is DECOUPLED from provisioning consent
+      // (disc 369): a workspace that declines, or isn't a CRL project, must STILL get a fresh server binary so any EXISTING
+      // `.mcp.json` entry (from a prior install, or one committed by a teammate) keeps working after an extension update
+      // (#66/#68). It writes only to the extension's private globalStorage → no consent needed. Run it every activation, but
+      // OFF the sync path (impl-review disc 370 #4): here in the async task, staged ONCE and threaded into provisionAll below.
+      let stableServerPath: string | undefined;
       try {
-        await provisionAll(context, false);
-      } catch (e) {
-        vscode.window.showErrorMessage(`CRL: unexpected setup failure — ${messageOf(e)}`);
+        stableServerPath = resolveStableMcpServerScript(context);
+      } catch {
+        /* resolveStableMcpServerScript already logs + warns; leave undefined (a later provision falls back to the bundled path) */
       }
+
+      try {
+        await clearStaleAssociationsAtActivation();
+      } catch (e) {
+        // Migration failure is unactionable (settings may be managed/readonly). Log; don't pop up. NOTE (disc 370): this is a
+        // GLOBAL `files.associations` write that runs unconditionally — the one consent-gate exception. It only REMOVES this
+        // extension's own legacy `*.crl→markdown` associations (never adds), is idempotent, and ownership is exact — so it is
+        // not the silent-provisioning the consent gate exists to stop.
+        getOutputChannel().appendLine(`CRL migration: ${messageOf(e)}`);
+      }
+      if (!provisionRoot) return; // no workspace folder → nothing to provision or offer
+
+      // impl-review (disc 370 #5): honor a PRE-MIGRATION workspace-scoped opt-out. The setting is now `scope:machine`, so VS
+      // Code ignores a `.vscode/settings.json` value — but a user who set `"crl.autoProvision": false` there meant "not here".
+      // Skip (don't provision, don't backfill "installed" over their intent) while that legacy value is present + detectable.
+      const inspected = vscode.workspace.getConfiguration("crl").inspect("autoProvision");
+      if (inspected?.workspaceValue === false || inspected?.workspaceFolderValue === false) return;
+
+      // Consent-based, relevance-gated provisioning (disc 369). A per-workspace decision (Install / Never) wins over the global
+      // `crl.autoProvision` mode, which governs only UNDECIDED workspaces. If VS Code coerces a legacy boolean against the new
+      // enum type, `resolveAutoProvisionMode`'s outcomes are both consent-safe (true/false→"prompt" = offer, never a silent write).
+      const mode = resolveAutoProvisionMode(vscode.workspace.getConfiguration("crl").get("autoProvision"));
+      const decision = getProvisionDecision(context, provisionRoot);
+      const already = stableServerPath ? isProvisionedByPath(provisionRoot, stableServerPath) : false;
+      const action = decideProvisioning(mode, decision, already);
+      if (action === "skip") return;
+      if (action === "silent") {
+        // Backfill the memento for a workspace THIS machine provisioned under the old silent default (undecided + already) so it
+        // reads as an explicit "installed" from now on. AWAIT before provisioning (which may reloadWindow → host terminates).
+        if (!decision && already) await setProvisionDecision(context, provisionRoot, "installed");
+        try {
+          await provisionAll(context, false, provisionRoot, stableServerPath);
+        } catch (e) {
+          vscode.window.showErrorMessage(`CRL: unexpected setup failure — ${messageOf(e)}`);
+        }
+        return;
+      }
+      // action === "check-relevance": undecided + not provisioned here → OFFER only if the workspace actually contains CRL files.
+      if (!(await workspaceHasCrlFiles(provisionRoot))) return; // a non-CRL project: no writes, no prompt (the core fix)
+      await offerProvisioning(context, provisionRoot, stableServerPath);
+    } catch (e) {
+      // Outer backstop (disc 370 #3): a rejected VS Code API call (the offer toast, a config/memento read) inside this detached
+      // task would otherwise be an unhandled rejection. Activation already returned + commands are registered, so this is log
+      // noise, not a crash — record it and move on (never a second toast).
+      getOutputChannel().appendLine(`CRL provisioning: ${messageOf(e)}`);
     }
   })();
+}
+
+// --- consent-based provisioning: the per-workspace decision memento + the offer (disc 369) ---
+
+interface StoredProvisionDecision {
+  decision: ProvisionDecision;
+  root: string; // the folder the decision was made for — a mismatch (multi-root reorder / standalone vs multi-root) re-evaluates
+}
+const PROVISION_DECISION_KEY = "crl.provisionDecision";
+
+function getProvisionDecision(context: vscode.ExtensionContext, root: string): ProvisionDecision | undefined {
+  const v = context.workspaceState.get<StoredProvisionDecision>(PROVISION_DECISION_KEY);
+  if (!v || (v.decision !== "installed" && v.decision !== "never")) return undefined;
+  if (v.root !== root) return undefined; // recorded for a different folder → treat as undecided (safety for multi-root)
+  return v.decision;
+}
+
+/** Persist the per-workspace decision. Returns the update Thenable so callers can AWAIT durability (disc 370 #2) — the write
+ *  must land before a `provisionAll` that may `reloadWindow`, and before command completion, or the choice can be lost. */
+function setProvisionDecision(context: vscode.ExtensionContext, root: string, decision: ProvisionDecision): Thenable<void> {
+  return context.workspaceState.update(PROVISION_DECISION_KEY, { decision, root } satisfies StoredProvisionDecision);
+}
+
+/** Does the provisioning target folder contain any `.crl`/`.cel` file? Scoped to the EXACT captured root (the write target),
+ *  NOT a `[0]` fallback (disc 370 #1: consent/relevance must be for the same folder we'll write) nor the whole multi-root set.
+ *  Excludes `node_modules` explicitly — `findFiles` consults `files.exclude` only, NOT `search.exclude` (disc 370 #6), so a
+ *  dependency shipping `.crl`/`.cel` would otherwise trigger an offer. Stops at 1 hit. */
+async function workspaceHasCrlFiles(root: string): Promise<boolean> {
+  try {
+    const folder = vscode.workspace.workspaceFolders?.find((f) => f.uri.fsPath === root);
+    if (!folder) return false; // the captured folder is gone (reorder/removal) → don't offer against a moved target
+    const found = await vscode.workspace.findFiles(new vscode.RelativePattern(folder, "**/*.{crl,cel}"), "**/node_modules/**", 1);
+    return found.length > 0;
+  } catch {
+    return false; // a findFiles failure must never crash activation or spuriously offer
+  }
+}
+
+/** The consent toast (non-modal): names EVERY write (the workspace `.mcp.json`/`CLAUDE.md` AND the global editor highlighting),
+ *  since "Install" runs the full `provisionAll`. Install → persist "installed" (AWAITED, before the write/reload) + provision the
+ *  captured root; Never → persist "never"; Not now / dismiss → leave undecided (re-offered next activation). */
+async function offerProvisioning(context: vscode.ExtensionContext, root: string, serverScriptPath: string | undefined): Promise<void> {
+  const choice = await vscode.window.showInformationMessage(
+    "This workspace has Clinical Reasoning Language files. Set up CRL tools? This adds an MCP server and a note to this workspace (.mcp.json, CLAUDE.md) and enables .crl highlighting in your editor settings.",
+    "Install",
+    "Not now",
+    "Never for this workspace",
+  );
+  if (choice === "Install") {
+    await setProvisionDecision(context, root, "installed"); // persist consent BEFORE provisioning (a reload could terminate the host)
+    try {
+      await provisionAll(context, false, root, serverScriptPath);
+    } catch (e) {
+      vscode.window.showErrorMessage(`CRL: unexpected setup failure — ${messageOf(e)}`);
+    }
+  } else if (choice === "Never for this workspace") {
+    await setProvisionDecision(context, root, "never");
+  }
+  // "Not now" / dismissed → leave the memento undecided; the next activation of this CRL workspace offers again.
 }
 
 /**
@@ -277,11 +392,13 @@ function flushWarnings(warnings: string[]): void {
   }
 }
 
-function ctxFor(context: vscode.ExtensionContext, root: string): ProvisionContext {
+function ctxFor(context: vscode.ExtensionContext, root: string, serverScriptPath?: string): ProvisionContext {
   const version = context.extension?.packageJSON?.version;
   return {
     workspaceRoot: root,
-    serverScriptPath: resolveStableMcpServerScript(context),
+    // Reuse an already-staged path when the caller has one (disc 370 #4: avoids re-staging + a duplicate storage-failure warning);
+    // otherwise resolve (which stages) — the manual `crl.setup` path.
+    serverScriptPath: serverScriptPath ?? resolveStableMcpServerScript(context),
     extensionVersion: typeof version === "string" ? version : "0.0.0",
   };
 }
@@ -440,12 +557,17 @@ async function writeHighlight(
   return { changed: res.associationsChanged || res.tokenColorsChanged, warnings: res.warnings };
 }
 
-async function provisionAll(context: vscode.ExtensionContext, manual: boolean): Promise<void> {
-  const root = workspaceRoot();
+async function provisionAll(context: vscode.ExtensionContext, manual: boolean, root = workspaceRoot(), serverScriptPath?: string): Promise<void> {
   if (!root) {
     if (manual) {
       vscode.window.showWarningMessage("CRL: open your CRL project folder first, then run CRL: Set up tools.");
     }
+    return;
+  }
+  // Consent-boundary guard (disc 370 #1): write ONLY to the captured root, and only if it's still a current workspace folder —
+  // a folder reorder/removal while an offer toast was open must not redirect the write to a different (unconsented) folder.
+  if (!(vscode.workspace.workspaceFolders ?? []).some((f) => f.uri.fsPath === root)) {
+    if (manual) vscode.window.showWarningMessage("CRL: the workspace changed — reopen the folder, then run CRL: Set up tools.");
     return;
   }
   warnMultiRoot();
@@ -458,7 +580,7 @@ async function provisionAll(context: vscode.ExtensionContext, manual: boolean): 
   // Provisioning (.mcp.json + CLAUDE.md) and highlighting are independent — a
   // malformed .mcp.json must not block highlighting, and vice versa.
   try {
-    const r = claudeCodeTarget.apply(ctxFor(context, root));
+    const r = claudeCodeTarget.apply(ctxFor(context, root, serverScriptPath));
     mcpOk = true;
     mcpChanged = r.mcp === "created" || r.mcp === "updated";
     warnings.push(...r.warnings);

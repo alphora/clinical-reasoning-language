@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL→CQL + CEL→FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "4.102.0",
+  "version": "4.103.0",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.95.0"
@@ -318,9 +318,20 @@
       "title": "Clinical Reasoning Language",
       "properties": {
         "crl.autoProvision": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically configure CRL tools (MCP server + CLAUDE.md) and highlighting when a workspace containing .crl files is opened. Use the 'CRL: Set up tools' / 'CRL: Remove tools' commands to do it manually."
+          "type": "string",
+          "enum": [
+            "prompt",
+            "always",
+            "never"
+          ],
+          "enumDescriptions": [
+            "Ask before configuring CRL tools when you open a workspace that contains .crl/.cel files, until you choose (recommended).",
+            "Silently configure CRL tools in every workspace on open (the previous default behavior).",
+            "Never configure CRL tools automatically; use 'CRL: Set up tools' to do it manually."
+          ],
+          "default": "prompt",
+          "scope": "machine",
+          "markdownDescription": "How CRL configures its tools (an MCP server in `.mcp.json` + a note in `CLAUDE.md`, plus editor highlighting) when you open a workspace.\n\n- `prompt` (default): ask the first time you open a workspace containing `.crl`/`.cel` files.\n- `always`: silently configure every workspace (the old behavior).\n- `never`: never automatically; use the **CRL: Set up tools** command.\n\nA per-workspace choice (Install / Never here) always wins over this setting. Machine-scoped so a repository can't force it on."
         },
         "crl.cockpit.primary": {
           "type": "string",

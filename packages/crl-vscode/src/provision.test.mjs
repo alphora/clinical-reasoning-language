@@ -34,6 +34,55 @@ const mcp = (ws) => join(ws, ".mcp.json");
 const md = (ws) => join(ws, "CLAUDE.md");
 const readJson = (p) => JSON.parse(readFileSync(p, "utf8"));
 
+// ── consent-based provisioning: the pure decision layer (disc 369) ──────────────────────────────────────────────────
+const { resolveAutoProvisionMode, decideProvisioning, isProvisionedByPath } = mod;
+
+test("resolveAutoProvisionMode: boolean back-compat + enum passthrough + safe default", () => {
+  assert.equal(resolveAutoProvisionMode(true), "always"); // old default → preserves observed silent-provision behavior
+  assert.equal(resolveAutoProvisionMode(false), "never");
+  assert.equal(resolveAutoProvisionMode("prompt"), "prompt");
+  assert.equal(resolveAutoProvisionMode("always"), "always");
+  assert.equal(resolveAutoProvisionMode("never"), "never");
+  assert.equal(resolveAutoProvisionMode(undefined), "prompt"); // unset → the new default
+  assert.equal(resolveAutoProvisionMode("garbage"), "prompt");
+  assert.equal(resolveAutoProvisionMode(0), "prompt");
+});
+
+test("decideProvisioning: a per-workspace decision WINS over mode; mode governs only undecided workspaces", () => {
+  for (const m of ["prompt", "always", "never"]) {
+    // "never" beats every mode (incl. "always" — a crl.remove can't be silently undone)
+    assert.equal(decideProvisioning(m, "never", false), "skip", `never/${m}`);
+    assert.equal(decideProvisioning(m, "never", true), "skip", `never/${m}/prov`);
+    // "installed" keeps refreshing under every mode (incl. "never")
+    assert.equal(decideProvisioning(m, "installed", false), "silent", `installed/${m}`);
+  }
+  // undecided: mode drives it
+  assert.equal(decideProvisioning("never", undefined, false), "skip");
+  assert.equal(decideProvisioning("never", undefined, true), "skip"); // never doesn't refresh even an existing entry
+  assert.equal(decideProvisioning("always", undefined, false), "silent");
+  // undecided + prompt: alreadyProvisioned (this machine) → silent migration-refresh; else → defer to the relevance check
+  assert.equal(decideProvisioning("prompt", undefined, true), "silent");
+  assert.equal(decideProvisioning("prompt", undefined, false), "check-relevance");
+});
+
+check("isProvisionedByPath: true ONLY for our owned entry at THIS machine's path (foreign clone / non-owned / malformed → false)", (ws) => {
+  const ours = join(ws, "gs", "smiledigitalhealth.crl-language-support", "mcp-server.js"); // this machine's staged path (carries the marker)
+  const foreign = join(ws, "other", "smiledigitalhealth.crl-language-support", "mcp-server.js"); // a teammate's committed path (owned, different location)
+  // absent .mcp.json
+  assert.equal(isProvisionedByPath(ws, ours), false);
+  // our owned entry at our path → true; but the SAME file checked against a foreign expected path → false (the clone case)
+  writeFileSync(mcp(ws), JSON.stringify({ mcpServers: { crl: { type: "stdio", command: "node", args: [ours] } } }));
+  assert.equal(isProvisionedByPath(ws, ours), true);
+  assert.equal(isProvisionedByPath(ws, foreign), false); // fresh clone: entry points at author's path, not ours → offer, don't silent-write
+  // a NON-owned `crl` server (user's own, no ownership marker) → false even if the path matches
+  const userOwn = join(ws, "my", "crl-server.js");
+  writeFileSync(mcp(ws), JSON.stringify({ mcpServers: { crl: { type: "stdio", command: "node", args: [userOwn] } } }));
+  assert.equal(isProvisionedByPath(ws, userOwn), false);
+  // malformed .mcp.json → false (never crashes; the apply path surfaces the refuse-to-touch on opt-in)
+  writeFileSync(mcp(ws), "{ not json");
+  assert.equal(isProvisionedByPath(ws, ours), false);
+});
+
 check("apply on empty workspace creates .mcp.json + CLAUDE.md", (ws) => {
   const ctx = ctxFor(ws);
   const r = target.apply(ctx);

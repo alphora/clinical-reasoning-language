@@ -225,6 +225,63 @@ function removeClaudeMd(ctx: ProvisionContext, warnings: string[]): MdOutcome {
   return "removed";
 }
 
+// --- consent-based provisioning: the pure decision layer (disc 369) ---
+
+export type AutoProvisionMode = "prompt" | "always" | "never";
+export type ProvisionDecision = "installed" | "never";
+
+/** Resolve the tri-state provisioning mode from the raw config value. Back-compat: the setting was a boolean (default true),
+ *  so an existing `true`/`false` in a user's settings.json still resolves — `true`→"always" (preserves the observed silent-
+ *  provision behavior the old default gave them; note most users never explicitly chose it), `false`→"never". Any
+ *  unrecognized value → the safe "prompt" default. */
+export function resolveAutoProvisionMode(raw: unknown): AutoProvisionMode {
+  if (raw === true) return "always";
+  if (raw === false) return "never";
+  if (raw === "always" || raw === "never" || raw === "prompt") return raw;
+  return "prompt";
+}
+
+/** Decide what activation should do, from the mode + the per-workspace memento decision + whether THIS machine already
+ *  provisioned the workspace. `"check-relevance"` means the answer depends on whether the workspace actually contains CRL
+ *  files (the caller computes that LAZILY, only then). A per-workspace decision (installed/never) WINS over the global mode —
+ *  the mode governs only UNDECIDED workspaces (so `crl.remove`→"never" can't be silently undone by mode "always", and an
+ *  installed workspace keeps refreshing under mode "never"). */
+export function decideProvisioning(
+  mode: AutoProvisionMode,
+  decision: ProvisionDecision | undefined,
+  alreadyProvisioned: boolean,
+): "silent" | "skip" | "check-relevance" {
+  if (decision === "never") return "skip"; // an explicit per-workspace "never" beats any mode (incl. "always")
+  if (decision === "installed") return "silent"; // …and an explicit "installed" keeps refreshing regardless of mode
+  if (mode === "never") return "skip";
+  if (mode === "always") return "silent";
+  // mode "prompt", undecided:
+  if (alreadyProvisioned) return "silent"; // MIGRATION: this machine already provisioned it silently → refresh, don't re-prompt
+  return "check-relevance"; // undecided + not provisioned here → the caller checks for CRL files, then offer/skip
+}
+
+/** Does THIS machine's `.mcp.json` already carry the owned `crl` server pointing at `expectedServerPath`? Distinguishes our
+ *  own past silent provisioning (migration → don't re-prompt) from a teammate's COMMITTED entry on a fresh clone (whose args
+ *  path is the AUTHOR's globalStorage → NOT provisioned here → should be offered). Separator-normalized compare; a malformed
+ *  or absent `.mcp.json` → false. */
+export function isProvisionedByPath(workspaceRoot: string, expectedServerPath: string): boolean {
+  const file = join(workspaceRoot, ".mcp.json");
+  if (!existsSync(file)) return false;
+  let root: Record<string, unknown>;
+  try {
+    root = readMcpRoot(file).root;
+  } catch {
+    return false; // malformed → not "provisioned by us" (the apply path surfaces the refuse-to-touch error if the user opts in)
+  }
+  const servers = isPlainObject(root.mcpServers) ? root.mcpServers : {};
+  const entry = servers[SERVER_KEY];
+  if (!ownsMcpEntry(entry)) return false;
+  const first = (entry as { args: unknown[] }).args[0];
+  if (typeof first !== "string") return false;
+  const norm = (p: string): string => p.replace(/\\/g, "/");
+  return norm(first) === norm(expectedServerPath);
+}
+
 export const claudeCodeTarget: ProvisionTarget = {
   id: "claude-code",
   displayName: "Claude Code",
