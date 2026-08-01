@@ -46,17 +46,6 @@ tmp/
 temp/
 *.tmp
 
-# Vibe Tools — extension-managed assets (protocols/, prompts/) +
-# Claude-maintained local workflow artifacts (discussions/, retros/).
-# Safe to delete to reset the extension; you will lose any local
-# consultation transcripts and retros. Promote durable decisions to
-# your project's normal docs location before cleanup.
-.vibe-tools/
-
-.claude/agents/vibe-reviewer-*.md
-
-# Holds this machine's extension path.
-/.mcp.json
 # .claude/ holds per-machine provisioned files (settings.local.json, etc.) — ignored —
 # EXCEPT skills/ and agents/, which are versioned CRL-domain project tooling
 # (co-versioned with the grammar; see .claude/skills/encode-policy-to-crl, .claude/agents).
@@ -64,7 +53,6 @@ temp/
 !.claude/skills/
 !.claude/agents/
 .cursor/
-
 
 issues/
 
@@ -78,11 +66,10 @@ features/
 # step-3 golden-oracle build output (regenerable)
 packages/*/test/oracle/.gen/
 
-# vibe-mail identity for THIS machine (see other vibe-tools repos).
-.vibe-mail.json
-
-# Corpus destination for THIS machine. Was committed so the repo itself
-# declared where transcripts go; that signal now lives per-machine instead,
-# so vibe-tools stops appearing in repositories that merely tolerate it.
-# The file stays on disk and corpus capture is unchanged.
+# vibe-tools (local dev tooling; not part of this project)
+.vibe-tools/
 .vibe-corpus.json
+.vibe-mail.json
+/.mcp.json
+.claude/agents/vibe-reviewer-*.md
+.claude/agents/vibe-panel-*.md
