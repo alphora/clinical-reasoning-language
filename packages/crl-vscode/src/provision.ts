@@ -18,7 +18,6 @@ const OWNERSHIP_MARKER = "crl-language-support";
 export interface ProvisionContext {
   workspaceRoot: string;
   serverScriptPath: string;
-  extensionVersion: string;
 }
 
 export type McpOutcome = "created" | "updated" | "unchanged" | "removed";
@@ -145,30 +144,14 @@ Each tool takes exactly one of \`code\` (inline CRL text) or \`path\` (a \`.crl\
 On valid input a tool returns a JSON \`ParseResult\` envelope — always check \`success\` first, and on \`success: false\` read \`errors[]\` and report them to the user. See each tool's own description for the exact result and error shape. Bad arguments or an unreadable/oversized file come back as a tool error (fix the input and retry). \`build_crl_ast\` success means parsing/AST construction succeeded — it does NOT perform semantic validation.`;
 }
 
-function startMarker(version: string): string {
-  return `${BLOCK_START_PREFIX} version="${version}" -->`;
-}
+// The managed block carries NO version in its marker (disc 371): a `version="X"` attribute meant every extension version bump
+// rewrote the block → git churn in a committed CLAUDE.md. The block is now refreshed by CONTENT diff (below), so it changes
+// only when the body text actually changes. `findBlock` still locates a legacy versioned marker via the prefix, so an existing
+// `<!-- crl-tools-start version="…" -->` migrates to the versionless form on the next provision — a ONE-TIME rewrite, then stable.
+const START_MARKER = `${BLOCK_START_PREFIX} -->`;
 
-function renderBlock(version: string): string {
-  return `${startMarker(version)}\n${crlBlockBody()}\n${BLOCK_END}`;
-}
-
-function parseBlockVersion(content: string): string | null {
-  const m = content.match(/<!-- crl-tools-start version="([^"]*)" -->/);
-  return m ? m[1] : null;
-}
-
-// Assumes plain X.Y.Z versions (the extension's package.json version); prerelease
-// or build suffixes are not interpreted.
-function versionGt(a: string, b: string): boolean {
-  const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
-  const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
-  for (let i = 0; i < 3; i++) {
-    const x = pa[i] ?? 0;
-    const y = pb[i] ?? 0;
-    if (x !== y) return x > y;
-  }
-  return false;
+function renderBlock(): string {
+  return `${START_MARKER}\n${crlBlockBody()}\n${BLOCK_END}`;
 }
 
 // Returns the indices of the single well-formed managed block, or a marker error.
@@ -184,7 +167,7 @@ function findBlock(content: string): { start: number; end: number } | "none" | "
 
 function writeClaudeMd(ctx: ProvisionContext, warnings: string[]): MdOutcome {
   const file = join(ctx.workspaceRoot, "CLAUDE.md");
-  const block = renderBlock(ctx.extensionVersion);
+  const block = renderBlock();
 
   if (!existsSync(file)) {
     atomicWrite(file, block + "\n");
@@ -201,8 +184,9 @@ function writeClaudeMd(ctx: ProvisionContext, warnings: string[]): MdOutcome {
     atomicWrite(file, content + sep + block + "\n");
     return "appended";
   }
-  const existingVersion = parseBlockVersion(content) ?? "0.0.0";
-  if (!versionGt(ctx.extensionVersion, existingVersion)) return "unchanged";
+  // Content-idempotent: rewrite ONLY when the block text actually differs — a version bump alone never touches CLAUDE.md.
+  const existing = content.slice(loc.start, loc.end);
+  if (existing === block) return "unchanged";
   atomicWrite(file, content.slice(0, loc.start) + block + content.slice(loc.end));
   return "updated";
 }

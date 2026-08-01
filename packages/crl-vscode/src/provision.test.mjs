@@ -28,7 +28,7 @@ function ctxFor(ws, version = "0.1.0") {
   mkdirSync(dir, { recursive: true });
   const serverScriptPath = join(dir, "mcp-server.js");
   writeFileSync(serverScriptPath, "// dummy", "utf8");
-  return { workspaceRoot: ws, serverScriptPath, extensionVersion: version };
+  return { workspaceRoot: ws, serverScriptPath }; // version param still shapes the server DIR path (ownership marker), not the CLAUDE.md block
 }
 const mcp = (ws) => join(ws, ".mcp.json");
 const md = (ws) => join(ws, "CLAUDE.md");
@@ -94,7 +94,8 @@ check("apply on empty workspace creates .mcp.json + CLAUDE.md", (ws) => {
   assert.deepEqual(j.mcpServers.crl.args, [ctx.serverScriptPath]);
   assert.equal(j.mcpServers.crl.env, undefined); // never synthesized
   const text = readFileSync(md(ws), "utf8");
-  assert.ok(text.includes('crl-tools-start version="0.1.0"'));
+  assert.ok(text.includes("<!-- crl-tools-start -->")); // disc 371: versionless marker (no per-version churn)
+  assert.ok(!/crl-tools-start version=/.test(text)); // never stamps a version
   assert.ok(text.includes("crl-tools-end"));
   assert.ok(text.includes("build_crl_ast"));
 });
@@ -142,12 +143,22 @@ check("mcpServers not an object → throws", (ws) => {
   assert.throws(() => target.apply(ctxFor(ws)), /not an object/);
 });
 
-check("version bump refreshes block; same version unchanged", (ws) => {
+check("CLAUDE.md block is content-idempotent — a version bump does NOT rewrite it (disc 371, no git churn)", (ws) => {
   target.apply(ctxFor(ws, "0.1.0"));
-  assert.equal(target.apply(ctxFor(ws, "0.1.0")).claudeMd, "unchanged");
-  assert.equal(target.apply(ctxFor(ws, "0.2.0")).claudeMd, "updated");
+  // a different extension version re-applying → still "unchanged" (the block carries no version, and its body is identical)
+  assert.equal(target.apply(ctxFor(ws, "0.2.0")).claudeMd, "unchanged");
+  assert.equal(target.apply(ctxFor(ws, "9.9.9")).claudeMd, "unchanged");
+});
+
+check("a LEGACY versioned marker migrates to the versionless form ONCE, then is stable", (ws) => {
+  // simulate a CLAUDE.md written by an old version (versioned marker)
+  writeFileSync(md(ws), '# proj\n\n<!-- crl-tools-start version="4.100.0" -->\nold body\n<!-- crl-tools-end -->\n');
+  const r1 = target.apply(ctxFor(ws));
+  assert.equal(r1.claudeMd, "updated"); // one-time rewrite to the versionless, current-body block
   const text = readFileSync(md(ws), "utf8");
-  assert.ok(text.includes('version="0.2.0"') && !text.includes('version="0.1.0"'));
+  assert.ok(text.includes("<!-- crl-tools-start -->") && !/crl-tools-start version=/.test(text));
+  assert.ok(text.includes("# proj")); // surrounding content preserved
+  assert.equal(target.apply(ctxFor(ws)).claudeMd, "unchanged"); // stable thereafter
 });
 
 check("preserves user-pinned command + unknown field; forces args", (ws) => {

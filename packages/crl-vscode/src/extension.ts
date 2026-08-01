@@ -393,13 +393,11 @@ function flushWarnings(warnings: string[]): void {
 }
 
 function ctxFor(context: vscode.ExtensionContext, root: string, serverScriptPath?: string): ProvisionContext {
-  const version = context.extension?.packageJSON?.version;
   return {
     workspaceRoot: root,
     // Reuse an already-staged path when the caller has one (disc 370 #4: avoids re-staging + a duplicate storage-failure warning);
     // otherwise resolve (which stages) — the manual `crl.setup` path.
     serverScriptPath: serverScriptPath ?? resolveStableMcpServerScript(context),
-    extensionVersion: typeof version === "string" ? version : "0.0.0",
   };
 }
 
