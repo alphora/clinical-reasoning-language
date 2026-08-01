@@ -80,3 +80,9 @@ packages/*/test/oracle/.gen/
 
 # vibe-mail identity for THIS machine (see other vibe-tools repos).
 .vibe-mail.json
+
+# Corpus destination for THIS machine. Was committed so the repo itself
+# declared where transcripts go; that signal now lives per-machine instead,
+# so vibe-tools stops appearing in repositories that merely tolerate it.
+# The file stays on disk and corpus capture is unchanged.
+.vibe-corpus.json
