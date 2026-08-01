@@ -1,0 +1,65 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "sur716-011-medical-policy-local",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://example.org/hcsc/sur716-011/CodeSystem/sur716-011-medical-policy-local",
+  "version": "0.0.0",
+  "name": "ReconstructiveBreastSurgeryCoverageLocal",
+  "title": "Reconstructive Breast Surgery Coverage",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-05-15T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Reconstructive Breast Surgery Coverage",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "affected-breast-reconstruction-requested",
+      "display": "Affected Breast Reconstruction Requested"
+    },
+    {
+      "code": "contralateral-breast-reconstruction-requested",
+      "display": "Contralateral Breast Reconstruction Requested"
+    },
+    {
+      "code": "prior-medically-necessary-full-mastectomy",
+      "display": "Prior Medically Necessary Full Mastectomy"
+    },
+    {
+      "code": "prior-medically-necessary-partial-mastectomy",
+      "display": "Prior Medically Necessary Partial Mastectomy"
+    },
+    {
+      "code": "accidental-injury-to-breast",
+      "display": "Accidental Injury To Breast"
+    },
+    {
+      "code": "trauma-to-breast",
+      "display": "Trauma To Breast"
+    },
+    {
+      "code": "to-achieve-symmetry",
+      "display": "To Achieve Symmetry"
+    }
+  ]
+}

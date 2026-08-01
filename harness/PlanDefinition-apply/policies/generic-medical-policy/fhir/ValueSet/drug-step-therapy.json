@@ -1,0 +1,39 @@
+{
+  "resourceType": "ValueSet",
+  "id": "drug-step-therapy",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset"
+    ]
+  },
+  "url": "http://example.org/hcsc/generic-medical-policy/ValueSet/drug-step-therapy",
+  "version": "0.0.0",
+  "name": "DrugStepTherapy",
+  "title": "Step Therapy Response",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-01-01T00:00:00.000Z",
+  "description": "Answer options for \"Step Therapy Response (Drug) Value\".",
+  "compose": {
+    "include": [
+      {
+        "system": "http://example.org/hcsc/generic-medical-policy/CodeSystem/generic-medical-policy-local",
+        "concept": [
+          {
+            "code": "drug-step-therapy-yes",
+            "display": "Yes"
+          },
+          {
+            "code": "drug-step-therapy-no",
+            "display": "No"
+          },
+          {
+            "code": "drug-step-therapy-na",
+            "display": "N/A"
+          }
+        ]
+      }
+    ]
+  }
+}

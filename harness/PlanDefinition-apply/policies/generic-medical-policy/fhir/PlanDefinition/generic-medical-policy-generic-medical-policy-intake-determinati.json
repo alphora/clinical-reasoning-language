@@ -1,0 +1,1330 @@
+{
+  "resourceType": "PlanDefinition",
+  "id": "generic-medical-policy-generic-medical-policy-intake-determinati",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-generic-medical-policy-intake-determinati",
+  "version": "0.0.0",
+  "name": "GenericMedicalPolicyIntakeGenericMedicalPolicyIntakeDetermination",
+  "title": "Generic Medical Policy Intake Determination",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Generic Medical Policy Intake Determination",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/plan-definition-type",
+        "code": "workflow-definition"
+      }
+    ]
+  },
+  "library": [
+    "http://example.org/hcsc/generic-medical-policy/Library/GenericMedicalPolicyInterface"
+  ],
+  "action": [
+    {
+      "title": "Generic Medical Policy Intake Determination",
+      "description": "Generic Medical Policy Intake Determination",
+      "code": [
+        {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+              "code": "guideline-based-care"
+            }
+          ]
+        }
+      ],
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+          "valueString": "any"
+        }
+      ],
+      "action": [
+        {
+          "title": "Request Is Medical Surgical",
+          "description": "Request Is Medical Surgical",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "Request Is Medical Surgical"
+              }
+            }
+          ],
+          "input": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Request Is Medical Surgical?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Request Is Medical Surgical"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-request-is-medical-surgical"
+              ]
+            }
+          ],
+          "action": [
+            {
+              "title": "Initial Treatment (Medical Surgical)",
+              "description": "Initial Treatment (Medical Surgical)",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Initial Treatment (Medical Surgical)"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Initial Treatment (Medical Surgical)?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Initial Treatment (Medical Surgical)"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-initial-treatment-medical-surgical"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Treatment Already Begun (Medical Surgical)",
+              "description": "Treatment Already Begun (Medical Surgical)",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Treatment Already Begun (Medical Surgical)"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Treatment Already Begun (Medical Surgical)?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Treatment Already Begun (Medical Surgical)"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-treatment-already-begun-medical-surgical"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "First Day Of Treatment (Medical Surgical) Provided",
+              "description": "First Day Of Treatment (Medical Surgical) Provided",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "First Day Of Treatment (Medical Surgical) Provided"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "First Day Of Treatment (Medical Surgical) Value?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "First Day Of Treatment (Medical Surgical) Value"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-first-day-of-treatment-medic-4e16b3917db5"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Emergency Services Requested (Medical Surgical)",
+              "description": "Emergency Services Requested (Medical Surgical)",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Emergency Services Requested (Medical Surgical)"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Emergency Services Requested (Medical Surgical)?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Emergency Services Requested (Medical Surgical)"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-emergency-services-requested-c448bffeac62"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Primary Diagnosis (Medical Surgical) Provided",
+              "description": "Primary Diagnosis (Medical Surgical) Provided",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Primary Diagnosis (Medical Surgical) Provided"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Primary Diagnosis (Medical Surgical) Value?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Primary Diagnosis (Medical Surgical) Value"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-primary-diagnosis-medical-surgical-value"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Clinical Documents And Order Available (Medical Surgical)",
+              "description": "Clinical Documents And Order Available (Medical Surgical)",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Clinical Documents And Order Available (Medical Surgical)"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Clinical Documents And Order Available (Medical Surgical)?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Clinical Documents And Order Available (Medical Surgical)"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-clinical-documents-and-order-8f77fb091f1d"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Additional Clinical Information (Medical Surgical) Provided",
+              "description": "Additional Clinical Information (Medical Surgical) Provided",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Additional Clinical Information (Medical Surgical) Provided"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Additional Clinical Information (Medical Surgical) Value?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Additional Clinical Information (Medical Surgical) Value"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-additional-clinical-informat-cdae2e42b848"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "otherwise",
+              "description": "otherwise",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            }
+          ],
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+              "valueString": "any"
+            }
+          ]
+        },
+        {
+          "title": "Request Is Drug",
+          "description": "Request Is Drug",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "Request Is Drug"
+              }
+            }
+          ],
+          "input": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Request Is Drug?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Request Is Drug"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-request-is-drug"
+              ]
+            }
+          ],
+          "action": [
+            {
+              "title": "Drug Type Provided",
+              "description": "Drug Type Provided",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Drug Type Provided"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Drug Type Value?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Drug Type Value"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-drug-type-value"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Treatment Already Begun (Drug)",
+              "description": "Treatment Already Begun (Drug)",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Treatment Already Begun (Drug)"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Treatment Already Begun (Drug)?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Treatment Already Begun (Drug)"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-treatment-already-begun-drug"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Reauthorization Response Demonstrated (Drug)",
+              "description": "Reauthorization Response Demonstrated (Drug)",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Reauthorization Response Demonstrated (Drug)"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Reauthorization Response Demonstrated (Drug)?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Reauthorization Response Demonstrated (Drug)"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-reauthorization-response-dem-ae3f80b27553"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "First Day Of Treatment (Drug) Provided",
+              "description": "First Day Of Treatment (Drug) Provided",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "First Day Of Treatment (Drug) Provided"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "First Day Of Treatment (Drug) Value?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "First Day Of Treatment (Drug) Value"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-first-day-of-treatment-drug-value"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Primary Diagnosis (Drug) Provided",
+              "description": "Primary Diagnosis (Drug) Provided",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Primary Diagnosis (Drug) Provided"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Primary Diagnosis (Drug) Value?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Primary Diagnosis (Drug) Value"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-primary-diagnosis-drug-value"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Dose Frequency Route Duration (Drug) Provided",
+              "description": "Dose Frequency Route Duration (Drug) Provided",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Dose Frequency Route Duration (Drug) Provided"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Dose Frequency Route Duration (Drug) Value?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Dose Frequency Route Duration (Drug) Value"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-dose-frequency-route-duration-drug-value"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Step Therapy Response (Drug) Provided",
+              "description": "Step Therapy Response (Drug) Provided",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Step Therapy Response (Drug) Provided"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Step Therapy Response (Drug) Value?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Step Therapy Response (Drug) Value"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-step-therapy-response-drug-value"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Clinical Documents Available (Drug)",
+              "description": "Clinical Documents Available (Drug)",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Clinical Documents Available (Drug)"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Clinical Documents Available (Drug)?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Clinical Documents Available (Drug)"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-clinical-documents-available-drug"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Additional Clinical Information (Drug) Provided",
+              "description": "Additional Clinical Information (Drug) Provided",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Additional Clinical Information (Drug) Provided"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Additional Clinical Information (Drug) Value?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Additional Clinical Information (Drug) Value"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-additional-clinical-informat-572a9c5df1be"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "otherwise",
+              "description": "otherwise",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            }
+          ],
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+              "valueString": "any"
+            }
+          ]
+        },
+        {
+          "title": "Request Is Behavioral Or Mental Health",
+          "description": "Request Is Behavioral Or Mental Health",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "Request Is Behavioral Or Mental Health"
+              }
+            }
+          ],
+          "input": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Request Is Behavioral Or Mental Health?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Request Is Behavioral Or Mental Health"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-request-is-behavioral-or-mental-health"
+              ]
+            }
+          ],
+          "action": [
+            {
+              "title": "Treatment Already Begun (Behavioral)",
+              "description": "Treatment Already Begun (Behavioral)",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Treatment Already Begun (Behavioral)"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Treatment Already Begun (Behavioral)?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Treatment Already Begun (Behavioral)"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-treatment-already-begun-behavioral"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "First Day Of Treatment (Behavioral) Provided",
+              "description": "First Day Of Treatment (Behavioral) Provided",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "First Day Of Treatment (Behavioral) Provided"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "First Day Of Treatment (Behavioral) Value?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "First Day Of Treatment (Behavioral) Value"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-first-day-of-treatment-behavioral-value"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Emergency Services Requested (Behavioral)",
+              "description": "Emergency Services Requested (Behavioral)",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Emergency Services Requested (Behavioral)"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Emergency Services Requested (Behavioral)?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Emergency Services Requested (Behavioral)"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-emergency-services-requested-behavioral"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Patient Is Risk To Self Or Others (Behavioral)",
+              "description": "Patient Is Risk To Self Or Others (Behavioral)",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Patient Is Risk To Self Or Others (Behavioral)"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Patient Is Risk To Self Or Others (Behavioral)?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Patient Is Risk To Self Or Others (Behavioral)"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-patient-is-risk-to-self-or-o-81ac372f3304"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Requested Level Of Care (Behavioral) Provided",
+              "description": "Requested Level Of Care (Behavioral) Provided",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Requested Level Of Care (Behavioral) Provided"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Requested Level Of Care (Behavioral) Value?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Requested Level Of Care (Behavioral) Value"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-requested-level-of-care-behavioral-value"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Substance Use Treatment Related (Behavioral)",
+              "description": "Substance Use Treatment Related (Behavioral)",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Substance Use Treatment Related (Behavioral)"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Substance Use Treatment Related (Behavioral)?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Substance Use Treatment Related (Behavioral)"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-substance-use-treatment-rela-71151a921c4b"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Primary Diagnosis (Behavioral) Provided",
+              "description": "Primary Diagnosis (Behavioral) Provided",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Primary Diagnosis (Behavioral) Provided"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Primary Diagnosis (Behavioral) Value?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Primary Diagnosis (Behavioral) Value"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-primary-diagnosis-behavioral-value"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Clinical Documents Available (Behavioral)",
+              "description": "Clinical Documents Available (Behavioral)",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Clinical Documents Available (Behavioral)"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Clinical Documents Available (Behavioral)?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Clinical Documents Available (Behavioral)"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-clinical-documents-available-behavioral"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Additional Clinical Information (Behavioral) Provided",
+              "description": "Additional Clinical Information (Behavioral) Provided",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Additional Clinical Information (Behavioral) Provided"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Additional Clinical Information (Behavioral) Value?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Additional Clinical Information (Behavioral) Value"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/generic-medical-policy/StructureDefinition/generic-medical-policy-additional-clinical-informat-f5008a50fc94"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "otherwise",
+              "description": "otherwise",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+            }
+          ],
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+              "valueString": "any"
+            }
+          ]
+        },
+        {
+          "title": "otherwise",
+          "description": "otherwise",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/hcsc/generic-medical-policy/PlanDefinition/generic-medical-policy-not-certify-unmet-recommendation"
+        }
+      ]
+    }
+  ]
+}

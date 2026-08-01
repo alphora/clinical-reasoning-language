@@ -1,0 +1,49 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "rx501-147-medical-policy-local",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://example.org/hcsc/rx501-147/CodeSystem/rx501-147-medical-policy-local",
+  "version": "0.0.0",
+  "name": "RisankizumabCoverageLocal",
+  "title": "Risankizumab Coverage",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-05-15T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Risankizumab Coverage",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "adult-18-or-older",
+      "display": "Adult Age 18 Or Older"
+    },
+    {
+      "code": "moderate-to-severely-active-crohns-disease",
+      "display": "Moderate To Severely Active Crohn's Disease"
+    },
+    {
+      "code": "moderate-to-severely-active-ulcerative-colitis",
+      "display": "Moderate To Severely Active Ulcerative Colitis"
+    }
+  ]
+}

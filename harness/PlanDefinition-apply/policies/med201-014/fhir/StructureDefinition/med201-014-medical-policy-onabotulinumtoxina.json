@@ -1,0 +1,148 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "med201-014-medical-policy-onabotulinumtoxina",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-publishablecasefeature"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-featureExpression",
+      "valueExpression": {
+        "language": "text/cql-identifier",
+        "expression": "OnabotulinumtoxinA",
+        "reference": "http://example.org/hcsc/med201-014/Library/Med201014MedicalPolicyLocalSource"
+      }
+    }
+  ],
+  "url": "http://example.org/hcsc/med201-014/StructureDefinition/med201-014-medical-policy-onabotulinumtoxina",
+  "version": "0.0.0",
+  "name": "OnabotulinumtoxinA",
+  "title": "OnabotulinumtoxinA",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "OnabotulinumtoxinA case feature determination",
+  "kind": "resource",
+  "abstract": false,
+  "type": "Observation",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Observation",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Observation",
+        "path": "Observation"
+      },
+      {
+        "id": "Observation.code",
+        "path": "Observation.code",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "patternCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://example.org/hcsc/med201-014/CodeSystem/med201-014-medical-policy-local",
+              "code": "onabotulinumtoxina",
+              "display": "OnabotulinumtoxinA"
+            }
+          ]
+        }
+      },
+      {
+        "id": "Observation.value[x]",
+        "path": "Observation.value[x]",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "type": [
+          {
+            "code": "boolean"
+          }
+        ]
+      },
+      {
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+            "extension": [
+              {
+                "url": "definition",
+                "valueCanonical": "http://example.org/hcsc/med201-014/StructureDefinition/med201-014-medical-policy-onabotulinumtoxina#Observation.subject"
+              },
+              {
+                "url": "expression",
+                "valueExpression": {
+                  "language": "text/fhirpath",
+                  "expression": "%resource.subject"
+                }
+              }
+            ]
+          }
+        ],
+        "id": "Observation.subject",
+        "path": "Observation.subject",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "type": [
+          {
+            "code": "Reference",
+            "targetProfile": [
+              "http://hl7.org/fhir/StructureDefinition/Patient"
+            ]
+          }
+        ]
+      },
+      {
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+            "extension": [
+              {
+                "url": "definition",
+                "valueCanonical": "http://example.org/hcsc/med201-014/StructureDefinition/med201-014-medical-policy-onabotulinumtoxina#Observation.effective[x]"
+              },
+              {
+                "url": "expression",
+                "valueExpression": {
+                  "language": "text/fhirpath",
+                  "expression": "%resource.authored"
+                }
+              }
+            ]
+          }
+        ],
+        "id": "Observation.effective[x]",
+        "path": "Observation.effective[x]",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "type": [
+          {
+            "code": "dateTime"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,513 @@
+{
+  "resourceType": "PlanDefinition",
+  "id": "sur716-011-medical-policy-il-hb-1384-determination",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-il-hb-1384-determination",
+  "version": "0.0.0",
+  "name": "StateMandatesIlHb1384Determination",
+  "title": "IL HB 1384 Determination",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-05-15T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "IL HB 1384 Determination",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/plan-definition-type",
+        "code": "eca-rule"
+      }
+    ]
+  },
+  "library": [
+    "http://example.org/hcsc/sur716-011/Library/Sur716011MedicalPolicyStateMandatesInterface"
+  ],
+  "action": [
+    {
+      "title": "IL HB 1384 Determination",
+      "description": "IL HB 1384 Determination",
+      "code": [
+        {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+              "code": "guideline-based-care"
+            }
+          ]
+        }
+      ],
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+          "valueString": "any"
+        }
+      ],
+      "action": [
+        {
+          "title": "IL Policy Subject Event",
+          "description": "IL Policy Subject Event",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "IL Policy Subject Event"
+              }
+            }
+          ],
+          "input": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "IL Policy Amended On Or After 2025-01-01?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "IL Policy Amended On Or After 2025-01-01"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-il-policy-amended-on-or-a-02f1cc29e1db"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "IL Policy Delivered On Or After 2025-01-01?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "IL Policy Delivered On Or After 2025-01-01"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-il-policy-delivered-on-or-b6c864d413c0"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "IL Policy Issued On Or After 2025-01-01?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "IL Policy Issued On Or After 2025-01-01"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-il-policy-issued-on-or-af-0b8615662ce9"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "IL Policy Renewed On Or After 2025-01-01?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "IL Policy Renewed On Or After 2025-01-01"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-il-policy-renewed-on-or-a-5eb8a55649db"
+              ]
+            }
+          ],
+          "action": [
+            {
+              "title": "IL Eligible Plan Type",
+              "description": "IL Eligible Plan Type",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "IL Eligible Plan Type"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "IL Plan Individual And Family PPO HMO POS?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "IL Plan Individual And Family PPO HMO POS"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-il-plan-individual-and-fa-d01057977258"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "IL Plan Student?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "IL Plan Student"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-il-plan-student"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "IL Plan Group Small Group?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "IL Plan Group Small Group"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-il-plan-group-small-group"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "IL Plan Group Mid Market?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "IL Plan Group Mid Market"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-il-plan-group-mid-market"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "IL Plan Group Large Group Fully Insured PPO HMO POS?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "IL Plan Group Large Group Fully Insured PPO HMO POS"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-il-plan-group-large-group-a95910797b9b"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "IL Plan Medicaid?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "IL Plan Medicaid"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-il-plan-medicaid"
+                  ]
+                }
+              ],
+              "action": [
+                {
+                  "title": "Service Is Medically Necessary",
+                  "description": "Service Is Medically Necessary",
+                  "code": [
+                    {
+                      "coding": [
+                        {
+                          "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                          "code": "guideline-based-care"
+                        }
+                      ]
+                    }
+                  ],
+                  "condition": [
+                    {
+                      "kind": "applicability",
+                      "expression": {
+                        "language": "text/cql-identifier",
+                        "expression": "Service Is Medically Necessary"
+                      }
+                    }
+                  ],
+                  "input": [
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "Service Is Medically Necessary?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "Service Is Medically Necessary"
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-service-is-medically-necessary"
+                      ]
+                    }
+                  ],
+                  "action": [
+                    {
+                      "title": "Intended To Restore Physical Appearance",
+                      "description": "Intended To Restore Physical Appearance",
+                      "code": [
+                        {
+                          "coding": [
+                            {
+                              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                              "code": "guideline-based-care"
+                            }
+                          ]
+                        }
+                      ],
+                      "condition": [
+                        {
+                          "kind": "applicability",
+                          "expression": {
+                            "language": "text/cql-identifier",
+                            "expression": "Intended To Restore Physical Appearance"
+                          }
+                        }
+                      ],
+                      "input": [
+                        {
+                          "extension": [
+                            {
+                              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                              "valueString": "Intended To Restore Physical Appearance?"
+                            },
+                            {
+                              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                              "valueMarkdown": "Intended To Restore Physical Appearance"
+                            }
+                          ],
+                          "type": "Observation",
+                          "profile": [
+                            "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-intended-to-restore-physi-52bde55dd056"
+                          ]
+                        }
+                      ],
+                      "action": [
+                        {
+                          "title": "Body Structure Damaged By Trauma",
+                          "description": "Body Structure Damaged By Trauma",
+                          "code": [
+                            {
+                              "coding": [
+                                {
+                                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                                  "code": "guideline-based-care"
+                                }
+                              ]
+                            }
+                          ],
+                          "condition": [
+                            {
+                              "kind": "applicability",
+                              "expression": {
+                                "language": "text/cql-identifier",
+                                "expression": "Body Structure Damaged By Trauma"
+                              }
+                            }
+                          ],
+                          "input": [
+                            {
+                              "extension": [
+                                {
+                                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                                  "valueString": "Body Structure Damaged By Trauma?"
+                                },
+                                {
+                                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                                  "valueMarkdown": "Body Structure Damaged By Trauma"
+                                }
+                              ],
+                              "type": "Observation",
+                              "profile": [
+                                "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-body-structure-damaged-by-trauma"
+                              ]
+                            }
+                          ],
+                          "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-certify-met-recommendation"
+                        },
+                        {
+                          "title": "otherwise",
+                          "description": "otherwise",
+                          "code": [
+                            {
+                              "coding": [
+                                {
+                                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                                  "code": "guideline-based-care"
+                                }
+                              ]
+                            }
+                          ],
+                          "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-not-certify-unmet-recommendation"
+                        }
+                      ],
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+                          "valueString": "any"
+                        }
+                      ]
+                    },
+                    {
+                      "title": "otherwise",
+                      "description": "otherwise",
+                      "code": [
+                        {
+                          "coding": [
+                            {
+                              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                              "code": "guideline-based-care"
+                            }
+                          ]
+                        }
+                      ],
+                      "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-not-certify-unmet-recommendation"
+                    }
+                  ],
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+                      "valueString": "any"
+                    }
+                  ]
+                },
+                {
+                  "title": "otherwise",
+                  "description": "otherwise",
+                  "code": [
+                    {
+                      "coding": [
+                        {
+                          "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                          "code": "guideline-based-care"
+                        }
+                      ]
+                    }
+                  ],
+                  "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-not-certify-unmet-recommendation"
+                }
+              ],
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+                  "valueString": "any"
+                }
+              ]
+            },
+            {
+              "title": "otherwise",
+              "description": "otherwise",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-not-certify-unmet-recommendation"
+            }
+          ],
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+              "valueString": "any"
+            }
+          ]
+        },
+        {
+          "title": "otherwise",
+          "description": "otherwise",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-not-certify-unmet-recommendation"
+        }
+      ]
+    }
+  ]
+}

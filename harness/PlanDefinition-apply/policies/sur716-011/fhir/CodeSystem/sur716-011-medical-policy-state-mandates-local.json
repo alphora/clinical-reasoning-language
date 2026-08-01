@@ -1,0 +1,209 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "sur716-011-medical-policy-state-mandates-local",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://example.org/hcsc/sur716-011/CodeSystem/sur716-011-medical-policy-state-mandates-local",
+  "version": "0.0.0",
+  "name": "StateMandatesLocal",
+  "title": "State Mandates",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-05-15T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "State Mandates",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "resides-in-illinois",
+      "display": "Resides In Illinois"
+    },
+    {
+      "code": "il-policy-amended-on-or-after-2025-01-01",
+      "display": "IL Policy Amended On Or After 2025-01-01"
+    },
+    {
+      "code": "il-policy-delivered-on-or-after-2025-01-01",
+      "display": "IL Policy Delivered On Or After 2025-01-01"
+    },
+    {
+      "code": "il-policy-issued-on-or-after-2025-01-01",
+      "display": "IL Policy Issued On Or After 2025-01-01"
+    },
+    {
+      "code": "il-policy-renewed-on-or-after-2025-01-01",
+      "display": "IL Policy Renewed On Or After 2025-01-01"
+    },
+    {
+      "code": "il-plan-individual-and-family-ppo-hmo-pos",
+      "display": "IL Plan Individual And Family PPO HMO POS"
+    },
+    {
+      "code": "il-plan-student",
+      "display": "IL Plan Student"
+    },
+    {
+      "code": "il-plan-group-small-group",
+      "display": "IL Plan Group Small Group"
+    },
+    {
+      "code": "il-plan-group-mid-market",
+      "display": "IL Plan Group Mid Market"
+    },
+    {
+      "code": "il-plan-group-large-group-fully-insured-ppo-hmo-pos",
+      "display": "IL Plan Group Large Group Fully Insured PPO HMO POS"
+    },
+    {
+      "code": "il-plan-medicaid",
+      "display": "IL Plan Medicaid"
+    },
+    {
+      "code": "service-is-medically-necessary",
+      "display": "Service Is Medically Necessary"
+    },
+    {
+      "code": "intended-to-restore-physical-appearance",
+      "display": "Intended To Restore Physical Appearance"
+    },
+    {
+      "code": "body-structure-damaged-by-trauma",
+      "display": "Body Structure Damaged By Trauma"
+    },
+    {
+      "code": "resides-in-arkansas",
+      "display": "Resides In Arkansas"
+    },
+    {
+      "code": "plan-is-non-aso-group",
+      "display": "Plan Is Non ASO Group"
+    },
+    {
+      "code": "group-indicated-mandate-applies-to-aso",
+      "display": "Group Indicated Mandate Applies To ASO"
+    },
+    {
+      "code": "ar-plan-fully-insured-group",
+      "display": "AR Plan Fully Insured Group"
+    },
+    {
+      "code": "ar-plan-student",
+      "display": "AR Plan Student"
+    },
+    {
+      "code": "ar-plan-small-group",
+      "display": "AR Plan Small Group"
+    },
+    {
+      "code": "ar-plan-mid-market",
+      "display": "AR Plan Mid Market"
+    },
+    {
+      "code": "ar-plan-large-group",
+      "display": "AR Plan Large Group"
+    },
+    {
+      "code": "ar-plan-hmo",
+      "display": "AR Plan HMO"
+    },
+    {
+      "code": "ar-plan-epo",
+      "display": "AR Plan EPO"
+    },
+    {
+      "code": "ar-plan-ppo",
+      "display": "AR Plan PPO"
+    },
+    {
+      "code": "ar-plan-pos",
+      "display": "AR Plan POS"
+    },
+    {
+      "code": "receiving-benefits-in-connection-with-a-mastectomy",
+      "display": "Receiving Benefits In Connection With A Mastectomy"
+    },
+    {
+      "code": "elects-breast-reconstruction",
+      "display": "Elects Breast Reconstruction"
+    },
+    {
+      "code": "ar405-reconstruction-of-mastectomy-breast",
+      "display": "AR 405 Reconstruction Of Mastectomy Breast"
+    },
+    {
+      "code": "ar405-reconstruction-of-other-breast-for-symmetry",
+      "display": "AR 405 Reconstruction Of Other Breast For Symmetry"
+    },
+    {
+      "code": "ar405-breast-prostheses",
+      "display": "AR 405 Breast Prostheses"
+    },
+    {
+      "code": "ar405-treatment-of-physical-complications-including-lymphedema",
+      "display": "AR 405 Treatment Of Physical Complications Including Lymphedema"
+    },
+    {
+      "code": "sb83-augmentation",
+      "display": "SB 83 Augmentation"
+    },
+    {
+      "code": "sb83-reduction",
+      "display": "SB 83 Reduction"
+    },
+    {
+      "code": "sb83-mastectomy",
+      "display": "SB 83 Mastectomy"
+    },
+    {
+      "code": "sb83-contralateral-procedure-for-symmetry",
+      "display": "SB 83 Contralateral Procedure For Symmetry"
+    },
+    {
+      "code": "sb83-breast-reconstruction-modality",
+      "display": "SB 83 Breast Reconstruction Modality"
+    },
+    {
+      "code": "sb83-chest-wall-reconstruction-including-aesthetic-flat-closure",
+      "display": "SB 83 Chest Wall Reconstruction Including Aesthetic Flat Closure"
+    },
+    {
+      "code": "sb83-custom-fabricated-breast-prosthesis-including-replacement",
+      "display": "SB 83 Custom Fabricated Breast Prosthesis Including Replacement"
+    },
+    {
+      "code": "sb83-treatment-of-physical-complications",
+      "display": "SB 83 Treatment Of Physical Complications"
+    },
+    {
+      "code": "surgery-best-course-determined-by-professional",
+      "display": "Surgery Best Course Determined By Professional"
+    },
+    {
+      "code": "consistent-with-prevailing-medical-standards",
+      "display": "Consistent With Prevailing Medical Standards"
+    },
+    {
+      "code": "in-consultation-with-the-patient",
+      "display": "In Consultation With The Patient"
+    }
+  ]
+}

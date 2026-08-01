@@ -1,0 +1,148 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "sur716-011-medical-policy-sb-83-treatment-of-physic-8b5756c2e412",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-publishablecasefeature"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-featureExpression",
+      "valueExpression": {
+        "language": "text/cql-identifier",
+        "expression": "SB 83 Treatment Of Physical Complications",
+        "reference": "http://example.org/hcsc/sur716-011/Library/Sur716011MedicalPolicyStateMandatesLocalSource"
+      }
+    }
+  ],
+  "url": "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-sb-83-treatment-of-physic-8b5756c2e412",
+  "version": "0.0.0",
+  "name": "SB83TreatmentOfPhysicalComplications",
+  "title": "SB 83 Treatment Of Physical Complications",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-05-15T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "SB 83 Treatment Of Physical Complications case feature determination",
+  "kind": "resource",
+  "abstract": false,
+  "type": "Observation",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Observation",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Observation",
+        "path": "Observation"
+      },
+      {
+        "id": "Observation.code",
+        "path": "Observation.code",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "patternCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://example.org/hcsc/sur716-011/CodeSystem/sur716-011-medical-policy-state-mandates-local",
+              "code": "sb83-treatment-of-physical-complications",
+              "display": "SB 83 Treatment Of Physical Complications"
+            }
+          ]
+        }
+      },
+      {
+        "id": "Observation.value[x]",
+        "path": "Observation.value[x]",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "type": [
+          {
+            "code": "boolean"
+          }
+        ]
+      },
+      {
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+            "extension": [
+              {
+                "url": "definition",
+                "valueCanonical": "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-sb-83-treatment-of-physic-8b5756c2e412#Observation.subject"
+              },
+              {
+                "url": "expression",
+                "valueExpression": {
+                  "language": "text/fhirpath",
+                  "expression": "%resource.subject"
+                }
+              }
+            ]
+          }
+        ],
+        "id": "Observation.subject",
+        "path": "Observation.subject",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "type": [
+          {
+            "code": "Reference",
+            "targetProfile": [
+              "http://hl7.org/fhir/StructureDefinition/Patient"
+            ]
+          }
+        ]
+      },
+      {
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+            "extension": [
+              {
+                "url": "definition",
+                "valueCanonical": "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-sb-83-treatment-of-physic-8b5756c2e412#Observation.effective[x]"
+              },
+              {
+                "url": "expression",
+                "valueExpression": {
+                  "language": "text/fhirpath",
+                  "expression": "%resource.authored"
+                }
+              }
+            ]
+          }
+        ],
+        "id": "Observation.effective[x]",
+        "path": "Observation.effective[x]",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "type": [
+          {
+            "code": "dateTime"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "resourceType": "ActivityDefinition",
+  "id": "med201-014-medical-policy-not-certify-eiu",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-communicationactivity",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableactivitydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableactivitydefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://example.org/hcsc/med201-014/ActivityDefinition/med201-014-medical-policy-not-certify-eiu",
+  "version": "0.0.0",
+  "name": "MedicalPolicyDeterminationNotCertifyEiu",
+  "title": "not-certify.EIU",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "not-certify.EIU",
+  "library": [
+    "http://example.org/hcsc/med201-014/Library/Med201014MedicalPolicyInterface"
+  ],
+  "kind": "CommunicationRequest",
+  "profile": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-communicationrequest",
+  "intent": "proposal",
+  "doNotPerform": false,
+  "code": {
+    "coding": [
+      {
+        "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-activity-type-cs",
+        "code": "send-message"
+      }
+    ]
+  },
+  "dynamicValue": [
+    {
+      "path": "payload.contentString",
+      "expression": {
+        "language": "text/cql-expression",
+        "expression": "'Unmet - EIU'"
+      }
+    },
+    {
+      "path": "note.text",
+      "expression": {
+        "language": "text/cql-expression",
+        "expression": "'Medical-policy criteria NOT MET (experimental / investigational / unproven) — the requested service is considered experimental, investigational, or unproven under this policy. A communicated sub-determination (embedded mode); not-certify category / PAS review-action A3; NOT a service order.'"
+      }
+    },
+    {
+      "path": "reasonCode",
+      "expression": {
+        "language": "text/cql-expression",
+        "expression": "CodeableConcept { coding: { Coding { system: uri { value: 'https://codesystem.x12.org/005010/306' }, code: code { value: 'A3' }, display: string { value: 'Not certified' } } } }"
+      }
+    }
+  ]
+}

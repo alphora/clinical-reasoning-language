@@ -1,0 +1,59 @@
+{
+  "resourceType": "ValueSet",
+  "id": "requested-level-of-care",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset"
+    ]
+  },
+  "url": "http://example.org/hcsc/generic-medical-policy/ValueSet/requested-level-of-care",
+  "version": "0.0.0",
+  "name": "RequestedLevelOfCare",
+  "title": "Requested Level Of Care",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-01-01T00:00:00.000Z",
+  "description": "Answer options for \"Requested Level Of Care (Behavioral) Value\".",
+  "compose": {
+    "include": [
+      {
+        "system": "http://example.org/hcsc/generic-medical-policy/CodeSystem/generic-medical-policy-local",
+        "concept": [
+          {
+            "code": "requested-level-of-care-outpatient-therapy",
+            "display": "Outpatient Therapy"
+          },
+          {
+            "code": "requested-level-of-care-intensive-outpatient",
+            "display": "Intensive Outpatient"
+          },
+          {
+            "code": "requested-level-of-care-partial-hospitalization",
+            "display": "Partial Hospitalization"
+          },
+          {
+            "code": "requested-level-of-care-inpatient",
+            "display": "Inpatient"
+          },
+          {
+            "code": "requested-level-of-care-residential",
+            "display": "Residential"
+          },
+          {
+            "code": "requested-level-of-care-medication-management",
+            "display": "Medication Management"
+          },
+          {
+            "code": "requested-level-of-care-psychological-testing",
+            "display": "Psychological Testing"
+          },
+          {
+            "code": "requested-level-of-care-other",
+            "display": "Other"
+          }
+        ]
+      }
+    ]
+  }
+}

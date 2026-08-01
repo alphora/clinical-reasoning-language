@@ -77,3 +77,6 @@ packages/crl/src/tests/regression/testdata/*-actual.*
 features/
 # step-3 golden-oracle build output (regenerable)
 packages/*/test/oracle/.gen/
+
+# vibe-mail identity for THIS machine (see other vibe-tools repos).
+.vibe-mail.json

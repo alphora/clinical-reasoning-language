@@ -1,0 +1,657 @@
+{
+  "resourceType": "PlanDefinition",
+  "id": "sur716-011-medical-policy-sb-83-determination",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-sb-83-determination",
+  "version": "0.0.0",
+  "name": "StateMandatesSb83Determination",
+  "title": "SB 83 Determination",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-05-15T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "SB 83 Determination",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/plan-definition-type",
+        "code": "eca-rule"
+      }
+    ]
+  },
+  "library": [
+    "http://example.org/hcsc/sur716-011/Library/Sur716011MedicalPolicyStateMandatesInterface"
+  ],
+  "action": [
+    {
+      "title": "SB 83 Determination",
+      "description": "SB 83 Determination",
+      "code": [
+        {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+              "code": "guideline-based-care"
+            }
+          ]
+        }
+      ],
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+          "valueString": "any"
+        }
+      ],
+      "action": [
+        {
+          "title": "SB 83 Eligible Plan Type",
+          "description": "SB 83 Eligible Plan Type",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "SB 83 Eligible Plan Type"
+              }
+            }
+          ],
+          "input": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "AR Plan Fully Insured Group?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "AR Plan Fully Insured Group"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-ar-plan-fully-insured-group"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "AR Plan Student?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "AR Plan Student"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-ar-plan-student"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "AR Plan HMO?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "AR Plan HMO"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-ar-plan-hmo"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "AR Plan EPO?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "AR Plan EPO"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-ar-plan-epo"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "AR Plan PPO?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "AR Plan PPO"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-ar-plan-ppo"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "AR Plan POS?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "AR Plan POS"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-ar-plan-pos"
+              ]
+            }
+          ],
+          "action": [
+            {
+              "title": "AR ASO Allows Mandate",
+              "description": "AR ASO Allows Mandate",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "AR ASO Allows Mandate"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Plan Is Non ASO Group?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Plan Is Non ASO Group"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-plan-is-non-aso-group"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Group Indicated Mandate Applies To ASO?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Group Indicated Mandate Applies To ASO"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-group-indicated-mandate-applies-to-aso"
+                  ]
+                }
+              ],
+              "action": [
+                {
+                  "title": "SB 83 Breast Reconstruction Surgery",
+                  "description": "SB 83 Breast Reconstruction Surgery",
+                  "code": [
+                    {
+                      "coding": [
+                        {
+                          "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                          "code": "guideline-based-care"
+                        }
+                      ]
+                    }
+                  ],
+                  "condition": [
+                    {
+                      "kind": "applicability",
+                      "expression": {
+                        "language": "text/cql-identifier",
+                        "expression": "SB 83 Breast Reconstruction Surgery"
+                      }
+                    }
+                  ],
+                  "input": [
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "SB 83 Augmentation?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "SB 83 Augmentation"
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-sb-83-augmentation"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "SB 83 Reduction?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "SB 83 Reduction"
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-sb-83-reduction"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "SB 83 Mastectomy?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "SB 83 Mastectomy"
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-sb-83-mastectomy"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "SB 83 Contralateral Procedure For Symmetry?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "SB 83 Contralateral Procedure For Symmetry"
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-sb-83-contralateral-proce-bea6d0808bfc"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "SB 83 Breast Reconstruction Modality?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "SB 83 Breast Reconstruction Modality"
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-sb-83-breast-reconstruction-modality"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "SB 83 Chest Wall Reconstruction Including Aesthetic Flat Closure?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "SB 83 Chest Wall Reconstruction Including Aesthetic Flat Closure"
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-sb-83-chest-wall-reconstr-3d0a5152dbba"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "SB 83 Custom Fabricated Breast Prosthesis Including Replacement?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "SB 83 Custom Fabricated Breast Prosthesis Including Replacement"
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-sb-83-custom-fabricated-b-e344097bbfaf"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "SB 83 Treatment Of Physical Complications?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "SB 83 Treatment Of Physical Complications"
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-sb-83-treatment-of-physic-8b5756c2e412"
+                      ]
+                    }
+                  ],
+                  "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-certify-met-recommendation"
+                },
+                {
+                  "title": "otherwise",
+                  "description": "otherwise",
+                  "code": [
+                    {
+                      "coding": [
+                        {
+                          "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                          "code": "guideline-based-care"
+                        }
+                      ]
+                    }
+                  ],
+                  "action": [
+                    {
+                      "title": "Surgery Best Course Determined By Professional",
+                      "description": "Surgery Best Course Determined By Professional",
+                      "code": [
+                        {
+                          "coding": [
+                            {
+                              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                              "code": "guideline-based-care"
+                            }
+                          ]
+                        }
+                      ],
+                      "condition": [
+                        {
+                          "kind": "applicability",
+                          "expression": {
+                            "language": "text/cql-identifier",
+                            "expression": "Surgery Best Course Determined By Professional"
+                          }
+                        }
+                      ],
+                      "input": [
+                        {
+                          "extension": [
+                            {
+                              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                              "valueString": "Surgery Best Course Determined By Professional?"
+                            },
+                            {
+                              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                              "valueMarkdown": "Surgery Best Course Determined By Professional"
+                            }
+                          ],
+                          "type": "Observation",
+                          "profile": [
+                            "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-surgery-best-course-deter-7f01e54b393f"
+                          ]
+                        }
+                      ],
+                      "action": [
+                        {
+                          "title": "Consistent With Prevailing Medical Standards",
+                          "description": "Consistent With Prevailing Medical Standards",
+                          "code": [
+                            {
+                              "coding": [
+                                {
+                                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                                  "code": "guideline-based-care"
+                                }
+                              ]
+                            }
+                          ],
+                          "condition": [
+                            {
+                              "kind": "applicability",
+                              "expression": {
+                                "language": "text/cql-identifier",
+                                "expression": "Consistent With Prevailing Medical Standards"
+                              }
+                            }
+                          ],
+                          "input": [
+                            {
+                              "extension": [
+                                {
+                                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                                  "valueString": "Consistent With Prevailing Medical Standards?"
+                                },
+                                {
+                                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                                  "valueMarkdown": "Consistent With Prevailing Medical Standards"
+                                }
+                              ],
+                              "type": "Observation",
+                              "profile": [
+                                "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-consistent-with-prevailin-4b8d2352f45a"
+                              ]
+                            }
+                          ],
+                          "action": [
+                            {
+                              "title": "In Consultation With The Patient",
+                              "description": "In Consultation With The Patient",
+                              "code": [
+                                {
+                                  "coding": [
+                                    {
+                                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                                      "code": "guideline-based-care"
+                                    }
+                                  ]
+                                }
+                              ],
+                              "condition": [
+                                {
+                                  "kind": "applicability",
+                                  "expression": {
+                                    "language": "text/cql-identifier",
+                                    "expression": "In Consultation With The Patient"
+                                  }
+                                }
+                              ],
+                              "input": [
+                                {
+                                  "extension": [
+                                    {
+                                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                                      "valueString": "In Consultation With The Patient?"
+                                    },
+                                    {
+                                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                                      "valueMarkdown": "In Consultation With The Patient"
+                                    }
+                                  ],
+                                  "type": "Observation",
+                                  "profile": [
+                                    "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-in-consultation-with-the-patient"
+                                  ]
+                                }
+                              ],
+                              "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-certify-met-recommendation"
+                            },
+                            {
+                              "title": "otherwise",
+                              "description": "otherwise",
+                              "code": [
+                                {
+                                  "coding": [
+                                    {
+                                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                                      "code": "guideline-based-care"
+                                    }
+                                  ]
+                                }
+                              ],
+                              "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-not-certify-unmet-recommendation"
+                            }
+                          ],
+                          "extension": [
+                            {
+                              "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+                              "valueString": "any"
+                            }
+                          ]
+                        },
+                        {
+                          "title": "otherwise",
+                          "description": "otherwise",
+                          "code": [
+                            {
+                              "coding": [
+                                {
+                                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                                  "code": "guideline-based-care"
+                                }
+                              ]
+                            }
+                          ],
+                          "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-not-certify-unmet-recommendation"
+                        }
+                      ],
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+                          "valueString": "any"
+                        }
+                      ]
+                    },
+                    {
+                      "title": "otherwise",
+                      "description": "otherwise",
+                      "code": [
+                        {
+                          "coding": [
+                            {
+                              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                              "code": "guideline-based-care"
+                            }
+                          ]
+                        }
+                      ],
+                      "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-not-certify-unmet-recommendation"
+                    }
+                  ],
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+                      "valueString": "any"
+                    }
+                  ]
+                }
+              ],
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+                  "valueString": "any"
+                }
+              ]
+            },
+            {
+              "title": "otherwise",
+              "description": "otherwise",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-not-certify-unmet-recommendation"
+            }
+          ],
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+              "valueString": "any"
+            }
+          ]
+        },
+        {
+          "title": "otherwise",
+          "description": "otherwise",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-not-certify-unmet-recommendation"
+        }
+      ]
+    }
+  ]
+}

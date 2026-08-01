@@ -1,0 +1,205 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "generic-medical-policy-local",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://example.org/hcsc/generic-medical-policy/CodeSystem/generic-medical-policy-local",
+  "version": "0.0.0",
+  "name": "GenericMedicalPolicyIntakeLocal",
+  "title": "Generic Medical Policy Intake",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Generic Medical Policy Intake",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "request-type-medical-surgical",
+      "display": "Request Is Medical Surgical"
+    },
+    {
+      "code": "request-type-drug",
+      "display": "Request Is Drug"
+    },
+    {
+      "code": "request-type-behavioral-mental-health",
+      "display": "Request Is Behavioral Or Mental Health"
+    },
+    {
+      "code": "ms-initial-treatment",
+      "display": "Initial Treatment (Medical Surgical)"
+    },
+    {
+      "code": "ms-treatment-already-begun",
+      "display": "Treatment Already Begun (Medical Surgical)"
+    },
+    {
+      "code": "ms-first-day-of-treatment",
+      "display": "First Day Of Treatment (Medical Surgical) Value"
+    },
+    {
+      "code": "ms-emergency-services-requested",
+      "display": "Emergency Services Requested (Medical Surgical)"
+    },
+    {
+      "code": "ms-primary-diagnosis",
+      "display": "Primary Diagnosis (Medical Surgical) Value"
+    },
+    {
+      "code": "ms-clinical-documents-available",
+      "display": "Clinical Documents And Order Available (Medical Surgical)"
+    },
+    {
+      "code": "ms-additional-clinical-information",
+      "display": "Additional Clinical Information (Medical Surgical) Value"
+    },
+    {
+      "code": "drug-type",
+      "display": "Drug Type Value"
+    },
+    {
+      "code": "drug-treatment-already-begun",
+      "display": "Treatment Already Begun (Drug)"
+    },
+    {
+      "code": "drug-reauthorization-response-demonstrated",
+      "display": "Reauthorization Response Demonstrated (Drug)"
+    },
+    {
+      "code": "drug-first-day-of-treatment",
+      "display": "First Day Of Treatment (Drug) Value"
+    },
+    {
+      "code": "drug-primary-diagnosis",
+      "display": "Primary Diagnosis (Drug) Value"
+    },
+    {
+      "code": "drug-dose-frequency-route-duration",
+      "display": "Dose Frequency Route Duration (Drug) Value"
+    },
+    {
+      "code": "drug-step-therapy",
+      "display": "Step Therapy Response (Drug) Value"
+    },
+    {
+      "code": "drug-clinical-documents-available",
+      "display": "Clinical Documents Available (Drug)"
+    },
+    {
+      "code": "drug-additional-clinical-information",
+      "display": "Additional Clinical Information (Drug) Value"
+    },
+    {
+      "code": "bh-treatment-already-begun",
+      "display": "Treatment Already Begun (Behavioral)"
+    },
+    {
+      "code": "bh-first-day-of-treatment",
+      "display": "First Day Of Treatment (Behavioral) Value"
+    },
+    {
+      "code": "bh-emergency-services-requested",
+      "display": "Emergency Services Requested (Behavioral)"
+    },
+    {
+      "code": "bh-risk-to-self-or-others",
+      "display": "Patient Is Risk To Self Or Others (Behavioral)"
+    },
+    {
+      "code": "requested-level-of-care",
+      "display": "Requested Level Of Care (Behavioral) Value"
+    },
+    {
+      "code": "bh-substance-use-related",
+      "display": "Substance Use Treatment Related (Behavioral)"
+    },
+    {
+      "code": "bh-primary-diagnosis",
+      "display": "Primary Diagnosis (Behavioral) Value"
+    },
+    {
+      "code": "bh-clinical-documents-available",
+      "display": "Clinical Documents Available (Behavioral)"
+    },
+    {
+      "code": "bh-additional-clinical-information",
+      "display": "Additional Clinical Information (Behavioral) Value"
+    },
+    {
+      "code": "drug-type-medical",
+      "display": "Medical"
+    },
+    {
+      "code": "drug-type-pharmacy",
+      "display": "Pharmacy"
+    },
+    {
+      "code": "drug-type-unknown",
+      "display": "Unknown"
+    },
+    {
+      "code": "drug-step-therapy-yes",
+      "display": "Yes"
+    },
+    {
+      "code": "drug-step-therapy-no",
+      "display": "No"
+    },
+    {
+      "code": "drug-step-therapy-na",
+      "display": "N/A"
+    },
+    {
+      "code": "requested-level-of-care-outpatient-therapy",
+      "display": "Outpatient Therapy"
+    },
+    {
+      "code": "requested-level-of-care-intensive-outpatient",
+      "display": "Intensive Outpatient"
+    },
+    {
+      "code": "requested-level-of-care-partial-hospitalization",
+      "display": "Partial Hospitalization"
+    },
+    {
+      "code": "requested-level-of-care-inpatient",
+      "display": "Inpatient"
+    },
+    {
+      "code": "requested-level-of-care-residential",
+      "display": "Residential"
+    },
+    {
+      "code": "requested-level-of-care-medication-management",
+      "display": "Medication Management"
+    },
+    {
+      "code": "requested-level-of-care-psychological-testing",
+      "display": "Psychological Testing"
+    },
+    {
+      "code": "requested-level-of-care-other",
+      "display": "Other"
+    }
+  ]
+}

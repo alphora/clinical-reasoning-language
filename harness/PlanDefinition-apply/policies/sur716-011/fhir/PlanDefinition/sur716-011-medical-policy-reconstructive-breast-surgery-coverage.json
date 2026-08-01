@@ -1,0 +1,428 @@
+{
+  "resourceType": "PlanDefinition",
+  "id": "sur716-011-medical-policy-reconstructive-breast-surgery-coverage",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-reconstructive-breast-surgery-coverage",
+  "version": "0.0.0",
+  "name": "ReconstructiveBreastSurgeryCoverageReconstructiveBreastSurgeryCoverageDetermination",
+  "title": "Reconstructive Breast Surgery Coverage Determination",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-05-15T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Reconstructive Breast Surgery Coverage Determination",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/plan-definition-type",
+        "code": "workflow-definition"
+      }
+    ]
+  },
+  "library": [
+    "http://example.org/hcsc/sur716-011/Library/Sur716011MedicalPolicyInterface"
+  ],
+  "action": [
+    {
+      "title": "Reconstructive Breast Surgery Coverage Determination",
+      "description": "Reconstructive Breast Surgery Coverage Determination",
+      "code": [
+        {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+              "code": "guideline-based-care"
+            }
+          ]
+        }
+      ],
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+          "valueString": "any"
+        }
+      ],
+      "action": [
+        {
+          "title": "Affected Breast Reconstruction Requested",
+          "description": "Affected Breast Reconstruction Requested",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "Affected Breast Reconstruction Requested"
+              }
+            }
+          ],
+          "input": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Affected Breast Reconstruction Requested?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Affected Breast Reconstruction Requested"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-affected-breast-reconstru-94126e9078a2"
+              ]
+            }
+          ],
+          "action": [
+            {
+              "title": "Qualifying Antecedent For Affected Breast",
+              "description": "Qualifying Antecedent For Affected Breast",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Qualifying Antecedent For Affected Breast"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Prior Medically Necessary Full Mastectomy?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Prior Medically Necessary Full Mastectomy"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-prior-medically-necessary-687290e2933a"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Prior Medically Necessary Partial Mastectomy?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Prior Medically Necessary Partial Mastectomy"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-prior-medically-necessary-b99aedadffc1"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Accidental Injury To Breast?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Accidental Injury To Breast"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-accidental-injury-to-breast"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Trauma To Breast?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Trauma To Breast"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-trauma-to-breast"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-certify-met-recommendation"
+            },
+            {
+              "title": "otherwise",
+              "description": "otherwise",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-state-mandate-determination"
+            }
+          ],
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+              "valueString": "any"
+            }
+          ]
+        },
+        {
+          "title": "Contralateral Breast Reconstruction Requested",
+          "description": "Contralateral Breast Reconstruction Requested",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "Contralateral Breast Reconstruction Requested"
+              }
+            }
+          ],
+          "input": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Contralateral Breast Reconstruction Requested?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Contralateral Breast Reconstruction Requested"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-contralateral-breast-reco-06c2a2e67142"
+              ]
+            }
+          ],
+          "action": [
+            {
+              "title": "To Achieve Symmetry",
+              "description": "To Achieve Symmetry",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "To Achieve Symmetry"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "To Achieve Symmetry?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "To Achieve Symmetry"
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-to-achieve-symmetry"
+                  ]
+                }
+              ],
+              "action": [
+                {
+                  "title": "Prior Medically Necessary Mastectomy",
+                  "description": "Prior Medically Necessary Mastectomy",
+                  "code": [
+                    {
+                      "coding": [
+                        {
+                          "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                          "code": "guideline-based-care"
+                        }
+                      ]
+                    }
+                  ],
+                  "condition": [
+                    {
+                      "kind": "applicability",
+                      "expression": {
+                        "language": "text/cql-identifier",
+                        "expression": "Prior Medically Necessary Mastectomy"
+                      }
+                    }
+                  ],
+                  "input": [
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "Prior Medically Necessary Full Mastectomy?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "Prior Medically Necessary Full Mastectomy"
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-prior-medically-necessary-687290e2933a"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "Prior Medically Necessary Partial Mastectomy?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "Prior Medically Necessary Partial Mastectomy"
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://example.org/hcsc/sur716-011/StructureDefinition/sur716-011-medical-policy-prior-medically-necessary-b99aedadffc1"
+                      ]
+                    }
+                  ],
+                  "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-certify-met-recommendation"
+                },
+                {
+                  "title": "otherwise",
+                  "description": "otherwise",
+                  "code": [
+                    {
+                      "coding": [
+                        {
+                          "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                          "code": "guideline-based-care"
+                        }
+                      ]
+                    }
+                  ],
+                  "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-state-mandate-determination"
+                }
+              ],
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+                  "valueString": "any"
+                }
+              ]
+            },
+            {
+              "title": "otherwise",
+              "description": "otherwise",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-state-mandate-determination"
+            }
+          ],
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+              "valueString": "any"
+            }
+          ]
+        },
+        {
+          "title": "otherwise",
+          "description": "otherwise",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/hcsc/sur716-011/PlanDefinition/sur716-011-medical-policy-state-mandate-determination"
+        }
+      ]
+    }
+  ]
+}
