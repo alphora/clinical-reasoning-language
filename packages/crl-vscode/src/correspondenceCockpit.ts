@@ -180,6 +180,7 @@ import {
 import type { CancelToken, ElicitationCancelReason, ElicitationOutcome } from "./agentDrivableUi";
 import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordinator";
 import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE, policyIdFromSrc } from "./provenanceFindings";
+import { resolveLaunchTarget } from "./policyLaunchTarget";
 import { flagIssueBody, flagIssueTitle, replaceIssueTypeLine } from "./flagIssueText";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
@@ -2720,15 +2721,31 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // ── commands ──
   /** In-flight guard for the async show commands (#156 slice 3, FIX 6). The active-`.cel` fast-path is sync, but the
    *  `findFiles` quick-pick path awaits — two rapid show invocations (Cockpit then Medical Validation) would otherwise
-   *  interleave two `openPanel` calls mutating the shared `mode`/`views`. While a pick is pending, a second show is
-   *  ignored (first-wins; the active user keeps their in-progress pick). */
-  let pickPending = false;
+   *  interleave two `openPanel` calls mutating the shared `mode`/`views`. While a pick is pending, a second UNTARGETED
+   *  show is ignored (first-wins; the active user keeps their in-progress pick).
+   *
+   *  #244 adds a second async path (the ambiguity pick), so a boolean is no longer a sufficient guard — it says "a pick
+   *  is running" but not WHICH, and whichever continuation landed first would clear it out from under the other.
+   *
+   *  Two pieces of state now, with distinct jobs:
+   *   - `showEpoch` is the AUTHORITY on intent: every accepted show takes the next epoch, and any async continuation acts
+   *     only if its epoch is still current. A targeted launch never waits — it supersedes (last explicit intent wins), so
+   *     a stale pick can't retarget away from what KELP just asked for.
+   *   - `activePick` is the on-screen picker, so a supersede can `hide()` it. Without that the superseded QuickPick stays
+   *     visible and choosing in it does nothing — and, worse, whatever gate said "a pick is pending" would stay set until
+   *     the user touched it, silently swallowing every later untargeted show. `pickPending` is derived from `activePick`
+   *     rather than tracked separately, so the two can't disagree. */
+  let showEpoch = 0;
+  let activePick: vscode.QuickPick<vscode.QuickPickItem & { value: string }> | undefined;
+  /** Epoch of the in-flight UNTARGETED show, if any — the first-wins gate. Set synchronously (before the `findFiles`
+   *  await, which precedes any picker), released only by its owner. */
+  let untargetedEpoch: number | undefined;
 
   /** Resolve the .cel to open a panel on (#156 slice 3, shared by BOTH commands). If the active editor is a `.cel`, use
    *  it (preserves the long-standing focused-`.cel` behavior). Otherwise scan the workspace for policy-shaped `.cel`
    *  files (those for which `findPolicySrc` succeeds — a non-policy `.cel` would fail discovery anyway) and quick-pick
    *  one. Returns the chosen path, or undefined when cancelled / none found. */
-  async function pickCelForPanel(): Promise<string | undefined> {
+  async function pickCelForPanel(epoch: number): Promise<string | undefined> {
     const ed = vscode.window.activeTextEditor;
     if (ed && ed.document.uri.scheme === "file" && ed.document.uri.fsPath.toLowerCase().endsWith(".cel")) {
       return ed.document.uri.fsPath; // sync fast-path — no re-entrancy window
@@ -2738,6 +2755,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // well under 500; no fix now — just the honest note. (findPolicySrc also does sync existsSync ancestor walks per
     // candidate; fine at 500, a UI-thread concern only if the cap rises.)
     const uris = await vscode.workspace.findFiles("**/*.cel", "**/node_modules/**", 500);
+    // Superseded WHILE scanning (a targeted launch landed during the await) — return before putting a picker on screen.
+    // Without this the epoch guard would discard the answer, but only after showing a dialog nobody asked for (#244).
+    if (epoch !== showEpoch) return undefined;
     // Policy-shaped only: a .cel under a policy `src/` with a `provenance/` sibling. Sort for a stable list.
     const policyCels = uris.map((u) => u.fsPath).filter((p) => findPolicySrc(p) !== undefined).sort();
     if (policyCels.length === 0) {
@@ -2748,8 +2768,41 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const rel = vscode.workspace.asRelativePath(p, false);
       return { label: basename(p), description: rel, value: p };
     });
-    const pick = await vscode.window.showQuickPick(items, { placeHolder: "Pick a policy .cel to open" });
-    return pick?.value;
+    return pickCel(items, "Pick a policy .cel to open");
+  }
+
+  /** The ONE cancellable QuickPick used by both pick paths. `showQuickPick` cannot be dismissed programmatically, so a
+   *  superseded pick would stay on screen and its eventual selection would be a silent no-op — the user picks a file and
+   *  nothing happens (#244 impl review, raised by both reviewers). `createQuickPick` gives us `hide()`, so
+   *  `cancelActivePick` can take it down the moment a targeted launch supersedes it.
+   *
+   *  Resolves with the chosen value, or `undefined` if the user dismissed it OR it was superseded. */
+  function pickCel(items: (vscode.QuickPickItem & { value: string })[], placeholder: string): Promise<string | undefined> {
+    cancelActivePick(); // never stack two pickers — the newer intent replaces the older
+    return new Promise<string | undefined>((resolve) => {
+      const qp = vscode.window.createQuickPick<vscode.QuickPickItem & { value: string }>();
+      qp.items = items;
+      qp.placeholder = placeholder;
+      let done = false;
+      const settle = (v: string | undefined): void => {
+        if (done) return; // onDidHide also fires after an accept — resolve exactly once
+        done = true;
+        if (activePick === qp) activePick = undefined; // clear ONLY our own registration, never a newer pick's
+        resolve(v);
+        qp.dispose();
+      };
+      qp.onDidAccept(() => settle(qp.selectedItems[0]?.value));
+      qp.onDidHide(() => settle(undefined));
+      activePick = qp;
+      qp.show();
+    });
+  }
+
+  /** Dismiss any on-screen pick. Its promise settles `undefined`, and the epoch guard stops its continuation acting. */
+  function cancelActivePick(): void {
+    const qp = activePick;
+    activePick = undefined;
+    qp?.hide(); // fires onDidHide → settle(undefined)
   }
 
   /** Open (or RETARGET) the single panel session in `targetMode` on `celPath`. One singleton controller + one
@@ -4207,25 +4260,81 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     renderPane("worklist"); // the drawer stays OPEN even if the thread is now empty (glyph flips to outline)
   }
 
-  /** Run a show command: guard re-entrancy (FIX 6), pick a .cel, open the panel in `targetMode`. */
-  function runShow(targetMode: "cockpit" | "medical-validation"): void {
-    if (pickPending) return; // a pick is already in flight — ignore (first-wins)
-    pickPending = true;
-    void pickCelForPanel().then(
+  /** Show a panel, optionally on a target supplied by the CALLER (#244). `rawTarget` is whatever the command was invoked
+   *  with: KELP's entity-folder Uri, the `editor/title` button's resource Uri, or nothing (palette/keybinding). All of the
+   *  resolution policy lives in `resolveLaunchTarget`; this function is the presentation + concurrency shell. */
+  function runShow(targetMode: "cockpit" | "medical-validation", rawTarget?: unknown): void {
+    const target = resolveLaunchTarget(rawTarget);
+
+    const label = targetMode === "medical-validation" ? "Medical Validation" : "the CRL cockpit";
+
+    if (target.kind === "error") {
+      // Supplied but unresolvable → fail LOUDLY (agreed with KELP). Never a silent picker fallback: that would present a
+      // mis-wired caller as ordinary behaviour.
+      //
+      // Deliberately does NOT take an epoch and does NOT cancel a pending pick (#244 impl review): this launch opened
+      // nothing, so superseding would deliver NEITHER intent — the user's own in-flight pick would be silently voided by
+      // someone else's bad path. A failed launch supersedes nothing.
+      void vscode.window.showErrorMessage(`CRL: cannot open ${label} — ${target.detail}`);
+      return;
+    }
+
+    if (target.kind === "cel") {
+      showEpoch += 1; // supersede any pending pick — explicit intent wins
+      cancelActivePick(); // …and take it off screen, so it can't be chosen into a void
+      openPanel(targetMode, target.celPath);
+      return;
+    }
+
+    if (target.kind === "ambiguous") {
+      // Several `.cel`s under ONE policy (a normal layout, not a fault). Offer exactly those — scoped to the policy the
+      // caller named, never the whole workspace. `pickCel` cancels any previous pick as it opens.
+      const epoch = (showEpoch += 1);
+      const items = target.cels.map((p) => ({
+        label: basename(p),
+        description: vscode.workspace.asRelativePath(p, false),
+        value: p,
+      }));
+      void pickCel(items, `Pick a .cel in ${basename(dirname(target.policySrc))}`).then(
+        (cel) => {
+          if (epoch !== showEpoch) return; // a later show superseded this pick
+          if (cel) openPanel(targetMode, cel);
+        },
+        (e) => console.warn(`[crl.cockpit] scoped pick failed: ${e instanceof Error ? e.message : e}`),
+      );
+      return;
+    }
+
+    // No usable target → today's behaviour: active `.cel`, else the workspace-wide picker. First-wins between two
+    // UNTARGETED shows (FIX 6): the active user keeps their in-progress pick. The marker is set SYNCHRONOUSLY, because
+    // `pickCelForPanel` awaits `findFiles` before any picker exists — gating on `activePick` alone would let two shows
+    // through that window. Ownership is by epoch, so a stale continuation can never clear a newer show's marker.
+    if (untargetedEpoch !== undefined) return;
+    const epoch = (showEpoch += 1);
+    untargetedEpoch = epoch;
+    const release = (): void => {
+      if (untargetedEpoch === epoch) untargetedEpoch = undefined;
+    };
+    void pickCelForPanel(epoch).then(
       (cel) => {
-        pickPending = false;
+        release();
+        if (epoch !== showEpoch) return; // superseded by a later (targeted) show — do NOT retarget away from it
         if (cel) openPanel(targetMode, cel);
       },
       (e) => {
-        pickPending = false;
+        release(); // must run on the failure path too, or every later untargeted show is silently swallowed
         console.warn(`[crl.cockpit] pick failed: ${e instanceof Error ? e.message : e}`);
       },
     );
   }
 
-  const showCmd = vscode.commands.registerCommand("crl.cockpit.show", () => runShow("cockpit"));
-  const showMedicalValidationCmd = vscode.commands.registerCommand("crl.medicalValidation.show", () =>
-    runShow("medical-validation"),
+  // Both commands accept an optional caller-supplied target. `...args` rather than `(target?)` so the registration is
+  // explicit that anything beyond the first argument is ignored, and an absent argument is the same as `undefined`.
+  const showCmd = vscode.commands.registerCommand("crl.cockpit.show", (...args: unknown[]) =>
+    runShow("cockpit", args[0]),
+  );
+  const showMedicalValidationCmd = vscode.commands.registerCommand("crl.medicalValidation.show", (...args: unknown[]) =>
+    runShow("medical-validation", args[0]),
   );
 
   function applyPrimary(next: PrimaryPane): void {

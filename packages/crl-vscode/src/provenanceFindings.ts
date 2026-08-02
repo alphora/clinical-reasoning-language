@@ -10,12 +10,13 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 import type { CorrespondenceModel, FindingTarget } from "@smile-digital-health/crl";
-import { findPolicySrc } from "@smile-digital-health/crl";
+import { findPolicySrc, findPolicySrcNear, collectPolicyCels, isFile } from "@smile-digital-health/crl";
 import { canonicalize } from "@smile-digital-health/crl/language-services";
 
 // #212: `findPolicySrc` moved to core (shared with the flag store); re-exported here so this module's existing consumers
 // (discoverProvenance below, medicalValidationStore, provenancePanel, the cockpit) keep importing it from `./provenanceFindings`.
-export { findPolicySrc };
+// #244 adds the directory-anchored siblings, used by the launch-target resolver (`policyLaunchTarget`).
+export { findPolicySrc, findPolicySrcNear, collectPolicyCels, isFile };
 
 /** The policy/artifact id for a resolved policy `src/` dir: the basename of its PARENT (`<policy>/src` → `<policy>`) — the
  *  same per-policy identity the sidecar/provenance/flag-store all key on. `undefined` when `src/` sits at the filesystem

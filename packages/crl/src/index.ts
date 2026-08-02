@@ -364,7 +364,7 @@ export type { BuildFlagResult, BuildFlagFailure } from "./flags/buildFlagDraft";
 export { occurrencesOf, occurrenceByNodeId, occurrenceByNodeKey, occurrenceKeyValue, parseOccurrenceKey, resolveOccurrence, isOccurrenceKey, isOccurrenceNode } from "./flags/occurrenceKey";
 export type { OccurrenceRef } from "./flags/occurrenceKey";
 // #212 — the policy source-layout primitive (shared by the flag store + provenance/MV discovery).
-export { findPolicySrc } from "./provenance/policyLayout";
+export { findPolicySrc, findPolicySrcFromDir, findPolicySrcNear, collectPolicyCels, isFile } from "./provenance/policyLayout";
 
 export interface Token {
   line: number;
