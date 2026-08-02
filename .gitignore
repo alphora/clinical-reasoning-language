@@ -67,8 +67,9 @@ features/
 packages/*/test/oracle/.gen/
 
 .vibe-tools/
+/.mcp.json
 .vibe-corpus.json
 .vibe-mail.json
-/.mcp.json
 .claude/agents/vibe-reviewer-*.md
 .claude/agents/vibe-panel-*.md
+.claude/settings.local.json
