@@ -280,15 +280,38 @@ version. Availability is version-bound; say which release your answer is for.
    and then exits, which is what wakes you. **Wake-on-exit is one-shot** — re-arm
    after every wake or you go quiet.
 
-   **But exactly ONE listener, ever.** Check `roster` first: if your own project
-   already shows `armedEndpoints` >= 1 and you did not just consume a wake, you are
-   already reachable — do nothing. Two listeners on one endpoint means you get woken
-   twice per message and burn a turn saying "nothing new". If `listen` exits **13
+   **But exactly ONE listener, ever — and do NOT pre-check `roster` to decide.**
+   `armedEndpoints` is aggregated per PROJECT while the invariant is per ENDPOINT,
+   so a sibling session's listener makes the count non-zero while YOUR endpoint has
+   nothing on it. Reading that as "already reachable" is how a session goes
+   permanently silent, and it has happened. Just arm. `listen` itself refuses a
+   second listener on your endpoint, and only after OBSERVING the existing one renew
+   its lease — which is a stronger check than the column ever was. If it exits **13
    (already-armed)**, do NOT arm again — end your turn. That exit is itself a wake,
    so re-arming on it is a tight loop.
 
-Check `roster` before sending: a peer with `armedEndpoints: 0` is registered but
-not listening, and your question will simply wait.
+3. **Arming a listener does NOT deliver answers to your own questions.** `listen`
+   blocks on claimable QUESTIONS only. An answer to something you asked is not one,
+   so it will not wake you — the reply lands in the store and sits there. Measured:
+   a peer answered in 75 seconds and the asker did not notice for nine minutes,
+   while its listener sat armed the whole time.
+
+   So when you `send`, arm a watcher for the reply **in the same turn**, with
+   `run_in_background`:
+
+   ```
+   node e:/src/vibe-tools/vibe-mail-mcp/dist/cli.js wait --for <message id> --endpoint <your endpoint id>
+   ```
+
+   Read the reply with `thread` — `wait` gives you an id, not a body. Pass `--after`
+   on every re-wait or you get the same reply again. This is also the only thing
+   that delivers a **clarification**: a peer that needs one is holding your claim
+   and blocked until you answer, so an unwatched question can deadlock both sides
+   until it expires.
+
+`roster` before sending is advisory only: a peer with `armedEndpoints: 0` is
+registered but not listening, so your question waits rather than waking them. It is
+never a reason not to send, and never a statement about whether they will answer.
 
 **Crossing a customer boundary needs the operator.** If the peer declares a
 different `customerContext`, `send` refuses with `needs-operator-approval` and
