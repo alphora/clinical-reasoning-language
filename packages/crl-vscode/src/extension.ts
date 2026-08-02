@@ -184,7 +184,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("crl.setup", async () => {
       try {
         const root = workspaceRoot();
-        // Persist consent BEFORE provisioning — provisionAll may reloadWindow, terminating the host before the memento lands.
+        // Persist consent BEFORE provisioning: provisionAll can throw past this point, and the window can close mid-flight —
+        // either way an unpersisted memento loses the user's choice and re-offers next activation.
         if (root) await setProvisionDecision(context, root, "installed"); // manual setup = an explicit per-workspace consent
         await provisionAll(context, true, root);
       } catch (e) {
@@ -275,7 +276,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (action === "skip") return;
       if (action === "silent") {
         // Backfill the memento for a workspace THIS machine provisioned under the old silent default (undecided + already) so it
-        // reads as an explicit "installed" from now on. AWAIT before provisioning (which may reloadWindow → host terminates).
+        // reads as an explicit "installed" from now on. AWAIT before provisioning, which can throw past the write (catch below).
         if (!decision && already) await setProvisionDecision(context, provisionRoot, "installed");
         try {
           await provisionAll(context, false, provisionRoot, stableServerPath);
@@ -312,7 +313,7 @@ function getProvisionDecision(context: vscode.ExtensionContext, root: string): P
 }
 
 /** Persist the per-workspace decision. Returns the update Thenable so callers can AWAIT durability (disc 370 #2) — the write
- *  must land before a `provisionAll` that may `reloadWindow`, and before command completion, or the choice can be lost. */
+ *  must land before a `provisionAll` that can throw past it, and before command completion, or the choice can be lost. */
 function setProvisionDecision(context: vscode.ExtensionContext, root: string, decision: ProvisionDecision): Thenable<void> {
   return context.workspaceState.update(PROVISION_DECISION_KEY, { decision, root } satisfies StoredProvisionDecision);
 }
@@ -333,7 +334,7 @@ async function workspaceHasCrlFiles(root: string): Promise<boolean> {
 }
 
 /** The consent toast (non-modal): names EVERY write (the workspace `.mcp.json`/`CLAUDE.md` AND the global editor highlighting),
- *  since "Install" runs the full `provisionAll`. Install → persist "installed" (AWAITED, before the write/reload) + provision the
+ *  since "Install" runs the full `provisionAll`. Install → persist "installed" (AWAITED, before the write) + provision the
  *  captured root; Never → persist "never"; Not now / dismiss → leave undecided (re-offered next activation). */
 async function offerProvisioning(context: vscode.ExtensionContext, root: string, serverScriptPath: string | undefined): Promise<void> {
   const choice = await vscode.window.showInformationMessage(
@@ -343,9 +344,10 @@ async function offerProvisioning(context: vscode.ExtensionContext, root: string,
     "Never for this workspace",
   );
   if (choice === "Install") {
-    await setProvisionDecision(context, root, "installed"); // persist consent BEFORE provisioning (a reload could terminate the host)
+    await setProvisionDecision(context, root, "installed"); // persist consent BEFORE provisioning (which can throw past the write)
     try {
-      await provisionAll(context, false, root, serverScriptPath);
+      // userInitiated: clicking Install IS a request, so it gets the same acknowledgement as the command (design #1).
+      await provisionAll(context, true, root, serverScriptPath);
     } catch (e) {
       vscode.window.showErrorMessage(`CRL: unexpected setup failure — ${messageOf(e)}`);
     }
@@ -482,7 +484,8 @@ async function writeScopeDecisions(
  */
 async function promptForCustomizedScopes(
   context: vscode.ExtensionContext,
-  customizedScopes: string[]
+  customizedScopes: string[],
+  canPrompt: boolean
 ): Promise<Set<string>> {
   const replaceScopes = new Set<string>();
   if (customizedScopes.length === 0) return replaceScopes;
@@ -499,6 +502,11 @@ async function promptForCustomizedScopes(
       continue;
     }
     if (prior === "keep") continue;
+    // #243: on the AUTOMATIC path we never ask. A per-scope "Replace / Keep mine" toast is the same prompt-with-no-basis-to-
+    // answer the codespace deployment rules out, and it is not an error, so silence is safe: an undecided scope keeps the
+    // user's own color (the conservative half), and `crl.setup` offers the choice again whenever they actually want it.
+    // Decisions ALREADY recorded above are still honored — only the question is suppressed.
+    if (!canPrompt) continue;
     const choice = await vscode.window.showInformationMessage(
       `CRL: your settings have a customized token color for "${scope}". Replace with CRL's default?`,
       "Replace",
@@ -528,7 +536,8 @@ async function promptForCustomizedScopes(
 // that changed.
 async function writeHighlight(
   context: vscode.ExtensionContext,
-  mode: "apply" | "remove"
+  mode: "apply" | "remove",
+  userInitiated = false
 ): Promise<{ changed: boolean; warnings: string[] }> {
   const rules = loadCrlRules(grammarPath(context));
   const cfg = vscode.workspace.getConfiguration();
@@ -538,9 +547,14 @@ async function writeHighlight(
     ? applyHighlight(curAssoc, curColors, rules)
     : removeHighlight(curAssoc, curColors, rules);
   if (mode === "apply" && res.customizedScopes.length > 0) {
-    const replaceScopes = await promptForCustomizedScopes(context, res.customizedScopes);
+    const replaceScopes = await promptForCustomizedScopes(context, res.customizedScopes, userInitiated);
     if (replaceScopes.size > 0) {
       res = applyHighlight(curAssoc, curColors, rules, { replaceScopes });
+    }
+    if (!userInitiated) {
+      getOutputChannel().appendLine(
+        `[provision] ${res.customizedScopes.length} customized token scope(s) present; not asking on the automatic path (#243)`,
+      );
     }
   }
 
@@ -555,39 +569,53 @@ async function writeHighlight(
   return { changed: res.associationsChanged || res.tokenColorsChanged, warnings: res.warnings };
 }
 
-async function provisionAll(context: vscode.ExtensionContext, manual: boolean, root = workspaceRoot(), serverScriptPath?: string): Promise<void> {
+/** `userInitiated` = the user asked for this in so many words — the `crl.setup` command, or "Install" on the consent toast.
+ *  It gates the acknowledgement + the can't-proceed warnings; the automatic (mode-driven) path passes false and stays quiet
+ *  on success. It is NOT "was there a prompt": an Install click is a request just as much as the command is (design #1). */
+async function provisionAll(context: vscode.ExtensionContext, userInitiated: boolean, root = workspaceRoot(), serverScriptPath?: string): Promise<void> {
   if (!root) {
-    if (manual) {
+    if (userInitiated) {
       vscode.window.showWarningMessage("CRL: open your CRL project folder first, then run CRL: Set up tools.");
     }
+    getOutputChannel().appendLine("[provision] skipped: no workspace folder"); // silence must never mean "no evidence" (#243)
     return;
   }
   // Consent-boundary guard (disc 370 #1): write ONLY to the captured root, and only if it's still a current workspace folder —
   // a folder reorder/removal while an offer toast was open must not redirect the write to a different (unconsented) folder.
   if (!(vscode.workspace.workspaceFolders ?? []).some((f) => f.uri.fsPath === root)) {
-    if (manual) vscode.window.showWarningMessage("CRL: the workspace changed — reopen the folder, then run CRL: Set up tools.");
+    if (userInitiated) vscode.window.showWarningMessage("CRL: the workspace changed — reopen the folder, then run CRL: Set up tools.");
+    getOutputChannel().appendLine(`[provision] skipped: ${root} is no longer a workspace folder`);
     return;
   }
   warnMultiRoot();
 
   const warnings: string[] = [];
-  let mcpOk = false;
-  let mcpChanged = false;
+  let toolsOk = false;
+  // Did anything Claude Code reads at session start actually change? BOTH files count: `.mcp.json` can be stable (the staged
+  // server path is version-independent) while the CLAUDE.md managed block is rewritten, which is exactly what 7b59db1 did.
+  let sessionInputsChanged = false;
+  let toolsOutcome = "not attempted"; // `.mcp.json` + CLAUDE.md succeed or throw as ONE step — don't attribute a throw to one
   let highlightOk = false;
 
   // Provisioning (.mcp.json + CLAUDE.md) and highlighting are independent — a
   // malformed .mcp.json must not block highlighting, and vice versa.
   try {
     const r = claudeCodeTarget.apply(ctxFor(context, root, serverScriptPath));
-    mcpOk = true;
-    mcpChanged = r.mcp === "created" || r.mcp === "updated";
+    toolsOk = true;
+    const mcpChanged = r.mcp === "created" || r.mcp === "updated";
+    const mdChanged = r.claudeMd !== "unchanged" && r.claudeMd !== "skipped";
+    sessionInputsChanged = mcpChanged || mdChanged;
+    toolsOutcome = `.mcp.json ${r.mcp}, CLAUDE.md ${r.claudeMd}`;
     warnings.push(...r.warnings);
   } catch (e) {
+    // apply() writes `.mcp.json` BEFORE CLAUDE.md, so a CLAUDE.md throw lands here with `.mcp.json` already written. Report the
+    // half, never the file — an operator reading "[provision] .mcp.json FAILED" for a file that exists and works is worse off.
+    toolsOutcome = `FAILED (${messageOf(e)})`;
     vscode.window.showErrorMessage(`CRL: could not configure tools — ${messageOf(e)}`);
   }
 
   try {
-    const hl = await writeHighlight(context, "apply");
+    const hl = await writeHighlight(context, "apply", userInitiated);
     highlightOk = true;
     warnings.push(...hl.warnings);
   } catch (e) {
@@ -596,22 +624,25 @@ async function provisionAll(context: vscode.ExtensionContext, manual: boolean, r
 
   flushWarnings(warnings);
 
-  if (mcpChanged) {
-    // A VS Code reload restarts the Claude Code extension so it re-reads
-    // .mcp.json and the CRL tools become available.
-    const choice = await vscode.window.showInformationMessage(
-      "CRL tools are set up for this workspace. Reload to finish.",
-      "Reload"
+  // NO reload prompt (#243). `.mcp.json` + the CLAUDE.md block are read by Claude Code when ITS session starts, not by this
+  // extension, and everything we provide ourselves (highlighting, diagnostics, completion/hover, the cockpit, the staged MCP
+  // server) is live without one. A reload also would NOT rescue the only case the old prompt was written for — a Claude Code
+  // session already running when `.mcp.json` changes negotiates its tool list once per session, so it has to be STARTED AGAIN;
+  // reload is the wrong lever in both directions. The prompt fired on every first open of a pre-baked codespace — the MV space
+  // ships no `.mcp.json`, so provisioning always "created" it (a repo that DOES commit one gets "updated", since the recorded
+  // server path is another machine's staged copy) — landing on a clinician with no useful action to take.
+  // The output channel is the ONLY passive evidence provisioning ran once success is silent — the codespace owner asked for
+  // exactly this when the toast went away. Log every run, on both paths, whatever the outcome.
+  getOutputChannel().appendLine(`[provision] tools: ${toolsOutcome}; highlighting: ${highlightOk ? "ok" : "FAILED"}`);
+  // Acknowledge only when the user ASKED — the `crl.setup` command or an "Install" click on the consent toast (both pass
+  // userInitiated). Still gated on both halves succeeding, so a failure toast is never chased by a success-sounding one.
+  // The fully automatic path stays silent on SUCCESS only: errors (above) and `flushWarnings` are deliberately still shown.
+  if (userInitiated && toolsOk && highlightOk) {
+    vscode.window.showInformationMessage(
+      sessionInputsChanged
+        ? "CRL: tools and highlighting are configured for this workspace. If Claude Code is already running, start a new session to pick up the CRL tools."
+        : "CRL: tools and highlighting are already configured for this workspace.",
     );
-    if (choice === "Reload") {
-      try {
-        await vscode.commands.executeCommand("workbench.action.reloadWindow");
-      } catch {
-        /* reload is best-effort */
-      }
-    }
-  } else if (manual && mcpOk && highlightOk) {
-    vscode.window.showInformationMessage("CRL: tools and highlighting are already configured for this workspace.");
   }
 }
 

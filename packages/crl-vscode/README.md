@@ -23,7 +23,7 @@ It configures everything automatically — there are no settings to paste by han
    ```
    (Or, in Cursor: Ctrl+Shift+P → "Developer: Install Extension From Location".)
 3. Open the folder that holds your `.crl` files.
-4. When the notification appears, click **Reload**. Done — `.crl` files are highlighted and Claude Code can use the CRL tools.
+4. When the extension offers to set up CRL tools, click **Install**. Done — `.crl` files are highlighted and Claude Code can use the CRL tools. No reload is needed; if a Claude Code session is already open, start a new one so it picks up the tools.
 
 > **Node.js required.** The CRL tools run as a small Node program, so Node needs to be on your PATH. If it isn't, ask Claude Code to install it for you.
 
