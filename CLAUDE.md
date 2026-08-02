@@ -224,7 +224,7 @@ User triggers for switching into this cadence:
 
 <!-- vibe-tools-orchestrator-end -->
 
-<!-- crl-tools-start version="4.103.0" -->
+<!-- crl-tools-start -->
 ## Clinical Reasoning Language (CRL) tools
 
 This workspace has the CRL parser available to you as MCP tools (server `crl`):
