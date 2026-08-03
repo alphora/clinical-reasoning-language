@@ -20,9 +20,9 @@ import { emitFhirDefFromPath } from "../fhir-emitter";
 import type { ImportDiagnostic } from "../imports/types";
 import { validateCRLImports } from "../imports/validate";
 import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "../index";
-// #212 step 2 — the MCP flag tools write the `.crl/flags/` STORE (not `.crl` meta-tags): validate+build via the shared seam,
+// #212 step 2 — the MCP flag tools write the `medical-validation/flags/` STORE (not `.crl` meta-tags): validate+build via the shared seam,
 // then dedup-check + save. `createFlag`/`setFlagStatus` (the `.crl` splicers) are no longer used here.
-import { validateAndBuildMvFlagDraft, flagStoreDir, loadFlags, saveFlag, isOpen, canonicalFlagTag } from "../index";
+import { validateAndBuildMvFlagDraft, flagStoreDir, hasLegacyFlagStore, loadFlags, saveFlag, isOpen, canonicalFlagTag } from "../index";
 import type { CreateFlagTarget, MvFlag, MvFlagScope, FlagStatus } from "../index";
 // canonicalize a selector's tag alias — `canonicalFlagTag` (the flag vocab), NOT the `.crl` registry's `canonicalTag`
 // (#212 step 4: flag tags left the registry, so the registry no longer knows them; the store holds the canonical tag).
@@ -81,7 +81,7 @@ function resolveSource(args: ToolArgs): string {
   return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
 
-/** #212 step 2 — the WRITE tools need the `.crl/flags/` store LOCATION, which only a filesystem `path` provides. The
+/** #212 step 2 — the WRITE tools need the `medical-validation/flags/` store LOCATION, which only a filesystem `path` provides. The
  *  path-required guard shared by both tools: reject inline `code` (no location), require a non-dir file path inside a
  *  discoverable policy, and return its store dir. NO content read (a status flip needs only the location — so it isn't
  *  size-capped on a large `.crl`). `flagStoreDir` undefined (path outside a policy) → ToolInputError. */
@@ -108,7 +108,7 @@ function resolveStoreDir(args: ToolArgs): { path: string; storeDir: string } {
 
 /** `create_flag` additionally needs the `.crl` TEXT (to validate the target declaration). Reads it with the same size/BOM
  *  guards as resolveSource. A non-CRL file resolves here (readable) → the validator returns a `parse-failed` domain result. */
-function resolvePathSource(args: ToolArgs): { text: string; storeDir: string } {
+function resolvePathSource(args: ToolArgs): { text: string; storeDir: string; path: string } {
   const { path: p, storeDir } = resolveStoreDir(args);
   let text: string;
   try {
@@ -120,7 +120,7 @@ function resolvePathSource(args: ToolArgs): { text: string; storeDir: string } {
   }
   if (Buffer.byteLength(text, "utf8") > MAX_INPUT_BYTES) throw new ToolInputError(`Input too large: > ${MAX_INPUT_BYTES} bytes.`);
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-  return { text, storeDir };
+  return { text, storeDir, path: p };
 }
 
 function runTool(fn: CrlFn, args: ToolArgs) {
@@ -896,7 +896,7 @@ export function createServer(): McpServer {
     {
       title: "Create a review flag (#205 crl-refactors)",
       description:
-        "Author a REVIEW FLAG as a store record under the policy's `.crl/flags/` (#212). WRITES a `<id>.json` file directly " +
+        "Author a REVIEW FLAG as a store record under the policy's `medical-validation/flags/` (#212). WRITES a `<id>.json` file directly " +
         "(the flag store is machine-managed sidecar metadata, not `.crl` source). Pass `path` — the target `.crl` file in the " +
         "policy (used to VALIDATE the target exists AND to locate the store via the enclosing `src/`); inline `code` is NOT " +
         "supported (a store can't be located without a filesystem path). Plus the target + flag: `kind` is concept|decision|" +
@@ -932,7 +932,7 @@ export function createServer(): McpServer {
       title: "Set a review flag's status (#205 crl-refactors)",
       description:
         "Flip the status (open↔resolved) of ONE review flag store record (#212), located by a selector. The counterpart to " +
-        "create_flag. Pass `path` (the target `.crl` — locates the `.crl/flags/` store; inline `code` is NOT supported), the " +
+        "create_flag. Pass `path` (the target `.crl` — locates the `medical-validation/flags/` store; inline `code` is NOT supported), the " +
         "selector, and `status` (the NEXT status). Selector: `scope` (concept|decision|library) + `name` + `tag` " +
         "(canonicalized) identify the flag when there is one such flag; pass `key` (a decision-occurrence key or the record's " +
         "dedup key) to disambiguate, and `library` to require a specific library. NOTE the store is POLICY-WIDE (all libraries), " +
@@ -975,17 +975,34 @@ const toolError = (e: unknown): ToolResponse => ({ content: [{ type: "text" as c
  *  re-add-guard `dedupKey`. They're mutually exclusive on a record (legacyToMvFlag), so `??` picks the right one. */
 const selectorKey = (f: MvFlag): string | undefined => f.anchor.occurrenceKey ?? f.dedupKey;
 
-/** #212 step 2 — `create_flag` WRITES a `.crl/flags/<id>.json` store record. Validate+build via the shared seam (against the
+/** #230 — refuse a flag WRITE while records remain at the OLD `.crl/flags/` location: creating/flipping in the new store while
+ *  old records sit hidden would split-brain a half-migrated policy (and the cockpit is already blocking mvComplete on them). A
+ *  domain result (not a tool error) — the fix is the user's: migrate + delete the old dir. `undefined` when the store is clean. */
+function legacyStoreRefusal(celPath: string): ToolResponse | undefined {
+  const legacy = hasLegacyFlagStore(celPath);
+  if (!legacy.present) return undefined;
+  return writeResult({
+    ok: false,
+    reason: "legacy-flag-store-present",
+    message: legacy.warning
+      ? "an unreadable legacy flag store remains at the old `.crl/flags/` location — migrate it to `medical-validation/flags/` and delete the old dir before authoring flags (CRL#230)"
+      : `${legacy.count} legacy flag record(s) remain at the old \`.crl/flags/\` store — migrate them to \`medical-validation/flags/\` and delete the old dir before authoring flags (CRL#230)`,
+  });
+}
+
+/** #212 step 2 — `create_flag` WRITES a `medical-validation/flags/<id>.json` store record. Validate+build via the shared seam (against the
  *  `.crl` at `path`), then dedup-check the store (an agent RETRY after a dropped response returns the existing record, not a
- *  duplicate) and `saveFlag`. Bad args / a path outside a policy → isError; a domain failure (bad tag/field/target) →
- *  `{success:false, reason, …}`; an IO/store-write failure → isError (the write is a real side effect now). */
+ *  duplicate) and `saveFlag`. Bad args / a path outside a policy → isError; a domain failure (bad tag/field/target, or an
+ *  un-migrated #230 legacy store) → `{success:false, reason, …}`; an IO/store-write failure → isError. */
 function runCreateFlag(args: CreateFlagArgs): ToolResponse {
-  let src: { text: string; storeDir: string };
+  let src: { text: string; storeDir: string; path: string };
   try {
     src = resolvePathSource(args);
   } catch (e) {
     return toolError(e);
   }
+  const refusal = legacyStoreRefusal(src.path);
+  if (refusal) return refusal; // #230: don't add to the new store while old records sit hidden at `.crl/flags/`
   try {
     const built = validateAndBuildMvFlagDraft(src.text, { kind: args.kind, name: args.name, library: args.library }, { tag: args.tag, gist: args.gist, fields: args.fields, status: args.status });
     if (!built.ok) return writeResult(built); // domain validation failure — no file written
@@ -1005,12 +1022,15 @@ function runCreateFlag(args: CreateFlagArgs): ToolResponse {
  *  stale-snapshot overwrite). 0 → not-found; >1 → ambiguous + candidates (pass `key` to disambiguate); already-at-status →
  *  changed:false. Store-only: a pre-#212 `.crl`-embedded flag is NOT addressable here (all content is migrated). */
 function runSetFlagStatus(args: SetFlagStatusArgs): ToolResponse {
-  let storeDir: string;
+  let resolved: { path: string; storeDir: string };
   try {
-    storeDir = resolveStoreDir(args).storeDir; // status flip needs only the location — no `.crl` read/size-cap
+    resolved = resolveStoreDir(args); // status flip needs only the location — no `.crl` read/size-cap
   } catch (e) {
     return toolError(e);
   }
+  const refusal = legacyStoreRefusal(resolved.path);
+  if (refusal) return refusal; // #230: refuse a flip while old records sit hidden at `.crl/flags/`
+  const storeDir = resolved.storeDir;
   try {
     const loaded = loadFlags(storeDir);
     if (loaded.warning) return writeResult({ ok: false, reason: "store-warning", message: loaded.warning });

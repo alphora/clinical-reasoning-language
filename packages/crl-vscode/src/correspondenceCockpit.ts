@@ -80,6 +80,7 @@ import {
   parseOccurrenceKey,
   isOpen,
   flagStoreDir,
+  hasLegacyFlagStore,
   loadFlags as loadStoredFlags,
   saveFlag,
   removeFlag,
@@ -538,7 +539,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let reviewGridEpoch = 0;
   let mvRevision = 0;
   // #203 Todo 4 / #212 S3 — the review-flag surface. `flagsList` = ALL flags (open + resolved) as `MvFlag`s, read from the
-  // `.crl/flags/` STORE (the single flag home; the S2 dual-read is gone), refreshed in reloadReviewFlags(). `flagStateError`
+  // `medical-validation/flags/` STORE (the single flag home; the S2 dual-read is gone), refreshed in reloadReviewFlags(). `flagStateError`
   // (+ a specific `flagStateNote`) = flag state is UNKNOWN — a corrupt store record, an unreadable `.crl`, OR a still-embedded
   // `.crl` flag the safety net caught → the mvComplete gate conservatively does NOT report complete. `anchorCtx` = the current
   // CRL structure the anchor resolver matches a flag's stored target against (assembled in rebuild). All cleared on retarget/reset.
@@ -550,7 +551,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let flagsByGid = new Map<string, MvFlag[]>();
   let flagStateError = false;
   // DISTINCT from flagStateError (which ALSO absorbs `.crl`-parse failures + un-migrated-flag counts): true ONLY when the
-  // `.crl/flags/` STORE read itself was partial/unreadable (a corrupt record OR a non-ENOENT readdir failure — EACCES/AV lock).
+  // `medical-validation/flags/` STORE read itself was partial/unreadable (a corrupt record OR a non-ENOENT readdir failure — EACCES/AV lock).
   // The long-lived action drawer uses THIS (not flagStateError) to tell "the open flag's record is momentarily unknown" (keep it,
   // don't close) from "the flag was genuinely deleted" (close) — else an unparseable-`.crl` policy would never close a real deletion.
   let flagStoreWarning = false;
@@ -598,7 +599,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   const views = new Map<Pane, PaneView>();
   let paneOrder: Pane[] = normalizePaneOrder(undefined, COCKPIT_PANE_SPEC); // user layout (configSection(mode).paneOrder), normalized
   let watcher: vscode.FileSystemWatcher | undefined;
-  let flagsWatcher: vscode.FileSystemWatcher | undefined; // #212 S2 (I6): the `.crl/flags/` store is OUTSIDE the src-scoped watcher
+  let flagsWatcher: vscode.FileSystemWatcher | undefined; // #212 S2 (I6): the `medical-validation/flags/` store is OUTSIDE the src-scoped watcher
   let debounce: ReturnType<typeof setTimeout> | undefined;
   let flagsDebounce: ReturnType<typeof setTimeout> | undefined;
   let orderDebounce: ReturnType<typeof setTimeout> | undefined;
@@ -1002,7 +1003,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
 
   // ── #203 Todo 4 / #212 S3: the review-flag surface ───────────────────────────────────
-  // Flags live in the `.crl/flags/` STORE (the single home; #212). The cockpit reads them from there, surfaces the count +
+  // Flags live in the `medical-validation/flags/` STORE (the single home; #212). The cockpit reads them from there, surfaces the count +
   // the mvComplete gate in the tree chrome, and WRITES status open↔resolved back to the `<id>.json` record via `saveFlag`.
   // It still reads the `.crl` text (live-buffer-aware) for authoritative library names + the un-migrated-flag safety net.
 
@@ -1021,7 +1022,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
   }
 
-  /** (Re)load ALL review flags into `flagsList` (as `MvFlag`s) from the `.crl/flags/` STORE — the single flag home (#212 S3:
+  /** (Re)load ALL review flags into `flagsList` (as `MvFlag`s) from the `medical-validation/flags/` STORE — the single flag home (#212 S3:
    *  the S2 dual-read is gone; content is migrated). Also (re)assembles `anchorCtx` and runs the un-migrated-flag SAFETY NET.
    *  `flagStateError` (+ a specific `flagStateNote`) blocks the mvComplete gate when flag state is UNKNOWN — a corrupt store
    *  record, an unreadable `.crl`, OR a still-EMBEDDED `.crl` flag a store-only read would silently ignore. Called from
@@ -1066,7 +1067,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       flagStateError = true;
       flagStateNote = `${unmigrated} un-migrated \`.crl\` flag(s) — migrate to the store`;
     }
-    // ── the `.crl/flags/` store (the single flag home) ──
+    // ── the `medical-validation/flags/` store (the single flag home) ──
     const storeDir = flagStoreDir(currentCel); // undefined when the .cel isn't in a discoverable policy src/ → no store flags, no warning (I8)
     if (storeDir) {
       const loaded = loadStoredFlags(storeDir);
@@ -1076,6 +1077,21 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         flagStateNote = flagStateNote ?? loaded.warning;
       }
       flagsList = loaded.flags;
+    }
+    // #230 MIGRATION SAFETY NET: records left at the OLD `.crl/flags/` location are NO LONGER READ by this code. If any remain, a
+    // hidden OPEN flag would falsely pass mvComplete — so block the gate (exactly like the embedded-flag net above) with a note to
+    // migrate AND delete the old dir (the untracked residue keeps dirtying the worktree — the original #230 complaint). Pure +
+    // unit-tested; present iff a record remains (incl. resolved — the audit trail still needs moving) or the old store is corrupt.
+    // (The MCP write tools additionally REFUSE authoring while this is present — blind-agent split-brain risk; the cockpit relies
+    //  on this VISIBLE gate block + note instead of hard-refusing the human's own writes, since the human has the full signal.)
+    const legacy = hasLegacyFlagStore(currentCel);
+    if (legacy.present) {
+      flagStateError = true;
+      flagStateNote =
+        flagStateNote ??
+        (legacy.warning
+          ? "unreadable old-location flag store `.crl/flags/` — migrate to `medical-validation/flags/` and delete the old dir"
+          : `${legacy.count} old-location flag record(s) in \`.crl/flags/\` — migrate to \`medical-validation/flags/\` and delete the old dir`);
     }
     // ── the anchor context (badge placement + reveal classification match a flag's stored target against the CURRENT structure) ──
     anchorCtx = {
@@ -2695,9 +2711,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       watcher.onDidChange(onFs);
       watcher.onDidDelete(onFs);
     }
-    // #212 S2 (I6): watch the `.crl/flags/` JSON store — it lives at the ARTIFACT root, outside the src-scoped watcher above.
-    // An external change (git checkout/merge, a manual repair of a corrupt record) must refresh the live gate + badges. A
-    // LIGHT refresh (reload flags + repaint chrome/badges), NOT a full rebuild — the model is unchanged.
+    // #212/#230: watch the `medical-validation/flags/` JSON store — it lives under `src/medical-validation/` but OUTSIDE this
+    // watcher's src globs above ({provenance,anchor-source}), so it needs its own watcher. An external change (git
+    // checkout/merge, a manual repair of a corrupt record) must refresh the live gate + badges. A LIGHT refresh (reload flags
+    // + repaint chrome/badges), NOT a full rebuild — the model is unchanged.
     const flagsDir = flagStoreDir(currentCel);
     if (flagsDir) {
       const watchedCel = currentCel; // capture: a debounced fire after a retarget must NOT refresh a DIFFERENT policy (gpt55)
@@ -3664,7 +3681,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     else noteFail(res.reason);
   }
 
-  /** Todo 4 (disc 363) — the action drawer's Delete: remove the local `.crl/flags/<id>.json` record and (best-effort) close its
+  /** Todo 4 (disc 363) — the action drawer's Delete: remove the local `medical-validation/flags/<id>.json` record and (best-effort) close its
    *  born-together GitHub issue as NOT PLANNED. Order (panel): take busy → clean re-read → derive close eligibility off the FINAL
    *  on-disk record (accept #7) → confirm (consequence-naming, honest) → post-confirm re-check + re-read → LOCAL delete → refresh →
    *  best-effort close. A local-delete failure keeps the flag + does NOT touch GitHub. Close eligibility: a numeric `ref`, the flag
@@ -3905,7 +3922,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
   }
 
-  /** #211/#212 — commit the drawer's Insert: author a flag record in the `.crl/flags/` STORE whose issue is created "born
+  /** #211/#212 — commit the drawer's Insert: author a flag record in the `medical-validation/flags/` STORE whose issue is created "born
    *  together" (the #204 loop). Order (design review 233/250): stale-guard → validate via the shared seam
    *  (`validateAndBuildMvFlagDraft`, no ref) so a tag/field/decl error aborts with NO orphan issue → store-warning gate →
    *  resolve the github repo → auth → create the issue stub (best-effort; ANY failure → the flag is still written, without a
@@ -4050,7 +4067,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           }
         }
       }
-      // #212 — the write goes to the `.crl/flags/` STORE. Build the record via the SHARED seam (validate → MvFlag; the SAME
+      // #212 — the write goes to the `medical-validation/flags/` STORE. Build the record via the SHARED seam (validate → MvFlag; the SAME
       // path the MCP tool uses, so one validation path). Build AFTER the POST, WITH the `ref` (so the dedupKey reflects the
       // persisted content). Write to the CAPTURED policy's store even if the cockpit identity moved on (do NOT abort post-POST
       // — that would strand a created issue). S4 swaps the seam's validator; the cockpit is then untouched.

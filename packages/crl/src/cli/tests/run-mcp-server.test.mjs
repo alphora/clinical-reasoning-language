@@ -7,11 +7,11 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import assert from "node:assert/strict";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 
-// #212 — the flag tools now write the `.crl/flags/` STORE, located from a `.crl` path via the enclosing policy `src/`
-// (an ancestor `src/` with a `provenance/` child). Build a minimal on-disk policy so `path` resolves + the store lands.
+// #212/#230 — the flag tools write the `medical-validation/flags/` STORE, located from a `.crl` path via the enclosing policy
+// `src/` (an ancestor `src/` with a `provenance/` child). Build a minimal on-disk policy so `path` resolves + the store lands.
 const CONCEPT_CRL = 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.';
 function mkPolicy(crlText = CONCEPT_CRL) {
   const root = mkdtempSync(join(tmpdir(), "crlmcp-"));
@@ -19,7 +19,7 @@ function mkPolicy(crlText = CONCEPT_CRL) {
   mkdirSync(join(root, "src", "crl"), { recursive: true });
   const crlPath = join(root, "src", "crl", "L.crl");
   writeFileSync(crlPath, crlText, "utf8");
-  return { root, crlPath, storeDir: join(root, ".crl", "flags") };
+  return { root, crlPath, storeDir: join(root, "src", "medical-validation", "flags") };
 }
 const storeFlags = (storeDir) => {
   try {
@@ -76,7 +76,7 @@ try {
   });
 
   await check("create_flag → writes a concept flag store record (MvFlag shape: tag/anchor.scope/status; NO source)", async () => {
-    const { crlPath, storeDir } = mkPolicy();
+    const { root, crlPath, storeDir } = mkPolicy();
     const r = await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "validation-concern", gist: "looks off for the customer" } });
     assert.ok(!r.isError, "not a tool error");
     const out = JSON.parse(r.content[0].text);
@@ -86,8 +86,36 @@ try {
     assert.equal(out.flag.anchor.scope, "concept"); // MvFlag.anchor.scope (was FlagInstance.scope)
     assert.equal(out.flag.status, "open");
     const onDisk = storeFlags(storeDir);
-    assert.equal(onDisk.length, 1, "one <id>.json written under .crl/flags/");
+    assert.equal(onDisk.length, 1, "one <id>.json written under medical-validation/flags/");
     assert.equal(onDisk[0].id, out.flag.id);
+    assert.ok(!existsSync(join(root, ".crl")), "#230: the new writer creates NO `.crl/` dir at the artifact root (regression lock)");
+  });
+
+  await check("create_flag → #230 REFUSES while a legacy `.crl/flags/` store still has records (migration guard, split-brain prevention)", async () => {
+    const { root, crlPath } = mkPolicy();
+    const legacyDir = join(root, ".crl", "flags"); // the OLD, untracked location
+    mkdirSync(legacyDir, { recursive: true });
+    const legacyRec = { schemaVersion: 1, id: "legacy1", category: "validation", tag: "validation-concern", gist: "stranded", status: "open", fields: {}, anchor: { scope: "concept", name: "C", label: "C" }, createdAt: "2026-07-13T00:00:00.000Z" };
+    writeFileSync(join(legacyDir, "legacy1.json"), JSON.stringify(legacyRec), "utf8");
+    const r = await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "validation-concern", gist: "new one" } });
+    assert.ok(!r.isError, "a domain result, not a tool error");
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, false);
+    assert.equal(out.reason, "legacy-flag-store-present");
+    assert.equal(storeFlags(join(root, "src", "medical-validation", "flags")).length, 0, "nothing written to the new store while the legacy store blocks");
+  });
+
+  await check("set_flag_status → #230 REFUSES while a legacy `.crl/flags/` store still has records (same guard as create_flag)", async () => {
+    const { root, crlPath } = mkPolicy();
+    const legacyDir = join(root, ".crl", "flags");
+    mkdirSync(legacyDir, { recursive: true });
+    const legacyRec = { schemaVersion: 1, id: "legacy2", category: "validation", tag: "validation-concern", gist: "stranded", status: "open", fields: {}, anchor: { scope: "concept", name: "C", label: "C" }, createdAt: "2026-07-13T00:00:00.000Z" };
+    writeFileSync(join(legacyDir, "legacy2.json"), JSON.stringify(legacyRec), "utf8");
+    const r = await client.callTool({ name: "set_flag_status", arguments: { path: crlPath, scope: "concept", name: "C", tag: "validation-concern", status: "resolved" } });
+    assert.ok(!r.isError, "a domain result, not a tool error");
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, false);
+    assert.equal(out.reason, "legacy-flag-store-present");
   });
 
   await check("create_flag → inline `code` is rejected (a store can't be located without a path)", async () => {

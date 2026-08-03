@@ -1,13 +1,16 @@
-// #212 flags→MV slice 1 — the flag STORE: per-flag JSON records under the artifact's `.crl/flags/` (CRL's metadata namespace,
-// parallel to KELP's `.kel/`; KELP is configured to track it). PER-FLAG files (`<id>.json`), NOT one `flags.json`, because
-// flags are cross-step/cross-branch/cross-actor (extraction on an eng branch, validation on an MV branch, later merged) — one
-// file is a merge-conflict magnet + a single corruption would lose ALL flags; per-file merges clean (uuid ids) + isolates
-// corruption. Atomic tmp+rename per file (mirrors saveSidecar). ⚠ load WARNS (never silently drops) on an unreadable/invalid
-// record → the caller maps `warning` to the gate's `error` so mvComplete BLOCKS on unknown flag state (never a silent pass).
+// #212/#230 flags→MV — the flag STORE: per-flag JSON records under the artifact's `medical-validation/flags/` (INSIDE the
+// tracked `medical-validation` entity folder, beside the MV sidecar — see medicalValidationSidecarPath). PER-FLAG files
+// (`<id>.json`), NOT one `flags.json`, because flags are cross-step/cross-branch/cross-actor (extraction on an eng branch,
+// validation on an MV branch, later merged) — one file is a merge-conflict magnet + a single corruption would lose ALL flags;
+// per-file merges clean (uuid ids) + isolates corruption. Atomic tmp+rename per file (mirrors saveSidecar). ⚠ load WARNS (never
+// silently drops) on an unreadable/invalid record → the caller maps `warning` to the gate's `error` so mvComplete BLOCKS on
+// unknown flag state (never a silent pass).
 //
-// ⚠ SLICE-1 SCOPE: this is the store IO only — NOT wired into the cockpit write path or the mvComplete gate yet (S2 wires
-// writes; the gate stays on the old `.crl` source until the migration slice, to avoid a transition blind-gate regression).
-// ⚠ KELP must be configured to TRACK `.crl/flags/` (carry it on the artifact branch) — a KELP-integration item, not this slice.
+// ⚠ #230: the store MOVED from `<artifactRoot>/.crl/flags/` (artifact root, OUTSIDE every KELP entity → never captured by
+// `kelp save`, left the worktree dirty, blocked downstream `kelp lock` with `worktree-dirty`) INTO the `medical-validation`
+// entity. KELP captures an entity FOLDER recursively (a git-tree hash), so a `flags/` subfolder under it is carried on the
+// artifact branch — provided the writes are COMMITTED through MV's lock→save→release (an uncommitted flag still dirties the
+// tree). Confirmed with KELP (folder-entity, content-agnostic capture).
 import { mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { basename, dirname, join } from "node:path";
@@ -17,10 +20,21 @@ import { coerceFlag, isValidFlagId, type MvFlag } from "./mvFlag";
 
 const isEnoent = (e: unknown): boolean => (e as NodeJS.ErrnoException)?.code === "ENOENT";
 
-/** The artifact's flag store dir: `<artifactRoot>/.crl/flags/` — at the ARTIFACT/policy root (dirname of the policy `src/`),
- *  parallel to `.kel-artifact.json`, per-policy by construction (one artifact = one policy → the per-policy gate can filter).
- *  `undefined` when the `.cel` isn't inside a discoverable policy `src/` (mirrors `medicalValidationSidecarPath`). */
+/** The artifact's flag store dir: `<policySrc>/medical-validation/flags/` — a `flags/` subfolder INSIDE the tracked
+ *  `medical-validation` entity (#230 moved it here from the untracked `<artifactRoot>/.crl/flags/`), per-policy by
+ *  construction (one artifact = one policy → the per-policy gate can filter). `undefined` when the `.cel` isn't inside a
+ *  discoverable policy `src/`. Mirrors `medicalValidationSidecarPath`, whose `medical-validation/<policyName>.json` is this
+ *  dir's sibling — so store and sidecar live in, and are captured by, the same entity. */
 export function flagStoreDir(celPath: string): string | undefined {
+  const src = findPolicySrc(celPath);
+  if (!src) return undefined;
+  return join(src, "medical-validation", "flags");
+}
+
+/** #230 migration probe: the OLD store dir `<artifactRoot>/.crl/flags/`, which this code no longer reads or writes. Used by the
+ *  cockpit gate + the MCP write tools to DETECT records stranded at the old location — a hidden open flag there would silently
+ *  pass mvComplete, and a fresh write would split-brain a half-migrated policy. `undefined` outside a discoverable policy. */
+export function legacyFlagStoreDir(celPath: string): string | undefined {
   const src = findPolicySrc(celPath);
   if (!src) return undefined;
   return join(dirname(src), ".crl", "flags");
@@ -67,8 +81,19 @@ export function loadFlags(storeDir: string): FlagStoreLoad {
   return warning ? { flags, warning } : { flags };
 }
 
+/** #230: is there a store at the OLD `.crl/flags/` location that must be migrated? `present` iff any record remains (INCLUDING
+ *  resolved — the audit trail still needs moving) OR the old store is unreadable/corrupt (absence can't be established safely).
+ *  A missing old dir → not present (clean, the common case). Reuses `loadFlags` (ENOENT→empty, corrupt→warning). Callers block
+ *  mvComplete / refuse writes on `present` until the records are moved to `medical-validation/flags/` and the old dir deleted. */
+export function hasLegacyFlagStore(celPath: string): { present: boolean; count: number; warning?: string } {
+  const dir = legacyFlagStoreDir(celPath);
+  if (!dir) return { present: false, count: 0 };
+  const { flags, warning } = loadFlags(dir);
+  return { present: flags.length > 0 || warning !== undefined, count: flags.length, warning };
+}
+
 /** Write one flag as `<storeDir>/<id>.json` via write-tmp-then-rename (tear-free; per-CALL-unique tmp — pid + a fresh uuid —
- *  so two writers to the same id in one process can't clobber a shared tmp). Creates `.crl/flags/`. THROWS on a real IO
+ *  so two writers to the same id in one process can't clobber a shared tmp). Creates the store dir. THROWS on a real IO
  *  failure (the caller surfaces it — a failed save must not silently diverge memory from disk). */
 export function saveFlag(storeDir: string, flag: MvFlag): void {
   if (!isValidFlagId(flag.id)) throw new Error(`refusing to save flag with unsafe id ${JSON.stringify(flag.id)}`); // never a `../x` into join()

@@ -1,5 +1,5 @@
 // #212 step 4 — the CORE-owned review-flag VOCABULARY + a PURE flag-draft field validator. Flags left `.crl` (they now live as
-// structured records under `.crl/flags/`), so their schema — the tags, field rules, aliases, categories, enums, and the human
+// structured records under `medical-validation/flags/`), so their schema — the tags, field rules, aliases, categories, enums, and the human
 // MV Type `displayName`s + `mv:*` labels — lives in this first-class core module. It is the SINGLE source of the flag vocabulary
 // (AND the MV label set) for the MCP `create_flag`/`set_flag_status` tools, the cockpit drawer, the issue emit, and the
 // content-repo label creation. The `.crl` meta-registry (`spec/metadata-registry.json`) stripped its flag entries in v0.3.4, so

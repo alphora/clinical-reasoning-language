@@ -1,5 +1,5 @@
 // #154/#203/#212: the registry-backed @tag validator + parseMetaTag. (#212 step 4b: review FLAGS left the `.crl` meta-registry
-// — they now live in the `.crl/flags/` store — so the collectFlags/openFlags/open-flag/flag-field blocks are gone; the former
+// — they now live in the `medical-validation/flags/` store — so the collectFlags/openFlags/open-flag/flag-field blocks are gone; the former
 // flag tags now validate as `meta-unknown-tag`, which this file's "former flag tags" block guards.)
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -90,7 +90,7 @@ concept "C":
   });
 });
 
-describe("#212 step 4b — review FLAGS left the `.crl` meta-registry (now `.crl/flags/` store records)", () => {
+describe("#212 step 4b — review FLAGS left the `.crl` meta-registry (now `medical-validation/flags/` store records)", () => {
   const validate = (input: string) => validateCRL(input);
   const withMeta = (metaLine: string) =>
     `library "L".\nconcept "C":\n- type is Observation.\n- meta is \`${metaLine}\`.\n- code is \`c\`.\n`;

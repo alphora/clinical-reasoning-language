@@ -350,11 +350,11 @@ export type { ParseMetaResult, ParsedMetaTag } from "./meta/parseMetaTag";
 export { flagTags, isFlagTag, canonicalFlagTag, flagCategoryOf, flagDisplayNameOf, flagLabelOf, allFlagLabels, flagFieldRulesOf, validateFlagFields, FORBIDDEN_FLAG_CHARS, hasForbiddenFlagChars, FORBIDDEN_GIST_CHARS, hasForbiddenGistChars } from "./flags/flagVocab";
 export type { FlagTagInfo, FlagLabel, FieldRule, FlagStatus, CreateFlagTarget, CreateFlagInput, ValidateFlagFieldsResult, FlagFieldsFailure } from "./flags/flagVocab";
 
-// #212 — the `.crl/flags/` STORE model (moved from crl-vscode so BOTH the cockpit AND the MCP flag tools share it). The
+// #212 — the `medical-validation/flags/` STORE model (moved from crl-vscode so BOTH the cockpit AND the MCP flag tools share it). The
 // single home for review flags: a pure record model + per-flag JSON store + a navigation anchor resolver. See discussions/248.
 export { coerceFlag, coerceFlagStatus, isOpen, isValidFlagId } from "./flags/mvFlag";
 export type { MvFlag, MvFlagAnchor, MvFlagStatus, MvFlagCategory, MvFlagScope } from "./flags/mvFlag";
-export { flagStoreDir, loadFlags, saveFlag, removeFlag } from "./flags/mvFlagStore";
+export { flagStoreDir, legacyFlagStoreDir, hasLegacyFlagStore, loadFlags, saveFlag, removeFlag } from "./flags/mvFlagStore";
 export type { FlagStoreLoad } from "./flags/mvFlagStore";
 export { resolveAnchor } from "./flags/mvFlagAnchor";
 export type { AnchorContext, AnchorConceptRef, AnchorResolution } from "./flags/mvFlagAnchor";

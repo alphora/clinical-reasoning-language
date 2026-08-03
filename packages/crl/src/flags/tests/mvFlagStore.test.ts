@@ -1,8 +1,8 @@
-// #212 flags→MV — the flag STORE IO (per-flag files under `.crl/flags/`). (Ported node:test → jest, disc 248.)
-import { mkdtempSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+// #212/#230 flags→MV — the flag STORE IO (per-flag files under `medical-validation/flags/`). (Ported node:test → jest, disc 248.)
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { flagStoreDir, loadFlags, saveFlag, removeFlag } from "../mvFlagStore";
+import { flagStoreDir, legacyFlagStoreDir, hasLegacyFlagStore, loadFlags, saveFlag, removeFlag } from "../mvFlagStore";
 import type { MvFlag } from "../mvFlag";
 
 const mkFlag = (id: string, over: Partial<MvFlag> = {}): MvFlag =>
@@ -96,4 +96,47 @@ test("loadFlags: an invalid/malformed record is NOT dropped silently — it sets
 
 test("flagStoreDir: a path not inside a policy src/ → undefined (mirrors medicalValidationSidecarPath)", () => {
   expect(flagStoreDir(join(tmpdir(), "nowhere", "x.cel"))).toBeUndefined();
+});
+
+test("flagStoreDir: #230 — resolves to `<policySrc>/medical-validation/flags` (INSIDE the tracked entity, not `.crl/flags`)", () => {
+  const root = tmp();
+  const src = join(root, "src");
+  mkdirSync(join(src, "provenance"), { recursive: true }); // findPolicySrc marker: a `src/` with a `provenance/` child
+  mkdirSync(join(src, "cel"), { recursive: true });
+  const dir = flagStoreDir(join(src, "cel", "policy.cel"));
+  expect(dir).toBe(join(src, "medical-validation", "flags"));
+});
+
+const mkPolicySrc = (): { root: string; src: string; cel: string } => {
+  const root = tmp();
+  const src = join(root, "src");
+  mkdirSync(join(src, "provenance"), { recursive: true }); // findPolicySrc marker: a `src/` with a `provenance/` child
+  return { root, src, cel: join(src, "cel", "policy.cel") };
+};
+
+test("legacyFlagStoreDir: #230 — points at `<artifactRoot>/.crl/flags` (the OLD, untracked location this code no longer reads)", () => {
+  const { root, cel } = mkPolicySrc();
+  expect(legacyFlagStoreDir(cel)).toBe(join(root, ".crl", "flags"));
+  expect(legacyFlagStoreDir(join(tmpdir(), "nowhere", "x.cel"))).toBeUndefined();
+});
+
+test("hasLegacyFlagStore: #230 — a clean policy (no old dir) → not present; records at the old location → present (incl. resolved)", () => {
+  const { cel } = mkPolicySrc();
+  expect(hasLegacyFlagStore(cel)).toEqual({ present: false, count: 0 }); // the common case — nothing to migrate
+  const legacy = legacyFlagStoreDir(cel)!;
+  saveFlag(legacy, mkFlag("old-open"));
+  saveFlag(legacy, mkFlag("old-resolved", { status: "resolved" })); // resolved counts — the audit trail still needs moving
+  const r = hasLegacyFlagStore(cel);
+  expect(r.present).toBe(true);
+  expect(r.count).toBe(2);
+});
+
+test("hasLegacyFlagStore: #230 — an unreadable/corrupt old record → present (absence can't be established safely)", () => {
+  const { cel } = mkPolicySrc();
+  const legacy = legacyFlagStoreDir(cel)!;
+  mkdirSync(legacy, { recursive: true });
+  writeFileSync(join(legacy, "broken.json"), "{ not json", "utf8");
+  const r = hasLegacyFlagStore(cel);
+  expect(r.present).toBe(true);
+  expect(r.warning).toBeTruthy();
 });

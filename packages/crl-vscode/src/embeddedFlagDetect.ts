@@ -1,4 +1,4 @@
-// #212 S3 — the un-migrated-flag SAFETY NET (pure + unit-tested). A store-only cockpit reads flags ONLY from `.crl/flags/`; if a
+// #212 S3 — the un-migrated-flag SAFETY NET (pure + unit-tested). A store-only cockpit reads flags ONLY from `medical-validation/flags/`; if a
 // policy still has a `.crl`-EMBEDDED review flag (un-migrated / an old checkout), the cockpit would silently ignore it → a false
 // `mvComplete`. This detects such flags so the cockpit can BLOCK the gate. Matched by the former flag TAGS (+ aliases) — a FIXED
 // historical set (the registry flag entries are stripped in S4, so this can't read the registry; un-migrated content only ever

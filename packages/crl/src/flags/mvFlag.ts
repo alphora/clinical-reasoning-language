@@ -1,5 +1,5 @@
 // #212 flags→MV slice 1 — the review-FLAG record model (PURE: no vscode, no fs; node-testable). Flags are relocating OUT of
-// `.crl` meta-tags into first-class structured records under `.crl/flags/` (CRL's own metadata namespace). A flag is a
+// `.crl` meta-tags into first-class structured records under `medical-validation/flags/` (CRL's own metadata namespace). A flag is a
 // VALIDATION FINDING — cross-step review metadata (extraction=engineering-origin, validation=MV-origin), NOT CRL content and
 // NOT an MV-step content artifact. The record is SELF-DESCRIBING (it retains its original target + a human label) so it stays
 // meaningful even when its anchor no longer resolves; the live anchor is for NAVIGATION, not identity (see mvFlagAnchor.ts).

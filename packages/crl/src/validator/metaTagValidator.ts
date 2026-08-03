@@ -3,7 +3,7 @@
 // shape (required fields present; enum fields in range; no duplicate keyed fields), and CARDINALITY (by canonical
 // tag). Anchors every diagnostic at the meta LINE (shape (b) location). Emits diagnostics with intrinsic `severity`;
 // the orchestrator routes by that. (#212 step 4b: review FLAGS left the registry — the `.crl`-meta open-flag warning
-// is gone; the MV gate reads the `.crl/flags/` store now.)
+// is gone; the MV gate reads the `medical-validation/flags/` store now.)
 //
 // SCOPE (this pass): the flag-feature-critical + core registry rules above. The family-C extraction-exhaust rules
 // (`run`-required, re-run staleness) and the re-add-detection guard are the documented #154 remainder — they concern
@@ -91,7 +91,7 @@ export class MetaTagValidator {
         }
       }
       // (#212 step 4b: review FLAGS left the `.crl` registry — the open-flag warning is gone; the MV gate reads the
-      //  `.crl/flags/` store now, not `.crl` meta tags. A former flag tag simply validates as `meta-unknown-tag` above.)
+      //  `medical-validation/flags/` store now, not `.crl` meta tags. A former flag tag simply validates as `meta-unknown-tag` above.)
     }
     // cardinality (by canonical tag)
     for (const [canon, count] of canonicalCounts) {

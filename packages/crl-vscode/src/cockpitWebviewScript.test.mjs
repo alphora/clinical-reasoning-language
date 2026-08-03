@@ -889,7 +889,7 @@ check("#212 S3: writeFlagStatus is STORE-ONLY (no origin dispatch) — read-modi
 });
 // (design 354) `revealFlag` DELETED — "Reveal in source" only re-opened the `.cel` (near-useless); the non-modal action drawer
 // + the anchor signature it renders are the legibility replacement. Its removal is locked by the "'Reveal in source' is GONE" test.
-check("#212 S2 (I6): a FileSystemWatcher covers the `.crl/flags/` store (outside the src-scoped watcher); a change does a LIGHT refresh, not a rebuild", () => {
+check("#212 S2 (I6): a FileSystemWatcher covers the `medical-validation/flags/` store (outside the src-scoped watcher); a change does a LIGHT refresh, not a rebuild", () => {
   const m = COCKPIT_SRC.match(/function setupWatcher\(\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "setupWatcher body");
   assert.match(m[1], /const flagsDir = flagStoreDir\(currentCel\)/);
@@ -959,7 +959,7 @@ check("#211: commitFlagDraft — trust+github gated, pre-POST recheck, LOCK+try/
   assert.match(m[1], /const fresh = await githubToken\(true\)/);
   assert.match(m[1], /catch \(e\)[\s\S]*?issue not created — \$\{e\.message\}/); // outer catch surfaces the RAW github message
   assert.match(m[1], /const withRef = ref \? \{ \.\.\.fields, ref \} : fields/);
-  // #212 S3: the write goes to the `.crl/flags/` STORE via the SHARED seam (validateAndBuildMvFlagDraft — the same path the MCP
+  // #212 S3: the write goes to the `medical-validation/flags/` STORE via the SHARED seam (validateAndBuildMvFlagDraft — the same path the MCP
   // tool uses; it host-injects id/createdAt/dedupKey). Built AFTER the POST, with the `ref`. `description` re-layered from stub.
   assert.match(m[1], /const built = validateAndBuildMvFlagDraft\(doc2\.getText\(\)/); // the final build (with ref)
   assert.match(m[1], /const flag: MvFlag = \{ \.\.\.built\.flag, \.\.\.\(desc \? \{ description: desc \} : \{\}\) \}/); // re-layer the multi-line note
