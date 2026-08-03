@@ -52,12 +52,13 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 16 registered (+ #205 write-half create_flag / set_flag_status)", async () => {
+  await check("MCP tools: 17 registered (+ #205 write-half create_flag / set_flag_status; + #17 canonicalize_source)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
       "authoring_kit",
       "build_crl_ast",
+      "canonicalize_source",
       "create_flag",
       "emit_cel",
       "emit_cql",
@@ -238,8 +239,8 @@ try {
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
-    assert.equal(kit.schemaVersion, "1.10"); // Todo 6 (1.6) / Piece 1 (1.7) / #207 (1.8) / #205 (1.9) / #212 4c flags→store (1.10)
-    assert.equal(kit.contentHash, "28fe9a720c043c1eed6389ccb5d506c7972cc7dace8c0360c76537a28e103b19");
+    assert.equal(kit.schemaVersion, "1.14"); // …/#212 4c flags→store (1.10) … / #215 (1.13) / #230 flags→medical-validation store (1.14)
+    assert.equal(kit.contentHash, "3ff030db20175f478d7927d24f638d823d53a3915bc264d0a8c45c620a623a3f");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.
@@ -254,9 +255,9 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.useCase, "prior-auth");
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    assert.equal(kit.schemaVersion, "1.10");
+    assert.equal(kit.schemaVersion, "1.14");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "a6d4fe2207e4ebef7afd430e351b57785d8ed945063c1bcf162c0ae40c07d6ef");
+    assert.equal(kit.contentHash, "046b0c9114e7809c09b5cd0e7ee488bcef84bc578bc83e6b6dbbe583497f7c4d");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.equal(refNames.length, 11); // shared medical-policy-determination.crl removed (config-driven local activities)
     assert.ok(!refNames.includes("medical-policy-determination.crl"));

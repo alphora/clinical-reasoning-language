@@ -164,8 +164,15 @@ export type { AuthoringEdge, AuthoringKit, AuthoringStage, AuthoringUseCase, Kit
 //   wins), and the anchored `age at start of` form is marked engine-supported but a COMPUTE-ONLY inference OUTSIDE the
 //   both-rep carve-out. NO payload-shape change. BOTH useCase hashes re-pin (schemaVersion is hashed AND the cpg-edge
 //   rule/model/reference inherit into the prior-auth chain).
+// "1.13" → "1.14": CONTENT change (#230) — the review-flag STORE moved from the untracked `<policy>/.crl/flags/` (artifact
+//   root, outside every KELP entity → never captured by `kelp save`, dirtied the worktree, blocked `kelp lock`) into the
+//   `medical-validation/flags/` subfolder of the tracked `medical-validation` entity. The `review-flags` rule + examples now
+//   teach the new location, and a new clause documents the migration: `create_flag`/`set_flag_status` REFUSE with
+//   `reason: legacy-flag-store-present` while records remain at the old `.crl/flags/` path (manual migration required). NO
+//   payload-shape change beyond the one added clause. BOTH useCase hashes re-pin (schemaVersion is hashed AND the cpg-edge
+//   review-flags rule inherits into the prior-auth chain).
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.13";
+const SCHEMA_VERSION = "1.14";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -567,8 +574,8 @@ const RULES: KitRule[] = [
       "When extraction hits a problem you cannot cleanly resolve — a source ambiguity, a source self-contradiction, an " +
       "unsettled modeling fork, or a place your encoding does not match the source — author a REVIEW FLAG rather than " +
       "silently choosing. A flag is NOT `.crl` content: it is a structured STORE RECORD you create with the `create_flag` " +
-      "MCP tool, which writes a `<policy>/.crl/flags/<id>.json` file (machine-managed sidecar metadata, NOT a `- meta is` " +
-      "line). Anchor it at the NARROWEST faithful scope — `concept`, `decision`, or `library` — by passing that node's name. " +
+      "MCP tool, which writes a `<policy>/src/medical-validation/flags/<id>.json` file — a per-flag record inside the tracked " +
+      "`medical-validation` entity (so `kelp save medical-validation` captures it), NOT a `- meta is` line. Anchor it at the NARROWEST faithful scope — `concept`, `decision`, or `library` — by passing that node's name. " +
       "The four tags, by what went wrong: `@customer-confirmable` — an EXTERNAL-stakeholder ambiguity you resolved " +
       "provisionally (carry the reading you took as the `assumption` field); `@internal-inconsistency` — the SOURCE " +
       "contradicts itself (source-vs-source); `@open-fork` — an INTERNAL modeling fork you encoded one way but did not " +
@@ -586,9 +593,9 @@ const RULES: KitRule[] = [
       "store record on re-extraction).",
     why:
       "A silent guess buries a narrative→CRL problem inside a green-looking artifact; a flag surfaces it and prevents " +
-      "Medical Validation completion while open — the review signal is the point. Flags live in the `.crl/flags/` store " +
+      "Medical Validation completion while open — the review signal is the point. Flags live in the `medical-validation/flags/` store " +
       "(not `.crl` source) so an AI re-extraction that rewrites the `.crl` cannot clobber the human review trail.",
-    ref: "spec/metadata-model.md (review flags → the `.crl/flags/` store); src/flags/flagVocab.ts (the flag vocabulary); the `create_flag`/`set_flag_status` MCP tools.",
+    ref: "spec/metadata-model.md (review flags → the `medical-validation/flags/` store); src/flags/flagVocab.ts (the flag vocabulary); the `create_flag`/`set_flag_status` MCP tools.",
     clauses: [
       {
         text:
@@ -615,7 +622,7 @@ const RULES: KitRule[] = [
       },
       {
         text:
-          "Flags do NOT appear in generated CQL/FHIR — they left `.crl` for the `.crl/flags/` store, so nothing renders " +
+          "Flags do NOT appear in generated CQL/FHIR — they left `.crl` for the `medical-validation/flags/` store, so nothing renders " +
           "into the compiled artifact. The store is their home; they surface in the Medical Validation cockpit (the flag " +
           "list + the mvComplete gate), not in the generated logic. Scope still matters for the ANCHOR (where the flag " +
           "points + how it's grouped in the cockpit), not for any emit surface.",
@@ -630,12 +637,22 @@ const RULES: KitRule[] = [
           "prefix is display-only prose; `tag: \"@open-fork\"` is an `unknown-tag`). Both REQUIRE a `path` to a `.crl` file " +
           "in the policy (inline `code` is NOT accepted — a store can't be located without a filesystem path); `create_flag` " +
           "uses it to VALIDATE the anchor target exists AND to locate the store, while `set_flag_status` uses it ONLY to " +
-          "locate the store (it does no `.crl` content read). They WRITE the `.crl/flags/<id>.json` record (they do NOT " +
+          "locate the store (it does no `.crl` content read). They WRITE the `medical-validation/flags/<id>.json` record (they do NOT " +
           "return `.crl` source for you to apply, and they never edit `.crl` files). `create_flag` is idempotent while open " +
           "(a same-content retry returns the existing record). PRECONDITION: the store is located by walking up to the " +
           "policy's `src/` dir (the one holding `provenance/`); if the tool errors \"not inside a discoverable policy\", the " +
           "policy layout isn't set up yet (run the provenance/promotion step first). (`@validation-concern`'s optional " +
           "`kind` triage enum + any occurrence `key` are carried as `fields` by the same tools.)",
+        force: "default",
+      },
+      {
+        text:
+          "#230 MIGRATION: the flag store moved from the pre-#230 `<policy>/.crl/flags/` location (artifact root, untracked) " +
+          "into the `medical-validation/flags/` subfolder of the tracked `medical-validation` entity. Do NOT hand-create or " +
+          "hand-edit records at the old `.crl/flags/` path. If a policy STILL has records there (an old checkout / a legacy " +
+          "store), BOTH `create_flag` and `set_flag_status` REFUSE with `reason: legacy-flag-store-present` — move those " +
+          "`<id>.json` records to `medical-validation/flags/` and DELETE the old `.crl/flags/` dir before authoring (a manual " +
+          "migration; the untracked residue also keeps dirtying the worktree, which blocks `kelp lock`).",
         force: "default",
       },
     ],
@@ -752,9 +769,9 @@ const EXAMPLES: KitExample[] = [
     title: "Review flag: an @open-fork on the concept it concerns (via create_flag — LEAN, detail in the linked issue)",
     language: "text",
     snippet:
-      'create_flag(\n  path: "<policy>/src/crl/coverage-policy.crl",\n  kind: "concept", name: "BMI Threshold",\n  tag: "open-fork",\n  gist: "eligibility threshold encoded as BMI-40-only, but the source also allows 35-plus-comorbidity",\n  fields: { chosen: "bmi-40-only", alternatives: "bmi-35-plus-comorbidity", ref: "#207" }\n)\n→ writes <policy>/.crl/flags/<id>.json  (status defaults to open)',
+      'create_flag(\n  path: "<policy>/src/crl/coverage-policy.crl",\n  kind: "concept", name: "BMI Threshold",\n  tag: "open-fork",\n  gist: "eligibility threshold encoded as BMI-40-only, but the source also allows 35-plus-comorbidity",\n  fields: { chosen: "bmi-40-only", alternatives: "bmi-35-plus-comorbidity", ref: "#207" }\n)\n→ writes <policy>/src/medical-validation/flags/<id>.json  (status defaults to open)',
     valid: true,
-    note: "The flag is a STORE record, not a `.crl` line: a one-line gist + `chosen`/`alternatives` (semantic, optional) + an optional `ref` to the tracker issue with the full reasoning. `create_flag` writes `.crl/flags/<id>.json`; it does NOT touch the `.crl`. An open flag blocks Medical Validation completion.",
+    note: "The flag is a STORE record, not a `.crl` line: a one-line gist + `chosen`/`alternatives` (semantic, optional) + an optional `ref` to the tracker issue with the full reasoning. `create_flag` writes `medical-validation/flags/<id>.json`; it does NOT touch the `.crl`. An open flag blocks Medical Validation completion.",
   },
   {
     title: "Review flag: an @fidelity-defect on a DECISION (required `direction` field)",
@@ -770,7 +787,7 @@ const EXAMPLES: KitExample[] = [
     snippet:
       'concept "Renal Function":\n- type is Observation.\n- meta is `@gap-filed: eGFR unit normalization not yet expressible; ref #180`.\n- code is `renal-function`.',
     valid: true,
-    note: "A durable pointer to already-tracked work — a REAL `.crl` meta tag (unlike flags, which left `.crl`), REQUIRED `; ref`, does not block mvComplete. Contrast with a review flag (a `.crl/flags/` store record authored via create_flag, blocks while open).",
+    note: "A durable pointer to already-tracked work — a REAL `.crl` meta tag (unlike flags, which left `.crl`), REQUIRED `; ref`, does not block mvComplete. Contrast with a review flag (a `medical-validation/flags/` store record authored via create_flag, blocks while open).",
   },
   {
     title: "Review flag at LIBRARY scope: an @internal-inconsistency spanning the whole policy (via create_flag)",

@@ -365,7 +365,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.13");
+    expect(kit.schemaVersion).toBe("1.14");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -775,8 +775,10 @@ describe("authoring-kit — getAuthoringKit", () => {
     // conceptLayerModel entry + the reference exemplar WIDEN from `at least <N>` to the full comparator set
     // (`at least`/`at most`/`under`/`younger than`); the exemplar gains an `Under Twenty One` (`under 21`) both-rep
     // concept + pediatric decision; the value-type-boolean clause is annotated with #241. BOTH hashes move.
-    expect(cpg.contentHash).toBe("ceae9c884a4b9cdf1790c1b9fb16f3913c83480bbd81d5bb397a7c371701a687");
-    expect(priorAuth.contentHash).toBe("3015d560c64d978ff77401a5f4723468087866f3cef04d262fa0a2f31fd44b56");
+    // #230 (schemaVersion 1.13→1.14): the review-flags rule + examples teach the relocated `medical-validation/flags/` store
+    // + a new migration clause (create_flag/set_flag_status refuse a legacy `.crl/flags/` store). BOTH hashes move.
+    expect(cpg.contentHash).toBe("3ff030db20175f478d7927d24f638d823d53a3915bc264d0a8c45c620a623a3f");
+    expect(priorAuth.contentHash).toBe("046b0c9114e7809c09b5cd0e7ee488bcef84bc578bc83e6b6dbbe583497f7c4d");
   });
 
   it("no RETIRED positive doctrine survives anywhere in the serialized payload (#224 anti-half-inversion guard)", () => {
@@ -1014,7 +1016,7 @@ describe("authoring-kit — review-flag + @gap-filed required fields are enforce
   });
 });
 
-describe("authoring-kit — the review-flags rule teaches the `.crl/flags/` STORE model, not `.crl`-meta flags (#212 step 4c)", () => {
+describe("authoring-kit — the review-flags rule teaches the `medical-validation/flags/` STORE model, not `.crl`-meta flags (#212 step 4c, #230 relocation)", () => {
   // Guards the kit PAYLOAD (what a KE agent receives) against re-teaching the deleted `.crl`-meta flag path (gpt55 impl
   // review, disc 253). The strip tests prove the tags left the registry; this proves the kit no longer instructs authoring
   // them as `.crl` lines / claims the tools return rewritten source.
@@ -1025,7 +1027,7 @@ describe("authoring-kit — the review-flags rule teaches the `.crl/flags/` STOR
   it("the review-flags rule points at the flag STORE + create_flag (a flag is a store record, not a `- meta is` line)", () => {
     expect(rule).toBeDefined();
     const text = JSON.stringify(rule);
-    expect(text).toContain(".crl/flags/");
+    expect(text).toContain("medical-validation/flags/"); // #230: the CURRENT store location the rule teaches
     expect(text).toContain("create_flag");
     expect(text).toContain("STORE RECORD");
   });
