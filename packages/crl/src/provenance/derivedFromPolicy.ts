@@ -77,3 +77,17 @@ export function toCarrierRelative(sourcePath: string, carrierDir: string): Carri
   }
   return { ok: true, path: posix, escapesCarrierDir: posix === ".." || posix.startsWith("../") };
 }
+
+/**
+ * #250 A — do two paths name the SAME file on THIS host's filesystem? Resolves both vs CWD (pure — no fs stat), then
+ * folds case on the case-INSENSITIVE default filesystems (win32 NTFS, darwin APFS/HFS+) so `RX.docx` IS `rx.docx` there;
+ * a plain string compare would miss that clobber. Case-SENSITIVE elsewhere (Linux ext4 — distinct files are legitimate).
+ * Used by the producers' overwrite guards; it is a LEXICAL identity (no `realpath`), so a symlink aliasing two names is
+ * not caught here — the guarded output file does not exist yet, so realpath is not applicable at derivation time.
+ */
+export function samePath(a: string, b: string): boolean {
+  const ra = resolve(a);
+  const rb = resolve(b);
+  const caseInsensitive = process.platform === "win32" || process.platform === "darwin";
+  return caseInsensitive ? ra.toLowerCase() === rb.toLowerCase() : ra === rb;
+}

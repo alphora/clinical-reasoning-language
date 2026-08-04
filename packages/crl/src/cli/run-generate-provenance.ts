@@ -1,9 +1,11 @@
 #!/usr/bin/env node
-import { statSync, writeFileSync } from "node:fs";
+import { statSync } from "node:fs";
 import { basename } from "node:path";
 
 import {
   generateProvenanceFiles,
+  samePath,
+  writeFileAtomic,
   type GenerateDiagnostic,
   type MergeDiagnostic,
 } from "../provenance";
@@ -83,6 +85,18 @@ if (!celPath || !anchorPath) {
   process.exit(1);
 }
 
+// #250 A-hardening — the artifact write (now atomic) would silently CLOBBER an input if --out aliases it. Refuse an --out
+// that resolves to the cel or the anchor source (the sidecar/back-pointer would then reference a destroyed file). An
+// --out equal to --merge is the intended in-place regenerate and stays allowed. This guards the two NAMED inputs; a
+// perverse --out onto a TRANSITIVELY imported .cel/.crl in the closure still writes after all reads complete (the
+// artifact stays sound) — closing that would need the read-file set threaded back from generateProvenanceFiles.
+if (outPath && (samePath(outPath, celPath) || samePath(outPath, anchorPath))) {
+  console.error(
+    `--out "${outPath}" resolves to an input (the --cel or --anchor); refusing to overwrite a source. Choose a different --out.`,
+  );
+  process.exit(1);
+}
+
 // File checks mirror run-validate-provenance: each input must be a readable file (the optional --merge too).
 const inputs: Array<[string, string]> = [
   ["cel", celPath],
@@ -124,7 +138,7 @@ try {
   // line — the summary AND the full diagnostics — goes to stderr.
   const json = JSON.stringify(r.artifact, null, 2);
   if (outPath) {
-    writeFileSync(outPath, json + "\n", "utf8");
+    writeFileAtomic(outPath, json + "\n");
     console.error(`wrote ${outPath} (policy ${r.policyId} v${r.policyVersion})`);
   } else {
     process.stdout.write(json + "\n");

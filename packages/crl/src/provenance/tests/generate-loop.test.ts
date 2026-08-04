@@ -13,7 +13,7 @@
  * an otherwise recommend; a companion .cel with frozen cases) so the K=8 baseline is the same shape T1's tests pin.
  */
 import { createHash } from "crypto";
-import { writeFileSync, mkdtempSync, rmSync } from "fs";
+import { writeFileSync, mkdirSync, mkdtempSync, rmSync } from "fs";
 import * as os from "os";
 import * as path from "path";
 
@@ -463,6 +463,35 @@ describe("#250 Todo A — generateProvenanceFiles emits a carrier-relative deriv
       expect(g.advisories).toBeUndefined(); // destination given → no dest-less advisory
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("advises (non-blocking) when the anchor resolves OUTSIDE the carrying checkout — #250 A-hardening P1/T11", () => {
+    const base = mkdtempSync(path.join(os.tmpdir(), "prov-a-escape-"));
+    try {
+      const repo = path.join(base, "repo");
+      mkdirSync(repo, { recursive: true });
+      writeFileSync(path.join(repo, ".git"), "gitdir: /elsewhere\n"); // pin the checkout root at repo
+      writeFileSync(
+        path.join(repo, "package.json"),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      );
+      writeFileSync(path.join(repo, "policy.crl"), POLICY_CRL);
+      const fCel = path.join(repo, "f.cel");
+      writeFileSync(fCel, CEL);
+      const anchorTxt = path.join(base, "anchor.txt"); // ABOVE the repo root → escapes
+      writeFileSync(anchorTxt, ANCHOR);
+      const artifactPath = path.join(repo, "out", "artifact.json"); // carrier inside the repo
+
+      const g = generateProvenanceFiles(fCel, anchorTxt, { artifactCarrierPath: artifactPath });
+      expect(g.advisories?.some((a) => /resolves OUTSIDE the repository checkout/.test(a))).toBe(
+        true,
+      );
+      // non-blocking: derivedFrom is still written, carrier-relative (climbs out of repo/out and up to base)
+      expect(g.artifact.anchorSource.derivedFrom).toBe("../../anchor.txt");
+      expect(classifyDerivedFrom(g.artifact.anchorSource.derivedFrom)).toBe("ok");
+    } finally {
+      rmSync(base, { recursive: true, force: true });
     }
   });
 

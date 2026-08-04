@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { deflateRawSync } from "node:zlib";
@@ -439,6 +439,15 @@ describe("deriveAnchorOutputPaths (shared txt/sidecar derivation)", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toMatch(/sidecar .* would overwrite the input source/);
   });
+  // #250 A-hardening: NTFS folds case, so a case-differing --out that resolves to the input still clobbers it.
+  (process.platform === "win32" ? it : it.skip)(
+    "win32: rejects a case-differing --out that resolves to the input (NTFS is case-insensitive)",
+    () => {
+      const r = deriveAnchorOutputPaths("E:\\src\\rx.docx", "E:\\src\\RX.docx");
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.reason).toMatch(/overwrite the input source/);
+    },
+  );
 });
 
 describe("canonicalizeSourceToFiles (#250 A — carrier-relative sidecar + upstream-source marker)", () => {
@@ -500,8 +509,35 @@ describe("canonicalizeSourceToFiles (#250 A — carrier-relative sidecar + upstr
     const res = canonicalizeSourceToFiles(buf, join(tmp, "rx.docx"), outTxt);
     if (res.ok) throw new Error("expected a write failure");
     expect(res.stage).toBe("write");
-    expect(res.message).toMatch(/failed to write the canonical text/);
+    expect(res.message).toMatch(/no new text was written/);
     expect(() => readFileSync(outTxt, "utf8")).toThrow();
+  });
+
+  it("sidecar write failure leaves the NEW .txt with a missing/stale sidecar (honest partial-pair message)", () => {
+    const buf = docx(para(t("body")));
+    // Pre-create the sidecar path as a DIRECTORY so its atomic rename (file→dir) fails while the .txt write succeeds.
+    mkdirSync(join(tmp, "rx.anchormeta.json"));
+    const res = canonicalizeSourceToFiles(buf, join(tmp, "rx.docx"));
+    if (res.ok) throw new Error("expected a write failure");
+    expect(res.stage).toBe("write");
+    expect(res.message).toMatch(/MISSING or STALE/);
+    expect(readFileSync(join(tmp, "rx.txt"), "utf8")).toBe("body"); // the new text DID land (atomic, before the sidecar)
+  });
+
+  it("advises when the .docx resolves OUTSIDE the carrying checkout (repo-escape, non-blocking)", () => {
+    writeFileSync(join(tmp, ".git"), "gitdir: /elsewhere\n"); // pin the checkout root at tmp
+    const outDir = join(tmp, "anchors");
+    mkdirSync(outDir, { recursive: true });
+    const buf = docx(para(t("body")));
+    const inPath = join(tmp, "..", "rx.docx"); // above the checkout root → escapes
+    const res = canonicalizeSourceToFiles(buf, inPath, join(outDir, "rx.txt"));
+    if (!res.ok) throw new Error(`expected ok, got [${res.stage}]`);
+    expect(res.advisories?.some((a) => /resolves OUTSIDE the repository checkout/.test(a))).toBe(
+      true,
+    );
+    // the advisory is non-blocking: derivedFrom is still written (carrier-relative) + the files exist
+    const meta = JSON.parse(readFileSync(res.metaPath, "utf8"));
+    expect(meta.derivedFrom).toMatch(/^\.\.\/\.\.\/rx\.docx$/);
   });
 
   // Cross-drive has no carrier-relative representation → fail loud BEFORE any write. win32-only: `path.relative` across

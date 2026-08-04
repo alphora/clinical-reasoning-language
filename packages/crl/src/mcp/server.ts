@@ -790,8 +790,9 @@ export function createServer(): McpServer {
         "{ success, policyId, policyVersion, clusterCount, diagnosticCountsByKind, mergeDiagnosticCountsByKind? (only " +
         "when merging), merged, advisories? }. #250: because this tool returns the artifact INLINE (it writes no file), " +
         "`anchorSource.derivedFrom` is made carrier-relative to the anchor's directory (or, when merging, the existing " +
-        "artifact's directory) — the `advisories` array (present only when non-empty) says so; if you persist the returned " +
-        "artifact anywhere else, run the provenance normalizer on save (once available) so derivedFrom stays resolvable. " +
+        "artifact's directory) — the `advisories` array (present only when non-empty) says so, and also carries other " +
+        "non-blocking producer advisories (e.g. the anchor resolves outside the carrying checkout); if you persist the " +
+        "returned artifact anywhere else, run the provenance normalizer on save (once available) so derivedFrom stays resolvable. " +
         "The `diagnostics`/`mergeDiagnostics` COUNTS describe the FRESH-scaffold worklist " +
         "(the attribution + over-reach BASELINE); when `merged` is true they are the PRE-MERGE baseline, NOT the " +
         "merged artifact's residual. While ATTRIBUTING the scaffold, run `validate_provenance_worklist` on the output " +
@@ -878,9 +879,11 @@ export function createServer(): McpServer {
         "`<name>.anchormeta.json`. The sidecar carries `textHash` (sha256 over the UTF-8 text — what " +
         "`generate_provenance` re-hashes for `anchorSource.textHash`), `offsetUnit` (`utf8-byte`), `derivedFromHash`, " +
         "and canonicalization `warnings`. Returns { success, textPath, metaPath, textHash, offsetUnit, byteLength, " +
-        "warnings }. WARNINGS ARE NON-FATAL — gate on the returned `warnings` array (they are also persisted in the " +
+        "warnings, advisories? }. WARNINGS ARE NON-FATAL — gate on the returned `warnings` array (they are also persisted in the " +
         "sidecar), not on success alone; a hard/fail-closed canonicalization returns { success:false, error, warnings } " +
-        "and writes nothing. A missing/unreadable/oversized/directory `in` path is a tool error. ⚠ Offsets + `textHash` " +
+        "and writes nothing. `advisories` (if present) are non-blocking (e.g. the `.docx` resolves outside the carrying " +
+        "checkout, so `derivedFrom` won't resolve in a clone lacking it). A missing/unreadable/oversized/directory `in` " +
+        "path is a tool error. ⚠ Offsets + `textHash` " +
         "are comparable only within one canonicalization-rule version — regenerate the anchor if the source changes.",
       inputSchema: {
         in: z
@@ -1161,6 +1164,7 @@ function runCanonicalizeSource(args: { in: string; out?: string }): {
             offsetUnit: result.offsetUnit,
             byteLength: result.byteLength,
             warnings: result.warnings,
+            ...(result.advisories ? { advisories: result.advisories } : {}),
           },
           null,
           2,

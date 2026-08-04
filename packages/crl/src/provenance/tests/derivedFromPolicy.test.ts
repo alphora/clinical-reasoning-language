@@ -1,7 +1,7 @@
 // #250 Todo B — the pure lexical `derivedFrom` classifier. The one home the producer, detectors, and normalizer share.
 import { join, resolve } from "node:path";
 
-import { classifyDerivedFrom, toCarrierRelative } from "../derivedFromPolicy";
+import { classifyDerivedFrom, samePath, toCarrierRelative } from "../derivedFromPolicy";
 
 describe("classifyDerivedFrom (#250 Todo B)", () => {
   it("accepts carrier-relative POSIX paths as ok", () => {
@@ -93,4 +93,17 @@ describe("toCarrierRelative (#250 Todo A)", () => {
       if (!r.ok) expect(r.reason).toBe("no-carrier-relative-representation");
     },
   );
+});
+
+describe("samePath (#250 A-hardening — the producers' overwrite-guard identity)", () => {
+  it("distinct files differ; identical / CWD-equivalent paths match", () => {
+    expect(samePath("/a/b/x.docx", "/a/b/y.docx")).toBe(false);
+    expect(samePath("/a/b/x.docx", "/a/b/x.docx")).toBe(true);
+    expect(samePath("a/./x.docx", "a/x.docx")).toBe(true); // resolved vs CWD before compare
+  });
+  it("folds case on case-insensitive filesystems (win32 / darwin), stays case-sensitive on Linux", () => {
+    const r = samePath("/a/b/X.docx", "/a/b/x.docx");
+    const caseInsensitive = process.platform === "win32" || process.platform === "darwin";
+    expect(r).toBe(caseInsensitive);
+  });
 });

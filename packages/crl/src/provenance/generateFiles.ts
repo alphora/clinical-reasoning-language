@@ -20,6 +20,7 @@ import { resolveCelImports } from "../cel/imports";
 import type { AnchorSourceMeta, ProvenanceArtifact } from "./artifact";
 import { CANONICALIZER_NAME, CANONICALIZER_VERSION } from "./canonicalize";
 import { classifyDerivedFrom, toCarrierRelative } from "./derivedFromPolicy";
+import { repoEscapeAdvisory } from "./repoEscape";
 import {
   generateProvenanceScaffold,
   mergeScaffold,
@@ -166,6 +167,10 @@ export function generateProvenanceFiles(
     );
   }
   const anchorSource = anchorMetaFor(anchorPath, anchorText, carrierDir);
+
+  // #250 A-hardening (P1/T11) — advise (non-blocking) when the anchor resolves outside the carrying checkout.
+  const escape = repoEscapeAdvisory(anchorPath, carrierDir);
+  if (escape) advisories.push(escape);
 
   const graph = resolveCelImports(celPath);
   // policyId = the covered library name (the scaffold's spine). A null coversName means there is no policy anchor: the

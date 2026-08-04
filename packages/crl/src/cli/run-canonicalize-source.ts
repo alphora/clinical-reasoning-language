@@ -61,5 +61,6 @@ if (!result.ok) {
 }
 
 for (const w of result.warnings) console.error(`warning [${w.kind}]: ${w.message}`);
+for (const a of result.advisories ?? []) console.error(`advisory: ${a}`);
 console.error(`wrote ${result.txtPath} (${result.byteLength} bytes) + ${result.metaPath}`);
 process.exit(0);
