@@ -12,9 +12,12 @@ reuse the CRE addressing).
 ## 1. Artifact
 One file per encoding+version (sidecar; links **captured at authoring time**, never reconstructed post-hoc):
 ```jsonc
-{ "schemaVersion": "1.0", "policyId": "RX501.147", "policyVersion": "2026-05-15",
+{ "schemaVersion": "1.1", "policyId": "RX501.147", "policyVersion": "2026-05-15",
   "anchorSource": {…/*§6*/}, "items": [/*§2*/], "ignoredRanges": [/*§4*/], "clusters": [/*§3*/] }
 ```
+**schemaVersion (see §12):** current writers emit **`"1.1"`** — the versioned envelope that carries the
+`anchorSource.derivedFromContract` marker. Readers still accept legacy marker-less **`"1.0"`** (a fail-closed loader
+rejects any *unknown* version rather than reinterpreting it). A `"1.1"` artifact MUST carry a valid marker.
 
 ## 2. Items
 ```jsonc
@@ -79,7 +82,9 @@ Walks the AST (declarations via the closure resolver `celSymbolsIndex` — NOT t
 - **ownership mapping (manifest-based; engine resolver authoritative):** `shared-reference` ⇔ the library is declared in the policy `package.json` `crl.sharedLibraries[]` (by library name) OR resolves from a package (origin `package`/node_modules); else `policy-owned`. (Supersedes the earlier "by resolved path" wording: the corpus vendors shared libs as local siblings, indistinguishable by `IndexedDeclaration.origin` — both `local` — so an explicit manifest is the signal; the package arm is forward-compat.) The indexer anchors on `coversTarget` as the policy and **warns** on any local library that is neither the covered policy nor manifest-declared (silent `policy-owned` default would cause false over-reach / false decision-implement).
 
 ## 6. anchor-source canonicalization (net-new tooling; CRL-tools capability, KELP-invoked)
-Deterministic read-only canonical-TEXT rendering of the immutable `refined-source` (.docx). Metadata block: `{ path, derivedFrom, derivedFromHash, canonicalizer, canonicalizerVersion, textHash, offsetUnit:"utf8-byte", unicodeNormalization:"NFC", rangeConvention:"half-open" }` (sidecar `<name>.anchormeta.json` — never an inline header, which would live inside the offset space). Determinism contract (golden-tested): pinned extractor+version; document order; explicit headers/footers/footnotes/tracked-changes policy (v1: body + tables only — verified safe: the real refined-source `.docx` carry empty footnotes/headers; warn if an excluded part ever holds text); **`<w:t>` content taken verbatim (never whitespace-collapsed; `xml:space` ignored), runs/`<w:t>` concatenated with no separator**; fixed `\n` line-endings; **NFC before hash+offsets**, but otherwise **preserve visible characters — do NOT lossy-fold smart-quotes / nbsp / dashes** (ASCII-folding would shift offsets off the text a human sees); utf8-byte half-open. JS is UTF-16 → consumers MUST use `sliceUtf8Bytes` / `byteOffsetToDisplayRange` (col = UTF-16 code units; hard-error on a mid-char offset), never `text.slice`.
+Deterministic read-only canonical-TEXT rendering of the immutable `refined-source` (.docx). Metadata block: `{ path, derivedFrom, derivedFromContract, derivedFromHash, canonicalizer, canonicalizerVersion, textHash, offsetUnit:"utf8-byte", unicodeNormalization:"NFC", rangeConvention:"half-open" }` (sidecar `<name>.anchormeta.json` — never an inline header, which would live inside the offset space).
+
+**`derivedFrom` is CARRIER-RELATIVE + POSIX (see §12):** a `/`-separated path relative to the directory of the file that *carries* it (the artifact JSON, or the `.anchormeta.json` sidecar) — never absolute, drive-qualified, `file://`, or `\`-separated (those are dead off the authoring machine). **`derivedFromContract`** names the contract: `"upstream-source"` (`derivedFrom` names an upstream `.docx`; `derivedFromHash` = that document's bytes) or `"anchor-self"` (Model A: `derivedFrom` names the canonical `.txt` itself; `derivedFromHash === textHash`). For a legacy marker-less record the contract is INFERRED from the **tell** `derivedFromHash === textHash ⇒ anchor-self, else upstream-source`; a `.anchormeta.json` sidecar (which has no `schemaVersion`) is `upstream-source` **by construction**, and legacy vs new is discriminated by marker presence. Determinism contract (golden-tested): pinned extractor+version; document order; explicit headers/footers/footnotes/tracked-changes policy (v1: body + tables only — verified safe: the real refined-source `.docx` carry empty footnotes/headers; warn if an excluded part ever holds text); **`<w:t>` content taken verbatim (never whitespace-collapsed; `xml:space` ignored), runs/`<w:t>` concatenated with no separator**; fixed `\n` line-endings; **NFC before hash+offsets**, but otherwise **preserve visible characters — do NOT lossy-fold smart-quotes / nbsp / dashes** (ASCII-folding would shift offsets off the text a human sees); utf8-byte half-open. JS is UTF-16 → consumers MUST use `sliceUtf8Bytes` / `byteOffsetToDisplayRange` (col = UTF-16 code units; hard-error on a mid-char offset), never `text.slice`.
 
 ## 7. CEL case addressing
 Add a stable `CELCase.caseId` to the grammar (bounded, like #135 — DONE, T4.2). Provenance addresses by `caseId` (name = display). Relink-on-rename rejected (no CEL rename provider). Fact ids deferred.
@@ -90,7 +95,7 @@ Add a stable `CELCase.caseId` to the grammar (bounded, like #135 — DONE, T4.2)
 - **§8 boundary (SETTLED):** freezing a case *identity* is **outside** §8's "no auto-migration" prohibition (which scopes to refined-/anchor-source *offset* relink across versions). Identity-minting is orthogonal to offset migration. The "no silent source mutation" spirit is honored by the author-time mechanism above.
 
 ## 8. Versioning + relink
-`refined-source`/`anchor-source` immutable per version; offsets valid only within a version. New version → **diff-assisted relink**, NOT auto-migration; triggered by **content/hash mismatch**, never path/name-lookup-success (stale `nodeId` resolves to the wrong node). `relinkHints` (rename AND split/merge/branch-reshape) are **provenance-only, non-authoritative, non-covering** — never satisfy a link alone; missing/stale → manual `needs-relink`, never auto-accept. **Match rank: name → code/text → shape** (shape tiebreaker only — the K1 split changes shape while preserving the criterion).
+`refined-source`/`anchor-source` immutable per version; offsets valid only within a version. New version → **diff-assisted relink**, NOT auto-migration; triggered by **content/hash mismatch**, never path/name-lookup-success (stale `nodeId` resolves to the wrong node). `relinkHints` (rename AND split/merge/branch-reshape) are **provenance-only, non-authoritative, non-covering** — never satisfy a link alone; missing/stale → manual `needs-relink`, never auto-accept. **Match rank: name → code/text → shape** (shape tiebreaker only — the K1 split changes shape while preserving the criterion). The `schemaVersion` envelope (`"1.0"` → `"1.1"` + the `derivedFromContract` marker, §12) is orthogonal to offset relink: it versions the *record shape*, not the source offsets, and a fail-closed loader rejects an unknown version rather than reinterpreting it.
 
 ## 9. Validators
 - **Referential integrity** — refs resolve via the **engine's resolution path** (so shared-references resolve).
@@ -107,9 +112,75 @@ Composite coverage of mis-tags = §9.2 ∪ over-reach ∪ §9.1 (§4).
 AST provenance indexer + `resolveCrlNodeRef` + `decisionReachability` + nodeKind/ownership derivation; `anchor-source`
 canonicalizer (KELP-invoked, golden-tested, UTF-8 helpers); CEL `caseId` grammar change + deterministic backfill; the
 §9 validator set (incl. drivesDetermination ancestor check, the two-mechanism guardrail, source-ack union); two-sense
-coverage derivation.
+coverage derivation. **The #250 `derivedFrom` portability gate (§12):** the carrier-relative producer + the
+`derived-from-*` validator family + the `normalize_provenance` repair tool (CLI `crl-normalize-provenance`).
 
 ## 11. Status
 KE items (#159) + SW rounds 1 & 2 folded. **Converged** (round-2: additive completeness only, no rejected directions).
 Build-ready pending: the anchor-source canonicalizer prerequisite, and (held) Track A (#134). Optional light round-3
 confirm of v0.3; otherwise → T4 build.
+
+## 12. `derivedFrom` portability gate (#250)
+*Amendment (2026-08): §1/§6/§8 above have been UPDATED to the #250 schemaVersion-1.1 model; this section is the
+consolidated home for the carrier-relative convention, the finding taxonomy, and the normalizer. The §1–§11 review
+metadata predates #250.*
+
+The provenance record's back-pointer to its source (`anchorSource.derivedFrom`) must be expressed **portably** —
+resolvable relative to its own carrier, not tied to the authoring machine's absolute paths. #250 makes that a validated
+convention.
+
+**The convention.** `derivedFrom` is **carrier-relative + POSIX**: a `/`-separated path relative to the *directory of the
+file that carries it* (the artifact JSON, or the `.anchormeta.json` sidecar) — no repo-root/`.git` discovery,
+worktree-independent. Absolute, drive-qualified (`C:\…`, `C:/…`, `C:foo`), URI-scheme (`file://…`), and `\`-separated
+paths are rejected — they are dead off the authoring machine. **A leading `../` is LEGAL** (a `../sibling/anchor.txt`
+layout is portable within a checkout that holds both) — do not "fix" it.
+
+**The envelope + contract.** A `schemaVersion:"1.1"` artifact carries `anchorSource.derivedFromContract`
+(`"upstream-source"` | `"anchor-self"`, §6). Readers accept legacy marker-less `"1.0"`; a fail-closed loader rejects an
+*unknown* version. For a marker-less record the contract is inferred from the **tell** (`derivedFromHash === textHash ⇒
+anchor-self, else upstream-source`) — which is why `derived-from-contract-mismatch` below reads as a *tell-vs-marker*
+disagreement (whereas `derived-from-sidecar-disagreement` is an oracle-vs-oracle mismatch between the two records).
+
+**The gate — `validate_provenance` findings.** All are `class:"integrity"`. Severity is **state-conditional**: graded a
+non-blocking `warning` during the #250 transition window, and a hard `error` from the bundled #250 delivery onward.
+- *lexical (pure):* `derived-from-absolute`, `derived-from-malformed` (path not carrier-relative POSIX),
+  `derived-from-oracle-malformed` (`derivedFromHash` not a well-formed `sha256:<64 hex>`).
+- *artifact→source (fs):* `derived-from-unresolved` (the source is not in this clone), `derived-from-source-unreadable`,
+  `derived-from-hash-mismatch` (the source's bytes ≠ the recorded oracle — a content change, or an un-smudged git-LFS
+  pointer).
+- *contract:* `derived-from-contract-mismatch` (the marker contradicts the hash tell).
+- *artifact↔sidecar:* `derived-from-sidecar-disagreement` (the artifact and the sidecar record different upstream
+  oracles), `derived-from-sidecar-malformed`, `derived-from-sidecar-unreadable`.
+
+**The normalizer — repair, and the readiness signal.** When a `derived-from-*` finding fires on a legacy corpus, do NOT
+hand-edit the path — run **`normalize_provenance`** (CLI **`crl-normalize-provenance`**). It rewrites `derivedFrom`
+carrier-relative and stamps the 1.1 marker, **oracle-verified** (it re-reads and re-hashes the written bytes). Repair is
+**per-record**: it writes each verified record and leaves each **worklisted** record **byte-untouched** — so one run can
+rewrite the artifact yet worklist its sidecar. **Exit 0 / `fullyNormalized:true`** = every processed record was rewritten
+and oracle-verified; **exit 2** = a residual worklist remains (records in the *same* run may already be written). Split
+the residue: a **dead upstream path** is retry-actionable — re-run with `--search-root <dir>` (one bounded,
+filesystem-safe walk that relocates the source by hash); a **hash mismatch, cross-drive source, marker/tell disagreement,
+or ambiguous discovery** needs a human. `--dry-run` computes the same status writing nothing (the corpus "how much
+residue is left" probe). Normalize processes **one artifact (plus its discovered sidecar), or one standalone sidecar, per
+invocation** — corpus-wide enumeration is external. **Always re-run `validate_provenance` after:** normalize verifies each
+record's own source trail (the artifact→source hash), but the artifact↔sidecar oracle cross-check
+(`derived-from-sidecar-disagreement`) runs only in validate — so a clean exit 0 is not, by itself, a full-gate pass.
+
+**Residual limitations (what the gate does NOT close).**
+- **Cross-drive source:** a source on a *different volume* than its carrier (e.g. a `.docx` on `C:` while the checkout is
+  on `E:`) has NO carrier-relative representation — the producer fails loudly and the normalizer worklists it. Bring the
+  source onto the carrier's volume/checkout, or accept the record as non-portable.
+- **Same-volume, outside the checkout:** a source outside the checkout but on the same volume IS representable (via
+  `../…`), so it *passes* on the authoring machine — but a fresh clone will not contain it. The gate proves a valid
+  carrier-relative *string*; it does **not** establish that the referenced file is committed/transferred with the
+  checkout. Portability still requires the source to travel with the clone. (The producer and normalizer emit a
+  best-effort out-of-tree *advisory* for such a path — a signal, not a gate failure.)
+- **The sidecar's own `derivedFrom`:** `validate_provenance` gates the *artifact's* `derivedFrom` (resolve + hash) and
+  cross-checks the sidecar's recorded *oracle* against the artifact's, but it does **not** re-resolve or re-hash the
+  *sidecar's own* `derivedFrom` path — that repair is the normalizer's job. An absolute/dead path stored *only* in a
+  sidecar is fixed by normalizing, not caught by the validate gate.
+
+**Reporting caveat.** A residual worklist count observed *after* normalization measures the records that could not be
+repaired by tool — the **post-repair residual**, NOT the original defect prevalence. Do not cite "N records still
+flagged" as evidence the problem was small; the pre-repair count was higher. (A concrete corpus figure comes from the H
+`--dry-run` sweep, not from this spec.)

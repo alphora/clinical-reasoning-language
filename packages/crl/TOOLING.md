@@ -75,13 +75,13 @@ Lowest-friction path if you want the language server, validation, and the MCP to
    ```bash
    code --install-extension crl-language-support-X.Y.Z.vsix --force
    ```
-3. Open VS Code in any workspace. The extension activates automatically (via `onStartupFinished`) and writes the `crl` server into `<workspace>/.mcp.json`. Any MCP host (Claude Code, etc.) picks up the 7 tools on its next start.
+3. Open VS Code in any workspace. The extension activates automatically (via `onStartupFinished`) and writes the `crl` server into `<workspace>/.mcp.json`. Any MCP host (Claude Code, etc.) picks up all 18 tools on its next start.
 
 ### Option B — npm tarball (`.tgz`) — for host apps + downstream code
 
 The tarball delivers three surfaces in one package — pick whichever fits your call site:
 
-- **CLI binaries** — `crl-emit` and `crl-validate` land in your project's `node_modules/.bin/`. The right vector for a host application or build pipeline (KELP-style use) that wants to script the CLI deterministically. See [Using the CLI with a project filesystem](#using-the-cli-with-a-project-filesystem) below.
+- **CLI binaries** — `crl-emit`, `crl-validate`, the four provenance bins (`crl-canonicalize-source`, `crl-generate-provenance`, `crl-validate-provenance`, `crl-normalize-provenance`), plus lexer/AST helpers land in your project's `node_modules/.bin/`. The right vector for a host application or build pipeline (KELP-style use) that wants to script the CLI deterministically. See [Using the CLI with a project filesystem](#using-the-cli-with-a-project-filesystem) and [Provenance tools](#provenance-tools) below.
 - **Library API** — typed in-process access to the same primitives the CLI uses (`tokenizeCRL`, `buildCRL`, `validateCRL`, `emitCQL`, `emitCelToFhir`, `emitFhirDefFromPath`, …). The right vector when you're **embedding CRL into your own tool** — another VS Code extension, a web service, a notebook, a custom validator. See [Library API](#library-api) below.
 - **MCP server bin** — `crl-mcp` lands in `node_modules/.bin/` too, in case you want to point another MCP host at this package's stdio server without going through the bundled VS Code extension.
 
@@ -192,7 +192,7 @@ esac
 
 ## MCP reference
 
-The bundled MCP server registers **7 tools** for interactive AI workflows. Each returns a JSON envelope on success; invalid arguments (XOR violation, unreadable path, oversized input) come back as a tool error.
+The bundled MCP server registers **18 tools** for interactive AI workflows. The **7 CRL-authoring tools** are detailed in the table below; the **5 provenance tools** in [Provenance tools](#provenance-tools); the remaining six (`emit_crl`, `run_decision`, `render_scenario`, `authoring_kit`, `create_flag`, `set_flag_status`) are registered but not yet detailed in this reference (a known documentation gap). Each returns a JSON envelope on success; invalid arguments (XOR violation, unreadable path, oversized input) come back as a tool error.
 
 | Tool | Input | Returns | Use when |
 |---|---|---|---|
@@ -422,6 +422,33 @@ npx crl-validate --path src/crl/cms22.crl
 ```
 
 The atomic two-lane contract on `--target fhir-def` is the load-bearing piece: a single CRL change regenerates `src/cql/` and `src/fhir/` together so `Library.content` URLs never drift out of sync.
+
+---
+
+## Provenance tools
+
+The provenance pipeline links a policy's narrative ↔ CRL ↔ CEL into an auditable artifact (spec: [`docs/provenance-spec.md`](../../docs/provenance-spec.md); KE loop: [`docs/provenance-authoring-handoff.md`](../../docs/provenance-authoring-handoff.md)). Four CLI bins and five MCP tools.
+
+The artifact's `derivedFrom` source back-pointer is **carrier-relative + POSIX** so it is expressed portably, not tied to the authoring machine (#250, spec §12). `validate_provenance` emits `derived-from-*` findings — a non-blocking warning during the transition window, a hard error from the #250 delivery onward; repair a flagged legacy record with `normalize_provenance`, never hand-edit the path.
+
+### CLI binaries
+
+| Bin | Does |
+|---|---|
+| `crl-canonicalize-source` | `.docx` → canonical `.txt` + `<name>.anchormeta.json` sidecar (an `upstream-source` record — `derivedFrom` names the `.docx`). |
+| `crl-generate-provenance` | scaffold / merge a provenance artifact from the CRL+CEL closure (Model-A `anchor-self` — `derivedFrom` names the `.txt`). |
+| `crl-validate-provenance` | run the §9 validators + the #250 `derived-from-*` gate; `--worklist` for the in-progress backlog view. |
+| `crl-normalize-provenance` | repair a legacy record: rewrite `derivedFrom` carrier-relative + stamp the 1.1 marker, oracle-verified (per-record — verified records are written, worklisted ones byte-untouched). **Exit 0** = every record normalized; **exit 2** = residue remains (a dead upstream path → re-run with `--search-root <dir>`; a hash mismatch / cross-drive source / marker-tell disagreement → adjudicate). `--dry-run` reports the status writing nothing. Re-run `validate_provenance` after (the artifact↔sidecar cross-check runs only in validate). One artifact (+ its sidecar), or one standalone sidecar, per invocation. |
+
+### MCP tools
+
+| Tool | Input | Returns |
+|---|---|---|
+| `canonicalize_source` | `.docx` path (+ optional out path) | the written `.txt` + sidecar paths |
+| `generate_provenance` | artifact / CEL context | the scaffold artifact (or a summary envelope) |
+| `validate_provenance` | artifact + cel + anchor paths | findings + counts (FINAL gate) |
+| `validate_provenance_worklist` | artifact + cel + anchor paths | findings + counts (worklist mode — the attribution backlog softened to warnings) |
+| `normalize_provenance` | artifact path OR a standalone `sidecar` (+ optional `anchor` override, `searchRoot`, `dryRun`) | the repair result (`fullyNormalized` + the worklist of unrepairable records) |
 
 ---
 

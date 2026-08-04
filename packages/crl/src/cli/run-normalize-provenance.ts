@@ -21,7 +21,8 @@ import { normalizeProvenanceFiles } from "../provenance";
  * record, an ambiguous or not-found discovery — are WORKLISTED, never rewritten. E leaves such records byte-untouched.
  *
  * Exit codes (distinct so CI separates "migration incomplete" from "crashed"):
- *   0 = every processed record is now normalized (the worklist is empty) — these carriers will pass the H gate;
+ *   0 = every processed record is now normalized (the worklist is empty) — these carriers pass the C-family trail checks
+ *       (the D2 artifact↔sidecar oracle cross-check still runs in validate_provenance, not here);
  *   2 = a clean run, but the worklist is non-empty (residue remains — re-run with discovery / adjudicate);
  *   1 = an operational error (bad args, an unloadable carrier, a write failure, or a post-write revalidation failure).
  * `--dry-run` computes the SAME readiness status from the planned outcomes (writing nothing) — it is 0/2, never a blanket 0.

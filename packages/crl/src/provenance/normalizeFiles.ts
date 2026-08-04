@@ -25,7 +25,7 @@
  *    else upstream-source`) ONLY when the record has no marker; a marker that CONTRADICTS the tell is worklisted, not replaced.
  *  - POST-WRITE REVALIDATE carries C's check itself (C does not exist yet): re-read the written bytes, re-load fail-closed,
  *    resolve the stored `derivedFrom` against the new carrier, require a regular file, and re-hash it against `derivedFromHash`.
- *    This is what makes "E exited 0 ⇒ the H gate will pass" true.
+ *    This is what makes "E exited 0 ⇒ the C-family trail checks pass" true (the D2 artifact↔sidecar cross-check runs in validate, not here).
  *
  * Reuses the shipped machinery: `classifyDerivedFrom` / `toCarrierRelative` / `samePath` / `isWellFormedSha256`
  * (derivedFromPolicy), `parseProvenanceArtifact` / `parseAnchorMeta` (the fail-closed loaders), `repoEscapeAdvisory`

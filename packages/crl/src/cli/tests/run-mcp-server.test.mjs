@@ -240,8 +240,8 @@ try {
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
-    assert.equal(kit.schemaVersion, "1.14"); // …/#212 4c flags→store (1.10) … / #215 (1.13) / #230 flags→medical-validation store (1.14)
-    assert.equal(kit.contentHash, "3ff030db20175f478d7927d24f638d823d53a3915bc264d0a8c45c620a623a3f");
+    assert.equal(kit.schemaVersion, "1.15"); // …/#212 4c flags→store (1.10) … / #215 (1.13) / #230 flags→medical-validation store (1.14) / #250 derivedFrom gate teaching (1.15)
+    assert.equal(kit.contentHash, "ab98184979e6483a33dd8fb610a1cd106dd03fd89d8f2b86f3eae8fd6b14d83c");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.
@@ -256,9 +256,9 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.useCase, "prior-auth");
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    assert.equal(kit.schemaVersion, "1.14");
+    assert.equal(kit.schemaVersion, "1.15");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "046b0c9114e7809c09b5cd0e7ee488bcef84bc578bc83e6b6dbbe583497f7c4d");
+    assert.equal(kit.contentHash, "2dcc5468eac3ecbe64b0b2a4cf1aabb9d194b375d912f3839c882f1630354f57");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.equal(refNames.length, 11); // shared medical-policy-determination.crl removed (config-driven local activities)
     assert.ok(!refNames.includes("medical-policy-determination.crl"));

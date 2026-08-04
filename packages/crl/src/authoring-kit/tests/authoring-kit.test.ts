@@ -70,7 +70,11 @@ describe("authoring-kit — reference artifacts", () => {
         name: "authoring-kit-reference",
         version: "1.0.0",
         private: true,
-        crl: { canonicalBase: "http://example.org/authoring-kit-reference", status: "draft", experimental: true },
+        crl: {
+          canonicalBase: "http://example.org/authoring-kit-reference",
+          status: "draft",
+          experimental: true,
+        },
       }),
     );
     writeFileSync(join(dir, "decision-reference.crl"), DECISION_REFERENCE_CRL);
@@ -98,14 +102,22 @@ describe("authoring-kit — reference artifacts", () => {
     // Guard the both-rep SHAPE on BOTH the lower- and upper-bound concept (a regression dropping either compute arm
     // would silently revert it to a plain local boolean — the content hash alone can't catch that, it re-pins on any change).
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/- code is `age-18-or-older`\./);
-    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/- definition is age today at least 18 years\./);
+    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(
+      /- definition is age today at least 18 years\./,
+    );
     // #215 upper bound: the pediatric `under 21` both-rep concept + decision must survive.
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/concept "Patient Under Twenty One Years":/);
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/- code is `under-21`\./);
-    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/- definition is age today under 21 years\./);
-    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/when "Patient Under Twenty One Years" then recommend activity "Approve"/);
+    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(
+      /- definition is age today under 21 years\./,
+    );
+    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(
+      /when "Patient Under Twenty One Years" then recommend activity "Approve"/,
+    );
     // both concepts carry the do-not-persist marker (symmetry — no unsafe asymmetry, panel r1)
-    expect((PATIENT_AGE_BOTH_REP_REFERENCE_CRL.match(/@business-logic-deferred/g) ?? [])).toHaveLength(2);
+    expect(
+      PATIENT_AGE_BOTH_REP_REFERENCE_CRL.match(/@business-logic-deferred/g) ?? [],
+    ).toHaveLength(2);
     // neutral disposition text — a pediatric approval must NOT read "adult"
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).not.toMatch(/APPROVE \/ adult|DENY \/ not an adult/);
   });
@@ -127,7 +139,10 @@ describe("authoring-kit — reference artifacts", () => {
             status: "draft",
             experimental: true,
             dispositions: {
-              options: { certify: { Approve: { label: "Approve" } }, "not-certify": { Deny: { label: "Deny" } } },
+              options: {
+                certify: { Approve: { label: "Approve" } },
+                "not-certify": { Deny: { label: "Deny" } },
+              },
             },
           },
         }),
@@ -192,7 +207,11 @@ describe("authoring-kit — reference artifacts", () => {
     type TNode = {
       concept?: string;
       composition?: unknown;
-      conditionTrace?: { op: string; satisfied: boolean; operands: { op: string; satisfied: boolean; concept?: { name: string } }[] };
+      conditionTrace?: {
+        op: string;
+        satisfied: boolean;
+        operands: { op: string; satisfied: boolean; concept?: { name: string } }[];
+      };
       children?: TNode[];
     };
     const find = (nodes: TNode[], pred: (n: TNode) => boolean): TNode | undefined => {
@@ -209,7 +228,8 @@ describe("authoring-kit — reference artifacts", () => {
     expect(guard.concept).toBeUndefined(); // a compound guard, not a single-concept `when`
     expect(guard.composition).toBeUndefined(); // NOT a `defined as` composite (the retired pre-#224 pattern)
     expect(guard.conditionTrace!.satisfied).toBe(true);
-    const operand = (nm: string) => guard.conditionTrace!.operands.find((o) => o.concept?.name === nm)!;
+    const operand = (nm: string) =>
+      guard.conditionTrace!.operands.find((o) => o.concept?.name === nm)!;
     expect(operand("Failed Drug Therapy").satisfied).toBe(false); // drug absent in this case
     expect(operand("Failed Physical Therapy").satisfied).toBe(true); // PT alone satisfies the distinct-criterion `or`
     // The CONTRAST node (#234 follow-up): "Viral Suppression Documented" is a GENUINE rung-1 `defined as` (one
@@ -217,9 +237,16 @@ describe("authoring-kit — reference artifacts", () => {
     // DOES carry a `composition` (sem-or over the two records) — the artifact's end-to-end proof that the
     // sanctioned `defined as` construct emits + runs. The lab-record approve case satisfies it via the lab arm alone.
     const approveViaLab = run.runs.find((r) => r.case.includes("lab record"))!;
-    const definedAs = find(approveViaLab.trace as TNode[], (n) => n.concept === "Viral Suppression Documented")!;
+    const definedAs = find(
+      approveViaLab.trace as TNode[],
+      (n) => n.concept === "Viral Suppression Documented",
+    )!;
     expect(definedAs).toBeDefined(); // a single-concept `when` on the `defined as` — KEEPS `concept` (not a compound guard)
-    const comp = definedAs.composition as { op: string; satisfied: boolean; operands: { concept: string; satisfied: boolean }[] };
+    const comp = definedAs.composition as {
+      op: string;
+      satisfied: boolean;
+      operands: { concept: string; satisfied: boolean }[];
+    };
     expect(comp).toBeDefined(); // and DOES carry a `composition` — the sem-or inference (mirror of the or-guard's omission)
     expect(comp.op).toBe("sem-or");
     expect(comp.satisfied).toBe(true);
@@ -229,8 +256,14 @@ describe("authoring-kit — reference artifacts", () => {
     // The OTHER arm, inspected directly (not just diagonally): the chart-record approve case satisfies the SAME
     // `defined as` via the chart operand with the lab operand FALSE — proving both sem-or arms independently (panel r1).
     const approveViaChart = run.runs.find((r) => r.case.includes("chart record"))!;
-    const daChart = find(approveViaChart.trace as TNode[], (n) => n.concept === "Viral Suppression Documented")!;
-    const compChart = daChart.composition as { satisfied: boolean; operands: { concept: string; satisfied: boolean }[] };
+    const daChart = find(
+      approveViaChart.trace as TNode[],
+      (n) => n.concept === "Viral Suppression Documented",
+    )!;
+    const compChart = daChart.composition as {
+      satisfied: boolean;
+      operands: { concept: string; satisfied: boolean }[];
+    };
     expect(compChart.satisfied).toBe(true);
     const recChart = (nm: string) => compChart.operands.find((o) => o.concept === nm)!;
     expect(recChart("Viral Load Below Threshold Lab Result").satisfied).toBe(false); // lab absent this case
@@ -238,7 +271,10 @@ describe("authoring-kit — reference artifacts", () => {
     // And the crit-3 DENY path, pinned in-trace (the CEL `result is` oracle can't distinguish same-`Deny` nodes): the
     // no-viral case has dx + failed drug therapy, so ONLY the `defined as` node can fail — assert it does (panel r1).
     const denyNoViral = run.runs.find((r) => r.case.includes("no documented viral suppression"))!;
-    const daDeny = find(denyNoViral.trace as TNode[], (n) => n.concept === "Viral Suppression Documented")!;
+    const daDeny = find(
+      denyNoViral.trace as TNode[],
+      (n) => n.concept === "Viral Suppression Documented",
+    )!;
     expect((daDeny.composition as { satisfied: boolean }).satisfied).toBe(false); // both records absent → the ONE fact is unmet → deny
   });
 
@@ -311,7 +347,13 @@ describe("authoring-kit — reference artifacts", () => {
     // The PATH: the top-level `when "Continuation Request"` branch fired and RECURSED into the delegated sub
     // ("Continuation of Therapy Determination"), whose own `otherwise` produced Deny — NOT the parent's
     // `otherwise`. Membership alone ("Deny") can't distinguish these; the trace shape can.
-    type TNode = { concept?: string; node?: string; nodeId?: string; satisfied?: boolean; children?: TNode[] };
+    type TNode = {
+      concept?: string;
+      node?: string;
+      nodeId?: string;
+      satisfied?: boolean;
+      children?: TNode[];
+    };
     const top = (denyViaSub.trace as TNode[]).find((n) => n.concept === "Continuation Request")!;
     expect(top.satisfied).toBe(true); // the delegating branch fired (vs falling through to the parent otherwise)
     expect((top.children ?? []).length).toBeGreaterThan(0); // it recursed into the delegated sub
@@ -365,7 +407,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.14");
+    expect(kit.schemaVersion).toBe("1.15");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -449,10 +491,18 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(src("pa-determination-reference.crl")).toBe(PA_DETERMINATION_REFERENCE_CRL);
     expect(src("pa-determination-reference.cel")).toBe(PA_DETERMINATION_REFERENCE_CEL);
     expect(src("patient-age-both-rep-reference.crl")).toBe(PATIENT_AGE_BOTH_REP_REFERENCE_CRL);
-    expect(src("source-delegated-decision-reference.crl")).toBe(SOURCE_DELEGATED_DECISION_REFERENCE_CRL);
-    expect(src("source-delegated-decision-reference.cel")).toBe(SOURCE_DELEGATED_DECISION_REFERENCE_CEL);
-    expect(src("disposition-arbitration-reference.crl")).toBe(DISPOSITION_ARBITRATION_REFERENCE_CRL);
-    expect(src("disposition-arbitration-reference.cel")).toBe(DISPOSITION_ARBITRATION_REFERENCE_CEL);
+    expect(src("source-delegated-decision-reference.crl")).toBe(
+      SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
+    );
+    expect(src("source-delegated-decision-reference.cel")).toBe(
+      SOURCE_DELEGATED_DECISION_REFERENCE_CEL,
+    );
+    expect(src("disposition-arbitration-reference.crl")).toBe(
+      DISPOSITION_ARBITRATION_REFERENCE_CRL,
+    );
+    expect(src("disposition-arbitration-reference.cel")).toBe(
+      DISPOSITION_ARBITRATION_REFERENCE_CEL,
+    );
   });
 
   it("artifact edges are CLOSURE-CORRECT: no cpg artifact references ANY prior-auth artifact's library by qualified ref", () => {
@@ -461,7 +511,8 @@ describe("authoring-kit — getAuthoringKit", () => {
     // artifact, then assert no cpg artifact quotes any of them — so a FUTURE prior-auth library referenced from a
     // cpg artifact fails here too.
     const kit = getAuthoringKit(undefined, "prior-auth");
-    const libNameOf = (src: string): string | undefined => /(?:^|\n)\s*library\s+"([^"]+)"/.exec(src)?.[1];
+    const libNameOf = (src: string): string | undefined =>
+      /(?:^|\n)\s*library\s+"([^"]+)"/.exec(src)?.[1];
     const priorAuthLibs = new Set(
       kit.referenceArtifacts
         .filter((a) => a.edge === "prior-auth")
@@ -498,7 +549,8 @@ describe("authoring-kit — getAuthoringKit", () => {
     const ast = parseInput(CRITERIA_DECISION_REFERENCE_CRL) as any;
     const decision = ast.statements.find((s: any) => s.type === "Decision");
     expect(decision).toBeDefined();
-    const whens = (body: any) => (body?.statements ?? []).filter((s: any) => s.type === "WhenBlock");
+    const whens = (body: any) =>
+      (body?.statements ?? []).filter((s: any) => s.type === "WhenBlock");
     const crit1 = whens(decision.body)[0];
     expect(crit1).toBeDefined(); // criterion-1 is a top-level `when` node
     expect(whens(crit1.body).length).toBeGreaterThanOrEqual(1); // criterion-2 is a NESTED `when` node (not a composite)
@@ -555,7 +607,9 @@ describe("authoring-kit — getAuthoringKit", () => {
                 );
               }
             } else {
-              throw new Error(`invariant clause in rule "${rule.id}" has an unresolvable test anchor: "${ref}"`);
+              throw new Error(
+                `invariant clause in rule "${rule.id}" has an unresolvable test anchor: "${ref}"`,
+              );
             }
           }
         }
@@ -583,7 +637,9 @@ describe("authoring-kit — getAuthoringKit", () => {
     // NB: the generic word "prior-auth" legitimately appears in "CRL is general (…CDS, prior-auth, quality…)"
     // framing prose, so it is NOT a PA-content marker — the shared-lib name + X12/HCR01 codes are.
     const { contentHash: _h, ...payload } = cpg;
-    expect(JSON.stringify(payload)).not.toMatch(/Medical Policy Determination|Pended|HCR01|X12|communicated-not-ordered|shared-lib-membership|no-pend/);
+    expect(JSON.stringify(payload)).not.toMatch(
+      /Medical Policy Determination|Pended|HCR01|X12|communicated-not-ordered|shared-lib-membership|no-pend/,
+    );
   });
 
   it("the `dispositions` rule is UN-FUSED — CPG-base only, NO PA `communicated-not-ordered` invariant", () => {
@@ -594,15 +650,21 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(disp.rule).toMatch(/plain `activity`/);
     expect(disp.rule).toMatch(/no approve\/deny\/pend verbs|do not invent/i);
     // The PA invariant is GONE from dispositions (relocated to pa-disposition-set).
-    const paClause = (disp.clauses ?? []).find((c) => c.test === "verifyLoop:communicated-not-ordered");
+    const paClause = (disp.clauses ?? []).find(
+      (c) => c.test === "verifyLoop:communicated-not-ordered",
+    );
     expect(paClause).toBeUndefined();
     // ...and dispositions no longer names the shared PA library.
     expect(disp.rule).not.toMatch(/Medical Policy Determination/);
   });
 
   it("pa-disposition-set carries the config-driven invariants — communicated-not-ordered + configured-membership + finality-by-mode, each a DISTINCT check", () => {
-    const paRule = getAuthoringKit(undefined, "prior-auth").rules.find((r) => r.id === "pa-disposition-set")!;
-    const anchors = (paRule.clauses ?? []).filter((c) => c.force === "invariant").map((c) => c.test);
+    const paRule = getAuthoringKit(undefined, "prior-auth").rules.find(
+      (r) => r.id === "pa-disposition-set",
+    )!;
+    const anchors = (paRule.clauses ?? [])
+      .filter((c) => c.force === "invariant")
+      .map((c) => c.test);
     expect(anchors).toEqual(
       expect.arrayContaining([
         "verifyLoop:communicated-not-ordered",
@@ -658,7 +720,9 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(rule!.rule).toMatch(/duplicate/i);
     // the invented-boundary invariant clause still anchors to the composition lens
     const invented = (rule!.clauses ?? []).find(
-      (c) => c.force === "invariant" && c.test === "judgeLens.composition:invented-determination-boundary",
+      (c) =>
+        c.force === "invariant" &&
+        c.test === "judgeLens.composition:invented-determination-boundary",
     );
     expect(invented).toBeDefined();
   });
@@ -777,8 +841,14 @@ describe("authoring-kit — getAuthoringKit", () => {
     // concept + pediatric decision; the value-type-boolean clause is annotated with #241. BOTH hashes move.
     // #230 (schemaVersion 1.13→1.14): the review-flags rule + examples teach the relocated `medical-validation/flags/` store
     // + a new migration clause (create_flag/set_flag_status refuse a legacy `.crl/flags/` store). BOTH hashes move.
-    expect(cpg.contentHash).toBe("3ff030db20175f478d7927d24f638d823d53a3915bc264d0a8c45c620a623a3f");
-    expect(priorAuth.contentHash).toBe("046b0c9114e7809c09b5cd0e7ee488bcef84bc578bc83e6b6dbbe583497f7c4d");
+    expect(cpg.contentHash).toBe(
+      "ab98184979e6483a33dd8fb610a1cd106dd03fd89d8f2b86f3eae8fd6b14d83c",
+    );
+    // #250 (schemaVersion 1.14→1.15): the PROVENANCE verify-loop note teaches the derivedFrom carrier-relative gate +
+    // normalize_provenance repair. BOTH hashes re-pin (schemaVersion is hashed + the base note inherits into both chains).
+    expect(priorAuth.contentHash).toBe(
+      "2dcc5468eac3ecbe64b0b2a4cf1aabb9d194b375d912f3839c882f1630354f57",
+    );
   });
 
   it("no RETIRED positive doctrine survives anywhere in the serialized payload (#224 anti-half-inversion guard)", () => {
@@ -829,11 +899,15 @@ describe("authoring-kit — getAuthoringKit", () => {
       // (b) the judge lens carries the unit-anchoring-first guidance + a 4th checkpoint
       const lens = kit.judgeLens.composition.find((c) => c.check === "hollowed-criteria")!;
       expect(lens.guidance).toMatch(/APPLY UNIT ANCHORING FIRST/);
-      expect(lens.checkpoints.some((c) => /without using the composite's label/i.test(c))).toBe(true);
+      expect(lens.checkpoints.some((c) => /without using the composite's label/i.test(c))).toBe(
+        true,
+      );
       // (c) the co-occurrence tell rode into the cpg-VISIBLE model prose (conceptLayerModel `defined as`), not
       // only the prior-auth-edge-filtered reference artifact (so a cpg consumer still receives the discriminator)
       const definedAs = kit.conceptLayerModel.find((m) => /defined as/.test(m.form))!;
-      expect(definedAs.meaning).toMatch(/SAME occurrence vs DIFFERENT|records may themselves coexist|SEPARATE underlying events/i);
+      expect(definedAs.meaning).toMatch(
+        /SAME occurrence vs DIFFERENT|records may themselves coexist|SEPARATE underlying events/i,
+      );
     }
   });
 
@@ -841,7 +915,9 @@ describe("authoring-kit — getAuthoringKit", () => {
     const kit = getAuthoringKit("local-decision-support", "prior-auth");
     const ex = kit.examples;
     // the guard-`criterion` replacement (valid), the genuine rung-1 (valid), the vacuity trap (judge-lens invalid)
-    const guardCrit = ex.find((e) => /ALTERNATIVES are joined in the DECISION layer/.test(e.title))!;
+    const guardCrit = ex.find((e) =>
+      /ALTERNATIVES are joined in the DECISION layer/.test(e.title),
+    )!;
     expect(guardCrit.valid).toBe(true);
     expect(guardCrit.snippet).toMatch(/criterion "Failed Conservative Therapy"/);
     expect(guardCrit.snippet).not.toMatch(/defined as/);
@@ -859,7 +935,9 @@ describe("authoring-kit — getAuthoringKit", () => {
     // or-guard (no `defined as` fusing them) — while carrying ONE genuine rung-1 `defined as` (viral suppression:
     // one occurrence recorded two ways) as the sanctioned-construct exemplar (finding 2, kit 1.12).
     expect(CRITERIA_DECISION_REFERENCE_CRL).toMatch(/criterion "Failed Conservative Therapy"/);
-    expect(CRITERIA_DECISION_REFERENCE_CRL).toMatch(/when \( "Failed Drug Therapy" or "Failed Physical Therapy" \)/);
+    expect(CRITERIA_DECISION_REFERENCE_CRL).toMatch(
+      /when \( "Failed Drug Therapy" or "Failed Physical Therapy" \)/,
+    );
     expect(CRITERIA_DECISION_REFERENCE_CRL).not.toMatch(/concept "Failed Conservative Therapy"/);
     // the distinct criteria are NOT fused by `defined as`; the ONLY surviving `defined as` is the genuine
     // rung-1 viral-suppression pair (one clinical state attested two ways). Panel r1 [important], both arms: a
@@ -876,8 +954,12 @@ describe("authoring-kit — getAuthoringKit", () => {
 
   it("#234 follow-up (kit 1.12, finding 1) — decision-composition carries the DNF SIZE note flagging #236 load-bearing", () => {
     for (const uc of ["cpg", "prior-auth"] as const) {
-      const dc = getAuthoringKit("local-decision-support", uc).rules.find((r) => r.id === "decision-composition")!;
-      const size = (dc.clauses ?? []).find((c) => /#236/.test(c.text) && /DISJUNCTIVE NORMAL FORM|DNF/.test(c.text));
+      const dc = getAuthoringKit("local-decision-support", uc).rules.find(
+        (r) => r.id === "decision-composition",
+      )!;
+      const size = (dc.clauses ?? []).find(
+        (c) => /#236/.test(c.text) && /DISJUNCTIVE NORMAL FORM|DNF/.test(c.text),
+      );
       expect(size, `DNF size note missing in ${uc}`).toBeDefined();
       expect(size!.force).toBe("default"); // mechanics/advisory, not an invariant
       expect(size!.text).toMatch(/K×\(S\+1\)|MULTIPLICATIVE/); // the expansion is quantified (K arms, not source-disjunct count)
@@ -927,7 +1009,9 @@ describe("authoring-kit — getAuthoringKit", () => {
   });
 
   it("the pa-disposition-set rule (#134/#167) is STRUCTURAL + config-driven — membership/mutual-exclusivity/finality, naming no activities", () => {
-    const rule = getAuthoringKit(undefined, "prior-auth").rules.find((r) => r.id === "pa-disposition-set");
+    const rule = getAuthoringKit(undefined, "prior-auth").rules.find(
+      (r) => r.id === "pa-disposition-set",
+    );
     expect(rule).toBeDefined();
     expect(rule!.edge).toBe("prior-auth");
     // config-driven membership (no shared library) + the never-CPGServiceRequest guard
@@ -997,16 +1081,30 @@ describe("authoring-kit — review-flag + @gap-filed required fields are enforce
     expect(r.reason).toBe("missing-field");
   });
   it("@gap-filed WITHOUT `; ref` → meta-missing-field (a NON-flag `.crl` tag, still validator-enforced)", () => {
-    expect(crlErrors(conceptWith("@gap-filed: eGFR normalization not expressible")).map((e) => e.kind)).toContain(
+    expect(
+      crlErrors(conceptWith("@gap-filed: eGFR normalization not expressible")).map((e) => e.kind),
+    ).toContain("meta-missing-field");
+  });
+  it("well-formed @fidelity-defect (+ `; direction`) validates; @gap-filed (+ `; ref`) raises NO missing-field error", () => {
+    expect(
+      validateFlagFields({
+        tag: "fidelity-defect",
+        gist: "x",
+        fields: { direction: "over-reach", ref: "#207" },
+      }).ok,
+    ).toBe(true);
+    expect(crlErrors(conceptWith("@gap-filed: x; ref #180")).map((e) => e.kind)).not.toContain(
       "meta-missing-field",
     );
   });
-  it("well-formed @fidelity-defect (+ `; direction`) validates; @gap-filed (+ `; ref`) raises NO missing-field error", () => {
-    expect(validateFlagFields({ tag: "fidelity-defect", gist: "x", fields: { direction: "over-reach", ref: "#207" } }).ok).toBe(true);
-    expect(crlErrors(conceptWith("@gap-filed: x; ref #180")).map((e) => e.kind)).not.toContain("meta-missing-field");
-  });
   it("the taught optional `; ref` is VOCAB-MODELED on ALL FIVE flag tags — proven via the accessor", () => {
-    for (const tag of ["customer-confirmable", "internal-inconsistency", "open-fork", "fidelity-defect", "validation-concern"]) {
+    for (const tag of [
+      "customer-confirmable",
+      "internal-inconsistency",
+      "open-fork",
+      "fidelity-defect",
+      "validation-concern",
+    ]) {
       const ref = flagFieldRulesOf(tag).find((r) => r.key === "ref");
       expect(ref).toBeDefined();
       expect(ref?.required).toBe(false);
@@ -1033,7 +1131,8 @@ describe("authoring-kit — the review-flags rule teaches the `medical-validatio
   });
 
   // The former-flag-tag `- meta is` construction, anywhere (rule prose OR an example) — the structural regression signal.
-  const FLAG_META_LINE = /-\s*meta is\s*`@(customer-confirmable|internal-inconsistency|open-fork|fidelity-defect|validation-concern)\b/;
+  const FLAG_META_LINE =
+    /-\s*meta is\s*`@(customer-confirmable|internal-inconsistency|open-fork|fidelity-defect|validation-concern)\b/;
 
   it("the DEAD `.crl`-meta flag teaching is gone from the WHOLE payload (prose + examples), not just a couple phrases", () => {
     expect(payload).not.toMatch(FLAG_META_LINE); // no "author a flag as `- meta is `@open-fork…`" reworded anywhere
@@ -1046,18 +1145,34 @@ describe("authoring-kit — the review-flags rule teaches the `medical-validatio
     const toolCallExamples = kit.examples.filter((e) => /create_flag/.test(e.snippet));
     expect(toolCallExamples.length).toBeGreaterThan(0);
     for (const e of toolCallExamples) expect(e.language).toBe("text");
-    const teachesCrlFlag = kit.examples.some((e) => e.language === "crl" && FLAG_META_LINE.test(e.snippet));
+    const teachesCrlFlag = kit.examples.some(
+      (e) => e.language === "crl" && FLAG_META_LINE.test(e.snippet),
+    );
     expect(teachesCrlFlag).toBe(false);
   });
 
   it("the `text` create_flag examples reference only real tool args + real flag fields (catches a stale/renamed key)", () => {
     // Every `<key>:` token in a create_flag illustration must be a real create_flag arg OR a real flagVocab field — so a
     // renamed arg (e.g. gist→summary) or a bogus field surfaces here (gpt55 + Claude impl review).
-    const toolArgs = new Set(["path", "code", "kind", "name", "library", "tag", "gist", "fields", "status"]);
+    const toolArgs = new Set([
+      "path",
+      "code",
+      "kind",
+      "name",
+      "library",
+      "tag",
+      "gist",
+      "fields",
+      "status",
+    ]);
     const flagFields = new Set(
-      ["customer-confirmable", "internal-inconsistency", "open-fork", "fidelity-defect", "validation-concern"].flatMap((t) =>
-        flagFieldRulesOf(t).map((r) => r.key),
-      ),
+      [
+        "customer-confirmable",
+        "internal-inconsistency",
+        "open-fork",
+        "fidelity-defect",
+        "validation-concern",
+      ].flatMap((t) => flagFieldRulesOf(t).map((r) => r.key)),
     );
     for (const e of kit.examples.filter((ex) => /create_flag/.test(ex.snippet))) {
       const keys = [...e.snippet.matchAll(/\b([a-z][a-z-]*)\s*:/g)].map((m) => m[1]);

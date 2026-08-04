@@ -3,8 +3,9 @@
 **Goal:** author ONE policy's provenance artifact (start with `rx501-147`) and drive it to a clean
 `crl-validate-provenance` run. This proves the agent-authors → validate loop end-to-end.
 
-**Authority:** `docs/provenance-spec.md` §1–§9 is the source of truth for the schema + every rule (roles, coverage,
-the §9 checks). This handoff is the *protocol*, not a re-statement of the rules — read the spec for the "what."
+**Authority:** `docs/provenance-spec.md` §1–§12 is the source of truth for the schema + every rule (roles, coverage,
+the §9 checks, the §12 `derivedFrom` portability gate). This handoff is the *protocol*, not a re-statement of the rules —
+read the spec for the "what."
 
 **Division of labor:** the KE authors the artifact + declares the manifest + freezes caseIds (all in `crl-content`); the
 tools side runs/wires `crl-validate-provenance` and iterates findings with the KE. Loop until zero error-severity findings
@@ -22,11 +23,26 @@ real `ProvenanceArtifact`/`Cluster`/`CrlNodeRef`/`CelNodeRef` literals + the sha
    Without it the vendored shared activities (Approve/Deny) read as `policy-owned` and get falsely flagged over-reach.
 3. **Author the artifact** JSON (schema §1) — see "Authoring" below.
 4. **Validate:** `crl-validate-provenance --artifact <a.json> --cel <policy.cel> --anchor <anchor-source.txt>`.
-5. **Iterate** on findings (see "Reading findings") until PASS, then review manual-review/warning.
+5. **Normalize if the source trail is flagged (#250):** if validate emits a `derived-from-*` finding on a legacy or
+   hand-edited record, run `crl-normalize-provenance --artifact <a.json>` (add `--search-root <dir>` if the upstream
+   source moved) — it rewrites `derivedFrom` carrier-relative + stamps the 1.1 marker, oracle-verified, writing each
+   verified record and leaving worklisted ones byte-untouched. **Exit 0** = every record normalized; **exit 2** = residue
+   remains (a dead upstream path → re-run with `--search-root <dir>`; a hash mismatch / cross-drive source / marker-tell
+   disagreement → adjudicate by hand). Do NOT hand-edit the path. **Re-run validate afterward** — normalize checks each
+   record's own source trail, but the artifact↔sidecar cross-check runs only in validate. (`--dry-run` reports the same
+   status without writing.)
+6. **Iterate** on findings (see "Reading findings") until PASS, then review manual-review/warning.
 
 ## Authoring the artifact (schema §1–§4, §6–§7)
-- **anchorSource:** copy the policy's `<name>.anchormeta.json` block verbatim (path/derivedFrom/derivedFromHash/
-  textHash/offsetUnit/unicodeNormalization/rangeConvention). The validator recomputes the text hash → drift if it differs.
+- **anchorSource:** the PRODUCER writes this — do not hand-author it. `crl-canonicalize-source` writes the
+  `<name>.anchormeta.json` sidecar as an **`upstream-source`** record (`derivedFrom` → the upstream `.docx`);
+  `generate_provenance` writes the artifact's `anchorSource` as a Model-A **`anchor-self`** record (`derivedFrom` → the
+  canonical `.txt`). **Do NOT copy one carrier's block verbatim into the other (#250):** `derivedFrom` is
+  CARRIER-RELATIVE, so the same string is valid only relative to *its own* file's directory — pasting the sidecar's block
+  into an artifact that lives in a different directory silently re-points or kills the path, and transplanting the
+  sidecar's `upstream-source` contract onto a generated artifact erases the `anchor-self` distinction. Preserve the
+  producer-authored `anchorSource`; if validate flags `derived-from-*`, normalize (loop step 5), never hand-edit. The
+  validator recomputes the text hash → `anchor-hash-drift` if it differs.
 - **items[]** — one per narrative clause (§2):
   - `origin:"source"` ⇒ ≥1 `sourceRefs` (utf8-**byte**, half-open `[start,end)` into the anchor-source text — NOT char
     offsets; multibyte matters). `item.text` MUST equal the NFC bytes at those offsets (validator: `item-text-drift`).
@@ -62,6 +78,9 @@ real `ProvenanceArtifact`/`Cluster`/`CrlNodeRef`/`CelNodeRef` literals + the sha
 - `nodekind-mismatch`/`ownership-mismatch` → the ref's stored kind/ownership disagrees with the index; fix the ref.
 - `anchor-hash-drift`/`item-text-drift` → the anchor text or an item's text doesn't match the bytes; re-derive.
 - `drives-determination-*` → fix the edge (ancestor structure / target is a determination item / both endpoints have nodeIds).
+- `derived-from-*` (#250) → the source back-pointer isn't portable (an absolute / `\` / cross-carrier path, a moved or
+  changed source, or an artifact↔sidecar oracle disagreement). Run `crl-normalize-provenance` (loop step 5); do NOT
+  hand-edit the path. Warning during the transition window, hard error from the #250 delivery onward.
 
 ## What "done" looks like
 PASS (zero error-severity findings) + a reviewed, empty-or-justified set of manual-review/warning findings. That artifact
