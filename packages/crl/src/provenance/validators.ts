@@ -10,7 +10,11 @@ import { createHash } from "node:crypto";
 import type { AuthoredKind, ProvenanceArtifact, Role } from "./artifact";
 import { sliceUtf8Bytes } from "./canonicalize";
 import { deriveCoverage } from "./coverage";
-import { classifyDerivedFrom, DERIVED_FROM_GATE_ENFORCED } from "./derivedFromPolicy";
+import {
+  classifyDerivedFrom,
+  DERIVED_FROM_GATE_ENFORCED,
+  isWellFormedSha256,
+} from "./derivedFromPolicy";
 import type { IndexedCrlNode, ProvenanceIndex, ProvNodeRef } from "./indexer";
 import { nodeKey } from "./indexer";
 
@@ -47,11 +51,16 @@ export type ProvenanceFindingKind =
   | "mn-keyword-soft"
   | "structural-mistag"
   | "over-reach"
-  // ── #250 derivedFrom carrier-path gate (Todo B: the pure LEXICAL half). NOT in ATTRIBUTION_KINDS → integrity-class,
-  //    reported at native severity in BOTH worklist + final (a broken source trail is not "remaining work"). The
-  //    resolve/hash checks (`derived-from-unresolved` / `-hash-mismatch`) + the sidecar cross-check land in later slices.
+  // ── #250 derivedFrom carrier-path gate. NOT in ATTRIBUTION_KINDS → integrity-class, reported at native severity in BOTH
+  //    worklist + final (a broken source trail is not "remaining work"). Todo B = the pure LEXICAL path checks (absolute /
+  //    malformed). Todo C = the pure oracle-shape check (`-oracle-malformed`) + the fs resolve/hash checks (`-unresolved` /
+  //    `-source-unreadable` / `-hash-mismatch`). The recorded-hash sidecar cross-check + the anchor-self tell invariant are D.
   | "derived-from-absolute"
   | "derived-from-malformed"
+  | "derived-from-oracle-malformed"
+  | "derived-from-unresolved"
+  | "derived-from-source-unreadable"
+  | "derived-from-hash-mismatch"
   // ── cockpit correspondence (#170): the FINAL-mode gate that the cockpit lights exactly each case's run path. NOT in
   //    ATTRIBUTION_KINDS → never softened; constructed in validateProvenanceFiles (outside validateProvenance) at
   //    class "integrity" + severity "error". Green now guarantees a correct cockpit, not just referential integrity.
@@ -325,6 +334,18 @@ export function validateProvenance(
       kind: "derived-from-absolute",
       severity: dfSeverity,
       message: `anchorSource.derivedFrom ${JSON.stringify(artifact.anchorSource.derivedFrom)} is an absolute/drive/scheme-bound path; it must be carrier-relative (POSIX \`/\`, relative to the directory of the file carrying this record) so the source resolves on any clone — an absolute path is dead off the authoring machine (#250).`,
+    });
+  }
+  // ── #250 (Todo C — the pure ORACLE-shape check). The recorded `derivedFromHash` must be a well-formed `sha256:<64 hex>`
+  //    or the source trail cannot be verified against it AT ALL. This is INDEPENDENT of the path class above (a record can
+  //    carry a valid path AND a garbage/absent oracle, or a bad path AND a bad oracle — distinct defects), so it is NOT part
+  //    of the path emit-one cascade and is not hidden behind a path defect. The fs resolve+hash (Todo C, validateFiles.ts)
+  //    SKIPS its read when this fires — it cannot compare a real file hash to a malformed oracle. Same gated severity.
+  if (!isWellFormedSha256(artifact.anchorSource.derivedFromHash)) {
+    findings.push({
+      kind: "derived-from-oracle-malformed",
+      severity: dfSeverity,
+      message: `anchorSource.derivedFromHash ${JSON.stringify(artifact.anchorSource.derivedFromHash)} is not a well-formed "sha256:<64 lowercase hex>" oracle; the source document the derivedFrom trail points at cannot be verified against it (#250).`,
     });
   }
 

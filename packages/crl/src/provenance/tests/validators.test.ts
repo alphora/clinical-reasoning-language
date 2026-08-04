@@ -68,7 +68,9 @@ afterAll(() => rmSync(root, { recursive: true, force: true }));
 const metaFor = (text: string): AnchorSourceMeta => ({
   path: "x.txt",
   derivedFrom: "x.docx",
-  derivedFromHash: "sha256:0",
+  // A WELL-FORMED placeholder oracle (64 hex) so fixtures don't incidentally trip #250 Todo C's `derived-from-oracle-malformed`
+  // — these pure tests are about the path class / structural findings, not the oracle shape (which has its own test).
+  derivedFromHash: "sha256:" + "0".repeat(64),
   canonicalizer: "crl-anchor-docx-text",
   canonicalizerVersion: "1.0.0",
   textHash: "sha256:" + createHash("sha256").update(Buffer.from(text, "utf8")).digest("hex"),
@@ -151,6 +153,46 @@ describe("validateProvenance — #250 derivedFrom carrier-path (Todo B)", () => 
 
   it("emits AT MOST one derived-from finding — a backslash-absolute path is classified absolute, not double-counted", () => {
     expect(dfKinds("E:\\src\\x.docx").map((f) => f.kind)).toEqual(["derived-from-absolute"]);
+  });
+
+  it("a malformed/absent recorded oracle → derived-from-oracle-malformed, INDEPENDENT of the path class (#250 Todo C)", () => {
+    const oracleKinds = (df: unknown, hash: unknown) =>
+      validateProvenance(
+        art(
+          {
+            anchorMeta: {
+              ...metaFor(""),
+              derivedFrom: df as string,
+              derivedFromHash: hash as string,
+            },
+          },
+          "",
+        ),
+        idx,
+        "",
+      )
+        .filter((f) => f.kind.startsWith("derived-from"))
+        .map((f) => f.kind);
+    // A good path + a bad oracle → oracle-malformed ALONE (it's not part of the path emit-one cascade). Uppercase prefix/hex
+    // and a non-string are deliberately malformed (isWellFormedSha256 is lowercase-64-hex only).
+    for (const badHash of ["sha256:0", "notahash", "", undefined, 42, "SHA256:" + "a".repeat(64)]) {
+      expect(oracleKinds("x.docx", badHash)).toEqual(["derived-from-oracle-malformed"]);
+    }
+    // A bad path AND a bad oracle → BOTH (distinct, independent defects), not hidden behind the path finding.
+    expect(oracleKinds("E:/x.docx", "sha256:0")).toEqual([
+      "derived-from-absolute",
+      "derived-from-oracle-malformed",
+    ]);
+    // A good path + a well-formed oracle → no derived-from finding from the pure layer.
+    expect(oracleKinds("x.docx", "sha256:" + "a".repeat(64))).toEqual([]);
+    // Gated severity + integrity class.
+    const one = validateProvenance(
+      art({ anchorMeta: { ...metaFor(""), derivedFromHash: "sha256:0" } }, ""),
+      idx,
+      "",
+    ).find((f) => f.kind === "derived-from-oracle-malformed");
+    expect(one?.severity).toBe(DF_SEV);
+    expect(one?.class).toBe("integrity");
   });
 });
 

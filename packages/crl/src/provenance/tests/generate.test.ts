@@ -65,7 +65,9 @@ const TEXT_HASH =
 const META: AnchorSourceMeta = {
   path: "anchor.txt",
   derivedFrom: "x.docx",
-  derivedFromHash: "sha256:0",
+  // WELL-FORMED (64 hex) but deliberately ≠ TEXT_HASH: keeps the tell inferring `upstream-source` (the markerless-input test)
+  // while no longer tripping #250 Todo C's `derived-from-oracle-malformed` in the coverage-baseline multiset.
+  derivedFromHash: "sha256:" + "a".repeat(64),
   canonicalizer: "crl-anchor-docx-text",
   canonicalizerVersion: "1.0.0",
   // the real hash of ANCHOR, so the asserted finding multiset is exactly { over-reach × K, uncovered-span × 1 } with
@@ -113,7 +115,7 @@ describe("generateProvenanceScaffold — Model A artifact shape", () => {
   });
 
   it("#250 A/F: a markerless anchorSource input still yields a LOADER-VALID 1.1 (ensureAnchorMarker stamps the tell)", () => {
-    // META (the fixture) carries NO derivedFromContract and derivedFromHash "sha256:0" != textHash → the tell infers
+    // META (the fixture) carries NO derivedFromContract and a derivedFromHash ≠ textHash → the tell infers
     // upstream-source; the scaffold must never emit a "1.1" record parseProvenanceArtifact would reject (marker-required).
     const { artifact } = gen();
     expect(artifact.anchorSource.derivedFromContract).toBe("upstream-source");
