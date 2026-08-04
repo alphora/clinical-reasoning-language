@@ -42,7 +42,9 @@ import type { DiscoveryOutcome, DiscoveryTarget } from "./discoverSource";
 import { discoverSources, discoveryTargetFor } from "./discoverSource";
 import {
   classifyDerivedFrom,
+  contractFromTell,
   isWellFormedSha256,
+  metaPathForAnchor,
   samePath,
   toCarrierRelative,
 } from "./derivedFromPolicy";
@@ -112,12 +114,6 @@ function hashFileSync(p: string): string | null {
   } catch {
     return null;
   }
-}
-
-/** The `<name>.anchormeta.json` sidecar path for an anchor `.txt` — the SAME rule the canonicalize producer writes by
- *  (`deriveAnchorOutputPaths`): strip a trailing `.txt` (case-insensitive), append `.anchormeta.json`. */
-export function metaPathForAnchor(anchorPath: string): string {
-  return anchorPath.replace(/\.txt$/i, "") + ".anchormeta.json";
 }
 
 /** Read + JSON-parse a carrier file (artifact / sidecar) under the {@link MAX_CARRIER_BYTES} cap. Returns a coded failure
@@ -230,7 +226,7 @@ function planRecord(i: RecordPlanInput): RecordPlan {
     );
   }
   const oracle = i.derivedFromHash;
-  const tell: DerivedFromContract = oracle === i.textHash ? "anchor-self" : "upstream-source";
+  const tell: DerivedFromContract = contractFromTell(oracle, i.textHash);
 
   // 2. Contract. A SIDECAR is canonicalize-contract (`upstream-source`) BY CONSTRUCTION (P4) — this is checked FIRST and
   // UNCONDITIONALLY, ahead of any recorded marker, so a hand-edited/foreign sidecar that already CLAIMS `anchor-self`

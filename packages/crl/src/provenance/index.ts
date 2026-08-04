@@ -122,7 +122,7 @@ export { generateProvenanceFiles } from "./generateFiles";
 export type { GenerateProvenanceFilesResult } from "./generateFiles";
 export { canonicalizeSourceToFiles, deriveAnchorOutputPaths } from "./canonicalizeFiles";
 export type { CanonicalizeToFilesResult, AnchorOutputPaths } from "./canonicalizeFiles";
-export { normalizeProvenanceFiles, metaPathForAnchor } from "./normalizeFiles";
+export { normalizeProvenanceFiles } from "./normalizeFiles";
 export type {
   NormalizeProvenanceOpts,
   NormalizeResult,
@@ -139,7 +139,7 @@ export type {
 } from "./discoverSource";
 export { writeFileAtomic } from "./writeFileAtomic";
 export { repoEscapeAdvisory } from "./repoEscape";
-export { samePath, isWellFormedSha256 } from "./derivedFromPolicy";
+export { samePath, isWellFormedSha256, metaPathForAnchor } from "./derivedFromPolicy";
 export { generateProvenanceScaffold, mergeScaffold } from "./generate";
 export type { GenerateDiagnostic, GenerateResult, MergeDiagnostic, MergeResult } from "./generate";
 export { allUnsatisfiedCriteria, failedCriterionFrontier } from "./failedCriteria";

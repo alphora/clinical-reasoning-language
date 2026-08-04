@@ -18,12 +18,9 @@ import { basename, dirname } from "node:path";
 
 import { buildAnchorArtifact } from "./canonicalize";
 import type { CanonicalizeError, CanonicalizeWarning } from "./canonicalize";
-import { samePath, toCarrierRelative } from "./derivedFromPolicy";
+import { metaPathForAnchor, samePath, toCarrierRelative } from "./derivedFromPolicy";
 import { repoEscapeAdvisory } from "./repoEscape";
 import { writeFileAtomic } from "./writeFileAtomic";
-
-/** The sidecar suffix appended to the text artifact's stem: `<stem>.anchormeta.json`. */
-const SIDECAR_SUFFIX = ".anchormeta.json";
 
 export type AnchorOutputPaths =
   | { ok: true; txtPath: string; metaPath: string }
@@ -44,7 +41,7 @@ export type AnchorOutputPaths =
  */
 export function deriveAnchorOutputPaths(inPath: string, outPath?: string): AnchorOutputPaths {
   const txtPath = outPath ?? inPath.replace(/\.[^./\\]+$/, "") + ".txt";
-  const metaPath = txtPath.replace(/\.txt$/i, "") + SIDECAR_SUFFIX;
+  const metaPath = metaPathForAnchor(txtPath); // the SINGLE home for this rule (derivedFromPolicy) — shared with D2 discovery.
   if (samePath(txtPath, inPath)) {
     return {
       ok: false,

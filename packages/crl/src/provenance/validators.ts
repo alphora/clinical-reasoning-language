@@ -12,6 +12,7 @@ import { sliceUtf8Bytes } from "./canonicalize";
 import { deriveCoverage } from "./coverage";
 import {
   classifyDerivedFrom,
+  contractFromTell,
   DERIVED_FROM_GATE_ENFORCED,
   isWellFormedSha256,
 } from "./derivedFromPolicy";
@@ -54,13 +55,19 @@ export type ProvenanceFindingKind =
   // ── #250 derivedFrom carrier-path gate. NOT in ATTRIBUTION_KINDS → integrity-class, reported at native severity in BOTH
   //    worklist + final (a broken source trail is not "remaining work"). Todo B = the pure LEXICAL path checks (absolute /
   //    malformed). Todo C = the pure oracle-shape check (`-oracle-malformed`) + the fs resolve/hash checks (`-unresolved` /
-  //    `-source-unreadable` / `-hash-mismatch`). The recorded-hash sidecar cross-check + the anchor-self tell invariant are D.
+  //    `-source-unreadable` / `-hash-mismatch`). Todo D = the artifact-local contract-tell invariant (`-contract-mismatch`,
+  //    pure — marker vs the derivedFromHash/textHash tell) + the sidecar↔artifact record cross-check (`-sidecar-disagreement`
+  //    /`-sidecar-malformed`/`-sidecar-unreadable`, fs — in validateFiles.ts, the layer that can locate the sidecar).
   | "derived-from-absolute"
   | "derived-from-malformed"
   | "derived-from-oracle-malformed"
   | "derived-from-unresolved"
   | "derived-from-source-unreadable"
   | "derived-from-hash-mismatch"
+  | "derived-from-contract-mismatch"
+  | "derived-from-sidecar-disagreement"
+  | "derived-from-sidecar-malformed"
+  | "derived-from-sidecar-unreadable"
   // ── cockpit correspondence (#170): the FINAL-mode gate that the cockpit lights exactly each case's run path. NOT in
   //    ATTRIBUTION_KINDS → never softened; constructed in validateProvenanceFiles (outside validateProvenance) at
   //    class "integrity" + severity "error". Green now guarantees a correct cockpit, not just referential integrity.
@@ -347,6 +354,35 @@ export function validateProvenance(
       severity: dfSeverity,
       message: `anchorSource.derivedFromHash ${JSON.stringify(artifact.anchorSource.derivedFromHash)} is not a well-formed "sha256:<64 lowercase hex>" oracle; the source document the derivedFrom trail points at cannot be verified against it (#250).`,
     });
+  }
+  // ── #250 (Todo D1 — the artifact-local contract TELL invariant). A 1.1 record carries a `derivedFromContract` marker; it
+  //    MUST agree with the hash tell (`anchor-self ⇔ derivedFromHash===textHash`). The loader DEFERS this consistency check
+  //    to "the C/D validators" (a contradictory-but-parseable record must stay loadable), and C is contract-AGNOSTIC — so
+  //    this is the ONLY place a marker is cross-checked against the hashes. Runs ARTIFACT-LOCAL (no sidecar, no fs) and
+  //    closes the forgery C alone misses: a `marker:"anchor-self"` record whose `derivedFrom` names some OTHER file whose
+  //    bytes match a wrong `derivedFromHash` — C resolves+hashes it green, V3 drift is green, yet `derivedFromHash≠textHash`
+  //    so the anchor-self claim is a lie. Fires ONLY when a marker is present (a 1.0 record has none to contradict) AND both
+  //    hashes are well-formed (a tell computed over a malformed hash is meaningless — `-oracle-malformed`/`anchor-hash-drift`
+  //    own those; mirrors the normalizer's `no-oracle` bail). Identity is CONTENT-defined: an anchor-self record whose
+  //    `derivedFrom` names a different BYTE-IDENTICAL file still satisfies the tell — by design (the gate is hash-defined),
+  //    not a hole. Same gated severity as B/C.
+  const dfMarker = artifact.anchorSource.derivedFromContract;
+  if (
+    dfMarker !== undefined &&
+    isWellFormedSha256(artifact.anchorSource.derivedFromHash) &&
+    isWellFormedSha256(artifact.anchorSource.textHash)
+  ) {
+    const tell = contractFromTell(
+      artifact.anchorSource.derivedFromHash,
+      artifact.anchorSource.textHash,
+    );
+    if (dfMarker !== tell) {
+      findings.push({
+        kind: "derived-from-contract-mismatch",
+        severity: dfSeverity,
+        message: `anchorSource.derivedFromContract "${dfMarker}" contradicts the derivedFromHash/textHash tell — the hashes imply "${tell}" (derivedFromHash ${artifact.anchorSource.derivedFromHash}, textHash ${artifact.anchorSource.textHash}); an "${dfMarker}" record requires derivedFromHash ${dfMarker === "anchor-self" ? "===" : "≠"} textHash (#250).`,
+      });
+    }
   }
 
   // ── V4 source-acknowledgement (reuse coverage) ──

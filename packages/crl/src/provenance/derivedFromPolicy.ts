@@ -10,6 +10,8 @@
 //     separator, a drive letter, or a URI scheme is dead off the authoring machine — the class of defect #250 catches).
 import { win32 as pathWin32, posix as pathPosix, relative, resolve, sep } from "node:path";
 
+import type { DerivedFromContract } from "./canonicalize";
+
 /** ok = a carrier-relative POSIX path; absolute = machine/drive/scheme-bound (dead off the authoring machine); malformed =
  *  not a usable relative path string at all (absent/blank/NUL, or a `\`-separated relative path that isn't POSIX). */
 export type DerivedFromClass = "ok" | "absolute" | "malformed";
@@ -102,4 +104,25 @@ export function samePath(a: string, b: string): boolean {
  */
 export function isWellFormedSha256(value: unknown): value is string {
   return typeof value === "string" && /^sha256:[0-9a-f]{64}$/.test(value);
+}
+
+/**
+ * #250 — the ONE definition of the contract TELL: `derivedFromHash === textHash ⇒ anchor-self, else upstream-source`
+ * (canonicalize.ts documents it; the normalizer at `planRecord` and the C/D validators all read it). Kept here — the
+ * single home for the carrier-path policy — so those call sites cannot drift on what the hashes imply.
+ *
+ * PRECONDITION: both inputs are well-formed `sha256:<hex>` oracles ({@link isWellFormedSha256}). The tell is a string
+ * comparison, so a malformed hash would yield a meaningless "upstream-source" (garbage ≠ anything); the normalizer bails
+ * to a `no-oracle` worklist BEFORE calling this, and the D validators guard on both hashes first — the caller owns the
+ * guard so this stays a pure two-string implication with no defensive branch of its own.
+ */
+export function contractFromTell(derivedFromHash: string, textHash: string): DerivedFromContract {
+  return derivedFromHash === textHash ? "anchor-self" : "upstream-source";
+}
+
+/** The `<name>.anchormeta.json` sidecar path for an anchor `.txt` — the SAME rule the canonicalize producer writes by
+ *  (`deriveAnchorOutputPaths`): strip a trailing `.txt` (case-insensitive), append `.anchormeta.json`. Pure path math;
+ *  lives here (the carrier-path policy home) so the producer, the normalizer, and the D sidecar cross-check share it. */
+export function metaPathForAnchor(anchorPath: string): string {
+  return anchorPath.replace(/\.txt$/i, "") + ".anchormeta.json";
 }

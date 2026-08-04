@@ -6,7 +6,15 @@
  * Throws on unreadable/invalid input — callers (CLI / MCP handler / cockpit) catch and present.
  */
 import { createHash } from "node:crypto";
-import { closeSync, constants, fstatSync, openSync, readFileSync, readSync } from "node:fs";
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readFileSync,
+  readSync,
+} from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 
 import { effectiveCaseId } from "../cel/ast/caseId";
@@ -15,13 +23,16 @@ import { resolveCelImports } from "../cel/imports";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 
 import type { AnchorSourceMeta, ProvenanceArtifact } from "./artifact";
+import type { AnchorMeta, DerivedFromContract } from "./canonicalize";
 import { buildCockpitModelFromResolved } from "./cockpitModel";
 import { checkCockpitCorrespondence, type CorrespondenceCheckResult } from "./correspondenceCheck";
 import { deriveCoverage, type CoverageReport } from "./coverage";
 import {
   classifyDerivedFrom,
+  contractFromTell,
   DERIVED_FROM_GATE_ENFORCED,
   isWellFormedSha256,
+  metaPathForAnchor,
 } from "./derivedFromPolicy";
 import {
   buildProvenanceIndex,
@@ -29,7 +40,7 @@ import {
   type ProvenanceIndex,
   type ProvenanceIndexDiagnostic,
 } from "./indexer";
-import { parseProvenanceArtifact } from "./loadArtifact";
+import { parseAnchorMeta, parseProvenanceArtifact } from "./loadArtifact";
 import {
   validateProvenance,
   WAIVER_KINDS,
@@ -174,6 +185,203 @@ export function derivedFromResolutionFindings(
   return [];
 }
 
+/** #250 Todo D2 — the outcome of loading the `<anchor>.anchormeta.json` sidecar. Every failure is a DISCRIMINATED value
+ *  (never a throw), mirroring `hashResolvedSource`. `absent` (ENOENT/ENOTDIR — a Model-A corpus legitimately has no
+ *  sidecar; skip) is kept DISTINCT from `unreadable` (the entry exists but is not a readable regular file — a dangling
+ *  symlink, a directory/device, EACCES/EIO) and `malformed` (readable but not a valid AnchorMeta — bad JSON, or a shape
+ *  `parseAnchorMeta` rejects). Skipping unreadable/malformed as if absent would make CORRUPTING the sidecar silently
+ *  DISABLE the cross-check — a fail-open escape hatch in a fail-closed gate. */
+type SidecarLoad =
+  | { kind: "absent" }
+  | { kind: "unreadable"; detail: string }
+  | { kind: "malformed"; detail: string }
+  | { kind: "ok"; meta: AnchorMeta };
+
+// A sidecar is small metadata; cap the read at the SAME 1 MB the normalizer bounds its carrier reads at
+// (`normalizeFiles.ts` MAX_CARRIER_BYTES) so a huge/adversarial file at the sidecar path is not slurped whole.
+const MAX_SIDECAR_BYTES = 1_000_000;
+
+function readSidecar(path: string): SidecarLoad {
+  // lstat FIRST: a DANGLING symlink (the entry exists, its target is gone) must be `unreadable`, not `absent` — a bare
+  // open ENOENTs on both and would mis-read the corruption as "no sidecar" (fail-open). Only a genuinely-absent entry
+  // (ENOENT) or a non-directory path component (ENOTDIR) is "no sidecar"; any other lstat error is an unreadable entry.
+  try {
+    lstatSync(path);
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    return code === "ENOENT" || code === "ENOTDIR"
+      ? { kind: "absent" }
+      : { kind: "unreadable", detail: e instanceof Error ? e.message : String(e) };
+  }
+  // The entry exists. Open it ONCE (read-only + non-blocking) and `fstat` the DESCRIPTOR — the object gated regular +
+  // size-capped is the object read, closing the stat→read TOCTOU and a FIFO block/swap exactly as `hashResolvedSource`
+  // does (a plain stat→readFileSync would hang forever if a FIFO is swapped in on the validate/MCP/cockpit path). A
+  // dangling symlink now fails the OPEN with ENOENT → unreadable (lstat already proved the entry exists), never `absent`.
+  let fd: number;
+  try {
+    fd = openSync(path, SOURCE_OPEN_FLAGS);
+  } catch (e) {
+    return { kind: "unreadable", detail: e instanceof Error ? e.message : String(e) };
+  }
+  try {
+    const st = fstatSync(fd);
+    if (!st.isFile()) {
+      return {
+        kind: "unreadable",
+        detail: "not a regular file (directory / device / fifo / dangling symlink)",
+      };
+    }
+    if (st.size > MAX_SIDECAR_BYTES) {
+      return {
+        kind: "unreadable",
+        detail: `sidecar is ${st.size} bytes (exceeds the ${MAX_SIDECAR_BYTES}-byte cap)`,
+      };
+    }
+    // Read from the SAME descriptor (no second path resolution); a read failure (EIO, …) falls to the outer catch →
+    // `unreadable`, NOT `malformed` — only `JSON.parse` sits in the inner try so a genuine I/O error isn't mislabeled.
+    const raw = readFileSync(fd, "utf8");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      return {
+        kind: "malformed",
+        detail: `invalid JSON: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
+    const pr = parseAnchorMeta(parsed);
+    return pr.ok
+      ? { kind: "ok", meta: pr.meta }
+      : { kind: "malformed", detail: `[${pr.code}] ${pr.message}` };
+  } catch (e) {
+    // An fstat/read failure (EIO, …) is an unreadable sidecar, never a throw that crashes the validate run.
+    return { kind: "unreadable", detail: e instanceof Error ? e.message : String(e) };
+  } finally {
+    try {
+      closeSync(fd);
+    } catch {
+      /* ignore — the discriminated outcome is already determined */
+    }
+  }
+}
+
+/**
+ * #250 Todo D2 — the within-contract sidecar↔artifact record cross-check. When the artifact's contract is `upstream-source`
+ * and a `<anchor>.anchormeta.json` sidecar exists beside the artifact's RECORDED anchor, the two records' recorded
+ * `derivedFromHash` oracles must AGREE. Compares the RECORDED fields — it NEVER re-resolves/re-hashes: the artifact and the
+ * sidecar relativize their `derivedFrom` against DIFFERENT carrier dirs (the artifact's dir vs the anchor's), so a CORRECT
+ * pair records different PATHS but the same oracle — re-resolution would flag every correct pair. Sidecar discovery resolves
+ * the artifact's OWN `anchorSource.path` against the artifact's carrier (`dirname(artifactPath)`) — the same carrier-dir
+ * basis as C's derivedFrom resolution, so D2 is independent of a possibly-relocated caller-supplied anchor path (a
+ * byte-identical anchor copy elsewhere passes V3 drift but must not redirect the cross-check). The normalizer discovers off
+ * the same carrier by basename; the two coincide for every record the producers write (a bare-basename `anchorSource.path`).
+ * Never throws (`readSidecar` is discriminated). Cascade / skips: a malformed artifact oracle (`-oracle-malformed` owns it),
+ * an `anchor-self` contract (cross-contract — a Model-A artifact has no upstream sidecar to agree with), or a non-string
+ * recorded anchor path → []. A present sidecar that can't be read/parsed, whose own oracle/textHash is malformed, or that
+ * claims a non-`upstream-source` contract (a `.anchormeta.json` is upstream-source BY CONSTRUCTION) is a
+ * `-sidecar-unreadable`/`-sidecar-malformed` finding, never a disagreement (the comparison was impossible, not two valid
+ * records disagreeing). `class:"integrity"` + gated severity.
+ */
+export function sidecarDisagreementFindings(
+  artifactPath: string,
+  artifact: ProvenanceArtifact,
+): ProvenanceFinding[] {
+  const a = artifact.anchorSource;
+  // Determine the artifact's contract. A present marker is AUTHORITATIVE (no textHash needed); a legacy 1.0 record infers
+  // from the tell, which needs BOTH hashes well-formed (else the tell is meaningless — `-oracle-malformed`/drift own it).
+  if (!isWellFormedSha256(a.derivedFromHash)) return [];
+  let contract: DerivedFromContract;
+  if (a.derivedFromContract !== undefined) {
+    contract = a.derivedFromContract;
+  } else {
+    if (!isWellFormedSha256(a.textHash)) return [];
+    contract = contractFromTell(a.derivedFromHash, a.textHash);
+  }
+  if (contract !== "upstream-source") return []; // anchor-self artifact → cross-contract → no sidecar to agree with.
+
+  // Locate the sidecar beside the artifact's RECORDED anchor (never the caller's anchorPath). A non-string recorded path is
+  // a deeply-broken artifact other validators own; guard it so this never throws in `resolve`.
+  if (typeof a.path !== "string" || a.path.trim() === "") return [];
+  const sidecarPath = metaPathForAnchor(resolve(dirname(artifactPath), a.path));
+  const sc = readSidecar(sidecarPath);
+  if (sc.kind === "absent") return []; // no sidecar is legitimate (`anchormeta-missing` was dropped; C hard-gates the trail).
+
+  const severity: Severity = DERIVED_FROM_GATE_ENFORCED ? "error" : "warning";
+  const finding = (kind: ProvenanceFinding["kind"], message: string): ProvenanceFinding => ({
+    kind,
+    severity,
+    class: "integrity",
+    message,
+  });
+
+  if (sc.kind === "unreadable") {
+    return [
+      finding(
+        "derived-from-sidecar-unreadable",
+        `the sidecar "${sidecarPath}" beside the anchor exists but could not be read as a regular file (${sc.detail}) — the artifact↔sidecar provenance records cannot be cross-checked (#250).`,
+      ),
+    ];
+  }
+  if (sc.kind === "malformed") {
+    return [
+      finding(
+        "derived-from-sidecar-malformed",
+        `the sidecar "${sidecarPath}" beside the anchor is not a valid .anchormeta.json (${sc.detail}) — the artifact↔sidecar provenance records cannot be cross-checked (#250).`,
+      ),
+    ];
+  }
+  // The sidecar loaded. To be COMPARED it must be a well-formed upstream-source record — a `.anchormeta.json` is
+  // upstream-source BY CONSTRUCTION (a canonicalize producer never writes an anchor-self sidecar). Four self-inconsistent
+  // conditions are `-sidecar-malformed` (the comparison is impossible / the sidecar lies about its own contract), NOT a
+  // disagreement: (1) a malformed derivedFromHash oracle; (2) a malformed textHash (its own tell can't be computed — a
+  // marker can't vouch past that); (3) a recorded non-`upstream-source` marker; (4) a `derivedFromHash===textHash`
+  // (anchor-self) tell. The sidecar's `derivedFrom` PATH is NOT re-validated here (that stays E's job).
+  const sm = sc.meta;
+  if (!isWellFormedSha256(sm.derivedFromHash)) {
+    return [
+      finding(
+        "derived-from-sidecar-malformed",
+        `the sidecar "${sidecarPath}" records a derivedFromHash ${JSON.stringify(sm.derivedFromHash)} that is not a well-formed "sha256:<64 hex>" oracle — the artifact↔sidecar records cannot be cross-checked (#250).`,
+      ),
+    ];
+  }
+  if (!isWellFormedSha256(sm.textHash)) {
+    return [
+      finding(
+        "derived-from-sidecar-malformed",
+        `the sidecar "${sidecarPath}" records a textHash ${JSON.stringify(sm.textHash)} that is not a well-formed "sha256:<64 hex>" value — its own upstream-source contract cannot be confirmed, so the records cannot be cross-checked (#250).`,
+      ),
+    ];
+  }
+  if (sm.derivedFromContract !== undefined && sm.derivedFromContract !== "upstream-source") {
+    return [
+      finding(
+        "derived-from-sidecar-malformed",
+        `the sidecar "${sidecarPath}" records derivedFromContract "${sm.derivedFromContract}" but a .anchormeta.json sidecar is upstream-source BY CONSTRUCTION — a self-inconsistent record (#250).`,
+      ),
+    ];
+  }
+  // Both hashes are now well-formed, so the tell is meaningful and the check is unconditional.
+  if (contractFromTell(sm.derivedFromHash, sm.textHash) === "anchor-self") {
+    return [
+      finding(
+        "derived-from-sidecar-malformed",
+        `the sidecar "${sidecarPath}" has derivedFromHash === textHash (an anchor-self tell) but a .anchormeta.json sidecar is upstream-source BY CONSTRUCTION — a self-inconsistent record (#250).`,
+      ),
+    ];
+  }
+  // Both records are well-formed upstream-source oracles → they must name the SAME upstream source by hash.
+  if (sm.derivedFromHash !== a.derivedFromHash) {
+    return [
+      finding(
+        "derived-from-sidecar-disagreement",
+        `the sidecar "${sidecarPath}" records derivedFromHash ${sm.derivedFromHash} but the artifact records ${a.derivedFromHash} — the two provenance records disagree about the upstream source (one is stale: re-run the producer (canonicalize) to regenerate the sidecar, or the normalizer to repair the artifact) (#250).`,
+      ),
+    ];
+  }
+  return [];
+}
+
 export function resolveProvenance(
   artifactPath: string,
   celPath: string,
@@ -209,12 +417,14 @@ export function resolveProvenance(
   ]);
 
   const coverage = deriveCoverage(artifact, index, anchorText);
-  // Pure §9 validators + the #250 Todo C fs resolve/hash checks (this layer has `artifactPath`, so the CARRIER dir; the pure
-  // validator is fs-free). MERGE then recompute every count + pass from the merged set — the C findings are `integrity`, so
-  // worklist/waiver counts are unaffected, but errorCount/warningCount/pass must see them.
+  // Pure §9 validators (incl. #250 Todo D1's contract-tell invariant) + the #250 Todo C fs resolve/hash checks + Todo D2's
+  // sidecar↔artifact record cross-check (this layer has `artifactPath` → the CARRIER dir, and `anchorPath` → the sidecar; the
+  // pure validator is fs-free). MERGE then recompute every count + pass from the merged set — the C/D2 findings are
+  // `integrity`, so worklist/waiver counts are unaffected, but errorCount/warningCount/pass must see them.
   const findings = [
     ...validateProvenance(artifact, index, anchorText, { celCaseIds, frozenCaseIds, mode }),
     ...derivedFromResolutionFindings(artifactPath, artifact),
+    ...sidecarDisagreementFindings(artifactPath, artifact),
   ];
   const errorCount = findings.filter((f) => f.severity === "error").length;
   return {

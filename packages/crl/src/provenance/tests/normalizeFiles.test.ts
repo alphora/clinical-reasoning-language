@@ -3,9 +3,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
+import { isWellFormedSha256, metaPathForAnchor } from "../derivedFromPolicy";
 import { parseAnchorMeta, parseProvenanceArtifact } from "../loadArtifact";
-import { isWellFormedSha256 } from "../derivedFromPolicy";
-import { metaPathForAnchor, normalizeProvenanceFiles } from "../normalizeFiles";
+import { normalizeProvenanceFiles } from "../normalizeFiles";
 
 const sha256 = (b: Buffer | string): string =>
   "sha256:" +
