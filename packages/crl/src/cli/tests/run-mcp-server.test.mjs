@@ -579,6 +579,43 @@ try {
       rmSync(tmp, { recursive: true, force: true });
     }
   });
+
+  await check("canonicalize_source with a non-.docx input → DOMAIN success:false envelope (NOT isError), writes nothing", async () => {
+    const { writeFileSync, mkdtempSync, rmSync, existsSync } = await import("node:fs");
+    const os = await import("node:os");
+    const tmp = mkdtempSync(resolve(os.tmpdir(), "mcp-canon-"));
+    try {
+      const inPath = resolve(tmp, "bad.docx");
+      writeFileSync(inPath, "not a zip"); // fail-closed canonicalization (not a valid .docx/ZIP)
+      const r = await client.callTool({ name: "canonicalize_source", arguments: { in: inPath } });
+      // A fail-closed canonicalization is a DOMAIN result, not a tool error (mirrors validate_* success:false).
+      assert.ok(!r.isError, "a fail-closed canonicalization must NOT be an isError envelope");
+      const out = JSON.parse(r.content[0].text);
+      assert.equal(out.success, false, "domain envelope reports success:false");
+      assert.ok(out.error && typeof out.error.kind === "string", "the structured canonicalize error is surfaced");
+      assert.ok(!existsSync(resolve(tmp, "bad.txt")), "no .txt written on a fail-closed canonicalization");
+      assert.ok(!existsSync(resolve(tmp, "bad.anchormeta.json")), "no sidecar written");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  await check("canonicalize_source operational failure → isError envelope (a .txt input self-overwrites → stage paths)", async () => {
+    const { writeFileSync, mkdtempSync, rmSync } = await import("node:fs");
+    const os = await import("node:os");
+    const tmp = mkdtempSync(resolve(os.tmpdir(), "mcp-canon-paths-"));
+    try {
+      // A `.txt` input: the default text-output derivation collides with the input → the path guard rejects it BEFORE
+      // any content is read as a .docx. This exercises the OPERATIONAL (isError) MCP mapping without a valid .docx buffer.
+      const inPath = resolve(tmp, "already.txt");
+      writeFileSync(inPath, "plain text, not a docx");
+      const r = await client.callTool({ name: "canonicalize_source", arguments: { in: inPath } });
+      assert.equal(r.isError, true, "an operational (paths) failure must be an isError envelope");
+      assert.match(r.content[0].text, /failed \[paths\]/, "the envelope names the paths stage");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 } finally {
   await client.close();
 }

@@ -627,8 +627,14 @@ export function canonicalizeDocx(input: Buffer): CanonicalizeResult {
 /**
  * File-artifact wrapper over {@link canonicalizeDocx}: attaches provenance back-pointers (the sidecar metadata).
  * Pure (no I/O) — the CLI/caller owns reading the `.docx` and writing `<name>.txt` + `<name>.anchormeta.json`.
+ *
+ * #250 A — this is THE `upstream-source` producer: `derivedFrom` names an UPSTREAM `.docx` and `derivedFromHash` is that
+ * `.docx`'s bytes (≠ `textHash`), so the sidecar is stamped `derivedFromContract: "upstream-source"` by construction (P4).
+ * It does NOT relativize `derivedFrom` (this function is pure, path-ignorant): the file-level caller
+ * (`canonicalizeSourceToFiles`) passes an ALREADY carrier-relative POSIX value, computed against the sidecar's directory.
+ *
  * @param artifactPath the canonical-text artifact path this metadata will describe (stored in `meta.path`)
- * @param derivedFrom  a label for the source `.docx` (e.g. its path), stored in `meta.derivedFrom`
+ * @param derivedFrom  the (carrier-relative POSIX) reference to the source `.docx`, stored verbatim in `meta.derivedFrom`
  */
 export function buildAnchorArtifact(
   input: Buffer,
@@ -641,7 +647,14 @@ export function buildAnchorArtifact(
   return {
     ok: true,
     text: r.text,
-    meta: { ...r.metaCore, path: artifactPath, derivedFrom, derivedFromHash, warnings: r.warnings },
+    meta: {
+      ...r.metaCore,
+      path: artifactPath,
+      derivedFrom,
+      derivedFromHash,
+      derivedFromContract: "upstream-source",
+      warnings: r.warnings,
+    },
   };
 }
 

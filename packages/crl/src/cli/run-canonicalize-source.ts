@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync } from "node:fs";
-import { basename } from "node:path";
+import { readFileSync } from "node:fs";
 
-import { buildAnchorArtifact } from "../provenance";
+import { canonicalizeSourceToFiles } from "../provenance";
 
 /**
  * crl-canonicalize-source — render a refined-source `.docx` into the canonical anchor-source `.txt`
@@ -43,9 +42,6 @@ if (!inPath) {
   process.exit(1);
 }
 
-const txtPath = outPath ?? inPath.replace(/\.[^./\\]+$/, "") + ".txt";
-const metaPath = txtPath.replace(/\.txt$/i, "") + ".anchormeta.json";
-
 let input: Buffer;
 try {
   input = readFileSync(inPath);
@@ -54,15 +50,16 @@ try {
   process.exit(1);
 }
 
-const result = buildAnchorArtifact(input, basename(txtPath), inPath);
+const result = canonicalizeSourceToFiles(input, inPath, outPath);
 if (!result.ok) {
-  console.error(`canonicalize failed [${result.error.kind}]: ${result.error.message}`);
+  const detail =
+    result.stage === "canonicalize"
+      ? `[${result.error.kind}] ${result.error.message}`
+      : result.message;
+  console.error(`canonicalize failed [${result.stage}]: ${detail}`);
   process.exit(1);
 }
 
-writeFileSync(txtPath, result.text, "utf8");
-writeFileSync(metaPath, JSON.stringify(result.meta, null, 2) + "\n", "utf8");
-
-for (const w of result.meta.warnings) console.error(`warning [${w.kind}]: ${w.message}`);
-console.error(`wrote ${txtPath} (${Buffer.byteLength(result.text, "utf8")} bytes) + ${metaPath}`);
+for (const w of result.warnings) console.error(`warning [${w.kind}]: ${w.message}`);
+console.error(`wrote ${result.txtPath} (${result.byteLength} bytes) + ${result.metaPath}`);
 process.exit(0);

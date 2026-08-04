@@ -3,8 +3,7 @@
 // bundled server (packages/crl-vscode/src/mcp-server.ts) — both are thin shims that import
 // createServer/main/selfTest from here, so the two can no longer drift. No module-level dispatch:
 // importing this module must NOT start a server (the thin entries own the argv dispatch).
-import { readFileSync, statSync, writeFileSync } from "node:fs";
-import { basename } from "node:path";
+import { readFileSync, statSync } from "node:fs";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -26,7 +25,11 @@ import { validateAndBuildMvFlagDraft, flagStoreDir, hasLegacyFlagStore, loadFlag
 import type { CreateFlagTarget, MvFlag, MvFlagScope, FlagStatus } from "../index";
 // canonicalize a selector's tag alias — `canonicalFlagTag` (the flag vocab), NOT the `.crl` registry's `canonicalTag`
 // (#212 step 4: flag tags left the registry, so the registry no longer knows them; the store holds the canonical tag).
-import { validateProvenanceFiles, generateProvenanceFiles, buildAnchorArtifact } from "../provenance";
+import {
+  validateProvenanceFiles,
+  generateProvenanceFiles,
+  canonicalizeSourceToFiles,
+} from "../provenance";
 
 // Caps the CRL SOURCE (input) size. Response size scales with this — there is
 // no separate output cap, but bounding input keeps responses bounded enough.
@@ -1110,28 +1113,38 @@ function runCanonicalizeSource(args: { in: string; out?: string }): {
     };
   }
 
-  const txtPath = args.out ?? inPath.replace(/\.[^./\\]+$/, "") + ".txt";
-  const metaPath = txtPath.replace(/\.txt$/i, "") + ".anchormeta.json";
-
-  const result = buildAnchorArtifact(input, basename(txtPath), inPath);
+  // Path derivation, carrier-relative derivedFrom (#250 A), the `upstream-source` marker, and the two writes all live
+  // in the shared `canonicalizeSourceToFiles` (the CLI bin runs the identical logic).
+  const result = canonicalizeSourceToFiles(input, inPath, args.out);
   if (!result.ok) {
-    // A fail-closed canonicalization is a DOMAIN result (mirrors validate_* returning success:false), not a
-    // tool error — but nothing is written, so surface the structured error + any warnings.
+    // A fail-closed canonicalization is a DOMAIN result (mirrors validate_* returning success:false), not a tool
+    // error — nothing is written, so surface the structured error + any warnings. A paths/carrier/write failure IS
+    // operational (bad output location / cross-drive / fs error) → an isError envelope.
+    if (result.stage === "canonicalize") {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                success: false,
+                error: result.error,
+                warnings: result.warnings,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
     return {
       content: [
         {
           type: "text",
-          text: JSON.stringify({ success: false, error: result.error, warnings: result.warnings }, null, 2),
+          text: `canonicalize_source failed [${result.stage}]: ${result.message}`,
         },
       ],
-    };
-  }
-  try {
-    writeFileSync(txtPath, result.text, "utf8");
-    writeFileSync(metaPath, JSON.stringify(result.meta, null, 2) + "\n", "utf8");
-  } catch (e) {
-    return {
-      content: [{ type: "text", text: `canonicalized OK but failed to persist: ${(e as Error).message}` }],
       isError: true,
     };
   }
@@ -1142,12 +1155,12 @@ function runCanonicalizeSource(args: { in: string; out?: string }): {
         text: JSON.stringify(
           {
             success: true,
-            textPath: txtPath,
-            metaPath,
-            textHash: result.meta.textHash,
-            offsetUnit: result.meta.offsetUnit,
-            byteLength: Buffer.byteLength(result.text, "utf8"),
-            warnings: result.meta.warnings,
+            textPath: result.txtPath,
+            metaPath: result.metaPath,
+            textHash: result.textHash,
+            offsetUnit: result.offsetUnit,
+            byteLength: result.byteLength,
+            warnings: result.warnings,
           },
           null,
           2,

@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { deflateRawSync } from "node:zlib";
 
 import {
@@ -9,6 +12,7 @@ import {
   byteRangeToDisplayRange,
   CANONICALIZER_VERSION,
 } from "../canonicalize";
+import { canonicalizeSourceToFiles, deriveAnchorOutputPaths } from "../canonicalizeFiles";
 
 // ---- minimal ZIP writer (builds a real .docx my reader parses; deflate exercises the real path) ----
 let TBL: Uint32Array | undefined;
@@ -384,6 +388,7 @@ describe("buildAnchorArtifact (file-artifact wrapper)", () => {
     expect(r.text).toBe("body");
     expect(r.meta.path).toBe("rx501.txt");
     expect(r.meta.derivedFrom).toBe("src/refined-source/rx501.docx");
+    expect(r.meta.derivedFromContract).toBe("upstream-source"); // #250 A — the canonicalize contract's marker
     expect(r.meta.derivedFromHash).toBe("sha256:" + createHash("sha256").update(buf).digest("hex"));
     expect(r.meta.textHash).toBe(
       canonicalizeDocx(buf).ok &&
@@ -395,6 +400,121 @@ describe("buildAnchorArtifact (file-artifact wrapper)", () => {
     const r = buildAnchorArtifact(Buffer.from("nope"), "x.txt", "x.docx");
     expect(r.ok).toBe(false);
   });
+});
+
+describe("deriveAnchorOutputPaths (shared txt/sidecar derivation)", () => {
+  it("default: replaces the input's extension with .txt, sidecar strips the .txt", () => {
+    const r = deriveAnchorOutputPaths("/src/refined/rx501.docx");
+    if (!r.ok) throw new Error(r.reason);
+    expect(r.txtPath).toBe("/src/refined/rx501.txt");
+    expect(r.metaPath).toBe("/src/refined/rx501.anchormeta.json");
+  });
+  it("--out ending in .txt: sidecar is <name>.anchormeta.json beside it", () => {
+    const r = deriveAnchorOutputPaths("/src/rx.docx", "/out/anchor.txt");
+    if (!r.ok) throw new Error(r.reason);
+    expect(r.txtPath).toBe("/out/anchor.txt");
+    expect(r.metaPath).toBe("/out/anchor.anchormeta.json");
+  });
+  it("--out NOT ending in .txt: sidecar appends the suffix whole (and stays distinct from the text path)", () => {
+    const r = deriveAnchorOutputPaths("/src/rx.docx", "/out/anchor.dat");
+    if (!r.ok) throw new Error(r.reason);
+    expect(r.txtPath).toBe("/out/anchor.dat");
+    expect(r.metaPath).toBe("/out/anchor.dat.anchormeta.json");
+    expect(r.metaPath).not.toBe(r.txtPath);
+  });
+  it("rejects --out equal to --in (would overwrite the source .docx)", () => {
+    const r = deriveAnchorOutputPaths("/src/rx.docx", "/src/rx.docx");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toMatch(/overwrite the input source/);
+  });
+  it("rejects a .txt input whose default text path IS the input (would overwrite it)", () => {
+    // "/src/rx.txt" → strip .txt → "/src/rx" + ".txt" = the input; guard fires before any canonicalization.
+    const r = deriveAnchorOutputPaths("/src/rx.txt");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toMatch(/overwrite the input source/);
+  });
+  it("rejects an input whose SIDECAR path would be the input (an .anchormeta.json input + a .txt --out)", () => {
+    // "/src/rx.anchormeta.json" → metaPath strips no `.txt` → "/src/rx.anchormeta.json" = the input.
+    const r = deriveAnchorOutputPaths("/src/rx.anchormeta.json", "/src/rx.txt");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toMatch(/sidecar .* would overwrite the input source/);
+  });
+});
+
+describe("canonicalizeSourceToFiles (#250 A — carrier-relative sidecar + upstream-source marker)", () => {
+  let tmp: string;
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "crl-canon-"));
+  });
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("colocated: derivedFrom is the .docx basename (carrier-relative) + marker + upstream hash; writes .txt", () => {
+    const buf = docx(para(t("body")));
+    const inPath = join(tmp, "rx.docx"); // the buffer is passed directly — inPath need not exist on disk
+    const res = canonicalizeSourceToFiles(buf, inPath);
+    if (!res.ok) throw new Error(`expected ok, got [${res.stage}]`);
+    expect(res.txtPath).toBe(join(tmp, "rx.txt"));
+    expect(res.metaPath).toBe(join(tmp, "rx.anchormeta.json"));
+    expect(readFileSync(res.txtPath, "utf8")).toBe("body");
+    const meta = JSON.parse(readFileSync(res.metaPath, "utf8"));
+    expect(meta.path).toBe("rx.txt");
+    expect(meta.derivedFrom).toBe("rx.docx"); // carrier-relative POSIX, colocated → the basename
+    expect(meta.derivedFromContract).toBe("upstream-source");
+    expect(meta.derivedFromHash).toBe("sha256:" + createHash("sha256").update(buf).digest("hex"));
+  });
+
+  it("sidecar in a different dir than the source: derivedFrom is the POSIX carrier-relative path (../..)", () => {
+    const buf = docx(para(t("body")));
+    const inPath = join(tmp, "refined", "rx.docx");
+    const outDir = join(tmp, "anchors");
+    mkdirSync(outDir, { recursive: true });
+    const res = canonicalizeSourceToFiles(buf, inPath, join(outDir, "rx.txt"));
+    if (!res.ok) throw new Error(`expected ok, got [${res.stage}]`);
+    const meta = JSON.parse(readFileSync(res.metaPath, "utf8"));
+    expect(meta.derivedFrom).toBe("../refined/rx.docx"); // POSIX `/`, relative to the sidecar's directory
+    expect(meta.derivedFromContract).toBe("upstream-source");
+  });
+
+  it("fail-closed canonicalization surfaces the structured error stage, writes nothing", () => {
+    const res = canonicalizeSourceToFiles(Buffer.from("not a zip"), join(tmp, "bad.docx"));
+    if (res.ok) throw new Error("expected a canonicalize failure");
+    expect(res.stage).toBe("canonicalize");
+    expect(() => readFileSync(join(tmp, "bad.txt"), "utf8")).toThrow(); // no .txt
+    expect(() => readFileSync(join(tmp, "bad.anchormeta.json"), "utf8")).toThrow(); // no sidecar
+  });
+
+  it("rejects an --out that would overwrite the input source (stage: paths, writes nothing)", () => {
+    const buf = docx(para(t("body")));
+    const inPath = join(tmp, "rx.docx");
+    const res = canonicalizeSourceToFiles(buf, inPath, inPath);
+    if (res.ok) throw new Error("expected a paths failure");
+    expect(res.stage).toBe("paths");
+    expect(() => readFileSync(inPath, "utf8")).toThrow(); // the source was never touched (nothing written)
+  });
+
+  it("write failure (output dir does not exist) → stage: write, nothing written", () => {
+    const buf = docx(para(t("body")));
+    const outTxt = join(tmp, "no-such-dir", "out.txt"); // parent dir absent → the FIRST write (the .txt) throws ENOENT
+    const res = canonicalizeSourceToFiles(buf, join(tmp, "rx.docx"), outTxt);
+    if (res.ok) throw new Error("expected a write failure");
+    expect(res.stage).toBe("write");
+    expect(res.message).toMatch(/failed to write the canonical text/);
+    expect(() => readFileSync(outTxt, "utf8")).toThrow();
+  });
+
+  // Cross-drive has no carrier-relative representation → fail loud BEFORE any write. win32-only: `path.relative` across
+  // drives returns the absolute target only under win32 semantics (the check is pure path math; no drive need exist).
+  (process.platform === "win32" ? it : it.skip)(
+    "cross-drive source vs sidecar → stage: carrier, writes nothing",
+    () => {
+      const buf = docx(para(t("body")));
+      const res = canonicalizeSourceToFiles(buf, "C:\\src\\rx.docx", "E:\\anchors\\rx.txt");
+      if (res.ok) throw new Error("expected a carrier failure");
+      expect(res.stage).toBe("carrier");
+    },
+  );
 });
 
 describe("UTF-8 offset helpers", () => {

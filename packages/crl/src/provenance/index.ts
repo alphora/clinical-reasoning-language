@@ -120,6 +120,8 @@ export { validateProvenanceFiles } from "./validateFiles";
 export type { ValidateProvenanceFilesResult } from "./validateFiles";
 export { generateProvenanceFiles } from "./generateFiles";
 export type { GenerateProvenanceFilesResult } from "./generateFiles";
+export { canonicalizeSourceToFiles, deriveAnchorOutputPaths } from "./canonicalizeFiles";
+export type { CanonicalizeToFilesResult, AnchorOutputPaths } from "./canonicalizeFiles";
 export { generateProvenanceScaffold, mergeScaffold } from "./generate";
 export type { GenerateDiagnostic, GenerateResult, MergeDiagnostic, MergeResult } from "./generate";
 export { allUnsatisfiedCriteria, failedCriterionFrontier } from "./failedCriteria";
