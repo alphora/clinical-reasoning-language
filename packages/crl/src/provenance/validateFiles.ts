@@ -15,10 +15,7 @@ import type { ResolvedCelGraph } from "../cel/imports/types";
 
 import type { AnchorSourceMeta, ProvenanceArtifact } from "./artifact";
 import { buildCockpitModelFromResolved } from "./cockpitModel";
-import {
-  checkCockpitCorrespondence,
-  type CorrespondenceCheckResult,
-} from "./correspondenceCheck";
+import { checkCockpitCorrespondence, type CorrespondenceCheckResult } from "./correspondenceCheck";
 import { deriveCoverage, type CoverageReport } from "./coverage";
 import {
   buildProvenanceIndex,
@@ -26,6 +23,7 @@ import {
   type ProvenanceIndex,
   type ProvenanceIndexDiagnostic,
 } from "./indexer";
+import { parseProvenanceArtifact } from "./loadArtifact";
 import {
   validateProvenance,
   WAIVER_KINDS,
@@ -61,7 +59,15 @@ export function resolveProvenance(
   anchorPath: string,
   mode: ProvenanceValidationMode = "final",
 ): ResolveProvenanceResult {
-  const artifact = JSON.parse(readFileSync(artifactPath, "utf8")) as ProvenanceArtifact;
+  // #250 F — fail-closed on an unknown schemaVersion / bad envelope (never a blind cast). resolveProvenance's contract is
+  // throw-on-invalid-input; the loader's coded failure becomes that throw, naming the offending value.
+  const parsed = parseProvenanceArtifact(JSON.parse(readFileSync(artifactPath, "utf8")));
+  if (!parsed.ok) {
+    throw new Error(
+      `provenance artifact "${artifactPath}" is not loadable [${parsed.code}]: ${parsed.message}`,
+    );
+  }
+  const artifact = parsed.artifact;
   const anchorText = readFileSync(anchorPath, "utf8");
   const graph = resolveCelImports(celPath);
   const index = buildProvenanceIndex(graph);
@@ -104,8 +110,9 @@ export function resolveProvenance(
     waiverCount: findings.filter((f) => WAIVER_KINDS.has(f.kind)).length,
     // Constrain to WAIVER_KINDS (not just scrutiny==="scrutinize") so a stray non-waiver scrutiny can never push this
     // above waiverCount and make the CLI's derived routine count (waiverCount - waiverScrutinizeCount) go negative.
-    waiverScrutinizeCount: findings.filter((f) => WAIVER_KINDS.has(f.kind) && f.scrutiny === "scrutinize")
-      .length,
+    waiverScrutinizeCount: findings.filter(
+      (f) => WAIVER_KINDS.has(f.kind) && f.scrutiny === "scrutinize",
+    ).length,
     // pass stays errorCount===0: in worklist mode the attribution backlog is "warning" → doesn't fail.
     pass: errorCount === 0,
   };
@@ -189,9 +196,9 @@ export function validateProvenanceFiles(
   // each case's path. Worklist mode SKIPS it (the in-progress scaffold's correspondence isn't a "remaining-work" item).
   const correspondenceFindings: ProvenanceFinding[] =
     mode === "final"
-      ? checkCockpitCorrespondence(
-          buildCockpitModelFromResolved(r, { artifactPath, celPath }),
-        ).map(correspondenceFinding)
+      ? checkCockpitCorrespondence(buildCockpitModelFromResolved(r, { artifactPath, celPath })).map(
+          correspondenceFinding,
+        )
       : [];
 
   // MERGE (do not mutate r.findings) then RECOMPUTE the severity counts + pass from the merged set — the stale

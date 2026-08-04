@@ -26,6 +26,7 @@ import {
   type MergeDiagnostic,
 } from "./generate";
 import { collectLibs } from "./indexer";
+import { parseProvenanceArtifact } from "./loadArtifact";
 
 /** sha256 of a UTF-8 string, in the `sha256:<lowercase-hex>` shape the canonicalizer + validators use for textHash. */
 function sha256Hex(text: string): string {
@@ -136,9 +137,17 @@ export function generateProvenanceFiles(
   // --merge: overlay the fresh STRUCTURE onto the existing artifact's preserved KE WORK (items, ref statuses, …). The
   // merged artifact is the result; we surface BOTH channels — the merge diagnostics (what the re-gen changed) AND the
   // generate diagnostics (the up-to-date attribution worklist against the fresh structure).
-  const existing = JSON.parse(
-    readFileSync(opts.existingArtifactPath, "utf8"),
-  ) as ProvenanceArtifact;
+  // #250 F — fail-closed on the --merge target's envelope (never a blind cast); generateProvenanceFiles throws on bad
+  // input (the CLI/MCP catch + present), so the loader's coded failure becomes that throw.
+  const parsedExisting = parseProvenanceArtifact(
+    JSON.parse(readFileSync(opts.existingArtifactPath, "utf8")),
+  );
+  if (!parsedExisting.ok) {
+    throw new Error(
+      `--merge artifact "${opts.existingArtifactPath}" is not loadable [${parsedExisting.code}]: ${parsedExisting.message}`,
+    );
+  }
+  const existing = parsedExisting.artifact;
   const merge = mergeScaffold(existing, fresh.artifact);
   return {
     policyId,

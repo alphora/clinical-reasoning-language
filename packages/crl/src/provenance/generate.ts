@@ -1538,9 +1538,16 @@ export function mergeScaffold(previous: ProvenanceArtifact, fresh: ProvenanceArt
   // ── Rule 1: envelope from `fresh`; anchorSource kept from `previous` on a hash drift (so the validator keeps emitting
   //    anchor-hash-drift durably + the existing sourceRefs stay valid against the text they were authored on — the
   //    re-anchor to the new source is a DEFERRED, separate step). ──
+  //    #250 F/A LANDMINE — READ BEFORE producer A flips the writer to schemaVersion "1.1": when this drift branch keeps a
+  //    LEGACY (pre-A, marker-less) `previous.anchorSource` while `fresh` carries the new "1.1" envelope, the merged artifact
+  //    becomes a "1.1" record whose anchorSource has NO `derivedFromContract` — which `parseProvenanceArtifact` HARD-REJECTS
+  //    (`marker-required`) on the KE's very next load. Because F is a permissive single interface (no compile-time union
+  //    guard), this is a RUNTIME failure, not a type error. Producer A MUST, when preserving a legacy anchorSource here,
+  //    STAMP the tell-inferred marker (`derivedFromHash === textHash ⇒ "anchor-self", else "upstream-source"`) so the
+  //    envelope stays a valid "1.1". This slice (F) is reader-only and does not stamp; the rule is A's to implement + test.
   let anchorSource = fresh.anchorSource;
   if (previous.anchorSource.textHash !== fresh.anchorSource.textHash) {
-    anchorSource = previous.anchorSource; // keep the old anchor; do NOT strip sourceRefs
+    anchorSource = previous.anchorSource; // keep the old anchor; do NOT strip sourceRefs (#250 A: stamp the tell-inferred marker)
     diagnostics.push({
       kind: "source-changed",
       message: `anchor source changed (previous textHash ${previous.anchorSource.textHash} != fresh ${fresh.anchorSource.textHash}); keeping the previous anchorSource so existing sourceRefs stay valid — re-anchoring is deferred.`,

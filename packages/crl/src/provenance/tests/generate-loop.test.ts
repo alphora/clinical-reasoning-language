@@ -438,3 +438,60 @@ describe("#250 Todo B canary — generateProvenanceFiles still emits an ABSOLUTE
     }
   });
 });
+
+// ── #250 Todo F: the fail-closed loader is actually WIRED into both packages/crl disk read-sites (not just unit-tested in
+//    isolation). Each path reads a real on-disk artifact whose schemaVersion the loader rejects, and must convert that to
+//    its documented throw — the whole point of F (a blind `as ProvenanceArtifact` cast would have sailed past both). ──
+describe("#250 Todo F — loader wired into the disk read-sites (throw-propagation)", () => {
+  it("validateProvenanceFiles → resolveProvenance THROWS fail-closed on an unknown schemaVersion", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "prov-f-validate-"));
+    try {
+      writeFileSync(
+        path.join(dir, "package.json"),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      );
+      writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
+      const fCel = path.join(dir, "f.cel");
+      writeFileSync(fCel, CEL);
+      const anchorTxt = path.join(dir, "anchor.txt");
+      writeFileSync(anchorTxt, ANCHOR);
+
+      const g = generateProvenanceFiles(fCel, anchorTxt);
+      const artifactPath = path.join(dir, "artifact.json");
+      // a valid scaffold with the version tampered to an unknown future value — the loader must reject it fail-closed.
+      writeFileSync(artifactPath, JSON.stringify({ ...g.artifact, schemaVersion: "2.0" }));
+
+      expect(() => validateProvenanceFiles(artifactPath, fCel, anchorTxt)).toThrow(
+        /is not loadable \[unsupported-schema-version\]/,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("generateProvenanceFiles --merge THROWS fail-closed on a bad-version existing artifact (before mergeScaffold)", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "prov-f-merge-"));
+    try {
+      writeFileSync(
+        path.join(dir, "package.json"),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      );
+      writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
+      const fCel = path.join(dir, "f.cel");
+      writeFileSync(fCel, CEL);
+      const anchorTxt = path.join(dir, "anchor.txt");
+      writeFileSync(anchorTxt, ANCHOR);
+
+      const g = generateProvenanceFiles(fCel, anchorTxt);
+      const badExisting = path.join(dir, "existing.json");
+      // the numeric `1` junk version the pre-F blind cast tolerated — the merge read must now reject it.
+      writeFileSync(badExisting, JSON.stringify({ ...g.artifact, schemaVersion: 1 }));
+
+      expect(() =>
+        generateProvenanceFiles(fCel, anchorTxt, { existingArtifactPath: badExisting }),
+      ).toThrow(/--merge artifact .* is not loadable \[unsupported-schema-version\]/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

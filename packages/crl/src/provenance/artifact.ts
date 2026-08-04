@@ -16,6 +16,8 @@
  */
 import type { AnchorMeta } from "./canonicalize";
 
+export type { DerivedFromContract } from "./canonicalize";
+
 // ── §2 items ────────────────────────────────────────────────────────────────
 
 export type Origin = "source" | "authored";
@@ -209,9 +211,23 @@ export interface IgnoredRange {
  */
 export type AnchorSourceMeta = Omit<AnchorMeta, "warnings">;
 
-/** §1 — the provenance artifact (one file per encoding+version; links captured at authoring time, never reconstructed). */
+/**
+ * §1 — the provenance artifact (one file per encoding+version; links captured at authoring time, never reconstructed).
+ *
+ * #250 F — `schemaVersion` is the versioned-record discriminant: `"1.0"` = the original shape (no contract marker);
+ * `"1.1"` adds the `anchorSource.derivedFromContract` marker (see {@link DerivedFromContract}). The version↔marker
+ * invariant — 1.0 omits the marker, 1.1 carries a valid one — is NOT structural here (the model stays permissive so a
+ * partially-authored / mid-migration artifact is representable, per the module doctrine above); it is enforced by the
+ * fail-closed loader `parseProvenanceArtifact` (which returns the strict `LoadedProvenanceArtifact` view), routed at both
+ * `packages/crl` disk read-sites. (An interface-per-version union was evaluated and rejected: `mergeScaffold` builds
+ * `schemaVersion: fresh.schemaVersion` (`generate.ts` Rule 1) from a union-typed discriminant, which a discriminated-
+ * interface union rejects at the construction site — forcing the marker-stamping that belongs to producer A into this
+ * reader-only slice. When a future version diverges in FIELDS, split into per-version interfaces then.) Because that
+ * compile-time guard is absent, producer A's merge-marker duty is guarded only at RUNTIME + by test — see the `#250 F/A
+ * LANDMINE` note on `mergeScaffold` Rule 1.
+ */
 export interface ProvenanceArtifact {
-  schemaVersion: "1.0"; // pinned; a future schema introduces a versioned union rather than widening this
+  schemaVersion: "1.0" | "1.1";
   policyId: string;
   policyVersion: string;
   anchorSource: AnchorSourceMeta;
@@ -220,4 +236,10 @@ export interface ProvenanceArtifact {
   clusters: Cluster[];
 }
 
+/** The version the WRITER stamps today. #250 F is reader-only — producers keep emitting `"1.0"`; producer A flips fresh
+ *  writes to `"1.1"` + marker. Kept distinct from {@link PROVENANCE_LATEST_SCHEMA_VERSION} so the loader can know a version
+ *  the producer does not yet emit (that separation is what makes F reader-only rather than a silent writer flip). */
 export const PROVENANCE_SCHEMA_VERSION = "1.0";
+
+/** The newest schema version the loader RECOGNIZES (the marker-bearing shape). See `KNOWN_SCHEMA_VERSIONS` in loadArtifact.ts. */
+export const PROVENANCE_LATEST_SCHEMA_VERSION = "1.1";

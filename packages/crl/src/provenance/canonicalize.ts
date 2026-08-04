@@ -44,11 +44,32 @@ export type CanonicalizeResult =
   | { ok: true; text: string; metaCore: AnchorMetaCore; warnings: CanonicalizeWarning[] }
   | { ok: false; error: CanonicalizeError; warnings: CanonicalizeWarning[] };
 
+/**
+ * #250 F — which producer CONTRACT wrote a `derivedFrom`/`derivedFromHash` pair, i.e. which file `derivedFromHash` hashes:
+ *  - `upstream-source`: `derivedFrom` names an UPSTREAM source (a `.docx`/`.pdf`/…) and `derivedFromHash` is that source's
+ *    bytes (≠ `textHash` in general) — the canonicalize contract;
+ *  - `anchor-self`: `derivedFrom` names the canonical anchor `.txt` ITSELF and `derivedFromHash === textHash` — the Model-A
+ *    (generate) contract, where the canonical text is its own source.
+ * Value-named after the CONTRACT (not the input format) so a future non-`.docx` canonicalizer is the SAME contract, not a
+ * new schema. Authoritative going forward (producer A stamps fresh, normalizer E stamps legacy); at migration D/E infer it
+ * from the tell `derivedFromHash === textHash ⇒ anchor-self, else upstream-source`. The `canonicalizer`/`canonicalizerVersion`
+ * fields do NOT encode this — `anchorMetaFor` (generateFiles.ts) stamps the canonicalizer name on Model-A records the
+ * canonicalizer never touched — which is exactly why this explicit marker exists.
+ */
+export type DerivedFromContract = "upstream-source" | "anchor-self";
+
 /** Persisted sidecar metadata (`<name>.anchormeta.json`): the core fields + provenance back-pointers + warnings. */
 export interface AnchorMeta extends AnchorMetaCore {
   path: string; // the canonical-text artifact this metadata describes
   derivedFrom: string; // the source .docx it was derived from
   derivedFromHash: string; // sha256:<hex> of the source .docx bytes
+  /**
+   * #250 F — the producer contract this record was written under (see {@link DerivedFromContract}). OPTIONAL on the shared
+   * shape: legacy records (and the whole pre-A corpus) omit it, and the sidecar carries NO `schemaVersion` to gate on — its
+   * legacy/new discriminant is marker PRESENCE. Newly written sidecars (producer A) stamp `upstream-source` by construction
+   * (P4); E stamps inferred legacy. On the ARTIFACT the version↔marker invariant is enforced by `parseProvenanceArtifact`.
+   */
+  derivedFromContract?: DerivedFromContract;
   warnings: CanonicalizeWarning[]; // durable: a consumer (KELP) gates on these, not on stderr
 }
 export type AnchorArtifactResult =

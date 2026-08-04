@@ -335,7 +335,7 @@ describe("#172 todo-3 boundary (c)+(d) — over-reach + coverage of cross-lib su
     expect(shrNode.ownership).toBe("shared-reference");
     const itemsById = new Map<string, never>();
     const emptyArt = {
-      schemaVersion: 1 as const,
+      schemaVersion: "1.0" as const, // #250 F: was the malformed numeric `1`; the loader now rejects non-"1.0"/"1.1" versions
       policyId: "P",
       policyVersion: "1",
       anchorSource: META,

@@ -10,6 +10,7 @@ export {
 export type {
   AnchorMetaCore,
   AnchorMeta,
+  DerivedFromContract,
   CanonicalizeResult,
   AnchorArtifactResult,
   CanonicalizeWarning,
@@ -44,11 +45,36 @@ export { buildConceptContainment } from "./conceptContainment";
 export type { ConceptContainment } from "./conceptContainment";
 export { buildConceptShapeIndex, codeIsLeavesPreorder } from "./conceptShape";
 export type { ConceptShapeNode, ConceptShapeIndex } from "./conceptShape";
-export { buildDefExprIndex, collectDefExprLeafKeys, buildDefStruct, DEF_EXPR_CAP, GUARD_OPERAND_CAP, DEF_MAX_EXPR_DEPTH } from "./definedAsExpr";
-export type { DefExpr, DefRef, DefExprEntry, DefExprIndex, DefStructExpr, ResolveDefExprEntry } from "./definedAsExpr";
-export { branchConditionToDefStruct, buildGuardOutlines, buildCriterionIdentities, criterionGateIdentities, topCriterion, criterionKey } from "./guardOutline";
+export {
+  buildDefExprIndex,
+  collectDefExprLeafKeys,
+  buildDefStruct,
+  DEF_EXPR_CAP,
+  GUARD_OPERAND_CAP,
+  DEF_MAX_EXPR_DEPTH,
+} from "./definedAsExpr";
+export type {
+  DefExpr,
+  DefRef,
+  DefExprEntry,
+  DefExprIndex,
+  DefStructExpr,
+  ResolveDefExprEntry,
+} from "./definedAsExpr";
+export {
+  branchConditionToDefStruct,
+  buildGuardOutlines,
+  buildCriterionIdentities,
+  criterionGateIdentities,
+  topCriterion,
+  criterionKey,
+} from "./guardOutline";
 export type { GuardOutline, CriterionIdentity } from "./guardOutline";
-export { buildCockpitModel, buildCockpitModelFromResolved, assembleConceptProjections } from "./cockpitModel";
+export {
+  buildCockpitModel,
+  buildCockpitModelFromResolved,
+  assembleConceptProjections,
+} from "./cockpitModel";
 export type { CockpitModel } from "./cockpitModel";
 export { checkCockpitCorrespondence } from "./correspondenceCheck";
 export type {
@@ -122,7 +148,13 @@ export type {
   CorrespondenceDiagnostic,
   ByteRange,
 } from "./correspondence";
-export { PROVENANCE_SCHEMA_VERSION } from "./artifact";
+export { PROVENANCE_SCHEMA_VERSION, PROVENANCE_LATEST_SCHEMA_VERSION } from "./artifact";
+export { parseProvenanceArtifact, KNOWN_SCHEMA_VERSIONS } from "./loadArtifact";
+export type {
+  ProvenanceParseResult,
+  ProvenanceParseErrorCode,
+  LoadedProvenanceArtifact,
+} from "./loadArtifact";
 export type {
   ProvenanceArtifact,
   Item,
