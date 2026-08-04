@@ -33,8 +33,8 @@ const artifact = (
 });
 
 describe("#250 F — parseProvenanceArtifact", () => {
-  it("constants: writer stamps 1.0, loader knows 1.0 + 1.1", () => {
-    expect(PROVENANCE_SCHEMA_VERSION).toBe("1.0");
+  it("constants: writer stamps 1.1 (post-#250-A), loader knows 1.0 + 1.1", () => {
+    expect(PROVENANCE_SCHEMA_VERSION).toBe("1.1"); // #250 A flipped the writer; legacy 1.0 stays readable
     expect(PROVENANCE_LATEST_SCHEMA_VERSION).toBe("1.1");
     expect(KNOWN_SCHEMA_VERSIONS).toEqual(["1.0", "1.1"]);
   });

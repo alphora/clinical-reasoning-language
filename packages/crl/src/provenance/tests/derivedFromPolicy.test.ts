@@ -1,5 +1,7 @@
 // #250 Todo B — the pure lexical `derivedFrom` classifier. The one home the producer, detectors, and normalizer share.
-import { classifyDerivedFrom } from "../derivedFromPolicy";
+import { join, resolve } from "node:path";
+
+import { classifyDerivedFrom, toCarrierRelative } from "../derivedFromPolicy";
 
 describe("classifyDerivedFrom (#250 Todo B)", () => {
   it("accepts carrier-relative POSIX paths as ok", () => {
@@ -47,4 +49,48 @@ describe("classifyDerivedFrom (#250 Todo B)", () => {
     expect(classifyDerivedFrom("E:/src/x.docx")).toBe("absolute");
     expect(classifyDerivedFrom("/etc/x.docx")).toBe("absolute");
   });
+});
+
+describe("toCarrierRelative (#250 Todo A)", () => {
+  // absolute roots so the result is independent of the process CWD; the RELATIVE structure is identical on both hosts.
+  const root = resolve("carrier-root-fixture");
+
+  it("colocated source → the bare basename, no escape", () => {
+    const r = toCarrierRelative(join(root, "dir", "anchor.txt"), join(root, "dir"));
+    expect(r).toEqual({ ok: true, path: "anchor.txt", escapesCarrierDir: false });
+  });
+
+  it("nested-under-carrier source → a POSIX `/` sub-path", () => {
+    const r = toCarrierRelative(join(root, "a", "b", "anchor.txt"), root);
+    expect(r).toEqual({ ok: true, path: "a/b/anchor.txt", escapesCarrierDir: false });
+  });
+
+  it("sibling-dir source → a `../` path, escapesCarrierDir true (legitimate, not an error)", () => {
+    const r = toCarrierRelative(join(root, "src", "anchor.txt"), join(root, "out"));
+    expect(r).toEqual({ ok: true, path: "../src/anchor.txt", escapesCarrierDir: true });
+  });
+
+  it("every ok result is itself carrier-relative-`ok` per the classifier (the self-check invariant)", () => {
+    for (const [src, carrier] of [
+      [join(root, "dir", "x.txt"), join(root, "dir")],
+      [join(root, "a", "b", "x.txt"), root],
+      [join(root, "src", "x.txt"), join(root, "deep", "out")],
+    ] as const) {
+      const r = toCarrierRelative(src, carrier);
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(classifyDerivedFrom(r.path)).toBe("ok");
+    }
+  });
+
+  // Windows-only: a cross-DRIVE source has NO carrier-relative representation (path.relative returns the absolute target),
+  // so the producer must FAIL rather than emit a drive-qualified value its own detector rejects. Cannot be forced on POSIX
+  // (no drive letters), hence the platform guard — this is exactly the C:-docx / E:-Dev-Drive split on the authoring machine.
+  it.runIf(process.platform === "win32")(
+    "cross-drive source → ok:false (no-carrier-relative-representation)",
+    () => {
+      const r = toCarrierRelative("C:\\src\\x.docx", "E:\\carrier");
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.reason).toBe("no-carrier-relative-representation");
+    },
+  );
 });

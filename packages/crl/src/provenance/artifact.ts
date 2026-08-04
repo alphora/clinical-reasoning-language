@@ -236,10 +236,11 @@ export interface ProvenanceArtifact {
   clusters: Cluster[];
 }
 
-/** The version the WRITER stamps today. #250 F is reader-only — producers keep emitting `"1.0"`; producer A flips fresh
- *  writes to `"1.1"` + marker. Kept distinct from {@link PROVENANCE_LATEST_SCHEMA_VERSION} so the loader can know a version
- *  the producer does not yet emit (that separation is what makes F reader-only rather than a silent writer flip). */
-export const PROVENANCE_SCHEMA_VERSION = "1.0";
+/** The version the WRITER stamps. #250 A FLIPPED this from "1.0" to "1.1": fresh `generate` artifacts now carry the
+ *  versioned envelope AND the `anchorSource.derivedFromContract` marker ("anchor-self" — Model A). Kept distinct from
+ *  {@link PROVENANCE_LATEST_SCHEMA_VERSION} so they can diverge again for a future writer/reader split. Legacy "1.0"
+ *  (marker-less) records stay readable — the loader accepts both — until the normalizer E stamps them. */
+export const PROVENANCE_SCHEMA_VERSION = "1.1";
 
 /** The newest schema version the loader RECOGNIZES (the marker-bearing shape). See `KNOWN_SCHEMA_VERSIONS` in loadArtifact.ts. */
 export const PROVENANCE_LATEST_SCHEMA_VERSION = "1.1";

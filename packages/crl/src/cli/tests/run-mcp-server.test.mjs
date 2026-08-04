@@ -537,7 +537,13 @@ try {
       const r = await client.callTool({ name: "generate_provenance", arguments: { cel: dme101Cel, anchor: anchorPath, includeArtifact: true } });
       assert.ok(!r.isError, "should not be a tool error");
       const out = JSON.parse(r.content[0].text);
-      assert.equal(out.artifact.schemaVersion, "1.0");
+      assert.equal(out.artifact.schemaVersion, "1.1"); // #250 A: generate now stamps the marker-bearing envelope
+      assert.equal(out.artifact.anchorSource.derivedFromContract, "anchor-self", "#250 A: Model-A marker");
+      assert.equal(out.artifact.anchorSource.derivedFrom, "anchor.txt", "#250 A: carrier-relative (colocated)");
+      assert.ok(
+        Array.isArray(out.advisories) && out.advisories.length > 0,
+        "#250 A: inline generate advises the derivedFrom is anchor-dir-relative (persist elsewhere → normalize)",
+      );
       assert.equal(out.artifact.items.length, 0, "Model A: scaffold emits no items");
       assert.ok(out.artifact.clusters.length > 0, "expected at least one cluster");
     } finally {

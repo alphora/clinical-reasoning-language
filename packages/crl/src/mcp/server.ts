@@ -785,7 +785,11 @@ export function createServer(): McpServer {
         "The anchor .txt is treated as ALREADY canonical: we hash its bytes (sha256) for anchorSource.textHash; we do " +
         "NOT re-canonicalize a .docx here. Returns a SUMMARY envelope by default to keep tool output small: " +
         "{ success, policyId, policyVersion, clusterCount, diagnosticCountsByKind, mergeDiagnosticCountsByKind? (only " +
-        "when merging), merged }. The `diagnostics`/`mergeDiagnostics` COUNTS describe the FRESH-scaffold worklist " +
+        "when merging), merged, advisories? }. #250: because this tool returns the artifact INLINE (it writes no file), " +
+        "`anchorSource.derivedFrom` is made carrier-relative to the anchor's directory (or, when merging, the existing " +
+        "artifact's directory) — the `advisories` array (present only when non-empty) says so; if you persist the returned " +
+        "artifact anywhere else, run the provenance normalizer on save (once available) so derivedFrom stays resolvable. " +
+        "The `diagnostics`/`mergeDiagnostics` COUNTS describe the FRESH-scaffold worklist " +
         "(the attribution + over-reach BASELINE); when `merged` is true they are the PRE-MERGE baseline, NOT the " +
         "merged artifact's residual. While ATTRIBUTING the scaffold, run `validate_provenance_worklist` on the output " +
         "(the in-progress check — the attribution backlog reads as remaining work, not errors); run the strict " +
@@ -1224,6 +1228,9 @@ function runGenerateProvenance(args: {
             note: "diagnostics are the pre-merge baseline; run validate_provenance_worklist on the output for the in-progress residual (or validate_provenance for the final/strict gate).",
           }
         : {}),
+      // #250 A — this tool returns the artifact inline (no file written here), so derivedFrom was made relative to the
+      // anchor's directory; the advisory tells the caller to normalize on save if it persists the artifact elsewhere.
+      ...(r.advisories?.length ? { advisories: r.advisories } : {}),
       ...(args.includeArtifact ? { artifact: r.artifact } : {}),
     };
     return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };

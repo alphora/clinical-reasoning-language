@@ -8,6 +8,7 @@ import type { AnchorSourceMeta } from "../artifact";
 import { deriveCoverage } from "../coverage";
 import { generateProvenanceScaffold } from "../generate";
 import { buildProvenanceIndex, nodeKey, type ProvenanceIndex } from "../indexer";
+import { parseProvenanceArtifact } from "../loadArtifact";
 import { validateProvenance } from "../validators";
 
 // ── fixture: a covered policy with a `defined as` composite criterion over two leaves, a when-gated recommend +
@@ -108,7 +109,15 @@ describe("generateProvenanceScaffold — Model A artifact shape", () => {
     for (const c of artifact.clusters) expect(c.items).toEqual([]);
     expect(artifact.ignoredRanges).toEqual([]);
     expect(artifact.policyId).toBe("P");
-    expect(artifact.schemaVersion).toBe("1.0");
+    expect(artifact.schemaVersion).toBe("1.1"); // #250 A flipped the writer to the marker-bearing envelope
+  });
+
+  it("#250 A/F: a markerless anchorSource input still yields a LOADER-VALID 1.1 (ensureAnchorMarker stamps the tell)", () => {
+    // META (the fixture) carries NO derivedFromContract and derivedFromHash "sha256:0" != textHash → the tell infers
+    // upstream-source; the scaffold must never emit a "1.1" record parseProvenanceArtifact would reject (marker-required).
+    const { artifact } = gen();
+    expect(artifact.anchorSource.derivedFromContract).toBe("upstream-source");
+    expect(parseProvenanceArtifact(artifact).ok).toBe(true);
   });
 
   it("one cluster per covered decision, clean ids, NO drivesDetermination edges in the artifact", () => {
@@ -141,7 +150,8 @@ describe("generateProvenanceScaffold — refs pass V1/V2; coverage baseline is {
     // celCaseIds / frozenCaseIds wired so the freeze + cel-resolution legs are ACTUALLY exercised (and must stay clean).
     const frozen = new Set(["case-approve", "case-deny", "case-leaf"]);
     // every emitted cel ref must address a FROZEN case (the scaffold never emits a ref to an un-frozen case).
-    for (const c of artifact.clusters) for (const r of c.cel) expect(frozen.has(r.caseId)).toBe(true);
+    for (const c of artifact.clusters)
+      for (const r of c.cel) expect(frozen.has(r.caseId)).toBe(true);
     const findings = validateProvenance(artifact, idx, ANCHOR, {
       celCaseIds: new Map([["f.cel", frozen]]),
       frozenCaseIds: new Map([["f.cel", frozen]]),

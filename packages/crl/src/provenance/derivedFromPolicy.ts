@@ -8,7 +8,7 @@
 //   - carrier-relative (not repo-root-relative) → no `.git` discovery, portable inside the repo, worktree-independent;
 //   - POSIX `/` → resolves identically on the Windows authoring machine AND the Linux/browser reviewer clone (a `\`
 //     separator, a drive letter, or a URI scheme is dead off the authoring machine — the class of defect #250 catches).
-import { win32 as pathWin32, posix as pathPosix } from "node:path";
+import { win32 as pathWin32, posix as pathPosix, relative, resolve, sep } from "node:path";
 
 /** ok = a carrier-relative POSIX path; absolute = machine/drive/scheme-bound (dead off the authoring machine); malformed =
  *  not a usable relative path string at all (absent/blank/NUL, or a `\`-separated relative path that isn't POSIX). */
@@ -51,4 +51,29 @@ export function classifyDerivedFrom(value: unknown): DerivedFromClass {
     return "absolute";
   if (value.includes("\\")) return "malformed"; // a relative path with a backslash separator — not POSIX
   return "ok";
+}
+
+/**
+ * The producer's write-side other half (Todo A): turn an absolute (or CWD-relative) `sourcePath` into the carrier-relative
+ * POSIX `derivedFrom` that `classifyDerivedFrom` blesses. `carrierDir` is the directory of the file that will CARRY the
+ * record (the artifact JSON / the anchormeta sidecar). Pure path math (`path.relative` on the host), no fs.
+ *
+ * It can FAIL: on Windows `path.relative` across DRIVES returns the absolute target (`C:\src.docx` when the carrier is on
+ * `E:`), which POSIX-ified is drive-qualified and `classifyDerivedFrom` rightly rejects — there is NO carrier-relative
+ * representation. Rather than emit a value its own detector would reject, the producer must FAIL LOUDLY; hence a discriminated
+ * result, never a bare string (docx on `C:` + a corpus on the `E:` Dev Drive is real on this machine, not hypothetical).
+ * `escapesCarrierDir` (a leading `..`) is returned for the caller's best-effort out-of-tree advisory — it is NOT itself an
+ * error (a `../sibling/anchor.txt` layout is legitimate and portable within a checkout holding both).
+ */
+export type CarrierRelativeResult =
+  | { ok: true; path: string; escapesCarrierDir: boolean }
+  | { ok: false; reason: "no-carrier-relative-representation"; attempted: string };
+
+export function toCarrierRelative(sourcePath: string, carrierDir: string): CarrierRelativeResult {
+  const rel = relative(resolve(carrierDir), resolve(sourcePath));
+  const posix = rel.split(sep).join("/");
+  if (classifyDerivedFrom(posix) !== "ok") {
+    return { ok: false, reason: "no-carrier-relative-representation", attempted: posix };
+  }
+  return { ok: true, path: posix, escapesCarrierDir: posix === ".." || posix.startsWith("../") };
 }

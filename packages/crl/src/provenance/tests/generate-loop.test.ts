@@ -20,10 +20,11 @@ import * as path from "path";
 import { resolveCelImports } from "../../cel/imports";
 import type { AnchorSourceMeta, CrlNodeRef, Item, ProvenanceArtifact } from "../artifact";
 import { deriveCoverage } from "../coverage";
-import { DERIVED_FROM_GATE_ENFORCED } from "../derivedFromPolicy";
+import { classifyDerivedFrom } from "../derivedFromPolicy";
 import { generateProvenanceScaffold, mergeScaffold } from "../generate";
 import { generateProvenanceFiles } from "../generateFiles";
 import { buildProvenanceIndex, nodeKey, type ProvenanceIndex } from "../indexer";
+import { parseProvenanceArtifact } from "../loadArtifact";
 import { validateProvenanceFiles } from "../validateFiles";
 import { validateProvenance, type ProvenanceFinding } from "../validators";
 
@@ -406,13 +407,11 @@ describe("validateProvenanceFiles — worklist mode passes a fresh scaffold (wor
   });
 });
 
-// ── #250 Todo B canary: the executable record of the B-before-A coupling. `generateProvenanceFiles` still writes the raw
-//    (absolute) anchorPath into `derivedFrom` (generateFiles.ts) — so a freshly generated scaffold trips the new detector.
-//    Todo A relativizes the producer; when it lands, this canary FAILS (no finding), forcing the A author to update it
-//    rather than letting the coupling outlive its reason as a silent comment. Pre-H the finding is a non-blocking warning.
-describe("#250 Todo B canary — generateProvenanceFiles still emits an ABSOLUTE derivedFrom (Todo A must flip this)", () => {
-  it("a freshly generated scaffold trips derived-from-absolute — Todo A (producer → carrier-relative) will make this fail", () => {
-    const dir = mkdtempSync(path.join(os.tmpdir(), "prov-df-canary-"));
+// ── #250 Todo A: the generate producer now emits a CARRIER-RELATIVE POSIX derivedFrom + the anchor-self marker + a "1.1"
+//    envelope (this REPLACES the Todo-B canary, which asserted the pre-A absolute derivedFrom + FAILED once A landed). ──
+describe("#250 Todo A — generateProvenanceFiles emits a carrier-relative derivedFrom + anchor-self marker (1.1)", () => {
+  it("no derived-from-absolute finding; derivedFrom is the carrier-relative anchor, marker anchor-self, schemaVersion 1.1", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "prov-a-generate-"));
     try {
       writeFileSync(
         path.join(dir, "package.json"),
@@ -421,18 +420,155 @@ describe("#250 Todo B canary — generateProvenanceFiles still emits an ABSOLUTE
       writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
       const fCel = path.join(dir, "f.cel");
       writeFileSync(fCel, CEL);
-      const anchorTxt = path.join(dir, "anchor.txt"); // absolute temp path — the producer records it verbatim (the #250 bug)
+      const anchorTxt = path.join(dir, "anchor.txt");
       writeFileSync(anchorTxt, ANCHOR);
 
+      // no artifactCarrierPath → the dest-less P8 fallback (carrier = the anchor's dir); the artifact IS written beside
+      // the anchor below, so that fallback is correct here (derivedFrom resolves).
       const g = generateProvenanceFiles(fCel, anchorTxt);
+      expect(g.artifact.schemaVersion).toBe("1.1");
+      expect(g.artifact.anchorSource.derivedFrom).toBe("anchor.txt"); // carrier-relative, POSIX
+      expect(g.artifact.anchorSource.derivedFromContract).toBe("anchor-self");
+      expect(classifyDerivedFrom(g.artifact.anchorSource.derivedFrom)).toBe("ok");
+      expect(g.advisories?.some((a) => /normaliz/i.test(a))).toBe(true); // dest-less fallback advisory (P8)
+
       const artifactPath = path.join(dir, "artifact.json");
       writeFileSync(artifactPath, JSON.stringify(g.artifact));
+      const findings = validateProvenanceFiles(artifactPath, fCel, anchorTxt).findings;
+      expect(findings.find((f) => f.kind === "derived-from-absolute")).toBeUndefined();
+      expect(findings.find((f) => f.kind === "derived-from-malformed")).toBeUndefined();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 
-      const df = validateProvenanceFiles(artifactPath, fCel, anchorTxt).findings.find(
-        (f) => f.kind === "derived-from-absolute",
+  it("with an explicit artifactCarrierPath in a SIBLING dir, derivedFrom is the ../ relative path (no advisory)", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "prov-a-carrier-"));
+    try {
+      writeFileSync(
+        path.join(dir, "package.json"),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
       );
-      expect(df).toBeDefined(); // ← Todo A makes this undefined; when it does, update/remove this canary.
-      expect(df?.severity).toBe(DERIVED_FROM_GATE_ENFORCED ? "error" : "warning"); // non-blocking until the H delivery
+      writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
+      const fCel = path.join(dir, "f.cel");
+      writeFileSync(fCel, CEL);
+      const anchorTxt = path.join(dir, "anchor.txt");
+      writeFileSync(anchorTxt, ANCHOR);
+      // the artifact will live in a sibling `out/` dir → derivedFrom must climb out and back into the anchor's dir.
+      const artifactPath = path.join(dir, "out", "artifact.json");
+
+      const g = generateProvenanceFiles(fCel, anchorTxt, { artifactCarrierPath: artifactPath });
+      expect(g.artifact.anchorSource.derivedFrom).toBe("../anchor.txt");
+      expect(classifyDerivedFrom(g.artifact.anchorSource.derivedFrom)).toBe("ok");
+      expect(g.advisories).toBeUndefined(); // destination given → no dest-less advisory
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // ── the F/A merge landmine: --merge onto a LEGACY 1.0 (marker-less) existing WITH an anchor-text drift, so mergeScaffold
+  //    Rule 1 preserves the legacy anchorSource under the new "1.1" envelope. The merged artifact MUST come out loader-valid.
+  /** Write a legacy 1.0 marker-less existing artifact (derived from a fresh scaffold, then downgraded) with a distinct
+   *  OLD textHash so a re-merge with the real anchor DRIFTS. `legacyDerivedFrom`/`hashMatchesText` shape the tell + rebase. */
+  const writeLegacyExisting = (
+    dir: string,
+    fCel: string,
+    anchorTxt: string,
+    legacyDerivedFrom: string,
+    hashMatchesText: boolean,
+  ): string => {
+    const template = generateProvenanceFiles(fCel, anchorTxt).artifact; // a valid 1.1 scaffold to borrow clusters from
+    const legacy = JSON.parse(JSON.stringify(template)) as ProvenanceArtifact;
+    legacy.schemaVersion = "1.0";
+    delete (legacy.anchorSource as { derivedFromContract?: unknown }).derivedFromContract;
+    legacy.anchorSource.textHash = "sha256:0ld0ld"; // != the real anchor → mergeScaffold Rule 1 drifts + preserves this
+    legacy.anchorSource.derivedFromHash = hashMatchesText ? "sha256:0ld0ld" : "sha256:d0cx"; // tell → anchor-self | upstream-source
+    legacy.anchorSource.derivedFrom = legacyDerivedFrom;
+    const existingPath = path.join(dir, "existing.json");
+    writeFileSync(existingPath, JSON.stringify(legacy));
+    return existingPath;
+  };
+
+  it("merge onto a legacy 1.0 markerless existing across a drift → loader-valid 1.1, tell-inferred anchor-self marker, valid derivedFrom rebased", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "prov-a-merge-legacy-"));
+    try {
+      writeFileSync(
+        path.join(dir, "package.json"),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      );
+      writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
+      const fCel = path.join(dir, "f.cel");
+      writeFileSync(fCel, CEL);
+      const anchorTxt = path.join(dir, "anchor.txt");
+      writeFileSync(anchorTxt, ANCHOR);
+      const existingPath = writeLegacyExisting(dir, fCel, anchorTxt, "anchor.txt", true);
+
+      const g = generateProvenanceFiles(fCel, anchorTxt, { existingArtifactPath: existingPath });
+      expect(g.merged).toBe(true);
+      expect(g.artifact.schemaVersion).toBe("1.1");
+      expect(g.artifact.anchorSource.textHash).toBe("sha256:0ld0ld"); // Rule 1 preserved the drifted anchor
+      expect(g.artifact.anchorSource.derivedFromContract).toBe("anchor-self"); // inferred (derivedFromHash === textHash)
+      expect(g.artifact.anchorSource.derivedFrom).toBe("anchor.txt"); // valid path, rebased (same dir → unchanged)
+      expect(parseProvenanceArtifact(g.artifact).ok).toBe(true); // the landmine is defused
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("merge across a drift preserving a legacy ABSOLUTE derivedFrom → verbatim (detector still flags) + upstream-source marker, still loader-valid", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "prov-a-merge-abs-"));
+    try {
+      writeFileSync(
+        path.join(dir, "package.json"),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      );
+      writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
+      const fCel = path.join(dir, "f.cel");
+      writeFileSync(fCel, CEL);
+      const anchorTxt = path.join(dir, "anchor.txt");
+      writeFileSync(anchorTxt, ANCHOR);
+      const deadAbsolute = process.platform === "win32" ? "C:\\dead\\src.docx" : "/dead/src.docx";
+      const existingPath = writeLegacyExisting(dir, fCel, anchorTxt, deadAbsolute, false);
+
+      const g = generateProvenanceFiles(fCel, anchorTxt, { existingArtifactPath: existingPath });
+      expect(g.artifact.anchorSource.derivedFromContract).toBe("upstream-source"); // inferred (hash !== textHash)
+      expect(g.artifact.anchorSource.derivedFrom).toBe(deadAbsolute); // VERBATIM — not masked/rebased (E owns recovery)
+      expect(parseProvenanceArtifact(g.artifact).ok).toBe(true); // loader passes (marker present)
+
+      // the absolute-path detector STILL fires (non-blocking warning until H) — the defect is surfaced, not hidden.
+      const artifactPath = path.join(dir, "merged.json");
+      writeFileSync(artifactPath, JSON.stringify(g.artifact));
+      const findings = validateProvenanceFiles(artifactPath, fCel, anchorTxt).findings;
+      expect(findings.some((f) => f.kind === "derived-from-absolute")).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("merge across a drift with a DIFFERENT output carrier → preserved derivedFrom rebased in the correct DIRECTION", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "prov-a-merge-rebase-"));
+    try {
+      writeFileSync(
+        path.join(dir, "package.json"),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      );
+      writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
+      const fCel = path.join(dir, "f.cel");
+      writeFileSync(fCel, CEL);
+      const anchorTxt = path.join(dir, "anchor.txt");
+      writeFileSync(anchorTxt, ANCHOR);
+      // legacy existing in `dir/` whose preserved derivedFrom is DISTINCT from what a fresh gen would produce ("../anchor.txt"),
+      // so the assertion proves the PRESERVED value was rebased (not the fresh one) AND pins the rebase arg direction: a
+      // swapped (prev↔new) rebase would yield "nested/legacy-src.txt" (unchanged) or "out/…", never "../nested/…".
+      const existingPath = writeLegacyExisting(dir, fCel, anchorTxt, "nested/legacy-src.txt", true);
+      const g = generateProvenanceFiles(fCel, anchorTxt, {
+        existingArtifactPath: existingPath,
+        artifactCarrierPath: path.join(dir, "out", "artifact.json"), // sibling `out/` → derivedFrom must climb `../`
+      });
+      expect(g.artifact.anchorSource.textHash).toBe("sha256:0ld0ld"); // the PRESERVED (drifted) anchor
+      expect(g.artifact.anchorSource.derivedFrom).toBe("../nested/legacy-src.txt"); // rebased dir→dir/out
+      expect(classifyDerivedFrom(g.artifact.anchorSource.derivedFrom)).toBe("ok");
+      expect(parseProvenanceArtifact(g.artifact).ok).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

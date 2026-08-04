@@ -114,9 +114,10 @@ try {
   const r = generateProvenanceFiles(celPath, anchorPath, {
     ...(policyVersion !== undefined ? { policyVersion } : {}),
     ...(mergePath !== undefined ? { existingArtifactPath: mergePath } : {}),
-    ...(clusterBy !== undefined
-      ? { clusterBy: clusterBy as "decision" | "disposition-path" }
-      : {}),
+    ...(clusterBy !== undefined ? { clusterBy: clusterBy as "decision" | "disposition-path" } : {}),
+    // #250 A — the artifact's write destination IS the carrier `derivedFrom` is made relative to. Without --out the
+    // artifact goes to stdout (dest unknown here) → generateProvenanceFiles falls back to the anchor dir + advises.
+    ...(outPath !== undefined ? { artifactCarrierPath: outPath } : {}),
   });
 
   // stdout is reserved for the artifact JSON (clean machine-readable output when --out is omitted); every human-facing
@@ -152,6 +153,11 @@ try {
     for (const d of r.mergeDiagnostics as MergeDiagnostic[]) {
       console.error(`  [${d.kind}] ${d.message}`);
     }
+  }
+
+  if (r.advisories?.length) {
+    console.error(`\nAdvisories (${r.advisories.length}):`);
+    for (const a of r.advisories) console.error(`  ⚠ ${a}`);
   }
 
   console.error(`\nDONE — ${r.artifact.clusters.length} cluster(s) generated.`);

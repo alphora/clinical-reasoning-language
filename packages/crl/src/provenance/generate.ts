@@ -203,6 +203,23 @@ function runPathReachedDecisions(
   return out;
 }
 
+/**
+ * #250 A/F — guarantee the `derivedFromContract` marker a "1.1" envelope REQUIRES, so no code path that stamps the versioned
+ * envelope can emit a loader-invalid artifact (`parseProvenanceArtifact` → `marker-required`). Both writers of a 1.1 envelope
+ * — `generateProvenanceScaffold` (fresh) and `mergeScaffold` (the Rule-1 drift-keep of a possibly-legacy `anchorSource`) — run
+ * their chosen anchorSource through this. An existing marker is kept; otherwise it is INFERRED from the tell (disc 375 P3):
+ * `derivedFromHash === textHash ⇒ anchor-self` (the Model-A / generate contract, canonical text is its own source), else
+ * `upstream-source` (the canonicalize contract). Purely lexical (no path/fs); the carrier-relativity of `derivedFrom` is a
+ * separate producer concern.
+ */
+function ensureAnchorMarker(a: AnchorSourceMeta): AnchorSourceMeta {
+  if (a.derivedFromContract) return a;
+  return {
+    ...a,
+    derivedFromContract: a.derivedFromHash === a.textHash ? "anchor-self" : "upstream-source",
+  };
+}
+
 export function generateProvenanceScaffold(
   graph: ResolvedCelGraph,
   opts: {
@@ -415,7 +432,9 @@ export function generateProvenanceScaffold(
     schemaVersion: PROVENANCE_SCHEMA_VERSION,
     policyId: opts.policyId,
     policyVersion: opts.policyVersion,
-    anchorSource: opts.anchorSource,
+    // #250 A/F — the writer stamps "1.1", which REQUIRES the marker; ensure it even if a direct caller passed an
+    // unmarked anchorSource, so the public scaffold can never emit a loader-invalid artifact.
+    anchorSource: ensureAnchorMarker(opts.anchorSource),
     items: [], // Model A: the source-attribution layer is the KE's, left empty by the scaffold
     ignoredRanges: [],
     clusters,
@@ -1538,21 +1557,25 @@ export function mergeScaffold(previous: ProvenanceArtifact, fresh: ProvenanceArt
   // ── Rule 1: envelope from `fresh`; anchorSource kept from `previous` on a hash drift (so the validator keeps emitting
   //    anchor-hash-drift durably + the existing sourceRefs stay valid against the text they were authored on — the
   //    re-anchor to the new source is a DEFERRED, separate step). ──
-  //    #250 F/A LANDMINE — READ BEFORE producer A flips the writer to schemaVersion "1.1": when this drift branch keeps a
-  //    LEGACY (pre-A, marker-less) `previous.anchorSource` while `fresh` carries the new "1.1" envelope, the merged artifact
-  //    becomes a "1.1" record whose anchorSource has NO `derivedFromContract` — which `parseProvenanceArtifact` HARD-REJECTS
-  //    (`marker-required`) on the KE's very next load. Because F is a permissive single interface (no compile-time union
-  //    guard), this is a RUNTIME failure, not a type error. Producer A MUST, when preserving a legacy anchorSource here,
-  //    STAMP the tell-inferred marker (`derivedFromHash === textHash ⇒ "anchor-self", else "upstream-source"`) so the
-  //    envelope stays a valid "1.1". This slice (F) is reader-only and does not stamp; the rule is A's to implement + test.
+  //    #250 A/F — the merged envelope's schemaVersion is `fresh`'s (see below); when that is "1.1" the anchorSource MUST
+  //    carry the marker, or `parseProvenanceArtifact` HARD-REJECTS the merged artifact (`marker-required`) on the KE's next
+  //    load — the F/A landmine. `ensureAnchorMarker` stamps the tell-inferred marker on whichever anchorSource wins
+  //    (a preserved LEGACY `previous`, or an unmarked direct-caller `fresh`), so this public function can never emit a
+  //    loader-invalid artifact. The CARRIER-RELATIVITY of the preserved `derivedFrom` (rebasing it from the previous
+  //    carrier dir to the output dir) needs directory context `mergeScaffold` does not have — that stays in the
+  //    `generateProvenanceFiles` wrapper, keyed on this same textHash-drift condition.
   let anchorSource = fresh.anchorSource;
   if (previous.anchorSource.textHash !== fresh.anchorSource.textHash) {
-    anchorSource = previous.anchorSource; // keep the old anchor; do NOT strip sourceRefs (#250 A: stamp the tell-inferred marker)
+    anchorSource = previous.anchorSource; // keep the old anchor; do NOT strip sourceRefs
     diagnostics.push({
       kind: "source-changed",
       message: `anchor source changed (previous textHash ${previous.anchorSource.textHash} != fresh ${fresh.anchorSource.textHash}); keeping the previous anchorSource so existing sourceRefs stay valid — re-anchoring is deferred.`,
     });
   }
+  // Gated on the merged envelope version. `fresh` is contractually a CURRENT-writer artifact (always "1.1" — the only
+  // fresh source is `generateProvenanceScaffold`); the mirror case (a hand-built "1.0" fresh over a marked "1.1" previous,
+  // which would yield a marker-forbidden 1.0) is out of contract and unreachable by any in-repo producer.
+  if (fresh.schemaVersion === "1.1") anchorSource = ensureAnchorMarker(anchorSource);
 
   // ── Rule 2: items + ignoredRanges are pure KE-authored layers — taken from `previous` (shallow-copied so a caller that
   //    mutates the result can't alias back into `previous`; the per-item objects are still shared — see the header). ──
