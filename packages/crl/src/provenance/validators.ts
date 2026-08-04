@@ -10,6 +10,7 @@ import { createHash } from "node:crypto";
 import type { AuthoredKind, ProvenanceArtifact, Role } from "./artifact";
 import { sliceUtf8Bytes } from "./canonicalize";
 import { deriveCoverage } from "./coverage";
+import { classifyDerivedFrom, DERIVED_FROM_GATE_ENFORCED } from "./derivedFromPolicy";
 import type { IndexedCrlNode, ProvenanceIndex, ProvNodeRef } from "./indexer";
 import { nodeKey } from "./indexer";
 
@@ -46,6 +47,11 @@ export type ProvenanceFindingKind =
   | "mn-keyword-soft"
   | "structural-mistag"
   | "over-reach"
+  // ── #250 derivedFrom carrier-path gate (Todo B: the pure LEXICAL half). NOT in ATTRIBUTION_KINDS → integrity-class,
+  //    reported at native severity in BOTH worklist + final (a broken source trail is not "remaining work"). The
+  //    resolve/hash checks (`derived-from-unresolved` / `-hash-mismatch`) + the sidecar cross-check land in later slices.
+  | "derived-from-absolute"
+  | "derived-from-malformed"
   // ── cockpit correspondence (#170): the FINAL-mode gate that the cockpit lights exactly each case's run path. NOT in
   //    ATTRIBUTION_KINDS → never softened; constructed in validateProvenanceFiles (outside validateProvenance) at
   //    class "integrity" + severity "error". Green now guarantees a correct cockpit, not just referential integrity.
@@ -297,6 +303,29 @@ export function validateProvenance(
         });
       }
     }
+  }
+
+  // ── #250 (Todo B) derivedFrom carrier-path — PURE LEXICAL check on `artifact.anchorSource.derivedFrom`. It must be a
+  //    carrier-relative POSIX path so the source document resolves on any clone; absolute/drive/scheme-bound is dead off the
+  //    authoring machine (the #250 defect), and a `\`-separated or blank/NUL value is not a usable path. `classifyDerivedFrom`
+  //    returns exactly one class so this emits at most one finding (malformed takes precedence over absolute). RESOLUTION
+  //    (the file exists + its bytes match `derivedFromHash`) is Todo C (fs layer). Severity is gated on DERIVED_FROM_GATE_ENFORCED:
+  //    a NON-BLOCKING `warning` until the bundled #250 delivery (H) ships the producer fix (A) + normalizer (E), then a hard
+  //    `error` — so a corpus never hard-fails before its repair tool ships, even from an interim develop release.
+  const dfClass = classifyDerivedFrom(artifact.anchorSource.derivedFrom);
+  const dfSeverity: Severity = DERIVED_FROM_GATE_ENFORCED ? "error" : "warning";
+  if (dfClass === "malformed") {
+    findings.push({
+      kind: "derived-from-malformed",
+      severity: dfSeverity,
+      message: `anchorSource.derivedFrom ${JSON.stringify(artifact.anchorSource.derivedFrom)} is not a usable carrier-relative path — it must be a non-blank, POSIX-separated (\`/\`) path relative to the directory of the file carrying this record (#250).`,
+    });
+  } else if (dfClass === "absolute") {
+    findings.push({
+      kind: "derived-from-absolute",
+      severity: dfSeverity,
+      message: `anchorSource.derivedFrom ${JSON.stringify(artifact.anchorSource.derivedFrom)} is an absolute/drive/scheme-bound path; it must be carrier-relative (POSIX \`/\`, relative to the directory of the file carrying this record) so the source resolves on any clone — an absolute path is dead off the authoring machine (#250).`,
+    });
   }
 
   // ── V4 source-acknowledgement (reuse coverage) ──
@@ -710,7 +739,9 @@ export function validateProvenance(
     // Re-grade ONLY a hard error→warning (the stated invariant); leave a native manual-review/warning attribution finding
     // untouched, so a future attribution kind that isn't error-severity can't be silently demoted.
     const severity =
-      mode === "worklist" && cls === "attribution" && f.severity === "error" ? "warning" : f.severity;
+      mode === "worklist" && cls === "attribution" && f.severity === "error"
+        ? "warning"
+        : f.severity;
     return { ...f, class: cls, severity };
   });
 }

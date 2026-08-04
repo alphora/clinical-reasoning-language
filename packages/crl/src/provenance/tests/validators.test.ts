@@ -12,6 +12,7 @@ import type {
   CelNodeRef,
   AnchorSourceMeta,
 } from "../artifact";
+import { DERIVED_FROM_GATE_ENFORCED } from "../derivedFromPolicy";
 import { buildProvenanceIndex, type ProvenanceIndex } from "../indexer";
 import {
   validateProvenance,
@@ -111,6 +112,46 @@ const ref = (
   ownership: "policy-owned",
   relation,
   status,
+});
+
+describe("validateProvenance — #250 derivedFrom carrier-path (Todo B)", () => {
+  // Severity is gated: a non-blocking `warning` until the #250 H delivery flips DERIVED_FROM_GATE_ENFORCED → hard `error`.
+  // Asserting against the constant keeps these tests correct on both sides of that flip.
+  const DF_SEV = DERIVED_FROM_GATE_ENFORCED ? "error" : "warning";
+  const dfKinds = (df: unknown, mode?: "worklist" | "final") =>
+    validateProvenance(
+      art({ anchorMeta: { ...metaFor(""), derivedFrom: df as string } }, ""),
+      idx,
+      "",
+      mode ? { mode } : undefined,
+    ).filter((f) => f.kind.startsWith("derived-from"));
+
+  it("a carrier-relative POSIX derivedFrom emits no derived-from finding", () => {
+    for (const ok of ["x.docx", "source/x.docx", "../refined-source/x.docx"]) {
+      expect(dfKinds(ok)).toEqual([]);
+    }
+  });
+
+  it("an absolute/scheme-bound derivedFrom → derived-from-absolute, integrity, gated severity, unsoftened in worklist", () => {
+    const fs = dfKinds("E:/src/repo-wt/x/artifacts/p.docx");
+    expect(fs.map((f) => f.kind)).toEqual(["derived-from-absolute"]);
+    expect(fs[0].severity).toBe(DF_SEV);
+    expect(fs[0].class).toBe("integrity");
+    // integrity findings are reported at native severity in BOTH modes (not a coverage backlog) — worklist must not soften it
+    expect(dfKinds("E:/x.docx", "worklist").map((f) => [f.kind, f.severity])).toEqual([
+      ["derived-from-absolute", DF_SEV],
+    ]);
+  });
+
+  it("a malformed derivedFrom (blank / NUL / backslash-relative / non-string) → derived-from-malformed", () => {
+    for (const bad of ["", "   ", "a\0b.docx", "a\\b.docx", undefined, 42]) {
+      expect(dfKinds(bad).map((f) => f.kind)).toEqual(["derived-from-malformed"]);
+    }
+  });
+
+  it("emits AT MOST one derived-from finding — a backslash-absolute path is classified absolute, not double-counted", () => {
+    expect(dfKinds("E:\\src\\x.docx").map((f) => f.kind)).toEqual(["derived-from-absolute"]);
+  });
 });
 
 describe("validateProvenance — V1/V2 referential integrity + agreement", () => {
@@ -860,9 +901,7 @@ describe("validateProvenance — judge-lens WAIVERS (FINAL mode only)", () => {
         );
       }
     }
-    const clusters: Cluster[] = [
-      { id: "c1", label: "", items: [], crl: linkCandidates, cel: [] },
-    ];
+    const clusters: Cluster[] = [{ id: "c1", label: "", items: [], crl: linkCandidates, cel: [] }];
     const fs = final(art({ items, clusters }));
     expect(fs.some((f) => f.severity === "error")).toBe(false); // no over-reach (all candidates covered) → pass holds
     const manualReview = fs.filter((f) => f.severity === "manual-review");
@@ -979,7 +1018,13 @@ describe("validateProvenance — judge-lens WAIVERS (FINAL mode only)", () => {
     // must-link item, the same Crit intentionally-unlinked → a LEGAL waiver. Keying the dedup by node ALONE would wrongly
     // suppress cB's legal waiver; keying by cluster+node keeps it.
     const items: Item[] = [
-      { id: "n1", origin: "source", text: "x", role: "criterion", linkRequirement: "must-link-decision" },
+      {
+        id: "n1",
+        origin: "source",
+        text: "x",
+        role: "criterion",
+        linkRequirement: "must-link-decision",
+      },
     ];
     const unlinked = (id: string, owns: string[]): Cluster => ({
       id,
@@ -1119,7 +1164,13 @@ describe("validateProvenance — judge-lens WAIVERS (FINAL mode only)", () => {
 
   it("INVARIANT: every waiver carries a scrutiny flag; no non-waiver does", () => {
     // exercise an artifact with all 4 waiver kinds + non-waiver findings, and assert the contract holds across the stream.
-    const arts = [authoredArt(), ignoredArt(MN_START, MN_END), legalUnlinkArt(), dispositionArt(), art({})];
+    const arts = [
+      authoredArt(),
+      ignoredArt(MN_START, MN_END),
+      legalUnlinkArt(),
+      dispositionArt(),
+      art({}),
+    ];
     for (const a of arts) {
       for (const f of final(a, ANCHOR)) {
         if (WAIVER_KINDS.has(f.kind)) expect(f.scrutiny).toBeDefined();

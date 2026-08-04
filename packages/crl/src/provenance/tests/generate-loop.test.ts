@@ -20,6 +20,7 @@ import * as path from "path";
 import { resolveCelImports } from "../../cel/imports";
 import type { AnchorSourceMeta, CrlNodeRef, Item, ProvenanceArtifact } from "../artifact";
 import { deriveCoverage } from "../coverage";
+import { DERIVED_FROM_GATE_ENFORCED } from "../derivedFromPolicy";
 import { generateProvenanceScaffold, mergeScaffold } from "../generate";
 import { generateProvenanceFiles } from "../generateFiles";
 import { buildProvenanceIndex, nodeKey, type ProvenanceIndex } from "../indexer";
@@ -399,6 +400,39 @@ describe("validateProvenanceFiles — worklist mode passes a fresh scaffold (wor
       // worklist skips the waiver block entirely → both counts zero regardless of artifact content.
       expect(work.waiverCount).toBe(0);
       expect(work.waiverScrutinizeCount).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ── #250 Todo B canary: the executable record of the B-before-A coupling. `generateProvenanceFiles` still writes the raw
+//    (absolute) anchorPath into `derivedFrom` (generateFiles.ts) — so a freshly generated scaffold trips the new detector.
+//    Todo A relativizes the producer; when it lands, this canary FAILS (no finding), forcing the A author to update it
+//    rather than letting the coupling outlive its reason as a silent comment. Pre-H the finding is a non-blocking warning.
+describe("#250 Todo B canary — generateProvenanceFiles still emits an ABSOLUTE derivedFrom (Todo A must flip this)", () => {
+  it("a freshly generated scaffold trips derived-from-absolute — Todo A (producer → carrier-relative) will make this fail", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "prov-df-canary-"));
+    try {
+      writeFileSync(
+        path.join(dir, "package.json"),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      );
+      writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
+      const fCel = path.join(dir, "f.cel");
+      writeFileSync(fCel, CEL);
+      const anchorTxt = path.join(dir, "anchor.txt"); // absolute temp path — the producer records it verbatim (the #250 bug)
+      writeFileSync(anchorTxt, ANCHOR);
+
+      const g = generateProvenanceFiles(fCel, anchorTxt);
+      const artifactPath = path.join(dir, "artifact.json");
+      writeFileSync(artifactPath, JSON.stringify(g.artifact));
+
+      const df = validateProvenanceFiles(artifactPath, fCel, anchorTxt).findings.find(
+        (f) => f.kind === "derived-from-absolute",
+      );
+      expect(df).toBeDefined(); // ← Todo A makes this undefined; when it does, update/remove this canary.
+      expect(df?.severity).toBe(DERIVED_FROM_GATE_ENFORCED ? "error" : "warning"); // non-blocking until the H delivery
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
