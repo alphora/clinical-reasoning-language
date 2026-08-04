@@ -415,3 +415,178 @@ describe("normalizeProvenanceFiles — artifact + discovered sidecar together", 
     }
   });
 });
+
+describe("normalizeProvenanceFiles — E2 discovery (--search-root)", () => {
+  let dir: string;
+  let docx: Buffer;
+  let docxHash: string;
+  let textHash: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "crl-norm-"));
+    docx = Buffer.from("PK the lost upstream docx", "utf8");
+    docxHash = sha256(docx);
+    textHash = sha256("the canonical text");
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  // A sidecar whose derivedFrom is a DEAD absolute path (resolves nowhere) — the E1 dead-path-needs-discovery case.
+  const writeDeadSidecar = (over: Record<string, unknown> = {}): string => {
+    const p = join(dir, "anchor.anchormeta.json");
+    writeFileSync(
+      p,
+      JSON.stringify(
+        sidecarJson({
+          derivedFrom: "/gone/worktree/source.docx",
+          derivedFromHash: docxHash,
+          textHash,
+          ...over,
+        }),
+        null,
+        2,
+      ) + "\n",
+    );
+    return p;
+  };
+
+  it("relocates a DEAD upstream path under --search-root and rewrites it carrier-relative", () => {
+    const p = writeDeadSidecar();
+    mkdirSync(join(dir, "found"), { recursive: true });
+    writeFileSync(join(dir, "found", "source.docx"), docx); // the source, moved here
+    const r = normalizeProvenanceFiles({ sidecarPath: p, searchRoot: dir });
+    expect(r).toMatchObject({ ok: true, fullyNormalized: true });
+    if (!r.ok) throw new Error("unreachable");
+    expect(r.carriers[0]).toMatchObject({ changed: true, wrote: true });
+    const out = readJson(p);
+    expect(out.derivedFrom).toBe("found/source.docx"); // carrier-relative POSIX to the discovered location
+    expect(out.derivedFromContract).toBe("upstream-source");
+    expect(parseAnchorMeta(out).ok).toBe(true);
+  });
+
+  it("--dry-run + --search-root reports the relocate as ready but writes nothing", () => {
+    const p = writeDeadSidecar();
+    mkdirSync(join(dir, "found"), { recursive: true });
+    writeFileSync(join(dir, "found", "source.docx"), docx);
+    const before = readFileSync(p, "utf8");
+    const r = normalizeProvenanceFiles({ sidecarPath: p, searchRoot: dir, dryRun: true });
+    expect(r).toMatchObject({ ok: true, fullyNormalized: true, dryRun: true });
+    if (!r.ok) throw new Error("unreachable");
+    expect(r.carriers[0]).toMatchObject({ changed: true, wrote: false });
+    expect(readFileSync(p, "utf8")).toBe(before);
+  });
+
+  it("keeps dead-path-needs-discovery (byte-untouched) when the source is NOT under the search root", () => {
+    const p = writeDeadSidecar();
+    const empty = mkdtempSync(join(tmpdir(), "crl-empty-"));
+    try {
+      const before = readFileSync(p, "utf8");
+      const r = normalizeProvenanceFiles({ sidecarPath: p, searchRoot: empty });
+      expect(r).toMatchObject({ ok: true, fullyNormalized: false });
+      if (!r.ok) throw new Error("unreachable");
+      expect(r.worklist[0]).toMatchObject({ reason: "dead-path-needs-discovery", kind: "sidecar" });
+      expect(readFileSync(p, "utf8")).toBe(before);
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+  });
+
+  it("worklists AMBIGUOUS (byte-untouched) when >1 copy hashes to the oracle under the root", () => {
+    const p = writeDeadSidecar();
+    mkdirSync(join(dir, "a"), { recursive: true });
+    mkdirSync(join(dir, "b"), { recursive: true });
+    writeFileSync(join(dir, "a", "source.docx"), docx);
+    writeFileSync(join(dir, "b", "source.docx"), docx);
+    const before = readFileSync(p, "utf8");
+    const r = normalizeProvenanceFiles({ sidecarPath: p, searchRoot: dir });
+    expect(r).toMatchObject({ ok: true, fullyNormalized: false });
+    if (!r.ok) throw new Error("unreachable");
+    expect(r.worklist[0]).toMatchObject({ reason: "ambiguous", kind: "sidecar" });
+    expect(readFileSync(p, "utf8")).toBe(before);
+  });
+
+  it("returns an input error for a --search-root that is not a directory", () => {
+    const p = writeDeadSidecar();
+    expect(
+      normalizeProvenanceFiles({ sidecarPath: p, searchRoot: join(dir, "nope") }),
+    ).toMatchObject({
+      ok: false,
+      stage: "input",
+    });
+    expect(normalizeProvenanceFiles({ sidecarPath: p, searchRoot: p })).toMatchObject({
+      ok: false,
+      stage: "input",
+    }); // a file, not a dir
+  });
+
+  it("normalizes a RESOLVABLE path directly even with --search-root present (a non-dead record is closed-form)", () => {
+    // The source resolves in place → closed-form; --search-root is present but the record isn't dead. (This asserts the
+    // OUTCOME — a resolvable record is normalized in place — not that the walk was skipped; the gating is unit-covered by
+    // the plan-then-discover structure, where only dead-path plans carry a discoveryTarget.)
+    const p = join(dir, "anchor.anchormeta.json");
+    writeFileSync(join(dir, "source.docx"), docx);
+    writeFileSync(
+      p,
+      JSON.stringify(
+        sidecarJson({
+          derivedFrom: resolve(dir, "source.docx"),
+          derivedFromHash: docxHash,
+          textHash,
+        }),
+        null,
+        2,
+      ) + "\n",
+    );
+    const r = normalizeProvenanceFiles({ sidecarPath: p, searchRoot: dir });
+    expect(r).toMatchObject({ ok: true, fullyNormalized: true });
+    expect(readJson(p).derivedFrom).toBe("source.docx");
+  });
+
+  it("worklists BUDGET-EXHAUSTED (byte-untouched) when the default-budget scan can't complete (source below maxDepth)", () => {
+    // The normalizer uses the frozen DEFAULT_DISCOVERY_BUDGET (maxDepth 64); a source 65 dirs deep trips it, so enumeration
+    // never completes → budget-exhausted, exercising applyDiscovery's budget-exhausted branch + reason wiring end-to-end.
+    const p = writeDeadSidecar();
+    const deep = join(dir, Array(65).fill("d").join("/"));
+    mkdirSync(deep, { recursive: true });
+    writeFileSync(join(deep, "source.docx"), docx);
+    const before = readFileSync(p, "utf8");
+    const r = normalizeProvenanceFiles({ sidecarPath: p, searchRoot: dir });
+    expect(r).toMatchObject({ ok: true, fullyNormalized: false });
+    if (!r.ok) throw new Error("unreachable");
+    expect(r.worklist[0]).toMatchObject({ reason: "budget-exhausted", kind: "sidecar" });
+    expect(readFileSync(p, "utf8")).toBe(before);
+  });
+});
+
+describe("normalizeProvenanceFiles — plan-phase load ordering (E2 restructure)", () => {
+  // DELIBERATE divergence from E1: planning now loads BOTH carriers before any write (Phase 1), so an unparseable sidecar
+  // fails the whole run byte-untouched rather than leaving a half-migrated pair (E1 wrote the artifact, THEN hit the sidecar
+  // and reported the artifact as "already normalized this run"). All-or-nothing is the better contract; this pins it.
+  it("an unparseable sidecar blocks the artifact write entirely (artifact left byte-untouched)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "crl-norm-"));
+    try {
+      const anchor = Buffer.from("anchor text\n", "utf8");
+      writeFileSync(join(dir, "anchor.txt"), anchor);
+      const textHash = sha256(anchor);
+      const artPath = join(dir, "art.json");
+      writeFileSync(
+        artPath,
+        JSON.stringify(
+          artifactJson({
+            path: "anchor.txt",
+            derivedFrom: "/gone/anchor.txt", // repairable closed-form, WOULD migrate if the sidecar were fine
+            derivedFromHash: textHash,
+            textHash,
+          }),
+          null,
+          2,
+        ) + "\n",
+      );
+      writeFileSync(metaPathForAnchor(join(dir, "anchor.txt")), "{ not json"); // corrupt sidecar beside the anchor
+      const before = readFileSync(artPath, "utf8");
+      const r = normalizeProvenanceFiles({ artifactPath: artPath });
+      expect(r).toMatchObject({ ok: false, stage: "load" });
+      expect(readFileSync(artPath, "utf8")).toBe(before); // NOT migrated — the pair is all-or-nothing
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

@@ -5,12 +5,13 @@
  * settled #250 convention — carrier-relative + POSIX `derivedFrom`, the versioned `schemaVersion:"1.1"` envelope, and the
  * `derivedFromContract` marker — so a corpus can mechanically repair itself before delivery H flips the gate to hard errors.
  *
- * WHAT "closed-form" means (design disc 383): E1 repairs only records it can VERIFY against the oracle already in the data
- * (`derivedFromHash`) WITHOUT searching the filesystem — an `anchor-self` record via its sibling anchor `.txt`, or an
- * `upstream-source` record whose absolute path still RESOLVES on this machine and hashes correctly. A dead upstream path
- * (the transient-worktree flavour that resolves nowhere) needs candidate DISCOVERY under a supplied `--search-root`; that
- * is Todo E2 (the Dev-Drive-safe bounded scan), deliberately kept OUT of this slice so the closed-form core carries zero
- * recursive-scan risk. Such records are WORKLISTED here, never rewritten. **H waits on E2, not on E1.**
+ * WHAT "closed-form" means (design disc 383): the E1 core repairs only records it can VERIFY against the oracle already in
+ * the data (`derivedFromHash`) WITHOUT searching the filesystem — an `anchor-self` record via its sibling anchor `.txt`, or
+ * an `upstream-source` record whose absolute path still RESOLVES on this machine and hashes correctly. A dead upstream path
+ * (the transient-worktree flavour that resolves nowhere) needs candidate DISCOVERY: the E2 layer (`discoverSource.ts`, wired
+ * here behind the OPTIONAL `searchRoot`) runs ONE bounded, Dev-Drive-safe walk over a supplied search root and relocates the
+ * source by hash. WITHOUT a `searchRoot`, a dead upstream path is WORKLISTED `dead-path-needs-discovery`, byte-untouched —
+ * so the closed-form core still carries zero recursive-scan risk on its own. **The H gate waits on E2.**
  *
  * The invariants the design pinned (both review arms):
  *  - The branch is keyed on VERIFICATION OUTCOME (does the current `derivedFrom` resolve AND hash to the oracle?) + contract
@@ -37,6 +38,8 @@ import { basename, dirname, join, resolve } from "node:path";
 import type { AnchorSourceMeta, ProvenanceArtifact } from "./artifact";
 import { PROVENANCE_LATEST_SCHEMA_VERSION } from "./artifact";
 import type { AnchorMeta, DerivedFromContract } from "./canonicalize";
+import type { DiscoveryOutcome, DiscoveryTarget } from "./discoverSource";
+import { discoverSources, discoveryTargetFor } from "./discoverSource";
 import {
   classifyDerivedFrom,
   isWellFormedSha256,
@@ -48,15 +51,17 @@ import { repoEscapeAdvisory } from "./repoEscape";
 import { writeFileAtomic } from "./writeFileAtomic";
 
 /** Why a record was left unrepaired. Structured (mirrors the B/C/D finding-kind discipline) so the cockpit / a driving
- *  script reads reason codes, not prose. E2 will add `ambiguous` / `budget-exhausted` for the discovery flavour. */
+ *  script reads reason codes, not prose. `ambiguous` / `budget-exhausted` are the E2 discovery flavour. */
 export type WorklistReason =
   | "no-oracle" // `derivedFromHash` (or the `textHash` the tell needs) is not a well-formed sha256:<hex>
   | "hash-mismatch" // upstream-source path RESOLVES but its bytes ≠ derivedFromHash — a content change, C's gate; never re-pointed
-  | "dead-path-needs-discovery" // upstream-source path resolves nowhere on this machine → E2's --search-root scan
+  | "dead-path-needs-discovery" // upstream-source path resolves nowhere → needs (or was not found by) the --search-root scan
   | "anchor-not-found" // anchor-self: the closed-form anchor .txt can't be located or doesn't hash to the oracle
   | "marker-tell-disagreement" // an existing marker contradicts the derivedFromHash/textHash tell → adjudicate, don't touch
   | "sidecar-hash-equals-text" // a sidecar with derivedFromHash === textHash (a real .anchormeta.json never has this)
-  | "no-carrier-relative"; // the verified source has no carrier-relative representation (cross-drive)
+  | "no-carrier-relative" // the verified/discovered source has no carrier-relative representation (cross-drive)
+  | "ambiguous" // E2: >1 distinct file under --search-root hashed to derivedFromHash — refuse to pick, disambiguate
+  | "budget-exhausted"; // E2: the discovery scan hit a ceiling before completing — uniqueness unprovable, poison every match
 
 export interface WorklistEntry {
   /** the carrier file (artifact or sidecar) whose record could not be normalized. */
@@ -185,12 +190,24 @@ type RecordPlan =
       resolvedSource: string;
       note?: string;
     }
-  | { kind: "worklist"; reason: WorklistReason; message: string };
+  | {
+      kind: "worklist";
+      reason: WorklistReason;
+      message: string;
+      /** present ONLY on a `dead-path-needs-discovery` plan whose recorded path yielded a usable filename hint — the seed the
+       *  orchestrator's single E2 walk consults. Its absence means "not recoverable by discovery" (blank/nameless path). */
+      discoveryTarget?: DiscoveryTarget;
+    };
 
-const worklist = (reason: WorklistReason, message: string): RecordPlan => ({
+const worklist = (
+  reason: WorklistReason,
+  message: string,
+  discoveryTarget?: DiscoveryTarget,
+): RecordPlan => ({
   kind: "worklist",
   reason,
   message,
+  ...(discoveryTarget ? { discoveryTarget } : {}),
 });
 
 /**
@@ -278,16 +295,27 @@ function planRecord(i: RecordPlanInput): RecordPlan {
           `derivedFrom "${cur}" resolves but its bytes do not match derivedFromHash — a content change, not a path defect (C's gate); refusing to re-point it.`,
         );
       }
+      // Dead upstream path — seed the orchestrator's single discovery walk with the salvaged filename hint. When the recorded
+      // path has NO usable filename (a trailing separator, `/gone/dir/`), discovery can't be seeded → say so, rather than
+      // promise a --search-root re-run that would silently never serve it.
+      const target = discoveryTargetFor(oracle, cur);
+      if (target.basename === "") {
+        return worklist(
+          "dead-path-needs-discovery",
+          `derivedFrom "${cur}" does not resolve and has no salvageable filename to seed discovery — recover it by hand.`,
+        );
+      }
       return worklist(
         "dead-path-needs-discovery",
-        `derivedFrom "${cur}" does not resolve on this machine; re-run the normalizer's discovery mode with an explicit --search-root to relocate it by hash (E2).`,
+        `derivedFrom "${cur}" does not resolve on this machine; re-run with an explicit --search-root to relocate the source by hash.`,
+        target,
       );
     }
     // anchor-self falls through to the closed-form repair below (the anchor + oracle are known, so a stale/wrong path is repairable).
   } else if (contract === "upstream-source") {
     return worklist(
       "dead-path-needs-discovery",
-      `derivedFrom is missing/blank; an upstream-source record can only be recovered by discovery (--search-root, E2).`,
+      `derivedFrom is missing/blank; an upstream-source record has no filename hint to seed discovery — recover it by hand.`,
     );
   }
 
@@ -387,14 +415,30 @@ function revalidateWritten(
   }
 }
 
-/** Process the ARTIFACT carrier: plan its `anchorSource` record, and (only if fully normalized) write the bumped 1.1
- *  envelope + stamped marker + rewritten derivedFrom in one atomic write, then revalidate. */
-function runArtifactCarrier(
+/** The write-side hooks a planned carrier carries into {@link finishCarrier} — kept with the plan so the orchestrator can
+ *  interpose the E2 discovery walk between planning and writing (it may REPLACE a dead-path plan before finish runs). */
+interface FinishIo {
+  current: { derivedFrom: unknown; contract?: DerivedFromContract; schemaVersion?: string };
+  build: (derivedFrom: string, contract: DerivedFromContract) => { obj: unknown; oracle: string };
+  reload: (raw: unknown) => ReloadedRecord | null;
+}
+
+/** A carrier planned but not yet written: everything {@link finishCarrier} needs, with a `plan` the orchestrator may swap
+ *  for a discovery-resolved one. Splitting plan from finish is what lets a SINGLE discovery walk serve every dead record. */
+interface PlannedCarrier {
+  path: string;
+  kind: "artifact" | "sidecar";
+  carrierDir: string;
+  plan: RecordPlan;
+  io: FinishIo;
+}
+
+/** Plan the ARTIFACT carrier's `anchorSource` record (pure decision + read-only verification; NO write). */
+function planArtifactCarrier(
   artifactPath: string,
   artifact: ProvenanceArtifact,
   anchorCandidate: string,
-  dryRun: boolean,
-): CarrierRun {
+): PlannedCarrier {
   const carrierDir = dirname(artifactPath);
   const a: AnchorSourceMeta = artifact.anchorSource;
   const plan = planRecord({
@@ -408,35 +452,40 @@ function runArtifactCarrier(
     anchorBasename: a.path,
     anchorCandidate,
   });
-  return finishCarrier(artifactPath, "artifact", carrierDir, plan, dryRun, {
-    current: {
-      derivedFrom: a.derivedFrom,
-      contract: a.derivedFromContract,
-      schemaVersion: artifact.schemaVersion,
-    },
-    build: (derivedFrom, contract): { obj: unknown; oracle: string } => ({
-      obj: {
-        ...artifact,
-        schemaVersion: PROVENANCE_LATEST_SCHEMA_VERSION,
-        anchorSource: { ...a, derivedFrom, derivedFromContract: contract },
+  return {
+    path: artifactPath,
+    kind: "artifact",
+    carrierDir,
+    plan,
+    io: {
+      current: {
+        derivedFrom: a.derivedFrom,
+        contract: a.derivedFromContract,
+        schemaVersion: artifact.schemaVersion,
       },
-      oracle: a.derivedFromHash,
-    }),
-    reload: (raw) => {
-      const p = parseProvenanceArtifact(raw);
-      return p.ok
-        ? {
-            derivedFrom: p.artifact.anchorSource.derivedFrom,
-            derivedFromHash: p.artifact.anchorSource.derivedFromHash,
-          }
-        : null;
+      build: (derivedFrom, contract): { obj: unknown; oracle: string } => ({
+        obj: {
+          ...artifact,
+          schemaVersion: PROVENANCE_LATEST_SCHEMA_VERSION,
+          anchorSource: { ...a, derivedFrom, derivedFromContract: contract },
+        },
+        oracle: a.derivedFromHash,
+      }),
+      reload: (raw) => {
+        const p = parseProvenanceArtifact(raw);
+        return p.ok
+          ? {
+              derivedFrom: p.artifact.anchorSource.derivedFrom,
+              derivedFromHash: p.artifact.anchorSource.derivedFromHash,
+            }
+          : null;
+      },
     },
-  });
+  };
 }
 
-/** Process a SIDECAR carrier: plan its own record, and (only if fully normalized) write the stamped marker + rewritten
- *  derivedFrom in one atomic write, then revalidate. A sidecar has no schemaVersion — marker presence is its discriminant. */
-function runSidecarCarrier(sidecarPath: string, meta: AnchorMeta, dryRun: boolean): CarrierRun {
+/** Plan a SIDECAR carrier's record. A sidecar has no schemaVersion — marker presence is its discriminant. */
+function planSidecarCarrier(sidecarPath: string, meta: AnchorMeta): PlannedCarrier {
   const carrierDir = dirname(sidecarPath);
   const plan = planRecord({
     derivedFrom: meta.derivedFrom,
@@ -448,40 +497,84 @@ function runSidecarCarrier(sidecarPath: string, meta: AnchorMeta, dryRun: boolea
     isSidecar: true,
     anchorBasename: meta.path,
   });
-  return finishCarrier(sidecarPath, "sidecar", carrierDir, plan, dryRun, {
-    current: {
-      derivedFrom: meta.derivedFrom,
-      contract: meta.derivedFromContract,
-      schemaVersion: undefined,
+  return {
+    path: sidecarPath,
+    kind: "sidecar",
+    carrierDir,
+    plan,
+    io: {
+      current: {
+        derivedFrom: meta.derivedFrom,
+        contract: meta.derivedFromContract,
+        schemaVersion: undefined,
+      },
+      build: (derivedFrom, contract): { obj: unknown; oracle: string } => ({
+        obj: { ...meta, derivedFrom, derivedFromContract: contract },
+        oracle: meta.derivedFromHash,
+      }),
+      reload: (raw) => {
+        const p = parseAnchorMeta(raw);
+        return p.ok
+          ? { derivedFrom: p.meta.derivedFrom, derivedFromHash: p.meta.derivedFromHash }
+          : null;
+      },
     },
-    build: (derivedFrom, contract): { obj: unknown; oracle: string } => ({
-      obj: { ...meta, derivedFrom, derivedFromContract: contract },
-      oracle: meta.derivedFromHash,
-    }),
-    reload: (raw) => {
-      const p = parseAnchorMeta(raw);
-      return p.ok
-        ? { derivedFrom: p.meta.derivedFrom, derivedFromHash: p.meta.derivedFromHash }
-        : null;
-    },
-  });
+  };
 }
 
-/** Shared tail: turn a plan into a CarrierOutcome + worklist, doing the conditional atomic write + post-write revalidate.
- *  `changed` diffs the target against what is on disk (derivedFrom string, marker, and — artifact only — schemaVersion), so
- *  an already-normalized carrier is a byte-untouched no-op (idempotency). */
-function finishCarrier(
-  path: string,
-  kind: "artifact" | "sidecar",
+/**
+ * #250 E2 — turn a single dead-path plan + its discovery OUTCOME into the final RecordPlan. A confirmed unique candidate
+ * becomes a `normalized` upstream-source plan (rewritten carrier-relative; the post-write revalidate re-hashes it exactly as
+ * any other repair); everything else stays worklisted with the precise reason. Only ever called on a plan the planner marked
+ * `dead-path-needs-discovery` with a `discoveryTarget`.
+ */
+function applyDiscovery(
   carrierDir: string,
-  plan: RecordPlan,
-  dryRun: boolean,
-  io: {
-    current: { derivedFrom: unknown; contract?: DerivedFromContract; schemaVersion?: string };
-    build: (derivedFrom: string, contract: DerivedFromContract) => { obj: unknown; oracle: string };
-    reload: (raw: unknown) => ReloadedRecord | null;
-  },
-): CarrierRun {
+  searchRoot: string,
+  target: DiscoveryTarget,
+  outcome: DiscoveryOutcome,
+): RecordPlan {
+  switch (outcome.kind) {
+    case "budget-exhausted":
+      return worklist(
+        "budget-exhausted",
+        `discovery under "${searchRoot}" did not complete (${outcome.ceiling}; unscanned: unknown) — a match cannot be proven unique on a partial scan; narrow --search-root, fix the unreadable entry, or raise the budget and re-run.`,
+      );
+    case "ambiguous":
+      return worklist(
+        "ambiguous",
+        `discovery under "${searchRoot}" found ${outcome.paths.length} distinct files that hash to derivedFromHash (${outcome.predicate} predicate): ${outcome.paths.join(", ")} — refusing to pick; disambiguate.`,
+      );
+    case "not-found":
+      return worklist(
+        "dead-path-needs-discovery",
+        `discovery fully scanned "${searchRoot}" but no candidate (basename${target.ext ? " then extension" : ""} stage) hashed to derivedFromHash — the source is not under this root.`,
+      );
+    case "found": {
+      const rel = toCarrierRelative(outcome.path, carrierDir);
+      if (!rel.ok) {
+        return worklist(
+          "no-carrier-relative",
+          `the discovered source "${outcome.path}" has no carrier-relative representation against "${carrierDir}" (cross-drive).`,
+        );
+      }
+      return {
+        kind: "normalized",
+        derivedFrom: rel.path,
+        contract: "upstream-source",
+        resolvedSource: outcome.path,
+        note: `relocated via discovery under "${searchRoot}" (${outcome.predicate} predicate).`,
+      };
+    }
+  }
+}
+
+/** Shared tail: turn a planned carrier into a CarrierOutcome + worklist, doing the conditional atomic write + post-write
+ *  revalidate. `changed` diffs the target against what is on disk (derivedFrom string, marker, and — artifact only —
+ *  schemaVersion), so an already-normalized carrier is a byte-untouched no-op (idempotency). The `plan` read here is the
+ *  FINAL one — the orchestrator may have replaced a dead-path plan with a discovery-resolved plan first. */
+function finishCarrier(pc: PlannedCarrier, dryRun: boolean): CarrierRun {
+  const { path, kind, carrierDir, plan, io } = pc;
   if (plan.kind === "worklist") {
     return {
       outcome: { path, kind, changed: false, wrote: false },
@@ -557,6 +650,9 @@ export interface NormalizeProvenanceOpts {
   sidecarPath?: string;
   /** the anchor `.txt` for a closed-form anchor-self repair (override; else the sibling `anchorSource.path` beside the artifact). */
   anchorPath?: string;
+  /** #250 E2 — an explicit directory to scan for a DEAD upstream-source path, relocating the source by hash. REQUIRED to
+   *  attempt discovery: absent, a dead upstream path stays worklisted `dead-path-needs-discovery`. Never defaults to `/`. */
+  searchRoot?: string;
   dryRun?: boolean;
 }
 
@@ -575,78 +671,116 @@ export function normalizeProvenanceFiles(opts: NormalizeProvenanceOpts): Normali
       message: "exactly one of artifactPath / sidecarPath must be given.",
     };
   }
+  // A supplied --search-root must be an existing directory — a typo'd root would otherwise scan nothing and report a
+  // definitive "not under this root", masking the real error. Validate BEFORE any work (E2).
+  if (opts.searchRoot !== undefined) {
+    let st;
+    try {
+      st = statSync(opts.searchRoot);
+    } catch (e) {
+      return {
+        ok: false,
+        stage: "input",
+        message: `searchRoot "${opts.searchRoot}" is not readable: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
+    if (!st.isDirectory()) {
+      return {
+        ok: false,
+        stage: "input",
+        message: `searchRoot "${opts.searchRoot}" is not a directory.`,
+      };
+    }
+  }
 
+  // ── Phase 1: load + PLAN every carrier (pure decision + read-only verification; NO writes yet) ──
+  const planned: PlannedCarrier[] = [];
+  if (opts.artifactPath) {
+    const artifactPath = opts.artifactPath;
+    const read = readCarrierJson(artifactPath);
+    if (!read.ok) return { ok: false, stage: "load", message: read.message };
+    const parsed = parseProvenanceArtifact(read.value);
+    if (!parsed.ok) {
+      return {
+        ok: false,
+        stage: "load",
+        message: `artifact "${artifactPath}" is not loadable [${parsed.code}]: ${parsed.message}`,
+      };
+    }
+    const artifact: ProvenanceArtifact = parsed.artifact;
+    // `parseProvenanceArtifact` guards the ENVELOPE, not `anchorSource.path` (which it does not require to be a string).
+    // The normalizer consumes it (basename/join), so guard it here rather than let `basename` throw past the "never
+    // throws" contract.
+    if (typeof artifact.anchorSource.path !== "string") {
+      return {
+        ok: false,
+        stage: "load",
+        message: `artifact "${artifactPath}" anchorSource.path must be a string (got ${JSON.stringify(artifact.anchorSource.path)}).`,
+      };
+    }
+
+    // The closed-form anchor-self repair honours the `--anchor` OVERRIDE (the anchor may have been relocated). Sidecar
+    // discovery, however, always uses the CANONICAL SIBLING (`anchorSource.path` beside the artifact) where canonicalize
+    // wrote it — an `--anchor` override must NOT redirect discovery away from a real, gate-scoped sidecar (review #3).
+    const siblingAnchor = join(dirname(artifactPath), basename(artifact.anchorSource.path));
+    const anchorCandidate = opts.anchorPath ?? siblingAnchor;
+    planned.push(planArtifactCarrier(artifactPath, artifact, anchorCandidate));
+
+    // Discover + plan the sidecar beside the canonical anchor (P4). ENOENT ⇒ a Model-A corpus with no sidecar (skip, not a
+    // defect); a non-regular entry / stat error is a real problem surfaced operationally (never silently skipped).
+    const sidecarPath = metaPathForAnchor(siblingAnchor);
+    if (!samePath(sidecarPath, artifactPath)) {
+      const probe = probeSidecar(sidecarPath);
+      if (typeof probe === "object") return { ok: false, stage: "load", message: probe.error };
+      if (probe === "regular") {
+        const sc = loadAndPlanSidecar(sidecarPath);
+        if (!sc.ok) return { ok: false, stage: "load", message: sc.message };
+        planned.push(sc.planned);
+      }
+    }
+  } else {
+    const sc = loadAndPlanSidecar(opts.sidecarPath as string);
+    if (!sc.ok) return { ok: false, stage: "load", message: sc.message };
+    planned.push(sc.planned);
+  }
+
+  // ── Phase 2: ONE bounded discovery walk for ALL dead-path records (E2). Gather every dead record's filename+oracle hint,
+  // scan the search root once, and REPLACE each dead-path plan with its resolved plan (normalized / ambiguous / exhausted /
+  // still-not-found). Only runs when a --search-root is given AND at least one record actually needs discovery. ──
+  if (opts.searchRoot !== undefined) {
+    const searchRoot = opts.searchRoot;
+    const discoverable = planned.filter(
+      (pc) =>
+        pc.plan.kind === "worklist" &&
+        pc.plan.reason === "dead-path-needs-discovery" &&
+        pc.plan.discoveryTarget !== undefined,
+    );
+    if (discoverable.length > 0) {
+      const targets = discoverable.map(
+        (pc) =>
+          (pc.plan as Extract<RecordPlan, { kind: "worklist" }>).discoveryTarget as DiscoveryTarget,
+      );
+      const outcomes = discoverSources(searchRoot, targets);
+      discoverable.forEach((pc, i) => {
+        pc.plan = applyDiscovery(pc.carrierDir, searchRoot, targets[i], outcomes[i]);
+      });
+    }
+  }
+
+  // ── Phase 3: FINISH each carrier — the only phase that writes (conditional atomic write + post-write revalidate) ──
   const carriers: CarrierOutcome[] = [];
   const worklist: WorklistEntry[] = [];
   const advisories: string[] = [];
-
   try {
-    if (opts.artifactPath) {
-      const artifactPath = opts.artifactPath;
-      const read = readCarrierJson(artifactPath);
-      if (!read.ok) return { ok: false, stage: "load", message: read.message };
-      const parsed = parseProvenanceArtifact(read.value);
-      if (!parsed.ok) {
-        return {
-          ok: false,
-          stage: "load",
-          message: `artifact "${artifactPath}" is not loadable [${parsed.code}]: ${parsed.message}`,
-        };
-      }
-      const artifact: ProvenanceArtifact = parsed.artifact;
-      // `parseProvenanceArtifact` guards the ENVELOPE, not `anchorSource.path` (which it does not require to be a string).
-      // The normalizer consumes it (basename/join), so guard it here rather than let `basename` throw past the "never
-      // throws" contract.
-      if (typeof artifact.anchorSource.path !== "string") {
-        return {
-          ok: false,
-          stage: "load",
-          message: `artifact "${artifactPath}" anchorSource.path must be a string (got ${JSON.stringify(artifact.anchorSource.path)}).`,
-        };
-      }
-
-      // The closed-form anchor-self repair honours the `--anchor` OVERRIDE (the anchor may have been relocated). Sidecar
-      // discovery, however, always uses the CANONICAL SIBLING (`anchorSource.path` beside the artifact) where canonicalize
-      // wrote it — an `--anchor` override must NOT redirect discovery away from a real, gate-scoped sidecar (review #3).
-      const siblingAnchor = join(dirname(artifactPath), basename(artifact.anchorSource.path));
-      const anchorCandidate = opts.anchorPath ?? siblingAnchor;
-      const run = runArtifactCarrier(artifactPath, artifact, anchorCandidate, dryRun);
+    for (const pc of planned) {
+      const run = finishCarrier(pc, dryRun);
       carriers.push(run.outcome);
       worklist.push(...run.worklist);
       advisories.push(...run.advisories);
-
-      // Discover + normalize the sidecar beside the canonical anchor (P4). ENOENT ⇒ a Model-A corpus with no sidecar (skip,
-      // not a defect); a non-regular entry / stat error is a real problem surfaced operationally (never silently skipped).
-      const sidecarPath = metaPathForAnchor(siblingAnchor);
-      if (!samePath(sidecarPath, artifactPath)) {
-        const probe = probeSidecar(sidecarPath);
-        if (typeof probe === "object") return { ok: false, stage: "load", message: probe.error };
-        if (probe === "regular") {
-          const sc = loadAndRunSidecar(sidecarPath, dryRun);
-          if (!sc.ok) {
-            // The artifact was already normalized this run; say so, so the operator doesn't read the sidecar failure as
-            // "nothing happened" (a re-run is idempotent). Only the sidecar half failed.
-            const note = run.outcome.wrote
-              ? ` (the artifact "${artifactPath}" WAS already normalized this run; re-running is idempotent — fix the sidecar and re-run)`
-              : "";
-            return { ok: false, stage: "load", message: sc.message + note };
-          }
-          carriers.push(sc.run.outcome);
-          worklist.push(...sc.run.worklist);
-          advisories.push(...sc.run.advisories);
-        }
-      }
-    } else {
-      const sidecarPath = opts.sidecarPath as string;
-      const sc = loadAndRunSidecar(sidecarPath, dryRun);
-      if (!sc.ok) return { ok: false, stage: "load", message: sc.message };
-      carriers.push(sc.run.outcome);
-      worklist.push(...sc.run.worklist);
-      advisories.push(...sc.run.advisories);
     }
   } catch (e) {
-    // A write/postwrite failure during the SIDECAR half, after the artifact carrier already wrote, would otherwise read
-    // as "nothing happened" — note that the artifact was normalized (a re-run is idempotent), matching the load-stage note.
+    // A write/postwrite failure during a LATER carrier (the sidecar), after an earlier one (the artifact) already wrote,
+    // would otherwise read as "nothing happened" — note that the artifact was normalized (a re-run is idempotent).
     const priorArtifact = carriers.some((c) => c.kind === "artifact" && c.wrote);
     const note = priorArtifact
       ? " (NOTE: the artifact was already normalized this run; re-running is idempotent — fix the sidecar and re-run)"
@@ -667,11 +801,11 @@ export function normalizeProvenanceFiles(opts: NormalizeProvenanceOpts): Normali
   };
 }
 
-/** Read + fail-close a sidecar (under the carrier size cap), then run it. Returns the operational failure MESSAGE or the CarrierRun. */
-function loadAndRunSidecar(
+/** Read + fail-close a sidecar (under the carrier size cap), then PLAN it. Returns the operational failure MESSAGE or the
+ *  planned carrier (unwritten — the orchestrator may interpose discovery, then finish it). */
+function loadAndPlanSidecar(
   sidecarPath: string,
-  dryRun: boolean,
-): { ok: true; run: CarrierRun } | { ok: false; message: string } {
+): { ok: true; planned: PlannedCarrier } | { ok: false; message: string } {
   const read = readCarrierJson(sidecarPath);
   if (!read.ok) return { ok: false, message: read.message };
   const parsed = parseAnchorMeta(read.value);
@@ -681,5 +815,5 @@ function loadAndRunSidecar(
       message: `sidecar "${sidecarPath}" is not loadable [${parsed.code}]: ${parsed.message}`,
     };
   }
-  return { ok: true, run: runSidecarCarrier(sidecarPath, parsed.meta, dryRun) };
+  return { ok: true, planned: planSidecarCarrier(sidecarPath, parsed.meta) };
 }

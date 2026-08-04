@@ -130,6 +130,13 @@ export type {
   WorklistEntry,
   WorklistReason,
 } from "./normalizeFiles";
+export { discoverSources, discoveryTargetFor, DEFAULT_DISCOVERY_BUDGET } from "./discoverSource";
+export type {
+  DiscoveryTarget,
+  DiscoveryOutcome,
+  DiscoveryPredicate,
+  DiscoveryBudget,
+} from "./discoverSource";
 export { writeFileAtomic } from "./writeFileAtomic";
 export { repoEscapeAdvisory } from "./repoEscape";
 export { samePath, isWellFormedSha256 } from "./derivedFromPolicy";

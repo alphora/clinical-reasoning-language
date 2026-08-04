@@ -666,6 +666,31 @@ try {
     }
   });
 
+  await check("normalize_provenance → searchRoot relocates a DEAD upstream path by hash (E2), rewrites carrier-relative", async () => {
+    const { writeFileSync, mkdirSync, mkdtempSync, rmSync } = await import("node:fs");
+    const os = await import("node:os");
+    const { createHash } = await import("node:crypto");
+    const tmp = mkdtempSync(resolve(os.tmpdir(), "mcp-norm-disc-"));
+    try {
+      const docx = Buffer.from("PK the lost upstream docx", "utf8");
+      const docxHash = "sha256:" + createHash("sha256").update(docx).digest("hex");
+      const textHash = "sha256:" + createHash("sha256").update(Buffer.from("text", "utf8")).digest("hex");
+      mkdirSync(resolve(tmp, "found"), { recursive: true });
+      writeFileSync(resolve(tmp, "found", "source.docx"), docx); // the source, relocated
+      const sidePath = resolve(tmp, "anchor.anchormeta.json");
+      writeFileSync(sidePath, JSON.stringify({ path: "anchor.txt", derivedFrom: "/gone/worktree/source.docx", derivedFromHash: docxHash, textHash, canonicalizer: "crl-anchor-docx-text", canonicalizerVersion: "1.0.0", offsetUnit: "utf8-byte", unicodeNormalization: "NFC", rangeConvention: "half-open", warnings: [] }, null, 2) + "\n");
+      const r = await client.callTool({ name: "normalize_provenance", arguments: { sidecar: sidePath, searchRoot: tmp } });
+      assert.ok(!r.isError, "a domain result (relocated), not a tool error");
+      const out = JSON.parse(r.content[0].text);
+      assert.equal(out.fullyNormalized, true, "the dead path was relocated + normalized");
+      const onDisk = JSON.parse(readFileSync(sidePath, "utf8"));
+      assert.equal(onDisk.derivedFrom, "found/source.docx", "rewritten carrier-relative POSIX to the discovered file");
+      assert.equal(onDisk.derivedFromContract, "upstream-source");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
   await check("crl-normalize-provenance CLI → exit codes 0 (normalized) / 2 (residue) / 1 (bad args)", async () => {
     const { writeFileSync, mkdtempSync, rmSync } = await import("node:fs");
     const os = await import("node:os");
@@ -692,13 +717,19 @@ try {
       assert.equal(runCli(["--artifact", artPath]), 0, "closed-form repair → exit 0");
 
       // Residue: a sidecar with a dead upstream path is worklisted → exit 2 (even in --dry-run).
-      const docxHash = "sha256:" + createHash("sha256").update(Buffer.from("d", "utf8")).digest("hex");
+      const dBytes = Buffer.from("d", "utf8");
+      const docxHash = "sha256:" + createHash("sha256").update(dBytes).digest("hex");
       const sidePath = resolve(tmp, "s.anchormeta.json");
       writeFileSync(sidePath, JSON.stringify({ path: "a.txt", derivedFrom: "/gone/s.docx", derivedFromHash: docxHash, textHash: "sha256:" + createHash("sha256").update(Buffer.from("t", "utf8")).digest("hex"), canonicalizer: "c", canonicalizerVersion: "1", offsetUnit: "utf8-byte", unicodeNormalization: "NFC", rangeConvention: "half-open", warnings: [] }, null, 2) + "\n");
       assert.equal(runCli(["--sidecar", sidePath, "--dry-run"]), 2, "worklist residue → exit 2");
 
+      // E2: with the source placed under --search-root, the same dead path is relocated → exit 0.
+      writeFileSync(resolve(tmp, "s.docx"), dBytes); // basename "s.docx" matches derivedFrom "/gone/s.docx"
+      assert.equal(runCli(["--sidecar", sidePath, "--search-root", tmp]), 0, "dead path relocated under --search-root → exit 0");
+
       assert.equal(runCli([]), 1, "no carrier arg → exit 1");
       assert.equal(runCli(["--sidecar", sidePath, "--anchor", resolve(tmp, "anchor.txt")]), 1, "--anchor with --sidecar → exit 1");
+      assert.equal(runCli(["--sidecar", sidePath, "--search-root"]), 1, "--search-root without a value → exit 1");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

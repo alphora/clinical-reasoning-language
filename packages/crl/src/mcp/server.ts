@@ -913,16 +913,19 @@ export function createServer(): McpServer {
         "hard-failing with no recourse. Pass EXACTLY ONE of `artifact` (the provenance JSON; its `<name>.anchormeta.json` " +
         "sidecar is auto-discovered beside the anchor and normalized too) OR `sidecar` (a standalone `.anchormeta.json`, " +
         "whose own `derivedFrom` is in gate scope). `anchor` (optional) overrides the anchor `.txt` used for a closed-form " +
-        "`anchor-self` repair (default: `anchorSource.path` beside the artifact). `dryRun:true` computes the plan + " +
+        "`anchor-self` repair (default: `anchorSource.path` beside the artifact). `searchRoot` (optional) enables candidate " +
+        "DISCOVERY for a DEAD upstream-source path (one that resolves NOWHERE): one bounded, single-threaded scan of that " +
+        "directory relocates the source by hashing candidates against `derivedFromHash`, then rewrites it carrier-relative " +
+        "(without it, a dead upstream path stays worklisted). `dryRun:true` computes the plan + " +
         "readiness WITHOUT writing. Every rewrite is VERIFIED against the oracle already in the data (`derivedFromHash`): a " +
         "record is rewritten only when its source hashes correctly, and each written carrier is RE-VALIDATED after write. " +
-        "Records this closed-form tool cannot repair from the oracle alone — an upstream path that resolves NOWHERE (needs " +
-        "the E2 discovery scan), a real hash-mismatch, or a self-inconsistent marker — are WORKLISTED (left byte-untouched), " +
-        "never guessed. Returns { success:true, fullyNormalized, dryRun, carriers[], worklist[] (structured reason codes: " +
-        "no-oracle | hash-mismatch | dead-path-needs-discovery | anchor-not-found | marker-tell-disagreement | " +
-        "sidecar-hash-equals-text | no-carrier-relative), advisories? }. `fullyNormalized:false` ⇔ the worklist is non-empty " +
-        "(the corpus is NOT yet ready for the gate). A bad-args / unloadable-carrier / write / post-write-revalidation " +
-        "failure is a tool error.",
+        "Records that cannot be repaired — a dead upstream path with no `searchRoot` (or one whose scan finds nothing / is " +
+        "ambiguous / exhausts its budget), a real hash-mismatch, or a self-inconsistent marker — are WORKLISTED (left " +
+        "byte-untouched), never guessed. Returns { success:true, fullyNormalized, dryRun, carriers[], worklist[] (structured " +
+        "reason codes: no-oracle | hash-mismatch | dead-path-needs-discovery | anchor-not-found | marker-tell-disagreement | " +
+        "sidecar-hash-equals-text | no-carrier-relative | ambiguous | budget-exhausted), advisories? }. `fullyNormalized:" +
+        "false` ⇔ the worklist is non-empty (the corpus is NOT yet ready for the gate). A bad-args / unloadable-carrier / " +
+        "write / post-write-revalidation failure is a tool error.",
       inputSchema: {
         artifact: z
           .string()
@@ -942,6 +945,12 @@ export function createServer(): McpServer {
           .describe(
             "Absolute path to the anchor `.txt` for a closed-form anchor-self repair (default: `anchorSource.path` beside the artifact).",
           ),
+        searchRoot: z
+          .string()
+          .optional()
+          .describe(
+            "Absolute path to a directory to scan for a DEAD upstream-source path, relocating the source by hash (E2). Required to attempt discovery; without it a dead upstream path stays worklisted.",
+          ),
         dryRun: z
           .boolean()
           .optional()
@@ -954,6 +963,7 @@ export function createServer(): McpServer {
           artifact?: string;
           sidecar?: string;
           anchor?: string;
+          searchRoot?: string;
           dryRun?: boolean;
         },
       ),
@@ -1243,6 +1253,7 @@ function runNormalizeProvenance(args: {
   artifact?: string;
   sidecar?: string;
   anchor?: string;
+  searchRoot?: string;
   dryRun?: boolean;
 }): { content: Array<{ type: "text"; text: string }>; isError?: boolean } {
   // Validate the single named carrier is a readable file within the size cap (mirrors the other file-reading tools). The
@@ -1304,6 +1315,7 @@ function runNormalizeProvenance(args: {
     ...(args.artifact !== undefined ? { artifactPath: args.artifact } : {}),
     ...(args.sidecar !== undefined ? { sidecarPath: args.sidecar } : {}),
     ...(args.anchor !== undefined ? { anchorPath: args.anchor } : {}),
+    ...(args.searchRoot !== undefined ? { searchRoot: args.searchRoot } : {}),
     ...(args.dryRun !== undefined ? { dryRun: args.dryRun } : {}),
   });
   if (!result.ok) {
