@@ -52,7 +52,7 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 17 registered (+ #205 write-half create_flag / set_flag_status; + #17 canonicalize_source)", async () => {
+  await check("MCP tools: 18 registered (+ #205 write-half create_flag / set_flag_status; + #17 canonicalize_source; + #250 E normalize_provenance)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
@@ -65,6 +65,7 @@ try {
       "emit_crl",
       "emit_crl_fhir",
       "generate_provenance",
+      "normalize_provenance",
       "render_scenario",
       "run_decision",
       "set_flag_status",
@@ -612,6 +613,92 @@ try {
       const r = await client.callTool({ name: "canonicalize_source", arguments: { in: inPath } });
       assert.equal(r.isError, true, "an operational (paths) failure must be an isError envelope");
       assert.match(r.content[0].text, /failed \[paths\]/, "the envelope names the paths stage");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  await check("normalize_provenance → repairs a dead anchor-self derivedFrom (1.0 → 1.1 + marker), success:true fullyNormalized", async () => {
+    const { writeFileSync, mkdtempSync, rmSync } = await import("node:fs");
+    const os = await import("node:os");
+    const { createHash } = await import("node:crypto");
+    const tmp = mkdtempSync(resolve(os.tmpdir(), "mcp-norm-"));
+    try {
+      const anchor = Buffer.from("canonical anchor text\n", "utf8");
+      writeFileSync(resolve(tmp, "anchor.txt"), anchor);
+      const textHash = "sha256:" + createHash("sha256").update(anchor).digest("hex");
+      const artPath = resolve(tmp, "art.json");
+      const anchorSource = { path: "anchor.txt", derivedFrom: "/gone/worktree/anchor.txt", derivedFromHash: textHash, textHash, canonicalizer: "crl-anchor-docx-text", canonicalizerVersion: "1.0.0", offsetUnit: "utf8-byte", unicodeNormalization: "NFC", rangeConvention: "half-open" };
+      writeFileSync(artPath, JSON.stringify({ schemaVersion: "1.0", policyId: "P", policyVersion: "1", anchorSource, items: [], ignoredRanges: [], clusters: [] }, null, 2) + "\n");
+      const r = await client.callTool({ name: "normalize_provenance", arguments: { artifact: artPath } });
+      assert.ok(!r.isError, "a domain result (repair succeeded), not a tool error");
+      const out = JSON.parse(r.content[0].text);
+      assert.equal(out.success, true);
+      assert.equal(out.fullyNormalized, true, "the corpus is now ready for the gate");
+      const onDisk = JSON.parse(readFileSync(artPath, "utf8"));
+      assert.equal(onDisk.schemaVersion, "1.1");
+      assert.equal(onDisk.anchorSource.derivedFrom, "anchor.txt");
+      assert.equal(onDisk.anchorSource.derivedFromContract, "anchor-self");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  await check("normalize_provenance → a dead upstream path is WORKLISTED (fullyNormalized:false), byte-untouched", async () => {
+    const { writeFileSync, mkdtempSync, rmSync } = await import("node:fs");
+    const os = await import("node:os");
+    const { createHash } = await import("node:crypto");
+    const tmp = mkdtempSync(resolve(os.tmpdir(), "mcp-norm-wl-"));
+    try {
+      const docxHash = "sha256:" + createHash("sha256").update(Buffer.from("docx", "utf8")).digest("hex");
+      const textHash = "sha256:" + createHash("sha256").update(Buffer.from("text", "utf8")).digest("hex");
+      const sidePath = resolve(tmp, "anchor.anchormeta.json");
+      const body = JSON.stringify({ path: "anchor.txt", derivedFrom: "/gone/source.docx", derivedFromHash: docxHash, textHash, canonicalizer: "crl-anchor-docx-text", canonicalizerVersion: "1.0.0", offsetUnit: "utf8-byte", unicodeNormalization: "NFC", rangeConvention: "half-open", warnings: [] }, null, 2) + "\n";
+      writeFileSync(sidePath, body);
+      const r = await client.callTool({ name: "normalize_provenance", arguments: { sidecar: sidePath } });
+      assert.ok(!r.isError, "a worklist is a domain outcome, not a tool error");
+      const out = JSON.parse(r.content[0].text);
+      assert.equal(out.fullyNormalized, false);
+      assert.equal(out.worklist[0].reason, "dead-path-needs-discovery");
+      assert.equal(readFileSync(sidePath, "utf8"), body, "left byte-untouched");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  await check("crl-normalize-provenance CLI → exit codes 0 (normalized) / 2 (residue) / 1 (bad args)", async () => {
+    const { writeFileSync, mkdtempSync, rmSync } = await import("node:fs");
+    const os = await import("node:os");
+    const { createHash } = await import("node:crypto");
+    const { execFileSync } = await import("node:child_process");
+    const cliPath = resolve(here, "../../../dist/cli/run-normalize-provenance.js");
+    // Runs the built CLI; returns its exit code (execFileSync throws on non-zero, carrying `.status`).
+    const runCli = (args) => {
+      try {
+        execFileSync(process.execPath, [cliPath, ...args], { stdio: "pipe" });
+        return 0;
+      } catch (e) {
+        return e.status;
+      }
+    };
+    const tmp = mkdtempSync(resolve(os.tmpdir(), "cli-norm-"));
+    try {
+      const anchor = Buffer.from("anchor\n", "utf8");
+      writeFileSync(resolve(tmp, "anchor.txt"), anchor);
+      const textHash = "sha256:" + createHash("sha256").update(anchor).digest("hex");
+      const src = { path: "anchor.txt", derivedFrom: "/gone/anchor.txt", derivedFromHash: textHash, textHash, canonicalizer: "crl-anchor-docx-text", canonicalizerVersion: "1.0.0", offsetUnit: "utf8-byte", unicodeNormalization: "NFC", rangeConvention: "half-open" };
+      const artPath = resolve(tmp, "art.json");
+      writeFileSync(artPath, JSON.stringify({ schemaVersion: "1.0", policyId: "P", policyVersion: "1", anchorSource: src, items: [], ignoredRanges: [], clusters: [] }, null, 2) + "\n");
+      assert.equal(runCli(["--artifact", artPath]), 0, "closed-form repair → exit 0");
+
+      // Residue: a sidecar with a dead upstream path is worklisted → exit 2 (even in --dry-run).
+      const docxHash = "sha256:" + createHash("sha256").update(Buffer.from("d", "utf8")).digest("hex");
+      const sidePath = resolve(tmp, "s.anchormeta.json");
+      writeFileSync(sidePath, JSON.stringify({ path: "a.txt", derivedFrom: "/gone/s.docx", derivedFromHash: docxHash, textHash: "sha256:" + createHash("sha256").update(Buffer.from("t", "utf8")).digest("hex"), canonicalizer: "c", canonicalizerVersion: "1", offsetUnit: "utf8-byte", unicodeNormalization: "NFC", rangeConvention: "half-open", warnings: [] }, null, 2) + "\n");
+      assert.equal(runCli(["--sidecar", sidePath, "--dry-run"]), 2, "worklist residue → exit 2");
+
+      assert.equal(runCli([]), 1, "no carrier arg → exit 1");
+      assert.equal(runCli(["--sidecar", sidePath, "--anchor", resolve(tmp, "anchor.txt")]), 1, "--anchor with --sidecar → exit 1");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

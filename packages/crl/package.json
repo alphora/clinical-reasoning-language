@@ -14,6 +14,7 @@
     "crl-canonicalize-source": "dist/cli/run-canonicalize-source.js",
     "crl-validate-provenance": "dist/cli/run-validate-provenance.js",
     "crl-generate-provenance": "dist/cli/run-generate-provenance.js",
+    "crl-normalize-provenance": "dist/cli/run-normalize-provenance.js",
     "crl-mcp": "dist/cli/run-mcp-server.js"
   },
   "sideEffects": false,

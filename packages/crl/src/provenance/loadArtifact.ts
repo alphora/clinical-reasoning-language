@@ -25,6 +25,7 @@
  * Input is a DECODED value (`unknown`), not JSON text: the two read-sites already own their `JSON.parse` (whose syntax
  * errors flow through their existing throw contracts); this guards the shape a blind `as ProvenanceArtifact` never did.
  */
+import type { AnchorMeta } from "./canonicalize";
 import type { AnchorSourceMeta, DerivedFromContract, ProvenanceArtifact } from "./artifact";
 
 /**
@@ -148,4 +149,62 @@ export function parseProvenanceArtifact(raw: unknown): ProvenanceParseResult {
   }
 
   return { ok: true, artifact: obj as unknown as LoadedProvenanceArtifact };
+}
+
+/**
+ * #250 E — the fail-closed loader for a `<name>.anchormeta.json` SIDECAR. `parseProvenanceArtifact` cannot serve here: it
+ * requires the artifact-only `schemaVersion`/`items`/`ignoredRanges`/`clusters` an {@link AnchorMeta} sidecar never carries.
+ * The normalizer must not blind-cast a sidecar before rewriting it, so this guards the load-bearing shape: an object whose
+ * `path`/`derivedFrom`/`derivedFromHash`/`textHash` are strings, `warnings` is an array, and — if present — `derivedFromContract`
+ * is a known value. It does NOT validate the `sha256:` FORMAT of the hashes ({@link isWellFormedSha256} does that at the
+ * point of use) nor the warning contents. The sidecar has NO schemaVersion — its legacy/new discriminant is marker PRESENCE
+ * — so there is no version to fail closed on; the guard is purely structural. Returns the typed {@link AnchorMeta} on success.
+ */
+export type AnchorMetaParseErrorCode =
+  | "not-an-object"
+  | "missing-field" // a required string field (path / derivedFrom / derivedFromHash / textHash) is absent or not a string
+  | "malformed-warnings" // `warnings` is absent or not an array
+  | "invalid-marker-value"; // `derivedFromContract` present but outside KNOWN_CONTRACTS
+
+export type AnchorMetaParseResult =
+  | { ok: true; meta: AnchorMeta }
+  | { ok: false; code: AnchorMetaParseErrorCode; message: string };
+
+export function parseAnchorMeta(raw: unknown): AnchorMetaParseResult {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return {
+      ok: false,
+      code: "not-an-object",
+      message: `sidecar must be a JSON object (got ${show(raw)}).`,
+    };
+  }
+  const obj = raw as Record<string, unknown>;
+  for (const field of ["path", "derivedFrom", "derivedFromHash", "textHash"] as const) {
+    if (typeof obj[field] !== "string") {
+      return {
+        ok: false,
+        code: "missing-field",
+        message: `sidecar \`${field}\` must be a string (got ${show(obj[field])}).`,
+      };
+    }
+  }
+  if (!Array.isArray(obj.warnings)) {
+    return {
+      ok: false,
+      code: "malformed-warnings",
+      message: `sidecar \`warnings\` must be an array (got ${show(obj.warnings)}).`,
+    };
+  }
+  const marker = obj.derivedFromContract;
+  if (
+    marker !== undefined &&
+    (typeof marker !== "string" || !KNOWN_CONTRACTS.includes(marker as DerivedFromContract))
+  ) {
+    return {
+      ok: false,
+      code: "invalid-marker-value",
+      message: `sidecar \`derivedFromContract\` ${show(marker)} — expected ${KNOWN_CONTRACTS.map((c) => `"${c}"`).join(" | ")}.`,
+    };
+  }
+  return { ok: true, meta: obj as unknown as AnchorMeta };
 }

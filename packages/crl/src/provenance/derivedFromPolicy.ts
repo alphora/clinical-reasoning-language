@@ -91,3 +91,15 @@ export function samePath(a: string, b: string): boolean {
   const caseInsensitive = process.platform === "win32" || process.platform === "darwin";
   return caseInsensitive ? ra.toLowerCase() === rb.toLowerCase() : ra === rb;
 }
+
+/**
+ * #250 E — is `value` the exact `sha256:<64 lowercase hex>` shape every `derivedFromHash` / `textHash` in the corpus uses?
+ * The normalizer validates the ORACLE (`derivedFromHash`) — and the `textHash` it derives the contract tell from — BEFORE
+ * any filesystem I/O, because `parseProvenanceArtifact` deliberately does NOT deep-validate these fields (it guards the
+ * envelope, not the hash strings). A malformed hash means E cannot verify a rewrite against a trustworthy oracle, so the
+ * record is worklisted rather than repaired. Lowercase-only + fixed 64 hex digits mirrors what the canonicalizer emits
+ * (`createHash("sha256").digest("hex")`), so a mixed-case or truncated value is rejected as not-our-shape.
+ */
+export function isWellFormedSha256(value: unknown): value is string {
+  return typeof value === "string" && /^sha256:[0-9a-f]{64}$/.test(value);
+}

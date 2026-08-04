@@ -122,9 +122,17 @@ export { generateProvenanceFiles } from "./generateFiles";
 export type { GenerateProvenanceFilesResult } from "./generateFiles";
 export { canonicalizeSourceToFiles, deriveAnchorOutputPaths } from "./canonicalizeFiles";
 export type { CanonicalizeToFilesResult, AnchorOutputPaths } from "./canonicalizeFiles";
+export { normalizeProvenanceFiles, metaPathForAnchor } from "./normalizeFiles";
+export type {
+  NormalizeProvenanceOpts,
+  NormalizeResult,
+  CarrierOutcome,
+  WorklistEntry,
+  WorklistReason,
+} from "./normalizeFiles";
 export { writeFileAtomic } from "./writeFileAtomic";
 export { repoEscapeAdvisory } from "./repoEscape";
-export { samePath } from "./derivedFromPolicy";
+export { samePath, isWellFormedSha256 } from "./derivedFromPolicy";
 export { generateProvenanceScaffold, mergeScaffold } from "./generate";
 export type { GenerateDiagnostic, GenerateResult, MergeDiagnostic, MergeResult } from "./generate";
 export { allUnsatisfiedCriteria, failedCriterionFrontier } from "./failedCriteria";
@@ -154,11 +162,13 @@ export type {
   ByteRange,
 } from "./correspondence";
 export { PROVENANCE_SCHEMA_VERSION, PROVENANCE_LATEST_SCHEMA_VERSION } from "./artifact";
-export { parseProvenanceArtifact, KNOWN_SCHEMA_VERSIONS } from "./loadArtifact";
+export { parseProvenanceArtifact, parseAnchorMeta, KNOWN_SCHEMA_VERSIONS } from "./loadArtifact";
 export type {
   ProvenanceParseResult,
   ProvenanceParseErrorCode,
   LoadedProvenanceArtifact,
+  AnchorMetaParseResult,
+  AnchorMetaParseErrorCode,
 } from "./loadArtifact";
 export type {
   ProvenanceArtifact,

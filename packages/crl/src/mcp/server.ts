@@ -29,6 +29,7 @@ import {
   validateProvenanceFiles,
   generateProvenanceFiles,
   canonicalizeSourceToFiles,
+  normalizeProvenanceFiles,
 } from "../provenance";
 
 // Caps the CRL SOURCE (input) size. Response size scales with this — there is
@@ -902,6 +903,63 @@ export function createServer(): McpServer {
   );
 
   server.registerTool(
+    "normalize_provenance",
+    {
+      title: "Normalize a legacy provenance carrier into the #250 convention",
+      description:
+        "Repair a legacy provenance carrier so it satisfies the #250 gate: rewrite `derivedFrom` to CARRIER-RELATIVE + " +
+        'POSIX, bump the artifact to `schemaVersion:"1.1"`, and stamp the `derivedFromContract` marker. This is the ' +
+        "sanctioned migration tool that makes the (delivery-H) hard gate SAFE — a corpus repairs itself instead of " +
+        "hard-failing with no recourse. Pass EXACTLY ONE of `artifact` (the provenance JSON; its `<name>.anchormeta.json` " +
+        "sidecar is auto-discovered beside the anchor and normalized too) OR `sidecar` (a standalone `.anchormeta.json`, " +
+        "whose own `derivedFrom` is in gate scope). `anchor` (optional) overrides the anchor `.txt` used for a closed-form " +
+        "`anchor-self` repair (default: `anchorSource.path` beside the artifact). `dryRun:true` computes the plan + " +
+        "readiness WITHOUT writing. Every rewrite is VERIFIED against the oracle already in the data (`derivedFromHash`): a " +
+        "record is rewritten only when its source hashes correctly, and each written carrier is RE-VALIDATED after write. " +
+        "Records this closed-form tool cannot repair from the oracle alone — an upstream path that resolves NOWHERE (needs " +
+        "the E2 discovery scan), a real hash-mismatch, or a self-inconsistent marker — are WORKLISTED (left byte-untouched), " +
+        "never guessed. Returns { success:true, fullyNormalized, dryRun, carriers[], worklist[] (structured reason codes: " +
+        "no-oracle | hash-mismatch | dead-path-needs-discovery | anchor-not-found | marker-tell-disagreement | " +
+        "sidecar-hash-equals-text | no-carrier-relative), advisories? }. `fullyNormalized:false` ⇔ the worklist is non-empty " +
+        "(the corpus is NOT yet ready for the gate). A bad-args / unloadable-carrier / write / post-write-revalidation " +
+        "failure is a tool error.",
+      inputSchema: {
+        artifact: z
+          .string()
+          .optional()
+          .describe(
+            "Absolute path to the provenance artifact JSON to normalize (its sidecar is auto-discovered).",
+          ),
+        sidecar: z
+          .string()
+          .optional()
+          .describe(
+            "Absolute path to a standalone `<name>.anchormeta.json` sidecar to normalize (mutually exclusive with `artifact`).",
+          ),
+        anchor: z
+          .string()
+          .optional()
+          .describe(
+            "Absolute path to the anchor `.txt` for a closed-form anchor-self repair (default: `anchorSource.path` beside the artifact).",
+          ),
+        dryRun: z
+          .boolean()
+          .optional()
+          .describe("Plan + report readiness without writing (default false)."),
+      },
+    },
+    (args) =>
+      runNormalizeProvenance(
+        args as {
+          artifact?: string;
+          sidecar?: string;
+          anchor?: string;
+          dryRun?: boolean;
+        },
+      ),
+  );
+
+  server.registerTool(
     "create_flag",
     {
       title: "Create a review flag (#205 crl-refactors)",
@@ -1164,6 +1222,115 @@ function runCanonicalizeSource(args: { in: string; out?: string }): {
             offsetUnit: result.offsetUnit,
             byteLength: result.byteLength,
             warnings: result.warnings,
+            ...(result.advisories ? { advisories: result.advisories } : {}),
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+  };
+}
+
+/**
+ * `normalize_provenance` — the #250 provenance NORMALIZER (Todo E1 closed-form core), the MCP equivalent of the
+ * `crl-normalize-provenance` CLI bin. Rewrites ONE legacy carrier (an artifact + its discovered sidecar, OR a standalone
+ * sidecar) into the carrier-relative + POSIX + marked convention, verifying every rewrite against the recorded oracle and
+ * re-validating each written carrier. Unrepairable records are worklisted, never guessed. A domain outcome (including a
+ * non-empty worklist) is `success:true` with `fullyNormalized:false`; an operational failure is a tool error.
+ */
+function runNormalizeProvenance(args: {
+  artifact?: string;
+  sidecar?: string;
+  anchor?: string;
+  dryRun?: boolean;
+}): { content: Array<{ type: "text"; text: string }>; isError?: boolean } {
+  // Validate the single named carrier is a readable file within the size cap (mirrors the other file-reading tools). The
+  // auto-discovered sidecar is size-capped inside the shared impl (readCarrierJson / MAX_CARRIER_BYTES); the hashed upstream
+  // SOURCE is a corpus document read in full for hashing (bounded by the trusted corpus per disc-375 P1, not capped).
+  const named: Array<[string, string]> = [];
+  if (args.artifact) named.push(["artifact", args.artifact]);
+  if (args.sidecar) named.push(["sidecar", args.sidecar]);
+  if (named.length !== 1) {
+    return {
+      content: [
+        { type: "text", text: "pass exactly one of `artifact` or `sidecar`." },
+      ],
+      isError: true,
+    };
+  }
+  if (args.sidecar && args.anchor) {
+    // --anchor targets a closed-form anchor-self repair (artifact mode); it is meaningless with a standalone sidecar.
+    return {
+      content: [
+        {
+          type: "text",
+          text: "`anchor` is not valid with `sidecar` (a standalone sidecar is upstream-source).",
+        },
+      ],
+      isError: true,
+    };
+  }
+  for (const [label, p] of named) {
+    let stat;
+    try {
+      stat = statSync(p);
+    } catch {
+      return {
+        content: [{ type: "text", text: `${label} path "${p}" not readable.` }],
+        isError: true,
+      };
+    }
+    if (!stat.isFile())
+      return {
+        content: [
+          { type: "text", text: `${label} path "${p}" is not a file.` },
+        ],
+        isError: true,
+      };
+    if (stat.size > MAX_INPUT_BYTES)
+      return {
+        content: [
+          {
+            type: "text",
+            text: `${label} file too large: ${stat.size} bytes > ${MAX_INPUT_BYTES}.`,
+          },
+        ],
+        isError: true,
+      };
+  }
+
+  const result = normalizeProvenanceFiles({
+    ...(args.artifact !== undefined ? { artifactPath: args.artifact } : {}),
+    ...(args.sidecar !== undefined ? { sidecarPath: args.sidecar } : {}),
+    ...(args.anchor !== undefined ? { anchorPath: args.anchor } : {}),
+    ...(args.dryRun !== undefined ? { dryRun: args.dryRun } : {}),
+  });
+  if (!result.ok) {
+    // input/load/write/postwrite are all OPERATIONAL — a tool error (nothing safely repaired, or a write went wrong).
+    return {
+      content: [
+        {
+          type: "text",
+          text: `normalize_provenance failed [${result.stage}]: ${result.message}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+  // A domain result — including a non-empty worklist (fullyNormalized:false) — is success:true (mirrors validate_* / the
+  // canonicalize fail-closed envelope): the corpus state is DATA the caller acts on, not a tool malfunction.
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(
+          {
+            success: true,
+            fullyNormalized: result.fullyNormalized,
+            dryRun: result.dryRun,
+            carriers: result.carriers,
+            worklist: result.worklist,
             ...(result.advisories ? { advisories: result.advisories } : {}),
           },
           null,
