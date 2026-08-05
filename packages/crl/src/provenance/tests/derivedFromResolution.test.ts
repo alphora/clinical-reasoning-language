@@ -15,6 +15,14 @@ const sha256 = (b: Buffer | string): string =>
 
 const DF_SEV = DERIVED_FROM_GATE_ENFORCED ? "error" : "warning";
 
+// #250 H — the enforcement PIN. The gate is now the terminal enforced state; DERIVED_FROM_GATE_ENFORCED is retained ONLY
+// as the rollback lever (derivedFromPolicy.ts). If it is ever reverted to `false`, THIS fails loudly — the whole point of
+// the pin is that the suite cannot go green with the gate silently un-flipped (disc 390, both design arms required it).
+test("#250 H: the derivedFrom gate is ENFORCED (a revert to warn-only must fail here)", () => {
+  expect(DERIVED_FROM_GATE_ENFORCED).toBe(true);
+  expect(DF_SEV).toBe("error");
+});
+
 /** A minimal artifact — `derivedFromResolutionFindings` reads only `anchorSource.{derivedFrom, derivedFromHash}`. */
 const artifactFor = (derivedFrom: unknown, derivedFromHash: unknown): ProvenanceArtifact =>
   ({ anchorSource: { derivedFrom, derivedFromHash } }) as unknown as ProvenanceArtifact;
@@ -210,12 +218,13 @@ case "c":
         expect(c?.severity).toBe(DF_SEV); // gated, identical in both modes (integrity is never softened)
       }
 
-      // In WORKLIST mode the coverage backlog softens to warning, so the ONLY thing that can be an error is the gated C
-      // finding → pass is exactly the inverse of the gate flag. This proves the merged finding reaches errorCount + pass
-      // (and pins the H flip: once DERIVED_FROM_GATE_ENFORCED is true this pass becomes false).
+      // In WORKLIST mode the coverage backlog softens to warning, so the ONLY thing that can be an error is the enforced C
+      // finding → pass is false. This proves the merged finding reaches errorCount + pass. Asserted LITERAL (not
+      // `!DERIVED_FROM_GATE_ENFORCED`): post-H the gate is enforced, so a literal makes a rollback to warn-only break here
+      // loudly at the fs C layer (disc 390).
       const w = validateProvenanceFiles(artifactPath, celPath, anchorPath, "worklist");
       expect(w.warningCount).toBeGreaterThanOrEqual(1);
-      expect(w.pass).toBe(!DERIVED_FROM_GATE_ENFORCED);
+      expect(w.pass).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -407,11 +407,12 @@ case "c":
         expect(d?.severity).toBe(DF_SEV);
       }
 
-      // In WORKLIST mode the coverage backlog softens to warning, so the ONLY possible error is the gated D2 finding →
-      // pass is exactly the inverse of the gate flag (pins the H flip).
+      // In WORKLIST mode the coverage backlog softens to warning, so the ONLY possible error is the enforced D2 finding →
+      // pass is false. Asserted LITERAL (not `!DERIVED_FROM_GATE_ENFORCED`): post-H a rollback to warn-only breaks here
+      // loudly at the fs D2 layer (disc 390).
       const w = validateProvenanceFiles(artifactPath, celPath, anchorPath, "worklist");
       expect(w.warningCount).toBeGreaterThanOrEqual(1);
-      expect(w.pass).toBe(!DERIVED_FROM_GATE_ENFORCED);
+      expect(w.pass).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

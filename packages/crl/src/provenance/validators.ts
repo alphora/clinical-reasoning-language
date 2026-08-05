@@ -14,6 +14,7 @@ import {
   classifyDerivedFrom,
   contractFromTell,
   DERIVED_FROM_GATE_ENFORCED,
+  DERIVED_FROM_REPAIR_HINT,
   isWellFormedSha256,
 } from "./derivedFromPolicy";
 import type { IndexedCrlNode, ProvenanceIndex, ProvNodeRef } from "./indexer";
@@ -325,22 +326,23 @@ export function validateProvenance(
   //    carrier-relative POSIX path so the source document resolves on any clone; absolute/drive/scheme-bound is dead off the
   //    authoring machine (the #250 defect), and a `\`-separated or blank/NUL value is not a usable path. `classifyDerivedFrom`
   //    returns exactly one class so this emits at most one finding (malformed takes precedence over absolute). RESOLUTION
-  //    (the file exists + its bytes match `derivedFromHash`) is Todo C (fs layer). Severity is gated on DERIVED_FROM_GATE_ENFORCED:
-  //    a NON-BLOCKING `warning` until the bundled #250 delivery (H) ships the producer fix (A) + normalizer (E), then a hard
-  //    `error` — so a corpus never hard-fails before its repair tool ships, even from an interim develop release.
+  //    (the file exists + its bytes match `derivedFromHash`) is Todo C (fs layer). Severity is gated on DERIVED_FROM_GATE_ENFORCED,
+  //    now `true` as of the H delivery (disc 390): these are hard `error`s. (Before H, while A + E were still landing, they were
+  //    a NON-BLOCKING `warning` so a corpus could never hard-fail before its repair tool shipped; the constant is retained as
+  //    the rollback lever — see derivedFromPolicy.ts.)
   const dfClass = classifyDerivedFrom(artifact.anchorSource.derivedFrom);
   const dfSeverity: Severity = DERIVED_FROM_GATE_ENFORCED ? "error" : "warning";
   if (dfClass === "malformed") {
     findings.push({
       kind: "derived-from-malformed",
       severity: dfSeverity,
-      message: `anchorSource.derivedFrom ${JSON.stringify(artifact.anchorSource.derivedFrom)} is not a usable carrier-relative path — it must be a non-blank, POSIX-separated (\`/\`) path relative to the directory of the file carrying this record (#250).`,
+      message: `anchorSource.derivedFrom ${JSON.stringify(artifact.anchorSource.derivedFrom)} is not a usable carrier-relative path — it must be a non-blank, POSIX-separated (\`/\`) path relative to the directory of the file carrying this record (#250). ${DERIVED_FROM_REPAIR_HINT}`,
     });
   } else if (dfClass === "absolute") {
     findings.push({
       kind: "derived-from-absolute",
       severity: dfSeverity,
-      message: `anchorSource.derivedFrom ${JSON.stringify(artifact.anchorSource.derivedFrom)} is an absolute/drive/scheme-bound path; it must be carrier-relative (POSIX \`/\`, relative to the directory of the file carrying this record) so the source resolves on any clone — an absolute path is dead off the authoring machine (#250).`,
+      message: `anchorSource.derivedFrom ${JSON.stringify(artifact.anchorSource.derivedFrom)} is an absolute/drive/scheme-bound path; it must be carrier-relative (POSIX \`/\`, relative to the directory of the file carrying this record) so the source resolves on any clone — an absolute path is dead off the authoring machine (#250). ${DERIVED_FROM_REPAIR_HINT}`,
     });
   }
   // ── #250 (Todo C — the pure ORACLE-shape check). The recorded `derivedFromHash` must be a well-formed `sha256:<64 hex>`
@@ -352,7 +354,7 @@ export function validateProvenance(
     findings.push({
       kind: "derived-from-oracle-malformed",
       severity: dfSeverity,
-      message: `anchorSource.derivedFromHash ${JSON.stringify(artifact.anchorSource.derivedFromHash)} is not a well-formed "sha256:<64 lowercase hex>" oracle; the source document the derivedFrom trail points at cannot be verified against it (#250).`,
+      message: `anchorSource.derivedFromHash ${JSON.stringify(artifact.anchorSource.derivedFromHash)} is not a well-formed "sha256:<64 lowercase hex>" oracle; the source document the derivedFrom trail points at cannot be verified against it (#250). ${DERIVED_FROM_REPAIR_HINT}`,
     });
   }
   // ── #250 (Todo D1 — the artifact-local contract TELL invariant). A 1.1 record carries a `derivedFromContract` marker; it
@@ -380,7 +382,7 @@ export function validateProvenance(
       findings.push({
         kind: "derived-from-contract-mismatch",
         severity: dfSeverity,
-        message: `anchorSource.derivedFromContract "${dfMarker}" contradicts the derivedFromHash/textHash tell — the hashes imply "${tell}" (derivedFromHash ${artifact.anchorSource.derivedFromHash}, textHash ${artifact.anchorSource.textHash}); an "${dfMarker}" record requires derivedFromHash ${dfMarker === "anchor-self" ? "===" : "≠"} textHash (#250).`,
+        message: `anchorSource.derivedFromContract "${dfMarker}" contradicts the derivedFromHash/textHash tell — the hashes imply "${tell}" (derivedFromHash ${artifact.anchorSource.derivedFromHash}, textHash ${artifact.anchorSource.textHash}); an "${dfMarker}" record requires derivedFromHash ${dfMarker === "anchor-self" ? "===" : "≠"} textHash (#250). ${DERIVED_FROM_REPAIR_HINT}`,
       });
     }
   }

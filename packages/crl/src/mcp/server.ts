@@ -793,7 +793,7 @@ export function createServer(): McpServer {
         "`anchorSource.derivedFrom` is made carrier-relative to the anchor's directory (or, when merging, the existing " +
         "artifact's directory) — the `advisories` array (present only when non-empty) says so, and also carries other " +
         "non-blocking producer advisories (e.g. the anchor resolves outside the carrying checkout); if you persist the " +
-        "returned artifact anywhere else, run the provenance normalizer on save (once available) so derivedFrom stays resolvable. " +
+        "returned artifact anywhere else, run normalize_provenance (CLI crl-normalize-provenance) on save so derivedFrom stays resolvable, then re-validate. " +
         "The `diagnostics`/`mergeDiagnostics` COUNTS describe the FRESH-scaffold worklist " +
         "(the attribution + over-reach BASELINE); when `merged` is true they are the PRE-MERGE baseline, NOT the " +
         "merged artifact's residual. While ATTRIBUTING the scaffold, run `validate_provenance_worklist` on the output " +
@@ -924,7 +924,7 @@ export function createServer(): McpServer {
         "byte-untouched), never guessed. Returns { success:true, fullyNormalized, dryRun, carriers[], worklist[] (structured " +
         "reason codes: no-oracle | hash-mismatch | dead-path-needs-discovery | anchor-not-found | marker-tell-disagreement | " +
         "sidecar-hash-equals-text | no-carrier-relative | ambiguous | budget-exhausted), advisories? }. `fullyNormalized:" +
-        "false` ⇔ the worklist is non-empty (the corpus is NOT yet ready for the gate). A bad-args / unloadable-carrier / " +
+        "false` ⇔ the worklist is non-empty (normalization is incomplete; records remain worklisted — re-validate to clear the gate). A bad-args / unloadable-carrier / " +
         "write / post-write-revalidation failure is a tool error.",
       inputSchema: {
         artifact: z

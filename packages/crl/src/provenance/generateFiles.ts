@@ -163,7 +163,7 @@ export function generateProvenanceFiles(
     const existingPath = opts?.existingArtifactPath;
     carrierDir = existingPath ? dirname(existingPath) : dirname(anchorPath);
     advisories.push(
-      `derivedFrom was made relative to ${existingPath ? "the existing artifact's directory (assumed in-place re-save)" : "the anchor's own directory"} because no artifact destination was given. If you persist the artifact anywhere else, run the provenance normalizer on save (once available) so derivedFrom stays resolvable (#250).`,
+      `derivedFrom was made relative to ${existingPath ? "the existing artifact's directory (assumed in-place re-save)" : "the anchor's own directory"} because no artifact destination was given. If you persist the artifact anywhere else, run normalize_provenance (CLI crl-normalize-provenance) on save so derivedFrom stays resolvable, then re-validate (#250).`,
     );
   }
   const anchorSource = anchorMetaFor(anchorPath, anchorText, carrierDir);

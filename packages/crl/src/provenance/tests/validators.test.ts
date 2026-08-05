@@ -117,8 +117,9 @@ const ref = (
 });
 
 describe("validateProvenance — #250 derivedFrom carrier-path (Todo B)", () => {
-  // Severity is gated: a non-blocking `warning` until the #250 H delivery flips DERIVED_FROM_GATE_ENFORCED → hard `error`.
-  // Asserting against the constant keeps these tests correct on both sides of that flip.
+  // Severity: post-H (disc 390) the #250 gate is ENFORCED → hard `error`. DF_SEV stays derived from the constant so a
+  // rollback flip re-grades the whole bank coherently; the literal `"error"` pin below (and the dedicated pin in
+  // derivedFromResolution.test.ts) is what makes a silent revert fail loudly.
   const DF_SEV = DERIVED_FROM_GATE_ENFORCED ? "error" : "warning";
   const dfKinds = (df: unknown, mode?: "worklist" | "final") =>
     validateProvenance(
@@ -138,6 +139,7 @@ describe("validateProvenance — #250 derivedFrom carrier-path (Todo B)", () => 
     const fs = dfKinds("E:/src/repo-wt/x/artifacts/p.docx");
     expect(fs.map((f) => f.kind)).toEqual(["derived-from-absolute"]);
     expect(fs[0].severity).toBe(DF_SEV);
+    expect(fs[0].severity).toBe("error"); // #250 H literal pin (pure layer): the gate is enforced, not warn-only
     expect(fs[0].class).toBe("integrity");
     // integrity findings are reported at native severity in BOTH modes (not a coverage backlog) — worklist must not soften it
     expect(dfKinds("E:/x.docx", "worklist").map((f) => [f.kind, f.severity])).toEqual([

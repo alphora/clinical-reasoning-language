@@ -31,6 +31,8 @@ import {
   classifyDerivedFrom,
   contractFromTell,
   DERIVED_FROM_GATE_ENFORCED,
+  DERIVED_FROM_REPAIR_HINT,
+  DERIVED_FROM_SIDECAR_REPAIR_HINT,
   isWellFormedSha256,
   metaPathForAnchor,
 } from "./derivedFromPolicy";
@@ -162,7 +164,7 @@ export function derivedFromResolutionFindings(
     return [
       finding(
         "derived-from-unresolved",
-        `anchorSource.derivedFrom "${a.derivedFrom}" does not resolve to a file on this machine (resolved to "${resolved}": ${hashed.detail}) — the source document the trail points at is not in this clone (#250).`,
+        `anchorSource.derivedFrom "${a.derivedFrom}" does not resolve to a file on this machine (resolved to "${resolved}": ${hashed.detail}) — the source document the trail points at is not in this clone (#250). ${DERIVED_FROM_REPAIR_HINT}`,
       ),
     ];
   }
@@ -170,7 +172,7 @@ export function derivedFromResolutionFindings(
     return [
       finding(
         "derived-from-source-unreadable",
-        `anchorSource.derivedFrom "${a.derivedFrom}" resolves to "${resolved}" but could not be read as a regular file (${hashed.detail}) — the source trail cannot be verified (#250).`,
+        `anchorSource.derivedFrom "${a.derivedFrom}" resolves to "${resolved}" but could not be read as a regular file (${hashed.detail}) — the source trail cannot be verified (#250). ${DERIVED_FROM_REPAIR_HINT}`,
       ),
     ];
   }
@@ -178,7 +180,7 @@ export function derivedFromResolutionFindings(
     return [
       finding(
         "derived-from-hash-mismatch",
-        `anchorSource.derivedFrom "${a.derivedFrom}" resolves to "${resolved}" but its bytes hash to ${hashed.hash}, not the recorded derivedFromHash ${a.derivedFromHash} — the source content changed since it was recorded (or an un-smudged git-LFS pointer is checked out in its place) (#250).`,
+        `anchorSource.derivedFrom "${a.derivedFrom}" resolves to "${resolved}" but its bytes hash to ${hashed.hash}, not the recorded derivedFromHash ${a.derivedFromHash} — the source content changed since it was recorded (or an un-smudged git-LFS pointer is checked out in its place) (#250). ${DERIVED_FROM_REPAIR_HINT}`,
       ),
     ];
   }
@@ -318,7 +320,7 @@ export function sidecarDisagreementFindings(
     return [
       finding(
         "derived-from-sidecar-unreadable",
-        `the sidecar "${sidecarPath}" beside the anchor exists but could not be read as a regular file (${sc.detail}) — the artifact↔sidecar provenance records cannot be cross-checked (#250).`,
+        `the sidecar "${sidecarPath}" beside the anchor exists but could not be read as a regular file (${sc.detail}) — the artifact↔sidecar provenance records cannot be cross-checked (#250). ${DERIVED_FROM_SIDECAR_REPAIR_HINT}`,
       ),
     ];
   }
@@ -326,7 +328,7 @@ export function sidecarDisagreementFindings(
     return [
       finding(
         "derived-from-sidecar-malformed",
-        `the sidecar "${sidecarPath}" beside the anchor is not a valid .anchormeta.json (${sc.detail}) — the artifact↔sidecar provenance records cannot be cross-checked (#250).`,
+        `the sidecar "${sidecarPath}" beside the anchor is not a valid .anchormeta.json (${sc.detail}) — the artifact↔sidecar provenance records cannot be cross-checked (#250). ${DERIVED_FROM_SIDECAR_REPAIR_HINT}`,
       ),
     ];
   }
@@ -341,7 +343,7 @@ export function sidecarDisagreementFindings(
     return [
       finding(
         "derived-from-sidecar-malformed",
-        `the sidecar "${sidecarPath}" records a derivedFromHash ${JSON.stringify(sm.derivedFromHash)} that is not a well-formed "sha256:<64 hex>" oracle — the artifact↔sidecar records cannot be cross-checked (#250).`,
+        `the sidecar "${sidecarPath}" records a derivedFromHash ${JSON.stringify(sm.derivedFromHash)} that is not a well-formed "sha256:<64 hex>" oracle — the artifact↔sidecar records cannot be cross-checked (#250). ${DERIVED_FROM_SIDECAR_REPAIR_HINT}`,
       ),
     ];
   }
@@ -349,7 +351,7 @@ export function sidecarDisagreementFindings(
     return [
       finding(
         "derived-from-sidecar-malformed",
-        `the sidecar "${sidecarPath}" records a textHash ${JSON.stringify(sm.textHash)} that is not a well-formed "sha256:<64 hex>" value — its own upstream-source contract cannot be confirmed, so the records cannot be cross-checked (#250).`,
+        `the sidecar "${sidecarPath}" records a textHash ${JSON.stringify(sm.textHash)} that is not a well-formed "sha256:<64 hex>" value — its own upstream-source contract cannot be confirmed, so the records cannot be cross-checked (#250). ${DERIVED_FROM_SIDECAR_REPAIR_HINT}`,
       ),
     ];
   }
@@ -357,7 +359,7 @@ export function sidecarDisagreementFindings(
     return [
       finding(
         "derived-from-sidecar-malformed",
-        `the sidecar "${sidecarPath}" records derivedFromContract "${sm.derivedFromContract}" but a .anchormeta.json sidecar is upstream-source BY CONSTRUCTION — a self-inconsistent record (#250).`,
+        `the sidecar "${sidecarPath}" records derivedFromContract "${sm.derivedFromContract}" but a .anchormeta.json sidecar is upstream-source BY CONSTRUCTION — a self-inconsistent record (#250). ${DERIVED_FROM_SIDECAR_REPAIR_HINT}`,
       ),
     ];
   }
@@ -366,7 +368,7 @@ export function sidecarDisagreementFindings(
     return [
       finding(
         "derived-from-sidecar-malformed",
-        `the sidecar "${sidecarPath}" has derivedFromHash === textHash (an anchor-self tell) but a .anchormeta.json sidecar is upstream-source BY CONSTRUCTION — a self-inconsistent record (#250).`,
+        `the sidecar "${sidecarPath}" has derivedFromHash === textHash (an anchor-self tell) but a .anchormeta.json sidecar is upstream-source BY CONSTRUCTION — a self-inconsistent record (#250). ${DERIVED_FROM_SIDECAR_REPAIR_HINT}`,
       ),
     ];
   }

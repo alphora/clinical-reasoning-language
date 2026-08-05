@@ -564,7 +564,7 @@ describe("#250 Todo A — generateProvenanceFiles emits a carrier-relative deriv
       expect(g.artifact.anchorSource.derivedFrom).toBe(deadAbsolute); // VERBATIM — not masked/rebased (E owns recovery)
       expect(parseProvenanceArtifact(g.artifact).ok).toBe(true); // loader passes (marker present)
 
-      // the absolute-path detector STILL fires (non-blocking warning until H) — the defect is surfaced, not hidden.
+      // the absolute-path detector STILL fires (a hard error post-H; disc 390) — the defect is surfaced, not hidden.
       const artifactPath = path.join(dir, "merged.json");
       writeFileSync(artifactPath, JSON.stringify(g.artifact));
       const findings = validateProvenanceFiles(artifactPath, fCel, anchorTxt).findings;

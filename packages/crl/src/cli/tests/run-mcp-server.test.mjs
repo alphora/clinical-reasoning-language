@@ -463,20 +463,27 @@ try {
       const anchorText = "Some policy narrative text.";
       const anchorPath = resolve(tmp, "anchor.txt");
       writeFileSync(anchorPath, anchorText);
+      // #250 H: a well-formed Model-A anchor-self record (schemaVersion 1.1 + marker) — the CURRENT producer shape.
+      // derivedFrom points at the anchor this test writes and derivedFromHash === textHash (the anchor-self tell), so the
+      // NOW-ENFORCED derivedFrom gate emits ZERO derived-from findings; the only residue is the attribution backlog this
+      // case is about. (Pre-H this stub carried a filler `derivedFrom:"x.docx"` + `sha256:0` oracle, which the flip would
+      // turn into hard errors and break the worklist-pass assertion below — see disc 390.)
+      const textHash = "sha256:" + createHash("sha256").update(Buffer.from(anchorText, "utf8")).digest("hex");
       const meta = {
-        path: "anchor.txt", derivedFrom: "x.docx", derivedFromHash: "sha256:0",
+        path: "anchor.txt", derivedFrom: "anchor.txt", derivedFromHash: textHash, derivedFromContract: "anchor-self",
         canonicalizer: "crl-anchor-docx-text", canonicalizerVersion: "1.0.0",
-        textHash: "sha256:" + createHash("sha256").update(Buffer.from(anchorText, "utf8")).digest("hex"),
+        textHash,
         offsetUnit: "utf8-byte", unicodeNormalization: "NFC", rangeConvention: "half-open",
       };
       const artifactPath = resolve(tmp, "artifact.json");
-      writeFileSync(artifactPath, JSON.stringify({ schemaVersion: "1.0", policyId: "DME101.030", policyVersion: "1", anchorSource: meta, items: [], ignoredRanges: [], clusters: [] }));
+      writeFileSync(artifactPath, JSON.stringify({ schemaVersion: "1.1", policyId: "DME101.030", policyVersion: "1", anchorSource: meta, items: [], ignoredRanges: [], clusters: [] }));
       const r = await client.callTool({ name: "validate_provenance", arguments: { artifact: artifactPath, cel: dme101Cel, anchor: anchorPath } });
       assert.ok(!r.isError, "should not be a tool error");
       const out = JSON.parse(r.content[0].text);
       assert.equal(out.pass, false, "empty artifact must not pass");
       assert.ok(out.findings.some((f) => f.kind === "over-reach"), "expected over-reach findings");
       assert.ok(out.findings.some((f) => f.kind === "uncovered-span"), "expected the unacknowledged anchor text");
+      assert.ok(out.findings.every((f) => !f.kind.startsWith("derived-from")), "#250 H: a well-formed anchor-self record emits no derived-from findings (final mode)");
 
       // validate_provenance_worklist (in-progress) on the SAME fresh scaffold: the attribution backlog re-grades to
       // "warning" → pass true, while validate_provenance (final) above reported errors. Integrity findings still surface.
@@ -488,6 +495,7 @@ try {
       assert.ok(wout.worklistCount > 0, "worklist mode: the attribution backlog is counted");
       assert.ok(wout.findings.every((f) => f.class !== "attribution" || f.severity === "warning"), "attribution findings graded warning in worklist");
       assert.match(wout.remaining, /remaining work/, "worklist envelope carries the remaining-work note");
+      assert.ok(wout.findings.every((f) => !f.kind.startsWith("derived-from")), "#250 H: no derived-from findings on the anchor-self scaffold (worklist mode) — the gate is enforced but this record is clean");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
@@ -634,7 +642,7 @@ try {
       assert.ok(!r.isError, "a domain result (repair succeeded), not a tool error");
       const out = JSON.parse(r.content[0].text);
       assert.equal(out.success, true);
-      assert.equal(out.fullyNormalized, true, "the corpus is now ready for the gate");
+      assert.equal(out.fullyNormalized, true, "normalization is complete (validation still required to clear the gate)");
       const onDisk = JSON.parse(readFileSync(artPath, "utf8"));
       assert.equal(onDisk.schemaVersion, "1.1");
       assert.equal(onDisk.anchorSource.derivedFrom, "anchor.txt");
