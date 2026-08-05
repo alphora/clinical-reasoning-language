@@ -15,6 +15,7 @@
     "crl-validate-provenance": "dist/cli/run-validate-provenance.js",
     "crl-generate-provenance": "dist/cli/run-generate-provenance.js",
     "crl-normalize-provenance": "dist/cli/run-normalize-provenance.js",
+    "crl-check-fhir-ids": "dist/cli/run-check-fhir-ids.js",
     "crl-mcp": "dist/cli/run-mcp-server.js"
   },
   "sideEffects": false,

@@ -17,7 +17,7 @@ import { validateCELFile } from "../cel/validator";
 import { runCel, renderScenario } from "../cre";
 import { emitCrlTwoLane } from "../emit-two-lane";
 import { writeTwoLane, EmitWriteError } from "../emit-writers";
-import { emitFhirDefFromPath } from "../fhir-emitter";
+import { emitFhirDefFromPath, scanFhirIds } from "../fhir-emitter";
 import type { ImportDiagnostic } from "../imports/types";
 import { validateCRLImports } from "../imports/validate";
 import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "../index";
@@ -625,6 +625,35 @@ export function createServer(): McpServer {
       },
     },
     (args) => runEmitCel(args as { path: string; includeResources?: boolean; out?: string }),
+  );
+
+  server.registerTool(
+    "check_fhir_ids",
+    {
+      title: "Check committed FHIR resource ids for conformance",
+      description:
+        "Scan committed FHIR JSON for resource ids that violate the FHIR id datatype `[A-Za-z0-9-.]{1,64}` — " +
+        "too long (> 64 chars), off-charset, or empty. Emit-time id derivation (#237) already keeps NEWLY " +
+        "emitted ids conformant; this READ-ONLY check finds resources ALREADY committed with invalid ids (e.g. a " +
+        "pre-fix exemplar with a 76-char id) so a content project can find and fix them. It does NOT fix anything. " +
+        "Pass `path` — an ABSOLUTE directory (scanned recursively; node_modules/.git/dist and dot-dirs skipped, walk " +
+        "bounded by file + visit caps) or a single `.json` file (a non-`.json` file root is a tool error). Checks each " +
+        "resource's top-level `id` and, for a Bundle, every `entry[].resource` id recursively; it does NOT descend " +
+        "`contained[]` or `Parameters.parameter[].resource` (a deliberate v1 boundary). A present id that is empty, " +
+        "non-string, > 64 chars, or off-charset is a violation; an ABSENT id is not. " +
+        "Returns `{ pass, complete, filesChecked, resourcesChecked, violations:[{ file, resourceType, id, idLength, " +
+        "reasons, location }], readErrors:[{ file, message }], truncated? }`. `pass` is true iff zero violations were " +
+        "found AMONG THE FILES PARSED; `complete` is true iff nothing was skipped (no read/parse errors, not " +
+        "truncated). A conformance gate should require `pass && complete` — a JSON parse failure or oversized file is a " +
+        "non-fatal `readError` (flips `complete`, not `pass`); a non-FHIR JSON file (no `resourceType`) is skipped.",
+      inputSchema: {
+        path: z
+          .string()
+          .min(1)
+          .describe("Absolute directory to scan (recursively) or a single .json file."),
+      },
+    },
+    (args) => runCheckFhirIds(args as { path: string }),
   );
 
   server.registerTool(
@@ -1615,34 +1644,56 @@ function runRenderScenario(args: { path: string; case?: string }): {
 // provisioned server copy, NOT the caller's workspace, so a relative path would
 // write files somewhere no one can find. Empty/whitespace and relative paths
 // are rejected as tool-input errors (isError), distinct from emit success:false.
+// Shared absolute-path validation for the write/scan tools. The MCP server's CWD
+// is the provisioned server copy, NOT the caller's workspace, so a relative path
+// resolves somewhere no one intends. Returns an error string, or null if fine.
+// win32 `isAbsolute("/tmp/x")` is true but DRIVE-RELATIVE (resolves against the
+// server process's current drive), so require a drive-letter or UNC root there.
+function absolutePathProblem(p: unknown, label: string): string | null {
+  if (typeof p !== "string" || p.trim().length === 0) {
+    return `\`${label}\` must be a non-empty absolute path.`;
+  }
+  if (!isAbsolute(p)) {
+    return (
+      `\`${label}\` must be an ABSOLUTE path — the MCP server's working directory is not your ` +
+      `workspace, so a relative path resolves to an unexpected location. Got: ${JSON.stringify(p)}.`
+    );
+  }
+  if (process.platform === "win32" && !/^[a-zA-Z]:[\\/]|^[\\/][\\/]/.test(p)) {
+    return (
+      `\`${label}\` must be a drive-rooted (\`C:\\...\`) or UNC (\`\\\\host\\...\`) absolute path on ` +
+      `Windows; a drive-relative path like ${JSON.stringify(p)} resolves against the server's current drive.`
+    );
+  }
+  return null;
+}
+
 type OutDirResult = { ok: true; outDir: string | undefined } | { ok: false; errorText: string };
 
 function validateOutDir(out: unknown): OutDirResult {
   if (out === undefined) return { ok: true, outDir: undefined };
-  if (typeof out !== "string" || out.trim().length === 0) {
-    return { ok: false, errorText: "`out` must be a non-empty absolute directory path." };
+  const problem = absolutePathProblem(out, "out");
+  return problem ? { ok: false, errorText: problem } : { ok: true, outDir: out as string };
+}
+
+function runCheckFhirIds(args: { path: string }): {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+} {
+  const problem = absolutePathProblem(args.path, "path");
+  if (problem) {
+    return { content: [{ type: "text", text: problem }], isError: true };
   }
-  if (!isAbsolute(out)) {
+  let report;
+  try {
+    report = scanFhirIds(args.path);
+  } catch (e) {
     return {
-      ok: false,
-      errorText:
-        "`out` must be an ABSOLUTE path — the MCP server's working directory is not your " +
-        `workspace, so a relative path writes to an unexpected location. Got: ${JSON.stringify(out)}.`,
+      content: [{ type: "text", text: `Path "${args.path}" not scannable: ${(e as Error).message}` }],
+      isError: true,
     };
   }
-  // win32 `isAbsolute("/tmp/x")` is true but DRIVE-RELATIVE (resolves against the
-  // server process's current drive, not the caller's workspace) — the exact
-  // surprise the absolute rule exists to prevent. Require a drive-letter or UNC
-  // root on win32.
-  if (process.platform === "win32" && !/^[a-zA-Z]:[\\/]|^[\\/][\\/]/.test(out)) {
-    return {
-      ok: false,
-      errorText:
-        "`out` must be a drive-rooted (`C:\\...`) or UNC (`\\\\host\\...`) absolute path on Windows; " +
-        `a drive-relative path like ${JSON.stringify(out)} resolves against the server's current drive, not your workspace.`,
-    };
-  }
-  return { ok: true, outDir: out };
+  return { content: [{ type: "text", text: JSON.stringify(report, null, 2) }] };
 }
 
 function runEmitCrlFhir(args: {

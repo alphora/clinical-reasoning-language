@@ -71,13 +71,14 @@ afterAll(async () => {
   if (connected) await client.close();
 });
 
-check("MCP tools: 18 registered (+ canonicalize_source — the MCP-only anchor maker)", async () => {
+check("MCP tools: 19 registered (+ canonicalize_source; + #237/T3 check_fhir_ids)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
       "authoring_kit",
       "build_crl_ast",
       "canonicalize_source",
+      "check_fhir_ids",
       "create_flag",
       "emit_cel",
       "emit_cql",

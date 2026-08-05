@@ -75,7 +75,7 @@ Lowest-friction path if you want the language server, validation, and the MCP to
    ```bash
    code --install-extension crl-language-support-X.Y.Z.vsix --force
    ```
-3. Open VS Code in any workspace. The extension activates automatically (via `onStartupFinished`) and writes the `crl` server into `<workspace>/.mcp.json`. Any MCP host (Claude Code, etc.) picks up all 18 tools on its next start.
+3. Open VS Code in any workspace. The extension activates automatically (via `onStartupFinished`) and writes the `crl` server into `<workspace>/.mcp.json`. Any MCP host (Claude Code, etc.) picks up all 19 tools on its next start.
 
 ### Option B — npm tarball (`.tgz`) — for host apps + downstream code
 
@@ -192,7 +192,7 @@ esac
 
 ## MCP reference
 
-The bundled MCP server registers **18 tools** for interactive AI workflows. The **7 CRL-authoring tools** are detailed in the table below; the **5 provenance tools** in [Provenance tools](#provenance-tools); the remaining six (`emit_crl`, `run_decision`, `render_scenario`, `authoring_kit`, `create_flag`, `set_flag_status`) are registered but not yet detailed in this reference (a known documentation gap). Each returns a JSON envelope on success; invalid arguments (XOR violation, unreadable path, oversized input) come back as a tool error.
+The bundled MCP server registers **19 tools** for interactive AI workflows. The **7 CRL-authoring tools** are detailed in the table below; the **5 provenance tools** in [Provenance tools](#provenance-tools); the remaining seven (`emit_crl`, `run_decision`, `render_scenario`, `authoring_kit`, `create_flag`, `set_flag_status`, `check_fhir_ids`) are registered but not yet detailed in this reference (a known documentation gap). Each returns a JSON envelope on success; invalid arguments (XOR violation, unreadable path, oversized input) come back as a tool error.
 
 | Tool | Input | Returns | Use when |
 |---|---|---|---|
@@ -288,6 +288,7 @@ The package's `exports` field gives typed access to the same primitives the CLI 
 | **CRL → CQL emit** | `emitCQL`, `emitCQLFromAST`, `emitCQLImports`, `CqlEmitOptions`, `CqlEmitResult`, `EmitImportsResult` |
 | **CRL two-lane emit + write** | `emitCrlTwoLane` (pure: CQL closure + FHIR defs), `writeTwoLane` / `EmitWriteError` (the SHARED disk writer behind both `crl-emit --target fhir-def` and the `emit_crl` MCP `out` dir) |
 | **CRL → FHIR Definition emit** | `emitFhirDefFromPath`, `emitFhirDefClosure`, `emitLibrary`, `emitValueSet`, `emitActivityDefinition`, `emitRecommendationDefinition`, `emitDecisionPlanDefinition`, `writeFhirResources`, plus `isFhirDefError`, `isFhirDefWarning`, `FHIR_DEF_WARNING_KINDS` |
+| **FHIR id conformance (T3)** | `scanFhirIds`, `collectIdViolations`, `FHIR_ID_MAX_LEN` (`check_fhir_ids` MCP tool / `crl-check-fhir-ids` CLI — flag committed ids that break `[A-Za-z0-9-.]{1,64}`) |
 | **CEL lex/parse/AST** | `tokenizeCEL`, `parseCEL`, `buildCEL`, `CELToken`, `CELParseResult`, CEL AST types |
 | **CEL validation** | `validateCEL`, `validateCELFile` |
 | **CEL → FHIR instance emit** | `emitCelToFhir`, `writeEmitResult`, `resolveCelImports`, `EmittedResource`, `EmittedCase`, `EmitResult`, `EmitDiagnostic` |

@@ -52,13 +52,14 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 18 registered (+ #205 write-half create_flag / set_flag_status; + #17 canonicalize_source; + #250 E normalize_provenance)", async () => {
+  await check("MCP tools: 19 registered (+ #205 create_flag / set_flag_status; + #17 canonicalize_source; + #250 E normalize_provenance; + #237/T3 check_fhir_ids)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
       "authoring_kit",
       "build_crl_ast",
       "canonicalize_source",
+      "check_fhir_ids",
       "create_flag",
       "emit_cel",
       "emit_cql",
@@ -501,6 +502,74 @@ try {
     assert.equal(a.isError, true);
     const b = await client.callTool({ name: "emit_crl", arguments: { path: cms22Crl, out: "   " } });
     assert.equal(b.isError, true);
+  });
+
+  await check("check_fhir_ids → flags a committed >64 id, passes a clean tree, skips non-FHIR JSON", async () => {
+    const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+    const os = await import("node:os");
+    const root = mkdtempSync(resolve(os.tmpdir(), "mcp-checkids-"));
+    try {
+      writeFileSync(resolve(root, "ok.json"), JSON.stringify({ resourceType: "Library", id: "fine" }));
+      writeFileSync(resolve(root, "bad.json"), JSON.stringify({ resourceType: "Library", id: "a".repeat(80) }));
+      writeFileSync(resolve(root, "notfhir.json"), JSON.stringify({ just: "data" }));
+      const r = await client.callTool({ name: "check_fhir_ids", arguments: { path: root } });
+      assert.ok(!r.isError, "a domain result, not a tool error");
+      const out = JSON.parse(r.content[0].text);
+      assert.equal(out.pass, false);
+      assert.equal(out.complete, true, "all files parsed → complete even though a violation exists");
+      assert.equal(out.violations.length, 1);
+      assert.equal(out.violations[0].resourceType, "Library");
+      assert.deepEqual(out.violations[0].reasons, ["too-long"]);
+      assert.equal(out.violations[0].idLength, 80);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await check("crl-check-fhir-ids CLI → exit codes 0 (clean) / 2 (violations) / 2 (incomplete) / 1 (bad args)", async () => {
+    const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+    const os = await import("node:os");
+    const { execFileSync } = await import("node:child_process");
+    const cliPath = resolve(here, "../../../dist/cli/run-check-fhir-ids.js");
+    const runCli = (args) => {
+      try {
+        execFileSync(process.execPath, [cliPath, ...args], { stdio: "pipe" });
+        return 0;
+      } catch (e) {
+        return e.status;
+      }
+    };
+    const tmp = mkdtempSync(resolve(os.tmpdir(), "cli-checkids-"));
+    try {
+      writeFileSync(resolve(tmp, "ok.json"), JSON.stringify({ resourceType: "Library", id: "fine" }));
+      assert.equal(runCli(["--path", tmp]), 0, "clean tree → exit 0");
+
+      writeFileSync(resolve(tmp, "bad.json"), JSON.stringify({ resourceType: "Library", id: "a".repeat(80) }));
+      assert.equal(runCli(["--path", tmp, "--quiet"]), 2, "violations → exit 2");
+
+      // Incomplete (malformed json) with NO violations still exits 2 — cannot certify.
+      const tmp2 = mkdtempSync(resolve(os.tmpdir(), "cli-checkids-inc-"));
+      writeFileSync(resolve(tmp2, "broken.json"), "{ not json");
+      assert.equal(runCli(["--path", tmp2]), 2, "incomplete scan → exit 2 (cannot certify)");
+      rmSync(tmp2, { recursive: true, force: true });
+
+      assert.equal(runCli([]), 1, "no --path → exit 1");
+      assert.equal(runCli(["--path", tmp, "stray"]), 1, "bare positional arg → exit 1");
+      assert.equal(runCli(["--path", resolve(tmp, "ok.json.txt")]), 1, "non-.json file root → exit 1");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  await check("check_fhir_ids with a RELATIVE path → isError", async () => {
+    const r = await client.callTool({ name: "check_fhir_ids", arguments: { path: "some/dir" } });
+    assert.equal(r.isError, true);
+    assert.match(r.content[0].text, /ABSOLUTE/);
+  });
+
+  await check("check_fhir_ids with a nonexistent root → isError (not scannable)", async () => {
+    const r = await client.callTool({ name: "check_fhir_ids", arguments: { path: resolve(here, "no-such-dir-xyz") } });
+    assert.equal(r.isError, true);
   });
 
   await check("emit_cel without path → isError", async () => {

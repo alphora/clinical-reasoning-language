@@ -299,6 +299,9 @@ export {
   isFhirDefError,
   isFhirDefWarning,
   writeFhirResources,
+  scanFhirIds,
+  collectIdViolations,
+  FHIR_ID_MAX_LEN,
   CAPABILITY_ORDER,
   type TerminologyResolver,
   type ConceptResolver,
@@ -317,6 +320,10 @@ export type {
   UnmatchedReference,
   MetadataResult,
   Capability,
+  CheckReport,
+  IdViolation,
+  IdViolationReason,
+  CheckReadError,
 } from "./fhir-emitter";
 // Two-lane CRL emit (CQL closure + FHIR defs) and its shared disk writer — the
 // SINGLE composition + write path behind both `crl-emit --target fhir-def` and

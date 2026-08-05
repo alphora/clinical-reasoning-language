@@ -49,6 +49,8 @@ export {
 } from "./cpgActivityProfiles";
 
 export { writeFhirResources } from "./writer";
+export { scanFhirIds, collectIdViolations, FHIR_ID_MAX_LEN } from "./checkIds";
+export type { CheckReport, IdViolation, IdViolationReason, CheckReadError } from "./checkIds";
 
 export type {
   CpgMetadata,
