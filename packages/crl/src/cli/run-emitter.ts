@@ -4,10 +4,11 @@ import * as path from "path";
 
 import { emitCelToFhir, writeEmitResult } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
-import { CAPABILITY_ORDER, writeFhirResources } from "../fhir-emitter";
+import { CAPABILITY_ORDER } from "../fhir-emitter";
 import type { Capability } from "../fhir-emitter";
 import { emitCQLImports } from "../imports/emit";
 import { emitCrlTwoLane } from "../emit-two-lane";
+import { writeTwoLane, EmitWriteError } from "../emit-writers";
 
 type TargetMode = "cql" | "fhir-def" | undefined;
 
@@ -226,43 +227,28 @@ if (filePath.toLowerCase().endsWith(".crl") && target === "fhir-def") {
     process.exit(1);
   }
 
-  const cqlOutDir = path.join(outDir, "cql");
-  const fhirOutDir = path.join(outDir, "fhir");
+  // Shared two-lane write path (SAME as the `emit_crl` MCP tool's `out`): CQL
+  // to <out>/cql/, FHIR to <out>/fhir/, so the two surfaces cannot drift.
+  let written;
   try {
-    mkdirSync(cqlOutDir, { recursive: true });
-    mkdirSync(fhirOutDir, { recursive: true });
+    written = writeTwoLane(two, outDir);
   } catch (e) {
-    process.stderr.write(`Failed to create output directory: ${(e as Error).message}\n`);
-    process.exit(1);
-  }
-
-  const writtenCql: string[] = [];
-  for (const entry of two.cqlLibraries) {
-    const outPath = path.join(cqlOutDir, entry.outputFilename);
-    try {
-      writeFileSync(outPath, entry.cql, "utf-8");
-      writtenCql.push(outPath);
-    } catch (e) {
-      process.stderr.write(`Failed to write ${outPath}: ${(e as Error).message}\n`);
-      process.exit(1);
+    // Echo the partial write (so the operator sees what landed) — but not under
+    // --quiet, which prints no per-file lines.
+    if (!quiet && e instanceof EmitWriteError) {
+      for (const p of e.partial.cql) process.stdout.write(`wrote ${p}\n`);
+      for (const p of e.partial.fhir) process.stdout.write(`wrote ${p}\n`);
     }
-  }
-
-  // ── FHIR side ──
-  let writtenFhir: string[];
-  try {
-    writtenFhir = writeFhirResources({ success: true, resources: two.fhir.resources }, fhirOutDir);
-  } catch (e) {
-    process.stderr.write(`Failed to write FHIR resources: ${(e as Error).message}\n`);
+    process.stderr.write(`Failed to write emit output: ${(e as Error).message}\n`);
     process.exit(1);
   }
 
   if (!quiet) {
-    for (const p of writtenCql) process.stdout.write(`wrote ${p}\n`);
-    for (const p of writtenFhir) process.stdout.write(`wrote ${p}\n`);
+    for (const p of written.cql) process.stdout.write(`wrote ${p}\n`);
+    for (const p of written.fhir) process.stdout.write(`wrote ${p}\n`);
   } else {
     process.stdout.write(
-      `wrote ${writtenCql.length} CQL + ${writtenFhir.length} FHIR resource(s) under ${outDir}\n`,
+      `wrote ${written.cql.length} CQL + ${written.fhir.length} FHIR resource(s) under ${outDir}\n`,
     );
   }
 
@@ -285,14 +271,17 @@ if (filePath.toLowerCase().endsWith(".cel")) {
     process.stderr.write(JSON.stringify({ diagnostics: blockers }, null, 2) + "\n");
     process.exit(1);
   }
+  // writeEmitResult creates <outDir> up front (matching the shared writer) and
+  // throws on a filesystem / traversal failure — surface it, don't let a raw
+  // stack trace escape.
+  let written;
   try {
-    mkdirSync(outDir, { recursive: true });
+    written = writeEmitResult(result, outDir);
   } catch (e) {
-    process.stderr.write(`Failed to create output directory "${outDir}": ${(e as Error).message}\n`);
+    process.stderr.write(`Failed to write CEL emit output under "${outDir}": ${(e as Error).message}\n`);
     process.exit(1);
   }
-  const written = writeEmitResult(result, outDir);
-  process.stdout.write(`wrote ${written} FHIR resource(s) under ${outDir}\n`);
+  process.stdout.write(`wrote ${written.length} FHIR resource(s) under ${outDir}\n`);
   // T12 / #85: surface result-deferred (outcomes parsed but not emitted —
   // tied to #70 / `metric`) on stderr the same way unsupported-yet is
   // surfaced, with exit code 2. Pre-fix the deferral was silent and the

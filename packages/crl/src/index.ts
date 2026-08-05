@@ -318,6 +318,13 @@ export type {
   MetadataResult,
   Capability,
 } from "./fhir-emitter";
+// Two-lane CRL emit (CQL closure + FHIR defs) and its shared disk writer — the
+// SINGLE composition + write path behind both `crl-emit --target fhir-def` and
+// the `emit_crl` MCP `out` directory (#237/T2).
+export { emitCrlTwoLane } from "./emit-two-lane";
+export type { EmitCrlTwoLaneResult, TwoLaneCqlLibrary } from "./emit-two-lane";
+export { writeTwoLane, EmitWriteError } from "./emit-writers";
+export type { TwoLaneWritten } from "./emit-writers";
 export type {
   CEL,
   CELLibraryDeclaration,

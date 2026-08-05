@@ -388,6 +388,121 @@ try {
     assert.ok(Array.isArray(out.emittedCases), "includeResources:true should expose emittedCases array");
   });
 
+  await check("emit_cel with out (absolute) → writes the FHIR tree + returns an absolute `written` manifest", async () => {
+    const { mkdtempSync, rmSync, existsSync } = await import("node:fs");
+    const os = await import("node:os");
+    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.cel");
+    const outDir = mkdtempSync(resolve(os.tmpdir(), "mcp-emitcel-out-"));
+    try {
+      const r = await client.callTool({ name: "emit_cel", arguments: { path: cms22Cel, out: outDir } });
+      assert.ok(!r.isError, "should not be a tool error");
+      const out = JSON.parse(r.content[0].text);
+      assert.equal(out.success, true);
+      assert.ok(Array.isArray(out.written), "written[] present when out is set");
+      assert.equal(out.written.length, out.resourceCount, "one written path per emitted resource");
+      assert.ok(out.written.every((p) => resolve(p) === p), "written paths are absolute");
+      assert.ok(out.written.every((p) => existsSync(p)), "every written path exists on disk");
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+
+  await check("emit_cel with a RELATIVE out → isError (server CWD is not the workspace)", async () => {
+    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.cel");
+    const r = await client.callTool({ name: "emit_cel", arguments: { path: cms22Cel, out: "relative/out" } });
+    assert.equal(r.isError, true);
+    assert.match(r.content[0].text, /ABSOLUTE/);
+  });
+
+  await check("emit_cel WITHOUT out → no `written` field (byte-identical to today's summary)", async () => {
+    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.cel");
+    const out = JSON.parse((await client.callTool({ name: "emit_cel", arguments: { path: cms22Cel } })).content[0].text);
+    assert.equal("written" in out, false, "no out → no written key at all (not null)");
+  });
+
+  await check("emit_crl with out (absolute) → writes both lanes, omits CQL bodies, returns { cql, fhir } manifest", async () => {
+    const { mkdtempSync, rmSync, existsSync } = await import("node:fs");
+    const os = await import("node:os");
+    const cms22Crl = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.crl");
+    const outDir = mkdtempSync(resolve(os.tmpdir(), "mcp-emitcrl-out-"));
+    try {
+      const r = await client.callTool({ name: "emit_crl", arguments: { path: cms22Crl, out: outDir } });
+      assert.ok(!r.isError, `should not be a tool error; got ${r.content?.[0]?.text?.slice(0, 200)}`);
+      const out = JSON.parse(r.content[0].text);
+      assert.equal(out.success, true);
+      assert.ok(out.written && Array.isArray(out.written.cql) && Array.isArray(out.written.fhir), "written.{cql,fhir} arrays");
+      assert.ok(out.written.cql.length > 0 && out.written.fhir.length > 0, "both lanes wrote at least one file");
+      assert.ok([...out.written.cql, ...out.written.fhir].every((p) => existsSync(p)), "every written path exists");
+      // Body suppression: with out set, cql.libraries carries filenames only, NOT the full source.
+      assert.ok(out.cql.libraries.every((l) => l.cql === undefined), "cql bodies omitted when out is set");
+      assert.ok(out.cql.libraries.every((l) => typeof l.outputFilename === "string"), "outputFilename retained");
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+
+  await check("emit_crl with a RELATIVE out → isError", async () => {
+    const cms22Crl = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.crl");
+    const r = await client.callTool({ name: "emit_crl", arguments: { path: cms22Crl, out: "relative/out" } });
+    assert.equal(r.isError, true);
+    assert.match(r.content[0].text, /ABSOLUTE/);
+  });
+
+  await check("emit_crl WITHOUT out → full cql.libraries bodies retained, no `written` field", async () => {
+    const cms22Crl = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.crl");
+    const out = JSON.parse((await client.callTool({ name: "emit_crl", arguments: { path: cms22Crl } })).content[0].text);
+    assert.equal("written" in out, false, "no out → no written key");
+    assert.ok(out.cql.libraries.every((l) => typeof l.cql === "string"), "no out → full CQL sources present");
+  });
+
+  await check("emit_crl with out on a hard-error .crl → written:null, nothing written, CQL bodies RETAINED", async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } = await import("node:fs");
+    const os = await import("node:os");
+    const root = mkdtempSync(resolve(os.tmpdir(), "mcp-crl-gatefail-"));
+    try {
+      writeFileSync(resolve(root, "package.json"), JSON.stringify({ name: "x", version: "1.0.0" }));
+      const crlPath = resolve(root, "bad.crl");
+      writeFileSync(crlPath, "this is not valid CRL syntax @@@ {{{"); // parse failure → cql lane !success
+      const outDir = resolve(root, "gen");
+      const out = JSON.parse((await client.callTool({ name: "emit_crl", arguments: { path: crlPath, out: outDir } })).content[0].text);
+      assert.equal(out.success, false, "a parse-failing .crl does not succeed");
+      assert.equal(out.written, null, "gate blocked → written:null (the two.cql.success term)");
+      assert.equal(existsSync(resolve(outDir, "cql")), false, "nothing written: no <out>/cql");
+      assert.equal(existsSync(resolve(outDir, "fhir")), false, "nothing written: no <out>/fhir");
+      // On gate-fail the successfully-emitted bodies are NOT withheld (they aren't on disk).
+      assert.ok(out.cql.libraries.every((l) => "cql" in l), "gate-fail retains cql bodies, does not suppress");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await check("emit_cel with out on an error-diagnostic .cel → written:null, nothing written", async () => {
+    const { mkdtempSync, writeFileSync, rmSync, existsSync } = await import("node:fs");
+    const os = await import("node:os");
+    const root = mkdtempSync(resolve(os.tmpdir(), "mcp-cel-gatefail-"));
+    try {
+      writeFileSync(resolve(root, "package.json"), JSON.stringify({ name: "x", version: "1.0.0" }));
+      const celPath = resolve(root, "bad.cel");
+      writeFileSync(celPath, "this is not valid CEL @@@ {{{"); // precondition-failed (error severity)
+      const outDir = resolve(root, "gen");
+      const out = JSON.parse((await client.callTool({ name: "emit_cel", arguments: { path: celPath, out: outDir } })).content[0].text);
+      assert.equal(out.success, false, "an error-diagnostic .cel does not succeed");
+      assert.equal(out.written, null, "gate blocked → written:null");
+      assert.equal(existsSync(outDir), false, "nothing written: <out> not created");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await check("emit_cel / emit_crl with a whitespace-only out → isError (validateOutDir)", async () => {
+    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.cel");
+    const cms22Crl = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.crl");
+    const a = await client.callTool({ name: "emit_cel", arguments: { path: cms22Cel, out: "   " } });
+    assert.equal(a.isError, true);
+    const b = await client.callTool({ name: "emit_crl", arguments: { path: cms22Crl, out: "   " } });
+    assert.equal(b.isError, true);
+  });
+
   await check("emit_cel without path → isError", async () => {
     const r = await client.callTool({ name: "emit_cel", arguments: {} });
     assert.equal(r.isError, true);

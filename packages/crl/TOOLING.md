@@ -286,6 +286,7 @@ The package's `exports` field gives typed access to the same primitives the CLI 
 | **CRL lex/parse/AST** | `tokenizeCRL`, `parseCRL`, `buildCRL`, `Token`, `ParseResult<T>`, AST types from `../ast/types` re-exported |
 | **CRL validation** | `validateCRL`, `validateCRLImports`, `ValidateOptions`, `ValidationResultEnvelope` |
 | **CRL → CQL emit** | `emitCQL`, `emitCQLFromAST`, `emitCQLImports`, `CqlEmitOptions`, `CqlEmitResult`, `EmitImportsResult` |
+| **CRL two-lane emit + write** | `emitCrlTwoLane` (pure: CQL closure + FHIR defs), `writeTwoLane` / `EmitWriteError` (the SHARED disk writer behind both `crl-emit --target fhir-def` and the `emit_crl` MCP `out` dir) |
 | **CRL → FHIR Definition emit** | `emitFhirDefFromPath`, `emitFhirDefClosure`, `emitLibrary`, `emitValueSet`, `emitActivityDefinition`, `emitRecommendationDefinition`, `emitDecisionPlanDefinition`, `writeFhirResources`, plus `isFhirDefError`, `isFhirDefWarning`, `FHIR_DEF_WARNING_KINDS` |
 | **CEL lex/parse/AST** | `tokenizeCEL`, `parseCEL`, `buildCEL`, `CELToken`, `CELParseResult`, CEL AST types |
 | **CEL validation** | `validateCEL`, `validateCELFile` |

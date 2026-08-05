@@ -4,17 +4,19 @@
 // createServer/main/selfTest from here, so the two can no longer drift. No module-level dispatch:
 // importing this module must NOT start a server (the thin entries own the argv dispatch).
 import { readFileSync, statSync } from "node:fs";
+import { isAbsolute } from "node:path";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
 import { getAuthoringKit, DEFAULT_STAGE, DEFAULT_USE_CASE } from "../authoring-kit";
-import { emitCelToFhir } from "../cel/emitter";
+import { emitCelToFhir, writeEmitResult } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
 import { validateCELFile } from "../cel/validator";
 import { runCel, renderScenario } from "../cre";
 import { emitCrlTwoLane } from "../emit-two-lane";
+import { writeTwoLane, EmitWriteError } from "../emit-writers";
 import { emitFhirDefFromPath } from "../fhir-emitter";
 import type { ImportDiagnostic } from "../imports/types";
 import { validateCRLImports } from "../imports/validate";
@@ -525,7 +527,7 @@ export function createServer(): McpServer {
       description:
         "Emit BOTH lanes from one .crl in a single call: the layered CQL closure AND the cpg-conformant FHIR Definition resources that reference it — the SAME two-lane composition as the CLI `crl-emit --target fhir-def` (shared `emitCrlTwoLane`, so the two cannot drift). " +
         "USE THIS (not `emit_cql`) for layered / both-representation policies: `emit_cql` is the single-library DIRECT lane and rejects both-representation with a duplicate `define`; `emit_crl` lowers it correctly via the decision/case-feature lane. The FHIR `Library.content` URLs point at the sibling `cql/<name>.cql`, so emitting one lane without the other ships broken references — this returns both together. " +
-        "Returns `{ success, cql: { libraries: [{ outputFilename, cql }] }, fhir: { resourceCount, resourceManifest: [{ resourceType, id, relativePath, sourceKind, sourceName }], errors, unmatched }, hardErrors, warnings, filenameCollisions, importDiagnostics, metadataErrors }`. `success` is true iff BOTH lanes are clean AND no CQL filename collides. `cql.libraries` carry the full CQL source (write each to `<out>/cql/<outputFilename>`); pass `includeResources: true` to also get the full FHIR `resources[]` (write each to `<out>/fhir/<ResourceType>/<id>.json`). " +
+        "Returns `{ success, cql: { libraries: [{ outputFilename, cql }] }, fhir: { resourceCount, resourceManifest: [{ resourceType, id, relativePath, sourceKind, sourceName }], errors, unmatched }, hardErrors, warnings, filenameCollisions, importDiagnostics, metadataErrors }`. `success` is true iff BOTH lanes are clean AND no CQL filename collides. `cql.libraries` carry the full CQL source (write each to `<out>/cql/<outputFilename>`); pass `includeResources: true` to also get the full FHIR `resources[]` (write each to `<out>/fhir/<ResourceType>/<id>.json`). Or pass `out` (an ABSOLUTE dir) to have the tool WRITE both lanes to disk for you via the same shared writer as the CLI — the response then adds `written: { cql, fhir }` (absolute paths) and omits the `cql.libraries[].cql` bodies (see the `out` field). " +
         "Publishable+ emit needs a publication date — pass `date` (ISO) or set `crl.date` in the artifact package.json. " +
         "A `defined as` `sem-not` whose operand is not a truth-set (a `coded from` resource list, or a cross-library/`definition is`/cyclic operand whose flavor can't be established) cannot be lowered: `success` becomes `false` with an `emit-unlowerable-negation` error, and the CQL carries a compile-failing `CRLCommon.UnsupportedNegation(...)` sentinel (never a silent unnegated body). Express the negation as a positive-anchored `A sem-and sem-not B`, or move it to the decision layer (`not`).",
       inputSchema: {
@@ -550,6 +552,22 @@ export function createServer(): McpServer {
           .describe(
             "CRMI capability level (default publishable). `executable` unsupported (#113).",
           ),
+        out: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "Optional ABSOLUTE output directory. When set, BOTH lanes are ALSO written to disk — " +
+              "CQL to `<out>/cql/<outputFilename>`, FHIR to `<out>/fhir/<ResourceType>/<id>.json` — via the " +
+              "SAME shared writer as `crl-emit --target fhir-def --out-dir`, so MCP and CLI cannot drift. The " +
+              "response then carries `written: { cql: string[], fhir: string[] }` (ABSOLUTE paths) and OMITS the " +
+              "full `cql.libraries[].cql` bodies (they are on disk). Nothing is written if a hard error or CQL " +
+              "filename collision blocks emit (`written: null`); unmatched-ref / warning deliverables still write " +
+              "(mirrors the CLI's write-then-exit-2). Relative paths are REJECTED (the server CWD is not your " +
+              "workspace). The write is NOT transactional — on a filesystem failure `<out>` may hold a partial " +
+              "deliverable. Existing files are overwritten; stale files from a prior emit are NOT pruned; do not " +
+              "target one directory from concurrent calls.",
+          ),
       },
     },
     (args) =>
@@ -559,6 +577,7 @@ export function createServer(): McpServer {
           includeResources?: boolean;
           date?: string;
           capability?: "shareable" | "computable" | "publishable" | "executable";
+          out?: string;
         },
       ),
   );
@@ -573,6 +592,7 @@ export function createServer(): McpServer {
         "Returns a SUMMARY envelope by default: " +
         "`{ success, caseCount, resourceCount, caseManifest:[{caseSlug, librarySlug, resourceCount}], resourceManifest:[{caseSlug, resourceType, id, outputPath}], diagnostics }`. " +
         "Pass `includeResources: true` to also receive the full `emittedCases[]` array (each case's full FHIR JSON bodies). " +
+        "Or pass `out` (an ABSOLUTE dir) to have the tool WRITE the FHIR instance tree to disk for you via the same shared writer as the CLI, returning a `written` manifest (see the `out` field). " +
         "success is true iff there are zero error-severity diagnostics; `unsupported-yet`, `result-deferred`, and `precondition-failed` (when not error) are warnings, surfaced but non-fatal. " +
         "Diagnostic kinds: unsupported-yet (fact's `defined by` couldn't derive a bare FHIR type — case skipped), " +
         "result-deferred (`result is` parsed but not emitted, deferred to #70/metric), " +
@@ -588,9 +608,23 @@ export function createServer(): McpServer {
           .describe(
             "Include the full emittedCases[] array (with resource bodies). Default false (summary only).",
           ),
+        out: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "Optional ABSOLUTE output directory. When set, the FHIR instances are ALSO written to disk at " +
+              "`<out>/<outputPath>/<id>.json` (the KALM-style tree) via the SAME shared writer as " +
+              "`crl-emit --path x.cel --out-dir`, so MCP and CLI cannot drift. The response then carries " +
+              "`written: string[]` (ABSOLUTE paths). Nothing is written if any error-severity diagnostic is " +
+              "present (`written: null`); warning-only results (unsupported-yet / result-deferred) still write " +
+              "(mirrors the CLI's write-then-exit-2). Relative paths are REJECTED (the server CWD is not your " +
+              "workspace). The write is NOT transactional; existing files are overwritten and stale files from a " +
+              "prior emit are NOT pruned.",
+          ),
       },
     },
-    (args) => runEmitCel(args as { path: string; includeResources?: boolean }),
+    (args) => runEmitCel(args as { path: string; includeResources?: boolean; out?: string }),
   );
 
   server.registerTool(
@@ -1576,6 +1610,41 @@ function runRenderScenario(args: { path: string; case?: string }): {
   return { content: [{ type: "text", text: JSON.stringify(vm, null, 2) }] };
 }
 
+// Optional `out` directory for the write-capable emit tools (`emit_crl`,
+// `emit_cel`). Must be absolute when present — the MCP server's CWD is the
+// provisioned server copy, NOT the caller's workspace, so a relative path would
+// write files somewhere no one can find. Empty/whitespace and relative paths
+// are rejected as tool-input errors (isError), distinct from emit success:false.
+type OutDirResult = { ok: true; outDir: string | undefined } | { ok: false; errorText: string };
+
+function validateOutDir(out: unknown): OutDirResult {
+  if (out === undefined) return { ok: true, outDir: undefined };
+  if (typeof out !== "string" || out.trim().length === 0) {
+    return { ok: false, errorText: "`out` must be a non-empty absolute directory path." };
+  }
+  if (!isAbsolute(out)) {
+    return {
+      ok: false,
+      errorText:
+        "`out` must be an ABSOLUTE path — the MCP server's working directory is not your " +
+        `workspace, so a relative path writes to an unexpected location. Got: ${JSON.stringify(out)}.`,
+    };
+  }
+  // win32 `isAbsolute("/tmp/x")` is true but DRIVE-RELATIVE (resolves against the
+  // server process's current drive, not the caller's workspace) — the exact
+  // surprise the absolute rule exists to prevent. Require a drive-letter or UNC
+  // root on win32.
+  if (process.platform === "win32" && !/^[a-zA-Z]:[\\/]|^[\\/][\\/]/.test(out)) {
+    return {
+      ok: false,
+      errorText:
+        "`out` must be a drive-rooted (`C:\\...`) or UNC (`\\\\host\\...`) absolute path on Windows; " +
+        `a drive-relative path like ${JSON.stringify(out)} resolves against the server's current drive, not your workspace.`,
+    };
+  }
+  return { ok: true, outDir: out };
+}
+
 function runEmitCrlFhir(args: {
   path: string;
   includeResources?: boolean;
@@ -1632,10 +1701,17 @@ function runEmitCrl(args: {
   includeResources?: boolean;
   date?: string;
   capability?: "shareable" | "computable" | "publishable" | "executable";
+  out?: string;
 }): {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 } {
+  const outCheck = validateOutDir(args.out);
+  if (!outCheck.ok) {
+    return { content: [{ type: "text", text: outCheck.errorText }], isError: true };
+  }
+  const outDir = outCheck.outDir;
+
   let stat;
   try {
     stat = statSync(args.path);
@@ -1666,10 +1742,47 @@ function runEmitCrl(args: {
     ...(args.capability !== undefined ? { capability: args.capability } : {}),
   });
 
+  // When `out` is set, write to disk. Gate on the CLI-exact condition — the same
+  // three checks the CLI makes SEPARATELY (`run-emitter.ts`): no FHIR hard
+  // errors, the CQL lane succeeded, no CQL filename collision. `two.cql.success`
+  // is checked in its own right because `emitCQLImports` can fail with NO
+  // `errors` field (zero resolved libraries / error-severity import diagnostics),
+  // so `hardErrors.length === 0` does NOT imply it — without this term MCP could
+  // write a FHIR lane with zero CQL (a broken `attachment.url` deliverable) where
+  // the CLI exits 1. This is still LOOSER than `two.success` (which also forbids
+  // `fhir.unmatched`): the CLI writes an unmatched/warning deliverable and exits
+  // 2, so MCP parity does the same. A blocked write reports `written: null`; a
+  // filesystem failure surfaces as isError (with the partial-write list).
+  let written: { cql: string[]; fhir: string[] } | null = null;
+  if (outDir !== undefined) {
+    const canWrite =
+      two.hardErrors.length === 0 && two.cql.success && two.filenameCollisions.length === 0;
+    if (canWrite) {
+      try {
+        written = writeTwoLane(two, outDir);
+      } catch (e) {
+        const partial = e instanceof EmitWriteError ? e.partial : { cql: [], fhir: [] };
+        return {
+          content: [
+            { type: "text", text: JSON.stringify({ error: (e as Error).message, written: partial }, null, 2) },
+          ],
+          isError: true,
+        };
+      }
+    }
+  }
+
   const payload = {
     success: two.success,
     cql: {
-      libraries: two.cqlLibraries,
+      // Suppress the full CQL bodies ONLY when they actually landed on disk
+      // (`written !== null`) — the `written.cql` paths are then authoritative. On
+      // a gate-blocked write (`written === null`) nothing was written, so the
+      // successfully-emitted bodies are still returned rather than withheld.
+      libraries:
+        written !== null
+          ? two.cqlLibraries.map((l) => ({ outputFilename: l.outputFilename }))
+          : two.cqlLibraries,
     },
     fhir: {
       resourceCount: two.fhir.resources.length,
@@ -1689,6 +1802,7 @@ function runEmitCrl(args: {
     filenameCollisions: two.filenameCollisions,
     importDiagnostics: two.fhir.importDiagnostics,
     metadataErrors: two.fhir.metadataErrors,
+    ...(outDir !== undefined ? { written } : {}),
   };
 
   return {
@@ -1696,10 +1810,16 @@ function runEmitCrl(args: {
   };
 }
 
-function runEmitCel(args: { path: string; includeResources?: boolean }): {
+function runEmitCel(args: { path: string; includeResources?: boolean; out?: string }): {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 } {
+  const outCheck = validateOutDir(args.out);
+  if (!outCheck.ok) {
+    return { content: [{ type: "text", text: outCheck.errorText }], isError: true };
+  }
+  const outDir = outCheck.outDir;
+
   let stat;
   try {
     stat = statSync(args.path);
@@ -1719,6 +1839,37 @@ function runEmitCel(args: { path: string; includeResources?: boolean }): {
   const graph = resolveCelImports(args.path);
   const result = emitCelToFhir(graph);
   const hasErrors = result.diagnostics.some((d) => d.severity === "error");
+
+  // When `out` is set, write to disk. Gate on no error-severity diagnostic
+  // (warnings still write, mirroring the CLI's write-then-exit-2). A blocked
+  // write reports `written: null`; a filesystem failure surfaces as isError.
+  let written: string[] | null = null;
+  if (outDir !== undefined && !hasErrors) {
+    const partial: string[] = [];
+    try {
+      written = writeEmitResult(result, outDir, partial);
+    } catch (e) {
+      // Symmetric with `emit_crl`: a machine-readable partial-write list, not just prose.
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                error:
+                  `Failed to write CEL emit output under "${outDir}"; it may hold a partial ` +
+                  `deliverable: ${(e as Error).message}`,
+                written: partial,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
 
   const resourceCount = result.emittedCases.reduce((n, c) => n + c.resources.length, 0);
   const summary = {
@@ -1740,6 +1891,7 @@ function runEmitCel(args: { path: string; includeResources?: boolean }): {
     ),
     diagnostics: result.diagnostics,
     ...(args.includeResources ? { emittedCases: result.emittedCases } : {}),
+    ...(outDir !== undefined ? { written } : {}),
   };
 
   return {
