@@ -149,8 +149,15 @@ non-blocking `warning` during the #250 transition window, and a hard `error` fro
   `derived-from-hash-mismatch` (the source's bytes ≠ the recorded oracle — a content change, or an un-smudged git-LFS
   pointer).
 - *contract:* `derived-from-contract-mismatch` (the marker contradicts the hash tell).
-- *artifact↔sidecar:* `derived-from-sidecar-disagreement` (the artifact and the sidecar record different upstream
-  oracles), `derived-from-sidecar-malformed`, `derived-from-sidecar-unreadable`.
+- *artifact↔sidecar (upstream-source artifacts only):* `derived-from-sidecar-disagreement` (the artifact and the sidecar
+  record different upstream oracles), `derived-from-sidecar-malformed`, `derived-from-sidecar-unreadable`. **Which edge each
+  oracle names is the load-bearing detail:** an artifact's `derivedFromHash` is the oracle for the artifact's OWN
+  `derivedFrom` — the anchor `.txt` for an anchor-self record (so it equals `textHash`, which is the tell), the `.docx` for
+  an upstream-source record — whereas a sidecar's `derivedFromHash` is *always* the `.txt ← .docx` canonicalization edge. So
+  the two oracles are like-for-like (both the `.docx`) **only when the artifact is upstream-source**; the cross-check is
+  therefore contract-conditional and never runs on an anchor-self artifact, whose oracle is *supposed* to differ from the
+  sidecar's. (Corollary: never "reconcile" an anchor-self artifact's oracle to its sidecar's — that would overwrite the
+  correct `.txt` hash with the `.docx` hash and flip the record's own tell to upstream-source.)
 
 **The normalizer — repair, and the readiness signal.** When a `derived-from-*` finding fires on a legacy corpus, do NOT
 hand-edit the path — run **`normalize_provenance`** (CLI **`crl-normalize-provenance`**). It rewrites `derivedFrom`
