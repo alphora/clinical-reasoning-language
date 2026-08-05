@@ -1,8 +1,8 @@
 {
   "resourceType": "Observation",
-  "id": "cms22-blood-pressure-screening-maria-has-normal-bp-at-her-wellness-visit-normal-systolic-component",
+  "id": "cms22-blood-pressure-screening-maria-has-normal-bp-459f327b27b6",
   "subject": {
-    "reference": "Patient/cms22-blood-pressure-screening-maria-has-normal-bp-at-her-wellness-visit-maria-garcia"
+    "reference": "Patient/cms22-blood-pressure-screening-maria-has-normal-bp-2cad6987aaa3"
   },
   "code": {
     "coding": [

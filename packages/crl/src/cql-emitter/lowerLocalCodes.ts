@@ -105,6 +105,7 @@ import type {
   TerminologyBodyLine,
   Location,
 } from "../ast/types";
+import { localCodeSystemSlug } from "../fhir-emitter/slug";
 import { matchNarrative } from "../template-match";
 import { sanctionedAgeTodayOp } from "../template-match/agePredicate";
 import type { CanonicalArg } from "../template-match/canonicalTypes";
@@ -214,24 +215,32 @@ export function localCodeSystemUrl(
   canonicalBase: string | undefined,
   localDomainId: string,
 ): string {
-  const slug = localSlug(localDomainId);
+  // #237/T1 (scope B) — the url-tail is the SAME collision-safe identity the FHIR
+  // `CodeSystem.id` uses (`localCodeSystemSlug`, which returns the full `<…>-local`
+  // tail), so id, url-tail, `codesystem '<url>'`, and every `coding.system` are
+  // byte-equal at ALL lengths — including the >64 case the old uncapped `localSlug`
+  // left divergent, and dotted domains where `rawSlug` (dot→hyphen) now matches the
+  // id instead of the old `localSlug` (dot-stripping) mismatch.
+  const tail = localCodeSystemSlug(localDomainId);
   if (canonicalBase) {
     // Normalize a trailing slash so the url is stable regardless of whether the
     // caller's canonicalBase ends in `/`. The FHIR-metadata loader already
     // strips it, but a direct `emitCQLFromAST({ canonicalBase })` caller may
     // not — and both lanes MUST produce a byte-equal url.
     const base = canonicalBase.replace(/\/+$/, "");
-    return `${base}/CodeSystem/${slug}-local`;
+    return `${base}/CodeSystem/${tail}`;
   }
-  return `urn:crl:codesystem:${slug}-local`;
+  return `urn:crl:codesystem:${tail}`;
 }
 
 /**
  * Title-case a policy-id slug for the human-readable local codesystem DECL name:
  * lowercase-hyphen-slug the id, then split on `-` and capitalize each token —
  * `example-direct` → "Example Direct", `example-for-emit` → "Example For Emit".
- * Keyed off the SAME slug source as the local-domain URL so the decl name and the
- * URL share one identity.
+ * This is a DISPLAY name only (not an id/url). It keeps the uncapped, dot-stripping
+ * `localSlug` for human readability; the local-domain id/URL now use the collision-safe
+ * `localCodeSystemSlug` (dot→hyphen, hashed at >64), so the decl name and the URL can
+ * differ on a dotted or >64 domain. That is fine — the name is not an identity key.
  */
 function titleCaseSlug(id: string): string {
   return localSlug(id)

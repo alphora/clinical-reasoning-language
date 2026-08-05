@@ -13,7 +13,7 @@ import {
 } from "../closureOrchestrator";
 import { emitCQLImports } from "../../imports/emit";
 import { localCodeSystemUrl } from "../../cql-emitter/lowerLocalCodes";
-import { capSlugForSuffix, slugify } from "../slug";
+import { localCodeSystemSlug } from "../slug";
 import { CPG_FEATURE_EXPRESSION_EXT } from "../types";
 import type { CpgMetadata, EmittedResource } from "../types";
 
@@ -1285,20 +1285,28 @@ describe("applyUrlUniquenessInvariant — Inv 0 (T3)", () => {
   });
 });
 
-describe("closureOrchestrator — truncation id-collision boundary (T4)", () => {
-  // Mirror codeSystem.ts' id derivation: capSlugForSuffix(slugify(name), "-local").
-  const idFor = (name: string): string => capSlugForSuffix(slugify(name), "-local");
+describe("closureOrchestrator — local-domain id collision-safety (#237/T1, was T4 truncation boundary)", () => {
+  // #237/T1 — call the REAL id function, not a mirror (a mirror silently diverges).
+  const idFor = (localDomainId: string): string => localCodeSystemSlug(localDomainId);
 
-  it("two library names differing only past the slug cap collide on the capped CodeSystem id", () => {
-    // capSlugForSuffix caps the base to 64 - len("-local") = 58 chars, so two
-    // names that diverge only after ~58 slug chars produce the SAME capped id.
+  it("two domains differing only past the cap now DISAMBIGUATE (hash apart), not collide", () => {
+    // Under the old lossy `capSlugForSuffix(slugify(...))` these produced the SAME
+    // capped id; the collision-safe `uniqueCapSlugForSuffix` hashes them apart.
     const prefix = "a".repeat(60);
-    expect(idFor(prefix + "xxxxx")).toBe(idFor(prefix + "yyyyy"));
+    const x = idFor(prefix + "xxxxx");
+    const y = idFor(prefix + "yyyyy");
+    expect(x).not.toBe(y);
+    expect(x.length).toBeLessThanOrEqual(64);
+    expect(y.length).toBeLessThanOrEqual(64);
+    expect(x.endsWith("-local")).toBe(true);
   });
 
-  it("CodeSystems whose ids collide share a relativePath → Inv 1 closure-resource-collision", () => {
-    const prefix = "a".repeat(60);
-    const id = idFor(prefix + "xxxxx");
+  it("a lossy-NORMALIZATION collision (distinct names, same rawSlug) still fails closed via Inv 1", () => {
+    // `uniqueCapSlug` explicitly does NOT separate two names that collapse to the
+    // same slug at <= 64 (e.g. "a/b" vs "ab" → "ab"); the closure invariant is the
+    // backstop for that class.
+    const id = idFor("a/b");
+    expect(idFor("ab")).toBe(id); // same normalized id — the collision the invariant must catch
     const relativePath = `CodeSystem/${id}.json`;
     const make = (sourceName: string): EmittedResource => ({
       resourceType: "CodeSystem",
@@ -1307,7 +1315,7 @@ describe("closureOrchestrator — truncation id-collision boundary (T4)", () => 
       sourceKind: "LocalCodeSystem",
       sourceName,
     });
-    const inv1 = applyInvariant1([make("LibA"), make("LibB")]);
+    const inv1 = applyInvariant1([make("LibAB1"), make("LibAB2")]);
     // both colliders dropped
     expect(inv1.surviving).toHaveLength(0);
     expect(inv1.errors).toHaveLength(1);

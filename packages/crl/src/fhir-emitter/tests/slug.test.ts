@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 
 import {
-  capSlug,
+  localCodeSystemSlug,
   pascalCaseName,
   pascalCaseNameForId,
   rawSlug,
   slugify,
   uniqueCapSlug,
+  uniqueCapSlugForSuffix,
 } from "../slug";
 
 describe("fhir-emitter slug helpers", () => {
@@ -80,23 +81,64 @@ describe("fhir-emitter slug helpers", () => {
     });
   });
 
-  describe("capSlug (round-2 gpt55 C1)", () => {
-    it("passes through slugs at or under 64 chars unchanged", () => {
-      expect(capSlug("foo-bar")).toBe("foo-bar");
+  // #237/T1 — `capSlug` is now module-private (a lossy truncation, NOT an id
+  // formatter). Its truncation is exercised via `slugify`'s 64-cap test above; every
+  // FHIR id composite goes through the collision-safe helpers below.
+
+  describe("uniqueCapSlugForSuffix (#237/T1 — suffix-preserving collision-safe cap)", () => {
+    it("returns base+suffix UNCHANGED when the whole fits in 64 (no churn)", () => {
+      expect(uniqueCapSlugForSuffix("foo-bar", "-local")).toBe("foo-bar-local");
+      // exactly 64 total (58-char base + 6-char suffix) is unchanged
+      const base58 = "a".repeat(58);
+      expect(uniqueCapSlugForSuffix(base58, "-local")).toBe(`${base58}-local`);
     });
 
-    it("truncates slugs over 64 chars and trims trailing hyphens", () => {
-      const long = "a".repeat(40) + "-" + "b".repeat(40);
-      const capped = capSlug(long);
-      expect(capped.length).toBeLessThanOrEqual(64);
-      expect(capped.endsWith("-")).toBe(false);
+    it("hashes on overflow, PRESERVES the suffix verbatim, and stays <= 64", () => {
+      const base = "a".repeat(80);
+      const out = uniqueCapSlugForSuffix(base, "-local");
+      const expectedHash = createHash("sha256").update(base, "utf8").digest("hex").slice(0, 12);
+      expect(out.length).toBeLessThanOrEqual(64);
+      expect(out.endsWith(`-${expectedHash}-local`)).toBe(true);
+      expect(out.startsWith("-")).toBe(false);
     });
 
-    it("round-2 invariant: combined library+terminology slug stays at or under 64 char FHIR id limit", () => {
-      const librarySlug = "a".repeat(64);
-      const terminologySlug = "b".repeat(64);
-      const combined = capSlug(librarySlug + "-" + terminologySlug);
-      expect(combined.length).toBeLessThanOrEqual(64);
+    it("two bases differing only past the stem hash apart (collision-safe)", () => {
+      const a = "x".repeat(60) + "aaaa";
+      const b = "x".repeat(60) + "bbbb";
+      expect(uniqueCapSlugForSuffix(a, "-local")).not.toBe(uniqueCapSlugForSuffix(b, "-local"));
+    });
+
+    it("takes the hash branch at the exact 65-char threshold and stays exactly 64", () => {
+      const base59 = "a".repeat(59); // 59 + len("-local")=6 = 65, one over the cap
+      const out = uniqueCapSlugForSuffix(base59, "-local");
+      expect(out.length).toBe(64);
+      expect(out.endsWith("-local")).toBe(true);
+      expect(out).toMatch(/^[a-z0-9.-]{1,64}$/);
+    });
+
+    it("throws on a suffix too long / out of charset to guarantee <= 64 (programmer error)", () => {
+      expect(() => uniqueCapSlugForSuffix("base", "-" + "x".repeat(60))).toThrow();
+      expect(() => uniqueCapSlugForSuffix("base", "-BAD!")).toThrow();
+    });
+
+    it("is deterministic", () => {
+      const base = "z".repeat(90);
+      expect(uniqueCapSlugForSuffix(base, "-recommendation")).toBe(
+        uniqueCapSlugForSuffix(base, "-recommendation"),
+      );
+    });
+  });
+
+  describe("localCodeSystemSlug (#237/T1 — one local-domain identity for both lanes)", () => {
+    it("appends -local and is byte-identical to the raw domain + -local at <= 64", () => {
+      const domain = "rx501-145-medical-policy";
+      expect(localCodeSystemSlug(domain)).toBe(`${domain}-local`);
+    });
+
+    it("stays <= 64 and keeps -local on an over-long domain", () => {
+      const out = localCodeSystemSlug("d".repeat(80));
+      expect(out.length).toBeLessThanOrEqual(64);
+      expect(out.endsWith("-local")).toBe(true);
     });
   });
 

@@ -1,8 +1,8 @@
 {
   "resourceType": "Observation",
-  "id": "cms69-bmi-screening-janes-high-bmi-is-followed-up-with-a-weight-assessment-referral-high-baseline-bmi",
+  "id": "cms69-bmi-screening-janes-high-bmi-is-followed-up-w-a86c9e4d0aa7",
   "subject": {
-    "reference": "Patient/cms69-bmi-screening-janes-high-bmi-is-followed-up-with-a-weight-assessment-referral-jane-doe"
+    "reference": "Patient/cms69-bmi-screening-janes-high-bmi-is-followed-up-w-425a5b862767"
   },
   "code": {
     "coding": [

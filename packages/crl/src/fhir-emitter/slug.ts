@@ -65,13 +65,16 @@ export function rawSlug(name: string): string {
 }
 
 /**
- * Round-2 review (gpt55 C1): cap any combined / composite slug to the
- * FHIR `id` 64-char limit. Callers that concatenate slugified parts
- * (e.g. `<librarySlug>-<terminologySlug>`) must pass the result through
- * here before using it as a FHIR `id`. Trims trailing hyphens after
- * truncation so the resulting id doesn't end with `-`.
+ * Round-2 review (gpt55 C1): cap a slug to the FHIR `id` 64-char limit.
+ *
+ * #237/T1 — this is now MODULE-PRIVATE: it is a lossy truncation with no collision
+ * disambiguation, so it is NOT an id-formatter. It survives only as the length-cap
+ * inside `slugify`/`policyIdBase` (whose public contracts document a 64-cap for
+ * display / name / path uses). Every FHIR `id` composite goes through the
+ * collision-safe `uniqueCapSlug` / `uniqueCapSlugForSuffix` instead. Trims trailing
+ * hyphens after truncation so the result doesn't end with `-`.
  */
-export function capSlug(slug: string): string {
+function capSlug(slug: string): string {
   if (slug.length <= SLUG_MAX_LEN) return slug;
   return slug.slice(0, SLUG_MAX_LEN).replace(/-+$/, "");
 }
@@ -124,21 +127,67 @@ export function uniqueCapSlug(raw: string): string {
 }
 
 /**
- * Cap a base slug + append a suffix so the combined result fits in
- * the FHIR id 64-char limit. Used by emit modules that suffix their
- * id (e.g. recommendation.ts: `<base>-recommendation`). Always trims
- * trailing hyphens from the truncated base to avoid `--` runs at the
- * base/suffix boundary.
+ * #237/T1 — the TRUNCATION-collision-safe cap for a composite FHIR `id` that must
+ * keep a STABLE, RECOGNIZABLE suffix (`<base>-recommendation`, `<domain>-local`).
+ * The suffix-preserving analogue of `uniqueCapSlug`: the disambiguating hash goes
+ * BEFORE the suffix so the suffix survives verbatim on the overflow branch, which
+ * keeps a FHIR `id` byte-equal to its canonical `url`-tail (the url ends in the
+ * uncapped suffix). Replaces the lossy `capSlugForSuffix` (deleted with the rest of
+ * the bare-truncation id paths).
  *
- * Per round-3 (Claude F1 + round-5 boundary verification): the base
- * is pre-capped to `SLUG_MAX_LEN - suffix.length` so cross-resource
- * boundary collisions (e.g. ActivityDef id vs Recommendation id at
- * the truncation boundary) cannot occur.
+ * INPUT CONTRACT (mirrors `uniqueCapSlug`): `baseRaw` MUST be an UNCAPPED `rawSlug`
+ * (or a composite of `rawSlug` parts) — do NOT pre-`capSlug`/`slugify` it, or the
+ * discriminating tail is gone before the hash sees it. `suffix` is appended verbatim
+ * and is expected to be a fixed constant (`-recommendation`, `-local`).
+ *
+ * - `baseRaw + suffix` fits in 64 → returned UNCHANGED (byte-identical to the old
+ *   `capSlugForSuffix` for any id that already fit; no golden churn at <= 64).
+ * - overflow → `<stem>-<hash><suffix>` where `<hash>` is the first `UNIQUE_HASH_LEN`
+ *   hex of sha256 over the FULL `baseRaw` (two bases differing only past the stem
+ *   still separate), and `<stem>` is `baseRaw` capped to
+ *   `64 - UNIQUE_HASH_LEN - 1 - suffix.length`. Result matches `[A-Za-z0-9-.]{1,64}`.
+ *
+ * SUFFIX PRECONDITION (guarded): `suffix` must be a legal FHIR-id-charset string of
+ * length <= `SLUG_MAX_LEN - UNIQUE_HASH_LEN` (52), so the result is provably <= 64
+ * on EVERY branch (including the empty-stem `<hash><suffix>` degrade). The `<= 64`
+ * guarantee holds only under this precondition; a violating `suffix` is a programmer
+ * error and THROWS rather than emitting an over-long/illegal id. Live callers pass
+ * fixed constants (`-local`, `-recommendation`) well within the bound.
+ *
+ * Self-defensive like `uniqueCapSlug`: trims leading/trailing hyphens on the stem
+ * and falls back to `<hash><suffix>` when the stem trims empty, so it can never emit
+ * a leading-`-` or a `--` run.
  */
-export function capSlugForSuffix(base: string, suffix: string): string {
-  const precapLen = SLUG_MAX_LEN - suffix.length;
-  const trimmed = base.slice(0, precapLen).replace(/-+$/, "");
-  return trimmed + suffix;
+export function uniqueCapSlugForSuffix(baseRaw: string, suffix: string): string {
+  const maxSuffix = SLUG_MAX_LEN - UNIQUE_HASH_LEN;
+  if (suffix.length > maxSuffix || !/^[a-z0-9.-]*$/.test(suffix)) {
+    throw new Error(
+      `uniqueCapSlugForSuffix: suffix must be FHIR-id-charset and <= ${maxSuffix} chars ` +
+        `to guarantee a <= 64 id (got ${JSON.stringify(suffix)})`,
+    );
+  }
+  const full = `${baseRaw}${suffix}`;
+  if (full.length <= SLUG_MAX_LEN) return full;
+  const hash = createHash("sha256").update(baseRaw, "utf8").digest("hex").slice(0, UNIQUE_HASH_LEN);
+  const stemBudget = SLUG_MAX_LEN - UNIQUE_HASH_LEN - 1 - suffix.length;
+  if (stemBudget <= 0) return `${hash}${suffix}`;
+  const stem = baseRaw.slice(0, stemBudget).replace(/^-+|-+$/g, "");
+  return stem ? `${stem}-${hash}${suffix}` : `${hash}${suffix}`;
+}
+
+/** The stable `-local` suffix on every local-domain CodeSystem id / url-tail. */
+export const LOCAL_CODESYSTEM_SUFFIX = "-local";
+
+/**
+ * #237/T1 — the SINGLE local-domain CodeSystem identity, shared by BOTH lanes so the
+ * FHIR CodeSystem `id`, its canonical `url`-tail, the CQL `codesystem '<url>'` tail,
+ * and every `coding.system` tail are BYTE-EQUAL at all lengths. `localDomainId` is
+ * the per-library domain base (`localDomainIdFor` output — the policy id, or
+ * `<policyId>-<rawSlug(libraryName)>` for a sibling). The `-local` suffix is
+ * preserved on the overflow branch via `uniqueCapSlugForSuffix`.
+ */
+export function localCodeSystemSlug(localDomainId: string): string {
+  return uniqueCapSlugForSuffix(rawSlug(localDomainId), LOCAL_CODESYSTEM_SUFFIX);
 }
 
 /**
@@ -292,5 +341,10 @@ export function localDomainIdFor(
   libraryName: string,
   isPrimary: boolean,
 ): string {
-  return isPrimary ? policyId : `${policyId}-${slugify(libraryName)}`;
+  // #237/T1 (scope B) — the sibling suffix uses the UNCAPPED `rawSlug`, not the
+  // 64-capping `slugify`: `localDomainId` is fed to the collision-safe
+  // `localCodeSystemSlug`, so a sibling library whose name exceeds 64 chars must
+  // keep its discriminating tail here (a `slugify` cap would lose it BEFORE the
+  // hash). Primary keeps the bare policy id (validated lossless <= 64).
+  return isPrimary ? policyId : `${policyId}-${rawSlug(libraryName)}`;
 }

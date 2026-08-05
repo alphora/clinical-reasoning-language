@@ -98,7 +98,7 @@ import { cqlQuotedIdentifier } from "../cql-emitter/cqlStrings";
 import type { CRLError } from "../types/errors";
 import { libraryCanonicalUrl, libraryId } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
-import { capSlug, pascalCaseName, policyIdBase, slugify } from "./slug";
+import { pascalCaseName, policyIdBase, rawSlug, slugify, uniqueCapSlug } from "./slug";
 import { tarjanSCC } from "./tarjan";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
@@ -192,10 +192,13 @@ export function planDefinitionCanonicalUrl(
   return `${metadata.canonicalBase}/PlanDefinition/${decisionId(metadata, decisionName)}`;
 }
 
-// R1 — id BASE is the policy id (`policyIdBase(metadata)`); the decision-name
-// slug is the suffix.
-function decisionId(metadata: CpgMetadata, decisionName: string): string {
-  return capSlug(`${policyIdBase(metadata)}-${slugify(decisionName)}`);
+// R1 — id BASE is the policy id (`policyIdBase(metadata)`); the decision-name slug
+// is the suffix. #237/T1 — one exported id helper (the closure orchestrator imports
+// THIS instead of mirroring the expression), collision-safe via `uniqueCapSlug` over
+// the component-wise `rawSlug` composite (NOT a whole-composite `rawSlug`, which
+// would collapse an empty-strip name's `"unnamed"` fallback).
+export function decisionId(metadata: CpgMetadata, decisionName: string): string {
+  return uniqueCapSlug(`${policyIdBase(metadata)}-${rawSlug(decisionName)}`);
 }
 
 /**

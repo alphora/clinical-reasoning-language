@@ -24,7 +24,7 @@
 import type { Terminology, TerminologyBodyLine } from "../ast/types";
 import type { CRLError } from "../types/errors";
 
-import { capSlug, pascalCaseName, policyIdBase, slugify } from "./slug";
+import { pascalCaseName, policyIdBase, rawSlug, slugify, uniqueCapSlug } from "./slug";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,
@@ -36,6 +36,14 @@ import type {
 // #104: ValueSet lifecycle profiles live in the CRMI IG (uv/crmi); consumers add
 // hl7.fhir.uv.crmi to their IG deps alongside CPG. CRMI capability profiles are
 // ADDITIVE (shareable → +computable → +publishable) — see crmiCapabilityProfiles.
+
+// #237/T1 — the single exported ValueSet id helper (resource body + collision map
+// both call THIS). Collision-safe via `uniqueCapSlug` over the component-wise
+// `rawSlug` composite; the ValueSet `url` derives from this id, so id↔url stay
+// byte-equal.
+export function valueSetId(metadata: CpgMetadata, terminologyName: string): string {
+  return uniqueCapSlug(`${policyIdBase(metadata)}-${rawSlug(terminologyName)}`);
+}
 
 /**
  * Emit one cpg-shareableValueSet from a single CRL Terminology.
@@ -60,7 +68,6 @@ export function emitValueSet(
 
   // R1 — id/url BASE is the policy id (`policyIdBase(metadata)`); the human
   // library-name slug remains the source of the computable `name`/`title` only.
-  const idBase = policyIdBase(metadata);
   const librarySlug = slugify(libraryName);
   const terminologySlug = slugify(terminology.name);
 
@@ -78,10 +85,10 @@ export function emitValueSet(
     });
   }
 
-  // Round-2 (gpt55 C1): cap the COMBINED slug at 64 — slugify already
-  // caps each component, but the concatenation can still exceed the
-  // FHIR id limit.
-  const id = capSlug(`${idBase}-${terminologySlug}`);
+  // #237/T1 — one exported id helper, collision-safe via `uniqueCapSlug` over the
+  // component-wise `rawSlug` composite (the `url` below derives from `id`, so id↔url
+  // stay byte-equal automatically).
+  const id = valueSetId(metadata, terminology.name);
   const computableName = pascalCaseName(`${librarySlug} ${terminologySlug}`);
 
   const title = metadata.title || libraryName;
@@ -229,10 +236,8 @@ export function emitValueSetsForLibrary(
   // otherwise emit non-conformant non-unique ids.
   const slugMap = new Map<string, Terminology[]>();
   // R1 — id BASE is the policy id; the terminology-name slug is the suffix.
-  const idBase = policyIdBase(metadata);
   for (const t of terminologies) {
-    const tSlug = slugify(t.name);
-    const id = capSlug(`${idBase}-${tSlug}`);
+    const id = valueSetId(metadata, t.name);
     const existing = slugMap.get(id) ?? [];
     existing.push(t);
     slugMap.set(id, existing);
@@ -254,8 +259,7 @@ export function emitValueSetsForLibrary(
   // Even with collisions, emit non-colliding ValueSets for partial
   // inspection. Caller's `success: false` already gates on errors.
   for (const t of terminologies) {
-    const tSlug = slugify(t.name);
-    const id = capSlug(`${idBase}-${tSlug}`);
+    const id = valueSetId(metadata, t.name);
     if ((slugMap.get(id)?.length ?? 0) > 1) continue;
     const { resource, errors: rErrors, unmatched: rUnmatched } = emitValueSet(t, libraryName, metadata, opts);
     if (resource) resources.push(resource);

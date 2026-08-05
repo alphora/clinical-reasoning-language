@@ -1,0 +1,16 @@
+{
+  "resourceType": "Observation",
+  "id": "cms22-blood-pressure-screening-maria-has-normal-bp-6ccca29e36a1",
+  "subject": {
+    "reference": "Patient/cms22-blood-pressure-screening-maria-has-normal-bp-2cad6987aaa3"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "85354-9"
+      }
+    ]
+  },
+  "effectiveDateTime": "2026-03-10"
+}

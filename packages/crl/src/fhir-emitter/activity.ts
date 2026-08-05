@@ -50,7 +50,7 @@ import {
   lookupCpgActivityProfile,
 } from "./cpgActivityProfiles";
 import { libraryCanonicalUrl } from "./library";
-import { capSlug, pascalCaseName, policyIdBase, slugify } from "./slug";
+import { pascalCaseName, policyIdBase, rawSlug, slugify, uniqueCapSlug } from "./slug";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,
@@ -80,7 +80,7 @@ export type TerminologyResolver = (termName: ReferenceName) => string | null;
  * is the single source of truth, preventing the same class of bug that
  * round-2 caught for Library URLs.
  *
- * R1 — slug rule is `capSlug(<policyIdBase>-<activitySlug>)`: the id BASE is the
+ * R1 — id rule is `activityDefinitionId` (`uniqueCapSlug` of `<policyIdBase>-<activitySlug>`): the id BASE is the
  * policy id (`metadata.name`), the SUFFIX is the activity declaration-name slug.
  * Identical to what `emitActivityDefinition` uses for the resource id.
  * canonicalBase is assumed pre-normalized by the metadata loader (no trailing
@@ -90,8 +90,15 @@ export function activityDefinitionCanonicalUrl(
   metadata: CpgMetadata,
   activityName: string,
 ): string {
-  const id = capSlug(`${policyIdBase(metadata)}-${slugify(activityName)}`);
+  const id = activityDefinitionId(metadata, activityName);
   return `${metadata.canonicalBase}/ActivityDefinition/${id}`;
+}
+
+// #237/T1 — the single exported ActivityDefinition id helper. Every site (this url,
+// the resource body, the collision map) calls THIS so the id cannot re-diverge.
+// Collision-safe via `uniqueCapSlug` over the component-wise `rawSlug` composite.
+export function activityDefinitionId(metadata: CpgMetadata, activityName: string): string {
+  return uniqueCapSlug(`${policyIdBase(metadata)}-${rawSlug(activityName)}`);
 }
 
 /**
@@ -150,7 +157,7 @@ export function emitActivityDefinition(
   }
 
   // R1 — id BASE is the policy id; the activity-name slug is the SUFFIX.
-  const id = capSlug(`${policyIdBase(metadata)}-${activitySlug}`);
+  const id = activityDefinitionId(metadata, activity.name);
   const computableName = pascalCaseName(`${librarySlug} ${activitySlug}`);
 
   // A configured PA determination (`<category>.<key>` in `crl.dispositions`) is customized ONLY on its
@@ -486,10 +493,9 @@ export function emitActivityDefinitionsForLibrary(
   const errors: CRLError[] = [];
   const unmatched: UnmatchedReference[] = [];
 
-  const base = policyIdBase(metadata);
   const slugMap = new Map<string, Activity[]>();
   for (const a of activities) {
-    const id = capSlug(`${base}-${slugify(a.name)}`);
+    const id = activityDefinitionId(metadata, a.name);
     const existing = slugMap.get(id) ?? [];
     existing.push(a);
     slugMap.set(id, existing);
@@ -508,7 +514,7 @@ export function emitActivityDefinitionsForLibrary(
   }
 
   for (const a of activities) {
-    const id = capSlug(`${base}-${slugify(a.name)}`);
+    const id = activityDefinitionId(metadata, a.name);
     if ((slugMap.get(id)?.length ?? 0) > 1) continue;
     const { resource, errors: rErrors, unmatched: rUnmatched } =
       emitActivityDefinition(

@@ -1,0 +1,19 @@
+{
+  "resourceType": "Observation",
+  "id": "cms22-bp-cognitive-support-hypertensive-reading-rob-386f5bcdf3f3",
+  "subject": {
+    "reference": "Patient/cms22-bp-cognitive-support-hypertensive-reading-rob-6fbdeec2c967"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "8480-6"
+      }
+    ]
+  },
+  "valueQuantity": {
+    "value": 152
+  },
+  "effectiveDateTime": "2026-04-12"
+}

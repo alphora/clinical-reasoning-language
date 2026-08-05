@@ -24,10 +24,10 @@
  * knowledgeCapability is the cumulative `capabilitiesUpTo(level)` list
  * (default shareable + computable + publishable).
  *
- * Slug rule: `recommendation-id = capSlugForSuffix(<librarySlug>-
- * <activitySlug>, "-recommendation")`. The pre-cap base ≤ 49 chars
- * + 15-char suffix = ≤ 64 total. No cross-Activity-Recommendation
- * boundary collision (round-3 F1 fix).
+ * Slug rule: `recommendation-id = recommendationId` =
+ * `uniqueCapSlugForSuffix(<policyIdBase>-<activitySlug>, "-recommendation")` —
+ * collision-safe (hash before the preserved `-recommendation` suffix), always ≤ 64.
+ * No cross-Activity-Recommendation boundary collision (distinct composites hash apart).
  *
  * v0 collision detection scope: this wrapper detects only intra-kind
  * (Recommendation-vs-Recommendation) collisions. Cross-kind PlanDef
@@ -39,7 +39,7 @@ import type { Activity } from "../ast/types";
 import type { CRLError } from "../types/errors";
 import { libraryCanonicalUrl } from "./library";
 import { activityDefinitionCanonicalUrl } from "./activity";
-import { capSlugForSuffix, pascalCaseName, policyIdBase, slugify } from "./slug";
+import { pascalCaseName, policyIdBase, rawSlug, slugify, uniqueCapSlugForSuffix } from "./slug";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -73,11 +73,14 @@ export function recommendationDefinitionCanonicalUrl(
   return `${metadata.canonicalBase}/PlanDefinition/${recommendationId(metadata, activityName)}`;
 }
 
-// R1 — id BASE is the policy id (`policyIdBase(metadata)`); the activity-name
-// slug + `-recommendation` are the suffix.
-function recommendationId(metadata: CpgMetadata, activityName: string): string {
-  const base = `${policyIdBase(metadata)}-${slugify(activityName)}`;
-  return capSlugForSuffix(base, REC_SUFFIX);
+// R1 — id BASE is the policy id (`policyIdBase(metadata)`); the activity-name slug +
+// `-recommendation` are the suffix. #237/T1 — one exported id helper (the closure
+// orchestrator imports THIS instead of mirroring), collision-safe via
+// `uniqueCapSlugForSuffix` over the component-wise `rawSlug` composite;
+// `-recommendation` is preserved verbatim on overflow so the id stays byte-equal to
+// its url-tail.
+export function recommendationId(metadata: CpgMetadata, activityName: string): string {
+  return uniqueCapSlugForSuffix(`${policyIdBase(metadata)}-${rawSlug(activityName)}`, REC_SUFFIX);
 }
 
 /**

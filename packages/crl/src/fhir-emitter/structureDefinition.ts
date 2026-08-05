@@ -100,7 +100,10 @@ function sdcExtractValue(profileUrl: string, elementId: string, expression: stri
  * would truncate the discriminating tail before the hash could see it.
  */
 export function caseFeatureId(metadata: CpgMetadata, conceptName: string): string {
-  return uniqueCapSlug(rawSlug(`${policyIdBase(metadata)}-${conceptName}`));
+  // #237/T1 — component-wise `rawSlug` (was whole-composite `rawSlug(`${base}-${name}`)`,
+  // which collapses an empty-strip concept name's `"unnamed"` to a bare `policyIdBase`
+  // = the Library id base, a latent collision). Per-part keeps one composition rule.
+  return uniqueCapSlug(`${policyIdBase(metadata)}-${rawSlug(conceptName)}`);
 }
 
 /** The case-feature StructureDefinition canonical url for an interface concept. */

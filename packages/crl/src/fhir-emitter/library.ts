@@ -24,12 +24,12 @@
  *     containing FHIR Bundle / package).
  *
  * Slug / metadata pipeline mirrors Todo 1 (`valueSet.ts`): same
- * `slugify` + `capSlug` + `pascalCaseName` + metadata defaulting +
+ * `slugify` + `pascalCaseName` + metadata defaulting +
  * deterministic `clock` injection + empty-array omission rules.
  */
 
 import type { CRLError } from "../types/errors";
-import { capSlug, pascalCaseName, policyIdBase, slugify } from "./slug";
+import { pascalCaseName, policyIdBase, slugify } from "./slug";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,

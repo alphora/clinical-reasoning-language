@@ -76,7 +76,7 @@ const CPG_TO_FHIR: Record<string, string> = {
 // share one helper. v2.3.0-FHIR-Todo-1 also added a 64-char truncation
 // cap matching the FHIR `id` regex — CEL slugify wasn't hitting the cap
 // in the corpus, but inheriting the cap is correct.
-import { slugify } from "../../fhir-emitter/slug";
+import { rawSlug, slugify, uniqueCapSlug } from "../../fhir-emitter/slug";
 import { lookupCpgActivityProfile } from "../../fhir-emitter/cpgActivityProfiles";
 
 interface DerivedType {
@@ -293,14 +293,26 @@ interface EmitContext {
   c: CELCase;
   caseSlug: string;
   librarySlug: string;
+  /**
+   * #237/T1 — the RAW (un-slugified) library name, for the collision-safe FHIR id
+   * composite. `librarySlug`/`caseSlug` stay for `outputPath` (file grouping), but
+   * the FHIR id composes from the uncapped raw parts so `uniqueCapSlug`'s hash sees
+   * the full discriminating tail. `c.name` already carries the raw case name.
+   */
+  libraryName: string;
   anchors: AnchorMap;
   /** Maps fact-name → emitted resource id (within this case), for cross-resource references. */
   emittedIds: Map<string, { id: string; resourceType: string }>;
   diagnostics: EmitDiagnostic[];
 }
 
+// #237/T1 — the CEL FHIR resource id. Was `${librarySlug}-${caseSlug}-${slugify(fact)}`
+// with NO composite cap (the #237 defect: ids ran 76–125 chars). Now the SAME
+// collision-safe `uniqueCapSlug` the CRL/FHIR lane uses, over the component-wise
+// `rawSlug` composite of the raw library/case/fact names — one id formatter across
+// both lanes, ids always ≤64.
 function makeResourceId(ctx: EmitContext, factName: string): string {
-  return `${ctx.librarySlug}-${ctx.caseSlug}-${slugify(factName)}`;
+  return uniqueCapSlug(`${rawSlug(ctx.libraryName)}-${rawSlug(ctx.c.name)}-${rawSlug(factName)}`);
 }
 
 // T12 / #91: per-case namespace prefix so subject Patient ids don't collide
@@ -309,7 +321,10 @@ function makeResourceId(ctx: EmitContext, factName: string): string {
 // `<librarySlug>-<caseSlug>-<factSlug>` shape every other emitted resource
 // already uses.
 function makePatientId(ctx: EmitContext, factName: string): string {
-  return `${ctx.librarySlug}-${ctx.caseSlug}-${slugify(factName)}`;
+  // #237/T1 — the Patient id uses the SAME derivation as every other resource id
+  // (T12/#91 made them share the `<library>-<case>-<fact>` shape); delegate so there
+  // is one id formatter, not a mirror that can drift.
+  return makeResourceId(ctx, factName);
 }
 
 /** Emit the subject Patient resource. */
@@ -731,6 +746,7 @@ export function emitCelToFhir(graph: ResolvedCelGraph): EmitResult {
       c,
       caseSlug: slugify(c.name),
       librarySlug,
+      libraryName: cel.library.name,
       anchors: buildAnchors(c),
       emittedIds: new Map(),
       diagnostics: [],

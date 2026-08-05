@@ -236,19 +236,21 @@ function makeResolversForSourceLibrary(
 
 /* ─── slug helpers (mirror per-emit-module slug rules) ──────────────── */
 
-import { capSlug, capSlugForSuffix, localDomainIdFor, pascalCaseNameForId, policyIdBase, slugify } from "./slug";
+import { localDomainIdFor, pascalCaseNameForId, policyIdBase, slugify } from "./slug";
+import { decisionId } from "./decision";
+import { recommendationId } from "./recommendation";
 import { tarjanSCC } from "./tarjan";
 
-// R1 — id BASE is the policy id (`policyIdBase(metadata)`), shared across the
-// whole closure; the declaration-name slug is the per-resource suffix. These
-// mirror the per-emit-module slug rules (decision.ts / recommendation.ts) so the
-// resolver-produced `definitionCanonical` byte-equals the emitter-produced `url`.
+// R1 — id BASE is the policy id, shared across the whole closure. #237/T1 — these
+// DELEGATE to the per-emit-module exported id helpers (was a mirrored expression) so
+// the resolver-produced `definitionCanonical` byte-equals the emitter-produced `url`
+// by construction — a mirror can silently diverge; a delegation cannot.
 function decisionIdForLib(metadata: CpgMetadata, decisionName: string): string {
-  return capSlug(`${policyIdBase(metadata)}-${slugify(decisionName)}`);
+  return decisionId(metadata, decisionName);
 }
 
 function recommendationIdForLib(metadata: CpgMetadata, activityName: string): string {
-  return capSlugForSuffix(`${policyIdBase(metadata)}-${slugify(activityName)}`, "-recommendation");
+  return recommendationId(metadata, activityName);
 }
 
 /* ─── Closure-level Decision classification + cycle detection ───────── */

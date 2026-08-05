@@ -41,7 +41,7 @@
 
 import type { CRLError } from "../types/errors";
 
-import { capSlugForSuffix, pascalCaseName, slugify } from "./slug";
+import { localCodeSystemSlug, pascalCaseName, slugify } from "./slug";
 import { localCodeSystemUrl } from "../cql-emitter/lowerLocalCodes";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
@@ -103,13 +103,13 @@ export function emitLocalCodeSystem(
   }
 
   // id: BASE is the per-library local domain (#198: `localDomainId`, defaulting to
-  // the policy id `metadata.name` for the primary). `capSlug(slugify(...))` mirrors
-  // `policyIdBase` so a primary's id is byte-identical; `capSlugForSuffix` caps to
-  // `64 - len("-local")` and appends the suffix so `-local` always survives
-  // truncation (mirrors recommendation.ts' suffix-aware capping). The computable
-  // `name` still derives from the human library name (per-library identity, not the
-  // resource id).
-  const id = capSlugForSuffix(slugify(localDomainId), LOCAL_SUFFIX);
+  // the policy id `metadata.name` for the primary). #237/T1 (scope B) — the id is now
+  // `localCodeSystemSlug(localDomainId)`, the SAME collision-safe identity that
+  // `localCodeSystemUrl` uses for the url-tail, so `CodeSystem.id`, `CodeSystem.url`,
+  // the CQL `codesystem '<url>'`, and every `coding.system` are BYTE-EQUAL at all
+  // lengths (`-local` preserved on the overflow branch). The computable `name` still
+  // derives from the human library name (per-library identity, not the resource id).
+  const id = localCodeSystemSlug(localDomainId);
   const computableName = pascalCaseName(`${librarySlug}${LOCAL_SUFFIX}`);
 
   // Title falls back to the CRL library name when package.json has none,

@@ -1,7 +1,14 @@
 import * as path from "path";
 
 import { resolveCelImports } from "../../imports";
+import { uniqueCapSlug } from "../../../fhir-emitter/slug";
 import { emitCelToFhir } from "../emitFhir";
+
+// #237/T1 — the CEL FHIR id is `uniqueCapSlug(<library>-<case>-<fact>)`. The old
+// pre-cap ids used below ARE that composite, so the current id is `uniqueCapSlug` of
+// the old string — compute it via the real formatter rather than re-hardcoding the
+// hashed form (which would re-break on any future rename).
+const idOf = (uncappedComposite: string): string => uniqueCapSlug(uncappedComposite);
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..", "..");
 
@@ -90,16 +97,20 @@ describe("CEL Todo 5 — emitted resource shape spot-checks", () => {
       const sub = (o.body as { subject?: { reference: string } }).subject;
       expect(sub?.reference).toBe(`Patient/${patient.id}`);
     }
-    // Lock the namespaced shape — T12 / #91 prevents id collisions in
-    // multi-case Bundles.
-    expect(patient.id).toMatch(/-maria-garcia$/);
-    expect(patient.id.length).toBeGreaterThan("maria-garcia".length);
+    // Lock the namespaced shape — T12 / #91 prevents id collisions in multi-case
+    // Bundles: the id carries the library+case namespace prefix. #237/T1 — the id is
+    // now collision-safe capped <= 64 (this composite exceeds 64, so it carries a hash
+    // tail) but still opens with the library+case namespace.
+    expect(patient.id.startsWith("cms22-blood-pressure-screening")).toBe(true);
+    expect(patient.id.length).toBeLessThanOrEqual(64);
   });
 
   test("Observation code parses canonical token form into Coding", () => {
     const r = emit(CORPUS.cms22);
     const panel = r.emittedCases[0].resources.find(
-      (res) => res.id === "cms22-blood-pressure-screening-maria-has-normal-bp-at-her-wellness-visit-normal-bp-panel",
+      (res) =>
+        res.id ===
+        idOf("cms22-blood-pressure-screening-maria-has-normal-bp-at-her-wellness-visit-normal-bp-panel"),
     )!;
     const code = panel.body.code as { coding: Array<{ system?: string; code: string }> };
     expect(code.coding[0].system).toBe("http://loinc.org");
@@ -109,10 +120,47 @@ describe("CEL Todo 5 — emitted resource shape spot-checks", () => {
   test("BP component observations carry valueQuantity", () => {
     const r = emit(CORPUS.cms22);
     const sys = r.emittedCases[0].resources.find(
-      (res) => res.id === "cms22-blood-pressure-screening-maria-has-normal-bp-at-her-wellness-visit-normal-systolic-component",
+      (res) =>
+        res.id ===
+        idOf("cms22-blood-pressure-screening-maria-has-normal-bp-at-her-wellness-visit-normal-systolic-component"),
     )!;
     const vq = sys.body.valueQuantity as { value: number };
     expect(vq.value).toBe(118);
+  });
+
+  // #237/T1 — the durable locks: every emitted CEL FHIR id is <= 64 (the #237 fix),
+  // and every intra-case reference resolves to a resource emitted IN THAT CASE, by
+  // full `<Type>/<id>` (proves the unified formatter kept reference integrity — refs
+  // and ids share one derivation — and that per-case `emittedIds` namespacing holds).
+  test("#237: every CEL FHIR id is <= 64 chars and every reference resolves (per case, typed)", () => {
+    const corpora = [CORPUS.cms22, CORPUS.cms69, CORPUS.cms22Strategy, CORPUS.cms69Strategy];
+    let totalResources = 0;
+    for (const corpus of corpora) {
+      const r = emit(corpus);
+      for (const c of r.emittedCases) {
+        // References are intra-case (per-case `emittedIds`), so validate the FULL
+        // `<Type>/<id>` against THIS case's resources — a cross-case dangling ref must
+        // not slip through on a corpus-wide id pool.
+        const typed = new Set(c.resources.map((res) => `${res.resourceType}/${res.id}`));
+        for (const res of c.resources) {
+          totalResources++;
+          expect(res.id.length).toBeLessThanOrEqual(64);
+          const refs: string[] = [];
+          const collect = (v: unknown): void => {
+            if (Array.isArray(v)) v.forEach(collect);
+            else if (v && typeof v === "object") {
+              for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+                if (k === "reference" && typeof val === "string") refs.push(val);
+                else collect(val);
+              }
+            }
+          };
+          collect(res.body);
+          for (const ref of refs) expect(typed.has(ref)).toBe(true);
+        }
+      }
+    }
+    expect(totalResources).toBeGreaterThan(0);
   });
 
   test("ServiceRequest from cms69 has intent=order (stage is ordered)", () => {

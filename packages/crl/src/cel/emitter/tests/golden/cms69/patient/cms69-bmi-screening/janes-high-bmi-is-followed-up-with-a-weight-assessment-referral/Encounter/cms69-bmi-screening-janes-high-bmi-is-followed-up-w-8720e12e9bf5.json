@@ -1,0 +1,18 @@
+{
+  "resourceType": "Encounter",
+  "id": "cms69-bmi-screening-janes-high-bmi-is-followed-up-w-8720e12e9bf5",
+  "subject": {
+    "reference": "Patient/cms69-bmi-screening-janes-high-bmi-is-followed-up-w-425a5b862767"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://www.ama-assn.org/go/cpt",
+        "code": "99395"
+      }
+    ]
+  },
+  "period": {
+    "start": "2026-01-15"
+  }
+}

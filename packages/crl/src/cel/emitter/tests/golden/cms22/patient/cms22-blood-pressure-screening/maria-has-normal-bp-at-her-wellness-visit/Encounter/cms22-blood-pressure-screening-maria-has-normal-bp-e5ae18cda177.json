@@ -1,8 +1,8 @@
 {
   "resourceType": "Encounter",
-  "id": "cms22-blood-pressure-screening-maria-has-normal-bp-at-her-wellness-visit-annual-wellness-visit",
+  "id": "cms22-blood-pressure-screening-maria-has-normal-bp-e5ae18cda177",
   "subject": {
-    "reference": "Patient/cms22-blood-pressure-screening-maria-has-normal-bp-at-her-wellness-visit-maria-garcia"
+    "reference": "Patient/cms22-blood-pressure-screening-maria-has-normal-bp-2cad6987aaa3"
   },
   "code": {
     "coding": [
