@@ -332,15 +332,25 @@ export class CycleDetector {
     scope: LibraryScope | undefined,
     currentLibName: string,
   ): void {
-    // Reps-only concepts have no top-level definition; representations
-    // reference terminologies (not concepts), so they add no cycle edges.
+    // A rep's `definition is` PROJECTOR can carry concept refs (in the misattachment case),
+    // so — unlike a rep's terminology-only refs — it CAN add cycle edges. Collect them so a
+    // cycle THROUGH a projector is detected (a well-formed datum-level projector carries none).
+    for (const rep of concept.representations ?? []) {
+      if (rep.projector) {
+        this.collectFromNarrative(rep.projector.body, refs, scope, currentLibName);
+      }
+    }
+    // Reps otherwise reference terminologies (not concepts), so they add no cycle edges.
     if (!concept.definition) return;
     switch (concept.definition.type) {
       case "CodedFromDefinition":
         return;
       case "DefinedAsDefinition": {
         const body = concept.definition.body;
-        if (body.type === "DefinedAsBareRef") {
+        // Bare ref and `exists ("X")` both add a single dependency edge to the referenced
+        // concept — needed so a cycle THROUGH an `exists` is detected; only a composition
+        // fans out to multiple edges.
+        if (body.type === "DefinedAsBareRef" || body.type === "DefinedAsExists") {
           this.addEdge(body.ref, refs, scope, currentLibName);
         } else if (body.type === "DefinedAsComposition") {
           this.collectFromComposition(

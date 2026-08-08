@@ -143,6 +143,52 @@ describe("buildDefExprIndex — the `defined as` operator tree (disc 199)", () =
     }
   });
 
+  // Concept-model Todo 1 carve-out to the drift guard above: a `defined as exists` concept has NO DefExpr body
+  // (so existence is not rendered as a bare-ref alias — gpt56 impl review #3), while `conceptShape` still flattens
+  // the exists operand (the emitter-faithful side). The two projections therefore KNOWINGLY diverge for an exists
+  // concept. This is INERT in increment 1 (an exists library's CQL lowering fails structurally, so `$apply` never
+  // runs) and is CLOSED by Todo 3's explicit `exists` DefExpr kind. Asserted EXPECTED here so the gap is a visible
+  // marker Todo 3 inherits, not a silently-false "MUST equal" the main sweep can't catch (its corpus has no exists).
+  it("KNOWN DIVERGENCE (Todo 1): an exists concept has no DefExpr body while conceptShape flattens its operand", () => {
+    const PE = `# PE
+library "PE".
+concept "Present":
+- type is Condition.
+- code is \`present\`.
+concept "Has Present":
+- defined as exists ( "Present" ).
+activity "X":
+- request CPGCommunicationRequest.
+- with \`x\`.
+decision "D":
+first:
+- when "Has Present" then recommend activity "X".
+- otherwise then recommend activity "X".`;
+    const PECEL = `# PEC
+library "PEC".
+covers "PE".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+case "c":
+- subject is "Pat".
+- result is "D" is "X".`;
+    const g = graphFrom(PE, PECEL);
+    const cl = buildCrlConceptLayer(g);
+    const { libs: l } = collectLibs(g);
+    const el = eligibleFor(g);
+    const dIdx = buildDefExprIndex(l, cl, el);
+    const sIdx = buildConceptShapeIndex(l, cl, el);
+    const hp = ck("PE", "Has Present");
+    // DefExpr: an exists concept gets NO body → no operator-tree leaves.
+    expect(dIdx.get(hp)?.body).toBeUndefined();
+    expect(collectDefExprLeafKeys(hp, dIdx)).toEqual([]);
+    // conceptShape (emitter-faithful): flattens the exists operand → the leaf-eligible `Present` IS a leaf.
+    expect(codeIsLeavesPreorder(sIdx.get(hp)!)).toEqual([ck("PE", "Present")]);
+    // ⇒ the two projections KNOWINGLY diverge for exists (inert until Todo 3 restores lockstep).
+  });
+
   it("a diamond composite keeps operands POSITIONAL in the structure but COLLAPSES the leaf sequence", () => {
     const comp = get("Comp");
     expect(comp.body?.kind).toBe("and");

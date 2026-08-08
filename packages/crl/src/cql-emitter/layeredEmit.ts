@@ -473,7 +473,10 @@ function visitDefinitionRefs(
       visit(def.terminologyName);
       return;
     case "DefinedAsDefinition":
-      if (def.body.type === "DefinedAsBareRef") visit(def.body.ref);
+      // Bare ref and `exists ("X")` both reference one concept — visit it for
+      // library-dependency computation. Only a composition carries an expression.
+      if (def.body.type === "DefinedAsBareRef" || def.body.type === "DefinedAsExists")
+        visit(def.body.ref);
       else visitCompositionRefs(def.body.expression, visit);
       return;
     case "DefinitionIsDefinition":
@@ -712,7 +715,9 @@ function requalifyDefinition(
       };
     case "DefinedAsDefinition": {
       const out: DefinedAsDefinition = { ...def };
-      if (def.body.type === "DefinedAsBareRef") {
+      // Bare ref and `exists ("X")` both carry a single concept `ref` that must be
+      // requalified across layers; only a composition carries an `expression`.
+      if (def.body.type === "DefinedAsBareRef" || def.body.type === "DefinedAsExists") {
         out.body = {
           ...def.body,
           ref: requalifyRef(def.body.ref, "concept", currentLayer, maps, lib, policyId, partition),

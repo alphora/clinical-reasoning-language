@@ -48,13 +48,14 @@ import type {
   CodedFromDefinition,
   DefinedAsBareRef,
   DefinedAsComposition,
+  DefinedAsExists,
   DefinitionIsDefinition,
   Parameter,
   Terminology,
   TerminologyBodyLine,
   TerminologySystem,
 } from "../ast/types";
-import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
+import { getRefName, getRefLibrary, isQualifiedRef, definedAsExistsNotLowered } from "../ast/types";
 import type { ReferenceName } from "../ast/types";
 import type { CRLError } from "../types/errors";
 import { lowerLocalCodes } from "./lowerLocalCodes";
@@ -1308,8 +1309,11 @@ class Emitter {
 
   private emitDefinedAs(
     c: Concept,
-    body: DefinedAsBareRef | DefinedAsComposition
+    body: DefinedAsBareRef | DefinedAsExists | DefinedAsComposition
   ): string {
+    // `defined as exists ("X")` has no CQL lowering in increment 1 (Todo 2/3). Guard loud;
+    // no current content uses it. After this the body narrows to bare-ref | composition.
+    if (body.type === "DefinedAsExists") definedAsExistsNotLowered("cql-emitter emitDefinedAs");
     // Case-feature truth-set INFERRED emit: a `defined as` concept is a normalized
     // truth-set. The operators stay set-ops (`union`/`intersect`/`except`) and the
     // operand-shape/`exists(...)` bridge is suppressed (every operand IS a
@@ -1691,10 +1695,14 @@ class Emitter {
     if (!body) return "unknown"; // asserted-only concept in this layer
     const next = new Set(visiting).add(name);
     switch (body.type) {
-      case "DefinedAsDefinition":
-        return body.body.type === "DefinedAsBareRef"
-          ? this.classifyRefFlavor(body.body.ref, next)
-          : this.classifyNegationOperand(body.body.expression, next);
+      case "DefinedAsDefinition": {
+        const da = body.body;
+        if (da.type === "DefinedAsBareRef") return this.classifyRefFlavor(da.ref, next);
+        // `exists ("X")` flavor is not modeled in increment 1 — return the loud no-guess
+        // sentinel (like `definition is`), never a composition-shaped guess.
+        if (da.type === "DefinedAsExists") return "unknown";
+        return this.classifyNegationOperand(da.expression, next);
+      }
       case "CodedFromDefinition":
         return "resource-list"; // `coded from` → RecordSource retrieve
       case "DefinitionIsDefinition":

@@ -61,6 +61,7 @@ import type {
   Decision,
   DefinedAsBareRef,
   DefinedAsComposition,
+  DefinedAsExists,
   Location,
   ReferenceName,
   WhenBlockBody,
@@ -297,10 +298,29 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
 }
 
 function walkDefinedAs(
-  body: DefinedAsBareRef | DefinedAsComposition,
+  body: DefinedAsBareRef | DefinedAsExists | DefinedAsComposition,
   lib: string,
   ctx: Ctx,
 ): CompositionTrace {
+  // `exists ("X")` evaluation (existence over a possibly-non-boolean concept, closed-world) is
+  // Todo 2/3 semantics, not increment 1. Do NOT throw — `walkDefinedAs` runs inside the
+  // read-only `runCel` path, which has no converting catch, so a throw would crash
+  // `run_decision`/viewModel. Instead set `runtimeError` (⇒ `status:"error"`, produced
+  // discarded) so the run does NOT report an authoritative pass/fail derived from an
+  // UNEVALUATED existence expression — a plain `satisfied:false` would let a caller reading
+  // only `status` accept a fabricated result — plus a diagnostic, plus an unsatisfied leaf so
+  // the trace is well-formed. On the OFF-path `truthOf` route this runs in an isolated scratch
+  // ctx (runtimeError is a by-value boolean copied by the `{...ctx}` spread), so it never
+  // pollutes the real run — the concept's off-path truth is just `false`. No current content
+  // uses `exists`, so this never fires in practice.
+  if (body.type === "DefinedAsExists") {
+    ctx.runtimeError = true;
+    ctx.diagnostics.push(
+      `\`defined as exists\` (${labelOf(getRefLibrary(body.ref) ?? lib, getRefName(body.ref))}) is not yet ` +
+        `evaluated — existence lowering lands in Todo 2/3 of the concept-model redesign; run marked error`,
+    );
+    return { op: "ref", concept: getRefName(body.ref), satisfied: false };
+  }
   return body.type === "DefinedAsBareRef"
     ? refTrace(body.ref, lib, ctx)
     : walkExpr(body.expression, lib, ctx);
@@ -312,8 +332,12 @@ function walkDefinedAs(
  * preempted concept's answer cannot change the case's status/produced/trace/diagnostics. ONLY `cache` is intentionally
  * shared, and that is safe: `evalConcept` is MONOTONIC (early-returns on any existing entry; only ever ADDS a cycle-free
  * result; never overwrites) and the main run already completed, so added cache entries cannot alter produced/trace.
- * LOAD-BEARING INVARIANT: this routes ONLY through `evalConcept` (never `walkBranches`/`emitAction`/`executeBody`, which
- * are the ONLY writers of `produced`/`trace`/`delegationStack`/`runtimeError`). Keep it that way.
+ * LOAD-BEARING INVARIANT: this routes ONLY through `evalConcept`. `walkBranches`/`emitAction`/`executeBody` are the
+ * writers of `produced`/`trace`/`delegationStack`; `runtimeError` has ONE additional writer reachable from `evalConcept`
+ * — `walkDefinedAs` sets it for an unlowered `defined as exists` (concept-model Todo 1). Isolation still holds: the
+ * scratch ctx below spreads `{...ctx}`, so its `runtimeError` is a fresh by-value boolean — an off-path exists marks the
+ * SCRATCH errored (discarded) and never the real run. So an eager off-path truth is unaffected (just `false`). Keep it
+ * that way — any NEW `runtimeError` writer reachable from `evalConcept` must likewise be neutralized by this spread.
  */
 function truthOf(id: Id, ctx: Ctx): ConceptEval {
   return evalConcept(id, {

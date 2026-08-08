@@ -5,6 +5,11 @@ RECOMMEND_ACTIVITY  : 'recommend activity';
 USE_DECISION        : 'use decision';
 TYPE_IS             : 'type is' -> mode(CONCEPT_MODE);
 VALUE_TYPE_IS       : 'value type is' -> mode(VALUE_TYPE_MODE);
+// `value element is` names the FHIR model-info property path of a representation's
+// datum (`Observation.value`, `Patient.birthDate`). Diverges from `value type is`
+// at char 6 ('e' vs 't') so there is no prefix conflict. Enters a dedicated mode
+// because the value is a dotted path the DEFAULT/CONCEPT modes cannot lex.
+VALUE_ELEMENT_IS    : 'value element is' -> mode(VALUE_ELEMENT_MODE);
 PARAM_TYPE_IS       : 'param type is' -> mode(PARAMETER_TYPE_MODE);
 EVIDENCE_IS         : 'evidence is';
 META_IS             : 'meta is';
@@ -32,6 +37,12 @@ CONCEPT      : 'concept';
 CRITERION    : 'criterion';
 DECISION     : 'decision';
 END          : 'end';
+// `exists` is the existence operator in a `defined as exists ("Concept")` body. It is
+// ALSO admitted as a narrative word (see `narrativeElement`'s NWord list in
+// CRLParser.g4) so clinical prose in a `definition is` body still parses. Declared
+// before NARRATIVE_WORD; longest-match keeps kebab words like `exists-foo` as
+// NARRATIVE_WORD (10 chars > 6).
+EXISTS       : 'exists';
 INCLUDE      : 'include';
 LIBRARY      : 'library';
 NOT          : 'not';
@@ -294,6 +305,45 @@ VALUE_TYPE_WS
     : [ \t\r\n]+ -> skip
     ;
 VALUE_TYPE_COMMENT_BLOCK
+    : BLOCK_COMMENT -> skip
+    ;
+
+mode VALUE_ELEMENT_MODE;
+// VALUE_ELEMENT_PATH — a FHIR model-info property path (ElementDefinition-style),
+// e.g. `Observation.value`, `Patient.birthDate`, `ImagingStudy.started`. Captured as
+// ONE token; the trailing structural `.` stays DOT because the optional
+// `('.' segment)` needs a following letter to extend the path. Segment charset allows
+// digits (`[A-Za-z][A-Za-z0-9]*`) though R4/R5 core element names are alpha.
+// Choice-type `[x]`, slices and indexers are DELIBERATELY out of scope for increment 1.
+// The lexer does NOT verify the path is resource-qualified or that the element exists
+// — a single-segment path (`value`) lexes here and is REJECTED by Todo 2's validator,
+// which checks the path against the declared `type`.
+VALUE_ELEMENT_PATH
+    : [A-Za-z] [A-Za-z0-9]* ('.' [A-Za-z] [A-Za-z0-9]*)* -> mode(DEFAULT_MODE)
+    ;
+// House error-recovery: a malformed run (`value[x]`, a digit-leading segment, a stray
+// `(`/`)`/`:`) OR a stray leading `.` is captured, wrapped in the JSON error envelope for
+// the lexer error listener, and control RETURNS to DEFAULT_MODE — so a bad path yields a
+// structured diagnostic and clean recovery instead of a stuck mode. Unlike the other modes'
+// catch-alls this alt1 excludes ONLY whitespace and `.`, so it also envelopes the
+// structural delimiters `:()` (which those modes leave to raw recovery) — strictly cleaner.
+// `.` is excluded from alt1 (so VALUE_ELEMENT_PATH wins on a valid path's internal dots) and
+// handled by alt2 (a leading dot). A double-dot / bad second segment yields a valid prefix
+// PATH + a trailing parse error, which is still an error, just at the parse layer.
+VALUE_ELEMENT_ErrorChar
+    : ( ~[ \t\r\n.]+ | '.' ) {
+        this.text = JSON.stringify({
+            errorType: 'InvalidToken',
+            value: this.text
+        });
+        this.type = CRLLexer.ERROR;
+    }
+    -> mode(DEFAULT_MODE)
+    ;
+VALUE_ELEMENT_WS
+    : [ \t\r\n]+ -> skip
+    ;
+VALUE_ELEMENT_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
 

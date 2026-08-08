@@ -446,6 +446,16 @@ export interface ActivityBecause extends ASTNode {
  */
 export type InterfaceSourceLayer = "LocalSource" | "RecordSource" | "Inferred";
 
+// A representation's explicit `value element is <path>.` — the FHIR model-info property path
+// of its datum, plus the path's own source location so Todo 2's validator can anchor a
+// "path X not on type Y" diagnostic at the `value element is` line. Shared by `Concept`
+// (the local representation's explicit value element) and `Representation` (a posrep's) so the
+// two carry an identical, non-drifting shape.
+export interface ValueElement {
+  path: string;
+  location: Location;
+}
+
 // Concept node (v0.7)
 // - conceptType (`type is X.`) is OPTIONAL for composition/predicate body
 //   kinds (deduced from body refs when omitted); REQUIRED for asserted body
@@ -460,6 +470,15 @@ export interface Concept extends ASTNode {
   // The concept's own local code (`- code is `…`.`). System = the package's
   // local domain (implicit). Present => locally assertable; absent => read-only.
   code?: string;
+  /**
+   * The concept's LOCAL representation's explicit `value element` path — present only
+   * when the author DEVIATES from the implicit-standard `Observation.value` (design of
+   * record §"Shape rules"; the standard shape is unwritten but Todo-2-checked). Carries
+   * its own location so a "path X not on type Y" diagnostic anchors at the
+   * `value element is` line, not the whole concept. Grammar-permissive: a `value element`
+   * without a `code is`/`type` parses here and is rejected by Todo 2.
+   */
+  valueElement?: ValueElement;
   // Optional: a concept may be representations-only (no top-level definition).
   definition?: ConceptDefinition;
   // `possible representation:` entries (ADR 0001 §3). May be empty.
@@ -576,14 +595,38 @@ export interface CodedFromDefinition extends ASTNode {
   location: Location;
 }
 
-// A `possible representation:` — an anonymous concept that inherits the
-// enclosing concept's fields except those it overrides (ADR 0001 §3). A
-// NON-LOCAL (external) source shape: `type` + a named `coded from`.
+// A `source representation:` (posrep) — an anonymous SELF-DESCRIBING representation of
+// the same clinical concept from a NON-LOCAL (external) source shape. Per the converged
+// model (representation-model.md refinement 5) a posrep does NOT inherit the enclosing
+// concept's fields — it is always fully explicit. The grammar/AST stay PERMISSIVE (fields
+// optional so a partial posrep still parses/builds); Todo 2's validator REJECTS an
+// incomplete posrep. A posrep carries `type` + `value element` + `value type`, an optional
+// named `coded from`, and an optional rep-level `definition is` PROJECTOR.
 export interface Representation extends ASTNode {
   type: "Representation";
   conceptType?: ConceptType;
   valueTypes: ConceptValueType[];
   terminologyName?: ReferenceName; // named coded-from
+  /**
+   * The FHIR model-info property path of this rep's datum (`Observation.value`,
+   * `Patient.birthDate`, `ImagingStudy.started`). Path + its own location so Todo 2's
+   * validator anchors a "path X not on type Y" diagnostic at the `value element is` line.
+   * Present only when the posrep authored one (grammar-permissive; the validator requires
+   * it on a posrep). A single-segment path lexes and is rejected by Todo 2.
+   */
+  valueElement?: ValueElement;
+  /**
+   * Rep-level `definition is` PROJECTOR — projects this rep's datum to the concept's
+   * canonical value type (e.g. `age today at least 18 years` over `Patient.birthDate`).
+   * DISTINCT from `Concept.definition` (a concept-level calculation over CONCEPTS): the
+   * projector consumes the SELECTED representation's datum. Reuses the
+   * `DefinitionIsDefinition` node — the field PLACEMENT is the discriminator. Todo 2's
+   * matcher must receive an explicit "representation-projector" context rather than infer
+   * semantics from the shared node class. A projector narrative carrying a concept ref is
+   * Todo 2's misattachment signal (a concept-level `definition is` written after the posrep,
+   * which the whitespace-insensitive grammar silently binds here).
+   */
+  projector?: DefinitionIsDefinition;
   location: Location;
 }
 
@@ -605,12 +648,43 @@ export interface ConceptReference extends ASTNode {
 
 export interface DefinedAsDefinition extends ASTNode {
   type: "DefinedAsDefinition";
-  body: DefinedAsBareRef | DefinedAsComposition;
+  body: DefinedAsBareRef | DefinedAsExists | DefinedAsComposition;
 }
 
 export interface DefinedAsBareRef extends ASTNode {
   type: "DefinedAsBareRef";
   ref: ReferenceName;
+}
+
+// `defined as exists ("Concept")` — explicit existence over a SINGLE concept (present →
+// true, absent → false; closed-world). The third `DefinedAsDefinition.body` member,
+// parallel to DefinedAsBareRef so downstream switches stay trivially
+// exhaustiveness-checked. TOP-LEVEL ONLY (not a composition atom) — the design of record
+// says promote a source to its own concept instead of nesting existence. `ref` preserves
+// a qualified reference's location. Consumers that walk `defined as` references (reference
+// resolution, cycle detection, emit closure, project index, provenance) MUST treat this
+// like a bare ref so the referenced concept is tracked.
+export interface DefinedAsExists extends ASTNode {
+  type: "DefinedAsExists";
+  ref: ReferenceName;
+}
+
+/**
+ * Increment-1 (concept-model redesign Todo 1) guard. `defined as exists (...)` PARSES and
+ * builds — its reference is tracked by every reference walker (resolution, cycles, emit
+ * closure, project index, provenance) — but has NO CQL/execution LOWERING yet; that lands
+ * in Todo 2/3 of the redesign. Emit and execution boundaries call this to fail LOUD rather
+ * than misread the node. No current content uses `exists`, so it never fires in practice;
+ * it is the safety net the design review (disc 394, gpt56 point #1) required once the
+ * `DefinedAsDefinition.body` union was widened.
+ */
+export function definedAsExistsNotLowered(where: string): never {
+  throw new Error(
+    "`defined as exists` is not yet lowered (" +
+      where +
+      ") — existence lowering lands in Todo 2/3 of the concept-model redesign. The " +
+      "construct parses and its reference is tracked, but no current content uses it.",
+  );
 }
 
 export interface DefinedAsComposition extends ASTNode {

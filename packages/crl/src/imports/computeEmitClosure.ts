@@ -132,6 +132,12 @@ export function expandClosureViaRefs(
  * auto-splits, an include with no matching `.cql`) for a ref the CQL never uses. Representation refs still enter
  * the emit CLOSURE via `collectCqlEmitRefs` (their FHIR Library / terminology may be a depends-on) — again,
  * closure membership ≠ per-library `include`s.
+ *
+ * The same exclusion covers a representation's `definition is` PROJECTOR: a projector's
+ * narrative refs are deliberately NOT walked here for the same reason (reps don't emit their
+ * own CQL body in increment 1). A well-formed datum-level projector carries no concept refs
+ * anyway; a misattached one is surfaced by referenceResolver/cycleDetector and rejected by
+ * Todo 2, so nothing is silently dropped from the emit that would otherwise be reachable.
  */
 export function collectCqlIncludeRefs(entry: RegistryEntry, _scope: LibraryScope): Set<string> {
   const refs = new Set<string>();
@@ -263,7 +269,9 @@ function visitConceptDefinitionRefs(concept: Concept, visit: (ref: ReferenceName
       break;
     case "DefinedAsDefinition": {
       const body = def.body;
-      if (body.type === "DefinedAsBareRef") {
+      // Bare ref and `exists ("X")` both pull their referenced concept into the emit
+      // closure; only a composition carries an expression to descend.
+      if (body.type === "DefinedAsBareRef" || body.type === "DefinedAsExists") {
         visit(body.ref);
       } else if (body.type === "DefinedAsComposition") {
         visitComposition((body as DefinedAsComposition).expression, visit);

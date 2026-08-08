@@ -329,6 +329,7 @@ conceptStatement
 
 conceptBody
     : (typeLine)?
+      (valueElementLine)?
       (valueTypeLine)*
       (metaLine)*
       (evidenceLine)?
@@ -341,21 +342,29 @@ conceptBody
 // Source Representation (ADR 0001 §3)
 // ============================
 //
-// A `source representation:` is an anonymous concept describing a NON-LOCAL
-// (external) source shape of the same clinical concept. It INHERITS the
-// enclosing concept's fields except those it overrides; written in
-// concept-body (dashed) syntax; inherited fields omitted. (The concept's own
-// LOCAL representation is its `code is`.) Non-emptiness is a validator rule.
+// A `source representation:` (posrep) is an anonymous SELF-DESCRIBING representation
+// of the same clinical concept from a NON-LOCAL (external) source shape. Per the
+// converged model (design of record §"Shape rules"; representation-model.md
+// refinement 5) a posrep is ALWAYS FULLY EXPLICIT — it does NOT inherit the enclosing
+// concept's fields. The grammar stays PERMISSIVE (fields optional so a partial posrep
+// still parses); Todo 2's validator REJECTS an incomplete posrep. (The concept's own
+// LOCAL representation is its `code is`, whose `type`/`value element` default to
+// Observation/`.value`; a posrep never defaults.) A posrep carries its own
+// `type` + `value element` + `value type`, an optional `coded from`, and an optional
+// `definition is` PROJECTOR (rep-level: projects the rep's datum to the canonical
+// shape — distinct from the concept-level `definition is` calculation over concepts).
 //
-//   - source representation: - type is ImagingStudy.
-//   - source representation: - type is Claim.
+//   - source representation: - type is ImagingStudy. - value element is ImagingStudy.started. - value type is dateTime. - coded from "Mammogram VS".
+// (The design-of-record's Patient/birthDate age posrep uses `value type is date`; the FHIR
+// `date` primitive is NOT yet in the value-type vocabulary — it lands with the value-type +
+// kit sync in Todo 4 alongside age-as-posrep, #257. Do not show it here until then.)
 //
 sourceRepresentationLine
     : DASH SOURCE_REPRESENTATION COLON representationBody
     ;
 
 representationBody
-    : (typeLine)? (valueTypeLine)* (codedFromLine)?
+    : (typeLine)? (valueElementLine)? (valueTypeLine)* (codedFromLine)? (definitionIsBody)?
     ;
 
 // ============================
@@ -364,6 +373,17 @@ representationBody
 
 typeLine
     : DASH TYPE_IS CONCEPT_TYPE DOT
+    ;
+
+// `value element is <path>.` — the FHIR model-info property path of this
+// representation's datum (`Observation.value`, `Patient.birthDate`). Present on a
+// posrep, and on the concept's LOCAL representation only when it deviates from the
+// implicit-standard `.value` (the standard shape is unwritten but validator-checked).
+// The path is one VALUE_ELEMENT_PATH token (dots internal); the trailing DOT
+// terminates the line. The lexer is permissive on path shape — Todo 2 validates it
+// against the declared `type`.
+valueElementLine
+    : DASH VALUE_ELEMENT_IS VALUE_ELEMENT_PATH DOT
     ;
 
 valueTypeLine
@@ -448,15 +468,21 @@ definitionIsBody
 //
 // A concept's `defined as` body is INFERENCE — it normalizes ONE concept's
 // sub-representations into one fact; it does NOT compose decision criteria (that is the
-// decision tree's `when`/branch structure, #168). Two shapes:
+// decision tree's `when`/branch structure, #168). Three shapes:
 //   1. Bare reference to a named concept
 //   2. Parenthesized sem-or / sem-and / sem-not over bare refs
+//   3. `exists ("Concept")` — explicit existence over a single concept (present → true,
+//      absent → false, closed-world). The operand is a CONCEPT (promote a source shape
+//      to its own concept if you need to derive from it). `exists` is TOP-LEVEL ONLY —
+//      it is deliberately NOT a composition atom (`(exists("A") sem-or "B")` does not
+//      parse); the design of record says promote instead (see "Clinical Mammogram").
 //
 // The inference operates on bare refs only (no narrative inside). Narrative belongs in
 // concept bodies with `definition is`.
 //
 // Examples:
 //   - defined as "Underweight Active".
+//   - defined as exists ( "Mammogram (ImagingStudy)" ).
 //
 //   - defined as
 //   (
@@ -471,6 +497,7 @@ definedAsBody
 
 daBody
     : conceptReference                                  # DefinedAsBareRef
+    | EXISTS LPAREN conceptReference RPAREN              # DefinedAsExists
     | LPAREN compositionExpression RPAREN               # DefinedAsComposition
     ;
 
@@ -512,7 +539,7 @@ narrative
 narrativeElement
     : qualifiableReference                                                                       # NConceptRef
     | quantity                                                                                   # NQuantity
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | NARRATIVE_WORD | TIME_UNIT)  # NWord
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | NARRATIVE_WORD | TIME_UNIT)  # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 

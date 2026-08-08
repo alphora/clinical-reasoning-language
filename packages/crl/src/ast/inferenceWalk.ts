@@ -25,6 +25,7 @@ import type {
   CompositionExpression,
   DefinedAsBareRef,
   DefinedAsComposition,
+  DefinedAsExists,
   ReferenceName,
 } from "./types";
 import { getRefName, isQualifiedRef, normalizeLocalRef } from "./types";
@@ -35,9 +36,13 @@ import { getRefName, isQualifiedRef, normalizeLocalRef } from "./types";
  * every `CompositionRef` is collected in written order). Mirrors the FHIR lane's prior `visitComposition`.
  */
 export function flattenDefinedAsBody(
-  body: DefinedAsBareRef | DefinedAsComposition,
+  body: DefinedAsBareRef | DefinedAsExists | DefinedAsComposition,
 ): ReferenceName[] {
+  // Bare ref and `exists ("X")` both name a single concept operand — its reference is the
+  // one leaf, tracked so the inference-order walk (FHIR case-feature + provenance lanes)
+  // surfaces it. (`exists` lowering itself is Todo 2/3; the operand still walks.)
   if (body.type === "DefinedAsBareRef") return [body.ref];
+  if (body.type === "DefinedAsExists") return [body.ref];
   const refs: ReferenceName[] = [];
   const visit = (expr: CompositionExpression): void => {
     switch (expr.type) {

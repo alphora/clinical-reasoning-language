@@ -13,6 +13,14 @@
  *   - DRIFT GUARD: the traversal's pre-order `leafEligible` keys MUST equal `codeIsLeavesPreorder` of the
  *     concept's `ConceptShapeNode` (own-first, operands left-to-right, cycle/diamond collapsed) — the
  *     load-bearing invariant that keeps the two projections of the same `defined as` in lockstep.
+ *     CARVE-OUT (concept-model Todo 1): a `defined as exists ("X")` concept gets NO DefExpr `body`
+ *     (undefined, like a `coded from` concept — see `buildDefExprIndex`) to avoid rendering existence as a
+ *     bare-ref alias (gpt56 impl review #3). `conceptShape` still flattens the exists operand X via
+ *     `flattenDefinedAsBody` (the emitter-faithful side), so for an exists concept the two projections
+ *     KNOWINGLY diverge (optree leaves = []; shape leaves = [X]). This is inert in increment 1 — an exists
+ *     library's CQL lowering fails structurally, so `$apply` never runs — and is CLOSED by Todo 3, which
+ *     adds an explicit `exists` DefExpr kind that traverses X and restores lockstep. The divergence is
+ *     asserted EXPECTED in `definedAsExpr.test.ts` so it is a visible marker, not a silent invariant break.
  *   - Cross-library + location-less operands mirror `conceptShape`: cross-lib is a retained STUB (not recursed,
  *     `leafEligible:false`); a leaf-eligible-but-unaddressable concept FAILS LOUD (never a stub); a NON-eligible
  *     location-less INTERMEDIATE is FLATTENED THROUGH (its `defined as` body inlined, cycle-guarded) so its
@@ -264,7 +272,12 @@ export function buildDefExprIndex(
     // location-less inline cycle. No body (or a cycle) → a benign stub (no nodeKey, not a leaf, not recursed).
     const ast = astByLibName.get(lib)?.get(name);
     if (ast?.definition?.type === "DefinedAsDefinition" && !path.has(name)) {
-      return buildBody(ast.definition.body, lib, new Set(path).add(name));
+      const daBody = ast.definition.body;
+      // `exists ("X")` has no operator structure to render in increment 1 — fall through to a
+      // plain leaf ref (its dependency is tracked by the provenance indexer), rather than
+      // flattening it into a bare-ref alias that this operator-PRESERVING model would then
+      // render identically to `defined as "X"`.
+      if (daBody.type !== "DefinedAsExists") return buildBody(daBody, lib, new Set(path).add(name));
     }
     return { kind: "ref", ref: { name, lib, crossLib: false, leafEligible: false, hasDefinedAs: false } };
   };
@@ -289,6 +302,8 @@ export function buildDefExprIndex(
     }
   };
 
+  // Callers filter out `DefinedAsExists` before this (an exists concept gets no DefExpr body),
+  // so this operator-preserving builder only ever sees a bare ref or a composition.
   function buildBody(body: DefinedAsBareRef | DefinedAsComposition, lib: string, path: ReadonlySet<string>): DefExpr {
     return body.type === "DefinedAsBareRef" ? buildRef(body.ref, lib, path) : buildExpr(body.expression, lib, path);
   }
@@ -297,8 +312,17 @@ export function buildDefExprIndex(
   for (const c of conceptLayer) {
     if (index.has(c.nodeKey)) continue; // first-wins, mirroring conceptShape
     const ast = astByLibName.get(c.lib)?.get(c.name);
+    // A `defined as exists ("X")` concept has no representable operator structure yet, so it
+    // gets NO DefExpr body (undefined, like a `coded from` concept) — never a bare-ref alias
+    // (gpt56 impl review #3). Its dependency edge is still tracked by the provenance indexer.
+    // ⚠ TRADE-OFF: `conceptShape` (via `flattenDefinedAsBody`) DOES surface the operand X, so an
+    // exists concept KNOWINGLY diverges from the DRIFT GUARD (optree []=/= shape [X]) — inert
+    // (exists never emits) and documented in this file's header carve-out + asserted expected in
+    // definedAsExpr.test.ts. Todo 3 adds an `exists` DefExpr kind that traverses X and restores lockstep.
+    const daBody =
+      ast?.definition?.type === "DefinedAsDefinition" ? ast.definition.body : undefined;
     const body =
-      ast?.definition?.type === "DefinedAsDefinition" ? buildBody(ast.definition.body, c.lib, new Set()) : undefined;
+      daBody && daBody.type !== "DefinedAsExists" ? buildBody(daBody, c.lib, new Set()) : undefined;
     index.set(c.nodeKey, {
       nodeKey: c.nodeKey,
       lib: c.lib,
@@ -315,9 +339,12 @@ export function buildDefExprIndex(
 
 /**
  * The pre-order `leafEligible` nodeKeys reachable from `rootKey`, following the operator tree's ref edges —
- * the operator-tree analog of `codeIsLeavesPreorder(ConceptShapeNode)`. MUST equal it (sequence). Mirrors
- * `walkInferenceOrder` EXACTLY: own leaf FIRST (both-rep concepts list themselves before operands), operands
- * LEFT-TO-RIGHT (the sem-operators are transparent to leaf ORDER — a `not` operand is still traversed, like
+ * the operator-tree analog of `codeIsLeavesPreorder(ConceptShapeNode)`. MUST equal it (sequence) — EXCEPT for a
+ * `defined as exists` concept, whose DefExpr `body` is undefined in increment 1 (see the DRIFT GUARD carve-out
+ * in this file's header): its optree leaves are [] while `conceptShape` yields the flattened operand. Inert
+ * (exists never emits) and closed by Todo 3's explicit `exists` DefExpr kind. Mirrors `walkInferenceOrder`
+ * EXACTLY otherwise: own leaf FIRST (both-rep concepts list themselves before operands), operands LEFT-TO-RIGHT
+ * (the sem-operators are transparent to leaf ORDER — a `not` operand is still traversed, like
  * `flattenDefinedAsBody`), a `visiting` path-set breaks cycles, a `visited` set collapses diamonds (first-wins),
  * and a cross-library / location-less ref is observed but NOT recursed.
  */

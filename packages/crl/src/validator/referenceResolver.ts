@@ -236,7 +236,9 @@ export class ReferenceResolver {
         }
         case "DefinedAsDefinition": {
           const body = def.body;
-          if (body.type === "DefinedAsBareRef") {
+          // Bare ref and `exists ("X")` both name a single concept whose reference must
+          // resolve; only a composition has an expression to walk.
+          if (body.type === "DefinedAsBareRef" || body.type === "DefinedAsExists") {
             this.checkRef(body.ref, CONCEPT_REF_KINDS, body.location, ctx, errors, "defined-as");
           } else if (body.type === "DefinedAsComposition") {
             this.walkComposition(
@@ -253,10 +255,17 @@ export class ReferenceResolver {
       }
     }
     // possible representations (ADR 0001 §3): validate named coded-from refs;
-    // inline codings carry no terminology reference.
+    // inline codings carry no terminology reference. A rep's `definition is` PROJECTOR is
+    // a NEW reference-carrying surface — walk its narrative concept refs too, so a projector
+    // that (mis)carries a concept ref surfaces unresolved refs LOUDLY instead of vanishing
+    // from resolution (a well-formed datum-level projector carries none). Todo 2 adds the
+    // misattachment diagnostic that rejects a projector holding a concept ref outright.
     for (const rep of concept.representations ?? []) {
       if (rep.terminologyName) {
         this.checkRef(rep.terminologyName, TERMINOLOGY_REF_KINDS, rep.location, ctx, errors, null);
+      }
+      if (rep.projector) {
+        this.walkNarrative(rep.projector.body, ctx, errors);
       }
     }
   }

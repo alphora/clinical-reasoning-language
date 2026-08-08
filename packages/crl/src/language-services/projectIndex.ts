@@ -577,8 +577,20 @@ function walkStatementRefs(
   const s = stmt as { type?: string };
   switch (s.type) {
     case "Concept": {
-      const c = stmt as { definition?: unknown };
+      const c = stmt as {
+        definition?: unknown;
+        representations?: { projector?: { body?: { elements?: unknown[] } } }[];
+      };
       walkConceptBody(c.definition, owningLib, owningOrigin, filePath, source, ns, out);
+      // A representation's `definition is` PROJECTOR carries concept refs (in the misattachment
+      // case). Index them for find-refs / go-to-definition / rename — a RESOLVED projector ref
+      // left unindexed would go stale on a rename of its target (gpt56 impl review r2 #3). A
+      // well-formed datum-level projector carries none, so this is a no-op for valid content.
+      for (const rep of c.representations ?? []) {
+        for (const el of rep.projector?.body?.elements ?? []) {
+          walkNarrativeElement(el, owningLib, owningOrigin, filePath, source, ns, out);
+        }
+      }
       return;
     }
     case "Decision": {
@@ -647,8 +659,9 @@ function walkDefinedAsBody(
 ): void {
   if (!body || typeof body !== "object") return;
   const b = body as { type?: string; ref?: unknown; expression?: unknown; location?: Loc };
-  if (b.type === "DefinedAsBareRef" && b.location) {
-    // `defined as` bare ref is concept-only per the slot table.
+  if ((b.type === "DefinedAsBareRef" || b.type === "DefinedAsExists") && b.location) {
+    // `defined as` bare ref and `exists ("X")` are both concept-only single refs per the
+    // slot table — index the reference for find-refs / hover.
     addRef(b.ref, "concept", owningLib, filePath, source, b.location, out);
   } else if (b.type === "DefinedAsComposition") {
     walkComposition(b.expression, owningLib, filePath, source, out);

@@ -31,7 +31,10 @@ export interface CockpitModel {
   conceptShape: ConceptShapeIndex;
   /** #187 Option-3: the operator-PRESERVING projection of the same `defined as` bodies (keyed by nodeKey) — the
    *  sem-or/and/not tree the MV Questionnaire renders as ANY OF / ALL OF boxes. Its leafEligible leaves are
-   *  drift-guarded equal to `conceptShape`'s (`collectDefExprLeafKeys` == `codeIsLeavesPreorder`). */
+   *  drift-guarded equal to `conceptShape`'s (`collectDefExprLeafKeys` == `codeIsLeavesPreorder`) — EXCEPT a
+   *  `defined as exists` concept, which has no DefExpr body in increment 1 and thus knowingly diverges from
+   *  `conceptShape`'s flattened operand (inert — exists never emits; closed by Todo 3's `exists` DefExpr kind;
+   *  see the DRIFT GUARD carve-out in definedAsExpr.ts). */
   defExpr: DefExprIndex;
   /** #224 ii.3 Todo 3 / #242: guard OUTLINE per COMPOUND (or criterion-bearing) `when`, keyed by the `when`'s structure
    *  nodeKey — the Flow pane hangs it as the `defined as`-style operator outline (so a compound guard's operands + any

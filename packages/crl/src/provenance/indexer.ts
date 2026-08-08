@@ -193,10 +193,17 @@ export function definitionConceptRefs(c: Concept): ReferenceName[] {
   const out: ReferenceName[] = [];
   const def = c.definition;
   if (def?.type === "DefinedAsDefinition") {
-    if (def.body.type === "DefinedAsBareRef") out.push(def.body.ref);
+    // Bare ref and `exists ("X")` each contribute their single concept ref as a direct edge.
+    if (def.body.type === "DefinedAsBareRef" || def.body.type === "DefinedAsExists")
+      out.push(def.body.ref);
     else compositionRefs(def.body.expression, out);
   } else if (def?.type === "DefinitionIsDefinition") {
     narrativeRefs(def.body.elements, out);
+  }
+  // A rep's `definition is` PROJECTOR contributes its narrative concept refs as direct edges
+  // too (present only in the misattachment case; a datum-level projector carries none).
+  for (const rep of c.representations ?? []) {
+    if (rep.projector) narrativeRefs(rep.projector.body.elements, out);
   }
   return out;
 }
@@ -465,12 +472,23 @@ export function buildProvenanceIndex(
     const refs: ReferenceName[] = [];
     let relation: StructuralRelation = "inference-operand";
     if (def?.type === "DefinedAsDefinition") {
-      if (def.body.type === "DefinedAsBareRef") refs.push(def.body.ref);
+      // Bare ref and `exists ("X")` each reach their single concept operand.
+      if (def.body.type === "DefinedAsBareRef" || def.body.type === "DefinedAsExists")
+        refs.push(def.body.ref);
       else compositionRefs(def.body.expression, refs);
       relation = "inference-operand";
     } else if (def?.type === "DefinitionIsDefinition") {
       narrativeRefs(def.body.elements, refs);
       relation = "definition-narrative";
+    }
+    // A rep's `definition is` PROJECTOR reaches its narrative concept refs as definition-narrative
+    // edges too (misattachment case; a datum-level projector carries none).
+    for (const rep of c.representations ?? []) {
+      if (rep.projector) {
+        const pRefs: ReferenceName[] = [];
+        narrativeRefs(rep.projector.body.elements, pRefs);
+        for (const r of pRefs) reach(r, lib, fromDecision, fromNodeId, "definition-narrative", key);
+      }
     }
     // Deliberately NOT walked (spec §5 scopes terminology-reachability to a reached ACTIVITY's `with`): a reached
     // concept's `coded from` / representation terminology. Those concepts are leaf + terminology is over-reach-excluded.

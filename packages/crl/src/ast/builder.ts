@@ -31,6 +31,7 @@ import {
   DefinedAsBodyContext,
   DaBodyContext,
   DefinedAsBareRefContext,
+  DefinedAsExistsContext,
   DefinedAsCompositionContext,
   CompositionExpressionContext,
   SemOrContext,
@@ -101,6 +102,7 @@ import {
   ConceptDefinition,
   DefinedAsDefinition,
   DefinedAsBareRef,
+  DefinedAsExists,
   DefinedAsComposition,
   CompositionExpression,
   SemOrExpression,
@@ -762,6 +764,21 @@ export class CRLAstBuilder
     return bt?.text !== undefined ? bt.text.slice(1, -1) : undefined;
   }
 
+  // Build a `value element is <path>.` line into `{ path, location }`. Shared by the
+  // concept's LOCAL representation (top-level line) and each posrep. Returns undefined
+  // when the line is absent, or when the path lexed as an ERROR token (malformed path —
+  // VALUE_ELEMENT_PATH() is then null and the parse error is already reported).
+  private parseValueElement(
+    veLine:
+      | import("../grammar/generated/antlr/CRLParser").ValueElementLineContext
+      | undefined,
+  ): { path: string; location: Location } | undefined {
+    if (!veLine) return undefined;
+    const pathTok = veLine.VALUE_ELEMENT_PATH?.();
+    if (!pathTok) return undefined;
+    return { path: pathTok.text, location: getLocation(veLine) };
+  }
+
   // Build the `possible representation:` entries — anonymous inheriting source
   // shapes. Each is type/value-type/coded-from (named or inline); inherited
   // fields are absent (ADR 0001 §3).
@@ -802,11 +819,23 @@ export class CRLAstBuilder
         if (termRef) terminologyName = refFromRefContext(termRef);
       }
 
+      // `value element is <path>.` — path + its own location for line-anchored Todo-2
+      // diagnostics. Absent when the posrep omits it (validator's job to require it).
+      const valueElement = this.parseValueElement(rb.valueElementLine?.());
+
+      // Rep-level `definition is` PROJECTOR (reuses the concept-level narrative builder;
+      // the field placement on `Representation.projector` is the discriminator).
+      let projector: DefinitionIsDefinition | undefined;
+      const dib = rb.definitionIsBody?.();
+      if (dib) projector = this.visitDefinitionIsBody(dib);
+
       reps.push({
         type: "Representation",
         ...(conceptType ? { conceptType } : {}),
         valueTypes,
         ...(terminologyName ? { terminologyName } : {}),
+        ...(valueElement ? { valueElement } : {}),
+        ...(projector ? { projector } : {}),
         location: getLocation(rl),
       });
     }
@@ -864,6 +893,9 @@ export class CRLAstBuilder
     const meta = this.metaFrom(bodyCtx.metaLine());
     const evidence = this.parseEvidence(bodyCtx);
     const code = this.parseCode(bodyCtx);
+    // The concept's LOCAL representation's explicit `value element` (deviation from the
+    // implicit-standard `.value`). Grammar-permissive; the validator enforces pairing.
+    const valueElement = this.parseValueElement(bodyCtx.valueElementLine?.());
     const definition = this.parseConceptDefinition(bodyCtx, ctx);
     const representations = this.parseRepresentations(bodyCtx);
     // A concept must carry SOME real body. An EMPTY `code is ``.` is not a real
@@ -885,6 +917,7 @@ export class CRLAstBuilder
       ...(conceptType ? { conceptType } : {}),
       valueTypes,
       ...(code !== undefined ? { code } : {}),
+      ...(valueElement ? { valueElement } : {}),
       ...(meta.length > 0 ? { meta } : {}),
       ...(evidence ? { evidence } : {}),
       ...(definition ? { definition } : {}),
@@ -899,6 +932,16 @@ export class CRLAstBuilder
     const ref = refFromRefContext(ctx.conceptReference());
     return {
       type: "DefinedAsBareRef",
+      ref,
+      location: getLocation(ctx),
+    };
+  }
+
+  // `defined as exists ("Concept")` — explicit existence over a single concept.
+  visitDefinedAsExists(ctx: DefinedAsExistsContext): DefinedAsExists {
+    const ref = refFromRefContext(ctx.conceptReference());
+    return {
+      type: "DefinedAsExists",
       ref,
       location: getLocation(ctx),
     };
@@ -955,10 +998,14 @@ export class CRLAstBuilder
   }
 
   // Wrapper for definedAsBody — dispatches to the labeled alternatives via visit().
-  // The labeled alts (DefinedAsBareRef / DefinedAsComposition) live on the daBody rule.
+  // The labeled alts (DefinedAsBareRef / DefinedAsExists / DefinedAsComposition) live on
+  // the daBody rule.
   visitDefinedAsBody(ctx: DefinedAsBodyContext): DefinedAsDefinition {
     const daBodyCtx = ctx.daBody();
-    const body = this.visit(daBodyCtx) as DefinedAsBareRef | DefinedAsComposition;
+    const body = this.visit(daBodyCtx) as
+      | DefinedAsBareRef
+      | DefinedAsExists
+      | DefinedAsComposition;
     return {
       type: "DefinedAsDefinition",
       body,
