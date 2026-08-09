@@ -407,14 +407,12 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — cross-cutting", () => {
     expect(soft.errors.some((e) => e.kind === "use-site-type-mismatch")).toBe(true);
   });
 
-  it("the pre-redesign mammogram-and-bmi.crl exemplar: `most recent \"Mammogram\"` warns (untyped), not errors", () => {
-    // The kit's `concept-layer-model` exemplar predates the v3 model. Its `"Mammogram"` is a
-    // value-preserving `defined as ( … sem-or … )` with NO declared value type, so under the
-    // CORRECTED model (sem-or is value-preserving, NOT boolean) `most recent "Mammogram"` sees an
-    // UNTYPED operand -> a use-site-operand-untyped WARNING, not a mismatch error. (The plan/disc 397
-    // predicted a mismatch; that framing predates the sem-or-value-preserving correction — the
-    // corrected behavior is a warning. Once the KE-migrated (C) exemplar declares "Mammogram" as
-    // dateTime, this site becomes clean.) This pins that rule B does not ERROR on it.
+  it("the canonical mammogram-and-bmi.crl exemplar (model C) is fully rule-B clean", () => {
+    // The kit's `concept-layer-model` exemplar, reconciled to model (C) with both KE teams
+    // (disc 398). `"Mammogram"` is now a dateTime `code is` + value-preserving `sem-or` union, so
+    // `most recent "Mammogram"` selects over an instance-bearing dateTime (NOT a derived boolean) —
+    // clean. Every posrep carries its concept's value type; the value-comparison operands are
+    // Quantity. This pins the exemplar as the POSITIVE rule-B exemplar (no errors, no warnings).
     const src = readFileSync(
       join(__dirname, "../../tests/fixtures/representation/mammogram-and-bmi.crl"),
       "utf8",
@@ -422,12 +420,11 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — cross-cutting", () => {
     const built = buildCRL(src);
     if (!built.success || !built.result) throw new Error("build failed");
     const result = new Validator().validate(built.result);
-    const ruleBErrors = result.errors.filter((e) => e.kind === "use-site-type-mismatch");
-    expect(ruleBErrors).toHaveLength(0);
-    const untyped = result.warnings.filter(
-      (e) => e.kind === "use-site-operand-untyped" && e.conceptName === "Most Recent Mammogram",
+    const ruleB = [...result.errors, ...result.warnings].filter(
+      (e) => e.kind === "use-site-type-mismatch" || e.kind === "use-site-operand-untyped",
     );
-    expect(untyped).toHaveLength(1);
+    expect(ruleB).toHaveLength(0);
+    expect(result.isValid).toBe(true);
   });
 });
 

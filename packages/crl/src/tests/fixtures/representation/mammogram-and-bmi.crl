@@ -1,89 +1,130 @@
 # Representation-model reference — Mammogram (multi-source) + BMI (cascade)
-// ⚠ PRE-REDESIGN FORM — pending the concept-model-redesign rule-B + example refresh.
-// This file is the authoring-kit's `concept-layer-model` exemplar (authoring-kit/index.ts),
-// but it predates the v3 concept model (tmp/representation-model.md): its `source representation`
-// posreps are the OLD permissive form (no `value element` / `value type`, which the Todo-2
-// `representation-shape` validator now REJECTS), and `Most Recent Mammogram` computes
-// `most recent "Mammogram"` over a BOOLEAN — the exact bad example refinement 1 kills (it must be
-// `most recent "Mammogram (ImagingStudy)"`, a dateTime-valued concept). It is DEFERRED, not
-// migrated, because completing the Claim / ExplanationOfBenefit / DiagnosticReport posreps needs
-// CLINICAL value-element decisions (content authoring, not language work). Do NOT treat this as a
-// current, valid exemplar. No automated test validates it today. See disc 396.
+// Canonical `concept-layer-model` exemplar (authoring-kit/index.ts). v3 concept model
+// (tmp/representation-model.md); reconciled with both KE teams as model (C) (disc 398).
+//
+// ── Addressability discipline (split on ADDRESSABILITY, not provenance) ──────────────────
+// A `source representation` is an alternative SHAPE of ONE datum — not independently nameable.
+// A `sem-or` operand is a CONCEPT — independently assertable and referenceable. So you SPLIT a
+// concept into named sub-concepts only when a downstream query needs to NAME a subset; you do
+// NOT split merely because the data came from different systems.
+//   • "Height" — ONE source rep, NO split. Nobody needs "height via value set X" as a separate
+//     fact, so there is nothing to name; a lone posrep suffices.
+//   • "Mammogram" — SPLIT into "Clinical Mammogram" (performed: ImagingStudy/DiagnosticReport)
+//     and "Administrative Mammogram" (billed: Claim/EoB). "Most recent CLINICAL mammogram" is a
+//     real query, so the clinical subset must be nameable — hence two assertable concepts,
+//     value-preservingly unioned by `sem-or` into a dateTime "Mammogram".
+// Author self-check (DELETE TEST): delete a split; if nothing downstream loses the ability to
+// NAME something, it should not have been split. This keeps (C) from becoming a cargo-cult
+// "always split by provenance".
+//
+// The union is a WORKED `sem-or` over two dateTime concepts — value-preserving, NOT boolean.
+// (`sem-or`/`sem-and`/bare `defined as` preserve the operands' value type; only `defined as
+// exists` / a top-level `sem-not` are boolean.) Time-selection (`most recent "Mammogram"`) is
+// valid because "Mammogram" is an instance-bearing dateTime, not a derived boolean.
 library "Representation Examples".
 
 // ============ Terminologies (external systems / value sets) ============
 terminology "Mammogram VS":
 - valueset is `http://example.org/screening/ValueSet/mammogram`.
-
 terminology "Mammogram DiagnosticReport VS":
 - valueset is `http://example.org/screening/ValueSet/mammogram-dr`.
-
+terminology "Mammogram Billing VS":
+- valueset is `http://example.org/screening/ValueSet/mammogram-billing`.
 terminology "Height VS":
 - valueset is `http://example.org/vitals/ValueSet/height`.
-
 terminology "Weight VS":
 - valueset is `http://example.org/vitals/ValueSet/weight`.
-
 terminology "Clinical BMI":
 - valueset is `http://example.org/vitals/ValueSet/bmi`.
 
-// ============ Mammogram — external source groupings (possible representations only; read-only) ============
+// ============ Mammogram — split by ADDRESSABILITY (clinical vs administrative), source-rep-only ============
+// The performed study: ImagingStudy/DiagnosticReport prove the study HAPPENED. Serviced-not-created,
+// effective-not-issued (`.issued` lags the study and would corrupt a recency window).
 concept "Clinical Mammogram":
-- source representation: - type is ImagingStudy. - coded from "Mammogram VS".
-- source representation: - type is DiagnosticReport. - coded from "Mammogram DiagnosticReport VS".
+- value type is dateTime.
+- source representation:
+  - type is ImagingStudy.
+  - value element is ImagingStudy.started.
+  - value type is dateTime.
+  - coded from "Mammogram VS".
+- source representation:
+  - type is DiagnosticReport.
+  - value element is DiagnosticReport.effectiveDateTime.
+  - value type is dateTime.
+  - coded from "Mammogram DiagnosticReport VS".
 
+// The billed study: Claim/EoB prove it was BILLED (deniable/reversible; no findings). A distinct
+// grade of evidence — payers distinguish them. Its own billing VS (CPT/HCPCS, not clinical codes).
 concept "Administrative Mammogram":
-- coded from "Mammogram VS".
-- source representation: - type is Claim. 
-- source representation: - type is ExplanationOfBenefit.
+- value type is dateTime.
+- source representation:
+  - type is Claim.
+  - value element is Claim.item.servicedDate.
+  - value type is dateTime.
+  - coded from "Mammogram Billing VS".
+- source representation:
+  - type is ExplanationOfBenefit.
+  - value element is ExplanationOfBenefit.item.servicedDate.
+  - value type is dateTime.
+  - coded from "Mammogram Billing VS".
 
-// ============ Mammogram — locally coded (`code is`, system = the package) + composed ============
+// ============ Mammogram — locally coded (`code is`) + value-preserving `sem-or` union ============
 concept "Mammogram":
-- type is Observation.
+- value type is dateTime.
 - code is `mammogram`.
 - defined as ( "Clinical Mammogram" sem-or "Administrative Mammogram" ).
 
+// Two natural user-assertion points (assert at any level, ADR 0001 §8):
+//   - assert the EVENT ("Mammogram") → flows to most-recent, count, up-to-date;
+//   - assert the BOOLEAN ("Up To Date On Mammography") → directly answers the screening question.
+concept "Had Mammogram":
+- value type is boolean.
+- code is `had-mammogram`.
+- defined as exists ("Mammogram").
+
 concept "Most Recent Mammogram":
-- type is Observation.
 - value type is dateTime.
 - definition is most recent "Mammogram".
 
 concept "Mammograms In Last Six Months":
-- type is Observation.
 - value type is integer.
 - definition is count of "Mammogram" within last 6 months.
 
-// Two natural user-assertion points (assert at any level, ADR 0001 §8):
-//   - assert the EVENT ("Mammogram") → flows to most-recent, count, and up-to-date;
-//   - assert the BOOLEAN ("Up To Date On Mammography") → directly answers the screening question.
 concept "Up To Date On Mammography":
-- type is Observation.
 - value type is boolean.
 - code is `up-to-date-on-mammography`.
 - definition is "Most Recent Mammogram" within last 27 months.
 
-// ============ BMI cascade — locally coded at every level ============
+// ============ BMI cascade — Height (no split) contrasts with Mammogram (split) ============
 concept "Height":
-- type is Observation.
 - value type is Quantity.
 - code is `height`.
-- source representation: - coded from "Height VS".
+- source representation:
+  - type is Observation.
+  - value element is Observation.value.
+  - value type is Quantity.
+  - coded from "Height VS".
 
 concept "Weight":
-- type is Observation.
 - value type is Quantity.
 - code is `weight`.
-- source representation: - coded from "Weight VS".
+- source representation:
+  - type is Observation.
+  - value element is Observation.value.
+  - value type is Quantity.
+  - coded from "Weight VS".
 
 concept "BMI":
-- type is Observation.
 - value type is Quantity.
 - code is `bmi`.
 - definition is body mass index of "Weight" and "Height".
-- source representation: - coded from "Clinical BMI".
+- source representation:
+  - type is Observation.
+  - value element is Observation.value.
+  - value type is Quantity.
+  - coded from "Clinical BMI".
 
 concept "High BMI":
-- type is Observation.
 - value type is boolean.
 - code is `high-bmi`.
 - definition is "BMI" at least 30 'kg/m2'.

@@ -49,7 +49,8 @@ import type { RepresentationShapeError, RepresentationShapeRule, ValidationError
 //     as a `CodedFromDefinition`) is a PRE-redesign asserted form the v3 composition has no slot
 //     for. Todo 2 does NOT reason about it (A.3/A.6 ignore it); its migration into a
 //     `source representation:` (or removal) is Todo 4 kit-migration work. No new content authors
-//     it; the two fixtures that do are pre-redesign (representation-edge-cases, mammogram-and-bmi).
+//     it; the remaining fixture that does is pre-redesign (representation-edge-cases). The
+//     mammogram-and-bmi exemplar has been migrated to model (C) — no base coded-from lane (disc 398).
 
 /** Source attribution for a diagnostic (multi-file mode). */
 interface Attribution {
