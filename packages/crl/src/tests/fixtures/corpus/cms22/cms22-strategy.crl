@@ -138,7 +138,6 @@ terminology "Patient Declined VS":
 concept "Blood Pressure Panels":
 - type is Observation.
 - value type is CodeableConcept.
-- value type is Quantity.
 - coded from "Blood Pressure Panels VS".
 
 concept "Standalone Systolic BP Observations":
@@ -210,6 +209,7 @@ concept "BP Reading":
 concept "Last BP Reading At This Encounter Selection":
 - meta is `Picks the latest BP observation tied to the current encounter`.
 - evidence is `Calculated by Smile`.
+- value type is Quantity.
 - definition is most recent "BP Reading".
 
 concept "Last BP Reading At This Encounter":

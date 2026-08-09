@@ -21,7 +21,7 @@ concept "Denominator":
 
 concept "Denominator Exclusions":
 - type is Observation.
-- value type is boolean.
+- value type is CodeableConcept.
 - defined as "cms22-Inferred"."Verified Hypertension As Of Qualifying Encounter".
 
 concept "Numerator":

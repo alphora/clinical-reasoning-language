@@ -17,6 +17,7 @@ parameter "Measurement Period":
 
 concept "BP Evaluation Encounter (not virtual)":
 - type is Encounter.
+- value type is CodeableConcept.
 - defined as
 (
    "cms22-RecordSource"."BP Screening Encounters"
@@ -26,14 +27,17 @@ concept "BP Evaluation Encounter (not virtual)":
 
 concept "BP Evaluation Encounter (not virtual) During MP":
 - type is Encounter.
+- value type is CodeableConcept.
 - definition is "BP Evaluation Encounter (not virtual)" during "Measurement Period".
 
 concept "BP Evaluation Encounter (not virtual) Performed":
 - type is Encounter.
+- value type is CodeableConcept.
 - definition is "BP Evaluation Encounter (not virtual)" performed.
 
 concept "Qualifying Encounter":
 - type is Encounter.
+- value type is CodeableConcept.
 - defined as
 (
    "BP Evaluation Encounter (not virtual) During MP"
@@ -69,7 +73,7 @@ concept "Diastolic BP Reading":
 
 concept "Last BP Panels On Qualifying Encounter Day":
 - type is Observation.
-- value type is Quantity.
+- value type is CodeableConcept.
 - definition is last "cms22-RecordSource"."Blood Pressure Panels" on day of "Qualifying Encounter".
 
 concept "Last BP Panel on Qualifying Encounter Day":
@@ -180,7 +184,7 @@ concept "Hypertensive Reading":
 
 concept "Last BP Panels Within Year Prior To Qualifying Encounter":
 - type is Observation.
-- value type is Quantity.
+- value type is CodeableConcept.
 - definition is last "cms22-RecordSource"."Blood Pressure Panels" within 1 year before start of "Qualifying Encounter".
 
 concept "Last BP Panel Within Year Prior to Qualifying Encounter":
@@ -300,18 +304,22 @@ concept "Second Hypertensive Reading 140+":
 
 concept "Follow-up Within 4 Weeks Ordered":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms22-RecordSource"."Follow-up Within 4 Weeks" ordered.
 
 concept "Follow-up Within 6 Months Ordered":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms22-RecordSource"."Follow-up Within 6 Months" ordered.
 
 concept "Four-Week Rescreen Order":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as "Follow-up Within 4 Weeks Ordered".
 
 concept "Six-Month Rescreen Order":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as "Follow-up Within 6 Months Ordered".
 
 concept "Non-Pharmacological Recommendations":
@@ -332,10 +340,12 @@ concept "Non-Pharmacological Recommendations":
 
 concept "Non-Pharmacological Recommendations Ordered":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Non-Pharmacological Recommendations" ordered.
 
 concept "Non-Pharmacological Recommendation Order":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as "Non-Pharmacological Recommendations Ordered".
 
 concept "Hypertension Lab or ECG Requests":
@@ -352,30 +362,37 @@ concept "Hypertension Lab or ECG Requests":
 
 concept "Hypertension Lab or ECG Requests Ordered":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Hypertension Lab or ECG Requests" ordered.
 
 concept "Hypertension Lab or ECG Order":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as "Hypertension Lab or ECG Requests Ordered".
 
 concept "Antihypertensive Medications Ordered":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "cms22-RecordSource"."Antihypertensive Medications" ordered.
 
 concept "Antihypertensive Medication Order":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - defined as "Antihypertensive Medications Ordered".
 
 concept "Primary-Care Referral Justified by Hypertensive Reading":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms22-RecordSource"."Primary-Care Referrals" justified by "cms22-RecordSource"."Hypertensive Reading Findings".
 
 concept "Primary-Care Referrals Ordered":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms22-RecordSource"."Primary-Care Referrals" ordered.
 
 concept "Referral for Hypertensive Reading":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as
 (
    "Primary-Care Referral Justified by Hypertensive Reading"
@@ -388,26 +405,32 @@ concept "Referral for Hypertensive Reading":
 
 concept "Six-Month Rescreen Order Same Day As Qualifying Encounter":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Six-Month Rescreen Order" same day as "Qualifying Encounter".
 
 concept "Non-Pharm Recommendation Order Same Day As Qualifying Encounter":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Non-Pharmacological Recommendation Order" same day as "Qualifying Encounter".
 
 concept "Referral for Hypertensive Reading Same Day As Qualifying Encounter":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Referral for Hypertensive Reading" same day as "Qualifying Encounter".
 
 concept "Four-Week Rescreen Order Same Day As Qualifying Encounter":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Four-Week Rescreen Order" same day as "Qualifying Encounter".
 
 concept "Hypertension Lab or ECG Order Same Day As Qualifying Encounter":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Hypertension Lab or ECG Order" same day as "Qualifying Encounter".
 
 concept "Antihypertensive Medication Order Same Day As Qualifying Encounter":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "Antihypertensive Medication Order" same day as "Qualifying Encounter".
 
 concept "Elevated BP Followup Bundle":
@@ -520,18 +543,22 @@ concept "Second HTN 140+ With Followup":
 
 concept "Hypertension Diagnoses Verified":
 - type is Condition.
+- value type is CodeableConcept.
 - definition is "cms22-RecordSource"."Hypertension Diagnoses" verified.
 
 concept "Verified Hypertension":
 - type is Condition.
+- value type is CodeableConcept.
 - defined as "Hypertension Diagnoses Verified".
 
 concept "Verified Hypertension As Of Qualifying Encounter Narrative":
 - type is Condition.
+- value type is CodeableConcept.
 - definition is "Verified Hypertension" as of "Qualifying Encounter".
 
 concept "Verified Hypertension As Of Qualifying Encounter":
 - type is Condition.
+- value type is CodeableConcept.
 - defined as "Verified Hypertension As Of Qualifying Encounter Narrative".
 
 
@@ -551,10 +578,12 @@ concept "BP Measurement Sources":
 
 concept "BP Measurement Sources Not Done With Reason":
 - type is Observation.
+- value type is CodeableConcept.
 - definition is "BP Measurement Sources" not done with reason ("cms22-RecordSource"."Medical Reasons" or "cms22-RecordSource"."Patient Declined Reasons").
 
 concept "BP Measurement Sources Same Day As Qualifying Encounter":
 - type is Observation.
+- value type is CodeableConcept.
 - definition is "BP Measurement Sources" same day as "Qualifying Encounter".
 
 concept "BP Measurement Not Done With Reason":
@@ -572,74 +601,92 @@ concept "BP Measurement Not Done With Reason":
 
 concept "Follow-up Within 4 Weeks Declined by Patient":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms22-RecordSource"."Follow-up Within 4 Weeks" not done with reason "cms22-RecordSource"."Patient Declined Reasons".
 
 concept "Follow-up Within 6 Months Declined by Patient":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms22-RecordSource"."Follow-up Within 6 Months" not done with reason "cms22-RecordSource"."Patient Declined Reasons".
 
 concept "Primary-Care Referrals Declined by Patient":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms22-RecordSource"."Primary-Care Referrals" not done with reason "cms22-RecordSource"."Patient Declined Reasons".
 
 concept "Non-Pharmacological Recommendations Declined by Patient":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Non-Pharmacological Recommendations" not done with reason "cms22-RecordSource"."Patient Declined Reasons".
 
 concept "Hypertension Lab or ECG Requests Declined by Patient":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Hypertension Lab or ECG Requests" not done with reason "cms22-RecordSource"."Patient Declined Reasons".
 
 concept "Antihypertensive Medications Declined by Patient":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "cms22-RecordSource"."Antihypertensive Medications" not done with reason "cms22-RecordSource"."Patient Declined Reasons".
 
 concept "Four-Week Rescreen Declined":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as "Follow-up Within 4 Weeks Declined by Patient".
 
 concept "Six-Month Rescreen Declined":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as "Follow-up Within 6 Months Declined by Patient".
 
 concept "Primary-Care Referral Declined":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as "Primary-Care Referrals Declined by Patient".
 
 concept "Non-Pharm Recommendation Declined":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as "Non-Pharmacological Recommendations Declined by Patient".
 
 concept "Hypertension Lab or ECG Declined":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as "Hypertension Lab or ECG Requests Declined by Patient".
 
 concept "Antihypertensive Medication Declined":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - defined as "Antihypertensive Medications Declined by Patient".
 
 concept "Primary-Care Referral Declined Same Day As Qualifying Encounter":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Primary-Care Referral Declined" same day as "Qualifying Encounter".
 
 concept "Six-Month Rescreen Declined Same Day As Qualifying Encounter":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Six-Month Rescreen Declined" same day as "Qualifying Encounter".
 
 concept "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Non-Pharm Recommendation Declined" same day as "Qualifying Encounter".
 
 concept "Four-Week Rescreen Declined Same Day As Qualifying Encounter":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Four-Week Rescreen Declined" same day as "Qualifying Encounter".
 
 concept "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Hypertension Lab or ECG Declined" same day as "Qualifying Encounter".
 
 concept "Antihypertensive Medication Declined Same Day As Qualifying Encounter":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "Antihypertensive Medication Declined" same day as "Qualifying Encounter".
 
 concept "Elevated BP Declined Bundle":

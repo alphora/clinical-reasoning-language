@@ -22,19 +22,16 @@ concept "Hypertension Diagnoses":
 concept "Blood Pressure Panels":
 - type is Observation.
 - value type is CodeableConcept.
-- value type is Quantity.
 - coded from "cms22-RecordConcepts"."Blood pressure panel with all children optional".
 
 concept "Systolic Blood Pressure Code":
 - type is Observation.
 - value type is CodeableConcept.
-- value type is Quantity.
 - coded from "cms22-RecordConcepts"."Systolic Blood Pressure Code".
 
 concept "Diastolic Blood Pressure Code":
 - type is Observation.
 - value type is CodeableConcept.
-- value type is Quantity.
 - coded from "cms22-RecordConcepts"."Diastolic Blood Pressure Code".
 
 concept "Standalone Systolic BP Observations":
