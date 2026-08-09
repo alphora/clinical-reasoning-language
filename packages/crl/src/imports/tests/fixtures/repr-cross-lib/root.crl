@@ -9,4 +9,8 @@ library "Root".
 concept "Foo":
 - type is Observation.
 - code is `foo`.
-- source representation: - coded from "Other"."VS".
+- source representation:
+  - type is Observation.
+  - value element is Observation.value.
+  - value type is Quantity.
+  - coded from "Other"."VS".

@@ -18,5 +18,7 @@ concept "Serum Potassium":
 - code is `serum-potassium`.
 - coded from "Serum Potassium VS".
 - source representation:
+  - type is Observation.
+  - value element is Observation.value.
   - value type is CodeableConcept.
   - coded from "Serum Potassium Categorical VS".

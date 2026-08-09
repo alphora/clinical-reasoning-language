@@ -10,6 +10,7 @@ import { DispositionValidator } from "./dispositionValidator";
 import { MetaTagValidator } from "./metaTagValidator";
 import { NameUniquenessValidator } from "./nameUniquenessValidator";
 import { ReferenceResolver } from "./referenceResolver";
+import { RepresentationShapeValidator } from "./representationShapeValidator";
 
 /**
  * Stable, machine-readable discriminator for validation errors. Lets
@@ -69,7 +70,13 @@ export type ValidationErrorKind =
   // `at least` | `at most` | `under` | `younger than` + a YEARS quantity. Closes the
   // validate/emit divergence (these emit a loud unmatched sentinel at emit but validated
   // green). Author error — never soft-demoted.
-  | "age-predicate-unsupported";
+  | "age-predicate-unsupported"
+  // concept-model redesign Todo 2 — a static shape defect in a concept's representations
+  // (posrep completeness, value-element path, projector misattachment, duplicate rep key,
+  // `definition is exists` misuse, >1 value type). The specific rule is on `.rule`. Every
+  // one is a structural author mistake made possible by Todo 1's permissive grammar
+  // superset — never soft-demoted.
+  | "representation-shape";
 
 /**
  * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
@@ -223,6 +230,49 @@ export interface AgePredicateUnsupportedError extends ValidationErrorBase {
   conceptName: string;
 }
 
+/**
+ * The specific representation-shape rule a `representation-shape` error violates
+ * (concept-model redesign Todo 2). Lets consumers specialize without parsing message text.
+ * See tmp/representation-model.md §"Shape rules" + disc 395.
+ *
+ *   - "incomplete-representation"    — a `source representation` missing `type` / `value
+ *                                      element` / `value type` (a posrep is ALWAYS fully
+ *                                      explicit; `coded from` stays optional)
+ *   - "value-element-invalid"        — a `value element` path that is single-segment, or
+ *                                      whose leading segment disagrees with the rep's `type`
+ *                                      ("path X is not on type Y"). (A posrep `value element`
+ *                                      with no `type` surfaces as `incomplete-representation`,
+ *                                      not here.)
+ *   - "value-element-without-code"   — a concept-level (local-rep) `value element` with no
+ *                                      local `code is` (it describes a non-existent local rep)
+ *   - "projector-misattachment"      — a rep-level `definition is` PROJECTOR whose narrative
+ *                                      carries a concept ref (a concept-level definition the
+ *                                      whitespace-insensitive grammar bound into the posrep)
+ *   - "duplicate-representation-key"  — two representations (local + posreps) share the
+ *                                      structural key `{type, value element, coding-source}`
+ *   - "definition-is-exists-misuse"  — a `definition is exists (...)` (existence is a
+ *                                      `defined as` operator, not `definition is`)
+ *   - "multiple-value-types"         — >1 `value type` on one concept or posrep (the
+ *                                      canonical result shape is singular)
+ */
+export type RepresentationShapeRule =
+  | "incomplete-representation"
+  | "value-element-invalid"
+  | "value-element-without-code"
+  | "projector-misattachment"
+  | "duplicate-representation-key"
+  | "definition-is-exists-misuse"
+  | "multiple-value-types";
+
+// concept-model redesign Todo 2 — a static representation-shape defect. One kind with a
+// `rule` sub-discriminator (mirrors `decision-shape`); `conceptName` names the offending
+// concept. Never demoted under `soft` (structural author mistake).
+export interface RepresentationShapeError extends ValidationErrorBase {
+  kind: "representation-shape";
+  rule: RepresentationShapeRule;
+  conceptName: string;
+}
+
 export type ValidationError =
   | EmptyNameError
   | DuplicateNameError
@@ -239,6 +289,7 @@ export type ValidationError =
   | DispositionRequestTypeError
   | DispositionNonFinalLeafError
   | AgePredicateUnsupportedError
+  | RepresentationShapeError
   | MetaDiagnostic;
 
 export interface ValidationResult {
@@ -295,6 +346,7 @@ export class Validator {
   private readonly dispositionValidator: DispositionValidator;
   private readonly metaTagValidator: MetaTagValidator;
   private readonly agePredicateValidator: AgePredicateValidator;
+  private readonly representationShapeValidator: RepresentationShapeValidator;
 
   constructor() {
     this.nameUniquenessValidator = new NameUniquenessValidator();
@@ -304,6 +356,7 @@ export class Validator {
     this.dispositionValidator = new DispositionValidator();
     this.metaTagValidator = new MetaTagValidator();
     this.agePredicateValidator = new AgePredicateValidator();
+    this.representationShapeValidator = new RepresentationShapeValidator();
   }
 
   /**
@@ -365,6 +418,12 @@ export class Validator {
     // (unsupported comparator / non-year unit). Always an error (author mistake, never
     // demoted) — closes the validate/emit divergence for the age carve-out.
     errors.push(...this.agePredicateValidator.validate(ast, sources));
+
+    // concept-model redesign Todo 2 — static representation-shape rules (posrep completeness,
+    // value-element path, projector misattachment, duplicate rep key, `definition is exists`
+    // misuse, >1 value type). Always an error (structural author mistake, never demoted) —
+    // closes the check gap Todo 1's permissive grammar superset opened.
+    errors.push(...this.representationShapeValidator.validate(ast, sources));
 
     // #154/#203 — registry-backed @tag metadata enforcement (vocabulary / field / cardinality / open-flag).
     // Routed through pushSplit so open-flag/unknown/malformed WARN (not fail) and meta-missing-field soft-demotes.

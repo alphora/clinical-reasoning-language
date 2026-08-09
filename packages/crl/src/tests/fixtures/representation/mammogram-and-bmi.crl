@@ -1,4 +1,14 @@
 # Representation-model reference — Mammogram (multi-source) + BMI (cascade)
+// ⚠ PRE-REDESIGN FORM — pending the concept-model-redesign rule-B + example refresh.
+// This file is the authoring-kit's `concept-layer-model` exemplar (authoring-kit/index.ts),
+// but it predates the v3 concept model (tmp/representation-model.md): its `source representation`
+// posreps are the OLD permissive form (no `value element` / `value type`, which the Todo-2
+// `representation-shape` validator now REJECTS), and `Most Recent Mammogram` computes
+// `most recent "Mammogram"` over a BOOLEAN — the exact bad example refinement 1 kills (it must be
+// `most recent "Mammogram (ImagingStudy)"`, a dateTime-valued concept). It is DEFERRED, not
+// migrated, because completing the Claim / ExplanationOfBenefit / DiagnosticReport posreps needs
+// CLINICAL value-element decisions (content authoring, not language work). Do NOT treat this as a
+// current, valid exemplar. No automated test validates it today. See disc 396.
 library "Representation Examples".
 
 // ============ Terminologies (external systems / value sets) ============

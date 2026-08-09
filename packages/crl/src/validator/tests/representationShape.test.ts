@@ -1,0 +1,302 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { describe, it, expect } from "vitest";
+
+import { buildCRL } from "../../index";
+import { validateCRLImports } from "../../imports/validate";
+import {
+  Validator,
+  type RepresentationShapeError,
+  type RepresentationShapeRule,
+  type ValidationResult,
+} from "../validator";
+
+// concept-model redesign Todo 2 — the STATIC representation-shape validator. Todo 1 made
+// posreps / `value element is` / rep-level projectors / `defined as exists` PARSE; these tests
+// pin the validate errors that make the malformed forms loud. End-to-end via buildCRL → Validator
+// (the real single-file path), mirroring agePredicate.test.ts.
+
+function validateFull(src: string): ValidationResult {
+  const built = buildCRL(src);
+  if (!built.success || !built.result) {
+    throw new Error("build failed: " + JSON.stringify(built.errors));
+  }
+  return new Validator().validate(built.result);
+}
+function shapeErrors(src: string, rule?: RepresentationShapeRule): RepresentationShapeError[] {
+  return validateFull(src).errors.filter(
+    (e): e is RepresentationShapeError =>
+      e.kind === "representation-shape" && (rule === undefined || e.rule === rule),
+  );
+}
+
+describe("RepresentationShapeValidator (Todo 2) — static shape rules", () => {
+  // ---------------------------------------------------------------- A.1
+  describe("A.1 incomplete-representation — a posrep is fully explicit", () => {
+    it("REJECTS a posrep missing value element + value type (old permissive form)", () => {
+      const src =
+        `library "T".\nterminology "VS":\n- valueset is \`http://x/VS\`.\n` +
+        `concept "Mammogram (ImagingStudy)":\n- value type is dateTime.\n` +
+        `- source representation:\n  - type is ImagingStudy.\n  - coded from "VS".\n`;
+      const errs = shapeErrors(src, "incomplete-representation");
+      expect(errs).toHaveLength(1);
+      // Teaching: names the missing fields + the concrete expected shape.
+      expect(errs[0].message).toMatch(/value element/);
+      expect(errs[0].message).toMatch(/value type/);
+      expect(errs[0].message).toMatch(/value element is <Resource>\.<path>/);
+      expect(errs[0].conceptName).toBe("Mammogram (ImagingStudy)");
+    });
+
+    it("REJECTS a posrep missing type", () => {
+      const src =
+        `library "T".\nterminology "VS":\n- valueset is \`http://x/VS\`.\n` +
+        `concept "C":\n- value type is Quantity.\n` +
+        `- source representation:\n  - value element is Observation.value.\n  - value type is Quantity.\n  - coded from "VS".\n`;
+      const errs = shapeErrors(src, "incomplete-representation");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/`type`/);
+    });
+
+    it("ACCEPTS a fully-explicit posrep (type + value element + value type; coded from optional)", () => {
+      const coded =
+        `library "T".\nterminology "VS":\n- valueset is \`http://x/VS\`.\n` +
+        `concept "C":\n- value type is Quantity.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n  - coded from "VS".\n`;
+      expect(shapeErrors(coded)).toHaveLength(0);
+      // `coded from` is optional (Patient/birthDate has none). `value type is dateTime` (not
+      // `date` — that value type lands in Todo 4 with the kit migration).
+      const uncoded =
+        `library "T".\nconcept "Age":\n- value type is dateTime.\n` +
+        `- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is dateTime.\n`;
+      expect(shapeErrors(uncoded)).toHaveLength(0);
+    });
+  });
+
+  // ---------------------------------------------------------------- A.2
+  describe("A.2 value-element-invalid — path shape", () => {
+    it("REJECTS a single-segment value element path", () => {
+      const src =
+        `library "T".\nconcept "C":\n- value type is Quantity.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is value.\n  - value type is Quantity.\n`;
+      const errs = shapeErrors(src, "value-element-invalid");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/single segment/);
+    });
+
+    it("REJECTS a path whose root disagrees with the rep type", () => {
+      const src =
+        `library "T".\nconcept "C":\n- value type is dateTime.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is ImagingStudy.started.\n  - value type is dateTime.\n`;
+      const errs = shapeErrors(src, "value-element-invalid");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/not on type `Observation`/);
+    });
+  });
+
+  // ---------------------------------------------------------------- A.3
+  describe("A.3 value-element-without-code — concept-level value element needs code is", () => {
+    it("REJECTS a concept-level value element with no local code", () => {
+      // Grammar order: value element precedes value type. Concept has a `definition is`
+      // producer (so build doesn't reject for no-producer) but no `code is` → A.3 fires.
+      const src =
+        `library "T".\nconcept "C":\n- value element is Observation.value.\n- value type is Quantity.\n` +
+        `- definition is most recent "C".\n`;
+      const errs = shapeErrors(src, "value-element-without-code");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/no local `code is`/);
+    });
+
+    it("ACCEPTS a concept-level value element alongside a code is", () => {
+      const src =
+        `library "T".\nconcept "C":\n- type is Observation.\n- value element is Observation.value.\n` +
+        `- value type is Quantity.\n- code is \`c\`.\n`;
+      expect(shapeErrors(src, "value-element-without-code")).toHaveLength(0);
+    });
+  });
+
+  // ---------------------------------------------------------------- A.5
+  describe("A.5 projector-misattachment — a projector must not reference a concept", () => {
+    it("REJECTS a source-representation projector carrying a concept ref", () => {
+      const src =
+        `library "T".\nconcept "Weight":\n- value type is Quantity.\n- code is \`w\`.\n` +
+        `concept "C":\n- value type is boolean.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n` +
+        `  - definition is most recent "Weight".\n`;
+      const errs = shapeErrors(src, "projector-misattachment");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/move the `definition is …` line ABOVE/);
+    });
+
+    it("ACCEPTS a projector that computes over its own datum (no concept ref)", () => {
+      const src =
+        `library "T".\nconcept "Age 18 Or Older":\n- value type is boolean.\n` +
+        `- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is dateTime.\n` +
+        `  - definition is age today at least 18 years.\n`;
+      expect(shapeErrors(src, "projector-misattachment")).toHaveLength(0);
+    });
+  });
+
+  // ---------------------------------------------------------------- A.6
+  describe("A.6 duplicate-representation-key — reps are unique by {type, value element, coding-source}", () => {
+    it("REJECTS two posreps with an equal structural key", () => {
+      const src =
+        `library "T".\nterminology "VS":\n- valueset is \`http://x/VS\`.\n` +
+        `concept "C":\n- value type is Quantity.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n  - coded from "VS".\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n  - coded from "VS".\n`;
+      const errs = shapeErrors(src, "duplicate-representation-key");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/same\s+representation/);
+    });
+
+    it("ACCEPTS posreps that differ in coding-source (distinct keys)", () => {
+      const src =
+        `library "T".\nterminology "VS1":\n- valueset is \`http://x/VS1\`.\nterminology "VS2":\n- valueset is \`http://x/VS2\`.\n` +
+        `concept "C":\n- value type is Quantity.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n  - coded from "VS1".\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n  - coded from "VS2".\n`;
+      expect(shapeErrors(src, "duplicate-representation-key")).toHaveLength(0);
+    });
+  });
+
+  // ---------------------------------------------------------------- A.8
+  describe("A.8 definition-is-exists-misuse — precise operator-shaped match", () => {
+    it("REJECTS `definition is exists (\"X\")` and points at `defined as exists`", () => {
+      const src =
+        `library "T".\nconcept "Mammogram (ImagingStudy)":\n- value type is dateTime.\n` +
+        `- source representation:\n  - type is ImagingStudy.\n  - value element is ImagingStudy.started.\n  - value type is dateTime.\n` +
+        `concept "C":\n- value type is boolean.\n- definition is exists ("Mammogram (ImagingStudy)").\n`;
+      const errs = shapeErrors(src, "definition-is-exists-misuse");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/defined as exists/);
+    });
+
+    it("does NOT flag an ordinary narrative that merely contains the word `exists`", () => {
+      // `"Weight" exists today` builds as [NConceptRef, NWord "exists", NWord "today"] — `exists`
+      // is not the leading operator, so it is legal narrative (characterized in concept-model-t1).
+      const src =
+        `library "T".\nconcept "Weight":\n- value type is Quantity.\n- code is \`w\`.\n` +
+        `concept "C":\n- value type is boolean.\n- definition is "Weight" exists today.\n`;
+      expect(shapeErrors(src, "definition-is-exists-misuse")).toHaveLength(0);
+    });
+  });
+
+  // ---------------------------------------------------------------- A.9
+  describe("A.9 multiple-value-types — the canonical result shape is singular", () => {
+    it("REJECTS a concept declaring two value types", () => {
+      const src =
+        `library "T".\nconcept "C":\n- type is Observation.\n- value type is Quantity.\n- value type is boolean.\n- code is \`c\`.\n`;
+      const errs = shapeErrors(src, "multiple-value-types");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/exactly one `value type`/);
+    });
+
+    it("REJECTS a posrep declaring two value types", () => {
+      const src =
+        `library "T".\nconcept "C":\n- value type is Quantity.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n` +
+        `  - value type is Quantity.\n  - value type is boolean.\n`;
+      const errs = shapeErrors(src, "multiple-value-types");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/a representation has exactly one/i);
+    });
+  });
+
+  // ---------- impl-review round-1 coverage (disc 396): branches the first 14 tests missed ----
+  describe("impl-review coverage", () => {
+    it("A.8 flags the no-parens form `exists \"X\"` (the AST cannot tell it from `exists (\"X\")`)", () => {
+      const src =
+        `library "T".\nconcept "X":\n- value type is boolean.\n- code is \`x\`.\n` +
+        `concept "C":\n- value type is boolean.\n- definition is exists "X".\n`;
+      expect(shapeErrors(src, "definition-is-exists-misuse")).toHaveLength(1);
+    });
+
+    it("A.8 flags a grouped operand `exists (\"A\" or \"B\")` and steers to promote the group", () => {
+      const src =
+        `library "T".\nconcept "A":\n- value type is boolean.\n- code is \`a\`.\n` +
+        `concept "B":\n- value type is boolean.\n- code is \`b\`.\n` +
+        `concept "C":\n- value type is boolean.\n- definition is exists ("A" or "B").\n`;
+      const errs = shapeErrors(src, "definition-is-exists-misuse");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/promote the group/);
+    });
+
+    it("A.5 flags a concept ref reachable ONLY through a projector disjunction group (nested walk)", () => {
+      // Both operands are groups — there is NO top-level NConceptRef, so a hit proves the
+      // recursion into NDisjunction, not a top-level match.
+      const src =
+        `library "T".\nconcept "A":\n- value type is Quantity.\n- code is \`a\`.\n` +
+        `concept "B":\n- value type is Quantity.\n- code is \`b\`.\n` +
+        `concept "C":\n- value type is Quantity.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n` +
+        `  - definition is body mass index of ("A" or "B") and ("A" or "B").\n`;
+      expect(shapeErrors(src, "projector-misattachment")).toHaveLength(1);
+    });
+
+    it("A.6 rejects two UNCODED posreps with an equal key (coding-source ∅)", () => {
+      const src =
+        `library "T".\nconcept "C":\n- value type is Quantity.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n`;
+      expect(shapeErrors(src, "duplicate-representation-key")).toHaveLength(1);
+    });
+
+    it("A.6 normalizes coding-source: bare `\"VS\"` and self-qualified `\"T\".\"VS\"` are the SAME key", () => {
+      const src =
+        `library "T".\nterminology "VS":\n- valueset is \`http://x/VS\`.\n` +
+        `concept "C":\n- value type is Quantity.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n  - coded from "VS".\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n  - coded from "T"."VS".\n`;
+      expect(shapeErrors(src, "duplicate-representation-key")).toHaveLength(1);
+    });
+
+    it("A.6 does NOT collide the local rep with an identical-shaped uncoded posrep (namespace disjoint)", () => {
+      // Protects the `local:`/`∅` namespacing: a local `code is` Observation and an uncoded
+      // Observation.value posrep are DIFFERENT source lanes, not a duplicate.
+      const src =
+        `library "T".\nconcept "C":\n- type is Observation.\n- value type is Quantity.\n- code is \`c\`.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n`;
+      expect(shapeErrors(src, "duplicate-representation-key")).toHaveLength(0);
+    });
+
+    it("A.2 concept-level: names the IMPLICIT local type when no `type is` was written", () => {
+      const src =
+        `library "T".\nconcept "C":\n- value element is ImagingStudy.started.\n- value type is dateTime.\n- code is \`c\`.\n`;
+      const errs = shapeErrors(src, "value-element-invalid");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/implicit local type `Observation`/);
+    });
+
+    it("stays a hard ERROR under `soft: true` (structural, non-demotable)", () => {
+      const src =
+        `library "T".\nconcept "C":\n- value type is Quantity.\n` +
+        `- source representation:\n  - type is Observation.\n  - coded from "VS".\n`;
+      const built = buildCRL(src);
+      if (!built.success || !built.result) throw new Error("build failed");
+      const r = new Validator().validate(built.result, { soft: true });
+      expect(r.errors.some((e) => e.kind === "representation-shape")).toBe(true);
+      expect(r.warnings.some((e) => e.kind === "representation-shape")).toBe(false);
+    });
+
+    it("MULTI-FILE: a shape error carries filePath + libraryName (not the wrong-file fallback)", () => {
+      const dir = mkdtempSync(join(tmpdir(), "repshape-mf-"));
+      writeFileSync(
+        join(dir, "package.json"),
+        JSON.stringify({ name: "repshape-mf", version: "0.0.0", crl: { canonicalBase: "http://example.org/repshape-mf" } }),
+      );
+      const crlPath = join(dir, "policy.crl");
+      writeFileSync(
+        crlPath,
+        `library "T".\nconcept "C":\n- value type is Quantity.\n` +
+          `- source representation:\n  - type is Observation.\n  - coded from "VS".\n`,
+      );
+      const result = validateCRLImports(crlPath);
+      const errs = result.validationErrors.filter((e) => e.kind === "representation-shape");
+      expect(errs.length).toBeGreaterThanOrEqual(1);
+      expect(errs[0].filePath).toBe(crlPath);
+      expect(errs[0].libraryName).toBe("T");
+    });
+  });
+});
