@@ -200,10 +200,10 @@ export function definitionConceptRefs(c: Concept): ReferenceName[] {
   } else if (def?.type === "DefinitionIsDefinition") {
     narrativeRefs(def.body.elements, out);
   }
-  // A rep's `definition is` PROJECTOR contributes its narrative concept refs as direct edges
-  // too (present only in the misattachment case; a datum-level projector carries none).
+  // A rep's `value projection is` PROJECTOR contributes its narrative concept refs as direct
+  // edges too (present only in the shape-defect case; a datum-local projection carries none).
   for (const rep of c.representations ?? []) {
-    if (rep.projector) narrativeRefs(rep.projector.body.elements, out);
+    if (rep.valueProjection) narrativeRefs(rep.valueProjection.body.elements, out);
   }
   return out;
 }
@@ -481,12 +481,12 @@ export function buildProvenanceIndex(
       narrativeRefs(def.body.elements, refs);
       relation = "definition-narrative";
     }
-    // A rep's `definition is` PROJECTOR reaches its narrative concept refs as definition-narrative
-    // edges too (misattachment case; a datum-level projector carries none).
+    // A rep's `value projection is` PROJECTOR reaches its narrative concept refs as
+    // definition-narrative edges too (shape-defect case; a datum-local projection carries none).
     for (const rep of c.representations ?? []) {
-      if (rep.projector) {
+      if (rep.valueProjection) {
         const pRefs: ReferenceName[] = [];
-        narrativeRefs(rep.projector.body.elements, pRefs);
+        narrativeRefs(rep.valueProjection.body.elements, pRefs);
         for (const r of pRefs) reach(r, lib, fromDecision, fromNodeId, "definition-narrative", key);
       }
     }

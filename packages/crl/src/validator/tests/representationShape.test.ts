@@ -14,7 +14,7 @@ import {
 } from "../validator";
 
 // concept-model redesign Todo 2 — the STATIC representation-shape validator. Todo 1 made
-// posreps / `value element is` / rep-level projectors / `defined as exists` PARSE; these tests
+// posreps / `value element is` / rep-level `value projection is` / `defined as exists` PARSE; these tests
 // pin the validate errors that make the malformed forms loud. End-to-end via buildCRL → Validator
 // (the real single-file path), mirroring agePredicate.test.ts.
 
@@ -117,24 +117,35 @@ describe("RepresentationShapeValidator (Todo 2) — static shape rules", () => {
   });
 
   // ---------------------------------------------------------------- A.5
-  describe("A.5 projector-misattachment — a projector must not reference a concept", () => {
-    it("REJECTS a source-representation projector carrying a concept ref", () => {
+  describe("A.5 value-projection-references-concept — a value projection must not reference a concept", () => {
+    it("REJECTS a `value projection is` carrying a concept ref", () => {
       const src =
         `library "T".\nconcept "Weight":\n- value type is Quantity.\n- code is \`w\`.\n` +
         `concept "C":\n- value type is boolean.\n` +
         `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n` +
-        `  - definition is most recent "Weight".\n`;
-      const errs = shapeErrors(src, "projector-misattachment");
+        `  - value projection is most recent "Weight".\n`;
+      const errs = shapeErrors(src, "value-projection-references-concept");
       expect(errs).toHaveLength(1);
-      expect(errs[0].message).toMatch(/move the `definition is …` line ABOVE/);
+      expect(errs[0].message).toMatch(/use `definition is …` ABOVE/);
     });
 
-    it("ACCEPTS a projector that computes over its own datum (no concept ref)", () => {
+    it("ACCEPTS a value projection that computes over its own datum (no concept ref)", () => {
       const src =
         `library "T".\nconcept "Age 18 Or Older":\n- value type is boolean.\n` +
         `- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is dateTime.\n` +
-        `  - definition is age today at least 18 years.\n`;
-      expect(shapeErrors(src, "projector-misattachment")).toHaveLength(0);
+        `  - value projection is age today at least 18 years.\n`;
+      expect(shapeErrors(src, "value-projection-references-concept")).toHaveLength(0);
+    });
+
+    it("REJECTS a value projection referencing a PARAMETER too (a narrative ref may resolve to either)", () => {
+      const src =
+        `library "T".\nparameter "Measurement Period":\n- param type is Period.\n` +
+        `concept "C":\n- value type is boolean.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n` +
+        `  - value projection is age at start of "Measurement Period" at least 18 years.\n`;
+      const errs = shapeErrors(src, "value-projection-references-concept");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/concept or parameter/);
     });
   });
 
@@ -223,7 +234,7 @@ describe("RepresentationShapeValidator (Todo 2) — static shape rules", () => {
       expect(errs[0].message).toMatch(/promote the group/);
     });
 
-    it("A.5 flags a concept ref reachable ONLY through a projector disjunction group (nested walk)", () => {
+    it("A.5 flags a concept ref reachable ONLY through a value-projection disjunction group (nested walk)", () => {
       // Both operands are groups — there is NO top-level NConceptRef, so a hit proves the
       // recursion into NDisjunction, not a top-level match.
       const src =
@@ -231,8 +242,8 @@ describe("RepresentationShapeValidator (Todo 2) — static shape rules", () => {
         `concept "B":\n- value type is Quantity.\n- code is \`b\`.\n` +
         `concept "C":\n- value type is Quantity.\n` +
         `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n` +
-        `  - definition is body mass index of ("A" or "B") and ("A" or "B").\n`;
-      expect(shapeErrors(src, "projector-misattachment")).toHaveLength(1);
+        `  - value projection is body mass index of ("A" or "B") and ("A" or "B").\n`;
+      expect(shapeErrors(src, "value-projection-references-concept")).toHaveLength(1);
     });
 
     it("A.6 rejects two UNCODED posreps with an equal key (coding-source ∅)", () => {

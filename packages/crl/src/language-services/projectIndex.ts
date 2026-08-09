@@ -579,15 +579,16 @@ function walkStatementRefs(
     case "Concept": {
       const c = stmt as {
         definition?: unknown;
-        representations?: { projector?: { body?: { elements?: unknown[] } } }[];
+        representations?: { valueProjection?: { body?: { elements?: unknown[] } } }[];
       };
       walkConceptBody(c.definition, owningLib, owningOrigin, filePath, source, ns, out);
-      // A representation's `definition is` PROJECTOR carries concept refs (in the misattachment
-      // case). Index them for find-refs / go-to-definition / rename — a RESOLVED projector ref
-      // left unindexed would go stale on a rename of its target (gpt56 impl review r2 #3). A
-      // well-formed datum-level projector carries none, so this is a no-op for valid content.
+      // A representation's `value projection is` PROJECTOR carries concept refs (in the
+      // shape-defect case). Index them for find-refs / go-to-definition / rename — a RESOLVED
+      // projection ref left unindexed would go stale on a rename of its target (gpt56 impl review
+      // r2 #3). A well-formed datum-local projection carries none, so this is a no-op for valid
+      // content.
       for (const rep of c.representations ?? []) {
-        for (const el of rep.projector?.body?.elements ?? []) {
+        for (const el of rep.valueProjection?.body?.elements ?? []) {
           walkNarrativeElement(el, owningLib, owningOrigin, filePath, source, ns, out);
         }
       }

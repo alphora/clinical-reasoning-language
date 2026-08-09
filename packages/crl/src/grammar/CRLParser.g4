@@ -351,8 +351,9 @@ conceptBody
 // LOCAL representation is its `code is`, whose `type`/`value element` default to
 // Observation/`.value`; a posrep never defaults.) A posrep carries its own
 // `type` + `value element` + `value type`, an optional `coded from`, and an optional
-// `definition is` PROJECTOR (rep-level: projects the rep's datum to the canonical
-// shape — distinct from the concept-level `definition is` calculation over concepts).
+// `value projection is` PROJECTOR (rep-level: projects THIS rep's own datum to the
+// concept's value — its OWN term, distinct from the concept-level `definition is`
+// calculation over concepts; a bare `definition is` inside a rep is a parse error).
 //
 //   - source representation: - type is ImagingStudy. - value element is ImagingStudy.started. - value type is dateTime. - coded from "Mammogram VS".
 // (The design-of-record's Patient/birthDate age posrep uses `value type is date`; the FHIR
@@ -363,8 +364,12 @@ sourceRepresentationLine
     : DASH SOURCE_REPRESENTATION COLON representationBody
     ;
 
+// A representation's optional trailing clause is a `value projection is` (the projector) —
+// its OWN term, NOT the concept-level `definition is`. A bare `definition is` cannot appear
+// inside a representation (the concept-level slot is before `sourceRepresentationLine*`), so
+// one written after a source representation is a LOUD parse error, never a silent projector.
 representationBody
-    : (typeLine)? (valueElementLine)? (valueTypeLine)* (codedFromLine)? (definitionIsBody)?
+    : (typeLine)? (valueElementLine)? (valueTypeLine)* (codedFromLine)? (valueProjectionBody)?
     ;
 
 // ============================
@@ -460,6 +465,12 @@ codeIsLine
 //
 definitionIsBody
     : DASH DEFINITION_IS narrative DOT
+    ;
+
+// Rep-level projector body — same narrative grammar as `definition is`, distinct keyword
+// (`value projection is`) so the construct is its own term. Only appears in representationBody.
+valueProjectionBody
+    : DASH VALUE_PROJECTION_IS narrative DOT
     ;
 
 // ============================

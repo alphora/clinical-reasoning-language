@@ -112,6 +112,7 @@ import {
   CompositionGroup,
   ConceptReference,
   DefinitionIsDefinition,
+  ValueProjection,
   NarrativeClause,
   NarrativeElement,
   NConceptRef,
@@ -823,11 +824,18 @@ export class CRLAstBuilder
       // diagnostics. Absent when the posrep omits it (validator's job to require it).
       const valueElement = this.parseValueElement(rb.valueElementLine?.());
 
-      // Rep-level `definition is` PROJECTOR (reuses the concept-level narrative builder;
-      // the field placement on `Representation.projector` is the discriminator).
-      let projector: DefinitionIsDefinition | undefined;
-      const dib = rb.definitionIsBody?.();
-      if (dib) projector = this.visitDefinitionIsBody(dib);
+      // Rep-level `value projection is` PROJECTOR — its own node (`ValueProjection`), built
+      // from the same narrative grammar as `definition is`. A bare `definition is` can no
+      // longer appear here (grammar), so no placement-based discrimination.
+      let valueProjection: ValueProjection | undefined;
+      const vpb = rb.valueProjectionBody?.();
+      if (vpb) {
+        valueProjection = {
+          type: "ValueProjection",
+          body: this.visitNarrative(vpb.narrative()),
+          location: getLocation(vpb),
+        };
+      }
 
       reps.push({
         type: "Representation",
@@ -835,7 +843,7 @@ export class CRLAstBuilder
         valueTypes,
         ...(terminologyName ? { terminologyName } : {}),
         ...(valueElement ? { valueElement } : {}),
-        ...(projector ? { projector } : {}),
+        ...(valueProjection ? { valueProjection } : {}),
         location: getLocation(rl),
       });
     }

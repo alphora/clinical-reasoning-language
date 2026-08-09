@@ -72,7 +72,7 @@ export type ValidationErrorKind =
   // green). Author error — never soft-demoted.
   | "age-predicate-unsupported"
   // concept-model redesign Todo 2 — a static shape defect in a concept's representations
-  // (posrep completeness, value-element path, projector misattachment, duplicate rep key,
+  // (posrep completeness, value-element path, value-projection-references-concept, duplicate rep key,
   // `definition is exists` misuse, >1 value type). The specific rule is on `.rule`. Every
   // one is a structural author mistake made possible by Todo 1's permissive grammar
   // superset — never soft-demoted.
@@ -245,9 +245,11 @@ export interface AgePredicateUnsupportedError extends ValidationErrorBase {
  *                                      not here.)
  *   - "value-element-without-code"   — a concept-level (local-rep) `value element` with no
  *                                      local `code is` (it describes a non-existent local rep)
- *   - "projector-misattachment"      — a rep-level `definition is` PROJECTOR whose narrative
- *                                      carries a concept ref (a concept-level definition the
- *                                      whitespace-insensitive grammar bound into the posrep)
+ *   - "value-projection-references-concept" — a rep-level `value projection is` PROJECTOR whose
+ *                                      narrative references another concept (or a parameter — a
+ *                                      narrative ref may resolve to either; either is illegal); a
+ *                                      projection is datum-local (for a concept-level calc use
+ *                                      `definition is` above the source representation)
  *   - "duplicate-representation-key"  — two representations (local + posreps) share the
  *                                      structural key `{type, value element, coding-source}`
  *   - "definition-is-exists-misuse"  — a `definition is exists (...)` (existence is a
@@ -259,7 +261,7 @@ export type RepresentationShapeRule =
   | "incomplete-representation"
   | "value-element-invalid"
   | "value-element-without-code"
-  | "projector-misattachment"
+  | "value-projection-references-concept"
   | "duplicate-representation-key"
   | "definition-is-exists-misuse"
   | "multiple-value-types";
@@ -420,7 +422,7 @@ export class Validator {
     errors.push(...this.agePredicateValidator.validate(ast, sources));
 
     // concept-model redesign Todo 2 — static representation-shape rules (posrep completeness,
-    // value-element path, projector misattachment, duplicate rep key, `definition is exists`
+    // value-element path, value-projection-references-concept, duplicate rep key, `definition is exists`
     // misuse, >1 value type). Always an error (structural author mistake, never demoted) —
     // closes the check gap Todo 1's permissive grammar superset opened.
     errors.push(...this.representationShapeValidator.validate(ast, sources));

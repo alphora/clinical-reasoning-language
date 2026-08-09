@@ -13,7 +13,8 @@ import type { RepresentationShapeError, RepresentationShapeRule, ValidationError
 
 // concept-model redesign Todo 2 — the STATIC "checked" layer for a concept's representations.
 // Todo 1 shipped a PERMISSIVE grammar superset: posreps, `value element is`, rep-level
-// `definition is` PROJECTORs, and `defined as exists` all PARSE and BUILD but were unchecked.
+// projectors (now their own `value projection is` term), and `defined as exists` all PARSE and
+// BUILD but were unchecked.
 // This validator makes the malformed forms a TEACHING validate error. It does NOT do per-rep
 // CEL conformance (the "does this rep's instance satisfy its retrieve" check) — that is the
 // INDEPENDENT-evaluator work of Todo 3, which owns the fixture producer it cross-checks against.
@@ -26,9 +27,9 @@ import type { RepresentationShapeError, RepresentationShapeRule, ValidationError
 //                                        leading segment disagrees with the rep's `type`
 //   A.3 value-element-without-code     — a concept-level (local-rep) `value element` with no
 //                                        local `code is` (describes a non-existent local rep)
-//   A.5 projector-misattachment        — a rep-level `definition is` PROJECTOR narrative
-//                                        carrying a concept ref (a concept-level definition the
-//                                        whitespace-insensitive grammar bound into the posrep)
+//   A.5 value-projection-references-concept — a rep-level `value projection is` PROJECTOR
+//                                        narrative referencing another concept (a projection is
+//                                        datum-local; a concept-level calc uses `definition is`)
 //   A.6 duplicate-representation-key    — two reps (local + posreps) share the structural key
 //                                        `{type, value element, coding-source}` (refinement 4)
 //   A.8 definition-is-exists-misuse    — a `definition is exists (...)` (existence is a
@@ -266,24 +267,25 @@ export class RepresentationShapeValidator {
       );
     }
 
-    // A.5 — projector misattachment. A rep-level `definition is` PROJECTOR projects THIS rep's
-    // datum to the canonical shape; operating over other named declarations is exclusively the
-    // concept-level derived slot. A narrative ref (`NConceptRef`) anywhere in the projector is a
-    // concept-level `definition is` the whitespace-insensitive grammar bound into the posrep. The
-    // ref resolves to a concept OR a parameter (referenceResolver narrative slots) — EITHER is a
-    // misattachment (a projector is datum-local), so the message names both; scope-aware
-    // concept-vs-parameter discrimination is not needed here to make the call.
-    if (rep.projector && narrativeHasConceptRef(rep.projector.body.elements)) {
+    // A.5 — a value projection references another concept. A `value projection is` PROJECTOR
+    // projects THIS representation's OWN datum to the concept's value; operating over other
+    // named declarations is exclusively the concept-level derived slot (`definition is`). A
+    // narrative ref (`NConceptRef`) anywhere in the projection resolves to a concept OR a
+    // parameter (referenceResolver narrative slots) — EITHER is illegal (a projection is
+    // datum-local), so the message names both. (Since `value projection is` is its own keyword,
+    // a MISPLACED concept-level `definition is` can no longer land here — that is a parse error —
+    // so this rule's only job is the datum-local scope violation.)
+    if (rep.valueProjection && narrativeHasConceptRef(rep.valueProjection.body.elements)) {
       errors.push(
         this.err(
-          "projector-misattachment",
+          "value-projection-references-concept",
           concept.name,
-          `Concept "${concept.name}": a source-representation projector (\`definition is …\` ` +
-            `inside a \`source representation:\`) references another concept or parameter, but a ` +
-            `projector computes over THIS representation's datum only. If this is a concept-level ` +
-            `calculation, move the \`definition is …\` line ABOVE \`source representation:\` so it ` +
-            `applies to the concept.`,
-          rep.projector.body.location,
+          `Concept "${concept.name}": a \`value projection is …\` inside a ` +
+            `\`source representation:\` references another concept or parameter, but a value ` +
+            `projection computes over THIS representation's own datum only. If you meant a ` +
+            `concept-level calculation over other concepts, use \`definition is …\` ABOVE the ` +
+            `\`source representation:\` (concept-level clauses precede representations).`,
+          rep.valueProjection.body.location,
           attribution,
         ),
       );

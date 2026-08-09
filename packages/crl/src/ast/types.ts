@@ -601,7 +601,7 @@ export interface CodedFromDefinition extends ASTNode {
 // concept's fields — it is always fully explicit. The grammar/AST stay PERMISSIVE (fields
 // optional so a partial posrep still parses/builds); Todo 2's validator REJECTS an
 // incomplete posrep. A posrep carries `type` + `value element` + `value type`, an optional
-// named `coded from`, and an optional rep-level `definition is` PROJECTOR.
+// named `coded from`, and an optional rep-level `value projection is` PROJECTOR (its own term).
 export interface Representation extends ASTNode {
   type: "Representation";
   conceptType?: ConceptType;
@@ -616,17 +616,17 @@ export interface Representation extends ASTNode {
    */
   valueElement?: ValueElement;
   /**
-   * Rep-level `definition is` PROJECTOR — projects this rep's datum to the concept's
-   * canonical value type (e.g. `age today at least 18 years` over `Patient.birthDate`).
-   * DISTINCT from `Concept.definition` (a concept-level calculation over CONCEPTS): the
-   * projector consumes the SELECTED representation's datum. Reuses the
-   * `DefinitionIsDefinition` node — the field PLACEMENT is the discriminator. Todo 2's
-   * matcher must receive an explicit "representation-projector" context rather than infer
-   * semantics from the shared node class. A projector narrative carrying a concept ref is
-   * Todo 2's misattachment signal (a concept-level `definition is` written after the posrep,
-   * which the whitespace-insensitive grammar silently binds here).
+   * Rep-level `value projection is` PROJECTOR — projects THIS representation's own datum to
+   * the concept's value (a type-crossing transformation, e.g. `age today at least 18 years`
+   * over `Patient.birthDate`: `dateTime` datum -> `boolean` concept value). Its OWN term and
+   * OWN node (`ValueProjection`), DISTINCT from `Concept.definition` (a concept-level
+   * `definition is` calculation over CONCEPTS): the node class itself carries the meaning, so
+   * no placement-based discrimination is needed. Because the keyword is distinct, a misplaced
+   * concept-level `definition is` can no longer silently bind here (it is a parse error) — the
+   * only remaining shape defect is a value projection that references another concept (it is
+   * datum-local), which the validator rejects.
    */
-  projector?: DefinitionIsDefinition;
+  valueProjection?: ValueProjection;
   location: Location;
 }
 
@@ -735,6 +735,17 @@ export interface CompositionGroup extends ASTNode {
 
 export interface DefinitionIsDefinition extends ASTNode {
   type: "DefinitionIsDefinition";
+  body: NarrativeClause;
+}
+
+// `value projection is <narrative>` — the REP-LEVEL projector (concept-model redesign). Its
+// own node (not a reused `DefinitionIsDefinition`) so the construct is self-describing: a
+// `ValueProjection` IS a rep-level datum-to-concept-value projection by identity, no
+// field-placement discrimination. Same narrative grammar as `definition is`, distinct keyword.
+// Lives ONLY on `Representation.valueProjection`. A projection is datum-local, so its narrative
+// must NOT reference other concepts (the validator rejects that).
+export interface ValueProjection extends ASTNode {
+  type: "ValueProjection";
   body: NarrativeClause;
 }
 

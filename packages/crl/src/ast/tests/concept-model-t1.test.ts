@@ -23,7 +23,7 @@ import {
 import { parseInput } from "./parseInput";
 
 // Concept-model redesign Todo 1 (disc 394): the grammar/AST additions — `value element is`
-// on the local rep and on posreps, the rep-level `definition is` projector, `defined as
+// on the local rep and on posreps, the rep-level `value projection is` projector, `defined as
 // exists (...)`, `exists` as a narrative word — plus the CONSUMER-SAFETY audit that the
 // widened `DefinedAsDefinition.body` union does not silently drop the new reference.
 
@@ -47,7 +47,7 @@ concept "Age 18 Or Older":
   - type is Patient.
   - value element is Patient.birthDate.
   - value type is dateTime.
-  - definition is age today at least 18 years.
+  - value projection is age today at least 18 years.
 
 concept "BMI Posrep":
 - value type is Quantity.
@@ -57,7 +57,7 @@ concept "BMI Posrep":
   - value element is Observation.value.
   - value type is Quantity.
   - coded from "BMI VS".
-  - definition is convert to canonical units.
+  - value projection is convert to canonical units.
 
 terminology "BMI VS":
 - valueset is \`http://example.org/bmi\`.`;
@@ -69,7 +69,7 @@ terminology "BMI VS":
     expect(c.valueElement?.location.start.line).toBeGreaterThan(0);
   });
 
-  it("captures a posrep's value element AND its rep-level `definition is` projector", () => {
+  it("captures a posrep's value element AND its rep-level `value projection is` projector", () => {
     const c = conceptNamed(src, "Age 18 Or Older");
     expect(c.representations).toHaveLength(1);
     const rep = c.representations[0];
@@ -80,18 +80,18 @@ terminology "BMI VS":
     // and kit move together — see disc 394 impl-round disposition. Structural assertion uses
     // `dateTime` (a valid value type) since this test is about AST shape, not FHIR fidelity.
     expect(rep.valueTypes).toEqual(["dateTime"]);
-    // Rep-level projector reuses the DefinitionIsDefinition node, placed on the rep.
-    expect(rep.projector?.type).toBe("DefinitionIsDefinition");
-    expect(rep.projector?.body.type).toBe("NarrativeClause");
-    // The concept-level definition slot is NOT filled — the projector is on the rep only.
+    // The rep-level projector is its OWN node (`ValueProjection`), placed on the rep.
+    expect(rep.valueProjection?.type).toBe("ValueProjection");
+    expect(rep.valueProjection?.body.type).toBe("NarrativeClause");
+    // The concept-level definition slot is NOT filled — the projection is on the rep only.
     expect(c.definition).toBeUndefined();
   });
 
-  it("a posrep may carry BOTH `coded from` and a projector (fixed slot order)", () => {
+  it("a posrep may carry BOTH `coded from` and a value projection (fixed slot order)", () => {
     const rep = conceptNamed(src, "BMI Posrep").representations[0];
     expect(rep.terminologyName).toBe("BMI VS");
     expect(rep.valueElement?.path).toBe("Observation.value");
-    expect(rep.projector?.type).toBe("DefinitionIsDefinition");
+    expect(rep.valueProjection?.type).toBe("ValueProjection");
   });
 
   it("a malformed value-element path (repeated dots) does not build cleanly (lex/parse error surfaces)", () => {
@@ -156,13 +156,14 @@ concept "C":
   });
 });
 
-describe("misattachment characterization (Claude C3 — whitespace-insensitive projector binding)", () => {
-  it("a concept-level `definition is` written AFTER a posrep silently binds as that rep's projector", () => {
-    // The grammar's concept-level `definition is` slot precedes `source representation:`.
-    // So a `definition is` line placed after the posrep has no concept-level slot left and
-    // binds to the rep's optional projector. This is the KNOWN hazard Todo 2 diagnoses (a
-    // projector narrative carrying a concept ref → "move it above source representation:").
-    const src = `library "T".
+describe("line-order footgun is now a LOUD parse error (value projection is its own term)", () => {
+  it("a concept-level `definition is` written AFTER a source representation is a PARSE ERROR", () => {
+    // The grammar's concept-level `definition is` slot precedes `source representation:`, and a
+    // representation now accepts ONLY `value projection is` (not a bare `definition is`). So a
+    // `definition is` placed after the source rep has no valid slot — it FAILS LOUDLY instead of
+    // silently binding as a projector (the iehp finding; position still matters, but a misplaced
+    // clause can no longer silently mean something else). This is the fix, asserted.
+    const built = buildCRL(`library "T".
 concept "BMI":
 - value type is Quantity.
 - code is \`bmi\`.
@@ -170,10 +171,72 @@ concept "BMI":
   - type is Observation.
   - value element is Observation.value.
   - value type is Quantity.
-- definition is most recent "Weight".`;
-    const c = conceptNamed(src, "BMI");
-    expect(c.definition).toBeUndefined(); // NOT a concept-level calculation…
-    expect(c.representations[0].projector?.type).toBe("DefinitionIsDefinition"); // …bound to the rep
+- definition is most recent "Weight".`);
+    expect(built.success).toBe(false);
+  });
+
+  it("the SAME narrative as an explicit `value projection is` builds — as the rep's projection", () => {
+    // Making the intent explicit is legal; the ambiguity only ever bit the SHARED keyword.
+    const c = conceptNamed(
+      `library "T".
+concept "Age 18 Or Older":
+- value type is boolean.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is dateTime.
+  - value projection is age today at least 18 years.`,
+      "Age 18 Or Older",
+    );
+    expect(c.definition).toBeUndefined();
+    expect(c.representations[0].valueProjection?.type).toBe("ValueProjection");
+  });
+
+  it("a CONCEPT-LEVEL `value projection is` (no source representation) is a PARSE ERROR", () => {
+    // `value projection is` is scoped to representations only — conceptBody has no slot for it.
+    // Pins the "representations only" contract against future grammar restructuring.
+    const built = buildCRL(`library "T".
+concept "C":
+- value type is boolean.
+- code is \`c\`.
+- value projection is age today at least 18 years.`);
+    expect(built.success).toBe(false);
+  });
+
+  it("the WORDS `projection` / `projects` remain ordinary narrative (only the exact phrase is reserved)", () => {
+    // Longest-match reserves `value projection is` as a phrase token; the bare words do not.
+    const c = conceptNamed(
+      `library "T".
+concept "C":
+- value type is boolean.
+- code is \`c\`.
+- definition is projection of the plan projects forward.`,
+      "C",
+    );
+    expect(c.definition?.type).toBe("DefinitionIsDefinition");
+  });
+
+  it("a trailing `value projection is` attaches to the LAST representation (positional, by design)", () => {
+    // The one residual of position-mattering: with multiple reps, a trailing projection binds to
+    // the last. This is intended (position is meant to matter; misplacement just fails LOUD now),
+    // characterized so it reads as deliberate, not missed.
+    const c = conceptNamed(
+      `library "T".
+concept "C":
+- value type is dateTime.
+- source representation:
+  - type is ImagingStudy.
+  - value element is ImagingStudy.started.
+  - value type is dateTime.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is dateTime.
+  - value projection is age today at least 18 years.`,
+      "C",
+    );
+    expect(c.representations[0].valueProjection).toBeUndefined();
+    expect(c.representations[1].valueProjection?.type).toBe("ValueProjection");
   });
 });
 
@@ -304,10 +367,10 @@ case "no present":
   });
 });
 
-describe("consumer-safety — a rep-level projector's concept refs are walked (Claude impl finding #3)", () => {
-  it("reference resolution flags an unresolved concept ref inside a posrep projector", () => {
-    // A projector carrying a concept ref is the misattachment case; the ref must NOT vanish —
-    // referenceResolver walks rep.projector so it surfaces as unresolved.
+describe("consumer-safety — a rep-level value projection's concept refs are walked (Claude impl finding #3)", () => {
+  it("reference resolution flags an unresolved concept ref inside a posrep value projection", () => {
+    // A value projection carrying a concept ref is the shape-defect case; the ref must NOT vanish
+    // — referenceResolver walks rep.valueProjection so it surfaces as unresolved.
     const src = `library "T".
 concept "P":
 - value type is boolean.
@@ -316,7 +379,7 @@ concept "P":
   - type is Observation.
   - value element is Observation.value.
   - value type is boolean.
-  - definition is "Missing Concept" performed.`;
+  - value projection is "Missing Concept" performed.`;
     const built = buildCRL(src);
     expect(built.success && built.result).toBeTruthy();
     const errors = new Validator().validate(built.result!).errors;

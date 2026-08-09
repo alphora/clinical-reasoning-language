@@ -10,6 +10,15 @@ VALUE_TYPE_IS       : 'value type is' -> mode(VALUE_TYPE_MODE);
 // at char 6 ('e' vs 't') so there is no prefix conflict. Enters a dedicated mode
 // because the value is a dotted path the DEFAULT/CONCEPT modes cannot lex.
 VALUE_ELEMENT_IS    : 'value element is' -> mode(VALUE_ELEMENT_MODE);
+// `value projection is` is the REP-LEVEL projector: it projects THIS representation's own
+// datum to the concept's value (a type-crossing transformation, e.g. Patient.birthDate
+// `dateTime` -> a `boolean` concept). Its OWN term — distinct from the concept-level
+// `definition is` (a calculation over other concepts) — so line position never silently
+// decides which you get; a bare `definition is` inside a representation is now a parse error.
+// Completes the `value <facet> is` rep vocabulary (type / element / projection). No mode: the
+// narrative that follows is lexed in DEFAULT_MODE exactly like `definition is`. Diverges from
+// `value type is` / `value element is` at char 6 ('p'), so no prefix conflict.
+VALUE_PROJECTION_IS : 'value projection is';
 PARAM_TYPE_IS       : 'param type is' -> mode(PARAMETER_TYPE_MODE);
 EVIDENCE_IS         : 'evidence is';
 META_IS             : 'meta is';

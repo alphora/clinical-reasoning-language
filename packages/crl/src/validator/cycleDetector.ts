@@ -332,12 +332,13 @@ export class CycleDetector {
     scope: LibraryScope | undefined,
     currentLibName: string,
   ): void {
-    // A rep's `definition is` PROJECTOR can carry concept refs (in the misattachment case),
-    // so — unlike a rep's terminology-only refs — it CAN add cycle edges. Collect them so a
-    // cycle THROUGH a projector is detected (a well-formed datum-level projector carries none).
+    // A rep's `value projection is` PROJECTOR can carry concept refs (the shape defect the
+    // validator rejects), so — unlike a rep's terminology-only refs — it CAN add cycle edges.
+    // Collect them so a cycle THROUGH a projection is detected (a well-formed datum-local
+    // projection carries none).
     for (const rep of concept.representations ?? []) {
-      if (rep.projector) {
-        this.collectFromNarrative(rep.projector.body, refs, scope, currentLibName);
+      if (rep.valueProjection) {
+        this.collectFromNarrative(rep.valueProjection.body, refs, scope, currentLibName);
       }
     }
     // Reps otherwise reference terminologies (not concepts), so they add no cycle edges.
