@@ -327,14 +327,31 @@ conceptStatement
     : CONCEPT conceptIdentifier COLON conceptBody
     ;
 
+// ORDER-INDEPENDENT concept body (disc 402). The prefix line kinds may appear in ANY order —
+// the fixed sequence that used to be here was pure convention (KEs faceplant on `- meta is @tag`
+// placement and `value type` vs `type` order), not needed for an unambiguous grammar: every line
+// is `DASH <distinct-keyword> …`, so ANTLR's adaptive LL(*) disambiguates each alternative on its
+// second token. CARDINALITY is no longer grammar-enforced — the builder rejects a duplicate of any
+// singleton line (`type`/`value element`/`evidence`/`code`/definition) with a teaching error, so
+// the fail-closed guarantee the old fixed sequence gave is preserved (build error ⇒ emit blocked).
+// `source representation:` (posreps) stay TRAILING on purpose: `representationBody` shares line
+// kinds with the concept body and CRL has no line terminator, so a concept line written AFTER a
+// posrep would be greedily captured by that posrep. Trailing posreps keep the boundary loud for the
+// non-shared kinds (a `definition is`/`defined as`/`code`/`evidence`/`meta` after a posrep has no
+// slot → parse error), but the SHARED kinds (`type`/`value element`/`value type`/`coded from`) are
+// silently absorbed into the posrep. AUTHORING RULE: put every concept-level line BEFORE the first
+// `source representation:`. The builder's rep-level duplicate messages restate this.
 conceptBody
-    : (typeLine)?
-      (valueElementLine)?
-      (valueTypeLine)*
-      (metaLine)*
-      (evidenceLine)?
-      (codeIsLine)?
-      (codedFromLine | definedAsBody | definitionIsBody)?
+    : ( typeLine
+      | valueElementLine
+      | valueTypeLine
+      | metaLine
+      | evidenceLine
+      | codeIsLine
+      | codedFromLine
+      | definedAsBody
+      | definitionIsBody
+      )*
       sourceRepresentationLine*
     ;
 
@@ -368,8 +385,17 @@ sourceRepresentationLine
 // its OWN term, NOT the concept-level `definition is`. A bare `definition is` cannot appear
 // inside a representation (the concept-level slot is before `sourceRepresentationLine*`), so
 // one written after a source representation is a LOUD parse error, never a silent projector.
+// ORDER-INDEPENDENT posrep body (disc 402), same rationale as `conceptBody`. Cardinality
+// (at most one `type`/`value element`/`coded from`/`value projection`) is builder-enforced.
+// A bare `definition is` is still not an alternative here, so one written inside a posrep is a
+// LOUD parse error, never a silent projector.
 representationBody
-    : (typeLine)? (valueElementLine)? (valueTypeLine)* (codedFromLine)? (valueProjectionBody)?
+    : ( typeLine
+      | valueElementLine
+      | valueTypeLine
+      | codedFromLine
+      | valueProjectionBody
+      )*
     ;
 
 // ============================

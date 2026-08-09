@@ -628,7 +628,10 @@ export class CRLAstBuilder
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
     _ctx: import("../grammar/generated/antlr/CRLParser").ConceptStatementContext,
   ): { conceptType?: ConceptType; valueTypes: ConceptValueType[] } {
-    const typeLine = bodyCtx.typeLine?.();
+    // disc 402: the concept body is order-independent, so every line accessor is now an ARRAY.
+    // Take the FIRST occurrence as the effective value; a duplicate is rejected (fail-closed) by
+    // checkConceptBodyCardinality. `[0]` (not just truthiness) matters: an empty array is TRUTHY.
+    const typeLine = bodyCtx.typeLine?.()?.[0];
     const valueTypeLines = bodyCtx.valueTypeLine?.() ?? [];
 
     let conceptType: ConceptType | undefined;
@@ -652,6 +655,130 @@ export class CRLAstBuilder
     }
 
     return { conceptType, valueTypes };
+  }
+
+  /** disc 402: the concept body is now ORDER-INDEPENDENT, so the grammar no longer caps the
+   *  singleton lines at one occurrence. The builder enforces that upper bound HERE (the lower
+   *  bound — "must have some producer" — stays in visitConceptStatement). This is deliberately
+   *  fail-closed: a reported builder error makes `buildCRL` fail, so a duplicate never reaches
+   *  emit (the exact guarantee the old fixed-sequence grammar gave — `emit_cql` does not run the
+   *  validator, so a validator-only check would let a first-wins pick emit silently). The
+   *  effective value taken elsewhere is always the FIRST occurrence. `reportDuplicateLines` flags
+   *  EACH 2nd+ occurrence of one singleton line kind on its own line; the cross-kind definition
+   *  cardinality (`multiple-definitions`) is instead ONE aggregate diagnostic anchored on the
+   *  2nd-authored definition line. `details.rule` lets consumers branch without parsing the
+   *  message. */
+  private reportDuplicateLines(
+    lines: readonly ParserRuleContext[],
+    rule: string,
+    subject: string,
+    label: string,
+    guidance: string,
+  ): void {
+    for (let i = 1; i < lines.length; i++) {
+      this.reportError(`${subject} declares ${label} more than once. ${guidance}`, lines[i], {
+        rule,
+      });
+    }
+  }
+
+  private checkConceptBodyCardinality(
+    bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
+    conceptName: string,
+  ): void {
+    const subject = `Concept "${conceptName}"`;
+    this.reportDuplicateLines(
+      bodyCtx.typeLine(),
+      "duplicate-type",
+      subject,
+      "`type`",
+      "A concept has exactly one `type` — its FHIR resource. Keep one `- type is <Resource>.` line.",
+    );
+    this.reportDuplicateLines(
+      bodyCtx.valueElementLine(),
+      "duplicate-value-element",
+      subject,
+      "`value element`",
+      "A concept's local representation has one `value element` path. Keep one `- value element is <path>.` line.",
+    );
+    this.reportDuplicateLines(
+      bodyCtx.evidenceLine(),
+      "duplicate-evidence",
+      subject,
+      "`evidence`",
+      "A concept has at most one `evidence` note. Keep one `- evidence is `…`.` line.",
+    );
+    this.reportDuplicateLines(
+      bodyCtx.codeIsLine(),
+      "duplicate-code",
+      subject,
+      "a local `code`",
+      "A concept has one local `code`. Keep one `- code is `…`.` line.",
+    );
+
+    // multiple-definitions — at most ONE definition body across the three kinds. The kinds live in
+    // separate accessor arrays, so merge and sort by source position to anchor on the 2nd-AUTHORED
+    // line, and word the message for repeat-of-kind vs mix (disc 402, gpt56/Fable point 4).
+    const defs: { ctx: ParserRuleContext; kind: string }[] = [
+      ...bodyCtx.codedFromLine().map((c) => ({ ctx: c as ParserRuleContext, kind: "coded from" })),
+      ...bodyCtx.definedAsBody().map((c) => ({ ctx: c as ParserRuleContext, kind: "defined as" })),
+      ...bodyCtx
+        .definitionIsBody()
+        .map((c) => ({ ctx: c as ParserRuleContext, kind: "definition is" })),
+    ].sort((a, b) => a.ctx.start.startIndex - b.ctx.start.startIndex);
+    if (defs.length > 1) {
+      const kinds = [...new Set(defs.map((d) => d.kind))];
+      const detail =
+        kinds.length === 1
+          ? `A concept has exactly one definition — this declares \`${kinds[0]}\` ${defs.length} times.`
+          : `\`${kinds.join("`, `")}\` are alternative definition forms — a concept has exactly one definition, not a mix.`;
+      this.reportError(`${subject} declares more than one definition. ${detail}`, defs[1].ctx, {
+        rule: "multiple-definitions",
+      });
+    }
+  }
+
+  /** disc 402: order-independence upper-bound for a posrep body (mirrors the concept-level check).
+   *  `value type` multiplicity stays the validator's A.9 (it was always a grammar 0..* array). */
+  private checkRepresentationBodyCardinality(
+    rb: import("../grammar/generated/antlr/CRLParser").RepresentationBodyContext,
+  ): void {
+    const subject = "A `source representation`";
+    // The collision an author most often hits here is MISPLACEMENT, not a real duplicate: a posrep
+    // body shares line kinds with the concept body and has no terminator, so a concept-level line
+    // written AFTER the `source representation:` is absorbed by it — colliding with the posrep's own
+    // line. The teaching clause redirects them (disc 402 impl-review Fable#5). It's why concept-level
+    // lines must go before the first `source representation:`.
+    const placement =
+      "(A line written after a `source representation:` belongs to that representation — put concept-level lines before the first `source representation:`.)";
+    this.reportDuplicateLines(
+      rb.typeLine(),
+      "duplicate-type",
+      subject,
+      "`type`",
+      `A source representation has one \`type\`. Keep one \`- type is <Resource>.\` line. ${placement}`,
+    );
+    this.reportDuplicateLines(
+      rb.valueElementLine(),
+      "duplicate-value-element",
+      subject,
+      "`value element`",
+      `A source representation has one \`value element\` path. Keep one \`- value element is <path>.\` line. ${placement}`,
+    );
+    this.reportDuplicateLines(
+      rb.codedFromLine(),
+      "duplicate-coded-from",
+      subject,
+      "`coded from`",
+      `A source representation has at most one \`coded from\`. Keep one \`- coded from \`…\`.\` line. ${placement}`,
+    );
+    this.reportDuplicateLines(
+      rb.valueProjectionBody(),
+      "duplicate-value-projection",
+      subject,
+      "`value projection`",
+      `A source representation has at most one \`value projection\`. Keep one \`- value projection is ….\` clause. ${placement}`,
+    );
   }
 
   /** #203 Todo 2: extract the raw backtick bodies of a `metaLine*` list. Shared by concept / decision / library
@@ -682,8 +809,8 @@ export class CRLAstBuilder
   private parseEvidence(
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
   ): string | undefined {
-    if (bodyCtx.evidenceLine?.()) {
-      const evidenceCtx = bodyCtx.evidenceLine?.();
+    const evidenceCtx = bodyCtx.evidenceLine?.()?.[0]; // disc 402: array; first occurrence
+    if (evidenceCtx) {
       if (evidenceCtx?.backtickString) {
         const backtickCtx = evidenceCtx.backtickString();
         if (backtickCtx?.text !== undefined) {
@@ -703,26 +830,19 @@ export class CRLAstBuilder
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
     ctx: import("../grammar/generated/antlr/CRLParser").ConceptStatementContext,
   ): ConceptDefinition | null {
-    if (bodyCtx.codedFromLine?.()) {
-      return this.buildCodedFrom(bodyCtx.codedFromLine()!, ctx);
-    } else if (bodyCtx.definedAsBody?.()) {
-      const infCtx = bodyCtx.definedAsBody();
-      if (!infCtx) {
-        this.reportError("AstError", ctx, {
-          message: "ConceptStatement: definedAsBody() unexpectedly returned undefined",
-        });
-        return null;
-      }
-      return this.visitDefinedAsBody(infCtx);
-    } else if (bodyCtx.definitionIsBody?.()) {
-      const logicCtx = bodyCtx.definitionIsBody();
-      if (!logicCtx) {
-        this.reportError("AstError", ctx, {
-          message: "ConceptStatement: definitionIsBody() unexpectedly returned undefined",
-        });
-        return null;
-      }
-      return this.visitDefinitionIsBody(logicCtx);
+    // disc 402: order-independent body ⇒ these are ARRAYS now (empty array is truthy, so guard on
+    // length). The effective definition keeps the historical KIND priority (coded from → defined as
+    // → definition is); a MIX or REPEAT is rejected by checkConceptBodyCardinality (fail-closed), so
+    // this pick only ever matters to error-recovery / IDE readers of an already-invalid AST.
+    const codedFrom = bodyCtx.codedFromLine?.() ?? [];
+    const definedAs = bodyCtx.definedAsBody?.() ?? [];
+    const definitionIs = bodyCtx.definitionIsBody?.() ?? [];
+    if (codedFrom.length > 0) {
+      return this.buildCodedFrom(codedFrom[0], ctx);
+    } else if (definedAs.length > 0) {
+      return this.visitDefinedAsBody(definedAs[0]);
+    } else if (definitionIs.length > 0) {
+      return this.visitDefinitionIsBody(definitionIs[0]);
     }
     // No top-level definition body — valid only when representations exist;
     // visitConceptStatement enforces "definition OR >=1 representation".
@@ -759,7 +879,7 @@ export class CRLAstBuilder
   private parseCode(
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
   ): string | undefined {
-    const codeLine = bodyCtx.codeIsLine?.();
+    const codeLine = bodyCtx.codeIsLine?.()?.[0]; // disc 402: array; first occurrence
     if (!codeLine) return undefined;
     const bt = codeLine.backtickString?.();
     return bt?.text !== undefined ? bt.text.slice(1, -1) : undefined;
@@ -792,8 +912,11 @@ export class CRLAstBuilder
       const rb = rl.representationBody();
       if (!rb) continue;
 
+      // disc 402: order-independent posrep body ⇒ array accessors; first occurrence is effective,
+      // duplicates rejected by checkRepresentationBodyCardinality below.
+      this.checkRepresentationBodyCardinality(rb);
       let conceptType: ConceptType | undefined;
-      const tl = rb.typeLine?.();
+      const tl = rb.typeLine?.()?.[0];
       if (tl) {
         try {
           const tok = tl.CONCEPT_TYPE();
@@ -814,7 +937,7 @@ export class CRLAstBuilder
       }
 
       let terminologyName: ReferenceName | undefined;
-      const cf = rb.codedFromLine?.();
+      const cf = rb.codedFromLine?.()?.[0];
       if (cf) {
         const termRef = cf.terminologyReference?.();
         if (termRef) terminologyName = refFromRefContext(termRef);
@@ -822,13 +945,13 @@ export class CRLAstBuilder
 
       // `value element is <path>.` — path + its own location for line-anchored Todo-2
       // diagnostics. Absent when the posrep omits it (validator's job to require it).
-      const valueElement = this.parseValueElement(rb.valueElementLine?.());
+      const valueElement = this.parseValueElement(rb.valueElementLine?.()?.[0]);
 
       // Rep-level `value projection is` PROJECTOR — its own node (`ValueProjection`), built
       // from the same narrative grammar as `definition is`. A bare `definition is` can no
       // longer appear here (grammar), so no placement-based discrimination.
       let valueProjection: ValueProjection | undefined;
-      const vpb = rb.valueProjectionBody?.();
+      const vpb = rb.valueProjectionBody?.()?.[0];
       if (vpb) {
         valueProjection = {
           type: "ValueProjection",
@@ -903,7 +1026,8 @@ export class CRLAstBuilder
     const code = this.parseCode(bodyCtx);
     // The concept's LOCAL representation's explicit `value element` (deviation from the
     // implicit-standard `.value`). Grammar-permissive; the validator enforces pairing.
-    const valueElement = this.parseValueElement(bodyCtx.valueElementLine?.());
+    const valueElement = this.parseValueElement(bodyCtx.valueElementLine?.()?.[0]);
+    this.checkConceptBodyCardinality(bodyCtx, name);
     const definition = this.parseConceptDefinition(bodyCtx, ctx);
     const representations = this.parseRepresentations(bodyCtx);
     // A concept must carry SOME real body. An EMPTY `code is ``.` is not a real
