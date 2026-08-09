@@ -1,0 +1,7 @@
+// rule B multi-file — a foreign-qualified operand that resolves typed-and-wrong.
+// "Vitals"."Flag" is boolean; a value-comparison operand must be Quantity -> use-site-type-mismatch.
+library "Root".
+
+concept "Check":
+- value type is boolean.
+- definition is "Vitals"."Flag" at least 30 'kg/m2'.

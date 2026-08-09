@@ -11,6 +11,7 @@ import { MetaTagValidator } from "./metaTagValidator";
 import { NameUniquenessValidator } from "./nameUniquenessValidator";
 import { ReferenceResolver } from "./referenceResolver";
 import { RepresentationShapeValidator } from "./representationShapeValidator";
+import { UseSiteTypeValidator } from "./useSiteTypeValidator";
 
 /**
  * Stable, machine-readable discriminator for validation errors. Lets
@@ -76,7 +77,20 @@ export type ValidationErrorKind =
   // `definition is exists` misuse, >1 value type). The specific rule is on `.rule`. Every
   // one is a structural author mistake made possible by Todo 1's permissive grammar
   // superset — never soft-demoted.
-  | "representation-shape";
+  | "representation-shape"
+  // concept-model redesign Todo 2 rule B — a use-site / result-shape TYPE mismatch: a pattern
+  // operand at a type-demanding position (time-selection / value-comparison) whose value type is
+  // wrong, a `defined as exists`/top-level `sem-not` concept declaring a non-boolean value type,
+  // a no-projector source representation whose value type disagrees with its concept, or a
+  // decision/criterion/action guard literal resolving to a non-boolean concept. The specific rule
+  // is on `.rule`. Fires ONLY where value types are declared (no-op on absent types); a structural
+  // author mistake — never soft-demoted.
+  | "use-site-type-mismatch"
+  // concept-model redesign Todo 2 rule B — a pattern operand at a type-demanding position whose
+  // resolved concept declares NO value type. An intrinsic WARNING (not an error): today 231/547
+  // concepts are untyped, and Todo 4's migration makes value types required. Flags the gap without
+  // failing the build.
+  | "use-site-operand-untyped";
 
 /**
  * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
@@ -275,6 +289,56 @@ export interface RepresentationShapeError extends ValidationErrorBase {
   conceptName: string;
 }
 
+/**
+ * The specific rule a `use-site-type-mismatch` violates (concept-model redesign Todo 2 rule B).
+ * One kind with a `rule` sub-discriminator (mirrors `representation-shape` / `decision-shape`);
+ * lets consumers specialize without parsing message text.
+ *
+ *   - "operand-shape"             — a pattern operand at a constrained position (time-selection ⟹
+ *                                   NOT boolean; value-comparison ⟹ Quantity) whose resolved concept
+ *                                   declares a value type that violates the operand constraint.
+ *                                   Carries `pattern` / `argPosition` / `expected` / `actual`.
+ *   - "exists-result-nonboolean"  — a `defined as exists (…)` concept declaring a non-boolean
+ *                                   `value type` (existence is boolean by definition).
+ *   - "negation-result-nonboolean"— a `defined as (… top-level sem-not …)` concept declaring a
+ *                                   non-boolean `value type` (closed-world negation is boolean).
+ *   - "posrep-value-type-mismatch"— a `source representation` with NO `value projection is` whose
+ *                                   `value type` differs from its concept's (the projection is the
+ *                                   bridge when they differ; without one they must match).
+ *   - "decision-guard-nonboolean" — a decision `when` guard / criterion body / action guard literal
+ *                                   resolving to a concept whose declared `value type` is not boolean
+ *                                   (a guard consumes a boolean; no implicit truthiness).
+ */
+export type UseSiteTypeRule =
+  | "operand-shape"
+  | "exists-result-nonboolean"
+  | "negation-result-nonboolean"
+  | "posrep-value-type-mismatch"
+  | "decision-guard-nonboolean";
+
+// concept-model redesign Todo 2 rule B — a use-site / result-shape type mismatch. One kind with a
+// `rule` sub-discriminator; `conceptName` names the offending concept (or the decision, for a
+// guard). The operand-shape rule additionally carries `pattern` / `argPosition` / `expected` /
+// `actual`. Never demoted under `soft` (structural author mistake).
+export interface UseSiteTypeMismatchError extends ValidationErrorBase {
+  kind: "use-site-type-mismatch";
+  rule: UseSiteTypeRule;
+  conceptName: string;
+  // Operand-shape payload — present only when `rule === "operand-shape"`.
+  pattern?: string;
+  argPosition?: number;
+  expected?: string;
+  actual?: string;
+}
+
+// concept-model redesign Todo 2 rule B — a pattern operand at a type-demanding position whose
+// resolved concept declares no value type. Intrinsic WARNING severity (routes as a warning, never
+// flips isValid). `conceptName` names the concept whose definition holds the use site.
+export interface UseSiteOperandUntypedWarning extends ValidationErrorBase {
+  kind: "use-site-operand-untyped";
+  conceptName: string;
+}
+
 export type ValidationError =
   | EmptyNameError
   | DuplicateNameError
@@ -292,6 +356,8 @@ export type ValidationError =
   | DispositionNonFinalLeafError
   | AgePredicateUnsupportedError
   | RepresentationShapeError
+  | UseSiteTypeMismatchError
+  | UseSiteOperandUntypedWarning
   | MetaDiagnostic;
 
 export interface ValidationResult {
@@ -349,6 +415,7 @@ export class Validator {
   private readonly metaTagValidator: MetaTagValidator;
   private readonly agePredicateValidator: AgePredicateValidator;
   private readonly representationShapeValidator: RepresentationShapeValidator;
+  private readonly useSiteTypeValidator: UseSiteTypeValidator;
 
   constructor() {
     this.nameUniquenessValidator = new NameUniquenessValidator();
@@ -359,6 +426,7 @@ export class Validator {
     this.metaTagValidator = new MetaTagValidator();
     this.agePredicateValidator = new AgePredicateValidator();
     this.representationShapeValidator = new RepresentationShapeValidator();
+    this.useSiteTypeValidator = new UseSiteTypeValidator();
   }
 
   /**
@@ -426,6 +494,13 @@ export class Validator {
     // misuse, >1 value type). Always an error (structural author mistake, never demoted) —
     // closes the check gap Todo 1's permissive grammar superset opened.
     errors.push(...this.representationShapeValidator.validate(ast, sources));
+
+    // concept-model redesign Todo 2 rule B — use-site & result-shape type checking (pattern
+    // operand constraints, `defined as exists`/`sem-not` boolean results, no-projector posrep
+    // value-type agreement, decision-guard booleanness). Routed through pushSplit so the
+    // `use-site-operand-untyped` WARNING routes as a warning; `use-site-type-mismatch` is a
+    // non-demotable error. Fires only where value types are declared (no-op on absent types).
+    pushSplit(this.useSiteTypeValidator.validate(ast, sources));
 
     // #154/#203 — registry-backed @tag metadata enforcement (vocabulary / field / cardinality / open-flag).
     // Routed through pushSplit so open-flag/unknown/malformed WARN (not fail) and meta-missing-field soft-demotes.

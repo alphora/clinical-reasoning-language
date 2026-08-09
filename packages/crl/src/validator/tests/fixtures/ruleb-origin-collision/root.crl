@@ -1,0 +1,10 @@
+// rule B origin-keying regression — local Foo and package Foo both declare X with OPPOSITE value
+// types. include "Foo" resolves qualified refs package-FIRST, so "Foo"."X" is the PACKAGE X
+// (Quantity) — a valid value-comparison operand, so NO error. A name-keyed (origin-blind) type
+// index would collide the two Foo libraries and could read the LOCAL X (boolean) -> a FALSE error.
+library "Root".
+include "Foo".
+
+concept "Check":
+- value type is boolean.
+- definition is "Foo"."X" at least 30 'kg/m2'.

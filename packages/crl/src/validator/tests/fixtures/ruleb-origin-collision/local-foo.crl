@@ -1,0 +1,7 @@
+// local Foo — declares X as boolean (the WRONG type for a value comparison). The package Foo
+// (node_modules/foo/foo.crl) declares X as Quantity; include "Foo" binds to the package.
+library "Foo".
+
+concept "X":
+- value type is boolean.
+- code is `x`.

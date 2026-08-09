@@ -1,0 +1,7 @@
+// local Foo — declares X as Quantity (would validate CLEAN at `at least`). include "Foo" binds the
+// PACKAGE Foo instead, so this X must NOT be the one rule B reads.
+library "Foo".
+
+concept "X":
+- value type is Quantity.
+- code is `x`.

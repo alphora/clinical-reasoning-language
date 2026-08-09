@@ -1,0 +1,10 @@
+// rule B origin-keying regression, INVERSE direction — local Foo.X=Quantity, package Foo.X=boolean.
+// include "Foo" binds "Foo"."X" package-FIRST -> the boolean X -> a value-comparison mismatch. This
+// pins the POSITIVE package-index typed retrieval (the package boolean type WAS read) AND reverse
+// origin isolation (the local Quantity X was NOT used, which would have validated clean).
+library "Root".
+include "Foo".
+
+concept "Check":
+- value type is boolean.
+- definition is "Foo"."X" at least 30 'kg/m2'.
