@@ -80,11 +80,14 @@ export type ValidationErrorKind =
   | "representation-shape"
   // concept-model redesign Todo 2 rule B — a use-site / result-shape TYPE mismatch: a pattern
   // operand at a type-demanding position (time-selection / value-comparison) whose value type is
-  // wrong, a `defined as exists`/top-level `sem-not` concept declaring a non-boolean value type,
-  // a no-projector source representation whose value type disagrees with its concept, or a
-  // decision/criterion/action guard literal resolving to a non-boolean concept. The specific rule
-  // is on `.rule`. Fires ONLY where value types are declared (no-op on absent types); a structural
-  // author mistake — never soft-demoted.
+  // wrong; a boolean at a REFINEMENT or temporal-ANCHOR operand position (Todo 4 —
+  // `boolean-at-refinement-position`); a boolean operand LEAF in a non-boolean `defined as`
+  // composition (Todo 4 — `boolean-in-refinement-composition`); a bare-ref `defined as "X"` alias whose
+  // value type disagrees with the target's (Todo 4 — `bare-ref-value-type-mismatch`); a `defined as
+  // exists`/top-level `sem-not` concept declaring a non-boolean value type; a no-projector source
+  // representation whose value type disagrees with its concept; or a decision/criterion/action guard
+  // literal resolving to a non-boolean concept. The specific rule is on `.rule`. Fires ONLY where
+  // value types are declared (no-op on absent types); a structural author mistake — never soft-demoted.
   | "use-site-type-mismatch"
   // concept-model redesign Todo 2 rule B — a pattern operand at a type-demanding position whose
   // resolved concept declares NO value type. An intrinsic WARNING (not an error): today 231/547
@@ -298,6 +301,28 @@ export interface RepresentationShapeError extends ValidationErrorBase {
  *                                   NOT boolean; value-comparison ⟹ Quantity) whose resolved concept
  *                                   declares a value type that violates the operand constraint.
  *                                   Carries `pattern` / `argPosition` / `expected` / `actual`.
+ *   - "boolean-at-refinement-position" — a `boolean`-declared concept used at a REFINEMENT or
+ *                                   temporal-ANCHOR operand position (`… performed`, `… during …`,
+ *                                   `component of`, `on day of`, a window anchor, …). Those positions
+ *                                   filter or anchor over event INSTANCES; a `boolean` emits the
+ *                                   existence/`and`/`or` shape, which has no instance stream to filter
+ *                                   or day to anchor (concept-model redesign Todo 4 / disc 403). Same
+ *                                   payload as `operand-shape`; a distinct rule so a consumer can find
+ *                                   every such hit without parsing message text. The check only proves
+ *                                   `!== boolean`, never "is a resource set" (hence the name).
+ *   - "boolean-in-refinement-composition" — a NON-boolean-valued `defined as` composition
+ *                                   (`sem-and`/`sem-or`, or a nested `sem-not`) with a `boolean`
+ *                                   operand LEAF. The composition's value is a resource stream (the
+ *                                   emitter's refinement shape); a boolean leaf can't be unioned /
+ *                                   intersected into it (lifts the emitter's `bridgeOperand`
+ *                                   `FIXME: boolean operand in refinement composition` to a pre-emit
+ *                                   error). ONE-directional — a boolean PARENT with a refinement leaf
+ *                                   stays legal (the exists-bridge existentializes it).
+ *   - "bare-ref-value-type-mismatch" — a `defined as "X"` bare-ref ALIAS whose declared value type
+ *                                   disagrees with X's on boolean-ness. A bare-ref is value-preserving
+ *                                   and the emitter bridges it in NEITHER direction, so a boolean alias
+ *                                   over a resource target (or vice-versa) silently mis-emits.
+ *                                   BIDIRECTIONAL (unlike the composition rule).
  *   - "exists-result-nonboolean"  — a `defined as exists (…)` concept declaring a non-boolean
  *                                   `value type` (existence is boolean by definition).
  *   - "negation-result-nonboolean"— a `defined as (… top-level sem-not …)` concept declaring a
@@ -311,6 +336,9 @@ export interface RepresentationShapeError extends ValidationErrorBase {
  */
 export type UseSiteTypeRule =
   | "operand-shape"
+  | "boolean-at-refinement-position"
+  | "boolean-in-refinement-composition"
+  | "bare-ref-value-type-mismatch"
   | "exists-result-nonboolean"
   | "negation-result-nonboolean"
   | "posrep-value-type-mismatch"
@@ -318,13 +346,15 @@ export type UseSiteTypeRule =
 
 // concept-model redesign Todo 2 rule B — a use-site / result-shape type mismatch. One kind with a
 // `rule` sub-discriminator; `conceptName` names the offending concept (or the decision, for a
-// guard). The operand-shape rule additionally carries `pattern` / `argPosition` / `expected` /
-// `actual`. Never demoted under `soft` (structural author mistake).
+// guard). Never demoted under `soft` (structural author mistake).
 export interface UseSiteTypeMismatchError extends ValidationErrorBase {
   kind: "use-site-type-mismatch";
   rule: UseSiteTypeRule;
   conceptName: string;
-  // Operand-shape payload — present only when `rule === "operand-shape"`.
+  // Operand payload — `pattern` / `argPosition` present for the two OPERAND-position rules
+  // (`operand-shape` AND `boolean-at-refinement-position`); absent for the result-shape / guard /
+  // posrep / composition rules. `expected` / `actual` are present on every rule EXCEPT the untyped
+  // case (which is a separate warning kind).
   pattern?: string;
   argPosition?: number;
   expected?: string;
@@ -496,7 +526,8 @@ export class Validator {
     errors.push(...this.representationShapeValidator.validate(ast, sources));
 
     // concept-model redesign Todo 2 rule B — use-site & result-shape type checking (pattern
-    // operand constraints, `defined as exists`/`sem-not` boolean results, no-projector posrep
+    // operand constraints incl. refinement/anchor booleans and non-boolean composition/bare-ref
+    // leaves (Todo 4), `defined as exists`/`sem-not` boolean results, no-projector posrep
     // value-type agreement, decision-guard booleanness). Routed through pushSplit so the
     // `use-site-operand-untyped` WARNING routes as a warning; `use-site-type-mismatch` is a
     // non-demotable error. Fires only where value types are declared (no-op on absent types).

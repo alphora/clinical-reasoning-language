@@ -21,7 +21,7 @@ import { matchNarrative } from "../template-match";
 import type { CanonicalArg, CanonicalPatternCall, ConceptRefArg } from "../template-match/canonicalTypes";
 import {
   OPERAND_CONSTRAINTS,
-  operandShapeDescription,
+  operandExpectation,
   type OperandConstraint,
 } from "../template-match/operandConstraints";
 
@@ -104,7 +104,10 @@ interface ResolveCtx {
 
 /** The outcome of resolving an operand ref to a declared value type. */
 type OperandResolution =
-  | { status: "typed"; valueType: ConceptValueType; derived: boolean }
+  // `derived` = has NO event instance stream (a `defined as`/`definition is` inference, OR a runtime
+  // PARAMETER scalar — see `origin`). `origin` distinguishes the two so a diagnostic can word itself
+  // correctly (a parameter has no "underlying resource concept" to point at).
+  | { status: "typed"; valueType: ConceptValueType; derived: boolean; origin: "concept" | "parameter" }
   | { status: "untyped" } // resolved to a concept declaring 0 value types
   | { status: "multiple" } // resolved to a concept declaring >1 (rule A.9 owns this)
   | { status: "unresolved" }; // not found / not visible / wrong kind (reference diagnostic owns this)
@@ -185,6 +188,37 @@ export class UseSiteTypeValidator {
           errors.push(
             resultMismatch("negation-result-nonboolean", concept.name, vts[0], body.location, attribution),
           );
+        } else if (body.type === "DefinedAsComposition") {
+          // 2b. COMPOSITION-OPERAND shape (category 2 — a language rule, NOT the pattern-operand
+          // registry; `sem-*` live in `CompositionExpression`, not `matchNarrative`). A non-boolean
+          // composition VALUE is a resource stream (the emitter's refinement shape); each leaf
+          // operand must also be non-boolean — a boolean leaf can't be unioned / intersected into
+          // the stream. This LIFTS the emitter's `bridgeOperand`
+          // `/* FIXME: boolean operand in refinement composition */` to a pre-emit error, and is
+          // STRONGER than the emitter for a cross-library leaf (which the emitter force-defaults to
+          // "refinement" and never flags — the validator resolves its real type). ONE-directional:
+          // reached only because the PARENT is non-boolean; a boolean parent + refinement leaf stays
+          // legal (the exists-bridge existentializes it), so it is NOT checked here.
+          this.checkCompositionLeaves(body.expression, concept.name, vts[0], ctx, attribution, errors);
+        }
+      }
+    }
+
+    // 2c. BARE-REF ALIAS value type (disc 404 Q4 + R2 Q3). `defined as "X"` is value-PRESERVING (the
+    // concept's value IS X's), and the emitter's bare-ref path returns the raw ref with NO bridge in
+    // either direction (unlike a composition leaf, where a refinement leaf under a boolean parent is
+    // legally `exists`-bridged). A bare alias therefore CANNOT change the value type, so the concept's
+    // must EQUAL the target's — full equality, not just boolean-ness (R2 Q3: a `Quantity` alias over a
+    // `CodeableConcept` target would otherwise pass the `is Quantity` value-comparison check on a lie).
+    if (def?.type === "DefinedAsDefinition" && def.body.type === "DefinedAsBareRef") {
+      const vts = concept.valueTypes ?? [];
+      if (vts.length === 1) {
+        const ref = def.body.ref;
+        const res = resolveOperand(getRefName(ref), getRefLibrary(ref) ?? undefined, ctx, false);
+        if (res.status === "typed" && vts[0] !== res.valueType) {
+          errors.push(
+            bareRefAliasMismatch(concept.name, vts[0], res.valueType, getRefName(ref), def.body.location, attribution),
+          );
         }
       }
     }
@@ -201,6 +235,46 @@ export class UseSiteTypeValidator {
           errors.push(posrepMismatch(concept.name, conceptVt, repVts[0], rep.location, attribution));
         }
       }
+    }
+  }
+
+  // Descend a NON-boolean concept's composition tree and flag every `boolean`-declared LEAF operand.
+  // The parent's refinement shape threads unchanged to every leaf in the emitter (`sem-and`/`sem-or`
+  // terms, a `sem-not` operand, a group), so a boolean leaf is rejected wherever it sits. This ENFORCES
+  // THE SHAPE RULE ACROSS ALL LEAVES; it does not claim every leaf reaches the identical emitter path
+  // — a positive-anchored `sem-and sem-not B` reaches `bridgeOperand`'s FIXME, whereas a no-base
+  // negation (`sem-or sem-not B`, all-negative `sem-and`) reaches `emitNoBaseNegation`, which may
+  // instead loud-refuse. Either way a boolean leaf is invalid, so the pre-emit check is sound (disc
+  // 404 Q3). A parameter leaf is skipped (`allowParameter: false`): a composition composes concepts /
+  // inferences, and a bare parameter is a reference-layer concern.
+  private checkCompositionLeaves(
+    expr: CompositionExpression,
+    conceptName: string,
+    conceptVt: ConceptValueType,
+    ctx: ResolveCtx,
+    attribution: Attribution,
+    errors: ValidationError[],
+  ): void {
+    switch (expr.type) {
+      case "CompositionRef": {
+        const res = resolveOperand(getRefName(expr.ref), getRefLibrary(expr.ref) ?? undefined, ctx, false);
+        if (res.status === "typed" && res.valueType === "boolean") {
+          errors.push(
+            compositionLeafMismatch(conceptName, conceptVt, getRefName(expr.ref), expr.location, attribution),
+          );
+        }
+        return;
+      }
+      case "CompositionGroup":
+      case "SemNotExpression":
+        this.checkCompositionLeaves(expr.expression, conceptName, conceptVt, ctx, attribution, errors);
+        return;
+      case "SemAndExpression":
+      case "SemOrExpression":
+        for (const term of expr.terms) {
+          this.checkCompositionLeaves(term, conceptName, conceptVt, ctx, attribution, errors);
+        }
+        return;
     }
   }
 
@@ -310,6 +384,12 @@ export class UseSiteTypeValidator {
       case "unresolved":
         return; // suppress — a multiple/unresolved operand is another diagnostic's job
       case "untyped": {
+        // A `refinement`-family (refinement/anchor) position stays SILENT on an untyped operand —
+        // these positions are ubiquitous (every `… performed` / `… during …` subject), and A.10
+        // (`missing-value-type`) already ERRORS on the untyped operand, so a warning here would both
+        // flood and double-report (disc 403 §8d). The rarer `time-selection` / `value-comparison`
+        // positions keep the warning (a type-demanding site a migration hasn't reached yet).
+        if (constraint.family === "refinement") return;
         const key = `${attribution.filePath ?? ""}${conceptName}${arg.value}${arg.location.start.line}:${arg.location.start.column}`;
         if (warnedUntyped.has(key)) return;
         warnedUntyped.add(key);
@@ -322,7 +402,7 @@ export class UseSiteTypeValidator {
         const ok = operandSatisfies(constraint, res.valueType, res.derived);
         if (!ok) {
           errors.push(
-            operandMismatch(conceptName, call, constraint, arg.value, res.valueType, arg.location, attribution),
+            operandMismatch(conceptName, call, constraint, arg.value, res.valueType, res.origin, arg.location, attribution),
           );
         }
         return;
@@ -516,15 +596,21 @@ function classify(
   if (c) {
     if (c.valueTypes.length === 0) return { status: "untyped" };
     if (c.valueTypes.length > 1) return { status: "multiple" };
-    return { status: "typed", valueType: c.valueTypes[0], derived: c.derived };
+    return { status: "typed", valueType: c.valueTypes[0], derived: c.derived, origin: "concept" };
   }
   if (allowParameter) {
     const pt = libTypes.parameters.get(name);
     if (pt !== undefined) {
-      // A parameter typed as a VALUE type is checkable (a definite single type). A parameter is an
-      // asserted runtime scalar, not an inference — `derived: false`. A parameter typed as a
-      // RESOURCE (`ConceptType`, e.g. `Observation`) is not a value — can't value-check it, stay silent.
-      if (VALUE_TYPES.has(pt)) return { status: "typed", valueType: pt as ConceptValueType, derived: false };
+      // A parameter typed as a VALUE type is checkable (a definite single type). A parameter is a
+      // runtime SCALAR with NO event instances of its own, so for instance-stream constraints
+      // (`not-derived boolean` — time-selection / refinement) it behaves like a derived, instance-less
+      // value: mark `derived: true` so a boolean PARAMETER is rejected at a refinement / selection
+      // position (`"Flag" performed`, `most recent "Flag"` — no stream to filter or select over; disc
+      // 404 R2 Q5). This does NOT affect `is Quantity` (value-comparison ignores `derived`, so a
+      // Quantity threshold parameter still validates). A parameter typed as a RESOURCE (`ConceptType`,
+      // e.g. `Observation`) is not a value — can't value-check it, stay silent.
+      if (VALUE_TYPES.has(pt))
+        return { status: "typed", valueType: pt as ConceptValueType, derived: true, origin: "parameter" };
       return { status: "unresolved" };
     }
   }
@@ -568,13 +654,17 @@ function operandMismatch(
   constraint: OperandConstraint,
   operandName: string,
   actual: ConceptValueType,
+  origin: "concept" | "parameter",
   location: Location,
   attribution: Attribution,
 ): UseSiteTypeMismatchError {
-  const expected = operandShapeDescription(constraint.shape);
+  const expected = operandExpectation(constraint);
   return {
     kind: "use-site-type-mismatch",
-    rule: "operand-shape",
+    // The `refinement` family is the refinement/anchor shape check — a distinct rule so a consumer
+    // can find every hit without parsing message text (disc 403 [crit] #2 / §9). `time-selection` /
+    // `value-comparison` stay `operand-shape`.
+    rule: constraint.family === "refinement" ? "boolean-at-refinement-position" : "operand-shape",
     conceptName,
     pattern: call.pattern,
     argPosition: constraint.position,
@@ -583,16 +673,57 @@ function operandMismatch(
     message:
       `Concept "${conceptName}": ${constraint.role} of \`${call.pattern}\` must be ${expected}, ` +
       `but its operand "${operandName}" declares type \`${actual}\`. ` + // "type" — operand may be a parameter (`param type is`)
-      (constraint.shape.rel === "not-derived"
-        ? `A time-selection pattern selects an instance by its event date, so a DERIVED ` +
-          `\`${constraint.shape.valueType}\` (computed by \`defined as\` / \`definition is\`, with no ` +
-          `event date of its own) can't be selected over — time-select the underlying dated event ` +
-          `instead (the \`code is\` / \`source representation\` concept its value is built from).`
-        : `A value-comparison pattern compares a magnitude, so its operand must be \`${constraint.shape.valueType}\`-valued.`),
+      operandMismatchTail(constraint, operandName, origin),
     location: loc(location),
     severity: "error",
     ...base(attribution),
   };
+}
+
+/** The teaching tail of an operand-shape mismatch, specific to the constraint's diagnostic family. */
+function operandMismatchTail(
+  constraint: OperandConstraint,
+  operandName: string,
+  origin: "concept" | "parameter",
+): string {
+  const vt = constraint.shape.valueType;
+  // A PARAMETER is a runtime scalar with no event instances (and no derivation / underlying resource
+  // concept to point at), so the concept-oriented guidance below is false for it — word it for the
+  // scalar instead (disc 404 R2 Q5 / R3 P1). Value-comparison is unaffected (a Quantity parameter is a
+  // valid compared value; a mismatch there is a genuine wrong-type, handled by the shared branch).
+  if (origin === "parameter" && constraint.family !== "value-comparison") {
+    return (
+      `A runtime parameter is a scalar with no event instances of its own, so it can't be ` +
+      `${constraint.family === "time-selection" ? "selected over" : "filtered or anchored over"} — ` +
+      `pass a concept with an instance stream here (a \`code is\` / \`source representation\` concept), ` +
+      `not the parameter "${operandName}".`
+    );
+  }
+  switch (constraint.family) {
+    case "time-selection":
+      return (
+        `A time-selection pattern selects an instance by its event date, so a DERIVED ` +
+        `\`${vt}\` (computed by \`defined as\` / \`definition is\`, with no ` +
+        `event date of its own) can't be selected over — time-select the underlying dated event ` +
+        `instead (the \`code is\` / \`source representation\` concept its value is built from).`
+      );
+    case "value-comparison":
+      return `A value-comparison pattern compares a magnitude, so its operand must be \`${vt}\`-valued.`;
+    case "refinement":
+      // The redesign's shape split: a concept consumed at BOTH a refinement/anchor position AND a
+      // boolean guard has NO single valid declaration (disc 403 [imp] #5). Point at the split
+      // (`defined as exists`) rather than telling the author to flip the value type — flipping it to
+      // non-boolean would only move the error to the guard site (the ping-pong the design forbids).
+      // NOTE: `defined as exists` does not yet LOWER to CQL (tracked in #265 — lowering is coming;
+      // see `definedAsExistsNotLowered`). The guidance is the correct MODEL fix; the emit path follows.
+      return (
+        `A refinement / anchor position filters or anchors over event INSTANCES, but a DERIVED ` +
+        `\`${vt}\` (computed by \`defined as\` / \`definition is\`) has no instances of its own — ` +
+        `refine the underlying resource concept its value is built from instead. If "${operandName}" ` +
+        `is specifically needed as a \`boolean\` elsewhere (e.g. a decision guard), keep the resource ` +
+        `concept here and derive a separate \`defined as exists ( … )\` boolean for the guard.`
+      );
+  }
 }
 
 function resultMismatch(
@@ -618,6 +749,80 @@ function resultMismatch(
       `declares \`value type is ${actual}\`. Change the value type to \`boolean\`, or use a ` +
       `value-preserving derivation (\`sem-or\` / \`sem-and\` / a bare \`defined as\`) if you meant to ` +
       `keep the \`${actual}\` value.`,
+    location: loc(location),
+    severity: "error",
+    ...base(attribution),
+  };
+}
+
+function compositionLeafMismatch(
+  conceptName: string,
+  conceptVt: ConceptValueType,
+  leafName: string,
+  location: Location,
+  attribution: Attribution,
+): UseSiteTypeMismatchError {
+  return {
+    kind: "use-site-type-mismatch",
+    rule: "boolean-in-refinement-composition",
+    conceptName,
+    // The check proves only `leaf === boolean` vs a non-boolean parent — NOT that the leaf is
+    // type-compatible with `conceptVt` (a `dateTime` leaf under a `CodeableConcept` parent passes
+    // here; broader value-type compatibility is out of scope). So `expected` states the shape demand,
+    // not `conceptVt` (disc 404 Q7).
+    expected: "not boolean",
+    actual: "boolean",
+    message:
+      `Concept "${conceptName}": this \`defined as\` composition produces a \`${conceptVt}\` (a ` +
+      `resource stream that is unioned / intersected / excepted), but its operand "${leafName}" ` +
+      `declares \`value type is boolean\`. A boolean truth isn't a stream — it can't be combined into ` +
+      `a non-boolean composition. Give "${leafName}" the resource value type it refines (so it ` +
+      `contributes instances), or, if this composition is really a determination, declare the concept ` +
+      `\`value type is boolean\` (then boolean operands compose, and a resource operand is bridged via ` +
+      `\`exists\`).`,
+    location: loc(location),
+    severity: "error",
+    ...base(attribution),
+  };
+}
+
+function bareRefAliasMismatch(
+  conceptName: string,
+  conceptVt: ConceptValueType,
+  targetVt: ConceptValueType,
+  targetName: string,
+  location: Location,
+  attribution: Attribution,
+): UseSiteTypeMismatchError {
+  // `conceptVt !== targetVt` (the caller's guard). Tailor the fix to the case: a boolean parent over a
+  // resource target wants `defined as exists`; a boolean target under a resource parent has the shapes
+  // swapped; two differing non-boolean types is a plain value-type mismatch (no shape issue).
+  let fix: string;
+  if (conceptVt === "boolean") {
+    fix =
+      `To publish a \`boolean\` here, use \`defined as exists ( "${targetName}" )\` (existence of ` +
+      `"${targetName}"), not a bare alias — a bare \`defined as\` copies "${targetName}"'s value unchanged, ` +
+      `so it can't be a truth.`;
+  } else if (targetVt === "boolean") {
+    fix =
+      `A boolean truth can't be read as a \`${conceptVt}\` value — reference a \`${conceptVt}\`-valued ` +
+      `concept, or declare this concept \`value type is boolean\`.`;
+  } else {
+    fix =
+      `Declare the same value type as "${targetName}" (\`${targetVt}\`), or reference a ` +
+      `\`${conceptVt}\`-valued concept instead.`;
+  }
+  return {
+    kind: "use-site-type-mismatch",
+    rule: "bare-ref-value-type-mismatch",
+    conceptName,
+    expected: conceptVt,
+    actual: targetVt,
+    message:
+      `Concept "${conceptName}": a bare \`defined as "${targetName}"\` is value-PRESERVING (its value IS ` +
+      `"${targetName}"'s), and the emitter bridges it in neither direction — so the concept's value type ` +
+      `must EQUAL the target's, but it declares \`value type is ${conceptVt}\` while "${targetName}" is ` +
+      `\`${targetVt}\`. ${fix}`,
     location: loc(location),
     severity: "error",
     ...base(attribution),
@@ -684,7 +889,7 @@ function untypedWarning(
     conceptName,
     message:
       `Concept "${conceptName}": ${constraint.role} of \`${pattern}\` should be ` +
-      `${operandShapeDescription(constraint.shape)}, but its operand "${operandName}" declares no ` +
+      `${operandExpectation(constraint)}, but its operand "${operandName}" declares no ` +
       `\`value type\`. This can't be checked until "${operandName}" declares one (a Todo-4 migration ` +
       `will make value types required).`,
     location: loc(location),

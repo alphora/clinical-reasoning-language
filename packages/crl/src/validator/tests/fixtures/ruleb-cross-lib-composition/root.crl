@@ -1,0 +1,13 @@
+// rule B multi-file — a non-boolean composition with a FOREIGN boolean leaf. The emitter would
+// force a cross-library composition operand to "refinement" (never flagging it); the validator
+// resolves "Vitals"."Flag"'s real boolean type -> boolean-in-refinement-composition. Proves the
+// check is STRONGER than the emitter for cross-library leaves (disc 404 Q8).
+library "Root".
+
+concept "Local":
+- value type is CodeableConcept.
+- code is `l`.
+
+concept "Bad":
+- value type is CodeableConcept.
+- defined as ( "Local" sem-and "Vitals"."Flag" ).

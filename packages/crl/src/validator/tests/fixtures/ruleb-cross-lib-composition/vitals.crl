@@ -1,0 +1,6 @@
+// rule B multi-file — the sibling library holding the boolean composition leaf.
+library "Vitals".
+
+concept "Flag":
+- value type is boolean.
+- code is `f`.
