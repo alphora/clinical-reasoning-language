@@ -25,11 +25,11 @@ import type { ConceptValueType } from "../grammar/conceptValueTypes";
 
 /** A required value-type shape for one operand position. */
 export type OperandShape =
-  // The operand must not be a DERIVED value of this type — i.e. a stream-less computed fact.
-  // Time-selection uses `not-derived boolean`: a DERIVED boolean has no instance stream to select
-  // the most-recent/earliest over (design refinement 1). A *coded* boolean (with a `code is` /
-  // `source representation`, hence an instance stream) is validly selectable — so this is
-  // derivation-aware, NOT a blanket "not boolean" (the validator checks the operand's stream).
+  // The operand must not be a DERIVED value of this type. Time-selection uses `not-derived boolean`:
+  // a DERIVED boolean (computed by `defined as` / `definition is`) has no event date to select the
+  // most-recent/earliest over (design refinement 1). A *coded / sourced* boolean (asserted, its
+  // instances carry event dates) is validly selectable — so this is derivation-aware, NOT a blanket
+  // "not boolean" (the validator checks whether the operand's value is inferred).
   | { rel: "not-derived"; valueType: ConceptValueType }
   // The operand MUST declare this value type. Value-comparison uses `is Quantity`: a magnitude
   // comparison is only meaningful over a Quantity operand.
@@ -81,5 +81,5 @@ export const OPERAND_CONSTRAINTS: Readonly<Record<string, readonly OperandConstr
 export function operandShapeDescription(shape: OperandShape): string {
   return shape.rel === "is"
     ? `\`${shape.valueType}\`-valued`
-    : `not a derived \`${shape.valueType}\` (it needs an instance stream to select over)`;
+    : `not a derived \`${shape.valueType}\` (a computed value has no event date to select over)`;
 }

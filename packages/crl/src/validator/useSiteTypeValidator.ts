@@ -66,14 +66,16 @@ interface Attribution {
   filePath?: string;
 }
 
-/** One concept's declared value types + whether it has a retrievable instance stream. */
+/** One concept's declared value types + whether its value is computed by inference (derived). */
 interface ConceptTypeInfo {
   // rule A.9 guarantees <=1 here, but 0 or >1 can occur — rule B suppresses on both (A.9 owns >1).
   valueTypes: ConceptValueType[];
-  // A local `code is` OR a `source representation` gives the concept instances to select over
-  // (an instance stream). A purely `defined as` / `definition is`-derived concept has none — that
-  // is what makes a DERIVED boolean not most-recent-able (design refinement 1).
-  hasStream: boolean;
+  // TRUE iff the concept's value is computed by inference — a `defined as` (sem-* / exists) or a
+  // `definition is` narrative. A `code is` / `source representation` / `coded from` assertion is NOT
+  // derived. A DERIVED boolean has no event date, so it is not time-selectable (design refinement 1).
+  // A concept that is BOTH coded AND derived counts as derived (operator ruling, disc 400): its
+  // `most recent` would be ambiguous, so it is rejected — the author models the dated event instead.
+  derived: boolean;
 }
 
 /** One library's declared concepts + parameters (name -> declared type token). */
@@ -102,7 +104,7 @@ interface ResolveCtx {
 
 /** The outcome of resolving an operand ref to a declared value type. */
 type OperandResolution =
-  | { status: "typed"; valueType: ConceptValueType; hasStream: boolean }
+  | { status: "typed"; valueType: ConceptValueType; derived: boolean }
   | { status: "untyped" } // resolved to a concept declaring 0 value types
   | { status: "multiple" } // resolved to a concept declaring >1 (rule A.9 owns this)
   | { status: "unresolved" }; // not found / not visible / wrong kind (reference diagnostic owns this)
@@ -317,7 +319,7 @@ export class UseSiteTypeValidator {
         return;
       }
       case "typed": {
-        const ok = operandSatisfies(constraint, res.valueType, res.hasStream);
+        const ok = operandSatisfies(constraint, res.valueType, res.derived);
         if (!ok) {
           errors.push(
             operandMismatch(conceptName, call, constraint, arg.value, res.valueType, arg.location, attribution),
@@ -447,8 +449,10 @@ function buildTypeIndex(ast: CRL, sources?: SourceContext[]): TypeIndex {
   };
   const add = (stmt: Statement, key: string): void => {
     if (stmt.type === "Concept" && stmt.name) {
-      const hasStream = stmt.code !== undefined || (stmt.representations ?? []).length > 0;
-      lib(key).concepts.set(stmt.name, { valueTypes: stmt.valueTypes ?? [], hasStream });
+      const derived =
+        stmt.definition?.type === "DefinedAsDefinition" ||
+        stmt.definition?.type === "DefinitionIsDefinition";
+      lib(key).concepts.set(stmt.name, { valueTypes: stmt.valueTypes ?? [], derived });
     } else if (stmt.type === "Parameter" && stmt.name) {
       lib(key).parameters.set(stmt.name, stmt.parameterType);
     }
@@ -512,34 +516,34 @@ function classify(
   if (c) {
     if (c.valueTypes.length === 0) return { status: "untyped" };
     if (c.valueTypes.length > 1) return { status: "multiple" };
-    return { status: "typed", valueType: c.valueTypes[0], hasStream: c.hasStream };
+    return { status: "typed", valueType: c.valueTypes[0], derived: c.derived };
   }
   if (allowParameter) {
     const pt = libTypes.parameters.get(name);
     if (pt !== undefined) {
-      // A parameter typed as a VALUE type is checkable (a definite single type; a parameter is a
-      // runtime scalar with no instance stream). A parameter typed as a RESOURCE (`ConceptType`,
-      // e.g. `Observation`) is not a value — can't value-check it, stay silent.
-      if (VALUE_TYPES.has(pt)) return { status: "typed", valueType: pt as ConceptValueType, hasStream: false };
+      // A parameter typed as a VALUE type is checkable (a definite single type). A parameter is an
+      // asserted runtime scalar, not an inference — `derived: false`. A parameter typed as a
+      // RESOURCE (`ConceptType`, e.g. `Observation`) is not a value — can't value-check it, stay silent.
+      if (VALUE_TYPES.has(pt)) return { status: "typed", valueType: pt as ConceptValueType, derived: false };
       return { status: "unresolved" };
     }
   }
   return { status: "unresolved" };
 }
 
-/** Whether a typed operand satisfies a constraint. `not-derived <T>` forbids only a stream-less T. */
+/** Whether a typed operand satisfies a constraint. `not-derived <T>` forbids a DERIVED T. */
 function operandSatisfies(
   constraint: OperandConstraint,
   valueType: ConceptValueType,
-  hasStream: boolean,
+  derived: boolean,
 ): boolean {
   if (constraint.shape.rel === "is") return valueType === constraint.shape.valueType;
-  // `not-derived <T>`: a coded / posrep concept of type T HAS an instance stream and is validly
-  // selectable (design refinement 1: "not a DERIVED boolean; a boolean is a single computed fact
-  // with no instance stream"). Only a stream-less derived T is forbidden. NOTE: a concept with a
-  // `code is` AND a `defined as` boolean has a stream (its coded assertions) and is treated as
-  // selectable — a deliberate reading of "derived" as "stream-less", flagged for design confirm.
-  return !(valueType === constraint.shape.valueType && !hasStream);
+  // `not-derived <T>`: a coded / sourced (asserted) concept of type T is validly selectable — its
+  // instances carry event dates. A DERIVED T (`defined as` / `definition is` — a computed value with
+  // no event date) is forbidden (design refinement 1). A concept that is BOTH coded AND derived is
+  // treated as derived and REJECTED (operator ruling, disc 400): its `most recent` is ambiguous, so
+  // the author models the underlying dated event and time-selects THAT instead.
+  return !(valueType === constraint.shape.valueType && derived);
 }
 
 /** Unwrap composition groups, then test whether the top-level operator is `sem-not`. */
@@ -580,9 +584,10 @@ function operandMismatch(
       `Concept "${conceptName}": ${constraint.role} of \`${call.pattern}\` must be ${expected}, ` +
       `but its operand "${operandName}" declares type \`${actual}\`. ` + // "type" — operand may be a parameter (`param type is`)
       (constraint.shape.rel === "not-derived"
-        ? `A time-selection pattern selects an instance by timestamp, so a DERIVED \`${constraint.shape.valueType}\` ` +
-          `(a computed fact with no instance stream) can't be selected over — point it at an ` +
-          `instance-bearing concept (one with a \`code is\` or a \`source representation\`).`
+        ? `A time-selection pattern selects an instance by its event date, so a DERIVED ` +
+          `\`${constraint.shape.valueType}\` (computed by \`defined as\` / \`definition is\`, with no ` +
+          `event date of its own) can't be selected over — time-select the underlying dated event ` +
+          `instead (the \`code is\` / \`source representation\` concept its value is built from).`
         : `A value-comparison pattern compares a magnitude, so its operand must be \`${constraint.shape.valueType}\`-valued.`),
     location: loc(location),
     severity: "error",

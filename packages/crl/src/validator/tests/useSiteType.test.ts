@@ -52,7 +52,7 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — operand constraints", () => {
       expect(errs[0].pattern).toBe("MostRecent");
       expect(errs[0].argPosition).toBe(0);
       expect(errs[0].actual).toBe("boolean");
-      expect(errs[0].message).toMatch(/instance stream/);
+      expect(errs[0].message).toMatch(/event date/);
     });
 
     it("ACCEPTS `most recent X` over a dateTime concept", () => {
@@ -82,10 +82,10 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — operand constraints", () => {
       }
     });
 
-    it("ACCEPTS `most recent X` over a CODED boolean (has an instance stream — not derived)", () => {
-      // Design refinement 1: the constraint is "not a DERIVED boolean". A coded boolean concept
-      // (locally-asserted boolean Observations) HAS an instance stream, so most-recent IS
-      // meaningful — it must NOT error.
+    it("ACCEPTS `most recent X` over a PURE CODED boolean (asserted, not derived)", () => {
+      // Design refinement 1: the constraint is "not a DERIVED boolean". A pure coded boolean concept
+      // (locally-asserted boolean Observations, no `defined as` / `definition is`) is NOT derived —
+      // its assertions carry event dates, so most-recent IS meaningful. It must NOT error.
       const src =
         `library "T".\n` +
         `concept "Asserted Flag":\n- value type is boolean.\n- code is \`f\`.\n` + // coded -> has stream
@@ -93,18 +93,17 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — operand constraints", () => {
       expect(mismatches(src)).toHaveLength(0);
     });
 
-    it("ACCEPTS `most recent X` over a boolean that is BOTH `code is` and `defined as` (has a stream)", () => {
-      // DESIGN-INTENT DECISION (flagged to operator/KEs, disc 400): a concept with BOTH a `code is`
-      // (locally-asserted, timestamped) AND a `defined as` boolean HAS an instance stream (its coded
-      // assertions), so rule B treats "derived" as "stream-less" and accepts it — it does NOT error.
-      // If the design of record intends "derived = has any derivation" instead, this flips to a
-      // mismatch; this test pins the current reading so the decision is explicit, not accidental.
+    it("REJECTS `most recent X` over a boolean that is BOTH `code is` and `defined as` (derived)", () => {
+      // OPERATOR RULING (disc 400): a concept with BOTH a `code is` and a `defined as` boolean counts
+      // as DERIVED — its `most recent` is ambiguous (the derived lane has no event date), so it is
+      // rejected. The author models the underlying dated event and time-selects THAT (disc 400's
+      // alternative representation: union the dated concepts via `sem-or`, then `most recent`).
       const src =
         `library "T".\n` +
         `concept "Src":\n- value type is boolean.\n- code is \`s\`.\n` +
         `concept "Mixed":\n- value type is boolean.\n- code is \`m\`.\n- defined as exists ( "Src" ).\n` +
         `concept "MR Mixed":\n- value type is boolean.\n- definition is most recent "Mixed".\n`;
-      expect(mismatches(src)).toHaveLength(0);
+      expect(mismatches(src, "operand-shape")).toHaveLength(1);
     });
   });
 
