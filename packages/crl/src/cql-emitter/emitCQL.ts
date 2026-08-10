@@ -58,6 +58,7 @@ import type {
 import { getRefName, getRefLibrary, isQualifiedRef, definedAsExistsNotLowered } from "../ast/types";
 import type { ReferenceName } from "../ast/types";
 import type { CRLError } from "../types/errors";
+import { ageComputeFnForUnit } from "../template-match/agePredicate";
 import { recencyOverrideById } from "../template-match/recencyProjectionOverride";
 
 import { lowerLocalCodes, preLowerAge } from "./lowerLocalCodes";
@@ -432,6 +433,10 @@ const PATTERN_RETURN_SHAPE: Record<string, PatternReturnShape> = {
   AfterEndOf: "other",
   OnDayOf: "other",
   AgeAt: "other",
+  // No `AgeInMonths` entry by design (#257 T2): the months compute fn only ever appears
+  // NESTED inside a top-level comparator (`AtLeast`/`AtMost`/`Below` = "boolean"), never as
+  // the top-level pattern, so it is never looked up here. If it ever were, the `?? "list"`
+  // default would fail loudly (`exists CRLCommon.AgeInMonths()`), not miscompile.
   Calculate: "other",
   Lowest: "other",
   Highest: "other",
@@ -1202,19 +1207,25 @@ class Emitter {
     // A missing threshold or op here is a compiler bug, not a defaultable case — fail
     // loudly (matching the co-invariant assert in lowerLocalCodes), never silently emit
     // a fabricated `18 'years'` or default the comparator to `AtLeast`.
-    if (c.__bothRepRecencyThreshold === undefined || c.__bothRepRecencyOp === undefined) {
+    if (
+      c.__bothRepRecencyThreshold === undefined ||
+      c.__bothRepRecencyOp === undefined ||
+      c.__recencyComputeFn === undefined
+    ) {
       throw new Error(
         `internal invariant violated: recency both-rep twin "${c.name}" has ` +
           `__bothRepMerge === "recency" but is missing __bothRepRecencyThreshold ` +
-          `(${c.__bothRepRecencyThreshold}) and/or __bothRepRecencyOp (${c.__bothRepRecencyOp}). ` +
-          `The marker, threshold, and op are set together in lowerLocalCodes; a recency ` +
-          `twin missing either is a compiler bug.`,
+          `(${c.__bothRepRecencyThreshold}), __bothRepRecencyOp (${c.__bothRepRecencyOp}), ` +
+          `and/or __recencyComputeFn (${c.__recencyComputeFn}). The marker, threshold, op, and ` +
+          `compute fn are set together in lowerLocalCodes; a recency twin missing any is a ` +
+          `compiler bug.`,
       );
     }
     // The recency emit consults the projection OVERRIDE the twin names (`__recencyOverrideId`) for
-    // its CQL helper + compute fn — age is ONE caller of the override mechanism, not a hardcoded
-    // engine branch. The override's helper/fn are age-shaped (`recencyAgeTruths` / `AgeAt`) so the
-    // emitted CQL is byte-identical to the retired carve-out; the CQL catalog stays age-shaped
+    // its CQL helper (the compute fn is per-UNIT, carried on the twin — see below) — age is ONE
+    // caller of the override mechanism, not a hardcoded engine branch. The override's helper is
+    // age-shaped (`recencyAgeTruths`) so the emitted CQL is byte-identical to the retired carve-out
+    // for the years case; the CQL catalog stays age-shaped
     // (the re-home is a compile-time seam). A missing/unknown id is a compiler bug (the marker is
     // set in lock-step with the recency markers in lowerLocalCodes).
     const override = c.__recencyOverrideId ? recencyOverrideById(c.__recencyOverrideId) : undefined;
@@ -1229,6 +1240,27 @@ class Emitter {
     }
     const threshold = c.__bothRepRecencyThreshold;
     const op = c.__bothRepRecencyOp;
+    // The compute fn is a per-UNIT HOW carried on the twin (`AgeAt` years / `AgeInMonths` months,
+    // #257 T2) — NOT on the override (which is unit-agnostic), and NOT re-derived from the unit
+    // here. The matcher chose it; the emit renders it so the compute fn matches the threshold's
+    // unit through the unit-blind comparator overload (#215).
+    const computeFn = c.__recencyComputeFn;
+    // INTERNAL-INVARIANT (#215 defense at the EXPORT boundary): the compute fn MUST agree with the
+    // threshold's unit (`AgeAt`↔years, `AgeInMonths`↔months). The compiler pairs them at one site,
+    // but `emitCQLFromAST` is a public entry a caller can feed a hand-built twin — a mismatched
+    // pair (`AgeAt` + `6 'months'`) would silently emit the exact unit-blind miscompile this slice
+    // exists to prevent. Fail loudly instead. The unit is parsed back out of the already-rendered
+    // threshold literal (e.g. `6 'months'`); a unitless threshold cannot be a sanctioned age one.
+    const thresholdUnit = /'([^']+)'/.exec(threshold)?.[1];
+    if (thresholdUnit === undefined || ageComputeFnForUnit(thresholdUnit) !== computeFn) {
+      throw new Error(
+        `internal invariant violated: recency both-rep twin "${c.name}" pairs compute fn ` +
+          `__recencyComputeFn (${computeFn}) with a threshold (${threshold}) whose unit ` +
+          `(${thresholdUnit ?? "(none)"}) does not match — this would emit a unit-blind ` +
+          `miscompile (#215). The matcher pairs the fn and unit; a mismatched twin is a compiler ` +
+          `bug (or an ill-formed hand-built AST).`,
+      );
+    }
     const localLib =
       this.caseFeature.kind === "inferred" ? this.caseFeature.localSourceLibrary : "";
     // The newest valid local boolean Observation (or null). `.value is FHIR.boolean`
@@ -1252,7 +1284,7 @@ class Emitter {
       `      where O.value is FHIR.boolean\n` +
       `      sort by (effective as FHIR.dateTime).value, id\n` +
       `  )`;
-    const computed = `CRLCommon.${op}(CRLCommon.${override.computeFn}(), ${threshold})`;
+    const computed = `CRLCommon.${op}(CRLCommon.${computeFn}(), ${threshold})`;
     // `CFH.<recencyHelper>(newestLocalObservation, computedBoolean)` returns the recency-selected
     // truth-set. The helper reads the projected datum + its recency timestamp
     // (`${override.valueElementPath}` / `${override.recencyTimestamp}`) internally (Patient

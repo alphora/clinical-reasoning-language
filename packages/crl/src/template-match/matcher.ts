@@ -26,6 +26,7 @@ import type {
 } from "../ast/types";
 import { getRefName, getRefLibrary } from "../ast/types";
 
+import { ageComputeFnForUnit } from "./agePredicate";
 import type {
   CanonicalArg,
   CanonicalPatternCall,
@@ -160,13 +161,16 @@ function isQuantity(e: NarrativeElement | undefined): e is Quantity {
 }
 
 /**
- * A `Quantity` whose unit is YEARS. The `age today <cmp> <Q>` predicates require it
- * (#215): `AgeAt()` returns age in whole YEARS and the cross-type comparator overloads
- * (`<Op>(Integer, System.Quantity)`, CRLCommon.cql) are unit-BLIND (compare `.value`
- * only), so a non-year threshold would silently mean `ageYears <cmp> <n>`. Enforcing
- * years AT THE MATCH means a non-year age narrative does NOT match → it soft-compiles
- * unknown → a LOUD sentinel (compute-only) or `emit-mixed-code-and-definition` (both-rep),
- * on BOTH lanes uniformly — never a silent unit-blind miscompile.
+ * A `Quantity` whose unit is YEARS. Now used ONLY by the four ANCHORED `age at start of <X>
+ * <cmp> <Q>` matchers, which stay years-only (#257 T2 Q2: need-driven — no anchored-months
+ * policy yet, and `AgeAt(StartOf(…))` computes whole YEARS). The age-TODAY matchers moved to
+ * `ageComputeFnForUnit` (years OR months) — see their bodies.
+ *
+ * #215: `AgeAt(StartOf(…))` returns age in whole YEARS and the cross-type comparator overloads
+ * (`<Op>(Integer, System.Quantity)`, CRLCommon.cql) are unit-BLIND (compare `.value` only), so a
+ * non-year threshold would silently mean `ageYears <cmp> <n>`. Enforcing years AT THE MATCH means
+ * a non-year anchored-age narrative does NOT match → it soft-compiles unknown → a LOUD sentinel,
+ * never a silent unit-blind miscompile.
  */
 function isYearQuantity(e: NarrativeElement | undefined): e is Quantity {
   return isQuantity(e) && (e.unit === "year" || e.unit === "years");
@@ -818,15 +822,17 @@ const ageAtStartOfYoungerThan: PatternMatcher = (els, loc) => {
 };
 
 /**
- * `age today at least <Q>` → AtLeast(AgeAt(), Q).
+ * `age today at least <Q>` → AtLeast(<AgeAt()|AgeInMonths()>, Q).
  *
- * `today` is the ENGINE evaluation date (CQL `Today()`); `AgeAt()` (no-arg
- * overload in CRLCommon) computes the patient's age at that date. The 5-element
- * template is distinct from the 3-element `age at <ConceptRef>` (`ageAt`) — that
- * form has `at` at els[1] and a ConceptRef at els[2], so `age today …` (bare
- * word at els[1]) cannot be mis-consumed by it, and the lengths differ anyway.
- * The resulting `Quantity`-returning `AgeAt()` feeds the `AtLeast(Integer, …)`
- * comparator (mirrors `ageAtStartOfAtLeast`, but AgeAt takes NO args).
+ * `today` is the ENGINE evaluation date (CQL `Today()`); the no-arg compute fn (in CRLCommon)
+ * computes the patient's age at that date — `AgeAt()` in whole YEARS or `AgeInMonths()` in whole
+ * MONTHS, SELECTED from the threshold's unit via `ageComputeFnForUnit` (#257 T2). The 5-element
+ * template is distinct from the 3-element `age at <ConceptRef>` (`ageAt`) — that form has `at` at
+ * els[1] and a ConceptRef at els[2], so `age today …` (bare word at els[1]) cannot be mis-consumed
+ * by it, and the lengths differ anyway. The resulting Integer-returning compute fn feeds the
+ * `AtLeast(Integer, System.Quantity)` unit-blind overload; the unit gate at the match (via the
+ * compute-fn lookup) keeps the compared units aligned (#215). This is the SOLE choice of which fn
+ * to emit — `sanctionedAgeTodayOp` only re-verifies the pairing.
  */
 const ageTodayAtLeast: PatternMatcher = (els, loc) => {
   if (els.length !== 5) return null;
@@ -834,17 +840,19 @@ const ageTodayAtLeast: PatternMatcher = (els, loc) => {
   if (!isWord(els[1], "today")) return null;
   if (!isWord(els[2], "at")) return null;
   if (!isWord(els[3], "least")) return null;
-  if (!isYearQuantity(els[4])) return null; // #215: year-only at the match (both lanes; no silent unit-blind miscompile)
-  const ageAt = makeCall("AgeAt", [], loc);
-  return makeCall("AtLeast", [nestedArg(ageAt), quantityArg(els[4] as Quantity)], loc);
+  const q = els[4];
+  if (!isQuantity(q)) return null;
+  const computeFn = ageComputeFnForUnit(q.unit);
+  if (computeFn === null) return null; // #215/#257 T2: sanctioned age units only (years/months); day/week fail → LOUD
+  return makeCall("AtLeast", [nestedArg(makeCall(computeFn, [], loc)), quantityArg(q)], loc);
 };
 
 /**
- * `age today at most <Q>` → AtMost(AgeAt(), Q) — the INCLUSIVE upper bound (≤ N,
- * #215). Symmetric with `ageTodayAtLeast`; 5 elements `[age][today][at][most][Q]`.
- * `AgeAt()` (Integer years) feeds the `AtMost(Integer, System.Quantity)` overload
- * (CRLCommon.cql, added for #215). NOTE the truncation equivalence taught in the
- * kit: `at most 21` ≡ `under 22` because AgeAt truncates to whole years.
+ * `age today at most <Q>` → AtMost(<AgeAt()|AgeInMonths()>, Q) — the INCLUSIVE upper bound (≤ N,
+ * #215). Symmetric with `ageTodayAtLeast`; 5 elements `[age][today][at][most][Q]`. The unit-selected
+ * Integer compute fn feeds the `AtMost(Integer, System.Quantity)` overload (CRLCommon.cql, #215).
+ * NOTE the truncation equivalence taught in the kit: `at most 21` ≡ `under 22` because the compute
+ * fn truncates to whole units (years OR months, #257 T2).
  */
 const ageTodayAtMost: PatternMatcher = (els, loc) => {
   if (els.length !== 5) return null;
@@ -852,30 +860,36 @@ const ageTodayAtMost: PatternMatcher = (els, loc) => {
   if (!isWord(els[1], "today")) return null;
   if (!isWord(els[2], "at")) return null;
   if (!isWord(els[3], "most")) return null;
-  if (!isYearQuantity(els[4])) return null; // #215: year-only at the match
-  const ageAt = makeCall("AgeAt", [], loc);
-  return makeCall("AtMost", [nestedArg(ageAt), quantityArg(els[4] as Quantity)], loc);
+  const q = els[4];
+  if (!isQuantity(q)) return null;
+  const computeFn = ageComputeFnForUnit(q.unit);
+  if (computeFn === null) return null; // #215/#257 T2: sanctioned age units only (years/months); day/week fail → LOUD
+  return makeCall("AtMost", [nestedArg(makeCall(computeFn, [], loc)), quantityArg(q)], loc);
 };
 
 /**
- * `age today under <Q>` → Below(AgeAt(), Q) — the EXCLUSIVE upper bound (< N,
- * #215). 4 elements `[age][today][under][Q]`. This is how pediatric policies read
- * ("under 21"). `Below(Integer, System.Quantity)` overload (CRLCommon.cql, #215).
+ * `age today under <Q>` → Below(<AgeAt()|AgeInMonths()>, Q) — the EXCLUSIVE upper bound (< N,
+ * #215). 4 elements `[age][today][under][Q]`. This is how pediatric policies read ("under 21",
+ * "under 6 months"). `Below(Integer, System.Quantity)` overload (CRLCommon.cql, #215); the unit
+ * selects the compute fn (#257 T2).
  */
 const ageTodayUnder: PatternMatcher = (els, loc) => {
   if (els.length !== 4) return null;
   if (!isWord(els[0], "age")) return null;
   if (!isWord(els[1], "today")) return null;
   if (!isWord(els[2], "under")) return null;
-  if (!isYearQuantity(els[3])) return null; // #215: year-only at the match
-  const ageAt = makeCall("AgeAt", [], loc);
-  return makeCall("Below", [nestedArg(ageAt), quantityArg(els[3] as Quantity)], loc);
+  const q = els[3];
+  if (!isQuantity(q)) return null;
+  const computeFn = ageComputeFnForUnit(q.unit);
+  if (computeFn === null) return null; // #215/#257 T2: sanctioned age units only (years/months); day/week fail → LOUD
+  return makeCall("Below", [nestedArg(makeCall(computeFn, [], loc)), quantityArg(q)], loc);
 };
 
 /**
- * `age today younger than <Q>` → Below(AgeAt(), Q) — SYNONYM of `under` (< N,
+ * `age today younger than <Q>` → Below(<AgeAt()|AgeInMonths()>, Q) — SYNONYM of `under` (< N,
  * #215): one canonical semantic (`Below`) with two accepted spellings. 5 elements
- * `[age][today][younger][than][Q]`. Both spellings lower BYTE-IDENTICALLY.
+ * `[age][today][younger][than][Q]`. Both spellings lower BYTE-IDENTICALLY; the unit selects the
+ * compute fn (#257 T2).
  */
 const ageTodayYoungerThan: PatternMatcher = (els, loc) => {
   if (els.length !== 5) return null;
@@ -883,9 +897,11 @@ const ageTodayYoungerThan: PatternMatcher = (els, loc) => {
   if (!isWord(els[1], "today")) return null;
   if (!isWord(els[2], "younger")) return null;
   if (!isWord(els[3], "than")) return null;
-  if (!isYearQuantity(els[4])) return null; // #215: year-only at the match
-  const ageAt = makeCall("AgeAt", [], loc);
-  return makeCall("Below", [nestedArg(ageAt), quantityArg(els[4] as Quantity)], loc);
+  const q = els[4];
+  if (!isQuantity(q)) return null;
+  const computeFn = ageComputeFnForUnit(q.unit);
+  if (computeFn === null) return null; // #215/#257 T2: sanctioned age units only (years/months); day/week fail → LOUD
+  return makeCall("Below", [nestedArg(makeCall(computeFn, [], loc)), quantityArg(q)], loc);
 };
 
 /** Bare ref alone: `<X>` → degenerate; treated as a 1-arg identity wrap. Not registered (single bare ref isn't a pattern call). */

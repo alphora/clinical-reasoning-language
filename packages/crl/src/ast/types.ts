@@ -543,19 +543,19 @@ export interface Concept extends ASTNode {
   __bothRepMerge?: "union" | "recency";
   /**
    * SYNTHETIC-EMITTER-ONLY. For a `"recency"` both-rep Inferred twin, the
-   * year threshold of the `age today <cmp> <Q>` computed arm, as an already-
-   * emitted CQL quantity literal (e.g. `18 'years'`). Carried so the recency
-   * emit renders `CRLCommon.<op>(CRLCommon.AgeAt(), <this>)` without
-   * re-matching the narrative. Set in LOCK-STEP with `__bothRepRecencyOp`
-   * (both present or both absent). Absent unless `__bothRepMerge === "recency"`.
+   * threshold of the `age today <cmp> <Q>` computed arm, as an already-emitted CQL
+   * quantity literal (e.g. `18 'years'` / `6 'months'`, #257 T2). Carried so the
+   * recency emit renders `CRLCommon.<op>(CRLCommon.<computeFn>(), <this>)` without
+   * re-matching the narrative. Set in LOCK-STEP with `__bothRepRecencyOp` and
+   * `__recencyComputeFn`. Absent unless `__bothRepMerge === "recency"`.
    */
   __bothRepRecencyThreshold?: string;
   /**
    * SYNTHETIC-EMITTER-ONLY. For a `"recency"` both-rep Inferred twin, the age
    * COMPARATOR op (#215): `"AtLeast"` (≥, `at least`), `"AtMost"` (≤, `at most`),
    * or `"Below"` (<, `under` / `younger than`). Set in LOCK-STEP with
-   * `__bothRepRecencyThreshold`; the recency emit renders
-   * `CRLCommon.<this>(CRLCommon.AgeAt(), <threshold>)`. Absent unless
+   * `__bothRepRecencyThreshold` and `__recencyComputeFn`; the recency emit renders
+   * `CRLCommon.<this>(CRLCommon.<computeFn>(), <threshold>)`. Absent unless
    * `__bothRepMerge === "recency"`.
    */
   __bothRepRecencyOp?: AgeRecencyOp;
@@ -564,11 +564,22 @@ export interface Concept extends ASTNode {
    * recency-projection override backing this twin (`age-today-over-patient-birthdate`).
    * Set in LOCK-STEP with the recency markers when lowering resolves a `code is` +
    * age `source representation` (`resolveRecencyProjection`). The recency emit looks the
-   * override up (`recencyOverrideById`) to render its CQL helper + compute fn — so age is
-   * ONE caller of the override mechanism, not a hardcoded engine branch. Absent unless
+   * override up (`recencyOverrideById`) to render its CQL helper — so age is ONE caller of
+   * the override mechanism, not a hardcoded engine branch. (The compute fn is NOT on the
+   * override; it is per-unit — carried on `__recencyComputeFn`, #257 T2.) Absent unless
    * `__bothRepMerge === "recency"`.
    */
   __recencyOverrideId?: string;
+  /**
+   * SYNTHETIC-EMITTER-ONLY. #257 (age slice) T2 — the no-arg CRLCommon compute fn for this
+   * recency twin's computed arm: `"AgeAt"` (whole YEARS) or `"AgeInMonths"` (whole MONTHS). The
+   * matcher CHOSE it from the projection's threshold unit (the ONLY choice point); the recency emit
+   * renders `CRLCommon.<this>()` so the compute fn matches the threshold's unit through the
+   * unit-blind comparator overload (#215) — never re-derived from the unit at emit. Set in
+   * LOCK-STEP with `__bothRepRecencyThreshold`/`__bothRepRecencyOp`. Absent unless
+   * `__bothRepMerge === "recency"`.
+   */
+  __recencyComputeFn?: AgeComputeFn;
   /**
    * SYNTHETIC-EMITTER-ONLY. #257 (age slice) T1 — marks a concept whose top-level
    * `definition` was SYNTHESIZED by lowering from a posrep's `value projection` (the age
@@ -586,6 +597,14 @@ export interface Concept extends ASTNode {
 /** The sanctioned patient-age comparator ops (#215), carried as canonical
  * pattern names: `AtLeast` (≥), `AtMost` (≤), `Below` (< — `under`/`younger than`). */
 export type AgeRecencyOp = "AtLeast" | "AtMost" | "Below";
+
+/** The sanctioned age-today COMPUTE fns (#257 T2), carried as no-arg CRLCommon pattern
+ * names: `AgeAt` (whole YEARS) and `AgeInMonths` (whole MONTHS). Each MUST pair with a
+ * threshold of the matching unit — the matcher pairs them and the shared
+ * `sanctionedAgeTodayOp` classifier rejects a mismatch (`AgeAt()` + months, `AgeInMonths()`
+ * + years), which would miscompile through the unit-blind comparator overload (#215). The
+ * marker `__recencyComputeFn` and `AgeProjectionArgs.computeFn` are the shape twins. */
+export type AgeComputeFn = "AgeAt" | "AgeInMonths";
 
 // Concept definition has 3 kinds per v0.7:
 //   - CodedFromDefinition    : `coded from "Valueset"`    (asserted; ref is a valueset)

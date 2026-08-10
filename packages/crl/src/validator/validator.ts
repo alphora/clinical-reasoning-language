@@ -66,9 +66,9 @@ export type ValidationErrorKind =
   | "meta-duplicate-field"
   | "meta-cardinality"
   | "open-flag"
-  // #215 — a `definition is age today <cmp> <n> <unit>` that is NOT a sanctioned age
-  // predicate: an unsupported comparator (`less than`, …) or a non-year unit. Sanctioned:
-  // `at least` | `at most` | `under` | `younger than` + a YEARS quantity. Closes the
+  // #215 / #257 T2 — an age predicate that is NOT sanctioned: an unsupported comparator
+  // (`less than`, …) or an unsanctioned unit (day/week — NOT years/months). Sanctioned:
+  // `at least` | `at most` | `under` | `younger than` + a YEARS or MONTHS quantity. Closes the
   // validate/emit divergence (these emit a loud unmatched sentinel at emit but validated
   // green). Author error — never soft-demoted.
   | "age-predicate-unsupported"

@@ -11,14 +11,16 @@
 // A `RecencyProjectionOverride` is catalog DATA, not narrative matching: it names the built
 // resource + value-element carrier, the datum `value type`, the recency-timestamp INVARIANT of
 // the projection (NOT authored — bounded-language principle: no `recency is` keyword), and the
-// CQL helper/compute-fn the emit renders. T1 ships EXACTLY ONE — age-today over
-// `Patient.birthDate`, timestamp `Patient.meta.lastUpdated`. Age is ONE caller of the override
-// mechanism, not a hardcoded `__bothRepMerge === "recency"` engine branch. The recency merge
-// stays age-SHAPED in the CQL catalog (`CaseFeatureCommon.recencyAgeTruths` / `CRLCommon.AgeAt`);
+// CQL helper the emit renders. (The compute fn is NOT on the override — it is a per-unit HOW,
+// `AgeAt` years / `AgeInMonths` months, carried on `AgeProjectionArgs.computeFn`, #257 T2.) T1
+// ships EXACTLY ONE — age-today over `Patient.birthDate`, timestamp `Patient.meta.lastUpdated`.
+// Age is ONE caller of the override mechanism, not a hardcoded `__bothRepMerge === "recency"`
+// engine branch. The recency merge stays age-SHAPED in the CQL catalog
+// (`CaseFeatureCommon.recencyAgeTruths` / `CRLCommon.AgeAt` / `CRLCommon.AgeInMonths`);
 // this module is the compile-time TS seam that makes it a lookup, keeping the emitted CQL
 // byte-identical to the retired carve-out.
 
-import type { AgeRecencyOp, Concept, NarrativeClause, Representation } from "../ast/types";
+import type { AgeComputeFn, AgeRecencyOp, Concept, NarrativeClause, Representation } from "../ast/types";
 import { isAgeAtStartOfPrefix, isAgeTodayPrefix, sanctionedAgeTodayOp } from "./agePredicate";
 import type { CanonicalArg } from "./canonicalTypes";
 import { matchNarrative } from "./matcher";
@@ -45,8 +47,9 @@ export interface RecencyProjectionOverride {
   readonly recencyTimestamp: string;
   /** The CaseFeatureCommon helper the recency emit renders (`CFH.<helper>(newestLocal, computed)`). */
   readonly recencyHelper: string;
-  /** The CRLCommon compute fn over the projected datum (`CRLCommon.<computeFn>()`). */
-  readonly computeFn: string;
+  // NOTE: the compute fn is NOT on the override — it is a per-UNIT HOW (`AgeAt` years /
+  // `AgeInMonths` months, #257 T2), chosen by the matcher and carried on `AgeProjectionArgs.computeFn`
+  // / the `__recencyComputeFn` twin marker, so a single override serves both units.
 }
 
 /** The sole T1 override: patient age-today over `Patient.birthDate`, recency timestamp
@@ -59,7 +62,6 @@ export const AGE_TODAY_OVER_BIRTHDATE: RecencyProjectionOverride = {
   resultValueType: "boolean",
   recencyTimestamp: "Patient.meta.lastUpdated",
   recencyHelper: "recencyAgeTruths",
-  computeFn: "AgeAt",
 };
 
 const OVERRIDES: readonly RecencyProjectionOverride[] = [AGE_TODAY_OVER_BIRTHDATE];
@@ -69,10 +71,15 @@ export function recencyOverrideById(id: string): RecencyProjectionOverride | und
   return OVERRIDES.find((o) => o.id === id);
 }
 
-/** The sanctioned age-today comparator + rendered year threshold parsed from a projection. */
+/** The sanctioned age-today comparator + compute fn + rendered threshold parsed from a projection. */
 export interface AgeProjectionArgs {
   op: AgeRecencyOp;
-  /** The threshold as a CQL quantity literal (e.g. `18 'years'`), rendered from the canonical arg. */
+  /** The no-arg compute fn the matcher chose from the threshold's unit (`AgeAt` years /
+   *  `AgeInMonths` months, #257 T2) — READ OFF the matched call, never re-derived here, so the
+   *  recency emit's fn cannot drift from the standalone lower's. */
+  computeFn: AgeComputeFn;
+  /** The threshold as a CQL quantity literal (e.g. `18 'years'` / `6 'months'`), rendered from the
+   *  canonical arg. */
   threshold: string;
 }
 
@@ -125,16 +132,22 @@ export function resolveRecencyProjection(rep: Representation): ProjectionResolut
   // Only an `age today …` prefix is in T1's remit; every other projector is left alone.
   if (!isAgeTodayPrefix(clause)) return { kind: "not-age" };
 
-  // It IS an age-today attempt — require a sanctioned comparator over the no-arg `AgeAt()` and a
-  // year quantity (the SAME gate the retired `definition is age today` used, so the two forms are
-  // classified identically). An unsanctioned comparator/unit is a LOUD author error, never a
-  // silent stub.
+  // It IS an age-today attempt — require a sanctioned comparator over a no-arg compute fn
+  // (`AgeAt()` years / `AgeInMonths()` months) whose unit MATCHES the threshold (the SAME shared
+  // gate the four age-today matchers and the validator use, so the forms are classified
+  // identically). An unsanctioned comparator/unit — or an inconsistent fn/unit pair — is a LOUD
+  // author error, never a silent stub. The compute fn is READ OFF the matched call (the matcher is
+  // the sole choice point), never re-derived from the unit here.
   const matched = matchNarrative(clause);
-  const op = sanctionedAgeTodayOp(matched);
-  if (op === null) return { kind: "unsanctioned-age-attempt" };
+  const sanctioned = sanctionedAgeTodayOp(matched);
+  if (sanctioned === null) return { kind: "unsanctioned-age-attempt" };
   const qArg = matched.args[1];
   if (qArg.type !== "QuantityArg") return { kind: "unsanctioned-age-attempt" };
-  const args: AgeProjectionArgs = { op, threshold: renderQuantityArg(qArg) };
+  const args: AgeProjectionArgs = {
+    op: sanctioned.op,
+    computeFn: sanctioned.computeFn,
+    threshold: renderQuantityArg(qArg),
+  };
 
   // Carrier check against the sole override. A sanctioned age-today projection on the wrong
   // resource / value element / value type is a recognized-but-misplaced projection — a distinct
@@ -277,8 +290,9 @@ export function ageProjectionUnsupportedMessage(conceptName: string): string {
   return (
     `Concept "${conceptName}": the age \`source representation\`'s ` +
     `\`value projection is age today …\` is not a supported age predicate. Supported: ` +
-    `\`age today <at least | at most | under | younger than> <n> years\` — a YEARS quantity ` +
-    `only. Use \`under\` (not \`less than\`); age is computed in whole years.`
+    `\`age today <at least | at most | under | younger than> <n> <years|months>\` — a YEARS or ` +
+    `MONTHS quantity. Use \`under\` (not \`less than\`); age is computed in whole years or whole ` +
+    `months.`
   );
 }
 
@@ -308,7 +322,7 @@ export function ageRetirementMessage(conceptName: string): string {
     `WITH a local override, keep \`- code is \`…\`.\` and add:  ` +
     `- source representation: - type is ${o.sourceType}. - value element is ` +
     `${o.valueElementPath}. - value type is ${o.repValueType}. - value projection is age today ` +
-    `<at least|at most|under|younger than> <n> years.  ` +
+    `<at least|at most|under|younger than> <n> <years|months>.  ` +
     `For a STANDALONE determination (no local assertion), author that same \`source ` +
     `representation\` WITHOUT a \`code is\`. (The anchored \`age at start of "<anchor>" …\` ` +
     `stays a concept-level \`definition is\`.)`

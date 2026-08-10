@@ -138,8 +138,10 @@ describe("recency-projection override registry (the single source validate + emi
       repValueType: "date",
       recencyTimestamp: "Patient.meta.lastUpdated",
       recencyHelper: "recencyAgeTruths",
-      computeFn: "AgeAt",
     });
+    // #257 T2 — the compute fn is NO LONGER on the override (it is a per-unit HOW carried on
+    // AgeProjectionArgs / __recencyComputeFn), so a single override serves both years and months.
+    expect((AGE_TODAY_OVER_BIRTHDATE as Record<string, unknown>).computeFn).toBeUndefined();
   });
 
   it("resolveRecencyProjection classifies match / wrong-carrier / unsanctioned / not-age", () => {
@@ -175,6 +177,18 @@ describe("recency-projection override registry (the single source validate + emi
       resolveRecencyProjection(rep("age today at least 18 years", { valueTypes: ["date", "boolean"] }))
         .kind,
     ).toBe("wrong-carrier");
+    // #257 T2 — a MONTHS projection matches, and its args carry computeFn AgeInMonths (read off the
+    // matched call). A years projection carries AgeAt. An unsanctioned unit (days) still is not a match.
+    const monthsRes = resolveRecencyProjection(rep("age today under 6 months"));
+    expect(monthsRes.kind).toBe("match");
+    if (monthsRes.kind === "match") {
+      expect(monthsRes.args.computeFn).toBe("AgeInMonths");
+      expect(monthsRes.args.op).toBe("Below");
+      expect(monthsRes.args.threshold).toBe("6 'months'");
+    }
+    const yearsRes = resolveRecencyProjection(rep("age today at least 18 years"));
+    if (yearsRes.kind === "match") expect(yearsRes.args.computeFn).toBe("AgeAt");
+    expect(resolveRecencyProjection(rep("age today under 6 days")).kind).toBe("unsanctioned-age-attempt");
     // Anchored `age at start of` references a concept → recognized, not a datum-local projection.
     expect(resolveRecencyProjection(rep('age at start of "Measurement Period" at least 18 years')).kind).toBe(
       "anchored-in-projection",

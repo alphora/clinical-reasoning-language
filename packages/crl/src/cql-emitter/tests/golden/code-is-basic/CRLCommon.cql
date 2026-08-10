@@ -493,6 +493,16 @@ define function "AgeAt"(anchor List<Encounter>):
 // resolves to the `AgeInYearsAt(Date)` overload.
 define function "AgeAt"():
   AgeInYearsAt(Today())
+// No-arg MONTHS overload (#257 T2) — the patient's age in whole MONTHS as of the
+// ENGINE evaluation date, for `age today <cmp> <n> months`. Truncates to whole
+// months (CQL `AgeInMonthsAt`), mirroring `AgeAt()`'s whole-years truncation, and
+// feeds the SAME unit-blind `<Op>(Integer, System.Quantity)` overloads below —
+// correct ONLY because the threshold is also in months (the matcher pairs the
+// compute fn with the unit; #215). NAMING: `AgeAt()` predates months and keeps its
+// name for byte-identity; a future age unit should follow this `AgeIn<Unit>()`
+// convention, not coin a third.
+define function "AgeInMonths"():
+  AgeInMonthsAt(Today())
 
 /**
  * Calculate(X) — pass-through that surfaces a derived Quantity.
@@ -547,12 +557,13 @@ define function "Abnormal"(X Quantity, lo Quantity, hi Quantity):
  *   - scalar value (Quantity, Integer) — direct comparison
  *   - list of values (List<Observation>, List<Observation.Component>) —
  *     existential: "any element in the list satisfies the comparison"
- *   - cross-type (Integer × Quantity) — for year-Integer ages compared
- *     to Quantity-year thresholds. Carried on AtLeast (`age today at least`),
+ *   - cross-type (Integer × Quantity) — for whole-unit Integer ages compared
+ *     to Quantity thresholds. Carried on AtLeast (`age today at least`),
  *     AtMost (`age today at most`), and Below (`age today under`/`younger than`)
  *     so every sanctioned age-predicate comparator resolves (#215). The overload
- *     is unit-BLIND (compares `.value` only), so the year-unit guard at the
- *     lowering gate is load-bearing.
+ *     is unit-BLIND (compares `.value` only), so the unit guard at the match is
+ *     load-bearing: it pairs the compute fn (`AgeAt()` years / `AgeInMonths()`
+ *     months, #257 T2) with the threshold's unit so like is compared to like.
  */
 define function "AtLeast"(value Quantity, target Quantity):
   value >= target

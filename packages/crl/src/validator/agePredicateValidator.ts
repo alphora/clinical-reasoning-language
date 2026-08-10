@@ -74,6 +74,10 @@ export class AgePredicateValidator {
     }
 
     // (2) ANCHORED `age at start of …` — still a sanctioned concept-level `definition is`.
+    //     DELIBERATELY stays YEARS-ONLY (#257 T2 Q2): only the age-TODAY projection widened to
+    //     months (need-driven, rx501-098); there is no anchored-months policy and it would need
+    //     `AgeInMonthsAt(anchor)` overloads. Do NOT "harmonize" this message or the four
+    //     `ageAtStartOf*` matchers to months to match the age-today surface.
     if (stmt.definition?.type === "DefinitionIsDefinition") {
       const body = stmt.definition.body;
       if (isAgeAtStartOfPrefix(body) && sanctionedAgeAnchoredOp(matchNarrative(body)) === null) {

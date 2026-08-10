@@ -82,12 +82,18 @@ describe("AgePredicateValidator (#215) — unsanctioned age predicates rejected 
     }
   });
 
-  it("ACCEPTS the migrated posrep form — a sanctioned `value projection is age today …` on the Patient carrier validates clean", () => {
+  it("ACCEPTS the migrated posrep form — a sanctioned `value projection is age today …` on the Patient carrier validates clean (YEARS and MONTHS, #257 T2)", () => {
     for (const proj of [
       "age today at least 18 years",
       "age today at most 21 years",
       "age today under 21 years",
       "age today younger than 18 years",
+      // #257 T2 — months are now sanctioned (rx501-098); plural AND singular unit.
+      "age today at least 6 months",
+      "age today at most 6 months",
+      "age today under 6 months",
+      "age today younger than 6 months",
+      "age today under 1 month",
     ]) {
       // Standalone (no local override) AND with a local `code is` override both validate clean.
       expect(ageErrors(posrepConcept(proj)), proj).toHaveLength(0);
@@ -114,10 +120,16 @@ describe("AgePredicateValidator (#215) — unsanctioned age predicates rejected 
   });
 
   it("REJECTS a posrep age projection that is unsanctioned or on the wrong carrier", () => {
-    // Unsanctioned comparator/unit on the Patient carrier → projection-unsupported.
+    // Unsanctioned comparator on the Patient carrier → projection-unsupported.
     const unsup = ageErrors(posrepConcept("age today less than 21 years"));
     expect(unsup).toHaveLength(1);
     if (unsup[0].kind === "age-predicate-unsupported") expect(unsup[0].reason).toBe("projection-unsupported");
+    // UNSANCTIONED units (days AND weeks — not years/months even after #257 T2) → projection-unsupported.
+    for (const unit of ["days", "weeks"]) {
+      const unsupUnit = ageErrors(posrepConcept(`age today under 21 ${unit}`));
+      expect(unsupUnit, unit).toHaveLength(1);
+      if (unsupUnit[0].kind === "age-predicate-unsupported") expect(unsupUnit[0].reason, unit).toBe("projection-unsupported");
+    }
     // A sanctioned age-today projection on the WRONG carrier (Observation, not Patient) →
     // projection-wrong-carrier.
     const wrong =
@@ -127,6 +139,16 @@ describe("AgePredicateValidator (#215) — unsanctioned age predicates rejected 
     const wc = ageErrors(wrong);
     expect(wc).toHaveLength(1);
     if (wc[0].kind === "age-predicate-unsupported") expect(wc[0].reason).toBe("projection-wrong-carrier");
+  });
+
+  it("REJECTS a concept with TWO age `source representation`s of DIFFERENT units (exactly-one rule; validator/emit parity — disc 410 Q4)", () => {
+    const src =
+      `library "T".\nconcept "Two Units":\n- value type is boolean.\n- code is \`tu\`.\n` +
+      `- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is age today at least 18 years.\n` +
+      `- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is age today under 6 months.\n`;
+    const errs = ageErrors(src);
+    expect(errs.length).toBeGreaterThanOrEqual(1);
+    expect(errs.some((e) => /more than one age .*source representation/.test(e.message))).toBe(true);
   });
 
   it("ACCEPTS every sanctioned ANCHORED comparator (no age-predicate error; the anchor ref itself is orthogonal)", () => {

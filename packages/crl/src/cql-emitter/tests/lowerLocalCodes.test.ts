@@ -457,25 +457,27 @@ concept "Mixed Def":
     expect(errors.find((e) => e.kind === "emit-mixed-code-and-definition")!.message).toMatch(/Mixed Def/);
   });
 
-  it("`code is` + age posrep with a NON-year unit projection → emit-age-projection-unsupported (unit guard, LOUD not silent)", () => {
-    // AgeAt() is age-in-YEARS and AtLeast is unit-blind; a non-year threshold
-    // would silently mean `ageYears >= 18`. The unit guard rejects the projection → it
-    // is not the accepted age-today pattern → a LOUD hard error, never a silent stub.
+  it("`code is` + age posrep with an UNSANCTIONED unit (days) projection → emit-age-projection-unsupported (unit guard, LOUD not silent)", () => {
+    // The compute fns are age-in-YEARS/MONTHS and the comparators are unit-blind; a day/week
+    // threshold has NO matching compute fn, so it would silently mean `ageYears >= 18` (or fail
+    // resolution). #257 T2 widened the sanctioned units to {years, months} — NOT days — so the
+    // unit guard still rejects days → a LOUD hard error, never a silent stub. (Months is now
+    // ACCEPTED; see the positive months tests below.)
     const ast = parse(
       lib(`
-concept "Age Months":
+concept "Age Days":
 - value type is boolean.
-- code is \`age-months\`.
+- code is \`age-days\`.
 - source representation:
   - type is Patient.
   - value element is Patient.birthDate.
   - value type is date.
-  - value projection is age today at least 18 months.
+  - value projection is age today at least 18 days.
 `),
     );
     const { errors } = lowerLocalCodes(ast);
     expect(errors.some((e) => e.kind === "emit-age-projection-unsupported")).toBe(true);
-    expect(errors.find((e) => e.kind === "emit-age-projection-unsupported")!.message).toMatch(/Age Months/);
+    expect(errors.find((e) => e.kind === "emit-age-projection-unsupported")!.message).toMatch(/Age Days/);
   });
 
   it("`code is` + age posrep on a NON-Observation concept `type is` → emit-mixed-code-and-definition (recency shape guard)", () => {
@@ -656,33 +658,111 @@ concept "${name}":
     expect(rUnder).toContain("CRLCommon.Below(CRLCommon.AgeAt(), 21 'years')");
   });
 
-  it("NON-year unit on EVERY upper-bound spelling (both-rep posrep) → emit-age-projection-unsupported (year-only at the match, per comparator)", () => {
+  it("MONTHS (#257 T2): `code is` + age posrep in MONTHS SPLITS merge:recency carrying computeFn AgeInMonths, emits CRLCommon.AgeInMonths (NOT AgeAt)", () => {
+    // rx501-098 — a months age. The recency twin carries `__recencyComputeFn: "AgeInMonths"`
+    // (chosen by the matcher from the `months` unit, read off the matched call — not re-derived),
+    // and the emitted computed arm compares whole MONTHS to a months threshold through the SAME
+    // unit-blind overload, so like is compared to like (#215).
+    for (const [pred, op, threshold] of [
+      ["age today at least 6 months", "AtLeast", "6 'months'"],
+      ["age today at most 6 months", "AtMost", "6 'months'"],
+      ["age today under 6 months", "Below", "6 'months'"],
+      ["age today younger than 6 months", "Below", "6 'months'"],
+      ["age today under 1 month", "Below", "1 'month'"], // singular unit
+    ] as const) {
+      const { ast: out, errors } = lowerAgeConcept("Infant Age", "infant-age", pred);
+      expect(errors.some((e) => e.kind === "emit-age-projection-unsupported"), pred).toBe(false);
+      const twin = recencyTwinOf(out, "Infant Age")!;
+      expect(twin, pred).toBeDefined();
+      expect(twin.__bothRepRecencyOp, pred).toBe(op);
+      expect(twin.__bothRepRecencyThreshold, pred).toBe(threshold);
+      expect(twin.__recencyComputeFn, pred).toBe("AgeInMonths");
+      expect(twin.__recencyOverrideId, pred).toBe("age-today-over-patient-birthdate");
+      const r = emitRecency(out, twin);
+      expect(r.success, pred).toBe(true);
+      expect(r.result, pred).toContain("CFH.recencyAgeTruths(");
+      expect(r.result, pred).toContain(`CRLCommon.${op}(CRLCommon.AgeInMonths(), ${threshold})`);
+      // The years compute fn must NOT appear on a months age (the #215 miscompile shape).
+      expect(r.result, pred).not.toContain("CRLCommon.AgeAt()");
+    }
+  });
+
+  it("YEARS unchanged (#257 T2 behavior-preservation): a years recency twin still carries computeFn AgeAt and emits CRLCommon.AgeAt()", () => {
+    const { ast: out } = lowerAgeConcept("Adult Age", "adult-age", "age today at least 18 years");
+    const twin = recencyTwinOf(out, "Adult Age")!;
+    expect(twin.__recencyComputeFn).toBe("AgeAt");
+    const r = emitRecency(out, twin);
+    expect(r.result).toContain("CRLCommon.AtLeast(CRLCommon.AgeAt(), 18 'years')");
+    expect(r.result).not.toContain("AgeInMonths");
+  });
+
+  it("MISSING __recencyComputeFn on a recency twin FAILS the emit invariant LOUDLY (lock-step with threshold/op)", () => {
+    // The compute fn is set in lock-step with the recency markers; a twin missing it is a compiler
+    // bug, not a defaultable case — emitRecencyMerge throws (surfaced as a success:false Exception),
+    // never fabricates `AgeAt()`.
+    const { ast: out } = lowerAgeConcept("Infant Age", "infant-age", "age today under 6 months");
+    const twin = recencyTwinOf(out, "Infant Age")!;
+    const broken: Concept = { ...twin };
+    delete broken.__recencyComputeFn;
+    const r = emitRecency(out, broken);
+    expect(r.success).toBe(false);
+    expect(r.errors?.some((e) => /__recencyComputeFn/.test(e.message ?? ""))).toBe(true);
+  });
+
+  it("MISMATCHED compute-fn↔unit on a recency twin FAILS the emit invariant LOUDLY (#215 defense at the export boundary)", () => {
+    // The matcher never produces a mismatch, but emitCQLFromAST is a public entry — a hand-built
+    // twin pairing `AgeAt` with a `'months'` threshold (or `AgeInMonths` with `'years'`) would
+    // silently emit the unit-blind miscompile #215 exists to prevent. emitRecencyMerge must throw.
+    const monthsTwin = recencyTwinOf(lowerAgeConcept("Infant Age", "infant-age", "age today under 6 months").ast, "Infant Age")!;
+    const yearsFnMonthsThreshold: Concept = { ...monthsTwin, __recencyComputeFn: "AgeAt" }; // AgeAt + 6 'months'
+    const r1 = emitRecency({ ...lowerAgeConcept("Infant Age", "infant-age", "age today under 6 months").ast, statements: [] }, yearsFnMonthsThreshold);
+    expect(r1.success).toBe(false);
+    expect(r1.errors?.some((e) => /unit-blind miscompile|does not match/.test(e.message ?? ""))).toBe(true);
+
+    const yearsTwin = recencyTwinOf(lowerAgeConcept("Adult Age", "adult-age", "age today at least 18 years").ast, "Adult Age")!;
+    const monthsFnYearsThreshold: Concept = { ...yearsTwin, __recencyComputeFn: "AgeInMonths" }; // AgeInMonths + 18 'years'
+    const r2 = emitRecency({ ...lowerAgeConcept("Adult Age", "adult-age", "age today at least 18 years").ast, statements: [] }, monthsFnYearsThreshold);
+    expect(r2.success).toBe(false);
+    expect(r2.errors?.some((e) => /unit-blind miscompile|does not match/.test(e.message ?? ""))).toBe(true);
+  });
+
+  it("TWO age `source representation`s with DIFFERENT units on one concept → rejected by the exactly-one rule at EMIT, NOT a silent pick (disc 410 Q4)", () => {
+    // One concept is one determination with one projection; a years posrep AND a months posrep on
+    // the same concept must be rejected (the "more than one age source representation" path), never
+    // silently resolved to one unit. (Validator-lane parity is pinned in validator/tests/agePredicate.)
+    const src = `# T\nlibrary "T".\nconcept "Two Units":\n- value type is boolean.\n- code is \`two-units\`.\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is age today at least 18 years.\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is age today under 6 months.\n`;
+    const emit = emitCQL(src, { libraryName: "T" });
+    expect(emit.success).toBe(false);
+    expect(emit.errors?.some((e) => /more than one age .*source representation/.test(e.message ?? ""))).toBe(true);
+  });
+
+  it("UNSANCTIONED unit (days) on EVERY upper-bound spelling (both-rep posrep) → emit-age-projection-unsupported (sanctioned units are years/months only, per comparator)", () => {
     for (const pred of [
-      "age today at most 216 months",
-      "age today under 216 months",
-      "age today younger than 216 months",
+      "age today at most 216 days",
+      "age today under 216 days",
+      "age today younger than 216 days",
     ]) {
-      const { errors } = lowerAgeConcept("Age Months", "age-months", pred);
+      const { errors } = lowerAgeConcept("Age Days", "age-days", pred);
       expect(
         errors.some((e) => e.kind === "emit-age-projection-unsupported"),
-        `year-guard should fire for "${pred}"`,
+        `unit-guard should fire for "${pred}"`,
       ).toBe(true);
     }
   });
 
-  it("COMPUTE-ONLY NON-year age narrative does NOT silently emit a unit-blind comparator call (#215 [critical] fix)", () => {
-    // Before the matcher year-guard, `age today under 216 months` (no `code is`) would
-    // resolve via the new `Below(Integer, System.Quantity)` overload to a unit-BLIND
-    // `Below(AgeAt(), 216 'months')` ≡ `ageYears < 216` — a silent miscompile. Year-only
-    // at the match means it is NOT a recognized age predicate → soft-compiles unknown →
-    // LOUD sentinel, never a resolved age call.
-    for (const pred of ["age today under 216 months", "age today at most 216 months"]) {
+  it("COMPUTE-ONLY UNSANCTIONED-unit age narrative does NOT silently emit a unit-blind comparator call (#215 [critical] fix)", () => {
+    // `age today under 216 days` (no `code is`) has NO sanctioned compute fn (days is not
+    // {years, months}), so it must NOT resolve via a unit-BLIND `Below(AgeAt(), 216 'days')`
+    // ≡ `ageYears < 216` — a silent miscompile. Unit-at-the-match means it is NOT a recognized
+    // age predicate → soft-compiles unknown → LOUD sentinel, never a resolved age call. (Months
+    // IS sanctioned now — see the positive months tests — so days is the unsanctioned probe.)
+    for (const pred of ["age today under 216 days", "age today at most 216 days"]) {
       const src = `# T\nlibrary "T".\nconcept "Age Gate":\n- value type is boolean.\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is ${pred}.\n`;
       const r = emitCQL(src, { libraryName: "T" });
-      expect(r.result ?? "").not.toMatch(/CRLCommon\.(Below|AtMost)\(CRLCommon\.AgeAt\(\), 216 'months'\)/);
+      expect(r.result ?? "").not.toMatch(/CRLCommon\.(Below|AtMost)\(CRLCommon\.Age(At|InMonths)\(\), 216 'days'\)/);
       expect(
         r.success === false,
-        `non-year age projection "${pred}" must fail loudly, not emit a resolved call`,
+        `unsanctioned-unit age projection "${pred}" must fail loudly, not emit a resolved call`,
       ).toBe(true);
       expect(r.errors?.some((e) => e.kind === "emit-age-projection-unsupported")).toBe(true);
     }
@@ -743,6 +823,27 @@ concept "Heavy":
     }
   });
 
+  it("STANDALONE MONTHS (#257 T2): a Patient months-age posrep-only concept emits CRLCommon.AgeInMonths (plural AND singular unit)", () => {
+    for (const [pred, call] of [
+      ["age today under 6 months", "CRLCommon.Below(CRLCommon.AgeInMonths(), 6 'months')"],
+      ["age today at least 6 months", "CRLCommon.AtLeast(CRLCommon.AgeInMonths(), 6 'months')"],
+      ["age today at most 6 months", "CRLCommon.AtMost(CRLCommon.AgeInMonths(), 6 'months')"],
+      ["age today younger than 6 months", "CRLCommon.Below(CRLCommon.AgeInMonths(), 6 'months')"],
+      // singular `month` across ALL FOUR ops (disc 410 — settled matrix).
+      ["age today under 1 month", "CRLCommon.Below(CRLCommon.AgeInMonths(), 1 'month')"],
+      ["age today at least 1 month", "CRLCommon.AtLeast(CRLCommon.AgeInMonths(), 1 'month')"],
+      ["age today at most 1 month", "CRLCommon.AtMost(CRLCommon.AgeInMonths(), 1 'month')"],
+      ["age today younger than 1 month", "CRLCommon.Below(CRLCommon.AgeInMonths(), 1 'month')"],
+    ] as const) {
+      const src = `# T\nlibrary "T".\nconcept "Age Gate":\n- value type is boolean.\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is ${pred}.\n`;
+      const r = emitCQL(src, { libraryName: "T" });
+      expect(r.success, `standalone months posrep emit should succeed for "${pred}"`).toBe(true);
+      expect(r.result, pred).toContain(call);
+      expect(r.result, pred).not.toContain("CRLCommon.AgeAt()"); // years fn must not leak onto a months age
+      expect(r.result).not.toContain("exists CRLCommon.");
+    }
+  });
+
   it("ANCHORED upper-bound (#215): `age at start of <X> at most|under|younger than <n> years` emits AtMost/Below over AgeAt(start of …)", () => {
     for (const [pred, call] of [
       ['age at start of "Measurement Period" at most 65 years', `CRLCommon.AtMost(CRLCommon.AgeAt(start of "Measurement Period"), 65 'years')`],
@@ -756,7 +857,7 @@ concept "Heavy":
     }
   });
 
-  it("ANCHORED NON-year (#215): `age at start of <X> <cmp> <n> months` does NOT silently emit a unit-blind call (year-only at the match — also fixes the pre-existing `at least`)", () => {
+  it("ANCHORED NON-year (#215/#257 T2): `age at start of <X> <cmp> <n> months` does NOT silently emit a unit-blind call — anchored stays YEARS-ONLY even though age-today widened to months (Q2: the sanctioned-months unit did NOT leak into the four ageAtStartOf* matchers)", () => {
     for (const pred of [
       'age at start of "Measurement Period" at least 65 months',
       'age at start of "Measurement Period" at most 65 months',

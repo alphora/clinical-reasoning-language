@@ -95,6 +95,7 @@
  */
 
 import type {
+  AgeComputeFn,
   AgeRecencyOp,
   CRL,
   Concept,
@@ -488,9 +489,10 @@ export function lowerLocalCodes(
         : undefined;
     // The RECENCY both-rep computed arm — the synthesized age definition + its parsed
     // {op, threshold}, present only when the (AGE) block consumed a Patient age posrep.
-    const bothRepRecency: { threshold: string; op: AgeRecencyOp } | null = ageMerge
-      ? { threshold: ageMerge.args.threshold, op: ageMerge.args.op }
-      : null;
+    const bothRepRecency: { threshold: string; op: AgeRecencyOp; computeFn: AgeComputeFn } | null =
+      ageMerge
+        ? { threshold: ageMerge.args.threshold, op: ageMerge.args.op, computeFn: ageMerge.args.computeFn }
+        : null;
     const bothRepDefinitionIs = ageMerge !== null ? synthAgeDef : undefined;
 
     // (3a) BOTH-REP + `source representation` 3-way — out of scope this round.
@@ -668,9 +670,10 @@ export function lowerLocalCodes(
     // `buildNameLayerMaps` resolves the name to Inferred (the public determination).
     //   - `defined as` twin → `__bothRepMerge: "union"` (asTruths() union inference).
     //   - age posrep twin → `__bothRepMerge: "recency"` (raw-Observation recency vs live
-    //     computed age); the twin carries the year threshold + comparator op (#215) AND
-    //     the stable `__recencyOverrideId` so the emit looks the override up (age is ONE
-    //     caller). Its `definition` was SYNTHESIZED from the posrep projection, so it is
+    //     computed age); the twin carries the threshold + comparator op + compute fn (`AgeAt`
+    //     years / `AgeInMonths` months, #215/#257 T2) AND the stable `__recencyOverrideId` so the
+    //     emit looks the override up (age is ONE caller). Its `definition` was SYNTHESIZED from the
+    //     posrep projection, so it is
     //     flagged `__synthesizedFromPosrep` (the retirement guard must never fire on it).
     if (bothRepDefinedAs !== undefined) {
       const inferredTwin: Concept = {
@@ -689,6 +692,7 @@ export function lowerLocalCodes(
         __bothRepMerge: "recency",
         __bothRepRecencyThreshold: bothRepRecency.threshold,
         __bothRepRecencyOp: bothRepRecency.op,
+        __recencyComputeFn: bothRepRecency.computeFn,
         __recencyOverrideId: ageMerge!.overrideId,
         __synthesizedFromPosrep: true,
       };

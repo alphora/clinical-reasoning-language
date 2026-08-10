@@ -40,7 +40,8 @@ define fluent function satisfied(truths List<System.Boolean>):
  * recencyAgeTruths — the patient-age both-representation RECENCY merge.
  *
  * Selects between a locally-asserted age boolean (the newest valid
- * `age-…` Observation) and a live computed age boolean (`AtLeast(AgeAt(), n)`),
+ * `age-…` Observation) and a live computed age boolean (e.g. `AtLeast(AgeAt(), n years)`
+ * or, for a months age, `Below(AgeInMonths(), n months)` — #257 T2),
  * then LIFTS the selection back to a truth-set so it composes in the
  * Inferred/Interface truth-set lane. This does NOT use `asTruths` — that reads
  * only `value.value is true`, discarding the Observation and ERASING an explicit
@@ -71,7 +72,8 @@ define fluent function satisfied(truths List<System.Boolean>):
  *              pre-filters boolean value ONLY — NO status filter, because a
  *              DTR-extracted answer is not stamped `final` and restricting status
  *              would silently drop it.
- *   computed — the live computed age boolean (`AtLeast(AgeAt(), n years)`).
+ *   computed — the live computed age boolean (`AtLeast(AgeAt(), n years)`, or a months
+ *              age `Below(AgeInMonths(), n months)` — #257 T2; unit-agnostic here).
  */
 // The selected age BOOLEAN (or null when NOT determined). Split from the
 // truth-set lift below so the precedence lattice is one flat nested-if over
