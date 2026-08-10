@@ -39,9 +39,13 @@ concept "BothRep":
 - code is \`br\`.
 - defined as ( "A" sem-or "B" ).
 concept "Age":
-- type is Observation.
+- value type is boolean.
 - code is \`age\`.
-- definition is age today at least 18 years.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 18 years.
 concept "Height":
 - type is Observation.
 - value type is Quantity.

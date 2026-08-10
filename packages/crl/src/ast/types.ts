@@ -559,6 +559,28 @@ export interface Concept extends ASTNode {
    * `__bothRepMerge === "recency"`.
    */
   __bothRepRecencyOp?: AgeRecencyOp;
+  /**
+   * SYNTHETIC-EMITTER-ONLY. #257 (age slice) T1 — the stable id of the built
+   * recency-projection override backing this twin (`age-today-over-patient-birthdate`).
+   * Set in LOCK-STEP with the recency markers when lowering resolves a `code is` +
+   * age `source representation` (`resolveRecencyProjection`). The recency emit looks the
+   * override up (`recencyOverrideById`) to render its CQL helper + compute fn — so age is
+   * ONE caller of the override mechanism, not a hardcoded engine branch. Absent unless
+   * `__bothRepMerge === "recency"`.
+   */
+  __recencyOverrideId?: string;
+  /**
+   * SYNTHETIC-EMITTER-ONLY. #257 (age slice) T1 — marks a concept whose top-level
+   * `definition` was SYNTHESIZED by lowering from a posrep's `value projection` (the age
+   * migration), NOT authored. The `definition is age today` retirement (validator +
+   * emit-boundary guard) must NEVER fire on such a definition: the narrative is
+   * compiler-internal (a projection re-homed as a definition to satisfy the current
+   * Inferred classification / `emitDefinitionIs` path), not an authorable surface form. A
+   * vestige to remove when posrep emit is first-class (#257). Absent on every authored
+   * concept, so a scan of the AUTHORED AST (validation + the pre-lowering retirement scan)
+   * never encounters it.
+   */
+  __synthesizedFromPosrep?: boolean;
 }
 
 /** The sanctioned patient-age comparator ops (#215), carried as canonical

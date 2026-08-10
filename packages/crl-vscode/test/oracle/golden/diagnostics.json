@@ -13,6 +13,23 @@
             "kind": "diagnostic",
             "range": {
               "start": {
+                "line": 2,
+                "character": 0
+              },
+              "end": {
+                "line": 2,
+                "character": 1
+              }
+            },
+            "message": "Concept \"A\" declares no `value type`. Every concept has exactly one `value type` — its canonical result shape. Add `- value type is <Type>.` (CodeableConcept for a coded resource refinement, Quantity for a measurement, boolean for a determination, dateTime/integer/etc. for a scalar).",
+            "severity": 0,
+            "source": "crl",
+            "code": "representation-shape"
+          },
+          {
+            "kind": "diagnostic",
+            "range": {
+              "start": {
                 "line": 4,
                 "character": 0
               },
@@ -40,6 +57,23 @@
           "fsPath": "$TMP/a.crl"
         },
         "diagnostics": [
+          {
+            "kind": "diagnostic",
+            "range": {
+              "start": {
+                "line": 4,
+                "character": 0
+              },
+              "end": {
+                "line": 6,
+                "character": 18
+              }
+            },
+            "message": "Concept \"A\" declares no `value type`. Every concept has exactly one `value type` — its canonical result shape. Add `- value type is <Type>.` (CodeableConcept for a coded resource refinement, Quantity for a measurement, boolean for a determination, dateTime/integer/etc. for a scalar).",
+            "severity": 0,
+            "source": "crl",
+            "code": "representation-shape"
+          },
           {
             "kind": "diagnostic",
             "range": {

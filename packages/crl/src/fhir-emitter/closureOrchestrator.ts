@@ -49,7 +49,7 @@ import type { ImportDiagnostic, ResolvedGraph } from "../imports/types";
 import type { CRLError } from "../types/errors";
 
 import { catalogFhirLibraries } from "../cql-emitter/catalog/loadCatalog";
-import { lowerLocalCodes, astHasConceptLocalCode } from "../cql-emitter/lowerLocalCodes";
+import { lowerLocalCodes, astHasConceptLocalCode, preLowerAge } from "../cql-emitter/lowerLocalCodes";
 import type { LowerLocalCodesResult } from "../cql-emitter/lowerLocalCodes";
 
 import { emitActivityDefinitionsForLibrary, type TerminologyResolver } from "./activity";
@@ -1157,12 +1157,17 @@ export function emitFhirDefClosure(
     // `patternCodeableConcept.coding.system` all byte-agree.
     const disambiguateDomain = !lib.isPrimarySeed && astHasConceptLocalCode(lib.ast);
     const entryLocalDomainId = localDomainIdFor(metadata.name, lib.libraryName, !disambiguateDomain);
-    const lowered = lowerLocalCodes(lib.ast, {
+    // #257 (age slice) T1 — the shared AGE pre-pipeline (retirement scan + standalone posrep
+    // synthesis) BEFORE `lowerLocalCodes`, so the retirement fires on the FHIR-only path too (MCP
+    // `emit_crl_fhir` never runs the Validator). The standalone transform adds no local code, so the
+    // case-feature `localCodes` selection is unchanged.
+    const preAge = preLowerAge(lib.ast);
+    const lowered = lowerLocalCodes(preAge.ast, {
       canonicalBase: metadata.canonicalBase,
       localDomainId: entryLocalDomainId,
     });
-    if (lowered.errors.length > 0) {
-      errors.push(...lowered.errors);
+    if (preAge.errors.length > 0 || lowered.errors.length > 0) {
+      errors.push(...preAge.errors, ...lowered.errors);
     } else {
       const codeConcepts = lowered.localCodes;
       if (codeConcepts.length > 0) {

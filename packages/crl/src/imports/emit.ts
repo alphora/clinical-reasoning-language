@@ -21,7 +21,12 @@ import {
 } from "../cql-emitter/layeredEmit";
 import type { Partition } from "../cql-emitter/layeredEmit";
 import { loadCatalogLibraries } from "../cql-emitter/catalog/loadCatalog";
-import { lowerLocalCodes, localCodeSystemUrl, astHasConceptLocalCode } from "../cql-emitter/lowerLocalCodes";
+import {
+  lowerLocalCodes,
+  localCodeSystemUrl,
+  astHasConceptLocalCode,
+  preLowerAge,
+} from "../cql-emitter/lowerLocalCodes";
 import { readCanonicalBase, readPolicyId } from "../fhir-emitter/metadata";
 import { localDomainIdFor, pascalCaseNameForId } from "../fhir-emitter/slug";
 import type { CRLError } from "../types/errors";
@@ -450,9 +455,22 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     // are disambiguated). Threaded into the lowering so the synthetic `codesystem
     // '<url>'` decl carries the disambiguated url for a sibling `code is` library.
     const entryLocalDomainId = domainIdFor(entry);
-    const lowered = lowerLocalCodes(entry.ast, { canonicalBase, localDomainId: entryLocalDomainId });
+    // #257 (age slice) T1 — run the shared AGE pre-pipeline (retirement scan + standalone posrep
+    // synthesis) BEFORE `lowerLocalCodes`, so a standalone Patient age posrep is classifiable in this
+    // lane (rather than dropping to a null layer) and the retirement fires here too. `didLower` is
+    // computed against the pre-transformed ast, so a standalone-only library (no `code is`) does not
+    // spuriously register a local-domain for collision tracking.
+    const preAge = preLowerAge(entry.ast);
+    if (preAge.errors.length > 0) lowerErrors.push(...preAge.errors);
+    const lowered = lowerLocalCodes(preAge.ast, { canonicalBase, localDomainId: entryLocalDomainId });
     if (lowered.errors.length > 0) lowerErrors.push(...lowered.errors);
-    const didLower = lowered.ast !== entry.ast;
+    // `didLower` = did `lowerLocalCodes` synthesize a local codesystem (the `code is` lowering) —
+    // computed against the pre-transformed ast, so a standalone-only library (no `code is`) does not
+    // spuriously register a local-domain for collision tracking. `astChanged` = did EITHER pass
+    // transform the ast (so the entry must carry the transformed ast — the standalone synthesis is
+    // lost otherwise, since `lowerLocalCodes` fast-paths a no-`code is` library to `=== preAge.ast`).
+    const didLower = lowered.ast !== preAge.ast;
+    const astChanged = lowered.ast !== entry.ast;
     if (didLower && entry.name) {
       // #198 — the collision key is the PER-ENTRY policy-id-slugged local-domain url
       // (the same disambiguated slug source the lowering uses), so the cross-library
@@ -469,7 +487,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       localUrnDisambiguated.set(urn, disambiguatedBaseFor(entry) !== undefined);
     }
     if (entry.name) localCodesCountByName.set(entry.name, lowered.localCodes.length);
-    return didLower ? { ...entry, ast: lowered.ast } : entry;
+    return astChanged ? { ...entry, ast: lowered.ast } : entry;
   });
   // Helper: the lowered `code is` count for an entry (0 when none / unnamed).
   const localCodesCountFor = (name: string | null): number =>

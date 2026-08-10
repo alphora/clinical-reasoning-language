@@ -96,22 +96,25 @@ describe("authoring-kit — reference artifacts", () => {
     expect(built.success).toBe(true);
   });
 
-  it("patient-age-both-rep-reference.crl (the SOLE `definition is` carve-out) validates clean + teaches BOTH bounds", () => {
-    // Both concepts carry BOTH `code is` (local) and `definition is age today <cmp> <N> years` (compute over
-    // Patient.birthDate) — the one sanctioned `definition is`. It must validate CLEAN embedded.
+  it("patient-age-both-rep-reference.crl (local override + Patient age posrep) validates clean + teaches BOTH bounds", () => {
+    // Both concepts carry BOTH a `code is` (local override) and a Patient age `source representation`
+    // whose `value projection is age today <cmp> <N> years` computes over Patient.birthDate (#257,
+    // the migrated form). It must validate CLEAN embedded.
     expect(crlErrors(PATIENT_AGE_BOTH_REP_REFERENCE_CRL)).toEqual([]);
     // Guard the both-rep SHAPE on BOTH the lower- and upper-bound concept (a regression dropping either compute arm
     // would silently revert it to a plain local boolean — the content hash alone can't catch that, it re-pins on any change).
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/- code is `age-18-or-older`\./);
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(
-      /- definition is age today at least 18 years\./,
+      /- value projection is age today at least 18 years\./,
     );
     // #215 upper bound: the pediatric `under 21` both-rep concept + decision must survive.
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/concept "Patient Under Twenty One Years":/);
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/- code is `under-21`\./);
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(
-      /- definition is age today under 21 years\./,
+      /- value projection is age today under 21 years\./,
     );
+    // Both concepts carry the Patient/birthDate posrep carrier.
+    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL.match(/- value element is Patient\.birthDate\./g) ?? []).toHaveLength(2);
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(
       /when "Patient Under Twenty One Years" then recommend activity "Approve"/,
     );
@@ -408,7 +411,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.18");
+    expect(kit.schemaVersion).toBe("1.19");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -977,11 +980,15 @@ describe("authoring-kit — getAuthoringKit", () => {
     // #257 (schemaVersion 1.17→1.18): SHAPE + CONTENT — the artifact `verification` taxonomy (`cre-run`/
     // `engine-run`/`validate-only`) + `verificationLegend` payload + the reachable `representation-reference.crl`
     // (validate-only) + boundary proof-vs-authoring-axis cross-refs. Design round: disc 408. BOTH hashes move.
+    // #257 age slice (schemaVersion 1.18→1.19): T1 MECHANICAL migration of `patient-age-both-rep-reference.crl`
+    // from the retired `definition is age today` carve-out to the Patient age `source representation` +
+    // `value projection` recency form (the migrated exemplar inherits into both useCases; schemaVersion is
+    // hashed). Deeper kit re-teach is T3 (same pre-release work-set). Design + impl rounds: disc 409. BOTH hashes move.
     expect(cpg.contentHash).toBe(
-      "7ca51e1055b116433f7378a1b5cdc7e3ae60a0fc92e1a8769ee7bb69eb743b72",
+      "15955a9c8875aabd2c8edc478677467d1e8843279d93699c12595793ee5175fe",
     );
     expect(priorAuth.contentHash).toBe(
-      "a53ef591a4647b9e2887136e8cc9a2c5e40b09b27a5bdfd203f89f4c3ab85004",
+      "6c72fdef2a0e411b2e146d1f466516336d872df945c7f694de6298597af2fa4b",
     );
   });
 

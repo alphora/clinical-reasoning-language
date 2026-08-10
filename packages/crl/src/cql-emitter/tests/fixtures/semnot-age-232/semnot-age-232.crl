@@ -1,12 +1,17 @@
 library "Semnot Age 232".
 
 // Mirrors the IEHP #232 real artifact: an under-21 gate = sem-not over the
-// sanctioned patient-age both-representation (recency) concept.
+// patient-age both-representation (recency) concept — the local `code is` override
+// recency-merged with a Patient age `source representation` (#257, replacing the
+// retired `definition is age today` carve-out).
 concept "Age 21 Or Older":
-- type is Observation.
 - value type is boolean.
 - code is `age-21-or-older`.
-- definition is age today at least 21 years.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 21 years.
 
 concept "Under Age 21":
 - type is Observation.

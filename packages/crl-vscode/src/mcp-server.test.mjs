@@ -136,6 +136,7 @@ check("authoring_kit (default = cpg base) → PA-free payload + embedded referen
       "decision-reference.cel",
       "decision-reference.crl",
       "patient-age-both-rep-reference.crl",
+      "representation-reference.crl",
     ]);
     // No PA content leaked into the base bundle.
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
@@ -162,6 +163,7 @@ check("authoring_kit useCase:'prior-auth' → the full inherited 11-artifact set
       "pa-determination-reference.cel",
       "pa-determination-reference.crl",
       "patient-age-both-rep-reference.crl",
+      "representation-reference.crl",
       "source-delegated-decision-reference.cel",
       "source-delegated-decision-reference.crl",
     ]);
@@ -405,17 +407,22 @@ check("validate_crl via inline code → single-file mode (no cross-file context)
     'library "CritFn".',
     'concept "Has Qualifying Diagnosis":',
     "- type is Observation.",
+    "- value type is boolean.",
     "- code is `dx`.",
     'concept "Failed Drug Therapy":',
     "- type is Observation.",
+    "- value type is boolean.",
     "- code is `fdt`.",
     'concept "Failed Physical Therapy":',
     "- type is Observation.",
+    "- value type is boolean.",
     "- code is `fpt`.",
     'concept "Failed Conservative Therapy":',
+    "- value type is boolean.",
     '- defined as ( "Failed Drug Therapy" sem-or "Failed Physical Therapy" ).',
     'concept "Imaging Not Recent":',
     "- type is Observation.",
+    "- value type is boolean.",
     "- code is `inr`.",
     'criterion "Meets Coverage Preconditions":',
     '- when ( "Has Qualifying Diagnosis" and "Failed Conservative Therapy" ).',

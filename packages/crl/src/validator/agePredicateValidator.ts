@@ -1,31 +1,37 @@
 import { CRL } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
 import { matchNarrative } from "../template-match";
+import { isAgeAtStartOfPrefix, sanctionedAgeAnchoredOp } from "../template-match/agePredicate";
 import {
-  isAgeAtStartOfPrefix,
-  isAgeTodayPrefix,
-  sanctionedAgeAnchoredOp,
-  sanctionedAgeTodayOp,
-} from "../template-match/agePredicate";
+  ageRetirementMessage,
+  isRetiredAgeTodayDefinition,
+  resolveAgeConcept,
+} from "../template-match/recencyProjectionOverride";
 
+import type { AgePredicateReason } from "./validator";
 import { ValidationError } from "./validator";
 
-// #215 — reject an ATTEMPTED age predicate that is NOT a sanctioned one (an unsupported
-// comparator such as `less than`, or a non-year unit) at AUTHOR time. Without this,
-// `validate_crl` returned success for `age today less than 21 years` / `age today under
-// 21 months` while `emit_crl` produced a loud unmatched sentinel — a validate/emit
-// divergence the KE flagged (#215 Ask 2).
+// #215 / #257 — author-time enforcement of the patient-age surface. THREE jobs:
 //
-// Screens BOTH predicate prefixes — `age today <…>` and `age at start of <…>`. Each is
-// unambiguously a predicate ATTEMPT: neither shares a prefix with the only bare age
-// calculation (`age at <ConceptRef>`), so screening cannot false-positive a legal form.
-// The "is it sanctioned?" test is the SHARED classifier (template-match/agePredicate) the
-// emit lowering gate also uses, so validate and emit cannot drift on the sanctioned op set.
+//  (1) RETIREMENT (#257). An authored `definition is age today <cmp> <Q>` is the RETIRED
+//      carve-out — patient age is now modeled as a Patient `source representation` over
+//      `Patient.birthDate` with a `value projection`. Any `definition is age today …` (sanctioned
+//      or not) is an error pointing at the posrep fix (`ageRetirementMessage` shows both the
+//      local-override and standalone variants). This is the author-time half of the retirement;
+//      the emit pipeline (`emitCQLFromAST`) is the emit-boundary half. The two SHARE
+//      `isRetiredAgeTodayDefinition` + `ageRetirementMessage` so they cannot drift.
 //
-// Out of scope (deliberate): `value type is boolean` enforcement for both-rep age
-// concepts (tracked separately — a nonsensical declaration, not a wrong determination);
-// and `sem-not` over an age concept (operator decision — existing content stays valid;
-// `sem-not` lives in a `DefinedAsDefinition`, which this validator never inspects).
+//  (2) ANCHORED (#215, unchanged). `definition is age at start of "<anchor>" <cmp> <Q>` computes
+//      over another concept (the anchor), so it STAYS a concept-level `definition is` (A.5 forbids
+//      it as a datum-local projection). An unsanctioned comparator/unit there is still rejected.
+//
+//  (3) POSREP PROJECTION (#257). A posrep `value projection is age today …` must be a sanctioned
+//      age predicate ON the built Patient age carrier. An unsanctioned attempt, or a sanctioned
+//      projection on the wrong carrier, is rejected — the SAME `resolveRecencyProjection` +
+//      messages the emit lowering uses, so validate and emit cannot drift on the sanctioned set.
+//
+// The "is it sanctioned?" tests are the SHARED classifiers (`template-match`), so `validate_crl`
+// and `emit_crl` cannot disagree on the accepted age forms (the #215 divergence this closes).
 
 type Attribution = { libraryName?: string; filePath?: string };
 
@@ -45,38 +51,73 @@ export class AgePredicateValidator {
     return errors;
   }
 
-  private check(stmt: CRL["statements"][number], attribution: Attribution, errors: ValidationError[]): void {
+  private check(
+    stmt: CRL["statements"][number],
+    attribution: Attribution,
+    errors: ValidationError[],
+  ): void {
     if (stmt.type !== "Concept") return;
-    if (stmt.definition?.type !== "DefinitionIsDefinition") return;
-    const body = stmt.definition.body;
 
-    const family = isAgeTodayPrefix(body)
-      ? "age today"
-      : isAgeAtStartOfPrefix(body)
-        ? "age at start of"
-        : null;
-    if (family === null) return;
+    // (1) RETIREMENT — an authored `definition is age today …` migrates to a posrep.
+    if (isRetiredAgeTodayDefinition(stmt)) {
+      const body =
+        stmt.definition?.type === "DefinitionIsDefinition" ? stmt.definition.body : undefined;
+      errors.push({
+        kind: "age-predicate-unsupported",
+        reason: "definition-retired",
+        conceptName: stmt.name,
+        message: ageRetirementMessage(stmt.name),
+        location: body?.location ?? stmt.location,
+        severity: "error",
+        ...attribution,
+      });
+    }
 
-    // It IS an age-predicate attempt — require the whole narrative to match a sanctioned
-    // age op (over the no-arg `AgeAt()` for `age today`, or `AgeAt(StartOf(<ref>))` for the
-    // anchored form). Non-year units fail here too (the matcher's year-guard makes them
-    // unknown → not sanctioned).
-    const matched = matchNarrative(body);
-    const sanctioned =
-      family === "age today" ? sanctionedAgeTodayOp(matched) : sanctionedAgeAnchoredOp(matched);
-    if (sanctioned !== null) return;
+    // (2) ANCHORED `age at start of …` — still a sanctioned concept-level `definition is`.
+    if (stmt.definition?.type === "DefinitionIsDefinition") {
+      const body = stmt.definition.body;
+      if (isAgeAtStartOfPrefix(body) && sanctionedAgeAnchoredOp(matchNarrative(body)) === null) {
+        errors.push({
+          kind: "age-predicate-unsupported",
+          reason: "unsupported-comparator",
+          conceptName: stmt.name,
+          message:
+            `Concept "${stmt.name}": unsupported \`age at start of\` predicate. Supported: ` +
+            `\`age at start of "<anchor>" <at least | at most | under | younger than> <n> years\` ` +
+            `— a YEARS quantity only. Use \`under\` (not \`less than\`); do NOT use month/day ` +
+            `units (age is computed in whole years).`,
+          location: body.location,
+          severity: "error",
+          ...attribution,
+        });
+      }
+    }
 
-    errors.push({
-      kind: "age-predicate-unsupported",
-      conceptName: stmt.name,
-      message:
-        `Concept "${stmt.name}": unsupported \`${family}\` predicate. Supported: ` +
-        `\`${family} <at least | at most | under | younger than> <n> years\` — a YEARS ` +
-        `quantity only. Use \`under\` (not \`less than\`); do NOT use month/day units ` +
-        `(age is computed in whole years).`,
-      location: body.location,
-      severity: "error",
-      ...attribution,
-    });
+    // (3) WHOLE-CONCEPT age SHAPE — the SHARED `resolveAgeConcept` classifier the emit lowering also
+    //     consults, so validate and emit cannot drift on the concept-shape lattice (not just the
+    //     sanctioned comparator set). Every age-shaped mis-authoring (unsanctioned / wrong-carrier /
+    //     3-way / 3-rep / non-Observation local / definition+posrep / non-boolean value type /
+    //     multiple age posreps) is reported here EXCEPT the `anchored` case, whose author-time owner
+    //     is A.5 (`value-projection-references-concept`) — reporting it here too would double-report.
+    const shape = resolveAgeConcept(stmt);
+    if (shape.kind === "error" && !shape.anchored) {
+      const firstRepLoc = (stmt.representations ?? [])[0];
+      errors.push({
+        kind: "age-predicate-unsupported",
+        reason: reasonForErrorKind(shape.errorKind),
+        conceptName: stmt.name,
+        message: shape.message,
+        location: firstRepLoc?.valueProjection?.body.location ?? firstRepLoc?.location ?? stmt.location,
+        severity: "error",
+        ...attribution,
+      });
+    }
   }
+}
+
+/** Map a shared emit-error kind to the validator's `reason` sub-discriminator. */
+function reasonForErrorKind(errorKind: string): AgePredicateReason {
+  if (errorKind === "emit-age-projection-unsupported") return "projection-unsupported";
+  if (errorKind === "emit-age-projection-wrong-carrier") return "projection-wrong-carrier";
+  return "projection-shape"; // concept-shape lattice (3-way / 3-rep / non-Observation / value type)
 }

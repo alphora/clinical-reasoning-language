@@ -35,6 +35,10 @@ export interface CrlConceptNode {
   definitionKind?: ConceptDefinitionKind;
   hasLocalCode: boolean; // has a local `- code is …` (locally assertable)
   hasRepresentations: boolean; // has ≥1 `possible representation:` entry
+  /** Has ≥1 `source representation` carrying a `value projection is …` — the datum is PROJECTED to the
+   *  concept's value (a computation), so the concept is INFERRED even with no top-level `definition`
+   *  (#257: the patient-age posrep recency form). */
+  hasValueProjection: boolean;
   /** The concept nodeKeys this concept is DIRECTLY defined in terms of (deduped, source order). Direct edges only. */
   definitionRefs: string[];
 }
@@ -64,8 +68,13 @@ export interface ConceptClassification {
 
 export function classifyConcept(c: CrlConceptNode): ConceptClassification {
   return {
+    // A `value projection` computes the concept's value from a representation's datum → inferred,
+    // even with no top-level `definition` (#257: the patient-age posrep recency form; a projection-
+    // less external `source representation` stays asserted — its datum IS the value).
     layer:
-      c.definitionKind === "defined-as" || c.definitionKind === "definition-is"
+      c.definitionKind === "defined-as" ||
+      c.definitionKind === "definition-is" ||
+      c.hasValueProjection
         ? "inferred"
         : "asserted",
     locallyAssertable: c.hasLocalCode,
@@ -124,6 +133,7 @@ export function buildCrlConceptLayer(
         ...(c.definition ? { definitionKind: DEF_KIND[c.definition.type] } : {}),
         hasLocalCode: c.code !== undefined,
         hasRepresentations: c.representations.length > 0,
+        hasValueProjection: c.representations.some((r) => r.valueProjection !== undefined),
         definitionRefs,
       });
     }

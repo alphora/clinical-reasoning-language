@@ -698,3 +698,20 @@ decision "Triage":
     expect(policyCql).toContain(`include FHIRHelpers version '${DEFAULT_FHIRHELPERS_VERSION}'`);
   });
 });
+
+describe("#257 (age slice) — standalone Patient age posrep in the imports/interface lane", () => {
+  it("a standalone age posrep in a decision-bearing (code-is) library rides the Inferred lane, not dropped to a null layer", () => {
+    // Regression guard for the impl-round [critical]: pre-migration a standalone `definition is age
+    // today` classified Inferred and emitted here; the migrated posrep form must NOT silently drop
+    // (classify null) when the library also has a `code is` concept forcing the interface split.
+    const root = path.join(FIXTURES, "standalone-age", "standalone-age.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(true);
+    // The age determination emits the generic computed call in SOME emitted library (the Inferred
+    // layer) — proving "Adult" was classified + emitted, not dropped.
+    const allCql = result.cqlByLibrary.map((e) => e.cql).join("\n\n");
+    expect(allCql).toContain("CRLCommon.AtLeast(CRLCommon.AgeAt(), 18 'years')");
+    // And a define for the age concept exists (the decision's `when "Adult"` resolves).
+    expect(allCql).toMatch(/define "Adult":/);
+  });
+});

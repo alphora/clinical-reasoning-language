@@ -8,10 +8,15 @@ import { buildCRL } from "../../index";
 import { validateCRLImports } from "../../imports/validate";
 import { Validator, type ValidationError, type ValidationResult } from "../validator";
 
-// #215 — the AgePredicateValidator rejects an unsanctioned age predicate (`age today <…>`
-// OR `age at start of <…>`) with an unsupported comparator or non-year unit, at AUTHOR
-// time, closing the validate/emit divergence (KE Ask 2). End-to-end via buildCRL (so
-// classification has run) then the Validator, mirroring the real single-file path.
+// #215 / #257 — the AgePredicateValidator at AUTHOR time:
+//  - RETIRES any `definition is age today …` (the carve-out migrated to a Patient age `source
+//    representation`), pointing at the posrep fix (#257);
+//  - keeps rejecting an unsanctioned ANCHORED `age at start of …` (unsupported comparator / non-
+//    year unit, #215) — anchored age stays a concept-level `definition is`;
+//  - rejects a posrep `value projection is age today …` that is unsanctioned or on the wrong
+//    carrier.
+// All carry `kind: "age-predicate-unsupported"` with a `reason` sub-discriminator. End-to-end via
+// buildCRL (so classification has run) then the Validator, mirroring the real single-file path.
 
 function validateFull(src: string): ValidationResult {
   const built = buildCRL(src);
@@ -23,6 +28,10 @@ function ageErrors(src: string): ValidationError[] {
 }
 const concept = (pred: string, extra = "") =>
   `library "T".\nconcept "C":\n- type is Observation.\n- value type is boolean.\n${extra}- definition is ${pred}.\n`;
+// The migrated posrep form: a Patient age `source representation` (optionally with a local
+// `code is` override) whose `value projection` computes live age over Patient.birthDate.
+const posrepConcept = (projection: string, extra = "") =>
+  `library "T".\nconcept "C":\n- value type is boolean.\n${extra}- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is ${projection}.\n`;
 
 describe("AgePredicateValidator (#215) — unsanctioned age predicates rejected at author time", () => {
   it("REJECTS an unsupported comparator (`less than`) — age today AND anchored", () => {
@@ -54,7 +63,7 @@ describe("AgePredicateValidator (#215) — unsanctioned age predicates rejected 
     }
   });
 
-  it("ACCEPTS every sanctioned age-today comparator with a year unit — and the doc is otherwise VALID", () => {
+  it("RETIRES every `definition is age today …` (sanctioned or not) with a migration-pointing error (#257)", () => {
     for (const pred of [
       "age today at least 18 years",
       "age today at most 21 years",
@@ -62,10 +71,62 @@ describe("AgePredicateValidator (#215) — unsanctioned age predicates rejected 
       "age today younger than 18 years",
       "age today under 1 year",
     ]) {
-      const r = validateFull(concept(pred));
-      expect(r.errors, pred).toHaveLength(0);
-      expect(r.isValid, pred).toBe(true);
+      const errs = ageErrors(concept(pred));
+      expect(errs, pred).toHaveLength(1);
+      if (errs[0].kind === "age-predicate-unsupported") {
+        expect(errs[0].reason, pred).toBe("definition-retired");
+      }
+      // The migration message points at the posrep replacement.
+      expect(errs[0].message, pred).toMatch(/source representation/);
+      expect(errs[0].message, pred).toMatch(/Patient\.birthDate/);
     }
+  });
+
+  it("ACCEPTS the migrated posrep form — a sanctioned `value projection is age today …` on the Patient carrier validates clean", () => {
+    for (const proj of [
+      "age today at least 18 years",
+      "age today at most 21 years",
+      "age today under 21 years",
+      "age today younger than 18 years",
+    ]) {
+      // Standalone (no local override) AND with a local `code is` override both validate clean.
+      expect(ageErrors(posrepConcept(proj)), proj).toHaveLength(0);
+      expect(ageErrors(posrepConcept(proj, "- code is `x`.\n")), `${proj} + code`).toHaveLength(0);
+    }
+  });
+
+  it("REJECTS the concept-shape lattice at AUTHOR time (validate/emit parity — no green-then-emit-fails)", () => {
+    // A non-boolean concept value type on an age projection.
+    const nonBool = ageErrors(posrepConcept("age today at least 18 years").replace("value type is boolean", "value type is Quantity"));
+    expect(nonBool).toHaveLength(1);
+    if (nonBool[0].kind === "age-predicate-unsupported") expect(nonBool[0].reason).toBe("projection-shape");
+    // A top-level definition + age posrep with no `code is` (the age posrep would be silently dropped
+    // at emit without this rule).
+    const defPlusPosrep = ageErrors(
+      `library "T".\nconcept "X":\n- type is Observation.\n- value type is boolean.\n- code is \`x\`.\nconcept "C":\n- value type is boolean.\n- defined as "X".\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is age today at least 18 years.\n`,
+    ).filter((e) => e.kind === "age-predicate-unsupported" && e.reason === "projection-shape");
+    expect(defPlusPosrep).toHaveLength(1);
+    // A `code is` + age posrep on an explicit non-Observation local type.
+    const nonObs = ageErrors(
+      posrepConcept("age today at least 18 years", "- type is Condition.\n- code is `c`.\n"),
+    ).filter((e) => e.kind === "age-predicate-unsupported" && e.reason === "projection-shape");
+    expect(nonObs).toHaveLength(1);
+  });
+
+  it("REJECTS a posrep age projection that is unsanctioned or on the wrong carrier", () => {
+    // Unsanctioned comparator/unit on the Patient carrier → projection-unsupported.
+    const unsup = ageErrors(posrepConcept("age today less than 21 years"));
+    expect(unsup).toHaveLength(1);
+    if (unsup[0].kind === "age-predicate-unsupported") expect(unsup[0].reason).toBe("projection-unsupported");
+    // A sanctioned age-today projection on the WRONG carrier (Observation, not Patient) →
+    // projection-wrong-carrier.
+    const wrong =
+      `library "T".\nconcept "C":\n- value type is boolean.\n- source representation:\n` +
+      `  - type is Observation.\n  - value element is Observation.value.\n  - value type is boolean.\n` +
+      `  - value projection is age today at least 18 years.\n`;
+    const wc = ageErrors(wrong);
+    expect(wc).toHaveLength(1);
+    if (wc[0].kind === "age-predicate-unsupported") expect(wc[0].reason).toBe("projection-wrong-carrier");
   });
 
   it("ACCEPTS every sanctioned ANCHORED comparator (no age-predicate error; the anchor ref itself is orthogonal)", () => {
@@ -89,8 +150,10 @@ describe("AgePredicateValidator (#215) — unsanctioned age predicates rejected 
   });
 
   it("does NOT touch `sem-not` over an age concept (operator decision — it lives in `defined as`, not `definition is`)", () => {
+    // "Age 21 Or Older" authored in the migrated posrep form (local override + Patient age
+    // projection); the `sem-not` over it is orthogonal to the age validator.
     const errs = ageErrors(
-      `library "T".\nconcept "Age 21 Or Older":\n- type is Observation.\n- value type is boolean.\n- code is \`a21\`.\n- definition is age today at least 21 years.\nconcept "Under 21":\n- type is Observation.\n- value type is boolean.\n- defined as ( sem-not "Age 21 Or Older" ).\n`,
+      `library "T".\nconcept "Age 21 Or Older":\n- value type is boolean.\n- code is \`a21\`.\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is age today at least 21 years.\nconcept "Under 21":\n- type is Observation.\n- value type is boolean.\n- defined as ( sem-not "Age 21 Or Older" ).\n`,
     );
     expect(errs).toHaveLength(0);
   });

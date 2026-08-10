@@ -1,0 +1,33 @@
+# standalone-age
+library "Standalone Age".
+
+// #257 (age slice) T1 — a local-coded concept forces the INTERFACE split (this library gets
+// layered), and a STANDALONE Patient age posrep (no local `code is` override) must be classifiable
+// in this lane — it rides the Inferred layer as a computed determination, NOT dropped to a null
+// layer. Pre-migration the equivalent `definition is age today` classified Inferred here; the
+// migrated posrep form must not regress.
+
+concept "Has Local Thing":
+- type is Observation.
+- value type is boolean.
+- code is `thing`.
+
+concept "Adult":
+- value type is boolean.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 18 years.
+
+decision "Eligibility":
+first:
+- when "Adult" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
+
+activity "certify.Approve":
+- request CPGCommunicationRequest.
+- with `Adult — approve.`.
+activity "not-certify.Deny":
+- request CPGCommunicationRequest.
+- with `Not an adult — deny.`.

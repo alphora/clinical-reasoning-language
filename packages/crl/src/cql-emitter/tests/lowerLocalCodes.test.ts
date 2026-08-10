@@ -402,14 +402,17 @@ concept "Both":
     expect(inferredTwin!.code).toBeUndefined();
   });
 
-  it("`code is` + `definition is age today at least <n> years` (patient-age both-rep) SPLITS with merge:recency", () => {
+  it("`code is` + a Patient age `source representation` (patient-age both-rep) SPLITS with merge:recency", () => {
     const ast = parse(
       lib(`
 concept "Age 18 Or Older":
-- type is Observation.
 - value type is boolean.
 - code is \`age-18-or-older\`.
-- definition is age today at least 18 years.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 18 years.
 `),
     );
     const { ast: out, errors } = lowerLocalCodes(ast);
@@ -425,6 +428,12 @@ concept "Age 18 Or Older":
     expect(inferredTwin!.__bothRepFoldInLocalSource).toBe("Age 18 Or Older");
     expect(inferredTwin!.__bothRepMerge).toBe("recency");
     expect(inferredTwin!.__bothRepRecencyThreshold).toBe("18 'years'");
+    expect(inferredTwin!.__bothRepRecencyOp).toBe("AtLeast");
+    expect(inferredTwin!.__recencyOverrideId).toBe("age-today-over-patient-birthdate");
+    expect(inferredTwin!.__synthesizedFromPosrep).toBe(true);
+    // The consumed posrep is stripped from both twins (not re-emitted as a standalone posrep).
+    expect(localTwin!.representations).toHaveLength(0);
+    expect(inferredTwin!.representations).toHaveLength(0);
     expect(localTwin!.code).toBeUndefined();
     expect(inferredTwin!.code).toBeUndefined();
   });
@@ -448,34 +457,41 @@ concept "Mixed Def":
     expect(errors.find((e) => e.kind === "emit-mixed-code-and-definition")!.message).toMatch(/Mixed Def/);
   });
 
-  it("`code is` + `definition is age today at least 18 months` (NON-year unit) → emit-mixed-code-and-definition (unit guard)", () => {
+  it("`code is` + age posrep with a NON-year unit projection → emit-age-projection-unsupported (unit guard, LOUD not silent)", () => {
     // AgeAt() is age-in-YEARS and AtLeast is unit-blind; a non-year threshold
-    // would silently mean `ageYears >= 18`. The unit guard rejects it → the
-    // narrative is not the accepted age-today pattern → hard error.
+    // would silently mean `ageYears >= 18`. The unit guard rejects the projection → it
+    // is not the accepted age-today pattern → a LOUD hard error, never a silent stub.
     const ast = parse(
       lib(`
 concept "Age Months":
-- type is Observation.
 - value type is boolean.
 - code is \`age-months\`.
-- definition is age today at least 18 months.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 18 months.
 `),
     );
     const { errors } = lowerLocalCodes(ast);
-    expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(true);
-    expect(errors.find((e) => e.kind === "emit-mixed-code-and-definition")!.message).toMatch(/Age Months/);
+    expect(errors.some((e) => e.kind === "emit-age-projection-unsupported")).toBe(true);
+    expect(errors.find((e) => e.kind === "emit-age-projection-unsupported")!.message).toMatch(/Age Months/);
   });
 
-  it("`code is` + age `definition is` on a NON-Observation `type is` → emit-mixed-code-and-definition (recency shape guard)", () => {
-    // The recency merge emits an Observation-boolean retrieve; a `type is Condition`
-    // recency concept would mis-emit against it. Require `type is Observation`.
+  it("`code is` + age posrep on a NON-Observation concept `type is` → emit-mixed-code-and-definition (recency shape guard)", () => {
+    // The local override's recency merge emits an Observation-boolean retrieve; a
+    // `type is Condition` local concept would mis-emit against it. Require Observation.
     const ast = parse(
       lib(`
 concept "Age Cond":
 - type is Condition.
 - value type is boolean.
 - code is \`age-cond\`.
-- definition is age today at least 18 years.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 18 years.
 `),
     );
     const { errors } = lowerLocalCodes(ast);
@@ -485,21 +501,28 @@ concept "Age Cond":
     expect(msg).toMatch(/type is Observation/);
   });
 
-  it("`code is` + age `definition is` + `source representation` (3-way) → emit-mixed-code-and-definition, NOT a silent pass-through", () => {
-    // A both-rep age concept that ALSO carries a `source representation` must NOT
-    // fall through the representation skip un-split (which would drop the local
-    // code side). Diagnose loudly.
+  it("`code is` + age posrep + a SECOND `source representation` (3-rep) → emit-mixed-code-and-definition, NOT a silent pass-through", () => {
+    // The 2-rep recency form (local override + Patient age projection) with an EXTRA
+    // representation is out of scope (#257 general N-rep); diagnose loudly rather than
+    // dropping the local-code side.
     const ast = parse(
       lib(`
 terminology "Ext VS":
 - valueset is \`http://example.org/ext\`.
 
 concept "Age Rep":
-- type is Observation.
 - value type is boolean.
 - code is \`age-rep\`.
-- definition is age today at least 18 years.
-- source representation: - coded from "Ext VS".
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 18 years.
+- source representation:
+  - type is Observation.
+  - value element is Observation.value.
+  - value type is boolean.
+  - coded from "Ext VS".
 `),
     );
     const { ast: out, errors } = lowerLocalCodes(ast);
@@ -516,11 +539,14 @@ concept "Age Rep":
     const ast = parse(
       lib(`
 concept "Age 18 Or Older":
-- type is Observation.
 - value type is boolean.
 - meta is \`@business-logic-deferred: answer resource must not persist beyond the session (#190)\`.
 - code is \`age-18-or-older\`.
-- definition is age today at least 18 years.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 18 years.
 `),
     );
     const { ast: lowered, errors } = lowerLocalCodes(ast);
@@ -557,17 +583,21 @@ concept "Age 18 Or Older":
     );
   });
 
-  // ── #215: UPPER-BOUND age predicates (`at most` ≤, `under`/`younger than` <) ──
-  // Same both-rep recency machinery as `at least`, carrying the comparator op.
+  // ── #215/#257: UPPER-BOUND age predicates (`at most` ≤, `under`/`younger than` <) ──
+  // Same both-rep recency machinery as `at least`, carrying the comparator op — now via the
+  // Patient age `source representation` (the migrated form; `definition is age today` is retired).
   const lowerAgeConcept = (name: string, code: string, predicate: string) =>
     lowerLocalCodes(
       parse(
         lib(`
 concept "${name}":
-- type is Observation.
 - value type is boolean.
 - code is \`${code}\`.
-- definition is ${predicate}.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is ${predicate}.
 `),
       ),
     );
@@ -626,7 +656,7 @@ concept "${name}":
     expect(rUnder).toContain("CRLCommon.Below(CRLCommon.AgeAt(), 21 'years')");
   });
 
-  it("NON-year unit on EVERY upper-bound spelling (both-rep) → emit-mixed-code-and-definition (year-only at the match, per comparator)", () => {
+  it("NON-year unit on EVERY upper-bound spelling (both-rep posrep) → emit-age-projection-unsupported (year-only at the match, per comparator)", () => {
     for (const pred of [
       "age today at most 216 months",
       "age today under 216 months",
@@ -634,7 +664,7 @@ concept "${name}":
     ]) {
       const { errors } = lowerAgeConcept("Age Months", "age-months", pred);
       expect(
-        errors.some((e) => e.kind === "emit-mixed-code-and-definition"),
+        errors.some((e) => e.kind === "emit-age-projection-unsupported"),
         `year-guard should fire for "${pred}"`,
       ).toBe(true);
     }
@@ -647,13 +677,14 @@ concept "${name}":
     // at the match means it is NOT a recognized age predicate → soft-compiles unknown →
     // LOUD sentinel, never a resolved age call.
     for (const pred of ["age today under 216 months", "age today at most 216 months"]) {
-      const src = `# T\nlibrary "T".\nconcept "Age Gate":\n- type is Observation.\n- value type is boolean.\n- definition is ${pred}.\n`;
+      const src = `# T\nlibrary "T".\nconcept "Age Gate":\n- value type is boolean.\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is ${pred}.\n`;
       const r = emitCQL(src, { libraryName: "T" });
       expect(r.result ?? "").not.toMatch(/CRLCommon\.(Below|AtMost)\(CRLCommon\.AgeAt\(\), 216 'months'\)/);
       expect(
-        r.success === false || (r.result ?? "").includes("UnmatchedNarrative"),
-        `non-year age narrative "${pred}" must fail loudly, not emit a resolved call`,
+        r.success === false,
+        `non-year age projection "${pred}" must fail loudly, not emit a resolved call`,
       ).toBe(true);
+      expect(r.errors?.some((e) => e.kind === "emit-age-projection-unsupported")).toBe(true);
     }
   });
 
@@ -693,15 +724,18 @@ concept "Heavy":
     // also excluded by the args.length !== 0 leg of the same guard — out of #215 scope.)
   });
 
-  it("COMPUTE-ONLY (no `code is`): `definition is age today under|at most <n> years` emits the generic comparator call (Below/AtMost), no recency merge", () => {
+  it("STANDALONE (no `code is`): a Patient age posrep-only concept emits the generic comparator call (Below/AtMost), no recency merge", () => {
+    // A standalone age posrep (no local override) synthesizes a `definition is` and rides the
+    // ordinary emitDefinitionIs path — byte-identical to the retired standalone `definition is
+    // age today`, but authored as a `source representation` (the migrated form).
     for (const [pred, call] of [
       ["age today under 21 years", "CRLCommon.Below(CRLCommon.AgeAt(), 21 'years')"],
       ["age today at most 21 years", "CRLCommon.AtMost(CRLCommon.AgeAt(), 21 'years')"],
       ["age today younger than 21 years", "CRLCommon.Below(CRLCommon.AgeAt(), 21 'years')"],
     ] as const) {
-      const src = `# T\nlibrary "T".\nconcept "Age Gate":\n- type is Observation.\n- value type is boolean.\n- definition is ${pred}.\n`;
+      const src = `# T\nlibrary "T".\nconcept "Age Gate":\n- value type is boolean.\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is ${pred}.\n`;
       const r = emitCQL(src, { libraryName: "T" });
-      expect(r.success, `compute-only emit should succeed for "${pred}"`).toBe(true);
+      expect(r.success, `standalone posrep emit should succeed for "${pred}"`).toBe(true);
       expect(r.result).toContain(call);
       // scalar comparator, NOT the List<Observation> `exists` overload (guards a
       // PATTERN_RETURN_SHAPE regression that would wrap the call in `exists`).

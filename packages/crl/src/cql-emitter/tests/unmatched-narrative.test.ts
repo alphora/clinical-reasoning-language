@@ -302,10 +302,10 @@ describe("issue #77 — catalog↔matcher drift fix (plus audit additions)", () 
     expect(r.result).toMatch(/CRLCommon\.AgeAt\(/);
   });
 
-  it("age today at least <n> years → AtLeast(AgeAt(), n) with the NO-arg AgeAt()", () => {
+  it("age today at least <n> years (posrep projection) → AtLeast(AgeAt(), n) with the NO-arg AgeAt()", () => {
     const src = lib(
       "T",
-      `concept "Adult Today":\n- type is Observation.\n- value type is boolean.\n- definition is age today at least 18 years.\n`,
+      `concept "Adult Today":\n- value type is boolean.\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is age today at least 18 years.\n`,
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);

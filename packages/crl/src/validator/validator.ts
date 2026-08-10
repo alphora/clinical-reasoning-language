@@ -240,11 +240,34 @@ export interface MetaDiagnostic extends ValidationErrorBase {
     | "open-flag";
 }
 
-// #215 — an attempted `age today <…>` predicate that isn't a sanctioned age predicate
-// (unsupported comparator or non-year unit). `conceptName` names the offending concept.
+// #215 / #257 — an age predicate/projection defect. `conceptName` names the offending concept;
+// the `reason` sub-discriminator (mirrors `representation-shape`'s `rule`) lets consumers
+// specialize without parsing message text.
+//
+//   - "unsupported-comparator"   — #215: an attempted `age at start of <…>` predicate with an
+//                                  unsupported comparator or non-year unit (anchored form; the
+//                                  `age today` form is now retired, below).
+//   - "definition-retired"       — #257: an authored `definition is age today …` — the carve-out
+//                                  is RETIRED; migrate to a Patient age `source representation`.
+//   - "projection-unsupported"   — #257: a posrep `value projection is age today …` with an
+//                                  unsupported comparator or non-year unit.
+//   - "projection-wrong-carrier" — #257: a sanctioned age-today projection on the wrong carrier
+//                                  (resource / value element / value type is not the Patient age one).
+//   - "projection-shape"         — #257: a whole-concept age-shape defect (a `code is`+`definition`+
+//                                  age posrep 3-way, a 3rd representation, a non-Observation local
+//                                  type, a `definition`+age posrep without `code is`, or a concept
+//                                  value type that is not the projection's result type).
+export type AgePredicateReason =
+  | "unsupported-comparator"
+  | "definition-retired"
+  | "projection-unsupported"
+  | "projection-wrong-carrier"
+  | "projection-shape";
+
 export interface AgePredicateUnsupportedError extends ValidationErrorBase {
   kind: "age-predicate-unsupported";
   conceptName: string;
+  reason: AgePredicateReason;
 }
 
 /**

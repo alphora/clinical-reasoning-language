@@ -1026,6 +1026,16 @@
       },
       {
         "kind": "completion",
+        "label": "date",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR value type — `value type is date.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
         "label": "dateTime",
         "itemKind": 24,
         "insertText": null,
@@ -1468,6 +1478,16 @@
         "insertText": null,
         "sortText": null,
         "detail": "CRL parameter type — `param type is CodeableConcept.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "date",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is date.`",
         "documentation": null,
         "range": null
       },

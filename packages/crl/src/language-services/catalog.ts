@@ -65,6 +65,7 @@ export const CONCEPT_VALUETYPES = [
   "Attachment",
   "boolean",
   "CodeableConcept",
+  "date",
   "dateTime",
   "integer",
   "Period",

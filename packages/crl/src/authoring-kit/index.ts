@@ -218,8 +218,17 @@ export type {
 //   `concept-form`/`value-type` dead-path refs are corrected. Design round: disc 408 (both design arms; two
 //   criticals — patient-age engine-run overstatement resolved to point-in-time construct verification, and the
 //   boundary contradiction resolved by the proof-vs-authoring-axis cross-refs). BOTH useCase hashes re-pin.
+// #257 age slice (schemaVersion 1.18→1.19): T1 MECHANICAL kit migration for the patient-age →
+//   posrep recency change. The `definition is age today` carve-out is RETIRED (replaced by a Patient
+//   age `source representation` whose `value projection is age today …` recency-merges with a local
+//   `code is` override); `patient-age-both-rep-reference.crl` is migrated to that form so it validates
+//   clean. This is the mechanical/compat half only — the DEEPER kit re-teach (the CONCEPT_LAYER_MODEL
+//   both-rep entry, the `patient-age-both-rep` rule prose, the boundary `definition is` carve-out
+//   wording, the representation-reference exemplar) is T3, in the SAME pre-release work-set (no release
+//   ships between). Design + impl rounds: disc 409. BOTH useCase hashes re-pin (the migrated exemplar
+//   inherits into both; schemaVersion is hashed).
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.18";
+const SCHEMA_VERSION = "1.19";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 

@@ -58,7 +58,9 @@ import type {
 import { getRefName, getRefLibrary, isQualifiedRef, definedAsExistsNotLowered } from "../ast/types";
 import type { ReferenceName } from "../ast/types";
 import type { CRLError } from "../types/errors";
-import { lowerLocalCodes } from "./lowerLocalCodes";
+import { recencyOverrideById } from "../template-match/recencyProjectionOverride";
+
+import { lowerLocalCodes, preLowerAge } from "./lowerLocalCodes";
 
 /**
  * #187 — the FHIRHelpers version the emitted CQL pins in
@@ -497,12 +499,22 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
     // pass is idempotent (clears `Concept.code`), so a re-entry from the layered
     // path (`emitLayered` → `emitCQLFromAST`) is a no-op. Hard errors (mixed
     // code+definition, empty code, missing type, duplicate code) short-circuit.
-    const lowered = lowerLocalCodes(ast, {
+    // #257 (age slice) T1 — the shared AGE pre-pipeline: the emit-boundary retirement scan of
+    // authored `definition is age today` (the carve-out replaced by the Patient age `source
+    // representation`) + the standalone (1-representation) age-posrep synthesis, run BEFORE the
+    // `code is` lowering (which additionally handles the 2-representation recency case). Runs on the
+    // ORIGINAL ast BEFORE any synthesis, so a definition SYNTHESIZED from a projection (flagged
+    // `__synthesizedFromPosrep`) is never mistaken for the retired authored form. The SAME
+    // `preLowerAge` runs in the imports/case-feature + FHIR lanes, so the standalone target is usable
+    // everywhere and the retirement fires on every path (none runs the Validator).
+    const pre = preLowerAge(ast);
+    const lowered = lowerLocalCodes(pre.ast, {
       canonicalBase: options.canonicalBase,
       localDomainId: options.localDomainId,
     });
-    if (lowered.errors.length > 0) {
-      return { success: false, errors: lowered.errors };
+    const preEmitErrors = [...pre.errors, ...lowered.errors];
+    if (preEmitErrors.length > 0) {
+      return { success: false, errors: preEmitErrors };
     }
     const emitter = new Emitter(lowered.ast, options);
     const out = emitter.emit();
@@ -1199,6 +1211,22 @@ class Emitter {
           `twin missing either is a compiler bug.`,
       );
     }
+    // The recency emit consults the projection OVERRIDE the twin names (`__recencyOverrideId`) for
+    // its CQL helper + compute fn — age is ONE caller of the override mechanism, not a hardcoded
+    // engine branch. The override's helper/fn are age-shaped (`recencyAgeTruths` / `AgeAt`) so the
+    // emitted CQL is byte-identical to the retired carve-out; the CQL catalog stays age-shaped
+    // (the re-home is a compile-time seam). A missing/unknown id is a compiler bug (the marker is
+    // set in lock-step with the recency markers in lowerLocalCodes).
+    const override = c.__recencyOverrideId ? recencyOverrideById(c.__recencyOverrideId) : undefined;
+    if (override === undefined) {
+      throw new Error(
+        `internal invariant violated: recency both-rep twin "${c.name}" has ` +
+          `__bothRepMerge === "recency" but __recencyOverrideId (${c.__recencyOverrideId}) ` +
+          `resolves to no built recency-projection override. The id is set in lock-step with ` +
+          `the recency markers in lowerLocalCodes; a recency twin without a resolvable override ` +
+          `is a compiler bug.`,
+      );
+    }
     const threshold = c.__bothRepRecencyThreshold;
     const op = c.__bothRepRecencyOp;
     const localLib =
@@ -1224,13 +1252,14 @@ class Emitter {
       `      where O.value is FHIR.boolean\n` +
       `      sort by (effective as FHIR.dateTime).value, id\n` +
       `  )`;
-    const computed = `CRLCommon.${op}(CRLCommon.AgeAt(), ${threshold})`;
-    // `CFH.recencyAgeTruths(newestLocalObservation, computedBoolean)` returns the
-    // recency-selected truth-set. It reads `Patient.birthDate` / `Patient.meta.lastUpdated`
-    // internally (Patient context), so the call site passes only the two arms.
-    // `CFH` is the include alias for CaseFeatureCommon (see the layered header).
+    const computed = `CRLCommon.${op}(CRLCommon.${override.computeFn}(), ${threshold})`;
+    // `CFH.<recencyHelper>(newestLocalObservation, computedBoolean)` returns the recency-selected
+    // truth-set. The helper reads the projected datum + its recency timestamp
+    // (`${override.valueElementPath}` / `${override.recencyTimestamp}`) internally (Patient
+    // context), so the call site passes only the two arms. `CFH` is the include alias for
+    // CaseFeatureCommon (see the layered header).
     return (
-      `CFH.recencyAgeTruths(\n` +
+      `CFH.${override.recencyHelper}(\n` +
       `  ${newestLocal},\n` +
       `  ${computed}\n` +
       `)`

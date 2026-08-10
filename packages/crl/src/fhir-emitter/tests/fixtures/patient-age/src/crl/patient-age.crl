@@ -1,15 +1,19 @@
 library "Patient Age".
 
-// Patient-age both-representation concept: a `code is` LOCAL assertion PLUS a
-// `definition is` live age computation. The Inferred layer RECENCY-MERGES them
-// (newest valid local Observation vs the computed age). Authored opt-in — a
-// `code is`-only concept stays local-only (no auto-injection).
+// Patient-age both-representation concept: a `code is` LOCAL assertion (the implicit-standard
+// local Observation) PLUS a Patient age `source representation` whose `value projection` computes
+// live age over `Patient.birthDate`. The Inferred layer RECENCY-MERGES them (newest valid local
+// Observation vs the computed age). Authored opt-in — a `code is`-only concept stays local-only
+// (no auto-injection). #257: this replaces the retired `definition is age today` carve-out.
 concept "Age 18 Or Older":
-- type is Observation.
 - value type is boolean.
 - meta is `@business-logic-deferred: the case-3 human-assert answer Observation for this age criterion must NOT persist beyond the client session (mechanism deferred — #190); the recency lattice treats it as session-fresh`.
 - code is `age-18-or-older`.
-- definition is age today at least 18 years.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 18 years.
 
 decision "Adult Eligibility Determination":
 first:
