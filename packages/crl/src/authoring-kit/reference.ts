@@ -70,18 +70,22 @@ is a communicated decision (see the dispositions rule).
 // ============ Concepts (local case-features: type is + code is only) ============
 
 concept "Hard Exclusion":
+- value type is boolean.
 - type is Condition.
 - code is \`hard-exclusion\`.
 
 concept "Qualifying Indication":
+- value type is boolean.
 - type is Condition.
 - code is \`qualifying-indication\`.
 
 concept "Contrast Allergy":
+- value type is boolean.
 - type is AllergyIntolerance.
 - code is \`contrast-allergy\`.
 
 concept "Complex Case":
+- value type is boolean.
 - type is Condition.
 - code is \`complex-case\`.
 
@@ -241,25 +245,31 @@ not-certify.Deny), validated against crl.dispositions.
 */
 
 concept "Has Qualifying Diagnosis":
+- value type is boolean.
 - type is Condition.
 - code is \`qualifying-diagnosis\`.
 
 concept "Failed Drug Therapy":
+- value type is boolean.
 - type is Observation.
 - code is \`failed-drug-therapy\`.
 concept "Failed Physical Therapy":
+- value type is boolean.
 - type is Observation.
 - code is \`failed-physical-therapy\`.
 criterion "Failed Conservative Therapy":          // two DISTINCT criteria (SEPARATE events) -> decision-layer or-guard,
 - when ( "Failed Drug Therapy" or "Failed Physical Therapy" ).  // NOT a \`defined as\` composite (not one fact recorded twice)
 
 concept "Viral Load Below Threshold Lab Result":
+- value type is boolean.
 - type is Observation.
 - code is \`viral-load-lab\`.
 concept "Viral Suppression Charted By Clinician":
+- value type is boolean.
 - type is Observation.
 - code is \`viral-suppression-charted\`.
 concept "Viral Suppression Documented":           // ONE clinical state attested two ways (lab OR chart note) -> GENUINE
+- value type is boolean.
 - defined as ( "Viral Load Below Threshold Lab Result" sem-or "Viral Suppression Charted By Clinician" ).  // rung-1 \`defined as\`, NOT distinct criteria
 
 decision "Coverage Determination":                 // criteria are nested \`when\` NODES (nesting = AND)
@@ -380,6 +390,7 @@ criteria as decision-tree nodes (see criteria-decision-reference).
 // (illustrative placeholder criterion — a real policy decomposes its stated criteria;
 // here a single local leaf keeps the focus on the determination pattern)
 concept "Has Qualifying Diagnosis":
+- value type is boolean.
 - type is Condition.
 - code is \`qualifying-diagnosis\`.
 
@@ -444,12 +455,15 @@ determination + one delegated sub.
 */
 
 concept "Continuation Request":
+- value type is boolean.
 - type is Condition.
 - code is \`continuation-request\`.
 concept "Demonstrated Response":
+- value type is boolean.
 - type is Observation.
 - code is \`demonstrated-response\`.
 concept "Clinically Indicated":
+- value type is boolean.
 - type is Condition.
 - code is \`clinically-indicated\`.
 
@@ -566,15 +580,19 @@ WHICH outcome wins (the EXACT disposition under \`first:\`), so a precedence inv
 
 // ===== Clinical criteria (local case-features; visible decision nodes) =====
 concept "Has Indication X":
+- value type is boolean.
 - type is Condition.
 - code is \`indication-x\`.
 concept "Failed Standard Therapy":
+- value type is boolean.
 - type is Observation.
 - code is \`failed-standard-therapy\`.
 concept "Has Indication Y":
+- value type is boolean.
 - type is Condition.
 - code is \`indication-y\`.
 concept "Has Severe Markers":
+- value type is boolean.
 - type is Observation.
 - code is \`severe-markers\`.
 

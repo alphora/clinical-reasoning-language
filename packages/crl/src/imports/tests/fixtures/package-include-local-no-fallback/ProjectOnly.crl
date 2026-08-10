@@ -3,6 +3,7 @@ library "ProjectOnly".
 
 concept "Local C":
 - type is Encounter.
+- value type is CodeableConcept.
 - coded from "Local T".
 
 terminology "Local T":

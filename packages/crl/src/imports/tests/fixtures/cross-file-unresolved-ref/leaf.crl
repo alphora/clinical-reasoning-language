@@ -3,6 +3,7 @@ library "Leaf".
 
 concept "Leaf Concept":
 - type is Encounter.
+- value type is CodeableConcept.
 - coded from "Leaf Vs".
 
 terminology "Leaf Vs":

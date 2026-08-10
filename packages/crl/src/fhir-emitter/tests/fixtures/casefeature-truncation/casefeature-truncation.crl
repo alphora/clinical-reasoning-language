@@ -21,6 +21,7 @@ concept "History Of Recurrent Skin Maceration With Fungal Infection":
 - code is `skin-maceration-fungal`.
 
 concept "Recurrent Skin Maceration Infection":
+- value type is boolean.
 - defined as ( "History Of Recurrent Skin Maceration With Bacterial Infection" sem-or "History Of Recurrent Skin Maceration With Fungal Infection" ).
 
 activity "Refer to Wound Care":

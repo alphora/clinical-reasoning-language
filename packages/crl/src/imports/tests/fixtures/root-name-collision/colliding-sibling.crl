@@ -3,6 +3,7 @@ library "Shared".
 
 concept "Sibling C":
 - type is Encounter.
+- value type is CodeableConcept.
 - coded from "Sibling T".
 
 terminology "Sibling T":

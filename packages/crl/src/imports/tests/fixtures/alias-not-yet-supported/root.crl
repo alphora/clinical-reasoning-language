@@ -4,4 +4,5 @@ include "SomePkg" as "P".
 
 concept "Root C":
 - type is Observation.
+- value type is CodeableConcept.
 - defined as "SomePkg"."Pkg C".

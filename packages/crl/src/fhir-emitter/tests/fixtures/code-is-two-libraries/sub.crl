@@ -10,6 +10,7 @@ library "Two Lib Sub".
 
 concept "Feature Sub":
 - type is Observation.
+- value type is boolean.
 - code is `feature-sub`.
 
 activity "Refer":

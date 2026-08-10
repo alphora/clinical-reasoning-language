@@ -15,10 +15,12 @@ concept "Hypertensive Reading":
 
 concept "Primary-Care Referral Justified by Hypertensive Reading":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Primary-Care Referrals" justified by "Hypertensive Reading".
 
 concept "Primary-Care Referrals Ordered":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Primary-Care Referrals" ordered.
 
 concept "Referral and Reading":

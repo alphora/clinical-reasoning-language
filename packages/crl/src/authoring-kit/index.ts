@@ -184,8 +184,13 @@ export type {
 //   normalized+oracle-verified — then re-validate, since the D2 artifact↔sidecar cross-check runs only in validate; exit 2
 //   = residue: a dead path → --search-root, else adjudicate) is the repair. NO payload-shape change. BOTH useCase hashes
 //   re-pin (schemaVersion is hashed AND the base note inherits into both chains).
+// #257 (schemaVersion 1.15→1.16): the concept-model redesign makes `value type` REQUIRED on EVERY concept
+//   (A.10 — `missing-value-type` is now a validator ERROR). Every reference-artifact/example concept declares
+//   its `value type` (the case-feature determinations are `value type is boolean`). NO doctrine change — the
+//   examples gain the now-mandatory shape. BOTH useCase hashes re-pin (schemaVersion is hashed + the concept
+//   declarations inherit into both chains).
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.15";
+const SCHEMA_VERSION = "1.16";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -722,7 +727,7 @@ const EXAMPLES: KitExample[] = [
     title: "Local case-feature concept (asserted, in scope)",
     language: "crl",
     snippet:
-      'concept "Documented Nonunion":\n- type is Condition.\n- code is `documented-nonunion`.',
+      'concept "Documented Nonunion":\n- type is Condition.\n- value type is boolean.\n- code is `documented-nonunion`.',
     valid: true,
     note: "type is + code is only — the Stage-1 leaf concept form.",
   },
@@ -730,7 +735,7 @@ const EXAMPLES: KitExample[] = [
     title: "A policy's ALTERNATIVES are joined in the DECISION layer, not by `defined as`",
     language: "crl",
     snippet:
-      'concept "Failed Drug Therapy":\n- type is Observation.\n- code is `failed-drug`.\nconcept "Failed Physical Therapy":\n- type is Observation.\n- code is `failed-pt`.\ncriterion "Failed Conservative Therapy":\n- when ( "Failed Drug Therapy" or "Failed Physical Therapy" ).',
+      'concept "Failed Drug Therapy":\n- type is Observation.\n- value type is boolean.\n- code is `failed-drug`.\nconcept "Failed Physical Therapy":\n- type is Observation.\n- value type is boolean.\n- code is `failed-pt`.\ncriterion "Failed Conservative Therapy":\n- when ( "Failed Drug Therapy" or "Failed Physical Therapy" ).',
     valid: true,
     note: "TWO DISTINCT criteria the policy offers as ALTERNATIVES, joined in the DECISION layer. Each stays its OWN visible `condition[]` in the emitted PlanDefinition, so a downstream reader sees WHICH modality failed. Naming it a `criterion` keeps the decision text unchanged (`when \"Failed Conservative Therapy\"`) while the atoms stay visible. REPLACES the former `defined as` sem-or composite over these same two failures: pre-#224 a `when` took a SINGLE concept reference, so `defined as` was the ONLY way to get a disjunction into a guard — that constraint is gone. The old note ('ONE criterion satisfiable by either representation') was weaker than the rule and was read as licensing any disjunction sitting under a criterion label. #168.",
   },
@@ -738,7 +743,7 @@ const EXAMPLES: KitExample[] = [
     title: "GENUINE rung-1 — ONE fact RECORDED two ways",
     language: "crl",
     snippet:
-      'concept "Viral Load Below Threshold Lab Result":\n- type is Observation.\n- code is `viral-load-lab`.\nconcept "Viral Suppression Charted By Clinician":\n- type is Observation.\n- code is `viral-suppression-charted`.\nconcept "Viral Suppression Documented":\n- defined as ( "Viral Load Below Threshold Lab Result" sem-or "Viral Suppression Charted By Clinician" ).',
+      'concept "Viral Load Below Threshold Lab Result":\n- type is Observation.\n- value type is boolean.\n- code is `viral-load-lab`.\nconcept "Viral Suppression Charted By Clinician":\n- type is Observation.\n- value type is boolean.\n- code is `viral-suppression-charted`.\nconcept "Viral Suppression Documented":\n- value type is boolean.\n- defined as ( "Viral Load Below Threshold Lab Result" sem-or "Viral Suppression Charted By Clinician" ).',
     valid: true,
     note: "ONE clinical reality — this patient's viral suppression — RECORDED in two places: a lab result or a clinician's chart note (the two records may themselves coexist; it is still ONE occurrence). The fact is nameable WITHOUT the concept's label, which IS the test. Contrast the criterion example above: failed drug therapy and failed physical therapy are two DIFFERENT events, not one occurrence recorded twice. This is rung-1 INFERENCE over ONE concept's representations. #168.",
   },
@@ -746,7 +751,7 @@ const EXAMPLES: KitExample[] = [
     title: 'THE VACUITY TRAP — the label supplying "the one fact"',
     language: "crl",
     snippet:
-      'concept "Life Threatening Cardiovascular Disease":\n- type is Condition.\n- code is `cv-disease`.\nconcept "Sleep Apnea":\n- type is Condition.\n- code is `sleep-apnea`.\nconcept "Uncontrolled Diabetes Mellitus":\n- type is Condition.\n- code is `uncontrolled-dm`.\nconcept "Severe Musculoskeletal Problem":\n- type is Condition.\n- code is `msk-problem`.\nconcept "Substantial Co Morbidity":\n- defined as ( "Life Threatening Cardiovascular Disease" sem-or "Sleep Apnea" sem-or "Uncontrolled Diabetes Mellitus" sem-or "Severe Musculoskeletal Problem" ).',
+      'concept "Life Threatening Cardiovascular Disease":\n- type is Condition.\n- value type is boolean.\n- code is `cv-disease`.\nconcept "Sleep Apnea":\n- type is Condition.\n- value type is boolean.\n- code is `sleep-apnea`.\nconcept "Uncontrolled Diabetes Mellitus":\n- type is Condition.\n- value type is boolean.\n- code is `uncontrolled-dm`.\nconcept "Severe Musculoskeletal Problem":\n- type is Condition.\n- value type is boolean.\n- code is `msk-problem`.\nconcept "Substantial Co Morbidity":\n- value type is boolean.\n- defined as ( "Life Threatening Cardiovascular Disease" sem-or "Sleep Apnea" sem-or "Uncontrolled Diabetes Mellitus" sem-or "Severe Musculoskeletal Problem" ).',
     valid: false,
     note: "Defended as rung-1 because the operands are 'representations of substantial co-morbidity' — but that fact is supplied by the concept's own NAME. Strip the label and there is no single clinical event: cardiovascular disease, sleep apnea, diabetes and a musculoskeletal problem are four DIFFERENT states, any of which independently satisfies the rule (they co-occur). The source's 'such as' marks alternatives, not representations. Faithful form: `criterion \"Substantial Co Morbidity\": - when ( A or B or C or D ).` The four operands are DECLARED, so the snippet is self-contained: pasting it produces ZERO validator output — no unresolved-reference noise to distract from the point. VALIDATOR-CLEAN — this is a JUDGE-lens (`hollowed-criteria`) violation, not a grammar/shape one (hence no `expectRule`); the grammar sees NOTHING wrong, which is exactly why UNIT ANCHORING exists.",
   },
@@ -813,7 +818,7 @@ const EXAMPLES: KitExample[] = [
       "@gap-filed is NOT a flag — it stays a `.crl` meta tag (required `; ref`), ships fine, does not gate",
     language: "crl",
     snippet:
-      'concept "Renal Function":\n- type is Observation.\n- meta is `@gap-filed: eGFR unit normalization not yet expressible; ref #180`.\n- code is `renal-function`.',
+      'concept "Renal Function":\n- type is Observation.\n- value type is boolean.\n- meta is `@gap-filed: eGFR unit normalization not yet expressible; ref #180`.\n- code is `renal-function`.',
     valid: true,
     note: "A durable pointer to already-tracked work — a REAL `.crl` meta tag (unlike flags, which left `.crl`), REQUIRED `; ref`, does not block mvComplete. Contrast with a review flag (a `medical-validation/flags/` store record authored via create_flag, blocks while open).",
   },

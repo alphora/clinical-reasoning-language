@@ -54,8 +54,10 @@ import type {
 // authoritative model. A `definition is` concept's value type stays AUTHOR-DECLARED.
 //
 // FIRES ONLY WHERE VALUE TYPES ARE DECLARED. Every check no-ops on an operand/concept whose value
-// type is absent (231/547 concepts are untyped today; rule B lights up as Todo 4 migrates). At a
-// type-demanding OPERAND position the absence surfaces as ONE `use-site-operand-untyped` WARNING;
+// type is absent. Since #257 (A.10) every concept is REQUIRED to declare a value type (a hard
+// `missing-value-type` error), so in practice absence occurs only for hand-constructed partial-AST
+// test inputs; the no-op discipline is retained for those. At a type-demanding OPERAND position an
+// absence surfaces as ONE `use-site-operand-untyped` WARNING (now largely subsumed by A.10's error);
 // everywhere else absence is silent. Secondary-diagnostic suppression (disc 397 gpt56 #7): no type
 // diagnostic when the target has 0 value types (warning only, at operand sites), >1 (rely on A.9),
 // or resolves to nothing (rely on the reference diagnostic).
@@ -177,7 +179,7 @@ export class UseSiteTypeValidator {
     // 2. RESULT shape — `defined as exists` / top-level `sem-not` ⟹ boolean.
     if (def?.type === "DefinedAsDefinition") {
       const vts = concept.valueTypes ?? [];
-      // Only a single declared value type is checkable (0 -> Todo 4 makes it required; >1 -> A.9).
+      // Only a single declared value type is checkable (0 -> A.10 (#257) makes it required; >1 -> A.9).
       if (vts.length === 1 && vts[0] !== "boolean") {
         const body = def.body;
         if (body.type === "DefinedAsExists") {
@@ -506,7 +508,7 @@ export class UseSiteTypeValidator {
     // resolver owns, so parameters are NOT resolved (`allowParameter: false`). Only a positively-
     // resolved, single-typed, non-boolean CONCEPT is a mismatch. Untyped guard concepts (the norm
     // today — presence determinations without an explicit `value type`) are silent, NOT warned:
-    // guards are far too numerous to flag every untyped operand, and Todo 4 makes types required.
+    // guards are far too numerous to flag every untyped operand, and A.10 (#257) makes types required.
     const res = resolveOperand(getRefName(ref), getRefLibrary(ref) ?? undefined, ctx, /*allowParameter*/ false);
     if (res.status === "typed" && res.valueType !== "boolean") {
       errors.push(guardMismatch(ownerName, res.valueType, location, attribution));
@@ -891,8 +893,8 @@ function untypedWarning(
     message:
       `Concept "${conceptName}": ${constraint.role} of \`${pattern}\` should be ` +
       `${operandExpectation(constraint)}, but its operand "${operandName}" declares no ` +
-      `\`value type\`. This can't be checked until "${operandName}" declares one (a Todo-4 migration ` +
-      `will make value types required).`,
+      `\`value type\`. Give "${operandName}" a \`value type\` so this can be checked (every concept ` +
+      `is required to declare one — see the \`missing-value-type\` error).`,
     location: loc(location),
     severity: "warning",
     ...base(attribution),

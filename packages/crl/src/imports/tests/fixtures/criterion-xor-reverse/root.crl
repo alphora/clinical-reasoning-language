@@ -6,8 +6,10 @@ criterion "Eligible":
 
 concept "Age Qualifies":
 - type is Observation.
+- value type is boolean.
 - code is `age`.
 
 concept "Eligible":
 - type is Observation.
+- value type is boolean.
 - code is `elig`.

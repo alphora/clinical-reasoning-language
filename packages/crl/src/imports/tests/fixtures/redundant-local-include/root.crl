@@ -4,4 +4,5 @@ include "Sibling".
 
 concept "Root C":
 - type is Encounter.
+- value type is CodeableConcept.
 - defined as "Sibling"."Sib C".

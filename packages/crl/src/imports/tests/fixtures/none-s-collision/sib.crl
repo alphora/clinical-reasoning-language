@@ -7,6 +7,7 @@ terminology "Sib Vs":
 
 concept "L":
 - type is Observation.
+- value type is boolean.
 - coded from "Sib Vs".
 
 activity "SibAct":

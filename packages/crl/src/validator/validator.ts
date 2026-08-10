@@ -273,6 +273,8 @@ export interface AgePredicateUnsupportedError extends ValidationErrorBase {
  *                                      `defined as` operator, not `definition is`)
  *   - "multiple-value-types"         — >1 `value type` on one concept or posrep (the
  *                                      canonical result shape is singular)
+ *   - "missing-value-type"           — a concept declares NO `value type` (the redesign requires
+ *                                      exactly one — its canonical result shape; A.10)
  */
 export type RepresentationShapeRule =
   | "incomplete-representation"
@@ -281,7 +283,8 @@ export type RepresentationShapeRule =
   | "value-projection-references-concept"
   | "duplicate-representation-key"
   | "definition-is-exists-misuse"
-  | "multiple-value-types";
+  | "multiple-value-types"
+  | "missing-value-type";
 
 // concept-model redesign Todo 2 — a static representation-shape defect. One kind with a
 // `rule` sub-discriminator (mirrors `decision-shape`); `conceptName` names the offending

@@ -4,8 +4,10 @@
  * This is the stable shape the sibling content-project KE agents bake against
  * (MCP is the contract — they have no filesystem access to this repo). Keep it
  * structured (objects, not prose blobs) so an agent can consume it without
- * string-parsing. `schemaVersion` is bumped when THIS shape changes;
- * `contentHash` changes whenever any content byte changes (the drift identity).
+ * string-parsing. `schemaVersion` advances on any kit CONTENT release (not only
+ * shape changes) — it is the version the KE seats' Step-0 re-sync keys off, and it
+ * is hashed into `contentHash`; the change class is recorded in the version history
+ * (index.ts). `contentHash` changes whenever any content byte changes (the drift identity).
  */
 
 /** Authoring slices. v1 ships exactly one; the param exists for forward-compat. */
@@ -218,7 +220,7 @@ export interface JudgeLens {
 }
 
 export interface AuthoringKit {
-  /** Contract-shape version; bump when this interface changes. */
+  /** Kit version; advances on any content release (the KE seats re-sync off it), hashed into contentHash. */
   schemaVersion: string;
   /** sha256 of the rest of the payload — the unforgeable drift identity (distinct + stable per useCase). */
   contentHash: string;

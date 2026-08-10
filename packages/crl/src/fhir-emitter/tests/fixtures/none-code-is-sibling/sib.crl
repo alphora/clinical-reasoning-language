@@ -8,6 +8,7 @@ library "Sib".
 
 concept "Feature B":
 - type is Observation.
+- value type is CodeableConcept.
 - code is `feature-b`.
 
 activity "Approve":

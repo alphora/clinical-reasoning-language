@@ -35,11 +35,15 @@ import type { RepresentationShapeError, RepresentationShapeRule, ValidationError
 //   A.8 definition-is-exists-misuse    — a `definition is exists (...)` (existence is a
 //                                        `defined as` operator, not `definition is`)
 //   A.9 multiple-value-types           — >1 `value type` on one concept or posrep
+//   A.10 missing-value-type            — a concept declares NO `value type` (the redesign requires
+//                                        exactly one). Now an ERROR: the #257 migration is complete,
+//                                        so every concept (corpus + fixtures + kit) is typed.
 //
 // NOT here (deliberate):
 //   - `x + n ≥ 1` ("at least one producer", #202) is ALREADY enforced at build time
 //     (ast/builder.ts — a concept with no code/posrep/defined-as/definition-is/coded-from is
-//     an AstError). Todo 2 adds nothing there; `value type`-REQUIRED is Todo 4 (the migration).
+//     an AstError). Todo 2 adds nothing there. (`value type`-REQUIRED is A.10 above — the #257
+//     migration landed it as an error once the whole corpus + fixtures were typed.)
 //   - "a local rep deviating from Observation must author an explicit value element" was
 //     considered and DROPPED: 35 corpus `code is` concepts are non-Observation PRESENCE
 //     determinations (Condition/MedicationRequest/Device) with no value path, so the rule is
@@ -128,6 +132,26 @@ export class RepresentationShapeValidator {
           `Concept "${concept.name}" declares ${valueTypes.length} value types ` +
             `(${valueTypes.join(", ")}). A concept has exactly one \`value type\` — its ` +
             `single canonical result shape. Keep one and remove the rest.`,
+          concept.location,
+          attribution,
+        ),
+      );
+    }
+
+    // A.10 — value type REQUIRED (concept-model redesign; the migration is complete, so this is now
+    // enforced). Every concept declares its ONE canonical result shape at the concept level — the
+    // type its emit/consumption is checked against — even when it also carries `source
+    // representation` posreps (each posrep is additionally self-describing). A missing value type is
+    // the invisible-shape bug this redesign exists to kill, so it is an ERROR, not a warning.
+    if (valueTypes.length === 0) {
+      errors.push(
+        this.err(
+          "missing-value-type",
+          concept.name,
+          `Concept "${concept.name}" declares no \`value type\`. Every concept has exactly one ` +
+            `\`value type\` — its canonical result shape. Add \`- value type is <Type>.\` ` +
+            `(CodeableConcept for a coded resource refinement, Quantity for a measurement, ` +
+            `boolean for a determination, dateTime/integer/etc. for a scalar).`,
           concept.location,
           attribution,
         ),

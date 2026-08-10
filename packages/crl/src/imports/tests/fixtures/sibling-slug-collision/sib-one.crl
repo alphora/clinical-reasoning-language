@@ -3,6 +3,7 @@ library "Sib One".
 
 concept "Alpha":
 - type is Observation.
+- value type is CodeableConcept.
 - code is `alpha`.
 
 activity "Approve":

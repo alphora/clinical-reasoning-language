@@ -9,4 +9,5 @@ terminology "Shared Vs":
 
 concept "Shared Leaf":
 - type is Observation.
+- value type is CodeableConcept.
 - coded from "Shared Vs".

@@ -3,6 +3,7 @@ library "Lib".
 
 concept "Age Qualifies":
 - type is Observation.
+- value type is boolean.
 - code is `age`.
 
 criterion "Eligible":

@@ -3,6 +3,7 @@ library "Sib".
 
 concept "NameThatExists":
 - type is Observation.
+- value type is CodeableConcept.
 - coded from "Sib T".
 
 terminology "Sib T":

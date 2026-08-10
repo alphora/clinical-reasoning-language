@@ -2,11 +2,14 @@ library "Example For Emit".
 
 concept "Implanted Estrogen Pellets":
 - type is MedicationRequest.
+- value type is boolean.
 - code is `implanted-estrogen-pellets`.
 concept "Implanted Estradiol Pellets":
 - type is MedicationRequest.
+- value type is boolean.
 - code is `implanted-estradiol-pellets`.
 concept "Implanted Estrogen Or Estradiol Pellets":
+- value type is boolean.
 - defined as ( "Implanted Estrogen Pellets" sem-or "Implanted Estradiol Pellets" ).
 
 

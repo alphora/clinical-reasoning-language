@@ -3,4 +3,5 @@ library "Lib1".
 
 concept "A":
 - type is Encounter.
+- value type is CodeableConcept.
 - defined as "Lib2"."B".

@@ -2,6 +2,7 @@ library "Direct Code Is".
 
 concept "Qualifying Diagnosis":
 - type is Condition.
+- value type is boolean.
 - code is `qualifying-diagnosis`.
 
 

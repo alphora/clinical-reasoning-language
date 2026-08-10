@@ -2,16 +2,21 @@ library "Nested Defined As".
 
 concept "Diagnosis A":
 - type is Condition.
+- value type is boolean.
 - code is `a`.
 concept "Diagnosis B":
 - type is Condition.
+- value type is boolean.
 - code is `b`.
 concept "Diagnosis C":
 - type is Condition.
+- value type is boolean.
 - code is `c`.
 concept "A And B":
+- value type is boolean.
 - defined as ( "Diagnosis A" sem-and "Diagnosis B" ).
 concept "Top":
+- value type is boolean.
 - defined as ( "A And B" sem-or "Diagnosis C" ).
 
 

@@ -407,7 +407,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.15");
+    expect(kit.schemaVersion).toBe("1.16");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -841,13 +841,14 @@ describe("authoring-kit — getAuthoringKit", () => {
     // concept + pediatric decision; the value-type-boolean clause is annotated with #241. BOTH hashes move.
     // #230 (schemaVersion 1.13→1.14): the review-flags rule + examples teach the relocated `medical-validation/flags/` store
     // + a new migration clause (create_flag/set_flag_status refuse a legacy `.crl/flags/` store). BOTH hashes move.
+    // #257 (schemaVersion 1.15→1.16): the concept-model redesign makes `value type` REQUIRED on every concept
+    // (A.10 — `missing-value-type` is now a validator ERROR); every reference/example concept declares its
+    // `value type` (case-feature determinations are `value type is boolean`). BOTH hashes move.
     expect(cpg.contentHash).toBe(
-      "ab98184979e6483a33dd8fb610a1cd106dd03fd89d8f2b86f3eae8fd6b14d83c",
+      "3e26309e34aaeb024c05dff63b3568424222ac21fe1bb4607567ff68ff802e06",
     );
-    // #250 (schemaVersion 1.14→1.15): the PROVENANCE verify-loop note teaches the derivedFrom carrier-relative gate +
-    // normalize_provenance repair. BOTH hashes re-pin (schemaVersion is hashed + the base note inherits into both chains).
     expect(priorAuth.contentHash).toBe(
-      "2dcc5468eac3ecbe64b0b2a4cf1aabb9d194b375d912f3839c882f1630354f57",
+      "02e6a2474188774fd543bbcea64eea2168d94fc8958b7cfaf20ddeb89a344f8e",
     );
   });
 

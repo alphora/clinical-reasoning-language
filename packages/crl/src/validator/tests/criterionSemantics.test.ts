@@ -36,9 +36,11 @@ function validateSoft(src: string): { errors: ValidationError[]; warnings: Valid
 
 const CONCEPTS = `concept "Age Qualifies":
 - type is Observation.
+- value type is boolean.
 - code is \`age\`.
 concept "Has Diagnosis":
 - type is Condition.
+- value type is boolean.
 - code is \`dx\`.`;
 
 const ACTS = `activity "Approve":

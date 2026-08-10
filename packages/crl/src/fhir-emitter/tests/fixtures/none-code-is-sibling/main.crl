@@ -3,6 +3,7 @@ library "Main Policy".
 
 concept "Feature A":
 - type is Observation.
+- value type is boolean.
 - code is `feature-a`.
 
 decision "Main Determination":

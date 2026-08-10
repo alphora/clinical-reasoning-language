@@ -187,6 +187,7 @@ library "Self".
 
 concept "X":
 - type is Observation.
+- value type is CodeableConcept.
 - coded from "Self T".
 
 terminology "Self T":
@@ -194,6 +195,7 @@ terminology "Self T":
 
 concept "Y":
 - type is Observation.
+- value type is CodeableConcept.
 - defined as "Self"."X".
 `;
       const result = validateCRL(src);

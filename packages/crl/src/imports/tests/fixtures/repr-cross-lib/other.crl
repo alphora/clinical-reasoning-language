@@ -7,4 +7,5 @@ terminology "VS":
 
 concept "Other Concept":
 - type is Observation.
+- value type is CodeableConcept.
 - coded from "VS".

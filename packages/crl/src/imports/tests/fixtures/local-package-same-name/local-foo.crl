@@ -3,6 +3,7 @@ library "Foo".
 
 concept "Foo Concept":
 - type is Encounter.
+- value type is CodeableConcept.
 - coded from "Foo Local T".
 
 terminology "Foo Local T":

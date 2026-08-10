@@ -7,4 +7,5 @@ include "SomePkg".
 // `include SomePkg` in Root.cql resolves to the package's own CQL (not dangling).
 concept "Root C":
 - type is Observation.
+- value type is CodeableConcept.
 - defined as "SomePkg"."Pkg C".

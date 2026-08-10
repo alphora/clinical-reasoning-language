@@ -40,10 +40,12 @@ library "CRC Recommendation".
 
 concept "Inclusion Criteria":
 - type is Observation.
+- value type is boolean.
 - definition is documented.
 
 concept "Exclusion Criteria":
 - type is Observation.
+- value type is boolean.
 - definition is documented.
 
 // One terminology to exercise Inv 2(b) (Library.relatedArtifact integrity)
@@ -57,34 +59,42 @@ terminology "Coverage Concern VS":
 // body — they're irrelevant to Inv 2(b) test coverage.
 concept "Has Coverage Concern":
 - type is Observation.
+- value type is boolean.
 - coded from "Coverage Concern VS".
 
 concept "No Coverage Concern":
 - type is Observation.
+- value type is boolean.
 - definition is documented.
 
 concept "Has Sedation Concern":
 - type is Observation.
+- value type is boolean.
 - definition is documented.
 
 concept "No Sedation Concern":
 - type is Observation.
+- value type is boolean.
 - definition is documented.
 
 concept "Has Sigmoidoscopy Complications":
 - type is Observation.
+- value type is boolean.
 - definition is documented.
 
 concept "No Sigmoidoscopy Complications":
 - type is Observation.
+- value type is boolean.
 - definition is documented.
 
 concept "Has Colonoscopy Complications":
 - type is Observation.
+- value type is boolean.
 - definition is documented.
 
 concept "No Colonoscopy Complications":
 - type is Observation.
+- value type is boolean.
 - definition is documented.
 
 // ============ Activities ============

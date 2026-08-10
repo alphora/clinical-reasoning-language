@@ -2,12 +2,15 @@ library "Both Representation".
 
 concept "Implanted Estrogen Pellets":
 - type is MedicationRequest.
+- value type is boolean.
 - code is `a`.
 concept "Implanted Estradiol Pellets":
 - type is MedicationRequest.
+- value type is boolean.
 - code is `b`.
 concept "Implanted Estrogen Or Estradiol Pellets":
 - type is Condition.
+- value type is boolean.
 - code is `c`.
 - defined as ( "Implanted Estrogen Pellets" sem-or "Implanted Estradiol Pellets" ).
 

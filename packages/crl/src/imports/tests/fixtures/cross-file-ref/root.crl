@@ -4,4 +4,5 @@ include "Leaf".
 
 concept "Root Concept":
 - type is Encounter.
+- value type is CodeableConcept.
 - defined as "Leaf"."Leaf Concept".

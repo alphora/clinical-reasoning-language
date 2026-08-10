@@ -18,18 +18,22 @@ Per the PA authoring approach:
 
 concept "Fracture Of Skull Or Vertebrae":
 - type is Condition.
+- value type is boolean.
 - code is `skull-or-vertebrae-fracture`.
 
 concept "Tumor-Related Fracture":
 - type is Condition.
+- value type is boolean.
 - code is `tumor-related-fracture`.
 
 concept "Concurrent Noninvasive Stimulator In Use":
 - type is Device.
+- value type is boolean.
 - code is `concurrent-noninvasive-stimulator`.
 
 concept "Documented Fracture Nonunion":
 - type is Condition.
+- value type is boolean.
 - code is `documented-fracture-nonunion`.
 
 // ============ Decision ============

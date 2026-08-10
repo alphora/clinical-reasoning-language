@@ -3,6 +3,7 @@ library "Root".
 
 concept "Trigger":
 - type is Encounter.
+- value type is boolean.
 - coded from "Trigger Valueset".
 
 terminology "Trigger Valueset":

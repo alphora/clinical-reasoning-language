@@ -215,6 +215,33 @@ describe("RepresentationShapeValidator (Todo 2) — static shape rules", () => {
     });
   });
 
+  describe("A.10 missing-value-type — value type is REQUIRED on every concept", () => {
+    it("REJECTS a concept that declares no value type", () => {
+      const src = `library "T".\nconcept "C":\n- type is Condition.\n- code is \`c\`.\n`;
+      const errs = shapeErrors(src, "missing-value-type");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/declares no `value type`/);
+      expect(errs[0].severity).toBe("error");
+    });
+
+    it("ACCEPTS a concept that declares exactly one value type", () => {
+      const src =
+        `library "T".\nconcept "C":\n- type is Condition.\n- value type is CodeableConcept.\n- code is \`c\`.\n`;
+      expect(shapeErrors(src, "missing-value-type")).toHaveLength(0);
+    });
+
+    it("REJECTS a concept with a fully-explicit posrep but NO concept-level value type (a posrep does not substitute)", () => {
+      // The redesign requires a concept-level value type even when the concept carries a
+      // self-describing `source representation`. The posrep's own value type does not satisfy it.
+      const src =
+        `library "T".\nconcept "C":\n- code is \`c\`.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n`;
+      const errs = shapeErrors(src, "missing-value-type");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/declares no `value type`/);
+    });
+  });
+
   // ---------- impl-review round-1 coverage (disc 396): branches the first 14 tests missed ----
   describe("impl-review coverage", () => {
     it("A.8 flags the no-parens form `exists \"X\"` (the AST cannot tell it from `exists (\"X\")`)", () => {

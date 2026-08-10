@@ -3,6 +3,7 @@ library "LibB".
 
 concept "Shared Name":
 - type is Observation.
+- value type is CodeableConcept.
 - coded from "LibB T".
 
 terminology "LibB T":

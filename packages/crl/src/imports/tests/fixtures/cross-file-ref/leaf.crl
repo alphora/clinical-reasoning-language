@@ -8,4 +8,5 @@ library "Leaf".
 // qualified ref (no `include` needed; cf. the cross-kind-same-name fixture).
 concept "Leaf Concept":
 - type is Encounter.
+- value type is CodeableConcept.
 - coded from "Leaf Vocab"."Leaf Vs".

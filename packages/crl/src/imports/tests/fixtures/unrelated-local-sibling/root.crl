@@ -3,6 +3,7 @@ library "Root".
 
 concept "Root C":
 - type is Encounter.
+- value type is CodeableConcept.
 - coded from "Root T".
 
 terminology "Root T":

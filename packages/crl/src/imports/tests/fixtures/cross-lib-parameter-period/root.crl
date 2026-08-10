@@ -3,4 +3,5 @@ library "Root".
 
 concept "Active in MP":
 - type is Encounter.
+- value type is CodeableConcept.
 - definition is "Encounter" during "Sib"."Measurement Period".

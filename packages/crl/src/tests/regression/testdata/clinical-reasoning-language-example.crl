@@ -275,6 +275,7 @@ concept "BMI":
 // the canonical "narrative + composer" shape.
 
 concept "Most Recent BMI Selection":
+- value type is Quantity.
 - meta is `Selects the most recent BMI observation within the configured lookback`.
 - evidence is `Calculated by Smile`.
 - definition is most recent "BMI".

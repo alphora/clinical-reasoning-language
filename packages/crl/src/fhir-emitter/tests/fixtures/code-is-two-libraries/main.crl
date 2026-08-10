@@ -10,6 +10,7 @@ library "Two Lib Main".
 
 concept "Feature Main":
 - type is Observation.
+- value type is boolean.
 - code is `feature-main`.
 
 decision "Main Determination":

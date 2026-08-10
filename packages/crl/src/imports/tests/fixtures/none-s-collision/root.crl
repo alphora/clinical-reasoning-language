@@ -10,6 +10,7 @@ terminology "Root Vs":
 
 concept "R":
 - type is Observation.
+- value type is boolean.
 - coded from "Root Vs".
 
 activity "RootAct":

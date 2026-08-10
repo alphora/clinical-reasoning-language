@@ -3,6 +3,7 @@ library "Sibling".
 
 concept "Sib C":
 - type is Encounter.
+- value type is CodeableConcept.
 - coded from "Sib T".
 
 terminology "Sib T":

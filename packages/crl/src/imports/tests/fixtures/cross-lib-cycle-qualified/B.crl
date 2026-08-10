@@ -3,4 +3,5 @@ library "B".
 
 concept "Y":
 - type is Observation.
+- value type is CodeableConcept.
 - defined as "A"."X".

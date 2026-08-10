@@ -2,11 +2,14 @@ library "Sem And Intersect".
 
 concept "Diagnosis A":
 - type is Condition.
+- value type is boolean.
 - code is `a`.
 concept "Diagnosis B":
 - type is Condition.
+- value type is boolean.
 - code is `b`.
 concept "A And B":
+- value type is boolean.
 - defined as ( "Diagnosis A" sem-and "Diagnosis B" ).
 
 

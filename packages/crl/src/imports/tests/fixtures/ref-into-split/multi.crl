@@ -8,4 +8,5 @@ terminology "Multi Vs":
 
 concept "Leaf Concept":
 - type is Observation.
+- value type is CodeableConcept.
 - coded from "Multi Vs".

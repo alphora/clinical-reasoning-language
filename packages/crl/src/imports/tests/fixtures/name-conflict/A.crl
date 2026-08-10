@@ -3,4 +3,5 @@ library "A".
 
 concept "X":
 - type is Observation.
+- value type is CodeableConcept.
 - coded from "VsA".

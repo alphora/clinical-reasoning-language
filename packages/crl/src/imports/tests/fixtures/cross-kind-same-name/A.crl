@@ -3,4 +3,5 @@ library "A".
 
 concept "BMI":
 - type is Observation.
+- value type is CodeableConcept.
 - coded from "B"."BMI".
