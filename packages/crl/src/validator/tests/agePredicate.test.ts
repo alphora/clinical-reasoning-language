@@ -76,9 +76,11 @@ describe("AgePredicateValidator (#215) — unsanctioned age predicates rejected 
       if (errs[0].kind === "age-predicate-unsupported") {
         expect(errs[0].reason, pred).toBe("definition-retired");
       }
-      // The migration message points at the posrep replacement.
+      // The migration message points at the posrep replacement + names the served worked exemplars (#257 T3).
       expect(errs[0].message, pred).toMatch(/source representation/);
       expect(errs[0].message, pred).toMatch(/Patient\.birthDate/);
+      expect(errs[0].message, pred).toMatch(/patient-age-both-rep-reference\.crl/);
+      expect(errs[0].message, pred).toMatch(/representation-reference\.crl/);
     }
   });
 

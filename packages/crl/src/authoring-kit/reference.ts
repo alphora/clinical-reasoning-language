@@ -701,22 +701,29 @@ library "Patient Age Reference".
 Patient-age BOTH-REPRESENTATION exemplar. A concept carries BOTH a \`code is\`
 LOCAL age Observation AND a Patient age \`source representation\` — a posrep over
 \`Patient.birthDate\` whose \`value projection is age today <cmp> <N> years\` computes
-the live age (#257: this replaced the retired \`definition is age today\` carve-out).
+the live age (#257: patient age migrated here from the retired \`definition is age today\` form,
+which is now an author-time + emit error).
 The Inferred layer RECENCY-MERGES the two: newest of the local age Observation
 (\`Observation.effective\`) vs \`Patient.meta.lastUpdated\` wins; indeterminate
 (\`lastUpdated\` absent) -> the session-fresh local-source wins. The recency timestamp is
 an INVARIANT of the built Patient age projection, NOT authored (no \`recency is\` keyword).
-AGE ONLY — a \`value projection\` that resolves to no built projection is rejected. The
-comparator's unit MUST be \`years\` (AgeAt() is in whole years).
+AGE ONLY — a \`value projection\` that resolves to no built projection is rejected. This is a
+2-representation concept in the MODEL sense — ONE authored \`source representation\` block PLUS
+one local \`code is\` producer — NOT two \`source representation\` blocks (a second age posrep is
+rejected). A STANDALONE age (no local override — see the \`representation-reference\` exemplar) is
+just the \`source representation\` with no \`code is\`; the recency merge applies ONLY when the
+local \`code is\` arm is present.
 
-COMPARATORS (#215): a LOWER bound \`at least <N>\` (>=) and the UPPER bounds
-\`at most <N>\` (<=, inclusive) / \`under <N>\` / \`younger than <N>\` (<, exclusive).
-The upper bounds are the engine-verified alternative to the INCORRECT
-\`sem-not "Age N Or Older"\` complement. The exact closed-world cell: with NO usable
-\`Patient.birthDate\` AND no local age assertion, the concept is FALSE (deny) — unlike
-\`sem-not\`, MISSING evidence does not become TRUE (a session-fresh local TRUE assertion
-still wins via recency). Because AgeAt() truncates to whole years, \`at most 21\` ==
-\`under 22\`, so a pediatric "under 21" gate is \`under 21\` (below), NOT \`at most 21\`.
+COMPARATORS + UNITS (#215, #257 T2): the comparator is a LOWER bound \`at least <N>\` (>=) or an
+UPPER bound \`at most <N>\` (<=, inclusive) / \`under <N>\` / \`younger than <N>\` (<, exclusive), and
+the unit is \`years\` OR \`months\` — \`days\`/\`weeks\` are a hard error. Years compute via \`AgeAt()\`
+(whole years), months via \`AgeInMonths()\` (whole months); both truncate, so \`at most N\` ≡
+\`under N+1\` in the chosen unit (a pediatric "under 21" gate is \`under 21\`, an infant "under 6
+months" gate is \`under 6 months\`). The upper bounds are the engine-verified alternative to the
+INCORRECT \`sem-not "Age N Or Older"\` complement. The exact closed-world cell: with NO usable
+\`Patient.birthDate\` AND no local age assertion, the concept is FALSE (deny) — unlike \`sem-not\`,
+MISSING evidence does not become TRUE (a session-fresh local TRUE assertion still wins via
+recency; the recency arbitration is unit-independent).
 */
 
 concept "Age 18 Or Older":
@@ -773,9 +780,11 @@ activity "Deny":
 export const REPRESENTATION_REFERENCE_CRL = `# Representation-model reference — Mammogram (multi-source) + BMI (cascade)
 // Canonical \`concept-layer-model\` exemplar (authoring-kit). The v3 concept model, reconciled
 // with both KE teams. FORWARD-LOOKING capability preview: it exercises constructs that PARSE +
-// VALIDATE but are runtime-DEFERRED (posreps #257; \`defined as exists\` #270; \`definition is\`
-// selection/count/within). Shipped as \`verification: validate-only\` — NOT a Stage-1 authoring
-// license (see the kit \`boundary\`); the value-preserving \`sem-or\` union is the piece to learn.
+// VALIDATE but are mostly runtime-DEFERRED (the general external posrep #257; \`defined as exists\`
+// #270; \`definition is\` selection/count/within) — EXCEPT the patient-age \`value projection\` (the
+// #257 age slice: T1 recency + T2 months) which RUNS. Shipped as \`verification: validate-only\` —
+// NOT a Stage-1 authoring license (see the kit \`boundary\`); the value-preserving \`sem-or\` union +
+// the standalone age \`value projection\` are the pieces to learn.
 // NOTE: when the concept-form addressability clause lands, this header's discipline duplicates it
 // and this artifact is byte-pinned — reconcile the two then (cite the clause; #257).
 //
@@ -905,4 +914,19 @@ concept "High BMI":
 - value type is boolean.
 - code is \`high-bmi\`.
 - definition is "BMI" at least 30 'kg/m2'.
+
+// ============ Patient age — the one sanctioned \`value projection\` posrep (standalone, months) ============
+// A STANDALONE age determination: the Patient age \`source representation\` ALONE (no local \`code is\`),
+// so the determination IS the live projection over \`Patient.birthDate\`. \`value projection\` is the
+// rep-level COMPUTATION — the sole built one is \`age today\` (#257 T1; T2 added the \`months\` unit
+// alongside \`years\`); an unresolvable projection is rejected at the catalog boundary. Recency
+// applies ONLY when a local \`code is\` override is also present (see the patient-age recency
+// exemplar); this standalone form has none.
+concept "Patient Under Six Months":
+- value type is boolean.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today under 6 months.
 `;

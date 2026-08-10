@@ -411,7 +411,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.19");
+    expect(kit.schemaVersion).toBe("1.20");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -984,12 +984,41 @@ describe("authoring-kit — getAuthoringKit", () => {
     // from the retired `definition is age today` carve-out to the Patient age `source representation` +
     // `value projection` recency form (the migrated exemplar inherits into both useCases; schemaVersion is
     // hashed). Deeper kit re-teach is T3 (same pre-release work-set). Design + impl rounds: disc 409. BOTH hashes move.
+    // #257 age slice (schemaVersion 1.19→1.20): T3 DEEPER kit re-teach — patient-age reframed as a Patient
+    // `source representation` `value projection` (NOT a `definition is` carve-out); the rule renamed
+    // `patient-age-projection` + reframed to both shapes; CONCEPT_LAYER_MODEL/concept-form/methodology/boundary/
+    // purposes/SUMMARY swept of the retired doctrine (anti-regression payload test added); units widen to
+    // `years|months`; the `representation-reference` exemplar + fixture gain a standalone months age concept.
+    // Design + impl rounds: disc 411. BOTH hashes move.
     expect(cpg.contentHash).toBe(
-      "15955a9c8875aabd2c8edc478677467d1e8843279d93699c12595793ee5175fe",
+      "3ebe6b7819eaca012406fb0d2ac342a1b20066e0353636438031794479b067da",
     );
     expect(priorAuth.contentHash).toBe(
-      "6c72fdef2a0e411b2e146d1f466516336d872df945c7f694de6298597af2fa4b",
+      "c80dde5322fc224426955b0bac43ffa1eec64c277c9422c6c106695cbf4ba38b",
     );
+  });
+
+  it("SERIALIZED payload teaches the posrep age model with NO residue of the retired `definition is age today` doctrine (#257 T3 sweep guard)", () => {
+    // Guards against the T1-era partial state recurring one layer down: a line-list edit is too fragile
+    // for a served artifact, so this asserts the ASSEMBLED payload over BOTH useCases. Patterns target
+    // POSITIVE retired doctrine only — retirement/anchored MENTIONS (e.g. "`definition is age today` is
+    // now an author-time + emit error") are legitimately present and must pass.
+    const forbidden: [RegExp, string][] = [
+      [/unit MUST be [`'"]?years/i, "years-only unit rule"],
+      [/months`?\s*\/\s*`?days/i, "`months`/`days` error ordering (T2 sanctioned months)"],
+      [/AgeAt\(\) is in (whole )?years/i, "AgeAt()-is-years rationale"],
+      [/`code is`[^.]{0,60}`definition is age today`/i, "the retired `code is` + `definition is age today` both-rep form"],
+    ];
+    for (const useCase of ["cpg", "prior-auth"] as const) {
+      const payload = JSON.stringify(getAuthoringKit(undefined, useCase));
+      for (const [re, label] of forbidden) {
+        expect(re.test(payload), `${useCase}: retired doctrine "${label}" must not appear in the served payload`).toBe(false);
+      }
+      // POSITIVE — the posrep model + T2 months ARE taught.
+      expect(payload, useCase).toContain("value projection");
+      expect(payload, useCase).toContain("patient-age-projection"); // the renamed rule id (accurate teaching surface)
+      expect(payload, useCase).toContain("AgeInMonths"); // the months compute fn is taught
+    }
   });
 
   it("no RETIRED positive doctrine survives anywhere in the serialized payload (#224 anti-half-inversion guard)", () => {

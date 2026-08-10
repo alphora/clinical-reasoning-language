@@ -318,7 +318,9 @@ export function ageRetirementMessage(conceptName: string): string {
   return (
     `Concept "${conceptName}": \`definition is age today …\` is RETIRED. Patient age is now ` +
     `modeled as a \`source representation\` over \`${o.valueElementPath}\` with a ` +
-    `\`value projection\` (see the representation-reference exemplar). ` +
+    `\`value projection\` (worked examples: the recency form in the served ` +
+    `\`patient-age-both-rep-reference.crl\` exemplar; the standalone form in ` +
+    `\`representation-reference.crl\`). ` +
     `WITH a local override, keep \`- code is \`…\`.\` and add:  ` +
     `- source representation: - type is ${o.sourceType}. - value element is ` +
     `${o.valueElementPath}. - value type is ${o.repValueType}. - value projection is age today ` +
