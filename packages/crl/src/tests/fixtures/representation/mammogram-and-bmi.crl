@@ -139,8 +139,9 @@ concept "High BMI":
 // ============ Patient age — the one sanctioned `value projection` posrep (standalone, months) ============
 // A STANDALONE age determination: the Patient age `source representation` ALONE (no local `code is`),
 // so the determination IS the live projection over `Patient.birthDate`. `value projection` is the
-// rep-level COMPUTATION — the sole built one is `age today` (#257 T1; T2 added the `months` unit
-// alongside `years`); an unresolvable projection is rejected at the catalog boundary. Recency
+// rep-level COMPUTATION — the sole one with a built emit-lowering is `age today` (#257 T1; T2 added
+// the `months` unit alongside `years`); an `age today` projection with a bad comparator/unit/carrier
+// is tool-rejected (other projection phrases parse but are runtime-deferred, not rejected). Recency
 // applies ONLY when a local `code is` override is also present (see the patient-age recency
 // exemplar); this standalone form has none.
 concept "Patient Under Six Months":

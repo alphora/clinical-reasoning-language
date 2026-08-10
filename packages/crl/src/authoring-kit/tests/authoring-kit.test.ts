@@ -411,7 +411,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.20");
+    expect(kit.schemaVersion).toBe("1.21");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -990,11 +990,16 @@ describe("authoring-kit — getAuthoringKit", () => {
     // purposes/SUMMARY swept of the retired doctrine (anti-regression payload test added); units widen to
     // `years|months`; the `representation-reference` exemplar + fixture gain a standalone months age concept.
     // Design + impl rounds: disc 411. BOTH hashes move.
+    // #257 age slice (schemaVersion 1.20→1.21): T3 impl-panel follow-up (disc 411 impl round) — honesty fixes:
+    // catalog-boundary claim NARROWED (only the age-today family is tool-enforced), `coded from`/`value
+    // projection` are independent slots, the recency `type is Observation` reworded to effective/implicit, and
+    // the `validate-only` legend + representation-reference `purpose` reworded (artifact tier vs construct
+    // status). BOTH hashes move again.
     expect(cpg.contentHash).toBe(
-      "3ebe6b7819eaca012406fb0d2ac342a1b20066e0353636438031794479b067da",
+      "05f65aa7b01d9faf0b6cfef1c761c1b5daed72c86e555df52e1dd32abf34add0",
     );
     expect(priorAuth.contentHash).toBe(
-      "c80dde5322fc224426955b0bac43ffa1eec64c277c9422c6c106695cbf4ba38b",
+      "72570f3a8331a7cfd0e4422ff93f39b8147dd5b092668c5947687a997a8c95f4",
     );
   });
 
@@ -1007,7 +1012,15 @@ describe("authoring-kit — getAuthoringKit", () => {
       [/unit MUST be [`'"]?years/i, "years-only unit rule"],
       [/months`?\s*\/\s*`?days/i, "`months`/`days` error ordering (T2 sanctioned months)"],
       [/AgeAt\(\) is in (whole )?years/i, "AgeAt()-is-years rationale"],
-      [/`code is`[^.]{0,60}`definition is age today`/i, "the retired `code is` + `definition is age today` both-rep form"],
+      // Impl-panel fix (both arms): the old `[^.]{0,60}` stopped at the `.` in `age-code`.` and matched
+      // NOTHING against the very form it guards. Use a punctuation-crossing gap; verified green against the
+      // current payload (the legit "retired `definition is age today` form" mention is >120 chars from any
+      // preceding `code is`).
+      [/`code is`[\s\S]{0,120}`definition is age today`/i, "the retired `code is` + `definition is age today` both-rep form"],
+      // The retired FRAMING family (the "ONE/SOLE `definition is` exception/carve-out" doctrine) — patterns
+      // above miss it. No false-positive surface: surviving "carve-out" hits are non-served comments or the
+      // decision-composition "no carve-out"; current age doctrine says "SOLE sanctioned Stage-1 posrep".
+      [/the (ONE|SOLE)[^.]{0,40}`?definition is`?[^.]{0,20}(exception|carve-out)/i, "the retired `definition is` exception/carve-out framing"],
     ];
     for (const useCase of ["cpg", "prior-auth"] as const) {
       const payload = JSON.stringify(getAuthoringKit(undefined, useCase));
@@ -1019,6 +1032,23 @@ describe("authoring-kit — getAuthoringKit", () => {
       expect(payload, useCase).toContain("patient-age-projection"); // the renamed rule id (accurate teaching surface)
       expect(payload, useCase).toContain("AgeInMonths"); // the months compute fn is taught
     }
+  });
+
+  it("the representation-reference exemplar semantically pins the STANDALONE months age projection (#257 T3 impl-panel — generic prose `.toContain`s don't prove the exemplar survives)", () => {
+    // Impl-panel catch (gpt56#6): the mirror-equality + crlErrors tests prove fidelity + grammar, and the
+    // payload `.toContain`s above match prose that persists even if this exemplar block is removed/changed.
+    // Pin the actual served block: the concept, its standalone shape (no local `code is`), the carrier, and
+    // the `under 6 months` projection — so a regression that drops or mutates it goes red HERE.
+    const src = REPRESENTATION_REFERENCE_CRL;
+    expect(src).toContain('concept "Patient Under Six Months":');
+    expect(src).toContain("value projection is age today under 6 months");
+    expect(src).toContain("value element is Patient.birthDate");
+    // STANDALONE = no local `code is` inside this concept's block (recency requires a `code is` arm).
+    const block = src.slice(
+      src.indexOf('concept "Patient Under Six Months":'),
+      src.length,
+    );
+    expect(block).not.toContain("code is");
   });
 
   it("no RETIRED positive doctrine survives anywhere in the serialized payload (#224 anti-half-inversion guard)", () => {

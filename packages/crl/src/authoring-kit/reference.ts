@@ -707,7 +707,9 @@ The Inferred layer RECENCY-MERGES the two: newest of the local age Observation
 (\`Observation.effective\`) vs \`Patient.meta.lastUpdated\` wins; indeterminate
 (\`lastUpdated\` absent) -> the session-fresh local-source wins. The recency timestamp is
 an INVARIANT of the built Patient age projection, NOT authored (no \`recency is\` keyword).
-AGE ONLY — a \`value projection\` that resolves to no built projection is rejected. This is a
+AGE ONLY — the ONLY projection with a built emit-lowering is \`age today\`; an \`age today\`
+projection with a bad comparator/unit/carrier is tool-rejected (any OTHER projection phrase
+parses + validates but is runtime-deferred, OUT of scope by rule — not tool-rejected). This is a
 2-representation concept in the MODEL sense — ONE authored \`source representation\` block PLUS
 one local \`code is\` producer — NOT two \`source representation\` blocks (a second age posrep is
 rejected). A STANDALONE age (no local override — see the \`representation-reference\` exemplar) is
@@ -772,10 +774,12 @@ activity "Deny":
  * The multi-representation exemplar (Mammogram multi-source + BMI cascade), shipped as the
  * `representation-reference.crl` artifact (`verification: "validate-only"`). Its CANONICAL source is the
  * `tests/fixtures/representation/mammogram-and-bmi.crl` FILE (ALSO the rule-B positive exemplar); this const is
- * the SHIPPED MIRROR, kept identical by a CRLF-normalized text-equality test (edit the fixture; the const follows). FORWARD-LOOKING capability preview: it exercises posreps (#257),
- * `defined as exists` (#270), and `definition is` selection/count/within — all parse+validate but runtime-
- * deferred. NOT a Stage-1 authoring license (see the kit `boundary`); the value-preserving `sem-or` union is
- * the piece it teaches (a MISSING worked `sem-or` regenerated the "defined-as is boolean" misconception).
+ * the SHIPPED MIRROR, kept identical by a CRLF-normalized text-equality test (edit the fixture; the const follows). FORWARD-LOOKING capability preview: it exercises constructs that PARSE + VALIDATE but are MOSTLY
+ * runtime-deferred (the general external posrep #257; `defined as exists` #270; `definition is`
+ * selection/count/within) — EXCEPT the standalone patient-age `value projection` (the #257 age slice: T1
+ * recency + T2 months), which is runtime-SHIPPED in production. NOT a Stage-1 authoring license (see the kit
+ * `boundary`); the value-preserving `sem-or` union + the standalone age `value projection` are the pieces it
+ * teaches (a MISSING worked `sem-or` regenerated the "defined-as is boolean" misconception).
  */
 export const REPRESENTATION_REFERENCE_CRL = `# Representation-model reference — Mammogram (multi-source) + BMI (cascade)
 // Canonical \`concept-layer-model\` exemplar (authoring-kit). The v3 concept model, reconciled
@@ -918,8 +922,9 @@ concept "High BMI":
 // ============ Patient age — the one sanctioned \`value projection\` posrep (standalone, months) ============
 // A STANDALONE age determination: the Patient age \`source representation\` ALONE (no local \`code is\`),
 // so the determination IS the live projection over \`Patient.birthDate\`. \`value projection\` is the
-// rep-level COMPUTATION — the sole built one is \`age today\` (#257 T1; T2 added the \`months\` unit
-// alongside \`years\`); an unresolvable projection is rejected at the catalog boundary. Recency
+// rep-level COMPUTATION — the sole one with a built emit-lowering is \`age today\` (#257 T1; T2 added
+// the \`months\` unit alongside \`years\`); an \`age today\` projection with a bad comparator/unit/carrier
+// is tool-rejected (other projection phrases parse but are runtime-deferred, not rejected). Recency
 // applies ONLY when a local \`code is\` override is also present (see the patient-age recency
 // exemplar); this standalone form has none.
 concept "Patient Under Six Months":
