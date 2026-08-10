@@ -10,7 +10,7 @@ policy-id source-typed form.
 | File | Library | Layer | Contents |
 |---|---|---|---|
 | `cms69.crl` | `"cms69"` | interface | Initial Population / Numerator / Denominator / Exclusions / Exceptions — the Quality Measure API (what the Measure evaluation engine consumes) |
-| `cms69-inferred.crl` | `"cms69-Inferred"` | inferred | `defined as` + `definition is` concepts: lifted property concepts, BMI classifications, intervention bundles, pregnancy logic, age predicate |
+| `cms69-inferred.crl` | `"cms69-Inferred"` | inferred | `defined as` + `definition is` concepts: BMI classifications, correlated intervention bundles (`justified by` ∪ `on day of or after`), pregnancy logic, age predicate |
 | `cms69-recordsource.crl` | `"cms69-RecordSource"` | record-source | `coded from` concepts (asserted FHIR resource-to-valueset bindings) |
 | `cms69-recordconcepts.crl` | `"cms69-RecordConcepts"` | terminology | terminology declarations (valuesets, codes) + the Measurement Period runtime parameter (declarative since v2.2.0) |
 

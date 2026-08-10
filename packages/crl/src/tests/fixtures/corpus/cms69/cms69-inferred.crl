@@ -11,42 +11,12 @@ parameter "Measurement Period":
 - param type is Period.
 
 
-// ============ Lifted property concepts (bare ref — type-only wrappers) ============
-
-concept "High BMI Follow-up Order Date":
-- type is ServiceRequest.
-- value type is dateTime.
-- defined as "cms69-RecordSource"."High BMI Follow-up Service Requests".
-
-concept "Weight Assessment Referral Date":
-- type is ServiceRequest.
-- value type is dateTime.
-- defined as "cms69-RecordSource"."Weight Assessment Referrals".
-
-concept "High BMI Medication Order Date":
-- type is MedicationRequest.
-- value type is dateTime.
-- defined as "cms69-RecordSource"."High BMI Medications".
-
-concept "Low BMI Follow-up Order Date":
-- type is ServiceRequest.
-- value type is dateTime.
-- defined as "cms69-RecordSource"."Low BMI Follow-up Service Requests".
-
-concept "Low BMI Medication Order Date":
-- type is MedicationRequest.
-- value type is dateTime.
-- defined as "cms69-RecordSource"."Low BMI Medications".
-
-concept "High BMI Procedure Performed Date":
-- type is Procedure.
-- value type is dateTime.
-- defined as "cms69-RecordSource"."High BMI Follow-up Procedures".
-
-concept "Low BMI Procedure Performed Date":
-- type is Procedure.
-- value type is dateTime.
-- defined as "cms69-RecordSource"."Low BMI Follow-up Procedures".
+// Lifted `*Order Date` / `*Performed Date` dateTime projections REMOVED (#257 T4/STEP2).
+// They bare-ref'd a resource concept as `dateTime` — a rule-B `bare-ref-value-type-mismatch`
+// once the recordsource concepts collapse to single-value-type `CodeableConcept`. Their only two
+// consumer shapes are now expressed at RESOURCE level: the correlated `on or before` becomes
+// `<orders> on day of or after <active diagnoses>` (an order SUBSET), and the `during MP` window
+// becomes `<orders> during "Measurement Period"`. See .vibe-tools/discussions/406.
 
 
 // ============ Inference declarations + composing concepts ============
@@ -164,16 +134,6 @@ concept "Underweight Diagnoses Active":
 - type is Condition.
 - definition is "cms69-RecordSource"."Underweight Diagnoses" active.
 
-concept "Has Overweight or Obese":
-- type is Observation.
-- value type is boolean.
-- defined as "Overweight or Obese Diagnoses Active".
-
-concept "Has Underweight":
-- type is Observation.
-- value type is boolean.
-- defined as "Underweight Diagnoses Active".
-
 
 // --- High BMI Interventions Ordered ---
 
@@ -181,10 +141,9 @@ concept "High BMI Follow-up Justified by Overweight Diagnosis":
 - type is ServiceRequest.
 - definition is "cms69-RecordSource"."High BMI Follow-up Service Requests" justified by "cms69-RecordSource"."Overweight or Obese Diagnoses".
 
-concept "Has Overweight On Or Before High BMI Follow-up Order":
-- type is Observation.
-- value type is boolean.
-- definition is "Has Overweight or Obese" on or before "High BMI Follow-up Order Date".
+concept "High BMI Follow-up Preceded by Overweight Diagnosis":
+- type is ServiceRequest.
+- definition is "cms69-RecordSource"."High BMI Follow-up Service Requests" on day of or after "Overweight or Obese Diagnoses Active".
 
 concept "High BMI Follow-up Order":
 - type is ServiceRequest.
@@ -192,17 +151,16 @@ concept "High BMI Follow-up Order":
 (
    "High BMI Follow-up Justified by Overweight Diagnosis"
    sem-or
-   "Has Overweight On Or Before High BMI Follow-up Order"
+   "High BMI Follow-up Preceded by Overweight Diagnosis"
 ).
 
 concept "Weight Assessment Referral Justified by Overweight Diagnosis":
 - type is ServiceRequest.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" justified by "cms69-RecordSource"."Overweight or Obese Diagnoses".
 
-concept "Has Overweight On Or Before Weight Assessment Referral":
-- type is Observation.
-- value type is boolean.
-- definition is "Has Overweight or Obese" on or before "Weight Assessment Referral Date".
+concept "Weight Assessment Referral Preceded by Overweight Diagnosis":
+- type is ServiceRequest.
+- definition is "cms69-RecordSource"."Weight Assessment Referrals" on day of or after "Overweight or Obese Diagnoses Active".
 
 concept "High BMI Weight Assessment Referral":
 - type is ServiceRequest.
@@ -210,17 +168,16 @@ concept "High BMI Weight Assessment Referral":
 (
    "Weight Assessment Referral Justified by Overweight Diagnosis"
    sem-or
-   "Has Overweight On Or Before Weight Assessment Referral"
+   "Weight Assessment Referral Preceded by Overweight Diagnosis"
 ).
 
 concept "High BMI Medication Justified by Overweight Diagnosis":
 - type is MedicationRequest.
 - definition is "cms69-RecordSource"."High BMI Medications" justified by "cms69-RecordSource"."Overweight or Obese Diagnoses".
 
-concept "Has Overweight On Or Before High BMI Medication Order":
-- type is Observation.
-- value type is boolean.
-- definition is "Has Overweight or Obese" on or before "High BMI Medication Order Date".
+concept "High BMI Medication Preceded by Overweight Diagnosis":
+- type is MedicationRequest.
+- definition is "cms69-RecordSource"."High BMI Medications" on day of or after "Overweight or Obese Diagnoses Active".
 
 concept "High BMI Medication Order":
 - type is MedicationRequest.
@@ -228,7 +185,7 @@ concept "High BMI Medication Order":
 (
    "High BMI Medication Justified by Overweight Diagnosis"
    sem-or
-   "Has Overweight On Or Before High BMI Medication Order"
+   "High BMI Medication Preceded by Overweight Diagnosis"
 ).
 
 concept "High BMI Interventions Ordered":
@@ -250,10 +207,9 @@ concept "High BMI Procedure Justified by Overweight Diagnosis":
 - type is Procedure.
 - definition is "cms69-RecordSource"."High BMI Follow-up Procedures" justified by "cms69-RecordSource"."Overweight or Obese Diagnoses".
 
-concept "Has Overweight On Or Before High BMI Procedure":
-- type is Observation.
-- value type is boolean.
-- definition is "Has Overweight or Obese" on or before "High BMI Procedure Performed Date".
+concept "High BMI Procedure Preceded by Overweight Diagnosis":
+- type is Procedure.
+- definition is "cms69-RecordSource"."High BMI Follow-up Procedures" on day of or after "Overweight or Obese Diagnoses Active".
 
 concept "High BMI Procedure Performed":
 - type is Procedure.
@@ -261,7 +217,7 @@ concept "High BMI Procedure Performed":
 (
    "High BMI Procedure Justified by Overweight Diagnosis"
    sem-or
-   "Has Overweight On Or Before High BMI Procedure"
+   "High BMI Procedure Preceded by Overweight Diagnosis"
 ).
 
 concept "High BMI Interventions Performed":
@@ -271,17 +227,18 @@ concept "High BMI Interventions Performed":
 
 // --- High BMI And Follow Up Provided ---
 
-concept "Documented High BMI During MP":
-- type is Observation.
-- value type is boolean.
-- definition is "Documented High BMI" during "Measurement Period".
+// `Documented High BMI` is already Measurement-Period-scoped (via `BMI During Measurement
+// Period`), so the former `... During MP` wrapper was a redundant `during` over a derived
+// boolean — a rule-B `boolean-at-refinement-position`. Removed; the composition uses the
+// already-MP-scoped boolean directly (#257 T4/STEP2). The measure's outer BMI↔intervention
+// during-MP join is a separate pre-existing fidelity gap (#267 E3).
 
 concept "High BMI And Follow Up Provided":
 - type is Observation.
 - value type is boolean.
 - defined as
 (
-   "Documented High BMI During MP"
+   "Documented High BMI"
    sem-and
    (
       "High BMI Interventions Ordered"
@@ -297,15 +254,13 @@ concept "Low BMI Follow-up Justified by Underweight Diagnosis":
 - type is ServiceRequest.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Service Requests" justified by "cms69-RecordSource"."Underweight Diagnoses".
 
-concept "Has Underweight On Or Before Low BMI Follow-up Order":
-- type is Observation.
-- value type is boolean.
-- definition is "Has Underweight" on or before "Low BMI Follow-up Order Date".
+concept "Low BMI Follow-up Orders During MP":
+- type is ServiceRequest.
+- definition is "cms69-RecordSource"."Low BMI Follow-up Service Requests" during "Measurement Period".
 
-concept "Low BMI Follow-up Order Date During MP":
-- type is Observation.
-- value type is boolean.
-- definition is "Low BMI Follow-up Order Date" during "Measurement Period".
+concept "Low BMI Follow-up Preceded by Underweight During MP":
+- type is ServiceRequest.
+- definition is "Low BMI Follow-up Orders During MP" on day of or after "Underweight Diagnoses Active".
 
 concept "Low BMI Follow-up Order":
 - type is ServiceRequest.
@@ -313,27 +268,20 @@ concept "Low BMI Follow-up Order":
 (
    "Low BMI Follow-up Justified by Underweight Diagnosis"
    sem-or
-   (
-      "Has Underweight On Or Before Low BMI Follow-up Order"
-      sem-and
-      "Low BMI Follow-up Order Date During MP"
-   )
+   "Low BMI Follow-up Preceded by Underweight During MP"
 ).
 
 concept "Weight Assessment Referral Justified by Underweight Diagnosis":
-- type is Observation.
-- value type is boolean.
+- type is ServiceRequest.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" justified by "cms69-RecordSource"."Underweight Diagnoses".
 
-concept "Has Underweight On Or Before Weight Assessment Referral":
-- type is Observation.
-- value type is boolean.
-- definition is "Has Underweight" on or before "Weight Assessment Referral Date".
+concept "Weight Assessment Referral During MP":
+- type is ServiceRequest.
+- definition is "cms69-RecordSource"."Weight Assessment Referrals" during "Measurement Period".
 
-concept "Weight Assessment Referral Date During MP":
-- type is Observation.
-- value type is boolean.
-- definition is "Weight Assessment Referral Date" during "Measurement Period".
+concept "Weight Assessment Referral Preceded by Underweight During MP":
+- type is ServiceRequest.
+- definition is "Weight Assessment Referral During MP" on day of or after "Underweight Diagnoses Active".
 
 concept "Low BMI Weight Assessment Referral":
 - type is ServiceRequest.
@@ -341,26 +289,20 @@ concept "Low BMI Weight Assessment Referral":
 (
    "Weight Assessment Referral Justified by Underweight Diagnosis"
    sem-or
-   (
-      "Has Underweight On Or Before Weight Assessment Referral"
-      sem-and
-      "Weight Assessment Referral Date During MP"
-   )
+   "Weight Assessment Referral Preceded by Underweight During MP"
 ).
 
 concept "Low BMI Medication Justified by Underweight Diagnosis":
 - type is MedicationRequest.
 - definition is "cms69-RecordSource"."Low BMI Medications" justified by "cms69-RecordSource"."Underweight Diagnoses".
 
-concept "Has Underweight On Or Before Low BMI Medication Order":
-- type is Observation.
-- value type is boolean.
-- definition is "Has Underweight" on or before "Low BMI Medication Order Date".
+concept "Low BMI Medication Orders During MP":
+- type is MedicationRequest.
+- definition is "cms69-RecordSource"."Low BMI Medications" during "Measurement Period".
 
-concept "Low BMI Medication Order Date During MP":
-- type is Observation.
-- value type is boolean.
-- definition is "Low BMI Medication Order Date" during "Measurement Period".
+concept "Low BMI Medication Preceded by Underweight During MP":
+- type is MedicationRequest.
+- definition is "Low BMI Medication Orders During MP" on day of or after "Underweight Diagnoses Active".
 
 concept "Low BMI Medication Order":
 - type is MedicationRequest.
@@ -368,11 +310,7 @@ concept "Low BMI Medication Order":
 (
    "Low BMI Medication Justified by Underweight Diagnosis"
    sem-or
-   (
-      "Has Underweight On Or Before Low BMI Medication Order"
-      sem-and
-      "Low BMI Medication Order Date During MP"
-   )
+   "Low BMI Medication Preceded by Underweight During MP"
 ).
 
 concept "Low BMI Interventions Ordered":
@@ -398,15 +336,13 @@ concept "Low BMI Follow-up Procedures Performed":
 - type is Procedure.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Procedures" performed.
 
-concept "Has Underweight On Or Before Low BMI Procedure":
-- type is Observation.
-- value type is boolean.
-- definition is "Has Underweight" on or before "Low BMI Procedure Performed Date".
+concept "Low BMI Procedures During MP":
+- type is Procedure.
+- definition is "cms69-RecordSource"."Low BMI Follow-up Procedures" during "Measurement Period".
 
-concept "Low BMI Procedure Performed Date During MP":
-- type is Observation.
-- value type is boolean.
-- definition is "Low BMI Procedure Performed Date" during "Measurement Period".
+concept "Low BMI Procedure Preceded by Underweight During MP":
+- type is Procedure.
+- definition is "Low BMI Procedures During MP" on day of or after "Underweight Diagnoses Active".
 
 concept "Low BMI Procedure Performed":
 - type is Procedure.
@@ -418,11 +354,7 @@ concept "Low BMI Procedure Performed":
       "Low BMI Follow-up Procedures Performed"
    )
    sem-or
-   (
-      "Has Underweight On Or Before Low BMI Procedure"
-      sem-and
-      "Low BMI Procedure Performed Date During MP"
-   )
+   "Low BMI Procedure Preceded by Underweight During MP"
 ).
 
 concept "Low BMI Interventions Performed":
@@ -432,17 +364,15 @@ concept "Low BMI Interventions Performed":
 
 // --- Low BMI And Follow Up Provided ---
 
-concept "Documented Low BMI During MP":
-- type is Observation.
-- value type is boolean.
-- definition is "Documented Low BMI" during "Measurement Period".
+// `Documented Low BMI` is already Measurement-Period-scoped (see the High counterpart above);
+// the former `... During MP` wrapper was a redundant `during` over a derived boolean. Removed.
 
 concept "Low BMI And Follow Up Provided":
 - type is Observation.
 - value type is boolean.
 - defined as
 (
-   "Documented Low BMI During MP"
+   "Documented Low BMI"
    sem-and
    (
       "Low BMI Interventions Ordered"

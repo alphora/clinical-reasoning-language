@@ -300,6 +300,10 @@ define function "During"(event List<Procedure>, period Interval<DateTime>):
   (event) P where (P.performed as Period) during period
 define function "During"(event List<Condition>, period Interval<DateTime>):
   (event) C where (C.onset as Period) during period
+define function "During"(event List<ServiceRequest>, period Interval<DateTime>):
+  (event) S where S.authoredOn during period
+define function "During"(event List<MedicationRequest>, period Interval<DateTime>):
+  (event) M where M.authoredOn during period
 
 /**
  * Overlaps(eventA, eventB) — narrative: `<eventA> overlaps <eventB>`.
@@ -317,10 +321,27 @@ define function "Overlaps"(eventA List<Observation>, eventB Interval<DateTime>):
 /**
  * OnDayOfOrAfter(X, anchor) — narrative: `<X> on day of or after
  * <anchor>`. Returns X whose start is on/after anchor's day.
+ *
+ * Correlated resource↔resource overloads (order/procedure X, Condition anchor)
+ * express "the orders/procedures for which a qualifying condition was
+ * documented on/before the order" — a day-granular, inclusive temporal
+ * refinement producing the order SUBSET (not a boolean). The condition's
+ * clinical time is its `onset as Period` start; the order's is `authoredOn`,
+ * the procedure's is `performed`. Mirrors the published CMS69 correlation
+ * (`Condition.prevalenceInterval() starts before or on day of order.authoredOn`).
  */
 define function "OnDayOfOrAfter"(X List<Observation>, anchor List<Encounter>):
   (X) O with (anchor) E
     such that (O.effective as Period) starts on or after day of start of E.period
+define function "OnDayOfOrAfter"(X List<ServiceRequest>, anchor List<Condition>):
+  (X) O with (anchor) C
+    such that (C.onset as Period) starts before or on day of O.authoredOn
+define function "OnDayOfOrAfter"(X List<MedicationRequest>, anchor List<Condition>):
+  (X) O with (anchor) C
+    such that (C.onset as Period) starts before or on day of O.authoredOn
+define function "OnDayOfOrAfter"(X List<Procedure>, anchor List<Condition>):
+  (X) P with (anchor) C
+    such that (C.onset as Period) starts before or on day of start of (P.performed as Period)
 
 /**
  * OnOrBefore(X, anchor) — narrative: `<X> on or before <anchor>`.

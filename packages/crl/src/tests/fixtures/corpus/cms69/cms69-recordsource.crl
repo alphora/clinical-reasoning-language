@@ -53,43 +53,36 @@ concept "Virtual Encounters":
 concept "High BMI Follow-up Service Requests":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- value type is dateTime.
 - coded from "cms69-RecordConcepts"."Follow Up for Above Normal BMI".
 
 concept "Low BMI Follow-up Service Requests":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- value type is dateTime.
 - coded from "cms69-RecordConcepts"."Follow Up for Below Normal BMI".
 
 concept "Weight Assessment Referrals":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- value type is dateTime.
 - coded from "cms69-RecordConcepts"."Referrals Where Weight Assessment May Occur".
 
 concept "High BMI Medications":
 - type is MedicationRequest.
 - value type is CodeableConcept.
-- value type is dateTime.
 - coded from "cms69-RecordConcepts"."Medications for Above Normal BMI".
 
 concept "Low BMI Medications":
 - type is MedicationRequest.
 - value type is CodeableConcept.
-- value type is dateTime.
 - coded from "cms69-RecordConcepts"."Medications for Below Normal BMI".
 
 concept "High BMI Follow-up Procedures":
 - type is Procedure.
 - value type is CodeableConcept.
-- value type is dateTime.
 - coded from "cms69-RecordConcepts"."Follow Up for Above Normal BMI Procedures".
 
 concept "Low BMI Follow-up Procedures":
 - type is Procedure.
 - value type is CodeableConcept.
-- value type is dateTime.
 - coded from "cms69-RecordConcepts"."Follow Up for Below Normal BMI Procedures".
 
 concept "Medical Reasons":

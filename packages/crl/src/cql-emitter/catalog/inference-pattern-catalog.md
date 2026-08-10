@@ -105,11 +105,13 @@ So `A and not B or C` parses as `(A and (not B)) or C`. Use explicit parens when
 
 Without parens, bare `or` between two concept refs in argument position is interpreted as the END of the current pattern call's argument followed by a top-level `or` introducing a sibling pattern. Authors who want the in-arg form MUST parenthesize. The template-match pass enforces this.
 
-For heterogeneous in-arg disjunctions (e.g., `Justified`'s `reason` mixing ConceptRefs and TemporalPredicates), the same rule applies — wrap the whole alternatives list in parens:
+For in-arg disjunctions of reason concepts (e.g., `Justified`'s `reason` accepting any of several diagnosis concepts), the same rule applies — wrap the whole alternatives list in parens:
 
 ```crl
-"High BMI Follow-up Service Requests" justified by ("Overweight or Obese Diagnoses" or "Has Overweight or Obese" on or before "High BMI Follow-up Order Date")
+"Low BMI Follow-up Service Requests" justified by ("Underweight Diagnoses" or "Malnutrition Diagnoses")
 ```
+
+(A temporal correlation between the action and a related resource — "ordered on/after a qualifying diagnosis" — is NOT expressed inside `justified by`; it is a separate resource refinement, `<action> on day of or after <diagnoses>`. Mixing a boolean temporal predicate into a resource reason is a rule-B shape error.)
 
 **Inside selection-pattern scopes.** Connectors `within`, `during`, `on day of`, `between … and …` are narrative sub-grammar (window-from-anchor, OnDayOf, BetweenAnchors), not boolean connectors. They live INSIDE pattern arguments and do not participate in `and`/`or`/`not` precedence at the body level.
 
@@ -373,30 +375,33 @@ A parameterized umbrella for windowed-from-anchor temporal scopes. Used as the `
 
 **Rule: no FHIR property access in CRL pattern bodies.** Pattern bodies reference concepts by name only — never `<concept>.<fhir-field>`. CRL is for clinical authors (doctors, nurses, informaticists). They write clinical concepts and clinical patterns, not FHIR navigations.
 
-When a pattern needs a property of a clinical concept (the date an order was placed, the start of a diagnosis's prevalence, the value of a measurement), lift that property into a separate named concept and reference the concept.
-
-**Concept-based property naming — the lift idiom.**
-
-```crl
-concept "High BMI Follow-up Order Date":
-- type is ServiceRequest.
-- value type is dateTime.
-- inferred from "High BMI Follow-up Service Requests".
-```
-
-The lifted concept is the clinical name for "when the high-BMI follow-up was ordered." The emitter resolves it to `<source>.authoredOn` based on the source type, valuetype, and clinical-name suffix.
+When a pattern needs the VALUE of a clinical concept (the numeric content of a measurement), that content is the concept's own value type — operate on the concept reference directly.
 
 **Quantity values.** Patterns that compare numeric values operate on a Quantity-typed concept reference directly — no `.value` access. The Quantity concept's numeric content is implicit.
 
-**Common lifts (source type → resolved FHIR property):**
+**Temporal properties are NOT lifted into `dateTime` concepts.** A date used in a temporal comparison (the date an order was placed, the start of a diagnosis's prevalence) is NOT modelled as a standalone `dateTime` concept aliasing a resource. Under the concept-model redesign, a `dateTime` concept that bare-refs a resource is a shape error (`bare-ref-value-type-mismatch`): a bare `defined as` is value-preserving and cannot project a resource to a scalar. Instead, express the temporal relationship at RESOURCE level, where the date is internal to the pattern's lowering:
 
-| Lifted concept name | Source type | Emitter resolves to |
-|---|---|---|
-| `<thing> Order Date` | ServiceRequest / MedicationRequest | `.authoredOn` |
-| `<thing> Performed Date` | Procedure | `.performed` |
-| `<thing> Issued Date` | Observation | `.issued` |
-| `<thing> Established Date` / `<thing> Onset` | Condition | `.prevalenceStart` (helper-resolved) |
-| `<thing> Effective Date` | Observation / DiagnosticReport | `.effective` |
+- **"orders/procedures for which a qualifying condition was documented on/before the order"** — a correlated, day-granular, inclusive resource refinement producing the order SUBSET:
+
+  ```crl
+  concept "High BMI Follow-up Preceded by Overweight Diagnosis":
+  - type is ServiceRequest.
+  - definition is "High BMI Follow-up Service Requests" on day of or after "Overweight or Obese Diagnoses Active".
+  ```
+
+  Lowers to `CRLCommon.OnDayOfOrAfter(<orders>, <conditions>)` — the order/procedure's own event time (`authoredOn` / `performed`) is compared against the condition's `onset`-derived prevalence start, entirely inside the helper. No `dateTime` concept is authored.
+
+- **"orders authored within a period"** — a resource temporal refinement:
+
+  ```crl
+  concept "Low BMI Follow-up Orders During MP":
+  - type is ServiceRequest.
+  - definition is "Low BMI Follow-up Service Requests" during "Measurement Period".
+  ```
+
+  Lowers to `CRLCommon.During(<orders>, <period>)`, using the order's own `authoredOn`.
+
+The old `<thing> Order Date` / `<thing> Performed Date` `dateTime`-lift idiom is REMOVED. If a genuine future need for a concept-level scalar/date projection appears (date arithmetic, a date-valued output), it is a rep-level `value projection is` concept, not a resource bare-ref — see the concept-model redesign notes.
 
 ## Quick index
 
@@ -594,12 +599,12 @@ The lifted concept is the clinical name for "when the high-BMI follow-up was ord
 - **Attestational** — `IsVerified(X)` and `DocumentedAs(X, classification)` assert a clinician's attestation.
 
 ### `Justified(action, reason)`
-- **intent** — the action was performed/ordered with a clinical reason that matches the specified valueset, optionally further qualified by a temporal predicate
-- **params** — `action`; `reason` (a valueset of acceptable reason concepts, or a disjunction of concepts, or a temporal predicate sub-call like `<Y> on or before <date>`)
+- **intent** — the action was performed/ordered with a clinical reason (reasonCode) that matches the specified valueset
+- **params** — `action`; `reason` (a valueset of acceptable reason concepts, or a disjunction of reason concepts). A TEMPORAL correlation to a related resource is NOT a `justified by` reason — use `<action> on day of or after <diagnoses>` (a separate resource refinement) and union the two.
 - **category** — Assertion *, secondary Classification*
 - **maturity** — strong
 - **evidence** — Pervasive — `reasonCode in valueset` is one of the most common qualifying clauses in DQM. CMS69 alone uses it 6× across the BMI intervention defines.
-- **examples** — `CMS69 :: High BMI Interventions Ordered` (`"High BMI Follow-up Service Requests" justified by "Overweight or Obese Diagnoses" or "Has Overweight or Obese" on or before "High BMI Follow-up Order Date"`), `CMS69 :: Low BMI Interventions Performed`, `CMS22 :: Hypertensive Reading Interventions`
+- **examples** — `CMS69 :: High BMI Follow-up Justified by Overweight Diagnosis` (`"High BMI Follow-up Service Requests" justified by "Overweight or Obese Diagnoses"`), unioned with the temporal path `"…" on day of or after "Overweight or Obese Diagnoses Active"`; `CMS22 :: Hypertensive Reading Interventions`
 - **anti-example** — `NotDoneWithReason(action, reason)` — Justified is "performed *for* X reason"; NotDoneWithReason is "*not* performed *because of* Y reason."
 
 ### `Active(X[, during])`
@@ -628,7 +633,7 @@ The lifted concept is the clinical name for "when the high-BMI follow-up was ord
 - **category** — Assertion *, secondary Classification*
 - **maturity** — moderate
 - **evidence** — L1: `Documented High BMI`, `Documented Low BMI` family in CMS69.
-- **examples** — `CMS69 :: Documented High BMI During Measurement Period`, `CMS69 :: Documented Low BMI During Measurement Period`
+- **examples** — `CMS69 :: Documented High BMI`, `CMS69 :: Documented Low BMI`
 - **anti-example** — `High(X)` / `Low(X)` for a *computed* classification. `DocumentedAs` is when the clinician asserted directly.
 
 ---
@@ -697,22 +702,24 @@ The lifted concept is the clinical name for "when the high-BMI follow-up was ord
 - **anti-example** — `During` is asymmetric containment; `Overlaps` is symmetric.
 
 ### `OnDayOfOrAfter(X, anchor)`
-- **intent** — X occurs on the same calendar day as or day after a clinical anchor
-- **params** — `X`; `anchor`
+- **intent** — X occurs on or after the anchor's day (day-granular, inclusive, UNBOUNDED — no upper bound). Includes the anchor↔resource correlated overloads: an order/procedure whose event day is on/after a qualifying Condition's `onset` prevalence start (CMS69 temporal intervention path).
+- **params** — `X` (event, order, or procedure); `anchor` (event or Condition)
 - **category** — Qualification *, secondary Contextualization*
 - **maturity** — moderate
-- **evidence** — L1: `Day After Procedure` (10), `Day Of Or Day After` formulations. L2 helper: `TJC.calendarDayOfOrDayAfter` (8 calls).
-- **examples** — `CMS108 :: Encounter With Intervention Comfort Measures On Day Of Or Day After Procedure`
+- **evidence** — L1: `Day After Procedure` (10), `Day Of Or Day After` formulations. L2 helper: `TJC.calendarDayOfOrDayAfter` (8 calls). CMS69 correlated intervention paths (order/procedure `on day of or after` an active diagnosis).
+- **examples** — `CMS108 :: Encounter With Intervention Comfort Measures On Day Of Or Day After Procedure`; `CMS69 :: High BMI Follow-up Preceded by Overweight Diagnosis`
 - **anti-example** — `BetweenAnchors(X, start, end)` for the "from start-anchor to end-anchor" window; `Within(X, window)` for a rolling time window.
+- **⚠ note** — the implementation is UNBOUNDED on-or-after (`starts on or after day of …`), so it also matches day+2, day+N. A genuinely BOUNDED "day-of-or-*next*-day" relation (the CMS108 / `TJC.calendarDayOfOrDayAfter` semantics) is a DISTINCT relation the current overloads over-include; if a measure requires the bounded window, it needs its own canonical (tracked separately).
 
 ### `OnOrBefore(X, anchor)`
 - **intent** — X occurs on or before a clinical anchor (or date)
-- **params** — `X`; `anchor` (event or date)
+- **params** — `X` (event or condition); `anchor` (event or date)
 - **category** — Qualification
-- **maturity** — moderate
-- **evidence** — L1: "on or before," "starts before or on day of." L2: 4× in CMS69 sample alone.
-- **examples** — `CMS69 :: High BMI Interventions Ordered`, `CMS69 :: High BMI Interventions Performed`
-- **anti-example** — `OnDayOfOrAfter(X, anchor)` for the directional flip.
+- **maturity** — under review (see ⚠ note)
+- **evidence** — L1: "on or before," "starts before or on day of." (CMS69 no longer uses this pattern after the T4/STEP2 re-model — its former uses had a boolean subject and were replaced by resource-level `on day of or after` correlations.)
+- **examples** — (no current corpus example; the CMS69 `on or before "…Order Date"` uses were re-modelled away.)
+- **anti-example** — `OnDayOfOrAfter(X, anchor)` for the directional flip — and the PREFERRED form for correlating a resource set to a related resource's timing (it returns the resource subset without a boolean).
+- **⚠ note** — the degenerate `OnOrBefore(X Boolean, anchor)` overload (a silent anchor-discarding passthrough) and this pattern's arg0 rule-B exemption are slated for removal now that no corpus concept feeds them (tracked in #268).
 
 ### `SameDay(eventA, eventB)`
 - **intent** — two events occurred on the same calendar day
@@ -855,7 +862,7 @@ A parameterized umbrella for windowed-from-anchor temporal scopes. Used as the `
 - **category** — Calculation *, secondary Classification*
 - **maturity** — strong
 - **evidence** — L1: `High BMI`, `Low BMI`, `Normal Blood Pressure`, `Elevated Blood Pressure`, `Abnormal Presentation`. L2: 18 `threshold-named`-tagged statements.
-- **examples** — `CMS22 :: Encounter with Normal Blood Pressure Reading`, `CMS69 :: Documented High BMI During Measurement Period`
+- **examples** — `CMS22 :: Encounter with Normal Blood Pressure Reading`, `CMS69 :: Documented High BMI`
 - **anti-example** — `DocumentedAs(X, high)` if the classification is asserted by a clinician (not computed); the named-category primitives are for the *computed* classification against standard cutoffs.
 
 ### `AtLeast(value, target)` / `AtMost(value, target)` / `Exceeds(value, target)` / `Below(value, target)`
