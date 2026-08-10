@@ -25,6 +25,7 @@ parameter "Measurement Period":
 
 concept "BMI Evaluation Encounter (not virtual)":
 - type is Encounter.
+- value type is CodeableConcept.
 - defined as
 (
    "cms69-RecordSource"."Encounters to Evaluate BMI"
@@ -34,14 +35,17 @@ concept "BMI Evaluation Encounter (not virtual)":
 
 concept "BMI Evaluation Encounter (not virtual) During MP":
 - type is Encounter.
+- value type is CodeableConcept.
 - definition is "BMI Evaluation Encounter (not virtual)" during "Measurement Period".
 
 concept "BMI Evaluation Encounter (not virtual) Performed":
 - type is Encounter.
+- value type is CodeableConcept.
 - definition is "BMI Evaluation Encounter (not virtual)" performed.
 
 concept "Qualifying Encounter":
 - type is Encounter.
+- value type is CodeableConcept.
 - defined as
 (
    "BMI Evaluation Encounter (not virtual) During MP"
@@ -128,10 +132,12 @@ concept "Has Normal BMI":
 
 concept "Overweight or Obese Diagnoses Active":
 - type is Condition.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Overweight or Obese Diagnoses" active.
 
 concept "Underweight Diagnoses Active":
 - type is Condition.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Underweight Diagnoses" active.
 
 
@@ -139,14 +145,17 @@ concept "Underweight Diagnoses Active":
 
 concept "High BMI Follow-up Justified by Overweight Diagnosis":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."High BMI Follow-up Service Requests" justified by "cms69-RecordSource"."Overweight or Obese Diagnoses".
 
 concept "High BMI Follow-up Preceded by Overweight Diagnosis":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."High BMI Follow-up Service Requests" on day of or after "Overweight or Obese Diagnoses Active".
 
 concept "High BMI Follow-up Order":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as
 (
    "High BMI Follow-up Justified by Overweight Diagnosis"
@@ -156,14 +165,17 @@ concept "High BMI Follow-up Order":
 
 concept "Weight Assessment Referral Justified by Overweight Diagnosis":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" justified by "cms69-RecordSource"."Overweight or Obese Diagnoses".
 
 concept "Weight Assessment Referral Preceded by Overweight Diagnosis":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" on day of or after "Overweight or Obese Diagnoses Active".
 
 concept "High BMI Weight Assessment Referral":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as
 (
    "Weight Assessment Referral Justified by Overweight Diagnosis"
@@ -173,14 +185,17 @@ concept "High BMI Weight Assessment Referral":
 
 concept "High BMI Medication Justified by Overweight Diagnosis":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."High BMI Medications" justified by "cms69-RecordSource"."Overweight or Obese Diagnoses".
 
 concept "High BMI Medication Preceded by Overweight Diagnosis":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."High BMI Medications" on day of or after "Overweight or Obese Diagnoses Active".
 
 concept "High BMI Medication Order":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - defined as
 (
    "High BMI Medication Justified by Overweight Diagnosis"
@@ -205,14 +220,17 @@ concept "High BMI Interventions Ordered":
 
 concept "High BMI Procedure Justified by Overweight Diagnosis":
 - type is Procedure.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."High BMI Follow-up Procedures" justified by "cms69-RecordSource"."Overweight or Obese Diagnoses".
 
 concept "High BMI Procedure Preceded by Overweight Diagnosis":
 - type is Procedure.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."High BMI Follow-up Procedures" on day of or after "Overweight or Obese Diagnoses Active".
 
 concept "High BMI Procedure Performed":
 - type is Procedure.
+- value type is CodeableConcept.
 - defined as
 (
    "High BMI Procedure Justified by Overweight Diagnosis"
@@ -222,6 +240,7 @@ concept "High BMI Procedure Performed":
 
 concept "High BMI Interventions Performed":
 - type is Procedure.
+- value type is CodeableConcept.
 - defined as "High BMI Procedure Performed".
 
 
@@ -252,18 +271,22 @@ concept "High BMI And Follow Up Provided":
 
 concept "Low BMI Follow-up Justified by Underweight Diagnosis":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Service Requests" justified by "cms69-RecordSource"."Underweight Diagnoses".
 
 concept "Low BMI Follow-up Orders During MP":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Service Requests" during "Measurement Period".
 
 concept "Low BMI Follow-up Preceded by Underweight During MP":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Low BMI Follow-up Orders During MP" on day of or after "Underweight Diagnoses Active".
 
 concept "Low BMI Follow-up Order":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as
 (
    "Low BMI Follow-up Justified by Underweight Diagnosis"
@@ -273,18 +296,22 @@ concept "Low BMI Follow-up Order":
 
 concept "Weight Assessment Referral Justified by Underweight Diagnosis":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" justified by "cms69-RecordSource"."Underweight Diagnoses".
 
 concept "Weight Assessment Referral During MP":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" during "Measurement Period".
 
 concept "Weight Assessment Referral Preceded by Underweight During MP":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "Weight Assessment Referral During MP" on day of or after "Underweight Diagnoses Active".
 
 concept "Low BMI Weight Assessment Referral":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as
 (
    "Weight Assessment Referral Justified by Underweight Diagnosis"
@@ -294,18 +321,22 @@ concept "Low BMI Weight Assessment Referral":
 
 concept "Low BMI Medication Justified by Underweight Diagnosis":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Low BMI Medications" justified by "cms69-RecordSource"."Underweight Diagnoses".
 
 concept "Low BMI Medication Orders During MP":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Low BMI Medications" during "Measurement Period".
 
 concept "Low BMI Medication Preceded by Underweight During MP":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "Low BMI Medication Orders During MP" on day of or after "Underweight Diagnoses Active".
 
 concept "Low BMI Medication Order":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - defined as
 (
    "Low BMI Medication Justified by Underweight Diagnosis"
@@ -330,22 +361,27 @@ concept "Low BMI Interventions Ordered":
 
 concept "Low BMI Procedure Justified by Underweight Diagnosis":
 - type is Procedure.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Procedures" justified by "cms69-RecordSource"."Underweight Diagnoses".
 
 concept "Low BMI Follow-up Procedures Performed":
 - type is Procedure.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Procedures" performed.
 
 concept "Low BMI Procedures During MP":
 - type is Procedure.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Procedures" during "Measurement Period".
 
 concept "Low BMI Procedure Preceded by Underweight During MP":
 - type is Procedure.
+- value type is CodeableConcept.
 - definition is "Low BMI Procedures During MP" on day of or after "Underweight Diagnoses Active".
 
 concept "Low BMI Procedure Performed":
 - type is Procedure.
+- value type is CodeableConcept.
 - defined as
 (
    (
@@ -359,6 +395,7 @@ concept "Low BMI Procedure Performed":
 
 concept "Low BMI Interventions Performed":
 - type is Procedure.
+- value type is CodeableConcept.
 - defined as "Low BMI Procedure Performed".
 
 
@@ -386,10 +423,12 @@ concept "Low BMI And Follow Up Provided":
 
 concept "BMI Observation Not Done With Reason":
 - type is Observation.
+- value type is Quantity.
 - definition is "cms69-RecordSource"."BMI Observations" not done with reason ("cms69-RecordSource"."Medical Reasons" or "cms69-RecordSource"."Patient Declined Reasons").
 
 concept "BMI Observation Same Day As Qualifying Encounter":
 - type is Observation.
+- value type is Quantity.
 - definition is "cms69-RecordSource"."BMI Observations" same day as "Qualifying Encounter".
 
 concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
@@ -407,18 +446,22 @@ concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
 
 concept "High BMI Follow-up Not Done With Medical Reason":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."High BMI Follow-up Service Requests" not done with reason "cms69-RecordSource"."Medical Reasons".
 
 concept "High BMI Follow-up Same Day As Qualifying Encounter":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."High BMI Follow-up Service Requests" same day as "Qualifying Encounter".
 
 concept "High BMI Follow-up Performed":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."High BMI Follow-up Service Requests" performed.
 
 concept "High BMI Follow-up Not Done With Reason":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as
 (
    "High BMI Follow-up Not Done With Medical Reason"
@@ -430,18 +473,22 @@ concept "High BMI Follow-up Not Done With Reason":
 
 concept "Low BMI Follow-up Not Done With Medical Reason":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Service Requests" not done with reason "cms69-RecordSource"."Medical Reasons".
 
 concept "Low BMI Follow-up Same Day As Qualifying Encounter":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Service Requests" same day as "Qualifying Encounter".
 
 concept "Low BMI Follow-up Performed":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Service Requests" performed.
 
 concept "Low BMI Follow-up Not Done With Reason":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as
 (
    "Low BMI Follow-up Not Done With Medical Reason"
@@ -453,18 +500,22 @@ concept "Low BMI Follow-up Not Done With Reason":
 
 concept "Weight Assessment Referral Not Done With Medical Reason":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" not done with reason "cms69-RecordSource"."Medical Reasons".
 
 concept "Weight Assessment Referral Same Day As Qualifying Encounter":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" same day as "Qualifying Encounter".
 
 concept "Weight Assessment Referral Performed":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" performed.
 
 concept "Weight Assessment Referral Not Done With Reason":
 - type is ServiceRequest.
+- value type is CodeableConcept.
 - defined as
 (
    "Weight Assessment Referral Not Done With Medical Reason"
@@ -476,18 +527,22 @@ concept "Weight Assessment Referral Not Done With Reason":
 
 concept "High BMI Medication Not Done With Medical Reason":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."High BMI Medications" not done with reason "cms69-RecordSource"."Medical Reasons".
 
 concept "High BMI Medication Same Day As Qualifying Encounter":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."High BMI Medications" same day as "Qualifying Encounter".
 
 concept "High BMI Medication Performed":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."High BMI Medications" performed.
 
 concept "High BMI Medication Not Done With Reason":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - defined as
 (
    "High BMI Medication Not Done With Medical Reason"
@@ -499,18 +554,22 @@ concept "High BMI Medication Not Done With Reason":
 
 concept "Low BMI Medication Not Done With Medical Reason":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Low BMI Medications" not done with reason "cms69-RecordSource"."Medical Reasons".
 
 concept "Low BMI Medication Same Day As Qualifying Encounter":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Low BMI Medications" same day as "Qualifying Encounter".
 
 concept "Low BMI Medication Performed":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Low BMI Medications" performed.
 
 concept "Low BMI Medication Not Done With Reason":
 - type is MedicationRequest.
+- value type is CodeableConcept.
 - defined as
 (
    "Low BMI Medication Not Done With Medical Reason"
@@ -541,23 +600,33 @@ concept "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI
 
 concept "Pregnancy Diagnoses Active During MP":
 - type is Condition.
+// value type deferred (#265): typing this CodeableConcept surfaces a bare-ref-value-type-mismatch on its
+// boolean consumer `Active Pregnancy Diagnosis`, whose correct `defined as exists` fix is not yet lowered
+// by the cql-emitter. Left untyped so the bare-ref check no-ops; type it when #265 lands.
 - definition is "cms69-RecordSource"."Pregnancy Diagnoses" active during "Measurement Period".
 
 concept "Active Pregnancy Diagnosis":
 - type is Observation.
 - value type is boolean.
+// FIXME (#265): this is a boolean determination bare-ref'ing a resource concept; the correct form is
+// `defined as exists ( "Pregnancy Diagnoses Active During MP" )`, but the cql-emitter does not yet lower
+// `defined as exists`. Kept as a bare-ref (its consumer `Is Pregnant …` treats it as boolean) and its
+// target left UNTYPED so rule-B's bare-ref check no-ops. Type the target + convert to exists when #265 lands.
 - defined as "Pregnancy Diagnoses Active During MP".
 
 concept "Pregnancy Status Overlaps MP":
 - type is Observation.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Pregnancy Status Observations" overlaps "Measurement Period".
 
 concept "Pregnancy Status Verified":
 - type is Observation.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Pregnancy Status Observations" verified.
 
 concept "Pregnancy Status Documented As Pregnancy Related":
 - type is Observation.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Pregnancy Status Observations" documented as "cms69-RecordSource"."Pregnancy or Other Related Diagnoses".
 
 concept "Verified Pregnancy Status":
