@@ -279,7 +279,7 @@ define "Pregnancy Diagnoses Active During MP":
   CRLCommon.Active(Cms69RecordSource."Pregnancy Diagnoses", "Measurement Period")
 
 define "Active Pregnancy Diagnosis":
-  "Pregnancy Diagnoses Active During MP"
+  exists ("Pregnancy Diagnoses Active During MP")
 
 define "Pregnancy Status Overlaps MP":
   CRLCommon.Overlaps(Cms69RecordSource."Pregnancy Status Observations", "Measurement Period")

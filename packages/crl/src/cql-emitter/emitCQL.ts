@@ -1311,9 +1311,6 @@ class Emitter {
     c: Concept,
     body: DefinedAsBareRef | DefinedAsExists | DefinedAsComposition
   ): string {
-    // `defined as exists ("X")` has no CQL lowering in increment 1 (Todo 2/3). Guard loud;
-    // no current content uses it. After this the body narrows to bare-ref | composition.
-    if (body.type === "DefinedAsExists") definedAsExistsNotLowered("cql-emitter emitDefinedAs");
     // Case-feature truth-set INFERRED emit: a `defined as` concept is a normalized
     // truth-set. The operators stay set-ops (`union`/`intersect`/`except`) and the
     // operand-shape/`exists(...)` bridge is suppressed (every operand IS a
@@ -1322,6 +1319,13 @@ class Emitter {
     // leaf. (A bare-ref `defined as` to another Inferred concept is a truth-set
     // alias — emit the qualified ref with NO `.asTruths()`.)
     if (this.caseFeature.kind === "inferred") {
+      // `defined as exists` inside the case-feature truth-set lane has no lowering — no content
+      // exercises it, and an existence collapse over a normalized truth-set is not a set-op form
+      // this lane models. Guard loud rather than guess (#265 lowered the STANDARD lane only). The
+      // guard narrows `body` to bare-ref | composition for the truth-set rendering below.
+      if (body.type === "DefinedAsExists") {
+        definedAsExistsNotLowered("cql-emitter emitDefinedAs (case-feature truth-set lane)");
+      }
       // Both-representation fold-in: the Inferred twin of a `code is` + `defined
       // as` concept must UNION the direct local-source retrieve with its inferred
       // composition: `LocalSource."X".asTruths() union (<composition>)`. The
@@ -1339,6 +1343,15 @@ class Emitter {
         return `${direct}\n  union (\n${indent(inner, 2)}\n  )`;
       }
       return inner;
+    }
+    if (body.type === "DefinedAsExists") {
+      // `defined as exists ("X")` → a boolean existence determination over concept X's define
+      // (a resource/refinement list): `exists (<X>)`. Mirrors the bare-ref lane's cross-lib
+      // qualification; the reference is tracked like a bare ref (ast/types.ts). (#265)
+      const crossLib = this.crossLibraryOf(body.ref);
+      const refName = getRefName(body.ref);
+      const ref = crossLib !== null ? cqlQualifiedRef(crossLib, refName) : cqlIdent(refName);
+      return `exists (${ref})`;
     }
     if (body.type === "DefinedAsBareRef") {
       const crossLib = this.crossLibraryOf(body.ref);
@@ -1698,8 +1711,9 @@ class Emitter {
       case "DefinedAsDefinition": {
         const da = body.body;
         if (da.type === "DefinedAsBareRef") return this.classifyRefFlavor(da.ref, next);
-        // `exists ("X")` flavor is not modeled in increment 1 — return the loud no-guess
-        // sentinel (like `definition is`), never a composition-shaped guess.
+        // `exists ("X")` is a boolean determination, not a truth-set/resource-list flavor — return
+        // the conservative no-guess sentinel for the sem-not refusal path (like `definition is`),
+        // never a composition-shaped guess. (Emit lowering itself landed in #265.)
         if (da.type === "DefinedAsExists") return "unknown";
         return this.classifyNegationOperand(da.expression, next);
       }

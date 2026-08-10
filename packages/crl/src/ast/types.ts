@@ -670,20 +670,22 @@ export interface DefinedAsExists extends ASTNode {
 }
 
 /**
- * Increment-1 (concept-model redesign Todo 1) guard. `defined as exists (...)` PARSES and
- * builds — its reference is tracked by every reference walker (resolution, cycles, emit
- * closure, project index, provenance) — but has NO CQL/execution LOWERING yet; that lands
- * in Todo 2/3 of the redesign. Emit and execution boundaries call this to fail LOUD rather
- * than misread the node. No current content uses `exists`, so it never fires in practice;
- * it is the safety net the design review (disc 394, gpt56 point #1) required once the
+ * Guard for `defined as exists (...)` code paths that do NOT lower it. The construct PARSES and
+ * builds — its reference is tracked by every reference walker (resolution, cycles, emit closure,
+ * project index, provenance). STANDARD-lane CQL lowering landed in #265 (`emitDefinedAs` →
+ * `exists (<X>)`; CMS69's `Active Pregnancy Diagnosis` is the first consumer). The paths that STILL
+ * call this — the case-feature truth-set ("inferred") emit lane and the run_decision/CEL evaluator —
+ * do not yet lower existence (tracked in #270); they call this to fail LOUD rather than misread the
+ * node. Originally the safety net the design review (disc 394, gpt56 point #1) required once the
  * `DefinedAsDefinition.body` union was widened.
  */
 export function definedAsExistsNotLowered(where: string): never {
   throw new Error(
-    "`defined as exists` is not yet lowered (" +
+    "`defined as exists` is not lowered on this path (" +
       where +
-      ") — existence lowering lands in Todo 2/3 of the concept-model redesign. The " +
-      "construct parses and its reference is tracked, but no current content uses it.",
+      ") — STANDARD-lane CQL lowering landed in #265, but the case-feature truth-set lane and the " +
+      "run_decision evaluator do not yet lower existence (#270). The construct parses and its " +
+      "reference is tracked like a bare ref.",
   );
 }
 

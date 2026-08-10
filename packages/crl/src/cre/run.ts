@@ -311,13 +311,14 @@ function walkDefinedAs(
   // only `status` accept a fabricated result — plus a diagnostic, plus an unsatisfied leaf so
   // the trace is well-formed. On the OFF-path `truthOf` route this runs in an isolated scratch
   // ctx (runtimeError is a by-value boolean copied by the `{...ctx}` spread), so it never
-  // pollutes the real run — the concept's off-path truth is just `false`. No current content
-  // uses `exists`, so this never fires in practice.
+  // pollutes the real run — the concept's off-path truth is just `false`. The run_decision/CEL
+  // evaluator does not lower `exists` (the cql-emitter standard lane does, #265; engine
+  // evaluation is tracked in #270); cms69, a measure, is not reached through this path.
   if (body.type === "DefinedAsExists") {
     ctx.runtimeError = true;
     ctx.diagnostics.push(
       `\`defined as exists\` (${labelOf(getRefLibrary(body.ref) ?? lib, getRefName(body.ref))}) is not yet ` +
-        `evaluated — existence lowering lands in Todo 2/3 of the concept-model redesign; run marked error`,
+        `evaluated by run_decision — engine existence evaluation is tracked in #270; run marked error`,
     );
     return { op: "ref", concept: getRefName(body.ref), satisfied: false };
   }

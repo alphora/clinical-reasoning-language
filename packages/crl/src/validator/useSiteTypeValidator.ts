@@ -714,8 +714,9 @@ function operandMismatchTail(
       // boolean guard has NO single valid declaration (disc 403 [imp] #5). Point at the split
       // (`defined as exists`) rather than telling the author to flip the value type — flipping it to
       // non-boolean would only move the error to the guard site (the ping-pong the design forbids).
-      // NOTE: `defined as exists` does not yet LOWER to CQL (tracked in #265 — lowering is coming;
-      // see `definedAsExistsNotLowered`). The guidance is the correct MODEL fix; the emit path follows.
+      // NOTE: `defined as exists` now lowers to CQL on the standard emit lane (#265); it is the
+      // correct MODEL fix here. (Its operand shape is not yet validated — a boolean operand is a
+      // silent always-true; tracked in #269.)
       return (
         `A refinement / anchor position filters or anchors over event INSTANCES, but a DERIVED ` +
         `\`${vt}\` (computed by \`defined as\` / \`definition is\`) has no instances of its own — ` +

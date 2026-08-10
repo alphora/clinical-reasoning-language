@@ -600,19 +600,16 @@ concept "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI
 
 concept "Pregnancy Diagnoses Active During MP":
 - type is Condition.
-// value type deferred (#265): typing this CodeableConcept surfaces a bare-ref-value-type-mismatch on its
-// boolean consumer `Active Pregnancy Diagnosis`, whose correct `defined as exists` fix is not yet lowered
-// by the cql-emitter. Left untyped so the bare-ref check no-ops; type it when #265 lands.
+- value type is CodeableConcept.
 - definition is "cms69-RecordSource"."Pregnancy Diagnoses" active during "Measurement Period".
 
 concept "Active Pregnancy Diagnosis":
 - type is Observation.
 - value type is boolean.
-// FIXME (#265): this is a boolean determination bare-ref'ing a resource concept; the correct form is
-// `defined as exists ( "Pregnancy Diagnoses Active During MP" )`, but the cql-emitter does not yet lower
-// `defined as exists`. Kept as a bare-ref (its consumer `Is Pregnant …` treats it as boolean) and its
-// target left UNTYPED so rule-B's bare-ref check no-ops. Type the target + convert to exists when #265 lands.
-- defined as "Pregnancy Diagnoses Active During MP".
+// A boolean existence determination: is there an active pregnancy diagnosis during the MP? The
+// published CMS69 measure gates the denominator exclusion on `exists`; `Is Pregnant …` consumes this
+// as a boolean alongside `Verified Pregnancy Status`.
+- defined as exists ( "Pregnancy Diagnoses Active During MP" ).
 
 concept "Pregnancy Status Overlaps MP":
 - type is Observation.

@@ -318,7 +318,8 @@ export function buildDefExprIndex(
     // ⚠ TRADE-OFF: `conceptShape` (via `flattenDefinedAsBody`) DOES surface the operand X, so an
     // exists concept KNOWINGLY diverges from the DRIFT GUARD (optree []=/= shape [X]) — inert
     // (exists never emits) and documented in this file's header carve-out + asserted expected in
-    // definedAsExpr.test.ts. Todo 3 adds an `exists` DefExpr kind that traverses X and restores lockstep.
+    // definedAsExpr.test.ts. A future `exists` DefExpr kind traverses X and restores lockstep (#270; note
+    // the cql-emitter standard lane now lowers `exists`, #265).
     const daBody =
       ast?.definition?.type === "DefinedAsDefinition" ? ast.definition.body : undefined;
     const body =

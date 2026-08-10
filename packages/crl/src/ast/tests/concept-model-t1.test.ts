@@ -289,11 +289,11 @@ concept "B":
 });
 
 describe("increment-1 lowering guard", () => {
-  it("definedAsExistsNotLowered throws a Todo-2/3 diagnostic naming the boundary", () => {
-    expect(() => definedAsExistsNotLowered("test-site")).toThrow(/not yet lowered \(test-site\)/);
+  it("definedAsExistsNotLowered throws a diagnostic naming the boundary (the paths that still guard, #270)", () => {
+    expect(() => definedAsExistsNotLowered("test-site")).toThrow(/not lowered on this path \(test-site\)/);
   });
 
-  it("emit_cql on an exists concept fails as a STRUCTURED error (caught by emitCQLFromAST), not a crash", () => {
+  it("emit_cql LOWERS an exists concept to a boolean `exists (<X>)` (#265; was a guarded structured error pre-#265)", () => {
     const ast = parseInput(`library "T".
 concept "Present":
 - type is Observation.
@@ -303,8 +303,9 @@ concept "Has Present":
 - value type is boolean.
 - defined as exists ( "Present" ).`);
     const res = emitCQLFromAST(ast);
-    expect(res.success).toBe(false);
-    expect(JSON.stringify(res.errors ?? [])).toMatch(/exists|not yet lowered/i);
+    expect(res.success).toBe(true);
+    expect(res.result ?? "").toMatch(/define "Has Present":\s*\n\s*exists \("Present"\)/);
+    expect(res.result ?? "").not.toContain("not yet lowered");
   });
 
   it("run_decision (runCel) on an exists concept does NOT throw — it surfaces a diagnostic and treats it as unsatisfied", () => {
