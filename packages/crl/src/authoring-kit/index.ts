@@ -26,6 +26,7 @@ import {
   PA_DETERMINATION_REFERENCE_CEL,
   PA_DETERMINATION_REFERENCE_CRL,
   PATIENT_AGE_BOTH_REP_REFERENCE_CRL,
+  REPRESENTATION_REFERENCE_CRL,
   SOURCE_DELEGATED_DECISION_REFERENCE_CEL,
   SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
 } from "./reference";
@@ -42,6 +43,7 @@ import type {
   KitRule,
   ReferenceArtifact,
   TypeAllowlist,
+  VerificationLegendEntry,
   VerifyLoop,
 } from "./types";
 
@@ -202,8 +204,22 @@ export type {
 //   Correlated resource-level temporal refinement is DEFERRED (boundary-OUT; a scope note only, no syntax). Design
 //   round: disc 407 (both design arms; the C4 defer/teach split resolved on the verified run_decision status:error
 //   fact). BOTH useCase hashes re-pin (schemaVersion is hashed + the cpg rule/model inherit into both chains).
+// #257 (schemaVersion 1.17→1.18): SHAPE + CONTENT — the artifact `verification` taxonomy + the reachable v3
+//   multi-representation exemplar. SHAPE: `ReferenceArtifact` gains a REQUIRED `verification` tier
+//   (`cre-run` | `engine-run` | `validate-only`), and the payload gains a `verificationLegend` (the in-payload
+//   meaning of each tier — a TS docstring never reaches the MCP consumer). CONTENT: all 11 existing artifacts get
+//   a tier (the 5 decision `.crl`+`.cel` pairs `cre-run`; patient-age `engine-run` = construct verified at
+//   `$r5.apply` POINT-IN-TIME, honestly NOT a per-build regression over the exact artifact); the mammogram
+//   multi-source + BMI exemplar ships as `representation-reference.crl` (edge cpg, `validate-only`) — reachable so
+//   a remote-MCP consumer can READ the value-preserving `sem-or` union (a missing worked `sem-or` regenerated the
+//   "defined-as is boolean" misconception, disc 398). The kit `boundary` (posrep + `definition is` entries)
+//   cross-references it as a forward-looking capability PREVIEW (proof axis) that is still OUT of scope to AUTHOR
+//   (authoring-scope axis) — the two axes are orthogonal. The `reference.ts` "proven, not asserted" header +
+//   `concept-form`/`value-type` dead-path refs are corrected. Design round: disc 408 (both design arms; two
+//   criticals — patient-age engine-run overstatement resolved to point-in-time construct verification, and the
+//   boundary contradiction resolved by the proof-vs-authoring-axis cross-refs). BOTH useCase hashes re-pin.
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.17";
+const SCHEMA_VERSION = "1.18";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -335,7 +351,7 @@ const RULES: KitRule[] = [
     category: "concept-model",
     rule: 'Every concept declares a `value type` (REQUIRED — its ONE canonical published result shape; A.10 `missing-value-type` is an ERROR; see rule value-type) plus at least one PRODUCER — the composition is `concept = value type + ( n primitives and/or ≤1 derived )`, `x + n ≥ 1`. A Stage-1 leaf concept declares `value type is` + `type is` + `code is` (local); `type is` is written EXPLICITLY in this kit\'s exemplars (the terse implicit-standard form that drops `type is` when it is the standard `Observation` / `Observation.value` shape is a later kit-migration, deferred — do not read its absence into these exemplars). A SINGLE criterion stated at a finer data-grain — multiple representations/components of ONE clinical fact — is normalized with `defined as` (INFERENCE) over named local leaves. The unit is anchored OUTSIDE the concept\'s own name: the operands must be alternative records of ONE underlying occurrence (e.g. "viral suppression documented" = a viral-load lab result OR a clinician chart note of the SAME suppression), NOT two SEPARATE events (failed drug therapy and failed physical therapy each occur independently — DISTINCT criteria; author them as decision structure, see decision-composition). The conjunction of DISTINCT criteria (a policy\'s "ALL of the following are met") is decision COMPOSITION (see decision-composition): author it as decision STRUCTURE — a compound branch guard `when ( A and B and C )` (or a named `criterion`) when the criteria share one consequence, sibling `when` branches when they route to DIFFERENT consequences — NEVER as a `defined as`/`sem-*` composite (which ships ONE opaque `condition[]` and asserts a sameness distinct criteria do not have). At the CONCEPT level this stage, `defined as` normalizes ONE concept\'s sub-representations; joining distinct criteria is a DECISION-level construct, not a concept-model one. Still OUT this stage: `source representation`/`coded from` (external) and `definition is` predicates (count/temporal/value) — the SOLE exception: the patient-age both-rep `definition is age today <at least | at most | under | younger than> <N> years` (see rule patient-age-both-rep). The boundary is the concept FORM, not the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional.',
     why: "Local-source pass proves decision authoring (incl. one-concept `defined as` inference) before external sources and predicate inference are added; keeping one-concept inference distinct from decision composition keeps distinct-criteria logic in the DECISION layer, where each criterion emits as its own visible `condition[]` (#168 — the test is same-fact vs distinct-criteria; distinct criteria are never fused by `defined as`/`sem-*`; see decision-composition).",
-    ref: "concept-layer-model; src/tests/fixtures/representation/mammogram-and-bmi.crl",
+    ref: "concept-layer-model; the `representation-reference.crl` artifact (the reachable worked v3 exemplar)",
     clauses: [
       {
         text: "A Stage-1 leaf concept declares `value type is` (REQUIRED, a property present on the concept — NOT position-bound; the exemplars order it after `type is`) + `type is` + `code is` (local). The IN-stage PRODUCERS are `code is` (local rep) and `defined as` (inference); `source representation`/`coded from` (external posreps) and `definition is` predicates are OUT this stage (the SOLE exception: the patient-age both-rep `definition is age today <at least | at most | under | younger than> <N> years` — see rule patient-age-both-rep). The general model `concept = value type + ( n primitives and/or ≤1 derived )` holds package-wide; this stage restricts only the PRODUCERS, never the value-type requirement.",
@@ -354,7 +370,7 @@ const RULES: KitRule[] = [
     category: "concept-model",
     rule: '`value type` is a concept\'s ONE canonical PUBLISHED result shape — the single declared result SHAPE every use site consumes and type-checks against (a shape, not a scalar-cardinality claim). REQUIRED on every concept (A.10 `missing-value-type` is a validator ERROR), and a value type with NO producer is invalid (`x + n ≥ 1`, #202). CHOOSE BY ROLE — what the concept RESULTS IN, not its FHIR resource type: `boolean` = a determination/finding (present-or-not, met-or-not) — INCLUDING any concept a decision `when`, a `criterion` body, or an action guard (`unless`/`only when`) consumes (a guard REQUIRES boolean; rule-B `decision-guard-nonboolean`); `Quantity` = a measurement/value (a BMI, a BP, a lab value — most-recent-able); `CodeableConcept` = a coded refinement/classification; `dateTime`/`integer`/`string` = a scalar datum. THE A.10b LESSON: a determination whose UNDERLYING resource is coded is STILL `boolean` when it is consumed as a guard — the guard CONSUMPTION governs the value type, NOT the resource\'s codedness. And do NOT relabel a genuinely resource/value-shaped concept `boolean` merely to feed a guard: keep that concept at its real shape (it may also be needed as an instance stream, e.g. `most recent`) and DERIVE a SEPARATE boolean guard concept from it. VALUE-PRESERVING INFERENCE: `sem-or`/`sem-and` composition and a bare-ref alias PRESERVE the declared value type (the author declares the concept\'s value type, the composition reconciles operands — the validator checks only that a NON-boolean composition has no BOOLEAN leaf, NOT full leaf-type compatibility, so it does not police all type drift); only a TOP-LEVEL `sem-not` and `defined as exists (…)` are inherently boolean — so a `defined as` concept is NOT boolean-by-default. NORMATIVE vs SHIPPED: the MODEL requires the value type checked at EVERY use site, but the validator ENFORCES a subset (the operand-constraint registry is seeded, not exhaustive — #266; the nested-call blind spot is the OUTER constrained position; and package-library resolution is a blind spot across ALL rule-B checks), so author to use-site typing as doctrine, not as a guarantee the tool catches every violation. Among the rule-B checks shipped THIS STAGE (NOT an exhaustive list): a guard operand must be boolean; a bare-ref alias must EQUAL its target\'s value type (FULL equality, not just boolean-ness); a NON-boolean composition requires every LEAF non-boolean (a boolean leaf is an ERROR; a boolean PARENT conversely exists-bridges refinement leaves, one-directional); a no-projector posrep must EQUAL the concept value type; a TOP-LEVEL `sem-not` / `defined as exists` result must be boolean. `defined as exists ( "Concept" )` is the explicit boolean EXISTENCE form (present → true, absent → false, closed-world) — LANE MATRIX (capability status, NOT a usable Stage-1 form yet): it PARSES + VALIDATES, and the STANDARD CQL emit lowers it to `exists (<Concept>)` (#265), BUT `run_decision` cannot PROVE it — it returns status:error whenever the exists concept is EVALUATED ON A DECISION PATH (engine existence evaluation is #270; an unused / off-path exists does not error the run, but it also is not verify-loop-proven); and #269 (reject a boolean operand, which emits silently-always-true via CQL list-promotion) is not yet built, so its operand must be an INSTANCE-BEARING non-boolean concept (in Stage-1, a local `code is` concept with a non-boolean value type) by AUTHOR care. Until #270 lands, a run_decision-provable boolean determination is a plain `code is` boolean concept (asserted directly); reach for `defined as exists` only when a non-boolean concept must be existence-tested, and expect the verify loop to gap on it.',
     why: "The published value type is what makes a concept's result legible AND checkable at every use site; DECLARING it (rather than inferring a return type — patterns have none) is what lets the producers disagree LOUDLY at validate time instead of silently at apply time (the #231 lane bug the redesign closes). The guard⇒boolean check is the specific rule that catches the A.10b masking — a coded-resource determination mis-typed `CodeableConcept` but consumed as a guard. Separating normative doctrine from shipped enforcement keeps the kit honest: it teaches the model to author to without claiming coverage the validator does not yet have.",
-    ref: "tmp/representation-model.md (design of record); src/validator/useSiteTypeValidator.ts (rule-B); concept-layer-model; #202; #231; #265; #266; #269; #270; A.10 missing-value-type",
+    ref: "the `representation-reference.crl` artifact (worked v3 exemplar); src/validator/useSiteTypeValidator.ts (rule-B); concept-layer-model; #202; #231; #265; #266; #269; #270; A.10 missing-value-type",
     clauses: [
       {
         text: "`value type` is REQUIRED on every concept (A.10 `missing-value-type` ERROR) and needs at least one producer (`x + n ≥ 1`, #202).",
@@ -1147,11 +1163,11 @@ const JUDGE_LENS: JudgeLens = {
 
 const BOUNDARY_ENTRIES: { text: string; edge: AuthoringEdge }[] = [
   {
-    text: "`definition is` predicates (count / most-recent / temporal / value thresholds — compute over a source); the SOLE exception is the patient-age both-rep `definition is age today <at least | at most | under | younger than> <N> years` recency merge (see rule patient-age-both-rep). CORRELATED resource-level temporal refinement (e.g. `<orders> on day of or after <active diagnoses>`) is a later-stage measure/refinement construct that EXISTS in CRL but is OUT of this kit — it is documented in the CQL emitter's inference-pattern catalog, not taught here",
+    text: "`definition is` predicates (count / most-recent / temporal / value thresholds — compute over a source); the SOLE exception is the patient-age both-rep `definition is age today <at least | at most | under | younger than> <N> years` recency merge (see rule patient-age-both-rep). CORRELATED resource-level temporal refinement (e.g. `<orders> on day of or after <active diagnoses>`) is a later-stage measure/refinement construct that EXISTS in CRL but is OUT of this kit — it is documented in the CQL emitter's inference-pattern catalog, not taught here. (The `representation-reference` validate-only artifact also PREVIEWS `definition is` selection/count/within — read-not-author, same proof-axis-vs-authoring-scope caveat as the posrep boundary entry.)",
     edge: "cpg",
   },
   {
-    text: "external / value-set sources (`source representation` / `coded from`)",
+    text: "external / value-set sources (`source representation` / `coded from`). The `representation-reference` artifact (verification `validate-only`) DEMONSTRATES posreps as a forward-looking capability preview — reachable to READ, but this is a PROOF-axis status, ORTHOGONAL to authoring scope: posreps remain OUT of scope to AUTHOR at Stage 1. Do not read the artifact's presence as a license",
     edge: "cpg",
   },
   {
@@ -1173,8 +1189,9 @@ const BOUNDARY_ENTRIES: { text: string; edge: AuthoringEdge }[] = [
  * source-delegated / disposition-arbitration) ride the `prior-auth` edge because they ARE PA coverage-determination
  * content — they recommend configured `<category>.<key>` determinations (certify/not-certify/pended) and carry their
  * own local determination `activity` blocks (validated against `crl.dispositions`; the shared vendored library was
- * retired in the configurable-PA-leaves work). The `cpg` base keeps only the pure-CDS `decision-reference` (service
- * ORDERS) + the `patient-age` carve-out. (A cpg-general criteria/delegation exemplar is deferred to the CPG-edge
+ * retired in the configurable-PA-leaves work). The `cpg` base keeps the pure-CDS `decision-reference` (service
+ * ORDERS), the `patient-age` carve-out, and the `representation-reference` capability preview (validate-only — the
+ * v3 multi-representation concept model). (A cpg-general criteria/delegation exemplar is deferred to the CPG-edge
  * build; the `cpg` decision RULES still teach the composition surface.)
  *
  * KNOWN GAP (deferred to the CPG-edge build): a few `cpg` RULES point by name at exemplars that ride the
@@ -1185,6 +1202,36 @@ const BOUNDARY_ENTRIES: { text: string; edge: AuthoringEdge }[] = [
  * fix is to author cpg-general (plain-activity) versions of those exemplars when the CPG seat is built; until
  * then the sole real consumer is the PA seat (`prior-auth`), for whom the refs resolve.
  */
+/**
+ * The in-payload legend for `ReferenceArtifact.verification` (a TS docstring never reaches the remote-MCP
+ * consumer). The three tiers are different KINDS of proof, NOT an ordered rank. It states the PROOF axis
+ * (is it runtime-proven, and by what?) — ORTHOGONAL to the AUTHORING-SCOPE axis (`boundary` / `conceptLayerModel`
+ * `scope`): a `validate-only` artifact can demonstrate a construct that is OUT of scope to AUTHOR at this stage.
+ */
+const VERIFICATION_LEGEND: VerificationLegendEntry[] = [
+  {
+    tier: "cre-run",
+    means:
+      "The artifact — a `.crl` + `.cel` PAIR — is executed through the CRE (the engine behind `run_decision`) by the kit's OWN test suite every build (a `.cel`'s tier names the pair it proves). Proves that the asserted recommendation is PRODUCED (membership) for each supplied case's facts — i.e. the branch/menu wiring reaches it.",
+    doesNotProve:
+      "Membership only: it does NOT prove exact output, that a guarded item is ABSENT, or path identity (two cases ending in the same disposition are indistinguishable). Nor clinical `code is` correctness, engine retrieval, FHIR emit, or `$apply` — CRE v1 is asserted-only (a concept is satisfied purely because a case fact is `defined by` it; it never evaluates `code is`).",
+  },
+  {
+    tier: "engine-run",
+    means:
+      "Validated by the kit suite, AND the artifact's CONSTRUCT was verified at `PlanDefinition/<id>/$r5.apply` POINT-IN-TIME by a separate engine harness (used for the patient-age recency merge, which asserted-only `run_decision` cannot prove).",
+    doesNotProve:
+      "That THIS exact artifact is re-run by the kit suite — the `$r5.apply` verification is a historical, point-in-time claim over the construct, not a per-build regression. There is no CEL companion.",
+  },
+  {
+    tier: "validate-only",
+    means:
+      "Validated by the kit suite (build + validator-clean) only. A capability PREVIEW of the concept model — reachable so the worked form (e.g. the value-preserving `sem-or` union) can be learned.",
+    doesNotProve:
+      "Any runtime behavior: the constructs it exercises are runtime-DEFERRED (posreps #257; `defined as exists` #270; `definition is` selection/count/within). It is NOT a runtime-proven template, and NOT a Stage-1 authoring license (see `boundary`).",
+  },
+];
+
 const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
   {
     name: "decision-reference.crl",
@@ -1192,6 +1239,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     edge: "cpg",
     purpose:
       "Canonical Stage-1 decision: first:/otherwise ordered precedence + a matched branch opening an `any:` menu with `unless`/`only when` guards and an always-offered item; local `code is` concepts; plain activity dispositions.",
+    verification: "cre-run",
     source: DECISION_REFERENCE_CRL,
   },
   {
@@ -1200,6 +1248,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     edge: "cpg",
     purpose:
       "Companion cases for decision-reference.crl: Patient subject, concept-linked facts, and one `result is` oracle per path (the unless drop, the only-when enable, ordered exclusion, a plain offer).",
+    verification: "cre-run",
     source: DECISION_REFERENCE_CEL,
   },
   {
@@ -1208,6 +1257,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     edge: "prior-auth",
     purpose:
       'The model for #168: a policy\'s DISTINCT criteria as decision STRUCTURE (each criterion visible/auditable) — nested `when` nodes or a COMPOUND BRANCH GUARD `when ( A and B )` (nesting/`and` = AND), each its own `condition[]`. "Failed Conservative Therapy" (failed drug therapy OR failed physical therapy) is a named `criterion` gated by an `or`-guard, NOT a `defined as`: failed drug therapy and failed physical therapy are two SEPARATE events joined in the DECISION layer. Its CONTRAST — "Viral Suppression Documented" (ONE clinical state attested two ways: a lab result OR a chart note) — IS a `defined as ( ... sem-or ... )`, riding the tree as a single-concept `when` node: the artifact\'s end-to-end proof that the sanctioned rung-1 construct emits + runs. THE TELL — alternative records of a SINGLE underlying occurrence (their records may coexist) are one fact → `defined as`; SEPARATE independently-occurring events are distinct criteria → decision structure. Criteria that route to DIFFERENT consequences MUST be separate `when` nodes; a conjunction sharing ONE consequence is a compound branch guard (or a `criterion`). Distinct criteria are NEVER fused into a `defined as`/`sem-*` composite (see decision-composition). `defined as` at the concept level normalizes ONE concept\'s representations.',
+    verification: "cre-run",
     source: CRITERIA_DECISION_REFERENCE_CRL,
   },
   {
@@ -1216,6 +1266,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     edge: "prior-auth",
     purpose:
       "Companion cases exercising each decision NODE: criterion-1 node (Has Qualifying Diagnosis), the nested criterion-2 node (the failed-conservative-therapy guard-`or`, resolving on EITHER distinct criterion — drug OR physical therapy), the criterion-3 node (the viral-suppression `defined as`, resolving on EITHER record — lab OR chart note — of the one occurrence, and denying at its `otherwise` when neither is present), and the top-level otherwise.",
+    verification: "cre-run",
     source: CRITERIA_DECISION_REFERENCE_CEL,
   },
   {
@@ -1224,6 +1275,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     edge: "prior-auth",
     purpose:
       "Canonical PRIOR-AUTHORIZATION exemplar (#134) — distinct from the CDS decision-reference (which ORDERs a service). The payer COMMUNICATES the determination via configured `<category>.<key>` local activities (certify.Approve / not-certify.Deny), validated against crl.dispositions; Pended (A4) is a non-final leaf, legitimate only in embedded mode.",
+    verification: "cre-run",
     source: PA_DETERMINATION_REFERENCE_CRL,
   },
   {
@@ -1232,6 +1284,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     edge: "prior-auth",
     purpose:
       "Companion cases for the PA exemplar: qualifying diagnosis → certify.Approve; otherwise → not-certify.Deny. The determination activities are local (config-driven, no shared library).",
+    verification: "cre-run",
     source: PA_DETERMINATION_REFERENCE_CEL,
   },
   {
@@ -1240,6 +1293,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     edge: "prior-auth",
     purpose:
       "Exemplar B — SOURCE-REQUIRED delegation (§2/§5-B): the source NAMES a separate determination, so the policy chains to it with a BARE same-library `use decision`. NOT DRY/reuse factoring — chaining is faithful only because the source draws the boundary. The bare same-library delegation IS evaluated (recursed; the sub determination bubbles up), so the oracle names the DELEGATED disposition, not the sub-decision name. One parent + one delegated sub.",
+    verification: "cre-run",
     source: SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
   },
   {
@@ -1248,6 +1302,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     edge: "prior-auth",
     purpose:
       "Companion cases for exemplar B: the two delegated-path cases (continuation → the sub's Approve/Deny bubbles up) + the two parent-resolved cases. The kit's unit test asserts the continuation→Deny case's PATH goes through the delegated sub (not the parent `otherwise`) — §4-req1.",
+    verification: "cre-run",
     source: SOURCE_DELEGATED_DECISION_REFERENCE_CEL,
   },
   {
@@ -1256,6 +1311,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     edge: "prior-auth",
     purpose:
       "Exemplar C — DISPOSITION-ARBITRATION (§5-C / §6). The TEMPTING-but-DON'T-chain case: ONE determination with MANY OVERLAPPING pathways + outcome PRECEDENCE + fall-through, which a KE is tempted to factor into chained sub-decisions — but the source draws no boundary, so it is ONE determination. Faithful form (CRL #224): each pathway a sibling `when` gated on its FULL conjunction as a COMPOUND BRANCH GUARD, the precedence carried by `first:` branch ORDER, the residual by `otherwise` — every criterion a visible guard atom, partial matches fall through (no trap), NO `use decision` and NO `sem-not` inference-layer arbitration. Two denies use DISTINCT activities (Deny vs Deny EIU) so `result is` distinguishes them.",
+    verification: "cre-run",
     source: DISPOSITION_ARBITRATION_REFERENCE_CRL,
   },
   {
@@ -1264,6 +1320,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     edge: "prior-auth",
     purpose:
       "Companion cases for exemplar C (verified 6/6): each pathway alone (approve), BOTH load-bearing overlap cases (a both-indication patient who fails one pathway still approves via the other — no overlap-pop), within-indication failure (Deny), off-indication (Deny EIU).",
+    verification: "cre-run",
     source: DISPOSITION_ARBITRATION_REFERENCE_CEL,
   },
   {
@@ -1272,7 +1329,17 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     edge: "cpg",
     purpose:
       "The patient-age BOTH-REPRESENTATION exemplar — the SOLE `definition is` exception to Stage-1 'local `code is` only' (see rule patient-age-both-rep). ONE concept carries BOTH arms: `code is` (the LOCAL age Observation) + `definition is age today <at least | at most | under | younger than> <N> years` (a live compute over `Patient.birthDate`). The Inferred layer recency-merges them (newest of the local `Observation.effective` vs `Patient.meta.lastUpdated` wins; indeterminate → session-fresh local-source wins); `Patient.birthDate` being a genuine clinical record that COMPUTES the age is what earns the carve-out. Engine-verified at `$r5.apply` (6 cases incl. the indeterminate-recency cell); the recency EXECUTION is not something asserted-only run_decision proves, so no companion CEL. AGE ONLY — do NOT generalize.",
+    verification: "engine-run",
     source: PATIENT_AGE_BOTH_REP_REFERENCE_CRL,
+  },
+  {
+    name: "representation-reference.crl",
+    language: "crl",
+    edge: "cpg",
+    purpose:
+      "The v3 concept-model multi-representation exemplar (Mammogram multi-source + BMI cascade) — reachable in the payload so a remote-MCP consumer can READ the worked form (a `ref:` path string can't be followed; disc 398 measured a MISSING worked `sem-or` REGENERATING the 'defined-as is boolean' misconception). Teaches: the value-preserving `sem-or` union of two dateTime concepts into a dateTime `Mammogram` (NOT boolean — only `defined as exists` / a top-level `sem-not` are boolean); addressability-split discipline (split a concept into named sub-concepts only when a downstream query must NAME the subset — NOT by provenance alone; contrast `Height`, one posrep, no split); self-describing posreps; and `defined as exists` / `definition is` selection/count/within forms. FORWARD-LOOKING CAPABILITY PREVIEW, `verification: validate-only` — it PARSES + VALIDATES clean but its constructs are runtime-DEFERRED (posreps #257; `defined as exists` returns run_decision status:error on-path, #270; `definition is` predicates deferred). This is a PROOF-axis status; on the AUTHORING-scope axis these constructs are still OUT of Stage-1 (see `boundary` / `conceptLayerModel` scope) — do NOT copy it as a run_decision-complete Stage-1 artifact.",
+    verification: "validate-only",
+    source: REPRESENTATION_REFERENCE_CRL,
   },
 ];
 
@@ -1306,6 +1373,7 @@ function buildBase(
     rules: RULES.filter((r) => inChain(r.edge)),
     typeAllowlist: TYPE_ALLOWLIST,
     referenceArtifacts: REFERENCE_ARTIFACTS.filter((a) => inChain(a.edge)),
+    verificationLegend: VERIFICATION_LEGEND,
     examples: EXAMPLES,
     verifyLoop,
     judgeLens: JUDGE_LENS,

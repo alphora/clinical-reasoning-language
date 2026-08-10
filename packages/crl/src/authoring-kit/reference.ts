@@ -1,12 +1,22 @@
 /**
  * Canonical Stage-1 reference artifacts for the authoring kit.
  *
- * These are the SINGLE SOURCE OF TRUTH for the kit's worked example. They are
- * embedded as TS string constants (NOT `.crl`/`.cel` files) because the npm
- * package and the VSIX ship `dist/**` only — a source-tree `.crl` would not be
- * present at runtime for the MCP consumers. The kit's unit test materializes
- * these to a temp project and runs the REAL validate/CRE path over them, so the
- * embedded text is proven, not asserted.
+ * With ONE exception (below), these constants are the SINGLE SOURCE OF TRUTH for the
+ * kit's worked examples. They are embedded as TS string constants (NOT `.crl`/`.cel`
+ * files) because the npm package and the VSIX ship `dist/**` only — a source-tree
+ * `.crl` would not be present at runtime for the MCP consumers. Each artifact carries a
+ * `verification` tier, and the kit's unit test enforces each tier's in-repository FLOOR
+ * (see the payload `verificationLegend`): EVERY artifact is built + validator-clean;
+ * a `cre-run` `.crl`+`.cel` pair is ADDITIONALLY executed through the CRE (the engine
+ * behind `run_decision`) every build. An `engine-run` artifact only RECORDS a
+ * point-in-time external-harness `$r5.apply` claim over its construct — the kit suite
+ * does NOT re-run that, so `engine-run` is not proven here, only the validate floor is.
+ * So the embedded text is proven to (or, for engine-run, recorded at) its declared tier,
+ * never over-claimed past it.
+ * (THE EXCEPTION — `REPRESENTATION_REFERENCE_CRL`: the CANONICAL source is the
+ * `tests/fixtures/representation/mammogram-and-bmi.crl` FILE — which is ALSO the rule-B
+ * positive exemplar, so it must stay a file — and this const is its SHIPPED MIRROR, kept
+ * identical by a CRLF-normalized text-equality test. Edit the fixture; the const follows.)
  *
  * `decision-reference.crl` exercises the full Stage-1 decision surface:
  *  - `first:` ordered precedence with a required `otherwise`,
@@ -742,4 +752,150 @@ activity "Approve":
 activity "Deny":
 - request CPGCommunicationRequest.
 - with \`Eligibility: DENY — age criterion not met.\`.
+`;
+
+/**
+ * The multi-representation exemplar (Mammogram multi-source + BMI cascade), shipped as the
+ * `representation-reference.crl` artifact (`verification: "validate-only"`). Its CANONICAL source is the
+ * `tests/fixtures/representation/mammogram-and-bmi.crl` FILE (ALSO the rule-B positive exemplar); this const is
+ * the SHIPPED MIRROR, kept identical by a CRLF-normalized text-equality test (edit the fixture; the const follows). FORWARD-LOOKING capability preview: it exercises posreps (#257),
+ * `defined as exists` (#270), and `definition is` selection/count/within — all parse+validate but runtime-
+ * deferred. NOT a Stage-1 authoring license (see the kit `boundary`); the value-preserving `sem-or` union is
+ * the piece it teaches (a MISSING worked `sem-or` regenerated the "defined-as is boolean" misconception).
+ */
+export const REPRESENTATION_REFERENCE_CRL = `# Representation-model reference — Mammogram (multi-source) + BMI (cascade)
+// Canonical \`concept-layer-model\` exemplar (authoring-kit). The v3 concept model, reconciled
+// with both KE teams. FORWARD-LOOKING capability preview: it exercises constructs that PARSE +
+// VALIDATE but are runtime-DEFERRED (posreps #257; \`defined as exists\` #270; \`definition is\`
+// selection/count/within). Shipped as \`verification: validate-only\` — NOT a Stage-1 authoring
+// license (see the kit \`boundary\`); the value-preserving \`sem-or\` union is the piece to learn.
+// NOTE: when the concept-form addressability clause lands, this header's discipline duplicates it
+// and this artifact is byte-pinned — reconcile the two then (cite the clause; #257).
+//
+// ── Addressability discipline (split on ADDRESSABILITY, not provenance alone) ──────────────
+// A \`source representation\` is an alternative SHAPE of ONE datum — not independently nameable.
+// A \`sem-or\` operand is a CONCEPT — independently assertable and referenceable. So you SPLIT a
+// concept into named sub-concepts only when a downstream query needs to NAME a subset; you do
+// NOT split merely because the data came from different systems.
+//   • "Height" — ONE source rep, NO split. Nobody needs "height via value set X" as a separate
+//     fact, so there is nothing to name; a lone posrep suffices.
+//   • "Mammogram" — SPLIT into "Clinical Mammogram" (performed: ImagingStudy/DiagnosticReport)
+//     and "Administrative Mammogram" (billed: Claim/EoB). "Most recent CLINICAL mammogram" is a
+//     real query, so the clinical subset must be nameable — hence two assertable concepts,
+//     value-preservingly unioned by \`sem-or\` into a dateTime "Mammogram".
+// Author self-check (DELETE TEST): delete a split; if nothing downstream loses the ability to
+// NAME something, it should not have been split. This keeps (C) from becoming a cargo-cult
+// "always split by provenance".
+//
+// The union is a WORKED \`sem-or\` over two dateTime concepts — value-preserving, NOT boolean.
+// (\`sem-or\`/\`sem-and\`/bare \`defined as\` preserve the operands' value type; only \`defined as
+// exists\` / a top-level \`sem-not\` are boolean.) Time-selection (\`most recent "Mammogram"\`) is
+// valid because "Mammogram" is an instance-bearing dateTime, not a derived boolean.
+library "Representation Examples".
+
+// ============ Terminologies (external systems / value sets) ============
+terminology "Mammogram VS":
+- valueset is \`http://example.org/screening/ValueSet/mammogram\`.
+terminology "Mammogram DiagnosticReport VS":
+- valueset is \`http://example.org/screening/ValueSet/mammogram-dr\`.
+terminology "Mammogram Billing VS":
+- valueset is \`http://example.org/screening/ValueSet/mammogram-billing\`.
+terminology "Height VS":
+- valueset is \`http://example.org/vitals/ValueSet/height\`.
+terminology "Weight VS":
+- valueset is \`http://example.org/vitals/ValueSet/weight\`.
+terminology "Clinical BMI":
+- valueset is \`http://example.org/vitals/ValueSet/bmi\`.
+
+// ============ Mammogram — split by ADDRESSABILITY (clinical vs administrative), source-rep-only ============
+// The performed study: ImagingStudy/DiagnosticReport prove the study HAPPENED. Serviced-not-created,
+// effective-not-issued (\`.issued\` lags the study and would corrupt a recency window).
+concept "Clinical Mammogram":
+- value type is dateTime.
+- source representation:
+  - type is ImagingStudy.
+  - value element is ImagingStudy.started.
+  - value type is dateTime.
+  - coded from "Mammogram VS".
+- source representation:
+  - type is DiagnosticReport.
+  - value element is DiagnosticReport.effectiveDateTime.
+  - value type is dateTime.
+  - coded from "Mammogram DiagnosticReport VS".
+
+// The billed study: Claim/EoB prove it was BILLED (deniable/reversible; no findings). A distinct
+// grade of evidence — payers distinguish them. Its own billing VS (CPT/HCPCS, not clinical codes).
+concept "Administrative Mammogram":
+- value type is dateTime.
+- source representation:
+  - type is Claim.
+  - value element is Claim.item.servicedDate.
+  - value type is dateTime.
+  - coded from "Mammogram Billing VS".
+- source representation:
+  - type is ExplanationOfBenefit.
+  - value element is ExplanationOfBenefit.item.servicedDate.
+  - value type is dateTime.
+  - coded from "Mammogram Billing VS".
+
+// ============ Mammogram — locally coded (\`code is\`) + value-preserving \`sem-or\` union ============
+concept "Mammogram":
+- value type is dateTime.
+- code is \`mammogram\`.
+- defined as ( "Clinical Mammogram" sem-or "Administrative Mammogram" ).
+
+// Two natural user-assertion points (assert at any level, ADR 0001 §8):
+//   - assert the EVENT ("Mammogram") → flows to most-recent, count, up-to-date;
+//   - assert the BOOLEAN ("Up To Date On Mammography") → directly answers the screening question.
+concept "Had Mammogram":
+- value type is boolean.
+- code is \`had-mammogram\`.
+- defined as exists ("Mammogram").
+
+concept "Most Recent Mammogram":
+- value type is dateTime.
+- definition is most recent "Mammogram".
+
+concept "Mammograms In Last Six Months":
+- value type is integer.
+- definition is count of "Mammogram" within last 6 months.
+
+concept "Up To Date On Mammography":
+- value type is boolean.
+- code is \`up-to-date-on-mammography\`.
+- definition is "Most Recent Mammogram" within last 27 months.
+
+// ============ BMI cascade — Height (no split) contrasts with Mammogram (split) ============
+concept "Height":
+- value type is Quantity.
+- code is \`height\`.
+- source representation:
+  - type is Observation.
+  - value element is Observation.value.
+  - value type is Quantity.
+  - coded from "Height VS".
+
+concept "Weight":
+- value type is Quantity.
+- code is \`weight\`.
+- source representation:
+  - type is Observation.
+  - value element is Observation.value.
+  - value type is Quantity.
+  - coded from "Weight VS".
+
+concept "BMI":
+- value type is Quantity.
+- code is \`bmi\`.
+- definition is body mass index of "Weight" and "Height".
+- source representation:
+  - type is Observation.
+  - value element is Observation.value.
+  - value type is Quantity.
+  - coded from "Clinical BMI".
+
+concept "High BMI":
+- value type is boolean.
+- code is \`high-bmi\`.
+- definition is "BMI" at least 30 'kg/m2'.
 `;

@@ -130,6 +130,24 @@ export interface KitExample {
   note?: string;
 }
 
+/**
+ * The proof method an artifact has actually been VERIFIED to — the HONEST status, not an assurance rank. The three
+ * values are different KINDS of proof, NOT an ordered ladder (a future artifact could be both `cre-run` and
+ * `engine-run`; when one exists this becomes a set). Full per-tier semantics — including what each does NOT prove —
+ * ship in the payload `verificationLegend`, because a TS docstring never reaches the remote-MCP consumer.
+ *  - `cre-run` — the artifact (a `.crl` + `.cel` PAIR) is executed through the CRE (the engine behind `run_decision`)
+ *    by the kit's OWN test suite every build. A `.cel`'s tier names the pair it proves. Proves the asserted
+ *    recommendation is PRODUCED (membership) for each case — NOT exact output, guarded-item absence, or path
+ *    identity; nor codes, engine retrieval, FHIR emit, or `$apply` (CRE v1 is asserted-only, never evaluates `code is`).
+ *  - `engine-run` — validated by the kit suite AND the CONSTRUCT is verified at `$r5.apply` POINT-IN-TIME by a
+ *    separate engine harness (NOT this exact artifact re-run by the kit suite; a historical claim). Used for the
+ *    patient-age recency merge, which asserted-only `run_decision` cannot prove.
+ *  - `validate-only` — validated by the kit suite (build + validator-clean) only; runtime execution DEFERRED (the
+ *    constructs it exercises are runtime-deferred — posreps #257, `defined as exists` #270, `definition is`
+ *    predicates). A capability preview, NOT a runtime-proven template.
+ */
+export type VerificationTier = "cre-run" | "engine-run" | "validate-only";
+
 /** A full reference artifact, embedded inline (the package ships dist/** only). */
 export interface ReferenceArtifact {
   name: string;
@@ -140,9 +158,20 @@ export interface ReferenceArtifact {
    * library rides `prior-auth` with that library, so a `cpg` kit never ships a determination ref it cannot resolve).
    */
   edge: AuthoringEdge;
+  /** The proof method this artifact has been verified to (see the payload `verificationLegend` for full semantics). */
+  verification: VerificationTier;
   purpose: string;
   /** The complete artifact text. */
   source: string;
+}
+
+/** One entry of the payload verification legend — the in-payload meaning of a `VerificationTier` (TS docstrings don't ship over MCP). */
+export interface VerificationLegendEntry {
+  tier: VerificationTier;
+  /** What this tier's proof establishes. */
+  means: string;
+  /** What it explicitly does NOT prove (so a consumer never over-reads the tier). */
+  doesNotProve: string;
 }
 
 /** The grammar-legal type vocabularies plus a non-binding stage-recommended subset. */
@@ -236,6 +265,13 @@ export interface AuthoringKit {
   rules: KitRule[];
   typeAllowlist: TypeAllowlist;
   referenceArtifacts: ReferenceArtifact[];
+  /**
+   * The in-payload legend for `ReferenceArtifact.verification` — one entry per tier a shipped artifact uses. It is
+   * HASHED payload (not a TS docstring) because the remote-MCP KE consumer receives JSON only; without it
+   * `verification: "validate-only"` is an opaque string. Distinguishes the PROOF axis (is it runtime-proven?) from
+   * the AUTHORING-SCOPE axis (`boundary`/`conceptLayerModel` scope) — the two are orthogonal.
+   */
+  verificationLegend: VerificationLegendEntry[];
   examples: KitExample[];
   verifyLoop: VerifyLoop;
   /**

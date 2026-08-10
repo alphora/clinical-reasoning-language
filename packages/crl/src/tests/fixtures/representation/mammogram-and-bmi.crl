@@ -1,8 +1,13 @@
 # Representation-model reference — Mammogram (multi-source) + BMI (cascade)
-// Canonical `concept-layer-model` exemplar (authoring-kit/index.ts). v3 concept model
-// (tmp/representation-model.md); reconciled with both KE teams as model (C) (disc 398).
+// Canonical `concept-layer-model` exemplar (authoring-kit). The v3 concept model, reconciled
+// with both KE teams. FORWARD-LOOKING capability preview: it exercises constructs that PARSE +
+// VALIDATE but are runtime-DEFERRED (posreps #257; `defined as exists` #270; `definition is`
+// selection/count/within). Shipped as `verification: validate-only` — NOT a Stage-1 authoring
+// license (see the kit `boundary`); the value-preserving `sem-or` union is the piece to learn.
+// NOTE: when the concept-form addressability clause lands, this header's discipline duplicates it
+// and this artifact is byte-pinned — reconcile the two then (cite the clause; #257).
 //
-// ── Addressability discipline (split on ADDRESSABILITY, not provenance) ──────────────────
+// ── Addressability discipline (split on ADDRESSABILITY, not provenance alone) ──────────────
 // A `source representation` is an alternative SHAPE of ONE datum — not independently nameable.
 // A `sem-or` operand is a CONCEPT — independently assertable and referenceable. So you SPLIT a
 // concept into named sub-concepts only when a downstream query needs to NAME a subset; you do

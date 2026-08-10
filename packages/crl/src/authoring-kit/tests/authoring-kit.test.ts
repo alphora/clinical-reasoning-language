@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -25,6 +25,7 @@ import {
   PA_DETERMINATION_REFERENCE_CEL,
   PA_DETERMINATION_REFERENCE_CRL,
   PATIENT_AGE_BOTH_REP_REFERENCE_CRL,
+  REPRESENTATION_REFERENCE_CRL,
   SOURCE_DELEGATED_DECISION_REFERENCE_CEL,
   SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
 } from "../reference";
@@ -407,7 +408,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.17");
+    expect(kit.schemaVersion).toBe("1.18");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -452,13 +453,14 @@ describe("authoring-kit — getAuthoringKit", () => {
     }
   });
 
-  it("the cpg base embeds only the PA-free artifacts (pure-CDS decision-reference + patient-age); NO PA artifacts", () => {
+  it("the cpg base embeds the PA-free artifacts (pure-CDS decision-reference + patient-age + representation-reference); NO PA artifacts", () => {
     const kit = getAuthoringKit(undefined, "cpg");
     const names = kit.referenceArtifacts.map((a) => a.name).sort();
     expect(names).toEqual([
       "decision-reference.cel",
       "decision-reference.crl",
       "patient-age-both-rep-reference.crl",
+      "representation-reference.crl",
     ]);
     // Every cpg artifact is edge-tagged cpg, and (closure) references no PA determination lib.
     for (const a of kit.referenceArtifacts) {
@@ -467,7 +469,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     }
   });
 
-  it("the prior-auth chain embeds the full 11-artifact set (cpg base + the PA edge, inheritance; shared lib removed)", () => {
+  it("the prior-auth chain embeds the full 12-artifact set (cpg base + the PA edge, inheritance; shared lib removed)", () => {
     const kit = getAuthoringKit(undefined, "prior-auth");
     const names = kit.referenceArtifacts.map((a) => a.name).sort();
     expect(names).toEqual([
@@ -480,6 +482,7 @@ describe("authoring-kit — getAuthoringKit", () => {
       "pa-determination-reference.cel",
       "pa-determination-reference.crl",
       "patient-age-both-rep-reference.crl",
+      "representation-reference.crl",
       "source-delegated-decision-reference.cel",
       "source-delegated-decision-reference.crl",
     ]);
@@ -503,6 +506,127 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(src("disposition-arbitration-reference.cel")).toBe(
       DISPOSITION_ARBITRATION_REFERENCE_CEL,
     );
+    expect(src("representation-reference.crl")).toBe(REPRESENTATION_REFERENCE_CRL);
+  });
+
+  it("STEP-4 (kit 1.18) — the `verification` taxonomy is honest, in-payload, and tier↔proof-consistent (disc 408)", () => {
+    for (const uc of ["cpg", "prior-auth"] as const) {
+      const kit = getAuthoringKit("local-decision-support", uc);
+      // (a) EVERY artifact declares exactly one recognized tier.
+      const tiers = new Set(["cre-run", "engine-run", "validate-only"]);
+      for (const a of kit.referenceArtifacts) {
+        expect(tiers.has(a.verification), `${a.name} has an unrecognized tier ${a.verification} in ${uc}`).toBe(
+          true,
+        );
+      }
+      // (b) The legend is IN the (hashed) payload — a TS docstring never reaches the MCP consumer. It is EXACTLY
+      //     the set of tiers the shipped artifacts use — no duplicate entries (uniqueness), no dangling entry for
+      //     an unused tier (coverage both ways = set equality) — each with a non-empty `means` + `doesNotProve`.
+      const legendTierList = kit.verificationLegend.map((l) => l.tier);
+      const legendTiers = new Set(legendTierList);
+      const usedTiers = new Set(kit.referenceArtifacts.map((a) => a.verification));
+      expect(legendTierList.length, `duplicate legend entries in ${uc}`).toBe(legendTiers.size);
+      expect([...legendTiers].sort(), `legend tiers != tiers artifacts use in ${uc}`).toEqual(
+        [...usedTiers].sort(),
+      );
+      for (const l of kit.verificationLegend) {
+        expect(l.means.length).toBeGreaterThan(0);
+        expect(l.doesNotProve.length).toBeGreaterThan(0);
+      }
+      // (c) TIER↔PROOF structural consistency (the field must not be an unverified claim):
+      //     - every `cre-run` `.crl` has a `.cel` companion (same basename) that is ALSO `cre-run` (the pair the
+      //       kit harness actually runs); every `cre-run` `.cel` has its `.crl`.
+      //     - `engine-run` / `validate-only` artifacts have NO `.cel` companion (not CRE-run).
+      const byName = new Map(kit.referenceArtifacts.map((a) => [a.name, a]));
+      const base = (n: string) => n.replace(/\.(crl|cel)$/, "");
+      for (const a of kit.referenceArtifacts) {
+        const cel = byName.get(`${base(a.name)}.cel`);
+        const crl = byName.get(`${base(a.name)}.crl`);
+        if (a.verification === "cre-run") {
+          if (a.name.endsWith(".crl")) {
+            expect(cel, `cre-run ${a.name} must have a .cel companion in ${uc}`).toBeDefined();
+            expect(cel!.verification).toBe("cre-run");
+          } else {
+            expect(crl, `cre-run ${a.name} must have a .crl companion in ${uc}`).toBeDefined();
+          }
+        } else {
+          // engine-run / validate-only are NOT proven via a CEL pair — assert no companion CEL exists.
+          expect(cel, `${a.verification} ${a.name} must NOT have a .cel companion in ${uc}`).toBeUndefined();
+        }
+      }
+      // (d) representation-reference is validate-only in BOTH assembled kits (cpg + inherited prior-auth), and its
+      //     purpose flags it as a NON-authoring capability preview (proof axis ≠ authoring scope).
+      const repr = byName.get("representation-reference.crl")!;
+      expect(repr.verification).toBe("validate-only");
+      expect(repr.edge).toBe("cpg");
+      expect(repr.purpose).toMatch(/validate-only|CAPABILITY PREVIEW/);
+      expect(repr.purpose).toMatch(/NOT .*Stage-1|OUT of Stage-1|not .*authoring/i);
+      expect(repr.purpose).toMatch(/#257/);
+      expect(repr.purpose).toMatch(/#270/);
+    }
+  });
+
+  it("STEP-4 — representation-reference.crl is BYTE-EQUAL (EOL-normalized) to the rule-B fixture and VALIDATES CLEAN", () => {
+    // The const is the shipped copy; the fixture is the canonical source (also the rule-B positive exemplar). An
+    // EOL-normalized equality guards drift (win32 CRLF trap: compare LF-normalized, not raw bytes).
+    const fixturePath = join(
+      __dirname,
+      "..",
+      "..",
+      "tests",
+      "fixtures",
+      "representation",
+      "mammogram-and-bmi.crl",
+    );
+    const norm = (s: string) => s.replace(/\r\n/g, "\n");
+    expect(norm(REPRESENTATION_REFERENCE_CRL)).toBe(norm(readFileSync(fixturePath, "utf8")));
+    // validate-only means EXACTLY that: it builds + validates clean (the tier's floor is honored). It does NOT run
+    // through the CRE — no CEL companion — so nothing beyond validate is asserted here.
+    expect(crlErrors(REPRESENTATION_REFERENCE_CRL)).toEqual([]);
+  });
+
+  it("STEP-4 — the `cre-run` tier is SELF-VERIFYING: EVERY cre-run pair is materialized and run through the CRE (disc 408 impl round)", () => {
+    // The `cre-run` legend claims each pair "is executed through the CRE every build". The tier↔proof structural
+    // test only checks pair TOPOLOGY — a future cre-run pair with both files present but no run test would pass it
+    // while the legend silently lies. This closes that gap the way `validate-only` is closed by crlErrors: it
+    // DERIVES the run set from the payload, so a cre-run label with an unrunnable/absent CEL FAILS here.
+    const kit = getAuthoringKit("local-decision-support", "prior-auth"); // the full 12-artifact chain
+    const byName = new Map(kit.referenceArtifacts.map((a) => [a.name, a]));
+    const crePairs = kit.referenceArtifacts.filter(
+      (a) => a.verification === "cre-run" && a.name.endsWith(".crl"),
+    );
+    expect(crePairs.length).toBe(5); // the 5 decision exemplars — a mechanical guard so the loop can't silently no-op
+    for (const crl of crePairs) {
+      const base = crl.name.replace(/\.crl$/, "");
+      const cel = byName.get(`${base}.cel`);
+      expect(cel, `cre-run ${crl.name} has no .cel companion in the payload`).toBeDefined();
+      const dir = mkdtempSync(join(tmpdir(), "authoring-kit-crerun-"));
+      writeFileSync(
+        join(dir, "package.json"),
+        JSON.stringify({
+          name: "authoring-kit-crerun",
+          version: "1.0.0",
+          private: true,
+          crl: {
+            canonicalBase: "http://example.org/authoring-kit-crerun",
+            status: "draft",
+            experimental: true,
+          },
+        }),
+      );
+      writeFileSync(join(dir, crl.name), crl.source);
+      const celPath = join(dir, `${base}.cel`);
+      writeFileSync(celPath, cel!.source);
+      const v = validateCELFile(celPath);
+      expect(v.errors, `${base}.cel does not validate clean`).toEqual([]);
+      const run = runCel(resolveCelImports(celPath));
+      expect(run.success, `${base} run failed`).toBe(true);
+      expect(run.runs.length, `${base} produced no cases`).toBeGreaterThan(0);
+      expect(
+        run.runs.every((r) => r.status === "pass"),
+        `${base} has a non-passing case`,
+      ).toBe(true);
+    }
   });
 
   it("artifact edges are CLOSURE-CORRECT: no cpg artifact references ANY prior-auth artifact's library by qualified ref", () => {
@@ -850,11 +974,14 @@ describe("authoring-kit — getAuthoringKit", () => {
     // `value type is` + the composition formula; a leading conceptLayerModel value-type entry; the stale posrep
     // `form` fixed; the patient-age #241 annotation reconciled with rule-B. Correlated temporal DEFERRED (scope
     // note only). Design round: disc 407. BOTH hashes move (cpg rule/model inherit into prior-auth).
+    // #257 (schemaVersion 1.17→1.18): SHAPE + CONTENT — the artifact `verification` taxonomy (`cre-run`/
+    // `engine-run`/`validate-only`) + `verificationLegend` payload + the reachable `representation-reference.crl`
+    // (validate-only) + boundary proof-vs-authoring-axis cross-refs. Design round: disc 408. BOTH hashes move.
     expect(cpg.contentHash).toBe(
-      "b62373fc237afe179d04f02c8e475bf806130a75027fa0beaf1adff175e59c92",
+      "7ca51e1055b116433f7378a1b5cdc7e3ae60a0fc92e1a8769ee7bb69eb743b72",
     );
     expect(priorAuth.contentHash).toBe(
-      "3cae9f7502f1dba0a7f627a0ab3448b86bfe564f2331e36e256017d2367ac8ca",
+      "a53ef591a4647b9e2887136e8cc9a2c5e40b09b27a5bdfd203f89f4c3ab85004",
     );
   });
 
