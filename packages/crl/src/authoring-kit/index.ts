@@ -189,8 +189,21 @@ export type {
 //   its `value type` (the case-feature determinations are `value type is boolean`). NO doctrine change — the
 //   examples gain the now-mandatory shape. BOTH useCase hashes re-pin (schemaVersion is hashed + the concept
 //   declarations inherit into both chains).
+// #257 (schemaVersion 1.16→1.17): the concept-model PROSE — teach what `value type` MEANS (1.16 added the shape
+//   mechanically). New `value-type` rule (published-shape doctrine; the ROLE heuristic — boolean=determination
+//   incl. any guard-consumed concept / Quantity=measurement / CodeableConcept=coded refinement / scalar; the
+//   A.10b guard⇒boolean lesson; VALUE-PRESERVING inference taught to the SHIPPED rule-B composition-leaf /
+//   bare-ref / posrep checks, not the design-doc's looser sentence; NORMATIVE-vs-SHIPPED so use-site typing is
+//   not over-claimed — #266; the `defined as exists` LANE MATRIX as CAPABILITY-STATUS, NOT a usable Stage-1 form
+//   — run_decision status:errors on it, #270). `concept-form` gains `value type is` + the composition
+//   `concept = value type + (n primitives and/or ≤1 derived)` (framed via the existing scope tags so Stage-1's
+//   producer boundary is unchanged); a leading `value type` conceptLayerModel entry; the stale posrep `form` fixed
+//   to the fully-explicit self-describing shape; the patient-age `#241` annotation reconciled with rule-B.
+//   Correlated resource-level temporal refinement is DEFERRED (boundary-OUT; a scope note only, no syntax). Design
+//   round: disc 407 (both design arms; the C4 defer/teach split resolved on the verified run_decision status:error
+//   fact). BOTH useCase hashes re-pin (schemaVersion is hashed + the cpg rule/model inherit into both chains).
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.16";
+const SCHEMA_VERSION = "1.17";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -273,20 +286,27 @@ const FORCE_MODEL: ForceModel = {
 
 const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
   {
-    form: "- code is `local-code`.",
+    form: "- value type is <shape>.",
     meaning:
-      "Query to the LOCAL source using local domain codes. The asserted layer. The ONLY concept form in this stage.",
+      "REQUIRED on EVERY concept (A.10 `missing-value-type` is a validator ERROR) — an ORTHOGONAL property, NOT a producer or a layer: the concept's ONE canonical PUBLISHED result shape, the thing every use site consumes and type-checks against. Choose by what the concept RESULTS IN, not its FHIR resource type: boolean = a determination/finding (incl. ANY concept a decision/`criterion`/action guard consumes); Quantity = a measurement/value (most-recent-able); CodeableConcept = a coded refinement; dateTime/integer/string = a scalar datum. The value-type line does NOT itself produce a value — at least one PRODUCER from the entries below is also required (`x + n ≥ 1`; a value type with nothing producing it is invalid, #202). Composition: `concept = value type + ( n primitives and/or ≤1 derived )`. See rule value-type.",
     scope: "in",
   },
   {
-    form: '- source representation: - coded from "Value Set".',
-    meaning: "Query to an EXTERNAL source / value set (standardized codes). Asserted, external.",
+    form: "- code is `local-code`.",
+    meaning:
+      "Query to the LOCAL source using local domain codes. The asserted layer. If `type is` is OMITTED the implicit standard is `Observation` / `Observation.value` (the concept's `value type` fills that value element); a declared non-Observation `type is` retrieves THAT resource, not `Observation.value`. The primary in-stage producer alongside `defined as` (plus the patient-age `definition is` carve-out below).",
+    scope: "in",
+  },
+  {
+    form: '- source representation: - type is <Resource>. - value element is <Resource.path>. - value type is <shape>. - coded from "Value Set".',
+    meaning:
+      "Query to an EXTERNAL source / value set — a fully-explicit SELF-DESCRIBING posrep (its own type + value element + value type; `coded from` optional). A posrep is NEVER terse (unlike the local rep) and, though it IS a producer (a primitive counting toward `x + n ≥ 1`), its own `value type is` does NOT by itself discharge the concept-level `value type is` requirement (A.10). Asserted, external.",
     scope: "out",
   },
   {
     form: "- defined as ( ... sem-and / sem-or / sem-not ... ).",
     meaning:
-      "INFERENCE / semantic normalization: combines the sub-representations or data-components of ONE concept into ONE clinical fact (the only added depth this stage; #126). It is NOT decision composition and NEVER combines distinct decision criteria — that is the decision tree's job (#168). THE TELL (anchor the unit OUTSIDE the label): name the ONE clinical reality the operands each RECORD without using the concept's own name — alternative records of a SINGLE underlying occurrence (a viral-load lab result and/or a chart note attesting the SAME suppression — the records may themselves coexist, that is fine) are one fact. Operands that are SEPARATE underlying events, each independently occurring (a patient can fail drug therapy AND, separately, physical therapy), are DISTINCT criteria → decision layer, NOT `defined as`. The tell is SAME occurrence vs DIFFERENT occurrences, not whether the records coexist. run_decision evaluates it: sem-and = all, sem-or = any, sem-not = not (closed-world). Bare operands resolve within the defining library; cross-library operands must be qualified.",
+      "INFERENCE / semantic normalization: combines the sub-representations or data-components of ONE concept into ONE clinical fact (the only added depth this stage; #126). It is NOT decision composition and NEVER combines distinct decision criteria — that is the decision tree's job (#168). THE TELL (anchor the unit OUTSIDE the label): name the ONE clinical reality the operands each RECORD without using the concept's own name — alternative records of a SINGLE underlying occurrence (a viral-load lab result and/or a chart note attesting the SAME suppression — the records may themselves coexist, that is fine) are one fact. Operands that are SEPARATE underlying events, each independently occurring (a patient can fail drug therapy AND, separately, physical therapy), are DISTINCT criteria → decision layer, NOT `defined as`. The tell is SAME occurrence vs DIFFERENT occurrences, not whether the records coexist. run_decision evaluates it: sem-and = all, sem-or = any, sem-not = not (closed-world). Bare operands resolve within the defining library; cross-library operands must be qualified. VALUE-PRESERVING: `sem-or`/`sem-and` and a bare-ref alias PRESERVE the concept's declared value type (the author declares it, the composition reconciles operands) — only a TOP-LEVEL `sem-not` and the `defined as exists (…)` sub-form are inherently boolean (see rule value-type). `defined as exists ( \"Concept\" )` is the explicit boolean EXISTENCE form (present → true, absent → false, closed-world), but run_decision cannot PROVE it — it returns status:error when it is EVALUATED ON A DECISION PATH (engine existence evaluation is #270); see rule value-type for the lane matrix.",
     scope: "in",
   },
   {
@@ -313,12 +333,12 @@ const RULES: KitRule[] = [
     id: "concept-form",
     edge: "cpg",
     category: "concept-model",
-    rule: 'Stage-1 leaf concepts carry `type is` + `code is` (local). A SINGLE criterion stated at a finer data-grain — multiple representations/components of ONE clinical fact — is normalized with `defined as` (INFERENCE) over named local leaves. The unit is anchored OUTSIDE the concept\'s own name: the operands must be alternative records of ONE underlying occurrence (e.g. "viral suppression documented" = a viral-load lab result OR a clinician chart note of the SAME suppression), NOT two SEPARATE events (failed drug therapy and failed physical therapy each occur independently — DISTINCT criteria; author them as decision structure, see decision-composition). The conjunction of DISTINCT criteria (a policy\'s "ALL of the following are met") is decision COMPOSITION (see decision-composition): author it as decision STRUCTURE — a compound branch guard `when ( A and B and C )` (or a named `criterion`) when the criteria share one consequence, sibling `when` branches when they route to DIFFERENT consequences — NEVER as a `defined as`/`sem-*` composite (which ships ONE opaque `condition[]` and asserts a sameness distinct criteria do not have). At the CONCEPT level this stage, `defined as` normalizes ONE concept\'s sub-representations; joining distinct criteria is a DECISION-level construct, not a concept-model one. Still OUT this stage: `source representation`/`coded from` (external) and `definition is` predicates (count/temporal/value) — the SOLE exception: the patient-age both-rep `definition is age today <at least | at most | under | younger than> <N> years` (see rule patient-age-both-rep). The boundary is the concept FORM, not the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional.',
+    rule: 'Every concept declares a `value type` (REQUIRED — its ONE canonical published result shape; A.10 `missing-value-type` is an ERROR; see rule value-type) plus at least one PRODUCER — the composition is `concept = value type + ( n primitives and/or ≤1 derived )`, `x + n ≥ 1`. A Stage-1 leaf concept declares `value type is` + `type is` + `code is` (local); `type is` is written EXPLICITLY in this kit\'s exemplars (the terse implicit-standard form that drops `type is` when it is the standard `Observation` / `Observation.value` shape is a later kit-migration, deferred — do not read its absence into these exemplars). A SINGLE criterion stated at a finer data-grain — multiple representations/components of ONE clinical fact — is normalized with `defined as` (INFERENCE) over named local leaves. The unit is anchored OUTSIDE the concept\'s own name: the operands must be alternative records of ONE underlying occurrence (e.g. "viral suppression documented" = a viral-load lab result OR a clinician chart note of the SAME suppression), NOT two SEPARATE events (failed drug therapy and failed physical therapy each occur independently — DISTINCT criteria; author them as decision structure, see decision-composition). The conjunction of DISTINCT criteria (a policy\'s "ALL of the following are met") is decision COMPOSITION (see decision-composition): author it as decision STRUCTURE — a compound branch guard `when ( A and B and C )` (or a named `criterion`) when the criteria share one consequence, sibling `when` branches when they route to DIFFERENT consequences — NEVER as a `defined as`/`sem-*` composite (which ships ONE opaque `condition[]` and asserts a sameness distinct criteria do not have). At the CONCEPT level this stage, `defined as` normalizes ONE concept\'s sub-representations; joining distinct criteria is a DECISION-level construct, not a concept-model one. Still OUT this stage: `source representation`/`coded from` (external) and `definition is` predicates (count/temporal/value) — the SOLE exception: the patient-age both-rep `definition is age today <at least | at most | under | younger than> <N> years` (see rule patient-age-both-rep). The boundary is the concept FORM, not the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional.',
     why: "Local-source pass proves decision authoring (incl. one-concept `defined as` inference) before external sources and predicate inference are added; keeping one-concept inference distinct from decision composition keeps distinct-criteria logic in the DECISION layer, where each criterion emits as its own visible `condition[]` (#168 — the test is same-fact vs distinct-criteria; distinct criteria are never fused by `defined as`/`sem-*`; see decision-composition).",
     ref: "concept-layer-model; src/tests/fixtures/representation/mammogram-and-bmi.crl",
     clauses: [
       {
-        text: "A Stage-1 leaf concept carries `type is` + `code is` (local); `source representation`/`coded from` (external) and `definition is` predicates are OUT this stage (the SOLE exception: the patient-age both-rep `definition is age today <at least | at most | under | younger than> <N> years` — see rule patient-age-both-rep).",
+        text: "A Stage-1 leaf concept declares `value type is` (REQUIRED, a property present on the concept — NOT position-bound; the exemplars order it after `type is`) + `type is` + `code is` (local). The IN-stage PRODUCERS are `code is` (local rep) and `defined as` (inference); `source representation`/`coded from` (external posreps) and `definition is` predicates are OUT this stage (the SOLE exception: the patient-age both-rep `definition is age today <at least | at most | under | younger than> <N> years` — see rule patient-age-both-rep). The general model `concept = value type + ( n primitives and/or ≤1 derived )` holds package-wide; this stage restricts only the PRODUCERS, never the value-type requirement.",
         force: "default",
       },
       {
@@ -329,10 +349,52 @@ const RULES: KitRule[] = [
     ],
   },
   {
+    id: "value-type",
+    edge: "cpg",
+    category: "concept-model",
+    rule: '`value type` is a concept\'s ONE canonical PUBLISHED result shape — the single declared result SHAPE every use site consumes and type-checks against (a shape, not a scalar-cardinality claim). REQUIRED on every concept (A.10 `missing-value-type` is a validator ERROR), and a value type with NO producer is invalid (`x + n ≥ 1`, #202). CHOOSE BY ROLE — what the concept RESULTS IN, not its FHIR resource type: `boolean` = a determination/finding (present-or-not, met-or-not) — INCLUDING any concept a decision `when`, a `criterion` body, or an action guard (`unless`/`only when`) consumes (a guard REQUIRES boolean; rule-B `decision-guard-nonboolean`); `Quantity` = a measurement/value (a BMI, a BP, a lab value — most-recent-able); `CodeableConcept` = a coded refinement/classification; `dateTime`/`integer`/`string` = a scalar datum. THE A.10b LESSON: a determination whose UNDERLYING resource is coded is STILL `boolean` when it is consumed as a guard — the guard CONSUMPTION governs the value type, NOT the resource\'s codedness. And do NOT relabel a genuinely resource/value-shaped concept `boolean` merely to feed a guard: keep that concept at its real shape (it may also be needed as an instance stream, e.g. `most recent`) and DERIVE a SEPARATE boolean guard concept from it. VALUE-PRESERVING INFERENCE: `sem-or`/`sem-and` composition and a bare-ref alias PRESERVE the declared value type (the author declares the concept\'s value type, the composition reconciles operands — the validator checks only that a NON-boolean composition has no BOOLEAN leaf, NOT full leaf-type compatibility, so it does not police all type drift); only a TOP-LEVEL `sem-not` and `defined as exists (…)` are inherently boolean — so a `defined as` concept is NOT boolean-by-default. NORMATIVE vs SHIPPED: the MODEL requires the value type checked at EVERY use site, but the validator ENFORCES a subset (the operand-constraint registry is seeded, not exhaustive — #266; the nested-call blind spot is the OUTER constrained position; and package-library resolution is a blind spot across ALL rule-B checks), so author to use-site typing as doctrine, not as a guarantee the tool catches every violation. Among the rule-B checks shipped THIS STAGE (NOT an exhaustive list): a guard operand must be boolean; a bare-ref alias must EQUAL its target\'s value type (FULL equality, not just boolean-ness); a NON-boolean composition requires every LEAF non-boolean (a boolean leaf is an ERROR; a boolean PARENT conversely exists-bridges refinement leaves, one-directional); a no-projector posrep must EQUAL the concept value type; a TOP-LEVEL `sem-not` / `defined as exists` result must be boolean. `defined as exists ( "Concept" )` is the explicit boolean EXISTENCE form (present → true, absent → false, closed-world) — LANE MATRIX (capability status, NOT a usable Stage-1 form yet): it PARSES + VALIDATES, and the STANDARD CQL emit lowers it to `exists (<Concept>)` (#265), BUT `run_decision` cannot PROVE it — it returns status:error whenever the exists concept is EVALUATED ON A DECISION PATH (engine existence evaluation is #270; an unused / off-path exists does not error the run, but it also is not verify-loop-proven); and #269 (reject a boolean operand, which emits silently-always-true via CQL list-promotion) is not yet built, so its operand must be an INSTANCE-BEARING non-boolean concept (in Stage-1, a local `code is` concept with a non-boolean value type) by AUTHOR care. Until #270 lands, a run_decision-provable boolean determination is a plain `code is` boolean concept (asserted directly); reach for `defined as exists` only when a non-boolean concept must be existence-tested, and expect the verify loop to gap on it.',
+    why: "The published value type is what makes a concept's result legible AND checkable at every use site; DECLARING it (rather than inferring a return type — patterns have none) is what lets the producers disagree LOUDLY at validate time instead of silently at apply time (the #231 lane bug the redesign closes). The guard⇒boolean check is the specific rule that catches the A.10b masking — a coded-resource determination mis-typed `CodeableConcept` but consumed as a guard. Separating normative doctrine from shipped enforcement keeps the kit honest: it teaches the model to author to without claiming coverage the validator does not yet have.",
+    ref: "tmp/representation-model.md (design of record); src/validator/useSiteTypeValidator.ts (rule-B); concept-layer-model; #202; #231; #265; #266; #269; #270; A.10 missing-value-type",
+    clauses: [
+      {
+        text: "`value type` is REQUIRED on every concept (A.10 `missing-value-type` ERROR) and needs at least one producer (`x + n ≥ 1`, #202).",
+        force: "validator-enforced",
+      },
+      {
+        text: "Choose the value type by ROLE — what the concept RESULTS IN, not its FHIR resource type: boolean = determination (incl. any guard-consumed concept); Quantity = measurement; CodeableConcept = coded refinement; dateTime/integer/string = scalar.",
+        force: "default",
+      },
+      {
+        text: "GUARD ⇒ BOOLEAN: any concept a decision `when`, a `criterion` body, or an action guard (`unless`/`only when`) consumes must be `value type is boolean` (rule-B `decision-guard-nonboolean`).",
+        force: "validator-enforced",
+      },
+      {
+        text: "A coded-resource determination consumed as a guard is boolean — the guard consumption governs, NOT the resource's codedness (the A.10b masking lesson). Do NOT relabel a genuinely resource/value-shaped concept boolean merely to feed a guard (the validator cannot SEE a relabel — the guard check then passes on the wrong shape); keep it at its real shape and DERIVE a separate boolean guard concept.",
+        force: "default",
+      },
+      {
+        text: "VALUE-PRESERVING inference (DOCTRINE, not fully tool-checked): `sem-or`/`sem-and` and a bare-ref alias preserve the declared value type (author declares; composition reconciles) — the validator does NOT check leaf-type compatibility, only that a non-boolean composition has no boolean leaf, so type drift among non-boolean leaves is on the author. Only a TOP-LEVEL `sem-not` and `defined as exists (…)` are inherently boolean.",
+        force: "default",
+      },
+      {
+        text: "SHIPPED rule-B checks (NOT exhaustive): a bare-ref alias = FULL equality with its target; a non-boolean composition rejects any boolean LEAF (a boolean parent conversely exists-bridges refinement leaves, one-directional); a no-projector posrep = concept value type; a TOP-LEVEL `sem-not` / `defined as exists` result must be boolean; a guard operand must be boolean.",
+        force: "validator-enforced",
+      },
+      {
+        text: "NORMATIVE vs SHIPPED: the model requires use-site type-checking EVERYWHERE, but the enforced set is a SUBSET (operand-constraint registry seeded not exhaustive, #266; nested-call / package-library blind spots) — author to the doctrine; do not assume the tool catches every use-site mismatch.",
+        force: "default",
+      },
+      {
+        text: "`defined as exists ( \"Concept\" )` LANE MATRIX (capability status, NOT a usable Stage-1 form yet): parses+validates ✓; standard CQL emit ✓ (#265, `exists (<Concept>)`); run_decision ✗ (status:error, #270) — cannot pass the kit verify-loop today; #269 (reject a boolean operand → silently-always-true) unbuilt, so its operand must be an instance-bearing non-boolean concept by author care. The run_decision-passing boolean determination form is a plain `code is` boolean concept.",
+        force: "default",
+      },
+    ],
+  },
+  {
     id: "patient-age-both-rep",
     edge: "cpg",
     category: "concept-model",
-    rule: 'PATIENT AGE is the SOLE sanctioned `definition is` exception to Stage-1 \'local `code is` only\'. A both-representation age concept carries BOTH arms on ONE concept: `- code is `<age-code>`.` (the LOCAL age Observation) AND `- definition is age today <at least | at most | under | younger than> <N> years.` (a live compute over `Patient.birthDate`). The Inferred layer RECENCY-MERGES the two: newest of the local age Observation (`Observation.effective`) vs `Patient.meta.lastUpdated` wins; indeterminate (`lastUpdated` absent) → the session-fresh local-source wins. COMPARATORS (#215): `at least <N>` (≥, lower bound) and the UPPER bounds `at most <N>` (≤, inclusive), `under <N>` / `younger than <N>` (<, exclusive). The upper bounds are the engine-verified alternative to the INCORRECT `sem-not "Age N Or Older"` complement — the exact closed-world cell: a member with NO usable birthDate AND no local age assertion evaluates FALSE (deny) through the recency truth-set (a session-fresh local TRUE assertion still wins via recency); the complement instead turns that MISSING evidence into TRUE, granting an under-N pathway for unknown age (a measured wrong determination). Because `AgeAt()` truncates to WHOLE years, `at most 21` ≡ `under 22` (a pediatric "under 21" gate is `under 21`, not `at most 21`). The anchored `age at start of <ref> <cmp> <N> years` predicate takes the SAME comparators, but it is a COMPUTE-ONLY inference (a measure-context age), NOT this both-rep recency merge — engine-supported, yet OUTSIDE this Stage-1 carve-out, which is specifically `code is` + `definition is age today <cmp> <N> years`. Constraints: the concept is `type is Observation` (emit recency-shape guard); the comparator\'s unit MUST be `years` (`months`/`days` are a hard error — AgeAt() is in years) AND the comparator must be sanctioned — `validate_crl` REJECTS an unsupported comparator (`less than`) or non-year unit at AUTHOR time (#215), and emit refuses them loudly; `value type is boolean` (author-required; validator/emit enforcement tracked #241); the arm combination is semantic — `code is` + `definition is age…` = recency-merge, `code is` alone = local-only, `definition is` alone = compute-only. Recency behaviour + the upper-bound FALSE-for-unknown are verified at `$r5.apply` (lower bound: 6 cases incl. the indeterminate-recency cell; upper bound: 11 cells incl. unknown→deny, the exclusive/inclusive boundary, and recency — #215). AGE-ONLY guardrail: this is the ONE `definition is` construct sanctioned this stage — do NOT generalize the carve-out to any other `definition is` predicate. The do-not-persist of a session-asserted age answer is a documentation marker (`@business-logic-deferred` in `meta is`) today; the persistence mechanism is #190 (deferred).',
+    rule: 'PATIENT AGE is the SOLE sanctioned `definition is` exception to Stage-1 \'local `code is` only\'. A both-representation age concept carries BOTH arms on ONE concept: `- code is `<age-code>`.` (the LOCAL age Observation) AND `- definition is age today <at least | at most | under | younger than> <N> years.` (a live compute over `Patient.birthDate`). The Inferred layer RECENCY-MERGES the two: newest of the local age Observation (`Observation.effective`) vs `Patient.meta.lastUpdated` wins; indeterminate (`lastUpdated` absent) → the session-fresh local-source wins. COMPARATORS (#215): `at least <N>` (≥, lower bound) and the UPPER bounds `at most <N>` (≤, inclusive), `under <N>` / `younger than <N>` (<, exclusive). The upper bounds are the engine-verified alternative to the INCORRECT `sem-not "Age N Or Older"` complement — the exact closed-world cell: a member with NO usable birthDate AND no local age assertion evaluates FALSE (deny) through the recency truth-set (a session-fresh local TRUE assertion still wins via recency); the complement instead turns that MISSING evidence into TRUE, granting an under-N pathway for unknown age (a measured wrong determination). Because `AgeAt()` truncates to WHOLE years, `at most 21` ≡ `under 22` (a pediatric "under 21" gate is `under 21`, not `at most 21`). The anchored `age at start of <ref> <cmp> <N> years` predicate takes the SAME comparators, but it is a COMPUTE-ONLY inference (a measure-context age), NOT this both-rep recency merge — engine-supported, yet OUTSIDE this Stage-1 carve-out, which is specifically `code is` + `definition is age today <cmp> <N> years`. Constraints: the concept is `type is Observation` (emit recency-shape guard); the comparator\'s unit MUST be `years` (`months`/`days` are a hard error — AgeAt() is in years) AND the comparator must be sanctioned — `validate_crl` REJECTS an unsupported comparator (`less than`) or non-year unit at AUTHOR time (#215), and emit refuses them loudly; `value type is boolean` (author-required; a guard-consumed age concept is author-time REJECTED if non-boolean by rule-B `decision-guard-nonboolean`, the non-guard-consumed residual tracked #241); the arm combination is semantic — `code is` + `definition is age…` = recency-merge, `code is` alone = local-only, `definition is` alone = compute-only. Recency behaviour + the upper-bound FALSE-for-unknown are verified at `$r5.apply` (lower bound: 6 cases incl. the indeterminate-recency cell; upper bound: 11 cells incl. unknown→deny, the exclusive/inclusive boundary, and recency — #215). AGE-ONLY guardrail: this is the ONE `definition is` construct sanctioned this stage — do NOT generalize the carve-out to any other `definition is` predicate. The do-not-persist of a session-asserted age answer is a documentation marker (`@business-logic-deferred` in `meta is`) today; the persistence mechanism is #190 (deferred).',
     why: "`Patient.birthDate` is a real clinical record that can COMPUTE the age, so a both-rep age concept has two genuine sources for the same fact; the recency merge lets EITHER the local age assertion OR the live compute answer — newest wins — which is why age (and age alone) earns the `definition is` carve-out the rest of the stage defers.",
     ref: "#190; patient-age recency merge; disc 173",
     clauses: [
@@ -342,7 +404,7 @@ const RULES: KitRule[] = [
         test: "verifyLoop:patient-age-both-rep",
       },
       {
-        text: "The both-rep age concept is `value type is boolean` (the exemplar demonstrates it; author-time/emit REJECTION of a non-boolean declaration is tracked — #241).",
+        text: "The both-rep age concept is `value type is boolean` (the exemplar demonstrates it). A both-rep age concept CONSUMED as a decision/`criterion` guard is now author-time REJECTED if non-boolean by rule-B `decision-guard-nonboolean`; general enforcement of the boolean declaration for a non-guard-consumed age concept remains tracked — #241.",
         force: "invariant",
         test: "verifyLoop:patient-age-both-rep",
       },
@@ -729,7 +791,7 @@ const EXAMPLES: KitExample[] = [
     snippet:
       'concept "Documented Nonunion":\n- type is Condition.\n- value type is boolean.\n- code is `documented-nonunion`.',
     valid: true,
-    note: "type is + code is only — the Stage-1 leaf concept form.",
+    note: "value type is + type is + code is only — the Stage-1 leaf concept form.",
   },
   {
     title: "A policy's ALTERNATIVES are joined in the DECISION layer, not by `defined as`",
@@ -1085,7 +1147,7 @@ const JUDGE_LENS: JudgeLens = {
 
 const BOUNDARY_ENTRIES: { text: string; edge: AuthoringEdge }[] = [
   {
-    text: "`definition is` predicates (count / most-recent / temporal / value thresholds — compute over a source); the SOLE exception is the patient-age both-rep `definition is age today <at least | at most | under | younger than> <N> years` recency merge (see rule patient-age-both-rep)",
+    text: "`definition is` predicates (count / most-recent / temporal / value thresholds — compute over a source); the SOLE exception is the patient-age both-rep `definition is age today <at least | at most | under | younger than> <N> years` recency merge (see rule patient-age-both-rep). CORRELATED resource-level temporal refinement (e.g. `<orders> on day of or after <active diagnoses>`) is a later-stage measure/refinement construct that EXISTS in CRL but is OUT of this kit — it is documented in the CQL emitter's inference-pattern catalog, not taught here",
     edge: "cpg",
   },
   {

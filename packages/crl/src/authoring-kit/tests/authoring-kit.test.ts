@@ -407,7 +407,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.16");
+    expect(kit.schemaVersion).toBe("1.17");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -844,11 +844,17 @@ describe("authoring-kit — getAuthoringKit", () => {
     // #257 (schemaVersion 1.15→1.16): the concept-model redesign makes `value type` REQUIRED on every concept
     // (A.10 — `missing-value-type` is now a validator ERROR); every reference/example concept declares its
     // `value type` (case-feature determinations are `value type is boolean`). BOTH hashes move.
+    // #257 (schemaVersion 1.16→1.17): the concept-model PROSE — a new `value-type` rule (published-shape doctrine +
+    // ROLE heuristic + the A.10b guard⇒boolean lesson + VALUE-PRESERVING inference to the shipped rule-B checks +
+    // NORMATIVE-vs-SHIPPED + the `defined as exists` LANE MATRIX as capability-status); `concept-form` gains
+    // `value type is` + the composition formula; a leading conceptLayerModel value-type entry; the stale posrep
+    // `form` fixed; the patient-age #241 annotation reconciled with rule-B. Correlated temporal DEFERRED (scope
+    // note only). Design round: disc 407. BOTH hashes move (cpg rule/model inherit into prior-auth).
     expect(cpg.contentHash).toBe(
-      "3e26309e34aaeb024c05dff63b3568424222ac21fe1bb4607567ff68ff802e06",
+      "b62373fc237afe179d04f02c8e475bf806130a75027fa0beaf1adff175e59c92",
     );
     expect(priorAuth.contentHash).toBe(
-      "02e6a2474188774fd543bbcea64eea2168d94fc8958b7cfaf20ddeb89a344f8e",
+      "3cae9f7502f1dba0a7f627a0ab3448b86bfe564f2331e36e256017d2367ac8ca",
     );
   });
 
@@ -951,6 +957,51 @@ describe("authoring-kit — getAuthoringKit", () => {
     // the `concept-form` rule no longer endorses the drug/PT disjunction as ONE fact
     const conceptForm = kit.rules.find((r) => r.id === "concept-form")!;
     expect(conceptForm.rule).not.toMatch(/failed drug OR (failed )?physical therapy/i);
+  });
+
+  it("STEP-3 (kit 1.17) — the `value-type` rule teaches the published-shape doctrine in BOTH useCases, matched DIRECTIONALLY to the SHIPPED validator (disc 407 impl round)", () => {
+    for (const uc of ["cpg", "prior-auth"] as const) {
+      const kit = getAuthoringKit("local-decision-support", uc);
+      const vt = kit.rules.find((r) => r.id === "value-type");
+      expect(vt, `value-type rule missing in ${uc}`).toBeDefined();
+      // Names the A.10 requirement + the guard⇒boolean check (the two shipped enforcements the doctrine rests on).
+      expect(vt!.rule).toMatch(/missing-value-type/);
+      expect(vt!.rule).toMatch(/decision-guard-nonboolean/);
+      // Published-shape (a SHAPE, not a scalar) + the ROLE heuristic (choose by RESULT, not resource type).
+      expect(vt!.rule).toMatch(/PUBLISHED result shape/);
+      expect(vt!.rule).toMatch(/CHOOSE BY ROLE/);
+      // DIRECTIONAL doctrine assertions — a polarity/scope reversal must FAIL these, not just a deletion.
+      // bare-ref alias = FULL equality (not "need not be equal"); only TOP-LEVEL sem-not/exists is boolean.
+      expect(vt!.rule).toMatch(/bare-ref alias must EQUAL[\s\S]*?FULL equality/);
+      expect(vt!.rule).toMatch(/NON-boolean composition requires every LEAF non-boolean/);
+      expect(vt!.rule).toMatch(/TOP-LEVEL `sem-not` \/ `defined as exists` result must be boolean/);
+      // The lane matrix in the RIGHT direction: standard CQL emits, BUT run_decision cannot prove it ON-PATH.
+      expect(vt!.rule).toMatch(/STANDARD CQL emit lowers it to `exists[\s\S]*?BUT `run_decision` cannot PROVE it/);
+      expect(vt!.rule).toMatch(/EVALUATED ON A DECISION PATH/);
+      // Honesty hedge — split so a bare "#266" token alone can't satisfy it (the most load-bearing assertion).
+      expect(vt!.rule).toMatch(/NORMATIVE vs SHIPPED/);
+      expect(vt!.rule).toMatch(/#266/);
+      // `defined as exists` is CAPABILITY-STATUS, NOT a usable Stage-1 form (run_decision status:errors, #270).
+      expect(vt!.rule).toMatch(/LANE MATRIX/);
+      expect(vt!.rule).toMatch(/NOT a usable Stage-1 form/);
+      expect(vt!.rule).toMatch(/#270/);
+      // CLAUSE FORCES — doctrine must NOT shelter under a `validator-enforced` tag (FORCE_MODEL §0). The
+      // value-preserving DOCTRINE + the "don't relabel" guidance are `default`; only the shipped-check list
+      // is `validator-enforced`. A regression that re-fuses them (the impl-round finding) fails here.
+      const clauses = vt!.clauses ?? [];
+      const preserving = clauses.find((c) => /VALUE-PRESERVING inference \(DOCTRINE/.test(c.text));
+      const relabel = clauses.find((c) => /Do NOT relabel/.test(c.text));
+      const shipped = clauses.find((c) => /SHIPPED rule-B checks/.test(c.text));
+      expect(preserving?.force, `value-preserving doctrine clause must be default in ${uc}`).toBe("default");
+      expect(relabel?.force, `don't-relabel guidance clause must be default in ${uc}`).toBe("default");
+      expect(shipped?.force, `shipped-checks clause must be validator-enforced in ${uc}`).toBe(
+        "validator-enforced",
+      );
+      // concept-form still preserves the Stage-1 producer exclusions (posreps / general `definition is` OUT).
+      const cf = kit.rules.find((r) => r.id === "concept-form")!;
+      expect(cf.clauses?.[0]?.text).toMatch(/OUT this stage/);
+      expect(cf.rule).toMatch(/value type is/);
+    }
   });
 
   it("#234 follow-up (kit 1.12, finding 1) — decision-composition carries the DNF SIZE note flagging #236 load-bearing", () => {
