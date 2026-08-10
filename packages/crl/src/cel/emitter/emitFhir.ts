@@ -266,8 +266,8 @@ function codeableConcept(raw: string): Record<string, unknown> {
 }
 
 /** Read body fields from a fact into a flat lookup. */
-function readFactBody(fact: CELFact): Record<string, string | number> {
-  const out: Record<string, string | number> = {};
+function readFactBody(fact: CELFact): Record<string, string | number | boolean> {
+  const out: Record<string, string | number | boolean> = {};
   for (const b of fact.body) {
     if (b.type === "CELNameField") out.name = b.value;
     else if (b.type === "CELBirthDateField") out.birthDate = b.value;
@@ -513,9 +513,13 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
     resourceBody.code = codeableConcept(body.code);
   }
 
-  // Value (numeric or string) — Observation primarily.
+  // Value (boolean, numeric, or string) — Observation primarily. #189 S1 — a boolean value lowers
+  // to `Observation.valueBoolean` (a `value type is boolean` determination), the shape the local
+  // `code is` truth-set retrieve consumes (`asTruths`: `value.value is true`).
   if (body.value !== undefined && fhirType === "Observation") {
-    if (typeof body.value === "number") {
+    if (typeof body.value === "boolean") {
+      resourceBody.valueBoolean = body.value;
+    } else if (typeof body.value === "number") {
       resourceBody.valueQuantity = { value: body.value };
     } else {
       resourceBody.valueString = String(body.value);

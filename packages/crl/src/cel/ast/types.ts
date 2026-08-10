@@ -127,7 +127,10 @@ export interface CELDateField {
 
 export interface CELValueField {
   type: "CELValueField";
-  value: number | string;
+  // #189 S1 — a boolean value (`value is true` / `value is false`) is first-class: a
+  // `value type is boolean` local `code is` concept authors its determination directly, and the
+  // emitter lowers it to `Observation.valueBoolean`. `number`/`string` remain for Quantity/text values.
+  value: number | string | boolean;
   location: Location;
 }
 

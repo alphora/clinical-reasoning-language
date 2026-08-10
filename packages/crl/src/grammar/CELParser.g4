@@ -77,7 +77,7 @@ nameField         : NAME_IS stringLiteral ;
 birthDateField    : BIRTH_DATE_IS stringLiteral ;
 codeField         : CODE_IS stringLiteral ;
 dateField         : DATE_IS stringLiteral ;
-valueField        : VALUE_IS (NUMBER | stringLiteral) ;
+valueField        : VALUE_IS (NUMBER | stringLiteral | TRUE | FALSE) ;
 stageField        : STAGE_IS STAGE_VALUE ;
 definedByField    : DEFINED_BY reference ;
 

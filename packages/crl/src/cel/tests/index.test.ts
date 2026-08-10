@@ -271,6 +271,40 @@ describe("CEL Todo 2 — negative fixtures (parse-success boundary cases)", () =
   });
 });
 
+describe("CEL #189 S1 — `value is true` / `value is false` (first-class boolean fact value)", () => {
+  const boolSrc = (v: string) =>
+    ['library "T".', 'fact "Determination":', `- value is ${v}.`, '- defined by "Some Concept".'].join("\n");
+
+  test("`value is true` builds a boolean CELValueField (value === true)", () => {
+    const r = buildCEL(boolSrc("true"));
+    expect(r.success).toBe(true);
+    const fact = (r.result as CEL).statements.find((s): s is CELFact => s.type === "CELFact");
+    const vf = fact!.body.find((b) => b.type === "CELValueField") as { value: unknown } | undefined;
+    expect(vf?.value).toBe(true);
+    expect(typeof vf?.value).toBe("boolean");
+  });
+
+  test("`value is false` builds a boolean CELValueField (value === false — distinct from absent)", () => {
+    const r = buildCEL(boolSrc("false"));
+    expect(r.success).toBe(true);
+    const fact = (r.result as CEL).statements.find((s): s is CELFact => s.type === "CELFact");
+    const vf = fact!.body.find((b) => b.type === "CELValueField") as { value: unknown } | undefined;
+    expect(vf?.value).toBe(false);
+    expect(typeof vf?.value).toBe("boolean");
+  });
+
+  test("`value is 42` still builds a numeric value (no regression), `value is \"text\"` a string", () => {
+    const num = buildCEL(boolSrc("42"));
+    expect(num.success).toBe(true);
+    const numFact = (num.result as CEL).statements.find((s): s is CELFact => s.type === "CELFact");
+    expect((numFact!.body.find((b) => b.type === "CELValueField") as { value: unknown }).value).toBe(42);
+    const str = buildCEL(boolSrc('"documented"'));
+    expect(str.success).toBe(true);
+    const strFact = (str.result as CEL).statements.find((s): s is CELFact => s.type === "CELFact");
+    expect((strFact!.body.find((b) => b.type === "CELValueField") as { value: unknown }).value).toBe("documented");
+  });
+});
+
 describe("CEL #135 — leading `# header` is optional (library stays required)", () => {
   test("no header — a file starting directly with `library` parses", () => {
     const src = ['library "NoHdr".', 'fact "X":', '- code is "s|c".', '- defined by "Patient".'].join("\n");

@@ -297,6 +297,15 @@ export class CELAstBuilder
     if (sl) {
       return { type: "CELValueField", value: unquote(sl.text), location: getLocation(ctx) };
     }
+    // #189 S1 — `value is true` / `value is false` (the TRUE/FALSE keyword tokens, shared with
+    // `result is`). A boolean value carries the concept's determination for a `value type is boolean`
+    // local `code is` leaf; the emitter lowers it to `Observation.valueBoolean`.
+    if (ctx.TRUE()) {
+      return { type: "CELValueField", value: true, location: getLocation(ctx) };
+    }
+    if (ctx.FALSE()) {
+      return { type: "CELValueField", value: false, location: getLocation(ctx) };
+    }
     throw new Error(`Empty valueField at ${getLocation(ctx).start.line}`);
   };
 
