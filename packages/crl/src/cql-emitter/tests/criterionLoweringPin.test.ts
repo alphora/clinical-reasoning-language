@@ -10,7 +10,13 @@ import { describe, it, expect } from "vitest";
 
 import { buildCRL } from "../../index";
 import { buildCriterionTable } from "../../ast/criterionExpansion";
-import { lowerLocalCodes } from "../lowerLocalCodes";
+import { lowerLocalCodes as lowerLocalCodesRaw } from "../lowerLocalCodes";
+
+// #271 — lowering local `code is` now REQUIRES `crl.canonicalBase` (no urn
+// fallback); inline-AST tests thread a fixed test base by default.
+const TEST_CB = "http://example.org/crl/test";
+const lowerLocalCodes: typeof lowerLocalCodesRaw = (ast, opts = {}) =>
+  lowerLocalCodesRaw(ast, { canonicalBase: TEST_CB, ...opts });
 import type { CRL } from "../../ast/types";
 
 function parse(body: string): CRL {

@@ -366,16 +366,16 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   // Direct `emitCQLFromAST` callers (CLI, tests) lower internally; this is the
   // imports-path counterpart so the layered classification sees lowered ASTs.
   const lowerErrors: CRLError[] = [];
-  // Slice 4 — load the project's `crl.canonicalBase` (best-effort) so the
-  // synthetic local codesystem's CQL `codesystem` URL is published under it,
-  // byte-equal with the FHIR lane. CQL emit must NOT hard-fail on missing/broken
-  // FHIR metadata (that's the FHIR lane's concern), so we use the lightweight
+  // Slice 4 — load the project's `crl.canonicalBase` so the synthetic local
+  // codesystem's CQL `codesystem` URL is published under it, byte-equal with the
+  // FHIR lane. CQL emit must NOT hard-fail on UNRELATED FHIR-metadata problems
+  // (missing `version` etc. — the FHIR lane's concern), so we use the lightweight
   // `readCanonicalBase` reader — it reads ONLY `crl.canonicalBase` and swallows
-  // errors. (The full `readPackageMetadata` returns `metadata: null` for any
-  // UNRELATED FHIR-metadata failure — e.g. a missing `version` — which would
-  // silently drop a VALID canonicalBase and diverge from the FHIR lane.) When
-  // absent/unreadable, canonicalBase stays undefined and the lowering falls back
-  // to the URN.
+  // unrelated read/parse errors. #271 — when `crl.canonicalBase` itself is
+  // absent/empty AND the library has local `code is` concepts to lower,
+  // `lowerLocalCodes` hard-errors with `missing-canonical-url-base` (no URN
+  // fallback), mirroring the FHIR lane so the two local-codesystem identities stay
+  // byte-equal.
   let canonicalBase: string | undefined;
   // R1 — also read the POLICY ID (`name`) so the synthetic local codesystem URL
   // slugs from the policy id, byte-equal with the FHIR lane's `CodeSystem.url`.

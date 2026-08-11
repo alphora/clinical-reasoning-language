@@ -2,7 +2,13 @@ import * as path from "path";
 
 import { emitCQLImports, computeSplitPlan } from "../emit";
 import { buildCRL } from "../../index";
-import { lowerLocalCodes } from "../../cql-emitter/lowerLocalCodes";
+import { lowerLocalCodes as lowerLocalCodesRaw } from "../../cql-emitter/lowerLocalCodes";
+
+// #271 — lowering local `code is` now REQUIRES `crl.canonicalBase` (no urn
+// fallback). Inline-AST callers below (no package.json) thread a fixed test base.
+const TEST_CB = "http://example.org/crl/test";
+const lowerLocalCodes: typeof lowerLocalCodesRaw = (ast, opts = {}) =>
+  lowerLocalCodesRaw(ast, { canonicalBase: TEST_CB, ...opts });
 import { DEFAULT_FHIRHELPERS_VERSION } from "../../cql-emitter/emitCQL";
 import { loadFHIRHelpers } from "../../cql-emitter/catalog/loadCatalog";
 import type { CRL } from "../../ast/types";
@@ -344,7 +350,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // R1/case-feature — the shared local codesystem DECL name is derived from the
     // POLICY ID (`crl-test-fixture`), title-cased: "Crl Test Fixture Local Codes".
     expect(concepts).toMatch(
-      /codesystem "Crl Test Fixture Local Codes": 'urn:crl:codesystem:crl-test-fixture-local'/,
+      /codesystem "Crl Test Fixture Local Codes": 'http:\/\/example\.org\/crl\/code-is-decision\/CodeSystem\/crl-test-fixture-local'/,
     );
     expect(concepts.match(/^codesystem /gm)).toHaveLength(1);
     expect(concepts).toMatch(

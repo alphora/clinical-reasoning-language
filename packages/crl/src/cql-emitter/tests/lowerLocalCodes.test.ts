@@ -2,8 +2,22 @@ import { describe, expect, it } from "vitest";
 
 import { buildCRL } from "../../index";
 import type { CRL, Concept, Terminology, Location } from "../../ast/types";
-import { emitCQL, emitCQLFromAST } from "../emitCQL";
-import { lowerLocalCodes, localCodeSystemUrl } from "../lowerLocalCodes";
+import { emitCQL as emitCQLRaw, emitCQLFromAST as emitCQLFromASTRaw } from "../emitCQL";
+import { lowerLocalCodes as lowerLocalCodesRaw, localCodeSystemUrl } from "../lowerLocalCodes";
+
+// #271 — `crl.canonicalBase` is now REQUIRED to lower local `code is` concepts
+// (no urn fallback). These wrappers thread a fixed test base so the existing
+// lowering/emit unit tests exercise mechanics without repeating it at every call.
+// An explicit `canonicalBase` in a test's own opts overrides the default (the
+// spread order below), and a test that wants the missing-base error passes
+// `{ canonicalBase: "" }`.
+const TEST_CB = "http://example.org/crl/test";
+const lowerLocalCodes: typeof lowerLocalCodesRaw = (ast, opts = {}) =>
+  lowerLocalCodesRaw(ast, { canonicalBase: TEST_CB, ...opts });
+const emitCQLFromAST: typeof emitCQLFromASTRaw = (ast, opts) =>
+  emitCQLFromASTRaw(ast, { canonicalBase: TEST_CB, ...(opts ?? {}) });
+const emitCQL: typeof emitCQLRaw = (src, opts) =>
+  emitCQLRaw(src, { canonicalBase: TEST_CB, ...(opts ?? {}) });
 
 // Slice 3 — concept-level `code is` local-source lowering. Covers the
 // `lowerLocalCodes` transform shape + each hard-error diagnostic, plus the
@@ -39,7 +53,7 @@ concept "Adult Patient":
     );
     expect(term).toBeDefined();
     expect(term!.body).toEqual([
-      expect.objectContaining({ type: "TerminologySystem", system: "urn:crl:codesystem:t-local" }),
+      expect.objectContaining({ type: "TerminologySystem", system: "http://example.org/crl/test/CodeSystem/t-local" }),
       expect.objectContaining({ type: "TerminologyCode", code: "adult-18-or-older" }),
     ]);
 
@@ -121,7 +135,7 @@ concept "Active Crohns Disease":
     }
     // ...and the URL is unchanged (the single implicit local domain URN).
     for (const sl of systemLines) {
-      expect(sl.system).toBe("urn:crl:codesystem:code-is-basic-local");
+      expect(sl.system).toBe("http://example.org/crl/test/CodeSystem/code-is-basic-local");
     }
     // The per-concept terminology NAMES are still the concept names (unchanged).
     expect(terms.map((t) => t.name).sort()).toEqual([
@@ -187,14 +201,19 @@ concept "Height":
     expect(concept!.definition).toBeUndefined();
   });
 
-  it("localCodeSystemUrl falls back to a URN when canonicalBase is undefined (and slugs the library name)", () => {
-    expect(localCodeSystemUrl(undefined, "Risankizumab Coverage")).toBe(
-      "urn:crl:codesystem:risankizumab-coverage-local",
+  it("localCodeSystemUrl THROWS when canonicalBase is absent (#271 — no urn fallback)", () => {
+    expect(() => localCodeSystemUrl(undefined, "Risankizumab Coverage")).toThrow(/canonicalBase/);
+    expect(() => localCodeSystemUrl("", "Risankizumab Coverage")).toThrow(/canonicalBase/);
+    expect(() => localCodeSystemUrl("   ", "Risankizumab Coverage")).toThrow(/canonicalBase/);
+  });
+
+  it("localCodeSystemUrl slugs the domain id under canonicalBase (library-name fallback slugs)", () => {
+    expect(localCodeSystemUrl("http://example.org/crl/x", "  Weird--Name!! ")).toBe(
+      "http://example.org/crl/x/CodeSystem/weird-name-local",
     );
-    expect(localCodeSystemUrl(undefined, "  Weird--Name!! ")).toBe(
-      "urn:crl:codesystem:weird-name-local",
+    expect(localCodeSystemUrl("http://example.org/crl/x", "日本語")).toBe(
+      "http://example.org/crl/x/CodeSystem/unnamed-local",
     );
-    expect(localCodeSystemUrl(undefined, "日本語")).toBe("urn:crl:codesystem:unnamed-local");
   });
 
   it("localCodeSystemUrl publishes under canonicalBase when set (byte-equal with the FHIR lane)", () => {
@@ -204,6 +223,28 @@ concept "Height":
     expect(localCodeSystemUrl("http://example.org/crl/x", "日本語")).toBe(
       "http://example.org/crl/x/CodeSystem/unnamed-local",
     );
+  });
+
+  it("#271 — a lowerable `code is` concept with NO canonicalBase hard-errors `missing-canonical-url-base` (no urn fallback)", () => {
+    const ast = parse(
+      lib(`
+concept "Adult Patient":
+- type is Observation.
+- code is \`adult-18-or-older\`.
+`),
+    );
+    // Explicit empty base OVERRIDES the wrapper's TEST_CB (spread order) — the real
+    // user-facing structured error, not the low-level `localCodeSystemUrl` throw.
+    const r = lowerLocalCodesRaw(ast, { canonicalBase: "" });
+    expect(r.errors.find((e) => e.kind === "missing-canonical-url-base")).toBeDefined();
+    expect(r.localCodes).toEqual([]); // nothing lowered
+    expect(r.ast).toBe(ast); // returned BY IDENTITY — imports/emit.ts:481 relies on this
+    // A whitespace-only base is treated as absent too.
+    expect(
+      lowerLocalCodesRaw(ast, { canonicalBase: "   " }).errors.some(
+        (e) => e.kind === "missing-canonical-url-base",
+      ),
+    ).toBe(true);
   });
 
   it("canonicalBase threads into the synthetic codesystem URL when passed to lowerLocalCodes", () => {
@@ -1044,7 +1085,7 @@ concept "Adult Patient":
     // (detectCollisions, same-named concept co-resides) and references the
     // shared decl via `from`.
     expect(cql).toContain(
-      "codesystem \"T Local Codes\": 'urn:crl:codesystem:t-local'",
+      "codesystem \"T Local Codes\": 'http://example.org/crl/test/CodeSystem/t-local'",
     );
     expect(cql).toContain(
       "code \"Adult Patient Code\": 'adult-18-or-older' from \"T Local Codes\"",
@@ -1064,7 +1105,7 @@ concept "Adult Patient":
       type: "Terminology",
       name: "Active Crohns Disease",
       body: [
-        { type: "TerminologySystem", system: "urn:crl:codesystem:t-local", name: "T Local Codes", location: LOC },
+        { type: "TerminologySystem", system: "http://example.org/crl/test/CodeSystem/t-local", name: "T Local Codes", location: LOC },
         { type: "TerminologyCode", code: "active-crohns-disease", location: LOC },
       ],
       location: LOC,

@@ -302,7 +302,7 @@ concept "Present":
 concept "Has Present":
 - value type is boolean.
 - defined as exists ( "Present" ).`);
-    const res = emitCQLFromAST(ast);
+    const res = emitCQLFromAST(ast, { canonicalBase: "http://example.org/crl/test" }); // #271 — canonicalBase required to lower local `code is`
     expect(res.success).toBe(true);
     expect(res.result ?? "").toMatch(/define "Has Present":\s*\n\s*exists \("Present"\)/);
     expect(res.result ?? "").not.toContain("not yet lowered");

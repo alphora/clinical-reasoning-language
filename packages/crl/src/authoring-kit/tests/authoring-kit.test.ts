@@ -411,7 +411,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.21");
+    expect(kit.schemaVersion).toBe("1.22");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -996,10 +996,10 @@ describe("authoring-kit — getAuthoringKit", () => {
     // the `validate-only` legend + representation-reference `purpose` reworded (artifact tier vs construct
     // status). BOTH hashes move again.
     expect(cpg.contentHash).toBe(
-      "05f65aa7b01d9faf0b6cfef1c761c1b5daed72c86e555df52e1dd32abf34add0",
+      "6fa32dd382edaf82fdb94da6863a2fcd38b62247e3f2b6ecfd58ef251191290f",
     );
     expect(priorAuth.contentHash).toBe(
-      "72570f3a8331a7cfd0e4422ff93f39b8147dd5b092668c5947687a997a8c95f4",
+      "6e7fae6cf0764629da3645fdea9ceb9c789246e6ce453d00ffb15c8647819492",
     );
   });
 

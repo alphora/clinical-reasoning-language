@@ -118,11 +118,13 @@ export interface EmitOptions {
    */
   crossLibraryParameters?: Map<string, Map<string, AstParameterInfo>>;
   /**
-   * Slice 4 — the project's `crl.canonicalBase`. Threaded to `lowerLocalCodes`
-   * so the synthetic local codesystem's CQL `codesystem` URL is published under
+   * The project's `crl.canonicalBase`. Threaded to `lowerLocalCodes` so the
+   * synthetic local codesystem's CQL `codesystem` URL is published under
    * canonicalBase (`<base>/CodeSystem/<slug>-local`) — byte-equal with the FHIR
-   * lane's emitted local CodeSystem `url`. Undefined for direct callers without
-   * a package.json (CLI / single-file `emitCQL`), which fall back to the URN.
+   * lane's emitted local CodeSystem `url`. **#271 — REQUIRED when the library has
+   * local `code is` concepts:** absent/empty yields a hard
+   * `missing-canonical-url-base` error (no URN fallback). A caller emitting local
+   * codes must supply it (e.g. the MCP/CLI reads it from the nearest package.json).
    */
   canonicalBase?: string;
   /**

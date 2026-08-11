@@ -2,7 +2,13 @@
 // model shares with the emitter. Guards the two load-bearing claims: membership is OPTS-INDEPENDENT, and a library
 // with ANY lowering error yields ∅ (fail-closed, matching the emitter's closed caseFeatureGateOpen).
 import { parseInput } from "../../ast/tests/parseInput";
-import { leafEligibleConcepts, lowerLocalCodes } from "../lowerLocalCodes";
+import { leafEligibleConcepts, lowerLocalCodes as lowerLocalCodesRaw } from "../lowerLocalCodes";
+
+// #271 — lowering local `code is` now REQUIRES `crl.canonicalBase` (no urn
+// fallback); inline-AST tests thread a fixed test base by default.
+const TEST_CB = "http://example.org/crl/test";
+const lowerLocalCodes: typeof lowerLocalCodesRaw = (ast, opts = {}) =>
+  lowerLocalCodesRaw(ast, { canonicalBase: TEST_CB, ...opts });
 
 const CLEAN = `# L
 library "L".
@@ -44,14 +50,18 @@ describe("leafEligibleConcepts", () => {
 
   it("membership is OPTS-INDEPENDENT (canonicalBase / localDomainId only shape the URL, not the gate)", () => {
     const ast = parseInput(CLEAN);
-    const bare = new Set(lowerLocalCodes(ast).localCodes.map((c) => c.concept));
-    const withOpts = new Set(
+    // #271 — an ABSENT base now hard-errors, so this compares TWO DIFFERENT bases (the
+    // wrapper's TEST_CB vs an explicit one) rather than absent-vs-present: membership
+    // must be identical either way. `leafEligibleConcepts` covers the base-free path
+    // (it passes a probe base internally).
+    const withBaseA = new Set(lowerLocalCodes(ast).localCodes.map((c) => c.concept));
+    const withBaseB = new Set(
       lowerLocalCodes(ast, {
         canonicalBase: "https://x/base",
         localDomainId: "policy-id",
       }).localCodes.map((c) => c.concept),
     );
-    expect([...withOpts].sort()).toEqual([...bare].sort());
+    expect([...withBaseB].sort()).toEqual([...withBaseA].sort());
   });
 
   it("FAIL-CLOSED: a library with a lowering error → ∅ (even though localCodes is partially populated pre-error)", () => {

@@ -6,7 +6,13 @@ import { parseInput } from "../../ast/tests/parseInput";
 import type { Decision } from "../../ast/types";
 import { buildCEL } from "../../cel";
 import type { ResolvedCelGraph } from "../../cel/imports/types";
-import { leafEligibleConcepts, lowerLocalCodes } from "../../cql-emitter/lowerLocalCodes";
+import { leafEligibleConcepts, lowerLocalCodes as lowerLocalCodesRaw } from "../../cql-emitter/lowerLocalCodes";
+
+// #271 — lowering local `code is` now REQUIRES `crl.canonicalBase` (no urn
+// fallback); inline-AST tests thread a fixed test base by default.
+const TEST_CB = "http://example.org/crl/test";
+const lowerLocalCodes: typeof lowerLocalCodesRaw = (ast, opts = {}) =>
+  lowerLocalCodesRaw(ast, { canonicalBase: TEST_CB, ...opts });
 import { collectCaseFeatures } from "../../fhir-emitter/closureOrchestrator";
 import type { RegistryEntry } from "../../imports/types";
 import {

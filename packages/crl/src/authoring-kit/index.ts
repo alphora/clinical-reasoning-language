@@ -251,8 +251,15 @@ export type {
 //   legend + the representation-reference `purpose` reworded so "the age construct is runtime-shipped" ≠ "this
 //   artifact is engine-run" (artifact tier vs construct status). Non-payload comments (reference.ts docstring)
 //   + the serialized-payload guard (regex + semantic pins) also hardened — see tests. BOTH useCase hashes re-pin.
+// #271 (schemaVersion 1.21→1.22): teach the project-config REQUIREMENT that landed with the canonicalBase
+//   precursor slice — a content project's `package.json` must declare `crl.canonicalBase`; the emitted local
+//   CodeSystem url is `<canonicalBase>/CodeSystem/<domain>-local`, so CQL/CEL emit now hard-errors
+//   `missing-canonical-url-base` without it (the urn fallback is removed — the CQL lane now matches the FHIR
+//   lane, which always required it). Added to VERIFY_LOOP_NOTE_BASE (the project-root/package.json note), incl.
+//   the `emit_cql`-needs-a-`path` consequence. NO payload-shape change. BOTH useCase hashes re-pin (schemaVersion
+//   is hashed AND the base note inherits into both chains).
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.21";
+const SCHEMA_VERSION = "1.22";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -944,6 +951,7 @@ const EXAMPLES: KitExample[] = [
 /** The verify-loop `note`, base (edge-invariant) segment. The PA closure paragraph is appended for prior-auth. */
 const VERIFY_LOOP_NOTE_BASE =
   "validate_cel and run_decision require FILES under a project root (a package.json); they do not accept inline code. In a content project's artifact-package layout, author <artifact>.crl and <artifact>.cel under the artifact's package and pass absolute paths. " +
+  "PROJECT CONFIG — the project's `package.json` MUST declare `crl.canonicalBase` (e.g. `\"crl\": { \"canonicalBase\": \"http://example.org/crl/<project>\" }`): every emitted local CodeSystem url is `<canonicalBase>/CodeSystem/<domain>-local`, so emit fails with `missing-canonical-url-base` without it (no urn fallback). Projects that emit FHIR already require it; `emit_cql` for local-`code is` content likewise needs a `path` (not inline `code`) so it can read the base from the nearest package.json. " +
   "PROVENANCE / PROMOTION (beyond the run_decision proof): generate the scaffold with `generate_provenance` " +
   'clusterBy:"disposition-path" — it clusters per RUN PATH (decision-node refs only) so it is correspondence-correct ' +
   "BY CONSTRUCTION, clearing the FINAL `validate_provenance` cockpit-correspondence gate AS GENERATED (before any " +

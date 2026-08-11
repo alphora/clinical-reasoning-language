@@ -69,12 +69,13 @@ describe("#237/T1 unified id formatter — component-wise 'unnamed' boundary (no
 });
 
 describe("#237/T1 scope-B — local-domain CodeSystem id == url-tail (both lanes) at overflow + dotted", () => {
-  it("overflow domain: CodeSystem id equals the url-tail (urn and canonicalBase forms)", () => {
+  it("overflow domain: CodeSystem id equals the url-tail (canonicalBase form; #271 requires a base)", () => {
     const domain = "d".repeat(80);
     const id = localCodeSystemSlug(domain);
     expect(id.length).toBeLessThanOrEqual(64);
     expect(id.endsWith("-local")).toBe(true);
-    expect(localCodeSystemUrl(undefined, domain)).toBe(`urn:crl:codesystem:${id}`);
+    // #271 — no urn fallback: the helper requires a canonicalBase.
+    expect(() => localCodeSystemUrl(undefined, domain)).toThrow(/canonicalBase/);
     expect(tail(localCodeSystemUrl(META.canonicalBase, domain))).toBe(id);
   });
 
@@ -82,6 +83,6 @@ describe("#237/T1 scope-B — local-domain CodeSystem id == url-tail (both lanes
     const id = localCodeSystemSlug("a.b.c");
     expect(id).toBe(uniqueCapSlugForSuffix("a-b-c", "-local"));
     expect(id).toBe("a-b-c-local");
-    expect(localCodeSystemUrl(undefined, "a.b.c")).toBe("urn:crl:codesystem:a-b-c-local");
+    expect(tail(localCodeSystemUrl(META.canonicalBase, "a.b.c"))).toBe("a-b-c-local");
   });
 });

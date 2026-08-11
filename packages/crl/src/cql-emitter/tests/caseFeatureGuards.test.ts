@@ -1,7 +1,16 @@
 import { buildCRL } from "../../index";
-import { emitCQLFromAST } from "../emitCQL";
+import { emitCQLFromAST as emitCQLFromASTRaw } from "../emitCQL";
 import { emitPartitioned, FULL_PARTITION } from "../layeredEmit";
-import { lowerLocalCodes } from "../lowerLocalCodes";
+import { lowerLocalCodes as lowerLocalCodesRaw } from "../lowerLocalCodes";
+
+// #271 — lowering local `code is` now REQUIRES `crl.canonicalBase` (no urn
+// fallback). These inline-AST tests have no package.json, so thread a fixed test
+// base by default (explicit opts still override).
+const TEST_CB = "http://example.org/crl/test";
+const lowerLocalCodes: typeof lowerLocalCodesRaw = (ast, opts = {}) =>
+  lowerLocalCodesRaw(ast, { canonicalBase: TEST_CB, ...opts });
+const emitCQLFromAST: typeof emitCQLFromASTRaw = (ast, opts) =>
+  emitCQLFromASTRaw(ast, { canonicalBase: TEST_CB, ...(opts ?? {}) });
 import type { CRL } from "../../ast/types";
 
 /**

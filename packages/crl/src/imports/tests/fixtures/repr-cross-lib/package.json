@@ -1,1 +1,8 @@
-{ "name": "crl-repr-fixture", "version": "0.0.0", "private": true }
+{
+  "name": "crl-repr-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "crl": {
+    "canonicalBase": "http://example.org/crl/repr-cross-lib"
+  }
+}

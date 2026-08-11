@@ -135,11 +135,11 @@ export interface LowerLocalCodesResult {
 /** Options for the lowering pass. */
 export interface LowerLocalCodesOptions {
   /**
-   * Slice 4 — the project's `crl.canonicalBase`. When set, the synthetic local
-   * codesystem's URL is published under it (`<base>/CodeSystem/<slug>-local`);
-   * when undefined (direct callers without a package.json), the URN fallback is
-   * used. Threaded through to `localCodeSystemUrl` so the CQL and FHIR identities
-   * stay byte-equal.
+   * The project's `crl.canonicalBase`. The synthetic local codesystem's URL is
+   * published under it (`<base>/CodeSystem/<slug>-local`). **#271 — REQUIRED when
+   * the library has local `code is` concepts:** absent/empty is a hard
+   * `missing-canonical-url-base` error (no URN fallback), mirroring the FHIR lane so
+   * the CQL and FHIR local-codesystem identities stay byte-equal.
    */
   canonicalBase?: string;
   /**
@@ -160,20 +160,21 @@ export interface LowerLocalCodesOptions {
  * non-alphanumeric → hyphen, collapse/trim hyphens; empty (e.g. a pure non-ASCII
  * library name) falls back to `unnamed` so the URL is always well-formed.
  *
- * Slice 4 — when `canonicalBase` is provided (the imports/FHIR lane loads it from
- * `crl.canonicalBase`), the local codesystem URL is published UNDER canonicalBase
+ * The local codesystem URL is published UNDER `crl.canonicalBase`
  * (`<base>/CodeSystem/<slug>-local`) for FHIR closure integrity + publishability;
- * the future case-feature profile fixes a code from this system. When canonicalBase
- * is undefined — the fallback for direct callers (CLI / single-file `emitCQL`)
- * without a package.json — it falls back to the plain URN
- * `urn:crl:codesystem:<slug>-local`. The CQL and FHIR identities MUST stay
- * byte-equal, so BOTH lanes call THIS helper.
+ * the case-feature profile fixes a code from this system. **#271 — canonicalBase is
+ * REQUIRED; there is NO urn fallback.** Passing an empty/undefined base is a
+ * caller-invariant violation (throws): the callers that lower local codes validate
+ * `crl.canonicalBase` first (`lowerLocalCodes` for the CQL lane, the FHIR-metadata
+ * loader for the FHIR lane) and hard-error with `missing-canonical-url-base` when it
+ * is absent — mirroring each other so the CQL and FHIR local-codesystem identities
+ * stay byte-equal. BOTH lanes call THIS helper.
  *
  * R1 — `localDomainId` is the slug SOURCE: the FHIR/imports lanes pass the POLICY
  * ID (`metadata.name`) so the local-domain url shares the policy-id base with
  * every other emitted FHIR resource id; direct callers without metadata pass the
- * source LIBRARY NAME (pre-R1 behavior). The function just slugs whatever it is
- * given — the CALLER decides which identity is authoritative for the domain.
+ * source LIBRARY NAME. The function just slugs whatever it is given — the CALLER
+ * decides which identity is authoritative for the domain.
  */
 export function localCodeSystemUrl(
   canonicalBase: string | undefined,
@@ -186,15 +187,16 @@ export function localCodeSystemUrl(
   // left divergent, and dotted domains where `rawSlug` (dot→hyphen) now matches the
   // id instead of the old `localSlug` (dot-stripping) mismatch.
   const tail = localCodeSystemSlug(localDomainId);
-  if (canonicalBase) {
-    // Normalize a trailing slash so the url is stable regardless of whether the
-    // caller's canonicalBase ends in `/`. The FHIR-metadata loader already
-    // strips it, but a direct `emitCQLFromAST({ canonicalBase })` caller may
-    // not — and both lanes MUST produce a byte-equal url.
-    const base = canonicalBase.replace(/\/+$/, "");
-    return `${base}/CodeSystem/${tail}`;
+  // #271 — REQUIRED, no urn fallback. Normalize a trailing slash so the url is
+  // stable regardless of whether the caller's canonicalBase ends in `/`.
+  const base = canonicalBase?.trim().replace(/\/+$/, "") ?? "";
+  if (!base) {
+    throw new Error(
+      "localCodeSystemUrl requires a non-empty canonicalBase (#271: no urn fallback). " +
+        "Validate crl.canonicalBase before lowering local codes.",
+    );
   }
-  return `urn:crl:codesystem:${tail}`;
+  return `${base}/CodeSystem/${tail}`;
 }
 
 /**
@@ -291,6 +293,43 @@ export function lowerLocalCodes(
     return { ast, errors, localCodes: [] };
   }
 
+  // #271 — a library with local `code is` concepts requires `crl.canonicalBase`. The
+  // synthetic local CodeSystem url is `<canonicalBase>/CodeSystem/<domain>-local`, and
+  // the CQL and FHIR lanes MUST derive it from the SAME base; the absent/empty case was
+  // previously swallowed → a `urn:crl:codesystem:<domain>-local` fallback that silently
+  // diverged the CQL lane from the FHIR lane (which hard-fails). Match the FHIR lane:
+  // hard error, no URN fallback.
+  //
+  // PRECEDENCE (deliberate): this reports BEFORE the per-concept structural diagnostics
+  // (empty/mixed/missing-type/duplicate) in the loop below — MIRRORING the FHIR lane,
+  // whose `normalizePackageMetadata` returns on the missing base before its per-field
+  // checks (`fhir-emitter/metadata.ts:169-177`). Fixing the base can reveal a structural
+  // defect on the next run; the two lanes stay consistent.
+  //
+  // FORWARD-COMPAT (deliberate over-approximation): the fast-path predicate above
+  // (`isLowerableConcept` = "has a `code`") is broader than "will synthesize a local
+  // terminology" — a `code is` + non-age `source representation` concept is PRESERVED
+  // (skip 3b) and emits no CodeSystem TODAY, yet still requires the base here. That shape
+  // lowers under the concept-model direction and will then need the base; requiring it now
+  // keeps the CQL/FHIR local identity base-derived rather than sometimes-urn. (If this
+  // false-positive ever bites a real CQL-only, sourced-only library, narrow by raising the
+  // error lazily at first actual synthesis — compute `urn` inside the loop.)
+  //
+  // ⚠ The early return hands back the INPUT `ast` BY IDENTITY. `imports/emit.ts` relies on
+  // that (its `didLower` check keeps the guarded `localCodeSystemUrl` at :481 unreached).
+  // A future "clone the ast on this error path" edit would arm that throw — keep identity.
+  const canonicalBase = opts.canonicalBase?.trim().replace(/\/+$/, "") ?? "";
+  if (!canonicalBase) {
+    errors.push({
+      type: "Validation",
+      kind: "missing-canonical-url-base",
+      message:
+        "package.json `crl.canonicalBase` is required for a library with local `code is` concepts — the synthetic local CodeSystem url is `<canonicalBase>/CodeSystem/<domain>-local`, and the CQL and FHIR lanes MUST derive it from the same base. " +
+        'Add e.g. `"crl": { "canonicalBase": "http://example.org/crl/myproject" }` to your project root\'s package.json.',
+    });
+    return { ast, errors, localCodes: [] };
+  }
+
   // Existing terminology names (so a synthetic name can't silently collide with
   // a hand-authored terminology — a legal cross-kind same-name, since name
   // uniqueness is per-kind). If the names match the emitter's two terminologies
@@ -353,7 +392,7 @@ export function lowerLocalCodes(
   // It NEVER follows the emitted-layer library name (`emitCQLFromAST`'s
   // `options.libraryName` may be the layered "<Lib> Concepts"); the local domain
   // belongs to the source policy, not the layer.
-  const urn = localCodeSystemUrl(opts.canonicalBase, opts.localDomainId ?? ast.library.name);
+  const urn = localCodeSystemUrl(canonicalBase, opts.localDomainId ?? ast.library.name);
 
   // Slice 4b — the ONE shared domain `codesystem` DECLARATION name. R1/case-feature:
   // derived from the POLICY ID (`opts.localDomainId`, the package.json `name`) so the
@@ -874,7 +913,14 @@ function mkError(kind: string, message: string, loc: Location): CRLError {
  * emits. So on any error this returns ∅. The internal-invariant `throw` (which never fires on valid
  * input) is likewise caught → ∅, so running this over a non-emittable policy during VALIDATION cannot
  * crash the cockpit build. Membership is independent of `opts` (they only shape the emitted URL/name),
- * so the bare call suffices.
+ * so this passes a PROBE base (below).
+ *
+ * #271 CARVE-OUT to the fail-closed guarantee above: `missing-canonical-url-base` is a REAL-emit hard
+ * error (a base-less project's actual case-feature emit fails closed). Because membership is
+ * base-independent, this function deliberately passes a probe base so eligibility still resolves — so a
+ * base-less project shows leaf-eligible concepts in the cockpit while its emit would emit no
+ * case-features. That is intentional (this is an eligibility/authoring view, not an emit gate), but it
+ * means this set is NOT a promise that emit will succeed.
  *
  * KNOWN EDGE (opts): membership is opts-independent EXCEPT one pathological collision. `lowerLocalCodes`
  * derives the synthetic local-codesystem DECL NAME from `opts.localDomainId ?? ast.library.name` and hard-errors
@@ -886,7 +932,11 @@ function mkError(kind: string, message: string, loc: Location): CRLError {
  */
 export function leafEligibleConcepts(ast: CRL): Set<string> {
   try {
-    const lowered = lowerLocalCodes(ast);
+    // #271 — membership is canonicalBase-INDEPENDENT (a base only shapes the
+    // synthetic local-codesystem URL, not which concepts are leaf-eligible). Pass
+    // a probe base so the eligibility gate is computed even when the caller hasn't
+    // resolved `crl.canonicalBase`; the URL it produces is never emitted here.
+    const lowered = lowerLocalCodes(ast, { canonicalBase: "http://example.org/crl/leaf-eligibility-probe" });
     if (lowered.errors.length > 0) return new Set();
     return new Set(lowered.localCodes.map((lc) => lc.concept));
   } catch {

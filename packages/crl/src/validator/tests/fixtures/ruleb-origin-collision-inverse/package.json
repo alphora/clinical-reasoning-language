@@ -1,1 +1,7 @@
-{ "name": "ruleb-origin-collision-inverse-fixture", "version": "0.0.0" }
+{
+  "name": "ruleb-origin-collision-inverse-fixture",
+  "version": "0.0.0",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/ruleb-origin-collision-inverse"
+  }
+}

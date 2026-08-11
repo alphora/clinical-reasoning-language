@@ -18,6 +18,10 @@ import { runCel, renderScenario } from "../cre";
 import { emitCrlTwoLane } from "../emit-two-lane";
 import { writeTwoLane, EmitWriteError } from "../emit-writers";
 import { emitFhirDefFromPath, scanFhirIds } from "../fhir-emitter";
+import { readCanonicalBase, readPolicyId } from "../fhir-emitter/metadata";
+// Import from the registry module directly (not the `../imports` barrel, which pulls
+// in `../index`) to keep the mcp-server bundle's dep graph tight.
+import { findProjectRoot } from "../imports/registry";
 import type { ImportDiagnostic } from "../imports/types";
 import { validateCRLImports } from "../imports/validate";
 import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "../index";
@@ -154,8 +158,24 @@ function runEmit(args: EmitArgs) {
       e instanceof ToolInputError ? e.message : `Unexpected error: ${(e as Error).message}`;
     return { content: [{ type: "text" as const, text: msg }], isError: true };
   }
+  // #271 — the emitted local CodeSystem url is `<canonicalBase>/CodeSystem/<domain>-local`
+  // and is REQUIRED (no urn fallback). For a path-based emit, resolve `crl.canonicalBase`
+  // (and the policy id) from the nearest package.json so emit_cql's local codesystem
+  // byte-matches the imports/FHIR lane. Inline `code` (no package.json) has no base, so a
+  // library carrying local `code is` reports `missing-canonical-url-base` — pass a `path`.
+  let canonicalBase: string | undefined;
+  let localDomainId: string | undefined;
+  if (typeof args.path === "string" && args.path.trim()) {
+    const projectRoot = findProjectRoot(args.path.trim());
+    if (projectRoot) {
+      canonicalBase = readCanonicalBase(projectRoot);
+      localDomainId = readPolicyId(projectRoot);
+    }
+  }
   const result = emitCQL(source, {
     libraryName: args.libraryName,
+    canonicalBase,
+    localDomainId,
   });
   return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 }
@@ -445,6 +465,14 @@ export function createServer(): McpServer {
       description:
         "Emit CQL from a CRL document. Pass exactly one of `code` (inline) or `path` (file), plus optional " +
         "`libraryName`. " +
+        "#271 — LOCAL `code is` CONTENT NEEDS A `path`: the emitted local CodeSystem url is " +
+        "`<canonicalBase>/CodeSystem/<domain>-local`, and `crl.canonicalBase` is REQUIRED (no urn fallback). " +
+        "This tool reads it from the nearest `package.json` walking up from `path`; inline `code` has no " +
+        "package.json, so a library with local `code is` concepts returns `missing-canonical-url-base` — pass a " +
+        "`path` inside a project whose `package.json` declares `crl.canonicalBase`. " +
+        "NOTE: `emit_cql` is the single-library DIRECT lane; for a NON-primary library in a multi-library " +
+        "`code is` project it does NOT reproduce the closure's cross-lib codesystem disambiguation — use " +
+        "`emit_crl` / the CLI closure emit for a multi-library policy. " +
         "Returns { success, result?, errors?, unmatched? }: on full success, `result` is the generated CQL text " +
         "targeting the CRLCommon library (src/cql-emitter/catalog/CRLCommon.cql). The emitted CQL library declaration is " +
         "unversioned (npm packaging IS the version system); `include CRLCommon` is also unversioned. " +
