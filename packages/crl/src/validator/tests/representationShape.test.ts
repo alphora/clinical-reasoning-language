@@ -266,6 +266,19 @@ describe("RepresentationShapeValidator (Todo 2) — static shape rules", () => {
       expect(errs[0].message).toMatch(/promote the group/);
     });
 
+    it("A.8 flags a single-ref `exists \"X\" <tail>` — the bare form folds, so a ref-with-filter survives (panel R3 F2)", () => {
+      // Regression pin for the narrowing: `exists "X"` folds to a reduction and never reaches A.8, so
+      // an unfolded `exists` + NConceptRef here necessarily carries a trailing filter (`… today`) that
+      // a reduction can't hold. Without the re-added NConceptRef arm this got ZERO diagnostics and only
+      // failed at the emit matcher.
+      const src =
+        `library "T".\nconcept "X":\n- value type is boolean.\n- code is \`x\`.\n` +
+        `concept "C":\n- value type is boolean.\n- definition is exists "X" today.\n`;
+      const errs = shapeErrors(src, "definition-is-exists-misuse");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/single bare operand|trailing filter/);
+    });
+
     it("A.5 flags a concept ref reachable ONLY through a value-projection disjunction group (nested walk)", () => {
       // Both operands are groups — there is NO top-level NConceptRef, so a hit proves the
       // recursion into NDisjunction, not a top-level match.

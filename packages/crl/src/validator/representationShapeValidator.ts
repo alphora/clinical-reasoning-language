@@ -138,20 +138,26 @@ export class RepresentationShapeValidator {
       );
     }
 
-    // A.10 — value type REQUIRED (concept-model redesign; the migration is complete, so this is now
-    // enforced). Every concept declares its ONE canonical result shape at the concept level — the
-    // type its emit/consumption is checked against — even when it also carries `source
-    // representation` posreps (each posrep is additionally self-describing). A missing value type is
-    // the invisible-shape bug this redesign exists to kill, so it is an ERROR, not a warning.
-    if (valueTypes.length === 0) {
+    // A.10 — value type REQUIRED, now SHAPE-CONDITIONAL (#189 S1). A `value type` names a SCALAR
+    // concept's single canonical result — the type its emit/consumption is checked against — so a
+    // Scalar concept (the default) still MUST declare exactly one; a missing one is the
+    // invisible-shape bug this redesign exists to kill, an ERROR. For a Record/RecordSet concept the
+    // published value is a record (or set of records) whose resource is `type is`, NOT a scalar
+    // result type, so a concept-level `value type` is OPTIONAL there (when present it names the
+    // datum type and A.9's exactly-one still applies). The relaxation is `Concept.valueTypes` ONLY —
+    // a `source representation` is still fully self-describing (A.1 requires its own value type).
+    const shape = concept.shape ?? "Scalar";
+    if (shape === "Scalar" && valueTypes.length === 0) {
       errors.push(
         this.err(
           "missing-value-type",
           concept.name,
-          `Concept "${concept.name}" declares no \`value type\`. Every concept has exactly one ` +
-            `\`value type\` — its canonical result shape. Add \`- value type is <Type>.\` ` +
-            `(CodeableConcept for a coded resource refinement, Quantity for a measurement, ` +
-            `boolean for a determination, dateTime/integer/etc. for a scalar).`,
+          `Concept "${concept.name}" is Scalar (the default \`shape\`) but declares no ` +
+            `\`value type\`. A Scalar concept has exactly one \`value type\` — its canonical result ` +
+            `shape. Add \`- value type is <Type>.\` (CodeableConcept for a coded resource ` +
+            `refinement, Quantity for a measurement, boolean for a determination, dateTime/integer/ ` +
+            `etc. for a scalar), or declare \`- shape is Record.\` / \`- shape is RecordSet.\` if this ` +
+            `concept publishes a record (or set of records) rather than a scalar value.`,
           concept.location,
           attribution,
         ),
@@ -191,34 +197,48 @@ export class RepresentationShapeValidator {
       );
     }
 
-    // A.8 — a leading-`exists` misuse. Existence is a `defined as` operator, not a `definition
-    // is` calculation. The grammar discards the parentheses, so `exists ("X")` and `exists "X"`
-    // both build as [NWord "exists", NConceptRef "X"], and `exists ("A" or "B")` as [NWord
-    // "exists", NDisjunction] — the rule fires when a `definition is` narrative LEADS with the
-    // word `exists` immediately followed by a ref or a parenthesized group. An ORDINARY narrative
-    // that merely contains the word ("`"Weight" exists today`") leads with the ref, not `exists`,
-    // so it is not flagged (see the negative test). NOTE: this is "leading exists + ref/group",
-    // NOT a parens-precise match — the AST cannot distinguish `exists "X"` from `exists ("X")`.
+    // A.8 — a leading-`exists` `definition is` misuse (#189 narrowing + panel R3 F2). A BARE single-ref
+    // `exists "X"` / `exists ("X")` now FOLDS to a structural `ReductionDefinition` in the builder
+    // (Q1→A1) — the canonical named reduction, whose RecordSet-operand coherence is the reduction
+    // validator's job — so it NEVER reaches here. What survives as a `DefinitionIsDefinition` leading
+    // with `exists` is a MALFORMED reduction, in two shapes, both flagged:
+    //   - a GROUP operand (`exists ("A" or "B")` → [NWord "exists", NDisjunction/NConjunction]): a
+    //     reduction has ONE operand, so promote the group to its own concept first.
+    //   - a single ref WITH A TAIL (`exists "X" today` / `exists "X" within last 2 years` → [NWord
+    //     "exists", NConceptRef, …tail]): the bare form folded, so an NConceptRef reaching here means a
+    //     trailing filter the reduction can't carry — fold it into the operand concept. (Restores the
+    //     coverage the narrowing dropped; without this the tail'd form gets ZERO diagnostics and only
+    //     fails at the emit matcher.)
+    // An ordinary narrative that merely contains the word (`"Weight" exists today`) leads with the ref,
+    // not `exists`, so it is not flagged. Message no longer steers to `defined as exists` (existence is
+    // now a `definition is` reduction).
     if (concept.definition?.type === "DefinitionIsDefinition") {
       const els = concept.definition.body.elements;
       const second = els[1]?.type;
-      if (
-        els.length >= 2 &&
-        els[0].type === "NWord" &&
-        els[0].value === "exists" &&
-        (second === "NConceptRef" || second === "NDisjunction" || second === "NConjunction")
-      ) {
-        const grouped = second !== "NConceptRef";
+      const leadsWithExists = els.length >= 2 && els[0].type === "NWord" && els[0].value === "exists";
+      if (leadsWithExists && (second === "NDisjunction" || second === "NConjunction")) {
         errors.push(
           this.err(
             "definition-is-exists-misuse",
             concept.name,
-            `Concept "${concept.name}": \`definition is exists (...)\` — existence is an operator ` +
-              `of \`defined as\`, not \`definition is\`. Use \`defined as exists ( "Concept" )\`` +
-              (grouped
-                ? ` over a SINGLE concept (promote the group first — e.g. a \`defined as ( … sem-or … )\` ` +
-                  `concept — then \`defined as exists\` that).`
-                : `.`),
+            `Concept "${concept.name}": \`definition is exists ( … or/and … )\` — a reduction has a ` +
+              `SINGLE operand, so it cannot exist over a group — promote the group to its own concept ` +
+              `(e.g. a \`defined as ( … sem-or … )\` concept) and then \`definition is exists "That ` +
+              `Concept".\`.`,
+            concept.definition.body.location,
+            attribution,
+          ),
+        );
+      } else if (leadsWithExists && second === "NConceptRef") {
+        // A bare `exists "X"` folds away, so an unfolded `exists` + ref here carries a trailing filter.
+        errors.push(
+          this.err(
+            "definition-is-exists-misuse",
+            concept.name,
+            `Concept "${concept.name}": \`definition is exists "…" <filter>\` — an \`exists\` reduction ` +
+              `takes a SINGLE bare operand (\`definition is exists "X".\`); a trailing filter (\`… today\`, ` +
+              `\`… within …\`) is not part of the reduction. Fold the filter into the operand concept (or ` +
+              `a derived \`shape is RecordSet\` concept), then \`definition is exists "That Concept".\`.`,
             concept.definition.body.location,
             attribution,
           ),

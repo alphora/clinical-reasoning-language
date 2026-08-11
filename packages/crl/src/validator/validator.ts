@@ -9,6 +9,7 @@ import { DecisionShapeValidator } from "./decisionShapeValidator";
 import { DispositionValidator } from "./dispositionValidator";
 import { MetaTagValidator } from "./metaTagValidator";
 import { NameUniquenessValidator } from "./nameUniquenessValidator";
+import { ReductionShapeValidator } from "./reductionShapeValidator";
 import { ReferenceResolver } from "./referenceResolver";
 import { RepresentationShapeValidator } from "./representationShapeValidator";
 import { UseSiteTypeValidator } from "./useSiteTypeValidator";
@@ -93,7 +94,12 @@ export type ValidationErrorKind =
   // resolved concept declares NO value type. An intrinsic WARNING (not an error): today 231/547
   // concepts are untyped, and Todo 4's migration makes value types required. Flags the gap without
   // failing the build.
-  | "use-site-operand-untyped";
+  | "use-site-operand-untyped"
+  // #189 grammar+validation slice — a reduction / shape COHERENCE finding. All intrinsic WARNINGS
+  // (validate-only; `isValid` stays true) — this slice LEADS the emit flip by one version, teaching
+  // the corpus toward the reduction/shape model before emit consults it. The specific rule is on
+  // `.rule`; `conceptName` names the offending concept. See ReductionShapeRule + disc 415.
+  | "reduction-shape";
 
 /**
  * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
@@ -396,6 +402,66 @@ export interface UseSiteOperandUntypedWarning extends ValidationErrorBase {
   conceptName: string;
 }
 
+/**
+ * The specific rule a `reduction-shape` finding violates (#189 grammar+validation slice). One kind
+ * with a `rule` sub-discriminator (mirrors `representation-shape` / `use-site-type-mismatch`); every
+ * one is an intrinsic WARNING — this validate-only slice ships one version BEFORE emit consults the
+ * reduction/shape model, so the findings teach the migration without failing the build. See
+ * .vibe-tools/discussions/415 + docs/emit-consistency-189-design.md §8.
+ *
+ *   - "recordset-operand-required"   — a `definition is <exists|count> "X"` whose named operand X is
+ *                                      NOT `shape is RecordSet` (a reduction reduces a set of records;
+ *                                      the A.8 single-ref supersession's coherence check).
+ *   - "reduction-result-nonboolean"  — an `exists` / `count` reduction on a Scalar concept declaring a
+ *                                      non-boolean `value type` (a presence/threshold reduction is boolean).
+ *   - "reduction-this-no-representation" — a `<reduction> this` on a concept with NO representation
+ *                                      (no `code is`, no `source representation`) — `this` has no records.
+ *   - "reduction-multi-rep"          — a `most recent this` / `count this` on a concept with >1
+ *                                      representation (local code arm + posreps): cross-rep dedup is
+ *                                      deferred (#257), so the reduction target is ambiguous today.
+ *   - "recordset-scalar-reduction"   — a `shape is RecordSet` concept carrying a reduction (a RecordSet
+ *                                      publishes its records; a reduction produces a reduced value).
+ *   - "recordset-bare-code-incoherent" — a `shape is RecordSet` concept that is a bare `code is` (no
+ *                                      posreps, no reduction): a bare local code is a boolean existence,
+ *                                      not a set of records.
+ *   - "record-shape-invariant"       — a `shape is Record` concept without a record-SELECTING `most
+ *                                      recent` reduction, or whose `type is R` disagrees with the
+ *                                      selected `RecordSet<R>` operand (a Record selects one record).
+ *   - "no-bare-scalar-code"          — a Scalar bare `code is` with NO reduction and NOT a `defined as`
+ *                                      (the satisfying reduction). THE MIGRATION PROMPT — fires
+ *                                      corpus-wide (every bare presence concept); carries a per-concept
+ *                                      action (`definition is exists this` for boolean, else `most
+ *                                      recent this`).
+ *   - "non-scalar-missing-type"      — a non-Scalar concept with no `type is` (and not a derived-from-
+ *                                      operand reduction) — a record shape needs its resource declared.
+ *   - "shape-marker-not-emit-active" — an explicit non-Scalar `shape is` on a concept that STILL has a
+ *                                      live emit path (emit does not yet consult `shape`): honest
+ *                                      "declared but not emit-active; the flip will change it" warning.
+ *   - "count-threshold-trivial"      — a `count … at least N` with N < 1 (trivially true).
+ */
+export type ReductionShapeRule =
+  | "recordset-operand-required"
+  | "reduction-result-nonboolean"
+  | "reduction-this-no-representation"
+  | "reduction-multi-rep"
+  | "recordset-scalar-reduction"
+  | "recordset-bare-code-incoherent"
+  | "record-shape-invariant"
+  | "no-bare-scalar-code"
+  | "non-scalar-missing-type"
+  | "shape-marker-not-emit-active"
+  | "count-threshold-trivial";
+
+// #189 grammar+validation slice — a reduction/shape coherence WARNING. One kind with a `rule`
+// sub-discriminator (mirrors `representation-shape`); `conceptName` names the offending concept.
+// Intrinsic WARNING severity (routes as a warning, never flips isValid) — the slice validates one
+// version ahead of the emit flip.
+export interface ReductionShapeError extends ValidationErrorBase {
+  kind: "reduction-shape";
+  rule: ReductionShapeRule;
+  conceptName: string;
+}
+
 export type ValidationError =
   | EmptyNameError
   | DuplicateNameError
@@ -415,6 +481,7 @@ export type ValidationError =
   | RepresentationShapeError
   | UseSiteTypeMismatchError
   | UseSiteOperandUntypedWarning
+  | ReductionShapeError
   | MetaDiagnostic;
 
 export interface ValidationResult {
@@ -472,6 +539,7 @@ export class Validator {
   private readonly metaTagValidator: MetaTagValidator;
   private readonly agePredicateValidator: AgePredicateValidator;
   private readonly representationShapeValidator: RepresentationShapeValidator;
+  private readonly reductionShapeValidator: ReductionShapeValidator;
   private readonly useSiteTypeValidator: UseSiteTypeValidator;
 
   constructor() {
@@ -483,6 +551,7 @@ export class Validator {
     this.metaTagValidator = new MetaTagValidator();
     this.agePredicateValidator = new AgePredicateValidator();
     this.representationShapeValidator = new RepresentationShapeValidator();
+    this.reductionShapeValidator = new ReductionShapeValidator();
     this.useSiteTypeValidator = new UseSiteTypeValidator();
   }
 
@@ -559,6 +628,13 @@ export class Validator {
     // `use-site-operand-untyped` WARNING routes as a warning; `use-site-type-mismatch` is a
     // non-demotable error. Fires only where value types are declared (no-op on absent types).
     pushSplit(this.useSiteTypeValidator.validate(ast, sources));
+
+    // #189 grammar+validation slice — reduction/shape COHERENCE, all intrinsic WARNINGS (validate-only,
+    // one version ahead of the emit flip): named-operand-must-be-RecordSet, reduction result/target
+    // coherence, multi-rep ambiguity, shape invariants (RecordSet/Record), the corpus-wide bare-scalar-
+    // code migration prompt, non-Scalar-needs-type, and the shape-marker-not-emit-active honesty note.
+    // Routed through pushSplit; every finding is `severity: "warning"`, so isValid is never flipped.
+    pushSplit(this.reductionShapeValidator.validate(ast, sources));
 
     // #154/#203 — registry-backed @tag metadata enforcement (vocabulary / field / cardinality / open-flag).
     // Routed through pushSplit so open-flag/unknown/malformed WARN (not fail) and meta-missing-field soft-demotes.
