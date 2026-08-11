@@ -1,0 +1,283 @@
+# CRL emit-consistency (#189) — design of record
+
+**Status:** design converged through four design-panel rounds (1, 2, 2R efficacy test, and a final round on
+the CRL-emit lens) plus operator decisions of 2026-08-11. **Not yet implemented.** This is the committed,
+durable design of record; the full round-by-round history (reviewer transcripts, per-point accept/refine/
+reject) lives in `.vibe-tools/discussions/413-emit189-context-free-total-boolean.md` (gitignored working log).
+Grounded in **`docs/CRL-NORTH-STAR.md`** (authoritative CRL model) — read that first.
+
+**How to resume:** read the charter, then §0 (scope) and §10 (deferred/resume) here, then the section for the
+slice you're building. The sequencing in §9 is the build order.
+
+---
+
+## 0. Scope (operator decision D2 — 2026-08-11)
+
+**#189 is scoped to the LOCAL path.** The local `code is` domain is the canonical production representation
+CRL logic runs on (charter §2); it is where #189's round-trip pain lives (PA runs exclusively off local codes,
+Patient excepted). The descriptor (§4) therefore has two arms only: **`local-exact`** and **`uncoded`**
+(Patient/birthDate — a value element, no `coded from`).
+
+**Deferred to when source representations land (~#257 territory) — see §10:** all sourced-CEL emission,
+external ValueSet membership validation, `verificationStatus`/refutation filtering, and
+selective-representation keying. These are the optional/additive path; nothing in PA today needs CEL cases
+emitted for external-coded facts.
+
+---
+
+## 1. Concept model (from the charter — normative summary)
+
+- One identity, a **declared value type** and a **declared cardinality** (operator decision D1 — cardinality
+  is declared, **not inferred** from reduction-presence): a scalar-valued concept declares a singular value
+  type (`boolean`/`Quantity`/…) and **must reduce**; a record-valued concept declares **`value type is set of
+  <T>`** and **publishes its records** (consumed by name). The explicit `set of` disambiguates a
+  `CodeableConcept` *set* (e.g. a coded-Encounter refinement operand) from a single-`CodeableConcept` scalar.
+  *(Exact surface — `set of <T>` vs a `records` keyword — finalized in the grammar slice; the ruling is that
+  cardinality is declared.)*
+- **Datum type ≠ result type.** The *representation datum* is the record shape (`Condition` with coding at
+  `Condition.code`, no value element); the *published result* is what the define returns (`Scalar<Boolean>`
+  from `exists`). `value type` names the RESULT. "value-type-must-match-a-real-element" applies **only** to a
+  representation read as a value *without* a reduction — and to any **value-reading** reduction (`most recent
+  this` on a scalar value type reads the value element; the check covers it too — final-round Claude #5).
+- **Source representation is fully explicit** (`type` + `value element` + `value type`, `coded from` optional)
+  and does **not** inherit the concept's fields (validator A.1, `representationShapeValidator.ts:260-275`).
+- **Closed-world:** absence = empty/false; explicit absence = an absence code (a record).
+
+---
+
+## 2. Reductions and result shape (final-round F1, F3)
+
+**Result shape = f(reduction, declared value type)** — a TOTAL function; every cell is a result type or a
+validation error (no silent rewrite = no manufacturing):
+
+| Reduction | Declared value type | Result | Lowering / rule |
+|---|---|---|---|
+| `exists this` | boolean | `Scalar<Boolean>` | **datum-discriminated** (F1): datum has NO value element → `exists([<R>: X])`; datum has a **boolean** value element → `exists([<R>: X] O where O.value is true)`; other datum → **error** |
+| `exists this` | non-boolean | — | **validation error** |
+| `most recent this` | scalar `V` (rep has a matching value element) | `Scalar<V>` | select newest, **then read the value element** (one composite reduction); `Coalesce(<read>, false)` if boolean, else null-guarded per §3 |
+| `most recent this` | scalar `V`, **valueless rep** | — | **validation error + migration prompt** ("existence is forced; author `exists this`") — NEVER silently rewrite to `exists` |
+| `most recent this` | record (`value type is <ResourceType>`) | `Record<R>` | select newest record; no value read |
+| `count this … at least N` | boolean | `Scalar<Boolean>` | `Count([<R>: X]) >= N` (total; `Count`→0 on empty — verify at impl before relying on bare) |
+| (none) | `set of <T>` | `RecordSet<T>` | the retrieve/union; published, consumed by name |
+| (none) | scalar | — | **validation error** (no bare scalar `code is`) |
+| named `exists "X"` / `most recent "X"` / `count "X"` | per above, `X` a `RecordSet` | per above | `X` must resolve to a `RecordSet`; else resolution error |
+
+Notes: `most recent` sort is the engine-proven form (`emitCQL.ts:1281-1285` — **`where` precedes `sort`**):
+`Last([<R>: X] O where O.value is FHIR.boolean sort by (O.effective as FHIR.dateTime).value, O.id)`. The sort
+**element is per representation, from the descriptor** (§4) — Condition→`recordedDate`, ServiceRequest→
+`authoredOn`, Observation→`effective`. **Period-typed recency** (Encounter/EpisodeOfCare/Flag) breaks
+`(x as FHIR.dateTime)` (null-sorts) → the descriptor carries a **typed sort expression** (e.g. `period.start`),
+or `most recent this` is **rejected** for Period-recency reps (final-round Claude #7).
+
+---
+
+## 3. Null-totality — whole-BOUNDARY invariant + a proof obligation
+
+Every boolean-valued define the emitter can produce is **total**. Rules:
+
+1. Totalize each boolean-producing **leaf** at its own boundary: `exists`/`count` total by construction (do
+   NOT wrap — a needless Coalesce blunts the assertion in rule 5); every nullable boolean derivation is
+   `Coalesce(<boolean predicate>, false)`.
+2. **Only the boolean predicate is Coalesced** — never a nullable non-boolean operand (`Coalesce(X,0) >= N`
+   manufactures a value; use `Coalesce(X >= N, false)`).
+3. **Per-operand-before-`not`** (`not Coalesce(A,false)` ≠ `Coalesce(not A,false)`). A terminal boundary
+   Coalesce is insufficient (wrong under negation) and harmful (masks a missed leaf as a plausible `false`).
+4. Retrieve **`where`-predicates are null-decided** (status-absent = pass). On the local path this is largely
+   moot — local uses absence codes, not status filters (§5).
+5. **Backstop = a static emit/test-time totality PROOF, not a runtime Coalesce.** Requires a **boolean-
+   totality effect** in resolved-concept metadata + a lowering table classifying each form (intrinsically-
+   total / boundary-totalized / rejected). The current emitter has only return-*shape* metadata
+   (`PATTERN_RETURN_SHAPE`), not nullability — this is new metadata to add (final-round gpt56 #10).
+6. **Scope:** totality holds over an artifact graph emitted by ONE emitter version. Mixed-version includes are
+   rejected/detected, never consumption-site-Coalesced.
+
+---
+
+## 4. Effective-representation descriptor (local-only per §0; F4, F5)
+
+One descriptor is the single source both lanes read; a CEL fact resolves to it or the case fails closed (§5).
+**Two arms** (local scope):
+
+```
+descriptor :=
+  | local-exact { resourceType, codingElement, system, code,
+                  datumValueType?, resultType/cardinality, recencyElement(+type), owningLibrary, valueElement? }
+  | uncoded     { resourceType, valueElement, datumValueType, resultType/cardinality, recencyElement(+type) }   // Patient/birthDate
+```
+
+- **`datumValueType` (the record's value) is separate from `resultType`/cardinality (the concept's published
+  result)** — F4. E.g. `Condition` datum (no value) → `Scalar<Boolean>` via `exists`; `Observation.value`
+  boolean datum → `Scalar<Boolean>` via `most recent`.
+- **`codingElement` is the retrieve-code PATH** (not universally `.code`), used by a **resource-specific
+  writer** (§7 — a supported-path/value registry, not "arbitrary paths").
+- **`valueElement` optional** (valueless existence has none). Its population rule (auto-map from `type is` ×
+  `value type`, e.g. Observation+boolean→`valueBoolean`, vs authored `value element is`) must be specified.
+- **Local derivation uses the OWNING library's `canonicalBase`/`localDomainId`** (sibling-lib disambiguation),
+  NOT the CEL file's library. System = `<owning canonicalBase>/CodeSystem/<owning domain>-local` (needs #271).
+- **`resultType` carries the discriminated shape `Scalar<V> | Record<R> | RecordSet<R>`** — `resourceType`
+  lives in `Record`/`RecordSet` only, NOT in `Scalar` (F5): `ConditionExists sem-or ServiceRequestExists` are
+  both `Scalar<Boolean>` and MUST compose.
+
+Local (`code is`) → the CEL lane **derives** `{system, code}` from the concept (identical to the retrieve by
+construction, fail-closed, no author token to mistype).
+
+---
+
+## 5. CEL emit — intent matrix (local path; F2)
+
+`emitFhir.ts` today emits a **present** resource for absent/negative intent (generic `status`) → `exists`
+returns true for a fact meant absent. Replace with:
+
+| Authored intent | Emit |
+|---|---|
+| **present** | the resource, coding **derived** from the descriptor |
+| **implicit absence** (omitted) | **no resource** (⇒ `exists` false; closed-world) |
+| **explicit false** (value-bearing rep, `value is false`) | the resource with `valueBoolean = false` — but see the interaction rule below |
+| **explicit absence** | **REJECT with a migration diagnostic** (F2): there is no positive→absence linkage, and synthesizing an absence code = manufacturing (charter §4). The author writes a **present** fact naming a *separately-authored absence concept* instead. |
+
+**Interaction rule (final-round F1/Claude #2):** an `explicit false` fact against a concept whose reduction is
+`exists this` would make bare `exists` true (round-trip lie). Resolve via §2's datum-discrimination: a boolean
+value-element rep uses value-filtered `exists (… where value is true)`, so `valueBoolean:false` correctly
+yields false. On a valueless rep, `explicit false` is a **validation error** (nothing to carry the false).
+
+**Fail-closed = case-ATOMIC ERROR** (not warn-and-skip; `emitFhir.ts:453-475` today leaves a misleading
+partial fixture): an unresolved concept / missing writer path / missing canonicalBase → error + ZERO
+resources for that case, diagnostic naming case/fact/concept/owning-library/field.
+
+**Conflict rule:** a fact naming a local concept that ALSO carries its own `code` is **rejected** (closes the
+author-token drift lane).
+
+---
+
+## 6. Multi-representation `this` (v1)
+
+- **`exists this`** = the **union** of each representation's existence (`exists(repA) or exists(repB) …`).
+  Total; dedup-immune (existence of the union). Degenerates to one retrieve for today's single-rep concepts.
+- **`most recent this`** and **`count this`** over a multi-rep concept = **REJECT until #257** (both need
+  cross-representation recency/**dedup** — ADR 0001; a naive union double-counts the same event present as
+  both a local and a source record — final-round Claude #8). Single-rep forms are fine now.
+
+---
+
+## 7. Composition, Interface, recency
+
+- **`defined as` is value-type-keyed:** booleans → plain `A or B`/`A and B`/`not A`; record-valued → set
+  algebra (`intersect`/`union`/`except`). `sem-and`/`sem-not` load-bearing (charter §5).
+- **Operand compatibility compares the discriminated result type** `Scalar<V> | Record<R> | RecordSet<R>`
+  (F5) — `resourceType` matters only for `Record`/`RecordSet` (`RecordSet<Condition>` ≠ `RecordSet<Encounter>`);
+  two `Scalar<Boolean>` compose regardless of source resource. Diagnostic names each *resolved* operand's
+  type + operator; an unresolved operand emits the resolution error instead.
+- **Mixed value type = author error** (decision B), fixed by an explicit `definition is exists "Record
+  Concept"` operand. Supersedes `docs/defined-as-is-semantic-composition.md` +
+  `docs/cql-to-crl-type-valuetype-rule.md §7` (update with the validation slice).
+- **Interface = pure façade** (`define "X": Inferred."X"`): keeps the `library[]` rebind-target job, loses
+  boolean-wrapping. Negated-guard `Coalesce` (`decision.ts:636-646`) stays (sits below its `not`); NOT
+  generalized to a terminal Coalesce.
+- **Layer-placement contract** (specify atomically with the flip): where the natural retrieve lives
+  (LocalSource), the total scalar define (Inferred), what `Interface."X"` aliases, what the case-feature
+  StructureDefinition `cpg-featureExpression` targets.
+- **Recency arbitration rewritten** to return a total boolean at the boundary (today `recencyAgeTruths`
+  returns a `{true}/{}` truth-set); if `this`+union-selection subsumes it, it sorts by the per-representation
+  recency element (§4).
+
+---
+
+## 8. Grammar + validation slice (LEADS)
+
+New surface: `definition is exists this` / `most recent this` / `count … at least N` / `this`; the **named**
+`definition is exists "X"`; the **record-valued cardinality declaration** (`value type is set of <T>` or a
+`records` marker — D1). `this` = an AST node for the concept's **representation records only** (no
+circularity); ref-walk / cycle / CRE / requalification specified.
+
+New validation (all **WARNINGS / migration-prompts in version N**, per §9):
+- **no bare SCALAR `code is`** (record-valued concepts are legal — declared via the cardinality marker).
+- **non-boolean concept in a decision guard** (#240 → reject-with-error).
+- **value-type-must-match-a-real-element** — for any representation read as a value (bare read OR a
+  value-reading reduction like `most recent this`).
+- **mixed-value-type composition** (§7).
+- **`most recent this` / `count this` on a multi-rep concept**; **`exists this` on a non-boolean**; **`most
+  recent this` on a valueless rep** (§2/§6).
+
+---
+
+## 9. Sequencing — one atomic gate across BOTH lanes (F6)
+
+1. **Grammar + validation slice** — new forms parse + validate; new checks are **WARNINGS**; new forms are
+   **validate-only** (they parse and validate but do NOT yet emit — say so explicitly, or a KE who follows the
+   migration prompt hits the still-live `emit-mixed-code-and-definition` hard-error, `lowerLocalCodes.ts:475/
+   512`). Old bare `code is` still emits via the current path.
+2. **Effective-representation descriptor** — inert shared infrastructure; activation gated. (Needs #271
+   canonicalBase-required first.)
+3. **Migration inventory** (reference-graph of every bare `code is` by consumption role) — **BEFORE
+   enforcement**, classified, migration steps written.
+4. **The atomic flip — ONE gate, BOTH lanes together:** CQL (natural-resource retrieve + `exists`/`most
+   recent` scalar lowering + Interface aliases + plain composition + recency total-boolean + `asTruths`/
+   `satisfied` removal + layer-placement contract) **AND** CEL (derive-local + intent matrix + case-atomic
+   fail-closed) **AND** the validation checks flip to **hard errors** — all in one version. Neither lane flips
+   without the other (a CQL-only flip leaves CEL writing author `.code` → still broken).
+5. **Layer-collapse** — separate, later.
+
+No version is internally inconsistent: N validates-with-warnings + emits the old form; the flip version
+enforces + emits the new form, both lanes, together.
+
+---
+
+## 10. DEFERRED / RESUME — do not lose this
+
+Everything punted, with enough to pick up. **Captured here so the investment survives; file as tracker issues
+when picked up (memory is not backlog).**
+
+### Deferred by D2 (sourced-CEL / source-representation path) — resume when source reps land (~#257)
+- **Sourced-CEL emission** — emitting CEL cases for external-coded (`source representation` + `coded from`)
+  facts. Needs the `external-valueset` / `external-code-set` descriptor arms.
+- **External ValueSet membership validation** — a `coded from` ValueSet admits many `{system, code, version}`;
+  validate the author's coding by **membership in the resolved expansion**, NOT string equality. When no
+  expansion / terminology service is available at build time → **fail closed (case error)**, not
+  "unverified-pass" (final-round ruling; was an option-list). `Coding.version` ≠ `valueSetVersion`; the CEL
+  token `system|code` carries no version → **use version-insensitive membership** (ruled; the smaller change).
+- **Refutation / `verificationStatus` path** — `exists this excluding refuted`: a grammar form (not in the §8
+  slice), a descriptor `statusElement` + status coding/value + filter policy, and a **resource-specific**
+  status/refutation discriminant (`verificationStatus` is Condition-only; ServiceRequest `revoked`,
+  MedicationRequest `cancelled`, `doNotPerform`, or none). Absent-status must **pass** (§3 rule 4). This is a
+  source-rep/real-chart concern; the local path uses absence codes (§5), not status filters.
+- **Selective-representation keying** — `emit(<posrep-key>)` + the descriptor's `selectedRepresentation` key:
+  how a representation is named for selective emit when a concept has local + multiple source reps. v1 default
+  (once needed): omitted = canonical local; source emission requires an explicit stable structural key.
+
+### Deferred to #257 (multi-representation semantics)
+- **`most recent this` / `count this` over a multi-rep concept** — need cross-rep recency arbitration + dedup
+  (ADR 0001 3-tier). Rejected with a migration prompt until #257 (§6).
+- **Multi-rep record-set publication** — a record-valued multi-rep concept whose reps are *different* resource
+  types has no single `RecordSet<R>` for §7's type matching. Also #257.
+
+### Emit-cluster remainder (tracked issues; not part of the #189 flip itself)
+- **#271** canonicalBase-required precursor (blocks the descriptor's local derivation) — land first.
+- **#255** Patient-compartment path (makes age cases loadable).
+- **#110** deterministic/scenario-relative CEL dates.
+- **#253** emit-contract docs · **#254→#214** MCP emit-to-disk exposure.
+- **Decision B doc reconciliation** — update `docs/defined-as-is-semantic-composition.md` +
+  `docs/cql-to-crl-type-valuetype-rule.md §7` (mixed-shape "legal" → author error); ride the validation slice.
+
+### Implementation-detail obligations carried into the build
+- **Resource-writer registry** (§4/§7) — a supported {resourceType → codingElement, valueElement, recency
+  element/type, choice-element JSON mapping} table + fail-closed for unsupported; today CEL writes only
+  `.code` and Observation values (`emitFhir.ts:513,517-525`).
+- **Boolean-totality effect metadata** (§3 rule 5) — the proof system behind the totality assertion.
+- **`valueElement` population rule** (§4) — auto-map vs `value element is`.
+
+---
+
+## Appendix — decision log
+
+| id | decision | date |
+|---|---|---|
+| Fork (i) | Local domain = CANONICAL/PRODUCTION (not chart-match; source reps optional/additive) | 2026-08-11 |
+| Fork (ii) | "no bare `code is`" = value-type-driven (scalar ⇒ reduction; record ⇒ publishes) | 2026-08-11 |
+| A | Boolean-from-valueless-resource = existence over the natural resource (`exists this`) | 2026-08-11 |
+| B | Mixed-value-type composition = author error (supersede two docs) | 2026-08-11 |
+| C | Coding identity = 3rd round-trip axis; derive-local / (defer)validate-external | 2026-08-11 |
+| D1 | Cardinality is **declared** (`value type is set of <T>`), not inferred | 2026-08-11 |
+| D2 | #189 scoped to the LOCAL path; sourced-CEL deferred | 2026-08-11 |
+
+Full round history + per-point processing: `.vibe-tools/discussions/413-emit189-context-free-total-boolean.md`
+(ROUND 1, 2, 2R, FINAL). Companion working notes: `tmp/DECISIONS-concept-model-and-189.md`.
