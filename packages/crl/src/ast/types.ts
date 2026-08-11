@@ -1,6 +1,7 @@
 import type { ActivityType } from "../grammar/activityTypes";
 import type { ConceptType } from "../grammar/conceptTypes";
 import type { ConceptValueType } from "../grammar/conceptValueTypes";
+import type { ConceptShape } from "../grammar/conceptShapes";
 import type { ParameterType } from "../grammar/parameterTypes";
 
 // Base AST Node interface
@@ -467,6 +468,15 @@ export interface Concept extends ASTNode {
   name: string;
   conceptType?: ConceptType;
   valueTypes: ConceptValueType[];
+  /**
+   * The concept's declared PUBLISHED-value cardinality (`- shape is Scalar|Record|RecordSet.`,
+   * #189). REQUIRED on the AST: the builder NORMALIZES an omitted `shape is` to `"Scalar"`, so
+   * no consumer ever re-interprets `undefined`. Scalar ⇒ the concept publishes a single reduced
+   * value (a reduction is owed); Record ⇒ a single selected record; RecordSet ⇒ the set of
+   * records. In the grammar+validation slice this drives validation only; it does not yet change
+   * emit (the flip consults it later).
+   */
+  shape: ConceptShape;
   // The concept's own local code (`- code is `…`.`). System = the package's
   // local domain (implicit). Present => locally assertable; absent => read-only.
   code?: string;
@@ -613,7 +623,8 @@ export type AgeComputeFn = "AgeAt" | "AgeInMonths";
 export type ConceptDefinition =
   | CodedFromDefinition
   | DefinedAsDefinition
-  | DefinitionIsDefinition;
+  | DefinitionIsDefinition
+  | ReductionDefinition;
 
 // Coded from definition — binds to a NAMED terminology / value set (an external
 // source). The concept's own local code lives on `Concept.code` (ADR 0001 §2).
@@ -735,6 +746,25 @@ export interface DefinedAsComposition extends ASTNode {
   expression: CompositionExpression;
 }
 
+/**
+ * Guard for emit / emit-adjacent code paths that reach a `ReductionDefinition` (#189). In the
+ * grammar+validation slice reductions PARSE + VALIDATE but are NOT emittable: emit stays on the
+ * old path until the atomic flip activates reductions. Every lane that could otherwise silently
+ * misemit (or fall through a `never`-checked switch) calls this to FAIL LOUD instead. The
+ * dedicated emit sentinel (`emit-reduction-not-active`) and the reference-walker teaching land
+ * with IMPL 3 and route through / replace this chokepoint; until then it is the single place a
+ * reduction's non-emittability is enforced.
+ */
+export function reductionNotEmittable(where: string): never {
+  throw new Error(
+    "`definition is` reduction (exists / most recent / count) is accepted for migration prep but " +
+      "CANNOT yet be emitted (" +
+      where +
+      ") — it parses and validates cleanly today; emit activates at the flip (#189). This path " +
+      "must not be reached by an emittable artifact in this version.",
+  );
+}
+
 // Composition expression tree. Operators are "semantic boolean" — operands
 // are typed refs (concept or inference), not booleans. See
 // project_sem-composition-operators memory.
@@ -779,6 +809,70 @@ export interface CompositionGroup extends ASTNode {
 export interface DefinitionIsDefinition extends ASTNode {
   type: "DefinitionIsDefinition";
   body: NarrativeClause;
+}
+
+// --------------------------- REDUCTION (v0.8, #189) ----------------------
+//
+// A `Reduction` is a set→scalar (or set→record) reduction over a target record set — the
+// concept's OWN representation records (`ThisRecords`) or a NAMED RecordSet concept
+// (`ReductionConceptRef`). It replaces `DefinitionIsDefinition` for the recognized reduction
+// forms, so downstream consumers see a STRUCTURAL node rather than having to re-match narrative
+// text. Built two ways:
+//   - the dedicated `countDefinition` production (`definition is count <target> at least N`), and
+//   - a builder-level normalization that folds the narrative forms `exists this` /
+//     `most recent this` / `exists "X"` into it.
+// `most recent "X"` is deliberately NOT normalized — it stays a `DefinitionIsDefinition` and
+// keeps its existing catalog-matcher / emit path (no-regression).
+//
+// TRUE discriminated union: the `count` arm alone carries `atLeast`, so a count-without-threshold
+// (or a threshold on exists/mostRecent) is UNREPRESENTABLE rather than merely invalid.
+export type ReductionTarget = ThisRecords | ReductionConceptRef;
+
+// The concept's OWN representation records (`this`). Its own node + location so a reduction
+// diagnostic can anchor at the `this` operand.
+export interface ThisRecords extends ASTNode {
+  type: "ThisRecords";
+}
+
+// A NAMED RecordSet concept as a reduction operand (`exists "X"`, `count "X" at least N`). `ref`
+// preserves a qualified reference's location. Consumers that walk references (resolution, cycle
+// detection, emit closure, project index, provenance) MUST track `ref` like a concept reference.
+export interface ReductionConceptRef extends ASTNode {
+  type: "ReductionConceptRef";
+  ref: ReferenceName;
+}
+
+export interface ExistsReduction {
+  kind: "exists";
+  target: ReductionTarget;
+}
+
+export interface MostRecentReduction {
+  kind: "mostRecent";
+  target: ReductionTarget;
+}
+
+export interface CountReduction {
+  kind: "count";
+  target: ReductionTarget;
+  atLeast: number;
+}
+
+export type Reduction = ExistsReduction | MostRecentReduction | CountReduction;
+
+// `definition is <reduction>.` — a concept whose value is a reduction over a record set. A
+// `ConceptDefinition` member parallel to `DefinitionIsDefinition`. NOTE: not every consumer of
+// `ConceptDefinition` is a compiler-exhaustive switch — several are `if/else` ref-collection
+// walkers (`referenceResolver`, `cycleDetector`, `provenance/indexer`, `imports/computeEmitClosure`,
+// `cql-emitter/layeredEmit`, `language-services/projectIndex`) that would fall THROUGH a new kind
+// silently. Each was taught an explicit `ReductionDefinition` arm so a NAMED reduction operand
+// (`ReductionConceptRef`) is tracked exactly like a concept ref (resolution, cycles, closure, index,
+// find-refs); the emit lanes fail loud via `reductionNotEmittable` (the dedicated
+// `emit-reduction-not-active` sentinel replaces that chokepoint at the flip). In the
+// grammar+validation slice a reduction PARSES + VALIDATES but does NOT yet emit.
+export interface ReductionDefinition extends ASTNode {
+  type: "ReductionDefinition";
+  reduction: Reduction;
 }
 
 // `value projection is <narrative>` — the REP-LEVEL projector (concept-model redesign). Its
@@ -874,6 +968,7 @@ export type Action = RecommendActivity | UseDecision;
 export type { ActivityType } from "../grammar/activityTypes";
 export type { ConceptType } from "../grammar/conceptTypes";
 export type { ConceptValueType } from "../grammar/conceptValueTypes";
+export type { ConceptShape } from "../grammar/conceptShapes";
 export { activityTypes } from "../grammar/activityTypes";
 export { conceptTypes } from "../grammar/conceptTypes";
 export { conceptValueTypes } from "../grammar/conceptValueTypes";

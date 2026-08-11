@@ -58,6 +58,7 @@ function isConceptOnlySlot(slot: ConceptSlotArg): slot is ConceptOnlySlot {
     slot === "defined-as" ||
     slot === "composition" ||
     slot === "narrative" ||
+    slot === "reduction" ||
     slot === "action-guard"
   );
 }
@@ -252,6 +253,16 @@ export class ReferenceResolver {
         case "DefinitionIsDefinition":
           this.walkNarrative(def.body, ctx, errors);
           break;
+        case "ReductionDefinition": {
+          // #189: a NAMED reduction operand (`exists "X"`, `count "X" at least N`) is a concept
+          // reference that must resolve — the same check the narrative forms got before they folded
+          // to a structural node. `this` (ThisRecords) names the concept's own records, no ref.
+          const target = def.reduction.target;
+          if (target.type === "ReductionConceptRef") {
+            this.checkRef(target.ref, CONCEPT_REF_KINDS, target.location, ctx, errors, "reduction");
+          }
+          break;
+        }
       }
     }
     // possible representations (ADR 0001 §3): validate named coded-from refs;
@@ -657,6 +668,7 @@ const SLOT_PHRASE: Record<ConceptOnlySlot, string> = {
   "defined-as": "a `defined as` concept definition",
   composition: "a `defined as` concept composition",
   narrative: "a `definition is` narrative",
+  reduction: "a `definition is` reduction operand (`exists` / `count` of a concept)",
   "action-guard": "an action guard (`unless` / `only when`)",
 };
 

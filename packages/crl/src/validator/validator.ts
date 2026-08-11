@@ -181,6 +181,7 @@ export type CriterionSlot =
   | "defined-as"
   | "composition"
   | "narrative"
+  | "reduction"
   | "action-guard"
   | "qualified";
 export interface ExternalLibraryNotIncludedError extends ValidationErrorBase {

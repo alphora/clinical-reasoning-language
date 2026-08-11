@@ -366,6 +366,16 @@ export class CycleDetector {
       case "DefinitionIsDefinition":
         this.collectFromNarrative(concept.definition.body, refs, scope, currentLibName);
         return;
+      case "ReductionDefinition": {
+        // #189: a NAMED reduction operand (`exists "X"`, `count "X" at least N`) adds a dependency
+        // edge to the referenced concept, so a cycle THROUGH a reduction is detected — the same edge
+        // the narrative forms added before they folded. `this` (ThisRecords) carries no edge.
+        const target = concept.definition.reduction.target;
+        if (target.type === "ReductionConceptRef") {
+          this.addEdge(target.ref, refs, scope, currentLibName);
+        }
+        return;
+      }
     }
   }
 

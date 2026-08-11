@@ -28,6 +28,9 @@ import {
   TerminologyReferenceContext,
   ConceptBodyContext,
   DefinitionIsBodyContext,
+  CountDefinitionContext,
+  NarrativeDefinitionContext,
+  ReductionTargetContext,
   DefinedAsBodyContext,
   DaBodyContext,
   DefinedAsBareRefContext,
@@ -112,6 +115,10 @@ import {
   CompositionGroup,
   ConceptReference,
   DefinitionIsDefinition,
+  ReductionDefinition,
+  Reduction,
+  ReductionTarget,
+  ConceptShape,
   ValueProjection,
   NarrativeClause,
   NarrativeElement,
@@ -191,6 +198,42 @@ function refFromRefContext(
     | TerminologyReferenceContext,
 ): ReferenceName {
   return refFromQualifiable(ctx.qualifiableReference());
+}
+
+/**
+ * Fold a `definition is <narrative>` clause into a structural `Reduction` when it matches one of
+ * the recognized narrative reduction forms — `exists this`, `exists "X"`, `most recent this`
+ * (#189). Returns `null` for everything else, INCLUDING `most recent "X"`, which is deliberately
+ * left as narrative so it keeps its existing catalog-matcher / emit path (no-regression). Matched
+ * against the built element stream (after AT_LEAST expansion), so `exists`/`most`/`recent`/`this`
+ * are NWords carrying their literal text.
+ */
+function narrativeToReduction(nc: NarrativeClause): Reduction | null {
+  const els = nc.elements;
+  const isWord = (e: NarrativeElement | undefined, w: string): boolean =>
+    e?.type === "NWord" && e.value === w;
+  // `exists this` → existence over the concept's OWN representation records.
+  if (els.length === 2 && isWord(els[0], "exists") && isWord(els[1], "this")) {
+    return { kind: "exists", target: { type: "ThisRecords", location: els[1].location } };
+  }
+  // `exists "X"` → existence over a NAMED RecordSet concept.
+  if (els.length === 2 && isWord(els[0], "exists") && els[1].type === "NConceptRef") {
+    return {
+      kind: "exists",
+      target: { type: "ReductionConceptRef", ref: els[1].value, location: els[1].location },
+    };
+  }
+  // `most recent this` → most-recent over the concept's OWN records. (`most recent "X"` is NOT
+  // folded — els[2] would be an NConceptRef, not `this`.)
+  if (
+    els.length === 3 &&
+    isWord(els[0], "most") &&
+    isWord(els[1], "recent") &&
+    isWord(els[2], "this")
+  ) {
+    return { kind: "mostRecent", target: { type: "ThisRecords", location: els[2].location } };
+  }
+  return null;
 }
 
 export class CRLAstBuilder
@@ -657,6 +700,25 @@ export class CRLAstBuilder
     return { conceptType, valueTypes };
   }
 
+  /** The concept's declared `shape is <Scalar|Record|RecordSet>.` (#189). REQUIRED on the AST:
+   *  an omitted `shape is` NORMALIZES to `"Scalar"`, so no consumer re-interprets `undefined`.
+   *  disc-402 order-independence ⇒ the accessor is an ARRAY; take the FIRST occurrence (a
+   *  duplicate is rejected by checkConceptBodyCardinality). The SHAPE_VALUE token was already
+   *  allowlist-checked by the lexer, so its text is a valid `ConceptShape`. */
+  private parseConceptShape(
+    bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
+  ): ConceptShape {
+    const shapeLine = bodyCtx.shapeLine?.()?.[0];
+    if (!shapeLine) return "Scalar";
+    try {
+      const tok = shapeLine.SHAPE_VALUE();
+      if (tok) return tok.text as ConceptShape;
+    } catch {
+      // malformed shape line; lexer already reported — fall back to the default.
+    }
+    return "Scalar";
+  }
+
   /** disc 402: the concept body is now ORDER-INDEPENDENT, so the grammar no longer caps the
    *  singleton lines at one occurrence. The builder enforces that upper bound HERE (the lower
    *  bound — "must have some producer" — stays in visitConceptStatement). This is deliberately
@@ -707,6 +769,13 @@ export class CRLAstBuilder
       subject,
       "`evidence`",
       "A concept has at most one `evidence` note. Keep one `- evidence is `…`.` line.",
+    );
+    this.reportDuplicateLines(
+      bodyCtx.shapeLine(),
+      "duplicate-shape",
+      subject,
+      "`shape`",
+      "A concept declares its published-value cardinality once. Keep one `- shape is <Scalar|Record|RecordSet>.` line.",
     );
     this.reportDuplicateLines(
       bodyCtx.codeIsLine(),
@@ -842,7 +911,9 @@ export class CRLAstBuilder
     } else if (definedAs.length > 0) {
       return this.visitDefinedAsBody(definedAs[0]);
     } else if (definitionIs.length > 0) {
-      return this.visitDefinitionIsBody(definitionIs[0]);
+      // definitionIsBody has labeled alts (countDefinition | narrativeDefinition); dispatch via
+      // visit() so the concrete labeled visitor runs (either may yield a ReductionDefinition).
+      return this.visit(definitionIs[0]) as ConceptDefinition;
     }
     // No top-level definition body — valid only when representations exist;
     // visitConceptStatement enforces "definition OR >=1 representation".
@@ -1027,6 +1098,7 @@ export class CRLAstBuilder
     // The concept's LOCAL representation's explicit `value element` (deviation from the
     // implicit-standard `.value`). Grammar-permissive; the validator enforces pairing.
     const valueElement = this.parseValueElement(bodyCtx.valueElementLine?.()?.[0]);
+    const shape = this.parseConceptShape(bodyCtx);
     this.checkConceptBodyCardinality(bodyCtx, name);
     const definition = this.parseConceptDefinition(bodyCtx, ctx);
     const representations = this.parseRepresentations(bodyCtx);
@@ -1048,6 +1120,7 @@ export class CRLAstBuilder
       name,
       ...(conceptType ? { conceptType } : {}),
       valueTypes,
+      shape,
       ...(code !== undefined ? { code } : {}),
       ...(valueElement ? { valueElement } : {}),
       ...(meta.length > 0 ? { meta } : {}),
@@ -1147,8 +1220,45 @@ export class CRLAstBuilder
 
   // === v0.7 definition-is body + narrative visitors ===
 
-  visitDefinitionIsBody(ctx: DefinitionIsBodyContext): DefinitionIsDefinition {
+  // `definition is count <target> at least N.` — the dedicated count-reduction production. Builds
+  // the structural `Reduction` node directly (the bare integer threshold cannot be narrative).
+  visitCountDefinition(ctx: CountDefinitionContext): ReductionDefinition {
+    const target = this.buildReductionTarget(ctx.reductionTarget());
+    // `NUMBER` admits decimals (`1.5`) and unbounded digit runs; a count threshold is inherently a
+    // whole number the AST must not misrepresent. Reject a non-integer / unsafe-integer threshold at
+    // BUILD (fail-closed, structural) so `atLeast: number` never holds `2.5` or an imprecise value.
+    // The SEMANTIC `≥ 1` triviality (`at least 0` is always true) is a validation warning (IMPL 2),
+    // not a structural error. Keep the parsed value on the node regardless — the build error blocks
+    // emit, so a rejected node is never consumed.
+    const raw = ctx.NUMBER().text;
+    const atLeast = Number(raw);
+    if (!Number.isSafeInteger(atLeast)) {
+      this.reportError(
+        `\`definition is count … at least ${raw}\` — a count threshold must be a whole number ` +
+          `(a safe integer). Write \`at least <N>\` with an integer count (e.g. \`at least 2\`).`,
+        ctx,
+        { rule: "count-threshold-not-integer" },
+      );
+    }
+    return {
+      type: "ReductionDefinition",
+      reduction: { kind: "count", target, atLeast },
+      location: getLocation(ctx),
+    };
+  }
+
+  // `definition is <narrative>.` — the general narrative form. The recognized reduction narratives
+  // (`exists this` / `most recent this` / `exists "X"`) are FOLDED into the structural `Reduction`
+  // node here; everything else (incl. `most recent "X"`, which keeps its live matcher/emit path)
+  // stays a `DefinitionIsDefinition`.
+  visitNarrativeDefinition(
+    ctx: NarrativeDefinitionContext,
+  ): DefinitionIsDefinition | ReductionDefinition {
     const narrative = this.visitNarrative(ctx.narrative());
+    const reduction = narrativeToReduction(narrative);
+    if (reduction) {
+      return { type: "ReductionDefinition", reduction, location: getLocation(ctx) };
+    }
     return {
       type: "DefinitionIsDefinition",
       body: narrative,
@@ -1156,10 +1266,20 @@ export class CRLAstBuilder
     };
   }
 
+  private buildReductionTarget(ctx: ReductionTargetContext): ReductionTarget {
+    if (ctx.THIS()) {
+      return { type: "ThisRecords", location: getLocation(ctx) };
+    }
+    const ref = refFromRefContext(ctx.conceptReference()!);
+    return { type: "ReductionConceptRef", ref, location: getLocation(ctx) };
+  }
+
   visitNarrative(ctx: NarrativeContext): NarrativeClause {
-    const elements = ctx
-      .narrativeElement()
-      .map((e) => this.visit(e) as NarrativeElement);
+    // #189: `at`/`least`/`count`/`this` are their own single-word tokens but are re-admitted to the
+    // `narrativeElement` NWord list, and `visitNWord` maps each to its literal text — so `at least`
+    // in prose stays the two NWords `at`, `least` (each with its own span) exactly as before the
+    // tokens existed, and every existing matcher keyed on those words is unaffected.
+    const elements = ctx.narrativeElement().map((e) => this.visit(e) as NarrativeElement);
     return {
       type: "NarrativeClause",
       elements,

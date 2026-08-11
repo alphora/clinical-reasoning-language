@@ -199,6 +199,9 @@ export function definitionConceptRefs(c: Concept): ReferenceName[] {
     else compositionRefs(def.body.expression, out);
   } else if (def?.type === "DefinitionIsDefinition") {
     narrativeRefs(def.body.elements, out);
+  } else if (def?.type === "ReductionDefinition") {
+    // #189: a NAMED reduction operand (`exists "X"`, `count "X" …`) is a direct edge; `this` is not.
+    if (def.reduction.target.type === "ReductionConceptRef") out.push(def.reduction.target.ref);
   }
   // A rep's `value projection is` PROJECTOR contributes its narrative concept refs as direct
   // edges too (present only in the shape-defect case; a datum-local projection carries none).

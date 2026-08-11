@@ -345,6 +345,7 @@ conceptBody
     : ( typeLine
       | valueElementLine
       | valueTypeLine
+      | shapeLine
       | metaLine
       | evidenceLine
       | codeIsLine
@@ -421,6 +422,15 @@ valueTypeLine
     : DASH VALUE_TYPE_IS CONCEPT_VALUE_TYPE DOT
     ;
 
+// `shape is <Scalar|Record|RecordSet>.` — the concept-level declaration of the cardinality of
+// the concept's PUBLISHED value (#189 grammar+validation slice). CONCEPT-LEVEL ONLY: it is not
+// an alternative in `representationBody` (a source representation has no independent shape). The
+// builder normalizes an omitted `shape is` to `Scalar`. The SHAPE_VALUE token is lexed against a
+// closed allowlist in SHAPE_MODE.
+shapeLine
+    : DASH SHAPE_IS SHAPE_VALUE DOT
+    ;
+
 // ============================
 // Parameter Statement
 // ============================
@@ -489,8 +499,24 @@ codeIsLine
 //   - evidence is `USPSTF age guidance`.
 //   - definition is age at start of "Measurement Period" at least 18 years.
 //
+// `definition is` has a dedicated COUNT-reduction alt and the general narrative alt (#189).
+// The count alt exists because its integer threshold (`at least N`) is a BARE NUMBER, which is
+// not a `narrativeElement` (a `quantity` requires a unit) — so `count <target> at least N`
+// cannot be expressed as narrative and needs a structural production. The other reduction forms
+// (`exists this` / `most recent this` / `exists "X"`) DO parse as narrative and are folded into
+// the structural `Reduction` node by the builder; `most recent "X"` is deliberately left as
+// narrative (it keeps its existing catalog-matcher / emit path).
 definitionIsBody
-    : DASH DEFINITION_IS narrative DOT
+    : DASH DEFINITION_IS COUNT reductionTarget AT LEAST NUMBER DOT   # countDefinition
+    | DASH DEFINITION_IS narrative DOT                                # narrativeDefinition
+    ;
+
+// A reduction's operand: the concept's OWN representation records (`this` → `ThisRecords`) or a
+// NAMED RecordSet concept (`"X"`). `count "X" at least N` reduces another concept's record set,
+// so the target is `THIS | conceptReference`, not this-only.
+reductionTarget
+    : THIS
+    | conceptReference
     ;
 
 // Rep-level projector body — same narrative grammar as `definition is`, distinct keyword
@@ -576,7 +602,7 @@ narrative
 narrativeElement
     : qualifiableReference                                                                       # NConceptRef
     | quantity                                                                                   # NQuantity
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | NARRATIVE_WORD | TIME_UNIT)  # NWord
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | NARRATIVE_WORD | TIME_UNIT)  # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 

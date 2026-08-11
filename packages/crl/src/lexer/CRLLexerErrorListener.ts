@@ -192,6 +192,9 @@ export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
           case "InvalidConceptValueType":
             message = `Invalid concept value type: ${parsed.value}`;
             break;
+          case "InvalidConceptShape":
+            message = `Invalid concept shape: ${parsed.value}`;
+            break;
           case "InvalidCharacterInActivityType":
             message = `Invalid character in activity type: ${parsed.value}`;
             break;

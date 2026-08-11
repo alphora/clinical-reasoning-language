@@ -25,6 +25,11 @@ META_IS             : 'meta is';
 DEFINED_AS          : 'defined as';
 CODED_FROM          : 'coded from';
 DEFINITION_IS       : 'definition is';
+// `shape is <Scalar|Record|RecordSet>` — the concept-level declaration of the cardinality
+// of the concept's PUBLISHED value (#189 grammar+validation slice). Scalar is the default
+// when omitted (builder-normalized). Enters a dedicated mode so the value is lexed against a
+// closed allowlist (mirrors VALUE_TYPE_MODE). Concept-level only — there is no rep-level shape.
+SHAPE_IS            : 'shape is' -> mode(SHAPE_MODE);
 SOURCE_REPRESENTATION : 'source representation';
 CODE_IS             : 'code is';
 SYSTEM_IS           : 'system is';
@@ -52,6 +57,23 @@ END          : 'end';
 // before NARRATIVE_WORD; longest-match keeps kebab words like `exists-foo` as
 // NARRATIVE_WORD (10 chars > 6).
 EXISTS       : 'exists';
+// === Reduction keywords (#189 grammar+validation slice) ===
+// Anchor the dedicated count-reduction production (`definition is count <target> at least N`):
+// a bare integer threshold is not a `narrativeElement` (a `quantity` requires a unit), so the
+// production needs real tokens rather than narrative. `THIS` is the concept's OWN representation
+// records as a reduction target (`ThisRecords`) — promoted to a first-class token so validators
+// and walkers match a STRUCTURAL node, not narrative text. All are ALSO admitted as narrative
+// words (see `narrativeElement`'s NWord list in CRLParser.g4) so clinical prose ("count of …",
+// "in this setting", "at least 18 years") still parses; `visitNWord` maps each back to its own
+// literal text, so every existing matcher (`isWord(el,"at")` + `isWord(el,"least")`, age/threshold
+// patterns) is byte-identical at the element level. `at least` is TWO single-word tokens (not one
+// multi-word token) so the count form is whitespace-insensitive like the rest of CRL and each word
+// keeps its own source span. Declared before NARRATIVE_WORD so they win on tie (longest-match still
+// keeps `atrium`/`leastwise` as NARRATIVE_WORD).
+COUNT        : 'count';
+AT           : 'at';
+LEAST        : 'least';
+THIS         : 'this';
 INCLUDE      : 'include';
 LIBRARY      : 'library';
 NOT          : 'not';
@@ -315,6 +337,37 @@ VALUE_TYPE_WS
     : [ \t\r\n]+ -> skip
     ;
 VALUE_TYPE_COMMENT_BLOCK
+    : BLOCK_COMMENT -> skip
+    ;
+
+mode SHAPE_MODE;
+// CONCEPT_SHAPE possibilities (case sensitive) — the declared cardinality of the concept's
+// PUBLISHED value. `Scalar` = a single reduced value (the DEFAULT when `shape is` is omitted;
+// builder-normalized). `Record` = a single selected record. `RecordSet` = the set of records.
+// The extract pipeline (scripts/extractConceptShapes.js) mirrors this allowlist to
+// generated/types/conceptShapes.json — the .g4 is the source of truth.
+SHAPE_VALUE
+    : ~[ \t\r\n.:()]+ {
+        const validShapes = [
+            'Scalar',
+            'Record',
+            'RecordSet'
+        ];
+        if (!validShapes.includes(this.text)) {
+            this.text = JSON.stringify({
+                errorType: 'InvalidConceptShape',
+                value: this.text,
+                validShapes
+            });
+            this.type = CRLLexer.ERROR;
+        }
+    }
+    -> mode(DEFAULT_MODE)
+    ;
+SHAPE_WS
+    : [ \t\r\n]+ -> skip
+    ;
+SHAPE_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
 

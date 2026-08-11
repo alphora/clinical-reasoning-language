@@ -48,6 +48,9 @@ const DEF_KIND: Record<NonNullable<Concept["definition"]>["type"], ConceptDefini
   DefinedAsDefinition: "defined-as",
   DefinitionIsDefinition: "definition-is",
   CodedFromDefinition: "coded-from",
+  // #189: a reduction is the `definition is` surface (a record→scalar calculation) → inferred,
+  // classified like `definition-is` for the renderer's raw signal.
+  ReductionDefinition: "definition-is",
 };
 
 /** The ADR-0001 LAYER (syntactic): `inferred` = `defined as`/`definition is` (calculated); `asserted` = everything else

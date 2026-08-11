@@ -648,6 +648,16 @@ function walkConceptBody(
       }
       return;
     }
+    case "ReductionDefinition": {
+      // #189: index a NAMED reduction operand (`exists "X"`, `count "X" …`) for find-refs / hover,
+      // like `exists ("X")`. `this` (ThisRecords) names no other concept, so nothing to index.
+      const rd = def as { reduction?: { target?: { type?: string; ref?: unknown; location?: Loc } } };
+      const target = rd.reduction?.target;
+      if (target?.type === "ReductionConceptRef" && target.location) {
+        addRef(target.ref, "concept", owningLib, filePath, source, target.location, out);
+      }
+      return;
+    }
   }
 }
 

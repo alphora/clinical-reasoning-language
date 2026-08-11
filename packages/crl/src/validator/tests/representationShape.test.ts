@@ -174,14 +174,17 @@ describe("RepresentationShapeValidator (Todo 2) — static shape rules", () => {
 
   // ---------------------------------------------------------------- A.8
   describe("A.8 definition-is-exists-misuse — precise operator-shaped match", () => {
-    it("REJECTS `definition is exists (\"X\")` and points at `defined as exists`", () => {
+    it("no longer flags `definition is exists (\"X\")` — the single-ref form is now a recognized reduction (A.8 arm superseded, #189)", () => {
+      // Q1→A1 (ratified): `definition is exists "X"` (parenthesized or not) folds to a structural
+      // ReductionDefinition{exists, "X"} in the builder — it IS the canonical named reduction, no
+      // longer an A.8 misuse steered to `defined as`. A.8's GROUP arm survives (see below). The
+      // named-operand RecordSet-resolution coherence (a warning) lands with the reduction
+      // validators in the next sub-commit; in this one the fold means A.8 simply no longer sees it.
       const src =
         `library "T".\nconcept "Mammogram (ImagingStudy)":\n- value type is dateTime.\n` +
         `- source representation:\n  - type is ImagingStudy.\n  - value element is ImagingStudy.started.\n  - value type is dateTime.\n` +
         `concept "C":\n- value type is boolean.\n- definition is exists ("Mammogram (ImagingStudy)").\n`;
-      const errs = shapeErrors(src, "definition-is-exists-misuse");
-      expect(errs).toHaveLength(1);
-      expect(errs[0].message).toMatch(/defined as exists/);
+      expect(shapeErrors(src, "definition-is-exists-misuse")).toHaveLength(0);
     });
 
     it("does NOT flag an ordinary narrative that merely contains the word `exists`", () => {
@@ -244,11 +247,13 @@ describe("RepresentationShapeValidator (Todo 2) — static shape rules", () => {
 
   // ---------- impl-review round-1 coverage (disc 396): branches the first 14 tests missed ----
   describe("impl-review coverage", () => {
-    it("A.8 flags the no-parens form `exists \"X\"` (the AST cannot tell it from `exists (\"X\")`)", () => {
+    it("no longer flags the no-parens form `exists \"X\"` — folds to the same reduction as `exists (\"X\")` (#189)", () => {
+      // The AST cannot tell `exists "X"` from `exists ("X")` (the singleton group collapses), and
+      // BOTH now fold to a ReductionDefinition — so neither is an A.8 misuse. (Q1→A1 supersession.)
       const src =
         `library "T".\nconcept "X":\n- value type is boolean.\n- code is \`x\`.\n` +
         `concept "C":\n- value type is boolean.\n- definition is exists "X".\n`;
-      expect(shapeErrors(src, "definition-is-exists-misuse")).toHaveLength(1);
+      expect(shapeErrors(src, "definition-is-exists-misuse")).toHaveLength(0);
     });
 
     it("A.8 flags a grouped operand `exists (\"A\" or \"B\")` and steers to promote the group", () => {

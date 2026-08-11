@@ -282,6 +282,11 @@ function visitConceptDefinitionRefs(concept: Concept, visit: (ref: ReferenceName
     case "DefinitionIsDefinition":
       visitNarrative(def.body, visit);
       break;
+    case "ReductionDefinition":
+      // #189: a NAMED reduction operand pulls its referenced concept into the emit closure, like
+      // `exists ("X")`; `this` (ThisRecords) references no other concept.
+      if (def.reduction.target.type === "ReductionConceptRef") visit(def.reduction.target.ref);
+      break;
   }
 }
 

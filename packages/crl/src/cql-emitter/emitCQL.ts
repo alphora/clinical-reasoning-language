@@ -55,7 +55,13 @@ import type {
   TerminologyBodyLine,
   TerminologySystem,
 } from "../ast/types";
-import { getRefName, getRefLibrary, isQualifiedRef, definedAsExistsNotLowered } from "../ast/types";
+import {
+  getRefName,
+  getRefLibrary,
+  isQualifiedRef,
+  definedAsExistsNotLowered,
+  reductionNotEmittable,
+} from "../ast/types";
 import type { ReferenceName } from "../ast/types";
 import type { CRLError } from "../types/errors";
 import { ageComputeFnForUnit } from "../template-match/agePredicate";
@@ -1188,6 +1194,8 @@ class Emitter {
         return this.emitDefinedAs(c, def.body);
       case "DefinitionIsDefinition":
         return this.emitDefinitionIs(c, def);
+      case "ReductionDefinition":
+        return reductionNotEmittable(`emitConceptBody("${c.name}")`);
     }
   }
 
@@ -1784,6 +1792,8 @@ class Emitter {
         return "resource-list"; // `coded from` → RecordSource retrieve
       case "DefinitionIsDefinition":
         return "unknown"; // temporal/count predicate flavor not modeled → loud
+      case "ReductionDefinition":
+        return "unknown"; // #189 reduction flavor not modeled (not emittable yet) → loud
     }
   }
 

@@ -64,7 +64,13 @@ import type {
   ActionStatement,
   InterfaceSourceLayer,
 } from "../ast/types";
-import { getRefName, getRefLibrary, isQualifiedRef, normalizeLocalRef } from "../ast/types";
+import {
+  getRefName,
+  getRefLibrary,
+  isQualifiedRef,
+  normalizeLocalRef,
+  reductionNotEmittable,
+} from "../ast/types";
 import { branchConditionConceptRefsExpanded } from "../ast/branchCondition";
 import { buildCriterionTable } from "../ast/criterionExpansion";
 import { pascalCaseNameForId } from "../fhir-emitter/slug";
@@ -272,6 +278,13 @@ export function classifyStatementLayer(stmt: Statement): Layer | null {
       case "DefinedAsDefinition":
       case "DefinitionIsDefinition":
         return "Inferred";
+      case "ReductionDefinition":
+        // #189: a reduction is NOT emittable in the grammar+validation slice, so it is deliberately
+        // NOT layer-classified — its library stays on the per-CRL path, where `emitConceptBody`
+        // fails loud (`reductionNotEmittable`). Returning "Inferred" here would route it into layered
+        // emit, whose `requalifyDefinition` reduction arm also throws; keeping it unclassified is the
+        // cleaner loud-fail until the flip activates reductions.
+        return null;
     }
   }
   // Decision / Activity / Parameter: not layer-classified.
@@ -481,6 +494,11 @@ function visitDefinitionRefs(
       return;
     case "DefinitionIsDefinition":
       visitNarrativeRefs(def.body, visit);
+      return;
+    case "ReductionDefinition":
+      // #189: a NAMED reduction operand contributes its concept ref for library-dependency
+      // computation, like `exists ("X")`; `this` (ThisRecords) contributes none.
+      if (def.reduction.target.type === "ReductionConceptRef") visit(def.reduction.target.ref);
       return;
   }
 }
@@ -737,6 +755,11 @@ function requalifyDefinition(
       };
       return out;
     }
+    case "ReductionDefinition":
+      // #189: a reduction is not emittable in the grammar+validation slice, so layered emit never
+      // requalifies one. First-class re-qualification of a named reduction target lands with the
+      // walker-teaching in IMPL 3; until then reaching here is a compiler bug → fail loud.
+      return reductionNotEmittable("requalifyDefinition");
   }
 }
 
@@ -1065,6 +1088,7 @@ function buildInterfaceReexports(
       name,
       ...(src?.conceptType !== undefined ? { conceptType: src.conceptType } : {}),
       valueTypes: src?.valueTypes ?? [],
+      shape: src?.shape ?? "Scalar", // #189: mirror the source concept's declared shape (Scalar default)
       definition: {
         type: "DefinedAsDefinition",
         body: { type: "DefinedAsBareRef", ref: qualified, location: qualified.location },
