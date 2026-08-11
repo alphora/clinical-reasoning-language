@@ -6,6 +6,7 @@ import {
   type ConceptDefinition,
   type ConceptShape,
   type Reduction,
+  type ReferenceName,
   type Statement,
   type Location,
 } from "../ast/types";
@@ -28,14 +29,16 @@ import type { ReductionShapeError, ReductionShapeRule, ValidationError } from ".
 // concept) down to a scalar (`exists`/`count` ⇒ boolean) or a record (`most recent`).
 //
 // Rules (all WARNINGS; see .vibe-tools/discussions/415 + the ReductionShapeRule doc in validator.ts):
-//   recordset-operand-required        — a named reduction operand X that is not `shape is RecordSet`
+//   recordset-operand-required        — a named `exists`/`count`/`most recent` operand X that is not
+//                                       `shape is RecordSet` (structural reduction AND narrative `most recent "X"`)
 //   reduction-result-nonboolean       — an exists/count reduction on a Scalar concept typed non-boolean
 //   reduction-this-no-representation  — a `<reduction> this` on a concept with no representation
 //   reduction-multi-rep               — a `most recent this` / `count this` with >1 representation
-//   recordset-scalar-reduction        — a RecordSet concept carrying a reduction
-//   recordset-bare-code-incoherent    — a RecordSet concept that is a bare `code is` (existence, not a set)
+//   recordset-scalar-reduction        — a RecordSet concept carrying a reduction OR a narrative `most
+//                                       recent "X"` selection (a set publishes records, not a value/record).
+//                                       A bare `code is` on a RecordSet is NOT flagged — it is the canonical
+//                                       base-record retrieve (North Star §3 / design §2 `(none) + set of <T>`).
 //   record-shape-invariant            — a Record concept without a record-selecting `most recent`
-//                                       (or whose `type is R` disagrees with the RecordSet<R> operand)
 //   no-bare-scalar-code               — a Scalar bare `code is` with no reduction (THE migration prompt)
 //   non-scalar-missing-type           — a non-Scalar concept with no `type is` (record shape needs a resource)
 //   shape-marker-not-emit-active      — an explicit non-Scalar `shape is` on a still-emitting concept
@@ -251,35 +254,56 @@ export class ReductionShapeValidator {
 
     // -- Shape-invariant checks ---------------------------------------------------------------
 
-    // recordset-scalar-reduction — a RecordSet publishes its records, not a reduced value.
-    if (shape === "RecordSet" && reduction) {
+    // recordset-scalar-reduction — a RecordSet publishes its records, not a reduced/selected value.
+    // BOTH a structural reduction (`exists`/`count`/`most recent this`) AND a narrative `most recent
+    // "X"` selection are rejected: a reduction produces a scalar, a selection ONE record — neither is a
+    // set. (A local `code is` alone on a RecordSet is NOT flagged — it is the canonical base-record
+    // RETRIEVE, North Star §3 / design §2 `(none) + set of <T> → RecordSet<T>`; the old
+    // `recordset-bare-code-incoherent` rule wrongly applied Scalar "code is = existence" intuition and
+    // false-flagged the charter's own worked example — deleted, panel R3 gpt56 #1.)
+    if (shape === "RecordSet" && (reduction || narrativeLeadsWithMostRecent(def))) {
+      const how = reduction
+        ? `a \`definition is ${verb(reduction)} …\` reduction`
+        : "a narrative `most recent …` selection";
       this.warn(
         "recordset-scalar-reduction",
         concept.name,
-        `Concept "${concept.name}" is \`shape is RecordSet\` but carries a \`definition is ` +
-          `${verb(reduction)} …\` reduction. A RecordSet publishes its set of records; a reduction ` +
-          `produces a single reduced value. Declare \`- shape is Scalar.\` (or \`Record\`) to reduce, ` +
-          `or drop the reduction to publish the set.`,
+        `Concept "${concept.name}" is \`shape is RecordSet\` but carries ${how}. A RecordSet publishes ` +
+          `its set of records; a reduction produces a single value and a selection a single record — ` +
+          `neither is a set. Declare \`- shape is Scalar.\` (to reduce to a value) or \`- shape is ` +
+          `Record.\` (to select one record), or drop the reduction/selection to publish the set.`,
         loc,
         attribution,
         errors,
       );
     }
 
-    // recordset-bare-code-incoherent — a bare local `code is` is a boolean existence, not a record set.
-    if (shape === "RecordSet" && hasCodeIs && reps === 0 && !reduction) {
-      this.warn(
-        "recordset-bare-code-incoherent",
-        concept.name,
-        `Concept "${concept.name}" is \`shape is RecordSet\` but its only representation is a bare ` +
-          `local \`code is\` — that is a boolean EXISTENCE determination, not a set of records. A ` +
-          `RecordSet needs a record-yielding representation (a \`source representation\` of a dated ` +
-          `resource) or a record-set derivation. Declare \`- shape is Scalar.\` if this is a presence ` +
-          `determination.`,
-        loc,
-        attribution,
-        errors,
+    // recordset-operand-required (narrative `most recent "X"`) — the BASE cardinality invariant (design
+    // §2 table: a named operand X must resolve to a RecordSet; NOT the deferred `type is R` agreement).
+    // `most recent "X"` stays a narrative DefinitionIsDefinition (only `most recent this` folds), so the
+    // structural check inside the `if (reduction)` block above never sees it; resolve its operand here.
+    const narrativeOperand = narrativeMostRecentOperand(def);
+    if (narrativeOperand) {
+      const operand = resolveConcept(
+        getRefName(narrativeOperand),
+        getRefLibrary(narrativeOperand) ?? undefined,
+        ctx,
       );
+      if (operand && operand.shape !== "RecordSet") {
+        this.warn(
+          "recordset-operand-required",
+          concept.name,
+          `Concept "${concept.name}": \`definition is most recent "${getRefName(narrativeOperand)}"\` ` +
+            `selects the most recent of a SET of records, but its operand ` +
+            `"${getRefName(narrativeOperand)}" is \`shape is ${operand.shape}\`, not \`shape is ` +
+            `RecordSet\`. A named selection operand must publish a record set — declare ` +
+            `"${getRefName(narrativeOperand)}" \`- shape is RecordSet.\`, or select \`most recent this\` ` +
+            `if the records are this concept's own.`,
+          loc,
+          attribution,
+          errors,
+        );
+      }
     }
 
     // record-shape-invariant — a Record publishes ONE selected record, via a `most recent` selection.
@@ -349,17 +373,20 @@ export class ReductionShapeValidator {
     // error owns it) — not double-warned here, and its definition slot is taken so the reduction
     // action would not apply.
     if (shape === "Scalar" && hasCodeIs && def === undefined) {
-      // The suggested reduction is conditioned on how many records the concept has: with a single
-      // representation (`code is` only), a direct `exists this` / `most recent this`; with a `code is`
-      // + posrep(s) (repCount > 1), a `most recent this` here would span every rep and immediately
-      // trip `reduction-multi-rep`, so steer to promoting a single representation instead (F6).
+      // The suggested reduction is conditioned on value type FIRST, then representation count. A boolean
+      // presence determination is `exists this` — valid over MULTIPLE representations too (design §6: the
+      // union of each rep's existence, dedup-immune), so repCount is irrelevant there (panel R3 gpt56 #2).
+      // A value-reading `most recent this` is the multi-rep-ambiguous one: with a `code is` + posrep(s)
+      // (repCount > 1) it would span every rep and trip `reduction-multi-rep`, so steer to promoting a
+      // single representation to a named RecordSet instead (F6).
       const action =
-        repCount > 1
-          ? `promote a single representation to a named \`- shape is RecordSet.\` concept and reduce ` +
-            `THAT (a \`most recent this\` here would span ${repCount} representations — see ` +
-            `reduction-multi-rep)`
-          : vt === "boolean" || vt === undefined
-            ? "add \`- definition is exists this.\` (a boolean presence determination)"
+        vt === "boolean" || vt === undefined
+          ? "add \`- definition is exists this.\` (a boolean presence determination — valid over " +
+            "multiple representations too)"
+          : repCount > 1
+            ? `promote a single representation to a named \`- shape is RecordSet.\` concept and reduce ` +
+              `THAT (a \`most recent this\` here would span ${repCount} representations — see ` +
+              `reduction-multi-rep)`
             : `add \`- definition is most recent this.\` (to publish the most recent record's \`${vt}\` value)`;
       this.warn(
         "no-bare-scalar-code",
@@ -415,6 +442,28 @@ function narrativeLeadsWithMostRecent(def: ConceptDefinition | undefined): boole
     els[1].type === "NWord" &&
     els[1].value === "recent"
   );
+}
+
+/**
+ * The NAMED operand of a narrative `most recent "X"` selection (its `els[2]` NConceptRef ref), or
+ * undefined. `most recent this` folds to a Reduction and never lands here; `most recent "X"` stays a
+ * DefinitionIsDefinition, so this is the only way to reach its operand for the base
+ * `recordset-operand-required` cardinality check (design §2: a named operand must be a RecordSet).
+ */
+function narrativeMostRecentOperand(def: ConceptDefinition | undefined): ReferenceName | undefined {
+  if (def?.type !== "DefinitionIsDefinition") return undefined;
+  const els = def.body.elements;
+  if (
+    els.length >= 3 &&
+    els[0].type === "NWord" &&
+    els[0].value === "most" &&
+    els[1].type === "NWord" &&
+    els[1].value === "recent" &&
+    els[2].type === "NConceptRef"
+  ) {
+    return els[2].value;
+  }
+  return undefined;
 }
 
 /** The author-facing verb for a reduction kind. */

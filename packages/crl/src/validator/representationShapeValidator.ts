@@ -229,16 +229,23 @@ export class RepresentationShapeValidator {
             attribution,
           ),
         );
-      } else if (leadsWithExists && second === "NConceptRef") {
-        // A bare `exists "X"` folds away, so an unfolded `exists` + ref here carries a trailing filter.
+      } else if (
+        leadsWithExists &&
+        (second === "NConceptRef" ||
+          (els[1].type === "NWord" && els[1].value === "this"))
+      ) {
+        // A bare `exists "X"` / `exists this` folds away (exactly 2 elements), so an unfolded `exists`
+        // reaching here — a ref (`exists "X" today`) OR `this` (`exists this today`) — carries a trailing
+        // filter the reduction can't hold (panel R3 gpt56 #4 added the `this` case).
+        const operand = second === "NConceptRef" ? `"…"` : "this";
         errors.push(
           this.err(
             "definition-is-exists-misuse",
             concept.name,
-            `Concept "${concept.name}": \`definition is exists "…" <filter>\` — an \`exists\` reduction ` +
-              `takes a SINGLE bare operand (\`definition is exists "X".\`); a trailing filter (\`… today\`, ` +
-              `\`… within …\`) is not part of the reduction. Fold the filter into the operand concept (or ` +
-              `a derived \`shape is RecordSet\` concept), then \`definition is exists "That Concept".\`.`,
+            `Concept "${concept.name}": \`definition is exists ${operand} <filter>\` — an \`exists\` ` +
+              `reduction takes a SINGLE bare operand (\`definition is exists "X".\` / \`exists this.\`); a ` +
+              `trailing filter (\`… today\`, \`… within …\`) is not part of the reduction. Fold the filter ` +
+              `into the operand concept (or a derived \`shape is RecordSet\` concept), then reduce that.`,
             concept.definition.body.location,
             attribution,
           ),

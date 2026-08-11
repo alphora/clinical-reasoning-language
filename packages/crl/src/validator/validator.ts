@@ -303,8 +303,9 @@ export interface AgePredicateUnsupportedError extends ValidationErrorBase {
  *                                      `defined as` operator, not `definition is`)
  *   - "multiple-value-types"         — >1 `value type` on one concept or posrep (the
  *                                      canonical result shape is singular)
- *   - "missing-value-type"           — a concept declares NO `value type` (the redesign requires
- *                                      exactly one — its canonical result shape; A.10)
+ *   - "missing-value-type"           — a SCALAR concept declares NO `value type` (its canonical result
+ *                                      shape; A.10, now shape-conditional — Record/RecordSet publish a
+ *                                      record whose resource is `type is`, so `value type` is optional there)
  */
 export type RepresentationShapeRule =
   | "incomplete-representation"
@@ -419,19 +420,22 @@ export interface UseSiteOperandUntypedWarning extends ValidationErrorBase {
  *   - "reduction-multi-rep"          — a `most recent this` / `count this` on a concept with >1
  *                                      representation (local code arm + posreps): cross-rep dedup is
  *                                      deferred (#257), so the reduction target is ambiguous today.
- *   - "recordset-scalar-reduction"   — a `shape is RecordSet` concept carrying a reduction (a RecordSet
- *                                      publishes its records; a reduction produces a reduced value).
- *   - "recordset-bare-code-incoherent" — a `shape is RecordSet` concept that is a bare `code is` (no
- *                                      posreps, no reduction): a bare local code is a boolean existence,
- *                                      not a set of records.
+ *   - "recordset-scalar-reduction"   — a `shape is RecordSet` concept carrying a reduction OR a narrative
+ *                                      `most recent "X"` selection (a set publishes records, not a
+ *                                      reduced value or a single selected record). NOTE: a bare local
+ *                                      `code is` on a RecordSet is NOT flagged — it is the canonical
+ *                                      base-record retrieve (North Star §3 / design §2 `(none) + set of`).
  *   - "record-shape-invariant"       — a `shape is Record` concept without a record-SELECTING `most
- *                                      recent` reduction, or whose `type is R` disagrees with the
- *                                      selected `RecordSet<R>` operand (a Record selects one record).
- *   - "no-bare-scalar-code"          — a Scalar bare `code is` with NO reduction and NOT a `defined as`
- *                                      (the satisfying reduction). THE MIGRATION PROMPT — fires
- *                                      corpus-wide (every bare presence concept); carries a per-concept
- *                                      action (`definition is exists this` for boolean, else `most
- *                                      recent this`).
+ *                                      recent` (the folded `most recent this` reduction OR the narrative
+ *                                      `most recent "X"`). (The `type is R` must-agree-with-the-selected-
+ *                                      `RecordSet<R>`-operand check is DEFERRED — reachable but held for
+ *                                      the flip step; see the validator's record-shape-invariant comment.)
+ *   - "no-bare-scalar-code"          — a Scalar bare `code is` (no definition) — NOT a `defined as` (a
+ *                                      satisfying reduction, exempt), NOT a mixed `code is`+`definition
+ *                                      is`/`coded from` (already an emit-mixed error). THE MIGRATION
+ *                                      PROMPT — fires corpus-wide (every bare presence concept); carries a
+ *                                      per-concept action (`definition is exists this` for boolean, else
+ *                                      `most recent this` / promote-to-RecordSet when multi-rep).
  *   - "non-scalar-missing-type"      — a non-Scalar concept with no `type is` (and not a derived-from-
  *                                      operand reduction) — a record shape needs its resource declared.
  *   - "shape-marker-not-emit-active" — an explicit non-Scalar `shape is` on a concept that STILL has a
@@ -445,7 +449,6 @@ export type ReductionShapeRule =
   | "reduction-this-no-representation"
   | "reduction-multi-rep"
   | "recordset-scalar-reduction"
-  | "recordset-bare-code-incoherent"
   | "record-shape-invariant"
   | "no-bare-scalar-code"
   | "non-scalar-missing-type"

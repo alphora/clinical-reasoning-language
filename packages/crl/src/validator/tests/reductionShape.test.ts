@@ -140,16 +140,50 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
     });
   });
 
-  // ---------------------------------------------------------------- recordset-bare-code-incoherent
-  describe("recordset-bare-code-incoherent — a bare `code is` is an existence, not a record set", () => {
-    it("WARNS for `shape is RecordSet` + a lone `code is`", () => {
-      const src = `library "T".\nconcept "C":\n- type is Condition.\n- shape is RecordSet.\n- code is \`c\`.\n`;
-      expect(redWarnings(src, "recordset-bare-code-incoherent", "C")).toHaveLength(1);
+  // ---------------------------------------------------------------- base-record retrieve (gpt56 R3 #1)
+  describe("a bare `code is` on a RecordSet is the CANONICAL base-record retrieve — NOT flagged", () => {
+    it("does NOT emit any recordset-*-incoherence warning for the North Star §3 base-record concept", () => {
+      // `"Conservative Therapy Trial"` (North Star §3 / design §2 `(none) + set of <T> → RecordSet<T>`):
+      // a local `code is` on a RecordSet is the retrieve that PRODUCES records — coherent, not a "boolean
+      // existence." The deleted `recordset-bare-code-incoherent` rule wrongly flagged exactly this.
+      const src =
+        `library "T".\nconcept "Conservative Therapy Trial":\n` +
+        `- type is Procedure.\n- shape is RecordSet.\n- code is \`ctt\`.\n`;
+      expect(redWarnings(src, "recordset-scalar-reduction", "Conservative Therapy Trial")).toHaveLength(0);
+      // It still (correctly) carries only the honest shape-marker-not-emit-active note — no incoherence.
+      const incoherence = redWarnings(src, undefined, "Conservative Therapy Trial").filter(
+        (e) => e.rule !== "shape-marker-not-emit-active",
+      );
+      expect(incoherence).toHaveLength(0);
+    });
+  });
+
+  // -------------------------------------------------- narrative `most recent "X"` operand (gpt56 R3 #3)
+  describe("recordset-operand-required over narrative `most recent \"X\"` (the base cardinality invariant)", () => {
+    it("WARNS when a narrative `most recent \"X\"` selects from a non-RecordSet operand", () => {
+      // X is Scalar (bare code) — a selection operand must be a RecordSet. `most recent "X"` stays
+      // narrative (does not fold), so this is the ONLY path that reaches its operand.
+      const src =
+        `library "T".\nconcept "X":\n- value type is Quantity.\n- code is \`x\`.\n` +
+        `concept "C":\n- value type is Quantity.\n- definition is most recent "X".\n`;
+      const w = redWarnings(src, "recordset-operand-required", "C");
+      expect(w).toHaveLength(1);
+      expect(w[0].message).toMatch(/most recent/);
     });
 
-    it("is CLEAN for a `shape is RecordSet` sourced from a posrep", () => {
-      const src = `library "T".\n${RECORDSET_X}`;
-      expect(redWarnings(src, "recordset-bare-code-incoherent")).toHaveLength(0);
+    it("is CLEAN when the narrative `most recent \"X\"` operand IS a RecordSet", () => {
+      const src =
+        `library "T".\n${RECORDSET_X}` +
+        `concept "C":\n- value type is Quantity.\n- definition is most recent "X".\n`;
+      expect(redWarnings(src, "recordset-operand-required")).toHaveLength(0);
+    });
+
+    it("WARNS recordset-scalar-reduction when a RecordSet concept itself SELECTS via narrative `most recent \"X\"`", () => {
+      // A selection publishes one record — a RecordSet shape cannot carry it.
+      const src =
+        `library "T".\n${RECORDSET_X}` +
+        `concept "C":\n- type is Observation.\n- shape is RecordSet.\n- definition is most recent "X".\n`;
+      expect(redWarnings(src, "recordset-scalar-reduction", "C")).toHaveLength(1);
     });
   });
 
@@ -195,7 +229,7 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
       expect(w[0].message).toMatch(/most recent this/);
     });
 
-    it("conditions the action on repCount: a `code is` + posrep Scalar steers to a named RecordSet, not `most recent this` (F6)", () => {
+    it("conditions the action on repCount: a NON-boolean `code is` + posrep steers to a named RecordSet, not `most recent this` (F6)", () => {
       // repCount 2 (code + posrep): a `most recent this` here would immediately trip reduction-multi-rep,
       // so the action steers to promoting one representation instead of chaining into another warning.
       const src =
@@ -204,6 +238,19 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
       const w = redWarnings(src, "no-bare-scalar-code", "C");
       expect(w).toHaveLength(1);
       expect(w[0].message).toMatch(/promote a single representation/);
+    });
+
+    it("a BOOLEAN `code is` + posrep steers to `exists this` even multi-rep (union, dedup-immune; gpt56 R3 #2)", () => {
+      // design §6: multi-rep `exists this` is the union of each rep's existence — supported and NOT
+      // multi-rep-ambiguous, so boolean-presence steers to `exists this` regardless of repCount (must
+      // NOT recommend promote-to-RecordSet, which is only for value-reading `most recent`).
+      const src =
+        `library "T".\nconcept "C":\n- value type is boolean.\n- code is \`c\`.\n` +
+        `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is boolean.\n`;
+      const w = redWarnings(src, "no-bare-scalar-code", "C");
+      expect(w).toHaveLength(1);
+      expect(w[0].message).toMatch(/exists this/);
+      expect(w[0].message).not.toMatch(/promote a single representation/);
     });
 
     it("EXEMPTS a `code is` + `defined as` both-rep (a satisfying reduction)", () => {

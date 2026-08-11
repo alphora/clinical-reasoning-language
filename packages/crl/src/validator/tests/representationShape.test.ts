@@ -279,6 +279,14 @@ describe("RepresentationShapeValidator (Todo 2) — static shape rules", () => {
       expect(errs[0].message).toMatch(/single bare operand|trailing filter/);
     });
 
+    it("A.8 flags `exists this <tail>` too — bare `exists this` folds, so a tail'd `this` survives (gpt56 R3 #4)", () => {
+      const src =
+        `library "T".\nconcept "C":\n- value type is boolean.\n- code is \`c\`.\n- definition is exists this today.\n`;
+      const errs = shapeErrors(src, "definition-is-exists-misuse");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toMatch(/single bare operand|trailing filter/);
+    });
+
     it("A.5 flags a concept ref reachable ONLY through a value-projection disjunction group (nested walk)", () => {
       // Both operands are groups — there is NO top-level NConceptRef, so a hit proves the
       // recursion into NDisjunction, not a top-level match.
