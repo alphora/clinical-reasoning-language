@@ -105,8 +105,12 @@ Only representations emit FHIR **instances**. A concept unions the records from 
 - `sem-or` = union · `sem-and` = intersection/refinement · `sem-not` = complement (closed-world).
 
 `sem-and` and `sem-not` are **load-bearing** — validated by real quality-measure logic (value-preserving
-refinement of a record set). Composition operands must **agree on value type** (mixed-value-type composition
-is an author error — see below).
+refinement of a record set). Composition operands' **result types must agree**, and the shipped validator
+enforces this **directionally** (not a blanket "mixed = error"): a leaf declaring `value type is boolean`
+inside a composition whose parent declares a non-boolean value type is a hard **error**
+(`boolean-in-refinement-composition`); any other result-type disagreement the implicit-existence bridge
+currently permits is a **warning** (`composition-result-type-mismatch`) today that becomes an **error at the
+#189 flip**. See `docs/emit-consistency-189-design.md` §7.
 
 ### `definition is` — named derivations
 
@@ -122,9 +126,11 @@ A concept's records are a **set**. Its **result shape and value are decided by i
 silently, never by consumption context. Two things are declared explicitly:
 
 - **The value type** — the scalar/element type of the concept's result (`boolean`, `Quantity`, `CodeableConcept`, …).
-- **The cardinality** — whether the concept publishes a **set of records** or a **single reduced value**. This
-  is declared, **not inferred** from whether a reduction happens to be present (that would drift back to a
-  consumption-site rule). A record-valued concept says so: **`value type is set of <T>`** (a `RecordSet`).
+- **The cardinality** — whether the concept publishes a **set of records** (`RecordSet`), a **single selected
+  record** (`Record`), or a **single reduced value** (`Scalar`). This is declared, **not inferred** from whether
+  a reduction happens to be present (that would drift back to a consumption-site rule). A concept declares it on
+  a dedicated concept-level line: **`- shape is Scalar | Record | RecordSet.`** — `Scalar` is the default the
+  builder normalizes an omitted `shape is` to; the record resource comes from `type is`, not from the value type.
 
 The rules:
 
@@ -133,34 +139,37 @@ The rules:
   `most recent this`, a `definition is` derivation, or a `defined as`). A bare scalar `code is` with no
   reduction is an **error** — the magic the emitter must never manufacture (the old `.asTruths()` hidden
   `exists(any true)`).
-- **A record-valued concept** (`value type is set of <T>`) ⟹ **no scalar reduction**; it **publishes its
+- **A record-valued concept** (`shape is RecordSet`) ⟹ **no scalar reduction**; it **publishes its
   record set**. Other concepts reference it **by name** and derive from its **records**. (The explicit
-  `set of` is what disambiguates a `CodeableConcept` *set* — e.g. a coded-Encounter refinement operand — from
-  a single-`CodeableConcept` scalar; both use the `CodeableConcept` value type, so cardinality can't be read
-  off the value type alone.)
+  `shape is RecordSet` is what disambiguates a `CodeableConcept` *set* — e.g. a coded-Encounter refinement
+  operand — from a single-`CodeableConcept` scalar; both would carry the `CodeableConcept` value type, so
+  cardinality can't be read off the value type alone — it is declared, on its own line.)
 
 **Worked example — step therapy (a real PA pattern):**
 
 ```crl
 concept "Conservative Therapy Trial":      // record-valued: declared a set → publishes its records
+- shape is RecordSet.                       // cardinality declared; resource is `type is`
 - type is Procedure.
-- value type is set of Procedure.
 - code is `conservative-therapy-trial`.
 
-concept "Adequate Step Therapy":           // scalar (boolean) → reduction is explicit
+concept "Adequate Step Therapy":           // scalar (boolean, the default shape) → reduction is explicit
 - value type is boolean.
 - definition is count "Conservative Therapy Trial" at least 2.
 
 concept "Most Recent Trial":               // single record → selection is explicit
-- value type is Procedure.
+- shape is Record.                          // one selected record; resource is `type is`, no value type
+- type is Procedure.
 - definition is most recent "Conservative Therapy Trial".
 ```
 
 One concept, one local code, many deriving references. There is no "two concepts sharing a code" problem
 (that would be `emit-duplicate-local-code`), and no dynamic "reduce at the use-site" rule: the base concept
-**declares** it is a record set, and each derivation names it and reaches its **records**. *(The exact
-surface form of the cardinality marker — `value type is set of <T>` vs a `records` keyword — is finalized in
-the grammar slice; the ruling is that cardinality is declared, not inferred.)*
+**declares** it is a record set, and each derivation names it and reaches its **records**. *(The cardinality
+marker is finalized as a dedicated concept-level line — `- shape is Scalar | Record | RecordSet.`, `Scalar` the
+default — grammar-shipped in the #189 validation slice; the ruling is that cardinality is declared, not
+inferred. `shape is Record | RecordSet` parses and validates today but is **validate-only** — emit activates
+at the flip.)*
 
 **Boolean determination from a valueless resource** (the #189 migration form): declare the concept's
 **result** value type boolean and reduce with existence over the natural resource —
@@ -243,10 +252,13 @@ When you review CRL logic, emit, or representation design, measure it against **
 This doc is authoritative on the points above. Two older specs need updating to match and should be read
 **subordinate** to this doc until reconciled:
 
-- `docs/defined-as-is-semantic-composition.md` and `docs/cql-to-crl-type-valuetype-rule.md §7` — both state
+- `docs/defined-as-is-semantic-composition.md` and `docs/cql-to-crl-type-valuetype-rule.md §7` — both stated
   that mixed-value-type ("mixed-shape") composition is legal via an implicit `exists` bridge. That is
-  **superseded**: mixed-value-type composition is an **author error**; the author writes an explicit
-  `definition is exists <record concept>` operand. These docs will be updated with the validation slice.
+  **superseded** (decision B), and both docs were **updated in the #189 grammar+validation slice** (IMPL 4)
+  with a superseding banner reflecting the shipped **directional** rule: a boolean leaf inside a non-boolean
+  composition is a hard **error**; other result-type disagreements the bridge permits are a **warning** today
+  that becomes an **error at the #189 flip**. The explicit `defined as exists ( … )` lift is the fix for the
+  boolean-parent-over-record-leaf warning cell (not for the error cell — there the leaf's value type is realigned).
 
 Related: `docs/decisions/0001-asserted-vs-sourced-data-model.md` (the asserted-vs-sourced foundation, still
 current).

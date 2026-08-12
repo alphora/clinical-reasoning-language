@@ -28,17 +28,22 @@ emitted for external-coded facts.
 ## 1. Concept model (from the charter — normative summary)
 
 - One identity, a **declared value type** and a **declared cardinality** (operator decision D1 — cardinality
-  is declared, **not inferred** from reduction-presence): a scalar-valued concept declares a singular value
-  type (`boolean`/`Quantity`/…) and **must reduce**; a record-valued concept declares **`value type is set of
-  <T>`** and **publishes its records** (consumed by name). The explicit `set of` disambiguates a
-  `CodeableConcept` *set* (e.g. a coded-Encounter refinement operand) from a single-`CodeableConcept` scalar.
-  *(Exact surface — `set of <T>` vs a `records` keyword — finalized in the grammar slice; the ruling is that
-  cardinality is declared.)*
+  is declared, **not inferred** from reduction-presence). The cardinality is a dedicated concept-level line,
+  **`- shape is Scalar | Record | RecordSet.`** (grammar-shipped in the validation slice; `Scalar` is the
+  default the builder normalizes an omitted `shape is` to): a **Scalar** concept declares a singular value type
+  (`boolean`/`Quantity`/…) and **must reduce**; a **RecordSet** concept **publishes its records** (consumed by
+  name), its record resource coming from `type is`; a **Record** concept is a single selected record. The
+  explicit `shape is RecordSet` disambiguates a `CodeableConcept` *set* (e.g. a coded-Encounter refinement
+  operand) from a single-`CodeableConcept` scalar — both would carry the `CodeableConcept` value type, so
+  cardinality can't be read off the value type. `shape is Record | RecordSet` parses and validates today but is
+  **validate-only** (emit activates at the flip).
 - **Datum type ≠ result type.** The *representation datum* is the record shape (`Condition` with coding at
   `Condition.code`, no value element); the *published result* is what the define returns (`Scalar<Boolean>`
-  from `exists`). `value type` names the RESULT. "value-type-must-match-a-real-element" applies **only** to a
-  representation read as a value *without* a reduction — and to any **value-reading** reduction (`most recent
-  this` on a scalar value type reads the value element; the check covers it too — final-round Claude #5).
+  from `exists`). For a **Scalar** concept, `value type` names the RESULT; for a **Record/RecordSet** concept
+  `value type` is optional (the result type is the record resource, from `type is`) and, when present, names the
+  record's **datum** type. "value-type-must-match-a-real-element" applies **only** to a representation read as a
+  value *without* a reduction — and to any **value-reading** reduction (`most recent this` on a scalar value
+  type reads the value element; the check covers it too — final-round Claude #5).
 - **Source representation is fully explicit** (`type` + `value element` + `value type`, `coded from` optional)
   and does **not** inherit the concept's fields (validator A.1, `representationShapeValidator.ts:260-275`).
 - **Closed-world:** absence = empty/false; explicit absence = an absence code (a record).
@@ -47,20 +52,32 @@ emitted for external-coded facts.
 
 ## 2. Reductions and result shape (final-round F1, F3)
 
-**Result shape = f(reduction, declared value type)** — a TOTAL function; every cell is a result type or a
-validation error (no silent rewrite = no manufacturing):
+**Result shape = f(reduction, declared shape, declared value type)** — every cell is a result type or a
+validation error (no silent rewrite = no manufacturing). The keying is **reduction × declared shape × declared
+value type** (`shape is` supplies the cardinality; for `Scalar` — the default — the value type carries the
+discrimination, for `Record`/`RecordSet` the resource comes from `type is`, **or from the shape-checked operand
+for a representation-free derived concept** — `reductionShapeValidator` exempts `non-scalar-missing-type` there,
+so this inheritance is only partly validated in N). The table enumerates the **defined** cells. **Normatively,
+any (reduction × shape) pairing not listed is invalid — an error at the flip.** The shipped-N
+`reductionShapeValidator` **warns** (all its findings are `severity: "warning"` in N, per §9 step 1) on the
+implemented subset — a scalar reduction on a `Record`/`RecordSet` → `recordset-scalar-reduction`; a `Record`
+concept that fails to select a record → `record-shape-invariant`. Deferred, still-unchecked cells (the `type
+is`-vs-operand agreement — "left for the flip step", `reductionShapeValidator.ts:313-321`; value-element
+correspondence; a `RecordSet` + scalar-narrative orphan; cross-library named operands) are listed in the
+validator header and remain flip blockers — so the matrix is total **normatively**, not by exhaustive shipped-N
+rows:
 
-| Reduction | Declared value type | Result | Lowering / rule |
-|---|---|---|---|
-| `exists this` | boolean | `Scalar<Boolean>` | **datum-discriminated** (F1): datum has NO value element → `exists([<R>: X])`; datum has a **boolean** value element → `exists([<R>: X] O where O.value is true)`; other datum → **error** |
-| `exists this` | non-boolean | — | **validation error** |
-| `most recent this` | scalar `V` (rep has a matching value element) | `Scalar<V>` | select newest, **then read the value element** (one composite reduction); `Coalesce(<read>, false)` if boolean, else null-guarded per §3 |
-| `most recent this` | scalar `V`, **valueless rep** | — | **validation error + migration prompt** ("existence is forced; author `exists this`") — NEVER silently rewrite to `exists` |
-| `most recent this` | record (`value type is <ResourceType>`) | `Record<R>` | select newest record; no value read |
-| `count this … at least N` | boolean | `Scalar<Boolean>` | `Count([<R>: X]) >= N` (total; `Count`→0 on empty — verify at impl before relying on bare) |
-| (none) | `set of <T>` | `RecordSet<T>` | the retrieve/union; published, consumed by name |
-| (none) | scalar | — | **validation error** (no bare scalar `code is`) |
-| named `exists "X"` / `most recent "X"` / `count "X"` | per above, `X` a `RecordSet` | per above | `X` must resolve to a `RecordSet`; else resolution error |
+| Reduction | Declared shape | Declared value type | Result | Lowering / rule |
+|---|---|---|---|---|
+| `exists this` | Scalar | boolean | `Scalar<Boolean>` | **datum-discriminated** (F1): datum has NO value element → `exists([<R>: X])`; datum has a **boolean** value element → `exists([<R>: X] O where O.value is true)`; other datum → **error** |
+| `exists this` | Scalar | non-boolean | — | **validation error** |
+| `most recent this` | Scalar | scalar `V` (rep has a matching value element) | `Scalar<V>` | select newest, **then read the value element** (one composite reduction); `Coalesce(<read>, false)` if boolean, else null-guarded per §3 |
+| `most recent this` | Scalar | scalar `V`, **valueless rep** | — | **validation error + migration prompt** ("existence is forced; author `exists this`") — NEVER silently rewrite to `exists` |
+| `most recent this` | Record | (optional; resource from `type is`) | `Record<R>` | select newest record; no value read |
+| `count this … at least N` | Scalar | boolean | `Scalar<Boolean>` | `Count([<R>: X]) >= N` (total; `Count`→0 on empty — verify at impl before relying on bare) |
+| (none) | RecordSet | (optional; resource from `type is`) | `RecordSet<R>` | the retrieve/union; published, consumed by name |
+| (none) | Scalar | scalar | — | **validation error** (no bare scalar `code is`) |
+| named `exists "X"` / `most recent "X"` / `count "X"` | per above | per above, `X` a `RecordSet` | per above | `X` must resolve to a `RecordSet`; else resolution error |
 
 Notes: `most recent` sort is the engine-proven form (`emitCQL.ts:1281-1285` — **`where` precedes `sort`**):
 `Last([<R>: X] O where O.value is FHIR.boolean sort by (O.effective as FHIR.dateTime).value, O.id)`. The sort
@@ -167,9 +184,17 @@ author-token drift lane).
   (F5) — `resourceType` matters only for `Record`/`RecordSet` (`RecordSet<Condition>` ≠ `RecordSet<Encounter>`);
   two `Scalar<Boolean>` compose regardless of source resource. Diagnostic names each *resolved* operand's
   type + operator; an unresolved operand emits the resolution error instead.
-- **Mixed value type = author error** (decision B), fixed by an explicit `definition is exists "Record
-  Concept"` operand. Supersedes `docs/defined-as-is-semantic-composition.md` +
-  `docs/cql-to-crl-type-valuetype-rule.md §7` (update with the validation slice).
+- **Mixed value type = author error** (decision B), realized **directionally** in the shipped validator
+  (`useSiteTypeValidator.ts`, b1068ca — grammar/validator is the source of truth): a leaf declaring `value type
+  is boolean` inside a composition whose parent declares a **non-boolean value type** is a hard **error**
+  (`boolean-in-refinement-composition`, value-type-keyed, non-demotable) — fixed by giving that leaf its
+  resource value type, or declaring the parent boolean (NOT by an `exists` lift). Any other result-type
+  disagreement the implicit-existence bridge permits — a **boolean parent over a resource/record leaf**, two
+  differing non-booleans, or a differing record resource — is a **warning** (`composition-result-type-mismatch`)
+  today that **becomes an error at the flip**; the boolean-parent + record-leaf cell is fixed by making the
+  bridge explicit with `defined as exists ( "Record Concept" )`. **Supersedes**
+  `docs/defined-as-is-semantic-composition.md` + `docs/cql-to-crl-type-valuetype-rule.md §7` — both **updated in
+  IMPL 4** with superseding banners (done, not deferred).
 - **Interface = pure façade** (`define "X": Inferred."X"`): keeps the `library[]` rebind-target job, loses
   boolean-wrapping. Negated-guard `Coalesce` (`decision.ts:636-646`) stays (sits below its `not`); NOT
   generalized to a terminal Coalesce.
@@ -185,16 +210,20 @@ author-token drift lane).
 ## 8. Grammar + validation slice (LEADS)
 
 New surface: `definition is exists this` / `most recent this` / `count … at least N` / `this`; the **named**
-`definition is exists "X"`; the **record-valued cardinality declaration** (`value type is set of <T>` or a
-`records` marker — D1). `this` = an AST node for the concept's **representation records only** (no
-circularity); ref-walk / cycle / CRE / requalification specified.
+`definition is exists "X"`; the **cardinality declaration** `- shape is Scalar | Record | RecordSet.` (a
+dedicated concept-level line, `Scalar` the default — D1). `this` = an AST node for the concept's
+**representation records only** (no circularity); ref-walk / cycle / CRE / requalification specified.
 
-New validation (all **WARNINGS / migration-prompts in version N**, per §9):
+New validation (**WARNINGS / migration-prompts in version N**, per §9, **except the two non-demotable errors
+noted**):
 - **no bare SCALAR `code is`** (record-valued concepts are legal — declared via the cardinality marker).
 - **non-boolean concept in a decision guard** (#240 → reject-with-error).
 - **value-type-must-match-a-real-element** — for any representation read as a value (bare read OR a
   value-reading reduction like `most recent this`).
-- **mixed-value-type composition** (§7).
+- **mixed-value-type composition** (§7) — **one cell is a hard ERROR, not a warning**: a boolean leaf inside a
+  composition whose parent declares a non-boolean value type (`boolean-in-refinement-composition`,
+  non-demotable). Other result-type disagreements are warnings in N that become errors at the flip
+  (`composition-result-type-mismatch`).
 - **`most recent this` / `count this` on a multi-rep concept**; **`exists this` on a non-boolean**; **`most
   recent this` on a valueless rep** (§2/§6).
 
@@ -203,9 +232,14 @@ New validation (all **WARNINGS / migration-prompts in version N**, per §9):
 ## 9. Sequencing — one atomic gate across BOTH lanes (F6)
 
 1. **Grammar + validation slice** — new forms parse + validate; new checks are **WARNINGS**; new forms are
-   **validate-only** (they parse and validate but do NOT yet emit — say so explicitly, or a KE who follows the
-   migration prompt hits the still-live `emit-mixed-code-and-definition` hard-error, `lowerLocalCodes.ts:475/
-   512`). Old bare `code is` still emits via the current path.
+   **validate-only** (they parse and validate but do NOT yet emit). A KE who follows a migration prompt and
+   authors a reduction now hits the dedicated **`emit-reduction-not-active`** sentinel (IMPL 3 — a clear
+   "accepted for validate-only migration, CANNOT yet be emitted, activates at the flip" diagnostic fired ahead
+   of the generic `emit-mixed-code-and-definition` check, on every lane incl. the FHIR-closure fold), not a
+   confusing mixed-code hard error. Old bare `code is` still emits via the current path. **SHIPPED** —
+   `bfdd204` (grammar+AST) · `c0d79fa`+`68af9b5` (reduction/shape validator) · `b1068ca` (use-site composition/
+   guard) · `92fc5c0`+`f24e36f` (emit sentinel). The `shape is` cardinality line lands here (`Scalar` default,
+   `Record`/`RecordSet` validate-only).
 2. **Effective-representation descriptor** — inert shared infrastructure; activation gated. (Needs #271
    canonicalBase-required first.)
 3. **Migration inventory** (reference-graph of every bare `code is` by consumption role) — **BEFORE
@@ -255,8 +289,8 @@ when picked up (memory is not backlog).**
 - **#255** Patient-compartment path (makes age cases loadable).
 - **#110** deterministic/scenario-relative CEL dates.
 - **#253** emit-contract docs · **#254→#214** MCP emit-to-disk exposure.
-- **Decision B doc reconciliation** — update `docs/defined-as-is-semantic-composition.md` +
-  `docs/cql-to-crl-type-valuetype-rule.md §7` (mixed-shape "legal" → author error); ride the validation slice.
+- ~~**Decision B doc reconciliation**~~ — **DONE in IMPL 4** (`docs/defined-as-is-semantic-composition.md` +
+  `docs/cql-to-crl-type-valuetype-rule.md §7` carry superseding banners for the shipped directional rule; §7 above).
 
 ### Implementation-detail obligations carried into the build
 - **Resource-writer registry** (§4/§7) — a supported {resourceType → codingElement, valueElement, recency
@@ -274,9 +308,9 @@ when picked up (memory is not backlog).**
 | Fork (i) | Local domain = CANONICAL/PRODUCTION (not chart-match; source reps optional/additive) | 2026-08-11 |
 | Fork (ii) | "no bare `code is`" = value-type-driven (scalar ⇒ reduction; record ⇒ publishes) | 2026-08-11 |
 | A | Boolean-from-valueless-resource = existence over the natural resource (`exists this`) | 2026-08-11 |
-| B | Mixed-value-type composition = author error (supersede two docs) | 2026-08-11 |
+| B | Mixed-value-type composition = author error (supersede two docs) — **realized directionally** in b1068ca: boolean-leaf-in-non-boolean = hard error; other result-type mismatches = warning→error-at-flip (§7) | 2026-08-11 |
 | C | Coding identity = 3rd round-trip axis; derive-local / (defer)validate-external | 2026-08-11 |
-| D1 | Cardinality is **declared** (`value type is set of <T>`), not inferred | 2026-08-11 |
+| D1 | Cardinality is **declared** (`- shape is Scalar \| Record \| RecordSet.`, `Scalar` default — grammar-shipped in the validation slice), not inferred | 2026-08-11 |
 | D2 | #189 scoped to the LOCAL path; sourced-CEL deferred | 2026-08-11 |
 
 Full round history + per-point processing: `.vibe-tools/discussions/413-emit189-context-free-total-boolean.md`

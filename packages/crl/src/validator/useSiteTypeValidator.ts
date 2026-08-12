@@ -1219,8 +1219,9 @@ function untypedWarning(
     message:
       `Concept "${conceptName}": ${constraint.role} of \`${pattern}\` should be ` +
       `${operandExpectation(constraint)}, but its operand "${operandName}" declares no ` +
-      `\`value type\`. Give "${operandName}" a \`value type\` so this can be checked (every concept ` +
-      `is required to declare one — see the \`missing-value-type\` error).`,
+      `\`value type\`. Give "${operandName}" a \`value type\` so this can be checked (a Scalar concept ` +
+      `is required to declare one — see the \`missing-value-type\` error; a \`shape is Record | RecordSet\` ` +
+      `concept takes its result type from \`type is\` instead).`,
     location: loc(location),
     severity: "warning",
     ...base(attribution),

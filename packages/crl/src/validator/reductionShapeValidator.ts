@@ -37,7 +37,7 @@ import type { ReductionShapeError, ReductionShapeRule, ValidationError } from ".
 //   recordset-scalar-reduction        — a RecordSet concept carrying a reduction OR a narrative `most
 //                                       recent "X"` selection (a set publishes records, not a value/record).
 //                                       A bare `code is` on a RecordSet is NOT flagged — it is the canonical
-//                                       base-record retrieve (North Star §3 / design §2 `(none) + set of <T>`).
+//                                       base-record retrieve (North Star §3 / design §2 `(none) × RecordSet`).
 //   record-shape-invariant            — a Record concept without a record-selecting `most recent`
 //   no-bare-scalar-code               — a Scalar bare `code is` with no reduction (THE migration prompt)
 //   non-scalar-missing-type           — a non-Scalar concept with no `type is` (record shape needs a resource)
@@ -258,7 +258,7 @@ export class ReductionShapeValidator {
     // BOTH a structural reduction (`exists`/`count`/`most recent this`) AND a narrative `most recent
     // "X"` selection are rejected: a reduction produces a scalar, a selection ONE record — neither is a
     // set. (A local `code is` alone on a RecordSet is NOT flagged — it is the canonical base-record
-    // RETRIEVE, North Star §3 / design §2 `(none) + set of <T> → RecordSet<T>`; the old
+    // RETRIEVE, North Star §3 / design §2 `(none) × RecordSet → RecordSet<R>`; the old
     // `recordset-bare-code-incoherent` rule wrongly applied Scalar "code is = existence" intuition and
     // false-flagged the charter's own worked example — deleted, panel R3 gpt56 #1.)
     if (shape === "RecordSet" && (reduction || narrativeLeadsWithMostRecent(def))) {

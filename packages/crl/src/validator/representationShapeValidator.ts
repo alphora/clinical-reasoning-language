@@ -35,9 +35,10 @@ import type { RepresentationShapeError, RepresentationShapeRule, ValidationError
 //   A.8 definition-is-exists-misuse    — a `definition is exists (...)` (existence is a
 //                                        `defined as` operator, not `definition is`)
 //   A.9 multiple-value-types           — >1 `value type` on one concept or posrep
-//   A.10 missing-value-type            — a concept declares NO `value type` (the redesign requires
-//                                        exactly one). Now an ERROR: the #257 migration is complete,
-//                                        so every concept (corpus + fixtures + kit) is typed.
+//   A.10 missing-value-type            — a SCALAR concept (the default shape) declares NO `value type`.
+//                                        Now an ERROR (the #257 migration is complete): a Scalar concept
+//                                        has exactly one. SHAPE-CONDITIONAL — a `shape is Record | RecordSet`
+//                                        concept MAY omit it (result type from `type is`); see the check below.
 //
 // NOT here (deliberate):
 //   - `x + n ≥ 1` ("at least one producer", #202) is ALREADY enforced at build time

@@ -143,7 +143,7 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
   // ---------------------------------------------------------------- base-record retrieve (gpt56 R3 #1)
   describe("a bare `code is` on a RecordSet is the CANONICAL base-record retrieve — NOT flagged", () => {
     it("does NOT emit any recordset-*-incoherence warning for the North Star §3 base-record concept", () => {
-      // `"Conservative Therapy Trial"` (North Star §3 / design §2 `(none) + set of <T> → RecordSet<T>`):
+      // `"Conservative Therapy Trial"` (North Star §3 / design §2 `(none) × RecordSet → RecordSet<R>`):
       // a local `code is` on a RecordSet is the retrieve that PRODUCES records — coherent, not a "boolean
       // existence." The deleted `recordset-bare-code-incoherent` rule wrongly flagged exactly this.
       const src =

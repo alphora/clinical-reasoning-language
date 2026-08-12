@@ -411,7 +411,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.22");
+    expect(kit.schemaVersion).toBe("1.23");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -995,11 +995,22 @@ describe("authoring-kit — getAuthoringKit", () => {
     // projection` are independent slots, the recency `type is Observation` reworded to effective/implicit, and
     // the `validate-only` legend + representation-reference `purpose` reworded (artifact tier vs construct
     // status). BOTH hashes move again.
+    // #271 (schemaVersion 1.21→1.22): teach the project-config `crl.canonicalBase` REQUIREMENT (emitted local
+    // CodeSystem url + removed urn fallback) in the verify-loop note. NO payload-shape change. BOTH hashes moved.
+    // #189 IMPL 4 (schemaVersion 1.22→1.23): the `value type` requirement is now SHAPE-CONDITIONAL — the shipped
+    // validation slice added `- shape is Scalar | Record | RecordSet.` (A.10 relaxation: `missing-value-type` errors
+    // only for a Scalar concept; Record/RecordSet take their result type from `type is`). Reworded the global "value
+    // type REQUIRED on EVERY concept / A.10 ERROR" claim (a contradiction against the shipped validator) to
+    // shape-conditional in `value-type` (rule + enforced clause), `concept-form`, and the CONCEPT_LAYER_MODEL value-type
+    // entry; added a MINIMAL `shape is` CONCEPT_LAYER_MODEL entry (scope `out`, validate-only, OUT of Stage-1). The
+    // two-arm panel (disc 415) additionally corrected the kit `value-type` composition teaching to the SHIPPED b1068ca
+    // rule — the `composition-result-type-mismatch` WARNING (→ error at flip) + `decision-guard-record-shaped`, and the
+    // shape-aware `concept = declared shape + …` package-wide model. BOTH hashes move.
     expect(cpg.contentHash).toBe(
-      "6fa32dd382edaf82fdb94da6863a2fcd38b62247e3f2b6ecfd58ef251191290f",
+      "9288e7497f7a7df29736d7e429cf272ff2510d83f0afc0a7ef5ffcbaa9106b6d",
     );
     expect(priorAuth.contentHash).toBe(
-      "6e7fae6cf0764629da3645fdea9ceb9c789246e6ce453d00ffb15c8647819492",
+      "08c84b02f1c7d03d51cdee659fe33a29fb3bbe955ee9e5faecad7b3524684afd",
     );
   });
 

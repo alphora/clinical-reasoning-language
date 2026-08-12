@@ -8,6 +8,12 @@
 
 > **Terminology (#168):** the `sem-*` combination this document describes is **INFERENCE** — it normalizes ONE concept's representations, components, or facets into one fact. We retire the word "semantic composition" for it in favor of *inference*, because "composition" collides with **decision composition** — combining a policy's DISTINCT criteria, which is the decision TREE's job (nested `when`s, sibling `first:` branches, `use decision`), never `defined as`. Where this doc still says "composition" below, it means the sem-* **body mechanism** (one concept), never decision composition. `defined as`/`sem-*` is one-concept inference; it never joins distinct criteria. See [decision-shapes.md](decision-shapes.md).
 
+> **⚠ SUPERSEDED IN PART — decision B (2026-08-11), realized in the #189 grammar+validation slice.** This document originally taught that mixed-value-type (`"mixed-shape"`) `sem-*` composition is *always* legal and the emitter *silently* bridges every operand — that "the validator may warn but does not block." That is **no longer the shipped rule**. Read this doc subordinate to [CRL-NORTH-STAR.md](CRL-NORTH-STAR.md) and [emit-consistency-189-design.md](emit-consistency-189-design.md) §7. The shipped rule (`src/validator/useSiteTypeValidator.ts`, commit `b1068ca`) has **two cells**:
+> - **ERROR (`boolean-in-refinement-composition`), non-demotable in N** — a leaf declaring `value type is boolean` inside a composition whose parent declares a **single non-boolean value type**. A boolean truth isn't a resource stream, so it can't be unioned / intersected / excepted. **Fix:** give the boolean leaf the resource value type it refines (so it contributes instances), OR — if this composition is really a determination — declare the parent `value type is boolean` (then boolean operands compose, and a resource operand is bridged via `exists`). This error is **value-type-keyed**: a `shape is Record | RecordSet` parent that *omits* `value type` gets the WARNING below instead, not this error.
+> - **WARNING (`composition-result-type-mismatch`), validate-only in N → ERROR at the #189 flip** — any **resolved, determinable** result-type disagreement the implicit-existence bridge currently permits: a **boolean parent over a resource/record leaf** (the classic exists-bridge), OR two differing non-booleans (including two Scalar leaves, e.g. a `Quantity` leaf under a `CodeableConcept` parent), OR a differing record resource (`RecordSet<A>` vs `RecordSet<B>`). (Shipped N conservatively *skips* the compare it can't decide — a parameter leaf, an unknown record resource, a package-only cross-library type — never inventing a type.) The emit is unchanged in N, so this direction is **not "preserved"** — it is on a migration deadline. **Fix** the boolean-parent + record-leaf cell by making the bridge explicit — derive `defined as exists ( "X" )` and compose *that* boolean (`X` must publish records — a `RecordSet`; a scalar non-boolean leaf must first be made record-valued, or `exists "X"` trips `recordset-operand-required`); **fix** other mismatches by aligning the leaf's shape / value type with the composition (or referencing a matching-result concept).
+>
+> The "author declares the result; the emitter figures out HOW" principle holds only up to these guardrails. At the flip, every result-type disagreement is an error and the emitter no longer implicitly `exists`-bridges. Where a specific claim below conflicts with this banner, **this banner wins**.
+
 ---
 
 ## The principle, in one paragraph
@@ -38,7 +44,7 @@ concept "Has Normal BMI":
 ).
 ```
 
-The inference combines a Quantity-bearing refinement with a boolean predicate. **This is not a defect.** The author is asserting: "the concept `Has Normal BMI` semantically means: the patient has a normal-BMI-range observation AND has no documented abnormal BMI. The result is a boolean predicate." The CQL emitter will translate this into something like `exists("Normal BMI Range") and "Without Documented Abnormal BMI"`, wrapping the refinement in `exists` to bridge to the boolean.
+The inference combines a Quantity-bearing refinement with a boolean predicate. **This is not a defect today, but see the banner** — a boolean-result composition over a refinement (`"Normal BMI Range"`) leaf is the WARNING cell: shipped emit is unchanged (the emitter translates it into something like `exists("Normal BMI Range") and "Without Documented Abnormal BMI"`, wrapping the refinement in `exists` to bridge to the boolean), but the validator now warns that the implicit bridge retires at the #189 flip. The migration is to make the refinement operand explicitly boolean — `defined as exists ( "Normal BMI Range" )` — and compose that. The author still declares the RESULT's shape; the guardrail is on *how* the operand reaches it.
 
 The author did not have to declare the operands as the same shape. They declared the RESULT's shape. The semantics of the composition follows.
 
@@ -50,12 +56,12 @@ The validator's job is to enforce the rules the design says are rules — not to
 - ✅ Check that the boolean rule is respected: `<Resource>+boolean` only valid if the resource has a native boolean value field; else `Observation+boolean`.
 - ✅ Check reference resolution: every concept ref points to a declared concept.
 - ✅ Check cycles, name uniqueness, action uniqueness — structural defects.
-- ⚠️ **WARN** (not error) on mixed-shape sem-* operands as a code-smell — but DO NOT block. The author may have explicitly chosen this.
-- ❌ **DO NOT** require sem-* operands to have matching `(type, valuetype)`. That's not a rule. The author declares the result.
+- ⚠️ **(SUPERSEDED — see the banner)** The original rule "WARN, never block on mixed-shape operands" is now two cells: (1) a leaf declaring `value type is boolean` inside a composition whose parent declares a **non-boolean value type** is a hard **error** (`boolean-in-refinement-composition`) — fix by giving that leaf its resource value type, or declaring the parent boolean; (2) any other result-type disagreement the exists-bridge permits (a boolean parent over a resource/record leaf; two differing non-booleans) is a **warning** (`composition-result-type-mismatch`) today that **becomes an error at the #189 flip** — fix the boolean-parent + record-leaf cell with an explicit `defined as exists ( "X" )` lift.
+- ❌ **DO NOT** require sem-* operands to have matching `(type, valuetype)` *element-for-element*. The result-type equality the validator now checks is at the **shape / record-resource** granularity (per the banner), not full datum-type matching — the author still declares the result.
 
 ### For the CQL emitter
 
-When the emitter walks a sem-* composition with mixed-shape operands, its job is to BRIDGE the operand types into the result type:
+When the emitter walks a sem-* composition with mixed-shape operands, its job is to BRIDGE the operand types into the result type (**this is the N-only behaviour the banner supersedes — the implicit bridge WARNS today and becomes an ERROR at the #189 flip; a boolean leaf under a non-boolean value-type parent already hard-errors**):
 
 - `sem-and(refinement, boolean)` with boolean result → emit `exists(refinement-as-CQL) and boolean-as-CQL`.
 - `sem-or(refinement-A, refinement-B)` with same-resource refinement result → emit `refinement-A-CQL union refinement-B-CQL`.
@@ -70,7 +76,7 @@ These are emitter-side translations, not author-side concerns. The author declar
 
 The transformation rule at [cql-to-crl-type-valuetype-rule.md](cql-to-crl-type-valuetype-rule.md) says: for any concept, the `(type, valuetype)` is decided by the author based on what the concept SEMANTICALLY MEANS, with the boolean rule as the one hard constraint (boolean valuetype requires a resource with a native boolean field, else fall back to Observation).
 
-The chain check in §7 of that rule has been updated to reflect this principle. Old version said: "mixed-shape sem-* composition is a defect, the validator flags it." That was wrong — it imposed a constraint the design doesn't have. New version says: mixed operands are legal under explicit author declaration; the validator may warn but does not block.
+The chain check in §7 of that rule has been through two revisions. The pre-v0.7 version said "mixed-shape sem-* composition is a defect, the validator flags it" (too strict); v0.7 relaxed it to "mixed operands are legal, the validator may warn but does not block." **Decision B (2026-08-11) supersedes BOTH** — see the banner at the top: a boolean leaf inside a non-boolean composition is now a hard **error**, and any other result-type disagreement the exists-bridge permits is a **warning** today that becomes an **error at the #189 flip**. The validator does block, in one direction, now.
 
 ---
 
@@ -97,11 +103,11 @@ These are the failure modes the corpus-correction work hit; future authors and a
 
 ### Mis-reading 1: "sem-and is boolean AND, so operands must be boolean"
 
-**No.** `sem-and` is semantic intersection. Operands can be refinements (the intersection is a smaller refinement), booleans (the intersection is `AND`), value-bearing (intersection over the value field), or mixed (the author declares the result's shape; the emitter bridges).
+**No.** `sem-and` is semantic intersection. Operands can be refinements (the intersection is a smaller refinement), booleans (the intersection is `AND`), value-bearing (intersection over the value field), or mixed (the author declares the result's shape; the emitter bridges — *within the banner's guardrails: a boolean leaf in a non-boolean composition hard-errors, and other mixes warn today / error at the flip*).
 
 ### Mis-reading 2: "If the author flips a concept from boolean to refinement, downstream consumers compose into a mixed-shape defect"
 
-**Not necessarily.** The downstream consumer has its own `(type, valuetype)` declaration. If the consumer declares boolean, the sem-* composition still produces boolean — the refinement operand is bridged via `exists` at emit time. Mixed operands compose; the result follows the declaration.
+**Not necessarily.** The downstream consumer has its own `(type, valuetype)` declaration. If the consumer declares boolean, the sem-* composition still produces boolean — the refinement operand is bridged via `exists` at emit time. Mixed operands compose; the result follows the declaration. **(This is exactly the banner's WARNING cell: shipped today, but the validator now warns that the implicit `exists` bridge retires at the #189 flip — make it explicit with `defined as exists ( "X" )`.)**
 
 ### Mis-reading 3: "The source CQL define returns List<X>, so the CRL concept MUST be a refinement"
 
@@ -113,7 +119,7 @@ These are the failure modes the corpus-correction work hit; future authors and a
 
 ### Mis-reading 5: "If I see operands of different types, I should refactor the CRL to add explicit `exists` wrappers"
 
-**No.** That's HOW. The author's declared result `(type, valuetype)` already captures the semantic intent. Adding explicit `exists` wrappers makes the CRL more verbose without changing its meaning. Trust the author's declaration; let the emitter bridge.
+**Mostly, but see the banner — decision B changed this in two ways.** (1) For a **boolean-result composition over a resource/record operand**, an explicit `exists` wrapper is no longer just redundant HOW: the shipped validator now **warns** (`composition-result-type-mismatch`) that the implicit bridge retires at the #189 flip, so writing `defined as exists ( "X" )` and composing *that* boolean is the **migration**, not verbosity. (2) A **boolean operand inside a NON-boolean composition** is a hard **error** (`boolean-in-refinement-composition`) — but the fix there is **not** an `exists` lift (that produces yet another boolean, which the non-boolean composition rejects): give the boolean leaf the resource value type it refines, or declare the parent `value type is boolean`. So: add an explicit `exists` to a **boolean-parent** composition to satisfy the retiring bridge; **realign types** (don't add `exists`) when a **non-boolean** composition carries a boolean leaf.
 
 ---
 
@@ -126,7 +132,7 @@ Per concept:
    - Boolean predicate: `<Resource>+boolean` if the resource has a native boolean value field (`Observation`, `QuestionnaireResponse`, etc.), else `Observation+boolean`.
    - Refinement: type and valuetype inherited from the subject of the refinement.
    - Value-bearing: type is the source resource; value type is the primitive extracted.
-3. **For inference bodies** (`defined as`): don't worry about whether operands "type-check". The inference is semantic. Declare the result; trust the emitter.
+3. **For inference bodies** (`defined as`): declare the result and let the inference be semantic — but mind the two guardrails in the banner (a boolean leaf inside a non-boolean composition is a hard error; a boolean parent over a resource/record leaf warns and errors at the #189 flip). Within those, trust the emitter.
 4. **For source-CQL audits**: read the define for SEMANTIC INTENT, not return-type mechanics. An `exists` in the define means the WHOLE define is a boolean; an `exists` at an OUTER define wrapping a list-shaped concept means the OUTER define is boolean — but the inner concept could be authored as either boolean (predicate-shaped intent) or refinement (list-shaped intent). Author decides.
 
 ---
@@ -147,18 +153,20 @@ When the CQL→CRL transformer MCP ships, its behavior must respect this princip
 
 - The transformer reads source CQL and INFERS the semantic intent of each define.
 - It declares the resulting CRL concept's `(type, valuetype)` based on that intent.
-- It does NOT enforce operand-type matching in composition bodies it constructs.
-- It does NOT refactor composition bodies to make operands type-uniform.
+- It does NOT enforce operand-type matching in composition bodies it constructs — **but it must respect the banner's two guardrails**: never place a boolean leaf under a non-boolean composition (a hard error), and treat a boolean-parent-over-record-leaf bridge as a `defined as exists ( "X" )` lift (the implicit bridge errors at the #189 flip).
+- It does NOT refactor composition bodies to make operands type-uniform, beyond the two guardrails above.
 
-The transformer's job is intent-capture, not type-bridging. Type bridging is the emitter's problem.
+The transformer's job is intent-capture, not type-bridging — within the shipped composition guardrails. Type bridging is the emitter's problem.
 
 ---
 
 ## Open design question — explicit vs succinct valuetype on inferred concepts
 
+> **⚠ RESOLVED FOR SCALAR by A.10 (#257, shipped) — this "open question" is largely closed.** `value type` is now **required on every Scalar concept** (`missing-value-type` is a validator ERROR; `representationShapeValidator.ts`). Since every `defined as` concept in Stage-1 is Scalar (the default shape), **Style B (omit the value type) no longer validates** for these concepts — the value type must be restated. Style B survives *only* for a `shape is Record | RecordSet` concept, where `value type` is optional and the result type comes from `type is`. The section below is retained for the historical rationale; read it under this constraint.
+
 For a `defined as` concept whose valuetype CAN be deduced from the subject (refinement preserves V_S, value-bearing primitive declared inline), should the author **restate** the valuetype explicitly, or **omit** it and let the reader / validator deduce it from the chain?
 
-Both are valid styles. CRL v0.7's grammar (`(valueTypeLine)*` — 0..*) and validator (skips chain check when V_C or V_S is missing) support both.
+Historically both were valid styles. CRL v0.7's grammar (`(valueTypeLine)*` — 0..*) allowed either; the validator then skipped the chain check when V_C or V_S was missing. **A.10 has since made the value type required for a Scalar concept**, so Style B (omit) is now a `missing-value-type` error there (see the note above); only non-Scalar `shape is Record | RecordSet` concepts may still omit it.
 
 **Style A — explicit:**
 
