@@ -36,6 +36,14 @@ function mismatches(src: string, rule?: UseSiteTypeRule): UseSiteTypeMismatchErr
 function untypedWarnings(src: string): ValidationError[] {
   return validateFull(src).warnings.filter((e) => e.kind === "use-site-operand-untyped");
 }
+// #189 IMPL 2b — the newly-invalid composition cells route as use-site-type-mismatch WARNINGS (the
+// exists-bridge still runs at emit until the flip), so they land in `.warnings`, not `.errors`.
+function mismatchWarnings(src: string, rule?: UseSiteTypeRule): UseSiteTypeMismatchError[] {
+  return validateFull(src).warnings.filter(
+    (e): e is UseSiteTypeMismatchError =>
+      e.kind === "use-site-type-mismatch" && (rule === undefined || e.rule === rule),
+  );
+}
 
 describe("UseSiteTypeValidator (Todo 2 rule B) — operand constraints", () => {
   // ---- Time-selection: operand must NOT be boolean (refinement 1's catch) ----
@@ -529,12 +537,40 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — boolean operand in a refineme
     expect(mismatches(equal, "bare-ref-value-type-mismatch")).toHaveLength(0);
   });
 
-  it("ACCEPTS a boolean PARENT with a refinement leaf (one-directional — the exists-bridge is legal)", () => {
+  it("WARNS (not errors) on a resource leaf under a boolean PARENT — the exists-bridge cell #189 retires", () => {
+    // Under the old asymmetric rule this was silently accepted (a boolean parent existentializes a
+    // refinement leaf). #189 IMPL 2b makes it a WARNING-only `composition-result-type-mismatch`: the
+    // bridge still runs at emit until the flip, so it is validate-only migration teaching — NOT an error
+    // (isValid stays true), and NOT the `boolean-in-refinement-composition` error (that stays reserved
+    // for a boolean leaf under a NON-boolean scalar parent).
     const src =
       `library "T".\n` +
       `concept "A":\n- value type is CodeableConcept.\n- code is \`a\`.\n` +
       `concept "B":\n- value type is boolean.\n- code is \`b\`.\n` +
       `concept "OK":\n- value type is boolean.\n- defined as ( "A" sem-and "B" ).\n`;
+    expect(mismatches(src, "boolean-in-refinement-composition")).toHaveLength(0); // NOT the error rule
+    const warns = mismatchWarnings(src, "composition-result-type-mismatch");
+    expect(warns).toHaveLength(1); // only the CodeableConcept leaf "A"; boolean leaf "B" agrees
+    expect(warns[0].conceptName).toBe("OK");
+    expect(warns[0].expected).toBe("boolean");
+    expect(warns[0].actual).toBe("CodeableConcept");
+    expect(warns[0].severity).toBe("warning");
+    expect(warns[0].message).toMatch(/defined as exists/); // steers to the emit-capable form (#265)
+    expect(validateFull(src).isValid).toBe(true); // a warning never flips isValid
+  });
+
+  it("WARNS on two DIFFERENT non-boolean leaves (the old rule only caught boolean leaves)", () => {
+    // A `CodeableConcept` composition with a `Quantity` leaf: neither is boolean, so the old
+    // one-directional (boolean-only) rule missed it. #189 IMPL 2b flags the result-type disagreement.
+    const src =
+      `library "T".\n` +
+      `concept "A":\n- value type is CodeableConcept.\n- code is \`a\`.\n` +
+      `concept "Q":\n- value type is Quantity.\n- code is \`q\`.\n` +
+      `concept "Mixed":\n- value type is CodeableConcept.\n- defined as ( "A" sem-or "Q" ).\n`;
+    const warns = mismatchWarnings(src, "composition-result-type-mismatch");
+    expect(warns).toHaveLength(1);
+    expect(warns[0].actual).toBe("Quantity");
+    expect(warns[0].expected).toBe("CodeableConcept");
     expect(mismatches(src, "boolean-in-refinement-composition")).toHaveLength(0);
   });
 
@@ -545,6 +581,19 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — boolean operand in a refineme
       `concept "C":\n- value type is CodeableConcept.\n- code is \`c\`.\n` +
       `concept "OK":\n- value type is CodeableConcept.\n- defined as ( "A" sem-and "C" ).\n`;
     expect(mismatches(src, "boolean-in-refinement-composition")).toHaveLength(0);
+    expect(mismatchWarnings(src, "composition-result-type-mismatch")).toHaveLength(0);
+  });
+
+  it("ACCEPTS an all-boolean composition (canonical `Scalar<Boolean>` leaves compose)", () => {
+    // `ConditionExists sem-or ServiceRequestExists` — every leaf is a boolean determination; no warning.
+    const src =
+      `library "T".\n` +
+      `concept "Ev":\n- value type is dateTime.\n- code is \`e\`.\n` +
+      `concept "CondExists":\n- value type is boolean.\n- defined as exists ( "Ev" ).\n` +
+      `concept "SrExists":\n- value type is boolean.\n- code is \`s\`.\n` +
+      `concept "Either":\n- value type is boolean.\n- defined as ( "CondExists" sem-or "SrExists" ).\n`;
+    expect(mismatches(src)).toHaveLength(0);
+    expect(mismatchWarnings(src)).toHaveLength(0);
   });
 
   it("does NOT double-report on a top-level `sem-not` (that's `negation-result-nonboolean`)", () => {
@@ -654,6 +703,7 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — language-level shape rules", 
         `activity "Do It":\n- request CPGCommunicationRequest.\n` +
         `decision "D":\n- when "Eligible" then recommend activity "Do It".\n`;
       expect(mismatches(boolean)).toHaveLength(0);
+      expect(mismatchWarnings(boolean, "decision-guard-record-shaped")).toHaveLength(0); // Scalar boolean → no shape warning
       const untyped =
         `library "T".\n` +
         `concept "Eligible":\n- code is \`e\`.\n` + // untyped presence concept — the norm today
@@ -793,6 +843,243 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — registry self-validation", ()
         ).toEqual(expected);
       }
     }
+  });
+});
+
+describe("UseSiteTypeValidator (Todo 2 rule B) — #189 IMPL 2b: record-shaped result types + guard teaching", () => {
+  // A concept's FULL discriminated result type (design §2): a Scalar publishes its value type; a
+  // Record / RecordSet publishes `Record<R>` / `RecordSet<R>` keyed on the FHIR resource (`type is R`),
+  // NOT its value type. The composition-leaf + bare-ref checks compare on that full result type.
+
+  it("REJECTS a bare-ref alias whose RECORD-SET resource disagrees (RecordSet<R> both directions)", () => {
+    const src =
+      `library "T".\n` +
+      `concept "Obs Set":\n- shape is RecordSet.\n- type is Observation.\n- code is \`o\`.\n` +
+      `concept "Cond Alias":\n- shape is RecordSet.\n- type is Condition.\n- defined as "Obs Set".\n`;
+    const errs = mismatches(src, "bare-ref-value-type-mismatch");
+    expect(errs).toHaveLength(1);
+    expect(errs[0].conceptName).toBe("Cond Alias");
+    expect(errs[0].expected).toBe("RecordSet<Condition>");
+    expect(errs[0].actual).toBe("RecordSet<Observation>");
+  });
+
+  it("ACCEPTS a bare-ref alias over the SAME record-set resource", () => {
+    const src =
+      `library "T".\n` +
+      `concept "Obs Set A":\n- shape is RecordSet.\n- type is Observation.\n- code is \`a\`.\n` +
+      `concept "Obs Set B":\n- shape is RecordSet.\n- type is Observation.\n- defined as "Obs Set A".\n`;
+    expect(mismatches(src, "bare-ref-value-type-mismatch")).toHaveLength(0);
+  });
+
+  it("WARNS on a record-shaped composition leaf whose resource disagrees with the parent", () => {
+    const src =
+      `library "T".\n` +
+      `concept "Obs Set":\n- shape is RecordSet.\n- type is Observation.\n- code is \`o\`.\n` +
+      `concept "Cond Set":\n- shape is RecordSet.\n- type is Condition.\n- code is \`c\`.\n` +
+      `concept "Union":\n- shape is RecordSet.\n- type is Observation.\n- defined as ( "Obs Set" sem-or "Cond Set" ).\n`;
+    const warns = mismatchWarnings(src, "composition-result-type-mismatch");
+    expect(warns).toHaveLength(1); // the Condition leaf; the Observation leaf agrees
+    expect(warns[0].expected).toBe("RecordSet<Observation>");
+    expect(warns[0].actual).toBe("RecordSet<Condition>");
+    expect(warns[0].severity).toBe("warning");
+  });
+
+  it("PRESERVES the boolean-in-refinement-composition ERROR for a boolean leaf under a RecordSet parent with a non-boolean DATUM value type (panel R1 gpt56 #2)", () => {
+    // The old rule's trigger was SHAPE-BLIND (a single non-boolean value type). A RecordSet parent that
+    // ALSO declares a non-boolean datum value type errored on a boolean leaf before #189 IMPL 2b, and
+    // must STILL error (not demote to a warning) — the discriminator is `hadOldBooleanLeafError`, not shape.
+    const src =
+      `library "T".\n` +
+      `concept "Obs Set":\n- shape is RecordSet.\n- type is Observation.\n- value type is Quantity.\n- code is \`o\`.\n` +
+      `concept "Bool":\n- value type is boolean.\n- code is \`b\`.\n` +
+      `concept "Bad":\n- shape is RecordSet.\n- type is Observation.\n- value type is Quantity.\n- defined as ( "Obs Set" sem-or "Bool" ).\n`;
+    const errs = mismatches(src, "boolean-in-refinement-composition");
+    expect(errs).toHaveLength(1); // the boolean leaf "Bool"; the Observation leaf agrees
+    expect(errs[0].conceptName).toBe("Bad");
+    expect(errs[0].actual).toBe("boolean");
+    expect(mismatchWarnings(src, "composition-result-type-mismatch")).toHaveLength(0); // no double-report
+    expect(validateFull(src).isValid).toBe(false); // a preserved hard error
+  });
+
+  it("WARNS (not errors) on a boolean leaf under a RecordSet parent that declares NO datum value type", () => {
+    // With no single parent value type, `hadOldBooleanLeafError` is false (the old code never reached this
+    // cell), so the boolean leaf is the WARNING-only `composition-result-type-mismatch`, not a hard error.
+    const src =
+      `library "T".\n` +
+      `concept "Obs Set":\n- shape is RecordSet.\n- type is Observation.\n- code is \`o\`.\n` +
+      `concept "Bool":\n- value type is boolean.\n- code is \`b\`.\n` +
+      `concept "Union":\n- shape is RecordSet.\n- type is Observation.\n- defined as ( "Obs Set" sem-or "Bool" ).\n`;
+    expect(mismatches(src, "boolean-in-refinement-composition")).toHaveLength(0);
+    const warns = mismatchWarnings(src, "composition-result-type-mismatch");
+    expect(warns).toHaveLength(1);
+    expect(warns[0].actual).toBe("boolean");
+    expect(warns[0].expected).toBe("RecordSet<Observation>");
+    expect(validateFull(src).isValid).toBe(true);
+  });
+
+  it("does NOT flag a value-preserving RecordSet `sem-not` as negation-result-nonboolean (panel R1 gpt56 #3)", () => {
+    // On a Record/RecordSet, `sem-not` is set-complement (`except`), value-preserving — NOT a boolean
+    // negation — so the Scalar-only result-shape check must not fire, with or without a datum value type.
+    const withDatum =
+      `library "T".\n` +
+      `concept "Conditions":\n- shape is RecordSet.\n- type is Condition.\n- code is \`c\`.\n` +
+      `concept "Excluded":\n- shape is RecordSet.\n- type is Condition.\n- value type is CodeableConcept.\n- defined as ( sem-not "Conditions" ).\n`;
+    expect(mismatches(withDatum, "negation-result-nonboolean")).toHaveLength(0);
+    expect(mismatchWarnings(withDatum, "composition-result-type-mismatch")).toHaveLength(0); // same resource → clean
+    const noDatum =
+      `library "T".\n` +
+      `concept "Conditions":\n- shape is RecordSet.\n- type is Condition.\n- code is \`c\`.\n` +
+      `concept "Excluded":\n- shape is RecordSet.\n- type is Condition.\n- defined as ( sem-not "Conditions" ).\n`;
+    expect(mismatches(noDatum, "negation-result-nonboolean")).toHaveLength(0);
+  });
+
+  it("STILL flags a Scalar non-boolean top-level `sem-not` as negation-result-nonboolean (Scalar gate keeps the existing error)", () => {
+    const src =
+      `library "T".\n` +
+      `concept "B":\n- value type is boolean.\n- code is \`b\`.\n` +
+      `concept "Neg":\n- value type is CodeableConcept.\n- defined as ( sem-not "B" ).\n`;
+    expect(mismatches(src, "negation-result-nonboolean")).toHaveLength(1);
+  });
+
+  it("a RecordSet parent + non-boolean datum + top-level `sem-not` + boolean leaf switches rule (negation → boolean-in-refinement) but STAYS an error (panel R2 Claude #5)", () => {
+    // The Scalar gate removes `negation-result-nonboolean` here (a RecordSet `sem-not` is `except`), but the
+    // descend then catches the boolean leaf via check (i) — a different rule, same `isValid: false`.
+    const src =
+      `library "T".\n` +
+      `concept "Bool":\n- value type is boolean.\n- code is \`b\`.\n` +
+      `concept "Bad":\n- shape is RecordSet.\n- type is Condition.\n- value type is CodeableConcept.\n- defined as ( sem-not "Bool" ).\n`;
+    expect(mismatches(src, "negation-result-nonboolean")).toHaveLength(0); // Scalar gate removed it
+    expect(mismatches(src, "boolean-in-refinement-composition")).toHaveLength(1); // caught by check (i) instead
+    expect(validateFull(src).isValid).toBe(false); // still an error either way
+  });
+
+  it("REJECTS a Scalar bare-ref alias over a DERIVED RecordSet with NO `type is` (shape disagreement is decidable; panel R2 Claude #1a)", () => {
+    // `Union` is a derived RecordSet with no `type is` (resource unknown), so its result type is
+    // `RecordSet<?>`. A `Scalar<Quantity>` bare-ref alias over it disagrees on SHAPE regardless of the
+    // unknown resource — HEAD errored (value types differ) and this version must too (not go silent).
+    const src =
+      `library "T".\n` +
+      `concept "A":\n- shape is RecordSet.\n- type is Observation.\n- code is \`a\`.\n` +
+      `concept "B":\n- shape is RecordSet.\n- type is Observation.\n- code is \`b\`.\n` +
+      `concept "Union":\n- shape is RecordSet.\n- defined as ( "A" sem-or "B" ).\n` + // derived RecordSet, NO type is
+      `concept "Alias":\n- value type is Quantity.\n- defined as "Union".\n`;
+    const errs = mismatches(src, "bare-ref-value-type-mismatch");
+    expect(errs).toHaveLength(1);
+    expect(errs[0].conceptName).toBe("Alias");
+    expect(errs[0].actual).toBe("RecordSet<…>"); // rendered with an unknown resource
+    expect(validateFull(src).isValid).toBe(false);
+  });
+
+  it("WARNS on the exists-bridge cell when the record leaf's resource is unknown (cold-flip hole closed; panel R2 Claude #1b)", () => {
+    // A `boolean` composition with a DERIVED-RecordSet leaf (resource unknown): the shapes disagree
+    // (`boolean` scalar vs record), so the forward-looking WARNING still fires — the exact retiring
+    // exists-bridge direction §9 step 1 exists to warm, even without the leaf's `type is`.
+    const src =
+      `library "T".\n` +
+      `concept "A":\n- shape is RecordSet.\n- type is Observation.\n- code is \`a\`.\n` +
+      `concept "B":\n- shape is RecordSet.\n- type is Observation.\n- code is \`b\`.\n` +
+      `concept "Union":\n- shape is RecordSet.\n- defined as ( "A" sem-or "B" ).\n` + // derived RecordSet, NO type is
+      `concept "C":\n- value type is boolean.\n- code is \`c\`.\n` +
+      `concept "Any":\n- value type is boolean.\n- defined as ( "Union" sem-or "C" ).\n`;
+    const warns = mismatchWarnings(src, "composition-result-type-mismatch");
+    expect(warns).toHaveLength(1); // the record-shaped leaf "Union"; the boolean leaf "C" agrees
+    expect(warns[0].actual).toBe("RecordSet<…>");
+    expect(warns[0].expected).toBe("boolean");
+  });
+
+  it("PRESERVES the error even when the RecordSet parent has a non-boolean datum value type but NO `type is` (panel R2 Claude #1b — was demoted to silence)", () => {
+    // The parent's RESULT type is indeterminate (RecordSet with no resource), so the WARNING path skips —
+    // but the preserved ERROR is VALUE-TYPE-keyed and does NOT depend on the result type being known, so a
+    // boolean leaf still errors (it emits broken today regardless of the missing `type is`).
+    const src =
+      `library "T".\n` +
+      `concept "Bool":\n- value type is boolean.\n- code is \`b\`.\n` +
+      `concept "Other":\n- shape is RecordSet.\n- type is Observation.\n- code is \`o\`.\n` + // record leaf; parent resource unknown → indeterminate, no warning
+      `concept "Bad":\n- shape is RecordSet.\n- value type is Quantity.\n- defined as ( "Other" sem-or "Bool" ).\n`;
+    const errs = mismatches(src, "boolean-in-refinement-composition");
+    expect(errs).toHaveLength(1); // the boolean leaf "Bool" — value-type-keyed, fires without the parent's `type is`
+    expect(errs[0].conceptName).toBe("Bad");
+    expect(mismatchWarnings(src, "composition-result-type-mismatch")).toHaveLength(0); // no double-report
+    expect(validateFull(src).isValid).toBe(false);
+  });
+
+  it("PRESERVES the error for a boolean-DATUM record-shaped LEAF under a non-boolean scalar parent (panel R2 Claude #1c — was demoted)", () => {
+    // The leaf's declared VALUE TYPE is boolean though its shape is RecordSet; HEAD keyed the error on the
+    // leaf's value type, and so must this version (the emitter is shape-blind) — it must not slip to a warning.
+    const src =
+      `library "T".\n` +
+      `concept "A":\n- value type is CodeableConcept.\n- code is \`a\`.\n` +
+      `concept "RecBool":\n- shape is RecordSet.\n- type is Observation.\n- value type is boolean.\n- code is \`r\`.\n` +
+      `concept "Bad":\n- value type is CodeableConcept.\n- defined as ( "A" sem-or "RecBool" ).\n`;
+    const errs = mismatches(src, "boolean-in-refinement-composition");
+    expect(errs).toHaveLength(1);
+    expect(errs[0].conceptName).toBe("Bad");
+    expect(errs[0].actual).toBe("boolean");
+    expect(mismatchWarnings(src, "composition-result-type-mismatch")).toHaveLength(0); // no double-report
+  });
+
+  it("composes two RecordSet<Observation> concepts with DIFFERENT datum value types cleanly (design F5 — resource-keyed, datum-agnostic; panel R2 Claude #6)", () => {
+    // A record result is keyed on the RESOURCE only, not the datum value type. A Quantity-datum and a
+    // boolean-datum RecordSet<Observation> publish the same `RecordSet<Observation>` and must compose
+    // without a whisper. Pinned so a later implementer does not "fix" it by folding the datum type in.
+    const src =
+      `library "T".\n` +
+      `concept "Vitals Q":\n- shape is RecordSet.\n- type is Observation.\n- value type is Quantity.\n- code is \`q\`.\n` +
+      `concept "Vitals B":\n- shape is RecordSet.\n- type is Observation.\n- value type is boolean.\n- code is \`b\`.\n` +
+      `concept "All Vitals":\n- shape is RecordSet.\n- type is Observation.\n- defined as ( "Vitals Q" sem-or "Vitals B" ).\n`;
+    expect(mismatches(src, "boolean-in-refinement-composition")).toHaveLength(0);
+    expect(mismatchWarnings(src, "composition-result-type-mismatch")).toHaveLength(0);
+  });
+
+  it("WARNS on a boolean-DATUM record-shaped guard operand — RecordSet AND Record (forward-looking; panel R2 Claude #2 / gpt56 #4)", () => {
+    // The operand declares `value type is boolean`, so today's value-type guard check passes silently —
+    // but it is a record SHAPE, so at the flip it publishes records and the guard hard-errors. The
+    // forward-looking WARNING leads the flip (design §9 step 1); the guard does NOT hard-error in N.
+    for (const shape of ["RecordSet", "Record"]) {
+      const def =
+        shape === "Record"
+          ? `- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is \`o\`.\n- definition is most recent this.\n`
+          : `- shape is RecordSet.\n- type is Observation.\n- value type is boolean.\n- code is \`o\`.\n`;
+      const src =
+        `library "T".\n` +
+        `concept "Obs Flags":\n${def}` +
+        `activity "Do It":\n- request CPGCommunicationRequest.\n` +
+        `decision "D":\n- when "Obs Flags" then recommend activity "Do It".\n`;
+      expect(mismatches(src, "decision-guard-nonboolean"), shape).toHaveLength(0); // NOT the hard error
+      const warns = mismatchWarnings(src, "decision-guard-record-shaped");
+      expect(warns, shape).toHaveLength(1);
+      expect(warns[0].message).toMatch(new RegExp(`shape is ${shape}`));
+      expect(warns[0].message).toMatch(/defined as exists/);
+      expect(validateFull(src).isValid, shape).toBe(true);
+    }
+  });
+
+  it("teaches a RECORD-VALUED decision guard to reduce with `exists` (shape-aware message)", () => {
+    // A RecordSet operand in a guard is still a hard error (a guard consumes a boolean), but the message
+    // steers to an `exists` presence reduction — the generic value-comparison guidance doesn't apply.
+    const src =
+      `library "T".\n` +
+      `concept "Obs Set":\n- shape is RecordSet.\n- type is Observation.\n- value type is Quantity.\n- code is \`o\`.\n` +
+      `activity "Do It":\n- request CPGCommunicationRequest.\n` +
+      `decision "D":\n- when "Obs Set" then recommend activity "Do It".\n`;
+    const errs = mismatches(src, "decision-guard-nonboolean");
+    expect(errs).toHaveLength(1);
+    expect(errs[0].actual).toBe("Quantity");
+    expect(errs[0].message).toMatch(/shape is RecordSet/);
+    expect(errs[0].message).toMatch(/exists/);
+    expect(errs[0].message).not.toMatch(/at least/); // record guidance drops the value-comparison hint
+  });
+
+  it("keeps the SCALAR non-boolean guard message unchanged (value-comparison hint retained)", () => {
+    const src =
+      `library "T".\n` +
+      `concept "BMI":\n- value type is Quantity.\n- code is \`b\`.\n` +
+      `activity "Do It":\n- request CPGCommunicationRequest.\n` +
+      `decision "D":\n- when "BMI" then recommend activity "Do It".\n`;
+    const errs = mismatches(src, "decision-guard-nonboolean");
+    expect(errs).toHaveLength(1);
+    expect(errs[0].message).toMatch(/at least/); // Scalar keeps the value-comparison guidance
+    expect(errs[0].message).not.toMatch(/shape is/);
   });
 });
 

@@ -3,6 +3,8 @@ import {
   getRefLibrary,
   type CRL,
   type Concept,
+  type ConceptShape,
+  type ConceptType,
   type Decision,
   type Statement,
   type BranchBlock,
@@ -78,6 +80,15 @@ interface ConceptTypeInfo {
   // A concept that is BOTH coded AND derived counts as derived (operator ruling, disc 400): its
   // `most recent` would be ambiguous, so it is rejected — the author models the dated event instead.
   derived: boolean;
+  // #189 IMPL 2b — the declared cardinality (`- shape is …`, builder-normalized to "Scalar" when
+  // omitted) and FHIR resource (`- type is R.`), threaded so a composition leaf / bare-ref target /
+  // guard operand can be compared on its FULL discriminated RESULT type (design §2): a Scalar's
+  // result is its value type; a Record/RecordSet's is `Record<R>` / `RecordSet<R>` (from conceptType,
+  // not the value type — which for a record shape is the DATUM type). `conceptType` may be absent (a
+  // record shape derived entirely from operands, or any Scalar), in which case a record result type
+  // is indeterminate and the compare is conservatively skipped.
+  shape: ConceptShape;
+  conceptType?: ConceptType;
 }
 
 /** One library's declared concepts + parameters (name -> declared type token). */
@@ -108,8 +119,18 @@ interface ResolveCtx {
 type OperandResolution =
   // `derived` = has NO event instance stream (a `defined as`/`definition is` inference, OR a runtime
   // PARAMETER scalar — see `origin`). `origin` distinguishes the two so a diagnostic can word itself
-  // correctly (a parameter has no "underlying resource concept" to point at).
-  | { status: "typed"; valueType: ConceptValueType; derived: boolean; origin: "concept" | "parameter" }
+  // correctly (a parameter has no "underlying resource concept" to point at). `shape`/`conceptType`
+  // (#189 IMPL 2b) carry the operand's declared cardinality + resource so a guard message can steer a
+  // record-valued operand to `exists` (a parameter is a Scalar with no resource: shape "Scalar",
+  // conceptType undefined).
+  | {
+      status: "typed";
+      valueType: ConceptValueType;
+      derived: boolean;
+      origin: "concept" | "parameter";
+      shape: ConceptShape;
+      conceptType?: ConceptType;
+    }
   | { status: "untyped" } // resolved to a concept declaring 0 value types
   | { status: "multiple" } // resolved to a concept declaring >1 (rule A.9 owns this)
   | { status: "unresolved" }; // not found / not visible / wrong kind (reference diagnostic owns this)
@@ -176,12 +197,28 @@ export class UseSiteTypeValidator {
       this.checkCall(call, concept.name, ctx, attribution, warnedUntyped, errors);
     }
 
-    // 2. RESULT shape — `defined as exists` / top-level `sem-not` ⟹ boolean.
+    // 2. RESULT shape + composition-leaf agreement (#189 IMPL 2b REPLACE).
     if (def?.type === "DefinedAsDefinition") {
       const vts = concept.valueTypes ?? [];
-      // Only a single declared value type is checkable (0 -> A.10 (#257) makes it required; >1 -> A.9).
-      if (vts.length === 1 && vts[0] !== "boolean") {
-        const body = def.body;
+      const body = def.body;
+
+      // 2a. RESULT shape — a NON-boolean-declared SCALAR whose form ALWAYS yields boolean (`defined as
+      // exists` / a top-level `sem-not`). SCALAR-ONLY (panel R1 gpt56 #3): on a Scalar the value type IS
+      // the result, so `exists`/`sem-not` yielding boolean contradicts a non-boolean value type. On a
+      // non-Scalar the value type is the DATUM type, so `negation-result-nonboolean` is the WRONG
+      // diagnostic — but for DIFFERENT reasons by shape (panel R2 gpt56 #2): on a `RecordSet`, `sem-not` is
+      // value-preserving set-complement (`except`, North Star §3 / design §7), a legitimate record form; on
+      // a `Record` (a single selected record) `sem-not` is genuinely incoherent, but that shape/form defect
+      // is owned by the reductionShapeValidator's `record-shape-invariant`, not this value-type check.
+      // DEFERRED GAP (panel R2 Claude #4): the inverse — a Record/RecordSet concept whose body is
+      // `defined as exists` (intrinsically `Scalar<Boolean>`) — is genuinely incoherent (a record shape
+      // cannot publish an existence boolean), but that is a SHAPE-vs-FORM coherence check that belongs with
+      // the reductionShapeValidator (which owns `recordset-scalar-reduction` and today covers only
+      // reductions / narrative `most recent`, not `defined as exists`). It lands with the flip / a
+      // reductionShapeValidator follow-up; the concept still gets `shape-marker-not-emit-active` (2a) now,
+      // so the flip is not cold. Non-demotable errors (design §2 exists/negation rows).
+      const resultChecksApply = concept.shape === "Scalar" && vts.length === 1 && vts[0] !== "boolean";
+      if (resultChecksApply) {
         if (body.type === "DefinedAsExists") {
           errors.push(
             resultMismatch("exists-result-nonboolean", concept.name, vts[0], body.location, attribution),
@@ -190,36 +227,74 @@ export class UseSiteTypeValidator {
           errors.push(
             resultMismatch("negation-result-nonboolean", concept.name, vts[0], body.location, attribution),
           );
-        } else if (body.type === "DefinedAsComposition") {
-          // 2b. COMPOSITION-OPERAND shape (category 2 — a language rule, NOT the pattern-operand
-          // registry; `sem-*` live in `CompositionExpression`, not `matchNarrative`). A non-boolean
-          // composition VALUE is a resource stream (the emitter's refinement shape); each leaf
-          // operand must also be non-boolean — a boolean leaf can't be unioned / intersected into
-          // the stream. This LIFTS the emitter's `bridgeOperand`
-          // `/* FIXME: boolean operand in refinement composition */` to a pre-emit error, and is
-          // STRONGER than the emitter for a cross-library leaf (which the emitter force-defaults to
-          // "refinement" and never flags — the validator resolves its real type). ONE-directional:
-          // reached only because the PARENT is non-boolean; a boolean parent + refinement leaf stays
-          // legal (the exists-bridge existentializes it), so it is NOT checked here.
-          this.checkCompositionLeaves(body.expression, concept.name, vts[0], ctx, attribution, errors);
+        }
+      }
+
+      // 2b. COMPOSITION-LEAF agreement — TWO decoupled checks over the same leaves (the 2b REPLACE):
+      //
+      //   (i) The PRESERVED ERROR (`boolean-in-refinement-composition`) — a boolean-VALUE-TYPE leaf under a
+      //       parent whose SINGLE value type is non-boolean. VALUE-TYPE-keyed and SHAPE-BLIND, byte-for-byte
+      //       HEAD (panel R1 both arms): HEAD's rule never tested shape, and the CURRENT emitter routes
+      //       composition shape purely on value type (`emitCQL.ts` bridgeOperand FIXME), so this cell is
+      //       exactly what emits broken today. It fires regardless of shape and regardless of whether the
+      //       parent's RESULT type is determinable — so a `RecordSet` parent with a non-boolean datum value
+      //       type (with OR without a `type is`), and a boolean-datum `RecordSet`-shaped LEAF, all still
+      //       error, never demoting to a warning or to silence.
+      //  (ii) The forward-looking WARNING (`composition-result-type-mismatch`) — a leaf whose full
+      //       discriminated RESULT type (`Scalar<V>`→V, `Record<R>`, `RecordSet<R>`; design §2) disagrees
+      //       with the composition's, in a cell (i) did NOT already error. These were PERMITTED before (the
+      //       retiring exists-bridge still runs at emit until the #189 flip), so they warn, never fail N.
+      //
+      // A top-level `sem-not` that already produced a Scalar RESULT error (2a) is not re-descended (matches
+      // HEAD's early return); otherwise we descend so both (i) and (ii) see every leaf.
+      if (body.type === "DefinedAsComposition") {
+        const parentResult = conceptResultType(concept.shape, vts, concept.conceptType);
+        const parentValueType = vts.length === 1 ? vts[0] : undefined;
+        const skipNegationResultError = resultChecksApply && topLevelIsSemNot(body.expression);
+        if (!skipNegationResultError) {
+          this.checkCompositionLeaves(
+            body.expression,
+            concept.name,
+            parentResult,
+            parentValueType,
+            ctx,
+            attribution,
+            errors,
+          );
         }
       }
     }
 
-    // 2c. BARE-REF ALIAS value type (disc 404 Q4 + R2 Q3). `defined as "X"` is value-PRESERVING (the
-    // concept's value IS X's), and the emitter's bare-ref path returns the raw ref with NO bridge in
-    // either direction (unlike a composition leaf, where a refinement leaf under a boolean parent is
-    // legally `exists`-bridged). A bare alias therefore CANNOT change the value type, so the concept's
-    // must EQUAL the target's — full equality, not just boolean-ness (R2 Q3: a `Quantity` alias over a
-    // `CodeableConcept` target would otherwise pass the `is Quantity` value-comparison check on a lie).
+    // 2c. BARE-REF ALIAS result type (disc 404 Q4 + R2 Q3; extended in #189 IMPL 2b). `defined as "X"`
+    // is value-PRESERVING (the concept's value IS X's), and the emitter's bare-ref path returns the raw
+    // ref with NO bridge in either direction (unlike a composition leaf, where a refinement leaf under a
+    // boolean parent is legally `exists`-bridged today). A bare alias therefore CANNOT change the result
+    // type, so the concept's must EQUAL the target's — full discriminated-result equality (not just
+    // boolean-ness): a `Quantity` alias over a `CodeableConcept` target, OR a `RecordSet<Condition>`
+    // alias over a `RecordSet<Observation>` target, both disagree. BIDIRECTIONAL, still a hard error (a
+    // bare alias has no bridge to migrate to — it is simply a wrong declaration).
     if (def?.type === "DefinedAsDefinition" && def.body.type === "DefinedAsBareRef") {
-      const vts = concept.valueTypes ?? [];
-      if (vts.length === 1) {
+      const parentResult = conceptResultType(concept.shape, concept.valueTypes ?? [], concept.conceptType);
+      if (parentResult !== undefined) {
         const ref = def.body.ref;
-        const res = resolveOperand(getRefName(ref), getRefLibrary(ref) ?? undefined, ctx, false);
-        if (res.status === "typed" && vts[0] !== res.valueType) {
+        const targetResult = resolveConceptResultType(
+          getRefName(ref),
+          getRefLibrary(ref) ?? undefined,
+          ctx,
+        );
+        // A shape disagreement (`Scalar<Quantity>` alias over a `RecordSet<?>` target) is reportable even
+        // when the target's resource is unknown (panel R2 Claude #1); only a same-record-shape/unknown-
+        // resource compare is skipped as indeterminate.
+        if (targetResult !== undefined && compareResultTypes(parentResult, targetResult) === "disagree") {
           errors.push(
-            bareRefAliasMismatch(concept.name, vts[0], res.valueType, getRefName(ref), def.body.location, attribution),
+            bareRefAliasMismatch(
+              concept.name,
+              renderResultType(parentResult),
+              renderResultType(targetResult),
+              getRefName(ref),
+              def.body.location,
+              attribution,
+            ),
           );
         }
       }
@@ -240,41 +315,86 @@ export class UseSiteTypeValidator {
     }
   }
 
-  // Descend a NON-boolean concept's composition tree and flag every `boolean`-declared LEAF operand.
-  // The parent's refinement shape threads unchanged to every leaf in the emitter (`sem-and`/`sem-or`
-  // terms, a `sem-not` operand, a group), so a boolean leaf is rejected wherever it sits. This ENFORCES
-  // THE SHAPE RULE ACROSS ALL LEAVES; it does not claim every leaf reaches the identical emitter path
-  // — a positive-anchored `sem-and sem-not B` reaches `bridgeOperand`'s FIXME, whereas a no-base
-  // negation (`sem-or sem-not B`, all-negative `sem-and`) reaches `emitNoBaseNegation`, which may
-  // instead loud-refuse. Either way a boolean leaf is invalid, so the pre-emit check is sound (disc
-  // 404 Q3). A parameter leaf is skipped (`allowParameter: false`): a composition composes concepts /
-  // inferences, and a bare parameter is a reference-layer concern.
+  // Descend a concept's composition tree; per CompositionRef LEAF, two decoupled checks:
+  //   (i)  PRESERVED ERROR — the leaf's declared VALUE TYPE is boolean AND the parent's single value type
+  //        is non-boolean (`parentValueType`). Resolved via `resolveOperand` (the leaf's VALUE type, like
+  //        HEAD), so a boolean-datum record-shaped leaf still errors. Shape-blind; independent of whether
+  //        the parent's RESULT type is determinable. When it fires, the leaf is NOT also warned.
+  //   (ii) WARNING — the leaf's full RESULT type (`resolveConceptResultType`) DISAGREES with the parent's
+  //        (`compareResultTypes`): a shape disagreement is reported even when a record's resource is
+  //        unknown; a same-record-shape/unknown-resource compare is skipped as indeterminate (never invent
+  //        a type). A parameter leaf resolves to undefined in both and is skipped (a composition composes
+  //        concepts, not a bare parameter — a reference-layer concern).
+  // The parent's shape threads unchanged to every leaf in the emitter (`sem-and`/`sem-or` terms, a `sem-not`
+  // operand, a group), so a mismatched leaf is rejected wherever it sits — it does not claim every leaf
+  // reaches the identical emitter path (a positive-anchored `sem-and sem-not B` reaches `bridgeOperand`'s
+  // FIXME; a no-base negation reaches `emitNoBaseNegation`, loud-refuse), but a mismatched leaf is invalid
+  // either way, so the pre-emit check is sound (disc 404 Q3).
   private checkCompositionLeaves(
     expr: CompositionExpression,
     conceptName: string,
-    conceptVt: ConceptValueType,
+    parentResult: ResultType | undefined,
+    parentValueType: string | undefined,
     ctx: ResolveCtx,
     attribution: Attribution,
     errors: ValidationError[],
   ): void {
     switch (expr.type) {
       case "CompositionRef": {
-        const res = resolveOperand(getRefName(expr.ref), getRefLibrary(expr.ref) ?? undefined, ctx, false);
-        if (res.status === "typed" && res.valueType === "boolean") {
+        const name = getRefName(expr.ref);
+        const library = getRefLibrary(expr.ref) ?? undefined;
+        // (i) PRESERVED ERROR — value-type-keyed, shape-blind (exactly HEAD + the shape-blind emitter).
+        const parentIsNonBoolValueType = parentValueType !== undefined && parentValueType !== "boolean";
+        const res = resolveOperand(name, library, ctx, /*allowParameter*/ false);
+        if (parentIsNonBoolValueType && res.status === "typed" && res.valueType === "boolean") {
           errors.push(
-            compositionLeafMismatch(conceptName, conceptVt, getRefName(expr.ref), expr.location, attribution),
+            compositionLeafMismatch(conceptName, parentValueType as string, name, expr.location, attribution),
           );
+          return; // this leaf is the error cell — do not also warn on it
+        }
+        // (ii) forward-looking WARNING — result-type-keyed (a shape disagreement is decidable even when a
+        // record's resource is unknown; a same-record-shape/unknown-resource compare is indeterminate).
+        if (parentResult !== undefined) {
+          const leafResult = resolveConceptResultType(name, library, ctx);
+          if (leafResult !== undefined && compareResultTypes(parentResult, leafResult) === "disagree") {
+            errors.push(
+              compositionResultMismatch(
+                conceptName,
+                renderResultType(parentResult),
+                renderResultType(leafResult),
+                name,
+                expr.location,
+                attribution,
+              ),
+            );
+          }
         }
         return;
       }
       case "CompositionGroup":
       case "SemNotExpression":
-        this.checkCompositionLeaves(expr.expression, conceptName, conceptVt, ctx, attribution, errors);
+        this.checkCompositionLeaves(
+          expr.expression,
+          conceptName,
+          parentResult,
+          parentValueType,
+          ctx,
+          attribution,
+          errors,
+        );
         return;
       case "SemAndExpression":
       case "SemOrExpression":
         for (const term of expr.terms) {
-          this.checkCompositionLeaves(term, conceptName, conceptVt, ctx, attribution, errors);
+          this.checkCompositionLeaves(
+            term,
+            conceptName,
+            parentResult,
+            parentValueType,
+            ctx,
+            attribution,
+            errors,
+          );
         }
         return;
     }
@@ -510,8 +630,19 @@ export class UseSiteTypeValidator {
     // today — presence determinations without an explicit `value type`) are silent, NOT warned:
     // guards are far too numerous to flag every untyped operand, and A.10 (#257) makes types required.
     const res = resolveOperand(getRefName(ref), getRefLibrary(ref) ?? undefined, ctx, /*allowParameter*/ false);
-    if (res.status === "typed" && res.valueType !== "boolean") {
-      errors.push(guardMismatch(ownerName, res.valueType, location, attribution));
+    if (res.status !== "typed") return;
+    if (res.valueType !== "boolean") {
+      // #189 IMPL 2b — the FAILURE is unchanged (a guard consumes a boolean; a typed non-boolean
+      // operand is still a hard error). The MESSAGE now steers a RECORD-valued operand (`shape`
+      // Record/RecordSet, threaded via the resolution) to an `exists` reduction rather than the generic
+      // value-comparison guidance, which does not apply to a record stream.
+      errors.push(guardMismatch(ownerName, getRefName(ref), res.valueType, res.shape, location, attribution));
+    } else if (res.shape !== "Scalar") {
+      // #189 IMPL 2b (panel R2 Claude #2) — a boolean-DATUM operand with a non-Scalar SHAPE passes today's
+      // value-type guard check, but at the flip it publishes records (not a boolean) and the guard hard-
+      // errors. Emit the forward-looking WARNING now so the flip is not cold — the guard cell that LEADS
+      // the flip, mirroring the composition/bare-ref result-type checks (design §9 step 1).
+      errors.push(guardRecordShapedWarning(ownerName, getRefName(ref), res.shape, location, attribution));
     }
   }
 }
@@ -534,7 +665,12 @@ function buildTypeIndex(ast: CRL, sources?: SourceContext[]): TypeIndex {
       const derived =
         stmt.definition?.type === "DefinedAsDefinition" ||
         stmt.definition?.type === "DefinitionIsDefinition";
-      lib(key).concepts.set(stmt.name, { valueTypes: stmt.valueTypes ?? [], derived });
+      lib(key).concepts.set(stmt.name, {
+        valueTypes: stmt.valueTypes ?? [],
+        derived,
+        shape: stmt.shape,
+        ...(stmt.conceptType ? { conceptType: stmt.conceptType } : {}),
+      });
     } else if (stmt.type === "Parameter" && stmt.name) {
       lib(key).parameters.set(stmt.name, stmt.parameterType);
     }
@@ -566,39 +702,65 @@ function resolveOperand(
   ctx: ResolveCtx,
   allowParameter: boolean,
 ): OperandResolution {
-  const isSelf = library === undefined || library === ctx.ownLibrary;
-  if (isSelf) {
-    return classify(ctx.index.get(ctx.ownKey), name, allowParameter);
-  }
-  // Foreign-qualified ref. Resolve visibility exactly as ReferenceResolver does; if the target
-  // library isn't legitimately visible (or its types aren't indexed), stay silent.
-  if (!ctx.scope) return { status: "unresolved" }; // single-file: a foreign ref is a reference error
-  const target = lookupKnownLibrary(ctx.scope, library);
-  if (!target) return { status: "unresolved" };
-  if (target.origin === "package" && !ctx.scope.explicitIncludes.has(library)) {
-    return { status: "unresolved" };
-  }
-  if (!target.names.concepts.has(name)) return { status: "unresolved" };
-  // A foreign ref is resolved as a CONCEPT only. A foreign-qualified *parameter* ref does resolve
-  // in the ReferenceResolver (narrative slots accept parameter), so rule B conservatively SKIPS it
-  // here rather than claiming it can't exist — any cross-library-parameter gap is the resolver's,
-  // not rule B's (a foreign boolean parameter at a constrained site is left unchecked, safe-silent).
-  return classify(ctx.index.get(idxKey(target.origin, target.libraryName)), name, /*allowParameter*/ false);
+  const found = resolveLib(name, library, ctx);
+  if (!found) return { status: "unresolved" };
+  // A foreign ref is resolved as a CONCEPT only (`allowParameter && isSelf`). A foreign-qualified
+  // *parameter* ref does resolve in the ReferenceResolver (narrative slots accept parameter), so rule B
+  // conservatively SKIPS it here rather than claiming it can't exist — any cross-library-parameter gap
+  // is the resolver's (a foreign boolean parameter at a constrained site is left unchecked, safe-silent).
+  return classify(found.types, name, allowParameter && found.isSelf);
 }
 
-function classify(
-  libTypes: LibraryTypes | undefined,
+/**
+ * Resolve a ref to its owning library's `LibraryTypes`, mirroring the ReferenceResolver's scope
+ * semantics: bare / self-qualified resolve in the owning library; a foreign-qualified ref resolves only
+ * when the scope legitimately makes the target visible (`lookupKnownLibrary` + explicit-include gate +
+ * the concept-name allowlist). Returns the owning `LibraryTypes` and whether it is the SELF scope (a
+ * parameter is reachable only in self scope). A ref that cannot be resolved conservatively — for any
+ * reason — returns `undefined` (silent), so rule B never invents a type it isn't sure of. Shared by the
+ * value-type resolution (`resolveOperand`) and the result-type resolution (`resolveConceptResultType`).
+ *
+ * KNOWN BOUND (disc 397 gpt56 #4): a package that `knownLibraries` can resolve but whose statements are
+ * not in `sources` (not a scope owner) has no entry in the index — its concepts' types are not
+ * available, so a foreign ref to one returns `undefined` and is NOT checked. This is a deliberate blind
+ * spot, not a bug: `KnownLibraryEntry` carries only names, never types.
+ */
+function resolveLib(
   name: string,
-  allowParameter: boolean,
-): OperandResolution {
-  if (!libTypes) return { status: "unresolved" };
+  library: string | undefined,
+  ctx: ResolveCtx,
+): { types: LibraryTypes; isSelf: boolean } | undefined {
+  const isSelf = library === undefined || library === ctx.ownLibrary;
+  if (isSelf) {
+    const types = ctx.index.get(ctx.ownKey);
+    return types ? { types, isSelf: true } : undefined;
+  }
+  // Foreign-qualified ref. Resolve visibility exactly as ReferenceResolver does; if the target library
+  // isn't legitimately visible (or its types aren't indexed), stay silent.
+  if (!ctx.scope) return undefined; // single-file: a foreign ref is a reference error
+  const target = lookupKnownLibrary(ctx.scope, library);
+  if (!target) return undefined;
+  if (target.origin === "package" && !ctx.scope.explicitIncludes.has(library)) return undefined;
+  if (!target.names.concepts.has(name)) return undefined;
+  const types = ctx.index.get(idxKey(target.origin, target.libraryName));
+  return types ? { types, isSelf: false } : undefined;
+}
+
+function classify(libTypes: LibraryTypes, name: string, allowParameter: boolean): OperandResolution {
   // Concept FIRST — mirrors NARRATIVE_REF_KINDS = [concept, parameter] precedence (a name declared
   // as both resolves to the concept; ReferenceResolver does the same).
   const c = libTypes.concepts.get(name);
   if (c) {
     if (c.valueTypes.length === 0) return { status: "untyped" };
     if (c.valueTypes.length > 1) return { status: "multiple" };
-    return { status: "typed", valueType: c.valueTypes[0], derived: c.derived, origin: "concept" };
+    return {
+      status: "typed",
+      valueType: c.valueTypes[0],
+      derived: c.derived,
+      origin: "concept",
+      shape: c.shape,
+      ...(c.conceptType ? { conceptType: c.conceptType } : {}),
+    };
   }
   if (allowParameter) {
     const pt = libTypes.parameters.get(name);
@@ -610,13 +772,89 @@ function classify(
       // position (`"Flag" performed`, `most recent "Flag"` — no stream to filter or select over; disc
       // 404 R2 Q5). This does NOT affect `is Quantity` (value-comparison ignores `derived`, so a
       // Quantity threshold parameter still validates). A parameter typed as a RESOURCE (`ConceptType`,
-      // e.g. `Observation`) is not a value — can't value-check it, stay silent.
+      // e.g. `Observation`) is not a value — can't value-check it, stay silent. A parameter is a
+      // Scalar with no resource (`shape: "Scalar"`, no `conceptType`) — #189 IMPL 2b.
       if (VALUE_TYPES.has(pt))
-        return { status: "typed", valueType: pt as ConceptValueType, derived: true, origin: "parameter" };
+        return {
+          status: "typed",
+          valueType: pt as ConceptValueType,
+          derived: true,
+          origin: "parameter",
+          shape: "Scalar",
+        };
       return { status: "unresolved" };
     }
   }
   return { status: "unresolved" };
+}
+
+// A concept's FULL discriminated RESULT type (design §2): a Scalar publishes its value type; a Record /
+// RecordSet publishes records of a FHIR resource (`conceptType`), which may be UNKNOWN when the concept
+// derives its resource from operands and carries no `type is` (a legitimate model form —
+// `reductionShapeValidator` exempts it from `non-scalar-missing-type`). The SHAPE is always known; only a
+// record's resource can be undetermined. Kept STRUCTURED (not a plain string) so a shape disagreement is
+// decidable without the resource (panel R2 Claude #1): `Scalar<V>` vs any record, or `Record` vs
+// `RecordSet`, differ for every resource.
+type ResultType =
+  | { shape: "Scalar"; valueType: ConceptValueType }
+  | { shape: "Record" | "RecordSet"; resource: ConceptType | undefined };
+
+/**
+ * A concept's result type, or `undefined` when FULLY indeterminate — a Scalar with 0 (A.10) or >1 (A.9)
+ * value types (no comparison possible). A record shape is NEVER fully indeterminate: its shape is known
+ * even when its resource is not (`resource: undefined`), which is enough to decide a shape disagreement.
+ */
+function conceptResultType(
+  shape: ConceptShape,
+  valueTypes: ConceptValueType[],
+  conceptType: ConceptType | undefined,
+): ResultType | undefined {
+  if (shape === "Scalar") {
+    return valueTypes.length === 1 ? { shape: "Scalar", valueType: valueTypes[0] } : undefined;
+  }
+  return { shape, resource: conceptType };
+}
+
+/**
+ * Whether two result types DISAGREE (a reportable mismatch), AGREE, or the comparison is INDETERMINATE.
+ * Shape disagreement is always decidable. Two same-shape records agree/disagree on their resource ONLY
+ * when both resources are known; if either is unknown the record-vs-record compare is indeterminate (a
+ * `RecordSet<?>` could be either) and is conservatively skipped — never a false mismatch. A record result
+ * is RESOURCE-keyed and DATUM-AGNOSTIC (design §4 F4 / §7 F5, panel R1 Claude #6): a `Quantity`-datum and
+ * a `boolean`-datum `RecordSet<Observation>` are the SAME result and compose without complaint (do NOT
+ * fold the datum value type in — it would falsely split two aliasable record sets). The charter §3
+ * "operands agree on value type" sentence is the SCALAR rule (where value type == result).
+ */
+function compareResultTypes(a: ResultType, b: ResultType): "agree" | "disagree" | "indeterminate" {
+  if (a.shape !== b.shape) return "disagree"; // Scalar vs record, or Record vs RecordSet — differ for all R
+  if (a.shape === "Scalar" && b.shape === "Scalar") {
+    return a.valueType === b.valueType ? "agree" : "disagree";
+  }
+  // Same record shape (Record | RecordSet) — compare resources, if both are known.
+  const ra = (a as { resource: ConceptType | undefined }).resource;
+  const rb = (b as { resource: ConceptType | undefined }).resource;
+  if (ra === undefined || rb === undefined) return "indeterminate";
+  return ra === rb ? "agree" : "disagree";
+}
+
+/** A result type rendered for a diagnostic message: `V` for a Scalar, `Record<R>` / `RecordSet<R>` for a
+ * record (`<…>` when the resource is unknown, mirroring `guardRecordShapedWarning`). */
+function renderResultType(rt: ResultType): string {
+  return rt.shape === "Scalar" ? rt.valueType : `${rt.shape}<${rt.resource ?? "…"}>`;
+}
+
+/**
+ * Resolve a CONCEPT ref (a `defined as` composition leaf / bare-ref target) to its result type, applying
+ * the same scope visibility as `resolveOperand`. `undefined` when unresolved / not-visible, when the ref
+ * names a PARAMETER (not a concept — a reference-layer concern), or when the result type is fully
+ * indeterminate (a Scalar with 0/>1 value types).
+ */
+function resolveConceptResultType(name: string, library: string | undefined, ctx: ResolveCtx): ResultType | undefined {
+  const found = resolveLib(name, library, ctx);
+  if (!found) return undefined;
+  const c = found.types.concepts.get(name);
+  if (!c) return undefined; // a parameter (or non-concept) — no shape/resource to compare
+  return conceptResultType(c.shape, c.valueTypes, c.conceptType);
 }
 
 /** Whether a typed operand satisfies a constraint. `not-derived <T>` forbids a DERIVED T. */
@@ -760,7 +998,7 @@ function resultMismatch(
 
 function compositionLeafMismatch(
   conceptName: string,
-  conceptVt: ConceptValueType,
+  parentValueType: string,
   leafName: string,
   location: Location,
   attribution: Attribution,
@@ -769,14 +1007,16 @@ function compositionLeafMismatch(
     kind: "use-site-type-mismatch",
     rule: "boolean-in-refinement-composition",
     conceptName,
-    // The check proves only `leaf === boolean` vs a non-boolean parent — NOT that the leaf is
-    // type-compatible with `conceptVt` (a `dateTime` leaf under a `CodeableConcept` parent passes
-    // here; broader value-type compatibility is out of scope). So `expected` states the shape demand,
-    // not `conceptVt` (disc 404 Q7).
+    // This is the EXISTING one-directional cell — a boolean-VALUE-TYPE leaf under a parent whose single
+    // value type is non-boolean (`parentValueType`), the value-type-keyed shape-blind trigger HEAD used.
+    // It proves only `leaf value type === boolean` vs a non-boolean parent value type — NOT full
+    // type-compatibility (a `dateTime` leaf under a `CodeableConcept` parent is caught by
+    // `composition-result-type-mismatch`, not here). So `expected` states the shape demand, not the value
+    // type (disc 404 Q7). Stays a NON-demotable ERROR.
     expected: "not boolean",
     actual: "boolean",
     message:
-      `Concept "${conceptName}": this \`defined as\` composition produces a \`${conceptVt}\` (a ` +
+      `Concept "${conceptName}": this \`defined as\` composition produces a \`${parentValueType}\` (a ` +
       `resource stream that is unioned / intersected / excepted), but its operand "${leafName}" ` +
       `declares \`value type is boolean\`. A boolean truth isn't a stream — it can't be combined into ` +
       `a non-boolean composition. Give "${leafName}" the resource value type it refines (so it ` +
@@ -789,43 +1029,87 @@ function compositionLeafMismatch(
   };
 }
 
+// #189 IMPL 2b — a `defined as` composition LEAF whose full discriminated RESULT type disagrees with the
+// composition's own, in a direction the retiring implicit-existence bridge PERMITTED (a resource/record
+// leaf under a `boolean` parent; two differing non-booleans; a record-set disagreement). WARNING-only:
+// the bridge still runs at emit until the #189 flip, so this is validate-only migration teaching, never a
+// hard error in N. (The boolean-leaf-under-a-non-boolean-scalar-parent cell is the separate, non-demotable
+// `boolean-in-refinement-composition` ERROR above.)
+function compositionResultMismatch(
+  conceptName: string,
+  parentResult: string,
+  leafResult: string,
+  leafName: string,
+  location: Location,
+  attribution: Attribution,
+): UseSiteTypeMismatchError {
+  // Tailor the teaching to the direction. A `boolean` parent over a resource/record leaf is the classic
+  // exists-bridge cell — steer to an explicit `exists`. Any other pair is a plain result-type mismatch.
+  const fix =
+    parentResult === "boolean"
+      ? `A \`boolean\` composition combines truths, but "${leafName}" publishes a \`${leafResult}\` — ` +
+        `today the emitter implicitly existentializes it, a bridge #189 retires. Make it explicit: derive ` +
+        `a boolean determination with \`defined as exists ( "${leafName}" )\` and compose THAT, so every ` +
+        `leaf of this composition is already a \`boolean\`.`
+      : `Every leaf of a value-preserving \`${parentResult}\` composition must publish the SAME ` +
+        `\`${parentResult}\`, but "${leafName}" publishes a \`${leafResult}\`. Align "${leafName}"'s ` +
+        `shape / value type with the composition, or reference a \`${parentResult}\`-publishing concept.`;
+  return {
+    kind: "use-site-type-mismatch",
+    rule: "composition-result-type-mismatch",
+    conceptName,
+    expected: parentResult,
+    actual: leafResult,
+    message:
+      `Concept "${conceptName}": this \`defined as\` composition publishes a \`${parentResult}\`, but its ` +
+      `operand "${leafName}" publishes a \`${leafResult}\`. ${fix} ` +
+      `(Validate-only migration warning — the current emit is unchanged in this version; the mismatch ` +
+      `becomes an error at the #189 flip.)`,
+    location: loc(location),
+    severity: "warning",
+    ...base(attribution),
+  };
+}
+
 function bareRefAliasMismatch(
   conceptName: string,
-  conceptVt: ConceptValueType,
-  targetVt: ConceptValueType,
+  conceptResult: string,
+  targetResult: string,
   targetName: string,
   location: Location,
   attribution: Attribution,
 ): UseSiteTypeMismatchError {
-  // `conceptVt !== targetVt` (the caller's guard). Tailor the fix to the case: a boolean parent over a
-  // resource target wants `defined as exists`; a boolean target under a resource parent has the shapes
-  // swapped; two differing non-boolean types is a plain value-type mismatch (no shape issue).
+  // `conceptResult !== targetResult` (the caller's guard). Both are FULL discriminated result types
+  // (#189 IMPL 2b): a Scalar's value type (`"boolean"` / `"Quantity"` / …) or a `Record<R>` / `RecordSet<R>`.
+  // Tailor the fix: a `boolean` parent over a non-boolean target wants `defined as exists`; a boolean
+  // target under a non-boolean parent has the shapes swapped; anything else (two differing non-booleans,
+  // a record-set disagreement) is a plain result-type mismatch (no shape bridge exists).
   let fix: string;
-  if (conceptVt === "boolean") {
+  if (conceptResult === "boolean") {
     fix =
       `To publish a \`boolean\` here, use \`defined as exists ( "${targetName}" )\` (existence of ` +
       `"${targetName}"), not a bare alias — a bare \`defined as\` copies "${targetName}"'s value unchanged, ` +
       `so it can't be a truth.`;
-  } else if (targetVt === "boolean") {
+  } else if (targetResult === "boolean") {
     fix =
-      `A boolean truth can't be read as a \`${conceptVt}\` value — reference a \`${conceptVt}\`-valued ` +
-      `concept, or declare this concept \`value type is boolean\`.`;
+      `A boolean truth can't be read as a \`${conceptResult}\` value — reference a \`${conceptResult}\`-` +
+      `publishing concept, or declare this concept \`value type is boolean\`.`;
   } else {
     fix =
-      `Declare the same value type as "${targetName}" (\`${targetVt}\`), or reference a ` +
-      `\`${conceptVt}\`-valued concept instead.`;
+      `Match "${targetName}"'s result type (\`${targetResult}\`), or reference a \`${conceptResult}\`-` +
+      `publishing concept instead.`;
   }
   return {
     kind: "use-site-type-mismatch",
     rule: "bare-ref-value-type-mismatch",
     conceptName,
-    expected: conceptVt,
-    actual: targetVt,
+    expected: conceptResult,
+    actual: targetResult,
     message:
-      `Concept "${conceptName}": a bare \`defined as "${targetName}"\` is value-PRESERVING (its value IS ` +
-      `"${targetName}"'s), and the emitter bridges it in neither direction — so the concept's value type ` +
-      `must EQUAL the target's, but it declares \`value type is ${conceptVt}\` while "${targetName}" is ` +
-      `\`${targetVt}\`. ${fix}`,
+      `Concept "${conceptName}": a bare \`defined as "${targetName}"\` is value-PRESERVING (its result IS ` +
+      `"${targetName}"'s), and the emitter bridges it in neither direction — so the concept's result type ` +
+      `must EQUAL the target's, but it publishes \`${conceptResult}\` while "${targetName}" publishes ` +
+      `\`${targetResult}\`. ${fix}`,
     location: loc(location),
     severity: "error",
     ...base(attribution),
@@ -858,10 +1142,25 @@ function posrepMismatch(
 
 function guardMismatch(
   ownerName: string,
+  operandName: string,
   actual: ConceptValueType,
+  shape: ConceptShape,
   location: Location,
   attribution: Attribution,
 ): UseSiteTypeMismatchError {
+  // #189 IMPL 2b — the failure is unchanged; only the guidance adapts to the operand's SHAPE. A
+  // record-valued operand (`Record`/`RecordSet`) publishes records, not a value, so the generic
+  // "value comparison like `… at least …`" fix does not apply — steer it to an `exists` presence
+  // reduction. A Scalar non-boolean (e.g. a `Quantity` observation value) keeps the value-comparison
+  // guidance.
+  const fix =
+    shape === "Scalar"
+      ? `A guard has no implicit truthiness — reference a boolean determination (e.g. a ` +
+        `\`defined as exists\` concept, or a value comparison like \`… at least …\`), not the raw ` +
+        `\`${actual}\` value.`
+      : `"${operandName}" is \`shape is ${shape}\` — it publishes records, not a truth. A guard needs a ` +
+        `\`boolean\`: derive a presence determination with \`defined as exists ( "${operandName}" )\` and ` +
+        `guard on THAT.`;
   return {
     kind: "use-site-type-mismatch",
     rule: "decision-guard-nonboolean",
@@ -869,12 +1168,39 @@ function guardMismatch(
     expected: "boolean",
     actual,
     message:
-      `Decision/criterion "${ownerName}": a guard consumes a \`boolean\`, but its operand resolves to a ` +
-      `concept declaring \`value type is ${actual}\`. A guard has no implicit truthiness — reference a ` +
-      `boolean determination (e.g. a \`defined as exists\` concept, or a value comparison like ` +
-      `\`… at least …\`), not the raw \`${actual}\` value.`,
+      `Decision/criterion "${ownerName}": a guard consumes a \`boolean\`, but its operand "${operandName}" ` +
+      `resolves to a concept declaring \`value type is ${actual}\`. ${fix}`,
     location: loc(location),
     severity: "error",
+    ...base(attribution),
+  };
+}
+
+// #189 IMPL 2b (panel R2 Claude #2) — the forward-looking guard WARNING. A guard operand with a `boolean`
+// DATUM value type but a non-Scalar SHAPE passes today's value-type check, but at the #189 flip it publishes
+// records (`Record<R>`/`RecordSet<R>`), not a boolean, so the guard will hard-error. Warned now so the flip
+// is not cold (design §9 step 1). WARNING severity — never flips isValid in N.
+function guardRecordShapedWarning(
+  ownerName: string,
+  operandName: string,
+  shape: ConceptShape,
+  location: Location,
+  attribution: Attribution,
+): UseSiteTypeMismatchError {
+  return {
+    kind: "use-site-type-mismatch",
+    rule: "decision-guard-record-shaped",
+    conceptName: ownerName,
+    expected: "boolean",
+    actual: `${shape}<…>`,
+    message:
+      `Decision/criterion "${ownerName}": a guard consumes a \`boolean\`, and its operand "${operandName}" ` +
+      `declares \`value type is boolean\` — but it is \`shape is ${shape}\`, so at the #189 flip it will ` +
+      `publish records, not a truth, and this guard will then hard-error. Derive a presence determination ` +
+      `now with \`defined as exists ( "${operandName}" )\` and guard on THAT. (Validate-only migration ` +
+      `warning — the current emit is unchanged in this version.)`,
+    location: loc(location),
+    severity: "warning",
     ...base(attribution),
   };
 }

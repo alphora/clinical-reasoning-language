@@ -344,19 +344,23 @@ export interface RepresentationShapeError extends ValidationErrorBase {
  *                                   payload as `operand-shape`; a distinct rule so a consumer can find
  *                                   every such hit without parsing message text. The check only proves
  *                                   `!== boolean`, never "is a resource set" (hence the name).
- *   - "boolean-in-refinement-composition" — a NON-boolean-valued `defined as` composition
- *                                   (`sem-and`/`sem-or`, or a nested `sem-not`) with a `boolean`
- *                                   operand LEAF. The composition's value is a resource stream (the
- *                                   emitter's refinement shape); a boolean leaf can't be unioned /
+ *   - "boolean-in-refinement-composition" — a `defined as` composition (`sem-and`/`sem-or`, or a nested
+ *                                   `sem-not`) whose parent declares a single NON-boolean value type, with
+ *                                   a `boolean` operand LEAF. The composition's value is a resource stream
+ *                                   (the emitter's refinement shape); a boolean leaf can't be unioned /
  *                                   intersected into it (lifts the emitter's `bridgeOperand`
  *                                   `FIXME: boolean operand in refinement composition` to a pre-emit
- *                                   error). ONE-directional — a boolean PARENT with a refinement leaf
- *                                   stays legal (the exists-bridge existentializes it).
- *   - "bare-ref-value-type-mismatch" — a `defined as "X"` bare-ref ALIAS whose declared value type
- *                                   disagrees with X's on boolean-ness. A bare-ref is value-preserving
- *                                   and the emitter bridges it in NEITHER direction, so a boolean alias
- *                                   over a resource target (or vice-versa) silently mis-emits.
- *                                   BIDIRECTIONAL (unlike the composition rule).
+ *                                   error). This is the NON-demotable ERROR cell; the RETIRING
+ *                                   exists-bridge direction (a resource/record leaf under a `boolean`
+ *                                   parent) and every other result-type disagreement are the WARNING-only
+ *                                   `composition-result-type-mismatch` (below), NOT this — see #189 IMPL 2b.
+ *   - "bare-ref-value-type-mismatch" — a `defined as "X"` bare-ref ALIAS whose full discriminated RESULT
+ *                                   type (Scalar value type, or `Record<R>` / `RecordSet<R>`) disagrees
+ *                                   with X's. A bare-ref is value-preserving and the emitter bridges it in
+ *                                   NEITHER direction, so a boolean alias over a resource target (or a
+ *                                   `RecordSet<Condition>` alias over a `RecordSet<Observation>`) silently
+ *                                   mis-emits. BIDIRECTIONAL, full-equality (not just boolean-ness), and a
+ *                                   hard error (a bare alias has no bridge to migrate to — #189 IMPL 2b).
  *   - "exists-result-nonboolean"  — a `defined as exists (…)` concept declaring a non-boolean
  *                                   `value type` (existence is boolean by definition).
  *   - "negation-result-nonboolean"— a `defined as (… top-level sem-not …)` concept declaring a
@@ -367,16 +371,37 @@ export interface RepresentationShapeError extends ValidationErrorBase {
  *   - "decision-guard-nonboolean" — a decision `when` guard / criterion body / action guard literal
  *                                   resolving to a concept whose declared `value type` is not boolean
  *                                   (a guard consumes a boolean; no implicit truthiness).
+ *   - "composition-result-type-mismatch" — (#189 IMPL 2b) a `defined as` composition LEAF whose full
+ *                                   discriminated RESULT type (design §2: `Scalar<V>` → `V`, `Record<R>`,
+ *                                   `RecordSet<R>`) disagrees with the composition's own — in a direction
+ *                                   the old asymmetric `boolean-in-refinement-composition` rule PERMITTED
+ *                                   (a resource/record leaf under a `boolean` parent via the retiring
+ *                                   exists-bridge; two differing non-booleans; a record-set shape
+ *                                   disagreement). Intrinsic WARNING severity (the bridge still runs at
+ *                                   emit until the #189 flip) — validate-only migration teaching, never
+ *                                   flips isValid. The boolean-leaf-under-a-non-boolean-SCALAR-parent cell
+ *                                   stays the non-demotable `boolean-in-refinement-composition` ERROR.
+ *   - "decision-guard-record-shaped" — (#189 IMPL 2b) a decision / criterion / action guard operand that
+ *                                   resolves to a concept with a `boolean` DATUM value type but a non-Scalar
+ *                                   SHAPE (Record/RecordSet). It passes today's value-type guard check, but
+ *                                   at the #189 flip it publishes records (`Record<R>`/`RecordSet<R>`), not a
+ *                                   boolean, so the guard would then hard-error. Intrinsic WARNING severity —
+ *                                   the forward-looking guard cell that LEADS the flip (design §9 step 1),
+ *                                   mirroring `composition-result-type-mismatch`; steers to an `exists`
+ *                                   reduction. The value-type failure (a non-boolean datum) stays the
+ *                                   `decision-guard-nonboolean` ERROR.
  */
 export type UseSiteTypeRule =
   | "operand-shape"
   | "boolean-at-refinement-position"
   | "boolean-in-refinement-composition"
+  | "composition-result-type-mismatch"
   | "bare-ref-value-type-mismatch"
   | "exists-result-nonboolean"
   | "negation-result-nonboolean"
   | "posrep-value-type-mismatch"
-  | "decision-guard-nonboolean";
+  | "decision-guard-nonboolean"
+  | "decision-guard-record-shaped";
 
 // concept-model redesign Todo 2 rule B — a use-site / result-shape type mismatch. One kind with a
 // `rule` sub-discriminator; `conceptName` names the offending concept (or the decision, for a
@@ -627,9 +652,11 @@ export class Validator {
     // concept-model redesign Todo 2 rule B — use-site & result-shape type checking (pattern
     // operand constraints incl. refinement/anchor booleans and non-boolean composition/bare-ref
     // leaves (Todo 4), `defined as exists`/`sem-not` boolean results, no-projector posrep
-    // value-type agreement, decision-guard booleanness). Routed through pushSplit so the
-    // `use-site-operand-untyped` WARNING routes as a warning; `use-site-type-mismatch` is a
-    // non-demotable error. Fires only where value types are declared (no-op on absent types).
+    // value-type agreement, decision-guard booleanness). Routed through pushSplit so each finding
+    // routes by its INTRINSIC severity: the `use-site-operand-untyped` warning and the #189 IMPL 2b
+    // warning-severity rules (`composition-result-type-mismatch`, `decision-guard-record-shaped`)
+    // route as warnings, while the error-severity `use-site-type-mismatch` rules stay non-demotable
+    // errors. Fires only where value types are declared (no-op on absent types).
     pushSplit(this.useSiteTypeValidator.validate(ast, sources));
 
     // #189 grammar+validation slice — reduction/shape COHERENCE, all intrinsic WARNINGS (validate-only,
