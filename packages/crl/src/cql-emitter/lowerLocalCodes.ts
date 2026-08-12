@@ -106,6 +106,7 @@ import type {
   TerminologyBodyLine,
   Location,
 } from "../ast/types";
+import { EMIT_REDUCTION_NOT_ACTIVE_KIND } from "../ast/types";
 import { localCodeSystemSlug } from "../fhir-emitter/slug";
 import { isAgeTodayPrefix } from "../template-match/agePredicate";
 import {
@@ -493,6 +494,24 @@ export function lowerLocalCodes(
     }
     // `ageShape.kind === "standalone"` cannot occur for a code-bearing concept (recency requires the
     // local `code is`); `resolveAgeConcept` never returns it here.
+
+    // (2-pre) `code is` + a `definition is` REDUCTION (#189 IMPL 3). A reduction is validate-only in
+    //   this slice — accepted for migration prep but NOT emittable. Caught HERE, BEFORE the generic
+    //   mixed check below, so the KE gets the dedicated `emit-reduction-not-active` sentinel (naming
+    //   the reduction) rather than the generic `emit-mixed-code-and-definition` interpolating the raw
+    //   `ReductionDefinition` type name. At the flip this whole check is deleted (reductions emit).
+    if (c.definition?.type === "ReductionDefinition") {
+      errors.push(
+        mkError(
+          EMIT_REDUCTION_NOT_ACTIVE_KIND,
+          `Concept "${c.name}" carries a local \`code is\` and a \`definition is\` reduction ` +
+            `(exists / most recent / count). A reduction is accepted by the grammar for validate-only ` +
+            `migration but CANNOT yet be emitted — emit activates at the flip (#189).`,
+          c.definition.location,
+        ),
+      );
+      continue;
+    }
 
     // (2) MIXED `code` + top-level `definition`. BOTH-REPRESENTATION is SUPPORTED (the
     //     case-feature model): the concept SPLITS into a LocalSource retrieve twin (the

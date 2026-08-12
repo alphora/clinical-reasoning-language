@@ -15,6 +15,7 @@ import type { AstParameterInfo } from "../cql-emitter/emitCQL";
 import {
   emitPartitioned,
   isLayerSplittable,
+  classifyStatementLayer,
   layerLibraryNamesFor,
   interfaceConceptNames,
   FULL_PARTITION,
@@ -312,7 +313,23 @@ export function computeSplitPlan(
   // decision surface IS the thing the Interface re-exports — and the per-CRL
   // path is the fallback that keeps every statement.
   const hasDecision = ast.statements.some((s) => s.type === "Decision");
-  if (hasDecision && localCodesCount > 0) {
+  // #189 IMPL 3 (panel R1 Fable #1 + R2 gpt56 #1) — the `interface` split fans concepts into
+  // source-typed layers via `classifyStatementLayer`; a CONCEPT that classifies NULL is assigned to NO
+  // layer, so `buildLayerAst` SILENTLY DROPS it (no error, both lanes success, the concept missing).
+  // `isLayerSplittable` already enforces "any null-classify statement ⇒ keep the whole library on the
+  // per-CRL path" for the FULL split (and `classifyStatementLayer`'s own contract says so, layeredEmit),
+  // but the `interface` branch never mirrored that invariant. Express it directly: if any CONCEPT
+  // classifies null — a `ReductionDefinition` (validate-only this slice; the charter's Adequate-Step-
+  // Therapy `count … at least 2` is exactly this decision + local-code + reduction shape), a still-
+  // `code`-bearing `source representation` concept, or a definition-less concept — fall to `none`, where
+  // the per-CRL emitter preserves every statement (and `emitConceptBody` fails a reduction loud with
+  // `emit-reduction-not-active`). Decision/Activity/Parameter are null-classify too but are HANDLED by
+  // the interface structure (the decision surface IS what the Interface re-exports), so only CONCEPT
+  // statements gate here. At the flip, reductions classify + emit, narrowing this guard.
+  const hasUnclassifiableConcept = ast.statements.some(
+    (s) => s.type === "Concept" && classifyStatementLayer(s) === null,
+  );
+  if (hasDecision && localCodesCount > 0 && !hasUnclassifiableConcept) {
     const interfaceConcepts = interfaceConceptNames(ast);
     return {
       kind: "interface",

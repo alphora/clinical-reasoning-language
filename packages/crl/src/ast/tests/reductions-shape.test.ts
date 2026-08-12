@@ -262,34 +262,32 @@ describe("folded named reductions keep ref-resolution + cycle detection (no sile
 
 // -------------------------------------------------- emit is non-active for reductions (Claude R1 #2)
 describe("reductions are validate-only: emit fails loud", () => {
-  it("a no-code reduction concept fails emit loud with the migration-prep message", () => {
-    // emitCQLFromAST wraps emission in try/catch, so `reductionNotEmittable`'s throw is returned as
-    // a failed result carrying the message (not re-thrown).
+  it("a no-code reduction concept fails emit loud with the structured `emit-reduction-not-active` sentinel (IMPL 3)", () => {
+    // A no-`code is` reduction reaches the deep emit throw (emitConceptBody); emitCQLFromAST's catch
+    // surfaces the typed `ReductionNotActiveError` as a STRUCTURED `emit-reduction-not-active`
+    // diagnostic (a filterable kind, not a bare `type: "Exception"`).
     const src =
       `library "T".\nconcept "X":\n- type is Condition.\n- shape is RecordSet.\n- code is \`x\`.\n` +
       `concept "C":\n- value type is boolean.\n- definition is exists "X".\n`;
     const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
     expect(r.success).toBe(false);
-    expect(
-      (r.errors ?? []).some((e) =>
-        /CANNOT yet be emitted|emit activates at the flip/.test(JSON.stringify(e)),
-      ),
-    ).toBe(true);
+    const sentinel = (r.errors ?? []).find((e) => e.kind === "emit-reduction-not-active");
+    expect(sentinel).toBeDefined();
+    expect(sentinel!.message).toMatch(/CANNOT yet be emitted|emit activates at the flip/);
   });
 
-  it("INTERIM TRAP (IMPL 3 replaces): `code is` + `exists this` fails emit (mixed code+definition)", () => {
-    // The dedicated `emit-reduction-not-active` sentinel lands in the next-but-one sub-commit and
-    // replaces this generic mixed-definition error for the `code is` + reduction case. Pinned so
-    // that replacement shows up as a visible test diff and an IMPL-3 slip can't ship version N with
-    // the misleading generic message. (The message currently interpolates the raw `ReductionDefinition`
-    // type name — the sentinel fixes that wording too.)
+  it("IMPL 3: `code is` + `exists this` now fails emit with the dedicated `emit-reduction-not-active` sentinel (was the generic mixed error)", () => {
+    // Replaces the pre-IMPL-3 INTERIM TRAP. A `code is` + reduction is caught by `lowerLocalCodes`
+    // BEFORE the generic mixed check, so the KE gets the reduction-specific sentinel — NOT the generic
+    // `emit-mixed-code-and-definition` that interpolated the raw `ReductionDefinition` type name.
     const src =
       `library "T".\nconcept "C":\n- value type is boolean.\n- code is \`c\`.\n- definition is exists this.\n`;
     const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
     expect(r.success).toBe(false);
-    expect(
-      (r.errors ?? []).some((e) => /ReductionDefinition|mixed-code-and-definition/.test(JSON.stringify(e))),
-    ).toBe(true);
+    expect((r.errors ?? []).some((e) => e.kind === "emit-reduction-not-active")).toBe(true);
+    expect((r.errors ?? []).some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(false);
+    // The misleading raw AST type name no longer leaks into the message.
+    expect((r.errors ?? []).every((e) => !/ReductionDefinition/.test(e.message ?? ""))).toBe(true);
   });
 });
 

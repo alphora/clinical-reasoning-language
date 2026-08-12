@@ -746,23 +746,50 @@ export interface DefinedAsComposition extends ASTNode {
   expression: CompositionExpression;
 }
 
+/** The diagnostic kind for the #189 emit sentinel — a `ReductionDefinition` that reached emit while
+ * reductions are still validate-only. A filterable kind (mirrors `emit-mixed-code-and-definition`) so
+ * tooling and the reductionShapeValidator's migration prompt can name the exact error a reduction hits. */
+export const EMIT_REDUCTION_NOT_ACTIVE_KIND = "emit-reduction-not-active";
+
+/** The KE-facing message for the emit-reduction-not-active sentinel raised on the DEEP emit paths
+ * (the no-`code is` reduction). The `code is` + reduction site in `lowerLocalCodes` raises its own
+ * more specific message but the SAME kind (`EMIT_REDUCTION_NOT_ACTIVE_KIND`) — so the KIND never
+ * drifts even though the two prose messages differ. `where` names the reaching context. Deliberately
+ * does NOT claim the reduction "validated cleanly" — a direct `emitCQL` call does not run
+ * `ReductionShapeValidator`, so this message must not assert a pipeline stage that may not have run. */
+export function reductionNotActiveMessage(where: string): string {
+  return (
+    "`definition is` reduction (exists / most recent / count) is accepted by the grammar for " +
+    "validate-only migration but CANNOT yet be emitted (" +
+    where +
+    ") — emit activates at the flip (#189)."
+  );
+}
+
+/** The #189 emit sentinel as a TYPED error (carries the filterable `kind` + an optional source
+ * `location`), so a lane's top-level `catch` surfaces it as a structured `emit-reduction-not-active`
+ * diagnostic rather than a bare `type: "Exception"` with only a message. */
+export class ReductionNotActiveError extends Error {
+  readonly kind = EMIT_REDUCTION_NOT_ACTIVE_KIND;
+  readonly location?: Location;
+  constructor(where: string, location?: Location) {
+    super(reductionNotActiveMessage(where));
+    this.name = "ReductionNotActiveError";
+    this.location = location;
+  }
+}
+
 /**
  * Guard for emit / emit-adjacent code paths that reach a `ReductionDefinition` (#189). In the
  * grammar+validation slice reductions PARSE + VALIDATE but are NOT emittable: emit stays on the
  * old path until the atomic flip activates reductions. Every lane that could otherwise silently
- * misemit (or fall through a `never`-checked switch) calls this to FAIL LOUD instead. The
- * dedicated emit sentinel (`emit-reduction-not-active`) and the reference-walker teaching land
- * with IMPL 3 and route through / replace this chokepoint; until then it is the single place a
- * reduction's non-emittability is enforced.
+ * misemit (or fall through a `never`-checked switch) calls this to FAIL LOUD instead — throwing the
+ * typed `ReductionNotActiveError` so the lane's `catch` surfaces the `emit-reduction-not-active`
+ * kind (IMPL 3). The `code is` + reduction case is caught earlier + structured by `lowerLocalCodes`
+ * (it never reaches a deep throw); this chokepoint covers the no-`code is` reduction paths.
  */
-export function reductionNotEmittable(where: string): never {
-  throw new Error(
-    "`definition is` reduction (exists / most recent / count) is accepted for migration prep but " +
-      "CANNOT yet be emitted (" +
-      where +
-      ") — it parses and validates cleanly today; emit activates at the flip (#189). This path " +
-      "must not be reached by an emittable artifact in this version.",
-  );
+export function reductionNotEmittable(where: string, location?: Location): never {
+  throw new ReductionNotActiveError(where, location);
 }
 
 // Composition expression tree. Operators are "semantic boolean" — operands

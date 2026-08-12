@@ -559,6 +559,73 @@ activity "Refer":
     expect(plan.policyId).toBe("Pol");
   });
 
+  it("#189 IMPL 3: a decision + `code is` library carrying a no-`code is` REDUCTION routes to `none`, NOT `interface` (panel R1 Claude #1)", () => {
+    // A `ReductionDefinition` concept classifies NULL in the FULL partition, so the `interface` split's
+    // `buildLayerAst` would SILENTLY DROP it (no sentinel, both lanes success, the concept missing — the
+    // charter's Adequate-Step-Therapy shape). The interface plan must refuse this and fall to `none`,
+    // where `emitConceptBody` fails loud. Mirrors the F1 Activity precedent above.
+    const src = parse(`library "Pol".
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is \`adult\`.
+
+concept "Enough Trials":
+- value type is boolean.
+- definition is exists "Adult Patient".
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Adult Patient" then recommend activity "Refer".
+`);
+    const lowered = lowerLocalCodes(src);
+    expect(lowered.localCodes.length).toBe(1);
+    const plan = computeSplitPlan(lowered.ast, "Pol", "Pol", lowered.localCodes.length);
+    expect(plan.kind).toBe("none"); // the reduction forces the per-CRL path (NOT "interface")
+    expect(plan.emittedLibraryNames).toEqual(["Pol"]);
+  });
+
+  it("#189 IMPL 3: a decision + `code is` library carrying a REPRESENTATION-bearing concept ALSO routes to `none` (the general null-classify guard; panel R2 gpt56 #1)", () => {
+    // Not reduction-specific: a `source representation` concept classifies NULL too
+    // (`classifyStatementLayer`), so the interface split would silently drop it. The guard expresses the
+    // documented invariant (any null-classify CONCEPT ⇒ per-CRL path), so this must route to `none`.
+    const src = parse(`library "Pol".
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is \`adult\`.
+
+concept "Height":
+- value type is Quantity.
+- source representation:
+  - type is Observation.
+  - value element is Observation.value.
+  - value type is Quantity.
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Adult Patient" then recommend activity "Refer".
+`);
+    const lowered = lowerLocalCodes(src);
+    expect(lowered.localCodes.length).toBe(1);
+    const plan = computeSplitPlan(lowered.ast, "Pol", "Pol", lowered.localCodes.length);
+    expect(plan.kind).toBe("none"); // the representation concept keeps the library on the per-CRL path
+  });
+
+  it("#189 IMPL 3 end-to-end: a decision + `code is` + pure-reduction library FAILS emit with the sentinel (the reduction is NOT silently dropped; panel R1 Claude #1)", () => {
+    const root = path.join(FIXTURES, "decision-localcode-reduction", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(false);
+    expect((result.errors ?? []).some((e) => e.kind === "emit-reduction-not-active")).toBe(true);
+    expect(result.cqlByLibrary).toHaveLength(0); // whole emit fails loud — no partial manifest (panel R2 gpt56 #3)
+  });
+
   it("F1 end-to-end: a non-decision local-code + Activity library emits ONE library keeping every statement", () => {
     // The per-CRL (`none`) emit must keep the Activity-bearing local-code library
     // as a single CQL library named after the source (no source-typed fan-out,

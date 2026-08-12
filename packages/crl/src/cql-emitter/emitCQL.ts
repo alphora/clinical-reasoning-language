@@ -61,6 +61,7 @@ import {
   isQualifiedRef,
   definedAsExistsNotLowered,
   reductionNotEmittable,
+  ReductionNotActiveError,
 } from "../ast/types";
 import type { ReferenceName } from "../ast/types";
 import type { CRLError } from "../types/errors";
@@ -583,6 +584,26 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
         : {}),
     };
   } catch (e) {
+    // #189 IMPL 3 — a `ReductionDefinition` that reached a deep emit path (no-`code is` reduction)
+    // throws the typed sentinel; surface it as a STRUCTURED `emit-reduction-not-active` diagnostic (a
+    // filterable kind + source location) rather than a bare `type: "Exception"`. Every lane that
+    // delegates to `emitCQLFromAST` (the standard CQL lane, `imports/emit`) inherits this. The `code is`
+    // + reduction case is caught earlier + structured by `lowerLocalCodes` (never reaches here).
+    if (e instanceof ReductionNotActiveError) {
+      return {
+        success: false,
+        errors: [
+          {
+            type: "Validation",
+            kind: e.kind,
+            message: e.message,
+            ...(e.location
+              ? { line: e.location.start.line, column: e.location.start.column }
+              : {}),
+          },
+        ],
+      };
+    }
     return {
       success: false,
       errors: [
@@ -1195,7 +1216,7 @@ class Emitter {
       case "DefinitionIsDefinition":
         return this.emitDefinitionIs(c, def);
       case "ReductionDefinition":
-        return reductionNotEmittable(`emitConceptBody("${c.name}")`);
+        return reductionNotEmittable(`emitConceptBody("${c.name}")`, def.location);
     }
   }
 

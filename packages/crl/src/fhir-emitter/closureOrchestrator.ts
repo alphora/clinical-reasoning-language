@@ -99,6 +99,13 @@ const CQL_FOLD_EXCLUDED_KINDS: ReadonlySet<string> = new Set([
   // would double-count.
   "emit-empty-local-code",
   "emit-mixed-code-and-definition",
+  // NOTE: `emit-reduction-not-active` is DELIBERATELY not excluded (panel R1, #189 IMPL 3). Unlike the
+  // other lowerLocalCodes hard kinds, it has TWO producers: (a) `code is` + reduction (surfaced by the
+  // FHIR lane's own lowerLocalCodes) AND (b) a no-`code is` reduction reaching the deep emit throw, which
+  // the FHIR lane's own pass NEVER sees (lowerLocalCodes only iterates code-bearing concepts). Excluding
+  // it would let a pure-reduction library report a MISLEADING FHIR `success:true` — the D2 hole this
+  // denylist exists to prevent. So it is folded (sinking success), and the case-(a) double-count is
+  // de-duped against `closureResult.errors` at the fold site below.
   "emit-local-code-missing-type",
   "emit-duplicate-local-code",
   "emit-duplicate-local-concept",
@@ -1813,6 +1820,14 @@ export function emitFhirDefFromPath(
   const cqlErrors = (cqlImports.success ? [] : cqlImports.errors ?? []).filter(
     (e) => e.kind !== undefined && !CQL_FOLD_EXCLUDED_KINDS.has(e.kind),
   );
+  // KNOWN pre-existing hole (panel R2 Fable [important], #270): the `e.kind !== undefined` predicate
+  // exists to skip EXCLUDED kinds, but it ALSO drops kind-LESS `type:"Exception"` throws — e.g.
+  // `definedAsExistsNotLowered` (a `defined as exists` on the case-feature Inferred lane). Such a throw
+  // fails `emitCQLImports` but is filtered out here, so `cqlManifestFailed` stays false and
+  // `emitFhirDefFromPath` can report a MISLEADING `success:true` (the exact D2 class this file guards).
+  // The class-level fix is one predicate — keep kind-less errors too: `e.kind === undefined ||
+  // !EXCLUDED.has(e.kind)`. Deferred to #270 (the Inferred-lane `defined as exists` work) to keep this
+  // #189 slice scoped to the reduction sentinel; reductions themselves now carry a `kind`, so they fold.
   const cqlManifestFailed = cqlErrors.length > 0;
   // Feature: configurable PA leaves — resolve the project's disposition config (emit is project-aware) and thread
   // it via opts so a determination activity emits the coded PAS reviewAction outcome. Absent config → no change.
@@ -1839,7 +1854,23 @@ export function emitFhirDefFromPath(
     kind: "disposition-config",
     message: `crl.dispositions${e.path.length ? "." + e.path.join(".") : ""}: ${e.message}`,
   }));
-  const errors = [...closureResult.errors, ...cqlErrors, ...dispositionEmitErrors];
+  // #189 IMPL 3 — de-dup `emit-reduction-not-active`: for a `code is` + reduction (case a) the FHIR
+  // lane's own lowerLocalCodes already put the same (kind, line, column) into `closureResult.errors`,
+  // so drop the folded CQL copy to avoid a double-listing. A no-`code is` reduction (case b) is absent
+  // from `closureResult.errors`, so it is kept — it is the only surfacing of the deep-emit sentinel on
+  // the FHIR lane, and `cqlManifestFailed` (above) already sank `success` for it.
+  // Key includes `message` (panel R2 gpt56 #2): `CRLError` carries no source-file identity and
+  // `closureResult.errors` aggregates the whole import closure, so a (kind,line,column)-only key could
+  // suppress a DISTINCT pure-reduction diagnostic in one library because a `code is` + reduction in
+  // another happens to share the coordinate. The two producers use different prose (site (a)'s
+  // lowerLocalCodes message vs the deep `reductionNotActiveMessage`), so `message` disambiguates them.
+  const reductionKey = (e: CRLError): string =>
+    `${e.kind}|${e.line ?? ""}|${e.column ?? ""}|${e.message ?? ""}`;
+  const closureErrorKeys = new Set(closureResult.errors.map(reductionKey));
+  const cqlErrorsDeduped = cqlErrors.filter(
+    (e) => e.kind !== "emit-reduction-not-active" || !closureErrorKeys.has(reductionKey(e)),
+  );
+  const errors = [...closureResult.errors, ...cqlErrorsDeduped, ...dispositionEmitErrors];
   const success =
     closureResult.success &&
     !cqlManifestFailed &&

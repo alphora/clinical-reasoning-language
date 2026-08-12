@@ -406,6 +406,26 @@ concept "Mixed":
     expect(errors.find((e) => e.kind === "emit-mixed-code-and-definition")!.message).toMatch(/Mixed/);
   });
 
+  it("`code is` + `definition is` REDUCTION → emit-reduction-not-active (NOT the generic mixed error; #189 IMPL 3)", () => {
+    // A reduction is validate-only this slice. lowerLocalCodes catches the `code is` + reduction case
+    // BEFORE the generic mixed check and raises the dedicated `emit-reduction-not-active` sentinel with
+    // a reduction-specific message — not `emit-mixed-code-and-definition` interpolating the raw type name.
+    const ast = parse(
+      lib(`
+concept "C":
+- value type is boolean.
+- code is \`c\`.
+- definition is exists this.
+`),
+    );
+    const { errors } = lowerLocalCodes(ast);
+    expect(errors.some((e) => e.kind === "emit-reduction-not-active")).toBe(true);
+    expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(false);
+    const msg = errors.find((e) => e.kind === "emit-reduction-not-active")!.message;
+    expect(msg).toMatch(/reduction/);
+    expect(msg).not.toMatch(/ReductionDefinition/); // no raw AST type name
+  });
+
   it("`code is` + `defined as` (both-representation) is NOT a mixed error — it SPLITS", () => {
     const ast = parse(
       lib(`

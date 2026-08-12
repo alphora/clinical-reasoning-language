@@ -1,0 +1,13 @@
+# code-is-reduction root (#189 IMPL 3, case a)
+library "Pol".
+
+// A `code is` + `definition is` REDUCTION concept. `lowerLocalCodes` catches this
+// BEFORE the generic mixed check and raises `emit-reduction-not-active` (case a).
+// On the FHIR lane, the lane's OWN lowerLocalCodes pass surfaces it, and the folded
+// CQL copy is de-duped — so the FHIR result carries EXACTLY ONE, with success sunk.
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is `adult-18-or-older`.
+- definition is exists this.

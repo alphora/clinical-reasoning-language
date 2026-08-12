@@ -756,10 +756,14 @@ function requalifyDefinition(
       return out;
     }
     case "ReductionDefinition":
-      // #189: a reduction is not emittable in the grammar+validation slice, so layered emit never
-      // requalifies one. First-class re-qualification of a named reduction target lands with the
-      // walker-teaching in IMPL 3; until then reaching here is a compiler bug → fail loud.
-      return reductionNotEmittable("requalifyDefinition");
+      // #189: a reduction is not emittable in the grammar+validation slice. A reduction-bearing library
+      // is kept OFF the interface/full split entirely — `computeSplitPlan` falls to the per-CRL `none`
+      // path when a reduction concept is present (IMPL 3, panel R1 Claude #1), where `emitConceptBody`
+      // fails loud instead. So layered requalification never sees a reduction; reaching here is a
+      // compiler bug → fail loud. NOTE: `emitPartitioned` is NOT under a try/catch, so this throw would
+      // propagate UNCAUGHT — it is a defensive/unreachable invariant guard, not a lane-surfaced
+      // diagnostic. First-class requalification of a reduction target lands at the flip.
+      return reductionNotEmittable("requalifyDefinition", def.location);
   }
 }
 

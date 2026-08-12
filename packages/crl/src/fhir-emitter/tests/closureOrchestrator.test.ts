@@ -197,6 +197,28 @@ const MALFORMED_DISPOSITIONS = join(
   "src/fhir-emitter/tests/fixtures/malformed-dispositions/malformed-dispositions.crl",
 );
 
+describe("closureOrchestrator — #189 IMPL 3: a reduction fails the FHIR lane loud (no misleading success)", () => {
+  const CASE_A = join(ROOT, "src/imports/tests/fixtures/code-is-reduction/root.crl");
+  const CASE_B = join(ROOT, "src/imports/tests/fixtures/decision-localcode-reduction/root.crl");
+
+  it("case (a) `code is` + reduction: EXACTLY ONE emit-reduction-not-active (folded copy de-duped), success sunk", () => {
+    const result = emitFhirDefFromPath(CASE_A, { clock: FIXED_CLOCK });
+    const sentinels = result.errors.filter((e) => e.kind === "emit-reduction-not-active");
+    expect(sentinels).toHaveLength(1); // FHIR lane's OWN lowerLocalCodes; the folded CQL copy is de-duped
+    expect(result.success).toBe(false);
+  });
+
+  it("case (b) pure reduction: the deep-emit sentinel is FOLDED onto the FHIR lane, sinking success (panel R1 both arms)", () => {
+    // Before IMPL 3 this failure was an untyped Exception dropped by the fold's `kind !== undefined`
+    // filter, so the FHIR lane could report success:true with the concept silently missing. The typed
+    // kind is now folded (not excluded), sinking success — and computeSplitPlan keeps the reduction OFF
+    // the interface split so `emitConceptBody` actually reaches it.
+    const result = emitFhirDefFromPath(CASE_B, { clock: FIXED_CLOCK });
+    expect(result.errors.some((e) => e.kind === "emit-reduction-not-active")).toBe(true);
+    expect(result.success).toBe(false);
+  });
+});
+
 describe("closureOrchestrator — malformed crl.dispositions (C2 regression)", () => {
   // The critical bug (now fixed): an error-severity `crl.dispositions` problem
   // used to silently degrade the emit to `configured:false` — dropping every PA

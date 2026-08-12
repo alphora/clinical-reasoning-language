@@ -1,0 +1,25 @@
+# decision-localcode-reduction root (#189 IMPL 3, panel R1 Claude #1)
+library "Pol".
+
+// A decision + concept-level `code is` library that ALSO carries a no-`code is`
+// REDUCTION concept ("Enough Trials"). A `ReductionDefinition` classifies NULL in
+// the FULL partition, so the `interface` split's `buildLayerAst` would SILENTLY
+// DROP it — no sentinel, both lanes success, the concept missing (the charter's
+// Adequate-Step-Therapy shape). `computeSplitPlan` must refuse the interface plan
+// and fall to `none`, where `emitConceptBody` fails loud with
+// `emit-reduction-not-active`.
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is `adult-18-or-older`.
+
+concept "Enough Trials":
+- value type is boolean.
+- definition is exists "Adult Patient".
+
+activity "Refer to GI":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Adult Patient" then recommend activity "Refer to GI".

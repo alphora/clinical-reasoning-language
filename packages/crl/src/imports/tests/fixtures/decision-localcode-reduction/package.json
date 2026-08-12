@@ -1,0 +1,8 @@
+{
+  "name": "crl-test-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "crl": {
+    "canonicalBase": "http://example.org/crl/decision-localcode-reduction"
+  }
+}

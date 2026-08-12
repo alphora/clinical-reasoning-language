@@ -394,7 +394,7 @@ export class ReductionShapeValidator {
         `Concept "${concept.name}" is Scalar with a local \`code is\` but no reduction. A Scalar ` +
           `concept publishes a single reduced value; a bare \`code is\` publishes the raw local code ` +
           `as a boolean existence. State the reduction explicitly: ${action}. NOTE: authoring the ` +
-          `reduction NOW will FAIL emit (\`emit-mixed-code-and-definition\` — a \`code is\` + reduction ` +
+          `reduction NOW will FAIL emit (\`emit-reduction-not-active\` — a \`code is\` + reduction ` +
           `is not yet emittable) until the flip version; make the change when the flip lands, or behind ` +
           `it. (Validate-only migration prompt — this concept's current emit is unchanged in N.)`,
         loc,

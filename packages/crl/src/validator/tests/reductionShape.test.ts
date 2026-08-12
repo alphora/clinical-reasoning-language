@@ -217,8 +217,9 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
       expect(w).toHaveLength(1);
       expect(w[0].message).toMatch(/exists this/);
       // F1 [critical]: the migration prompt must warn that authoring the reduction NOW fails emit
-      // (emit-mixed-code-and-definition) until the flip — else a KE follows it straight into a hard error.
-      expect(w[0].message).toMatch(/emit-mixed-code-and-definition/);
+      // (emit-reduction-not-active — the IMPL-3 sentinel for a `code is` + reduction) until the flip,
+      // else a KE follows it straight into a hard error.
+      expect(w[0].message).toMatch(/emit-reduction-not-active/);
       expect(w[0].message).toMatch(/until the flip/);
     });
 
