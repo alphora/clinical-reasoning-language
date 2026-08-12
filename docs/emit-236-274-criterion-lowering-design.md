@@ -5,8 +5,13 @@ all criticals verified against the code). Metrics **VERIFIED** against real arti
 CQL-DEFINE DAG (§2)** — emit each criterion once as a named per-operand-totalized boolean CQL define, referenced
 by one `text/cql-identifier` condition. ⚠ The sub-PD / `definitionCanonical` shape (an earlier draft) was
 **KILLED as a category error** (§1a) — do NOT resurrect it. **§3 = the resolved atomic BUILD CONTRACT (A–J).**
-NEEDS BUILD — no code yet. Operator override 2026-08-12: correctness-first, **#236 is the priority build**; close
-the two **[HARNESS]** gaps first (translator forward-ref tolerance; `$apply` per-reference caching).
+NEEDS BUILD — no code yet. Operator override 2026-08-12: correctness-first, **#236 is the priority build**. The
+two **[HARNESS]** gaps are now **CLOSED (verified 2026-08-12, cqf-fhir-cr-cli 4.7.0)**: (1) the translator
+**tolerates forward references** (a define resolves one declared later) → emit needs **no topological sort**; (2)
+the CQL engine **memoizes ExpressionDef evaluation per patient context** (a 2⁴⁰-path, non-foldable doubling DAG
+evaluated in 2.3 s, not per-reference) → a criterion→criterion DAG is **linear at eval-time**; the caps safely
+retire to an eval-time bound and CRE must replicate memoization in its own evaluator. Evidence in §3 D/G and
+disc 417.
 
 ---
 
@@ -209,7 +214,10 @@ by the nullable legacy plain re-export shape, `decision.ts:637-646`); `not X` �
 operands, `useSiteTypeValidator` `checkGuardLiterals`). Emit in **topological order** (cycle-free by
 `cycleDetector`; the CQL child ref is load-bearing, unlike provenance's blank-token trick). `interfaceSurface`
 (`layeredEmit.ts:973-1034`) KEEPS its expansion-based atom walk — over-applying "stop expanding" there drops the
-re-exports the define bodies reference. **[HARNESS] verify translator forward-ref tolerance.**
+re-exports the define bodies reference. **[HARNESS ✔ 2026-08-12] translator forward-ref tolerance CONFIRMED**
+(a define resolving one declared textually later translated + evaluated cleanly on cqf-cli 4.7.0). So topological
+order is **not required for correctness** — keep it only as a determinism/readability nicety, not a load-bearing
+constraint; a cycle is still a validator error, not a translator one.
 
 **D. Guard lowering: criterion ref → ONE literal.** Build-time choice, with both arms' safeguards: **(a)**
 emit-LOCAL pre-pass (replace the `expandGuardOrRecord` at `decision.ts:683`) rewriting a criterion ref to a
@@ -241,9 +249,15 @@ full sub-trace at FIRST occurrence + reference nodes at later sites (precedent: 
 blowup refusal for a now-linear artifact. Survives as eval-time bounds: dependency-depth (reuse
 `CRITERION_MAX_DEPTH`), cycle/undefined (validator), a per-body node-count guard (size for MACHINE-generated
 files, not authored), DNF arm-cap on the RESIDUAL parent guard only. No materialization remains, so the CRE bound
-lives in the memoized evaluator's stack guard. **[HARNESS] verify `$apply` per-reference caching** (standard CQL
-engines cache per-context → `$apply` may already be DAG-shaped; changes how aggressive the caps must be, not the
-shape).
+lives in the memoized evaluator's stack guard. **[HARNESS ✔ 2026-08-12] `$apply`/engine per-reference caching
+CONFIRMED**: the cqf CQL engine **memoizes ExpressionDef evaluation per patient context** — a 40-level doubling
+DAG (`L(n)="L(n-1)" and "L(n-1)"`, L0 a non-foldable retrieve so folding is ruled out; 2⁴⁰≈1.1e12 resolutions if
+per-reference) evaluated in 2.3 s. So one decision-guard define referencing the criterion DAG evaluates each
+criterion **once** — linear at the CQL layer. Consequence: the emit-tree caps CAN retire to an eval-time bound
+without reintroducing an exponential eval-time trace; **CRE must implement the same memoization** in its own
+evaluator (per F), since that is OUR code, not the engine's. (Residual: whether `$apply` shares one context
+across N *separate* action conditions is a further nicety — even without it, N linear evals is polynomial, never
+exponential.)
 
 **H. Provenance identity.** Declaration id `criterionKey(lib,name)` vs occurrence id `decisionSubNodeRef(lib,
 decision, nodeId)` + ref location → the tuple `(criterion, guard-nodeKey)`. `sourcedFromCriterion` becomes
@@ -285,8 +299,10 @@ macro with no artifact identity to a named CQL define) — worth its own kit lin
    G caps retire/replace · H provenance · I diagnostics+kit · J acceptance incl. the synthetic doubling-DAG
    fixture + trace-linearity assertion). **All land atomically** (or behind a flag) — no two-lane-inconsistent
    intermediate release. HOLD on code.
-3. **[HARNESS, before/during build]** close the two verification gaps: CQL translator forward-ref tolerance;
-   `$apply` per-reference caching (cqf-fhir-cr 4.7.0).
+3. **[HARNESS ✔ 2026-08-12 — CLOSED]** both verification gaps closed on cqf-fhir-cr-cli 4.7.0: translator
+   forward-ref tolerance CONFIRMED (no topological sort needed); engine ExpressionDef memoization per context
+   CONFIRMED (criterion DAG linear at eval-time; CRE must replicate). Tests in the session scratchpad
+   (`harness-gaps/cql/{ForwardRef,MemoDag2}.cql`).
 4. Regenerate goldens (`run_decision`/`validate_cel` behavior-identical + trace-linearity; oracle `oracle:update`
    deliberately) + vsix (batched with the emit work the KEs are waiting on).
 
