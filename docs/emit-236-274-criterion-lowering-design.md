@@ -1,8 +1,12 @@
-# #236 design (DRAFT) — criterion referenced-definition lowering
+# #236/#274 design-of-record — criterion CQL-define-DAG lowering
 
-**STATUS:** design DRAFT (2026-08-12), pre-panel, pre-build. Scoping is verified (below); the fix shape is
-proposed; example-derived metrics are marked **[TBD-example]** pending the KE artifact (vibe-mail
-`01KZVXTAZTQEZ52303WGWVGQGV`). Fire the crl-emit panel on this before writing code (operator holds code).
+**STATUS (2026-08-12): DESIGN COMPLETE + twice-reviewed** (crl-emit panel R1+R2, disc 417; both arms converged,
+all criticals verified against the code). Metrics **VERIFIED** against real artifacts (§1). **Fix = shape-2
+CQL-DEFINE DAG (§2)** — emit each criterion once as a named per-operand-totalized boolean CQL define, referenced
+by one `text/cql-identifier` condition. ⚠ The sub-PD / `definitionCanonical` shape (an earlier draft) was
+**KILLED as a category error** (§1a) — do NOT resurrect it. **§3 = the resolved atomic BUILD CONTRACT (A–J).**
+NEEDS BUILD — no code yet. Operator override 2026-08-12: correctness-first, **#236 is the priority build**; close
+the two **[HARNESS]** gaps first (translator forward-ref tolerance; `$apply` per-reference caching).
 
 ---
 
