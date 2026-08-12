@@ -24,8 +24,10 @@ level:
 
 1. **CRLCommon.cql ships verbatim into every emitted policy's `cql/` folder** — `loadCatalog.ts` ("always ships
    [these] into every policy's `cql/` output"). A bug in a function reaches the consumer as-is.
-2. **The emitter maps canonical pattern names 1:1 onto `CRLCommon.<name>` calls** (`emitCQL.ts:248-252`, two
-   overrides), and the matcher produces those calls (`matcher.ts:314-623`).
+2. **The emitter maps canonical pattern names 1:1 onto `CRLCommon.<name>` calls** — `functionNameFor`
+   (`emitCQL.ts:248-256`) is an identity map with exactly two overrides (`Last→LastOf`, `First→FirstOf`), and
+   the call is emitted at `emitCQL.ts:1885` (`return \`CRLCommon.${fn}(${args})\``). *(There is no `matcher.ts`
+   — both panel arms cited one; verified absent, mechanism is the two emitCQL sites above.)*
 3. **The bug bodies are all present in in-tree v0.2.0** (`CRLCommon.cql:101, 221-225, 237-252, 271-273, 422-440,
    590-598`).
 
