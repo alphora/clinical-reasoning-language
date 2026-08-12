@@ -137,8 +137,10 @@ The rules:
 - **A scalar-valued concept** (`value type is boolean` / `Quantity` / …, singular) ⟹ its record set MUST
   collapse to that scalar ⟹ an **explicit reduction is required** (`definition is exists this` /
   `most recent this`, a `definition is` derivation, or a `defined as`). A bare scalar `code is` with no
-  reduction is an **error** — the magic the emitter must never manufacture (the old `.asTruths()` hidden
-  `exists(any true)`).
+  reduction is **invalid** — the magic the emitter must never manufacture (the old `.asTruths()` hidden
+  `exists(any true)`). *(In the shipped validate-only slice this is the `no-bare-scalar-code` **warning** — a
+  migration prompt; it becomes a hard error at the flip. A `code is` concept whose reduction is supplied by a
+  `value projection` posrep — e.g. patient age — is NOT bare and is exempt.)*
 - **A record-valued concept** (`shape is RecordSet`) ⟹ **no scalar reduction**; it **publishes its
   record set**. Other concepts reference it **by name** and derive from its **records**. (The explicit
   `shape is RecordSet` is what disambiguates a `CodeableConcept` *set* — e.g. a coded-Encounter refinement

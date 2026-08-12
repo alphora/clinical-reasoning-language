@@ -145,6 +145,12 @@ export class ReductionShapeValidator {
       def?.type === "ReductionDefinition" ? def.reduction : undefined;
     const hasCodeIs = concept.code !== undefined;
     const reps = concept.representations?.length ?? 0;
+    // A `source representation` carrying a `value projection` (e.g. the Patient age-recency posrep) IS an
+    // effective reduction — the projection computes the concept's value from the rep datum, synthesized at
+    // emit (lowerLocalCodes recency merge). So it satisfies the "state the reduction" requirement and is
+    // EXEMPT from `no-bare-scalar-code` below (else the kit's SANCTIONED age-recency pattern — `code is` +
+    // age posrep, no `definition is` — would warn with a suggestion that BREAKS it; full-slice panel R4 Fable #1).
+    const hasValueProjectionRep = concept.representations?.some((r) => r.valueProjection !== undefined) ?? false;
     // The count of a concept's OWN representation records: the local `code is` arm (if present) +
     // every `source representation` (posrep). Cross-rep dedup is deferred (#257), so >1 makes a
     // `this` reduction ambiguous today.
@@ -372,7 +378,7 @@ export class ReductionShapeValidator {
     // `definition is`/`coded from` MIXED form is out of emit scope already (the emit-mixed hard
     // error owns it) — not double-warned here, and its definition slot is taken so the reduction
     // action would not apply.
-    if (shape === "Scalar" && hasCodeIs && def === undefined) {
+    if (shape === "Scalar" && hasCodeIs && def === undefined && !hasValueProjectionRep) {
       // The suggested reduction is conditioned on value type FIRST, then representation count. A boolean
       // presence determination is `exists this` — valid over MULTIPLE representations too (design §6: the
       // union of each rep's existence, dedup-immune), so repCount is irrelevant there (panel R3 gpt56 #2).

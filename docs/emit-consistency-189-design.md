@@ -1,9 +1,12 @@
 # CRL emit-consistency (#189) — design of record
 
 **Status:** design converged through four design-panel rounds (1, 2, 2R efficacy test, and a final round on
-the CRL-emit lens) plus operator decisions of 2026-08-11. **Not yet implemented.** This is the committed,
-durable design of record; the full round-by-round history (reviewer transcripts, per-point accept/refine/
-reject) lives in `.vibe-tools/discussions/413-emit189-context-free-total-boolean.md` (gitignored working log).
+the CRL-emit lens) plus operator decisions of 2026-08-11. **The grammar + validation slice (§8/§9 step 1) is
+IMPLEMENTED and SHIPPED (validate-only — it parses/validates the new forms but does NOT emit; commits
+`bfdd204` · `c0d79fa`+`68af9b5` · `b1068ca` · `92fc5c0`+`f24e36f` · `5e37b2b`). The atomic emit FLIP (§9 step 4)
+is NOT yet implemented.** This is the committed, durable design of record; the full round-by-round history
+(reviewer transcripts, per-point accept/refine/reject) lives in
+`.vibe-tools/discussions/413-emit189-context-free-total-boolean.md` (gitignored working log).
 Grounded in **`docs/CRL-NORTH-STAR.md`** (authoritative CRL model) — read that first.
 
 **How to resume:** read the charter, then §0 (scope) and §10 (deferred/resume) here, then the section for the
@@ -60,8 +63,9 @@ for a representation-free derived concept** — `reductionShapeValidator` exempt
 so this inheritance is only partly validated in N). The table enumerates the **defined** cells. **Normatively,
 any (reduction × shape) pairing not listed is invalid — an error at the flip.** The shipped-N
 `reductionShapeValidator` **warns** (all its findings are `severity: "warning"` in N, per §9 step 1) on the
-implemented subset — a scalar reduction on a `Record`/`RecordSet` → `recordset-scalar-reduction`; a `Record`
-concept that fails to select a record → `record-shape-invariant`. Deferred, still-unchecked cells (the `type
+implemented subset — a scalar reduction (or narrative `most recent …`) on a `RecordSet` →
+`recordset-scalar-reduction`; a `Record` concept that does not select a single record → `record-shape-invariant`.
+Deferred, still-unchecked cells (the `type
 is`-vs-operand agreement — "left for the flip step", `reductionShapeValidator.ts:313-321`; value-element
 correspondence; a `RecordSet` + scalar-narrative orphan; cross-library named operands) are listed in the
 validator header and remain flip blockers — so the matrix is total **normatively**, not by exhaustive shipped-N
@@ -219,7 +223,10 @@ noted**):
 - **no bare SCALAR `code is`** (record-valued concepts are legal — declared via the cardinality marker).
 - **non-boolean concept in a decision guard** (#240 → reject-with-error).
 - **value-type-must-match-a-real-element** — for any representation read as a value (bare read OR a
-  value-reading reduction like `most recent this`).
+  value-reading reduction like `most recent this`). **DEFERRED — NOT shipped in the slice** (a FLIP BLOCKER):
+  it needs the FHIR model-info element registry that does not exist yet, so only AST-determinable checks land
+  now (`reductionShapeValidator.ts:49-54` / `representationShapeValidator.ts:47-51`). The `§2` valueless-rep row
+  is likewise a NORMATIVE (flip) error, not a shipped-N diagnostic.
 - **mixed-value-type composition** (§7) — **one cell is a hard ERROR, not a warning**: a boolean leaf inside a
   composition whose parent declares a non-boolean value type (`boolean-in-refinement-composition`,
   non-demotable). Other result-type disagreements are warnings in N that become errors at the flip

@@ -267,6 +267,18 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
       expect(redWarnings(src, "no-bare-scalar-code")).toHaveLength(0);
     });
 
+    it("EXEMPTS a `code is` + `value projection` posrep (patient age-recency — the projection IS the reduction)", () => {
+      // The sanctioned age-recency pattern: a local `code is` override PLUS a Patient age `value projection`
+      // posrep, no `definition is`. The projection computes the value (synthesized at emit), so it is NOT a bare
+      // `code is`. Before the exemption this false-warned with a suggestion (`add definition is exists this`) that
+      // BREAKS the recency merge (full-slice panel R4 Fable #1).
+      const src =
+        `library "T".\nconcept "Age":\n- value type is boolean.\n- code is \`age-18-or-older\`.\n` +
+        `- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n` +
+        `  - value type is date.\n  - value projection is age today at least 18 years.\n`;
+      expect(redWarnings(src, "no-bare-scalar-code", "Age")).toHaveLength(0);
+    });
+
     it("does not fire on a code-less concept (nothing to migrate)", () => {
       const src = `library "T".\n${RECORDSET_X}` + `concept "C":\n- value type is boolean.\n- definition is exists "X".\n`;
       expect(redWarnings(src, "no-bare-scalar-code")).toHaveLength(0);

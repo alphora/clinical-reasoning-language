@@ -32,8 +32,10 @@ import type { RepresentationShapeError, RepresentationShapeRule, ValidationError
 //                                        datum-local; a concept-level calc uses `definition is`)
 //   A.6 duplicate-representation-key    — two reps (local + posreps) share the structural key
 //                                        `{type, value element, coding-source}` (refinement 4)
-//   A.8 definition-is-exists-misuse    — a `definition is exists (...)` (existence is a
-//                                        `defined as` operator, not `definition is`)
+//   A.8 definition-is-exists-misuse    — a MALFORMED leading-`exists` `definition is` (a GROUP operand
+//                                        or a tail'd single ref). A BARE `exists "X"` now FOLDS to a
+//                                        `ReductionDefinition` (the narrowing), so only these residual
+//                                        malformed shapes are flagged here (see the detail at A.8 below).
 //   A.9 multiple-value-types           — >1 `value type` on one concept or posrep
 //   A.10 missing-value-type            — a SCALAR concept (the default shape) declares NO `value type`.
 //                                        Now an ERROR (the #257 migration is complete): a Scalar concept

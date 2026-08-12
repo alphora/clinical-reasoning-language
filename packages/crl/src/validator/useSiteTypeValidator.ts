@@ -56,9 +56,10 @@ import type {
 // authoritative model. A `definition is` concept's value type stays AUTHOR-DECLARED.
 //
 // FIRES ONLY WHERE VALUE TYPES ARE DECLARED. Every check no-ops on an operand/concept whose value
-// type is absent. Since #257 (A.10) every concept is REQUIRED to declare a value type (a hard
-// `missing-value-type` error), so in practice absence occurs only for hand-constructed partial-AST
-// test inputs; the no-op discipline is retained for those. At a type-demanding OPERAND position an
+// type is absent. Since #257 (A.10) every SCALAR concept is REQUIRED to declare a value type (a hard
+// `missing-value-type` error); a `shape is Record | RecordSet` concept MAY omit it (its result type
+// comes from `type is`), so absence is a LEGAL state for those (plus hand-constructed partial-AST test
+// inputs); the no-op discipline covers both. At a type-demanding OPERAND position an
 // absence surfaces as ONE `use-site-operand-untyped` WARNING (now largely subsumed by A.10's error);
 // everywhere else absence is silent. Secondary-diagnostic suppression (disc 397 gpt56 #7): no type
 // diagnostic when the target has 0 value types (warning only, at operand sites), >1 (rely on A.9),
@@ -628,7 +629,10 @@ export class UseSiteTypeValidator {
     // resolver owns, so parameters are NOT resolved (`allowParameter: false`). Only a positively-
     // resolved, single-typed, non-boolean CONCEPT is a mismatch. Untyped guard concepts (the norm
     // today — presence determinations without an explicit `value type`) are silent, NOT warned:
-    // guards are far too numerous to flag every untyped operand, and A.10 (#257) makes types required.
+    // guards are far too numerous to flag every untyped operand, and A.10 (#257) makes a value type
+    // required for SCALAR concepts. NOTE the residual flip hole: a `shape is Record | RecordSet` guard
+    // operand that omits `value type` also resolves `untyped` and is silent here, yet hard-errors at the
+    // flip (a record stream is not a boolean) — a guard cell the A.10 relaxation left NOT leading the flip.
     const res = resolveOperand(getRefName(ref), getRefLibrary(ref) ?? undefined, ctx, /*allowParameter*/ false);
     if (res.status !== "typed") return;
     if (res.valueType !== "boolean") {

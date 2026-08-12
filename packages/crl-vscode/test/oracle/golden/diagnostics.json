@@ -21,7 +21,7 @@
                 "character": 1
               }
             },
-            "message": "Concept \"A\" declares no `value type`. Every concept has exactly one `value type` — its canonical result shape. Add `- value type is <Type>.` (CodeableConcept for a coded resource refinement, Quantity for a measurement, boolean for a determination, dateTime/integer/etc. for a scalar).",
+            "message": "Concept \"A\" is Scalar (the default `shape`) but declares no `value type`. A Scalar concept has exactly one `value type` — its canonical result shape. Add `- value type is <Type>.` (CodeableConcept for a coded resource refinement, Quantity for a measurement, boolean for a determination, dateTime/integer/ etc. for a scalar), or declare `- shape is Record.` / `- shape is RecordSet.` if this concept publishes a record (or set of records) rather than a scalar value.",
             "severity": 0,
             "source": "crl",
             "code": "representation-shape"
@@ -69,7 +69,7 @@
                 "character": 18
               }
             },
-            "message": "Concept \"A\" declares no `value type`. Every concept has exactly one `value type` — its canonical result shape. Add `- value type is <Type>.` (CodeableConcept for a coded resource refinement, Quantity for a measurement, boolean for a determination, dateTime/integer/etc. for a scalar).",
+            "message": "Concept \"A\" is Scalar (the default `shape`) but declares no `value type`. A Scalar concept has exactly one `value type` — its canonical result shape. Add `- value type is <Type>.` (CodeableConcept for a coded resource refinement, Quantity for a measurement, boolean for a determination, dateTime/integer/ etc. for a scalar), or declare `- shape is Record.` / `- shape is RecordSet.` if this concept publishes a record (or set of records) rather than a scalar value.",
             "severity": 0,
             "source": "crl",
             "code": "representation-shape"

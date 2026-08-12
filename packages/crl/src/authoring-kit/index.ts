@@ -271,8 +271,17 @@ export type {
 //   and are OUT of Stage-1 authoring. Teach-what-works: the marker exists + parses + validates, so a KE reading a
 //   validate-only capability artifact understands it; authoring Record/RecordSet stays deferred. NO other
 //   payload-shape change. BOTH useCase hashes re-pin (the cpg concept-model rules/model inherit into prior-auth).
+// #189 full-slice sanity panel follow-up (schemaVersion 1.23→1.24): KE-facing honesty fixes from the closing
+//   two-arm panel (disc 415 R4). (1) The `code is` CONCEPT_LAYER_MODEL entry now names the `no-bare-scalar-code`
+//   validate-only MIGRATION PROMPT (fires on every bare Scalar boolean leaf) and reconciles it with the
+//   `definition is` OUT-of-stage rule — do NOT act on it in Stage-1 (the reduction is not emit-active; authoring
+//   it fails `emit-reduction-not-active`). (2) The `value-type` shipped-checks clause narrows the guard warning:
+//   `decision-guard-record-shaped` fires on a TYPED record-shaped operand only; a value-type-less Record/RecordSet
+//   guard operand is silent in N (a residual flip hole). Paired VALIDATOR fix (reductionShapeValidator): the
+//   sanctioned age-recency posrep (`code is` + `value projection`) is now EXEMPT from `no-bare-scalar-code` (it was
+//   false-warning with a suggestion that breaks the recency merge). NO payload-shape change. BOTH useCase hashes re-pin.
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.23";
+const SCHEMA_VERSION = "1.24";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -369,7 +378,7 @@ const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
   {
     form: "- code is `local-code`.",
     meaning:
-      "Query to the LOCAL source using local domain codes. The asserted layer. If `type is` is OMITTED the implicit standard is `Observation` / `Observation.value` (the concept's `value type` fills that value element); a declared non-Observation `type is` retrieves THAT resource, not `Observation.value`. The primary in-stage producer alongside `defined as` (and, for patient age, an optional local override paired with a Patient age `value projection` — see below).",
+      "Query to the LOCAL source using local domain codes. The asserted layer. If `type is` is OMITTED the implicit standard is `Observation` / `Observation.value` (the concept's `value type` fills that value element); a declared non-Observation `type is` retrieves THAT resource, not `Observation.value`. The primary in-stage producer alongside `defined as` (and, for patient age, an optional local override paired with a Patient age `value projection` — see below). MIGRATION-PROMPT (validate-only, do NOT act on it in Stage-1): a bare Scalar boolean `code is` determination — the canonical Stage-1 leaf — emits a `no-bare-scalar-code` WARNING in the shipped #189 validation slice, prompting that its existence be stated explicitly (`definition is exists this`) at the emit FLIP. IGNORE it in Stage-1: reductions are NOT emit-active yet (authoring one now FAILS emit via `emit-reduction-not-active`), so keep the bare `code is` form until the flip lands. The warning does NOT flip validity, and it does NOT contradict the `definition is` OUT-of-stage rule — it is a forward-looking flip prompt, not a Stage-1 action. (A `code is` concept whose reduction is supplied by a `value projection` posrep — patient age — is NOT bare and does not warn.)",
     scope: "in",
   },
   {
@@ -449,7 +458,7 @@ const RULES: KitRule[] = [
         force: "default",
       },
       {
-        text: "SHIPPED rule-B checks (NOT exhaustive): a bare-ref alias = FULL equality with its target; a non-boolean composition rejects any boolean LEAF (`boolean-in-refinement-composition`, value-type-keyed hard ERROR — fix by giving the leaf its resource value type or declaring the parent boolean, NOT an `exists` lift); any OTHER composition result-type disagreement the implicit-existence bridge permits (a boolean parent over a resource/record leaf; two differing non-booleans, incl. two Scalar leaves like Quantity-under-CodeableConcept; a differing record resource) is a `composition-result-type-mismatch` WARNING today that becomes an ERROR at the #189 flip (fix the boolean-parent+record-leaf cell with an explicit `defined as exists ( \"X\" )`); a record-shaped concept in a decision guard warns (`decision-guard-record-shaped`); a no-projector posrep = concept value type; a TOP-LEVEL `sem-not` / `defined as exists` result must be boolean; a guard operand must be boolean.",
+        text: "SHIPPED rule-B checks (NOT exhaustive): a bare-ref alias = FULL equality with its target; a non-boolean composition rejects any boolean LEAF (`boolean-in-refinement-composition`, value-type-keyed hard ERROR — fix by giving the leaf its resource value type or declaring the parent boolean, NOT an `exists` lift); any OTHER composition result-type disagreement the implicit-existence bridge permits (a boolean parent over a resource/record leaf; two differing non-booleans, incl. two Scalar leaves like Quantity-under-CodeableConcept; a differing record resource) is a `composition-result-type-mismatch` WARNING today that becomes an ERROR at the #189 flip (fix the boolean-parent+record-leaf cell with an explicit `defined as exists ( \"X\" )`); a TYPED record-shaped concept (a non-Scalar shape with a declared boolean datum value type) in a decision guard warns (`decision-guard-record-shaped`) — but a value-type-LESS Record/RecordSet guard operand resolves untyped and is SILENT in N (a residual flip hole, not caught until the flip); a no-projector posrep = concept value type; a TOP-LEVEL `sem-not` / `defined as exists` result must be boolean; a guard operand must be boolean.",
         force: "validator-enforced",
       },
       {

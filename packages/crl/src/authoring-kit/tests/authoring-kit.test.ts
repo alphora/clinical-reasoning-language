@@ -411,7 +411,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.23");
+    expect(kit.schemaVersion).toBe("1.24");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -1006,11 +1006,15 @@ describe("authoring-kit — getAuthoringKit", () => {
     // two-arm panel (disc 415) additionally corrected the kit `value-type` composition teaching to the SHIPPED b1068ca
     // rule — the `composition-result-type-mismatch` WARNING (→ error at flip) + `decision-guard-record-shaped`, and the
     // shape-aware `concept = declared shape + …` package-wide model. BOTH hashes move.
+    // #189 full-slice sanity follow-up (schemaVersion 1.23→1.24, disc 415 R4): the `code is` entry names the
+    // `no-bare-scalar-code` validate-only migration prompt + reconciles it with `definition is` OUT-of-stage; the
+    // `value-type` shipped-checks clause narrows `decision-guard-record-shaped` to a TYPED record operand (untyped is
+    // silent in N). Paired validator fix exempts the age-recency `value projection` posrep from the false warning. BOTH hashes move.
     expect(cpg.contentHash).toBe(
-      "9288e7497f7a7df29736d7e429cf272ff2510d83f0afc0a7ef5ffcbaa9106b6d",
+      "9dbe4b9e58439a12b22d6f6dd70ae41c09f16fee02a0fb5e5c3bbfa60566e3b3",
     );
     expect(priorAuth.contentHash).toBe(
-      "08c84b02f1c7d03d51cdee659fe33a29fb3bbe955ee9e5faecad7b3524684afd",
+      "1e6b1f6fd4e61118a34f48795596511e0e91c289c74be20e92a0cc81b95f9e8d",
     );
   });
 
