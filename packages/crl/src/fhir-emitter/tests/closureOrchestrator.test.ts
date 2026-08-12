@@ -208,6 +208,16 @@ describe("closureOrchestrator — #189 IMPL 3: a reduction fails the FHIR lane l
     expect(result.success).toBe(false);
   });
 
+  it("a kind-LESS CQL throw (`defined as exists` on the Inferred lane, #270) sinks FHIR success — no misleading success (panel R2 Fable)", () => {
+    // `defined as exists` lowers on the standard lane (#265) but throws the UNTYPED
+    // `definedAsExistsNotLowered` on the case-feature Inferred lane the interface split uses. The fold
+    // now keeps kind-less exceptions (they are genuine hard failures), so `success` sinks instead of a
+    // misleading `success:true` off the empty-manifest fallback.
+    const KINDLESS = join(ROOT, "src/imports/tests/fixtures/decision-defined-as-exists/root.crl");
+    const result = emitFhirDefFromPath(KINDLESS, { clock: FIXED_CLOCK });
+    expect(result.success).toBe(false);
+  });
+
   it("case (b) pure reduction: the deep-emit sentinel is FOLDED onto the FHIR lane, sinking success (panel R1 both arms)", () => {
     // Before IMPL 3 this failure was an untyped Exception dropped by the fold's `kind !== undefined`
     // filter, so the FHIR lane could report success:true with the concept silently missing. The typed

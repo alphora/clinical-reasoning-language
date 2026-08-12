@@ -1817,17 +1817,16 @@ export function emitFhirDefFromPath(
   // (The CLI re-runs `emitCQLImports` for the CQL-write side; this is the
   // public/MCP path's guard.)
   const cqlImports = emitCQLImports(rootPath);
+  // Fold kind-LESS `type:"Exception"` throws too (panel R2 Fable [important]): this predicate exists to
+  // skip EXCLUDED KINDS (the FHIR lane surfaces those itself), NOT to skip Exceptions. A kind-less throw
+  // — e.g. `definedAsExistsNotLowered` (a `defined as exists` on the case-feature Inferred lane, #270),
+  // or any future untyped emit throw — is a genuine CQL-lane hard failure. The old `e.kind !== undefined`
+  // guard dropped it, so `cqlManifestFailed` stayed false and `emitFhirDefFromPath` could report a
+  // MISLEADING `success:true` off the empty-manifest fallback — the exact D2 class this file exists to
+  // guard. Keeping kind-less errors folds them so `success` sinks; only truly-EXCLUDED kinds are dropped.
   const cqlErrors = (cqlImports.success ? [] : cqlImports.errors ?? []).filter(
-    (e) => e.kind !== undefined && !CQL_FOLD_EXCLUDED_KINDS.has(e.kind),
+    (e) => e.kind === undefined || !CQL_FOLD_EXCLUDED_KINDS.has(e.kind),
   );
-  // KNOWN pre-existing hole (panel R2 Fable [important], #270): the `e.kind !== undefined` predicate
-  // exists to skip EXCLUDED kinds, but it ALSO drops kind-LESS `type:"Exception"` throws — e.g.
-  // `definedAsExistsNotLowered` (a `defined as exists` on the case-feature Inferred lane). Such a throw
-  // fails `emitCQLImports` but is filtered out here, so `cqlManifestFailed` stays false and
-  // `emitFhirDefFromPath` can report a MISLEADING `success:true` (the exact D2 class this file guards).
-  // The class-level fix is one predicate — keep kind-less errors too: `e.kind === undefined ||
-  // !EXCLUDED.has(e.kind)`. Deferred to #270 (the Inferred-lane `defined as exists` work) to keep this
-  // #189 slice scoped to the reduction sentinel; reductions themselves now carry a `kind`, so they fold.
   const cqlManifestFailed = cqlErrors.length > 0;
   // Feature: configurable PA leaves — resolve the project's disposition config (emit is project-aware) and thread
   // it via opts so a determination activity emits the coded PAS reviewAction outcome. Absent config → no change.

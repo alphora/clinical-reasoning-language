@@ -1,0 +1,24 @@
+# decision-defined-as-exists root (#189 IMPL 3 fold fix / #270)
+library "Pol".
+
+// A decision + `code is` library whose decision guard is a `defined as exists`
+// concept. `defined as exists` lowers on the STANDARD lane (#265) but NOT on the
+// case-feature Inferred lane (#270), which the interface split uses — so
+// `emitConceptBody` throws the UNTYPED `definedAsExistsNotLowered`. The FHIR fold
+// must treat that kind-less throw as manifest-failing (not drop it) so
+// `emitFhirDefFromPath` does NOT report a misleading `success:true`.
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is `adult`.
+
+concept "Has Adult":
+- value type is boolean.
+- defined as exists ( "Adult Patient" ).
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Has Adult" then recommend activity "Refer".
