@@ -4,15 +4,44 @@
 // consult for a LOCAL concept's retrieve coding path + recency sort element. INERT in T1 — nothing in the
 // production emit path reads it yet.
 //
-// SCOPE — CQL-READ spelling ONLY. A row names the logical FHIR-model property the CQL lane reads (e.g.
-// `effective`, sorted as `(effective as FHIR.dateTime).value`), NOT the serialized JSON write name
-// (`effectiveDateTime`). Those differ on every choice element; conflating them is exactly the coherence
-// failure the descriptor exists to prevent (panel R1 P2). T2 (resource-writer registry) EXTENDS each row with
-// the write-side spellings; do not add them here.
+// SCOPE — CQL-READ spelling (the rows) + the JSON-WRITE name resolvers (T2). A row names the logical FHIR-model
+// property the CQL lane reads (e.g. `effective`, sorted as `(effective as FHIR.dateTime).value`), NOT the
+// serialized JSON write name (`effectiveDateTime`). Those differ on every choice element; conflating them is
+// exactly the coherence failure the descriptor exists to prevent (panel R1 P2).
 //
 // A deliberate SUBSET (the proven local cells). An unlisted resource is a fail-closed `unsupported-resource`
 // derivation error — NOT a silent default (panel R1 P4). No universal `.code` default: a strategy is declared
 // per row (medication carries its coding on a choice element, not `.code`).
+//
+// T2 — the WRITE-name resolvers (`codingJsonName` / `valueJsonName` / `recencyStampJsonName`) DERIVE the
+// serialized JSON name from a read row via one FHIR polymorphic-element spelling rule (`choiceElementJsonName`),
+// rather than storing a second write table that could drift (design §4/§7/§10). INERT in T2 — nothing production
+// calls them; the CEL lane wires them at the flip (T5/T6) and, in the same commit, SUPERSEDES + DELETES the
+// parallel prior write authority in `packages/crl/src/cel/emitter/emitFhir.ts`: the `applyDateField` stored
+// date map, the universal `resourceBody.code` write, and the type-switched value write (today at :355-371,
+// :512-513, :519-527 respectively — SYMBOLS lead; the line refs are as-of and will drift). BLAST RADIUS the
+// flip must inherit, not discover: `applyDateField`'s map covers 15 resource types while this registry has 5,
+// so the deletion converts the other 10 (Encounter, MedicationStatement, DiagnosticReport, …) into
+// descriptor-resolution `unsupported-resource` failures — the intended fail-closed behavior (design §5/§9), a
+// stated consequence. Until the flip this is inert infrastructure ALONGSIDE the old authority.
+//
+// SPELLING ≠ LEGALITY: a resolver spells a JSON name correctly for any variant; it does NOT assert the target
+// element admits that variant. `conceptValueTypes` is CRL-wide (includes `date`/`Attachment`), but e.g.
+// `Observation.value[x]` (R4) admits neither `valueDate` nor `valueAttachment`. Per-resource variant-set
+// legality is the T3 model-info obligation (design §8 flip-blocker); T2 never certifies it.
+//
+// CONSUMPTION CONTRACT: the resolvers take `CodingStrategy`/`RecencyAccess`/strings — none takes a
+// `resourceType`, so they CANNOT gate an unsupported resource. That is deliberate: descriptor resolution
+// (`deriveEffectiveRepresentations`) is the single fail-closed chokepoint (design §5). Call these resolvers
+// ONLY on fields of an already-derived descriptor — never on a hand-built `RecencyAccess` that would bypass the
+// gate. FAIL-CLOSED ASYMMETRY (intentional): `recencyStampJsonName` guards a dotted/empty `sortExpr` because a
+// REAL derived descriptor field is dotted (the uncoded age arm's `meta.lastUpdated`, `effectiveRepresentation.ts`),
+// so a contract-abiding caller can legitimately reach the guard; `codingJsonName` has no fail-closed channel
+// because no descriptor produces a dotted/empty coding field (every registry field is top-level; the uncoded
+// arm carries no coding). Do not "fix" the asymmetry by adding a guard coding cannot need, nor copy coding's
+// guardlessness to a resolver that does.
+
+import { conceptValueTypes } from "../grammar/conceptValueTypes";
 
 /** How a resource's retrieve code is carried, for the CQL retrieve `[<Resource>: <code>]`. No universal
  *  default — every supported resource declares its strategy explicitly (panel R1 P4). */
@@ -80,4 +109,85 @@ export function resourceEmitRow(resourceType: string): ResourceEmitRow | undefin
   return Object.prototype.hasOwnProperty.call(RESOURCE_EMIT_REGISTRY, resourceType)
     ? RESOURCE_EMIT_REGISTRY[resourceType]
     : undefined;
+}
+
+// ── T2: JSON-write-name resolvers ────────────────────────────────────────────────────────────────────────
+// The serialized-JSON write names the CEL lane needs at the flip, DERIVED from the read row via the one FHIR
+// polymorphic-element spelling rule. See the SCOPE / SPELLING≠LEGALITY / CONSUMPTION notes in the file header.
+
+/** A resolved JSON write name, or a fail-closed diagnostic. `value-element-unmappable` = a value element T2
+ *  cannot map (authored non-`value`, or an unknown value type — general element mapping is T3, design §8);
+ *  `unsupported-recency-path` = a `sortExpr` that is not a top-level writable stamp (dotted/empty). */
+export type JsonNameResult =
+  | { jsonName: string }
+  | { errorKind: "value-element-unmappable" | "unsupported-recency-path"; detail: string };
+
+/** The FHIR spelling of a polymorphic (choice) element `<base>[x]` populated with variant `<variant>`:
+ *  `<base><Variant>` with the variant's first char uppercased (a primitive like `boolean`/`dateTime` → capital;
+ *  a complex type like `CodeableConcept` is already capital → no-op). NOT a legality claim — see the header. */
+function choiceElementJsonName(base: string, variant: string): string {
+  return base + variant.charAt(0).toUpperCase() + variant.slice(1);
+}
+
+/** The JSON write name for a resource's retrieve coding, derived from its read-side `CodingStrategy`. A plain
+ *  `codeable-concept` writes its own element name (`code`); a `choice-codeable-concept` writes the CodeableConcept
+ *  variant of its choice element (`medication` → `medicationCodeableConcept`). Total over the two strategy kinds. */
+export function codingJsonName(strategy: CodingStrategy): string {
+  switch (strategy.kind) {
+    case "codeable-concept":
+      return strategy.field;
+    case "choice-codeable-concept":
+      return choiceElementJsonName(strategy.field, "CodeableConcept");
+  }
+}
+
+/** The JSON write name for a concept's datum value — the NAME axis of the design §4 value-population rule (the
+ *  type-dependent payload encoding is the CEL-lane writer's job at the flip, T5/T6). Maps ONLY the standard
+ *  `value[x]` carrier (`valueElement === "value"`) to `value<Type>`, a SPELLING (element legality is T3). Fails
+ *  closed on an authored non-`value` element (the T1 boundary — general element mapping needs the model-info
+ *  registry, design §8) or an unknown value type. Only ever called when a datum exists (a valueless concept
+ *  writes no value at all — not this function's concern). */
+export function valueJsonName(
+  valueElement: string,
+  datumValueType: string | undefined,
+): JsonNameResult {
+  if (valueElement !== "value") {
+    return {
+      errorKind: "value-element-unmappable",
+      detail: `authored value element \`${valueElement}\` is not mappable in T2 (only the standard \`value[x]\` carrier; general element mapping is the T3 model-info registry, §8)`,
+    };
+  }
+  if (datumValueType === undefined || !conceptValueTypes.includes(datumValueType)) {
+    return {
+      errorKind: "value-element-unmappable",
+      detail: `value type \`${datumValueType ?? "(none)"}\` is not a known concept value type`,
+    };
+  }
+  // A SPELLING only — whether `value[x]` on the target resource admits this variant (e.g. `valueDate` is illegal
+  // on Observation.value[x] in R4) is the T3 model-info legality gate, not T2's to assert.
+  return { jsonName: choiceElementJsonName("value", datumValueType) };
+}
+
+/** The JSON write name for a resource's recency date-stamp, derived from its read-side `RecencyAccess` so the
+ *  written stamp is consistent with the read cast BY CONSTRUCTION (a `cast:"dateTime"` choice is populated with
+ *  its `<base>DateTime` variant, which `(<base> as FHIR.dateTime).value` reads null-sort-safely). Rejects a
+ *  DOTTED-or-EMPTY `sortExpr` FIRST, before either branch (it does NOT validate general FHIR element-name syntax
+ *  — whitespace/bracket spellings are unreachable per the consumption contract, so unguarded by design):
+ *  `meta.lastUpdated` (uncoded Patient — a server-assigned stamp the resource-writer never emits) and, later,
+ *  design §2's Period recency (`period.start`) are dotted paths, not top-level stamps, until T3; a naive
+ *  `cast:"dateTime"` derivation would spell an invalid nested `period.startDateTime`. */
+export function recencyStampJsonName(recency: RecencyAccess): JsonNameResult {
+  const expr = recency.sortExpr;
+  if (expr.length === 0 || expr.includes(".")) {
+    return {
+      errorKind: "unsupported-recency-path",
+      detail: `a dotted or empty \`sortExpr\` (\`${expr}\`) is not a top-level writable stamp — it needs the T3 model-info registry (current instances: Patient \`meta.lastUpdated\`; §2 Period recency \`period.start\`)`,
+    };
+  }
+  switch (recency.cast) {
+    case "none":
+      return { jsonName: expr }; // a plain top-level dateTime element (`recordedDate`, `authoredOn`) writes as itself
+    case "dateTime":
+      return { jsonName: choiceElementJsonName(expr, "dateTime") }; // choice populated with the dateTime variant
+  }
 }
