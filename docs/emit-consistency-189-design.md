@@ -108,7 +108,11 @@ Every boolean-valued define the emitter can produce is **total**. Rules:
 5. **Backstop = a static emit/test-time totality PROOF, not a runtime Coalesce.** Requires a **boolean-
    totality effect** in resolved-concept metadata + a lowering table classifying each form (intrinsically-
    total / boundary-totalized / rejected). The current emitter has only return-*shape* metadata
-   (`PATTERN_RETURN_SHAPE`), not nullability — this is new metadata to add (final-round gpt56 #10).
+   (`PATTERN_RETURN_SHAPE`), not nullability — this is new metadata to add (final-round gpt56 #10). **Full
+   buildable spec: `docs/emit-189-boolean-totality.md`** (the corrected classification, the two-phase
+   obligation→discharge→proof model, whole-graph coverage, and the verification gaps). **Built AT the flip
+   (T5), NOT as an inert precursor** — totality is a fact about the lowering, so an AST-only classifier would
+   pass the proof vacuously (disc 426, both crl-emit arms + operator).
 6. **Scope:** totality holds over an artifact graph emitted by ONE emitter version. Mixed-version includes are
    rejected/detected, never consumption-site-Coalesced.
 
@@ -303,7 +307,8 @@ when picked up (memory is not backlog).**
 - **Resource-writer registry** (§4/§7) — a supported {resourceType → codingElement, valueElement, recency
   element/type, choice-element JSON mapping} table + fail-closed for unsupported; today CEL writes only
   `.code` and Observation values (`emitFhir.ts:513,517-525`).
-- **Boolean-totality effect metadata** (§3 rule 5) — the proof system behind the totality assertion.
+- **Boolean-totality effect metadata** (§3 rule 5) — the proof system behind the totality assertion. **Spec'd
+  in `docs/emit-189-boolean-totality.md`; folded into T5 (not an inert precursor) per disc 426.**
 - **`valueElement` population rule** (§4) — auto-map vs `value element is`.
 
 ---
