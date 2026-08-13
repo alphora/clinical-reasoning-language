@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { localCodeSystemUrl } from "../../cql-emitter/lowerLocalCodes";
+import { localCodeSystemUrl } from "../slug";
 import { emitLocalCodeSystem, type LocalCodeConcept } from "../codeSystem";
 import type { CpgMetadata } from "../types";
 

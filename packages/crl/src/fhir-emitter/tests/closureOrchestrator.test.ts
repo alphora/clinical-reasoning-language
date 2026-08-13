@@ -12,7 +12,7 @@ import {
   emitFhirDefFromPath,
 } from "../closureOrchestrator";
 import { emitCQLImports } from "../../imports/emit";
-import { localCodeSystemUrl } from "../../cql-emitter/lowerLocalCodes";
+import { localCodeSystemUrl } from "../slug";
 import { localCodeSystemSlug } from "../slug";
 import { CPG_FEATURE_EXPRESSION_EXT } from "../types";
 import type { CpgMetadata, EmittedResource } from "../types";

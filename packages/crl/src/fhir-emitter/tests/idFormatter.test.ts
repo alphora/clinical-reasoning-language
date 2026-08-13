@@ -5,7 +5,7 @@ import { decisionId, planDefinitionCanonicalUrl } from "../decision";
 import { recommendationDefinitionCanonicalUrl, recommendationId } from "../recommendation";
 import { caseFeatureCanonicalUrl, caseFeatureId } from "../structureDefinition";
 import { localCodeSystemSlug, policyIdBase, uniqueCapSlug, uniqueCapSlugForSuffix } from "../slug";
-import { localCodeSystemUrl } from "../../cql-emitter/lowerLocalCodes";
+import { localCodeSystemUrl } from "../slug";
 import type { CpgMetadata } from "../types";
 
 /**

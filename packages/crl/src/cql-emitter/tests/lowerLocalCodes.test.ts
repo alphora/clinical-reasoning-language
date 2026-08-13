@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { buildCRL } from "../../index";
 import type { CRL, Concept, Terminology, Location } from "../../ast/types";
 import { emitCQL as emitCQLRaw, emitCQLFromAST as emitCQLFromASTRaw } from "../emitCQL";
-import { lowerLocalCodes as lowerLocalCodesRaw, localCodeSystemUrl } from "../lowerLocalCodes";
+import { lowerLocalCodes as lowerLocalCodesRaw } from "../lowerLocalCodes";
+import { localCodeSystemUrl } from "../../fhir-emitter/slug";
 
 // #271 — `crl.canonicalBase` is now REQUIRED to lower local `code is` concepts
 // (no urn fallback). These wrappers thread a fixed test base so the existing

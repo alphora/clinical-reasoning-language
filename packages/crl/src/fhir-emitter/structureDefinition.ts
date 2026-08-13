@@ -37,7 +37,7 @@
 
 import type { CRLError } from "../types/errors";
 
-import { localCodeSystemUrl } from "../cql-emitter/lowerLocalCodes";
+import { localCodeSystemUrl } from "./slug";
 import { libraryCanonicalUrl } from "./library";
 import { pascalCaseName, policyIdBase, rawSlug, uniqueCapSlug } from "./slug";
 import {

@@ -191,6 +191,56 @@ export function localCodeSystemSlug(localDomainId: string): string {
 }
 
 /**
+ * Deterministic local-domain codesystem URL for a library — the single implicit
+ * local domain shared by every `code is` code in the library. Slug = lowercase,
+ * non-alphanumeric → hyphen, collapse/trim hyphens; empty (e.g. a pure non-ASCII
+ * library name) falls back to `unnamed` so the URL is always well-formed.
+ *
+ * The local codesystem URL is published UNDER `crl.canonicalBase`
+ * (`<base>/CodeSystem/<slug>-local`) for FHIR closure integrity + publishability;
+ * the case-feature profile fixes a code from this system. **#271 — canonicalBase is
+ * REQUIRED; there is NO urn fallback.** Passing an empty/undefined base is a
+ * caller-invariant violation (throws): the callers that lower local codes validate
+ * `crl.canonicalBase` first (`lowerLocalCodes` for the CQL lane, the FHIR-metadata
+ * loader for the FHIR lane) and hard-error with `missing-canonical-url-base` when it
+ * is absent — mirroring each other so the CQL and FHIR local-codesystem identities
+ * stay byte-equal. BOTH lanes call THIS helper.
+ *
+ * R1 — `localDomainId` is the slug SOURCE: the FHIR/imports lanes pass the POLICY
+ * ID (`metadata.name`) so the local-domain url shares the policy-id base with
+ * every other emitted FHIR resource id; direct callers without metadata pass the
+ * source LIBRARY NAME. The function just slugs whatever it is given — the CALLER
+ * decides which identity is authoritative for the domain.
+ *
+ * #189 T1 — relocated here from `cql-emitter/lowerLocalCodes` (beside its only dep
+ * `localCodeSystemSlug`) so the emit representation-descriptor and BOTH lanes can
+ * import the local-domain identity from this leaf util without a `cql-emitter ↔
+ * emit` cycle.
+ */
+export function localCodeSystemUrl(
+  canonicalBase: string | undefined,
+  localDomainId: string,
+): string {
+  // #237/T1 (scope B) — the url-tail is the SAME collision-safe identity the FHIR
+  // `CodeSystem.id` uses (`localCodeSystemSlug`, which returns the full `<…>-local`
+  // tail), so id, url-tail, `codesystem '<url>'`, and every `coding.system` are
+  // byte-equal at ALL lengths — including the >64 case the old uncapped `localSlug`
+  // left divergent, and dotted domains where `rawSlug` (dot→hyphen) now matches the
+  // id instead of the old `localSlug` (dot-stripping) mismatch.
+  const tail = localCodeSystemSlug(localDomainId);
+  // #271 — REQUIRED, no urn fallback. Normalize a trailing slash so the url is
+  // stable regardless of whether the caller's canonicalBase ends in `/`.
+  const base = canonicalBase?.trim().replace(/\/+$/, "") ?? "";
+  if (!base) {
+    throw new Error(
+      "localCodeSystemUrl requires a non-empty canonicalBase (#271: no urn fallback). " +
+        "Validate crl.canonicalBase before lowering local codes.",
+    );
+  }
+  return `${base}/CodeSystem/${tail}`;
+}
+
+/**
  * Δ15 — PascalCase a name for the FHIR `name` (computable) field.
  * Lowercase → strip non-alphanumeric (keep spaces + hyphens + underscore)
  * → split on `[-_\s]+` → capitalize first letter per token → concat.

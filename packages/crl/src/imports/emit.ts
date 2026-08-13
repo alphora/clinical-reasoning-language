@@ -23,12 +23,11 @@ import type { Partition } from "../cql-emitter/layeredEmit";
 import { loadCatalogLibraries } from "../cql-emitter/catalog/loadCatalog";
 import {
   lowerLocalCodes,
-  localCodeSystemUrl,
   astHasConceptLocalCode,
   preLowerAge,
 } from "../cql-emitter/lowerLocalCodes";
 import { readCanonicalBase, readPolicyId } from "../fhir-emitter/metadata";
-import { localDomainIdFor, pascalCaseNameForId } from "../fhir-emitter/slug";
+import { localDomainIdFor, pascalCaseNameForId, localCodeSystemUrl } from "../fhir-emitter/slug";
 import type { CRLError } from "../types/errors";
 
 import { resolveImports } from "./index";

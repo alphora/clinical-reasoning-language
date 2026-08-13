@@ -41,8 +41,7 @@
 
 import type { CRLError } from "../types/errors";
 
-import { localCodeSystemSlug, pascalCaseName, slugify } from "./slug";
-import { localCodeSystemUrl } from "../cql-emitter/lowerLocalCodes";
+import { localCodeSystemSlug, localCodeSystemUrl, pascalCaseName, slugify } from "./slug";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,
