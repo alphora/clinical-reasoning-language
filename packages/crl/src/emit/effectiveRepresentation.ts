@@ -8,6 +8,7 @@
 
 import type { Concept } from "../ast/types";
 import { localCodeSystemUrl } from "../fhir-emitter/slug";
+import { relativeElementPath } from "../fhir-model/elementPath";
 import type { ConceptValueType } from "../grammar/conceptValueTypes";
 import type { ResultType } from "../grammar/resultType";
 import { conceptResultType } from "../grammar/resultType";
@@ -102,12 +103,9 @@ export type DerivationOutcome =
   | { status: "deferred"; reason: "sourced" }
   | { status: "error"; error: DerivationError };
 
-/** Strip a leading `<Resource>.` prefix so an authored/catalog qualified path becomes the relative read path the
- *  descriptor stores (`Patient.birthDate` → `birthDate`, `Patient.meta.lastUpdated` → `meta.lastUpdated`). */
-function relativePath(path: string, resourceType: string): string {
-  const prefix = `${resourceType}.`;
-  return path.startsWith(prefix) ? path.slice(prefix.length) : path;
-}
+// The qualified→relative element-path strip is the lane-neutral `relativeElementPath` (shared with the flip's
+// validate-lane consumer, which must not import emit). Aliased locally to keep the call sites below unchanged.
+const relativePath = relativeElementPath;
 
 /** The first empty owning-metadata field, or `null` if all three are present. */
 function firstEmptyOwningField(

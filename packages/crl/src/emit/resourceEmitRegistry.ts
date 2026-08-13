@@ -181,7 +181,7 @@ export function recencyStampJsonName(recency: RecencyAccess): JsonNameResult {
   if (expr.length === 0 || expr.includes(".")) {
     return {
       errorKind: "unsupported-recency-path",
-      detail: `a dotted or empty \`sortExpr\` (\`${expr}\`) is not a top-level writable stamp — it needs the T3 model-info registry (current instances: Patient \`meta.lastUpdated\`; §2 Period recency \`period.start\`)`,
+      detail: `a dotted or empty \`sortExpr\` (\`${expr}\`) is not a top-level writable stamp — recency-path writability is a SEPARATE later concern, NOT the T3a value-read model (current instances: Patient \`meta.lastUpdated\`, server-assigned/never written; §2 Period recency \`period.start\`, out of the resource subset)`,
     };
   }
   switch (recency.cast) {
