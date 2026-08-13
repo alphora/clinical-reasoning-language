@@ -108,45 +108,50 @@ Syntax and rules:
   emit-capable way to author a single-determination `first:` exclusion; the
   per-action `unless` is a different, menu-member-only construct — see "Per-action
   guards".)
-- **A branch guard lowers to structure, never to CQL.** `and` becomes several
-  ANDed applicability conditions on one action. `or` expands to
-  disjunctive-normal-form arms whose *placement is context-sensitive*: under an
-  enclosing `first:` the arms splice in as contiguous ordered siblings; under
-  `all:` / flat / other contexts the arms are wrapped in one synthesized
-  `cqf-applicabilityBehavior: "any"` grouping action (so exactly one arm
-  applies). Either way the disjunction stays **visible and auditable** in the
-  emitted `PlanDefinition.action` and in the cockpit's per-atom guard box — a
-  reviewer sees *which* atom failed. This is the load-bearing property that
-  separates a branch guard from inference (`defined as` / `sem-*`), which *does*
-  collapse to an opaque CQL boolean. Keep decision logic in branch guards and
-  branches; keep alternative-representation logic in `defined as`.
+- **A branch guard's STRUCTURE lowers to action shape, never collapsing to one
+  opaque CQL boolean.** `and` becomes several ANDed applicability conditions on
+  one action. An INLINE `or` expands to disjunctive-normal-form arms whose
+  *placement is context-sensitive*: under an enclosing `first:` the arms splice in
+  as contiguous ordered siblings; under `all:` / flat / other contexts the arms
+  are wrapped in one synthesized `cqf-applicabilityBehavior: "any"` grouping
+  action (so exactly one arm applies). For an inline `or` the disjunction stays
+  **visible and auditable** as those arms in the emitted `PlanDefinition.action`;
+  a reviewer sees *which* atom failed. (A guard leaf that is a named `criterion`
+  is one identifier condition resolving to that criterion's own named define —
+  post-#236 its `or` lives inside the define, visible there + in the use-site
+  `input[]` + the cockpit view-model node, not as parent action arms; see the
+  criterion section.) This visible-atom property is what separates a branch guard
+  from inference (`defined as` / `sem-*`), which fuses distinct criteria into an
+  opaque CQL boolean asserting a false sameness. Keep decision logic in branch
+  guards and branches; keep alternative-representation logic in `defined as`.
 
 ### The materialization envelope (a resource bound, not an authoring gate)
 
-Because `or` expands to DNF arms, an `and`-of-`or`s multiplies:
+Because an INLINE `or` expands to DNF arms, an inline `and`-of-`or`s multiplies:
 `( "A" or "B" ) and ( "C" or "D" )` materializes 2×2 = 4 arms. The emitter caps
-the materialized tree — **256 arms**, and (for `criterion` expansion) **1024
-atoms** / **32 levels of nesting**. These are envelopes that keep emit from
-exploding on a pathological tree; they are **not** an authoring-complexity gate,
-and a faithful clinical model never approaches them.
+the materialized tree — **256 arms** (an ARM cap only; a guard's own `and`/`or`
+nesting is parser-bounded, not a separate emit cap). This is an envelope that
+keeps emit from exploding on a pathological *inline* tree; it is **not** an
+authoring-complexity gate, and a faithful clinical model never approaches it.
 
 If you ever do hit the cap, the emitter reports it
-(`compound-guard-expansion-overflow` / `criterion-expansion-overflow`) rather
-than emitting a truncated resource — and its guidance is deliberate: **a faithful
-model that overflows is a capability gap, not an authoring error. Do not
-restructure the decision solely to satisfy the bound.** Raise it, and consult the
-authoring kit for factoring guidance. The kit — not this page and not the
-emitter — owns the "too complex / how to factor" doctrine.
+(`compound-guard-expansion-overflow`) rather than emitting a truncated resource —
+and its guidance is deliberate: **a faithful model that overflows is a capability
+gap, not an authoring error. Do not restructure the decision solely to satisfy
+the bound.** Raise it, and consult the authoring kit for factoring guidance. The
+kit — not this page and not the emitter — owns the "too complex / how to factor"
+doctrine.
 
-One thing the kit's guidance cannot be is "name the sub-expressions with a
-`criterion`": a `criterion` inline-expands, so it does **not** reduce the
-materialized count (see below). The only construct that keeps logic *out* of the
-DNF is a `use decision` sub-decision — but `use decision` is an **action**, not a
+Two faithful constructs keep logic *out* of the parent DNF. (1) Post-#236, a
+**named `criterion`** is a first-class factoring path: a criterion reference is
+ONE DNF leaf — its `or` lives inside the criterion's own named boolean define,
+emitted once and referenced by identity — so naming a reused or large-`or`
+sub-expression collapses it to a single leaf instead of expanding at the parent
+(its atoms stay visible in the define body + the use-site `input[]`; see below).
+(2) A `use decision` sub-decision — but `use decision` is an **action**, not a
 condition, so it is available only when the source genuinely has a shared,
-action-bearing sub-determination to delegate to (with its own dispositions). A
-*pure guard* blowup (a boolean with no natural sub-decision) has no out-of-DNF
-form today — that is exactly the capability-gap case to raise, not to paper over
-by inventing a sub-decision that changes which disposition is produced.
+action-bearing sub-determination to delegate to (with its own dispositions), never
+a fabricated one.
 
 ## `criterion` — naming a reusable guard
 
@@ -188,16 +193,27 @@ Syntax and semantics:
 - **Reference:** use the name in any branch condition — bare
   (`- when "Meets Coverage Preconditions" then …`) or inside a compound
   (`… and "Meets Coverage Preconditions" …`).
-- **It inline-expands.** A `criterion` reference is replaced by its body before
-  lowering, producing output **byte-identical** to hand-inlining the condition. A
-  `criterion` is an authoring convenience — a *name* for otherwise-repeated
-  branch-guard text — and nothing more. It changes **no** structural guidance:
-  the atoms stay individually visible; a decision reads the same as if you had
-  inlined it.
-- **It is not an arm reducer.** Because it expands, factoring two 4-way `or`s
-  into two criteria still materializes 16 arms. Reach for a `criterion` for
-  *readability*, never expecting it to shrink the emitted resource (see the
-  don't-case).
+- **It lowers to a named define, referenced by identity (#236).** A `criterion`
+  is emitted ONCE as a named boolean CQL define; a reference lowers to a single
+  guard literal — one positive `text/cql-identifier` `condition[]`, or
+  `not Coalesce("Lib"."Name", false)` when negated — pointing at that define, NOT
+  its inline-expanded body. N references → the body is emitted once (a DAG of
+  named defines, linear in distinct criteria). The atoms stay individually
+  visible — in the criterion's transparent decomposable define body, in the
+  use-site `input[]` (its recursive atom closure), and as an expandable named node
+  in the cockpit view-model (the MV cockpit rendering trails, #274) — so naming
+  does not hide them; it relocates *where* they surface (from per-atom action
+  `condition[]`, as an inline guard would emit, to the define + `input[]`).
+- **It reduces the parent arm count when factoring a disjunction.** A criterion
+  reference is always one DNF leaf, so its body never multiplies the parent guard's
+  arm count: factoring two 4-way `or`s into two criteria yields a parent guard of
+  **one** arm with two identifier conditions (each `or` lives in its own define,
+  emitted once), not 16 inline arms. Precisely: naming reduces the arm count exactly
+  when the inlined-then-NNF body would have >1 DNF arm — a positive effective
+  disjunction, or a negated effective conjunction (`not ( A and B )`); a body whose
+  inlined NNF is a pure conjunction is arm-neutral. Reach for a `criterion` for
+  *readability* (DRY) AND for *emit tractability* (factoring a reused or large-`or`
+  sub-term out of the DNF).
 - **A criterion holds only branch-guard logic**, never actions. It cannot
   `recommend` or `use`; it is a boolean condition, not a sub-decision.
 - **It is library-local.** Reference a criterion **unqualified** (a same-library
@@ -228,7 +244,7 @@ fires. The boundary:
 
 | You have… | Use | Lowers to | A reviewer sees… |
 |---|---|---|---|
-| **Conjuncts, or an `or` nested under an `and`, gating one rule** (shared branch, one disposition) | a **branch guard** — or a named **`criterion`** if it recurs | `PlanDefinition.action` structure (one or more applicability actions per branch) | each atom, in the branch's guard box |
+| **Conjuncts, or an `or` nested under an `and`, gating one rule** (shared branch, one disposition) | a **branch guard** — or a named **`criterion`** to factor a reused/large-`or` sub-term | `PlanDefinition.action` structure | each INLINE atom in the branch's guard box; a named `criterion` as one identifier condition (its atoms in the criterion's define + use-site `input[]`, post-#236) |
 | **An `or` of distinct criteria sharing one disposition, or criteria routing to *different* dispositions** | separate **`when` branches** | one branch node per criterion, each → one or more applicability actions | each criterion as its **own top-level node** |
 | **Alternative *representations* of one fact** (two data forms of a single already-defined clinical fact) | **`defined as` / `sem-*`** | a CQL boolean (inference) | one fact; the representations are internal |
 | **Reusable action-bearing logic** — a shared determination that yields recommendations | **`use decision`** | a referenced sub-`PlanDefinition` | a linked sub-decision, kept out of the DNF |
@@ -285,8 +301,13 @@ Given a whole-condition `or` under `first:`, choose:
   their own top-level node → sibling branches** (the default for a coverage
   policy whose disjuncts a reviewer reads as separate qualifying pathways).
 - **An `or` of interchangeable alternatives of one rule, sharing one body → a
-  guard is fine** (DRYer; the cockpit still boxes the atoms). Promote the shared
-  `or` to a named `criterion` if it recurs.
+  guard is fine** (DRYer; an inline guard boxes each atom in `PlanDefinition.action`).
+  Promote the shared `or` to a named `criterion` when it recurs or needs arm-count
+  relief — but note the promotion is **not** emit-neutral post-#236: a named
+  criterion emits one identifier condition (its atoms in the define + use-site
+  `input[]` + cockpit view-model node), whereas an inline guard emits per-atom
+  action conditions. Both are faithful — an audit-granularity choice, not a
+  fidelity one.
 
 ```
 criterion "Failed Conservative Therapy":        // DISTINCT criteria (SEPARATE events) = or-guard
@@ -506,12 +527,16 @@ this instead:** parenthesize to say what you mean —
 ```
 `not` is supported and lowers structurally: De Morgan pushes it to the ref
 leaves, and each negated literal emits a per-atom `not Coalesce(<ref>, false)`
-applicability condition (never a compound CQL boolean). Semantics are
-closed-world — `not "X"` holds when `X` is *not established*. This is the
+applicability condition (never a compound CQL boolean). A `criterion` ref is
+itself a leaf, so `not "C"` is ONE `not Coalesce("C", false)` condition — never
+De-Morganed into the criterion's body (which stays structural inside its define).
+That is the #236 negation advantage: inlining `not ( A and B )` would De Morgan
+into a 2-arm `not A or not B`, while a negated criterion ref stays one leaf.
+Semantics are closed-world — `not "X"` holds when `X` is *not established*. This is the
 emit-capable way to author a single-determination `first:` exclusion, which a
 menu-member-only per-action `unless` cannot express.
 
-### ✗ expect a `criterion` to shrink the emitted arm count
+### ✓ use a `criterion` to factor a large `or` out of the parent DNF (#236)
 ```
 criterion "Left":  - when ( "A" or "B" or "C" or "D" ).
 criterion "Right": - when ( "E" or "F" or "G" or "H" ).
@@ -520,14 +545,16 @@ first:
 - when ( "Left" and "Right" ) then recommend activity "Approve".
 - otherwise then recommend activity "Deny".
 ```
-A `criterion` inline-expands, so this still materializes 4×4 = 16 arms — naming
-the ORs changed nothing structural. **Do this instead:** the criterion is fine as
-a *readability* aid — just don't reach for it expecting arm reduction. If you are
-genuinely near the 256-arm envelope with a **faithful** model, that is a
-capability gap: raise it and consult the authoring kit (which owns factoring
-doctrine), rather than restructuring solely to satisfy the bound. Only a
-`use decision` keeps logic out of the DNF, and only when the source has a real
-action-bearing sub-determination to delegate to.
+Post-#236 each `criterion` lowers to its own named boolean define, and the parent
+guard `( "Left" and "Right" )` is a pure `and` of two identifier leaves — **one**
+arm with two `text/cql-identifier` conditions, NOT the 4×4 = 16 inline arms the
+same `or`s would materialize written directly in the guard. Each `or` lives inside
+its define (`define "Left": Coalesce("A", false) or …`), emitted once; the atoms
+remain visible in the define bodies + the use-site `input[]`. So a `criterion` is
+both a *readability* aid and a genuine *arm-count* remedy for a reused or large-`or`
+sub-term. (If you are still near the 256-arm envelope with a **faithful** *inline*
+model, that is a capability gap: raise it and consult the authoring kit, which owns
+factoring doctrine, rather than restructuring solely to satisfy the bound.)
 
 ### ✗ `any:` over `when`-branches
 ```

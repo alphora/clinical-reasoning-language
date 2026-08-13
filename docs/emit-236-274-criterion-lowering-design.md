@@ -284,9 +284,19 @@ Two statements currently trail the mechanics and flip once referencing lands:
   and NEGATED refs alike — `not <criterion>` is `not Coalesce("crit", false)`, one condition, no re-expansion.
 - `branch-guards`: "NEVER reach for a `criterion` expecting relief — it inline-expands and does nothing for the
   arm count" → **now it does provide relief** (positive or negated).
-Plus: `decision-composition` records #236 as load-bearing (kit 1.12) — update the cross-link to "resolved by
-named-criterion-define lowering, vX.Y." Note this is a KE-visible semantic change (criterion goes from a pure
+Plus: `decision-composition` records #236 as load-bearing — the cross-link is updated to "resolved by
+named-criterion-define lowering." Note this is a KE-visible semantic change (criterion goes from a pure
 macro with no artifact identity to a named CQL define) — worth its own kit line, not just the two flips.
+
+**DONE (kit schemaVersion 1.24→1.25, disc 422).** The design-panel round expanded the scope beyond the two
+statements above: the faithfulness DISCRIMINATOR was re-grounded (both `decision-composition` + `concept-form`
+invariants and the `hollowed-criteria`/`dropped-or-added-criterion` judge lenses) from "each criterion its own
+action-level `condition[]`" → "opaque INFERENCE composite (`defined as`/`sem-*`) vs named TRANSPARENT define
+(`criterion`)", since per §2a a named criterion loses NO atom visibility (atoms relocate to the define body +
+use-site `input[]` + cockpit ANY-OF node). Every "each atom visible" prose surface was swept to distinguish
+inline (action `condition[]`) from named criterion. `docs/decision-shapes.md` was folded into the same
+transaction (it was cited by the flipped rules' `ref` fields and still taught the retired inline-expansion
+model). The `criterion-expansion-overflow`/criterion-atom bound was retired from the kit's cap doctrine.
 
 ---
 

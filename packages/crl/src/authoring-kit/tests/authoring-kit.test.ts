@@ -417,7 +417,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.24");
+    expect(kit.schemaVersion).toBe("1.25");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -1016,11 +1016,18 @@ describe("authoring-kit — getAuthoringKit", () => {
     // `no-bare-scalar-code` validate-only migration prompt + reconciles it with `definition is` OUT-of-stage; the
     // `value-type` shipped-checks clause narrows `decision-guard-record-shaped` to a TYPED record operand (untyped is
     // silent in N). Paired validator fix exempts the age-recency `value projection` posrep from the false warning. BOTH hashes move.
+    // #236 criterion-as-reducer flip (schemaVersion 1.24→1.25, disc 422): the criterion framing is inverted — a
+    // `criterion` lowers ONCE to a named boolean CQL define referenced BY IDENTITY (one condition per ref; body once;
+    // IS an arm reducer when its body carries an `or`). The faithfulness discriminator was re-grounded across the
+    // `decision-composition` + `concept-form` invariants and the `hollowed-criteria`/`dropped-or-added-criterion`
+    // judge lenses (action-condition-count → opaque-inference-vs-named-transparent-define); every "each atom visible"
+    // prose surface swept to distinguish inline vs named; `criterion-expansion-overflow`/criterion-atom bound retired.
+    // CONTENT bump, NO payload-shape change. BOTH hashes move.
     expect(cpg.contentHash).toBe(
-      "9dbe4b9e58439a12b22d6f6dd70ae41c09f16fee02a0fb5e5c3bbfa60566e3b3",
+      "4c176043e369138da4271ed4c8d306612ccb8e6056e5d2cedd5e0d7c52e000b6",
     );
     expect(priorAuth.contentHash).toBe(
-      "1e6b1f6fd4e61118a34f48795596511e0e91c289c74be20e92a0cc81b95f9e8d",
+      "6e7a8508458c1d920885d87344d3bf2fdf47bc34f95ff688375ec390ac4bd671",
     );
   });
 
@@ -1103,6 +1110,82 @@ describe("authoring-kit — getAuthoringKit", () => {
       for (const re of retired) {
         expect(blob, `retired doctrine still in ${uc} payload: ${re}`).not.toMatch(re);
       }
+    }
+  });
+
+  it("#236 — the criterion-as-reducer flip lands in both useCases (no retired 'inline-expands / not a reducer' framing; the re-grounded discriminator + define-reference reality are taught)", () => {
+    // The #236 kit flip (schemaVersion 1.25, disc 422) inverted the criterion framing. A half-inverted payload
+    // (a surviving "inline-expands byte-identical / NOT an arm reducer" claim, or a judge lens still keyed on
+    // action-level condition COUNT) is worse than the old kit — it would sanction a shape the same payload tells
+    // a judge to flag. Sweep for the retired POSITIVE claims (NEGATION-SAFE: the retirement quotes live only in
+    // source COMMENTS, which JSON.stringify(kit) does not serialize) + STRUCTURALLY pin the new discriminator.
+    for (const uc of ["cpg", "prior-auth"] as const) {
+      const kit = getAuthoringKit("local-decision-support", uc);
+      const blob = JSON.stringify(kit);
+      const retired: RegExp[] = [
+        /NOT an (emit-)?arm reducer/i,
+        /it does not shrink the DNF/i,
+        /does nothing for the arm count/i,
+        /inline-expands byte-identical/i,
+        /byte-identical to hand-inlining/i,
+        // the retired PAIRED-diagnostic reporting form (only `compound-guard-expansion-overflow` survives in
+        // the reporting slot; `criterion-expansion-overflow` appears now ONLY as a "retired"/"GONE" mention).
+        /`compound-guard-expansion-overflow`\s*\/\s*`criterion-expansion-overflow`/,
+        // the retired materialization "criterion atom" bound (the caps item now lists arm/nesting only).
+        /criterion atom \/ nesting/i,
+      ];
+      for (const re of retired) {
+        expect(blob, `${uc}: retired #236 criterion framing "${re}" must not appear in the served payload`).not.toMatch(re);
+      }
+      // POSITIVE — the define-reference reality is taught on the `criterion` rule.
+      const crit = kit.rules.find((r) => r.id === "criterion")!;
+      expect(crit.rule).toMatch(/lowers ONCE to a NAMED boolean CQL define/i);
+      expect(crit.rule).toMatch(/referenced BY IDENTITY/i);
+      expect(crit.rule).toMatch(/IS an emit-arm reducer/i);
+      // arm-reduction is stated as the EXACT rule (inlined-then-NNF > 1 arm), NOT a false blanket
+      // (both crl-emit arms R2/R3: a negated criterion ref is NOT inherently reducing; a negated `or`
+      // body is arm-neutral). Pin the governing rule + the de-categoricalized converse, and forbid
+      // the retired false exemplar so the earlier over-correction cannot silently return.
+      expect(crit.rule).toMatch(/inlined-then-NNF equivalent would have >1 DNF arm/i);
+      expect(crit.rule).toMatch(/negated ref to an effective-conjunction body/i);
+      expect(crit.rule).toMatch(/positive pure-`and`\/single-ref body/i);
+      expect(crit.rule).not.toMatch(/or a negated criterion ref/i);
+      // the body is emitted STRUCTURALLY into the define (no parent De Morgan / DNF flattening).
+      expect(crit.rule).toMatch(/NO De Morgan \/ DNF flattening of the body/i);
+      // the atoms-not-hidden framing (relocation, not loss).
+      expect(crit.rule).toMatch(/atoms stay VISIBLE/i);
+      // the EXAMPLE notes + reference-artifact purpose carry the post-flip phrasing (gpt/Claude R2/R3:
+      // these had NO pin — a regression to "each conjunct its own action condition" matched no retired
+      // regex and would pass). Pin on the serialized payload so the exact C2-class residue goes red HERE.
+      expect(blob, `${uc}: policy-alternatives example`).toMatch(/stay visible in the criterion's TRANSPARENT define body/i);
+      expect(blob, `${uc}: compound-guard example`).toMatch(/resolves to ONE identifier `condition\[\]` naming that criterion/i);
+      // the criteria-decision-reference artifact is prior-auth-edge (filtered out of the cpg payload).
+      if (uc === "prior-auth") {
+        expect(blob, `${uc}: criteria-decision reference purpose`).toMatch(/a named `criterion` is one identifier `condition\[\]` whose TRANSPARENT decomposable define/i);
+      }
+      // POSITIVE — the re-grounded discriminator lands on the hollowed-criteria judge lens (opacity, not count).
+      const lens = kit.judgeLens.composition.find((c) => c.check === "hollowed-criteria")!;
+      expect(lens.checkpoints.some((c) => /OPACITY-OF-INFERENCE/i.test(c))).toBe(true);
+      expect(lens.checkpoints.some((c) => /a named criterion is faithful/i.test(c))).toBe(true);
+      // POSITIVE — the re-grounded discriminator also lands on the surfaces that carried the old
+      // action-condition-count framing (Claude#2/gpt#C2: these had NO structural pin and DID survive
+      // the first pass). Pin the inline-vs-named qualification on each so a regression goes red HERE.
+      const dc = kit.rules.find((r) => r.id === "decision-composition")!;
+      expect(dc.why).toMatch(/a named criterion as one identifier `condition\[\]` resolving to a transparent define/i);
+      const dcInvariant = (dc.clauses ?? []).find((c) => /The faithful home is decision STRUCTURE/.test(c.text))!;
+      expect(dcInvariant.text).toMatch(/a named criterion as one identifier `condition\[\]`/i);
+      const bg = kit.rules.find((r) => r.id === "branch-guards")!;
+      expect(bg.rule).toMatch(/a CRITERION atom is one `condition\[\]` naming the criterion/i);
+      const bgClause = (bg.clauses ?? []).find((c) => /a CRITERION atom is one identifier/.test(c.text))!;
+      expect(bgClause, `${uc}: branch-guards clause must carry the inline-vs-named carve-out`).toBeDefined();
+      const conceptForm = kit.rules.find((r) => r.id === "concept-form")!;
+      const cfInvariant = (conceptForm.clauses ?? []).find((c) => /the faithful form keeps each criterion/.test(c.text))!;
+      expect(cfInvariant.text).toMatch(/a named criterion as one identifier `condition\[\]`/i);
+      const minimalism = kit.rules.find((r) => r.id === "minimalism")!;
+      expect(minimalism.rule).toMatch(/a named criterion as one identifier `condition\[\]`/i);
+      // the dropped-or-added-criterion checkpoint now names the criterion define/input[] as a visible surface.
+      const dropped = kit.judgeLens.composition.find((c) => c.check === "dropped-or-added-criterion")!;
+      expect(dropped.checkpoints.some((c) => /a named criterion's transparent define \+ use-site `input\[\]`/i.test(c))).toBe(true);
     }
   });
 

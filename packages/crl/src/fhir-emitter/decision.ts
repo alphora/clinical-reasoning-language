@@ -284,8 +284,7 @@ type EmitActionResult =
       reason:
         | "unresolved-ref"
         | "all-children-suppressed"
-        | "compound-guard-overflow"
-        | "criterion-overflow";
+        | "compound-guard-overflow";
     };
 
 /* ─── Single-Decision emit ───────────────────────────────────────── */
@@ -518,10 +517,11 @@ interface EmitCtx {
   isStrategy: boolean;
   errors: CRLError[];
   unmatched: UnmatchedReference[];
-  // #224 ii.1c — the emitting library's criterion table. Guards are expanded (gated by the
-  // GLOBAL envelope) at `emitWhenBlock` ENTRY, so `soleRef` / arm-cap / DNF / `guardLabel`
-  // all see the fully-inlined guard (sole-ref collapse + byte-identity, disc 303 C3). Empty
-  // for callers with no criteria (cms / unit tests) → every guard fast-paths to identity.
+  // #224 ii.1c / #236 — the emitting library's criterion table (`name → Criterion`). A criterion
+  // ref is NOT inline-expanded: it is a first-class guard LITERAL resolved to its own boolean
+  // define (`entry.defineId`), so `soleRef` / arm-cap / DNF see a criterion ref as ONE atom. The
+  // table drives resolution (`criterionIndex`) + the recursive `input[]` atom closure. Empty for
+  // callers with no criteria (cms / unit tests) → those guards carry no criterion leaves.
   criterionTable: CriterionTable;
   // #236 — the criterion INDEX (built from `criterionTable`). A criterion GUARD ref lowers to a
   // NAMED reference (`defineId` = bare name) to the criterion's emitted boolean define, NOT its
@@ -1293,9 +1293,9 @@ export function emitDecisionPlanDefinitionsForLibrary(
   libraryName: string,
   metadata: CpgMetadata,
   opts: EmitOptions = {},
-  // #224 ii.1c — the library's criterion table (`name → Criterion`), so a guard that
-  // references a criterion is expanded before emit. Defaults to empty for callers with no
-  // criteria (byte-unchanged). Build via `buildCriterionTable(<library statements>)`.
+  // #224 ii.1c / #236 — the library's criterion table (`name → Criterion`), so a guard that
+  // references a criterion resolves it to its own boolean define (NOT inline-expanded). Defaults
+  // to empty for callers with no criteria. Build via `buildCriterionTable(<library statements>)`.
   criterionTable: CriterionTable = new Map(),
 ): {
   resources: EmittedResource[];
