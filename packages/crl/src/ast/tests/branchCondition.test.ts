@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   assertWellFormedBranchCondition,
   branchConditionArmCount,
-  branchConditionConceptRefsFollowingCriteria,
   branchConditionConceptRefsStrict,
   branchConditionDNF,
   branchConditionRefs,
@@ -12,7 +11,6 @@ import {
   toNNF,
   visitBranchCondition,
 } from "../branchCondition";
-import { buildCriterionTable } from "../criterionExpansion";
 import {
   getRefName,
   refDisplay,
@@ -20,10 +18,8 @@ import {
   type BranchConditionCriterionRef,
   type BranchConditionLiteral,
   type BranchConditionNot,
-  type Criterion,
   type Location,
   type ReferenceName,
-  type SourcedFromCriterion,
 } from "../types";
 
 const LOC = { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } };
@@ -336,89 +332,59 @@ describe("#224 iii.2 — `not` / negation-normal-form / signed-literal DNF", () 
     ref: name,
     location: loc,
   });
-  const markedRef = (name: string, loc: Location, marker: SourcedFromCriterion): BranchCondition => ({
-    type: "BranchConditionRef",
-    ref: name,
-    location: loc,
-    sourcedFromCriterion: marker,
+  describe("toNNF — #236: a criterion ref is a signed literal (not a to-expand node)", () => {
+    it("a ROOT criterion ref in a not-free tree passes through by IDENTITY (already NNF)", () => {
+      const c = cref("C", L(1));
+      expect(toNNF(c)).toBe(c);
+    });
+    it("a NESTED criterion ref in a not-free tree passes through by IDENTITY", () => {
+      const t = and(ref("A"), cref("C", L(1)));
+      expect(toNNF(t)).toBe(t);
+    });
+    it("`not <criterion>` normalizes to a negated-criterion literal (Not over a criterion ref)", () => {
+      const r = toNNF(not(cref("C", L(1))));
+      expect(r.type).toBe("BranchConditionNot");
+      expect((r as { operand: BranchCondition }).operand.type).toBe("BranchConditionCriterionRef");
+    });
+    it("De Morgan over a COMPOUND containing a criterion: `not (A and Elig)` → `not A or not Elig`", () => {
+      // The only path that manufactures a negated-criterion literal from a COMPOUND (the sole-`not`
+      // case above comes straight from the source). The criterion operand must survive as a
+      // `Not`-over-`BranchConditionCriterionRef`, NOT be flattened to a concept ref.
+      const nnf = toNNF(not(and(ref("A"), cref("Elig", L(1)))));
+      expect(nnf.type).toBe("BranchConditionOr");
+      const ops = (nnf as { operands: BranchCondition[] }).operands;
+      expect(ops[0]!.type).toBe("BranchConditionNot");
+      expect((ops[0] as { operand: BranchCondition }).operand.type).toBe("BranchConditionRef");
+      expect(ops[1]!.type).toBe("BranchConditionNot");
+      expect((ops[1] as { operand: BranchCondition }).operand.type).toBe("BranchConditionCriterionRef");
+    });
+    it("DNF `A and not Elig` → ONE arm: a positive concept literal + a negated CRITERION literal", () => {
+      const arms = branchConditionDNF(and(ref("A"), not(cref("Elig", L(1)))));
+      expect(arms).toHaveLength(1); // a criterion negation contributes ONE arm, never its body's arms
+      const arm = arms[0]!;
+      expect(arm).toHaveLength(2);
+      expect(arm[0]!.type).toBe("BranchConditionRef");
+      expect((arm[0] as { ref: string }).ref).toBe("A");
+      expect(arm[1]!.type).toBe("BranchConditionNot");
+      expect((arm[1] as { operand: BranchCondition }).operand.type).toBe("BranchConditionCriterionRef");
+    });
+    it("armCount of `A and not Elig` = 1 (parity with DNF; the signed criterion literal is one atom)", () => {
+      expect(branchConditionArmCount(and(ref("A"), not(cref("Elig", L(1)))), 1024)).toBe(1);
+    });
   });
 
-  describe("toNNF — criterion tripwire (public contract, incl. the not-free fast path)", () => {
-    it("throws on a ROOT criterion ref even with NO `not` in the tree", () => {
-      expect(() => toNNF(cref("C", L(1)))).toThrow(/criterion/i);
-    });
-    it("throws on a NESTED criterion ref in a not-free tree", () => {
-      expect(() => toNNF(and(ref("A"), cref("C", L(1))))).toThrow(/criterion/i);
-    });
-    it("throws on a criterion ref UNDER a `not`", () => {
-      expect(() => toNNF(not(cref("C", L(1))))).toThrow(/criterion/i);
-    });
-  });
-
-  describe("toNNF — marker + location transfer (the plan's normative rule)", () => {
-    const M = (name: string): SourcedFromCriterion => ({ name, refLocation: L(9) });
-
-    it("negated marked ref: marker HOISTS to the Not, the inner ref is UNMARKED (no duplication)", () => {
-      // `not C` where C := "X" → expansion stamps C on the ref → NNF must move it to the Not.
-      const out = toNNF(not(markedRef("X", L(2), M("C")))) as BranchConditionNot;
-      expect(out.type).toBe("BranchConditionNot");
-      expect(out.sourcedFromCriterion?.name).toBe("C"); // boundary root carries it
-      expect(out.operand.type).toBe("BranchConditionRef");
-      expect((out.operand as { sourcedFromCriterion?: unknown }).sourcedFromCriterion).toBeUndefined(); // NOT duplicated
-    });
-
+  describe("toNNF — location preservation", () => {
     it("negated literal LEAF takes the underlying REF's location", () => {
       const out = toNNF(not(ref("A"))) as BranchConditionNot;
       expect(out.operand.location).toBe(LOC); // the ref's own location (from the `ref` helper)
     });
-
-    it("De Morgan flip TRANSFERS a marker from the negated compound to the replacement root", () => {
-      // C := (A or B), used as `not C` → expansion marks the Or with C; NNF flips to And, marker moves.
-      const markedOr: BranchCondition = {
-        type: "BranchConditionOr",
-        operands: [ref("A"), ref("B")],
-        location: L(3),
-        sourcedFromCriterion: M("C"),
-      };
-      const out = toNNF(not(markedOr));
-      expect(out.type).toBe("BranchConditionAnd"); // De Morgan: not(A or B) → not A and not B
-      expect(out.sourcedFromCriterion?.name).toBe("C"); // transferred to the And replacement root
-    });
-
-    it("double negation cancels and preserves the OUTER marker (outermost wins)", () => {
-      const innerNot: BranchCondition = { type: "BranchConditionNot", operand: ref("A"), location: L(4) };
-      const outer: BranchCondition = {
-        type: "BranchConditionNot",
-        operand: innerNot,
-        location: L(5),
-        sourcedFromCriterion: M("Outer"),
-      };
-      const out = toNNF(outer);
-      expect(out.type).toBe("BranchConditionRef"); // not not A → A
-      expect(out.sourcedFromCriterion?.name).toBe("Outer");
-    });
   });
 
-  describe("branchConditionConceptRefsStrict / …FollowingCriteria — collect THROUGH `not`", () => {
+  describe("branchConditionConceptRefsStrict — collect THROUGH `not`", () => {
     it("strict: `A and not B` → [A, B] (never throws on a plain negated ref)", () => {
       expect(branchConditionConceptRefsStrict(and(ref("A"), not(ref("B"))), "test").map((r) => r.ref)).toEqual([
         "A",
         "B",
-      ]);
-    });
-    it("following-criteria: `not <criterion>` follows into the body's refs", () => {
-      const table = buildCriterionTable([
-        { type: "Criterion", name: "C", condition: or(ref("P"), ref("Q")), location: L(1) } as Criterion,
-      ]);
-      const refs = branchConditionConceptRefsFollowingCriteria(not(cref("C", L(2))), table);
-      expect(refs.map((r) => r.ref)).toEqual(["P", "Q"]);
-    });
-    it("following-criteria: a `not` INSIDE a criterion body is followed", () => {
-      const table = buildCriterionTable([
-        { type: "Criterion", name: "C", condition: not(ref("Hidden")), location: L(1) } as Criterion,
-      ]);
-      expect(branchConditionConceptRefsFollowingCriteria(cref("C", L(2)), table).map((r) => r.ref)).toEqual([
-        "Hidden",
       ]);
     });
   });

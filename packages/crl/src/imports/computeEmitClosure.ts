@@ -38,8 +38,8 @@ import type {
   BranchBlock,
 } from "../ast/types";
 import { getRefLibrary, isQualifiedRef } from "../ast/types";
-import { branchConditionConceptRefsExpanded } from "../ast/branchCondition";
 import { buildCriterionTable, type CriterionTable } from "../ast/criterionExpansion";
+import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex";
 
 import { buildLibraryScopes, lookupKnownLibrary } from "./scopes";
 import type { LibraryScope } from "./scopes";
@@ -356,18 +356,17 @@ function visitDecisionRefs(
   visit: (ref: ReferenceName) => void,
   criterionTable: CriterionTable,
 ): void {
+  // #236 — the criterion INDEX (built from the same table; a Criterion IS a Statement). Replaces
+  // the materializing `branchConditionConceptRefsExpanded`: a guard's criterion-only concept
+  // dependencies are collected LINEARLY, never atom-capped. This matters now that the CQL
+  // overflow gate is retired — the old graceful SKIP leaned on `decisionGuardOverflows`
+  // hard-failing first, so a dropped cross-library concept would have shipped silently.
+  const criterionIndex = buildCriterionIndex([...criterionTable.values()]);
   function visitBranch(branch: BranchBlock): void {
-    // `when` carries a boolean guard over concept refs (any of which may be a criterion ref
-    // to expand); `otherwise` carries none. A guard that breaches the GLOBAL envelope is
-    // SKIPPED here. This closure feeds BOTH emit lanes (collectCqlEmitRefs + the FHIR
-    // superset), so the skip is justified lane-accurately, NOT by decision.ts (which never
-    // runs on a standalone CQL emit): on the CQL lane the SAME overflow is a hard error at
-    // the `emitCQLImports` boundary (`decisionGuardOverflows`), so an incomplete closure
-    // never ships; on the FHIR lane the decision action is suppressed. Either way the
-    // under-included refs belong to output that isn't emitted — a benign under-inclusion.
+    // `when` carries a boolean guard over concept refs (any of which may be a criterion ref,
+    // now followed via the index into its recursive atom closure); `otherwise` carries none.
     if (branch.type === "WhenBlock")
-      for (const atom of branchConditionConceptRefsExpanded(branch.condition, criterionTable, "emit closure").refs)
-        visit(atom.ref);
+      for (const atom of guardConceptClosure(branch.condition, criterionIndex)) visit(atom.ref);
     const body = branch.body;
     if (body.type === "ActionStatement") {
       const action = body.action;

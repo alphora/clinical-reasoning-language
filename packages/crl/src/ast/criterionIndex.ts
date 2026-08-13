@@ -22,10 +22,17 @@ import {
 import type { BranchCondition, BranchConditionRef, Criterion, Statement } from "./types";
 import { getRefName } from "./types";
 
-/** Depth bound for the criterion-dependency DAG. Reuses the expansion engine's alias-chain
- *  bound: post-#236 the emit tree no longer materializes, so this survives only as an
- *  EVAL-TIME / index recursion bound (stack-overflow guard), not an emit-size gate. A body
- *  whose dependency nesting exceeds this is `status: "depth-exceeded"`. */
+/** Depth at which a criterion-dependency chain is FLAGGED `status: "depth-exceeded"`. Reuses the
+ *  expansion engine's alias-chain bound; post-#236 the emit tree no longer materializes, so this is
+ *  now only a DEGRADED-STATUS LABEL. It is computed POST-HOC (on unwind, `analyze`) — it does NOT
+ *  truncate the closure (a `depth-exceeded` entry still carries its COMPLETE `recursiveAtomClosure`)
+ *  and does NOT cap the recursion. Recursion depth is instead bounded by MEMOIZATION (each distinct
+ *  criterion is analysed once) to O(longest simple dependency chain) ≤ the number of distinct
+ *  criteria — single digits in real artifacts, and the intended nesting bound is this constant. A
+ *  chain deeper than the JS call stack is therefore a THEORETICAL stack overflow on pathological
+ *  unvalidated input, unreachable in practice and deliberately NOT capped, because provenance wants
+ *  the complete closure (a hard depth cutoff would reintroduce the deep-concept under-reporting #236
+ *  removed). disc 420. */
 export const CRITERION_INDEX_MAX_DEPTH = CRITERION_MAX_DEPTH;
 
 /** Why an entry's derived facts may be incomplete. `ok` = fully resolved. `cycle` = the
@@ -33,8 +40,9 @@ export const CRITERION_INDEX_MAX_DEPTH = CRITERION_MAX_DEPTH;
  *  the index only needs to not hang and to flag it). `undefined-dependency` = the body
  *  references a criterion name absent from the table (also a `criterion-misuse`/unresolved
  *  error upstream). `depth-exceeded` = dependency nesting beyond `CRITERION_INDEX_MAX_DEPTH`.
- *  A non-`ok` entry still carries best-effort `recursiveAtomClosure`/`dependencyDepth` (the
- *  offending edge is skipped, never walked unboundedly). */
+ *  A non-`ok` entry still carries best-effort `recursiveAtomClosure`/`dependencyDepth`: a `cycle`
+ *  skips the back-edge (so the walk terminates), while `depth-exceeded` is a post-hoc LABEL that
+ *  skips nothing — its closure is complete (see `CRITERION_INDEX_MAX_DEPTH`). */
 export type CriterionIndexStatus = "ok" | "cycle" | "undefined-dependency" | "depth-exceeded";
 
 /** One distinct criterion, with everything the lowering seams need to emit/evaluate a
@@ -55,8 +63,10 @@ export interface CriterionIndexEntry {
    *  bodies — deduped by name, first-occurrence node kept (for its location), deterministic
    *  order. This is the criterion's DTR case-feature closure (§2d `input[]`). */
   readonly recursiveAtomClosure: readonly BranchConditionRef[];
-  /** The DIRECT sub-criterion names the body references (deduped, source order). Edges of
-   *  the dependency DAG — used for topological define emission and cycle detection. */
+  /** The DIRECT sub-criterion names the body references (deduped, source order). Edges of the
+   *  dependency DAG — used for cycle detection and `dependencyDepth`. NOT for ordering define
+   *  emission: `emitCriteria` emits criteria in SOURCE order and relies on the CQL translator's
+   *  verified forward-reference tolerance (commit 8f35539), so no topological sort is performed. */
   readonly criterionDependencies: readonly string[];
   /** Max criterion-nesting depth BELOW this criterion (0 = references no sub-criteria).
    *  Saturates at `CRITERION_INDEX_MAX_DEPTH + 1` on a cycle / over-deep chain. */
@@ -126,8 +136,10 @@ function directRefs(cond: BranchCondition): { concepts: BranchConditionRef[]; cr
  * cyclic or doubling-DAG criterion table is analysed in time linear in the number of
  * distinct criteria — never the 2^k of a per-use materialization. A criterion whose
  * dependency subgraph cycles / references an undefined criterion / nests past the depth
- * bound gets a non-`ok` `status` and best-effort derived facts (the offending edge skipped),
- * NEVER an unbounded walk or a hang (provenance builds this on UNVALIDATED input).
+ * bound gets a non-`ok` `status` and best-effort derived facts. A cycle can NEVER hang (the
+ * `onStack` back-edge skip terminates it); recursion depth is bounded by memoization to
+ * O(distinct criteria) (see `CRITERION_INDEX_MAX_DEPTH` for the one residual, unreachable-in-
+ * practice deep-chain stack caveat). provenance builds this on UNVALIDATED input.
  */
 export function buildCriterionIndex(statements: readonly Statement[]): CriterionIndex {
   const table: CriterionTable = buildCriterionTable(statements as Statement[]);
@@ -159,8 +171,10 @@ export function buildCriterionIndex(statements: readonly Statement[]): Criterion
 
     const { concepts, criteria } = directRefs(crit.condition);
 
-    // Cycle / stack guard: if any dependency is already on the current path, this criterion
-    // is in a cycle — flag it and skip the back-edge (no recursion) so we cannot loop.
+    // Cycle guard: if any dependency is already on the current path, this criterion is in a
+    // cycle — flag it and skip the back-edge (no recursion) so we cannot loop. (This guards
+    // CYCLES, not depth: an acyclic chain still recurses to its full length — see the depth caveat
+    // on CRITERION_INDEX_MAX_DEPTH.)
     onStack.add(name);
     const dedup = new Map<string, BranchConditionRef>(); // name → first-seen ref
     for (const c of concepts) {
@@ -227,4 +241,42 @@ export function buildCriterionIndex(statements: readonly Statement[]): Criterion
     has: (name) => byName.has(name),
     entries,
   };
+}
+
+/**
+ * #236 — every CONCEPT ref a guard gates on, FOLLOWING criterion refs into their (recursive)
+ * atom closure via the INDEX. The linear replacement for the materializing
+ * `branchConditionConceptRefsExpanded`: a direct concept ref contributes itself; a criterion ref
+ * contributes its `recursiveAtomClosure` (already memoized/deduped/bounded), so a doubling-DAG
+ * criterion is bounded, never re-walked or atom-capped. Used by the three emit collectors
+ * (interface surface, case-feature SDs, emit closure) so a criterion-only concept is surfaced
+ * even for a criterion the old expansion walk would have refused. Duplicates across the direct
+ * and closure sets are possible — callers dedupe (all three key by name/canonical first-seen).
+ */
+export function guardConceptClosure(
+  cond: BranchCondition,
+  index: CriterionIndex,
+): BranchConditionRef[] {
+  const out: BranchConditionRef[] = [];
+  const walk = (n: BranchCondition): void => {
+    switch (n.type) {
+      case "BranchConditionRef":
+        out.push(n);
+        return;
+      case "BranchConditionCriterionRef": {
+        const entry = index.get(getRefName(n.ref));
+        if (entry) out.push(...entry.recursiveAtomClosure);
+        return;
+      }
+      case "BranchConditionNot":
+        if (n.operand) walk(n.operand);
+        return;
+      case "BranchConditionAnd":
+      case "BranchConditionOr":
+        n.operands.forEach(walk);
+        return;
+    }
+  };
+  walk(cond);
+  return out;
 }

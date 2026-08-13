@@ -45,6 +45,7 @@ import type {
   Concept,
   CompositionExpression,
   ConceptDefinition,
+  Criterion,
   CodedFromDefinition,
   DefinedAsBareRef,
   DefinedAsComposition,
@@ -64,6 +65,7 @@ import {
   ReductionNotActiveError,
 } from "../ast/types";
 import type { ReferenceName } from "../ast/types";
+import { emitCriterionDefine } from "./emitCriterionDefine";
 import type { CRLError } from "../types/errors";
 import { ageComputeFnForUnit } from "../template-match/agePredicate";
 import { recencyOverrideById } from "../template-match/recencyProjectionOverride";
@@ -658,6 +660,25 @@ class Emitter {
   private readonly terminologyNames: Set<string> = new Set();
   /** Names declared as concepts. */
   private readonly conceptNames: Set<string> = new Set();
+  /**
+   * #236 — names declared as CRITERIA. A criterion lowers to a bare `define "X"`
+   * (like a concept), so for CQL top-level-identifier collision purposes it is
+   * indexed and checked EXACTLY like a concept name: a same-name TERMINOLOGY is
+   * suffixed (`detectCollisions`), and a same-name ordinary PARAMETER is a hard emit
+   * error (`detectCriterionParameterCollisions`) — NOT the silent concept-vs-parameter
+   * shadow, because a criterion is a BOOLEAN guard, not a value the parameter's users
+   * could resolve to. Concept-vs-criterion itself can't collide (the validator's
+   * concept-XOR-criterion bucket forbids it).
+   *
+   * "Exactly like a concept" also means criteria inherit the SAME residual, PRE-EXISTING
+   * collision gaps the concept `define` surface already has and this pass does NOT close
+   * (they are a separate hardening item — a full emitted-identifier preflight — because
+   * they bite concepts identically, independent of #236): a `codesystem` DECL name (a
+   * terminology body's `TerminologySystem.name`, or the synthetic `<Lib> Local Codes`),
+   * a second-order collision from a suffixed terminology name, and an `include` alias
+   * (`FHIRHelpers`/`CRLCommon`/`CFH`/cross-library). disc 420, both arms.
+   */
+  private readonly criterionNames: Set<string> = new Set();
   /** Concept's declared FHIR resource type. */
   private readonly conceptType: Map<string, string | undefined> = new Map();
   /** Concept's declared first valuetype (or undefined). */
@@ -750,6 +771,7 @@ class Emitter {
     this.caseFeature = options.caseFeature ? { ...options.caseFeature } : { kind: "off" };
     this.indexNames();
     this.detectCollisions();
+    this.detectCriterionParameterCollisions();
     this.guardBothRepLane();
   }
 
@@ -826,6 +848,10 @@ class Emitter {
         }
       } else if (stmt.type === "Terminology" && stmt.name) {
         this.terminologyNames.add(stmt.name);
+      } else if (stmt.type === "Criterion" && stmt.name) {
+        // #236 — index criterion names alongside concepts/terminology so the collision
+        // passes below see a criterion's `define "X"` identifier.
+        this.criterionNames.add(stmt.name);
       }
     }
     for (const stmt of this.ast.statements) {
@@ -841,19 +867,61 @@ class Emitter {
 
   /**
    * Second pass: resolve terminology emit names — when a terminology name
-   * collides with a concept OR an AST parameter of the same name (both
-   * produce CQL top-level identifiers `define X` / `parameter X`), the
-   * terminology gets the " ValueSet" / " Code" disambiguating suffix.
+   * collides with a concept, a CRITERION (#236), OR an AST parameter of the same
+   * name (all produce CQL top-level identifiers `define X` / `valueset X` /
+   * `parameter X`), the terminology gets the " ValueSet" / " Code" disambiguating
+   * suffix. A criterion is treated exactly like a concept here (both emit `define X`).
    */
   private detectCollisions(): void {
     for (const stmt of this.ast.statements) {
       if (stmt.type !== "Terminology" || !stmt.name) continue;
-      if (this.conceptNames.has(stmt.name) || this.astParameters.has(stmt.name)) {
+      if (
+        this.conceptNames.has(stmt.name) ||
+        this.criterionNames.has(stmt.name) ||
+        this.astParameters.has(stmt.name)
+      ) {
         const suffix = hasOnlyValueset(stmt) ? " ValueSet" : " Code";
         this.terminologyEmitName.set(stmt.name, stmt.name + suffix);
       } else {
         this.terminologyEmitName.set(stmt.name, stmt.name);
       }
+    }
+  }
+
+  /**
+   * #236 — a criterion's `define "X"` and a same-name `parameter "X"` both claim the
+   * CQL top-level identifier `X` in ONE emitted library → a duplicate-identifier CQL
+   * error. Unlike the concept-vs-parameter case (where `indexNames` silently shadows
+   * the parameter — a concept SUPERSEDES a same-named parameter as the value narrative
+   * refs resolve to), a criterion is a BOOLEAN GUARD, not a value: dropping the
+   * parameter would break the concept bodies that read it, and keeping both collides.
+   * There is no safe automatic resolution, so this is a HARD emit error. The validator
+   * permits the pair (Criterion and Parameter are separate uniqueness buckets), so this
+   * emit-seam preflight is the only guard. `astParameters` already excludes any
+   * concept-shadowed parameter, and a criterion can't co-exist with a same-name concept,
+   * so a hit here is unambiguously a criterion↔parameter clash. Only an ORDINARY
+   * parameter (`kind: "parameter"` → emits `parameter "X"`) can collide: a Patient/
+   * Practitioner parameter emits `context Patient`, NOT a top-level `"X"` identifier,
+   * so its source name never clashes with a criterion's `define` (disc 420, both arms).
+   */
+  private detectCriterionParameterCollisions(): void {
+    for (const stmt of this.ast.statements) {
+      if (stmt.type !== "Criterion" || !stmt.name) continue;
+      // `astParameters` holds BOTH context (Patient/Practitioner) and ordinary parameters; only an
+      // ordinary parameter emits the top-level `parameter "X"` identifier that would collide.
+      if (this.astParameters.get(stmt.name)?.kind !== "parameter") continue;
+      this.emitErrors.push({
+        type: "Validation",
+        kind: "emit-criterion-parameter-name-collision",
+        line: stmt.location.start.line,
+        column: stmt.location.start.column,
+        message:
+          `Criterion "${stmt.name}" and parameter "${stmt.name}" both emit the CQL ` +
+          `top-level identifier \`${stmt.name}\` in one library (criterion → \`define\`, ` +
+          `parameter → \`parameter\`) — a duplicate-identifier collision. A criterion is a ` +
+          `boolean guard, not a value, so the parameter cannot be shadowed the way a same-` +
+          `named concept would. Rename the criterion or the parameter.`,
+      });
     }
   }
 
@@ -879,7 +947,32 @@ class Emitter {
     if (concepts.length > 0) {
       sections.push(this.emitConcepts(concepts));
     }
+
+    // #236 — each `criterion` becomes a boolean CQL define (referenced by identifier from a
+    // decision guard, never inline-expanded). Filtered through `skipNames` for parity with concepts
+    // (the set is currently never populated → an inert no-op today, kept so criteria participate if
+    // a future SKIP case — cross-library shadowing, deprecation — starts populating it).
+    const criteria = this.ast.statements
+      .filter((s): s is Criterion => s.type === "Criterion" && !!s.name)
+      .filter((c) => !this.skipNames.has(c.name));
+    if (criteria.length > 0) {
+      sections.push(this.emitCriteria(criteria));
+    }
     return sections.join("\n\n") + "\n";
+  }
+
+  /**
+   * #236 — emit each `criterion` as a per-operand-total boolean define. The body references
+   * co-resident defines BARE: concept re-exports + sibling criterion defines live in the SAME
+   * library (the `none` lane is one library; the layered Interface lane holds the decision's
+   * boolean surface + the criteria). Guard operands are boolean by validation
+   * (`checkGuardLiterals`), so `Coalesce(<leaf>, false)` is well-typed. No cross-library
+   * qualification is needed — everything a criterion references is beside it.
+   */
+  private emitCriteria(criteria: Criterion[]): string {
+    return criteria
+      .map((c) => emitCriterionDefine(c.name, c.condition, (name) => cqlIdent(name), cqlIdent))
+      .join("\n\n");
   }
 
   /** Issue #79 — unmatched narratives accumulated during this emit. */

@@ -201,11 +201,14 @@ check("#242 parity: `A and Crit` — a single-ref `criterion` boundary + body ma
   assert.equal(agree(`"A" and "Crit"`, ["A"], { extra: CRIT }), `AND[L["G","A"],CR"Crit"(L["G","C"])]`);
 });
 
-check("#242 KNOWN DIVERGENCE: a NESTED criterion (criterion → criterion) — flow keeps the inner box (#233), questionnaire flattens it", () => {
-  const { flow, quest } = bothShapes(`"A" and "Crit2"`, ["A"], { extra: CRIT_NESTED });
-  assert.equal(flow, `AND[L["G","A"],CR"Crit2"(CR"Crit"(L["G","C"]))]`, "flow preserves the inner Crit boundary at every hop (#233)");
-  assert.equal(quest, `AND[L["G","A"],CR"Crit2"(L["G","C"])]`, "questionnaire flattens the inner criterion (criterion boxes are #233 FLOW-ONLY)");
-  assert.notEqual(flow, quest, "nested criterion boundaries are a KNOWN divergence (see header) — #233 is flow-only, orthogonal to #242");
+check("#242/#236 parity: a NESTED criterion (criterion → criterion) — questionnaire now KEEPS the inner box, matching flow", () => {
+  // #236 RESOLVED the former #233 divergence: a criterion rides the guard tree as a first-class
+  // `op:"criterion"` node whose `body` carries the nested `op:"criterion"`, so `buildStructural`
+  // recurses through every hop. Flow and questionnaire now AGREE — both keep the inner `Crit` box.
+  assert.equal(
+    agree(`"A" and "Crit2"`, ["A"], { extra: CRIT_NESTED }),
+    `AND[L["G","A"],CR"Crit2"(CR"Crit"(L["G","C"]))]`,
+  );
 });
 
 check("#242 parity: `B and Crit` where Crit = `A and C` — a COMPOUND criterion body matches", () => {

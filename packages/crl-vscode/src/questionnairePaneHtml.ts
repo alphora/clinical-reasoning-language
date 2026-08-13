@@ -187,6 +187,18 @@ function renderQExpr(e: QExpr): string {
       const blkTitle = e.blocking ? ` title="this criterion blocked the branch"` : "";
       const summary =
         `<summary class="q-crit-summary"><span class="q-prompt"><span class="q-concept">${escapeHtml(e.name)}</span>?</span>${renderExpOpts(e.answer)}</summary>`;
+      // #236: `body` is absent on a criterion's LATER occurrences this case (the run trace carries the
+      // body only on the FIRST occurrence — linear in distinct criteria). A body-less occurrence renders
+      // as a flat named row (no <details> disclosure — there is nothing to expand); the criterion's own
+      // answer still reads. Its body was shown at the first occurrence.
+      if (!e.body) {
+        const flatCls = e.blocking ? "q-crit-flat q-crit-blocking" : "q-crit-flat";
+        // A blocking flat row keeps the blocked-branch tooltip; otherwise explain the missing
+        // disclosure (its body was drawn at this criterion's first occurrence this case) so the row
+        // does not read as a broken <details> (#236, disc 419).
+        const flatTitle = e.blocking ? blkTitle : ` title="expanded at its first occurrence in this case"`;
+        return `<div class="${flatCls}"${flatTitle}><span class="q-prompt"><span class="q-concept">${escapeHtml(e.name)}</span>?</span>${renderExpOpts(e.answer)}</div>`;
+      }
       return `<details class="${cls}"${blkTitle}>${summary}<div class="q-crit-body">${renderQExpr(e.body)}</div></details>`;
     }
   }
@@ -437,7 +449,12 @@ export const QUESTIONNAIRE_STYLE =
   `.q-crit-summary:focus-visible{outline:1px solid var(--vscode-focusBorder,#3794ff);outline-offset:-1px}` +
   `.q-crit-summary .q-concept{color:var(--vscode-charts-blue,#3794ff)}` + // the criterion NAME reads as the guard accent, not the purple concept channel
   `.q-crit-body{padding:3px 8px 5px 14px;border-top:1px solid var(--vscode-panel-border,#454545)}` +
+  // #236: a criterion's LATER occurrence has no body (shown once, at the first occurrence) → a FLAT named
+  // row, same accent rail/answer chip as the collapsible header but no disclosure triangle (nothing to open).
+  `.q-crit-flat{margin:4px 0 6px;padding:3px 6px 3px 8px;border:1px solid var(--vscode-panel-border,#454545);border-left:3px solid var(--vscode-charts-blue,#3794ff);border-radius:0 6px 6px 6px;background:var(--vscode-editor-background,#1e1e1e)}` +
+  `.q-crit-flat .q-concept{color:var(--vscode-charts-blue,#3794ff)}` +
   // a COLLAPSED blocking criterion: red rail + a red-tinted ANSWER chip (the "No", or the "Yes" under a negated guard)
   // so the folded blocker is visible without expanding.
   `.q-crit-blocking{border-left-color:var(--vscode-editorError-foreground,#f14c4c)}` +
-  `.q-crit-blocking>.q-crit-summary .q-opt-answer{background:rgba(241,76,76,.18);border-color:var(--vscode-editorError-foreground,#f14c4c)}`;
+  `.q-crit-blocking>.q-crit-summary .q-opt-answer{background:rgba(241,76,76,.18);border-color:var(--vscode-editorError-foreground,#f14c4c)}` +
+  `.q-crit-flat.q-crit-blocking .q-opt-answer{background:rgba(241,76,76,.18);border-color:var(--vscode-editorError-foreground,#f14c4c)}`;

@@ -1,10 +1,10 @@
 // #224 ii.1c (design §5.1 / disc 303 I2) — the emit family builds a criterion table from the
-// RAW graph AST (S6 closure) AND from the LOWERED AST (S7 case-features / S8 interface). The
-// engine's "expandedSize ok ⇒ expandCriteria never throws" guarantee, and the S7-skip /
-// S5-suppress agreement ("nothing dangles"), silently depend on those two tables being EQUAL
-// — i.e. on `lowerLocalCodes` passing `Criterion` statements (and guard conditions) through
-// UNCHANGED. This test PINS that invariant so a future lowering pass that touches criteria
-// can't desynchronize the overflow dispositions without a failing test.
+// RAW graph AST (S6 closure) AND from the LOWERED AST (S7 case-features / S8 interface). #236: a
+// criterion lowers to a named define referenced by identity, and its atom-closure input[] is
+// derived from the criterion table — so the raw-AST and lowered-AST tables MUST stay EQUAL, i.e.
+// `lowerLocalCodes` must pass `Criterion` statements (and guard conditions) through UNCHANGED. This
+// test PINS that invariant so a future lowering pass that touches criteria can't desynchronize the
+// criterion index / define emission without a failing test.
 
 import { describe, it, expect } from "vitest";
 

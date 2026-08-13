@@ -9,7 +9,6 @@ import type {
   ReferenceName,
 } from "../ast/types";
 import { getRefLibrary, isQualifiedRef } from "../ast/types";
-import { buildCriterionTable, decisionGuardOverflows } from "../ast/criterionExpansion";
 import { emitCQLFromAST, infoForParameterStatement } from "../cql-emitter/emitCQL";
 import type { AstParameterInfo } from "../cql-emitter/emitCQL";
 import {
@@ -519,38 +518,12 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     };
   }
 
-  // #224 ii.1c — criterion-expansion overflow is a HARD error on the CQL lane. Unlike the
-  // FHIR lane (which suppresses the affected decision action + diagnoses per-decision), the
-  // CQL Interface re-export surface has no per-decision suppression channel — a breaching
-  // guard would silently omit its concepts from the interface. Fail-closed with a structured
-  // error BEFORE the split plan runs (`interfaceSurface` skips the guard gracefully, so this
-  // is the ONLY place the CQL lane reports it). Criteria pass through lowering unchanged, so
-  // the lowered-closure table matches.
-  const criterionOverflowErrors: CRLError[] = [];
-  for (const entry of emitClosure) {
-    const table = buildCriterionTable(entry.ast.statements);
-    for (const stmt of entry.ast.statements) {
-      if (stmt.type !== "Decision") continue;
-      for (const o of decisionGuardOverflows(stmt, table)) {
-        criterionOverflowErrors.push({
-          type: "Validation",
-          kind: "criterion-expansion-overflow",
-          message: `Decision "${stmt.name}" has a guard whose materialized tree exceeds the criterion-expansion envelope (${o.status}${o.detail?.name ? `: "${o.detail.name}"` : ""}). This is an emit-stage RESOURCE boundary, not a FHIR or authoring-complexity limit; factor the determination (e.g. a \`use decision\` sub-decision) or consult the authoring kit.`,
-          line: o.location.start.line,
-          column: o.location.start.column,
-        });
-      }
-    }
-  }
-  if (criterionOverflowErrors.length > 0) {
-    return {
-      success: false,
-      graph,
-      importDiagnostics: graph.diagnostics,
-      cqlByLibrary: [],
-      errors: criterionOverflowErrors,
-    };
-  }
+  // #236 — the CQL-lane criterion-expansion overflow gate is RETIRED. A criterion no longer
+  // inline-expands (materializes) into the interface surface — it emits ONE boolean define,
+  // referenced by identifier, and `interfaceSurface` / the emit closure now collect its concept
+  // dependencies LINEARLY via the criterion INDEX (never atom-capped). So there is no
+  // "materialized tree exceeds the envelope" condition to fail on, and no silent omission the
+  // gate needed to guard: a doubling-DAG criterion emits a small, valid, DAG-shaped library.
 
   // #186/#201 — the suppression consumer is the closure's GRAPH-ROOT decision library:
   // the decision-bearing library that is never a cross-library `use decision` TARGET

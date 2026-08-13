@@ -921,6 +921,55 @@ case "c":
   assert.ok(!/<li\b/.test(gx[1]), "no <li> anywhere inside the guard-exp <li> (flat q-item slicing can't be reached)");
 });
 
+test("#236 render: a criterion's LATER occurrence → a flat q-crit-flat row (no <details>), its body drawn at the first occurrence", () => {
+  // A criterion referenced TWICE (an `all:` decision) renders its body ONCE — the second occurrence
+  // is a body-less `q-crit-flat` div (not a broken empty <details>), keeping the criterion name +
+  // answer, and the blocked-branch tooltip when it failed.
+  const crl = `library "Crit".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+criterion "Eligible":
+- when ( "A" and "B" ).
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "D":
+all:
+- when "Eligible" then recommend activity "Approve".
+- when "Eligible" then recommend activity "Deny".`;
+  const cel = `library "Cases".
+covers "Crit".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fA":
+- code is "http://e|a".
+- date is "2026-01-01".
+- defined by "A".
+case "c":
+- subject is "Pat".
+- fact is "fA".
+- result is "D" is "Deny".`;
+  const { sv, rootLib } = renderCase({ "c.crl": crl, "c.cel": cel }, "c.cel", "c");
+  const { html } = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g_" });
+  // FIRST occurrence: the expandable <details> carrying the body.
+  assert.match(html, /<details class="q-criterion q-crit-blocking"/, "first occurrence is an expandable <details> with the body");
+  // LATER occurrence: a flat blocking row — NOT a <details> (nothing to expand), keeping the tooltip.
+  assert.match(
+    html,
+    /<div class="q-crit-flat q-crit-blocking" title="this criterion blocked the branch"><span class="q-prompt"><span class="q-concept">Eligible<\/span>\?/,
+    "later occurrence → flat q-crit-flat blocking row, no <details>",
+  );
+});
+
 test("ii.3 render: a NESTED criterion → a <details> INSIDE a <details>, both collapsed", () => {
   const crl = `library "Crit".
 concept "A":

@@ -15,26 +15,20 @@ import type {
   BranchConditionNot,
   BranchConditionLiteral,
   BranchConditionNegatedLiteral,
+  BranchConditionNegatedCriterionLiteral,
   ReferenceName,
 } from "./types";
 import { getRefName } from "./types";
-import {
-  expandGuardOrRecord,
-  containsCriterionRef,
-  expandedSize,
-  type CriterionTable,
-  type ExpandedSize,
-  type ExpansionReason,
-} from "./criterionExpansion";
 
-// #224 ii: an un-expanded `BranchConditionCriterionRef` reaching a SEMANTIC guard
-// consumer (DNF / arm-count / eval / emit) means the criterion-expansion seam was
-// missed — a bug, never a valid state post-expansion. Throw LOUDLY (the tripwire)
-// rather than mis-handle it as a concept. SOURCE-side consumers (refs, describe,
-// well-formedness, structure sig) handle it directly — it is expected there.
+// #236: a criterion ref is a first-class DNF / arm-count / eval LITERAL (it lowers to a
+// REFERENCED boolean define, not an inline expansion). But a CONCEPT-ONLY collector — the
+// reference resolver, or a case-feature walk that resolves concept NAMES — must never
+// silently absorb a criterion ref as if it were a concept (that would mis-resolve it). Such
+// collectors call this to throw LOUDLY. SOURCE-side consumers that legitimately see criteria
+// (refs, describe, well-formedness, structure sig, DNF, arm-count, CRE eval) handle them directly.
 function unexpandedCriterion(node: BranchConditionCriterionRef, where: string): never {
   throw new Error(
-    `internal: un-expanded criterion reference "${String(node.ref)}" reached ${where} — criterion expansion must run before this seam`,
+    `internal: criterion reference "${String(node.ref)}" reached ${where}, a CONCEPT-ONLY seam — a criterion is not a concept ref (post-#236 it lowers to a referenced boolean define); a concept-only collector must route criteria explicitly`,
   );
 }
 
@@ -139,86 +133,10 @@ export function branchConditionConceptRefsStrict(
   return out;
 }
 
-/**
- * #224 ii.1c — SOURCE-side concept refs of a guard, FOLLOWING criterion refs INTO their
- * bodies. For provenance reachability / gating: a concept referenced ONLY inside a criterion
- * body is still gating on / reached by the decision (the disc-300 closure argument, source-
- * side). Unlike `branchConditionConceptRefsExpanded` this does NOT materialize a fresh tree —
- * it walks the body in place and collects its concept-ref LEAVES (a criterion ref becomes its
- * body's concepts, recursively).
- *
- * The GLOBAL envelope still applies (a criterion DAG doubles: `C_k := C_{k-1} and C_{k-1}` →
- * 2^k leaf visits). Provenance runs on UNVALIDATED input (`buildProvenanceIndex` calls no
- * validator — the same reason `runCel` must gate), so a cyclic OR envelope-breaching table
- * would otherwise loop/hang the host. Gate on `expandedSize` first; a non-`ok` guard falls
- * back to its INLINE concept refs only (criteria skipped — the pre-ii.1c behavior: the
- * criterion-only concepts are under-reported for that one guard, not collected via an
- * unbounded walk). The `ok` path is then bounded by the atom cap (≤ CAP leaf visits). The
- * `active` cycle guard is retained as defence in depth even though `ok` implies acyclic.
- *
- * Name-level criterion DECLARATION indexing (find-refs / hover / rename on the criterion NAME
- * itself) stays deferred to ii.4; this covers only the concept-reachability correctness.
- */
-export function branchConditionConceptRefsFollowingCriteria(
-  c: BranchCondition,
-  table: CriterionTable,
-): BranchConditionRef[] {
-  // GLOBAL-envelope gate (see doc): a breaching/cyclic table falls back to inline refs only,
-  // never an unbounded DAG walk. Criterion-free guards are `ok` with no walk (exempt).
-  if (containsCriterionRef(c) && expandedSize(c, table).status !== "ok") {
-    return branchConditionRefs(c);
-  }
-  const out: BranchConditionRef[] = [];
-  const active = new Set<string>(); // criterion names on the current path (cycle guard)
-  const walk = (n: BranchCondition): void => {
-    if (n.type === "BranchConditionRef") {
-      out.push(n);
-      return;
-    }
-    if (n.type === "BranchConditionCriterionRef") {
-      const name = getRefName(n.ref);
-      const crit = table.get(name);
-      if (!crit || active.has(name)) return; // undefined or cyclic → contribute nothing
-      active.add(name);
-      walk(crit.condition);
-      active.delete(name);
-      return;
-    }
-    // #224 iii.2: explicit `not` handling (has `operand`, not `operands`) — see the note
-    // in `branchConditionRefs`. Concept reachability is polarity-agnostic; recurse in.
-    if (n.type === "BranchConditionNot") {
-      if (n.operand) walk(n.operand);
-      return;
-    }
-    if (Array.isArray((n as BranchConditionAnd | BranchConditionOr).operands))
-      (n as BranchConditionAnd | BranchConditionOr).operands.forEach(walk);
-  };
-  walk(c);
-  return out;
-}
-
-/**
- * #224 ii.1c — the criterion-aware ref collector for the EMIT seams (closure, CQL
- * interface surface, case-features). It EXPANDS the guard's criterion refs (gated by the
- * GLOBAL envelope) against `table`, then collects the concept refs of the expanded tree
- * via `branchConditionConceptRefsStrict` — which therefore never trips (the expanded tree
- * holds no criterion ref). A criterion-free guard fast-paths to identity (no envelope).
- *
- * On a non-`ok` envelope status it returns `{ refs: [], overflow }` WITHOUT throwing — the
- * seam disposes of the overflow per its lane (closure/case-features: skip; CQL interface:
- * hard error). This is the single point where the emit seams cross the criterion boundary,
- * so the tripwire in `branchConditionConceptRefsStrict` stays a live backstop for any seam
- * that forgot to route through here.
- */
-export function branchConditionConceptRefsExpanded(
-  c: BranchCondition,
-  table: CriterionTable,
-  where: string,
-): { refs: BranchConditionRef[]; overflow?: { status: ExpansionReason; detail?: ExpandedSize["detail"] } } {
-  const g = expandGuardOrRecord(c, table);
-  if (!g.ok) return { refs: [], overflow: { status: g.status, detail: g.detail } };
-  return { refs: branchConditionConceptRefsStrict(g.cond, where) };
-}
+// #236 retired: `branchConditionConceptRefsFollowingCriteria` (the criterion-following provenance
+// collector) and `branchConditionConceptRefsExpanded` (the criterion-materializing emit collector)
+// were replaced by `guardConceptClosure` in `criterionIndex.ts` — a linear, memoized, non-
+// materializing DAG walk. A criterion no longer expands anywhere, so both are gone.
 
 /** #224 iii.2: does the guard contain any `not` node? The fast-path predicate for `toNNF`
  *  — a guard with NONE is already in negation-normal form and is returned by identity. */
@@ -252,46 +170,38 @@ export function containsNot(c: BranchCondition): boolean {
  * so a positive guard's DNF is byte-identical to the pre-iii.2 output; zero golden drift).
  * Idempotent (NNF of an NNF tree is itself).
  *
- * MARKER TRANSFER (ii.1b): each rewritten node transfers its OWN `sourcedFromCriterion` onto
- * the replacement root; coincident outer/inner markers resolve OUTERMOST-wins (the outer
- * transfer overwrites last — matching `materialize`'s boundary rule). LOCATION: a flipped
- * `and`/`or` keeps the rewritten node's OWN location; a synthesized `Not(ref)` leaf takes the
- * underlying REF's location (per-operand diagnostic precision). NOTE: DNF output for a
- * `not`-containing guard therefore holds SYNTHESIZED nodes not present in the source AST —
- * consumers must not assume arm atoms map 1:1 to source spans.
+ * LOCATION: a flipped `and`/`or` keeps the rewritten node's OWN location; a synthesized
+ * `Not(ref)` leaf takes the underlying REF's location (per-operand diagnostic precision). NOTE:
+ * DNF output for a `not`-containing guard therefore holds SYNTHESIZED nodes not present in the
+ * source AST — consumers must not assume arm atoms map 1:1 to source spans.
  */
 export function toNNF(c: BranchCondition): BranchCondition {
-  // Identity fast path for an already-NNF tree — BUT honor the criterion tripwire: a not-free
-  // tree carrying a stray (unexpanded) criterion ref must still throw (the public contract),
-  // never slip through as identity. A not-free AND criterion-free tree returns by identity
-  // (byte-stable for positive guards); anything else runs the recursion (which throws on a
-  // criterion ref at any polarity).
-  if (!containsNot(c) && !containsCriterionRef(c)) return c;
+  // Identity fast path for an already-NNF tree. Post-#236 a criterion ref is a legal signed
+  // literal (not a to-expand node), so a not-FREE tree is already in NNF whether or not it
+  // carries criterion refs — return it by identity (byte-stable for positive guards). Only a
+  // `not` anywhere forces the De Morgan recursion.
+  if (!containsNot(c)) return c;
   const nnf = (n: BranchCondition, negated: boolean): BranchCondition => {
-    // Transfer THIS source node's criterion marker onto the produced root (outermost wins,
-    // since the outer call's transfer runs after the inner). Only clones when a marker is
-    // present, so unmarked positive refs keep object identity.
-    // `out` is never a `BranchConditionCriterionRef` here (those throw), so stamping a marker
-    // is always type-sound; the cast keeps the generic return type through the spread.
-    const withMarker = <T extends BranchCondition>(out: T): T =>
-      n.sourcedFromCriterion ? ({ ...out, sourcedFromCriterion: n.sourcedFromCriterion } as T) : out;
     switch (n.type) {
       case "BranchConditionCriterionRef":
-        return unexpandedCriterion(n, "toNNF");
+        // #236: a criterion ref is a signed literal (like a concept ref). Positive → keep it;
+        // negated → wrap in a fresh `Not` (the DNF single-atom boundary).
+        if (!negated) return n;
+        return {
+          type: "BranchConditionNot",
+          operand: { type: "BranchConditionCriterionRef", ref: n.ref, location: n.location },
+          location: n.location,
+        };
       case "BranchConditionRef":
-        if (!negated) return withMarker(n); // positive literal — marker stays on the ref
-        // Negated literal: HOIST the marker onto the new `Not` (the boundary root), and DROP it
-        // from the embedded ref — a marker must sit on the boundary root ONLY, never be
-        // duplicated onto an inner node (else an iii.3 attribution collector double-counts the
-        // criterion). The ref is re-wrapped in a fresh `Not` regardless, so no identity is lost.
-        return withMarker({
+        if (!negated) return n; // positive literal
+        // Negated literal: re-wrap the ref in a fresh `Not` (the DNF single-atom boundary).
+        return {
           type: "BranchConditionNot",
           operand: { type: "BranchConditionRef", ref: n.ref, location: n.location },
           location: n.location,
-        });
+        };
       case "BranchConditionNot":
-        // `not X` flips polarity; the Not's own marker transfers onto whatever X produces.
-        return withMarker(nnf(n.operand, !negated));
+        return nnf(n.operand, !negated); // `not X` flips polarity
       case "BranchConditionAnd":
       case "BranchConditionOr": {
         // De Morgan: under negation `and`↔`or` and each operand is negated.
@@ -301,11 +211,11 @@ export function toNNF(c: BranchCondition): BranchCondition {
             : negated && n.type === "BranchConditionOr"
               ? "BranchConditionAnd"
               : n.type;
-        return withMarker({
+        return {
           type: flipTo,
           operands: n.operands.map((o) => nnf(o, negated)),
           location: n.location,
-        });
+        };
       }
     }
   };
@@ -340,18 +250,21 @@ export function branchConditionDNF(c: BranchCondition): BranchConditionLiteral[]
       case "BranchConditionRef":
         return [[n]];
       case "BranchConditionNot": {
-        // Post-`toNNF` invariant: a `not` wraps EXACTLY a ref (the single-atom boundary that
-        // keeps every arm free of a compound CQL boolean). A `Not` over anything else means
-        // `toNNF` did not run / failed — a loud internal error, never silent mis-emit.
-        if (n.operand.type !== "BranchConditionRef") {
-          throw new Error(
-            `internal: branchConditionDNF saw a non-normalized negation over ${n.operand.type} — toNNF must run first`,
-          );
-        }
-        return [[n as BranchConditionNegatedLiteral]];
+        // Post-`toNNF` invariant: a `not` wraps EXACTLY a single ref — a concept ref
+        // (`BranchConditionNegatedLiteral`) or, post-#236, a criterion ref
+        // (`BranchConditionNegatedCriterionLiteral`). A `Not` over a COMPOUND means `toNNF` did
+        // not run / failed — a loud internal error, never silent mis-emit.
+        if (n.operand.type === "BranchConditionRef") return [[n as BranchConditionNegatedLiteral]];
+        if (n.operand.type === "BranchConditionCriterionRef")
+          return [[n as BranchConditionNegatedCriterionLiteral]];
+        throw new Error(
+          `internal: branchConditionDNF saw a non-normalized negation over ${n.operand.type} — toNNF must run first`,
+        );
       }
       case "BranchConditionCriterionRef":
-        return unexpandedCriterion(n, "branchConditionDNF");
+        // #236: a criterion ref is a positive signed literal — ONE arm, lowered to one
+        // `text/cql-identifier` condition referencing the criterion's define (never expanded).
+        return [[n]];
       case "BranchConditionOr":
         return n.operands.flatMap((o) => dnf(o));
       case "BranchConditionAnd": {
@@ -390,7 +303,10 @@ export function branchConditionArmCount(c: BranchCondition, cap = 16): number {
   const go = (n: BranchCondition): number => {
     if (n.type === "BranchConditionRef") return 1;
     if (n.type === "BranchConditionNot") return 1; // post-NNF: `not` over a single ref = 1 arm
-    if (n.type === "BranchConditionCriterionRef") return unexpandedCriterion(n, "branchConditionArmCount");
+    // #236: a criterion is ONE arm — it lowers to a referenced define, not its expanded body.
+    // This is where the exponential dies: a criterion carrying `(a or b or … )` no longer throws
+    // its disjuncts into the parent's cartesian product.
+    if (n.type === "BranchConditionCriterionRef") return 1;
     if (n.type === "BranchConditionOr") {
       let sum = 0;
       for (const o of n.operands) {
@@ -449,35 +365,22 @@ export function soleRef(c: BranchCondition): BranchConditionRef | null {
  * unmatched-ref messages) need different renderings, so it is explicit, never defaulted.
  * Renders the SOURCE tree (pre-`toNNF`), so the author's own `not (...)` spelling is shown.
  *
- * #224 ii.3 — `opts.markerAware` (default false → BYTE-SAFE for every existing caller,
- * incl. the FHIR-emitting decision.ts arm-wrapper title which MUST stay the expansion):
- * when set, a node carrying `sourcedFromCriterion` renders by the criterion's NAME (via the
- * caller's `display` convention — a criterion name is library-local, so a bare `string`
- * `ReferenceName`) and STOPS descending (name-REPLACEMENT). A name-replaced subtree is a
- * LEAF — the marker check precedes the ref branch (sole-ref-collapse can stamp the marker
- * onto a Ref leaf), and the `not`/parent-op paren logic treats a marked node as a leaf so
- * `not <criterion>` reads `not Eligible`, never `not (Eligible)`.
+ * #236: a criterion ref renders by its author NAME (via `display`) as a LEAF — it is not
+ * expanded, so `not <criterion>` reads `not Eligible`, never `not (Eligible)`.
  */
 export function describeBranchCondition(
   c: BranchCondition,
   display: (r: ReferenceName) => string,
-  opts: { markerAware?: boolean } = {},
 ): string {
-  const markerAware = opts.markerAware ?? false;
-  // A marker-bearing node renders as a NAME leaf (no descent, no parens) when marker-aware.
-  const isNameLeaf = (n: BranchCondition): boolean => markerAware && n.sourcedFromCriterion !== undefined;
   const go = (n: BranchCondition, parentOp: "and" | "or" | null): string => {
-    // #224 ii.3: a criterion boundary → its author NAME (replacement). PRECEDES the ref branch.
-    if (isNameLeaf(n)) return display(n.sourcedFromCriterion!.name);
     // A concept ref OR a criterion ref renders via `display` (source-side label; a
     // criterion ref shows the criterion's own name — the name-preserving render).
     if (n.type === "BranchConditionRef" || n.type === "BranchConditionCriterionRef") return display(n.ref);
     // #224 iii.2: `not` binds tighter than `and`/`or`, so `not "A"` needs no parens, but a
-    // compound operand does: `not ("A" or "B")`. A name-replaced operand is a leaf → no parens.
+    // compound operand does: `not ("A" or "B")`. A criterion ref operand is a leaf → no parens.
     if (n.type === "BranchConditionNot") {
       const compound =
-        !isNameLeaf(n.operand) &&
-        (n.operand.type === "BranchConditionAnd" || n.operand.type === "BranchConditionOr");
+        n.operand.type === "BranchConditionAnd" || n.operand.type === "BranchConditionOr";
       const inner = go(n.operand, null);
       return `not ${compound ? `(${inner})` : inner}`;
     }

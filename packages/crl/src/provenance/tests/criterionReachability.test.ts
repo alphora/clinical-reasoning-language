@@ -1,9 +1,9 @@
 // #224 ii.1c — a concept referenced ONLY inside a `criterion` body must still be
 // decision-REACHED (and gating). Provenance is a SOURCE-side consumer (no expansion /
-// materialization), so the reachability walk FOLLOWS criterion refs into their bodies
-// (`branchConditionConceptRefsFollowingCriteria`). Without this, "Gate Concept" — reachable
-// only through `criterion "Eligible"` — would be invisible to the decision-reachability walk
-// (the disc-300 closure argument, transposed to provenance). The criterion NAME-level
+// materialization), so the reachability walk FOLLOWS criterion refs into their bodies via the
+// linear, memoized `guardConceptClosure` (criterionIndex.ts). Without this, "Gate Concept" —
+// reachable only through `criterion "Eligible"` — would be invisible to the decision-reachability
+// walk (the disc-300 closure argument, transposed to provenance). The criterion NAME-level
 // declaration index (find-refs / rename) stays deferred to ii.4.
 
 import { writeFileSync, mkdtempSync, rmSync } from "fs";

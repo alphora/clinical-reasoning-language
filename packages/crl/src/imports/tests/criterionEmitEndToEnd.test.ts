@@ -1,10 +1,17 @@
 // #224 ii.1c — end-to-end CQL emit through the PUBLIC entry (`emitCQLImports`) over a
 // decision whose guard references a `criterion`. This exercises the emit-family seams that
 // run OUTSIDE the FHIR decision lane — the CQL emit closure (S6, `computeCqlEmitClosure`) and
-// the Interface re-export surface (S8, `interfaceSurface`) — proving they EXPAND the guard
-// (never trip the un-expanded-criterion tripwire) and that a concept referenced only via the
-// criterion body still surfaces on the Interface. Also proves the C1 fix: an envelope-
-// breaching criterion is a STRUCTURED error at this boundary, never an uncaught throw.
+// the Interface re-export surface (S8, `interfaceSurface`).
+//
+// #236 flip: a criterion no longer inline-EXPANDS into each guard that references it. It lowers
+// ONCE to a named boolean CQL `define`, and every guard references it BY NAME
+// (`text/cql-identifier`). So the assertions here are the define-reference semantics:
+//   - the Interface library carries a `define "<criterion>"` (the boolean surface);
+//   - a concept reachable ONLY through the criterion body still re-exports on the Interface and
+//     still flows to a case-feature StructureDefinition + action input (the atom closure);
+//   - the guard's applicability condition names the CRITERION, not its inlined body;
+//   - a deep doubling-chain criterion emits LINEARLY (one define per criterion), where the
+//     retired inline-expansion path would have blown past the atom cap.
 
 import { writeFileSync, mkdtempSync, rmSync } from "fs";
 import * as os from "os";
@@ -37,9 +44,10 @@ first:
 - otherwise then recommend activity "No".
 ${ACTIVITIES}`;
 
-// Doubling-chain criterion C0..C10: C0 = Gate and Gate (2 atoms); C_k = C_{k-1} and C_{k-1}
-// → 2^(k+1). C10 materializes 2048 leaves > the 1024 atom cap.
-function overflowPolicy(): string {
+// Doubling-chain criterion C0..C10: C0 = Gate and Gate; C_k = C_{k-1} and C_{k-1}. Inline
+// expansion would materialize 2^(k+1) leaves — C10 = 2048 atoms, past the retired 1024 cap.
+// Post-flip each C_k is ONE named define referencing C_{k-1} by name → 11 defines, LINEAR.
+function doublingChainPolicy(): string {
   const criteria = [`criterion "C0":\n- when ( "Gate Concept" and "Gate Concept" ).`];
   for (let k = 1; k <= 10; k++) criteria.push(`criterion "C${k}":\n- when ( "C${k - 1}" and "C${k - 1}" ).`);
   return `# Policy
@@ -54,21 +62,6 @@ first:
 - otherwise then recommend activity "No".
 ${ACTIVITIES}`;
 }
-
-// The hand-inlined twin of POLICY: NO criterion declaration; the guard is written inline as
-// `when ( "Gate Concept" )`. Otherwise byte-identical — so any emit divergence is the
-// criterion machinery (classify → table-build → expand), which AST-constructed parity cannot
-// see (it bypasses builder classification + lowering).
-const POLICY_INLINE = `# Policy
-library "Policy".
-concept "Gate Concept":
-- type is Observation.
-- code is \`gate\`.
-decision "PolicyDec":
-first:
-- when ( "Gate Concept" ) then recommend activity "Act".
-- otherwise then recommend activity "No".
-${ACTIVITIES}`;
 
 function withPolicy<T>(policySrc: string, fn: (root: string) => T): T {
   const root = mkdtempSync(path.join(os.tmpdir(), "crit-cql-"));
@@ -90,34 +83,65 @@ function withPolicy<T>(policySrc: string, fn: (root: string) => T): T {
 }
 
 describe("#224 ii.1c — criterion CQL emit (closure + interface surface)", () => {
-  it("emits successfully and re-exports the criterion-only concept on the INTERFACE library", () => {
+  it("emits a named define + re-exports the criterion-only concept on the INTERFACE library", () => {
     withPolicy(POLICY, (root) => {
       const result = emitCQLImports(path.join(root, "policy.crl"));
-      // Success proves S6 (computeCqlEmitClosure) + S8 (interfaceSurface) EXPANDED the
-      // criterion guard rather than throwing the un-expanded-criterion tripwire.
+      // Success proves S6 (computeCqlEmitClosure) + S8 (interfaceSurface) followed the criterion.
       expect(result.success).toBe(true);
-      // Assert specifically the INTERFACE library (`PolicyInterface`) re-exports the
-      // criterion-body concept — NOT merely that some LocalSource library mentions the name
-      // (which would pass trivially). The re-export existing proves S8 followed the criterion.
       const iface = result.cqlByLibrary.find((e) => e.libraryName === "PolicyInterface")?.cql ?? "";
+      // #236: the criterion lowers to a named boolean define on the Interface (the reference
+      // target every guard cites) — NOT inlined into each guard.
+      expect(iface).toContain('define "Eligible"');
+      // The criterion-body concept re-exports on the Interface (NOT merely that some LocalSource
+      // library mentions the name) — proving S8 followed the criterion into its body.
       expect(iface).toContain("Gate Concept");
     });
   });
 
-  it("an envelope-breaching criterion is a STRUCTURED error at the boundary, not a crash (C1)", () => {
-    withPolicy(overflowPolicy(), (root) => {
-      // Must not throw out of the public API (the pre-fix behavior was an uncaught
-      // CriterionExpansionError from interfaceSurface).
+  it("a MIXED guard `( Inline and Eligible )` re-exports BOTH the inline concept AND the criterion-body concept", () => {
+    // The guard-concept closure must follow a criterion ref sitting BESIDE an inline concept ref in
+    // one guard: `Inline` (direct) and `Gate Concept` (reachable only through the criterion body) must
+    // both re-export on the Interface, so neither the emitted `define "Eligible"` reference nor the
+    // inline condition dangles.
+    const src = `# Policy
+library "Policy".
+concept "Inline":
+- type is Observation.
+- code is \`inline\`.
+concept "Gate Concept":
+- type is Observation.
+- code is \`gate\`.
+criterion "Eligible":
+- when ( "Gate Concept" ).
+decision "PolicyDec":
+first:
+- when ( "Inline" and "Eligible" ) then recommend activity "Act".
+- otherwise then recommend activity "No".
+${ACTIVITIES}`;
+    withPolicy(src, (root) => {
       const result = emitCQLImports(path.join(root, "policy.crl"));
-      expect(result.success).toBe(false);
-      const overflow = (result.errors ?? []).find((e) => e.kind === "criterion-expansion-overflow");
-      expect(overflow).toBeDefined();
-      // Message READABILITY (disc 305): the CQL-lane diagnostic names the decision and states the
-      // materialized-tree resource boundary (a `kind`-only assertion lets the message rot).
-      // Wording is UNIFIED with the FHIR lane (disc 305 follow-up): "materialized tree exceeds the
-      // criterion-expansion envelope".
-      expect(overflow!.message).toContain("PolicyDec");
-      expect(overflow!.message).toContain("materialized tree");
+      expect(result.success).toBe(true);
+      const iface = result.cqlByLibrary.find((e) => e.libraryName === "PolicyInterface")?.cql ?? "";
+      expect(iface).toContain('define "Eligible"'); // the criterion define
+      expect(iface).toContain("Inline"); // the inline guard concept
+      expect(iface).toContain("Gate Concept"); // reachable only via the criterion body — still re-exported
+    });
+  });
+
+  it("a deep doubling-chain criterion emits LINEARLY (one define per criterion), not an overflow", () => {
+    withPolicy(doublingChainPolicy(), (root) => {
+      // The retired path threw a `criterion-expansion-overflow` here (C10 materialized 2048 atoms
+      // past the cap). Post-flip every criterion is emitted ONCE as a named define → success.
+      const result = emitCQLImports(path.join(root, "policy.crl"));
+      expect(result.success).toBe(true);
+      const iface = result.cqlByLibrary.find((e) => e.libraryName === "PolicyInterface")?.cql ?? "";
+      // Linearity: exactly 11 criterion defines (C0..C10), each emitted once. An expansion would
+      // be impossible to even emit at this depth; a linear DAG emits one define per criterion.
+      const defineCount = (iface.match(/define "C\d+"/g) ?? []).length;
+      expect(defineCount).toBe(11);
+      // Each define references its predecessor BY NAME (the DAG edge), not an inlined subtree.
+      expect(iface).toContain('define "C10"');
+      expect(iface).toContain('"C9"');
     });
   });
 });
@@ -190,53 +214,38 @@ describe("#224 iii.1 — per-action guard emit (self-qualified, guard-only conce
   });
 });
 
-// ── ii.2 Battery 1 — PARSE-DRIVEN parity (the full pipeline, not just the emitter) ──
-// AST-constructed parity (criterionEmit.test.ts) bypasses builder classification + lowering.
-// A classification bug (a criterion ref left as a concept ref → silent cascade-suppression) is
-// invisible to it. Driving two REAL `.crl` files (criterion vs hand-inlined) through the public
-// emit entries proves the integrated classify → table-build → expand → emit chain does not
-// desync. The hand-inlined twin has NO criterion declaration, so full-output parity ALSO proves
-// "the emitter emits NOTHING for a Criterion statement" for free (a restored locked-scope item).
-describe("#224 ii.2 — parse-driven emit parity (criterion vs hand-inlined)", () => {
-  it("CQL lane: emitCQLImports over a criterion doc == over the hand-inlined doc (+ emits-nothing)", () => {
-    const via = withPolicy(POLICY, (root) => emitCQLImports(path.join(root, "policy.crl")));
-    const inl = withPolicy(POLICY_INLINE, (root) => emitCQLImports(path.join(root, "policy.crl")));
-    expect(via.success).toBe(true);
-    expect(inl.success).toBe(true);
-    // A decision guard NEVER lowers to CQL and a Criterion statement emits nothing → the full
-    // per-library emit is IDENTICAL. NORMALIZER DISCIPLINE (disc 305): compare the WHOLE
-    // PerLibraryEmit — including the split-manifest fields the FHIR follow-up consumes
-    // (`outputFilename`, `sourceLibraryName`, and any role/includes) — dropping ONLY `filePath`
-    // (the absolute temp-dir path, the one field that legitimately differs). A projection to
-    // `{libraryName, cql}` would hide a criterion-induced manifest divergence.
-    const norm = (r: typeof via) =>
-      [...r.cqlByLibrary]
-        .map(({ filePath: _filePath, ...rest }) => rest)
-        .sort((a, b) => a.libraryName.localeCompare(b.libraryName));
-    expect(norm(via)).toEqual(norm(inl));
-  });
-
-  it("FHIR lane: emitFhirDefFromPath over a criterion doc == over the hand-inlined doc (+ emits-nothing)", () => {
-    const via = withPolicy(POLICY, (root) => emitFhirDefFromPath(path.join(root, "policy.crl")));
-    const inl = withPolicy(POLICY_INLINE, (root) => emitFhirDefFromPath(path.join(root, "policy.crl")));
-    expect(via.success).toBe(true);
-    expect(inl.success).toBe(true);
-    // NORMALIZER DISCIPLINE (disc 305): the ONLY legitimate divergence is the `location` source
-    // span (the criterion declaration shifts line numbers by 2), which rides on the resource
-    // WRAPPER, NOT the FHIR content. Prove that precisely: (1) the FHIR content (`.resource`,
-    // which carries no source span) is EXACTLY equal — the criterion decl contributes no resource
-    // and the expanded guard emits the same structure; (2) the wrappers match too once ONLY the
-    // top-level `location` key is dropped — asserting `location` is the SOLE differing field
-    // (not a recursive strip that could hide a real nested divergence).
-    expect(via.resources.map((w) => (w as { resource: unknown }).resource)).toEqual(
-      inl.resources.map((w) => (w as { resource: unknown }).resource),
-    );
-    const dropWrapperLocation = (ws: unknown[]) =>
-      ws.map((w) => {
-        const { location: _location, ...rest } = w as Record<string, unknown>;
-        return rest;
-      });
-    expect(dropWrapperLocation(via.resources)).toEqual(dropWrapperLocation(inl.resources));
+// ── #236 — the criterion guard lowers to a NAMED define reference (not its inlined body) ──
+// The inverse of the retired "criterion == hand-inlined" parity: a decision whose guard is a
+// criterion must reference the criterion BY NAME at the applicability condition, while the
+// concept reachable only through the criterion body still flows to a case-feature SD + input.
+describe("#236 — criterion guard emits a define reference + the atom-closure input", () => {
+  it("FHIR lane: the applicability condition names the criterion; the criterion-only concept still gets its SD + input", () => {
+    withPolicy(POLICY, (root) => {
+      const result = emitFhirDefFromPath(path.join(root, "policy.crl"), { date: "2026-06-04" });
+      expect(result.success).toBe(true);
+      const resources = result.resources.map((r) => r.resource as Record<string, any>);
+      const pd = resources.find(
+        (r) => r.resourceType === "PlanDefinition" && String(r.id).includes("policydec"),
+      );
+      // The guarded action references the CRITERION by name (a `text/cql-identifier` define
+      // reference), NOT the inlined body concept "Gate Concept".
+      const actStack = [...(pd!.action ?? [])];
+      let guarded: Record<string, any> | undefined;
+      while (actStack.length) {
+        const a = actStack.pop();
+        if (a.condition?.some((c: any) => c.expression?.language === "text/cql-identifier")) guarded = a;
+        if (a.action) actStack.push(...a.action);
+      }
+      const cond = guarded!.condition.find((c: any) => c.expression?.language === "text/cql-identifier");
+      expect(cond.expression.expression).toBe("Eligible");
+      // The criterion-only concept still reaches a case-feature StructureDefinition …
+      const sd = resources.find(
+        (r) => r.resourceType === "StructureDefinition" && String(r.id).includes("gate-concept"),
+      );
+      expect(sd).toBeDefined();
+      // … and the guarded action carries an input profiled to it (the atom closure flowed).
+      expect(guarded!.input?.some((i: any) => i.profile?.[0] === sd!.url)).toBe(true);
+    });
   });
 
   it("FHIR emit is DETERMINISTIC under a fixed date (repeated emit byte-identical)", () => {

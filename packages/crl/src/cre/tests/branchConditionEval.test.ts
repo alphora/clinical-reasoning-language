@@ -249,8 +249,8 @@ case "aAbsent":
     it("renderScenario builds a structure-faithful `not` view WITHOUT throwing (unvalidated lane)", () => {
       const result = renderScenario(graphFrom(notCrl, NOT_CASES));
       expect(result.success).toBe(true);
-      // schema bumped to 3 for the `not` BranchConditionView variant.
-      expect(result.schemaVersion).toBe(3);
+      // schema v3 added the `not` view variant; #236 v4 added the `criterion` variant.
+      expect(result.schemaVersion).toBe(4);
       // Find the `not` guard node in the aAbsent case's view and assert its structure + negated satisfied.
       const json = JSON.stringify(result);
       expect(json).toContain('"op":"not"');

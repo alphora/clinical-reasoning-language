@@ -362,6 +362,10 @@ export function lowerLocalCodes(
       topLevelIdentifierNames.add(stmt.name);
     } else if (stmt.type === "Parameter" && stmt.name) {
       topLevelIdentifierNames.add(stmt.name);
+    } else if (stmt.type === "Criterion" && stmt.name) {
+      // #236 — a criterion emits `define "X"`, a top-level CQL identifier, so the synthetic
+      // `<Lib> Local Codes` codesystem name must be checked against it too (disc 420, both arms).
+      topLevelIdentifierNames.add(stmt.name);
     }
   }
 

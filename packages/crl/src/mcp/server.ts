@@ -705,8 +705,10 @@ export function createServer(): McpServer {
         "failCount, errorCount, runs:[{case, decision, status, expected, produced, trace:[{node, nodeId, " +
         "source, satisfied, ...}], diagnostics, conceptTruth:[{lib, name, satisfied}]}], errors, importDiagnostics }. " +
         "#224: a `when` may guard on a compound `and`/`or`/`not` — such a node OMITS `concept` and carries " +
-        "`conditionTrace` (op:and|or|not|ref tree; a `not` node carries `operand`, each ref-leaf {name,libraryName?}); " +
-        "a single-ref `when` keeps `concept`. " +
+        "`conditionTrace` (op:and|or|not|ref|criterion tree; a `not` node carries `operand`, each ref-leaf " +
+        "{name,libraryName?}); #236: a `criterion` node carries {criterion:{name,libraryName}, satisfied, and either " +
+        "`body` (its own boolean sub-tree, on the criterion's FIRST occurrence per case) or `reference:true` (a later " +
+        "occurrence — body shown once, keeping the trace linear in distinct criteria); a single-ref `when` keeps `concept`. " +
         "`conceptTruth` is the case's per-concept answer over the whole closure — including OFF-path concepts " +
         "`first:` never evaluated; an ABSENT (lib,name) is UNKNOWN, never `false`. NOT yet evaluated (deferred): `definition " +
         "is` predicates (count/temporal/value) and `coded from`/external value sets.",
@@ -734,9 +736,11 @@ export function createServer(): McpServer {
         "`run_decision` (raw evaluation trace), this returns the FULL decision tree (the CRL AST is the " +
         "structural spine — EVERY branch and action, reached or not) overlaid with per-node run state: " +
         "`evaluated` (reached?), `condition` (overall satisfied + facts, plus `expr`: the #224 guard expression " +
-        "tree — a single `ref` leaf, `and`/`or` nodes, or a `not` node (op:\"not\", carries `operand`), each with " +
-        "per-node satisfied + leaf facts/`defined as` explanation; schemaVersion 2 replaced the old " +
-        "`condition.concept`, v3 added `not`), " +
+        "tree — a single `ref` leaf, `and`/`or` nodes, a `not` node (op:\"not\", carries `operand`), or a #236 " +
+        "`criterion` node (op:\"criterion\", carries `criterion:{name,libraryName}` + on its FIRST occurrence per " +
+        "case a `body` sub-view, on a LATER occurrence `reference:true` and no body — an undefined/cyclic criterion " +
+        "carries neither), each with per-node satisfied + leaf facts/`defined as` explanation; schemaVersion 2 " +
+        "replaced the old `condition.concept`, v3 added `not`, v4 added `criterion`), " +
         "`guard` provenance, `guardedOut`, `action` (recommend-activity vs use-decision, qualifier, " +
         'produced), `unreachedReason:"preempted"` for first:-short-circuited branches, and a `source` ' +
         "span (filePath + 0-based range) per node for navigation. Pass `path` (absolute .cel); `case` " +

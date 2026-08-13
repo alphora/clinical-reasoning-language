@@ -1185,8 +1185,9 @@ check("iii.3b: De Morgan SUPPRESSION `not ( ( A and B ) or C )` (A no, B yes, C 
 });
 
 check("iii.3b: `when not <criterion=(A or B)>` — the negated EXCLUSION criterion expands + pinpoints (A established blocks)", () => {
-  // The canonical PA negation shape (Claude review c3): a negated exclusion criterion. Expansion inlines
-  // `(A or B)` under the `not` BEFORE the zip, so the box is `not > or > [A, B]`; A established → blocks.
+  // The canonical PA negation shape (Claude review c3): a negated exclusion criterion. #236: the
+  // criterion is a NAMED boundary under the `not` (not inlined); its body `(A or B)` lives inside the
+  // `criterion` wrapper, so the box is `not > criterion(Excluded) > or > [A, B]`; A established → blocks.
   const crl = `library "G".
 concept "A":
 - type is Condition.
@@ -1211,9 +1212,9 @@ first:
   const { sv, rootLib } = renderCase({ "g.crl": crl, "g.cel": guardCel(["A"]) }, "g.cel", "c");
   const q = buildQuestionnaire(sv, booleanResolver, rootLib);
   const when = q.questions.find((x) => x.rowKind === "when-evaluated");
-  assert.equal(when.expansion.kind, "not", "the criterion expanded under the `not`");
-  // #224 ii.3: the criterion boundary now wraps its body in a COLLAPSIBLE `criterion` node (name + parity-aware
-  // blocking), and the `(A or B)` ANY OF box lives inside its `body`.
+  assert.equal(when.expansion.kind, "not", "the guard is a `not` over the criterion boundary");
+  // #236: the criterion boundary is a COLLAPSIBLE `criterion` node (name + parity-aware blocking)
+  // under the `not`, and the `(A or B)` ANY OF box lives inside its `body`.
   const crit = when.expansion.operand;
   assert.equal(crit.kind, "criterion", "the `Excluded` criterion is a named wrapper under the `not`");
   assert.equal(crit.name, "Excluded");
@@ -1454,6 +1455,48 @@ first:
   assert.ok(inner, "Inner is a nested `criterion` wrapper inside Outer's body");
   assert.equal(inner.name, "Inner");
   assert.equal(inner.body.kind, "or", "Inner body `A or B` inside the nested wrapper");
+});
+
+check("#236: a criterion referenced TWICE — the SECOND occurrence is a BODY-LESS `criterion` node (still blocking-aware)", () => {
+  // An `all:` decision guards two branches by the SAME criterion. The run trace carries the body on
+  // the FIRST occurrence this case and `reference:true` (no body) on the later one; the questionnaire
+  // mirrors it — the reference occurrence is a COLLAPSED named `criterion` row with NO body, blocking
+  // still set when it failed. This is the render-lane DAG-collapse (the whole point of the flip).
+  const crl = `library "Crit".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+criterion "Eligible":
+- when ( "A" and "B" ).
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "D":
+all:
+- when "Eligible" then recommend activity "Approve".
+- when "Eligible" then recommend activity "Deny".`;
+  // A present, B absent → Eligible=(A and B) false → both `all:` branches evaluate FALSE.
+  const { sv, rootLib } = renderCase({ "c.crl": crl, "c.cel": critCel(["A"]) }, "c.cel", "c");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const whens = q.questions.filter((x) => x.rowKind === "when-evaluated");
+  assert.equal(whens.length, 2, "both `all:` branches produce an evaluated row");
+  const [first, second] = whens;
+  // Both are the named `Eligible` criterion, both answered "no" (false), both blocking (branch false).
+  for (const w of [first, second]) {
+    assert.equal(w.expansion.kind, "criterion");
+    assert.equal(w.expansion.name, "Eligible");
+    assert.equal(w.expansion.answer, "no");
+    assert.ok(w.expansion.blocking, "a false criterion blocks its (false) branch — collapsed blocker reads red");
+  }
+  // FIRST occurrence carries the body; the SECOND is a bare reference (NO body — the DAG collapse).
+  assert.equal(first.expansion.body.kind, "and", "first occurrence expands its body `A and B`");
+  assert.equal(second.expansion.body, undefined, "later occurrence is BODY-LESS (a reference, not a re-expansion)");
 });
 
 check("ii.3: a PREEMPTED criterion guard → answer 'unknown', NEVER blocking (never evaluated)", () => {

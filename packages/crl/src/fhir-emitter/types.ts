@@ -342,6 +342,10 @@ export interface UnmatchedReference {
     | "empty-terminology"
     | "unresolved-activity"
     | "unresolved-concept"
+    // #236 — a decision guard references a `criterion` name absent from the criterion index
+    // (undefined criterion). Distinct from `unresolved-concept` so the diagnostic names the
+    // right kind (a criterion lowers to a referenced boolean define, not a concept re-export).
+    | "unresolved-criterion"
     | "unresolved-decision"
     | "unresolved-terminology"
     // NOTE: a free-text `with` on an ActivityDefinition is IGNORED (#181) — it no

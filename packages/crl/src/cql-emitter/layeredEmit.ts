@@ -71,8 +71,7 @@ import {
   normalizeLocalRef,
   reductionNotEmittable,
 } from "../ast/types";
-import { branchConditionConceptRefsExpanded } from "../ast/branchCondition";
-import { buildCriterionTable } from "../ast/criterionExpansion";
+import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex";
 import { pascalCaseNameForId } from "../fhir-emitter/slug";
 
 import type { CRLError } from "../types/errors";
@@ -287,6 +286,12 @@ export function classifyStatementLayer(stmt: Statement): Layer | null {
         return null;
     }
   }
+  // #236 — a `criterion` is a decision-facing boolean define: co-locate it with the decision's
+  // boolean surface (the Interface layer), where it references the concept re-exports + sibling
+  // criterion defines BARE. Classifying it also lets a criterion-bearing library split (a criterion
+  // no longer forces the per-CRL path). Its referenced concept re-exports are surfaced into Interface
+  // by `interfaceSurface` (from the criterion's recursive atom closure).
+  if (stmt.type === "Criterion") return "Interface";
   // Decision / Activity / Parameter: not layer-classified.
   return null;
 }
@@ -972,16 +977,15 @@ export function interfaceConceptNames(ast: CRL): string[] {
  */
 export function interfaceSurface(ast: CRL): { name: string; sourceLayer: Layer | undefined }[] {
   const maps = buildNameLayerMaps(ast, FULL_PARTITION);
-  // #224 ii.1c — a guard atom may reference a `criterion`; the Interface re-export surface
-  // must include the EXPANDED guard's concepts (each atom lowers to a CQL define the emitted
-  // decision references, though the guard boolean itself never lowers to CQL). Expand
-  // GRACEFULLY (skip an envelope-breaching guard's atoms rather than throw): the overflow is
-  // surfaced as a structured HARD error at the CQL emit BOUNDARY (`emitCQLImports`, via
-  // `decisionGuardOverflows`), which fails the emit before this runs — so an overflow guard
-  // never actually reaches here in a public CQL emit; the graceful skip is the backstop that
-  // keeps a direct `interfaceSurface` caller from crashing. Criteria survive lowering
-  // unchanged, so this table (from the lowered `ast`) matches the FHIR lane's.
-  const criterionTable = buildCriterionTable(ast.statements);
+  // #236 — a guard atom may reference a `criterion`. The Interface re-export surface must
+  // include the concepts a criterion body references (recursively), so the emitted criterion
+  // define's bare `Coalesce("Cov", false)` resolves to an Interface re-export rather than
+  // dangling at `$apply`. Use the criterion INDEX (memoized, LINEAR) — NOT the materializing
+  // expansion walk, which would overflow the atom cap on a doubling-DAG criterion and SILENTLY
+  // DROP those re-exports (harmless before, but now that the CQL overflow gate is retired the
+  // omission would ship). Criteria survive lowering unchanged, so this index (from the lowered
+  // `ast`) matches the FHIR lane's.
+  const criterionIndex = buildCriterionIndex(ast.statements);
   const out: { name: string; sourceLayer: Layer | undefined }[] = [];
   const seen = new Set<string>();
   const add = (ref: ReferenceName): void => {
@@ -1010,12 +1014,9 @@ export function interfaceSurface(ast: CRL): { name: string; sourceLayer: Layer |
   };
   const walkMember = (member: BlockMember): void => {
     if (member.type === "WhenBlock") {
-      for (const atom of branchConditionConceptRefsExpanded(
-        member.condition,
-        criterionTable,
-        "cql-emit interfaceSurface",
-      ).refs)
-        add(atom.ref);
+      // Direct concept atoms + each guard criterion's recursive atom closure — LINEAR via the
+      // index (a doubling-DAG criterion is bounded, never re-walked or atom-capped).
+      for (const atom of guardConceptClosure(member.condition, criterionIndex)) add(atom.ref);
       walkBlock(member.body);
     } else if (member.type === "OtherwiseBlock") {
       walkBlock(member.body);

@@ -6,7 +6,7 @@ import { buildCEL } from "../../cel";
 import type { ResolvedCelGraph } from "../../cel/imports/types";
 import type { RegistryEntry } from "../../imports/types";
 
-import { runCel, __evalBranchConditionForTest } from "../run";
+import { runCel } from "../run";
 import { renderScenario, __zipConditionTraceForTest, unsatisfiedFrontier, frontierTooltip } from "../viewModel";
 import type { BranchConditionView } from "../viewModel";
 import type { BranchCondition } from "../../ast/types";
@@ -15,12 +15,14 @@ import { allUnsatisfiedCriteria, type FcScenario } from "../../provenance/failed
 const LOC = { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } } as const;
 const critRef = (ref: string): BranchCondition => ({ type: "BranchConditionCriterionRef", ref, location: LOC });
 
-// #224 ii.1c — the EVAL + RENDER wiring for a `criterion` guard. A `when` that references a
-// criterion must expand to the criterion's body BEFORE the CRE evaluates it (S1) and BEFORE
-// the view-model zips the trace (S3) — so the criterion version is behaviorally IDENTICAL to
-// the hand-inlined guard, and the render never degrades to an unevaluated leaf (disc 303 Q3:
-// both sides expand from the same table source). `parseInput` does NOT classify, so the test
-// graph runs `classifyCriterionRefs` (as `buildCRL` does) to produce the tripwire node.
+// #236 — the EVAL + RENDER wiring for a `criterion` guard. A `when` that references a criterion no
+// longer inline-EXPANDS the criterion's body into the guard. The CRE evaluates the criterion BY
+// REFERENCE to its boolean body (memoized per case), emitting an `op:"criterion"` trace node (body
+// sub-trace on the FIRST occurrence per case, `reference:true` on later ones — the render-lane
+// analogue of the emit DAG). The view-model walks the SAME raw AST spine (criterion refs intact)
+// and zips it against that trace. So a criterion is behaviorally identical to the hand-inlined guard
+// (it evaluates to the same boolean), but renders as a NAMED boundary node, not the expanded body.
+// `parseInput` does NOT classify, so the test graph runs `classifyCriterionRefs` (as `buildCRL` does).
 
 function graphFrom(crlSrc: string, celSrc: string): ResolvedCelGraph {
   const crl = classifyCriterionRefs(parseInput(crlSrc));
@@ -52,7 +54,7 @@ concept "Leaf B":
 - type is Observation.
 - code is \`leaf-b\`.`;
 
-// Two GuardLib flavors that must behave IDENTICALLY: one factors the guard through a
+// Two GuardLib flavors that must EVALUATE IDENTICALLY: one factors the guard through a
 // `criterion`, the other inlines `Leaf A and Leaf B` directly.
 const VIA_CRITERION = `library "GuardLib".
 ${LEAVES}
@@ -101,14 +103,16 @@ case "onlyA":
 const statuses = (g: ResolvedCelGraph): string[] =>
   runCel(g).runs.map((r) => `${r.case}:${r.status}`).sort();
 
-// A doubling-chain criterion C0..C10 (2^(k+1) atoms; C10 = 2048 > the 1024 cap), as CRL text.
+// A doubling-chain criterion C0..C10: C0 = Leaf A and Leaf A; C_k = C_{k-1} and C_{k-1}. Inline
+// expansion would materialize 2^(k+1) atoms (C10 = 2048, past the retired 1024 cap). Post-flip each
+// C_k evaluates ONCE by reference (memoized per case) → LINEAR, no cap, no overflow.
 function doublingChain(): string {
   const out = [`criterion "C0":\n- when ( "Leaf A" and "Leaf A" ).`];
   for (let k = 1; k <= 10; k++) out.push(`criterion "C${k}":\n- when ( "C${k - 1}" and "C${k - 1}" ).`);
   return out.join("\n");
 }
 
-describe("#224 ii.1c — criterion eval + render parity", () => {
+describe("#236 — criterion eval + render (reference, not expansion)", () => {
   it("a `when` referencing a criterion evaluates identically to the hand-inlined guard", () => {
     const viaCriterion = statuses(graphFrom(VIA_CRITERION, CASES));
     const inlined = statuses(graphFrom(HAND_INLINED, CASES));
@@ -117,12 +121,12 @@ describe("#224 ii.1c — criterion eval + render parity", () => {
     expect(viaCriterion).toEqual(inlined);
   });
 
-  it("renderScenario expands the same graph the trace was zipped against (no degradation)", () => {
+  it("renderScenario zips the raw criterion spine against the run's op:criterion trace (no degradation)", () => {
     const viaCriterion = renderScenario(graphFrom(VIA_CRITERION, CASES));
     const inlined = renderScenario(graphFrom(HAND_INLINED, CASES));
-    // Both-sides-expanded (disc 303 Q3): render succeeds with no error scenarios, exactly as
-    // the inlined version — a half-missed seam would degrade the compound guard to an
-    // unevaluated leaf and desync pass/fail.
+    // Both render successfully with no error scenarios; the per-case pass/fail matches the inlined
+    // twin — a half-missed seam (spine expanded but trace by-reference, or vice versa) would degrade
+    // the criterion node to an unevaluated leaf and desync pass/fail.
     expect(viaCriterion.success).toBe(true);
     expect(viaCriterion.errorCount).toBe(0);
     expect(viaCriterion.scenarios.map((s) => `${s.case}:${s.status}`).sort()).toEqual(
@@ -130,8 +134,11 @@ describe("#224 ii.1c — criterion eval + render parity", () => {
     );
   });
 
-  it("a criterion used TWICE expands to disjoint identical subtrees (design §7 pin)", () => {
-    // Two `all:` branches both guarded by the SAME criterion → two independent expansions.
+  it("a criterion used TWICE renders LINEARLY: first occurrence carries the body, later ones are references", () => {
+    // Two `all:` branches both guarded by the SAME criterion. Post-flip the run trace carries the
+    // criterion BODY on its first occurrence per case and `reference:true` on later ones (the render-
+    // lane analogue of the emit DAG); the VM mirrors that. So the guard trees are NOT two disjoint
+    // expansions — they are one named boundary shown once with its body, then referenced.
     const twiceCriterion = `library "GuardLib".
 ${LEAVES}
 ${ACTIVITIES}
@@ -142,26 +149,36 @@ all:
 - when "Eligible" then recommend activity "Approve".
 - when "Eligible" then recommend activity "Deny".`;
     const both = renderScenario(graphFrom(twiceCriterion, CASES)).scenarios.find((s) => s.case.name === "both")!;
-    // The two branches are INDEPENDENT expansions of the one criterion; their guard-expression
-    // trees (op / satisfied / operands / concept / facts) must be byte-identical — proving the
-    // fresh-node rebuild produced disjoint-but-structurally-equal subtrees, deterministically.
-    // #224 ii.3: each boundary-root now ALSO carries `sourcedFromCriterion: { name: "Eligible" }`
-    // (name-replacement marker) — pinned positively here (both expansions carry the SAME name).
-    const guardExpr = (i: number): unknown => (both.tree[i] as { condition: { expr: unknown } }).condition.expr;
-    expect(guardExpr(0)).toEqual({
+    const guardExpr = (i: number): BranchConditionView =>
+      (both.tree[i] as { condition: { expr: BranchConditionView } }).condition.expr;
+    // Both branches are the SAME named boundary (op:"criterion", satisfied, naming "Eligible").
+    const e0 = guardExpr(0);
+    const e1 = guardExpr(1);
+    expect(e0.op).toBe("criterion");
+    expect(e1.op).toBe("criterion");
+    expect(e0).toMatchObject({ op: "criterion", satisfied: true, criterion: { name: "Eligible", libraryName: "GuardLib" } });
+    expect(e1).toMatchObject({ op: "criterion", satisfied: true, criterion: { name: "Eligible", libraryName: "GuardLib" } });
+    // FIRST occurrence carries the body (the `and` of the two leaves); the SECOND is a bare reference
+    // (body omitted, `reference:true`) — the trace linearity that keeps the render linear in DISTINCT
+    // criteria rather than cloning the subtree per use.
+    expect((e0 as { body?: BranchConditionView }).body).toMatchObject({
       op: "and",
       satisfied: true,
-      sourcedFromCriterion: { name: "Eligible" },
       operands: [
         { op: "ref", satisfied: true, concept: { name: "Leaf A", libraryName: "GuardLib" }, facts: ["fA"] },
         { op: "ref", satisfied: true, concept: { name: "Leaf B", libraryName: "GuardLib" }, facts: ["fB"] },
       ],
     });
-    expect(guardExpr(1)).toEqual(guardExpr(0));
+    expect((e1 as { body?: BranchConditionView }).body).toBeUndefined();
+    expect((e1 as { reference?: boolean }).reference).toBe(true);
   });
 
-  it("a covered-decision guard breaching the GLOBAL envelope → status:\"error\" (eval non-ok)", () => {
-    const overflow = `library "GuardLib".
+  it("a deep doubling-chain criterion evaluates + renders LINEARLY (no overflow error, no throw)", () => {
+    // The retired inline-expansion path threw/errored here (C10 materialized 2048 atoms past the
+    // cap). Post-flip every criterion is evaluated ONCE by reference (memoized per case), so a
+    // doubling DAG resolves in time linear in DISTINCT criteria — no `criterion-expansion` error,
+    // no uncaught throw, in BOTH the run and the render lane.
+    const deep = `library "GuardLib".
 ${LEAVES}
 ${ACTIVITIES}
 ${doublingChain()}
@@ -169,35 +186,19 @@ decision "D":
 first:
 - when "C10" then recommend activity "Approve".
 - otherwise then recommend activity "Deny".`;
-    const runs = runCel(graphFrom(overflow, CASES)).runs;
-    // Every case targeting the over-cap decision errors (materialization refused), never a
-    // silent pass/fail — and no uncaught throw out of runCel.
-    expect(runs.every((r) => r.status === "error")).toBe(true);
-    expect(runs.some((r) => r.diagnostics.some((d) => /criterion-expansion|envelope/.test(d)))).toBe(true);
-  });
-
-  it("the RENDER lane degrades with the eval status on an overflow doc (no throw — census row 5's overflow side)", () => {
-    // Battery 3's render-lane overflow disposition (disc 305 Claude #5c): renderScenario over an
-    // envelope-breaching covered decision must NOT throw the tripwire; it degrades WITH the eval
-    // status (the case becomes an error scenario), consistent with runCel above.
-    const overflow = `library "GuardLib".
-${LEAVES}
-${ACTIVITIES}
-${doublingChain()}
-decision "D":
-first:
-- when "C10" then recommend activity "Approve".
-- otherwise then recommend activity "Deny".`;
-    const render = renderScenario(graphFrom(overflow, CASES));
-    // No uncaught throw; every scenario carries the error status (degrades with eval, not silent).
-    // Guard against vacuity: `.every` is trivially true on `[]`, and a graph-level empty render on
-    // overflow IS a failure of "degrades per-case" — so pin the exact count (CASES = both + onlyA).
+    const runs = runCel(graphFrom(deep, CASES)).runs;
+    expect(runs).toHaveLength(2); // guard against a vacuous `.every`/`.some` on an empty runs array
+    // No case errors, and no envelope/expansion diagnostic anywhere (the retired disposition).
+    expect(runs.every((r) => r.status !== "error")).toBe(true);
+    expect(runs.some((r) => r.diagnostics.some((d) => /criterion-expansion|envelope/.test(d)))).toBe(false);
+    // The render lane likewise succeeds with a scenario per case (never throws, never degrades all).
+    const render = renderScenario(graphFrom(deep, CASES));
     expect(render.scenarios).toHaveLength(2);
-    expect(render.scenarios.every((s) => s.status === "error")).toBe(true);
+    expect(render.errorCount).toBe(0);
   });
 });
 
-describe("#224 ii.1c — criterion through a `use decision` sub-decision", () => {
+describe("#236 — criterion through a `use decision` sub-decision", () => {
   const DELEG_CASES = `library "Cases".
 covers "GuardLib".
 ${PATIENT}
@@ -215,7 +216,7 @@ case "both":
 - fact is "fB".
 - result is "Top" is "Approve".`;
 
-  it("a sub-decision whose guard is a criterion evaluates correctly (wrapResolve OK path)", () => {
+  it("a sub-decision whose guard is a criterion evaluates correctly (delegated frame OK path)", () => {
     const crl = `library "GuardLib".
 ${LEAVES}
 ${ACTIVITIES}
@@ -234,7 +235,7 @@ first:
     expect(runs.map((r) => `${r.case}:${r.status}`)).toEqual(["both:pass"]);
   });
 
-  it("a sub-decision whose guard breaches the envelope → status:\"error\", NOT not-found (C2)", () => {
+  it("a deep-chain criterion guard behind a `use decision` sub evaluates cleanly (no overflow, no not-found)", () => {
     const crl = `library "GuardLib".
 ${LEAVES}
 ${ACTIVITIES}
@@ -248,44 +249,31 @@ first:
 - when "C10" then recommend activity "Approve".
 - otherwise then recommend activity "Deny".`;
     const run = runCel(graphFrom(crl, DELEG_CASES)).runs[0]!;
-    // The overflow sub must ERROR the case (C2 fix) — not degrade to the misleading
-    // "target not found" path that would silently compute pass/fail.
-    expect(run.status).toBe("error");
-    expect(run.diagnostics.some((d) => /envelope/.test(d))).toBe(true);
+    // Post-flip the deep chain resolves by reference through the sub — no envelope error, no throw,
+    // and never the misleading "target not found" path the retired overflow disposition risked.
+    expect(run.status).not.toBe("error");
+    expect(run.diagnostics.some((d) => /envelope|criterion-expansion/.test(d))).toBe(false);
     expect(run.diagnostics.some((d) => /not found/.test(d))).toBe(false);
   });
 });
 
-// ── ii.2 Battery 2 — the STRICT eval throw-site + the SOFT render degrade ─────────
-// The 4th (and highest-stakes) tripwire site is `evalBranchCondition` (run.ts:444) — the
-// "silent-wrong-answer" case. It is a non-exported function, so unlike the three
-// `branchCondition.ts` collector sites (pinned in criterionClassify.test.ts) it can only be
-// reached via the test-only export. The render lane is the counterexample: it DEGRADES.
-describe("#224 ii.2 — tripwire liveness: STRICT eval throws, SOFT render degrades", () => {
-  it("evalBranchCondition THROWS on a raw un-expanded criterion ref (the eval tripwire is live)", () => {
-    // ctx/frame are unread on the criterion-ref branch (it throws before touching them), so
-    // stubs suffice to drive the site.
-    expect(() =>
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      __evalBranchConditionForTest(critRef("Eligible"), {} as any, {} as any),
-    ).toThrow(/un-expanded criterion/i);
-  });
-
-  it("the render lane DEGRADES a raw criterion ref at the ROUTING site (never throws)", () => {
-    // Pin the ACTUAL routing site (`zipConditionTrace`, viewModel.ts:636), not just the terminal
-    // helper: given a stray criterion ref + a (mismatched) trace, it must return a NAMED
-    // unevaluated leaf — NOT throw, NOT attach the trace's satisfied state. This is the VM
-    // stability contract and the enumerated exception to "STRICT lanes throw"; the safety net is
-    // the parity/presence assertions, not a throw. (The trace here is deliberately a `satisfied`
-    // ref the routing must IGNORE for a criterion ref.)
+// ── #236 — the render lane routing site DEGRADES on a trace mismatch (never throws) ──────────────
+// The eval site (run.ts `evalBranchCondition`) no longer THROWS on a criterion ref — it resolves the
+// criterion by reference. The render routing site (`zipConditionTrace`) is the SOFT counterpart: on
+// any trace shape/identity mismatch it returns the NAMED unevaluated leaf, never a throw.
+describe("#236 — render-lane routing degrade (VM stability contract)", () => {
+  it("zipConditionTrace degrades a criterion ref against a mismatched (ref) trace to a NAMED unevaluated boundary", () => {
+    // Pin the ACTUAL routing site (`zipConditionTrace`): given a criterion-ref spine + a mismatched
+    // (op:"ref") trace, it must return the unevaluated `op:"criterion"` boundary naming the criterion
+    // — NOT throw, NOT cross-attach the trace's `satisfied` state. This is the VM stability contract.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const view = __zipConditionTraceForTest(critRef("Eligible"), { op: "ref", satisfied: true } as any);
-    expect(view).toEqual({ op: "ref", concept: { name: "Eligible" } });
+    expect(view).toEqual({ op: "criterion", criterion: { name: "Eligible" } });
   });
 });
 
-// ── ii.2 Battery 5 — structure-preserving + deterministic PIPELINE invariants ─────
-describe("#224 ii.2 — pipeline invariants (joint parity + determinism)", () => {
+// ── #236 — structure-preserving + deterministic PIPELINE invariants ───────────────────────────────
+describe("#236 — pipeline invariants (run parity + render divergence + determinism)", () => {
   const TWICE_VIA = `library "GuardLib".
 ${LEAVES}
 ${ACTIVITIES}
@@ -303,43 +291,26 @@ all:
 - when ( "Leaf A" and "Leaf B" ) then recommend activity "Approve".
 - when ( "Leaf A" and "Leaf B" ) then recommend activity "Deny".`;
 
-  it("a twice-used criterion's run+render is JOINTLY identical to the twice-inlined hand doc", () => {
-    // Run parity on the MEANINGFUL projection — case, status, AND the produced recommendation set
-    // (two semantically different runs can share statuses; the produced set is what the oracle
-    // checks). A status-only comparison would miss a divergent recommendation.
+  it("a twice-used criterion RUNS identically to the twice-inlined hand doc, but RENDERS as a named boundary", () => {
+    // RUN parity on the MEANINGFUL projection — case, status, AND the produced recommendation set. A
+    // criterion evaluates to the same boolean as its inline body, so the runs are behaviorally equal.
+    // (`viaWhen` DOES differ — see the dedicated test below — so it is not part of this projection.)
     const runProjection = (g: ResolvedCelGraph) =>
       runCel(g)
         .runs.map((r) => ({ case: r.case, status: r.status, produced: r.produced.map((p) => p.recommendation).sort() }))
         .sort((a, b) => a.case.localeCompare(b.case));
     expect(runProjection(graphFrom(TWICE_VIA, CASES))).toEqual(runProjection(graphFrom(TWICE_INLINE, CASES)));
-    // …AND render parity — REVISED by #224 ii.3 (criterion NAME rendering). ii.2 originally pinned
-    // the via-criterion guard tree as byte-identical to the hand-inlined twin ("indistinguishable in
-    // the rendered VM too"). ii.3 DELIBERATELY makes them distinguishable: the via tree now carries a
-    // `sourcedFromCriterion` marker at the boundary (so the label name-replaces to `Eligible`). So the
-    // structural parity now holds MODULO that marker, and the marker's PRESENCE (via) / ABSENCE
-    // (inline) is pinned positively. Only the serialized-bytes EMIT parity stays absolute (elsewhere).
+    // RENDER DIVERGENCE (#236): the via-criterion guard renders as an `op:"criterion"` boundary
+    // (naming "Eligible"); the hand-inlined twin renders its expanded `op:"and"` tree. The flip makes
+    // them DELIBERATELY distinguishable — the criterion is a named unit, not an inlined subtree.
     const bothVia = renderScenario(graphFrom(TWICE_VIA, CASES)).scenarios.find((s) => s.case.name === "both")!;
     const bothInl = renderScenario(graphFrom(TWICE_INLINE, CASES)).scenarios.find((s) => s.case.name === "both")!;
-    const expr = (s: typeof bothVia, i: number): unknown =>
-      (s.tree[i] as { condition: { expr: unknown } }).condition.expr;
-    // Recursively drop `sourcedFromCriterion` so the STRUCTURE (op/satisfied/concept/operands) can be
-    // compared marker-free — ii.3 changes the marker, not the guard shape.
-    const stripMarker = (e: unknown): unknown => {
-      if (e === null || typeof e !== "object") return e;
-      const { sourcedFromCriterion, ...rest } = e as Record<string, unknown>;
-      void sourcedFromCriterion;
-      const out: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(rest)) out[k] = Array.isArray(v) ? v.map(stripMarker) : stripMarker(v);
-      return out;
-    };
-    expect(stripMarker(expr(bothVia, 0))).toEqual(stripMarker(expr(bothInl, 0)));
-    expect(stripMarker(expr(bothVia, 1))).toEqual(stripMarker(expr(bothInl, 1)));
-    // #224 ii.3 positive pin: the via-criterion boundary CARRIES the author's name; the inline twin does NOT.
-    const marker = (e: unknown): unknown => (e as { sourcedFromCriterion?: { name: string } }).sourcedFromCriterion;
-    expect(marker(expr(bothVia, 0))).toEqual({ name: "Eligible" });
-    expect(marker(expr(bothVia, 1))).toEqual({ name: "Eligible" });
-    expect(marker(expr(bothInl, 0))).toBeUndefined();
-    expect(marker(expr(bothInl, 1))).toBeUndefined();
+    const expr = (s: typeof bothVia, i: number): BranchConditionView =>
+      (s.tree[i] as { condition: { expr: BranchConditionView } }).condition.expr;
+    expect(expr(bothVia, 0).op).toBe("criterion");
+    expect(expr(bothVia, 1).op).toBe("criterion");
+    expect(expr(bothInl, 0).op).toBe("and");
+    expect(expr(bothInl, 1).op).toBe("and");
   });
 
   it("run + render are DETERMINISTIC across repeated invocations (no table/Map-order leakage)", () => {
@@ -350,8 +321,11 @@ all:
   });
 });
 
-// ── #224 ii.3 — criterion NAME rendering (marker-aware VM label + frontier, DISPLAY-ONLY) ──────────
-describe("#224 ii.3 — criterion NAME rendering", () => {
+// ── #236 — criterion NAME rendering (VM label + frontier, DISPLAY) ────────────────────────────────
+// A criterion ref is NOT expanded, so `describeBranchCondition` renders it by its author name
+// naturally — the `when` label names the criterion, and the structured frontier of a FAILED criterion
+// blocks on the criterion NAME (a single reusable named unit), not its inner atoms.
+describe("#236 — criterion NAME rendering", () => {
   const MORE_LEAVES = `concept "Leaf C":
 - type is Observation.
 - code is \`leaf-c\`.
@@ -397,7 +371,7 @@ first:
 
   const ELIGIBLE = `criterion "Eligible":\n- when ( "Leaf A" and "Leaf B" ).`;
 
-  it("boundary at guard ROOT: `when \"Eligible\"` → label `when Eligible` (name-replacement, not the expansion)", () => {
+  it("boundary at guard ROOT: `when \"Eligible\"` → label `when Eligible` (the criterion name, not the body)", () => {
     expect(labelsOf(lib(ELIGIBLE, `"Eligible"`))[0]).toBe("when Eligible");
   });
 
@@ -406,43 +380,46 @@ first:
   });
 
   it("criterion as a non-first `or` operand → `when Leaf A or Eligible` (NO parens around the name-leaf)", () => {
-    // The paren [critical]: a name-replaced compound criterion is a LEAF, so it is never wrapped
-    // even though its expansion `(Leaf A and Leaf B)` is compound.
+    // The paren [critical]: a named criterion is a LEAF, so it is never wrapped even though its body
+    // `(Leaf A and Leaf B)` is compound.
     expect(labelsOf(lib(ELIGIBLE, `( "Leaf A" or "Eligible" )`))[0]).toBe("when Leaf A or Eligible");
   });
 
-  it("`not <criterion>` → `when not Eligible`, NEVER `not (Eligible)` (parent-frame leaf fix)", () => {
+  it("`not <criterion>` → `when not Eligible`, NEVER `not (Eligible)` (criterion is a leaf)", () => {
     expect(labelsOf(lib(ELIGIBLE, `not "Eligible"`))[0]).toBe("when not Eligible");
   });
 
-  it("nested NON-coincident: `Outer = A and Inner`, `Inner = B or C` → `when Outer` (outermost-wins)", () => {
+  it("nested criterion: `Outer = A and Inner`, `Inner = B or C` → `when Outer` (the referenced name wins)", () => {
     const crit = `criterion "Inner":\n- when ( "Leaf B" or "Leaf C" ).\ncriterion "Outer":\n- when ( "Leaf A" and "Inner" ).`;
     expect(labelsOf(lib(crit, `"Outer"`))[0]).toBe("when Outer");
   });
 
-  it("COINCIDENT alias chain `Outer = Inner = Leaf A` → `when Outer` (outermost wins; Inner unrecoverable)", () => {
+  it("criterion referencing a criterion `Outer = Inner = Leaf A` → `when Outer` (the referenced name)", () => {
     const crit = `criterion "Inner":\n- when ( "Leaf A" ).\ncriterion "Outer":\n- when ( "Inner" ).`;
     expect(labelsOf(lib(crit, `"Outer"`))[0]).toBe("when Outer");
   });
 
-  it("SINGLE-ATOM criterion `Eligible2 = Leaf A` → `when Eligible2` + marker on the sole ref leaf", () => {
+  it("SINGLE-ATOM criterion `Eligible2 = Leaf A` → `when Eligible2` + an op:criterion node over a ref body", () => {
     const crit = `criterion "Eligible2":\n- when ( "Leaf A" ).`;
     expect(labelsOf(lib(crit, `"Eligible2"`))[0]).toBe("when Eligible2");
     const expr = firstWhenExpr(lib(crit, `"Eligible2"`));
-    expect(expr.op).toBe("ref"); // sole-ref collapse
-    expect(expr.sourcedFromCriterion).toEqual({ name: "Eligible2" });
+    expect(expr.op).toBe("criterion"); // #236: a named boundary, NOT a collapsed sole-ref
+    expect((expr as { criterion: { name: string } }).criterion).toMatchObject({ name: "Eligible2" });
+    // Its body is the criterion's own guard — the sole ref to Leaf A.
+    expect((expr as { body?: BranchConditionView }).body).toMatchObject({ op: "ref", concept: { name: "Leaf A" } });
   });
 
-  it("marker threads onto the VM node (the shape Todo 2's box reads)", () => {
+  it("op:criterion node names the criterion and carries its body (the shape the cockpit box reads)", () => {
     const expr = firstWhenExpr(lib(ELIGIBLE, `"Eligible"`));
-    expect(expr.op).toBe("and"); // Eligible = Leaf A and Leaf B, boundary on the `and` root
-    expect(expr.sourcedFromCriterion).toEqual({ name: "Eligible" });
+    expect(expr.op).toBe("criterion");
+    expect((expr as { criterion: { name: string } }).criterion).toMatchObject({ name: "Eligible" });
+    // Eligible = Leaf A and Leaf B → the body is the `and` of the two leaves.
+    expect((expr as { body?: BranchConditionView }).body).toMatchObject({ op: "and" });
   });
 
-  it("ATOMS-STAY: a FAILED single-atom criterion labels `when Eligible2` but its frontier atom stays the concept", () => {
-    // The design principle (disc 305 §A7): LABELS name-replace; the STRUCTURED frontier keeps ATOM
-    // granularity. A single-atom criterion `Eligible2 = Leaf A` that fails → header/label `when Eligible2`,
-    // but "which failed" is the concept `Leaf A`, not the criterion name (atom-granularity is finer).
+  it("FRONTIER: a FAILED single-atom criterion labels `when Eligible2` AND its frontier names the CRITERION", () => {
+    // #236 DAG-collapse philosophy: a criterion is ONE reusable named unit, so a FAILED criterion
+    // blocks on the criterion NAME (Eligible2), not its inner atom (Leaf A). Label and frontier agree.
     const crit = `criterion "Eligible2":\n- when ( "Leaf A" ).`;
     const cel = `library "Cases".
 covers "GuardLib".
@@ -453,16 +430,15 @@ case "none":
     expect(labelsOf(lib(crit, `"Eligible2"`), cel)[0]).toBe("when Eligible2");
     const expr = firstWhenExpr(lib(crit, `"Eligible2"`), cel);
     expect(expr.satisfied).toBe(false);
-    // The frontier atom is the CONCEPT (Leaf A), not the criterion name — atoms stay.
-    expect(frontierTooltip(unsatisfiedFrontier(expr))).toBe("Leaf A unmet");
+    // The frontier atom is the CRITERION (Eligible2), the single named blocker.
+    expect(frontierTooltip(unsatisfiedFrontier(expr))).toBe("Eligible2 unmet");
   });
 
-  it("false-`or` alternatives with criterion boundaries → frontier ALT-LABELS use the NAMES, not the expansions", () => {
+  it("false-`or` alternatives with criterion boundaries → frontier ALT-LABELS use the NAMES, not the bodies", () => {
     // Two criteria as the two arms of an `or`; neither holds (no facts) → the branch is a false `or`,
-    // and the frontier's per-alternative labels (via `describeConditionView`) must name-replace so the
+    // and the frontier's per-alternative labels (via `describeConditionView`) name the criteria so the
     // tooltip stays in step with the `when` label.
     const crit = `${ELIGIBLE}\ncriterion "Other":\n- when ( "Leaf C" or "Leaf D" ).`;
-    // Give a case that evaluates (facts absent → both criteria false → or false).
     const cel = `library "Cases".
 covers "GuardLib".
 ${PATIENT}
@@ -473,13 +449,12 @@ case "none":
     const tip = frontierTooltip(unsatisfiedFrontier(expr));
     expect(tip).toContain("alt 1 (Eligible)");
     expect(tip).toContain("alt 2 (Other)");
-    expect(tip).not.toContain("Leaf A and Leaf B"); // the expansion must NOT leak into the alt label
+    expect(tip).not.toContain("Leaf A and Leaf B"); // the body must NOT leak into the alt label
   });
 
   it("failedCriteria: a FAILED single-atom criterion's display concept is the NAME (header matches `when Eligible2`)", () => {
-    // #224 ii.3 (impl-review point 1): `fcConcept` is marker-aware, so the i.4b "single" display header
-    // reads `when Eligible2` (criterion name), NOT `when Leaf A` (the lone atom) — consistent with the tree
-    // node label + `conceptLabel`. The compound-preemptor path shares `fcConcept`, so it is covered too.
+    // `fcConcept` reads the `op:"criterion"` node, so the "single" display header reads `when Eligible2`
+    // (criterion name), NOT `when Leaf A` (the body atom) — consistent with the tree node label.
     const crit = `criterion "Eligible2":\n- when ( "Leaf A" ).`;
     const cel = `library "Cases".
 covers "GuardLib".
@@ -493,9 +468,10 @@ case "none":
     expect(single?.display).toMatchObject({ reason: "unsatisfied-when", guard: "single", concept: { name: "Eligible2" } });
   });
 
-  it("marker survives the astConditionExpr DEGRADE path: a PREEMPTED criterion branch still carries the boundary + name label", () => {
+  it("a PREEMPTED criterion branch degrades to a NAMED unevaluated op:criterion boundary (astConditionExpr path)", () => {
     // A `first:` where branch 0 matches → branch 1 (criterion-guarded) is PREEMPTED (unevaluated) → its
-    // `expr` is built by `astConditionExpr` (the no-trace fallback), which must ALSO carry the marker.
+    // `expr` is built by `astConditionExpr` (the no-trace fallback), which renders the criterion ref as
+    // an `op:"criterion"` boundary naming it, with NO `satisfied`/`body` (unreached).
     const crit = ELIGIBLE; // Eligible = Leaf A and Leaf B
     const src = `library "GuardLib".
 ${LEAVES}
@@ -520,33 +496,146 @@ case "a":
 - fact is "fA".
 - result is "D" is "Approve".`;
     const labels = labelsOf(src, cel);
-    expect(labels).toContain("when Eligible"); // name-replaced on the PREEMPTED branch too
+    expect(labels).toContain("when Eligible"); // named on the PREEMPTED branch too
     const scen = renderScenario(graphFrom(src, cel)).scenarios[0]!;
     const b1 = scen.tree.find((n) => n.kind === "when" && n.nodeId === "when[1]") as {
       evaluated: boolean;
       condition: { expr: BranchConditionView };
     };
     expect(b1.evaluated).toBe(false); // preempted → astConditionExpr fallback built the expr
-    expect(b1.condition.expr.sourcedFromCriterion).toEqual({ name: "Eligible" });
+    expect(b1.condition.expr.op).toBe("criterion");
+    expect((b1.condition.expr as { criterion: { name: string } }).criterion).toMatchObject({ name: "Eligible" });
+    expect((b1.condition.expr as { satisfied?: boolean }).satisfied).toBeUndefined(); // unevaluated → no state
+    expect((b1.condition.expr as { body?: BranchConditionView }).body).toBeUndefined();
   });
 
-  it("duplicate atom inline + criterion: `Leaf A and Eligible2` (Eligible2 = Leaf A) → label keeps both, marker on the criterion", () => {
+  it("duplicate atom inline + criterion: `Leaf A and Eligible2` (Eligible2 = Leaf A) → label keeps both; op:criterion operand", () => {
     const crit = `criterion "Eligible2":\n- when ( "Leaf A" ).`;
     const expr = firstWhenExpr(lib(crit, `( "Leaf A" and "Eligible2" )`));
     expect(labelsOf(lib(crit, `( "Leaf A" and "Eligible2" )`))[0]).toBe("when Leaf A and Eligible2");
     expect(expr.op).toBe("and");
-    // operand 0 = the plain inline atom (no marker); operand 1 = the criterion boundary (marker).
+    // operand 0 = the plain inline atom (op:"ref"); operand 1 = the criterion boundary (op:"criterion").
     const ops = (expr as { operands: BranchConditionView[] }).operands;
-    expect(ops[0]!.sourcedFromCriterion).toBeUndefined();
-    expect(ops[1]!.sourcedFromCriterion).toEqual({ name: "Eligible2" });
+    expect(ops[0]!.op).toBe("ref");
+    expect(ops[1]!.op).toBe("criterion");
+    expect((ops[1]! as { criterion: { name: string } }).criterion).toMatchObject({ name: "Eligible2" });
   });
 
-  it("C2 regression: `viaWhen` (run-trace label) stays the EXPANSION, marker-BLIND (eval contract frozen)", () => {
-    // Eligible holds → Approve produced; the produced record's `viaWhen` is the run-trace label, which
-    // MUST remain the inlined expansion (the KE path-assertion contract), NOT the criterion name.
+  it("`viaWhen` (run-trace label) is the criterion NAME (the criterion is referenced, not expanded)", () => {
+    // #236: the run trace no longer inlines the criterion, so `describeBranchCondition` renders it by
+    // name → `viaWhen` = "Eligible" (the flip's whole point — a criterion is a named unit end-to-end).
     const via = runCel(graphFrom(lib(ELIGIBLE, `"Eligible"`), CASES)).runs.find((r) => r.case === "both")!;
     const approve = via.produced.find((p) => p.recommendation === "Approve")!;
-    expect(approve.viaWhen).toBe("Leaf A and Leaf B");
-    expect(approve.viaWhen).not.toBe("Eligible");
+    expect(approve.viaWhen).toBe("Eligible");
+    expect(approve.viaWhen).not.toBe("Leaf A and Leaf B");
+  });
+});
+
+// A op:"criterion" trace collector over a runCel serialized trace (through conditionTrace / operand /
+// body / operands / children, and a top-level trace array).
+function critTraceNodes(node: unknown, out: Array<Record<string, unknown>> = []): Array<Record<string, unknown>> {
+  if (Array.isArray(node)) {
+    for (const c of node) critTraceNodes(c, out);
+    return out;
+  }
+  if (!node || typeof node !== "object") return out;
+  const n = node as Record<string, unknown>;
+  if (n.op === "criterion") out.push(n);
+  for (const k of ["conditionTrace", "operand", "body"]) if (n[k]) critTraceNodes(n[k], out);
+  for (const k of ["operands", "children"]) if (Array.isArray(n[k])) critTraceNodes(n[k], out);
+  return out;
+}
+const critName = (n: Record<string, unknown>): string => (n.criterion as { name: string }).name;
+
+// #236 — the CRE evaluates on UNVALIDATED input (`runCel` runs no validator, run.ts), so the
+// cyclic + undefined-criterion dispositions are production-reachable and must be closed-world false,
+// LOUDLY diagnosed, and (disc 419 both-arms catch) must NOT fabricate a `reference:true` (which
+// would promise a first-occurrence body that never exists).
+describe("#236 — CRE criterion error dispositions (unvalidated input)", () => {
+  it("a CYCLIC criterion → closed-world false + a `cycle detected` diagnostic (no hang, no spurious reference)", () => {
+    const crl = `library "GuardLib".
+${LEAVES}
+${ACTIVITIES}
+criterion "X":
+- when ( "Y" ).
+criterion "Y":
+- when ( "X" ).
+decision "D":
+first:
+- when "X" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+    const cel = `library "Cases".
+covers "GuardLib".
+${PATIENT}
+case "c":
+- subject is "Pat".
+- result is "D" is "Deny".`;
+    const run = runCel(graphFrom(crl, cel)).runs[0]!;
+    // X cycles → closed-world false → otherwise → Deny (matches the expected result) — and it TERMINATED.
+    expect(run.status).toBe("pass");
+    expect(run.diagnostics.some((d) => /cycle detected/.test(d))).toBe(true);
+    const crits = critTraceNodes(run.trace);
+    const xNodes = crits.filter((n) => critName(n) === "X");
+    expect(xNodes.length).toBeGreaterThanOrEqual(1);
+    expect(xNodes.every((n) => n.satisfied === false)).toBe(true); // closed-world false everywhere
+    // disc 419: a cyclic criterion never fabricates a `reference:true` anywhere in the trace.
+    expect(crits.every((n) => n.reference === undefined)).toBe(true);
+  });
+
+  it("an UNDEFINED criterion (defensive `!crit` path) → closed-world false + a `no definition` diagnostic; `not <undefined>` does not silently invert", () => {
+    // The classifier only produces a criterion ref when a declaration exists, so the undefined path is
+    // defensive — inject a criterion ref to an undeclared name into a decision guard to drive it
+    // through the PUBLIC runCel (rather than a test-only eval hook).
+    const graph = graphFrom(
+      `library "GuardLib".
+${LEAVES}
+${ACTIVITIES}
+decision "D":
+first:
+- when not "Leaf A" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`,
+      `library "Cases".
+covers "GuardLib".
+${PATIENT}
+case "c":
+- subject is "Pat".
+- result is "D" is "Approve".`,
+    );
+    // Swap the first branch guard `not "Leaf A"` → `not <undefined criterion "Ghost">`.
+    const dec = graph.coversTarget.ast.statements.find(
+      (s) => s.type === "Decision" && s.name === "D",
+    ) as { body: { statements: Array<{ condition: BranchCondition }> } };
+    dec.body.statements[0]!.condition = { type: "BranchConditionNot", operand: critRef("Ghost"), location: LOC };
+    const run = runCel(graph).runs[0]!;
+    // Ghost undefined → false; `not false` → true → the branch fires → Approve. But it is DIAGNOSED
+    // (never a silent inversion — the whole reason run.ts diagnoses the `!crit` path).
+    expect(run.diagnostics.some((d) => /no definition/.test(d))).toBe(true);
+    const ghost = critTraceNodes(run.trace).filter((n) => critName(n) === "Ghost");
+    expect(ghost.length).toBe(1);
+    expect(ghost[0]!.satisfied).toBe(false); // closed-world false
+    expect(ghost[0]!.body).toBeUndefined(); // no body …
+    expect(ghost[0]!.reference).toBeUndefined(); // … and no fabricated reference
+  });
+
+  it("`tracedCriteria` is PER-CASE: each case's FIRST occurrence of a criterion carries its OWN body", () => {
+    // Two cases both evaluate the SAME twice-referenced criterion. If body/reference state leaked
+    // across cases (per-run instead of per-case), case 2's first occurrence would be a bare reference.
+    const crl = `library "GuardLib".
+${LEAVES}
+${ACTIVITIES}
+criterion "Elig":
+- when ( "Leaf A" and "Leaf B" ).
+decision "D":
+all:
+- when "Elig" then recommend activity "Approve".
+- when "Elig" then recommend activity "Deny".`;
+    const runs = runCel(graphFrom(crl, CASES)).runs;
+    expect(runs).toHaveLength(2);
+    for (const r of runs) {
+      const elig = critTraceNodes(r.trace).filter((n) => critName(n) === "Elig");
+      expect(elig.length).toBe(2); // referenced twice per case
+      expect(elig.filter((n) => n.body !== undefined).length).toBe(1); // exactly one bodied, PER CASE
+      expect(elig.filter((n) => n.reference === true).length).toBe(1);
+    }
   });
 });

@@ -33,16 +33,11 @@ import { toZeroBasedRange } from "../language-services/contracts";
 import { mapImportDiagnostic } from "../language-services/diagnostics";
 
 import { buildGlobalDecisionMap, makeResolveDecision } from "./decisionResolver";
-// #224 ii.1c — the view-model expands the SAME graph guards the CRE evaluated (shared
-// wiring in expandDecisions.ts), so the trace zip walks structurally-identical guards
-// (the both-sides-expanded invariant, disc 303 Q3). Without this the zip degrades to
-// unevaluated leaves (astConditionExpr, viewModel.ts:610) for any criterion-bearing guard.
-import type { CriterionTable } from "../ast/criterionExpansion";
-import {
-  buildCriterionTablesForGraph,
-  expandCoveredDecisions,
-  wrapResolveWithExpansion,
-} from "./expandDecisions";
+// #236 — the view-model no longer EXPANDS criterion guards. run.ts walks the RAW decisions and
+// evaluates each criterion by reference, emitting an `op:"criterion"` trace node; the VM walks the
+// SAME raw AST spine (criterion refs intact) and zips it against that trace (both sides stopped
+// expanding — the lockstep invariant that replaces the old both-sides-EXPANDED one, disc 418 R5).
+// `expandCoveredDecisions`/`wrapResolveWithExpansion` are retired here.
 import {
   childId,
   runCel,
@@ -57,13 +52,16 @@ import {
 // v3 (#224 iii.2): `BranchConditionView` gains a `{ op: "not" }` variant (decision-guard
 //   negation). An exhaustive decoder must handle it. Now reachable on the VALIDATED lane too
 //   (#224 iii.3 — `not` is a first-class, emit-capable guard; the merge gate is gone).
-// #224 ii.3 — NO bump: `BranchConditionView.sourcedFromCriterion?` is OPTIONAL/additive (no op-
-//   exhaustive decoder breaks; an unaware consumer ignores it). BUT two BEHAVIOR changes ride
-//   along on v3, so a consumer that pins label BYTES must re-baseline: (1) the `when` node `label`
-//   name-REPLACES an expanded criterion boundary with the author's name; (2) a marker may sit on
-//   ANY node and CAN NEST — a renderer name-replaces at the OUTERMOST marked node and stops, so a
-//   nested inner boundary is not double-rendered (outermost-wins, mirroring the AST stamp rule).
-export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 3;
+// v4 (#236): `BranchConditionView` gains an `{ op: "criterion" }` variant — a decision guard's
+//   `criterion` ref now projects as a NAMED boundary node (evaluated by REFERENCE to its boolean
+//   body, mirroring the run.ts `op:"criterion"` trace) instead of being inline-EXPANDED into the
+//   guard before the VM runs. An exhaustive `op` decoder MUST handle it. `body` is the criterion's
+//   own guard sub-view, present ONLY on the FIRST occurrence per (lib,name) in a case; later
+//   occurrences set `reference:true` and omit it (linear in distinct criteria — the render-lane
+//   analogue of the emit DAG). v4 also DROPS the retired `sourcedFromCriterion` marker field (it
+//   marked expanded criterion bodies, which no longer exist): a criterion boundary is now the
+//   first-class `op:"criterion"` node; a consumer that pinned the marker reads that node instead.
+export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 4;
 
 type ActionKind = "recommend-activity" | "use-decision";
 export type ConceptView = { name: string; libraryName?: string };
@@ -148,24 +146,24 @@ export interface ViewNode {
  *  and/or nodes carry their combined `satisfied?`. A simple guard is a single
  *  `ref`. Rich "which conjunct failed" rendering is i.4; i.2 makes it
  *  compound-SAFE + TRUTHFUL (no first-operand-masquerading-as-the-whole-guard). */
-// #224 ii.3: `sourcedFromCriterion` (name-only) marks a node that is the boundary-root of an
-// EXPANDED `criterion` — the DISPLAY-SAFE projection of the AST `SourcedFromCriterion` (the raw
-// AST `refLocation` is deliberately NOT carried into the stable ScenarioViewModel; this is a pure
-// visual boundary, not a source-navigation handle). It may sit on ANY node kind (and/or/not/ref —
-// a sole-ref criterion `Eligible=A` stamps the marker on the Ref leaf). NESTING: markers can appear
-// on inner nodes; a renderer name-REPLACES at the OUTERMOST marked node it meets and does not
-// descend, so a nested inner boundary is not double-rendered (outermost-wins, mirroring the AST
-// stamp rule). Additive/optional — schemaVersion stays 3 (no op-exhaustive decoder breaks), but the
-// VM label BYTES change at a marked boundary (a consumed-contract behavior change; see :60).
-export type BranchConditionMarker = { name: string };
 export type BranchConditionView =
-  | { op: "and" | "or"; satisfied?: boolean; operands: BranchConditionView[]; sourcedFromCriterion?: BranchConditionMarker }
+  | { op: "and" | "or"; satisfied?: boolean; operands: BranchConditionView[] }
   // #224 iii.2/iii.3/iii.3b: a decision-guard `not`. Structure-faithful; `satisfied` is the
   // closed-world negation from the CRE trace. Flow + questionnaire panes render the `not` node,
   // and iii.3b pins PRECISE blocking attribution under negation: the frontier yields `negated-ref`
   // items (the established literals that blocked) and the questionnaire flags them (parity-aware).
-  | { op: "not"; satisfied?: boolean; operand: BranchConditionView; sourcedFromCriterion?: BranchConditionMarker }
-  | { op: "ref"; satisfied?: boolean; concept: ConceptView; explanation?: ExplanationView; facts?: string[]; sourcedFromCriterion?: BranchConditionMarker };
+  | { op: "not"; satisfied?: boolean; operand: BranchConditionView }
+  | { op: "ref"; satisfied?: boolean; concept: ConceptView; explanation?: ExplanationView; facts?: string[] }
+  // #236: a decision-guard `criterion` ref — a NAMED boolean boundary evaluated by REFERENCE
+  // (mirrors the run.ts `op:"criterion"` trace). Exactly THREE inhabited states (AT MOST ONE of
+  // `body`/`reference` is ever present): (1) UNEVALUATED (unreached/preempted branch) → no
+  // `satisfied`, no `body`, no `reference`; (2) FIRST evaluated occurrence per (lib,name) in a case
+  // → `satisfied` + `body` (the criterion's own guard sub-view); (3) a LATER occurrence of that same
+  // criterion → `satisfied` + `reference:true`, `body` omitted (linear in distinct criteria — the
+  // render-lane analogue of the emit DAG). An UNDEFINED/CYCLIC criterion is state (1)-with-satisfied:
+  // `satisfied:false` and NEITHER `body` nor `reference` (an opaque/error node) — so `reference:true`
+  // ALWAYS implies a `body` at an earlier occurrence.
+  | { op: "criterion"; satisfied?: boolean; criterion: ConceptView; body?: BranchConditionView; reference?: boolean };
 
 export interface ConditionView {
   /** The guard expression tree (was `concept: ConceptView` before #224). */
@@ -248,20 +246,16 @@ export function renderScenario(
     };
   }
 
-  // #224 ii.1c — expand covered-decision criterion guards from the SAME table source the CRE
-  // used (both-sides-expanded, disc 303 Q3). A decision whose guard breached the GLOBAL
-  // envelope is absent from `decisions` (→ shown unresolved); its case already carries
-  // status:"error" from runCel, so the scenario is an error regardless.
-  const criterionTablesByLib = buildCriterionTablesForGraph(graph);
+  // #236 — RAW decisions (no up-front criterion expansion), name-keyed. Mirrors the map runCel
+  // builds: a criterion guard is walked as a criterion REF and zipped against the run's
+  // `op:"criterion"` trace node, never materialized into the spine. First-write-wins (a duplicate
+  // decision name is a validation error).
   const rawDecisions: Decision[] = [];
   if (graph.coversTarget) {
     for (const s of graph.coversTarget.ast.statements) if (s.type === "Decision") rawDecisions.push(s);
   }
-  const coveredTableName = graph.coversTarget?.name ?? "";
-  const { decisions } = expandCoveredDecisions(
-    rawDecisions,
-    criterionTablesByLib.get(coveredTableName) ?? new Map(),
-  );
+  const decisions = new Map<string, Decision>();
+  for (const d of rawDecisions) if (!decisions.has(d.name)) decisions.set(d.name, d);
   const celCases = new Map<string, CELCase>();
   const facts = new Map<string, CELFact>();
   if (graph.cel) {
@@ -275,7 +269,7 @@ export function renderScenario(
 
   const runs = opts?.case ? result.runs.filter((r) => r.case === opts.case) : result.runs;
   const scenarios = runs.map((run) =>
-    buildScenario(run, celCases.get(run.case), decisions, facts, filePath, coveredLib, graph, criterionTablesByLib),
+    buildScenario(run, celCases.get(run.case), decisions, facts, filePath, coveredLib, graph),
   );
 
   const passCount = scenarios.filter((s) => s.status === "pass").length;
@@ -302,7 +296,6 @@ function buildScenario(
   filePath: string,
   coveredLib: string | undefined,
   graph: ResolvedCelGraph,
-  criterionTablesByLib: Map<string, CriterionTable>,
 ): ScenarioViewModel {
   const dec = run.decision ? decisions.get(run.decision) : undefined;
   const decision: DecisionView | null = run.decision
@@ -327,13 +320,13 @@ function buildScenario(
     coveredFilePath: filePath,
     coveredStatements: [...decisions.values()],
   });
-  // #224 ii.1c — expand sub-decision guards on resolve, exactly as the CRE does (shared
-  // wrapper), so the VM recurses structurally-identical guards and the nodeId sets stay
-  // aligned with the trace. (`decisions` is already expanded, so the covered-statement seed
-  // above is criterion-free; the wrapper covers cross-library `use decision` targets.) The
-  // wrapper's `errors` map is unused here: an overflow sub already made the RUN report
-  // status:"error" for the case, so the VM tolerably renders that sub unresolved.
-  const { resolve } = wrapResolveWithExpansion(makeResolveDecision(globalDecisionMap), criterionTablesByLib);
+  // #236 — sub-decision guards resolve RAW, exactly as the CRE does (run.ts dropped the expansion
+  // wrapper too). A `use decision` sub whose guard references a criterion recurses with the
+  // criterion ref intact, so the VM spine and the run trace BOTH carry `op:"criterion"` nodes and
+  // the nodeId sets stay aligned. Missing this site (resolving raw for the ROOT but expanded for
+  // subs) would diverge spine-vs-trace for every criterion-bearing `use decision` guard and
+  // SILENTLY degrade the zip (disc 418 R5 — Fable's lockstep critical).
+  const resolve = makeResolveDecision(globalDecisionMap);
   const tree = dec
     ? walkBranchesVM(
         dec.body.statements,
@@ -473,11 +466,10 @@ function walkBranchesVM(
     const node: ViewNode = {
       nodeId,
       kind: "when",
-      // #224 ii.3: marker-AWARE — an expanded criterion boundary renders by the author's NAME
-      // (name-replacement) instead of its inlined body, so `when Meets TAR Documentation Criteria`
-      // replaces an 800-char run-on. The RAW-side label ecosystem (crlStructure, provenance) already
-      // shows the name off the source CriterionRef; this re-converges the VM label with them.
-      label: `when ${describeBranchCondition(b.condition, getRefName, { markerAware: true })}`,
+      // #236: a criterion ref is not expanded, so `describeBranchCondition` renders it by its author
+      // NAME (`when Meets TAR Documentation Criteria` instead of an 800-char run-on) — converged with
+      // the RAW-side label ecosystem (crlStructure, provenance) which name it off the source CriterionRef.
+      label: `when ${describeBranchCondition(b.condition, getRefName)}`,
       source: span(b.location, filePath),
       evaluated: !!t,
       condition,
@@ -647,38 +639,39 @@ function buildActionVM(
 // (AST = concept refs/structure, trace = per-node satisfied); `astConditionExpr`
 // is the unevaluated/preempted fallback (no `satisfied`). Trace/AST misalignment
 // degrades to an unevaluated leaf rather than throwing (keeps the VM stable).
-// #224 ii.3: carry the AST criterion-boundary marker onto the built VM node as the DISPLAY-SAFE
-// `{ name }` projection (drops the raw AST `refLocation`). Applied at EVERY builder return so the
-// boundary survives into `BranchConditionView` regardless of which path (trace-zip, single-ref
-// fast path, or the ast-degrade fallback) built it. A `BranchConditionCriterionRef` carries no
-// marker (`?: never`) and never reaches a marked builder in production (expansion runs first).
-function withCriterionMarker<T extends BranchConditionView>(view: T, cond: BranchCondition): T {
-  return cond.sourcedFromCriterion ? { ...view, sourcedFromCriterion: { name: cond.sourcedFromCriterion.name } } : view;
-}
-
 function mapConditionExpr(cond: BranchCondition, t: TraceNode | undefined): BranchConditionView {
   if (t?.conditionTrace) return zipConditionTrace(cond, t.conditionTrace);
   if (t && cond.type === "BranchConditionRef") {
-    return withCriterionMarker(
-      {
-        op: "ref",
-        ...(t.satisfied !== undefined ? { satisfied: t.satisfied } : {}),
-        concept: conceptView(cond.ref),
-        ...(t.composition ? { explanation: mapComposition(t.composition) } : {}),
-        ...(t.facts && t.facts.length > 0 ? { facts: t.facts } : {}),
-      },
-      cond,
-    );
+    return {
+      op: "ref",
+      ...(t.satisfied !== undefined ? { satisfied: t.satisfied } : {}),
+      concept: conceptView(cond.ref),
+      ...(t.composition ? { explanation: mapComposition(t.composition) } : {}),
+      ...(t.facts && t.facts.length > 0 ? { facts: t.facts } : {}),
+    };
   }
   return astConditionExpr(cond);
 }
 
 function zipConditionTrace(cond: BranchCondition, bt: BranchConditionTrace): BranchConditionView {
-  // #224 ii: a criterion ref should have been expanded before the VM runs on the
-  // AST spine. If a seam is half-missed (run expanded, VM not), the trace won't
-  // match — degrade to an unevaluated leaf (the VM's stability contract; a display
-  // oddity, never a throw), showing the criterion's own name.
-  if (cond.type === "BranchConditionCriterionRef") return astConditionExpr(cond);
+  // #236: a criterion ref evaluates by REFERENCE — the run trace carries an `op:"criterion"` node
+  // (body sub-trace on the FIRST occurrence per case, `reference:true` on later ones). Mirror it as
+  // a named boundary node. On any trace-shape mismatch, degrade to the unevaluated named leaf (the
+  // VM's stability contract — a display oddity, never a throw).
+  if (cond.type === "BranchConditionCriterionRef") {
+    // Degrade on ANY shape OR IDENTITY mismatch: the trace leaf must be a criterion AND name the
+    // SAME criterion the AST spine references. Positional drift (spine criterion A paired with trace
+    // criterion B) must not cross-attach B's satisfied/body to A's node — show the unevaluated named
+    // leaf instead (disc 419, gpt-5.6 #1; the analogue of the `bt.op !== "ref"` guard on ordinary refs).
+    if (bt.op !== "criterion" || bt.criterion.name !== getRefName(cond.ref)) return astConditionExpr(cond);
+    return {
+      op: "criterion",
+      ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
+      criterion: { name: bt.criterion.name, libraryName: bt.criterion.libraryName },
+      ...(bt.body ? { body: traceBodyView(bt.body) } : {}),
+      ...(bt.reference ? { reference: true } : {}),
+    };
+  }
   if (cond.type === "BranchConditionRef") {
     // The trace leaf must actually BE a ref — else degrade to unevaluated (never
     // attach another node's `satisfied`/facts to this leaf).
@@ -691,50 +684,41 @@ function zipConditionTrace(cond: BranchCondition, bt: BranchConditionTrace): Bra
     // cross-lib display, and i.4c blocking-match by concept key all correct in one move.
     // Additive/schema-neutral (a leaf already may carry `libraryName`). Compound-only:
     // a single-ref `when` never produces a `conditionTrace`, so it never reaches here.
-    return withCriterionMarker(
-      {
-        op: "ref",
-        ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
-        concept: { name: bt.concept.name, ...(bt.concept.libraryName ? { libraryName: bt.concept.libraryName } : {}) },
-        ...(bt.composition ? { explanation: mapComposition(bt.composition) } : {}),
-        ...(bt.facts && bt.facts.length > 0 ? { facts: bt.facts } : {}),
-      },
-      cond,
-    );
+    return {
+      op: "ref",
+      ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
+      concept: { name: bt.concept.name, ...(bt.concept.libraryName ? { libraryName: bt.concept.libraryName } : {}) },
+      ...(bt.composition ? { explanation: mapComposition(bt.composition) } : {}),
+      ...(bt.facts && bt.facts.length > 0 ? { facts: bt.facts } : {}),
+    };
   }
   if (cond.type === "BranchConditionNot") {
     // #224 iii.2: keep the negation structure; on any trace-shape mismatch degrade the whole
     // subtree to unevaluated (the VM stability contract — a display oddity, never a throw).
     if (bt.op !== "not") return astConditionExpr(cond);
-    return withCriterionMarker(
-      {
-        op: "not",
-        ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
-        operand: zipConditionTrace(cond.operand, bt.operand),
-      },
-      cond,
-    );
+    return {
+      op: "not",
+      ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
+      operand: zipConditionTrace(cond.operand, bt.operand),
+    };
   }
   const op: "and" | "or" = cond.type === "BranchConditionAnd" ? "and" : "or";
   // Any STRUCTURAL mismatch (operator or arity) → degrade the WHOLE subtree to
   // unevaluated (drop `satisfied` entirely); don't half-trust a mismatched trace.
   if (bt.op !== op || bt.operands.length !== cond.operands.length) return astConditionExpr(cond);
-  return withCriterionMarker(
-    {
-      op,
-      ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
-      operands: cond.operands.map((o, k) => zipConditionTrace(o, bt.operands[k]!)),
-    },
-    cond,
-  );
+  return {
+    op,
+    ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
+    operands: cond.operands.map((o, k) => zipConditionTrace(o, bt.operands[k]!)),
+  };
 }
 
-// #224 ii.2 — test-only export. `zipConditionTrace` is the SOFT-lane degrade ROUTING site: on a
-// stray un-expanded criterion ref it returns a NAMED unevaluated leaf (never throws — the VM
-// stability contract) rather than recognising it as an evaluated node. In production it never
-// receives one (renderScenario expands first), so this defensive routing is otherwise untestable.
-// Exported (with its trace arg) solely so the ii.2 tripwire battery can pin that the render lane
-// degrades at the routing site — unlike the STRICT lanes, which throw. NOT for production use.
+// Test-only export of `zipConditionTrace`. #236: renderScenario NO LONGER expands criteria, so in
+// production this DOES receive `BranchConditionCriterionRef` nodes and zips them against the run's
+// `op:"criterion"` trace (first-class, not a degrade). Exported so the render-lane battery can pin
+// both the healthy criterion zip AND the SOFT-lane degrade: on any trace shape/identity mismatch it
+// returns the NAMED unevaluated leaf (never throws — the VM stability contract), unlike the STRICT
+// lanes. NOT for production use.
 export function __zipConditionTraceForTest(
   cond: BranchCondition,
   trace: BranchConditionTrace,
@@ -742,16 +726,52 @@ export function __zipConditionTraceForTest(
   return zipConditionTrace(cond, trace);
 }
 
+// #236 — project a criterion's BODY sub-trace (carried on the `op:"criterion"` trace's FIRST
+// occurrence) directly to a view. Unlike the guard zip there is NO AST spine here: a criterion
+// body is a PURE boolean expression (no when/action nodes → no reachability graying), and the run
+// trace full-evaluates every operand (run.ts:560 — no short-circuit), so the body trace is
+// structurally complete and authoritative. Mirrors `mapComposition` (the `defined as` trace→view
+// projection); recurses through nested criteria (a criterion referencing a sub-criterion — the
+// nested first occurrence carries its own body, a nested reference sets `reference`).
+function traceBodyView(bt: BranchConditionTrace): BranchConditionView {
+  switch (bt.op) {
+    case "ref":
+      return {
+        op: "ref",
+        satisfied: bt.satisfied,
+        concept: { name: bt.concept.name, ...(bt.concept.libraryName ? { libraryName: bt.concept.libraryName } : {}) },
+        ...(bt.composition ? { explanation: mapComposition(bt.composition) } : {}),
+        ...(bt.facts && bt.facts.length > 0 ? { facts: bt.facts } : {}),
+      };
+    case "and":
+    case "or":
+      return { op: bt.op, satisfied: bt.satisfied, operands: bt.operands.map(traceBodyView) };
+    case "not":
+      return { op: "not", satisfied: bt.satisfied, operand: traceBodyView(bt.operand) };
+    case "criterion":
+      return {
+        op: "criterion",
+        satisfied: bt.satisfied,
+        criterion: { name: bt.criterion.name, libraryName: bt.criterion.libraryName },
+        ...(bt.body ? { body: traceBodyView(bt.body) } : {}),
+        ...(bt.reference ? { reference: true } : {}),
+      };
+  }
+}
+
 function astConditionExpr(cond: BranchCondition): BranchConditionView {
-  // A concept ref OR a stray (un-expanded) criterion ref → an unevaluated `ref`
-  // leaf carrying its name. A criterion ref here is a missed-seam display oddity
-  // (the CRE would have thrown); the VM shows the criterion name rather than crash.
-  if (cond.type === "BranchConditionRef" || cond.type === "BranchConditionCriterionRef")
-    return withCriterionMarker({ op: "ref", concept: conceptView(cond.ref) }, cond);
+  // A concept ref → an unevaluated `ref` leaf carrying its name.
+  if (cond.type === "BranchConditionRef")
+    return { op: "ref", concept: conceptView(cond.ref) };
+  // #236 — an UNEVALUATED criterion (unreached/preempted branch, no trace): a named boundary node
+  // with no `satisfied`/`body`. (A reached criterion arrives via the zip with an `op:"criterion"`
+  // trace.) This keeps a criterion rendering as `op:"criterion"` whether reached or not.
+  if (cond.type === "BranchConditionCriterionRef")
+    return { op: "criterion", criterion: conceptView(cond.ref) };
   if (cond.type === "BranchConditionNot") // #224 iii.2: unevaluated negation (no trace)
-    return withCriterionMarker({ op: "not", operand: astConditionExpr(cond.operand) }, cond);
+    return { op: "not", operand: astConditionExpr(cond.operand) };
   const op: "and" | "or" = cond.type === "BranchConditionAnd" ? "and" : "or";
-  return withCriterionMarker({ op, operands: cond.operands.map(astConditionExpr) }, cond);
+  return { op, operands: cond.operands.map(astConditionExpr) };
 }
 
 // ── #224 i.4b: unsatisfied frontier ("which conjunct failed") ──────────────────
@@ -765,14 +785,10 @@ function astConditionExpr(cond: BranchCondition): BranchConditionView {
  *  construction. When cross-lib concept refs in guards land, qualify iff the leaf's
  *  (now frame-resolved) `libraryName` differs from the frame: a 1-line change here. */
 function describeConditionView(v: BranchConditionView): string {
-  // #224 ii.3: a criterion boundary renders by its author NAME (name-replacement) — a LEAF: no
-  // descent, and (see `leaf` below) never parenthesized by a parent op. UNCONDITIONALLY marker-
-  // aware: this only runs in the frontier/label path, and it MUST stay in step with the marker-
-  // aware VM node label (the `when` label above) or the failed-criterion tooltip would contradict it.
-  if (v.sourcedFromCriterion) return v.sourcedFromCriterion.name;
   if (v.op === "ref") return v.concept.name;
-  // A ref OR a name-replaced criterion boundary renders as a leaf → no surrounding parens.
-  const leaf = (o: BranchConditionView): boolean => o.op === "ref" || o.sourcedFromCriterion !== undefined;
+  if (v.op === "criterion") return v.criterion.name; // #236: a criterion renders by its author name (a leaf)
+  // A ref OR a criterion boundary renders as a leaf → no surrounding parens.
+  const leaf = (o: BranchConditionView): boolean => o.op === "ref" || o.op === "criterion";
   // #224 iii.2: `not` binds tightest — bare operand for a leaf, parenthesized for a compound.
   if (v.op === "not")
     return `not ${leaf(v.operand) ? describeConditionView(v.operand) : `(${describeConditionView(v.operand)})`}`;
@@ -815,12 +831,23 @@ function establishedWitness(v: BranchConditionView): Frontier {
   if (v.op === "or") return v.operands.flatMap(establishedWitness);
   // nested `not` — a TRUE `not Y` is witnessed by Y being FALSE (polarity flips back via rawFrontier).
   if (v.op === "not") return v.satisfied === true ? rawFrontier(v.operand) : [];
-  return []; // unreachable — ref/and/or/not exhaust BranchConditionView
+  // #236: an ESTABLISHED criterion witnesses a false `not <criterion>` — the criterion NAME is the
+  // blocker (a single named unit, not its inner atoms), the dual of the false-criterion `ref` below.
+  if (v.op === "criterion") return v.satisfied === true ? [{ kind: "negated-ref", concept: v.criterion }] : [];
+  return []; // unreachable — ref/and/or/not/criterion exhaust BranchConditionView
 
 }
 
 function rawFrontier(v: BranchConditionView): Frontier {
   if (v.op === "ref") return v.satisfied === false ? [{ kind: "ref", concept: v.concept }] : [];
+  // #236: a FALSE criterion boundary blocks as a SINGLE named unit — the criterion name, NOT its
+  // inner atoms (the DAG-collapse philosophy: a criterion is one reusable named unit, and this is
+  // consistent whether the occurrence carries a body or is a later `reference`). Reuses the `ref`
+  // item: the validator guarantees name is concept-XOR-criterion, so `frontierItemKey`'s `r:` bucket
+  // is collision-free on VALIDATED input (the CRE tolerates unvalidated input, where a same-named
+  // concept+criterion could dedup into one item — a degraded-input display oddity, not a fault here).
+  // A satisfied/unevaluated criterion contributes nothing.
+  if (v.op === "criterion") return v.satisfied === false ? [{ kind: "ref", concept: v.criterion }] : [];
   // #224 iii.3b: a false `not` blocked (the operand is TRUE). Pinpoint the ESTABLISHED leaves
   // that witness the operand's truth as `negated-ref` items (the dual of a false `and`/`or`
   // frontier). `not X` → `[X]`; `not (A or B)` → the true disjunct(s); `not (A and B)` → both

@@ -17,8 +17,8 @@
  * need its own type; do NOT read the "no DefStructExpr variant" choice here as settled beyond Slice 1).
  *
  * SAFETY (disc 318 [critical] 2): provenance runs on UNVALIDATED input, and a criterion DAG can double
- * (`C_k := C_{k-1} and C_{k-1}` → 2^k). `buildGuardOutlines` pre-gates each `when` on `expandedSize` exactly
- * as `branchConditionConceptRefsFollowingCriteria` does (branchCondition.ts) — a breaching/cyclic guard records
+ * (`C_k := C_{k-1} and C_{k-1}` → 2^k). `buildGuardOutlines` pre-gates each `when` on `expandedSize`
+ * (criterionExpansion.ts) — a breaching/cyclic guard records
  * a `…` ELISION STUB (not an omission: omitting would re-open the masquerade, disc 318 review [important] 1),
  * so the host never walks an unbounded DAG. The converter additionally caps criterion-recursion HOPS as a render-time
  * backstop. It caps operand WIDTH only for CRITERION-FREE fan-out (`GUARD_OPERAND_CAP`, #246); #247 SURFACES every

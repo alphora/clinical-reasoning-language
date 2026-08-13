@@ -184,74 +184,47 @@ export type BranchCondition =
   | BranchConditionCriterionRef
   | BranchConditionNot;
 
-// #224 ii.1b: provenance stamped on the BOUNDARY-ROOT of a criterion substitution
-// during `expandCriteria` — the criterion whose (expanded) body this subtree is, plus
-// the location of the criterion REF that was replaced. Emit IGNORES it (expansion is
-// byte-identical to hand-inlined); it exists for rendering the author's criterion name
-// at the boundary (A7) and for source correspondence. Present ONLY on expanded output,
-// never on a source AST. For coincident boundaries (a bare-alias chain `X → Y → A`,
-// whose boundary-roots are the same physical node) the OUTERMOST criterion wins (the
-// author wrote `X`), so the stamp overwrites unconditionally.
-export interface SourcedFromCriterion {
-  name: string;
-  refLocation: Location;
-}
-
 export interface BranchConditionRef extends ASTNode {
   type: "BranchConditionRef";
   ref: ReferenceName;
   location: Location;
-  sourcedFromCriterion?: SourcedFromCriterion;
 }
 
-// #224 ii: a guard atom that references a named `criterion` (NOT a concept). The
-// parser produces a `BranchConditionRef` for every bare atom; the criterion-
-// CLASSIFICATION pass rewrites a ref whose name resolves to a criterion into this
-// distinct node. Making it a distinct union member is the TRIPWIRE: the criterion-
-// EXPANSION seam replaces it with the criterion's condition, and every SEMANTIC
-// consumer (eval / DNF / emit) treats an un-expanded `BranchConditionCriterionRef`
-// as a hard error — so a missed expansion is a loud throw, never a silent
-// misresolved concept. SOURCE-side consumers (validation, find-refs, structure)
-// handle it directly. `sourcedFromCriterion` (ii.1b) is stamped on the expanded
-// Ref/And/Or nodes that REPLACE this one — never on `BranchConditionCriterionRef`
-// itself, since an expanded tree contains none.
+// #224 ii: a guard atom that references a named `criterion` (NOT a concept). The parser
+// produces a `BranchConditionRef` for every bare atom; the criterion-CLASSIFICATION pass
+// rewrites a ref whose name resolves to a criterion into this distinct node. #236: a
+// criterion ref is a first-class signed LITERAL — it lowers to a REFERENCED boolean define
+// (CQL/FHIR) and is evaluated by REFERENCE (CRE), never inline-expanded. Making it a
+// distinct union member keeps a CONCEPT-ONLY collector from silently absorbing it as a
+// concept: such collectors (`branchConditionConceptRefsStrict`) throw loudly. SOURCE-side
+// consumers (validation, find-refs, structure, DNF, arm-count, CRE eval) handle it directly.
 export interface BranchConditionCriterionRef extends ASTNode {
   type: "BranchConditionCriterionRef";
   ref: ReferenceName;
   location: Location;
-  // #224 ii.1b: type-enforce "a criterion ref never carries an expansion marker" — an
-  // expanded tree contains no criterion ref. `?: never` also makes `sourcedFromCriterion`
-  // a known (absent) property across the whole `BranchCondition` union, so a consumer can
-  // read it off any member without a type narrow.
-  sourcedFromCriterion?: never;
 }
 
 export interface BranchConditionAnd extends ASTNode {
   type: "BranchConditionAnd";
   operands: BranchCondition[]; // invariant: length >= 2
   location: Location;
-  sourcedFromCriterion?: SourcedFromCriterion; // #224 ii.1b — see SourcedFromCriterion
 }
 
 export interface BranchConditionOr extends ASTNode {
   type: "BranchConditionOr";
   operands: BranchCondition[]; // invariant: length >= 2
   location: Location;
-  sourcedFromCriterion?: SourcedFromCriterion; // #224 ii.1b — see SourcedFromCriterion
 }
 
 // #224 iii.2: a UNARY negation over a single operand. In a SOURCE tree the operand may
 // be any `BranchCondition` (`not "A"`, `not ("A" or "B")`, `not "Criterion"`, `not not
 // "A"`). `toNNF` (branchCondition.ts) pushes negation to the leaves via De Morgan, so a
-// NORMALIZED tree only ever has a `Not` DIRECTLY over a `BranchConditionRef` (a signed
-// literal — see `BranchConditionNegatedLiteral`). `sourcedFromCriterion` may sit on a
-// `Not` when a criterion's expanded body root is a negation (MarkableCondition,
-// criterionExpansion.ts); the NNF marker-transfer rule moves it onto the rewritten root.
+// NORMALIZED tree only ever has a `Not` DIRECTLY over a `BranchConditionRef` or a
+// `BranchConditionCriterionRef` (a signed literal — see `BranchConditionNegatedLiteral`).
 export interface BranchConditionNot extends ASTNode {
   type: "BranchConditionNot";
   operand: BranchCondition; // unary; exactly one. May be undefined-ish only on a malformed editor buffer.
   location: Location;
-  sourcedFromCriterion?: SourcedFromCriterion; // #224 ii.1b — see SourcedFromCriterion
 }
 
 // #224 iii.2: a `Not` STATICALLY guaranteed to wrap a single concept ref — the only
@@ -260,11 +233,31 @@ export interface BranchConditionNot extends ASTNode {
 // without a runtime narrow. `branchConditionDNF` asserts this at the `Not` case.
 export type BranchConditionNegatedLiteral = BranchConditionNot & { operand: BranchConditionRef };
 
-// #224 iii.2: a DNF ARM ATOM — a positive concept ref OR a negated single-ref literal.
-// `branchConditionDNF` returns `BranchConditionLiteral[][]`. A positive-only guard yields
-// only `BranchConditionRef` atoms (byte-identical to the pre-iii.2 `BranchConditionRef[][]`
-// output — zero golden drift); a negated literal carries its own located `Not` node.
-export type BranchConditionLiteral = BranchConditionRef | BranchConditionNegatedLiteral;
+// #236/#274: a `Not` STATICALLY guaranteed to wrap a single CRITERION ref — the negated
+// counterpart of a criterion literal. Post-#236 a criterion ref is a first-class signed
+// DNF literal (referenced as a named define, not inline-expanded), so `not <criterion>` is
+// one arm: `not Coalesce("crit", false)`. NOTE: this shares `.type === "BranchConditionNot"`
+// with `BranchConditionNegatedLiteral`, so the two negated literals discriminate at the
+// OPERAND level (`operand.type`), NOT by a switch on the node's own `.type` — a consumer
+// that must tell concept-negation from criterion-negation narrows on `lit.operand.type`.
+export type BranchConditionNegatedCriterionLiteral = BranchConditionNot & {
+  operand: BranchConditionCriterionRef;
+};
+
+// #224 iii.2 / #236: a DNF ARM ATOM — a positive concept ref, a negated single concept-ref,
+// a positive CRITERION ref, or a negated single criterion-ref. `branchConditionDNF` returns
+// `BranchConditionLiteral[][]`. A positive concept-only guard yields only `BranchConditionRef`
+// atoms (byte-identical to the pre-iii.2 output — zero golden drift). A criterion literal
+// (#236) lowers to ONE `text/cql-identifier` condition referencing the criterion's boolean
+// define — NEVER its inline expansion — so a criterion contributes ONE arm regardless of its
+// body's shape (the tree→DAG collapse that fixes the #236 blow-up). Since criterion and
+// concept literals share no `.type` in the positive case but a negated literal is a
+// `BranchConditionNot` in BOTH cases, so a consumer discriminates on the wrapped operand's `.type`.
+export type BranchConditionLiteral =
+  | BranchConditionRef
+  | BranchConditionNegatedLiteral
+  | BranchConditionCriterionRef
+  | BranchConditionNegatedCriterionLiteral;
 
 // When block. The guard is a `BranchCondition` expression (was a single
 // `conceptName: ReferenceName` before #224). Read guard refs ONLY through the

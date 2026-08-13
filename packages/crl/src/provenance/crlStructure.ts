@@ -14,8 +14,8 @@
 import { decisionSpine, type SpineNodeKind } from "../ast/decisionSpine";
 import type { ActionStatement, BranchCondition, ReferenceName, WhenBlock } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
-import { branchConditionConceptRefsFollowingCriteria, describeBranchCondition } from "../ast/branchCondition";
-import { buildCriterionTable, type CriterionTable } from "../ast/criterionExpansion";
+import { describeBranchCondition } from "../ast/branchCondition";
+import { buildCriterionIndex, guardConceptClosure, type CriterionIndex } from "../ast/criterionIndex";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { LsLocation } from "../language-services/contracts";
 
@@ -127,16 +127,16 @@ function refKeysOf(
   kind: CrlNodeKind,
   node: WhenBlock | ActionStatement | { type: string },
   decisionLib: string,
-  criterionTable: CriterionTable,
+  criterionIndex: CriterionIndex,
 ): string[] {
   if (kind === "when")
-    // #224 ii.1c — a `when` guard atom may reference a criterion; bridge the row to the
-    // criterion BODY's concepts (following criteria into their bodies, source-side, no
-    // materialization) so the cross-pane bridge lands on real concept keys rather than a
-    // dangling criterion-kind key. The `criterion(<name>)` structure-sig token (refSig
-    // above) still identifies the guard node itself; the criterion NAME-level declaration
-    // index (find-refs / rename) stays ii.4.
-    return branchConditionConceptRefsFollowingCriteria((node as WhenBlock).condition, criterionTable).map((atom) =>
+    // #224 ii.1c / #236 — a `when` guard atom may reference a criterion; bridge the row to the
+    // criterion BODY's concepts (following criteria into their bodies via `guardConceptClosure`,
+    // source-side, no materialization, LINEAR/uncapped) so the cross-pane bridge lands on real
+    // concept keys rather than a dangling criterion-kind key. The `criterion(<name>)` structure-sig
+    // token (refSig above) still identifies the guard node itself; the criterion NAME-level
+    // declaration index (find-refs / rename) stays ii.4.
+    return guardConceptClosure((node as WhenBlock).condition, criterionIndex).map((atom) =>
       refKey(atom.ref, "concept", decisionLib),
     );
   if (kind === "otherwise") return [];
@@ -175,9 +175,9 @@ export function buildCrlStructure(
 
   const out: CrlDecisionStructure[] = [];
   for (const [lib, info] of libs) {
-    // #224 ii.1c — the lib's criterion table, so a `when` guard's criterion refs bridge to
-    // their body concepts (refKeysOf). Built once per library.
-    const criterionTable = buildCriterionTable(info.entry.ast.statements);
+    // #224 ii.1c / #236 — the lib's criterion INDEX, so a `when` guard's criterion refs bridge to
+    // their body concepts (refKeysOf, via `guardConceptClosure`). Built once per library.
+    const criterionIndex = buildCriterionIndex(info.entry.ast.statements);
     // Iterate the AST statements directly (SOURCE order, deterministic) + filter to decisions — NOT the by-name decls
     // map (which would order by first-name-appearance and could be perturbed by a cross-kind same-name declaration).
     for (const s of info.entry.ast.statements) {
@@ -200,7 +200,7 @@ export function buildCrlStructure(
           kind: sn.kind,
           label: labelOf(sn.kind, sn.node),
           ...(sn.kind === "action" ? { actionKind: actionKindOf(sn.node as ActionStatement) } : {}),
-          refKeys: refKeysOf(sn.kind, sn.node, lib, criterionTable),
+          refKeys: refKeysOf(sn.kind, sn.node, lib, criterionIndex),
           ...(sn.kind === "when"
             ? { sigLabel: conditionSigLabel((sn.node as WhenBlock).condition, lib) }
             : {}),

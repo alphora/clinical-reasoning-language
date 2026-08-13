@@ -157,21 +157,38 @@ ${ACT}`);
   });
 });
 
-describe("criterion — the tripwire: an un-expanded criterion ref throws at every SEMANTIC seam", () => {
+describe("criterion — #236: a criterion ref is a DNF/arm-count LITERAL; concept-only seams still throw", () => {
   const critRef: BranchCondition = {
     type: "BranchConditionCriterionRef",
     ref: "Eligible",
     location: { start: { line: 1, column: 0 }, end: { line: 1, column: 1 } },
   };
+  const notCrit: BranchCondition = {
+    type: "BranchConditionNot",
+    operand: critRef,
+    location: { start: { line: 1, column: 0 }, end: { line: 1, column: 1 } },
+  };
 
-  it("branchConditionDNF throws (emit lowering)", () => {
-    expect(() => branchConditionDNF(critRef)).toThrow(/un-expanded criterion/i);
+  it("branchConditionDNF: a positive criterion ref is ONE arm, ONE positive criterion literal (#236)", () => {
+    const dnf = branchConditionDNF(critRef);
+    expect(dnf).toHaveLength(1);
+    expect(dnf[0]).toHaveLength(1);
+    expect(dnf[0][0].type).toBe("BranchConditionCriterionRef");
   });
-  it("branchConditionArmCount throws (emit cap pre-check)", () => {
-    expect(() => branchConditionArmCount(critRef)).toThrow(/un-expanded criterion/i);
+  it("branchConditionDNF: `not <criterion>` is ONE arm, ONE negated-criterion literal (Not over a crit ref)", () => {
+    const dnf = branchConditionDNF(notCrit);
+    expect(dnf).toHaveLength(1);
+    expect(dnf[0]).toHaveLength(1);
+    const lit = dnf[0][0];
+    expect(lit.type).toBe("BranchConditionNot");
+    expect((lit as { operand: BranchCondition }).operand.type).toBe("BranchConditionCriterionRef");
   });
-  it("branchConditionConceptRefsStrict throws (emit closure / CQL interface / case-features)", () => {
-    expect(() => branchConditionConceptRefsStrict(critRef, "test")).toThrow(/un-expanded criterion/i);
+  it("branchConditionArmCount: a criterion is ONE arm — the exponential dies here (#236)", () => {
+    expect(branchConditionArmCount(critRef)).toBe(1);
+    expect(branchConditionArmCount(notCrit)).toBe(1);
+  });
+  it("branchConditionConceptRefsStrict STILL throws — a criterion at a CONCEPT-ONLY seam is a bug", () => {
+    expect(() => branchConditionConceptRefsStrict(critRef, "test")).toThrow(/concept-only seam/i);
   });
   it("the tolerant branchConditionRefs SKIPS a criterion ref (source-side, no throw)", () => {
     expect(branchConditionRefs(critRef)).toEqual([]);

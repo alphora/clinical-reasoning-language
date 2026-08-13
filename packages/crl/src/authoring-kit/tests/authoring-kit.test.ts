@@ -205,16 +205,19 @@ describe("authoring-kit — reference artifacts", () => {
     expect(run.runs.length).toBe(5); // drug+VL→approve; PT+chart→approve; no-viral→deny (crit-3); no-therapy→deny (crit-2); no-dx→deny (crit-1)
     expect(run.runs.every((r) => r.status === "pass")).toBe(true);
     // "Failed Conservative Therapy" is a `criterion` (failed drug OR failed physical therapy — DISTINCT criteria that
-    // can co-occur, #234), NOT a `defined as` composite. Referenced in a `when` it inline-expands to a decision-layer
-    // OR-guard: the nested node carries `conditionTrace` (op:"or") and OMITS `concept`/`composition`. The
-    // physical-therapy case satisfies it via the PT distinct-criterion operand alone (either distinct criterion does).
+    // can co-occur, #234), NOT a `defined as` composite. #236: referenced in a `when` it rides the trace as a NAMED
+    // `op:"criterion"` node (evaluated by reference, NOT inline-expanded) that OMITS `concept`/`composition` and
+    // carries its boolean body sub-trace (the distinct-criterion `or`) on this first occurrence. The physical-therapy
+    // case satisfies it via the PT distinct-criterion operand alone (either distinct criterion does).
+    type OpNode = { op: string; satisfied: boolean; concept?: { name: string } };
     type TNode = {
       concept?: string;
       composition?: unknown;
       conditionTrace?: {
         op: string;
         satisfied: boolean;
-        operands: { op: string; satisfied: boolean; concept?: { name: string } }[];
+        criterion?: { name: string };
+        body?: { op: string; satisfied: boolean; operands: OpNode[] };
       };
       children?: TNode[];
     };
@@ -227,13 +230,16 @@ describe("authoring-kit — reference artifacts", () => {
       return undefined;
     };
     const canary = run.runs.find((r) => r.case.includes("physical therapy"))!;
-    const guard = find(canary.trace as TNode[], (n) => n.conditionTrace?.op === "or")!;
-    expect(guard).toBeDefined(); // the criterion inline-expanded into an OR-guard node (not a composite)
+    const guard = find(canary.trace as TNode[], (n) => n.conditionTrace?.op === "criterion")!;
+    expect(guard).toBeDefined(); // #236: the criterion rides the trace as a NAMED op:"criterion" node (not inline-expanded)
     expect(guard.concept).toBeUndefined(); // a compound guard, not a single-concept `when`
     expect(guard.composition).toBeUndefined(); // NOT a `defined as` composite (the retired pre-#224 pattern)
+    expect(guard.conditionTrace!.criterion!.name).toBe("Failed Conservative Therapy"); // the author's name, preserved
     expect(guard.conditionTrace!.satisfied).toBe(true);
-    const operand = (nm: string) =>
-      guard.conditionTrace!.operands.find((o) => o.concept?.name === nm)!;
+    // The criterion's boolean BODY (its first-occurrence sub-trace) is the distinct-criterion `or`.
+    const body = guard.conditionTrace!.body!;
+    expect(body.op).toBe("or");
+    const operand = (nm: string) => body.operands.find((o) => o.concept?.name === nm)!;
     expect(operand("Failed Drug Therapy").satisfied).toBe(false); // drug absent in this case
     expect(operand("Failed Physical Therapy").satisfied).toBe(true); // PT alone satisfies the distinct-criterion `or`
     // The CONTRAST node (#234 follow-up): "Viral Suppression Documented" is a GENUINE rung-1 `defined as` (one

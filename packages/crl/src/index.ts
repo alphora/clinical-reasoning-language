@@ -87,22 +87,16 @@ export type {
   BranchConditionLiteral,
   BranchConditionNegatedLiteral,
   Criterion,
-  SourcedFromCriterion,
 } from "./ast/types";
 export { classifyCriterionRefs } from "./ast/criterionClassify";
-// #224 ii.1b — the criterion EXPANSION engine (pure transform + the atoms/depth
-// envelope). Seam-wiring is ii.1c; this publishes the primitives those seams call.
+// The criterion table + the non-materializing expansion-size envelope (#236 retired inline
+// expansion; a criterion lowers to a referenced boolean define — see `criterionIndex.ts`).
 export {
-  expandCriteria,
   expandedSize,
   containsCriterionRef,
   buildCriterionTable,
-  CriterionExpansionError,
   CRITERION_EXPANSION_ATOM_CAP,
   CRITERION_MAX_DEPTH,
-  // #224 ii.1c — decision-level wiring lifted over the guard-level engine.
-  expandDecisionCriteria,
-  expandGuardOrRecord,
 } from "./ast/criterionExpansion";
 export type { CriterionTable, ExpandedSize, ExpansionReason } from "./ast/criterionExpansion";
 export {

@@ -78,6 +78,7 @@ import type {
   BlockQualifier,
   BranchBlock,
   BranchConditionRef,
+  BranchConditionCriterionRef,
   BranchConditionLiteral,
   Concept,
   Decision,
@@ -93,7 +94,8 @@ import {
   branchConditionDNF,
   branchConditionArmCount,
 } from "../ast/branchCondition";
-import { expandGuardOrRecord, type CriterionTable } from "../ast/criterionExpansion";
+import { type CriterionTable } from "../ast/criterionExpansion";
+import { buildCriterionIndex, type CriterionIndex } from "../ast/criterionIndex";
 import { cqlQuotedIdentifier } from "../cql-emitter/cqlStrings";
 import type { CRLError } from "../types/errors";
 import { libraryCanonicalUrl, libraryId } from "./library";
@@ -383,6 +385,9 @@ export function emitDecisionPlanDefinition(
     errors,
     unmatched,
     criterionTable,
+    // Built from the same criteria the table holds (a Criterion IS a Statement) — no extra
+    // threading. Memoized/linear, so a doubling-DAG criterion table is bounded (#236 step A).
+    criterionIndex: buildCriterionIndex([...criterionTable.values()]),
     guardQualifierLibraryName:
       guardQualifierLibraryName ?? libraryId(metadata, libraryReferenceSuffix),
   };
@@ -518,6 +523,12 @@ interface EmitCtx {
   // all see the fully-inlined guard (sole-ref collapse + byte-identity, disc 303 C3). Empty
   // for callers with no criteria (cms / unit tests) → every guard fast-paths to identity.
   criterionTable: CriterionTable;
+  // #236 — the criterion INDEX (built from `criterionTable`). A criterion GUARD ref lowers to a
+  // NAMED reference (`defineId` = bare name) to the criterion's emitted boolean define, NOT its
+  // inline expansion; its `recursiveAtomClosure` supplies the use-site DTR `input[]`. Resolution
+  // routes a criterion literal HERE (an `unresolved-criterion` on a name absent from the index),
+  // never through `conceptResolver` (which would mis-report `unresolved-concept`).
+  criterionIndex: CriterionIndex;
   // #224 iii.1 — the CQL library NAME the PlanDefinition's `library[]` targets (the
   // Interface re-export, or the name-keeping Root). A NEGATED `unless` guard's inline
   // `text/cql-expression` must LIBRARY-QUALIFY its concept (`not "<Lib>"."<C>"`) so
@@ -673,31 +684,14 @@ function emitWhenBlock(
   ctx: EmitCtx,
   enclosingQualifier: BlockQualifier | undefined,
 ): EmitActionResult {
-  // #224 ii.1c — expand criterion refs at the WhenBlock ENTRY, BEFORE soleRef / arm-cap /
-  // DNF / guardLabel, so a criterion aliasing a single concept re-enters the byte-identical
-  // single-ref path (sole-ref collapse, disc 303 C3) and every downstream reader sees the
-  // fully-inlined guard. The envelope is GLOBAL; a breach pushes a `criterion-expansion-
-  // overflow` diagnostic (RESOURCE bound, "materialized tree" — disc 302) and suppresses the
-  // guard (parity with the arm-cap overflow). A criterion-free guard fast-paths to identity
-  // → byte-unchanged goldens. The message renders the AUTHOR's criterion name (raw guard).
-  const guard = expandGuardOrRecord(wbRaw.condition, ctx.criterionTable);
-  if (!guard.ok) {
-    ctx.errors.push({
-      type: "Validation",
-      kind: "criterion-expansion-overflow",
-      message: `Guard \`${describeBranchCondition(
-        wbRaw.condition,
-        getRefName,
-      )}\` references a criterion whose materialized tree exceeds the criterion-expansion envelope (${guard.status}${
-        guard.detail?.name ? `: "${guard.detail.name}"` : ""
-      }). This is an emit-stage RESOURCE boundary — the fully-inlined guard is too large to materialize — NOT a FHIR limit and NOT an authoring-complexity limit. A \`criterion\` inline-expands, so it does not reduce the emitted arm count; factor the determination (e.g. a \`use decision\` sub-decision) or consult the authoring kit.`,
-      line: wbRaw.location?.start.line,
-      column: wbRaw.location?.start.column,
-    });
-    return { kind: "suppressed", reason: "criterion-overflow" };
-  }
-  // Reuse the node when nothing expanded (identity fast path) to avoid churn.
-  const wb: WhenBlock = guard.cond === wbRaw.condition ? wbRaw : { ...wbRaw, condition: guard.cond };
+  // #236 — NO criterion expansion. A criterion ref is a first-class guard LITERAL: it lowers to
+  // a NAMED reference to the criterion's boolean define, never its inline expansion. So the guard
+  // is used RAW — `soleRef` / arm-cap / DNF see criterion refs as atoms, and a criterion carries
+  // ONE arm (not its expanded body — where the #236 exponential died, `branchConditionArmCount`).
+  // A sole CONCEPT ref still takes the byte-identical single-ref path below; a sole CRITERION ref
+  // returns null from `soleRef` (concept-ref-only) → the compound path → one condition. The old
+  // criterion-expansion-overflow RESOURCE gate is RETIRED (the guard no longer materializes, §G).
+  const wb = wbRaw;
 
   const sole = soleRef(wb.condition);
   if (!sole) return emitCompoundWhenBlock(wb, ctx, enclosingQualifier);
@@ -786,44 +780,79 @@ function emitCompoundWhenBlock(
 
   const arms = branchConditionDNF(wb.condition);
 
-  // #224 iii.3 — each DNF arm is a conjunction of SIGNED literals (post-`toNNF`, a literal is a
-  // bare positive ref OR a `not` over a SINGLE ref). `litRef` projects the LOCATED ref node +
-  // polarity: the ref drives resolution/normalization/inputs (polarity-agnostic — `not X`
-  // resolves the SAME concept as `X`), the polarity drives the emitted condition form
-  // (`guardApplicabilityCondition`). The negated operand is type-pinned to a ref by
-  // `BranchConditionNegatedLiteral`, so no cast is needed.
-  const litRef = (a: BranchConditionLiteral): { atom: BranchConditionRef; polarity: "positive" | "negated" } =>
-    a.type === "BranchConditionNot"
-      ? { atom: a.operand, polarity: "negated" }
-      : { atom: a, polarity: "positive" };
+  // #224 iii.3 / #236 — each DNF arm is a conjunction of SIGNED literals: a positive/negated
+  // CONCEPT ref, or a positive/negated CRITERION ref. `litRef` projects the located atom + its
+  // KIND + polarity. KIND drives RESOLUTION (concept → `conceptResolver`; criterion → the index,
+  // `defineId` = bare name) and INPUTS (a criterion contributes its recursive atom closure, not
+  // itself); polarity drives the emitted condition form (`guardApplicabilityCondition`). The two
+  // negated literals share `.type === "BranchConditionNot"`, so we discriminate on `operand.type`.
+  type LitInfo =
+    | { kind: "concept"; atom: BranchConditionRef; polarity: "positive" | "negated" }
+    | { kind: "criterion"; atom: BranchConditionCriterionRef; polarity: "positive" | "negated" };
+  const litRef = (a: BranchConditionLiteral): LitInfo => {
+    if (a.type === "BranchConditionNot") {
+      return a.operand.type === "BranchConditionCriterionRef"
+        ? { kind: "criterion", atom: a.operand, polarity: "negated" }
+        : { kind: "concept", atom: a.operand, polarity: "negated" };
+    }
+    return a.type === "BranchConditionCriterionRef"
+      ? { kind: "criterion", atom: a, polarity: "positive" }
+      : { kind: "concept", atom: a, polarity: "positive" };
+  };
+  // Kind-tagged keys: a criterion and a concept of the same name cannot coexist on VALID input
+  // (the nameUniquenessValidator concept-XOR-criterion bucket), but runCel/provenance tolerate
+  // unvalidated input, so tag anyway — a `k:`/`c:` prefix keeps them from ever aliasing.
+  const conceptAtomKey = (r: ReferenceName): string => `c:${atomKey(r)}`;
+  const criterionAtomKey = (name: string): string => `k:${name}`;
 
-  // Resolve every DISTINCT atom once (first-seen order across arms). Collect ALL
-  // unresolved atoms — each with its OWN location — so the author sees every bad
-  // ref, then suppress the whole guard ONCE (mirrors the single-ref suppression). A
-  // negated atom resolves + suppresses exactly like a positive one (same concept, same key).
+  // Resolve every DISTINCT atom once (first-seen order across arms). Collect ALL unresolved
+  // atoms — each with its OWN location — so the author sees every bad ref, then suppress the
+  // whole guard ONCE. A negated atom resolves + suppresses exactly like a positive one.
   const resolvedByKey = new Map<string, string>();
   const distinctSeen = new Set<string>();
-  const unresolved: BranchConditionRef[] = [];
+  const unresolvedConcepts: BranchConditionRef[] = [];
+  const unresolvedCriteria: BranchConditionCriterionRef[] = [];
   for (const arm of arms) {
     for (const lit of arm) {
-      const { atom } = litRef(lit);
-      const normalized = normalizeLocalRef(atom.ref, ctx.libraryName);
-      const key = atomKey(normalized);
-      if (distinctSeen.has(key)) continue;
-      distinctSeen.add(key);
-      const cqlId = ctx.conceptResolver(normalized);
-      if (cqlId === null) {
-        unresolved.push(atom);
-        continue;
+      const info = litRef(lit);
+      if (info.kind === "concept") {
+        const normalized = normalizeLocalRef(info.atom.ref, ctx.libraryName);
+        const key = conceptAtomKey(normalized);
+        if (distinctSeen.has(key)) continue;
+        distinctSeen.add(key);
+        const cqlId = ctx.conceptResolver(normalized);
+        if (cqlId === null) {
+          unresolvedConcepts.push(info.atom);
+          continue;
+        }
+        resolvedByKey.set(key, cqlId);
+      } else {
+        const name = getRefName(info.atom.ref);
+        const key = criterionAtomKey(name);
+        if (distinctSeen.has(key)) continue;
+        distinctSeen.add(key);
+        const entry = ctx.criterionIndex.get(name);
+        if (!entry) {
+          unresolvedCriteria.push(info.atom);
+          continue;
+        }
+        resolvedByKey.set(key, entry.defineId);
       }
-      resolvedByKey.set(key, cqlId);
     }
   }
-  if (unresolved.length > 0) {
-    for (const atom of unresolved) {
+  if (unresolvedConcepts.length > 0 || unresolvedCriteria.length > 0) {
+    for (const atom of unresolvedConcepts) {
       ctx.unmatched.push({
         kind: "unresolved-concept",
         text: refDisplay(atom.ref), // raw ref — parity with the single-ref path
+        line: atom.location?.start.line,
+        column: atom.location?.start.column,
+      });
+    }
+    for (const atom of unresolvedCriteria) {
+      ctx.unmatched.push({
+        kind: "unresolved-criterion",
+        text: refDisplay(atom.ref),
         line: atom.location?.start.line,
         column: atom.location?.start.column,
       });
@@ -848,26 +877,37 @@ function emitCompoundWhenBlock(
   }
 
   const armActions: Array<Record<string, unknown>> = arms.map((arm) => {
-    // #224 iii.3 — carry each literal's polarity alongside its normalized ref so the emitted
-    // condition + label reflect it. A negated literal → the null-safe `not Coalesce(...)` carrier
-    // (guardApplicabilityCondition); a positive one → the bare `text/cql-identifier`.
-    const armLits = arm.map((lit) => {
-      const { atom, polarity } = litRef(lit);
-      return { normalized: normalizeLocalRef(atom.ref, ctx.libraryName), polarity };
-    });
+    // #224 iii.3 / #236 — carry each literal's KIND + polarity. Concept → `conceptResolver` id;
+    // criterion → its `defineId` (both bare CQL identifiers → identical condition form). A negated
+    // literal → the null-safe `not Coalesce(...)` carrier; a positive one → `text/cql-identifier`.
+    const armLits = arm.map(litRef);
+    const labelName = (info: LitInfo): string =>
+      info.kind === "concept"
+        ? getRefName(normalizeLocalRef(info.atom.ref, ctx.libraryName))
+        : getRefName(info.atom.ref);
     const armLabel = armLits
-      .map(({ normalized, polarity }) =>
-        polarity === "negated" ? `not ${getRefName(normalized)}` : getRefName(normalized),
-      )
+      .map((info) => (info.polarity === "negated" ? `not ${labelName(info)}` : labelName(info)))
       .join(" and ");
-    const conditions = armLits.map(({ normalized, polarity }) =>
-      guardApplicabilityCondition(polarity, resolvedByKey.get(atomKey(normalized))!, ctx.guardQualifierLibraryName),
-    );
-    // Arm-aware `input`: union over the arm's NON-qualified atoms, BOTH polarities — a negated
-    // atom's concept is still a case feature (parity with iii.1 `unless`, which inputs its guard).
-    const armInputNames = armLits
-      .filter(({ normalized }) => !isQualifiedRef(normalized))
-      .map(({ normalized }) => getRefName(normalized));
+    const conditions = armLits.map((info) => {
+      const key =
+        info.kind === "concept"
+          ? conceptAtomKey(normalizeLocalRef(info.atom.ref, ctx.libraryName))
+          : criterionAtomKey(getRefName(info.atom.ref));
+      return guardApplicabilityCondition(info.polarity, resolvedByKey.get(key)!, ctx.guardQualifierLibraryName);
+    });
+    // Arm-aware `input`: a CONCEPT atom contributes itself (non-qualified only); a CRITERION atom
+    // contributes its RECURSIVE ATOM CLOSURE (the concepts under it, #236 step E) — DTR surfaces
+    // the criterion's case features at the use-site. BOTH polarities. Deduped downstream by canonical.
+    const armInputNames: string[] = [];
+    for (const info of armLits) {
+      if (info.kind === "concept") {
+        const normalized = normalizeLocalRef(info.atom.ref, ctx.libraryName);
+        if (!isQualifiedRef(normalized)) armInputNames.push(getRefName(normalized));
+      } else {
+        const entry = ctx.criterionIndex.get(getRefName(info.atom.ref));
+        if (entry) for (const ref of entry.recursiveAtomClosure) armInputNames.push(getRefName(ref.ref));
+      }
+    }
     const inputs = buildActionInputs(armInputNames, ctx);
     return {
       title: armLabel,
@@ -886,13 +926,10 @@ function emitCompoundWhenBlock(
   // Placement. Single arm (pure-`and`) → the one action, no wrapper. >=2 arms:
   // splice under an enclosing `first:`, else one `"any"` grouping wrapper.
   if (armActions.length >= 2 && enclosingQualifier !== "first") {
-    // #224 ii.3 — MUST stay marker-BLIND (no `{ markerAware: true }`): this label is the EMITTED
-    // arm-wrapper `title`/`description` (serialized FHIR bytes), so the ii.2 serialized-bytes emit
-    // parity stays absolute. Name-replacement is a DISPLAY-only concern confined to the VM label.
-    // The other emit-side `describeBranchCondition` sites here likewise stay blind: the action titles
-    // (the `when …` labels above) are emitted bytes; the overflow-diagnostic messages are author-facing
-    // text where the expansion is fine (design v2 flagged them "marker-aware OK" — blind is the
-    // conservative choice, and keeps this display-only slice's diff out of the emitter entirely).
+    // #236: this label is the EMITTED arm-wrapper `title`/`description` (serialized FHIR bytes).
+    // `describeBranchCondition` renders a criterion ref by its author name (it is not expanded), so
+    // a criterion-guarded wrapper is titled by the criterion — consistent with the CQL-identifier
+    // condition it carries and with the VM display label.
     const guardLabel = describeBranchCondition(wb.condition, getRefName);
     const wrapper: Record<string, unknown> = {
       title: guardLabel,

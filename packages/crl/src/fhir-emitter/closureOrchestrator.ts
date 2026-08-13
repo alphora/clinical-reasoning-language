@@ -37,8 +37,8 @@
 
 import type { Activity, BranchBlock, Concept, Decision, ReferenceName, Terminology } from "../ast/types";
 import { getRefLibrary, getRefName, isQualifiedRef, normalizeLocalRef } from "../ast/types";
-import { branchConditionConceptRefsExpanded } from "../ast/branchCondition";
 import { buildCriterionTable } from "../ast/criterionExpansion";
+import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex";
 import { resolveDispositionConfig } from "../dispositions";
 import { computeFhirEmitClosure } from "../imports/computeEmitClosure";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
@@ -436,18 +436,17 @@ export function collectCaseFeatures(
   // input). NOTE (i.1): this is the full atom set for the decision; the
   // ARM-SPECIFIC input union per emitted DNF arm (G15) is decided at the emit
   // site (decision.ts) in i.3, not here.
-  // #224 ii.1c — a guard atom may reference a `criterion`; case-features must be collected
-  // from the EXPANDED guard (its body concepts are inputs too). Criteria survive lowering
-  // unchanged, so a table from the lowered `ast` matches. A guard that breaches the GLOBAL
-  // envelope is SKIPPED (its decision is suppressed by the decision emit — decision.ts — so
-  // it contributes no action.input/SD; nothing dangles).
-  const criterionTable = buildCriterionTable(lowered.ast.statements);
+  // #236 — a guard atom may reference a `criterion`; case-features must include the concepts a
+  // criterion body references (they become action.input + case-feature SDs, and step-E puts the
+  // criterion's atom closure into the emitted action.input[] — so these SDs MUST exist or the
+  // input dangles). Collect via the criterion INDEX (memoized, LINEAR) — NOT the materializing
+  // walk, which would atom-cap a doubling-DAG criterion and silently drop its atoms (post-flip
+  // the decision is NOT suppressed, so that omission would ship). Criteria survive lowering.
+  const criterionIndex = buildCriterionIndex(lowered.ast.statements);
   const conditionRefs: ReferenceName[] = [];
   const visitBranch = (branch: BranchBlock): void => {
     if (branch.type === "WhenBlock")
-      for (const atom of branchConditionConceptRefsExpanded(branch.condition, criterionTable, "case-feature collection")
-        .refs)
-        conditionRefs.push(atom.ref);
+      for (const atom of guardConceptClosure(branch.condition, criterionIndex)) conditionRefs.push(atom.ref);
     const body = branch.body;
     if (body.type === "ActionStatement") return;
     for (const stmt of body.statements) {

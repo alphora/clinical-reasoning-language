@@ -263,13 +263,12 @@ function firstBlockerOnPath(
  *  UNSATISFIED case takes the `guard:"compound"` display path instead (see `unsatisfiedWhenNode`). */
 function fcConcept(n: FcViewNode): { name: string; libraryName?: string } {
   const e = n.condition?.expr;
-  // #224 ii.3: a SINGLE-ATOM criterion (`Eligible = Leaf A`, sole-ref collapse) carries the
-  // boundary marker on the ref leaf → show the criterion NAME so the "single"/preemptor header
-  // matches the tree node label (`when Eligible`), not the lone atom `Leaf A`. atoms-stay governs
-  // the COMPOUND frontier ("which conjunct failed"), NOT relabeling a whole named criterion as its
-  // one sub-atom. A COMPOUND criterion preemptor already shows the name via the `n.label` fallback.
-  if (e && e.op === "ref" && e.sourcedFromCriterion) return { name: e.sourcedFromCriterion.name };
   if (e && e.op === "ref" && e.concept) return e.concept;
+  // #236: a sole `when <criterion>` is a NAMED boundary node (op:"criterion") — its display concept
+  // is the criterion's own name, so the "single" header reads `when Eligible` (matching the tree
+  // node label), never the redundant `when Eligible — unmet: Eligible` the compound/frontier path
+  // would produce (disc 419: both arms). The criterion is concept-XOR-criterion by name-uniqueness.
+  if (e && e.op === "criterion") return e.criterion;
   return { name: n.label.replace(/^when\s+/, "") };
 }
 
@@ -278,8 +277,13 @@ function fcConcept(n: FcViewNode): { name: string; libraryName?: string } {
  *  failed), computed HERE at build time so the cockpit renders from `display` alone (FIX-3). */
 function unsatisfiedWhenNode(n: FcViewNode): FailedCriterionNode {
   const expr = n.condition?.expr;
+  // #236: a sole `op:"criterion"` guard is a NAMED single blocker (like a `ref`), NOT a compound —
+  // routing it to the "single" path shows `when Eligible` instead of the self-referential
+  // `when Eligible — unmet: Eligible` the frontier path yields (disc 419: both arms). A genuinely
+  // COMPOUND guard containing criteria still takes the compound path (its frontier names them).
+  const isNamedLeaf = expr && (expr.op === "ref" || expr.op === "criterion");
   const display: FailedCriterionDisplay =
-    expr && expr.op !== "ref"
+    expr && !isNamedLeaf
       ? {
           reason: "unsatisfied-when",
           guard: "compound",

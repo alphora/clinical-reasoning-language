@@ -69,18 +69,14 @@ import type {
 import { getRefLibrary, getRefName } from "../ast/types";
 import { soleRef, describeBranchCondition } from "../ast/branchCondition";
 import type { BranchCondition } from "../ast/types";
-// #224 ii.1c — expand a decision's criterion-guard refs before evaluation. The envelope is
-// GLOBAL (materialization bounds eval too, and `runCel` runs NO semantic validation — a
-// cyclic/undefined table can reach here directly), so a breach degrades GRACEFULLY to
-// status:"error" rather than throwing out of the run. The wiring is SHARED with the view-
-// model (expandDecisions.ts) so run + render expand from the SAME table source (the
-// both-sides-expanded trace-zip invariant, disc 303 Q3).
-import type { CriterionExpansionError } from "../ast/criterionExpansion";
-import {
-  buildCriterionTablesForGraph,
-  expandCoveredDecisions,
-  wrapResolveWithExpansion,
-} from "./expandDecisions";
+// #236 — the CRE evaluates a decision's criterion-guard refs BY REFERENCE (memoized per case),
+// never by up-front expansion. `runCel` runs NO semantic validation, so a cyclic/undefined
+// criterion table can reach the evaluator directly; it degrades to closed-world false + a
+// diagnostic (never a throw). The per-library criterion TABLES are the only shared wiring with the
+// view-model (`buildCriterionTablesForGraph`), so run + render resolve criteria from the SAME
+// source and their `op:"criterion"` traces/spines stay zip-consistent.
+import type { CriterionTable } from "../ast/criterionExpansion";
+import { buildCriterionTablesForGraph } from "./criterionTables";
 import type { CELCase, CELDefinedByField, CELFact, CELResultField } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { LsLocation } from "../language-services/contracts";
@@ -137,6 +133,22 @@ export type BranchConditionTrace =
       satisfied: boolean;
       concept: { name: string; libraryName?: string };
       composition?: CompositionTrace;
+      facts?: string[];
+    }
+  // #236: a decision-guard `criterion` ref — evaluated by REFERENCE to the criterion's boolean
+  // body (memoized per case), NOT inline-expanded. THREE shapes: (1) the FIRST occurrence of a
+  // given `(lib, name)` per case that RESOLVES carries the full `body` sub-trace; (2) a LATER
+  // occurrence of that same criterion sets `reference: true` and omits `body`, so the serialized
+  // trace stays LINEAR in DISTINCT criteria — the run_decision analog of the emit DAG (a criterion
+  // referenced N times, or a doubling DAG, does not re-bloat the trace); (3) an UNDEFINED or CYCLIC
+  // criterion (no body anywhere, closed-world false) carries NEITHER `body` nor `reference` — an
+  // opaque/error node. So `reference: true` ALWAYS implies a `body` shown at an earlier occurrence.
+  | {
+      op: "criterion";
+      satisfied: boolean;
+      criterion: { name: string; libraryName: string };
+      body?: BranchConditionTrace;
+      reference?: boolean;
       facts?: string[];
     };
 
@@ -233,10 +245,18 @@ interface Ctx {
    *  cross-library qualified ref resolves its sub in its own library. (The root-decision lookup in `runCase` reads its
    *  own `decisions` map BEFORE Ctx is built, so no per-library decision map is stored on Ctx.) */
   resolveDecision: (callerLib: string, ref: ReferenceName) => ResolvedDecision | undefined;
-  /** #224 ii.1c — sub-decisions whose criterion guard breached the GLOBAL envelope (populated
-   *  by `wrapResolveWithExpansion` as `resolveDecision` is called). Keyed `idOf(lib,name)`. A
-   *  `use decision` whose target is here is an OVERFLOW (status:"error"), NOT a not-found. */
-  subExpansionErrors: Map<string, CriterionExpansionError>;
+  /** #236 — per-library criterion tables (`name → Criterion`), for reference-and-evaluate: a
+   *  criterion guard resolves its body HERE instead of being inline-expanded up front. Keyed by library. */
+  criterionTables: Map<string, CriterionTable>;
+  /** Per-case memo of criterion satisfaction — a criterion referenced N times (or a doubling DAG)
+   *  evaluates ONCE. Keyed `idOf(lib,name)`; mirrors `cache`. Carries the body sub-trace for
+   *  first-occurrence tracing; not memoized through a cycle-break (mirrors `cache`). */
+  criterionCache: Map<Id, { sat: boolean; facts: string[]; body: BranchConditionTrace }>;
+  /** Criteria currently on the evaluation stack — cycle guard (mirrors `stack`). */
+  criterionStack: Set<Id>;
+  /** `(lib,name)` of criteria already emitted with a FULL body sub-trace this case; later
+   *  occurrences trace as references (`op:"criterion", reference:true`) to keep the trace linear. */
+  tracedCriteria: Set<Id>;
   /** The ROOT (covered) library — the frame `currentLib` is seeded with it; a cross-library sub pushes its OWN lib. */
   rootLib: string;
   /** `(lib,name)` keys on the current delegation path (cycle guard; seeded with `idOf(rootLib, rootDecisionName)`).
@@ -473,14 +493,66 @@ function evalBranchCondition(
     };
   }
   if (cond.type === "BranchConditionCriterionRef") {
-    // #224 ii TRIPWIRE: a criterion ref must be replaced by its condition at the
-    // expansion seam BEFORE evaluation. Reaching the CRE means the seam was missed —
-    // throw LOUDLY rather than mis-evaluate it as an (absent → false, or a stray
-    // fact → true) concept. This is exactly the silent-wrong-answer the distinct
-    // node type exists to make impossible.
-    throw new Error(
-      `internal: un-expanded criterion reference "${getRefName(cond.ref)}" reached evalBranchCondition — criterion expansion must run before the CRE`,
-    );
+    // #236: evaluate a criterion by REFERENCE to its boolean body (memoized per case), NOT by
+    // inline expansion. A criterion is library-local (cross-library criterion refs are a
+    // validation error), so it resolves in the current frame's library.
+    const name = getRefName(cond.ref);
+    const lib = getRefLibrary(cond.ref) ?? frame.currentLib;
+    const cid = idOf(lib, name);
+    const crit = ctx.criterionTables?.get(lib)?.get(name);
+    const critTrace = (
+      sat: boolean,
+      facts: string[],
+      body?: BranchConditionTrace,
+    ): { sat: boolean; facts: string[]; trace: BranchConditionTrace } => {
+      // FIRST occurrence per (lib,name) with a RESOLVED body carries the body sub-trace; a LATER
+      // occurrence of that same (already-bodied) criterion is a `reference` (body shown once — the
+      // linearity that keeps the serialized trace linear in DISTINCT criteria). An UNDEFINED or
+      // CYCLIC criterion has NO body anywhere, so it emits NEITHER body nor reference — an
+      // opaque/error node — NOT a spurious `reference` (which would promise a first-occurrence body
+      // that never exists, breaking the contract MCP/schema consumers code against). disc 419: both
+      // review arms (gpt-5.6 #10 / Fable N1) flagged the no-body `reference:true`.
+      const bodied = ctx.tracedCriteria.has(cid);
+      const first = body !== undefined && !bodied;
+      if (body !== undefined) ctx.tracedCriteria.add(cid);
+      return {
+        sat,
+        facts,
+        trace: {
+          op: "criterion",
+          satisfied: sat,
+          criterion: { name, libraryName: lib },
+          ...(first ? { body } : bodied ? { reference: true } : {}),
+          ...(facts.length > 0 ? { facts } : {}),
+        },
+      };
+    };
+    if (!crit) {
+      // Undefined criterion → LOUD (deduped) + closed-world false. A SILENT false would invert to
+      // a spurious TRUE under `not <criterion>`, so it must be diagnosed (mirrors an unresolved
+      // concept). Validated emit forbids this; the CRE runs on un-revalidated input, so guard here.
+      if (!ctx.reportedUnresolved.has(cid)) {
+        ctx.reportedUnresolved.add(cid);
+        ctx.diagnostics.push(`criterion "${name}" resolves to no definition in ${lib} — treated as unsatisfied`);
+      }
+      return critTrace(false, []);
+    }
+    const cached = ctx.criterionCache.get(cid);
+    if (cached) return critTrace(cached.sat, cached.facts, cached.body);
+    if (ctx.criterionStack.has(cid)) {
+      // Cycle-break: closed-world false, diagnosed, NOT memoized (mirrors evalConcept).
+      ctx.diagnostics.push(`criterion cycle detected at "${name}" (${lib}) — treated as unsatisfied`);
+      ctx.cycleHits++;
+      return critTrace(false, []);
+    }
+    ctx.criterionStack.add(cid);
+    const cyclesBefore = ctx.cycleHits;
+    const inner = evalBranchCondition(crit.condition, ctx, { ...frame, currentLib: lib });
+    ctx.criterionStack.delete(cid);
+    if (ctx.cycleHits === cyclesBefore) {
+      ctx.criterionCache.set(cid, { sat: inner.sat, facts: inner.facts, body: inner.trace });
+    }
+    return critTrace(inner.sat, inner.facts, inner.trace);
   }
   if (cond.type === "BranchConditionNot") {
     // #224 iii.2/iii.3: closed-world negation — `not X` is satisfied iff X is NOT established.
@@ -510,12 +582,6 @@ function evalBranchCondition(
   return { sat, facts, trace: { op, satisfied: sat, operands: results.map((r) => r.trace) } };
 }
 
-// #224 ii.2 — test-only export. `evalBranchCondition` is the highest-stakes STRICT tripwire
-// site (run.ts:444 — the "silent-wrong-answer" case) and, unlike the three `branchCondition.ts`
-// collector sites, is a non-exported function unreachable from the public API without bypassing
-// the expansion seam. Exported solely so the ii.2 tripwire battery can pin that a raw
-// un-expanded `BranchConditionCriterionRef` throws here. NOT for production use.
-export const __evalBranchConditionForTest = evalBranchCondition;
 
 export function recName(action: ActionStatement["action"]): string {
   return action.type === "RecommendActivity"
@@ -606,20 +672,9 @@ function emitAction(
   const refLib = getRefLibrary(stmt.action.decisionName);
   const resolved = ctx.resolveDecision(frame.currentLib, stmt.action.decisionName);
   if (!resolved) {
-    // #224 ii.1c — DISTINGUISH an envelope OVERFLOW from a genuine not-found: the resolver
-    // returns `undefined` for both, but a sub whose guard breached the criterion envelope was
-    // recorded in `subExpansionErrors` (keyed by the resolved owning lib — `refLib` for a
-    // qualified ref, else the caller's frame). An overflow is a RUNTIME error (status:"error"),
-    // not a missing target — report it precisely and stop the walk (mirrors the delegation-cycle
-    // disposition), rather than silently evaluating the delegation as an empty production.
-    const overflow = ctx.subExpansionErrors.get(idOf(refLib ?? frame.currentLib, name));
-    if (overflow) {
-      ctx.runtimeError = true;
-      ctx.diagnostics.push(
-        `\`use decision "${name}"\` cannot be evaluated: its guard exceeds the criterion-expansion envelope (${overflow.reason}${overflow.detail?.name ? `: "${overflow.detail.name}"` : ""})`,
-      );
-      return false;
-    }
+    // #236 — no expansion-overflow disposition to distinguish any more (criteria are referenced,
+    // not materialized, so a `use decision` target's guard can never "breach the envelope"); an
+    // unresolved target is simply not-found.
     // Leaf + diagnostic (don't crash, don't produce a phantom disposition). THREE distinct messages:
     //  - a QUALIFIED target whose library/sub is not in the resolved graph → unresolved-cross-lib;
     //  - a BARE target not found in the CURRENT frame's library → not-found-in-current-lib. Naming `frame.currentLib`
@@ -767,11 +822,10 @@ function walkBranches(
     // in `node`). `label`/`viaWhen` = the rendered guard (bare name for a single
     // ref = legacy-identical).
     const nodeId = childId(parentId, `when[${i}]`);
-    // #224 ii.3 — MUST stay marker-BLIND (no `{ markerAware: true }`): this `label` flows to
-    // `ProducedRec.viaWhen` (the EVAL-output path the authoring kit teaches KEs to assert
-    // execution paths against). Name-replacing it would change `viaWhen` from the expansion to the
-    // criterion name — an eval/identity change + silent breakage of existing path assertions. Only
-    // the VM DISPLAY label (viewModel.ts) is marker-aware; the cockpit reads the VM, not this trace.
+    // #236: `describeBranchCondition` renders a criterion ref by its author NAME (it is not
+    // expanded), so this `label` — which flows to `ProducedRec.viaWhen`, the EVAL-output path KEs
+    // assert execution against — names the criterion (`Eligible`), consistent with the VM display
+    // label. A criterion is a named unit end-to-end (eval trace + VM), never an inlined body.
     const label = describeBranchCondition(b.condition, getRefName);
     const soleR = soleRef(b.condition);
     let sat: boolean;
@@ -822,14 +876,9 @@ function runCase(
   filePath: string,
   concepts: Map<Id, ConceptEntry>,
   resolveDecision: (callerLib: string, ref: ReferenceName) => ResolvedDecision | undefined,
-  // #224 ii.1c — covered decisions whose criterion guard breached the GLOBAL expansion
-  // envelope; a case targeting one gets a precise status:"error" (not the generic
-  // "not found", which the absent expanded entry would otherwise trigger).
-  decisionExpansionErrors: Map<string, CriterionExpansionError>,
-  // #224 ii.1c — SUB-decisions (`use decision` targets) whose guard breached the envelope
-  // (populated lazily by the resolver wrapper); consulted in `emitAction` so an overflow
-  // delegation reports status:"error" instead of a misleading not-found.
-  subExpansionErrors: Map<string, CriterionExpansionError>,
+  // #236 — per-library criterion tables for reference-and-evaluate (threaded onto Ctx; a criterion
+  // guard resolves its body here at eval time instead of being inline-expanded up front).
+  criterionTables: Map<string, CriterionTable>,
 ): CaseRun {
   const diagnostics: string[] = [];
   let subjectFact: string | undefined;
@@ -876,24 +925,8 @@ function runCase(
   }
   const decisionName = result.leafName;
   const expectedBranch = result.value.branchName;
-  // #224 ii.1c — a covered decision whose guard exceeded the criterion-expansion envelope
-  // can't be evaluated; report it precisely (before the generic not-found path below).
-  const expansionError = decisionExpansionErrors.get(decisionName);
-  if (expansionError) {
-    return {
-      case: c.name,
-      decision: decisionName,
-      status: "error",
-      expected: { leaf: decisionName, branch: expectedBranch },
-      produced: [],
-      trace: [],
-      diagnostics: [
-        ...diagnostics,
-        `decision "${decisionName}" cannot be evaluated: its guard exceeds the criterion-expansion envelope (${expansionError.reason}${expansionError.detail?.name ? `: "${expansionError.detail.name}"` : ""})`,
-      ],
-      conceptTruth: [],
-    };
-  }
+  // #236 — no criterion-expansion-overflow disposition any more: a criterion guard is evaluated by
+  // reference (memoized), never materialized, so a decision can never "exceed the envelope".
   const decision = decisions.get(decisionName);
   if (!decision) {
     return {
@@ -920,7 +953,10 @@ function runCase(
     trace: [],
     diagnostics,
     resolveDecision,
-    subExpansionErrors,
+    criterionTables,
+    criterionCache: new Map(),
+    criterionStack: new Set(),
+    tracedCriteria: new Set(),
     rootLib: coveredLib,
     // Seed the delegation cycle guard with `(rootLib, rootDecisionName)` — the `(lib,name)` re-key (#172). For the
     // same-library recursion this is a 1:1 rename of the old bare-name seed.
@@ -979,14 +1015,15 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
     if (s.type === "Decision") rawDecisions.push(s);
   }
 
-  // #224 ii.1c — per-library criterion tables + expand the top-level covered decisions'
-  // criterion guards. The envelope is GLOBAL (`expandDecisionCriteria` materializes the tree
-  // the CRE walks); a breach degrades to a per-case status:"error" (recorded in
-  // `decisionExpansionErrors`, surfaced in runCase) rather than throwing. Criterion-free
-  // decisions pass through by identity. Wiring shared with the view-model (expandDecisions.ts).
+  // #236 — per-library criterion tables for REFERENCE-and-evaluate. NO up-front expansion: the
+  // decisions are walked RAW (a criterion guard resolves its body via `ctx.criterionTables` at eval
+  // time, memoized), so a doubling-DAG criterion no longer materializes the CRE walk tree. Threaded
+  // into Ctx below; the view-model shares the same tables (expandDecisions.ts).
   const criterionTablesByLib = buildCriterionTablesForGraph(graph);
-  const coveredTable = criterionTablesByLib.get(coveredLib) ?? new Map();
-  const { decisions, errors: decisionExpansionErrors } = expandCoveredDecisions(rawDecisions, coveredTable);
+  // name → decision (RAW; no expansion). Mirrors the map the old `expandCoveredDecisions` returned,
+  // minus the materialization — first-write-wins (a duplicate decision name is a validation error).
+  const decisions = new Map<string, Decision>();
+  for (const d of rawDecisions) if (!decisions.has(d.name)) decisions.set(d.name, d);
 
   // Global `(lib,name)` decision map + the shared resolver over the WHOLE graph (#172). LOCAL-FIRST precedence matches
   // the provenance indexer (indexer.ts:11-13). The covered library's own decisions are added last → authoritative for
@@ -1000,10 +1037,9 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
     coveredFilePath: graph.coversTarget.filePath,
     coveredStatements: rawDecisions,
   });
-  const { resolve: resolveDecision, errors: subExpansionErrors } = wrapResolveWithExpansion(
-    makeResolveDecision(globalDecisionMap),
-    criterionTablesByLib,
-  );
+  // #236 — no expansion wrapper: sub-decisions resolve RAW; their criterion guards evaluate by
+  // reference in the sub-frame (same as the root). `criterionTablesByLib` covers every library.
+  const resolveDecision = makeResolveDecision(globalDecisionMap);
 
   // Concept definitions across the resolved closure — needed to evaluate
   // `defined as` operands (bare = local to the defining library; qualified =
@@ -1042,8 +1078,7 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
           filePath,
           concepts,
           resolveDecision,
-          decisionExpansionErrors,
-          subExpansionErrors,
+          criterionTablesByLib,
         ),
       );
   }

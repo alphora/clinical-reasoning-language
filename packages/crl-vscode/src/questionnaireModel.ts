@@ -45,18 +45,21 @@ export type QExpr =
        *  `satisfied`) is never a blocker under either polarity, even if its DISPLAYED answer is "no"/"yes" (mirrors
        *  i.4b's opaque handling — a degraded node is never a pinpointed blocker). A non-blocking atom (a false member of
        *  a satisfied `or`, or — under odd parity — a member of a De Morgan-dual FALSE `and`) leaves this unset →
-       *  renders informational. Computed LOCALLY in `buildGuardStruct`. Only ever set on guard-box leaves; a
+       *  renders informational. Computed LOCALLY in `buildStructural`. Only ever set on guard-box leaves; a
        *  `defined as` expansion leaf never carries it. */
       blocking?: boolean;
     }
   | { kind: "external"; name: string; lib: string } // a cross-library operand — NOT evaluated here (distinct from local "unknown")
   | { kind: "more"; count: number } // width truncation (`+N more`) or, count 0, a depth-cap `…` stub
-  /** #224 ii.3: a `criterion` boundary — a NAMED, COLLAPSIBLE wrapper around the criterion's own guard sub-tree
+  /** #224 ii.3 / #236: a `criterion` boundary — a NAMED, COLLAPSIBLE wrapper around the criterion's own guard sub-tree
    *  (`body`), so its sub-criteria fold away by default instead of splaying into a wall. `answer` is the criterion's
    *  OVERALL result (its node `satisfied`; "unknown" when unevaluated/preempted). `blocking` (parity-aware, same rule
    *  as a leaf) surfaces a COLLAPSED blocker so a reviewer sees which folded criterion failed the branch without
-   *  expanding. The atoms STAY — they live inside `body`, and a NESTED criterion wraps recursively. */
-  | { kind: "criterion"; name: string; answer: "yes" | "no" | "unknown"; blocking?: boolean; body: QExpr };
+   *  expanding. `body` is OPTIONAL post-#236: the run trace carries a criterion's body only on its FIRST occurrence
+   *  per case (later occurrences are `reference`s), so a reused criterion in a later branch renders as a collapsed
+   *  named row with its answer but no expandable body. When present the atoms live inside `body`, and a NESTED
+   *  criterion wraps recursively. */
+  | { kind: "criterion"; name: string; answer: "yes" | "no" | "unknown"; blocking?: boolean; body?: QExpr };
 
 /** How a row was reached — drives dimming (`preempted` ⇒ dim) and is future-proof for unreached rows. */
 export type Reach = "evaluated" | "preempted";
@@ -214,7 +217,7 @@ export function buildQuestionnaire(
       case "criterion":
         // #233 INVARIANT: `buildDefStruct` (the ONLY producer feeding `enrich`) NEVER emits a `criterion` node — a
         // `defined as` body has no criteria; only the guard producer (`branchConditionToDefStruct`) does. The
-        // questionnaire models criterion boundaries via its own `buildGuardStruct`/`QExpr.criterion`, not this path.
+        // questionnaire models criterion boundaries via `buildStructural`'s `op:"criterion"` / `QExpr.criterion`, not this path.
         throw new Error("unreachable: criterion node in a defined-as body (buildDefStruct never emits criterion)");
       case "leaf": {
         const valueTypes = resolveValueTypes(s.lib, s.name);
@@ -243,10 +246,9 @@ export function buildQuestionnaire(
     node: ViewNode,
     e: ConditionView["expr"],
   ): { name: string; libraryName?: string } =>
-    // #224 ii.3: a MARKED ref (a sole-ref criterion `Eligible = A`, marker stamped on the Ref leaf) is NOT a bare
-    // concept — its row must read the criterion NAME (`when Eligible`, from the marker-aware `node.label`), not the
-    // lone atom `A`. Only an UNMARKED single ref keeps its concept identity.
-    e.op === "ref" && !e.sourcedFromCriterion ? e.concept : { name: node.label.replace(/^when\s+/, "") };
+    // #236: a bare concept ref keeps its concept identity; anything else (a compound guard, or a
+    // criterion `op:"criterion"` boundary) reads the guard label off `node.label` (`when Eligible`).
+    e.op === "ref" ? e.concept : { name: node.label.replace(/^when\s+/, "") };
 
   const attachExpansion = (
     q: Question,
@@ -273,44 +275,12 @@ export function buildQuestionnaire(
   //   answer  — the atom's per-leaf runtime `satisfied` when evaluated (no short-circuit ⇒ every operand has it);
   //             else `conceptTruth` (a preempted guard, or a zip-degraded operand) → "unknown" if absent, never "no".
   //   blocking — LOCAL: branch-false ∧ atom-false ∧ no ancestor `or` satisfied (§ `blocking` doc on QExpr leaf).
-  // #224 ii.3: the criterion-boundary ENTRY. A node carrying `sourcedFromCriterion` becomes a named COLLAPSIBLE
-  // `criterion` wrapper around its structural sub-tree; nested criteria re-enter here (so each wraps). Everything else
-  // falls through to `buildStructural` (today's op-dispatch). `buildStructural`'s recursive calls go BACK through this
-  // entry, so a marker anywhere in the tree is honored. (Mutually recursive `const`s — both are initialized before the
-  // first call from `attachGuardStruct`, so the forward reference is safe.)
-  // SCOPE: this covers branch `when` guards (the `condition.expr` tree). An ACTION guard (`unless`/`only when`) surfaces
-  // as a `GuardView` (a bare `ConceptView`, no expr/marker), so a criterion in an action guard is NOT collapsed here —
-  // a known gap for a later slice, harmless today (the blocked-guard terminal row shows the guard concept as before).
-  const buildGuardStruct = (
-    expr: BranchConditionView,
-    frameLib: string | undefined,
-    branchFalse: boolean,
-    underSatisfiedOr: boolean,
-    negated: boolean,
-  ): QExpr => {
-    if (expr.sourcedFromCriterion) {
-      // The wrapper's answer is the criterion's OWN runtime result. NO `conceptTruth` fallback (unlike a leaf): a
-      // criterion is NOT a concept (name is concept-XOR-criterion, nameUniquenessValidator), so it can never have a
-      // `conceptTruth` row — a preempted/unevaluated criterion is genuinely "unknown", exactly as a preempted COMPOUND
-      // guard row already shows "n/a" while its atoms still carry their own off-path `conceptTruth`.
-      const answer: "yes" | "no" | "unknown" =
-        expr.satisfied !== undefined ? (expr.satisfied ? "yes" : "no") : "unknown";
-      const node: Extract<QExpr, { kind: "criterion" }> = {
-        kind: "criterion",
-        name: expr.sourcedFromCriterion.name,
-        answer,
-        body: buildStructural(expr, frameLib, branchFalse, underSatisfiedOr, negated),
-      };
-      // Same parity-aware, runtime-evidence-gated blocking rule as a leaf (§ `blocking` doc on QExpr leaf): a criterion
-      // blocks the branch when it FAILED (parity-flipped under odd `not`), the branch is false, and no ancestor `or`
-      // (or De Morgan-dual `and`) is satisfied. Set on the wrapper so a COLLAPSED blocker still reads red.
-      const critFailed = negated ? expr.satisfied === true : expr.satisfied === false;
-      if (branchFalse && critFailed && !underSatisfiedOr) node.blocking = true;
-      return node;
-    }
-    return buildStructural(expr, frameLib, branchFalse, underSatisfiedOr, negated);
-  };
-
+  // #236: a criterion boundary rides the guard tree as a first-class `op:"criterion"` node — the
+  // `buildStructural` op-dispatch turns it into the named COLLAPSIBLE `criterion` wrapper (no
+  // marker path any more). SCOPE: this covers branch `when` guards (the `condition.expr` tree). An
+  // ACTION guard (`unless`/`only when`) surfaces as a `GuardView` (a bare `ConceptView`, no expr), so
+  // a criterion in an action guard is NOT collapsed here — a known gap for a later slice, harmless
+  // today (the blocked-guard terminal row shows the guard concept as before).
   const buildStructural = (
     expr: BranchConditionView,
     frameLib: string | undefined,
@@ -324,7 +294,26 @@ export function buildQuestionnaire(
       // #224 iii.2/iii.3b: structure-faithful negation box (never dedups). Recurse the operand with
       // FLIPPED parity; `branchFalse`/`underSatisfiedOr` propagate. This is what pins precise
       // blocking under negation (a `not X` blocks when X IS established — the leaf flip below).
-      return { kind: "not", operand: buildGuardStruct(expr.operand, frameLib, branchFalse, underSatisfiedOr, !negated) };
+      return { kind: "not", operand: buildStructural(expr.operand, frameLib, branchFalse, underSatisfiedOr, !negated) };
+    }
+    if (expr.op === "criterion") {
+      // #236: a criterion boundary → the NAMED, COLLAPSIBLE `criterion` QExpr (was the
+      // `sourcedFromCriterion`-marker path pre-flip; the boundary is now a first-class `op:"criterion"`
+      // node). `body` is present only on the criterion's FIRST occurrence this case (later branches
+      // carry a `reference` with no body → a collapsed named row). Same parity-aware, runtime-
+      // evidence-gated blocking rule as a leaf/marker: it blocks when it FAILED (flipped under odd
+      // `not`), the branch is false, and no effective-`or` ancestor is satisfied.
+      const answer: "yes" | "no" | "unknown" =
+        expr.satisfied !== undefined ? (expr.satisfied ? "yes" : "no") : "unknown";
+      const node: Extract<QExpr, { kind: "criterion" }> = {
+        kind: "criterion",
+        name: expr.criterion.name,
+        answer,
+        ...(expr.body ? { body: buildStructural(expr.body, frameLib, branchFalse, underSatisfiedOr, negated) } : {}),
+      };
+      const critFailed = negated ? expr.satisfied === true : expr.satisfied === false;
+      if (branchFalse && critFailed && !underSatisfiedOr) node.blocking = true;
+      return node;
     }
     if (expr.op !== "ref") {
       // A satisfied `or` (positive parity) makes its false members INFORMATIONAL — and its De Morgan
@@ -335,7 +324,7 @@ export function buildQuestionnaire(
         (negated ? expr.op === "and" && expr.satisfied === false : expr.op === "or" && expr.satisfied === true);
       return {
         kind: expr.op,
-        operands: expr.operands.map((o) => buildGuardStruct(o, frameLib, branchFalse, nextUnderSatOr, negated)),
+        operands: expr.operands.map((o) => buildStructural(o, frameLib, branchFalse, nextUnderSatOr, negated)),
       };
     }
     const lib = expr.concept.libraryName ?? frameLib ?? "";
@@ -373,7 +362,7 @@ export function buildQuestionnaire(
   // Attach the guard box to a COMPOUND `when` row. `branchFalse` (the whole guard evaluated false) enables blocking
   // styling; a preempted guard (never evaluated) passes false → informational only.
   const attachGuardStruct = (q: Question, cond: ConditionView, frameLib: string | undefined): void => {
-    q.expansion = buildGuardStruct(cond.expr, frameLib, cond.satisfied === false, false, false);
+    q.expansion = buildStructural(cond.expr, frameLib, cond.satisfied === false, false, false);
     q.expansionKind = "guard";
   };
 
@@ -393,10 +382,10 @@ export function buildQuestionnaire(
         // BRANCH-level result (so a false conjunct of a satisfied `or` never gets
         // mislabelled a diverter).
         const guardConcept = guardConceptOf(node, cond.expr);
-        // #224 ii.3: a MARKED ref (sole-ref criterion) is treated as NOT-single so it takes the guard-box path and
-        // renders as a `criterion` collapsible wrapping its one atom — never `attachExpansion` (that is the `defined
-        // as` representation path; a criterion is a guard, not a representation-disjunction).
-        const isSingleRef = cond.expr.op === "ref" && !cond.expr.sourcedFromCriterion;
+        // #236: a criterion guard is an `op:"criterion"` node (not `op:"ref"`), so it is NOT single-ref → it takes the
+        // guard-box path and renders as a `criterion` collapsible — never `attachExpansion` (that is the `defined as`
+        // representation path; a criterion is a guard, not a representation-disjunction).
+        const isSingleRef = cond.expr.op === "ref";
         if (node.unreachedReason === "preempted") {
           // first:-preempted sibling → DIMMED terminal; case answer from conceptTruth (off-path). No recurse.
           const wq = emitWhen(guardConcept, node, frameLib, depth, "when-preempted", "preempted", undefined);

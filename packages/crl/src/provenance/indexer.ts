@@ -32,8 +32,8 @@ import type {
 } from "../ast/types";
 import type { WhenBlock } from "../ast/types";
 import { getRefName, getRefLibrary } from "../ast/types";
-import { branchConditionRefs, branchConditionConceptRefsFollowingCriteria } from "../ast/branchCondition";
-import { buildCriterionTable, type CriterionTable } from "../ast/criterionExpansion";
+import { branchConditionRefs } from "../ast/branchCondition";
+import { buildCriterionIndex, guardConceptClosure, type CriterionIndex } from "../ast/criterionIndex";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { RegistryEntry } from "../imports/types";
 import type { LsLocation, ZeroBasedRange } from "../language-services/contracts";
@@ -343,16 +343,20 @@ export function buildProvenanceIndex(
   const { libs, coversName, diagnostics } = collectLibs(graph, opts);
   if (!coversName) return emptyIndex(diagnostics);
 
-  // #224 ii.1c — per-library criterion table, memoized (built once per library, not per
-  // decision walked).
-  const criterionTableCache = new Map<string, CriterionTable>();
-  const criterionTableFor = (lib: string): CriterionTable => {
-    let t = criterionTableCache.get(lib);
-    if (!t) {
-      t = buildCriterionTable(libs.get(lib)?.entry.ast.statements ?? []);
-      criterionTableCache.set(lib, t);
+  // #224 ii.1c / #236 — per-library criterion INDEX, memoized (built once per library, not per
+  // decision walked). The index's `guardConceptClosure` LINEARLY collects the concepts a guard
+  // reaches through its criteria (memoized, never atom-capped) — replacing the capped
+  // `branchConditionConceptRefsFollowingCriteria`, so a concept reachable only through a LARGE
+  // (post-#236 legal, un-capped) criterion stays decision-REACHED instead of silently dropping to
+  // an orphan. Consistent with the emit-lane collectors (closureOrchestrator/computeEmitClosure).
+  const criterionIndexCache = new Map<string, CriterionIndex>();
+  const criterionIndexFor = (lib: string): CriterionIndex => {
+    let ix = criterionIndexCache.get(lib);
+    if (!ix) {
+      ix = buildCriterionIndex(libs.get(lib)?.entry.ast.statements ?? []);
+      criterionIndexCache.set(lib, ix);
     }
-    return t;
+    return ix;
   };
 
   const intrinsicNodeKind = (declKind: DeclKind, node: Statement): NodeKind => {
@@ -557,9 +561,9 @@ export function buildProvenanceIndex(
     seenDecisions.add(dkey);
     // #224 ii.1c — follow criterion refs into their bodies so a concept referenced ONLY via a
     // criterion is still decision-REACHED (the disc-300 closure argument, source-side; no
-    // materialization). The criterion NAME-level declaration index stays ii.4. Table memoized
+    // materialization). The criterion NAME-level declaration index stays ii.4. Index memoized
     // per library (hoisted out of the per-decision walk).
-    const criterionTable = criterionTableFor(lib);
+    const criterionIndex = criterionIndexFor(lib);
     // A reached decision AND all its sub-nodes are themselves decision-reached (structural members of a reached subtree) —
     // so §9.2 can flag an item linked to any decision sub-node, and isDecisionReached works for nodeId-bearing refs.
     recordEdge(dkey, { fromDecision, fromNodeId: "", relation: "spine-member" });
@@ -570,10 +574,7 @@ export function buildProvenanceIndex(
         relation: "spine-member",
       });
       if (sn.kind === "when") {
-        for (const atom of branchConditionConceptRefsFollowingCriteria(
-          (sn.node as WhenBlock).condition,
-          criterionTable,
-        )) {
+        for (const atom of guardConceptClosure((sn.node as WhenBlock).condition, criterionIndex)) {
           reach(atom.ref, lib, fromDecision, sn.nodeId, "when-condition");
         }
       } else if (sn.kind === "action") {

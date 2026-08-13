@@ -28,12 +28,8 @@ import { collectDecisionArms } from "../ast/decisionArms";
 import { decisionSpine, type SpineNode } from "../ast/decisionSpine";
 import type { ActionStatement, Decision, ReferenceName, WhenBlock } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
-import {
-  branchConditionRefs,
-  branchConditionConceptRefsFollowingCriteria,
-  describeBranchCondition,
-} from "../ast/branchCondition";
-import { buildCriterionTable, type CriterionTable } from "../ast/criterionExpansion";
+import { branchConditionRefs, describeBranchCondition } from "../ast/branchCondition";
+import { buildCriterionIndex, guardConceptClosure, type CriterionIndex } from "../ast/criterionIndex";
 import type { CELBranchResult, CELCase, CELResultField } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import { renderScenario, type ScenarioViewModel } from "../cre";
@@ -266,30 +262,28 @@ export function generateProvenanceScaffold(
 
   // #224 ii.1c — per-library criterion table (memoized; hoisted out of the per-decision
   // buildCtx so a library's table is built once, not once per decision).
-  const criterionTableCache = new Map<string, CriterionTable>();
-  const tableFor = (lib: string): CriterionTable => {
-    let t = criterionTableCache.get(lib);
-    if (!t) {
-      t = buildCriterionTable(libs.get(lib)?.entry.ast.statements ?? []);
-      criterionTableCache.set(lib, t);
+  const criterionIndexCache = new Map<string, CriterionIndex>();
+  const indexFor = (lib: string): CriterionIndex => {
+    let ix = criterionIndexCache.get(lib);
+    if (!ix) {
+      ix = buildCriterionIndex(libs.get(lib)?.entry.ast.statements ?? []);
+      criterionIndexCache.set(lib, ix);
     }
-    return t;
+    return ix;
   };
 
   const buildCtx = (lib: string, decision: Decision): DecisionCtx => {
     const declRef = decisionDeclRef(lib, decision.name);
     const spine = decisionSpine(decision);
     const gatingConceptKeys = new Set<string>();
-    // #224 ii.1c — follow criterion refs into their bodies so a concept referenced ONLY via
+    // #224 ii.1c / #236 — follow criterion refs into their bodies so a concept referenced ONLY via
     // a criterion is still a gating concept (source-side, no materialization; the criterion
-    // NAME-level index stays ii.4).
-    const criterionTable = tableFor(lib);
+    // NAME-level index stays ii.4). `guardConceptClosure` collects LINEARLY (uncapped), so a gating
+    // concept reached only through a large post-#236 criterion is not silently dropped.
+    const criterionIndex = indexFor(lib);
     for (const sn of spine) {
       if (sn.kind === "when") {
-        for (const atom of branchConditionConceptRefsFollowingCriteria(
-          (sn.node as WhenBlock).condition,
-          criterionTable,
-        )) {
+        for (const atom of guardConceptClosure((sn.node as WhenBlock).condition, criterionIndex)) {
           gatingConceptKeys.add(conceptKeyOf(atom.ref, lib));
         }
       } else if (sn.kind === "action") {
