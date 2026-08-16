@@ -315,6 +315,10 @@
         {
           "command": "crl.cockpit.toggleKeys",
           "when": "crl.active"
+        },
+        {
+          "command": "crl.dev.applyQuestionnaireHarness",
+          "when": "config.crl.dev.enableCspHarness"
         }
       ]
     },
@@ -449,6 +453,11 @@
           "default": "claude-sonnet-5",
           "scope": "window",
           "description": "The Anthropic model id the agent requests. Used only when crl.agent.provider is 'anthropic'."
+        },
+        "crl.dev.enableCspHarness": {
+          "type": "boolean",
+          "default": false,
+          "description": "Developer tool. Show the \"$apply Questionnaire CSP harness\" command, used to re-walk the Content-Security-Policy ladder for the vendored LForms renderer (see media/lforms/README.md). Needed in the VS Code web workbench, where testing requires an installed VSIX."
         }
       }
     }

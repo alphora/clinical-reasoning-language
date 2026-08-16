@@ -7,10 +7,10 @@
 // Run it via the command `CRL Dev: $apply Questionnaire CSP harness`, pick a rung, read the violations in the
 // panel or in the "CRL" output channel.
 //
-// ⚠ TODO before a real release: this command is registered unconditionally and so appears in the palette of a
-// production VSIX. That is deliberate today — installing a VSIX is the only route into the web workbench, which
-// is where the CSP ladder has to be re-walked — but it should be gated (dev-only `when` clause, or stripped at
-// package time) before the extension ships to users.
+// It is HIDDEN from the palette unless `crl.dev.enableCspHarness` is turned on. Gated by a setting rather than
+// by `ExtensionMode.Development` on purpose: the web-workbench CSP test requires an INSTALLED VSIX, which runs
+// in Production mode, so a dev-mode gate would disable the harness in the one place it is most needed. The
+// command stays registered either way, so flipping the setting is all it takes.
 //
 // ⚠ Desktop is necessary but NOT sufficient. MV runs in the VS Code web workbench, which is stricter. The rung
 // that passes here must be re-walked there before the cockpit's policy is changed.
