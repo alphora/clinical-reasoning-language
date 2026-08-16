@@ -107,11 +107,11 @@ const embedJson = (v: unknown): string =>
  * sequence renders the fixture correctly, with answers and `enableWhen` gating intact. See
  * media/lforms/README.md for the measurements.
  *
- * ⚠ NOT verified: that the rendered form is READ-ONLY. `addFormToPage` renders interactive controls, and
- * `prepopulate: false` does not change that — an operator can edit answers locally, after which the pane no
- * longer shows the upstream `$apply` result. Before this is user-facing, either the producer must set
- * `Questionnaire.item.readOnly`, or a supported LForms view/read-only option must be found for THIS version
- * (do not guess an option name — check the 43.1.0 API).
+ * The rendered controls are INTERACTIVE — `addFormToPage` renders live inputs and `prepopulate: false` does not
+ * change that, so an operator can edit answers locally. That is ACCEPTED, not a defect (operator decision,
+ * 2026-08-16): read-only is not a requirement for this pane. Edits are local to the webview and posted nowhere,
+ * so nothing can be written back. Do not "fix" it by forcing `Questionnaire.item.readOnly` or hunting an LForms
+ * view mode; if a future requirement DOES demand read-only, that is a new decision, not a latent bug.
  */
 const BOOTSTRAP = `
 (function () {
