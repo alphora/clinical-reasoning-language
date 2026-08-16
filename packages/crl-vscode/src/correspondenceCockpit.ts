@@ -2492,7 +2492,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       { viewColumn: columnFor(pane), preserveFocus: true },
       { enableScripts: true, retainContextWhenHidden: true },
     );
-    panel.webview.html = shellHtml();
+    panel.webview.html = shellHtml(pane, panel.webview.cspSource);
     coord.setPaneCapability(pane, "renderable"); // all panes render + receive reveals (the tree flowchart lit up in T3)
     const disposables: vscode.Disposable[] = [
       panel.webview.onDidReceiveMessage((m) => onWebviewMessage(pane, m)),
@@ -4980,10 +4980,32 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
 /** Hermetic webview shell (strict CSP + nonce). Swaps #root on `render` + acks `ready`; `highlight` (gen-checked) toggles
  *  `.current` + scrolls; clicks on `[data-reveal]` post the opaque key back. No external resources. */
-function shellHtml(): string {
+/**
+ * The per-pane Content-Security-Policy. Pure + exported so the policy is string-testable, like
+ * COCKPIT_WEBVIEW_SCRIPT below.
+ *
+ * Every pane is nonce-only TODAY and this returns one string for all of them. It exists as a seam because the
+ * `$apply` questionnaire pane will need `style-src 'unsafe-inline' <cspSource>` — LForms is an Angular Elements
+ * build that injects ~7 unnonced <style> elements at runtime, and a nonce present alongside `'unsafe-inline'`
+ * makes browsers ignore the latter, so the nonce must be DROPPED rather than supplemented. That is the ONLY
+ * directive that needs to change: `script-src` stays nonce-only (the vendored bundles carry no eval/new
+ * Function) and `default-src` stays `'none'`. Measured on Desktop AND the web workbench — see
+ * media/lforms/README.md.
+ *
+ * Because each pane is its own WebviewPanel with its own document, that relaxation lands in ONE pane and leaves
+ * every other pane nonce-only.
+ */
+export function cockpitPaneCsp(
+  _pane: Pane,
+  a: { nonce: string; styleNonce: string; cspSource: string },
+): string {
+  return `default-src 'none'; style-src 'nonce-${a.styleNonce}'; script-src 'nonce-${a.nonce}';`;
+}
+
+function shellHtml(pane: Pane, cspSource: string): string {
   const nonce = randomBytes(16).toString("base64");
   const styleNonce = randomBytes(16).toString("base64");
-  const csp = `default-src 'none'; style-src 'nonce-${styleNonce}'; script-src 'nonce-${nonce}';`;
+  const csp = cockpitPaneCsp(pane, { nonce, styleNonce, cspSource });
   const style = `body{font:13px var(--vscode-editor-font-family,monospace);color:var(--vscode-foreground);white-space:pre-wrap;padding:8px}
 .covered{background:var(--vscode-editor-findMatchHighlightBackground,rgba(100,170,255,.18))}
 .uncovered{background:var(--vscode-diffEditor-removedTextBackground,rgba(255,170,80,.22))}
