@@ -183,6 +183,10 @@ import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordina
 import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE, policyIdFromSrc } from "./provenanceFindings";
 import { resolveLaunchTarget } from "./policyLaunchTarget";
 import { flagIssueBody, flagIssueTitle, replaceIssueTypeLine } from "./flagIssueText";
+// ⚠ FIXTURE, temporary: stands in for the $apply producer until issue #277 lands. Imported (not read from
+// disk) because `.vscodeignore` excludes `src/**` from the VSIX — esbuild inlines it, so dev and packaged
+// behave identically.
+import APPLY_QUESTIONNAIRE_FIXTURE from "./testdata/questionnaire-pane/get-case.example.json";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
 
@@ -2078,10 +2082,23 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // innerHTML never execute). The vendor bundles live in this pane's own shell document.
       // ⚠ EXPLICIT BRANCH ON PURPOSE: the `questionnaire` case below is the bare `else`, so without this a new
       // pane id would silently render the STATIC questionnaire instead.
-      // Data wiring is pending the emit side's core exports (issue #277); until then the shell shows its own
-      // placeholder, which is why nothing is posted here yet.
       v.anchors = {};
       v.reveals = {};
+      // ⚠ FIXTURE-BACKED until the producer exists (issue #277). The real source is a case lookup keyed off the
+      // focused case; the message SHAPE is already final, so swapping the source is a one-line change here and
+      // nothing downstream moves.
+      const focused = focusedScenario();
+      const aq = focused ? APPLY_QUESTIONNAIRE_FIXTURE : undefined;
+      void v.panel.webview.postMessage({
+        type: "applyQuestionnaire",
+        gen,
+        indexVersion,
+        // Render identity: remount only when the case's CONTENT changes. Once the producer supplies a revision
+        // or content hash (requested on #277), use that instead of the case id.
+        key: focused ? `${focused.decision?.libraryName ?? ""}::${focusedCaseId(state) ?? ""}` : undefined,
+        q: aq?.questionnaire,
+        qr: aq?.questionnaireResponse,
+      });
     } else {
       // questionnaire (#177 slice 3) — a STATIC, read-only projection of the FOCUSED cel case's fired path. Gets the
       // selected-case `sv` via the SAME `scenarioByCaseId` join `driveFailedCriteriaPeek` uses + a frame-aware
@@ -5367,6 +5384,30 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `for(const id of (m.noIds||[])){const el=document.getElementById(id);if(el)el.classList.add('flow-leaf-no');}}` +
   // The tree-pane chrome (toggle + gap banner) — injected ABOVE #root so it never clobbers the flowchart.
   `else if(m.type==='fcChrome'){fcc.innerHTML=m.html;}` +
+  // The $apply questionnaire pane. DATA ONLY — this branch never receives `html`, because a fragment carrying
+  // <script> would be inert (innerHTML does not execute scripts) and re-rendering would tear down the mounted
+  // form. The vendor runtime is already loaded by this pane's shell document.
+  // `key` is the render identity: remount ONLY when the case's CONTENT changes. Every cockpit re-render
+  // (rebuild/applyShowKeys/renderEmpty) reaches every pane, and remounting a 1.85 MB Angular app on an
+  // unrelated render would churn and discard in-progress answers.
+  `else if(m.type==='applyQuestionnaire'){` +
+  `if(m.key&&m.key===window.__aqKey)return;` +
+  `window.__aqKey=m.key;` +
+  `const host=document.getElementById('root');` +
+  `const fail=(t)=>{host.replaceChildren();const p=document.createElement('p');p.className='placeholder';p.textContent=t;host.appendChild(p);};` +
+  `if(!m.q){fail('Select a case to see its $apply questionnaire.');return;}` +
+  `if(typeof LForms==='undefined'||!LForms.Util){fail('The LForms runtime did not load.');return;}` +
+  `try{` +
+  `host.replaceChildren();const mount=document.createElement('div');host.appendChild(mount);mount.id='aqMount';` +
+  `let form=LForms.Util.convertFHIRQuestionnaireToLForms(m.q,'R4');` +
+  `if(!form){fail('convertFHIRQuestionnaireToLForms returned nothing.');return;}` +
+  `if(m.qr)form=LForms.Util.mergeFHIRDataIntoLForms('QuestionnaireResponse',m.qr,form,'R4');` +
+  `LForms.Util.addFormToPage(form,'aqMount',{prepopulate:false});` +
+  // addFormToPage can resolve without painting (an unrecognised item tree yields an empty form). Angular
+  // Elements upgrades asynchronously, so poll briefly rather than measuring on the next frame.
+  `let n=0;const chk=()=>{if(mount.getBoundingClientRect().height>0)return;if(++n>40){fail('The questionnaire did not render.');return;}setTimeout(chk,50);};setTimeout(chk,50);` +
+  `}catch(e){fail('Could not render the questionnaire: '+((e&&e.message)?e.message:String(e)));}` +
+  `}` +
   // #211: the create-flag drawer's OWN region — set (or clear with '') its html. The render handler never touches it, so a
   // same-policy tree rebuild leaves the drawer + the user's typed text intact. aff() shows the selected tag's fields.
   // Todo 5 (impl-review [important]): the drawer is last in DOM + revealed preserveFocus, so a keyboard user would tab through
