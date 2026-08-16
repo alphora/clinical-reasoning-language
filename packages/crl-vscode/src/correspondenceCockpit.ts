@@ -186,7 +186,7 @@ import { flagIssueBody, flagIssueTitle, replaceIssueTypeLine } from "./flagIssue
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
 
-const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "worklist"]; // all panes (render/clearPending/reveal fan-out); tree/questionnaire/worklist opt-in; MUST stay in lockstep with engine `Pane` (silent-failure list — not compiler-checked; disc 179)
+const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "applyQuestionnaire", "worklist"]; // all panes (render/clearPending/reveal fan-out); tree/questionnaire/applyQuestionnaire/worklist opt-in; MUST stay in lockstep with engine `Pane` (silent-failure list — not compiler-checked; disc 179)
 // The panes the navigator can WALK (primary/cycle/config-primary). tree is render+reveal+peek-only, never a primary —
 // so it is absent here. Used to build the setPrimary quickpick + guard config-primary against a stray "tree".
 const PRIMARY_PANES: PrimaryPane[] = ["source", "crl", "cel"];
@@ -196,7 +196,7 @@ const PRIMARY_PANES: PrimaryPane[] = ["source", "crl", "cel"];
 // paneOrder listing all six must get a 6th column instead of piling onto column One via the `?? One` fallback (VS Code
 // supports up to 9). The default MV set stays 4 (worklist/source/tree/questionnaire); this only bounds the overflow case.
 const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.ViewColumn.Three, vscode.ViewColumn.Four, vscode.ViewColumn.Five, vscode.ViewColumn.Six];
-const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "Questionnaire", worklist: "Worklist" };
+const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "Questionnaire", applyQuestionnaire: "Questionnaire ($apply)", worklist: "Worklist" };
 // Perf gate (disc 118): the measured full-render floor. Over → fall back to a navigation-only placeholder, don't freeze.
 const MAX_SOURCE_CHARS = 200_000;
 const MAX_SOURCE_MARKS = 2000;
@@ -2072,6 +2072,16 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.flaggableGids = r.flaggableGids;
       v.startNodeGid = r.startNodeGid; // the chrome-mirror count badge's node
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode });
+    } else if (pane === "applyQuestionnaire") {
+      // The $apply-driven pane (LForms). Per the integration design it receives DATA ONLY — never `html` — so
+      // there is no innerHTML swap for the mounted form to survive and no dead-script trap (scripts inserted via
+      // innerHTML never execute). The vendor bundles live in this pane's own shell document.
+      // ⚠ EXPLICIT BRANCH ON PURPOSE: the `questionnaire` case below is the bare `else`, so without this a new
+      // pane id would silently render the STATIC questionnaire instead.
+      // Data wiring is pending the emit side's core exports (issue #277); until then the shell shows its own
+      // placeholder, which is why nothing is posted here yet.
+      v.anchors = {};
+      v.reveals = {};
     } else {
       // questionnaire (#177 slice 3) — a STATIC, read-only projection of the FOCUSED cel case's fired path. Gets the
       // selected-case `sv` via the SAME `scenarioByCaseId` join `driveFailedCriteriaPeek` uses + a frame-aware

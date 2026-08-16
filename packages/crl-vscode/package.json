@@ -413,6 +413,7 @@
               "source",
               "tree",
               "questionnaire",
+              "applyQuestionnaire",
               "crl",
               "cel"
             ]
