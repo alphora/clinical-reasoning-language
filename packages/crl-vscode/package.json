@@ -170,6 +170,10 @@
       {
         "command": "crl.agent.chat",
         "title": "CRL: Open CRL Assist"
+      },
+      {
+        "command": "crl.dev.applyQuestionnaireHarness",
+        "title": "CRL Dev: $apply Questionnaire CSP harness"
       }
     ],
     "viewsContainers": {
