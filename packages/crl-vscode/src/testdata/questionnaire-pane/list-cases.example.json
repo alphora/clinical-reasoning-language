@@ -1,0 +1,54 @@
+{
+  "libraries": [
+    {
+      "libraryId": "um-css-03",
+      "cases": [
+        {
+          "caseSlug": "age-gate-adult-cannot-use-minor-dmc-route",
+          "available": true,
+          "unavailableReason": null,
+          "lane": "mixed",
+          "laneMatchesArtifact": true
+        },
+        {
+          "caseSlug": "age-gate-minor-cannot-use-adult-dmc-route",
+          "available": true,
+          "unavailableReason": null,
+          "lane": "source",
+          "laneMatchesArtifact": true
+        },
+        {
+          "caseSlug": "age-silence-adult-reaches-under-21-dmc-pathway",
+          "available": true,
+          "unavailableReason": null,
+          "lane": "source",
+          "laneMatchesArtifact": true
+        }
+      ]
+    },
+    {
+      "libraryId": "um-css-04",
+      "cases": [
+        {
+          "caseSlug": "coverage-baseline",
+          "available": false,
+          "unavailableReason": "no-qa-data",
+          "lane": "local",
+          "laneMatchesArtifact": true
+        }
+      ]
+    },
+    {
+      "libraryId": "blepharoplasty",
+      "cases": [
+        {
+          "caseSlug": "functional-impairment-documented",
+          "available": false,
+          "unavailableReason": "lane-mismatch",
+          "lane": "source",
+          "laneMatchesArtifact": false
+        }
+      ]
+    }
+  ]
+}
