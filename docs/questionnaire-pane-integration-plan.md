@@ -85,11 +85,21 @@ re-run the `serve-web` recipe. Do not adopt it on argument alone.
 
 ## 5. Still open — genuinely unresolved
 
-1. **The data-loading path is unspecified, and it is the real gap.** Nothing in the cockpit loads Q/QR today,
-   and a webview cannot call an MCP tool by name. Needs: which extension-host function loads them; how a cockpit
-   selection maps to `{libraryId, caseSlug}`; whether the host reads artifacts directly or shares the tool's
-   implementation; loading/unavailable/malformed/warning states; and **stale-result handling** when case A
-   resolves after the user has selected case B (generation or case-identity check).
+1. **The data-loading path.** ~~A webview cannot call an MCP tool by name.~~ True but irrelevant — **nothing
+   needs to speak MCP.** The extension host already imports core functionality directly
+   (`mcp-server.ts` → `import { main, selfTest } from "@smile-digital-health/crl/mcp"`; other modules import
+   `renderScenario`/`resolveCelImports` from `@smile-digital-health/crl`; the core package exports `.`,
+   `./language-services`, `./mcp`, `./provenance`). The MCP server is one front-end over core code.
+
+   **Asked of the emit side** (`tmp/HANDOFF-questionnaire-pane-to-emit-side.md`): implement the two tools'
+   logic as core functions exported from `@smile-digital-health/crl`, with the MCP tools as thin wrappers. The
+   pane's host then calls the core function — no protocol, no subprocess, one implementation.
+
+   Genuinely still open: how a cockpit selection maps to `{libraryId, caseSlug}`;
+   loading/unavailable/malformed/warning states; and **stale-result handling** when case A resolves after the
+   user has selected case B (generation or case-identity check). Also requested from the emit side: a
+   render-identity key (revision/content hash) on `getQuestionnaireCase`, so the shell remounts on content
+   change rather than on every cockpit re-render.
 2. **Questionnaire item types are unpinned, so `img-src` is fixture-bound, not contract-bound.** The measured
    fixture is `group`/`boolean` only; `choice`/`open-choice` pull the vendored PNGs via `styles.css`. Either pin
    the accepted item types in the producer contract or schedule a re-walk of the ladder.
