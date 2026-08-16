@@ -2496,13 +2496,23 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function ensurePane(pane: Pane): PaneView {
     let v = views.get(pane);
     if (v) return v;
+    // The $apply pane loads the vendored LForms runtime from media/lforms/. Without localResourceRoots the
+    // webview refuses those URIs outright — no CSP violation, just a silent 404 and a blank pane. Scoped to that
+    // one directory; every other pane keeps the default (no local resources at all).
+    const lformsRoot = vscode.Uri.joinPath(context.extensionUri, "media", "lforms");
     const panel = vscode.window.createWebviewPanel(
       `crlCockpit.${pane}`,
       paneTitle(pane),
       { viewColumn: columnFor(pane), preserveFocus: true },
-      { enableScripts: true, retainContextWhenHidden: true },
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        ...(pane === "applyQuestionnaire" ? { localResourceRoots: [lformsRoot] } : {}),
+      },
     );
-    panel.webview.html = shellHtml(pane, panel.webview.cspSource);
+    panel.webview.html = shellHtml(pane, panel.webview.cspSource, (f: string) =>
+      panel.webview.asWebviewUri(vscode.Uri.joinPath(lformsRoot, f)).toString(),
+    );
     coord.setPaneCapability(pane, "renderable"); // all panes render + receive reveals (the tree flowchart lit up in T3)
     const disposables: vscode.Disposable[] = [
       panel.webview.onDidReceiveMessage((m) => onWebviewMessage(pane, m)),
@@ -5006,13 +5016,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
  * every other pane nonce-only.
  */
 export function cockpitPaneCsp(
-  _pane: Pane,
+  pane: Pane,
   a: { nonce: string; styleNonce: string; cspSource: string },
 ): string {
+  if (pane === "applyQuestionnaire") {
+    // The style nonce is DROPPED, not supplemented: a nonce present makes browsers ignore 'unsafe-inline',
+    // so keeping both would silently remain nonce-only and LForms would render unstyled. `cspSource` is needed
+    // for the vendored styles.css <link>, which style-src also governs. Measured clean on Desktop AND the web
+    // workbench; img-src stays SHUT (never violated for group/boolean items).
+    return `default-src 'none'; style-src 'unsafe-inline' ${a.cspSource}; script-src 'nonce-${a.nonce}';`;
+  }
   return `default-src 'none'; style-src 'nonce-${a.styleNonce}'; script-src 'nonce-${a.nonce}';`;
 }
 
-function shellHtml(pane: Pane, cspSource: string): string {
+function shellHtml(pane: Pane, cspSource: string, asset: (f: string) => string): string {
   const nonce = randomBytes(16).toString("base64");
   const styleNonce = randomBytes(16).toString("base64");
   const csp = cockpitPaneCsp(pane, { nonce, styleNonce, cspSource });
@@ -5180,7 +5197,20 @@ ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
-    `<style nonce="${styleNonce}">${style}</style></head><body><div id="fcChrome"></div><div id="root"></div><div id="flagDrawer"></div>` +
+    `<style nonce="${styleNonce}">${style}</style>` +
+    // The $apply pane's vendored runtime loads HERE, in the shell document — a real document load, so the
+    // scripts execute. They must NOT be delivered in a render fragment: the cockpit installs those with
+    // `root.innerHTML`, and <script> inserted that way never runs. Zone.js first (the concatenated bundle
+    // deliberately excludes it, and without it Angular never bootstraps and the form silently paints nothing).
+    // The stylesheet <link> needs no nonce here because this pane's style-src is 'unsafe-inline' + cspSource.
+    (pane === "applyQuestionnaire"
+      ? `<link rel="stylesheet" href="${asset("styles.css")}">` +
+        `<style>#root{white-space:normal}</style>` + // the shell's body{white-space:pre-wrap} would mangle the form
+        `<script nonce="${nonce}" src="${asset("zone.min.js")}"></script>` +
+        `<script nonce="${nonce}" src="${asset("lhc-forms.js")}"></script>` +
+        `<script nonce="${nonce}" src="${asset("lformsFHIR.min.js")}"></script>`
+      : "") +
+    `</head><body><div id="fcChrome"></div><div id="root"></div><div id="flagDrawer"></div>` +
     `<script nonce="${nonce}">` +
     COCKPIT_WEBVIEW_SCRIPT +
     `</script></body></html>`
