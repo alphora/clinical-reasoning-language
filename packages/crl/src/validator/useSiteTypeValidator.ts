@@ -13,10 +13,11 @@ import {
   type BlockBody,
   type ActionStatement,
   type CompositionExpression,
+  type DefinedAsBooleanComposition,
   type ReferenceName,
   type Location,
 } from "../ast/types";
-import { branchConditionRefs } from "../ast/branchCondition";
+import { branchConditionRefs, branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import { conceptValueTypes, type ConceptValueType } from "../grammar/conceptValueTypes";
 import {
   type ResultType,
@@ -270,6 +271,15 @@ export class UseSiteTypeValidator {
           );
         }
       }
+
+      // 2d. BOOLEAN COMPOSITION (`defined as ("A" and "B")`) — concept-boolean-composition T2 (design §2/§6).
+      // A NEW family (T1): zero corpus, so ALL three checks are hard errors enforced NOW — no legacy warn-window
+      // like the `defined as exists` record-shape deferral (that hole predates + is migration-gated; digging a
+      // second one for new syntax has no excuse — plan-panel disc 457 both arms). Emit stays sentinel-inert until
+      // T3; these checks are what makes the family internally consistent within the release.
+      if (body.type === "DefinedAsBooleanComposition") {
+        this.checkBooleanComposition(concept, body, vts, ctx, attribution, errors);
+      }
     }
 
     // 2c. BARE-REF ALIAS result type (disc 404 Q4 + R2 Q3; extended in #189 IMPL 2b). `defined as "X"`
@@ -318,6 +328,72 @@ export class UseSiteTypeValidator {
         if (repVts[0] !== conceptVt) {
           errors.push(posrepMismatch(concept.name, conceptVt, repVts[0], rep.location, attribution));
         }
+      }
+    }
+  }
+
+  // concept-boolean-composition T2 (design §2/§6; plan-panel disc 457) — validate the `defined as
+  // ( <boolean> )` family. Three hard checks; ALL constrain ONLY the new family, so zero existing corpus is
+  // touched. Emit is sentinel-inert until T3; this is what keeps the T1-parsed family internally consistent.
+  private checkBooleanComposition(
+    concept: Concept,
+    body: DefinedAsBooleanComposition,
+    vts: ConceptValueType[],
+    ctx: ResolveCtx,
+    attribution: Attribution,
+    errors: ValidationError[],
+  ): void {
+    // T2.1 — RESULT type MUST be a declared `Scalar<Boolean>`. A boolean composition intrinsically yields a
+    // scalar boolean; enforce shape AND value type NOW (no `defined as exists`-style record-shape deferral —
+    // that hole is pre-existing + migration-gated; a new zero-corpus family gets no second known-invalid cell).
+    if (concept.shape !== "Scalar") {
+      // A record shape is NEVER fully indeterminate (`resultType.ts`) — `conceptResultType` returns a value.
+      const rt = conceptResultType(concept.shape, vts, concept.conceptType);
+      errors.push(
+        booleanCompositionResult(
+          "boolean-composition-result-nonscalar",
+          concept.name,
+          rt ? renderResultType(rt) : `${concept.shape}<…>`,
+          body.location,
+          attribution,
+        ),
+      );
+    } else if (vts.length === 1 && vts[0] !== "boolean") {
+      // Scalar + a single non-boolean value type. (0 value types → A.10 `missing-value-type` owns it; >1 → A.9.)
+      errors.push(
+        booleanCompositionResult(
+          "boolean-composition-result-nonboolean",
+          concept.name,
+          vts[0],
+          body.location,
+          attribution,
+        ),
+      );
+    }
+
+    // (T2.3 PURE-DERIVED — no local `code is` / `source representation` — is a REPRESENTATION-SOURCE coherence
+    // defect, so it lives in `representationShapeValidator` as a non-demotable `representation-shape` rule, NOT
+    // here: it can fire with no value type declared, which a `use-site-type-mismatch` must not, disc 457 both arms.)
+
+    // T2.2 — every OPERAND must resolve to a `Scalar<Boolean>` by its RESULT type, NOT its datum value type: a
+    // `shape is RecordSet` + `value type is boolean` — or an UNTYPED record — publishes records, not a boolean.
+    // A record result is decidable even with an unknown resource; a 0-vt Scalar / an unindexed cross-lib target
+    // resolves `undefined` and stays SILENT (fail-OPEN, safe only because emit is sentinel-blocked; T3 is the
+    // fail-closed point). The concept-layer `and`/`or`/`not` is STRICT — no criterion exists-bridge; a record
+    // operand is steered to `exists`.
+    for (const op of branchConditionConceptRefsStrict(body.expression, "useSiteType boolean composition")) {
+      const rt = resolveConceptResultType(getRefName(op.ref), getRefLibrary(op.ref) ?? undefined, ctx);
+      if (rt !== undefined && !(rt.shape === "Scalar" && rt.valueType === "boolean")) {
+        errors.push(
+          booleanCompositionOperandNonBoolean(
+            concept.name,
+            getRefName(op.ref),
+            renderResultType(rt),
+            rt.shape !== "Scalar",
+            op.location,
+            attribution,
+          ),
+        );
       }
     }
   }
@@ -945,6 +1021,77 @@ function resultMismatch(
       `declares \`value type is ${actual}\`. Change the value type to \`boolean\`, or use a ` +
       `value-preserving derivation (\`sem-or\` / \`sem-and\` / a bare \`defined as\`) if you meant to ` +
       `keep the \`${actual}\` value.`,
+    location: loc(location),
+    severity: "error",
+    ...base(attribution),
+  };
+}
+
+// concept-boolean-composition T2 — the result-type errors for `defined as ( <boolean> )`. A boolean composition
+// intrinsically publishes a scalar boolean, so a record shape (`-nonscalar`) or a non-boolean Scalar value type
+// (`-nonboolean`) contradicts the declaration (design §2, no-magic §4). Non-demotable.
+function booleanCompositionResult(
+  rule: Extract<
+    UseSiteTypeRule,
+    "boolean-composition-result-nonscalar" | "boolean-composition-result-nonboolean"
+  >,
+  conceptName: string,
+  actual: string,
+  location: Location,
+  attribution: Attribution,
+): UseSiteTypeMismatchError {
+  const nonScalar = rule === "boolean-composition-result-nonscalar";
+  return {
+    kind: "use-site-type-mismatch",
+    rule,
+    conceptName,
+    // Both result rules use the full-result spelling so a machine consumer sees cardinality is part of the demand
+    // (matches the operand rule's `Scalar<boolean>`; disc 457 both arms). `renderResultType` drops the wrapper on
+    // the ACTUAL Scalar rendering — a documented asymmetry.
+    expected: "Scalar<boolean>",
+    actual,
+    message:
+      `Concept "${conceptName}": a \`defined as ( … and / or / not … )\` boolean composition always produces a ` +
+      `scalar \`boolean\`, but the concept declares ` +
+      (nonScalar
+        ? `\`${actual}\` (a record shape). Declare \`shape is Scalar\` + \`value type is boolean\`. To combine ` +
+          `record concepts, promote each to a boolean first with \`defined as exists ( … )\`.`
+        : `\`value type is ${actual}\`. Change the value type to \`boolean\` — a boolean composition cannot ` +
+          `publish a \`${actual}\`.`),
+    location: loc(location),
+    severity: "error",
+    ...base(attribution),
+  };
+}
+
+// concept-boolean-composition T2 — an operand that does not publish a `Scalar<Boolean>`. Keyed on the operand's
+// full RESULT type (`resolveConceptResultType`), so an untyped / boolean-datum RECORD operand is caught (it
+// publishes records, not a boolean). The remediation BRANCHES on the operand's shape (disc 457 Claude): a RECORD
+// operand is promoted with `exists`; a Scalar non-boolean has no instance stream, so `exists` over it would be the
+// silent-always-true form #269 flags — steer it to a boolean reduction instead. Non-demotable.
+function booleanCompositionOperandNonBoolean(
+  conceptName: string,
+  operandName: string,
+  actualResult: string,
+  operandIsRecord: boolean,
+  location: Location,
+  attribution: Attribution,
+): UseSiteTypeMismatchError {
+  const fix = operandIsRecord
+    ? `The concept-layer \`and\`/\`or\`/\`not\` is strict — it does not implicitly existentialize a record ` +
+      `operand. Promote "${operandName}" to a boolean first: declare a separate \`value type is boolean\` ` +
+      `concept whose body is \`defined as exists ( "${operandName}" )\`, and compose that.`
+    : `A \`${actualResult}\` has no truth value to combine — reduce it to a boolean fact (a \`definition is ` +
+      `${operandName} at least <threshold>\` concept, say) or reference a concept declared \`value type is boolean\`.`;
+  return {
+    kind: "use-site-type-mismatch",
+    rule: "boolean-composition-operand-nonboolean",
+    conceptName,
+    expected: "Scalar<boolean>",
+    actual: actualResult,
+    message:
+      `Concept "${conceptName}": every operand of a \`defined as ( … and / or / not … )\` boolean composition ` +
+      `must be a scalar \`boolean\`, but operand "${operandName}" publishes a \`${actualResult}\`. ${fix}`,
     location: loc(location),
     severity: "error",
     ...base(attribution),

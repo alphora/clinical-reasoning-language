@@ -314,6 +314,10 @@ export type RepresentationShapeRule =
   | "value-projection-references-concept"
   | "duplicate-representation-key"
   | "definition-is-exists-misuse"
+  // concept-boolean-composition T2 (design §6) — a `defined as ( <boolean> )` concept is PURE-DERIVED; it
+  // cannot also carry a local `code is` / `source representation` (a representation-source coherence defect,
+  // not a use-site TYPE mismatch — it can fire with no value type declared). The both-rep fold is #257-deferred.
+  | "boolean-composition-not-pure-derived"
   | "multiple-value-types"
   | "missing-value-type";
 
@@ -399,6 +403,14 @@ export type UseSiteTypeRule =
   | "bare-ref-value-type-mismatch"
   | "exists-result-nonboolean"
   | "negation-result-nonboolean"
+  // concept-boolean-composition T2 — the `defined as ( <boolean> )` family (design §2). Result MUST be a
+  //   declared Scalar<Boolean>; operands MUST resolve to Scalar<Boolean> (RESULT type, not datum value type).
+  //   A 0-vt/A.10 Scalar or an unindexed cross-lib operand is deliberately SILENT here (fail-OPEN; T3 emit is
+  //   the fail-closed point). (The PURE-DERIVED / no-`code is` check is a `representation-shape` rule, not here —
+  //   it is a representation-source coherence defect that can fire with no value type declared.)
+  | "boolean-composition-result-nonscalar"
+  | "boolean-composition-result-nonboolean"
+  | "boolean-composition-operand-nonboolean"
   | "posrep-value-type-mismatch"
   | "decision-guard-nonboolean"
   | "decision-guard-record-shaped";

@@ -167,6 +167,36 @@ export class RepresentationShapeValidator {
       );
     }
 
+    // concept-boolean-composition T2 (design §6) — a `defined as ( … and / or / not … )` boolean composition is
+    // PURE-DERIVED: it cannot ALSO carry a local `code is` or a `source representation`. The both-rep fold
+    // (`code is` + a derived body) is #257-deferred and its machinery was built for sem-compositions; the boolean
+    // family has no both-rep story yet. A REPRESENTATION-SOURCE coherence defect (fires even with no value type
+    // declared), so it lives here as a non-demotable `representation-shape` rule — NOT a use-site TYPE mismatch
+    // (disc 457, both crl-emit arms; placement settled on the mechanical fact that `representation-shape` is
+    // non-demotable while `reduction-shape` is warning-only).
+    if (
+      concept.definition?.type === "DefinedAsDefinition" &&
+      concept.definition.body.type === "DefinedAsBooleanComposition" &&
+      (concept.code !== undefined || representations.length > 0)
+    ) {
+      const sources = [
+        concept.code !== undefined ? "a local `code is`" : undefined,
+        representations.length > 0 ? "a `source representation`" : undefined,
+      ].filter((s): s is string => s !== undefined);
+      errors.push(
+        this.err(
+          "boolean-composition-not-pure-derived",
+          concept.name,
+          `Concept "${concept.name}": a \`defined as ( … and / or / not … )\` boolean composition is a ` +
+            `PURE-DERIVED determination — it cannot also carry ${sources.join(" and ")} (a boolean ` +
+            `determination has no both-representation fold yet; that lands with #257). Remove the local source, ` +
+            `or model the asserted fact as a separate concept the composition references.`,
+          concept.location,
+          attribution,
+        ),
+      );
+    }
+
     // A.3 — concept-level (local-rep) `value element` with no local `code is`. The concept-level
     // value element describes the LOCAL representation, which exists only when a `code is` is
     // present; without one it describes a representation that isn't there.

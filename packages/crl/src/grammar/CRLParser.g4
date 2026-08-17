@@ -569,8 +569,10 @@ definedAsBody
 //     rejected by the shared builder, exactly as in a `when` guard.
 // The operator-free degenerate `("A")` is a genuine ATN ambiguity resolved by ALTERNATIVE ORDER (min alt
 // number → `DefinedAsComposition`). The builder does NOT normalize it to a bare ref — it STAYS a
-// `DefinedAsComposition` (a single `CompositionRef`); treating it as a value-preserving alias of `defined as
-// "A"` is the T2 alias-invariant obligation, not a T1 AST rewrite. Intentional; not operator-token-disambiguated.
+// `DefinedAsComposition` (a single `CompositionRef`). Treating it as a value-preserving alias of `defined as
+// "A"` is a T3 obligation (SUPERSEDES the earlier "T2" note): the equivalence is emit-flip-entangled — today
+// `("A")` bridges to `exists("A")` on the standard lane, so `("A") ≡ "A"` only holds post-flip, and forcing it
+// in T2 would regress a working form (disc 457). Not a T1 AST rewrite. Intentional; not operator-token-disambiguated.
 daBody
     : conceptReference                                  # DefinedAsBareRef
     | EXISTS LPAREN conceptReference RPAREN              # DefinedAsExists

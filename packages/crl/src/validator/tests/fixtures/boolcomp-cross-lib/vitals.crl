@@ -1,0 +1,11 @@
+// The sibling library: a Scalar<Boolean> (clean operand) and a RecordSet (erroring operand).
+library "Vitals".
+
+concept "Flag":
+- value type is boolean.
+- code is `f`.
+
+concept "Obs":
+- shape is RecordSet.
+- type is Observation.
+- code is `o`.

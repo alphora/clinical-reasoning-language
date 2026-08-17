@@ -1,0 +1,9 @@
+// concept-boolean-composition T2 multi-file — a boolean composition over TWO foreign operands: an indexed
+// sibling `Scalar<Boolean>` ("Vitals"."Flag" — must be accepted, proving foreign operands ARE checkable) and an
+// indexed sibling RECORD ("Vitals"."Obs" — must error `boolean-composition-operand-nonboolean`). One fixture,
+// both outcomes; disc 457 gpt56 [important] "foreign operand visible in indexed sources IS checkable".
+library "Root".
+
+concept "Both":
+- value type is boolean.
+- defined as ( "Vitals"."Flag" and "Vitals"."Obs" ).
