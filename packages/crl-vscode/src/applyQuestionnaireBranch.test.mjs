@@ -49,9 +49,24 @@ describe("applyQuestionnaire webview branch", () => {
     assert.ok(branch.includes("The questionnaire did not render."), "no message for the empty-mount case");
   });
 
-  it("renders a placeholder when no case is focused", () => {
+  it("distinguishes NO CASE SELECTED from NO DATA FOUND", () => {
+    // These are different states and were previously one message. "No data" is the normal state until the
+    // producer (#277) exists, so conflating them would read as a bug in the pane rather than absent artifacts.
+    assert.ok(branch.includes("if(!m.label)"), "no branch for the nothing-selected case");
+    assert.match(branch, /Select a case to see its FHIR questionnaire\./);
     assert.ok(branch.includes("if(!m.q)"), "no branch for the absent-questionnaire case");
-    assert.match(branch, /Select a case to see its \$apply questionnaire\./);
+    assert.match(branch, /Could not find FHIR Questionnaire data for this case\./);
+  });
+
+  it("says WHERE it looked when no data was found", () => {
+    // Without the path, "could not find" is unactionable — the whole point is that the reader can go check.
+    assert.match(branch, /Looked for: '\+m\.lookedFor/);
+  });
+
+  it("shows the case header on both the success and failure paths", () => {
+    // Mirrors the CRL Questionnaire pane's header so the two panes read as the same case side by side.
+    const heads = branch.match(/head\('Case - '\+m\.label\)/g) ?? [];
+    assert.ok(heads.length >= 2, `case header should appear on failure AND success paths, found ${heads.length}`);
   });
 
   it("wraps the mount so a throw cannot leave a silently blank pane", () => {
