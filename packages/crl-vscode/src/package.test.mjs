@@ -13,6 +13,10 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// Imported so the package.json default and the spec's fallback are pinned to each other — two sources of truth
+// for "what MV shows with no setting" would otherwise diverge silently.
+import { MEDICAL_VALIDATION_PANE_SPEC, COCKPIT_PANE_SPEC } from "./paneOrder.ts";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgPath = resolve(here, "../package.json");
 const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
@@ -160,14 +164,44 @@ check("contributes the crl.medical-validation.primary setting (enum source|cel; 
   assert.equal(prop.scope, "window");
 });
 
-check("contributes the crl.medical-validation.paneOrder setting (enum incl worklist+questionnaire; default [worklist,source,tree,questionnaire], window scope) (#156 slice 3 / #177 slice 3)", () => {
+check("contributes the crl.medical-validation.paneOrder setting (enum + ALL-panes default, window scope)", () => {
   const prop = c.configuration?.properties?.["crl.medical-validation.paneOrder"];
   assert.ok(prop, "expected crl.medical-validation.paneOrder in contributes.configuration.properties");
   assert.equal(prop.type, "array");
-  // #177 slice 3: questionnaire is now a valid MV pane key + part of the canonical default (the operator's 4-panel set).
-  assert.deepEqual(prop.items?.enum, ["worklist", "source", "tree", "questionnaire", "crl", "cel"]);
-  assert.deepEqual(prop.default, ["worklist", "source", "tree", "questionnaire"]);
+  assert.deepEqual(prop.items?.enum, ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"]);
+  // Operator's default (2026-08-16). Deliberately a SUBSET of the enum: the setting is the source of truth, so
+  // the rest are opt-in via the enum a user editing this setting is already looking at. Defaulting to all seven
+  // was tried and reverted — seven webviews side by side on a browser-only clinician's screen.
+  assert.deepEqual(prop.default, ["source", "fhirQuestionnaire", "tree"]);
   assert.equal(prop.scope, "window");
+});
+
+check("the package default and the COCKPIT spec's fallback are the SAME list", () => {
+  // Same trap as MV: cockpit canonical omitted `tree` (right when canonical meant "always appended", wrong now
+  // that it means "what you get with no usable setting") while the package default included it — so deleting
+  // the setting gave four panes and a mistyped setting gave three.
+  const prop = c.configuration?.properties?.["crl.cockpit.paneOrder"];
+  assert.deepEqual([...COCKPIT_PANE_SPEC.canonical], prop.default);
+});
+
+check("the package default and the MV spec's fallback are the SAME list", () => {
+  // Two sources of truth for "what MV shows with no setting" would diverge silently: package.json supplies the
+  // value when the setting is unset, spec.canonical when it is set to a non-array.
+  const prop = c.configuration?.properties?.["crl.medical-validation.paneOrder"];
+  assert.deepEqual([...MEDICAL_VALIDATION_PANE_SPEC.canonical], prop.default);
+});
+
+check("every default pane is a valid pane", () => {
+  const prop = c.configuration?.properties?.["crl.medical-validation.paneOrder"];
+  assert.ok(prop.default.every((p) => prop.items.enum.includes(p)), "a default pane is missing from the enum");
+});
+
+check("no crl.dev.* command or setting ships to users", () => {
+  // The CSP harness is a dev-host instrument, not a feature: no command, no palette entry, no setting.
+  const props = Object.keys(c.configuration?.properties ?? {});
+  assert.deepEqual(props.filter((k) => k.startsWith("crl.dev.")), []);
+  assert.deepEqual((c.commands ?? []).map((x) => x.command).filter((k) => k.startsWith("crl.dev.")), []);
+  assert.deepEqual((c.menus?.commandPalette ?? []).map((m) => m.command).filter((k) => k.startsWith("crl.dev.")), []);
 });
 
 check("contributes the crl.medical-validation.showKeys setting (boolean, default true, window scope) (#156 slice 3)", () => {

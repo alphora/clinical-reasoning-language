@@ -14,7 +14,8 @@
     "test:mcp": "npm run test:mcp -w @smile-digital-health/crl",
     "test:ext": "npm test -w crl-language-support",
     "test:vitest": "vitest run --no-file-parallelism",
-    "package:extension": "npm run package -w crl-language-support"
+    "package:extension": "npm run package -w crl-language-support",
+    "seed:questionnaire": "node packages/crl-vscode/scripts/seed-questionnaire-fixture.mjs"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.10",

@@ -30,11 +30,13 @@ export interface PaneSpec {
   aliases?: Record<PublicPaneKey, InternalPane>;
 }
 
-/** The cockpit spec — BYTE-IDENTICAL to the pre-spec behavior: valid = the 4 panes, canonical = the 3 always-present
- *  (tree opt-in), no aliases. Keep this in lockstep with `crl.cockpit.paneOrder`'s enum + default. */
+/** The cockpit spec. `canonical` is the FALLBACK (see normalizePaneOrder), so it MUST equal
+ *  `crl.cockpit.paneOrder`'s `default` in package.json — otherwise deleting the setting and setting it to a
+ *  non-array give different panels. It previously omitted `tree` (correct when canonical meant "always
+ *  appended", wrong now that it means "what you get with no usable setting"); pinned by package.test.mjs. */
 export const COCKPIT_PANE_SPEC: PaneSpec = {
   valid: ["source", "crl", "cel", "tree"],
-  canonical: ["source", "crl", "cel"],
+  canonical: ["source", "crl", "cel", "tree"],
 };
 
 /** The medical-validation spec — `worklist` is now a FIRST-CLASS internal pane (the review surface), DISTINCT from `cel`
@@ -42,11 +44,32 @@ export const COCKPIT_PANE_SPEC: PaneSpec = {
  *  not-canonical, so a MV user can open the read-only CEL alongside the worklist. No alias (dropped when worklist split
  *  from cel — pane split, disc 179): listing both `worklist` and `cel` now opens BOTH (they're different internal panes). */
 export const MEDICAL_VALIDATION_PANE_SPEC: PaneSpec = {
-  valid: ["worklist", "source", "tree", "questionnaire", "crl", "cel"],
-  canonical: ["worklist", "source", "tree", "questionnaire"],
+  // `canonical` here is the FALLBACK (see normalizePaneOrder) — not a set of panes forced into an explicit
+  // order. Every pane below, worklist included, can be omitted by writing an order without it, and an empty
+  // order shows nothing.
+  //
+  // MUST MATCH `crl.medical-validation.paneOrder`'s `default` in package.json (pinned by package.test.mjs).
+  // Defaulting to all seven was briefly tried and reverted: it put seven retainContextWhenHidden webviews —
+  // including the 1.85 MB LForms shell — side by side on a browser-only clinician's screen, for panes most of
+  // them never open. Discoverability comes from the settings enum, which is where someone editing paneOrder
+  // already is.
+  valid: ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"],
+  canonical: ["source", "fhirQuestionnaire", "tree"],
 };
 
-const VALID_PANES: ReadonlySet<Pane> = new Set<Pane>(["source", "crl", "cel", "tree", "questionnaire", "worklist"]);
+/** Every internal pane, in a stable order — the ONE authoritative list. Anything that needs to enumerate panes
+ *  (the valid set below, the webview view types, the serializer registration) derives from this rather than
+ *  repeating it, because the repeated copies have already drifted once: `fhirQuestionnaire` was added to the
+ *  cockpit's list and to this file but missed in `correspondenceEngine.PANES`, silently costing that pane its
+ *  reveal effects. None of those lists is compiler-checked against the `Pane` union. */
+export const ALL_PANES: readonly Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "fhirQuestionnaire", "worklist"];
+
+/** The webview view type for a pane's panel. Shared so the panel that is CREATED and the serializer that
+ *  RECLAIMS it after a window reload can never disagree — a mismatch there is invisible until a restored tab
+ *  refuses to go away. */
+export const cockpitViewType = (pane: Pane): string => `crlCockpit.${pane}`;
+
+const VALID_PANES: ReadonlySet<Pane> = new Set<Pane>(ALL_PANES);
 
 /** Resolve a PUBLIC key to an InternalPane via the spec's aliases (identity when unmapped); undefined if the result is
  *  not a real pane (so an alias can never introduce a non-pane). */
@@ -73,11 +96,22 @@ export function normalizePaneOrder(raw: unknown, spec: PaneSpec): Pane[] {
       out.push(internal);
     }
   }
-  for (const key of spec.canonical) {
-    const internal = toInternal(key, spec);
-    if (internal !== undefined && !seen.has(internal)) {
-      seen.add(internal);
-      out.push(internal);
+  // SETTINGS ARE THE SOURCE OF TRUTH. Any ARRAY the user writes is honored exactly — nothing is force-appended,
+  // so every pane is opt-out-able, and an EMPTY array means an empty panel. That is a real thing to want, and
+  // silently repopulating it would be the same bug as force-appending.
+  //
+  // `canonical` is the FALLBACK for when the user has expressed nothing AT ALL — the setting is unset or not an
+  // array. It is not a set of mandatory panes.
+  //
+  // This changed (2026-08-16). Panes used to be appended whether or not the user listed them, so an order that
+  // omitted one silently got it back and no pane could be turned off.
+  if (!Array.isArray(raw)) {
+    for (const key of spec.canonical) {
+      const internal = toInternal(key, spec);
+      if (internal !== undefined && !seen.has(internal)) {
+        seen.add(internal);
+        out.push(internal);
+      }
     }
   }
   return out;

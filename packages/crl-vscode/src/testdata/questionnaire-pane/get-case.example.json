@@ -1,0 +1,112 @@
+{
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "id": "um-css-03-adult-dmc-route-determination",
+    "url": "http://example.org/crl/um-css-03/Questionnaire/adult-dmc-route-determination",
+    "version": "0.0.0-fixture",
+    "name": "AdultDmcRouteDetermination",
+    "title": "Adult DMC Route Determination",
+    "status": "active",
+    "subjectType": ["Patient"],
+    "item": [
+      {
+        "linkId": "age-gate",
+        "text": "Age gate",
+        "type": "group",
+        "item": [
+          {
+            "linkId": "age-twenty-one-or-older",
+            "text": "Age twenty one or older",
+            "type": "boolean",
+            "required": true,
+            "code": [
+              {
+                "system": "http://example.org/crl/um-css-03/CodeSystem/um-css-03-local",
+                "code": "age-twenty-one-or-older",
+                "display": "Age twenty one or older"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "linkId": "dmc-route-criteria",
+        "text": "DMC route criteria",
+        "type": "group",
+        "enableWhen": [
+          {
+            "question": "age-twenty-one-or-older",
+            "operator": "=",
+            "answerBoolean": true
+          }
+        ],
+        "item": [
+          {
+            "linkId": "has-qualifying-diagnosis",
+            "text": "Has qualifying diagnosis",
+            "type": "boolean",
+            "required": true,
+            "code": [
+              {
+                "system": "http://example.org/crl/um-css-03/CodeSystem/um-css-03-local",
+                "code": "has-qualifying-diagnosis",
+                "display": "Has qualifying diagnosis"
+              }
+            ]
+          },
+          {
+            "linkId": "prior-treatment-documented",
+            "text": "Prior treatment documented",
+            "type": "boolean",
+            "required": true,
+            "code": [
+              {
+                "system": "http://example.org/crl/um-css-03/CodeSystem/um-css-03-local",
+                "code": "prior-treatment-documented",
+                "display": "Prior treatment documented"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "questionnaireResponse": {
+    "resourceType": "QuestionnaireResponse",
+    "id": "um-css-03-adult-dmc-route-determination-example",
+    "questionnaire": "http://example.org/crl/um-css-03/Questionnaire/adult-dmc-route-determination|0.0.0-fixture",
+    "status": "completed",
+    "subject": { "reference": "Patient/example" },
+    "item": [
+      {
+        "linkId": "age-gate",
+        "text": "Age gate",
+        "item": [
+          {
+            "linkId": "age-twenty-one-or-older",
+            "text": "Age twenty one or older",
+            "answer": [{ "valueBoolean": true }]
+          }
+        ]
+      },
+      {
+        "linkId": "dmc-route-criteria",
+        "text": "DMC route criteria",
+        "item": [
+          {
+            "linkId": "has-qualifying-diagnosis",
+            "text": "Has qualifying diagnosis",
+            "answer": [{ "valueBoolean": true }]
+          },
+          {
+            "linkId": "prior-treatment-documented",
+            "text": "Prior treatment documented",
+            "answer": [{ "valueBoolean": false }]
+          }
+        ]
+      }
+    ]
+  },
+  "lane": "mixed",
+  "warnings": []
+}

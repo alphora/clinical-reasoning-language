@@ -154,7 +154,9 @@ import {
   type CrlRevealMaps,
 } from "./crlRevealMaps";
 import {
+  ALL_PANES,
   COCKPIT_PANE_SPEC,
+  cockpitViewType,
   MEDICAL_VALIDATION_PANE_SPEC,
   normalizePaneOrder,
   type PaneSpec,
@@ -183,10 +185,11 @@ import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordina
 import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE, policyIdFromSrc } from "./provenanceFindings";
 import { resolveLaunchTarget } from "./policyLaunchTarget";
 import { flagIssueBody, flagIssueTitle, replaceIssueTypeLine } from "./flagIssueText";
+import { caseDisplayName } from "./caseDisplayName";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
 
-const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "worklist"]; // all panes (render/clearPending/reveal fan-out); tree/questionnaire/worklist opt-in; MUST stay in lockstep with engine `Pane` (silent-failure list — not compiler-checked; disc 179)
+const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "fhirQuestionnaire", "worklist"]; // all panes (render/clearPending/reveal fan-out); tree/questionnaire/fhirQuestionnaire/worklist opt-in; MUST stay in lockstep with engine `Pane` (silent-failure list — not compiler-checked; disc 179)
 // The panes the navigator can WALK (primary/cycle/config-primary). tree is render+reveal+peek-only, never a primary —
 // so it is absent here. Used to build the setPrimary quickpick + guard config-primary against a stray "tree".
 const PRIMARY_PANES: PrimaryPane[] = ["source", "crl", "cel"];
@@ -195,8 +198,14 @@ const PRIMARY_PANES: PrimaryPane[] = ["source", "crl", "cel"];
 // cel are DISTINCT internal panes, so MV's valid set is up to 6 (worklist, cel, source, tree, questionnaire, crl) — a user
 // paneOrder listing all six must get a 6th column instead of piling onto column One via the `?? One` fallback (VS Code
 // supports up to 9). The default MV set stays 4 (worklist/source/tree/questionnaire); this only bounds the overflow case.
-const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.ViewColumn.Three, vscode.ViewColumn.Four, vscode.ViewColumn.Five, vscode.ViewColumn.Six];
-const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "Questionnaire", worklist: "Worklist" };
+// NINE slots. MV now has SEVEN panes and defaults to all of them, so a six-slot list left the seventh falling
+// back to `?? One` and piling on top of the first pane — reachable on a fresh install, not an edge case.
+// Nine is VS Code's own maximum, so this cannot under-provision again as panes are added.
+const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.ViewColumn.Three, vscode.ViewColumn.Four, vscode.ViewColumn.Five, vscode.ViewColumn.Six, vscode.ViewColumn.Seven, vscode.ViewColumn.Eight, vscode.ViewColumn.Nine];
+// The two questionnaire panes are named by their SOURCE, which is the whole point of showing both: "CRL
+// Questionnaire" is the projection of what the CRL says, "FHIR Questionnaire" is what the emitted artifact
+// actually produced via $apply. Naming one of them "$apply" would name the mechanism rather than the thing.
+const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "CRL Questionnaire", fhirQuestionnaire: "FHIR Questionnaire", worklist: "Worklist" };
 // Perf gate (disc 118): the measured full-render floor. Over → fall back to a navigation-only placeholder, don't freeze.
 const MAX_SOURCE_CHARS = 200_000;
 const MAX_SOURCE_MARKS = 2000;
@@ -403,7 +412,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  "CRL Medical Validation" prefix. Since the pane split (disc 179) the `worklist` pane carries its own title ("Worklist")
    *  and the `cel` pane reads "CEL" in BOTH modes (it's the read-only case-list now, not the worklist). */
   const paneTitle = (pane: Pane): string =>
-    mode === "medical-validation" ? `CRL Medical Validation · ${PANE_TITLE[pane]}` : PANE_TITLE[pane];
+    mode === "medical-validation" ? `Medical Validation - ${PANE_TITLE[pane]}` : PANE_TITLE[pane];
   /** The navigable primary panes for the current mode (#156 slice 3, FIX 2). MV's primary enum is [source, cel] (no crl —
    *  it has no CRL pane in the default and its config enum excludes crl), so the set-primary quickpick + the persisted
    *  guard must reject "crl" in MV mode. Cockpit keeps the full [source, crl, cel]. */
@@ -621,9 +630,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** Reconcile OPEN panels to the (normalized) paneOrder, then place columns. Unlike applyPaneOrder (reorder-only), this
    *  OPENS a now-listed visible pane (rendering it immediately so it isn't blank) and DISPOSES an open pane dropped from
    *  the order — so toggling the opt-in tree pane in settings takes effect live, without re-running "Show Cockpit". Only
-   *  the tree pane can ever be disposed here: normalizePaneOrder always re-adds the 3 canonical panes. */
+   *  ⚠ CHANGED 2026-08-16: ANY pane can now be disposed here. normalizePaneOrder no longer re-adds "canonical"
+   *  panes to an explicit order (the setting is the source of truth), so a user can drop source/CRL/CEL/
+   *  worklist/either questionnaire — not just the opt-in tree. Anything here that assumed a pane is always
+   *  present must not. */
   const reconcilePaneOrder = (): void => {
-    for (const pane of [...views.keys()]) if (!paneOrder.includes(pane)) views.get(pane)?.panel.dispose(); // dispose dropped (tree only)
+    for (const pane of [...views.keys()]) if (!paneOrder.includes(pane)) views.get(pane)?.panel.dispose(); // dispose any dropped pane
     let opened = false;
     for (const pane of paneOrder) {
       if (!state.paneVisibility[pane]) continue;
@@ -738,12 +750,19 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       shouldRerenderQuestionnaire({
         prevCaseId,
         nextCaseId: focusedCaseId(next),
+        // Either questionnaire pane being open is reason enough to run this hook — they render the same case
+        // from different sources (CRL projection vs the emitted artifact) and both must follow the selection.
+        paneOpen: views.has("questionnaire") || views.has("fhirQuestionnaire"),
         mode,
-        paneOpen: views.has("questionnaire"),
       })
     ) {
       currentQuestionIndex = -1; // a new case starts with NO question focused
       renderPane("questionnaire");
+      // The $apply pane follows the SAME case selection. Without this it is rendered only by rebuild() — which
+      // runs before any case is focused — so it would sit permanently on its "select a case" placeholder while
+      // the static questionnaire beside it updated. Its own render-identity guard makes a no-change render a
+      // cheap no-op, so re-rendering here cannot churn the mounted form.
+      renderPane("fhirQuestionnaire");
       // #177 slice 4: the questionnaire just re-rendered for the new case (no focused question) — re-drive the "this node" marker
       // across all panes. CORRECTNESS MODEL (mirrors driveDoneOverlay): the PANE-ACK re-drive (onWebviewMessage's `ready` →
       // driveThisNode, fires on every marker-bearing pane render) is the guarantee — a freshly rendered pane always re-paints
@@ -2072,6 +2091,41 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.flaggableGids = r.flaggableGids;
       v.startNodeGid = r.startNodeGid; // the chrome-mirror count badge's node
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode });
+    } else if (pane === "fhirQuestionnaire") {
+      // The $apply-driven pane (LForms). Per the integration design it receives DATA ONLY — never `html` — so
+      // there is no innerHTML swap for the mounted form to survive and no dead-script trap (scripts inserted via
+      // innerHTML never execute). The vendor bundles live in this pane's own shell document.
+      // ⚠ EXPLICIT BRANCH ON PURPOSE: the `questionnaire` case below is the bare `else`, so without this a new
+      // pane id would silently render the STATIC questionnaire instead.
+      v.anchors = {};
+      v.reveals = {};
+      // Reads the REAL qa path, not a compiled-in fixture — the same path the producer (#277) will write to, so
+      // nothing here changes when it lands. Async, hence the gen guard.
+      {
+        const focused = focusedScenario();
+        const cid = focusedCaseId(state);
+        // Render identity — currently SELECTION identity, not content identity. It suppresses remounts on
+        // unrelated cockpit re-renders (rebuild/applyShowKeys), which is what it is for. It does NOT detect a
+        // Q/QR that changed on disk for the still-selected case; that needs the producer's revision or content
+        // hash (requested on #277). Do not describe this as content-based until it is.
+        const key = focused ? `${focused.decision?.libraryName ?? ""}::${cid ?? ""}` : undefined;
+        // Same derivation the CRL Questionnaire pane uses (questionnairePaneHtml.ts:331) — strips the authored
+        // `-> outcome` suffix — so the two panes show an identical case header.
+        const label = focused ? caseDisplayName(focused.case?.name ?? "") : undefined;
+        const post = (q?: unknown, qr?: unknown, lookedFor?: string): void => {
+          if (v.gen !== gen) return; // a newer render superseded this async load
+          // Contract breaches are detected HOST-side, where the JSON is already parsed, and shown above the form.
+          // Left to LForms these degrade quietly (empty dropdown, absent widget), which is the one failure shape
+          // this pane must not have.
+          const unrenderable = q === undefined ? [] : unrenderableQuestionnaireFeatures(q);
+          void v.panel.webview.postMessage({ type: "fhirQuestionnaire", gen, indexVersion, key, label, q, qr, lookedFor, unrenderable });
+        };
+        // The FULL authored name (arrow suffix included) is the artifact-directory key — see the note on
+        // loadFhirQuestionnaireCase. `label` above is the display form, which deliberately strips it.
+        const caseName = focused?.case?.name ?? "";
+        if (!focused || !cid || !caseName) post();
+        else void loadFhirQuestionnaireCase(caseName, focused.decision?.libraryName).then((r) => post(r.q, r.qr, r.lookedFor));
+      }
     } else {
       // questionnaire (#177 slice 3) — a STATIC, read-only projection of the FOCUSED cel case's fired path. Gets the
       // selected-case `sv` via the SAME `scenarioByCaseId` join `driveFailedCriteriaPeek` uses + a frame-aware
@@ -2102,6 +2156,68 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** The FOCUSED cel case's `ScenarioViewModel` — the questionnaire's input. Resolved via the SAME frozen
    *  `scenarioByCaseId` join the failed-criterion peek uses (caseId → sv; ambiguous/unfrozen cases excluded in
    *  rebuild). undefined when the selection is not a cel case (or no case is selected) → the pane shows a placeholder. */
+  /**
+   * Read the FHIR Questionnaire + QuestionnaireResponse for a case FROM DISK, at the settled qa layout
+   * (docs/questionnaire-pane-integration-plan.md §5a):
+   *
+   *   <artifact>/tests/data/fhir/patient/<library-slug>-cases/<case-slug>/Questionnaire/*.json
+   *   <artifact>/tests/data/fhir/patient/<library-slug>-cases/<case-slug>/QuestionnaireResponse/*.json
+   *
+   * This is deliberately a real filesystem read and not a compiled-in fixture: it exercises the exact path the
+   * producer (issue #277) will write to, so when the producer lands nothing here changes. To test it today,
+   * copy a Questionnaire/QuestionnaireResponse pair into a case directory.
+   *
+   * The case directory carries an outcome suffix (`…-met` / `…-unmet`) that the case id does not, hence the
+   * trailing `*` on the slug.
+   */
+  async function loadFhirQuestionnaireCase(
+    caseName: string,
+    libraryName: string | undefined,
+  ): Promise<{ q?: unknown; qr?: unknown; lookedFor: string }> {
+    const slugify = artifactSlug;
+    // ⚠ Keyed on the case's FULL AUTHORED NAME, including its `-> outcome` suffix — that is what the emitter
+    // slugifies into the directory name:
+    //   "exclusion overrides full documentation -> unmet (ordered precedence)"
+    //     → exclusion-overrides-full-documentation-unmet-ordered-precedence
+    // NOT the caseId (which is a different, shorter identifier — `exclusion-overrides-precedence` here) and NOT
+    // caseDisplayName (which strips the arrow, and the outcome is part of the directory name). Keying on the
+    // caseId matched by luck on cases whose id happened to prefix the directory, and silently missed otherwise.
+    //
+    // Because the whole name is used, the match is EXACT — no prefix glob, so no risk of binding a sibling case
+    // whose slug extends this one.
+    const slug = slugify(caseName);
+    // Scope by library too when we know it — two libraries can carry the same case slug, and in a multi-root
+    // workspace findFiles spans every folder.
+    const libSeg = libraryName ? `${slugify(libraryName)}-cases` : "*";
+    const lookedFor = `**/tests/data/fhir/patient/${libSeg}/${slug}/{Questionnaire,QuestionnaireResponse}/*.json`;
+    const out: { q?: unknown; qr?: unknown; lookedFor: string } = { lookedFor };
+    if (!slug) return { ...out, lookedFor: "(no case id — nothing was searched)" };
+    let hits: readonly vscode.Uri[] = [];
+    try {
+      hits = await vscode.workspace.findFiles(lookedFor, "**/node_modules/**", 200);
+    } catch {
+      return out;
+    }
+    for (const uri of hits) {
+      const segs = uri.path.split("/");
+      const type = segs[segs.length - 2]; // the <ResourceType> dir holding the file
+      const caseDir = segs[segs.length - 3]; // the <case-slug> dir holding that
+      if (type !== "Questionnaire" && type !== "QuestionnaireResponse") continue;
+      if (caseDir !== slug) continue; // exact case-directory match; belt and braces against a glob surprise
+      if (type === "Questionnaire" && out.q) continue; // a case has one of each
+      if (type === "QuestionnaireResponse" && out.qr) continue;
+      // Per-FILE try: one malformed document must not abort the search and hide a valid one later in the list.
+      try {
+        const json: unknown = JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8"));
+        if (type === "Questionnaire") out.q = json;
+        else out.qr = json;
+      } catch {
+        // skip this file; keep looking
+      }
+    }
+    return out;
+  }
+
   function focusedScenario(): ScenarioViewModel | undefined {
     const sel = state.selection;
     return sel && sel.primary === "cel" ? scenarioByCaseId.get(sel.caseId) : undefined;
@@ -2191,6 +2307,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.criterionOccurrences = []; // #224 ii.3 Slice 2b: reset the criterion-verdict substrate too (symmetry)
       v.flaggableGids = [];
       v.startNodeGid = undefined;
+      if (pane === "fhirQuestionnaire") {
+        // This pane owns its own DOM and holds a render-identity key in the webview. The generic `render`
+        // message would replace #root (destroying the LForms mount) WITHOUT clearing that key, so re-selecting
+        // the same case afterwards would hit the skip-remount check and never rebuild the form. Its own
+        // data-only message clears the key and paints the placeholder.
+        void v.panel.webview.postMessage({ type: "fhirQuestionnaire", gen, indexVersion, key: undefined, label: undefined });
+        continue;
+      }
       void v.panel.webview.postMessage({ type: "render", html: `<p class="placeholder">${escapeHtml(message)}</p>`, gen, indexVersion, mode });
     }
   }
@@ -2486,13 +2610,24 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function ensurePane(pane: Pane): PaneView {
     let v = views.get(pane);
     if (v) return v;
+    // The $apply pane loads the vendored LForms runtime from media/lforms/. Setting localResourceRoots NARROWS
+    // the webview to that one directory. (Omitting it does NOT mean "no local resources" — VS Code's default is
+    // the workspace folders plus the extension directory; the other panes are protected by their
+    // `default-src 'none'` CSP, not by an empty root list.)
+    const lformsRoot = vscode.Uri.joinPath(context.extensionUri, "media", "lforms");
     const panel = vscode.window.createWebviewPanel(
-      `crlCockpit.${pane}`,
+      cockpitViewType(pane), // shared with the reload serializer — see registerCockpitPaneSerializers
       paneTitle(pane),
       { viewColumn: columnFor(pane), preserveFocus: true },
-      { enableScripts: true, retainContextWhenHidden: true },
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        ...(pane === "fhirQuestionnaire" ? { localResourceRoots: [lformsRoot] } : {}),
+      },
     );
-    panel.webview.html = shellHtml();
+    panel.webview.html = shellHtml(pane, panel.webview.cspSource, (f: string) =>
+      panel.webview.asWebviewUri(vscode.Uri.joinPath(lformsRoot, f)).toString(),
+    );
     coord.setPaneCapability(pane, "renderable"); // all panes render + receive reveals (the tree flowchart lit up in T3)
     const disposables: vscode.Disposable[] = [
       panel.webview.onDidReceiveMessage((m) => onWebviewMessage(pane, m)),
@@ -4980,10 +5115,204 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
 /** Hermetic webview shell (strict CSP + nonce). Swaps #root on `render` + acks `ready`; `highlight` (gen-checked) toggles
  *  `.current` + scrolls; clicks on `[data-reveal]` post the opaque key back. No external resources. */
-function shellHtml(): string {
+/**
+ * The per-pane Content-Security-Policy. Pure + exported so the policy is string-testable, like
+ * COCKPIT_WEBVIEW_SCRIPT below.
+ *
+ * Every pane is nonce-only TODAY and this returns one string for all of them. It exists as a seam because the
+ * `$apply` questionnaire pane will need `style-src 'unsafe-inline' <cspSource>` — LForms is an Angular Elements
+ * build that injects ~7 unnonced <style> elements at runtime, and a nonce present alongside `'unsafe-inline'`
+ * makes browsers ignore the latter, so the nonce must be DROPPED rather than supplemented. That is the ONLY
+ * directive that needs to change: `script-src` stays nonce-only (the vendored bundles carry no eval/new
+ * Function) and `default-src` stays `'none'`. Measured on Desktop AND the web workbench — see
+ * media/lforms/README.md.
+ *
+ * Because each pane is its own WebviewPanel with its own document, that relaxation lands in ONE pane and leaves
+ * every other pane nonce-only.
+ */
+export function cockpitPaneCsp(
+  pane: Pane,
+  a: { nonce: string; styleNonce: string; cspSource: string },
+): string {
+  if (pane === "fhirQuestionnaire") {
+    // The style nonce is DROPPED, not supplemented: a nonce present makes browsers ignore 'unsafe-inline',
+    // so keeping both would silently remain nonce-only and LForms would render unstyled. `cspSource` is needed
+    // for the vendored styles.css <link>, which style-src also governs. Measured clean on Desktop AND the web
+    // workbench.
+    //
+    // `img-src ${cspSource}` (added when the producer contract was pinned to ALL R4 item types): `styles.css`
+    // pulls two LOCAL images — down_arrow_gray_10_10.png and magnifying_glass.png, the autocompleter's dropdown
+    // arrow and search icon — which appear for `choice`/`open-choice` items. The earlier group/boolean fixture
+    // never requested one, which is why this stayed shut and looked clean. The image set is CLOSED: the vendored
+    // files contain no other image reference, no @font-face, and no remote asset host, so this needs no `data:`
+    // and no widening later. (The one `data:` image route is markdown-it's link validator, reachable only via
+    // `rendering-markdown`/`rendering-xhtml` item text — contracted OUT on the producer side, not allowed here.)
+    //
+    // `connect-src` stays SHUT via default-src. The bundles carry live fetch/XHR call sites (ValueSet expansion,
+    // external autocomplete); this pane does no computation, so it must do no fetching. See
+    // `unrenderableQuestionnaireFeatures` for the host-side detector that makes that constraint LOUD.
+    return `default-src 'none'; img-src ${a.cspSource}; style-src 'unsafe-inline' ${a.cspSource}; script-src 'nonce-${a.nonce}';`;
+  }
+  return `default-src 'none'; style-src 'nonce-${a.styleNonce}'; script-src 'nonce-${a.nonce}';`;
+}
+
+/**
+ * The emitter's directory-name derivation: lowercase, non-alphanumerics collapsed to `-`, trimmed.
+ *
+ * Pure + exported so the ONE thing that decides whether a case's artifacts are found at all is pinned by tests
+ * against real directory names. Applied to a case's FULL AUTHORED NAME (arrow suffix included) it yields the
+ * case artifact directory; applied to a library name plus `-cases` it yields the library segment.
+ */
+export const artifactSlug = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+/**
+ * Questionnaire features this pane CANNOT render, found before handing the resource to LForms.
+ *
+ * Every one of these fails SILENTLY or near-silently — an empty dropdown, a missing widget, a six-second stall —
+ * which is the failure shape this pane has been bitten by three times. The producer contract (#277) forbids them;
+ * this is the detector that makes a contract breach loud instead of leaving a clinician to notice a control that
+ * never populates.
+ *
+ * Each entry was verified against the VENDORED bundle, not assumed:
+ *
+ *   - `answerValueSet` — `loadAnswerValueSets` tries a terminology server, then `LForms.fhirContext.client`, then
+ *     REJECTS ("A terminology server or a FHIR server is needed"). This shell configures neither, on purpose, so
+ *     the reject fires with no network attempt and `connect-src` never even enters it. A CONTAINED ValueSet is no
+ *     escape: `_expandContainedValueSet` still POSTs to a server rather than reading `expansion.contains` locally.
+ *   - `preferredTerminologyServer` — the one input that makes LForms actually attempt a fetch, which `connect-src`
+ *     then blocks. Detecting it beats discovering it as a CSP violation nothing displays.
+ *   - `answerExpression` / `x-fhir-query` — SDC population extensions; both need a FHIR context that is absent.
+ *   - item type `reference` — `_getDataType`'s switch has no case for it, so it returns the initializer `"string"`,
+ *     which is not an LForms dataType (`ST` is) and matches no renderer branch: no widget, no throw, no violation.
+ *   - `rendering-xhtml` / `rendering-markdown` carrying an image — the only `data:` image route in the bundle
+ *     (markdown-it's link validator allows `data:image/(gif|png|jpeg|webp)`), and `img-src` deliberately excludes
+ *     `data:`, so the image is blocked.
+ *
+ * Pure + exported so the list is unit-testable without a webview.
+ */
+export function unrenderableQuestionnaireFeatures(q: unknown): string[] {
+  const found = new Set<string>();
+  const at = (o: Record<string, unknown>): string =>
+    typeof o.linkId === "string" && o.linkId ? ` (linkId ${o.linkId})` : "";
+
+  const walk = (node: unknown, depth: number): void => {
+    if (depth > 64 || node === null || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      for (const child of node) walk(child, depth + 1);
+      return;
+    }
+    const o = node as Record<string, unknown>;
+
+    if (typeof o.answerValueSet === "string") {
+      const contained = o.answerValueSet.startsWith("#");
+      found.add(
+        `answerValueSet${at(o)} — answer lists must arrive fully expanded as inline answerOption; ` +
+          (contained
+            ? "a contained ValueSet is still expanded via a server, not read locally"
+            : "no terminology server or FHIR context is configured in this pane"),
+      );
+    }
+    // MEASURED against the all-item-types fixture in the web workbench, 2026-08-17 — not predicted. Both of
+    // these render a control that looks answerable and can never show its answer, which is worse than rendering
+    // nothing: a reviewer reads them as unanswered questions rather than unsupported ones.
+    if (o.type === "reference" && typeof o.linkId === "string") {
+      found.add(
+        `item type 'reference'${at(o)} — renders an empty text input that can never hold the valueReference ` +
+          `answer (_getDataType has no 'reference' case, so it falls through to the initializer "string")`,
+      );
+    }
+    if (o.type === "url" && typeof o.linkId === "string") {
+      found.add(
+        `item type 'url'${at(o)} — renders, but the answer never populates: LForms maps dataType URL to ` +
+          `'valueUrl', and R4 QuestionnaireResponse.item.answer has no valueUrl (R4 uses valueUri)`,
+      );
+    }
+    if (typeof o.url === "string") {
+      const u = o.url;
+      if (u.endsWith("preferredTerminologyServer")) {
+        found.add("preferredTerminologyServer extension — the pane blocks outbound requests (connect-src)");
+      }
+      if (u.endsWith("sdc-questionnaire-answerExpression")) {
+        found.add("answerExpression extension — needs a FHIR context this pane does not provide");
+      }
+      if ((u.endsWith("rendering-xhtml") || u.endsWith("rendering-markdown")) && typeof o.valueString === "string") {
+        if (/<img\b|data:image\//i.test(o.valueString)) {
+          found.add(`${u.split("/").pop()} with an embedded image — img-src does not permit data: images`);
+        }
+      }
+    }
+    const expr = o.valueExpression;
+    if (expr !== null && typeof expr === "object" && !Array.isArray(expr)) {
+      if ((expr as Record<string, unknown>).language === "application/x-fhir-query") {
+        found.add("x-fhir-query expression — needs a FHIR context this pane does not provide");
+      }
+    }
+
+    for (const v of Object.values(o)) walk(v, depth + 1);
+  };
+
+  walk(q, 0);
+  return [...found].sort();
+}
+
+/**
+ * The pane-specific pieces of the shell document, split by WHERE they must go. Pure + exported because every
+ * silent failure this pane has had lived here, and none of them was catchable by typecheck or by the message
+ * tests — each presented identically, as "LForms is undefined" over a blank pane:
+ *
+ *   - vendor scripts in <head> → they run before <body> exists, LForms throws on `document.body.appendChild`
+ *     and never defines its global;
+ *   - `zone.min.js` after `lhc-forms.js` → Angular never bootstraps (the bundle deliberately excludes Zone.js);
+ *   - the error hooks after the scripts they exist to observe → the cause is unreported;
+ *   - a nonce on the <link> → under this pane's `style-src 'unsafe-inline' <cspSource>` (nonce DROPPED) a
+ *     nonced link would be blocked, and the form renders unstyled rather than failing loudly.
+ *
+ * Every one of those is a change a reasonable refactor would make, so they are pinned by tests rather than by
+ * comments alone.
+ */
+export function paneShellFragments(
+  pane: Pane,
+  a: { nonce: string; asset: (f: string) => string },
+): { head: string; bodyScripts: string } {
+  if (pane !== "fhirQuestionnaire") return { head: "", bodyScripts: "" };
+  const head =
+    // Capture-phase error listener FIRST, before anything it needs to observe. THREE distinct failure channels
+    // that do not overlap: a 404 gives an `error` whose target has a src; a script that loads then THROWS gives
+    // an `error` with no target src; a CSP-blocked script raises `securitypolicyviolation` and neither of the
+    // others. Listening to one makes the other two indistinguishable from "loaded fine and defined nothing".
+    `<script nonce="${a.nonce}">window.__aqErrs=[];` +
+    `window.addEventListener('error',function(e){var t=e&&e.target;` +
+    `if(t&&(t.src||t.href)){window.__aqErrs.push('404 '+String(t.src||t.href).split('/').pop());}` +
+    `else{window.__aqErrs.push('threw '+((e&&e.message)?e.message:'(no message)'));}},true);` +
+    `document.addEventListener('securitypolicyviolation',function(e){window.__aqErrs.push('CSP '+e.violatedDirective+' blocked '+String(e.blockedURI||'').split('/').pop());});` +
+    // FOURTH channel, added with the all-item-types contract. The three above are all SYNCHRONOUS; LForms fails
+    // asynchronously in the paths the wider contract reaches. `loadAnswerValueSets` rejects outright when no
+    // terminology server and no FHIR context are configured (neither is, deliberately) — verified in the
+    // vendored bundle as `Promise.reject(new Error("Unable to load ValueSet ... A terminology server or a FHIR
+    // server is needed."))`, raised WITHOUT any network attempt. Nothing listened for that, so it read as a
+    // clean load with an empty dropdown.
+    `window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;` +
+    `window.__aqErrs.push('rejected '+((r&&r.message)?r.message:String(r)));});` +
+    `</script>` +
+    // NO nonce on the link — this pane's style-src is 'unsafe-inline' + cspSource, with the nonce dropped.
+    `<link rel="stylesheet" href="${a.asset("styles.css")}">` +
+    `<style>#root{white-space:normal}</style>`; // the shell's body{white-space:pre-wrap} would mangle the form
+  // BODY, after the divs — see the throw described above. Zone.js first.
+  const bodyScripts =
+    `<script nonce="${a.nonce}" src="${a.asset("zone.min.js")}"></script>` +
+    `<script nonce="${a.nonce}" src="${a.asset("lhc-forms.js")}"></script>` +
+    `<script nonce="${a.nonce}" src="${a.asset("lformsFHIR.min.js")}"></script>`;
+  return { head, bodyScripts };
+}
+
+function shellHtml(pane: Pane, cspSource: string, asset: (f: string) => string): string {
   const nonce = randomBytes(16).toString("base64");
   const styleNonce = randomBytes(16).toString("base64");
-  const csp = `default-src 'none'; style-src 'nonce-${styleNonce}'; script-src 'nonce-${nonce}';`;
+  const csp = cockpitPaneCsp(pane, { nonce, styleNonce, cspSource });
   const style = `body{font:13px var(--vscode-editor-font-family,monospace);color:var(--vscode-foreground);white-space:pre-wrap;padding:8px}
 .covered{background:var(--vscode-editor-findMatchHighlightBackground,rgba(100,170,255,.18))}
 .uncovered{background:var(--vscode-diffEditor-removedTextBackground,rgba(255,170,80,.22))}
@@ -5148,7 +5477,23 @@ ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
-    `<style nonce="${styleNonce}">${style}</style></head><body><div id="fcChrome"></div><div id="root"></div><div id="flagDrawer"></div>` +
+    `<style nonce="${styleNonce}">${style}</style>` +
+    // The $apply pane's vendored runtime loads HERE, in the shell document — a real document load, so the
+    // scripts execute. They must NOT be delivered in a render fragment: the cockpit installs those with
+    // `root.innerHTML`, and <script> inserted that way never runs. Zone.js first (the concatenated bundle
+    // deliberately excludes it, and without it Angular never bootstraps and the form silently paints nothing).
+    // The stylesheet <link> needs no nonce here because this pane's style-src is 'unsafe-inline' + cspSource.
+    paneShellFragments(pane, { nonce, asset }).head +
+    `</head><body><div id="fcChrome"></div><div id="root"></div><div id="flagDrawer"></div>` +
+    // ⚠ The vendor runtime loads in the BODY, after the divs — NOT in <head>. LForms bootstraps against
+    // `document.body`, so loading it from <head> throws
+    // "Cannot read properties of null (reading 'appendChild')" before it can define the `LForms` global, and
+    // lformsFHIR then dies looking for `UcumLhcUtils`. Neither is a 404 or a CSP violation, so the only visible
+    // symptom is "LForms is undefined".
+    // Zone.js still first: the concatenated bundle deliberately excludes it and Angular will not bootstrap
+    // without it. These are classic (non-module) scripts, so parse order is execution order, and the message
+    // listener below registers in the same synchronous pass — message dispatch is async, so it cannot be missed.
+    paneShellFragments(pane, { nonce, asset }).bodyScripts +
     `<script nonce="${nonce}">` +
     COCKPIT_WEBVIEW_SCRIPT +
     `</script></body></html>`
@@ -5305,6 +5650,67 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `for(const id of (m.noIds||[])){const el=document.getElementById(id);if(el)el.classList.add('flow-leaf-no');}}` +
   // The tree-pane chrome (toggle + gap banner) — injected ABOVE #root so it never clobbers the flowchart.
   `else if(m.type==='fcChrome'){fcc.innerHTML=m.html;}` +
+  // The $apply questionnaire pane. DATA ONLY — this branch never receives `html`, because a fragment carrying
+  // <script> would be inert (innerHTML does not execute scripts) and re-rendering would tear down the mounted
+  // form. The vendor runtime is already loaded by this pane's shell document.
+  // `key` is the render identity: remount ONLY when the case's CONTENT changes. Every cockpit re-render
+  // (rebuild/applyShowKeys/renderEmpty) reaches every pane, and remounting a 1.85 MB Angular app on an
+  // unrelated render would churn and discard in-progress answers.
+  `else if(m.type==='fhirQuestionnaire'){` +
+  // The skip-remount latch is set ONLY after a successful mount (bottom of the try). Latching it up-front
+  // latched FAILURES too: select a case with no artifacts -> "could not find" paints and the key sticks -> the
+  // producer (or the seed script) writes the files -> every later render posts the same key and returns early,
+  // so the pane shows "could not find" until you select a different case and come back. That is precisely the
+  // workflow this pane exists for.
+  `if(m.key&&m.key===window.__aqKey)return;` +
+  `window.__aqKey=undefined;` +
+  `const host=document.getElementById('root');` +
+  // The case header mirrors the CRL Questionnaire pane's, so the two panes read as the same case side by side.
+  `const head=(t)=>{const h=document.createElement('p');h.className='aq-case';h.textContent=t;return h;};` +
+  `const fail=(t)=>{host.replaceChildren();if(m.label)host.appendChild(head('Case - '+m.label));const p=document.createElement('p');p.className='placeholder';p.textContent=t;host.appendChild(p);};` +
+  `if(!m.label){fail('Select a case to see its FHIR questionnaire.');return;}` +
+  // Distinguish "nothing selected" from "selected, but the producer has written nothing for it" — the second is
+  // the normal state until #277 lands, and saying WHERE we looked is what makes it actionable.
+  `if(!m.q){fail('Could not find FHIR Questionnaire data for this case.'+(m.lookedFor?(' Looked for: '+m.lookedFor):''));return;}` +
+  `if(typeof LForms==='undefined'||!LForms.Util){` +
+  `const errs=(window.__aqErrs||[]);` +
+  `fail('The LForms runtime did not load. '+(errs.length?('Failures: '+errs.join(' | ')):'No 404, no throw, no CSP violation — the scripts ran and defined no LForms global. Check load ORDER (zone.js must precede lhc-forms.js).'));` +
+  `return;}` +
+  `try{` +
+  `host.replaceChildren();host.appendChild(head('Case - '+m.label));` +
+  // Producer-contract breaches, detected host-side. Shown ABOVE the form and NOT fatal: the rest of the
+  // questionnaire still renders, and the operator sees exactly which items will not.
+  `const un=(m.unrenderable||[]);` +
+  `if(un.length){const c=document.createElement('p');c.className='aq-warning';` +
+  `c.textContent='This questionnaire uses features the pane cannot render ('+un.length+'): '+un.join(' | ');` +
+  `host.appendChild(c);}` +
+  `const mount=document.createElement('div');host.appendChild(mount);mount.id='aqMount';` +
+  `let form=LForms.Util.convertFHIRQuestionnaireToLForms(m.q,'R4');` +
+  `if(!form){fail('convertFHIRQuestionnaireToLForms returned nothing.');return;}` +
+  `if(m.qr)form=LForms.Util.mergeFHIRDataIntoLForms('QuestionnaireResponse',m.qr,form,'R4');` +
+  `LForms.Util.addFormToPage(form,'aqMount',{prepopulate:false});` +
+  `window.__aqKey=m.key;` + // latch ONLY on success — see the note at the top of this branch
+
+  // addFormToPage can resolve without painting (an unrecognised item tree yields an empty form). Angular
+  // Elements upgrades asynchronously, so poll briefly rather than measuring on the next frame.
+  // The no-paint poll must not outlive its own render. It closes over `mount`, and on timeout it used to call
+  // fail(), which clears #root — so a slow case A could wipe the LIVE form of case B selected moments later,
+  // and label the wreckage with A. It now bails if the latch moved on, and reports WITHOUT tearing down a form
+  // that may still be upgrading (Angular Elements can be slow on a cold codespace).
+  `const mine=m.key;let n=0;const chk=()=>{if(window.__aqKey!==mine)return;` +
+  `if(mount.getBoundingClientRect().height>0)return;` +
+  `if(++n>40){const w=document.createElement('p');w.className='aq-warning';` +
+  // Report WHAT failed, not just THAT nothing painted. Errors raised after addFormToPage resolves (Angular
+  // Elements upgrades asynchronously, so they escape the try/catch below) land in __aqErrs and were previously
+  // read only in the LForms-undefined branch — i.e. never, once the runtime loaded. A blank pane with a
+  // generic warning is the exact shape of the two false-negative CSP readings this pane has already produced.
+  `const errs=(window.__aqErrs||[]);` +
+  `w.textContent='The questionnaire has not rendered yet. If it stays blank, the form did not paint.'` +
+  `+(errs.length?(' Failures: '+errs.join(' | ')):'');` +
+  `if(!mount.previousElementSibling||!mount.previousElementSibling.classList.contains('aq-warning'))host.insertBefore(w,mount);return;}` +
+  `setTimeout(chk,50);};setTimeout(chk,50);` +
+  `}catch(e){fail('Could not render the questionnaire: '+((e&&e.message)?e.message:String(e)));}` +
+  `}` +
   // #211: the create-flag drawer's OWN region — set (or clear with '') its html. The render handler never touches it, so a
   // same-policy tree rebuild leaves the drawer + the user's typed text intact. aff() shows the selected tag's fields.
   // Todo 5 (impl-review [important]): the drawer is last in DOM + revealed preserveFocus, so a keyboard user would tab through
