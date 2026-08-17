@@ -2112,7 +2112,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         const label = focused ? caseDisplayName(focused.case?.name ?? "") : undefined;
         const post = (q?: unknown, qr?: unknown, lookedFor?: string): void => {
           if (v.gen !== gen) return; // a newer render superseded this async load
-          void v.panel.webview.postMessage({ type: "fhirQuestionnaire", gen, indexVersion, key, label, q, qr, lookedFor });
+          // Contract breaches are detected HOST-side, where the JSON is already parsed, and shown above the form.
+          // Left to LForms these degrade quietly (empty dropdown, absent widget), which is the one failure shape
+          // this pane must not have.
+          const unrenderable = q === undefined ? [] : unrenderableQuestionnaireFeatures(q);
+          void v.panel.webview.postMessage({ type: "fhirQuestionnaire", gen, indexVersion, key, label, q, qr, lookedFor, unrenderable });
         };
         // The FULL authored name (arrow suffix included) is the artifact-directory key — see the note on
         // loadFhirQuestionnaireCase. `label` above is the display form, which deliberately strips it.
@@ -5132,8 +5136,20 @@ export function cockpitPaneCsp(
     // The style nonce is DROPPED, not supplemented: a nonce present makes browsers ignore 'unsafe-inline',
     // so keeping both would silently remain nonce-only and LForms would render unstyled. `cspSource` is needed
     // for the vendored styles.css <link>, which style-src also governs. Measured clean on Desktop AND the web
-    // workbench; img-src stays SHUT (never violated for group/boolean items).
-    return `default-src 'none'; style-src 'unsafe-inline' ${a.cspSource}; script-src 'nonce-${a.nonce}';`;
+    // workbench.
+    //
+    // `img-src ${cspSource}` (added when the producer contract was pinned to ALL R4 item types): `styles.css`
+    // pulls two LOCAL images — down_arrow_gray_10_10.png and magnifying_glass.png, the autocompleter's dropdown
+    // arrow and search icon — which appear for `choice`/`open-choice` items. The earlier group/boolean fixture
+    // never requested one, which is why this stayed shut and looked clean. The image set is CLOSED: the vendored
+    // files contain no other image reference, no @font-face, and no remote asset host, so this needs no `data:`
+    // and no widening later. (The one `data:` image route is markdown-it's link validator, reachable only via
+    // `rendering-markdown`/`rendering-xhtml` item text — contracted OUT on the producer side, not allowed here.)
+    //
+    // `connect-src` stays SHUT via default-src. The bundles carry live fetch/XHR call sites (ValueSet expansion,
+    // external autocomplete); this pane does no computation, so it must do no fetching. See
+    // `unrenderableQuestionnaireFeatures` for the host-side detector that makes that constraint LOUD.
+    return `default-src 'none'; img-src ${a.cspSource}; style-src 'unsafe-inline' ${a.cspSource}; script-src 'nonce-${a.nonce}';`;
   }
   return `default-src 'none'; style-src 'nonce-${a.styleNonce}'; script-src 'nonce-${a.nonce}';`;
 }
@@ -5150,6 +5166,84 @@ export const artifactSlug = (s: string): string =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+
+/**
+ * Questionnaire features this pane CANNOT render, found before handing the resource to LForms.
+ *
+ * Every one of these fails SILENTLY or near-silently — an empty dropdown, a missing widget, a six-second stall —
+ * which is the failure shape this pane has been bitten by three times. The producer contract (#277) forbids them;
+ * this is the detector that makes a contract breach loud instead of leaving a clinician to notice a control that
+ * never populates.
+ *
+ * Each entry was verified against the VENDORED bundle, not assumed:
+ *
+ *   - `answerValueSet` — `loadAnswerValueSets` tries a terminology server, then `LForms.fhirContext.client`, then
+ *     REJECTS ("A terminology server or a FHIR server is needed"). This shell configures neither, on purpose, so
+ *     the reject fires with no network attempt and `connect-src` never even enters it. A CONTAINED ValueSet is no
+ *     escape: `_expandContainedValueSet` still POSTs to a server rather than reading `expansion.contains` locally.
+ *   - `preferredTerminologyServer` — the one input that makes LForms actually attempt a fetch, which `connect-src`
+ *     then blocks. Detecting it beats discovering it as a CSP violation nothing displays.
+ *   - `answerExpression` / `x-fhir-query` — SDC population extensions; both need a FHIR context that is absent.
+ *   - item type `reference` — `_getDataType`'s switch has no case for it, so it returns the initializer `"string"`,
+ *     which is not an LForms dataType (`ST` is) and matches no renderer branch: no widget, no throw, no violation.
+ *   - `rendering-xhtml` / `rendering-markdown` carrying an image — the only `data:` image route in the bundle
+ *     (markdown-it's link validator allows `data:image/(gif|png|jpeg|webp)`), and `img-src` deliberately excludes
+ *     `data:`, so the image is blocked.
+ *
+ * Pure + exported so the list is unit-testable without a webview.
+ */
+export function unrenderableQuestionnaireFeatures(q: unknown): string[] {
+  const found = new Set<string>();
+  const at = (o: Record<string, unknown>): string =>
+    typeof o.linkId === "string" && o.linkId ? ` (linkId ${o.linkId})` : "";
+
+  const walk = (node: unknown, depth: number): void => {
+    if (depth > 64 || node === null || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      for (const child of node) walk(child, depth + 1);
+      return;
+    }
+    const o = node as Record<string, unknown>;
+
+    if (typeof o.answerValueSet === "string") {
+      const contained = o.answerValueSet.startsWith("#");
+      found.add(
+        `answerValueSet${at(o)} — answer lists must arrive fully expanded as inline answerOption; ` +
+          (contained
+            ? "a contained ValueSet is still expanded via a server, not read locally"
+            : "no terminology server or FHIR context is configured in this pane"),
+      );
+    }
+    if (o.type === "reference" && typeof o.linkId === "string") {
+      found.add(`item type 'reference'${at(o)} — the vendored LForms converter maps it to no widget, silently`);
+    }
+    if (typeof o.url === "string") {
+      const u = o.url;
+      if (u.endsWith("preferredTerminologyServer")) {
+        found.add("preferredTerminologyServer extension — the pane blocks outbound requests (connect-src)");
+      }
+      if (u.endsWith("sdc-questionnaire-answerExpression")) {
+        found.add("answerExpression extension — needs a FHIR context this pane does not provide");
+      }
+      if ((u.endsWith("rendering-xhtml") || u.endsWith("rendering-markdown")) && typeof o.valueString === "string") {
+        if (/<img\b|data:image\//i.test(o.valueString)) {
+          found.add(`${u.split("/").pop()} with an embedded image — img-src does not permit data: images`);
+        }
+      }
+    }
+    const expr = o.valueExpression;
+    if (expr !== null && typeof expr === "object" && !Array.isArray(expr)) {
+      if ((expr as Record<string, unknown>).language === "application/x-fhir-query") {
+        found.add("x-fhir-query expression — needs a FHIR context this pane does not provide");
+      }
+    }
+
+    for (const v of Object.values(o)) walk(v, depth + 1);
+  };
+
+  walk(q, 0);
+  return [...found].sort();
+}
 
 /**
  * The pane-specific pieces of the shell document, split by WHERE they must go. Pure + exported because every
@@ -5181,6 +5275,14 @@ export function paneShellFragments(
     `if(t&&(t.src||t.href)){window.__aqErrs.push('404 '+String(t.src||t.href).split('/').pop());}` +
     `else{window.__aqErrs.push('threw '+((e&&e.message)?e.message:'(no message)'));}},true);` +
     `document.addEventListener('securitypolicyviolation',function(e){window.__aqErrs.push('CSP '+e.violatedDirective+' blocked '+String(e.blockedURI||'').split('/').pop());});` +
+    // FOURTH channel, added with the all-item-types contract. The three above are all SYNCHRONOUS; LForms fails
+    // asynchronously in the paths the wider contract reaches. `loadAnswerValueSets` rejects outright when no
+    // terminology server and no FHIR context are configured (neither is, deliberately) — verified in the
+    // vendored bundle as `Promise.reject(new Error("Unable to load ValueSet ... A terminology server or a FHIR
+    // server is needed."))`, raised WITHOUT any network attempt. Nothing listened for that, so it read as a
+    // clean load with an empty dropdown.
+    `window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;` +
+    `window.__aqErrs.push('rejected '+((r&&r.message)?r.message:String(r)));});` +
     `</script>` +
     // NO nonce on the link — this pane's style-src is 'unsafe-inline' + cspSource, with the nonce dropped.
     `<link rel="stylesheet" href="${a.asset("styles.css")}">` +
@@ -5562,6 +5664,12 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `return;}` +
   `try{` +
   `host.replaceChildren();host.appendChild(head('Case - '+m.label));` +
+  // Producer-contract breaches, detected host-side. Shown ABOVE the form and NOT fatal: the rest of the
+  // questionnaire still renders, and the operator sees exactly which items will not.
+  `const un=(m.unrenderable||[]);` +
+  `if(un.length){const c=document.createElement('p');c.className='aq-warning';` +
+  `c.textContent='This questionnaire uses features the pane cannot render ('+un.length+'): '+un.join(' | ');` +
+  `host.appendChild(c);}` +
   `const mount=document.createElement('div');host.appendChild(mount);mount.id='aqMount';` +
   `let form=LForms.Util.convertFHIRQuestionnaireToLForms(m.q,'R4');` +
   `if(!form){fail('convertFHIRQuestionnaireToLForms returned nothing.');return;}` +
@@ -5578,7 +5686,13 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `const mine=m.key;let n=0;const chk=()=>{if(window.__aqKey!==mine)return;` +
   `if(mount.getBoundingClientRect().height>0)return;` +
   `if(++n>40){const w=document.createElement('p');w.className='aq-warning';` +
-  `w.textContent='The questionnaire has not rendered yet. If it stays blank, the form did not paint.';` +
+  // Report WHAT failed, not just THAT nothing painted. Errors raised after addFormToPage resolves (Angular
+  // Elements upgrades asynchronously, so they escape the try/catch below) land in __aqErrs and were previously
+  // read only in the LForms-undefined branch — i.e. never, once the runtime loaded. A blank pane with a
+  // generic warning is the exact shape of the two false-negative CSP readings this pane has already produced.
+  `const errs=(window.__aqErrs||[]);` +
+  `w.textContent='The questionnaire has not rendered yet. If it stays blank, the form did not paint.'` +
+  `+(errs.length?(' Failures: '+errs.join(' | ')):'');` +
   `if(!mount.previousElementSibling||!mount.previousElementSibling.classList.contains('aq-warning'))host.insertBefore(w,mount);return;}` +
   `setTimeout(chk,50);};setTimeout(chk,50);` +
   `}catch(e){fail('Could not render the questionnaire: '+((e&&e.message)?e.message:String(e)));}` +

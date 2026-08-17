@@ -124,10 +124,31 @@ re-run the `serve-web` recipe. Do not adopt it on argument alone.
    Still wanted from the emit side (#277), but neither blocks: core-function exports with thin MCP wrappers, and
    a **render-identity key** (revision or content hash) to replace `library::caseId`, so remount tracks content
    rather than selection.
-2. **Questionnaire item types are unpinned, so `img-src` is fixture-bound, not contract-bound.** The measured
-   fixture is `group`/`boolean` only; `choice`/`open-choice` pull the vendored PNGs via `styles.css`. Either pin
-   the accepted item types in the producer contract or schedule a re-walk of the ladder. **The one genuinely
-   open item on our side.**
+2. ~~**Questionnaire item types are unpinned.**~~ **SETTLED + BUILT.** The operator pinned the producer contract
+   to **all R4 item types** (2026-08-17), so the CSP is now contract-bound rather than fixture-bound:
+   `img-src <cspSource>` is in the policy for this pane, and an all-item-types measurement fixture exists
+   (`--fixture all-types`) so the ladder is re-walked against the whole contract instead of `group`/`boolean`.
+
+   The width is final: the vendored image set is closed (two local PNGs, no `@font-face`, no `data:` URIs, no
+   remote host), so no `data:`/`blob:`/wildcard is warranted. `connect-src` stays shut — this pane does no
+   computation, so it does no fetching.
+
+   What that forced OUT of the producer contract, because each fails silently rather than loudly (all verified
+   against the vendored bundle, see `unrenderableQuestionnaireFeatures`):
+
+   | Must not emit | Why it cannot work here |
+   |---|---|
+   | `answerValueSet` (external **or** contained) | `loadAnswerValueSets` rejects with no network attempt when no terminology server and no FHIR context are configured — neither is, deliberately. `_expandContainedValueSet` still POSTs to a server rather than reading `expansion.contains` locally, so shipping the expansion inline is **not** an escape. |
+   | `preferredTerminologyServer` | The one input that makes LForms actually fetch — which `connect-src` then blocks. |
+   | `answerExpression`, `x-fhir-query` | SDC population extensions; both need a FHIR context this pane does not provide. |
+   | `rendering-xhtml` / `rendering-markdown` carrying an image | The only `data:` image route in the bundle, and `img-src` excludes `data:`. |
+   | item type `reference` | `_getDataType`'s switch has no case for it, so it returns the initializer `"string"` — not an LForms dataType (`ST` is) — and no renderer branch matches: **no widget, no throw, no violation.** |
+
+   Answer lists must arrive fully expanded as inline `answerOption`. Recorded on #277.
+
+   Because every one of those degrades quietly, the constraint is **detected as well as documented**:
+   `unrenderableQuestionnaireFeatures()` walks the parsed Questionnaire host-side and the pane shows a banner
+   naming each breach above the form. The form still renders; the operator just sees which items will not.
 3. ~~**Pane identity.**~~ **SETTLED + BUILT.** `fhirQuestionnaire`, titled "Medical Validation - FHIR
    Questionnaire", alongside the CRL Questionnaire pane rather than replacing it. Both panes are named by their
    SOURCE — what the CRL says vs what the emitted artifact produced — which is the point of showing both.

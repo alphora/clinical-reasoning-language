@@ -152,15 +152,33 @@ problem together: an `<iframe>` inside the pane whose `src` is served from `cspS
 gets a real document load, so scripts execute, and it carries its own meta CSP while the parent stays
 nonce-only. Note `srcdoc:`/`blob:` iframes **inherit** the parent policy, so it must be a served file.
 
-`img-src` was not needed **for the measured fixture**, which contains only `group` and `boolean` items: no
-`img-src` violation was ever reported, on either platform, at any rung. Do not widen it speculatively.
+`img-src ${cspSource}` **is** needed, and is now in the policy. It was absent for the original measurement and
+that reading was correct but *not general*: the fixture contained only `group` and `boolean` items, which never
+request an image, so no `img-src` violation could be reported at any rung on either platform.
 
-⚠ But do not read that as "images are never needed." `magnifying_glass.png` and `down_arrow_gray_10_10.png` are
-referenced from `styles.css` and belong to selector/autocomplete widgets — item types (`choice`,
-`open-choice`, anything with an answer value set) that this fixture does not exercise, and which may only fetch
-on interaction. Before relying on `img-src` staying shut, either pin the accepted Questionnaire item types in
-the producer contract, or re-walk the ladder against a fixture covering the types the producer can actually
-emit.
+The operator has since pinned the producer contract to **all R4 item types**, so the surface changed.
+`magnifying_glass.png` and `down_arrow_gray_10_10.png` are referenced from `styles.css` and belong to the
+autocompleter — `choice` / `open-choice` items pull them. Re-measure with the all-item-types fixture
+(`npm run seed:questionnaire -- --root <repo> --all --fixture all-types`), not the basic one.
+
+**The image set is CLOSED, so this needs no further widening.** Verified against the vendored files, not assumed:
+`styles.css` contains exactly two `url()` references (both above, both local); there is no `@font-face` and no
+font file anywhere in the bundle; there are no `data:` URIs; there is no remote asset host. Specifically **do not
+add `data:`** — the only `data:` image route is markdown-it's link validator (`/^data:image\/(gif|png|jpeg|webp);/`
+in `lhc-forms.js`), reachable solely through `rendering-markdown` / `rendering-xhtml` item text, which the
+producer contract forbids and `unrenderableQuestionnaireFeatures()` detects and reports.
+
+⚠ **`connect-src` stays shut, and that is load-bearing.** The bundles carry live network call sites (6 `.ajax(`,
+5 `XMLHttpRequest`, 3 `fetch(` in `lhc-forms.js`; 8 `fetch(` in `lformsFHIR.min.js`) for ValueSet expansion and
+external autocomplete. `$apply` runs upstream at build time and this pane loads two JSON files, so an outbound
+request from a clinician's webview is out of scope by design.
+
+⚠ **Two script-injection paths exist and are blocked by `script-src 'nonce-…'` — deliberately.** A dynamically
+created `<script>` carries no nonce, so LForms' lazy FHIR-library loader (`loadFHIRLibs`) and its JSONP icon
+loader cannot run. We pre-load `lformsFHIR.min.js` eagerly, so the first should never be reached. The JSONP icon
+loader has a **6-second timeout**, so if some item type does reach it the symptom is a stall, not an error —
+which is what the all-item-types measurement is for. Do **not** widen `script-src` to fix either; nonce-only
+script is the strongest guarantee this pane has.
 
 Why `'unsafe-inline'` rather than a nonce: LForms is an Angular Elements build and injects ~7 component
 `<style>` elements at runtime, unnonced. A nonce cannot be attached to them from outside, and keeping the
