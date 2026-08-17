@@ -138,7 +138,11 @@ export function shouldReflectNavigatorSelection(
   return mode !== "medical-validation" || navVisible;
 }
 
-const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "worklist"]; // reveal fan-out set (tree/questionnaire/worklist included); NOT the navigable/cycle set
+// Reveal fan-out set (tree/questionnaire/fhirQuestionnaire/worklist included); NOT the navigable/cycle set.
+// `fhirQuestionnaire` was missing here when the pane was added — it renders, but received no reveal effects, so
+// it alone never highlighted the current selection. Not compiler-checked against the `Pane` union; keep in
+// lockstep with `ALL_PANES` in paneOrder.ts (pinned by a test).
+const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "fhirQuestionnaire", "worklist"];
 
 function selectionTarget(sel: Selection): RevealEffect["target"] {
   if (sel.primary === "source") return { kind: "unit", id: sel.unitId };

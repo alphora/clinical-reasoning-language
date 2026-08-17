@@ -154,7 +154,9 @@ import {
   type CrlRevealMaps,
 } from "./crlRevealMaps";
 import {
+  ALL_PANES,
   COCKPIT_PANE_SPEC,
+  cockpitViewType,
   MEDICAL_VALIDATION_PANE_SPEC,
   normalizePaneOrder,
   type PaneSpec,
@@ -2614,7 +2616,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // `default-src 'none'` CSP, not by an empty root list.)
     const lformsRoot = vscode.Uri.joinPath(context.extensionUri, "media", "lforms");
     const panel = vscode.window.createWebviewPanel(
-      `crlCockpit.${pane}`,
+      cockpitViewType(pane), // shared with the reload serializer — see registerCockpitPaneSerializers
       paneTitle(pane),
       { viewColumn: columnFor(pane), preserveFocus: true },
       {

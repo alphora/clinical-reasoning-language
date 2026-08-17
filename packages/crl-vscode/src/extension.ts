@@ -30,6 +30,7 @@ import { registerDiagnostics } from "./diagnostics";
 import { registerCelDiagnostics } from "./celDiagnostics";
 import { registerApplyQuestionnaireHarness } from "./applyQuestionnaireHarness";
 import { registerCorrespondenceCockpit } from "./correspondenceCockpit";
+import { registerCockpitPaneSerializers } from "./cockpitPaneSerializers";
 import { registerProvenancePanel } from "./provenancePanel";
 import { registerScenarioRunner } from "./scenarioRunner";
 import { CelCompletionProvider, CEL_DOCUMENT_SELECTOR } from "./celCompletion";
@@ -180,6 +181,11 @@ function registerLanguageFeatures(
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  // Reclaim-and-discard any cockpit/MV pane tab VS Code restored from the previous window. MUST run during
+  // activate, before restoration is attempted, and must cover every pane view type — an unregistered view type
+  // comes back as a tab the panel does not own and can never dispose, which reads as the paneOrder setting
+  // being ignored. See cockpitPaneSerializers.ts.
+  registerCockpitPaneSerializers(context);
   // Register commands FIRST so they survive a provisioning failure.
   context.subscriptions.push(
     vscode.commands.registerCommand("crl.setup", async () => {
