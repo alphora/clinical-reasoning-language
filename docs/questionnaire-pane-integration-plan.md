@@ -142,13 +142,28 @@ re-run the `serve-web` recipe. Do not adopt it on argument alone.
    | `preferredTerminologyServer` | The one input that makes LForms actually fetch — which `connect-src` then blocks. |
    | `answerExpression`, `x-fhir-query` | SDC population extensions; both need a FHIR context this pane does not provide. |
    | `rendering-xhtml` / `rendering-markdown` carrying an image | The only `data:` image route in the bundle, and `img-src` excludes `data:`. |
-   | item type `reference` | `_getDataType`'s switch has no case for it, so it returns the initializer `"string"` — not an LForms dataType (`ST` is) — and no renderer branch matches: **no widget, no throw, no violation.** |
+   | item type `reference` | `_getDataType`'s switch has no case for it, so it returns the initializer `"string"` — not an LForms dataType (`ST` is). **Measured:** renders an empty text input that can never hold the `valueReference` answer. |
+   | item type `url` | `_lformsTypesToFHIRFields` maps `URL → "Url"`, so LForms reads `valueUrl`; R4 `QuestionnaireResponse.item.answer` has no `valueUrl` (R4 uses `valueUri`). **Measured:** the control renders, the answer never populates. |
 
    Answer lists must arrive fully expanded as inline `answerOption`. Recorded on #277.
 
    Because every one of those degrades quietly, the constraint is **detected as well as documented**:
    `unrenderableQuestionnaireFeatures()` walks the parsed Questionnaire host-side and the pane shows a banner
    naming each breach above the form. The form still renders; the operator just sees which items will not.
+
+   **The ladder was re-walked 2026-08-17** against the all-item-types fixture in the web workbench. Everything
+   rendered and populated, the coded items pulled their autocompleter PNGs with **no CSP violation**, and
+   nothing reached LForms' 6-second JSONP icon loader. Both degradations found were ones the static reading got
+   WRONG, and both matter for the same reason — the control looks answerable while being permanently blank,
+   which a reviewer reads as an unanswered question rather than an unsupported one:
+
+   | Type | Predicted | Measured |
+   |---|---|---|
+   | `reference` | no widget at all | an empty **text input** that never populates |
+   | `url` | renders normally | renders, but the answer **never** populates |
+
+   That is the argument for the fixture pinning an expected OUTCOME per type rather than mere presence: a
+   presence-only check would have called this run a clean pass.
 3. ~~**Pane identity.**~~ **SETTLED + BUILT.** `fhirQuestionnaire`, titled "Medical Validation - FHIR
    Questionnaire", alongside the CRL Questionnaire pane rather than replacing it. Both panes are named by their
    SOURCE — what the CRL says vs what the emitted artifact produced — which is the point of showing both.
