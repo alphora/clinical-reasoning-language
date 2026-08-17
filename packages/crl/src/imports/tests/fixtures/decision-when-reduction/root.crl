@@ -1,0 +1,27 @@
+# decision-when-reduction root (#189 Slice-C boundary 1)
+library "Pol".
+
+// A decision whose `when` guard IS a reduction concept ("Cov" = `code is` Condition +
+// `exists this`). Exercises the boundary-1 lane crux: the reduction classifies Inferred and
+// re-exports BARE through the Interface layer (a TOTAL boolean has no `.satisfied()`), and the
+// FHIR case-feature lane LOUD-GATES it (a reduction case-feature SD's featureExpression would
+// dangle at $apply, so it is refused rather than shipped).
+
+concept "Cov":
+- type is Condition.
+- value type is boolean.
+- shape is Scalar.
+- code is `cov`.
+- definition is exists this.
+
+decision "Cov Determination":
+first:
+- when "Cov" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
+
+activity "certify.Approve":
+- request CPGCommunicationRequest.
+- with `Coverage determination: APPROVE / Certified.`.
+activity "not-certify.Deny":
+- request CPGCommunicationRequest.
+- with `Coverage determination: DENY / Not Certified.`.

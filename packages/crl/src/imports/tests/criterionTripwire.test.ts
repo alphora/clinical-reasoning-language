@@ -37,9 +37,11 @@ library "Policy".
 concept "Gate Concept":
 - type is Observation.
 - code is \`gate\`.
+- shape is RecordSet.
 concept "Other":
 - type is Observation.
 - code is \`other\`.
+- shape is RecordSet.
 criterion "Inner":
 - when ( "Gate Concept" ).
 criterion "Eligible":

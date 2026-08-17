@@ -324,31 +324,104 @@ describe("deriveEffectiveRepresentations — fail-closed errors", () => {
   });
 });
 
-describe("T1 inertness — allowlist import boundary", () => {
-  it("no production module OUTSIDE src/emit/ imports effectiveRepresentation (only tests do)", () => {
+// #189 §4.1 T1 EXTENSION — `most recent this` typed value reads via the FHIR value-read model (T3a).
+describe("deriveEffectiveRepresentations — most recent this typed value reads (§4.1)", () => {
+  it("Observation + integer + most recent this → NON-boolean value read: datum integer", () => {
+    const [d] = derived(
+      `library "T".\nconcept "Obs":\n- type is Observation.\n- value type is integer.\n- code is \`obs\`.\n- definition is most recent this.\n`,
+      "Obs",
+    );
+    if (d.arm !== "local-exact") throw new Error("expected local-exact");
+    expect(d.resourceType).toBe("Observation");
+    expect(d.valueElement).toBe("value");
+    expect(d.datumValueType).toBe("integer");
+    expect(d.resultType).toEqual({ shape: "Scalar", valueType: "integer" });
+  });
+
+  it("Observation + Quantity + most recent this → datum Quantity", () => {
+    const [d] = derived(
+      `library "T".\nconcept "Obs":\n- type is Observation.\n- value type is Quantity.\n- code is \`obs\`.\n- definition is most recent this.\n`,
+      "Obs",
+    );
+    if (d.arm !== "local-exact") throw new Error("expected local-exact");
+    expect(d.datumValueType).toBe("Quantity");
+  });
+
+  it("Condition (modeled-valueless ∅) + most recent this → error{value-read-valueless}", () => {
+    const out = deriveEffectiveRepresentations(
+      concept(
+        `library "T".\nconcept "C":\n- type is Condition.\n- value type is boolean.\n- code is \`c\`.\n- definition is most recent this.\n`,
+        "C",
+      ),
+      OWNING,
+    );
+    expect(out.status).toBe("error");
+    if (out.status === "error") expect(out.error.kind).toBe("value-read-valueless");
+  });
+
+  it("Observation + date (NOT an Observation.value[x] variant in R4) + most recent this → error{value-type-not-admitted}", () => {
+    const out = deriveEffectiveRepresentations(
+      concept(
+        `library "T".\nconcept "D":\n- type is Observation.\n- value type is date.\n- code is \`d\`.\n- definition is most recent this.\n`,
+        "D",
+      ),
+      OWNING,
+    );
+    expect(out.status).toBe("error");
+    if (out.status === "error") expect(out.error.kind).toBe("value-type-not-admitted");
+  });
+
+  it("Observation + authored non-value element (`Observation.status`) + most recent this → error{value-read-unmodeled}", () => {
+    const out = deriveEffectiveRepresentations(
+      concept(
+        `library "T".\nconcept "S":\n- type is Observation.\n- value type is boolean.\n- code is \`s\`.\n- value element is Observation.status.\n- definition is most recent this.\n`,
+        "S",
+      ),
+      OWNING,
+    );
+    expect(out.status).toBe("error");
+    if (out.status === "error") expect(out.error.kind).toBe("value-read-unmodeled");
+  });
+});
+
+describe("#189-flip import boundary — effectiveRepresentation wired ONLY at the sanctioned CQL-lane sites", () => {
+  it("only the flip's CQL-lane consumers import effectiveRepresentation; resourceEmitRegistry stays emit-internal", () => {
     const srcRoot = join(__dirname, "..", ".."); // packages/crl/src
-    const offenders: string[] = [];
+    // The #189 flip (Slice B2a) WIRES the effective-representation deriver into the CQL emit lane at
+    // EXACTLY two sites: `lowerLocalCodes` (derives + attaches the `most recent this` descriptor) and
+    // `emitCQL` (reads it, type-only). Every OTHER production module importing `effectiveRepresentation` —
+    // and ANY import of `resourceEmitRegistry` (which carries the cross-todo cast contract) OUTSIDE
+    // src/emit/ — is still the premature-wiring hazard this boundary guards. Match an actual IMPORT, NOT a
+    // comment mention (the substring scan false-positived on migration/*.ts docstrings citing line numbers).
+    const ER_ALLOW = new Set(["cql-emitter/lowerLocalCodes.ts", "cql-emitter/emitCQL.ts"]);
+    const erOffenders: string[] = [];
+    const registryOffenders: string[] = [];
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const p = join(dir, entry.name);
         if (entry.isDirectory()) {
-          if (entry.name === "emit" && dir === srcRoot) continue; // the module's own home is allowed
+          if (entry.name === "emit" && dir === srcRoot) continue; // the modules' own home is allowed
           if (entry.name === "tests" || entry.name === "generated" || entry.name === "node_modules")
             continue;
           walk(p);
         } else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts")) {
-          // Both modules are INERT in T1 — a partial early wiring of the registry ALONE (which carries the
-          // cross-todo cast contract) is exactly the hazard this boundary guards (panel).
+          const rel = p.slice(srcRoot.length + 1).replace(/\\/g, "/"); // normalize Win path separators
           const text = readFileSync(p, "utf8");
-          if (text.includes("effectiveRepresentation") || text.includes("resourceEmitRegistry"))
-            offenders.push(p.slice(srcRoot.length + 1));
+          if (/from\s+["'][^"']*\/effectiveRepresentation["']/.test(text) && !ER_ALLOW.has(rel)) {
+            erOffenders.push(rel);
+          }
+          if (/from\s+["'][^"']*\/resourceEmitRegistry["']/.test(text)) registryOffenders.push(rel);
         }
       }
     };
     walk(srcRoot);
     expect(
-      offenders,
-      `effectiveRepresentation is INERT — no production importer expected, found: ${offenders.join(", ")}`,
+      erOffenders,
+      `effectiveRepresentation may be imported ONLY by the sanctioned flip sites (${[...ER_ALLOW].join(", ")}); found: ${erOffenders.join(", ")}`,
+    ).toEqual([]);
+    expect(
+      registryOffenders,
+      `resourceEmitRegistry must stay emit-internal (import via effectiveRepresentation), found: ${registryOffenders.join(", ")}`,
     ).toEqual([]);
   });
 });

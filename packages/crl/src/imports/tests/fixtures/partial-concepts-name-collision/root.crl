@@ -13,6 +13,8 @@ concept "Adult Patient":
 - value type is boolean.
 - code is `adult-18-or-older`.
 
+// `From Sibling` aliases the cross-library `Pol Concepts` boolean, which forces the
+// `include PolConcepts` on the Inferred layer this fixture asserts.
 concept "From Sibling":
 - type is Observation.
 - value type is boolean.

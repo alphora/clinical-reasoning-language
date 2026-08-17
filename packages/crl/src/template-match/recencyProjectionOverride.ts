@@ -45,8 +45,15 @@ export interface RecencyProjectionOverride {
   /** The recency-timestamp element — an INVARIANT of the built projection, not authored. The CQL
    *  helper reads it internally (documented here for the catalog boundary, not rendered by TS). */
   readonly recencyTimestamp: string;
-  /** The CaseFeatureCommon helper the recency emit renders (`CFH.<helper>(newestLocal, computed)`). */
+  /** The CaseFeatureCommon helper the recency emit renders (`CFH.<helper>(newestLocal, computed)`). Lifts the
+   *  recency-selected boolean to a truth-set List — the pre-#189-flip form; retained (unreferenced by the flipped
+   *  emit) so the truth-set lane can still consult it. */
   readonly recencyHelper: string;
+  /** #189 Slice C 2b.3b.1 — the CaseFeatureCommon helper for the TOTAL-boolean recency emit: returns the
+   *  recency-SELECTED nullable Boolean (NOT lifted to a List), which the emit wraps `Coalesce(<sel>, false)` to a
+   *  total boolean. Already exists in the catalog (`recencyAgeSelected`, `CaseFeatureCommon.cql:105`) — no CQL
+   *  change, only this descriptor pointer. */
+  readonly recencySelectedHelper: string;
   // NOTE: the compute fn is NOT on the override — it is a per-UNIT HOW (`AgeAt` years /
   // `AgeInMonths` months, #257 T2), chosen by the matcher and carried on `AgeProjectionArgs.computeFn`
   // / the `__recencyComputeFn` twin marker, so a single override serves both units.
@@ -62,6 +69,7 @@ export const AGE_TODAY_OVER_BIRTHDATE: RecencyProjectionOverride = {
   resultValueType: "boolean",
   recencyTimestamp: "Patient.meta.lastUpdated",
   recencyHelper: "recencyAgeTruths",
+  recencySelectedHelper: "recencyAgeSelected",
 };
 
 const OVERRIDES: readonly RecencyProjectionOverride[] = [AGE_TODAY_OVER_BIRTHDATE];

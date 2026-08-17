@@ -61,20 +61,16 @@ concept "BMI Observation During MP":
 - value type is Quantity.
 - definition is "cms69-RecordSource"."BMI Observations" during "Measurement Period".
 
-concept "BMI Observation Has Positive Value":
-- type is Observation.
-- value type is Quantity.
-- definition is "cms69-RecordSource"."BMI Observations" exceeds 0 'kg/m2'.
-
+// The published CMS69 measure gates only on a BMI documented DURING the measurement
+// period; the low/high/normal classification runs on the recorded value. The former
+// `exceeds 0 'kg/m2'` positive-value guard was a data-quality artifact (not part of the
+// measure), and `exceeds` is an inherently-boolean comparator with no record-set
+// realization — so it could not be intersected as a Quantity record set. `BMI During
+// Measurement Period` is therefore the during-MP BMI observations directly.
 concept "BMI During Measurement Period":
 - type is Observation.
 - value type is Quantity.
-- defined as
-(
-   "BMI Observation During MP"
-   sem-and
-   "BMI Observation Has Positive Value"
-).
+- defined as "BMI Observation During MP".
 
 
 // --- BMI clinical classifications ---

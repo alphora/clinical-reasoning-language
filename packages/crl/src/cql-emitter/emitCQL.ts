@@ -36,10 +36,28 @@ import { parseMetaTag } from "../meta/parseMetaTag";
 import { emitCqlTags, emitsToCql, suppressStatusesOf } from "../meta/registry";
 import { matchNarrative } from "../template-match";
 import { cqlStringLiteral, cqlQuotedIdentifier } from "./cqlStrings";
+import { PATTERN_RETURN_SHAPE } from "./patternReturnShape";
+import type { PatternReturnShape } from "./patternReturnShape";
+import { emitsTotalScalarBoolean, sameLayerResolver } from "./totalScalarBoolean";
+import { conceptResultType, renderResultType } from "../grammar/resultType";
+import type { ResultType } from "../grammar/resultType";
 import type {
   CanonicalArg,
   CanonicalPatternCall,
 } from "../template-match/canonicalTypes";
+// #189 Slice C boundary 2 (2a) — the totality-ledger enrollment surface. `import type` for the obligation
+// (erased at runtime, so no cycle despite `booleanTotality` importing `PATTERN_RETURN_SHAPE` as a VALUE from
+// here); `DefineLedger`/`EmittedDefineEntry`/`classifyBooleanTotality` are runtime imports used at emit time.
+import type {
+  BooleanTotalityObligation,
+  EmittedDefineEntry,
+  DischargeMetadata,
+  DischargeKind,
+  DefineOrigin,
+  DefineResult,
+  DefineVisibility,
+} from "../emit/booleanTotality";
+import { DefineLedger, classifyBooleanTotality } from "../emit/booleanTotality";
 import type {
   CRL,
   Concept,
@@ -62,8 +80,13 @@ import {
   isQualifiedRef,
   definedAsExistsNotLowered,
   reductionNotEmittable,
-  ReductionNotActiveError,
+  StructuredEmitError,
+  ReductionShapeIncoherentError,
+  CountThresholdTrivialError,
+  MostRecentDerivationError,
+  ReductionInCompositionError,
 } from "../ast/types";
+import type { EffectiveRepresentationDescriptor } from "../emit/effectiveRepresentation";
 import type { ReferenceName } from "../ast/types";
 import { emitCriterionDefine } from "./emitCriterionDefine";
 import type { CRLError } from "../types/errors";
@@ -195,6 +218,34 @@ export interface EmitOptions {
    * single-file callers stay byte-unchanged.
    */
   libraryRenames?: ReadonlyMap<string, string>;
+  /**
+   * #189 Slice-C boundary 1 — a pre-split `concept name → declared shape` map for
+   * resolving a REDUCTION operand whose target lives in a DIFFERENT emitted layer
+   * library. In the layered path a reduction's records operand is requalified to a
+   * cross-layer ref (`<S>-LocalSource."X Records"`), so `emitConceptBody`'s
+   * `conceptByName` (built from THIS layer's statements only) cannot see it; this
+   * map is computed ONCE from the pre-split working AST (all concepts visible) in
+   * `emitPartitioned` and threaded to every layer emitter so the reduction arm can
+   * check the operand is a `RecordSet` before rendering `exists`/`Count`/the select.
+   * Undefined for the `none` path + single-file callers (their `conceptByName`
+   * already holds every concept). Keyed by BARE name — safe for boundary 1's
+   * single-rep reductions (the twin `"X Records"` is a distinct name); the full
+   * `{libraryIdentity, defineName}` metadata index (§4.5) supersedes it when
+   * reductions compose.
+   */
+  conceptShapesByName?: ReadonlyMap<string, Concept["shape"]>;
+  /**
+   * #189 Slice C boundary 2 (2a) — the AUTHORED (pre-lowering) boolean-totality obligation per concept name,
+   * for the totality-ledger enrollment (`emitConcept`). Built by the caller from the RAW authored AST (BEFORE
+   * `preLowerAge`/`lowerLocalCodes` mutate it) — `for (c of raw concepts) map.set(c.name, classifyBooleanTotality(c))`
+   * — so a `"public-determination"` (or untagged) emitted define inherits its authored obligation rather than
+   * a re-classification of its lowered form (which loses `rejected`/E1 signals; disc 439 crit #2). Keyed by
+   * authored name (the validator forbids duplicate concept names, so no collision); both-rep's two same-named
+   * twins are disambiguated by `Concept.__loweringRole` (the `source-impl` half ignores this map). ABSENT ⇒
+   * `emitCQLFromAST` builds it from its own raw input (direct none-lane callers); the layered path passes the
+   * caller's map (its own input is already lowered). REPORT-MODE metadata only in 2a (no proof gate consumes it).
+   */
+  authoredObligations?: ReadonlyMap<string, BooleanTotalityObligation>;
 }
 
 /**
@@ -245,6 +296,16 @@ export interface EmitResult {
    * `@crl-future-expression` annotations were seen.
    */
   futureExpressions?: FutureExpressionRequest[];
+  /**
+   * #189 Slice C boundary 2 (2a) — the totality-ledger entries enrolled during THIS library's emit (one per
+   * emitted `define`, via `DefineLedger.appendDefine`). Populated on EVERY return that carries `result` (a
+   * successful emit AND a partial/unmatched/emit-error emit whose `result` is still populated), so a
+   * completeness cross-check covers partial output too (disc 439 #9); absent on exception paths with no
+   * `result`. Consumed in 2a ONLY by tests running `proveWholeBoundaryTotality` in REPORT mode; carried on
+   * `LayeredEmitEntry.result` so callers aggregate across a split's layer libraries. No production gate reads
+   * it yet (2b activates the closure-level proof).
+   */
+  ledgerEntries?: readonly EmittedDefineEntry[];
 }
 
 /** Map a canonical pattern name to its `CRLCommon.X` function name. */
@@ -369,89 +430,11 @@ function renderMetaBlock(meta: { text: string }[] | undefined): string {
 type CompositionShape = "boolean" | "refinement";
 
 // === Pattern return-shape classification ===
-// CRLCommon library (v0.2.0+) returns the primitive list-shaped form for
-// filter patterns. The boolean realization is composed at the call site by
-// wrapping with `exists(...)`. The author's `(type, valuetype)` declaration
-// drives whether the emitter wraps (boolean consumer) or calls directly
-// (refinement consumer). Per the principle [[patterns-are-semantic]] +
-// [[defined-as-is-semantic-composition]] + catalog v0.6.0 "What not How".
-//
-// "list"     — function returns List<Resource>; emitter wraps with
-//              `exists(...)` for boolean consumers.
-// "boolean"  — function returns Boolean (inherently a predicate);
-//              refinement consumers get a FIXME comment.
-// "instance" — function returns Instance<Resource> (singleton — e.g.
-//              MostRecent/Last/Earliest/First); for refinement consumers
-//              the emitter lifts to a singleton-list via `{...}`.
-// "other"    — function returns Period/Quantity/Interval/DateTime;
-//              author's valuetype should match, emitter just calls.
-type PatternReturnShape = "list" | "boolean" | "instance" | "other";
-
-const PATTERN_RETURN_SHAPE: Record<string, PatternReturnShape> = {
-  // List-returning filter patterns (primitive form per v0.2.0 refactor).
-  Has: "list",
-  HasHistoryOf: "list",
-  CurrentlyTaking: "list",
-  HasAdverseReactionTo: "list",
-  AsOf: "list",
-  Within: "list",
-  ComponentOf: "list",
-  NotDoneWithReason: "list",
-  BaselineAndFollowUp: "list",
-  WasOrdered: "list",
-  Justified: "list",
-  Active: "list",
-  IsVerified: "list",
-  DocumentedAs: "list",
-  During: "list",
-  Overlaps: "list",
-  OnDayOfOrAfter: "list",
-  OnOrBefore: "list",
-  SameDay: "list",
-  BetweenAnchors: "list",
-  WasPerformed: "list",
-
-  // Inherently-boolean patterns (no meaningful list realization).
-  Without: "boolean",
-  With: "boolean",
-  AtLeastApart: "boolean",
-  AtMostApart: "boolean",
-  AtLeastN: "boolean",
-  Consecutive: "boolean",
-  High: "boolean",
-  Low: "boolean",
-  Normal: "boolean",
-  Abnormal: "boolean",
-  AtLeast: "boolean",
-  AtMost: "boolean",
-  Between: "boolean",
-  Exceeds: "boolean",
-  Below: "boolean",
-
-  // Instance-returning selection patterns (singleton resource).
-  MostRecent: "instance",
-  Last: "instance",
-  LastOf: "instance",
-  Earliest: "instance",
-  First: "instance",
-  FirstOf: "instance",
-
-  // Other-shape patterns (Period, Quantity, Interval).
-  InpatientStay: "other",
-  BeforeStartOf: "other",
-  AfterStartOf: "other",
-  BeforeEndOf: "other",
-  AfterEndOf: "other",
-  OnDayOf: "other",
-  AgeAt: "other",
-  // No `AgeInMonths` entry by design (#257 T2): the months compute fn only ever appears
-  // NESTED inside a top-level comparator (`AtLeast`/`AtMost`/`Below` = "boolean"), never as
-  // the top-level pattern, so it is never looked up here. If it ever were, the `?? "list"`
-  // default would fail loudly (`exists CRLCommon.AgeInMonths()`), not miscompile.
-  Calculate: "other",
-  Lowest: "other",
-  Highest: "other",
-};
+// The table itself now lives in the leaf `./patternReturnShape` (extracted #189 Slice C 2a to break the
+// value-import cycle with `emit/booleanTotality`). Imported at the top for local use and re-exported here so
+// existing importers of `PATTERN_RETURN_SHAPE` / `PatternReturnShape` from `emitCQL` are unchanged.
+export { PATTERN_RETURN_SHAPE };
+export type { PatternReturnShape };
 
 /**
  * v2.2 Todo 3 — CRL parameter type → CQL parameter type token.
@@ -507,6 +490,28 @@ export function infoForParameterStatement(stmt: Parameter): AstParameterInfo {
   return { kind: "parameter", cqlType: cqlTypeForParameter(stmt.parameterType) };
 }
 
+/**
+ * #189 Slice C 2a — classify every authored concept's boolean-totality obligation from the RAW (pre-lowering)
+ * AST, keyed by name, for ledger enrollment (`EmitOptions.authoredObligations`). Each classify is defensive
+ * (a malformed concept classifies `rejected`/`unclassified`, never throws) — but wrapped so a future
+ * classifier edit that throws can never turn a currently-succeeding emit into an exception (byte-invariance).
+ */
+export function buildAuthoredObligations(ast: CRL): ReadonlyMap<string, BooleanTotalityObligation> {
+  const map = new Map<string, BooleanTotalityObligation>();
+  for (const s of ast.statements) {
+    if (s.type !== "Concept" || !s.name) continue;
+    try {
+      map.set(s.name, classifyBooleanTotality(s));
+    } catch (e) {
+      map.set(s.name, {
+        kind: "unclassified",
+        reason: `classifyBooleanTotality threw: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    }
+  }
+  return map;
+}
+
 export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult {
   try {
     // Slice 3 — lower concept-level `code is` local source codes into synthetic
@@ -532,7 +537,16 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
     if (preEmitErrors.length > 0) {
       return { success: false, errors: preEmitErrors };
     }
-    const emitter = new Emitter(lowered.ast, options);
+    // #189 Slice C 2a — the AUTHORED (pre-lowering) obligations for ledger enrollment. Built from the RAW
+    // `ast` (BEFORE `preLowerAge`/`lowerLocalCodes`, disc 439 #10) so a `public-determination` inherits its
+    // authored obligation, not a re-classification of its lowered form (which loses `rejected`/E1). Built
+    // here ONLY when the caller supplied none — the layered path passes its own (its input is already lowered,
+    // so this fallback would be wrong for it). Report-mode side channel; it changes no emitted bytes.
+    const emitOptions: EmitOptions =
+      options.authoredObligations !== undefined
+        ? options
+        : { ...options, authoredObligations: buildAuthoredObligations(ast) };
+    const emitter = new Emitter(lowered.ast, emitOptions);
     const out = emitter.emit();
     const unmatched = emitter.getUnmatched();
     // Slice 4b D1 — emit-time diagnostics accumulated through the Emitter's
@@ -560,6 +574,7 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
         result: out,
         errors: [...emitErrors, ...errors],
         unmatched,
+        ledgerEntries: emitter.getLedgerEntries(),
         ...(emitter.getFutureExpressions().length > 0
           ? { futureExpressions: emitter.getFutureExpressions() }
           : {}),
@@ -573,6 +588,7 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
         success: false,
         result: out,
         errors: emitErrors,
+        ledgerEntries: emitter.getLedgerEntries(),
         ...(emitter.getFutureExpressions().length > 0
           ? { futureExpressions: emitter.getFutureExpressions() }
           : {}),
@@ -581,17 +597,20 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
     return {
       success: true,
       result: out,
+      ledgerEntries: emitter.getLedgerEntries(),
       ...(emitter.getFutureExpressions().length > 0
         ? { futureExpressions: emitter.getFutureExpressions() }
         : {}),
     };
   } catch (e) {
-    // #189 IMPL 3 — a `ReductionDefinition` that reached a deep emit path (no-`code is` reduction)
-    // throws the typed sentinel; surface it as a STRUCTURED `emit-reduction-not-active` diagnostic (a
-    // filterable kind + source location) rather than a bare `type: "Exception"`. Every lane that
-    // delegates to `emitCQLFromAST` (the standard CQL lane, `imports/emit`) inherits this. The `code is`
-    // + reduction case is caught earlier + structured by `lowerLocalCodes` (never reaches here).
-    if (e instanceof ReductionNotActiveError) {
+    // #189 — a `ReductionDefinition` reaching a deep emit path throws a TYPED `StructuredEmitError`
+    // (validate-only sentinel `emit-reduction-not-active`, or a coherence/threshold defect the
+    // validator-free emit path must fail loud on: `emit-reduction-shape-incoherent` /
+    // `emit-count-threshold-trivial`); surface it as a STRUCTURED `Validation` diagnostic (a filterable
+    // kind + source location) rather than a bare `type: "Exception"`. Every lane that delegates to
+    // `emitCQLFromAST` (the standard CQL lane, `imports/emit`) inherits this. The `code is` + reduction
+    // case is caught earlier + structured by `lowerLocalCodes` (never reaches here).
+    if (e instanceof StructuredEmitError) {
       return {
         success: false,
         errors: [
@@ -740,6 +759,12 @@ class Emitter {
   // the block comment on the emitted define).
   private readonly futureExpressions: FutureExpressionRequest[] = [];
 
+  // #189 Slice C 2a — the totality-ledger: every emitted concept/criterion `define` enrolls here (dual-write,
+  // alongside the existing text assembly). Consumed via `getLedgerEntries()` → `EmitResult.ledgerEntries`;
+  // REPORT-MODE only in 2a (no proof gate). The ledger's own `render()` is NOT used — output stays the
+  // section assembly, byte-identical.
+  private readonly ledger = new DefineLedger();
+
   constructor(ast: CRL, options: EmitOptions) {
     this.ast = ast;
     this.options = {
@@ -764,6 +789,15 @@ class Emitter {
       // #227 — render-only qualifier rename map (raw → `S`); empty for the layered
       // path and single-file callers, making `renderLib` the identity there.
       libraryRenames: options.libraryRenames ?? new Map<string, string>(),
+      // #189 Slice-C boundary 1 — cross-layer reduction-operand shape map (see the
+      // EmitOptions doc). Empty for the `none` path / single-file callers, whose
+      // `conceptByName` already holds every concept. INERT until the layered
+      // reduction emit consumes it (build steps 2–4).
+      conceptShapesByName: options.conceptShapesByName ?? new Map<string, Concept["shape"]>(),
+      // #189 Slice C boundary 2 (2a) — authored (pre-lowering) obligations per concept name for ledger
+      // enrollment. Empty when the caller supplied none; `emitCQLFromAST` builds a real map from its raw
+      // input before construction and passes it here (direct none-lane callers) — see EmitOptions doc.
+      authoredObligations: options.authoredObligations ?? new Map<string, BooleanTotalityObligation>(),
     };
     // Normalize the case-feature emit mode. The public option has no `"off"` arm
     // (absence === off); map it onto the internal discriminated union so the
@@ -971,8 +1005,330 @@ class Emitter {
    */
   private emitCriteria(criteria: Criterion[]): string {
     return criteria
-      .map((c) => emitCriterionDefine(c.name, c.condition, (name) => cqlIdent(name), cqlIdent))
+      .map((c) => {
+        const cql = emitCriterionDefine(c.name, c.condition, (name) => cqlIdent(name), cqlIdent);
+        this.enrollCriterion(c.name, cql);
+        return cql;
+      })
       .join("\n\n");
+  }
+
+  /** #189 Slice C 2a — enrolled totality entries for this library's emit (→ `EmitResult.ledgerEntries`). */
+  getLedgerEntries(): readonly EmittedDefineEntry[] {
+    return this.ledger.entries();
+  }
+
+  /** The emitted-library identity every ledger entry keys on — matches the `library` header
+   *  (`renderLib(libraryName)`), so a `none`-path raw≠rendered name still keys correctly (disc 439 #9). */
+  private ledgerLibrary(): string {
+    return this.renderLib(this.options.libraryName ?? "GeneratedFromCRL");
+  }
+
+  /** A boolean-valued Scalar concept (exactly one value type, `boolean`). */
+  private isBooleanScalarConcept(c: Concept): boolean {
+    return c.valueTypes.length === 1 && c.valueTypes[0] === "boolean";
+  }
+
+  /** #189 Slice C 2a — a façade's emitted form, so `enrollConcept`'s obligation and `emittedDischargeAndType`'s
+   *  discharge AGREE (disc 439 code review, gpt56 #1): `"recordsource"` = a plain record re-export (no boolean
+   *  define); `"total-boolean"` = a BARE re-export of a total Inferred reduction (delegates its totality);
+   *  `"satisfied"` = `…satisfied()` = `exists(truths)`, intrinsically total by its OWN existence wrapper. */
+  private facadeForm(c: Concept): "recordsource" | "total-boolean" | "satisfied" {
+    if (c.__interfaceSourceLayer === "RecordSource") return "recordsource";
+    if (c.__interfaceSourceLayer === "Inferred" && c.__interfaceReexportMode === "total-boolean") return "total-boolean";
+    return "satisfied"; // Inferred `.satisfied()` or LocalSource `.asTruths().satisfied()`
+  }
+
+  /**
+   * #189 Slice C 2a — enroll a concept's emitted `define` into the totality ledger (DUAL-WRITE, alongside the
+   * unchanged text assembly). Obligation SOURCE by lowering role (disc 439): impl twins manufacture
+   * `not-applicable`; a façade manufactures an obligation matching its emitted form (`facadeForm`); a
+   * `public-determination` (or untagged authored) inherits its AUTHORED obligation (`authoredObligations`,
+   * else a last-resort in-place classify). `obligationSource` records that provenance so 2b's gate can refuse
+   * `in-place`. Discharge + resultType come from the EMITTED form (`emittedDischargeAndType`).
+   */
+  private enrollConcept(c: Concept, cql: string): void {
+    const role = c.__loweringRole;
+    let obligation: BooleanTotalityObligation;
+    let origin: DefineOrigin = "authored";
+    let obligationSource: "manufactured" | "authored-map" | "in-place" = "manufactured";
+    if (role === "records-impl" || role === "source-impl") {
+      // origin stays "authored" — it is DON'T-CARE for a non-boolean subject (the proof skips origin matching
+      // for a `not-boolean`/`nullable` discharge); the enum has no implementation-twin arm.
+      obligation = {
+        kind: "not-applicable",
+        nullable: false,
+        reason: `lowering role \`${role}\` — implementation twin (no boolean define)`,
+      };
+    } else if (role === "interface-facade" && this.caseFeature.kind === "interface") {
+      // GATE on `caseFeature.kind === "interface"` — the SAME precondition `emitConceptBody` keys the façade
+      // emit on (round-2 code review, Claude #2). A role-tagged concept reaching the public `emitCQLFromAST`
+      // with `caseFeature` off emits a LEGACY body, not `…satisfied()`; without this gate it would enroll a
+      // manufactured `total` façade over a non-façade body (a false-total). Off the gate, it falls through to
+      // the authored/public branch below, which classifies it by the form it ACTUALLY emits. (Production
+      // façades always carry `caseFeature: "interface"` — `emitPartitioned` sets it on the Interface layer —
+      // so this changes no emitted or enrolled bytes for a real producer.)
+      origin = "interface-facade";
+      const form = this.facadeForm(c);
+      if (form === "recordsource") {
+        obligation = { kind: "not-applicable", nullable: false, reason: "RecordSource record re-export (no boolean define)" };
+      } else if (form === "total-boolean") {
+        // A bare re-export of a total Inferred reduction — total IFF the reduction is (delegated).
+        const ref =
+          c.definition?.type === "DefinedAsDefinition" && c.definition.body.type === "DefinedAsBareRef"
+            ? c.definition.body.ref
+            : undefined;
+        obligation =
+          ref !== undefined
+            ? { kind: "composite", operands: [ref], cell: "§2 interface façade — bare total-boolean re-export (delegated)" }
+            : { kind: "unclassified", reason: "total-boolean façade with no bare-ref body (unexpected shape)" };
+      } else {
+        // `…satisfied()` = `exists(truths)` — intrinsically total, independent of the truth-set operand.
+        obligation = {
+          kind: "intrinsically-total",
+          form: "interface façade `…satisfied()` = exists(truths)",
+          cell: "§2 interface façade — satisfied() existence wrapper (CaseFeatureCommon)",
+        };
+      }
+    } else {
+      // public-determination OR untagged authored: inherit the AUTHORED obligation (the map is built from the
+      // RAW pre-lowering AST). The last-resort in-place classify only fires when no map entry exists (a direct
+      // caller that skipped the builder, or a caller that passed a map built from LOWERED forms) — documented
+      // unsound-as-production-source (disc 439 #4/round-2 #3), tagged `in-place` so 2b's gate can refuse it.
+      const mapped = this.options.authoredObligations.get(c.name);
+      // Wrap the last-resort classify (symmetry with `buildAuthoredObligations`, round-2 #6): a future
+      // classifier edit that throws must never turn a currently-succeeding emit into an exception.
+      let inPlace: BooleanTotalityObligation | undefined;
+      if (mapped === undefined) {
+        try {
+          inPlace = classifyBooleanTotality(c);
+        } catch (e) {
+          inPlace = { kind: "unclassified", reason: `classifyBooleanTotality threw: ${e instanceof Error ? e.message : String(e)}` };
+        }
+      }
+      obligation = mapped ?? inPlace!;
+      obligationSource = mapped !== undefined ? "authored-map" : "in-place";
+    }
+    const { resultType, discharge, result } = this.emittedDischargeAndType(c, role);
+    // #189 Slice C 2b.0 — routing visibility from the lowering role. `impl` twins are never routing targets;
+    // `facade` ONLY under the same `caseFeature.kind === "interface"` gate the façade emit/obligation use
+    // (round-3 pin) — a role-tagged concept in a non-interface lane emitted a legacy body → `public`; an
+    // untagged `public-determination`/authored concept is `public`.
+    const visibility: DefineVisibility =
+      role === "records-impl" || role === "source-impl"
+        ? "impl"
+        : role === "interface-facade" && this.caseFeature.kind === "interface"
+          ? "facade"
+          : "public";
+    this.ledger.appendDefine({
+      library: this.ledgerLibrary(),
+      name: c.name,
+      resultType,
+      obligation,
+      discharge,
+      origin,
+      cql,
+      obligationSource,
+      result,
+      visibility,
+      // #189 2b.4a — a FORM-KEYED staging exemption from the HARD gate rides on the still-live REJECTED form
+      // (the pre-flip bare-scalar `code is`, set at the classifier). An E1 #257 reject leaves `staging` unset →
+      // the gate blocks it. Families (a)/(c) live on the ungated single-library path, so no discharge-side marker.
+      stagingExclusion: obligation.kind === "rejected" ? obligation.staging : undefined,
+    });
+  }
+
+  /** #189 Slice C 2a — a `criterion` define is per-leaf totalized (`emitCriterionDefine`), so it is an
+   *  intrinsically-total boolean axiom by construction. */
+  private enrollCriterion(name: string, cql: string): void {
+    this.ledger.appendDefine({
+      library: this.ledgerLibrary(),
+      name,
+      resultType: "Boolean",
+      obligation: {
+        kind: "intrinsically-total",
+        form: "criterion (per-leaf Coalesce)",
+        cell: "§2 criterion → per-operand-total boolean define",
+      },
+      discharge: { booleanEffect: "total", dischargedBy: "axiom" },
+      origin: "criterion-axiom",
+      cql,
+      obligationSource: "manufactured",
+      result: { shape: "Scalar", valueType: "boolean" },
+      visibility: "public",
+    });
+  }
+
+  /**
+   * #189 Slice C 2a — the DISCHARGE + result type of a concept's emitted `define`, from its EMITTED form.
+   * `resultType === "Boolean"` is the proof's subject gate; a non-boolean form returns a `non-Boolean(...)`
+   * token (skipped by the proof). FAIL-CLOSED (disc 439 #5): a form whose boolean-ness is not locally
+   * determinable is reported `nullable`/non-Boolean, never a dishonest `total`. Report-mode snapshot of
+   * CURRENT emit — the honest non-total forms are bare comparators (nullable) and authored `rejected` flip-
+   * forms; truth-set-lane defined-as emit Lists (skipped) and their Interface `…satisfied()` façade IS total
+   * (`exists`); 2b totalizes comparators + composes-over-totals to retire the truth-set lane.
+   */
+  private emittedDischargeAndType(
+    c: Concept,
+    role: Concept["__loweringRole"],
+  ): { resultType: string; discharge: DischargeMetadata; result: DefineResult } {
+    // The `result` (§4.5 2b.0) is the EMITTED define's discriminated result. `total`/`nullable` boolean forms
+    // are Scalar<boolean>; `notBoolean` defaults to `{opaque, form}` (the honest arm for a truth-set List / a
+    // form whose resource type is not locally known), overridable at a record-bearing site.
+    const notBoolean = (form: string, result?: DefineResult): { resultType: string; discharge: DischargeMetadata; result: DefineResult } => ({
+      resultType: `non-Boolean(${form})`,
+      discharge: { booleanEffect: "not-boolean" },
+      result: result ?? { shape: "opaque", form },
+    });
+    const total = (by: DischargeKind): { resultType: string; discharge: DischargeMetadata; result: DefineResult } => ({
+      resultType: "Boolean",
+      discharge: { booleanEffect: "total", dischargedBy: by },
+      result: { shape: "Scalar", valueType: "boolean" },
+    });
+    const nullableBool = (reason: string): { resultType: string; discharge: DischargeMetadata; result: DefineResult } => ({
+      resultType: "Boolean",
+      discharge: { booleanEffect: "nullable", reason },
+      result: { shape: "Scalar", valueType: "boolean" },
+    });
+    // A RecordSet-emitting form's resource — MIRRORS the emit's own resolution (`emitCodedFrom`
+    // `retrieveResourceType ?? conceptType ?? "Observation"`) so `result` reports the resource the retrieve
+    // ACTUALLY emits: a synthetic source-impl `CodedFromDefinition` carries `retrieveResourceType`; a
+    // hand-authored `coded from` has none and the emit falls back to `type is` (`conceptType`); a records twin
+    // / natural retrieve carries `conceptType`. When BOTH are absent the emit uses its LEGACY `"Observation"`
+    // default — a fabricated resource the concept never declared, so `result` reports `opaque` there rather
+    // than assert a resource the author did not choose (charter §3–§4; a near-never cell — code review #4).
+    const recordSetResultOf = (form: string): DefineResult => {
+      const rt =
+        c.definition?.type === "CodedFromDefinition"
+          ? (c.definition.retrieveResourceType ?? c.conceptType)
+          : c.conceptType;
+      return rt !== undefined ? { shape: "RecordSet", resourceType: rt } : { shape: "opaque", form };
+    };
+
+    // Implementation twins publish records — no boolean define.
+    if (role === "records-impl" || role === "source-impl") return notBoolean(role, recordSetResultOf(role));
+    // Interface façade (disc 439 code review, gpt56 #1 — split by emitted form; `…satisfied()` is total by
+    // its OWN existence wrapper, NOT a delegation to the truth-set operand). GATED on `caseFeature.kind ===
+    // "interface"` to match the emit precondition (round-2 #2): a role-tagged concept in a non-interface lane
+    // emits a legacy body, so it falls through to the definition switch (its ACTUAL form) below.
+    if (role === "interface-facade" && this.caseFeature.kind === "interface") {
+      const form = this.facadeForm(c);
+      if (form === "recordsource") return notBoolean("RecordSource record re-export");
+      if (form === "total-boolean") return total("facade-delegated"); // bare re-export — delegates to the reduction
+      return total("facade-satisfied"); // `…satisfied()` = `exists(truths)` — intrinsically total
+    }
+    // #189 Slice C 2b.3b.1 — a both-representation twin's discharge is KINDED, lock-step with the emit flip + the
+    // totality predicate. A `"recency"` twin emits `Coalesce(CFH.recencyAgeSelected(...), false)` — a TOTAL boolean →
+    // discharges `total("boundary-coalesce")`, but ONLY when it declares a Scalar boolean (the SAME invariant
+    // `emitRecencyMerge` + the predicate assert; a malformed twin is a loud emit error, so the discharge reports it
+    // non-boolean rather than certifying a total it cannot emit). A `"union"` twin still emits a truth-set List
+    // (`.asTruths() union …`) → NOT a boolean. Checked before the definition switch because a recency twin's
+    // definition does NOT emit via the catalog path.
+    if (c.__bothRepMerge === "recency") {
+      return this.isBooleanScalarConcept(c) && c.shape === "Scalar"
+        ? total("boundary-coalesce")
+        : notBoolean("malformed recency twin (non-scalar-boolean declaration)");
+    }
+    if (c.__bothRepMerge !== undefined) return notBoolean(`both-rep ${c.__bothRepMerge} truth-set merge`);
+
+    const def = c.definition;
+    if (def === undefined) return notBoolean("representations-only stub");
+    switch (def.type) {
+      case "ReductionDefinition": {
+        const r = def.reduction;
+        if (r.kind === "exists") return total("intrinsic-exists");
+        if (r.kind === "count") return total("count-bare"); // †runtime empty/null pin (disc 439 #7) — 2b's gate discharges
+        // A boolean `most recent this` is `Coalesce(FHIRHelpers.ToBoolean(<newest value read>), false)` ONLY
+        // for a Scalar boolean; a `shape is Record` most-recent is a record SELECTION (non-boolean). Guard on
+        // shape too, mirroring the coherence guard, not only the value type (disc 439 round-2 #2).
+        return this.isBooleanScalarConcept(c) && c.shape === "Scalar"
+          ? total("boundary-coalesce")
+          : notBoolean(
+              "most recent (non-scalar/non-boolean value read)",
+              c.shape === "Record" && c.conceptType !== undefined
+                ? { shape: "Record", resourceType: c.conceptType }
+                : undefined,
+            );
+      }
+      case "CodedFromDefinition":
+        return notBoolean("coded-from retrieve", recordSetResultOf("coded-from retrieve"));
+      case "DefinedAsDefinition": {
+        // The truth-set lanes (inferred/interface) emit a List; the boolean subject is the façade.
+        if (this.caseFeature.kind !== "off") {
+          // #189 Slice C 2b.2 — a FLIPPED bare-ref alias to a total boolean discharges `composite-delegated`: its
+          // authored obligation is already `composite` over [referent] (`booleanTotality.ts:296`), so the closure
+          // proof delegates to the referent's own total. `emitsTotalScalarBoolean(c)` gates on `c`'s OWN boolean
+          // declaration + the referent's totality — LOCK-STEP with the emit flip. Every OTHER truth-set
+          // `defined as` (a composition, a non-boolean-declared or non-total alias) stays a List.
+          if (emitsTotalScalarBoolean(c, sameLayerResolver((n) => this.conceptByName.get(n)))) {
+            return total("composite-delegated");
+          }
+          return notBoolean("truth-set defined-as (List)");
+        }
+        // LEGACY lane (`caseFeature` off — cms/none): the emitted shape depends on the body + value type
+        // (disc 439 code review, gpt56 #2 / Claude #1 — the flat "Boolean/composite" row was body/shape-blind):
+        //   - `defined as exists ("X")` → `exists (...)` — intrinsically total.
+        //   - boolean value type → boolean `and`/`or`/`not` composition/alias — a delegated composite.
+        //   - non-boolean value type → REFINEMENT `union`/`intersect`/`except` (a List) — NOT a boolean define
+        //     (labeling it Boolean would pollute the subject set AND false-PASS an ill-typed refinement whose
+        //     operands happen to be total booleans).
+        const body = def.body;
+        if (body.type === "DefinedAsExists") return total("intrinsic-exists");
+        // Boolean-vs-refinement is the emitter's OWN `declaredShapeOfConcept` rule (`valueTypes.includes
+        // ("boolean")`), NOT `isBooleanScalarConcept` (exactly-one) — a multi-value-type concept including
+        // `boolean` emits boolean CQL (round-2 code review). (A composition/alias's declared value type is
+        // value-preserving vs its operands/referent, so this labels the alias by the type it emits; a
+        // validator-free MISMATCH is a `rejected` obligation — caught before the subject filter.) Note the
+        // KNOWN false-FAIL cell: a boolean composition over refinement operands is emitted total (each leaf
+        // `exists`-bridged) but its List operand DEFINES enroll `not-boolean`, so the composite proof fails a
+        // form whose CQL is total — that cell dies at the flip (refinement-leaf-in-boolean-parent
+        // warning→error), so counting it in the 2a burn-down baseline is deliberate (round-2 #5).
+        return this.declaredShapeOfConcept(c) === "boolean"
+          ? total("composite-delegated")
+          : notBoolean("refinement composition/alias (List)");
+      }
+      case "DefinitionIsDefinition": {
+        const call = matchNarrative(def.body);
+        if (!call.known) {
+          // Unmatched narrative — the emitter emits a compile-failing sentinel. Fail-closed: report nullable
+          // on a boolean concept (never a false `total`), non-Boolean otherwise.
+          return this.isBooleanScalarConcept(c)
+            ? nullableBool(`unmatched narrative "${call.pattern}" (fail-closed)`)
+            : notBoolean("unmatched narrative");
+        }
+        const shape = PATTERN_RETURN_SHAPE[call.pattern];
+        if (shape === "boolean") {
+          // #189 Slice C 2b.1 — a boolean-DECLARED comparator now emits `Coalesce(<cmp>, false)` (total at its
+          // boundary, `emitDefinitionIs`); a refinement-declared concept over a boolean pattern is the
+          // ill-typed FIXME passthrough (`emitDefinitionIs` `:2522`), still a bare nullable boolean. Discharge
+          // in lock-step with the emit, keyed on the emitter's OWN `declaredShapeOfConcept` rule.
+          return this.declaredShapeOfConcept(c) === "boolean"
+            ? total("boundary-coalesce")
+            : nullableBool(`catalog comparator \`${call.pattern}\` in a refinement concept (FIXME passthrough)`);
+        }
+        if (shape === "list") {
+          // A LIST pattern (`Has`/`WasPerformed`/…) realizes a boolean consumer as `exists <call>` — presence
+          // over the set IS the intended boolean, so it is intrinsically total.
+          return this.isBooleanScalarConcept(c)
+            ? total("intrinsic-exists")
+            : notBoolean(`catalog \`${call.pattern}\` (list)`);
+        }
+        if (shape === "instance") {
+          // #189 Slice C 2b.1 code review (both arms) — an INSTANCE pattern (`most recent "X"`/`Last`/…) on a
+          // boolean concept emits presence-semantics `exists { <selection> }` (`emitDefinitionIs`), which is
+          // the §4 GAP-3 value-vs-presence cell: presence of the newest record ≠ "its boolean value is true".
+          // `classifyBooleanTotality` classifies it `unclassified` and REFUSES to certify presence as total
+          // (`booleanTotality.ts:139-147`). Keep the DISCHARGE honest — report `nullable`, NOT a false `total`,
+          // so the ledger/`CloseIndex` never certifies a total over this semantically-unresolved lowering. The
+          // `unclassified` obligation already makes the proof `incomplete`; the SEMANTIC accept-presence-vs-
+          // reject-with-migration decision is deferred to 2b.3 (the value-read lowering) — its death point.
+          return this.isBooleanScalarConcept(c)
+            ? nullableBool(`instance-pattern \`${call.pattern}\` on a boolean concept — value-vs-presence unresolved (§4 gap 3, → 2b.3)`)
+            : notBoolean(`catalog \`${call.pattern}\` (instance)`);
+        }
+        return notBoolean(`catalog \`${call.pattern}\` (other)`);
+      }
+    }
   }
 
   /** Issue #79 — unmatched narratives accumulated during this emit. */
@@ -1264,7 +1620,11 @@ class Emitter {
         }
       }
     }
-    return `${metaBlock}${header}\n${indent(body, 1)}`;
+    const cql = `${metaBlock}${header}\n${indent(body, 1)}`;
+    // #189 Slice C 2a — DUAL-WRITE: enroll the emitted define into the totality ledger (report-mode side
+    // record). The returned string is UNCHANGED — output stays the section assembly, byte-identical.
+    this.enrollConcept(c, cql);
+    return cql;
   }
 
   private emitConceptBody(c: Concept, def: ConceptDefinition): string {
@@ -1284,7 +1644,12 @@ class Emitter {
       const qref = cqlQualifiedRef(getRefLibrary(def.body.ref) ?? "", name);
       switch (c.__interfaceSourceLayer) {
         case "Inferred":
-          return `${qref}.satisfied()`;
+          // #189 Slice-C boundary 1 — a REDUCTION source publishes a TOTAL boolean (`exists`/`Count`/a
+          // `Coalesce`-guarded `most recent`), which has no `.satisfied()` method: re-export it BARE. A
+          // `defined as` truth-set determination stays `.satisfied()`. The mode is decided at synthesis
+          // (`buildInterfaceReexports`) because this per-layer emitter's `conceptByName` is layer-isolated
+          // and cannot see the source concept's definition.
+          return c.__interfaceReexportMode === "total-boolean" ? qref : `${qref}.satisfied()`;
         case "LocalSource":
           return `${qref}.asTruths().satisfied()`;
         // RecordSource (and any other) → fall through to the legacy re-export.
@@ -1308,21 +1673,253 @@ class Emitter {
         return this.emitDefinedAs(c, def.body);
       case "DefinitionIsDefinition":
         return this.emitDefinitionIs(c, def);
-      case "ReductionDefinition":
+      case "ReductionDefinition": {
+        const r = def.reduction;
+        // #189 flip (Slice A/B1) — activate emission of a reduction over a LOCAL `shape is RecordSet`
+        // operand (`exists "X"` / `count "X" at least N` where X publishes a record set) →
+        // `exists (<X>)` / `Count(<X>) >= N`, mirroring `defined as exists`. Both are TOTAL booleans
+        // ONLY once the operand resolves to a record set; over a scalar/record they are ILL-TYPED CQL,
+        // not total booleans — disc 429 assigned operand-cardinality validity to the §4.5 lowering
+        // reject (Slice C), not the totality proof. So GATE on a locally-resolved `shape is RecordSet`:
+        // a non-RecordSet local operand, a cross-lib operand (Slice C), `this` (ThisRecords — lowered by
+        // `lowerLocalCodes` to the named form before it reaches here), and `most recent` all stay loud.
+        // The `code is` + `this` forms are lowered here by `lowerLocalCodes`, which also guards their
+        // threshold + result-concept coherence; the NAMED-operand form reaches here VALIDATOR-FREE, so
+        // mirror both guards with the SAME typed kinds (crl-emit Slice-B1 disc + disc 431 crit).
+        if ((r.kind === "exists" || r.kind === "count") && r.target.type === "ReductionConceptRef") {
+          // `count … at least N` with N < 1 is an author error (trivially true), NOT a not-yet-active
+          // form — fail loud with the specific kind, not the misleading not-active sentinel.
+          if (r.kind === "count" && r.atLeast < 1) {
+            throw new CountThresholdTrivialError(
+              `Concept "${c.name}": \`count "${getRefName(r.target.ref)}" at least ${r.atLeast}\` is ` +
+                `trivially true (every set has at least ${r.atLeast} members). Use \`at least 1\` (or ` +
+                `\`exists\`), or a threshold ≥ 1.`,
+              def.location,
+            );
+          }
+          // Slice-C boundary 1: resolve the operand shape + rendered ref via the SHARED resolver so the
+          // `none` (bare) and layered (cross-layer qualified) lanes cannot drift.
+          const { shape: operandShape, rendered: operandRef } = this.reductionOperand(r.target.ref);
+          const refName = getRefName(r.target.ref);
+          if (operandShape === "RecordSet") {
+            // COHERENCE (charter): the RESULT concept `c` publishes a Scalar boolean for exists/count. A
+            // non-Scalar shape, or a value type that is not exactly one `boolean`, contradicts that —
+            // and the totality classifier (`booleanTotality.ts`) rejects the same, so admitting it here
+            // would arm a Slice-C proof failure. Mirror the `this`-path guard in `lowerLocalCodes`.
+            if (c.shape !== "Scalar" || c.valueTypes.length !== 1 || c.valueTypes[0] !== "boolean") {
+              const vtClause =
+                c.valueTypes.length === 1
+                  ? ` and \`value type is ${c.valueTypes[0]}\``
+                  : c.valueTypes.length > 1
+                    ? ` and ${c.valueTypes.length} value types (needs exactly one \`boolean\`)`
+                    : " and no `value type`"; // lock-step mirror of the lowerLocalCodes this-path clause
+              throw new ReductionShapeIncoherentError(
+                `Concept "${c.name}": \`definition is ${r.kind === "count" ? "count" : "exists"} ` +
+                  `"${refName}"\` publishes a Scalar boolean, but the concept declares ` +
+                  `\`shape is ${c.shape}\`${vtClause}. Declare \`- shape is Scalar.\` with ` +
+                  `\`value type is boolean\`.`,
+                def.location,
+              );
+            }
+            return r.kind === "exists"
+              ? `exists (${operandRef})`
+              : `Count(${operandRef}) >= ${r.atLeast}`;
+          }
+        }
+        // #189 Slice B2a/B2b — a `most recent this`, lowered by `lowerLocalCodes` to a `mostRecent` over the
+        // records twin (which ALSO attached the resolved `__effectiveDescriptor`). TWO active cells,
+        // discriminated by the RESULT concept's declared shape (lowerLocalCodes gated each): `shape is
+        // Scalar` boolean → B2a VALUE READ; `shape is Record` → B2b RECORD SELECT (no value read). A named
+        // `most recent "X"` is NOT normalized to a ReductionDefinition (stays a DefinitionIsDefinition), so
+        // this arm only ever sees the lowered `this` form.
+        if (r.kind === "mostRecent" && r.target.type === "ReductionConceptRef") {
+          const { shape: operandShape, rendered: operandRef } = this.reductionOperand(r.target.ref);
+          if (operandShape === "RecordSet") {
+            const desc = c.__effectiveDescriptor as EffectiveRepresentationDescriptor | undefined;
+            if (c.shape === "Record") {
+              // B2b RECORD SELECT — `Last((<twin>) O sort by <recency>, id)`, the filter-free/read-free
+              // spine (`emitSelectNewest` with no value filter). A Record's OPTIONAL `value type` (a datum
+              // descriptor, design §1) is NOT read by the select, so it is deliberately NOT guarded here
+              // (rejecting it would hard-fail validator-clean content — B2b panel #1). NULL-RECENCY: a record
+              // whose recency element is null sorts first and cannot mask a dated record; if ALL records are
+              // undated `Last` returns the highest-`id` record — deterministic, unreachable on the canonical
+              // lane (T2: CEL writes the dateTime variant), inheriting the disc-433-reviewed shared-primitive
+              // behavior (for a Record the failure mode is "wrong record published", cf. B2a's "wrong truth").
+              // FULL CONTRACT GUARD (a hand-built AST via `emitCQLFromAST` is a public entry): a Record select
+              // carries NO datum and — because B2b admits ANY registry resource (no Observation pin) — the
+              // descriptor's resource must match the concept, or a mismatched descriptor would emit the wrong
+              // resource's recency element (gpt56 #4). Validate local-exact arm + recency present + value
+              // element/datum ABSENT + `desc.resourceType === c.conceptType`, failing loud with a FILTERABLE
+              // kind rather than an ill-typed emit.
+              if (
+                desc === undefined ||
+                desc.arm !== "local-exact" ||
+                desc.recency === undefined ||
+                desc.valueElement !== undefined ||
+                desc.datumValueType !== undefined ||
+                desc.resourceType !== c.conceptType
+              ) {
+                throw new MostRecentDerivationError(
+                  `Concept "${c.name}": a lowered \`shape is Record\` \`most recent this\` reached emit ` +
+                    `without a well-formed record descriptor / declaration (arm ` +
+                    `"${desc === undefined ? "(none)" : desc.arm}", resource ` +
+                    `"${desc?.arm === "local-exact" ? (desc.resourceType ?? "(none)") : "(n/a)"}" vs concept ` +
+                    `"${c.conceptType ?? "(none)"}", recency ` +
+                    `"${desc?.arm === "local-exact" ? (desc.recency ? "set" : "(none)") : "(n/a)"}", datum ` +
+                    `"${desc?.arm === "local-exact" ? (desc.datumValueType ?? "(none)") : "(n/a)"}", shape ` +
+                    `"${c.shape}"). This is a compiler invariant that lowerLocalCodes upholds on valid input.`,
+                  def.location,
+                );
+              }
+              return this.emitSelectNewest(operandRef, desc, undefined);
+            }
+            // B2a VALUE READ — FULL CONTRACT GUARD (crl-emit B2a impl #4/#5): validate EVERY field the
+            // boolean read consumes (arm, resource, datum, recency, value element) AND the concept's own
+            // declaration, and fail loud with a FILTERABLE kind rather than a bare exception or ill-typed emit.
+            if (
+              desc === undefined ||
+              desc.arm !== "local-exact" ||
+              desc.resourceType !== "Observation" ||
+              desc.datumValueType !== "boolean" ||
+              desc.valueElement === undefined ||
+              desc.recency === undefined ||
+              c.shape !== "Scalar" ||
+              c.valueTypes.length !== 1 ||
+              c.valueTypes[0] !== "boolean"
+            ) {
+              throw new MostRecentDerivationError(
+                `Concept "${c.name}": a lowered \`most recent this\` reached emit without a well-formed ` +
+                  `Observation-boolean descriptor / declaration (arm ` +
+                  `"${desc === undefined ? "(none)" : desc.arm}", resource ` +
+                  `"${desc?.arm === "local-exact" ? (desc.resourceType ?? "(none)") : "(n/a)"}", datum ` +
+                  `"${desc?.arm === "local-exact" ? (desc.datumValueType ?? "(none)") : "(n/a)"}", shape ` +
+                  `"${c.shape}", value types [${c.valueTypes.join(", ") || "none"}]). This is a compiler ` +
+                  `invariant that lowerLocalCodes upholds on valid input.`,
+                def.location,
+              );
+            }
+            return this.emitMostRecentBooleanRead(operandRef, desc);
+          }
+        }
         return reductionNotEmittable(`emitConceptBody("${c.name}")`, def.location);
+      }
     }
   }
 
   /**
-   * Emit the patient-age RECENCY both-rep merge (Inferred twin). Emits a
-   * truth-set (`{ true }` / `{}`) so it composes in the Inferred/Interface lane.
+   * #189 Slice B2a — the SHARED select-newest skeleton for `most recent this` (extracted so B2b's Record
+   * select can't re-spell/drift the filter+sort — disc 433). Emits `Last((<twinRef>) O [where O.<ve> is
+   * <filter>] sort by <recency>, id)`. The recency sort is the descriptor's per-resource access
+   * (`(effective as FHIR.dateTime).value` for Observation, cast:"dateTime"; `<expr>.value` for cast:"none"),
+   * ALIAS-FREE — CQL sort resolves against the result element, NOT the query alias (disc 433 Claude #2).
+   * `valueTypeFilter` (e.g. `FHIR.boolean`) restricts to records whose datum CONFORMS to the declared type,
+   * so a newer mistyped/valueless row can't mask an older conforming one ("newest CONFORMING record wins" —
+   * disc 433 crit).
+   */
+  private emitSelectNewest(
+    twinRef: string,
+    desc: EffectiveRepresentationDescriptor & { arm: "local-exact" },
+    valueTypeFilter: string | undefined,
+  ): string {
+    const recencyExpr =
+      desc.recency.cast === "dateTime"
+        ? `(${desc.recency.sortExpr} as FHIR.dateTime).value`
+        : `${desc.recency.sortExpr}.value`;
+    const whereClause =
+      valueTypeFilter !== undefined && desc.valueElement !== undefined
+        ? `\n      where O.${desc.valueElement} is ${valueTypeFilter}`
+        : "";
+    // `twinRef` is the ALREADY-RENDERED operand expression (bare `"X Records"` on the `none` path, or a
+    // cross-layer `<S>-LocalSource."X Records"` qualified ref on the layered path — Slice-C boundary 1),
+    // so it is inserted verbatim, NOT re-wrapped with `cqlIdent` (which would double-quote a qualifier).
+    return `Last(\n    (${twinRef}) O${whereClause}\n      sort by ${recencyExpr}, id\n  )`;
+  }
+
+  /**
+   * #189 Slice-C boundary 1 — resolve a reduction operand ref to its declared SHAPE and its RENDERED CQL
+   * reference, for BOTH emit lanes off one authority (so the `none` and layered spellings cannot drift —
+   * disc 436 Q3). The operand is the lowered records twin (`<X> Records`):
+   *   - `none` path: a BARE local ref — shape from this library's `conceptByName`, rendered `cqlIdent`.
+   *   - LAYERED path: `requalifyDefinition` rewrote it to a cross-layer qualified ref
+   *     (`<S>-LocalSource."X Records"`) whose target is NOT in this layer's `conceptByName`; the shape
+   *     comes from the pre-split `conceptShapesByName` map and the render carries the qualifier.
+   * A `shape` of `undefined` (unknown operand) fails the caller's `=== "RecordSet"` gate → the reduction
+   * falls through to the loud `reductionNotEmittable`, never a silent bad emit.
+   */
+  private reductionOperand(ref: ReferenceName): { shape: Concept["shape"] | undefined; rendered: string } {
+    const crossLib = this.crossLibraryOf(ref);
+    const refName = getRefName(ref);
+    if (crossLib !== null) {
+      return { shape: this.options.conceptShapesByName.get(refName), rendered: cqlQualifiedRef(crossLib, refName) };
+    }
+    return { shape: this.conceptByName.get(refName)?.shape, rendered: cqlIdent(refName) };
+  }
+
+  /**
+   * #189 Slice-C boundary 1 — a REDUCTION operand cannot appear in a TRUTH-SET `defined as`, whether as a
+   * composition operand (`( "R" sem-or "S" )`) OR a bare-ref alias (`defined as "R"`). Both flow through the
+   * truth-set lane, which treats a same-layer Inferred sibling as an `.asTruths()` list / a
+   * `.satisfied()`-collapsible determination — but a reduction publishes a bare CQL Boolean, so
+   * `<boolean> union <List<Boolean>>` (composition) or `Interface."D".satisfied()` on a bare boolean
+   * (bare-ref alias) is ill-typed, caught only at translator load, shipped under success:true. Composing
+   * `defined as` over TOTAL booleans is a boundary-2 change; loud-refuse until then with a CRL-level kind.
+   * SHARED by the composition-operand site (`emitComposition` CompositionRef) and the bare-ref-alias site
+   * (`emitDefinedAs` truth-set lane) so they cannot drift (impl-panel round 1, Claude — the bare-ref alias
+   * bypassed the composition-only guard). Scope: only a SAME-LAYER LOCAL reduction is checked here. A
+   * cross-library operand is left unchecked — NOT because it is universally preflight-blocked (impl-panel
+   * round 2, Claude): `emit-cross-library-ref-into-split-library` only fires when the TARGET library is
+   * SPLIT; a `defined as` referencing a reduction in a none-path foreign sibling would fall to the truth-set
+   * lane's foreign-null fallback (a plain `Foreign."R"` Boolean woven into a set-op — ill-typed). That is a
+   * PRE-EXISTING, non-reduction-specific class (any foreign operand in a truth-set composition is equally
+   * ill-typed) and cross-library concept refs are v0-unsupported generally, so the full cross-lib guard
+   * lands with §4.5 (cross-lib reduction operands), not boundary 1.
+   */
+  private assertNotReductionTruthSetOperand(ref: ReferenceName): void {
+    if (this.crossLibraryOf(ref) !== null) return;
+    const operand = this.conceptByName.get(getRefName(ref));
+    if (operand?.definition?.type === "ReductionDefinition") {
+      throw new ReductionInCompositionError(
+        `Concept "${operand.name}" is a reduction (a TOTAL scalar boolean) and cannot be a truth-set operand in a ` +
+          `REFINEMENT-lane \`defined as\` composition (a union/intersect/except of a total boolean and a truth-set ` +
+          `List is ill-typed). To compose booleans, declare the PARENT concept \`- value type is boolean.\` so the ` +
+          `whole composition flips to the boolean (\`and\`/\`or\`/\`not\`) lane (#189 2b.3b.1). Weaving a total ` +
+          `boolean into a truth-set (refinement) List is the record-half case, deferred to a later #189 boundary. ` +
+          `(A bare-ref alias to a SCALAR-BOOLEAN reduction is supported; reaching this guard via the alias form ` +
+          `means a NON-Scalar-boolean reduction, which has no bare boolean re-export.)`,
+        typeof ref === "string" ? undefined : ref.location,
+      );
+    }
+  }
+
+  /**
+   * #189 Slice B2a — a Scalar BOOLEAN `most recent this` value read → a TOTAL boolean at the boundary
+   * (requires-boundary discharge, `docs/emit-189-boolean-totality.md`): select the newest CONFORMING
+   * record, read its boolean value, `Coalesce(<read>, false)` (closed-world — absence is false; NEVER the
+   * age truth-set `{true}/{}` lift, which is age-specific and retired §7). The read primitive
+   * `FHIRHelpers.ToBoolean(O.value as FHIR.boolean)` matches the engine-proven age recency helper
+   * (`catalog/CaseFeatureCommon.cql`); the exact spelling stays a build-verify G-gate (design pins the SORT,
+   * not the READ). `valueElement` is caller-guaranteed present (the lowering derived a value-bearing datum).
+   */
+  private emitMostRecentBooleanRead(
+    twinRef: string,
+    desc: EffectiveRepresentationDescriptor & { arm: "local-exact" },
+  ): string {
+    const newest = this.emitSelectNewest(twinRef, desc, "FHIR.boolean");
+    return `Coalesce(\n  FHIRHelpers.ToBoolean((${newest}).${desc.valueElement!} as FHIR.boolean),\n  false\n)`;
+  }
+
+  /**
+   * Emit the patient-age RECENCY both-rep merge (Inferred twin). #189 Slice C 2b.3b.1 — emits a TOTAL scalar
+   * boolean `Coalesce(CFH.recencyAgeSelected(local, computed), false)` (was the `recencyAgeTruths` `{ true }` / `{}`
+   * truth-set lift, now retired from emit), so it composes in the Inferred/Interface boolean lane.
    *
    * The merge CANNOT use `asTruths()` — that reads only `value.value is true`,
    * discarding the Observation and erasing an explicit `false`. Instead the
    * newest VALID local Observation is selected from the LocalSource retrieve
-   * (status in final/amended/corrected, boolean value, sorted by `issued`), and
-   * the CaseFeatureCommon `recencyAgeTruths` helper does the precedence select
-   * (asserted-if-newer vs computed) and lifts to a truth-set.
+   * (boolean value, sorted by `effective`), and the CaseFeatureCommon
+   * `recencyAgeSelected` helper does the precedence select (asserted-if-newer vs
+   * computed) returning a nullable Boolean, which the outer `Coalesce(..., false)`
+   * totalizes (closed-world — an undetermined merge is false).
    */
   private emitRecencyMerge(c: Concept): string {
     const foldIn = c.__bothRepFoldInLocalSource!;
@@ -1343,6 +1940,23 @@ class Emitter {
           `and/or __recencyComputeFn (${c.__recencyComputeFn}). The marker, threshold, op, and ` +
           `compute fn are set together in lowerLocalCodes; a recency twin missing any is a ` +
           `compiler bug.`,
+      );
+    }
+    // #189 Slice C 2b.3b.1 — CARDINALITY/coherence invariant (crl-emit code review, both arms). The recency merge
+    // emits a SCALAR boolean (`Coalesce(CFH.recencyAgeSelected(...), false)`); a non-scalar (Record/RecordSet) or
+    // non-single-boolean declaration would emit a shape the concept did NOT declare (charter §3 cardinality is
+    // authoritative / §4 no-magic). `resolveAgeConcept` enforces `value type is boolean` but does NOT gate shape,
+    // and `emitCQLFromAST` is a validator-free public entry, so assert here — the SAME `isScalarBoolean` invariant
+    // the totality predicate + the discharge (`emittedDischargeAndType`) key on, so a malformed twin is ONE loud
+    // emit error, never a predicate/emit/discharge drift.
+    if (!(c.shape === "Scalar" && c.valueTypes.length === 1 && c.valueTypes[0] === "boolean")) {
+      throw new Error(
+        `internal invariant violated: recency both-rep twin "${c.name}" must declare a single \`boolean\` value ` +
+          `type and \`Scalar\` cardinality (has shape=${c.shape ?? "(none)"}, value type(s)=` +
+          `${c.valueTypes.length > 0 ? c.valueTypes.join(", ") : "(none)"}). The recency merge emits a scalar ` +
+          `boolean; a non-scalar/non-boolean declaration would manufacture a shape the concept did not declare ` +
+          `(charter §3/§4). Declare \`- value type is boolean.\` (and Scalar cardinality) on a patient-age ` +
+          `recency concept.`,
       );
     }
     // The recency emit consults the projection OVERRIDE the twin names (`__recencyOverrideId`) for
@@ -1409,17 +2023,21 @@ class Emitter {
       `      sort by (effective as FHIR.dateTime).value, id\n` +
       `  )`;
     const computed = `CRLCommon.${op}(CRLCommon.${computeFn}(), ${threshold})`;
-    // `CFH.<recencyHelper>(newestLocalObservation, computedBoolean)` returns the recency-selected
-    // truth-set. The helper reads the projected datum + its recency timestamp
-    // (`${override.valueElementPath}` / `${override.recencyTimestamp}`) internally (Patient
-    // context), so the call site passes only the two arms. `CFH` is the include alias for
-    // CaseFeatureCommon (see the layered header).
-    return (
-      `CFH.${override.recencyHelper}(\n` +
+    // #189 Slice C 2b.3b.1 — the recency merge is now a TOTAL boolean at its boundary: the recency-SELECTED
+    // nullable Boolean (`recencyAgeSelected`), `Coalesce`d to `false` (closed-world — an undetermined merge is
+    // false). NOT the `recencyAgeTruths` List lift (retired from emit; the helper stays in the catalog,
+    // unreferenced). Do NOT Coalesce `computed` before arbitration — a null computed (malformed/absent
+    // birthDate) must fall through to the local-source fallback (`CaseFeatureCommon.cql:102-104`), so only the
+    // OUTER arbitration result is Coalesced. `CFH.<recencySelectedHelper>(newestLocalObservation, computedBoolean)`
+    // reads the projected datum + its recency timestamp (`${override.valueElementPath}` /
+    // `${override.recencyTimestamp}`) internally (Patient context), so the call site passes only the two arms.
+    // `CFH` is the include alias for CaseFeatureCommon (see the layered header).
+    const selected =
+      `CFH.${override.recencySelectedHelper}(\n` +
       `  ${newestLocal},\n` +
       `  ${computed}\n` +
-      `)`
-    );
+      `)`;
+    return `Coalesce(\n${indent(selected)},\n  false\n)`;
   }
 
   private emitCodedFrom(c: Concept, def: CodedFromDefinition): string {
@@ -1482,6 +2100,96 @@ class Emitter {
   }
 
   /**
+   * #189 Slice C 2b.3b.1ii — classify a boolean-parent `defined as` COMPOSITION's SAME-LAYER (bare-ref) operands
+   * for the pivot. Distinguishes: a QUALIFIED operand (`hasQualifiedOperand` — a rendered cross-LAYER ref or an
+   * authored cross-LIBRARY ref → the caller DEFERS to the existing behavior; the cross-lib verdict rides the
+   * index-backed resolver in a later slice); an UNRESOLVED bare name (`firstUnresolvedBareName` — a same-layer ref
+   * to no known concept, an author typo → loud, not a dangling identifier); a KNOWN-non-boolean OR INDETERMINATE
+   * operand (`firstNonBooleanOperand` + its `firstNonBooleanResultType`, `undefined` ⇒ indeterminate 0/>1 value
+   * types — BOTH are result-type problems: an indeterminate scalar has no determinate type and a shape-blind
+   * comparator can still read it `total`, so it must be caught as a mismatch, NOT silently flipped — 1ii-a review
+   * gpt56 #2); and per-operand totality (`anyTotal` / `firstNonTotalOperand`) via the shared predicate. NOTE: the
+   * FLIP decision itself is the shared predicate at the caller (parent + operand gate, lock-step with 1i), not an
+   * `allTotal` flag here.
+   */
+  private classifyBooleanCompositionOperands(expr: CompositionExpression): {
+    hasQualifiedOperand: boolean;
+    firstUnresolvedBareName?: string;
+    anyTotal: boolean;
+    firstNonBooleanOperand?: string;
+    firstNonBooleanResultType?: ResultType; // undefined ⇒ the operand's result type is INDETERMINATE (0/>1 value types)
+    firstNonTotalOperand?: string;
+  } {
+    const refs: ReferenceName[] = [];
+    const walk = (e: CompositionExpression): void => {
+      switch (e.type) {
+        case "CompositionRef":
+          refs.push(e.ref);
+          break;
+        case "CompositionGroup":
+        case "SemNotExpression":
+          walk(e.expression);
+          break;
+        case "SemAndExpression":
+        case "SemOrExpression":
+          e.terms.forEach(walk);
+          break;
+      }
+    };
+    walk(expr);
+    const resolver = sameLayerResolver((n) => this.conceptByName.get(n));
+    let hasQualifiedOperand = false;
+    let anyTotal = false;
+    let firstUnresolvedBareName: string | undefined;
+    let firstNonBooleanOperand: string | undefined;
+    let firstNonBooleanResultType: ResultType | undefined;
+    let firstNonTotalOperand: string | undefined;
+    for (const ref of refs) {
+      if (getRefLibrary(ref) !== null) {
+        hasQualifiedOperand = true; // cross-layer / cross-library → defer (1ii-b)
+        continue;
+      }
+      const name = getRefName(ref);
+      const concept = this.conceptByName.get(name);
+      if (concept === undefined) {
+        if (firstUnresolvedBareName === undefined) firstUnresolvedBareName = name;
+        continue;
+      }
+      const rt = conceptResultType(concept.shape, concept.valueTypes ?? [], concept.conceptType);
+      const isScalarBoolean = rt !== undefined && rt.shape === "Scalar" && rt.valueType === "boolean";
+      if (!isScalarBoolean && firstNonBooleanOperand === undefined) {
+        // A known non-boolean result type OR an indeterminate one (rt === undefined) — both are result-type
+        // problems the boolean lane cannot take.
+        firstNonBooleanOperand = name;
+        firstNonBooleanResultType = rt;
+      }
+      if (emitsTotalScalarBoolean(concept, resolver)) anyTotal = true;
+      else if (firstNonTotalOperand === undefined) firstNonTotalOperand = name;
+    }
+    return {
+      hasQualifiedOperand,
+      firstUnresolvedBareName,
+      anyTotal,
+      firstNonBooleanOperand,
+      firstNonBooleanResultType,
+      firstNonTotalOperand,
+    };
+  }
+
+  /** #189 2b.3b.1ii — the category-specific remedy for a `emit-composition-result-type-mismatch` operand (1ii-a
+   *  review gpt56 #3: `defined as exists` is valid ONLY for a RecordSet, not a scalar or a single record). */
+  private compositionMismatchRemedy(operand: string, rt: ResultType | undefined): string {
+    if (rt !== undefined && rt.shape === "RecordSet") {
+      return `Make the existence bridge explicit with \`- defined as exists ( "${operand}" ).\` (existence over the record set), or give "${operand}" a boolean value type.`;
+    }
+    if (rt !== undefined && rt.shape === "Record") {
+      return `Reduce "${operand}" to a boolean explicitly (a boolean \`most recent\` / comparator over the record), not an existence bridge over a single record.`;
+    }
+    // Scalar<V≠boolean> or indeterminate (0/>1 value types).
+    return `Give "${operand}" a single \`- value type is boolean.\` (or derive a boolean from it).`;
+  }
+
+  /**
    * Determine the shape to use for a composition expression FROM ITS
    * PARENT's perspective. The parent concept's declared
    * `(type, valuetype)` is authoritative — operands of a composition
@@ -1516,7 +2224,128 @@ class Emitter {
       // composition: `LocalSource."X".asTruths() union (<composition>)`. The
       // LocalSource leaf is an EXPLICIT qualified ref (not a bare same-name ref —
       // that would resolve to this very Inferred twin and self-recurse).
+      // #189 Slice-C boundary 1 — a bare-ref alias `defined as "R"` to a REDUCTION is ill-typed in the
+      // truth-set lane (its façade would apply `.satisfied()` to a bare Boolean). The composition arm below
+      // guards via `emitComposition`; guard the bare-ref arm here with the SAME shared assertion so the
+      // alias form cannot bypass it (impl-panel round 1, Claude).
       const foldIn = c.__bothRepFoldInLocalSource;
+      // #189 Slice C 2b.2 — FLIP: a bare-ref alias whose OWN declaration is boolean AND whose same-layer referent
+      // emits a TOTAL Scalar boolean (a reduction / boolean comparator / boolean list-pattern, transitively —
+      // `emitsTotalScalarBoolean(c)`, which gates on `c`'s declared value type per charter §3–§4) re-exports that
+      // total boolean DIRECTLY (a bare CQL Boolean), NOT lifted to a truth-set `.asTruths()` List. A non-total /
+      // non-boolean-declared alias keeps the load-bearing guard + the `.asTruths()` path. Fold-in (a both-rep
+      // concept, `__bothRepMerge` set) is orthogonal — the predicate already refuses it, and `foldIn === undefined`
+      // keeps the flip out of the union path (whose weave is guarded next).
+      if (body.type === "DefinedAsBareRef" && foldIn === undefined && emitsTotalScalarBoolean(c, sameLayerResolver((n) => this.conceptByName.get(n)))) {
+        return cqlIdent(getRefName(body.ref));
+      }
+      // #189 Slice C 2b.2 (code review, Claude #3) — a both-rep UNION whose inferred bare-ref operand is a TOTAL
+      // boolean would emit `LocalSource."X".asTruths() union (<Boolean>)` — ill-typed. The flip is excluded here
+      // (`foldIn !== undefined`) and the retained reduction guard misses a comparator/alias operand, so reject any
+      // total-boolean bare-ref operand woven into the union (mirrors the composition-site widening).
+      if (
+        body.type === "DefinedAsBareRef" &&
+        foldIn !== undefined &&
+        getRefLibrary(body.ref) === null &&
+        emitsTotalScalarBoolean(this.conceptByName.get(getRefName(body.ref)), sameLayerResolver((n) => this.conceptByName.get(n)))
+      ) {
+        throw new ReductionInCompositionError(
+          `Concept "${getRefName(body.ref)}" emits a TOTAL boolean and cannot be the inferred operand of a ` +
+            `both-representation \`code is\` + \`defined as\` union (a truth-set List \`union\` a total boolean is ` +
+            `ill-typed). Composing a both-rep merge over total booleans is deferred to a later #189 boundary.`,
+          typeof body.ref === "string" ? undefined : body.ref.location,
+        );
+      }
+      // #189 Slice C 2b.3b.1 — FLIP a boolean-declared `defined as` COMPOSITION whose operands are ALL total to
+      // the boolean lane (`and`/`or`/`not`) instead of the truth-set set-op lane (`union`/`intersect`/`except`).
+      // TOTALITY-GATED: the shared predicate returns true only when EVERY operand is total (recursively), so a
+      // composition mixing a truth-set (bare-scalar `code is`) operand stays on the truth-set lane (BYTE-INVARIANT,
+      // deferred to 2e; the retained refinement guard in `emitComposition` still fires on a MIXED operand set). A
+      // fold-in weave (`foldIn !== undefined`) stays refinement (§4.6(i) — the record-half flip rides 2b.4/#257).
+      // Gated the SAME way as the discharge (`emittedDischargeAndType`) + the façade, which consult the SAME
+      // predicate, so emit / discharge / façade agree by construction.
+      // #189 2b.3b.1ii — PIVOT for a boolean-DECLARED `defined as` COMPOSITION. `declaredShapeOfConcept(c) ===
+      // "boolean"` is the boolean-vs-refinement gate (includes-boolean). Then:
+      //   - a QUALIFIED / cross-lib operand → DEFER to the current behavior (the cross-lib totality/compatibility
+      //     verdict rides the index-backed resolver, a later slice — keeps `layered-name-collision` byte-invariant);
+      //   - PARENT CARDINALITY authority (disc 452 #1, re-affirmed 1ii-a review, BOTH arms): only a Scalar<boolean>
+      //     parent may emit a scalar boolean composition. A boolean-DECLARED but non-scalar-boolean parent (Record /
+      //     RecordSet / multi-value-type) must NOT flip — it falls through to the current path (loud via the retained
+      //     refinement guard when operands are total). The FLIP itself is the shared predicate
+      //     `emitsTotalScalarBoolean(c)` (parent isScalarBoolean + EVERY operand total), lock-step with the discharge
+      //     + façade — NOT the classifier, which only SELECTS the honest error when the parent is scalar-boolean but
+      //     the composition does not flip.
+      if (body.type === "DefinedAsComposition" && foldIn === undefined && this.declaredShapeOfConcept(c) === "boolean") {
+        const resolver = sameLayerResolver((n) => this.conceptByName.get(n));
+        const cls = this.classifyBooleanCompositionOperands(body.expression);
+        const parentIsScalarBoolean =
+          c.shape === "Scalar" && (c.valueTypes?.length ?? 0) === 1 && c.valueTypes?.[0] === "boolean";
+        if (!cls.hasQualifiedOperand && parentIsScalarBoolean) {
+          const loc = body.expression.location.start;
+          if (cls.firstUnresolvedBareName !== undefined) {
+            // A same-layer bare operand resolving to NO known concept — an author typo / missing concept, NOT the
+            // deferred cross-lib cell. Loud rather than a dangling identifier that only fails at translator load
+            // (1ii-a review, both arms — §4.4 miss policy for the reachable same-layer case).
+            this.emitErrors.push({
+              type: "Validation",
+              kind: "emit-declared-result-unresolved",
+              line: loc.line,
+              column: loc.column,
+              message:
+                `Concept "${c.name}" is a boolean \`defined as\` composition whose operand ` +
+                `"${cls.firstUnresolvedBareName}" does not resolve to a concept in this library. Check the name, or ` +
+                `import the library that declares it.`,
+            });
+            return `/* FIXME: emit-declared-result-unresolved (${c.name} -> ${cls.firstUnresolvedBareName}) */ CRLCommon.DeclaredResultUnresolved('${cls.firstUnresolvedBareName}')`;
+          }
+          if (cls.firstNonBooleanOperand !== undefined) {
+            // A boolean parent over an operand with a KNOWN non-boolean OR INDETERMINATE (0/>1 value-type) result
+            // type — a hard emit error at the flip (design §7 `composition-result-type-mismatch`), NOT a silent
+            // `exists`-bridge. Remedy is category-specific (a RecordSet CAN take an explicit `exists`; a scalar /
+            // single record cannot) — 1ii-a review gpt56 #2 (indeterminate) + #3 (remedy).
+            this.emitErrors.push({
+              type: "Validation",
+              kind: "emit-composition-result-type-mismatch",
+              line: loc.line,
+              column: loc.column,
+              message:
+                `Concept "${c.name}" is a boolean \`defined as\` composition but operand "${cls.firstNonBooleanOperand}" ` +
+                `has ${cls.firstNonBooleanResultType === undefined ? "an INDETERMINATE result type (0 or >1 value types)" : `result type \`${renderResultType(cls.firstNonBooleanResultType)}\``}, ` +
+                `not \`boolean\`. A boolean composition (\`and\`/\`or\`/\`not\`) cannot take it. ` +
+                this.compositionMismatchRemedy(cls.firstNonBooleanOperand, cls.firstNonBooleanResultType),
+            });
+            return `/* FIXME: emit-composition-result-type-mismatch (${c.name}) */ CRLCommon.CompositionResultTypeMismatch('${c.name}')`;
+          }
+          if (emitsTotalScalarBoolean(c, resolver)) {
+            return this.emitComposition(body.expression, "boolean"); // FLIP — parent Scalar<boolean> + EVERY operand total
+          }
+          if (cls.anyTotal) {
+            // MIXED totality: every operand is boolean-COMPATIBLE (mismatch above did not fire) but some are total,
+            // some not — their result types AGREE (both Scalar<boolean>) so the mismatch diagnostic would be false.
+            // NEW kind. Remedy: make the non-total operand total, or keep the composition on the truth-set lane.
+            this.emitErrors.push({
+              type: "Validation",
+              kind: "emit-composition-totality-mixed",
+              line: loc.line,
+              column: loc.column,
+              message:
+                `Concept "${c.name}" is a boolean \`defined as\` composition mixing TOTAL and non-total boolean ` +
+                `operands (e.g. non-total "${cls.firstNonTotalOperand}"). A total scalar boolean (reduction / recency ` +
+                `/ comparator) cannot compose with a non-total truth-set operand in one lane. Make every operand ` +
+                `total, or keep the composition on the truth-set lane using only truth-set operands (the non-total ` +
+                `bare-scalar retirement is a later #189 boundary).`,
+            });
+            return `/* FIXME: emit-composition-totality-mixed (${c.name}) */ CRLCommon.CompositionTotalityMixed('${c.name}')`;
+          }
+          // else: ALL operands non-total (bare-scalar truth-set) → fall through to the current truth-set/refinement
+          // path (BYTE-INVARIANT; the bare-scalar flip is deferred to slice 2e).
+        }
+        // NOTE (ledger honesty, 1ii-a review Claude nit): on the error returns above the concept still enrolls a
+        // discharge from its PRE-error form (`emittedDischargeAndType` runs separately). Harmless — the emit already
+        // fails (`success:false`), so nothing ships — but the T7 declared-vs-emitted gate must exempt an
+        // emit-errored concept rather than trip on the sentinel body.
+      }
+      if (body.type === "DefinedAsBareRef") this.assertNotReductionTruthSetOperand(body.ref);
       const inner =
         body.type === "DefinedAsBareRef"
           ? this.emitTruthSetBareRef(body.ref)
@@ -1533,6 +2362,26 @@ class Emitter {
       // `defined as exists ("X")` → a boolean existence determination over concept X's define
       // (a resource/refinement list): `exists (<X>)`. Mirrors the bare-ref lane's cross-lib
       // qualification; the reference is tracked like a bare ref (ast/types.ts). (#265)
+      //
+      // #189 Slice-C boundary 1 (impl-panel round 2, Claude) — the none-path `defined as exists` arm is a
+      // THIRD truth-set-adjacent entry a reduction operand can reach (besides the composition operand and
+      // the bare-ref alias, both guarded by `assertNotReductionTruthSetOperand`). A reduction is ALREADY a
+      // total boolean (`define "R": exists(...)`), so `exists ("R")` applies `exists` to a scalar Boolean:
+      // ill-typed at translator load, or SILENTLY INVERTED if the translator promotes the singleton to a
+      // list (`exists({false})` = true). `defined as exists` is for a RECORD SET / refinement operand; to
+      // reference a reduction's boolean directly, use `defined as "R"`. Loud-refuse rather than ship it.
+      if (this.crossLibraryOf(body.ref) === null) {
+        const operand = this.conceptByName.get(getRefName(body.ref));
+        if (operand?.definition?.type === "ReductionDefinition") {
+          throw new ReductionInCompositionError(
+            `\`defined as exists ("${operand.name}")\` applies \`exists\` to reduction "${operand.name}", ` +
+              `which is already a TOTAL boolean — \`exists\` over a scalar boolean is ill-typed (and may ` +
+              `silently invert via singleton promotion). Reference the reduction directly with ` +
+              `\`defined as "${operand.name}"\`, or apply \`exists\` to a record set.`,
+            typeof body.ref === "string" ? undefined : body.ref.location,
+          );
+        }
+      }
       const crossLib = this.crossLibraryOf(body.ref);
       const refName = getRefName(body.ref);
       const ref = crossLib !== null ? cqlQualifiedRef(crossLib, refName) : cqlIdent(refName);
@@ -1669,6 +2518,36 @@ class Emitter {
   ): string {
     switch (expr.type) {
       case "CompositionRef": {
+        // #189 Slice-C boundary 1 — LOUD GUARD: a REDUCTION operand in a TRUTH-SET composition
+        // (`shape === "refinement"`) is ill-typed (see `assertNotReductionTruthSetOperand`). A `boolean`-
+        // shape composition over a reduction (`"R" and "S"`) is well-typed, so this is gated on refinement.
+        if (shape === "refinement") {
+          this.assertNotReductionTruthSetOperand(expr.ref);
+          // #189 Slice C 2b.2 — post-alias-flip, a TOTAL-boolean operand (a flipped alias / a comparator) woven
+          // into a TRUTH-SET composition is `Boolean union/intersect/except List` — ill-typed. The reduction-only
+          // guard above misses an alias/comparator (a `DefinedAsDefinition`/`DefinitionIsDefinition`, not a
+          // `ReductionDefinition`), so reject any total-boolean operand here. GATED on the truth-set lane
+          // (`caseFeature.kind !== "off"`) — the legacy/none lane composes via `bridgeOperand` (`exists`-wrapping),
+          // NOT `.asTruths()` set-ops, so a total-boolean operand there is the pre-existing FIXME passthrough, not
+          // this weave (code review, Claude #2). #189 2b.3b.1 RETAINS this guard for the REFINEMENT lane (plan
+          // §4.5): the boolean-lane flip lands at the pivot (`emitDefinedAs`), so a BOOLEAN parent never reaches
+          // here; a REFINEMENT parent still cannot weave a total boolean into a truth-set List (the record-half
+          // case, a later boundary).
+          if (
+            this.caseFeature.kind !== "off" &&
+            getRefLibrary(expr.ref) === null &&
+            emitsTotalScalarBoolean(this.conceptByName.get(getRefName(expr.ref)), sameLayerResolver((n) => this.conceptByName.get(n)))
+          ) {
+            throw new ReductionInCompositionError(
+              `Concept "${getRefName(expr.ref)}" emits a TOTAL scalar boolean and cannot be a truth-set operand in ` +
+                `a REFINEMENT-lane \`defined as\` composition (a total boolean union/intersect/except a truth-set ` +
+                `List is ill-typed). To compose booleans, declare the PARENT concept \`- value type is boolean.\` so ` +
+                `the composition flips to the boolean (\`and\`/\`or\`/\`not\`) lane (#189 2b.3b.1). Weaving a total ` +
+                `boolean into a truth-set (refinement) List is the record-half case, deferred to a later #189 boundary.`,
+              typeof expr.ref === "string" ? undefined : expr.ref.location,
+            );
+          }
+        }
         // Case-feature truth-set leaf: `.asTruths()` on LocalSource leaves,
         // self-qualified bare truth-set on same-layer Inferred siblings. Bypasses
         // the operand-shape `bridgeOperand` path entirely (no `exists(...)`).
@@ -1801,7 +2680,7 @@ class Emitter {
     const cause =
       flavor === "resource-list"
         ? "has a resource-list (`coded from`) operand, which has no bounded universe to negate against"
-        : "has an operand whose truth-representation could not be established locally (a cross-library/foreign operand, a `definition is` predicate, or a cyclic definition)";
+        : "has an operand whose truth-representation could not be established locally (a cross-library/foreign operand, a `definition is` predicate, a TOTAL scalar boolean such as a patient-age recency merge / reduction / comparator, or a cyclic definition)";
     this.emitErrors.push({
       type: "Validation",
       kind: "emit-unlowerable-negation",
@@ -1809,10 +2688,11 @@ class Emitter {
       column: loc?.column ?? 0,
       message:
         `\`sem-not\` ${cause}, so this \`defined as\` cannot be lowered to CQL. ` +
-        "Express it as a positive-anchored `A sem-and sem-not B` (list refinement " +
-        "over a base), or move the negation to the decision layer (`not`). The " +
-        "emitted CQL carries a compile-failing CRLCommon.UnsupportedNegation(…) " +
-        "sentinel so it cannot silently ship.",
+        "If the operand is a TOTAL scalar boolean (e.g. a patient-age recency merge — #189 2b.3b.1), declare " +
+        "THIS concept `- value type is boolean.` so the whole composition flips to the `not (...)` boolean lane. " +
+        "Otherwise express it as a positive-anchored `A sem-and sem-not B` (list refinement over a base), or move " +
+        "the negation to the decision layer (`not`). The emitted CQL carries a compile-failing " +
+        "CRLCommon.UnsupportedNegation(…) sentinel so it cannot silently ship.",
     });
     const note =
       flavor === "resource-list"
@@ -1887,8 +2767,12 @@ class Emitter {
     if (visiting.has(name)) return "unknown"; // cycle → loud (never memoize a guess)
     const c = this.conceptByName.get(name);
     if (!c) return "unknown";
-    // Patient-age both-representation recency twin lifts to a truth-set.
-    if (c.__bothRepMerge === "recency") return "truth-set";
+    // #189 Slice C 2b.3b.1 — a Patient-age RECENCY twin now emits a bare TOTAL boolean
+    // (`Coalesce(CFH.recencyAgeSelected(...), false)`), NOT a truth-set. A REFINEMENT-lane `sem-not` over it would
+    // otherwise render `{ true } except (<Boolean>)` — ill-typed (a boolean is not a truth-set universe). Return
+    // `unknown` → the no-base-negation path loud-refuses (the remedy: declare the parent boolean so it flips to the
+    // `not (...)` boolean lane). A boolean-declared parent never reaches this classifier (it flips at the pivot).
+    if (c.__bothRepMerge === "recency") return "unknown";
     const body = c.definition;
     if (!body) return "unknown"; // asserted-only concept in this layer
     const next = new Set(visiting).add(name);
@@ -1958,6 +2842,16 @@ class Emitter {
     }
     if (declared === "boolean" && patternShape === "instance") {
       return `exists { ${call} }`;
+    }
+    if (declared === "boolean" && patternShape === "boolean") {
+      // #189 Slice C 2b.1 — TOTALIZE the boolean comparator at its own boundary. A catalog comparator
+      // (`CRLCommon.AtLeast`/`Below`/…) is a NULLABLE boolean (its argument can be null — e.g. an absent
+      // age), so a bare emit violates the charter's null-safety-by-construction (§4). `Coalesce(<cmp>, false)`
+      // makes it TOTAL under closed-world (absence ⟹ false). Applied PER-OPERAND at the leaf, BEFORE any `not`
+      // (a comparator is a leaf — no `not` here; a composing `defined as` Coalesces each operand at 2b.3).
+      // The age both-rep recency merge is a SEPARATE path (`emitRecencyMerge`, `{true}/{}` truth-set) and does
+      // NOT reach here, so there is no double-Coalesce.
+      return `Coalesce(${call}, false)`;
     }
     // All other combinations: declared matches pattern shape (or pattern is
     // "other"-shaped and the author chose a matching valuetype).

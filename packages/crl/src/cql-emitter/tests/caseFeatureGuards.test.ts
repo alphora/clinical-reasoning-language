@@ -182,3 +182,54 @@ concept "Top":
     expect(cql).not.toContain('"Pol-Inferred"."A And B"');
   });
 });
+
+describe("#189 Slice-C boundary 1 — `defined as exists` over a REDUCTION is loud-refused (none-path arm)", () => {
+  // impl-panel round 2 (Claude): the none-path `defined as exists ("R")` arm is a THIRD entry a reduction
+  // operand can reach (besides a composition operand and a bare-ref alias). A reduction is already a TOTAL
+  // boolean, so `exists ("R")` applies `exists` to a scalar Boolean — ill-typed at translator load, or
+  // SILENTLY INVERTED via singleton→list promotion (`exists({false})` = true). Loud-refuse.
+  it("`concept D: defined as exists (\"R\")` where R is a reduction hard-errors with `emit-reduction-in-composition`", () => {
+    const a = ast(`library "Pol".
+
+concept "R":
+- type is Condition.
+- value type is boolean.
+- shape is Scalar.
+- code is \`r\`.
+- definition is exists this.
+
+concept "D":
+- type is Observation.
+- value type is boolean.
+- defined as exists ( "R" ).
+`);
+    const lowered = lowerLocalCodes(a);
+    expect(lowered.errors).toEqual([]);
+    // Direct (none-path) emit — the truth-set lane throws `definedAsExistsNotLowered` separately; this
+    // pins the none-path arm's reduction guard.
+    const result = emitCQLFromAST(lowered.ast, { libraryName: "Pol" });
+    expect(result.success).toBe(false);
+    expect(result.errors?.map((e) => e.kind)).toContain("emit-reduction-in-composition");
+  });
+
+  it("`defined as exists (\"X\")` over a genuine RecordSet (a `code is` records concept) still EMITS — the guard is reduction-specific", () => {
+    // No over-fire: `exists` over a real record set is the legitimate #265 form.
+    const a = ast(`library "Pol".
+
+concept "Trials":
+- type is Observation.
+- shape is RecordSet.
+- code is \`t\`.
+
+concept "D":
+- type is Observation.
+- value type is boolean.
+- defined as exists ( "Trials" ).
+`);
+    const lowered = lowerLocalCodes(a);
+    expect(lowered.errors).toEqual([]);
+    const result = emitCQLFromAST(lowered.ast, { libraryName: "Pol" });
+    expect(result.success, JSON.stringify(result.errors)).toBe(true);
+    expect(result.result).toMatch(/define "D":\s*\n\s*exists \("Trials"\)/);
+  });
+});

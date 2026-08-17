@@ -9,8 +9,9 @@ import type {
   ReferenceName,
 } from "../ast/types";
 import { getRefLibrary, isQualifiedRef } from "../ast/types";
-import { emitCQLFromAST, infoForParameterStatement } from "../cql-emitter/emitCQL";
+import { emitCQLFromAST, infoForParameterStatement, buildAuthoredObligations } from "../cql-emitter/emitCQL";
 import type { AstParameterInfo } from "../cql-emitter/emitCQL";
+import type { BooleanTotalityObligation, EmittedDefineEntry } from "../emit/booleanTotality";
 import {
   emitPartitioned,
   isLayerSplittable,
@@ -124,6 +125,13 @@ export interface PerLibraryEmit {
   // reads it there; this field is what makes the `none`/name-keeping-root path
   // self-describing rather than needing a re-derivation from `libraryName`.
   localDomainId?: string;
+  // #189 Slice C 2b.0 — the totality-ledger entries this CQL entry enrolled during emit
+  // (`EmitResult.ledgerEntries`, one per emitted `define`). Surfaced through the closure so the §4.5
+  // `CloseIndex` + public-reference routing map can be built as a PROJECTION of the aggregated entries, and
+  // the closure-level totality REPORT proof can run over policy libraries. `undefined` for the three shared
+  // catalog libraries (`isSharedCatalog`) — they are fixed emitter assets OUTSIDE the ledger subject set
+  // (2a hand-off (d)), so they enroll nothing and are excluded from the proof subject.
+  ledgerEntries?: readonly EmittedDefineEntry[];
 }
 
 // #186/#201 — a shared, activities-only library (only `activity` blocks; no
@@ -465,6 +473,13 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   // is emitted. (`lowered.localCodes` is populated from the exact synthesis loop
   // that builds the synthetic terminologies — one source of truth.)
   const localCodesCountByName = new Map<string, number>();
+  // #189 Slice C 2a — the AUTHORED (pre-lowering) boolean-totality obligations per emit entry, for the
+  // totality-ledger enrollment in `emitCQLFromAST`/`emitPartitioned`. Built from the RAW `entry.ast` BELOW
+  // (BEFORE `preLowerAge`/`lowerLocalCodes`, disc 439 #10) and keyed by filePath — because the emit loop
+  // iterates the LOWERED `emitClosure` (whose ASTs have `code` cleared / twins split), from which the
+  // authored `rejected`/E1 obligations cannot be recovered. Threaded into every emit call so production
+  // enrollment is HONEST-by-construction (not a test-only inventory).
+  const authoredObligationsByPath = new Map<string, ReadonlyMap<string, BooleanTotalityObligation>>();
   const emitClosure = rawEmitClosure.map((entry) => {
     // #198 — per-entry local domain (primary keeps the bare policy id; siblings
     // are disambiguated). Threaded into the lowering so the synthetic `codesystem
@@ -475,6 +490,8 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     // lane (rather than dropping to a null layer) and the retirement fires here too. `didLower` is
     // computed against the pre-transformed ast, so a standalone-only library (no `code is`) does not
     // spuriously register a local-domain for collision tracking.
+    // #189 Slice C 2a — classify authored obligations from the RAW `entry.ast` (still un-lowered here).
+    authoredObligationsByPath.set(entry.filePath, buildAuthoredObligations(entry.ast));
     const preAge = preLowerAge(entry.ast);
     if (preAge.errors.length > 0) lowerErrors.push(...preAge.errors);
     const lowered = lowerLocalCodes(preAge.ast, { canonicalBase, localDomainId: entryLocalDomainId });
@@ -845,6 +862,9 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
         crossLibraryParameters,
         canonicalBase,
         localDomainId: entryLocalDomainId,
+        // #189 Slice C 2a — authored obligations from the RAW ast (this entry's input was lowered above, so
+        // `emitCQLFromAST`'s self-build would classify lowered forms; pass the raw-derived map instead).
+        authoredObligations: authoredObligationsByPath.get(entry.filePath),
         // #227 — a layered library may FOREIGN-ref a name-keeping-root (`none`)
         // sibling; render that `include`/qualified-ref through `S` so it matches the
         // renamed target's header. Layered sibling names aren't in the map (identity).
@@ -903,6 +923,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
           layer: part.layer,
           includes: part.crossLibraryIncludes,
           localDomainId: entryDisambiguatedBase,
+          ledgerEntries: part.result.ledgerEntries,
         });
       }
       continue;
@@ -944,6 +965,9 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       libraryName: entry.name,
       crossLibraryIncludes: crossLibs,
       crossLibraryParameters,
+      // #189 Slice C 2a — the `synthetic` ast is built from the LOWERED `entry.ast.statements`, so pass the
+      // raw-derived authored obligations rather than let `emitCQLFromAST` self-build from lowered forms.
+      authoredObligations: authoredObligationsByPath.get(entry.filePath),
       // #227 — render header/`include`/qualified-refs through `S` (comparisons stay
       // keyed on the raw `libraryName` above); consulted only on this `none` path.
       libraryRenames,
@@ -976,6 +1000,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       role: "root",
       includes: crossLibs,
       localDomainId: entryDisambiguatedBase,
+      ledgerEntries: emit.ledgerEntries,
     });
   }
 

@@ -1,0 +1,15 @@
+{
+  "name": "decision-when-named-reduction",
+  "version": "0.0.0",
+  "private": true,
+  "crl": {
+    "canonicalBase": "http://example.org/crl/decision-when-named-reduction",
+    "dispositions": {
+      "mode": "standalone",
+      "options": {
+        "certify": { "Approve": { "label": "Approve" } },
+        "not-certify": { "Deny": { "label": "Deny" } }
+      }
+    }
+  }
+}

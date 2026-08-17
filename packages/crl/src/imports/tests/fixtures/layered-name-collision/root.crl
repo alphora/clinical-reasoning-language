@@ -14,7 +14,11 @@ concept "Leaf":
 - value type is CodeableConcept.
 - coded from "VS".
 
+// `Top` aliases the cross-library `X Asserted` boolean, which forces the `include XAsserted`
+// this fixture asserts. (`Leaf` stays declared — it drives the RecordConcepts/RecordSource
+// split — but is no longer composed into `Top`, whose former `sem-or` mixed a CodeableConcept
+// operand into a boolean.)
 concept "Top":
 - type is Observation.
 - value type is boolean.
-- defined as ( "Leaf" sem-or "X Asserted"."Sibling Concept" ).
+- defined as "X Asserted"."Sibling Concept".

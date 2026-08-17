@@ -559,11 +559,14 @@ activity "Refer":
     expect(plan.policyId).toBe("Pol");
   });
 
-  it("#189 IMPL 3: a decision + `code is` library carrying a no-`code is` REDUCTION routes to `none`, NOT `interface` (panel R1 Claude #1)", () => {
-    // A `ReductionDefinition` concept classifies NULL in the FULL partition, so the `interface` split's
-    // `buildLayerAst` would SILENTLY DROP it (no sentinel, both lanes success, the concept missing — the
-    // charter's Adequate-Step-Therapy shape). The interface plan must refuse this and fall to `none`,
-    // where `emitConceptBody` fails loud. Mirrors the F1 Activity precedent above.
+  it("#189 Slice-C flip: a decision + `code is` + REDUCTION library routes to `interface` (the reduction now classifies Inferred, so it is emitted, never dropped)", () => {
+    // PRE-FLIP this asserted `none`: a `ReductionDefinition` classified NULL, so the `interface` split's
+    // `buildLayerAst` would have SILENTLY DROPPED it — the guard forced the per-CRL path to avoid that.
+    // The Slice-C flip CLASSIFIES a reduction into the Inferred layer (`classifyStatementLayer`), so it is
+    // no longer droppable: the library routes `interface`, the reduction lands in `<policyId>Inferred`, and
+    // `emitConceptBody` renders it there (or fails LOUD if its operand is not a RecordSet — as here,
+    // `exists "Adult Patient"` over a Scalar boolean — which is an EMIT-time loud fail, not a routing skip).
+    // Contrast the sibling test below: a `source representation` concept STILL null-classifies → still `none`.
     const src = parse(`library "Pol".
 
 concept "Adult Patient":
@@ -584,8 +587,9 @@ decision "Triage":
     const lowered = lowerLocalCodes(src);
     expect(lowered.localCodes.length).toBe(1);
     const plan = computeSplitPlan(lowered.ast, "Pol", "Pol", lowered.localCodes.length);
-    expect(plan.kind).toBe("none"); // the reduction forces the per-CRL path (NOT "interface")
-    expect(plan.emittedLibraryNames).toEqual(["Pol"]);
+    expect(plan.kind).toBe("interface"); // the reduction classifies Inferred → interface (NOT forced to `none`)
+    // The reduction concept lands in the Inferred layer — proof it is NOT dropped by the split.
+    expect(plan.emittedLibraryNames).toContain("PolInferred");
   });
 
   it("#189 IMPL 3: a decision + `code is` library carrying a REPRESENTATION-bearing concept ALSO routes to `none` (the general null-classify guard; panel R2 gpt56 #1)", () => {
@@ -618,12 +622,94 @@ decision "Triage":
     expect(plan.kind).toBe("none"); // the representation concept keeps the library on the per-CRL path
   });
 
-  it("#189 IMPL 3 end-to-end: a decision + `code is` + pure-reduction library FAILS emit with the sentinel (the reduction is NOT silently dropped; panel R1 Claude #1)", () => {
+  it("#189 Slice-C flip end-to-end: a decision + `code is` + named-`exists` reduction library EMITS layered (the reduction lands in the Inferred layer, cross-layer-qualified, not dropped)", () => {
     const root = path.join(FIXTURES, "decision-localcode-reduction", "root.crl");
     const result = emitCQLImports(root);
-    expect(result.success).toBe(false);
-    expect((result.errors ?? []).some((e) => e.kind === "emit-reduction-not-active")).toBe(true);
-    expect(result.cqlByLibrary).toHaveLength(0); // whole emit fails loud — no partial manifest (panel R2 gpt56 #3)
+    expect(result.success, JSON.stringify(result.errors ?? [])).toBe(true);
+    expect((result.errors ?? []).some((e) => e.kind === "emit-reduction-not-active")).toBe(false);
+    // POST-FLIP: the decision + `code is` library routes `interface` (the reduction now classifies
+    // Inferred), so it fans into layered libraries rather than the single `Pol`. The reduction
+    // "Enough Trials" is emitted in the Inferred layer over its records operand — cross-layer-QUALIFIED
+    // (`PolLocalSource."Trial Records"`), the boundary-1 cross-lib operand resolution — proving it is
+    // present, not silently dropped by `buildLayerAst`.
+    // `emitCQLImports` bases the emitted `S` on the POLICY id (package name `crl-test-fixture`), so the
+    // layered libraries are `CrlTestFixture*`, not `Pol*`.
+    expect(policyLibNames(result)).toContain("CrlTestFixtureInferred");
+    const inferred = findLib(result, "CrlTestFixtureInferred") ?? "";
+    expect(inferred).toMatch(
+      /define "Enough Trials":\s*\n\s*exists \(CrlTestFixtureLocalSource\."Trial Records"\)/,
+    );
+    // The decision surface concept ("Adult Patient", a `code is`) is re-exported BARE-through-satisfied by
+    // the Interface layer; the reduction is not a decision case-feature here, so it stays Inferred-only.
+    const iface = findLib(result, "CrlTestFixtureInterface") ?? "";
+    expect(iface).toMatch(
+      /define "Adult Patient":\s*\n\s*CrlTestFixtureLocalSource\."Adult Patient"\.asTruths\(\)\.satisfied\(\)/,
+    );
+  });
+
+  it("#189 Slice-C flip façade totality: a decision guarding ON a reduction re-exports it BARE through the Interface (a total boolean has no `.satisfied()`)", () => {
+    // The step-5 façade crux: when a decision's `when` guard IS a reduction concept ("Cov" = `code is` +
+    // `exists this`), the reduction classifies Inferred and publishes a TOTAL boolean (`exists(...)`). The
+    // Interface re-export MUST be BARE (`Inferred."Cov"`), NOT `Inferred."Cov".satisfied()` — a plain CQL
+    // Boolean has no `.satisfied()` method (that is the truth-set collapse for a `defined as` determination).
+    // The totality marker is set at Interface SYNTHESIS (`buildInterfaceReexports`), since the Interface
+    // emitter's own `conceptByName` cannot see the source concept's definition. Contrast the code-is case
+    // above, which DOES collapse `.asTruths().satisfied()`.
+    const root = path.join(FIXTURES, "decision-when-reduction", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success, JSON.stringify(result.errors ?? [])).toBe(true);
+    const inferred = findLib(result, "DecisionWhenReductionInferred") ?? "";
+    expect(inferred).toMatch(
+      /define "Cov":\s*\n\s*exists \(DecisionWhenReductionLocalSource\."Cov Records"\)/,
+    );
+    const iface = findLib(result, "DecisionWhenReductionInterface") ?? "";
+    // BARE re-export — the whole define body is the qualified ref, NOTHING appended.
+    expect(iface).toMatch(/define "Cov":\s*\n\s*DecisionWhenReductionInferred\."Cov"\s*\n/);
+    expect(iface).not.toMatch(/DecisionWhenReductionInferred\."Cov"\.satisfied\(\)/);
+  });
+
+  it("#189 Slice-C flip routing-tripwire: decision+reduction → `interface`; Activity+reduction (unclassifiable sibling) → `none`", () => {
+    // A2 splits "Enough Trials" into a records twin (a `CodedFromDefinition`) + a retargeted
+    // `ReductionDefinition`. POST-FLIP the reduction classifies Inferred, so it no longer forces `none` by
+    // itself — the routing is now decided exactly as for a `defined as` Inferred concept:
+    //   - WITH a decision → `interface` (the reduction lands in Inferred, twin in LocalSource, decision
+    //     surface re-exported).
+    //   - WITH an Activity but NO decision → `none`: the Activity is UNCLASSIFIABLE, so `isLayerSplittable`
+    //     is false (no `full`) AND `hasDecision` is false (no `interface`) — the per-CRL path preserves the
+    //     Activity. This is the tripwire: a reduction no longer drags an Activity-bearing library off `none`.
+    // (A PURE decisionless reduction library — no Activity — instead routes `full`, exactly like a pure
+    // decisionless `defined as` library: all statements classify, >1 layer. That is covered by the layered
+    // suite; the interesting routing contrast here is the unclassifiable-sibling guard.)
+    const decisionful = parse(`library "Pol".
+concept "Enough Trials":
+- type is Observation.
+- value type is boolean.
+- code is \`trial\`.
+- definition is exists this.
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Enough Trials" then recommend activity "Refer".
+`);
+    const loweredD = lowerLocalCodes(decisionful);
+    expect(loweredD.errors).toEqual([]);
+    expect(computeSplitPlan(loweredD.ast, "Pol", "Pol", loweredD.localCodes.length).kind).toBe("interface");
+
+    const activityful = parse(`library "Pol".
+concept "Enough Trials":
+- type is Observation.
+- value type is boolean.
+- code is \`trial\`.
+- definition is exists this.
+
+activity "Refer":
+- request CPGServiceRequest.
+`);
+    const loweredA = lowerLocalCodes(activityful);
+    expect(loweredA.errors).toEqual([]);
+    expect(computeSplitPlan(loweredA.ast, "Pol", "Pol", loweredA.localCodes.length).kind).toBe("none");
   });
 
   it("F1 end-to-end: a non-decision local-code + Activity library emits ONE library keeping every statement", () => {

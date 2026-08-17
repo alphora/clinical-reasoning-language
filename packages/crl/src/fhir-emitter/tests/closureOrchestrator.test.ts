@@ -197,7 +197,7 @@ const MALFORMED_DISPOSITIONS = join(
   "src/fhir-emitter/tests/fixtures/malformed-dispositions/malformed-dispositions.crl",
 );
 
-describe("closureOrchestrator — #189 IMPL 3: a reduction fails the FHIR lane loud (no misleading success)", () => {
+describe("closureOrchestrator — #189: unactivated reductions fail the FHIR lane loud; a decision+code-is+reduction library now emits layered (Slice C)", () => {
   const CASE_A = join(ROOT, "src/imports/tests/fixtures/code-is-reduction/root.crl");
   const CASE_B = join(ROOT, "src/imports/tests/fixtures/decision-localcode-reduction/root.crl");
 
@@ -218,14 +218,81 @@ describe("closureOrchestrator — #189 IMPL 3: a reduction fails the FHIR lane l
     expect(result.success).toBe(false);
   });
 
-  it("case (b) pure reduction: the deep-emit sentinel is FOLDED onto the FHIR lane, sinking success (panel R1 both arms)", () => {
-    // Before IMPL 3 this failure was an untyped Exception dropped by the fold's `kind !== undefined`
-    // filter, so the FHIR lane could report success:true with the concept silently missing. The typed
-    // kind is now folded (not excluded), sinking success — and computeSplitPlan keeps the reduction OFF
-    // the interface split so `emitConceptBody` actually reaches it.
+  it("#189 Slice-C flip — case (b) a decision + `code is` + reduction library EMITS successfully (the reduction classifies Inferred → the library splits, so the case-feature lane has its LocalSource target)", () => {
+    // PRE-FLIP this library routed `none` (the `ReductionDefinition` classified null), and a decision +
+    // `code is` needs the LAYERED split to emit case-features — so the FHIR lane failed loud with
+    // `decision-root-library-missing`. The Slice-C flip makes the reduction Inferred-classifiable, so the
+    // library now splits: the decision case-feature ("Adult Patient", a plain `code is` — the decision does
+    // NOT reference the reduction, so the reduction case-feature loud-gate is not tripped) emits its SD, and
+    // the reduction "Enough Trials" emits in the Inferred layer over its records operand. The whole emit
+    // SUCCEEDS — the Slice-C payoff this test anticipated. CASE_A (`code is` + `most recent this` value
+    // read) still fails loud with the reduction sentinel (its own test above): a NON-decision reduction
+    // library stays per-CRL, where `emitConceptBody`'s B2a arm is exercised — covered elsewhere.
     const result = emitFhirDefFromPath(CASE_B, { clock: FIXED_CLOCK });
-    expect(result.errors.some((e) => e.kind === "emit-reduction-not-active")).toBe(true);
+    expect(result.errors.some((e) => e.kind === "emit-reduction-not-active")).toBe(false);
+    expect(result.errors.some((e) => e.kind === "decision-root-library-missing")).toBe(false);
+    expect(result.success, JSON.stringify(result.errors)).toBe(true); // Slice-C: the split now emits case-features
+  });
+
+  it("#189 Slice-C boundary 1 — a decision guarding ON a reduction LOUD-GATES the FHIR case-feature lane (no dangling featureExpression, zero partial decision output)", () => {
+    // When a decision's `when` condition IS a reduction ("Cov" = `code is` + `exists this`), the reduction
+    // is collected as a boolean case-feature by NAME (its `code is` still registers under "Cov"), so the
+    // emit would otherwise produce a case-feature SD whose `cpg-featureExpression` targets
+    // `LocalSource."Cov"` — which does NOT exist there (the LocalSource layer has "Cov Records"; the boolean
+    // determination lives in Inferred/Interface). That featureExpression DANGLES: it resolves at neither
+    // translator-load nor emit, only failing at `$apply`. The correct reduction case-feature SD is deferred
+    // to a later boundary (§4.6/G1), so boundary 1 fails LOUD and suppresses this source's decision +
+    // case-feature emit — never shipping the dangling artifact.
+    const root = join(ROOT, "src/imports/tests/fixtures/decision-when-reduction/root.crl");
+    const result = emitFhirDefFromPath(root, { clock: FIXED_CLOCK });
     expect(result.success).toBe(false);
+    expect(result.errors.some((e) => e.kind === "unsupported-casefeature-reduction")).toBe(true);
+    // ZERO partial DECISION/case-feature output (gpt56 #4 — the layer Libraries/CodeSystem/ADs legitimately
+    // remain; `success:false` gates the write): no case-feature StructureDefinition and no decision
+    // PlanDefinition survive. Attribute semantically by resourceType, not only by path substring.
+    const sds = result.resources.filter(
+      (r) => (r.resource as { resourceType?: string }).resourceType === "StructureDefinition",
+    );
+    expect(sds).toEqual([]);
+    const decisionPd = result.resources.some((r) =>
+      r.relativePath.includes("PlanDefinition/decision-when-reduction-cov-determination"),
+    );
+    expect(decisionPd).toBe(false);
+  });
+
+  it("#189 Slice-C boundary 1 — a decision guarding on a NAMED/code-less reduction is ALSO loud-gated (the collection-based gate missed this form)", () => {
+    // impl-panel round 1, both arms — critical A. `when "Enough Trials"` where "Enough Trials" =
+    // `count "Trial Records" at least 2` has NO own `code is`, so `collectCaseFeatures` never returns it —
+    // a `unionConcepts` filter is silent and the decision would emit a vacuous empty-input / no-SD guard
+    // under success:true. Keying the gate on the decision GUARD SURFACE (`interfaceConceptNames`) catches it.
+    const root = join(ROOT, "src/imports/tests/fixtures/decision-when-named-reduction/root.crl");
+    const result = emitFhirDefFromPath(root, { clock: FIXED_CLOCK });
+    expect(result.success).toBe(false);
+    expect(result.errors.some((e) => e.kind === "unsupported-casefeature-reduction")).toBe(true);
+    const decisionPd = result.resources.some((r) =>
+      r.relativePath.includes("PlanDefinition/decision-when-named-reduction-cov-determination"),
+    );
+    expect(decisionPd).toBe(false);
+  });
+
+  it("#189 Slice-C boundary 2 (2b.2) — a decision guarding on a `defined as` ALIAS to a reduction is loud-gated via the TRANSITIVE operand closure", () => {
+    // Post-2b.2 the alias ("Cov Alias" = `defined as "Cov"`, Cov a reduction) FLIPS: it emits a total boolean at
+    // the CQL lane rather than throwing, so the transitive loudness that previously blocked its case-feature
+    // disappears. The widened `unsupported-casefeature-reduction` gate re-erects the block by walking the guard
+    // atom's same-lib `defined as` closure to the reduction — the direct-reduction gate (`reductionNames`) would
+    // MISS the alias (a `DefinedAsDefinition`). (disc 444 #1/#4.)
+    const root = join(ROOT, "src/imports/tests/fixtures/decision-when-alias-to-reduction/root.crl");
+    const result = emitFhirDefFromPath(root, { clock: FIXED_CLOCK });
+    expect(result.success).toBe(false);
+    expect(result.errors.some((e) => e.kind === "unsupported-casefeature-reduction")).toBe(true);
+    const sds = result.resources.filter(
+      (r) => (r.resource as { resourceType?: string }).resourceType === "StructureDefinition",
+    );
+    expect(sds).toEqual([]);
+    const decisionPd = result.resources.some((r) =>
+      r.relativePath.includes("PlanDefinition/decision-when-alias-to-reduction-cov-determination"),
+    );
+    expect(decisionPd).toBe(false);
   });
 });
 

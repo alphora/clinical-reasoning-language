@@ -1,0 +1,35 @@
+# decision-when-alias-to-reduction root (#189 Slice-C boundary 2, slice 2b.2)
+library "Pol".
+
+// A decision whose `when` guard is a `defined as` ALIAS ("Cov Alias") to a reduction ("Cov" =
+// `code is` Condition + `exists this`). Post-2b.2 the alias FLIPS at the CQL lane — its Inferred
+// define re-exports the reduction's total boolean directly and its Interface façade re-exports
+// BARE — so the CQL emit SUCCEEDS. But the underlying is still a reduction whose case-feature SD
+// is unconverged, so the FHIR gate must catch it via the guard's TRANSITIVE `defined as` operand
+// closure (the direct-reduction gate would MISS the alias, a `DefinedAsDefinition`). Pre-2b.2 the
+// alias was blocked transitively by the CQL truth-set THROW; the flip removes that, so the FHIR
+// gate re-erects the block.
+
+concept "Cov":
+- type is Condition.
+- value type is boolean.
+- shape is Scalar.
+- code is `cov`.
+- definition is exists this.
+
+concept "Cov Alias":
+- type is Observation.
+- value type is boolean.
+- defined as "Cov".
+
+decision "Cov Determination":
+first:
+- when "Cov Alias" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
+
+activity "certify.Approve":
+- request CPGCommunicationRequest.
+- with `Coverage determination: APPROVE / Certified.`.
+activity "not-certify.Deny":
+- request CPGCommunicationRequest.
+- with `Coverage determination: DENY / Not Certified.`.

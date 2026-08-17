@@ -1,13 +1,17 @@
-# code-is-reduction root (#189 IMPL 3, case a)
+# code-is-reduction root (#189, case a — a STILL-DEFERRED reduction)
+
 library "Pol".
 
-// A `code is` + `definition is` REDUCTION concept. `lowerLocalCodes` catches this
-// BEFORE the generic mixed check and raises `emit-reduction-not-active` (case a).
-// On the FHIR lane, the lane's OWN lowerLocalCodes pass surfaces it, and the folded
-// CQL copy is de-duped — so the FHIR result carries EXACTLY ONE, with success sunk.
+// A `code is` + `definition is` reduction concept whose reduction is NOT yet emittable
+// (`most recent this` — Slice A2/B1 activated `exists this` and `count this`; the value-read/recency
+// forms wait for Slice B2). `lowerLocalCodes` catches this BEFORE the generic mixed check and raises
+// `emit-reduction-not-active` (case a). On the FHIR lane, the lane's OWN lowerLocalCodes pass surfaces
+// it, and the folded CQL copy is de-duped — so the FHIR result carries EXACTLY ONE, with success sunk.
+// (`exists this` / `count this` now LOWER instead; their CQL-lane coverage lives in reductions-shape /
+// lowerLocalCodes unit tests, and their FHIR case-feature ripple is deferred to Slice C.)
 
 concept "Adult Patient":
 - type is Observation.
-- value type is boolean.
+- value type is Quantity.
 - code is `adult-18-or-older`.
-- definition is exists this.
+- definition is most recent this.

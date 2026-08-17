@@ -260,28 +260,191 @@ describe("folded named reductions keep ref-resolution + cycle detection (no sile
   });
 });
 
-// -------------------------------------------------- emit is non-active for reductions (Claude R1 #2)
-describe("reductions are validate-only: emit fails loud", () => {
-  it("a no-code reduction concept fails emit loud with the structured `emit-reduction-not-active` sentinel (IMPL 3)", () => {
-    // A no-`code is` reduction reaches the deep emit throw (emitConceptBody); emitCQLFromAST's catch
-    // surfaces the typed `ReductionNotActiveError` as a STRUCTURED `emit-reduction-not-active`
-    // diagnostic (a filterable kind, not a bare `type: "Exception"`).
+// -------------------------------------------------- reductions emit progressively (#189 flip)
+describe("reductions emit progressively (#189 flip): `exists` + `count` + Scalar-boolean + Record `most recent this` active; non-boolean Scalar `most recent` still loud", () => {
+  it("#189 flip Slice A: a no-code named `exists \"X\"` reduction now EMITS `exists (<X>)` (was validate-only)", () => {
+    // Slice A activates a reduction over a NAMED RecordSet operand (`exists "X"`) — it emits like
+    // `defined as exists`. `code is` + `exists this` also emits now (Slice A2, below); the value-read
+    // forms (count / most recent) stay loud (below / #189).
     const src =
       `library "T".\nconcept "X":\n- type is Condition.\n- shape is RecordSet.\n- code is \`x\`.\n` +
       `concept "C":\n- value type is boolean.\n- definition is exists "X".\n`;
     const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
-    expect(r.success).toBe(false);
-    const sentinel = (r.errors ?? []).find((e) => e.kind === "emit-reduction-not-active");
-    expect(sentinel).toBeDefined();
-    expect(sentinel!.message).toMatch(/CANNOT yet be emitted|emit activates at the flip/);
+    expect(r.success, JSON.stringify(r.errors ?? [])).toBe(true);
+    expect(r.result ?? "").toMatch(/define "C":\s*\n\s*exists \("X"\)/);
+    // The RecordSet publisher X retrieves its OWN records at the NATURAL resource (Condition), NOT the
+    // forced-Observation of the scalar boolean-determination path — the two spellings of one
+    // determination (`exists "X"` here, `exists this` in A2) must emit the SAME resource (crl-emit R1 crit).
+    expect(r.result ?? "").toMatch(/define "X":\s*\n\s*\[Condition: "X Code"\]/);
   });
 
-  it("IMPL 3: `code is` + `exists this` now fails emit with the dedicated `emit-reduction-not-active` sentinel (was the generic mixed error)", () => {
-    // Replaces the pre-IMPL-3 INTERIM TRAP. A `code is` + reduction is caught by `lowerLocalCodes`
-    // BEFORE the generic mixed check, so the KE gets the reduction-specific sentinel — NOT the generic
-    // `emit-mixed-code-and-definition` that interpolated the raw `ReductionDefinition` type name.
+  it("Slice A2: `code is` + `exists this` now EMITS a records twin + `exists (<X Records>)` (was the reject sentinel)", () => {
+    // Slice A2 activates the ONE emittable `code is` + reduction form. `lowerLocalCodes` splits "C"
+    // into a RecordSet retrieve twin "C Records" (the concept's own records over its local code, at
+    // its NATURAL resource) + the retargeted named `exists`. `emitConceptBody`'s Slice-A gate then
+    // emits `exists ("C Records")` over the local RecordSet operand.
     const src =
-      `library "T".\nconcept "C":\n- value type is boolean.\n- code is \`c\`.\n- definition is exists this.\n`;
+      `library "T".\nconcept "C":\n- type is Condition.\n- value type is boolean.\n- code is \`c\`.\n- definition is exists this.\n`;
+    const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
+    expect(r.success, JSON.stringify(r.errors ?? [])).toBe(true);
+    // The twin retrieves the concept's own records at the NATURAL resource (Condition, not Observation).
+    expect(r.result ?? "").toMatch(/define "C Records":\s*\n\s*\[Condition: "C Code"\]/);
+    // The public boolean is the named existence over that twin.
+    expect(r.result ?? "").toMatch(/define "C":\s*\n\s*exists \("C Records"\)/);
+    expect(r.result ?? "").not.toContain("emit-reduction-not-active");
+  });
+
+  it("Slice B1: `code is` + `count this at least N` EMITS a records twin + `Count(<X Records>) >= N`", () => {
+    // count reduces THIS concept's own records like `exists this`, but renders a threshold. Same
+    // records-twin lowering; the retargeted reduction preserves `count`/`atLeast`.
+    const src =
+      `library "T".\nconcept "C":\n- type is Condition.\n- value type is boolean.\n- code is \`c\`.\n- definition is count this at least 2.\n`;
+    const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
+    expect(r.success, JSON.stringify(r.errors ?? [])).toBe(true);
+    expect(r.result ?? "").toMatch(/define "C Records":\s*\n\s*\[Condition: "C Code"\]/);
+    expect(r.result ?? "").toMatch(/define "C":\s*\n\s*Count\("C Records"\) >= 2/);
+  });
+
+  it("Slice B1: a no-code named `count \"X\" at least N` reduction EMITS `Count(<X>) >= N`", () => {
+    const src =
+      `library "T".\nconcept "X":\n- type is Condition.\n- shape is RecordSet.\n- code is \`x\`.\n` +
+      `concept "C":\n- value type is boolean.\n- definition is count "X" at least 3.\n`;
+    const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
+    expect(r.success, JSON.stringify(r.errors ?? [])).toBe(true);
+    expect(r.result ?? "").toMatch(/define "C":\s*\n\s*Count\("X"\) >= 3/);
+  });
+
+  it("Slice B1: `count this at least 0` is an author error (trivially true) — `emit-count-threshold-trivial`", () => {
+    const src =
+      `library "T".\nconcept "C":\n- type is Observation.\n- value type is boolean.\n- code is \`c\`.\n- definition is count this at least 0.\n`;
+    const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
+    expect(r.success).toBe(false);
+    expect((r.errors ?? []).some((e) => e.kind === "emit-count-threshold-trivial")).toBe(true);
+  });
+
+  it("Slice B1: a NAMED `count \"X\" at least 0` is an author error → `emit-count-threshold-trivial` (NOT the not-active sentinel)", () => {
+    // The named path reaches `emitConceptBody` validator-free; a trivial threshold must surface the
+    // specific author-error kind, not the misleading "not yet emittable" sentinel (crl-emit B1 disc).
+    const src =
+      `library "T".\nconcept "X":\n- type is Condition.\n- shape is RecordSet.\n- code is \`x\`.\n` +
+      `concept "C":\n- value type is boolean.\n- definition is count "X" at least 0.\n`;
+    const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
+    expect(r.success).toBe(false);
+    expect((r.errors ?? []).some((e) => e.kind === "emit-count-threshold-trivial")).toBe(true);
+    expect((r.errors ?? []).some((e) => e.kind === "emit-reduction-not-active")).toBe(false);
+  });
+
+  it("Slice B1: a NAMED reduction whose RESULT concept is non-boolean → `emit-reduction-shape-incoherent` (charter; validator-free emit path mirrors the `this` guard)", () => {
+    // `emitConceptBody` checks only the OPERAND shape; without a result-concept coherence guard a
+    // `value type is Quantity` consumer would emit a Boolean it did not declare. Mirror the `this`-path
+    // guard (disc 431 crit) on the named path — for both `exists` and `count`.
+    const existsSrc =
+      `library "T".\nconcept "X":\n- type is Condition.\n- shape is RecordSet.\n- code is \`x\`.\n` +
+      `concept "C":\n- value type is Quantity.\n- definition is exists "X".\n`;
+    const re = emitCQL(existsSrc, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
+    expect(re.success).toBe(false);
+    expect((re.errors ?? []).some((e) => e.kind === "emit-reduction-shape-incoherent")).toBe(true);
+
+    const countSrc =
+      `library "T".\nconcept "X":\n- type is Condition.\n- shape is RecordSet.\n- code is \`x\`.\n` +
+      `concept "C":\n- shape is RecordSet.\n- definition is count "X" at least 2.\n`;
+    const rc = emitCQL(countSrc, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
+    expect(rc.success).toBe(false);
+    expect((rc.errors ?? []).some((e) => e.kind === "emit-reduction-shape-incoherent")).toBe(true);
+  });
+
+  it("Slice B2a: a Scalar boolean `code is` + `most recent this` EMITS select-newest + boolean read + Coalesce", () => {
+    // The value-read reduction: select the newest CONFORMING Observation, read its boolean value, and
+    // Coalesce to false (closed-world total boolean at the boundary — NOT the age truth-set lift).
+    const src =
+      `library "T".\nconcept "C":\n- type is Observation.\n- value type is boolean.\n- code is \`c\`.\n- definition is most recent this.\n`;
+    const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
+    expect(r.success, JSON.stringify(r.errors ?? [])).toBe(true);
+    const cql = r.result ?? "";
+    expect(cql).toMatch(/define "C Records":\s*\n\s*\[Observation: "C Code"\]/);
+    expect(cql).toMatch(/define "C":/);
+    // select-newest (aliased where, alias-free sort), conforming type-filter, boolean read, Coalesce.
+    expect(cql).toContain("Last(");
+    expect(cql).toMatch(/where O\.value is FHIR\.boolean/);
+    expect(cql).toMatch(/sort by \(effective as FHIR\.dateTime\)\.value, id/);
+    expect(cql).toContain("FHIRHelpers.ToBoolean");
+    expect(cql).toMatch(/Coalesce\(/);
+    expect(cql).toMatch(/,\s*false/); // closed-world default (comma may be followed by a newline)
+  });
+
+  it("Slice B2b: a `shape is Record` `code is` + `most recent this` EMITS a record select-newest (no value read, no Coalesce)", () => {
+    // The record-selection reduction: select the newest record over the twin, NO value filter/read and NO
+    // Coalesce (a Record result is nullable — empty → null; only booleans are totalized). Procedure carries a
+    // `dateTime`-cast recency (`performed`), so the sort is `(performed as FHIR.dateTime).value, id`.
+    const src =
+      `library "T".\nconcept "C":\n- type is Procedure.\n- shape is Record.\n- code is \`c\`.\n- definition is most recent this.\n`;
+    const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
+    expect(r.success, JSON.stringify(r.errors ?? [])).toBe(true);
+    const cql = r.result ?? "";
+    // The twin retrieves the concept's own records at the NATURAL resource (Procedure).
+    expect(cql).toMatch(/define "C Records":\s*\n\s*\[Procedure: "C Code"\]/);
+    // select-newest, alias-free recency sort — NO where-filter, NO boolean read, NO Coalesce.
+    expect(cql).toMatch(/define "C":\s*\n\s*Last\(/);
+    expect(cql).toMatch(/sort by \(performed as FHIR\.dateTime\)\.value, id/);
+    expect(cql).not.toContain("where O.");
+    expect(cql).not.toContain("FHIRHelpers.ToBoolean");
+    expect(cql).not.toContain("Coalesce");
+  });
+
+  it("Slice B2b: a Record `most recent this` on a `none`-cast recency resource (Condition) sorts by the plain dateTime element", () => {
+    // Condition carries a plain-`dateTime` recency (`recordedDate`, cast:none) → `recordedDate.value` with no
+    // `as FHIR.dateTime`. A VALUELESS resource is fine for a record SELECT (no value read), unlike the B2a
+    // value read which errors valueless. This pins the recency-cast branch of the shared select-newest spine.
+    const src =
+      `library "T".\nconcept "C":\n- type is Condition.\n- shape is Record.\n- code is \`c\`.\n- definition is most recent this.\n`;
+    const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
+    expect(r.success, JSON.stringify(r.errors ?? [])).toBe(true);
+    const cql = r.result ?? "";
+    expect(cql).toMatch(/define "C Records":\s*\n\s*\[Condition: "C Code"\]/);
+    expect(cql).toMatch(/define "C":\s*\n\s*Last\(/);
+    expect(cql).toMatch(/sort by recordedDate\.value, id/);
+    expect(cql).not.toContain("as FHIR.dateTime");
+    expect(cql).not.toContain("Coalesce");
+  });
+
+  it("Slice B2b: a `shape is Record` `most recent this` with an OPTIONAL value type on a VALUE-BEARING resource (Observation) still emits a bare record select — the datum is ignored (design §1; crl-emit B2b #1 regression guard)", () => {
+    // A Record's `value type` is OPTIONAL and names the record's DATUM (design of record §1); a bare record
+    // select never reads it. Emit must NOT reject it (rejecting would hard-fail validator-clean content) and
+    // must NOT read it. Observation is the one value-BEARING registry row — this pins that a record select
+    // ignores the value even when the resource HAS one.
+    const src =
+      `library "T".\nconcept "C":\n- type is Observation.\n- shape is Record.\n- value type is boolean.\n- code is \`c\`.\n- definition is most recent this.\n`;
+    const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
+    expect(r.success, JSON.stringify(r.errors ?? [])).toBe(true);
+    const cql = r.result ?? "";
+    expect(cql).toMatch(/define "C Records":\s*\n\s*\[Observation: "C Code"\]/);
+    expect(cql).toMatch(/define "C":\s*\n\s*Last\(/);
+    expect(cql).toMatch(/sort by \(effective as FHIR\.dateTime\)\.value, id/);
+    // The optional datum is IGNORED: no value filter, no boolean read, no Coalesce.
+    expect(cql).not.toContain("where O.");
+    expect(cql).not.toContain("FHIRHelpers.ToBoolean");
+    expect(cql).not.toContain("Coalesce");
+  });
+
+  it("Slice B2b: a Record `most recent this` on a choice-coding resource (MedicationRequest) selects newest with the `none`-cast `authoredOn` recency", () => {
+    // MedicationRequest is the one `choice-codeable-concept` coding row AND a `none`-cast recency
+    // (`authoredOn`) — this pins a record select at that boundary of the registry.
+    const src =
+      `library "T".\nconcept "C":\n- type is MedicationRequest.\n- shape is Record.\n- code is \`c\`.\n- definition is most recent this.\n`;
+    const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
+    expect(r.success, JSON.stringify(r.errors ?? [])).toBe(true);
+    const cql = r.result ?? "";
+    expect(cql).toMatch(/define "C":\s*\n\s*Last\(/);
+    expect(cql).toMatch(/sort by authoredOn\.value, id/);
+    expect(cql).not.toContain("as FHIR.dateTime");
+    expect(cql).not.toContain("Coalesce");
+  });
+
+  it("`most recent this` NON-boolean `code is` reductions still fail loud (`emit-reduction-not-active`; Slice C)", () => {
+    // B2a activates only the boolean value read; a non-boolean `most recent this` stays validate-only
+    // (Slice C — the case-feature lane is boolean-locked + per-type conversion deferred).
+    const src =
+      `library "T".\nconcept "C":\n- type is Observation.\n- value type is Quantity.\n- code is \`c\`.\n- definition is most recent this.\n`;
     const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });
     expect(r.success).toBe(false);
     expect((r.errors ?? []).some((e) => e.kind === "emit-reduction-not-active")).toBe(true);

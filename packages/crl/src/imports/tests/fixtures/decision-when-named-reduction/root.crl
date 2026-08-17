@@ -1,0 +1,29 @@
+# decision-when-named-reduction root (#189 Slice-C boundary 1, impl-panel round 1 critical A)
+library "Pol".
+
+// A decision whose `when` guard is a NAMED, code-LESS reduction ("Enough Trials" = `count "Trial
+// Records" at least 2`). The named reduction has NO own `code is`, so `collectCaseFeatures` never
+// returns it — a case-feature-collection-based gate is SILENT and the decision would emit a vacuous
+// empty-input / no-SD guard under success:true. The FHIR loud gate keys on the decision GUARD SURFACE
+// (`interfaceConceptNames`), so it catches this form too.
+
+concept "Trial Records":
+- type is Observation.
+- shape is RecordSet.
+- code is `trial`.
+
+concept "Enough Trials":
+- value type is boolean.
+- definition is count "Trial Records" at least 2.
+
+decision "Cov Determination":
+first:
+- when "Enough Trials" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
+
+activity "certify.Approve":
+- request CPGCommunicationRequest.
+- with `APPROVE`.
+activity "not-certify.Deny":
+- request CPGCommunicationRequest.
+- with `DENY`.

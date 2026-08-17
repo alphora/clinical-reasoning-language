@@ -4,6 +4,11 @@
 rule 5). Read the charter `docs/CRL-NORTH-STAR.md` (null-safety by construction) and §3 of the main design
 first. This doc expands §3 rule 5 into a buildable spec.
 
+**Source-tree paths (verified 2026-08-14):** `emitCQL.ts`, `layeredEmit.ts`, `emitCriterionDefine.ts` live in
+`packages/crl/src/cql-emitter/` (NOT `emit/`); `decision.ts` in `packages/crl/src/fhir-emitter/`; the new
+`booleanTotality.ts` and the T1/T2 infra in `packages/crl/src/emit/`. Line citations drift as code moves —
+trust the function/const name over the number.
+
 **Sequencing decision (disc 426, both crl-emit arms + operator 2026-08-13):** the boolean-totality classifier is
 **built at the flip (T5), NOT as an inert phase-0 precursor.** Whether a form is total is a fact about the
 **§2/§7 lowering contract** — which catalog overload is selected, whether `Count` is bare or Coalesced, whether
@@ -49,10 +54,10 @@ under a record-valued parent is set algebra §7, NOT boolean — `not-applicable
 | `defined as exists ("X")` | intrinsically-total | existence bridge |
 | `count this … at least N` / `count "X" … at least N` | intrinsically-total **(⚠ verify)** | `Count(…) >= N` — **§2's own "verify `Count`→0 on empty at impl" flag is undischarged**; pin the engine behavior for the emitted target type before relying on bare |
 | multi-rep `exists this` | intrinsically-total | union of per-rep existence (§6, in scope for v1) — total regardless of the source arm |
-| catalog pattern, boolean concept, pattern shape `list`/`instance` | intrinsically-total | `exists <call>` / `exists { <call> }` (`emitCQL.ts:1948-1961`) |
+| catalog pattern, boolean concept, pattern shape `list`/`instance` | intrinsically-total | `exists <call>` / `exists { <call> }` (`cql-emitter/emitCQL.ts:1948-1961`) |
 | `most recent this`, Scalar boolean | requires-boundary | select-newest → read `value` → `Coalesce(<read>, false)` (Coalesce the boolean READ, never the record) |
 | age recency (standalone `uncoded` AND local/computed merge) | requires-boundary | via **`resolveAgeConcept`** (the shared validate+emit authority — do NOT shape-match `age today ≥ N`); §7's total-boolean rewrite is the discharge, NOT the current `recencyAgeTruths` truth-set |
-| catalog pattern, inherently-boolean (`High`/`Low`/`AtLeast`/`Between`/…), scalar comparison | requires-boundary | nullable CQL comparison (`emitCQL.ts:414-429`, `return call` fall-through) → `Coalesce(<predicate>, false)` — **NEVER `Coalesce(X, 0) >= N`** (rule 2: Coalesce the predicate, not the operand) |
+| catalog pattern, inherently-boolean (`High`/`Low`/`AtLeast`/`Between`/…), scalar comparison | requires-boundary | nullable CQL comparison (comparator pattern entries `cql-emitter/emitCQL.ts:414-429`; the `return call` fall-through is `cql-emitter/emitCQL.ts:1962-1964`) → `Coalesce(<predicate>, false)` — **NEVER `Coalesce(X, 0) >= N`** (rule 2: Coalesce the predicate, not the operand) |
 | `defined as` composition (`sem-or`/`sem-and`/`sem-not`) / bare ref, boolean parent | composite | carry `operands: ReferenceName[]` ONLY (no `negated` flag). `not "A"` is `not <A's own total define>` = total; per-operand-before-`not` (rule 3) is discharged **architecturally** at each operand's own boundary, not at the composition site (use-site repair would violate context-free emission). The proof requires every resolved operand's effect to be `total`. Preserve qualified refs; treat `CompositionGroup` as transparent |
 | `most recent this`, Record shape | not-applicable | returns `Record<R>`, no value read (§2) |
 | Record / RecordSet / non-boolean scalar | not-applicable — **but carry `nullable` for non-boolean scalars** | a `Scalar<Quantity>` `most recent this` is nullable-non-boolean; a later comparison consuming it must Coalesce the *predicate* (rule 2). Reading not-applicable as "consume anywhere" is the `Coalesce(X,0)` trap |
@@ -69,11 +74,12 @@ folded into "rejected" and exempted.
 model must state, per surface, how totality is established:
 
 - **Authored concept defines** — via the classifier (this doc).
-- **Criterion defines** (#236, `emitCQL.ts:959-972` / `emitCriterionDefine.ts`) — per-operand-totalized **by
-  construction** in their own emitter; the proof cites that as an axiom, does not re-derive.
+- **Criterion defines** (#236 — SHIPPED `7f9aaf1`; `cql-emitter/emitCQL.ts:955-976` gathers/renders via
+  `cql-emitter/emitCriterionDefine.ts`) — per-operand-totalized **by construction** in their own emitter;
+  the proof cites that as an axiom, does not re-derive.
 - **Interface façades** (`define "X": Inferred."X"`) — **delegated**: total iff the aliased define is total.
 - **Age-recency synthesized defines/helpers** — the §7 rewritten total-boolean boundary is the discharge.
-- **Guard-atom `not Coalesce(…, false)` carriers** (`decision.ts:636-668`) — ruled to STAY (§7), NOT generalized;
+- **Guard-atom `not Coalesce(…, false)` carriers** (`fhir-emitter/decision.ts:659-674`, `guardApplicabilityCondition`) — ruled to STAY (§7), NOT generalized;
   a by-construction total carrier, an axiom for the proof.
 - **Cross-library aliases/includes** — mixed emitter versions rejected/detected (§3 rule 6), never
   consumption-site-Coalesced.
@@ -93,7 +99,7 @@ model must state, per surface, how totality is established:
 
 - **`src/emit/booleanTotality.ts`** — emit-lane (the proof is emit/test-time; no validator consumes totality; T1
   precedent of `emit/` importing `template-match`). Not lane-neutral (no validate consumer, unlike T3a).
-- **Export / lift `PATTERN_RETURN_SHAPE`** (`emitCQL.ts:390`, currently a non-exported const) rather than
+- **Export / lift `PATTERN_RETURN_SHAPE`** (`cql-emitter/emitCQL.ts:390`, currently a non-exported const) rather than
   duplicating the pattern→shape table.
 - Route age through `resolveAgeConcept`; never shape-match the projection syntax.
 - Reconcile §3 rule 5's three-class prose with this doc's classes when T5 lands, so two readers don't build

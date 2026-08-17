@@ -1,7 +1,14 @@
 # layered-name-collision sibling — a REAL single-layer library literally named "X Asserted"
 library "X Asserted".
 
+// `Sibling Concept` is a STANDALONE patient-age determination (a `source representation` over
+// `Patient.birthDate`, no local `code is`). An age posrep lowers to an intrinsically-total
+// boolean, so it clears the boundary-totality gate. Root's `Top` aliases it cross-library,
+// which forces the `include XAsserted` this fixture asserts.
 concept "Sibling Concept":
-- type is Observation.
 - value type is boolean.
-- defined as "Sibling Concept".
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 18 years.

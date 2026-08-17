@@ -52,6 +52,7 @@ import type {
   ConceptDefinition,
   DefinedAsDefinition,
   DefinitionIsDefinition,
+  ReductionDefinition,
   NarrativeClause,
   NarrativeElement,
   ArgValue,
@@ -69,7 +70,6 @@ import {
   getRefLibrary,
   isQualifiedRef,
   normalizeLocalRef,
-  reductionNotEmittable,
 } from "../ast/types";
 import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex";
 import { pascalCaseNameForId } from "../fhir-emitter/slug";
@@ -78,6 +78,7 @@ import type { CRLError } from "../types/errors";
 
 import { emitCQLFromAST } from "./emitCQL";
 import type { EmitResult, EmitOptions } from "./emitCQL";
+import { emitsTotalScalarBoolean, sameLayerResolver } from "./totalScalarBoolean";
 
 /**
  * A partition VALUE — the bucket a statement is assigned to for emit. The FULL
@@ -278,12 +279,17 @@ export function classifyStatementLayer(stmt: Statement): Layer | null {
       case "DefinitionIsDefinition":
         return "Inferred";
       case "ReductionDefinition":
-        // #189: a reduction is NOT emittable in the grammar+validation slice, so it is deliberately
-        // NOT layer-classified — its library stays on the per-CRL path, where `emitConceptBody`
-        // fails loud (`reductionNotEmittable`). Returning "Inferred" here would route it into layered
-        // emit, whose `requalifyDefinition` reduction arm also throws; keeping it unclassified is the
-        // cleaner loud-fail until the flip activates reductions.
-        return null;
+        // #189 Slice-C boundary 1 — a reduction over a `shape is RecordSet` operand is a TOTAL
+        // determination (`exists`/`Count`/`most recent`), so it classifies INTO the Inferred layer
+        // exactly like a `defined as`. Its records operand (the `<X> Records` twin) classifies
+        // LocalSource; `requalifyDefinition`'s ReductionDefinition arm requalifies the target ref
+        // across that boundary, and `emitConceptBody` renders the qualified operand (resolving its
+        // shape via `conceptShapesByName`, since the Inferred layer's own `conceptByName` cannot see
+        // the twin). Flipping this null→"Inferred" ALSO opens the `interface` route
+        // (`imports/emit.ts` `hasUnclassifiableConcept` narrows), so the façade totality marker
+        // (`buildInterfaceReexports`) and the FHIR case-feature gate (`closureOrchestrator`) are now
+        // load-bearing, not optional.
+        return "Inferred";
     }
   }
   // #236 — a `criterion` is a decision-facing boolean define: co-locate it with the decision's
@@ -337,6 +343,28 @@ function buildNameLayerMaps(ast: CRL, partition: Partition): NameLayerMaps {
     }
   }
   return { concept, terminology };
+}
+
+/**
+ * #189 Slice-C boundary 1 — the pre-split `concept name → declared shape` map
+ * (`EmitOptions.conceptShapesByName`). Built from the ast (post-`lowerLocalCodes`,
+ * so the records twins are present) BEFORE the per-layer split, so a reduction's
+ * cross-layer records operand can be shape-checked by the layer emitter whose own
+ * `conceptByName` holds only that layer's statements. Keyed by BARE name (boundary 1
+ * single-rep reductions synthesize distinct twin names, e.g. `"X Records"`); a
+ * both-representation same-name pair (out of boundary-1 scope) resolves RecordSet-wins
+ * so a reduction operand ref to the retrieve twin reads `RecordSet`, never the Inferred
+ * fold. Synthetic Interface re-exports are EXCLUDED (mirrors `buildNameLayerMaps`),
+ * so a `define "X"` façade never shadows the real "X"'s shape.
+ */
+export function buildConceptShapeMap(ast: CRL): Map<string, Concept["shape"]> {
+  const shapes = new Map<string, Concept["shape"]>();
+  for (const stmt of ast.statements) {
+    if (stmt.type !== "Concept" || !stmt.name || stmt.__interfaceReexport) continue;
+    if (shapes.get(stmt.name) === "RecordSet" && stmt.shape !== "RecordSet") continue;
+    shapes.set(stmt.name, stmt.shape);
+  }
+  return shapes;
 }
 
 /** The set of DISTINCT layers the library's classifiable statements span. */
@@ -760,15 +788,37 @@ function requalifyDefinition(
       };
       return out;
     }
-    case "ReductionDefinition":
-      // #189: a reduction is not emittable in the grammar+validation slice. A reduction-bearing library
-      // is kept OFF the interface/full split entirely — `computeSplitPlan` falls to the per-CRL `none`
-      // path when a reduction concept is present (IMPL 3, panel R1 Claude #1), where `emitConceptBody`
-      // fails loud instead. So layered requalification never sees a reduction; reaching here is a
-      // compiler bug → fail loud. NOTE: `emitPartitioned` is NOT under a try/catch, so this throw would
-      // propagate UNCAUGHT — it is a defensive/unreachable invariant guard, not a lane-surfaced
-      // diagnostic. First-class requalification of a reduction target lands at the flip.
-      return reductionNotEmittable("requalifyDefinition", def.location);
+    case "ReductionDefinition": {
+      // #189 Slice-C boundary 1 — requalify the reduction's operand ref across the layer boundary,
+      // exactly like a `defined as` bare ref. A NAMED operand (`ReductionConceptRef`, e.g. the lowered
+      // `<X> Records` twin) resolves against the CONCEPT slot → a cross-layer target rewrites to
+      // `<policyId>-LocalSource."X Records"`; a same-layer target stays bare.
+      const target = def.reduction.target;
+      if (target.type === "ThisRecords") {
+        // INVARIANT: `lowerLocalCodes` retargets every `this` reduction to a named records twin
+        // BEFORE layered emit, so a `ThisRecords` reaching requalification means an un-lowered
+        // reduction was routed layered. That is only reachable via the validator-free
+        // `emitCQLFromAST` entry with a no-`code is` `exists this` (which lowering leaves untouched) —
+        // fail loud naming the invariant rather than silently dropping the operand.
+        throw new Error(
+          `internal invariant violated: a \`ReductionDefinition\` with a \`this\` (ThisRecords) target ` +
+            `reached layered requalification. \`lowerLocalCodes\` must retarget \`this\` to a named ` +
+            `records twin before the layered split; a bare \`exists this\` with no \`code is\` (only ` +
+            `reachable via the validator-free emitCQLFromAST entry) is not emittable in the layered lane.`,
+        );
+      }
+      const out: ReductionDefinition = {
+        ...def,
+        reduction: {
+          ...def.reduction,
+          target: {
+            ...target,
+            ref: requalifyRef(target.ref, "concept", currentLayer, maps, lib, policyId, partition),
+          },
+        },
+      };
+      return out;
+    }
   }
 }
 
@@ -1035,6 +1085,17 @@ export function interfaceSurface(ast: CRL): { name: string; sourceLayer: Layer |
 }
 
 /**
+ * The PUBLIC-determination twin of a both-representation same-name pair (§4.7 winner rule): an untagged authored
+ * concept or the `public-determination` twin is the public meaning; a `source-impl`/`records-impl` retrieve half is
+ * not. Mirrors `declaredResultIndex.ts` `isPublicCandidate` (minus the interface-façade check — the synthetic
+ * re-exports are not yet in this AST when `buildInterfaceReexports` runs).
+ */
+function isPublicTwin(c: Concept): boolean {
+  const role = c.__loweringRole;
+  return role === undefined || role === "public-determination";
+}
+
+/**
  * Synthesize the Interface re-export `Concept`s for the interface concept names.
  * Each is marked `__interfaceReexport` and pre-qualified to its source layer.
  * Names whose source layer is not a re-exportable source layer are skipped.
@@ -1046,9 +1107,22 @@ function buildInterfaceReexports(
 ): { reexports: Concept[]; errors: CRLError[] } {
   const reexports: Concept[] = [];
   const errors: CRLError[] = [];
+  // #189 Slice C 2b.3b.1 — twin-selection WINNER RULE (§4.7). A both-representation lowering emits TWO same-named
+  // twins: a `source-impl`/`records-impl` retrieve half + the `public-determination` twin (e.g. the age RECENCY
+  // twin). The façade's totality predicate + re-export mode must key on the PUBLIC determination — the recency twin
+  // reads TOTAL, the source-impl half does not — so a non-public twin must never overwrite a public one. Do it
+  // deterministically (prefer public) rather than relying on the lowering's append order (the twin happens to be
+  // appended last today, but that is not a contract, and the predicate's totality read is now load-bearing).
   const sourceConceptByName = new Map<string, Concept>();
   for (const stmt of ast.statements) {
-    if (stmt.type === "Concept" && stmt.name) sourceConceptByName.set(stmt.name, stmt);
+    if (stmt.type !== "Concept" || !stmt.name) continue;
+    const existing = sourceConceptByName.get(stmt.name);
+    // A non-public twin never overwrites a public one. Two DISTINCT public candidates for one name (the rule would
+    // silently revert to append order) is unreachable today: `lowerLocalCodes` tags exactly one public concept per
+    // name (a `source-impl`/`records-impl` half + one `public-determination` twin, or a single untagged authored
+    // concept). If a future lowering can emit two public same-name twins, this needs a real tiebreak.
+    if (existing !== undefined && isPublicTwin(existing) && !isPublicTwin(stmt)) continue;
+    sourceConceptByName.set(stmt.name, stmt);
   }
   for (const name of interfaceConceptNames(ast)) {
     const rawSourceLayer = maps.concept.get(name);
@@ -1081,6 +1155,46 @@ function buildInterfaceReexports(
       continue;
     }
     const src = sourceConceptByName.get(name);
+    // #189 Slice-C boundary 1 — TOTALITY mode for an Inferred re-export. A REDUCTION that publishes a
+    // Scalar boolean (`exists`/`Count`/a `Coalesce`-guarded `most recent`) is a TOTAL boolean, so the
+    // façade re-exports it BARE (a plain CQL Boolean has no `.satisfied()`); a `defined as` truth-set
+    // determination stays `.satisfied()`.
+    const srcIsReduction = src?.definition?.type === "ReductionDefinition";
+    const srcIsScalarBoolean =
+      src?.shape === "Scalar" && src.valueTypes.length === 1 && src.valueTypes[0] === "boolean";
+    // HARD ERROR (impl-panel round 1, both arms — critical B): a REDUCTION Inferred source that is NOT a
+    // Scalar boolean (a `shape is Record` `most recent this`, or a non-boolean scalar reduction) has NO
+    // valid boolean Interface collapse — `.satisfied()` on a record / non-boolean is a category error, and
+    // a bare re-export would publish a non-boolean as a decision guard surface. The old else-branch silently
+    // marked it `"truth-set"` → the façade emitted `Inferred."X".satisfied()` on a record (ill-typed CQL,
+    // shipped under success:true). Reachable validator-clean via the record-shaped-guard cell (still a
+    // warning until T7) AND permanently via the validator-free `emitCQLFromAST`/MCP entry. Refuse LOUD here,
+    // mirroring the F3 not-source-typed guard above, rather than emit ill-typed CQL. Only a Scalar-boolean
+    // reduction re-exports as a total boolean; a non-boolean *Scalar* most-recent is already loud at emit
+    // (the B2a value-read guard throws), so this specifically closes the Record / non-boolean-scalar hole.
+    if (sourceLayer === "Inferred" && srcIsReduction && !srcIsScalarBoolean) {
+      errors.push({
+        type: "Validation",
+        kind: "emit-reduction-nonboolean-interface",
+        message:
+          `decision references reduction concept "${name}", which publishes a ${src?.shape ?? "?"} ` +
+          `(value type ${src && src.valueTypes.length > 0 ? src.valueTypes.join(", ") : "(none)"}) rather ` +
+          `than a Scalar boolean. A non-boolean reduction has no valid boolean Interface collapse ` +
+          `(\`.satisfied()\` on a record / non-boolean is a category error), so it cannot be a decision ` +
+          `guard surface. Only a Scalar-boolean reduction (exists / count / boolean most-recent) re-exports ` +
+          `as a total boolean.`,
+        ...(src?.location ? { line: src.location.start.line, column: src.location.start.column } : {}),
+      });
+      continue;
+    }
+    // #189 Slice C 2b.2 — a total-boolean re-export is granted to ANY source whose Inferred define emits a total
+    // Scalar boolean (a Scalar-boolean reduction, a boolean comparator, a boolean list-pattern, OR a bare-ref
+    // alias transitively resolving to one — `emitsTotalScalarBoolean`), NOT only a direct `ReductionDefinition`
+    // (disc 444 #1/#2). Consistent BY CONSTRUCTION with the emit flip + the ledger discharge, which consult the
+    // SAME predicate — so the façade cannot `.satisfied()` a bare Boolean (an alias/comparator source) nor
+    // bare-re-export a truth-set. The non-boolean-reduction HARD ERROR above still fires for a DIRECT reduction
+    // guard; an alias to a non-boolean reduction is caught loud at emit (its referent trips the retained guard).
+    const srcEmitsTotalBoolean = emitsTotalScalarBoolean(src, sameLayerResolver((n) => sourceConceptByName.get(n)));
     const targetLib = layerLibraryName(policyId, sourceLayer);
     const qualified: QualifiedReference = {
       type: "QualifiedReference",
@@ -1102,10 +1216,22 @@ function buildInterfaceReexports(
       representations: [],
       location: src?.location ?? ast.location,
       __interfaceReexport: true,
+      // #189 Slice C 2a — the decision/action-guard façade; the ledger enrollment manufactures a `composite`
+      // obligation delegating to the re-exported source define (never inheriting an authored obligation).
+      __loweringRole: "interface-facade",
       // The source layer this re-export re-publishes from — read by the
       // case-feature Interface emit to pick the define body (`…satisfied()` /
       // `…asTruths().satisfied()` / legacy plain re-export). See emitCQL.ts.
       __interfaceSourceLayer: sourceLayer,
+      // #189 Slice-C boundary 1 — totality mode (Inferred source only): a total-boolean reduction
+      // re-exports BARE, a truth-set determination collapses with `.satisfied()`.
+      ...(sourceLayer === "Inferred"
+        ? {
+            __interfaceReexportMode: (srcEmitsTotalBoolean
+              ? "total-boolean"
+              : "truth-set") as "total-boolean" | "truth-set",
+          }
+        : {}),
     };
     reexports.push(reexport);
   }
@@ -1155,6 +1281,11 @@ export function emitPartitioned(
   baseOptions: Omit<EmitOptions, "libraryName" | "crossLibraryIncludes"> = {},
 ): LayeredEmitResult {
   const maps = buildNameLayerMaps(ast, partition);
+  // #189 Slice-C boundary 1 — the cross-layer reduction-operand shape map, computed
+  // ONCE from the pre-split ast (all concepts + records twins visible) and threaded
+  // to every layer emitter below. INERT until the layered reduction emit consumes it
+  // (build steps 2–4); today no layer routes a reduction, so it changes no output.
+  const conceptShapesByName = buildConceptShapeMap(ast);
   // R2 — synthesize the Interface re-exports (FULL split only). They are appended
   // to a WORKING AST so the existing classify/sweep/emit loop materializes the
   // `Interface` layer with no special casing. `buildNameLayerMaps` already
@@ -1223,6 +1354,7 @@ export function emitPartitioned(
       ...baseOptions,
       libraryName,
       crossLibraryIncludes,
+      conceptShapesByName,
       ...(caseFeature ? { caseFeature } : {}),
     });
     if (!result.success) success = false;

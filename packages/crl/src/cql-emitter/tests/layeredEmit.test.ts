@@ -1,5 +1,6 @@
 import { buildCRL } from "../../index";
 import {
+  buildConceptShapeMap,
   emitLayered,
   emitPartitioned,
   FULL_PARTITION,
@@ -38,6 +39,70 @@ function ast(body: string): CRL {
 
 const layer = (r: ReturnType<typeof emitLayered>, name: Layer) =>
   r.entries.find((e) => e.layer === name);
+
+describe("buildConceptShapeMap (#189 Slice-C boundary 1 — cross-layer reduction-operand shapes)", () => {
+  it("maps declared shapes by name, and a lowered `code is`+reduction to its RecordSet twin + Scalar reduction", () => {
+    // After `lowerLocalCodes`, a `code is` + `exists this` concept "X" is a records
+    // twin "X Records" (RecordSet) + the retargeted Scalar reduction "X".
+    const raw = ast(`library "L".
+
+concept "X":
+- type is Condition.
+- value type is boolean.
+- code is \`x\`.
+- definition is exists this.
+
+concept "Trials":
+- type is Procedure.
+- shape is RecordSet.
+- code is \`t\`.
+`);
+    const { ast: lowered, errors } = lowerLocalCodes(raw);
+    expect(errors).toHaveLength(0);
+    const shapes = buildConceptShapeMap(lowered);
+    // The cross-layer records operand a reduction reduces reads as a RecordSet.
+    expect(shapes.get("X Records")).toBe("RecordSet");
+    // The reduction concept itself publishes a Scalar boolean.
+    expect(shapes.get("X")).toBe("Scalar");
+    // A plain RecordSet publisher maps to RecordSet (the named `exists "Trials"` operand).
+    expect(shapes.get("Trials")).toBe("RecordSet");
+  });
+
+  it("excludes synthetic Interface re-exports so a `define \"X\"` façade never shadows the real shape", () => {
+    // A re-export concept carries `__interfaceReexport`; the map must skip it.
+    const a = ast(`library "L".
+
+concept "R":
+- type is Condition.
+- shape is RecordSet.
+- code is \`r\`.
+`);
+    const withReexport: CRL = {
+      ...a,
+      statements: [
+        ...a.statements,
+        // A synthetic Interface re-export of "R" — Scalar-shaped, same name.
+        {
+          type: "Concept",
+          name: "R",
+          shape: "Scalar",
+          valueTypes: ["boolean"],
+          representations: [],
+          conceptType: "Condition",
+          __interfaceReexport: true,
+          definition: {
+            type: "DefinedAsDefinition",
+            body: { type: "DefinedAsBareRef", ref: "R" },
+            location: a.statements[0].location,
+          },
+          location: a.statements[0].location,
+        } as CRL["statements"][number],
+      ],
+    };
+    // The real "R" (RecordSet) wins; the reexport is skipped.
+    expect(buildConceptShapeMap(withReexport).get("R")).toBe("RecordSet");
+  });
+});
 
 describe("layeredEmit — splittability gate", () => {
   it("multi-layer all-classifiable library is splittable", () => {
@@ -512,5 +577,433 @@ decision "Cover":
     for (const e of r.entries) {
       expect(e.result.result).toContain(`library ${e.libraryName}`);
     }
+  });
+});
+
+describe("layeredEmit — #189 Slice-C boundary 1: layered emit for every reduction form", () => {
+  // Coverage per the plan's verification bar (impl-panel round 1, both arms): the layered emit-string was
+  // pinned only for `exists`; pin `count`, Scalar-boolean `most recent` (B2a), and Record `most recent`
+  // (B2b) too — the cases where the cross-layer QUALIFIED operand threads through `Count(...)` and the
+  // `emitSelectNewest`/`emitMostRecentBooleanRead` helpers, which a bare-name regression would silently break.
+  const inferredOf = (src: string): string => {
+    const lowered = lowerLocalCodes(ast(src));
+    expect(lowered.errors).toEqual([]);
+    const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
+    expect(r.success, JSON.stringify(r.errors)).toBe(true);
+    return layer(r, "Inferred")!.result.result;
+  };
+
+  it("layered `count \"X\" at least N` → `Count(<S>-LocalSource.\"X Records\") >= N` (cross-layer-qualified)", () => {
+    const inf = inferredOf(`library "Pol".
+
+concept "Trials":
+- type is Observation.
+- shape is RecordSet.
+- code is \`t\`.
+
+concept "Enough":
+- value type is boolean.
+- definition is count "Trials" at least 2.
+
+activity "R":
+- request CPGServiceRequest.
+
+decision "D":
+- when "Enough" then recommend activity "R".
+`);
+    expect(inf).toMatch(/define "Enough":\s*\n\s*Count\(PolLocalSource\."Trials"\) >= 2/);
+  });
+
+  it("layered Scalar-boolean `most recent this` (B2a) → `Coalesce(FHIRHelpers.ToBoolean((Last(...)))...)` over the qualified twin", () => {
+    const inf = inferredOf(`library "Pol".
+
+concept "Fever":
+- type is Observation.
+- value type is boolean.
+- shape is Scalar.
+- code is \`f\`.
+- definition is most recent this.
+
+activity "R":
+- request CPGServiceRequest.
+
+decision "D":
+- when "Fever" then recommend activity "R".
+`);
+    // The select operand is the cross-layer-qualified records twin; the value read + Coalesce wrap the select.
+    expect(inf).toContain(`(PolLocalSource."Fever Records") O`);
+    expect(inf).toMatch(/where O\.value is FHIR\.boolean/);
+    expect(inf).toMatch(/sort by \(effective as FHIR\.dateTime\)\.value, id/);
+    expect(inf).toMatch(/Coalesce\(\s*\n\s*FHIRHelpers\.ToBoolean\(/);
+  });
+
+  it("layered Record `most recent this` (B2b) — decisionless full split, both recency casts, over the qualified twin", () => {
+    // A Record `most recent` cannot be a decision guard (that hard-errors — see the façade test below), so
+    // it reaches the Inferred layer via a decisionless FULL split. dateTime cast (Procedure.performed):
+    const proc = inferredOf(`library "Pol".
+
+concept "Last Proc":
+- type is Procedure.
+- shape is Record.
+- code is \`p\`.
+- definition is most recent this.
+`);
+    expect(proc).toMatch(
+      /define "Last Proc":\s*\n\s*Last\(\s*\n\s*\(PolLocalSource\."Last Proc Records"\) O\s*\n\s*sort by \(performed as FHIR\.dateTime\)\.value, id/,
+    );
+    // none cast (Condition.recordedDate — no `as FHIR.dateTime`):
+    const cond = inferredOf(`library "Pol".
+
+concept "Last Cond":
+- type is Condition.
+- shape is Record.
+- code is \`c\`.
+- definition is most recent this.
+`);
+    expect(cond).toMatch(
+      /define "Last Cond":\s*\n\s*Last\(\s*\n\s*\(PolLocalSource\."Last Cond Records"\) O\s*\n\s*sort by recordedDate\.value, id/,
+    );
+  });
+});
+
+describe("layeredEmit — #189 Slice-C boundary 1: non-boolean reduction on the Interface surface (façade hard-error)", () => {
+  it("a decision guarding a Record `most recent this` reduction HARD-ERRORS (no `.satisfied()` on a record)", () => {
+    // impl-panel round 1, both arms — critical B. A Record reduction has no valid boolean Interface
+    // collapse; the old else-branch emitted `Inferred."X".satisfied()` on a record select (ill-typed CQL
+    // under success:true). Synthesis must refuse loud.
+    const a = ast(`library "Pol".
+
+concept "Last Cov":
+- type is Condition.
+- shape is Record.
+- code is \`cov\`.
+- definition is most recent this.
+
+activity "R":
+- request CPGServiceRequest.
+
+decision "D":
+- when "Last Cov" then recommend activity "R".
+`);
+    const lowered = lowerLocalCodes(a);
+    expect(lowered.errors).toEqual([]);
+    const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
+    expect(r.success).toBe(false);
+    expect(r.errors?.some((e) => e.kind === "emit-reduction-nonboolean-interface")).toBe(true);
+  });
+});
+
+describe("layeredEmit — #189 Slice-C boundary 1: composition loud-guard", () => {
+  it("a `defined as` truth-set composition over a REDUCTION operand fails LOUD (emit-reduction-in-composition), not ill-typed CQL", () => {
+    // The step-7 guard: post-flip a reduction ("R" = `code is` + `exists this`) classifies Inferred, so a
+    // `defined as ( "R" sem-or "S" )` becomes layer-emittable. But the truth-set lane renders siblings as
+    // `.asTruths()` lists and `union`s them, while "R" is a bare CQL Boolean → `"R" union
+    // <LocalSource>."S".asTruths()` fails to type-check at translator load. Composing `defined as` over
+    // TOTAL booleans is a boundary-2 change; until then the emitter refuses LOUD with a CRL-level kind.
+    const a = ast(`library "Pol".
+
+concept "R":
+- type is Condition.
+- value type is boolean.
+- shape is Scalar.
+- code is \`r\`.
+- definition is exists this.
+
+concept "S":
+- type is Observation.
+- value type is boolean.
+- code is \`s\`.
+
+concept "Combo":
+- type is Observation.
+- value type is boolean.
+- defined as ( "R" sem-or "S" ).
+
+activity "Approve":
+- request CPGServiceRequest.
+
+decision "Cover":
+- when "Combo" then recommend activity "Approve".
+`);
+    const lowered = lowerLocalCodes(a);
+    expect(lowered.errors).toEqual([]);
+    const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
+    expect(r.success).toBe(false);
+    // The Inferred layer (which emits "Combo") carries the loud, filterable diagnostic.
+    const inferred = r.entries.find((e) => e.layer === "Inferred");
+    expect(inferred?.result.errors?.some((e) => e.kind === "emit-reduction-in-composition")).toBe(true);
+  });
+
+  it("#189 2b.2 — a BARE-REF alias `defined as \"R\"` to a reduction FLIPS: the reduction's total boolean re-exports DIRECTLY", () => {
+    // Pre-2b.2 this failed loud (`assertNotReductionTruthSetOperand`). The flip: D's Inferred define emits the
+    // reduction bare (`"R"`, NOT `.asTruths()`), and D's Interface façade re-exports BARE (total-boolean mode),
+    // NOT `.satisfied()` on a Boolean. The classifier consults the shared `emitsTotalScalarBoolean` predicate at
+    // the emit site, the façade, and the ledger in lock-step (disc 444).
+    const a = ast(`library "Pol".
+
+concept "R":
+- type is Condition.
+- value type is boolean.
+- shape is Scalar.
+- code is \`r\`.
+- definition is exists this.
+
+concept "D":
+- type is Observation.
+- value type is boolean.
+- defined as "R".
+
+activity "Approve":
+- request CPGServiceRequest.
+
+decision "Cover":
+- when "D" then recommend activity "Approve".
+`);
+    const lowered = lowerLocalCodes(a);
+    expect(lowered.errors).toEqual([]);
+    const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
+    expect(r.success).toBe(true);
+    const inferred = layer(r, "Inferred");
+    // D re-exports R's total boolean directly — bare `"R"`, no truth-set lift.
+    expect(inferred?.result.result).toMatch(/define "D":\s*\n\s*"R"/);
+    expect(inferred?.result.result).not.toContain(`"D".asTruths()`);
+    expect(inferred?.result.result).not.toContain(`"R".asTruths()`);
+    // D's Interface façade re-exports BARE (total-boolean), not `.satisfied()`.
+    const iface = layer(r, "Interface");
+    expect(iface?.result.result).toMatch(/define "D":\s*\n\s*PolInferred\."D"/);
+    expect(iface?.result.result).not.toMatch(/define "D":[\s\S]*?\.satisfied\(\)/);
+  });
+
+  it("#189 2b.2 — a COMPOSITION over the flipped alias STAYS loud (composition-over-totals is 2b.3)", () => {
+    // The widened composition guard: post-flip, D is a total boolean. Weaving it into a truth-set composition
+    // (`E: defined as ("D" sem-or "S")`) is `Boolean union List` — ill-typed. The reduction-only guard misses D
+    // (a `DefinedAsDefinition`), so the total-boolean predicate check rejects it. 2b.3 deletes this guard.
+    const a = ast(`library "Pol".
+
+concept "R":
+- type is Condition.
+- value type is boolean.
+- shape is Scalar.
+- code is \`r\`.
+- definition is exists this.
+
+concept "D":
+- type is Observation.
+- value type is boolean.
+- defined as "R".
+
+concept "S":
+- type is Observation.
+- value type is boolean.
+- code is \`s\`.
+
+concept "E":
+- type is Observation.
+- value type is boolean.
+- defined as ( "D" sem-or "S" ).
+
+activity "Approve":
+- request CPGServiceRequest.
+
+decision "Cover":
+- when "E" then recommend activity "Approve".
+`);
+    const lowered = lowerLocalCodes(a);
+    expect(lowered.errors).toEqual([]);
+    const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
+    expect(r.success).toBe(false);
+    const inferred = r.entries.find((e) => e.layer === "Inferred");
+    expect(inferred?.result.errors?.some((e) => e.kind === "emit-reduction-in-composition")).toBe(true);
+  });
+
+  it("#189 2b.2 — a boolean COMPARATOR used as a decision guard re-exports its façade BARE (total-boolean), not `.satisfied()` (2b.1 hand-off)", () => {
+    // Post-2b.1 a boolean comparator emits `Coalesce(<cmp>, false)` (total). The shared predicate classifies it
+    // total, so its Interface façade re-exports BARE — the pre-2b.2 `srcIsReduction`-only classifier would have
+    // marked it `truth-set` → `.satisfied()` on a plain Boolean (ill-typed). (disc 444 #1; verifies site 3.)
+    const a = ast(`library "Pol".
+
+concept "Sys":
+- type is Observation.
+- value type is Quantity.
+- code is \`sys\`.
+
+concept "Sys Below 120":
+- value type is boolean.
+- definition is "Sys" below 120 'mm[Hg]'.
+
+activity "Approve":
+- request CPGServiceRequest.
+
+decision "Cover":
+- when "Sys Below 120" then recommend activity "Approve".
+`);
+    const lowered = lowerLocalCodes(a);
+    expect(lowered.errors).toEqual([]);
+    const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
+    expect(r.success, JSON.stringify(r.entries.flatMap((e) => e.result.errors ?? []))).toBe(true);
+    const iface = layer(r, "Interface");
+    expect(iface?.result.result).toMatch(/define "Sys Below 120":\s*\n\s*PolInferred\."Sys Below 120"/);
+    expect(iface?.result.result).not.toMatch(/define "Sys Below 120":[\s\S]*?\.satisfied\(\)/);
+  });
+
+  it("#189 2b.2 — a both-rep `code is` + `defined as` to a TOTAL comparator fails LOUD, not `List union Boolean` (code review, Claude #3)", () => {
+    // The both-rep union twin keeps the bare-ref body and is excluded from the flip (`foldIn !== undefined`); the
+    // retained reduction guard misses a comparator (a `DefinitionIsDefinition`). Without the fold-in weave guard,
+    // the union would emit `LocalSource."Merged".asTruths() union ("C")` — a truth-set List `union` a total
+    // Boolean, ill-typed under success:true. The weave guard rejects it.
+    const a = ast(`library "Pol".
+
+concept "Sys":
+- type is Observation.
+- value type is Quantity.
+- code is \`sys\`.
+
+concept "C":
+- value type is boolean.
+- definition is "Sys" below 120 'mm[Hg]'.
+
+concept "Merged":
+- type is Observation.
+- value type is boolean.
+- code is \`m\`.
+- defined as "C".
+
+activity "Approve":
+- request CPGServiceRequest.
+
+decision "Cover":
+- when "Merged" then recommend activity "Approve".
+`);
+    const lowered = lowerLocalCodes(a);
+    expect(lowered.errors).toEqual([]);
+    const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
+    expect(r.success).toBe(false);
+    const inferred = r.entries.find((e) => e.layer === "Inferred");
+    expect(inferred?.result.errors?.some((e) => e.kind === "emit-reduction-in-composition")).toBe(true);
+  });
+
+  it("#189 2b.2 — a CHAINED bare-ref alias (A → D → reduction) resolves total and flips (recursion)", () => {
+    const a = ast(`library "Pol".
+
+concept "R":
+- type is Condition.
+- value type is boolean.
+- shape is Scalar.
+- code is \`r\`.
+- definition is exists this.
+
+concept "D":
+- type is Observation.
+- value type is boolean.
+- defined as "R".
+
+concept "A":
+- type is Observation.
+- value type is boolean.
+- defined as "D".
+
+activity "Approve":
+- request CPGServiceRequest.
+
+decision "Cover":
+- when "A" then recommend activity "Approve".
+`);
+    const lowered = lowerLocalCodes(a);
+    expect(lowered.errors).toEqual([]);
+    const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
+    expect(r.success).toBe(true);
+    const inferred = layer(r, "Inferred");
+    expect(inferred?.result.result).toMatch(/define "A":\s*\n\s*"D"/);
+    expect(inferred?.result.result).not.toContain(`"D".asTruths()`);
+  });
+});
+
+// #189 Slice C 2b.3b.1 (crl-emit code review, gpt56 #3) — the Interface twin-selection WINNER RULE must pick the
+// `public-determination` (recency) twin as the façade source DETERMINISTICALLY, not by lowering's append order.
+// The recency twin reads TOTAL → the re-export is bare; the `source-impl` half reads non-total → `.satisfied()`.
+// This fixture puts the source-impl twin LAST (adversarial to append-order last-write-wins), so it passes ONLY if
+// the winner rule (prefer public) is in force.
+describe("#189 Slice C 2b.3b.1 — Interface twin-selection winner rule", () => {
+  const src = `library "Age Order".
+
+concept "Age 21 Or Older":
+- value type is boolean.
+- code is \`age-21-or-older\`.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 21 years.
+
+concept "Under Age 21":
+- type is Observation.
+- value type is boolean.
+- defined as ( sem-not "Age 21 Or Older" ).
+
+decision "Elig":
+first:
+- when "Under Age 21" then recommend activity "a.Approve".
+
+activity "a.Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+`;
+
+  it("picks the recency (public-determination) twin over a LAST-appended source-impl twin → bare Interface re-export (order-independent)", () => {
+    const lowered = lowerLocalCodes(ast(src));
+    const stmts = [...lowered.ast.statements];
+    const isAge = (s: unknown): boolean =>
+      (s as { type?: string; name?: string }).type === "Concept" &&
+      (s as { name?: string }).name === "Age 21 Or Older";
+    const impl = stmts.find(
+      (s) => isAge(s) && (s as { __loweringRole?: string }).__loweringRole === "source-impl",
+    )!;
+    const pub = stmts.find(
+      (s) => isAge(s) && (s as { __bothRepMerge?: string }).__bothRepMerge === "recency",
+    )!;
+    expect(impl).toBeDefined();
+    expect(pub).toBeDefined();
+    const ageIdx = stmts.map((s, i) => [isAge(s), i] as const).filter(([a]) => a).map(([, i]) => i);
+    const lo = Math.min(...ageIdx);
+    const hi = Math.max(...ageIdx);
+    // Adversarial: public twin FIRST, source-impl LAST — append-order last-write would (wrongly) pick source-impl.
+    stmts[lo] = pub;
+    stmts[hi] = impl;
+    const r = emitPartitioned({ ...lowered.ast, statements: stmts }, "AgeOrder", "AgeOrder", FULL_PARTITION);
+    const iface = layer(r, "Interface")!.result.result;
+    expect(iface).toContain(`define "Under Age 21":`);
+    expect(iface).not.toContain(".satisfied()"); // bare re-export, NOT the truth-set façade
+  });
+});
+
+// #189 Slice C 2b.3b.1 (crl-emit code review, gpt56 #4) — post-flip a recency twin emits a bare TOTAL boolean, so a
+// REFINEMENT-lane `sem-not` over it must LOUD-REFUSE (`classifyConceptFlavor` recency→"unknown"), NOT render the
+// ill-typed `{ true } except (<Boolean>)`. This pins the defensive classifier change against a silent regression to
+// "truth-set".
+describe("#189 Slice C 2b.3b.1 — refinement-lane sem-not over a recency twin loud-refuses", () => {
+  it("a REFINEMENT parent `defined as ( sem-not <recency> )` refuses (emit-unlowerable-negation + UnsupportedNegation), never `{ true } except (<Boolean>)`", () => {
+    const src = `library "Ref Refuse".
+
+concept "Age 21 Or Older":
+- value type is boolean.
+- code is \`age-21-or-older\`.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 21 years.
+
+concept "Weird":
+- type is Observation.
+- value type is CodeableConcept.
+- defined as ( sem-not "Age 21 Or Older" ).
+`;
+    const lowered = lowerLocalCodes(ast(src));
+    const r = emitPartitioned(lowered.ast, "RefR", "RefR", FULL_PARTITION);
+    const blob = JSON.stringify(r);
+    expect(r.success).toBe(false);
+    expect(blob).toContain("emit-unlowerable-negation");
+    expect(blob).toContain("UnsupportedNegation");
+    expect(blob).not.toContain("{ true } except"); // the pre-flip ill-typed form must NOT appear
   });
 });

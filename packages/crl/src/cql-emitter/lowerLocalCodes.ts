@@ -101,12 +101,19 @@ import type {
   Concept,
   CodedFromDefinition,
   DefinitionIsDefinition,
+  Reduction,
+  ReductionConceptRef,
   Statement,
   Terminology,
   TerminologyBodyLine,
   Location,
 } from "../ast/types";
 import { EMIT_REDUCTION_NOT_ACTIVE_KIND } from "../ast/types";
+import {
+  deriveEffectiveRepresentations,
+  type EffectiveRepresentationDescriptor,
+  type OwningLibraryMetadata,
+} from "../emit/effectiveRepresentation";
 import { localCodeSystemSlug, localCodeSystemUrl } from "../fhir-emitter/slug";
 import { isAgeTodayPrefix } from "../template-match/agePredicate";
 import {
@@ -342,6 +349,12 @@ export function lowerLocalCodes(
   // the original `defined as` and carries `__bothRepFoldInLocalSource` so the emit
   // unions in the direct LocalSource retrieve. Keyed in declaration order.
   const bothRepInferredTwins: Concept[] = [];
+  // #189 Slice A2 — the RECORDS TWINS of `code is` + `exists this` concepts. A concept "X" with a
+  // local `code is` AND `definition is exists this` lowers to TWO statements: this RecordSet
+  // retrieve twin "X Records" (the concept's own records, over its local code, NATURAL resource) +
+  // the retargeted reduction concept "X" (`exists "X Records"`, pushed to `loweredConcepts`). The
+  // twins are APPENDED to the statement list (they share no name with an existing statement).
+  const recordsTwins: Concept[] = [];
   const localCodes: Array<{ concept: string; code: string; conceptType: string }> = [];
   const syntheticTerminologies: Terminology[] = [];
   // The local-domain URN slug source: R1 — the POLICY ID (`opts.localDomainId`,
@@ -454,21 +467,453 @@ export function lowerLocalCodes(
     // `ageShape.kind === "standalone"` cannot occur for a code-bearing concept (recency requires the
     // local `code is`); `resolveAgeConcept` never returns it here.
 
-    // (2-pre) `code is` + a `definition is` REDUCTION (#189 IMPL 3). A reduction is validate-only in
-    //   this slice — accepted for migration prep but NOT emittable. Caught HERE, BEFORE the generic
-    //   mixed check below, so the KE gets the dedicated `emit-reduction-not-active` sentinel (naming
-    //   the reduction) rather than the generic `emit-mixed-code-and-definition` interpolating the raw
-    //   `ReductionDefinition` type name. At the flip this whole check is deleted (reductions emit).
+    // (2-pre) `code is` + a `definition is` REDUCTION (#189). Caught HERE, BEFORE the generic mixed
+    //   check below. Slice A2 ACTIVATES the ONE emittable form — `exists this` with NO `source
+    //   representation` — by lowering it to a RECORDS TWIN + a retargeted named `exists`. Every OTHER
+    //   reduction form (count / most recent, and `exists` over an already-NAMED ref) and the 3-way
+    //   `code is` + reduction + `source representation` stay validate-only: the KE gets the dedicated
+    //   `emit-reduction-not-active` sentinel (naming the reduction) rather than the generic
+    //   `emit-mixed-code-and-definition`. Each remaining form activates in its owning slice.
     if (c.definition?.type === "ReductionDefinition") {
-      errors.push(
-        mkError(
-          EMIT_REDUCTION_NOT_ACTIVE_KIND,
-          `Concept "${c.name}" carries a local \`code is\` and a \`definition is\` reduction ` +
-            `(exists / most recent / count). A reduction is accepted by the grammar for validate-only ` +
-            `migration but CANNOT yet be emitted — emit activates at the flip (#189).`,
-          c.definition.location,
-        ),
+      const red = c.definition.reduction;
+      // Slice A2 activated `exists this`; B1 added `count this at least N`; B2a a Scalar boolean `most
+      // recent this` value read; B2b a `shape is Record` `most recent this` record select. All reduce THIS
+      // concept's OWN records (a records twin), so they share ONE lowering — only the retargeted reduction
+      // node (and its emit rendering) differ. Still validate-only: a NON-boolean Scalar `most recent this`
+      // value read (Slice C), any `<reduction>` over an already-NAMED ref coupled with a local `code is`, a
+      // representation-bearing reduction, and the `code is` + reduction + `source representation` 3-way —
+      // the dedicated `emit-reduction-not-active` sentinel.
+      const isThisReduction = red.target.type === "ThisRecords" && c.representations.length === 0;
+      const emittable =
+        isThisReduction && (red.kind === "exists" || red.kind === "count" || red.kind === "mostRecent");
+      if (!emittable) {
+        errors.push(
+          mkError(
+            EMIT_REDUCTION_NOT_ACTIVE_KIND,
+            `Concept "${c.name}" carries a local \`code is\` and a \`definition is\` reduction that ` +
+              `is not yet emittable. \`exists this\`, \`count this at least N\`, a Scalar boolean ` +
+              `\`most recent this\` (value read on a value-bearing resource), and a \`shape is Record\` ` +
+              `\`most recent this\` (select the newest record) with no \`source representation\` lower ` +
+              `today (#189 Slice A/B1/B2a/B2b); a NON-boolean Scalar \`most recent this\` value read, ` +
+              `any \`<reduction>\` over a named ref WHEN coupled with this local \`code is\` (the ` +
+              `no-\`code is\` named \`exists "Y"\` IS active — Slice A), and a \`code is\` + reduction + ` +
+              `\`source representation\` 3-way are accepted by the grammar for validate-only migration ` +
+              `but CANNOT yet be emitted — each activates in its slice.`,
+            c.definition.location,
+          ),
+        );
+        continue;
+      }
+
+      // `count … at least N` with N < 1 is trivially true (every set has at least N<1 members) — an
+      // author error at emit (matrix §2), mirroring the validator's `count-threshold-trivial` warning.
+      if (red.kind === "count" && red.atLeast < 1) {
+        errors.push(
+          mkError(
+            "emit-count-threshold-trivial",
+            `Concept "${c.name}": \`count this at least ${red.atLeast}\` is trivially true (every set ` +
+              `has at least ${red.atLeast} members). Use \`at least 1\` for a presence threshold (or ` +
+              `\`definition is exists this\`), or a threshold ≥ 1.`,
+            c.definition.location,
+          ),
+        );
+        continue;
+      }
+
+      // The reduction phrase for kind-aware diagnostics below.
+      const reductionPhrase =
+        red.kind === "count" ? "count this" : red.kind === "mostRecent" ? "most recent this" : "exists this";
+
+      // COHERENCE (charter: never emit a value shape the concept's declaration contradicts).
+      if (red.kind !== "mostRecent") {
+        // `exists`/`count` publish a SCALAR BOOLEAN (presence / threshold is true-or-false), so the
+        // concept must declare exactly `shape is Scalar` + a single `value type is boolean`. This MATCHES
+        // the totality classifier (`booleanTotality.ts` rejects a Scalar with ≠1 value type) and §2's
+        // `Scalar × boolean` cell; absent/multiple/non-boolean is incoherent (an absent one is itself an
+        // A.10 validator error). emitCQL runs no validator, so enforce it here rather than manufacture —
+        // or arm a Slice-C proof failure by emitting a cell the classifier rejects (emit ⊄ classifier).
+        if (c.shape !== "Scalar" || c.valueTypes.length !== 1 || c.valueTypes[0] !== "boolean") {
+          const vtClause =
+            c.valueTypes.length === 1
+              ? ` and \`value type is ${c.valueTypes[0]}\``
+              : c.valueTypes.length > 1
+                ? ` and ${c.valueTypes.length} value types (needs exactly one \`boolean\`)`
+                : " and no `value type`";
+          errors.push(
+            mkError(
+              "emit-reduction-shape-incoherent",
+              `Concept "${c.name}": \`definition is ${reductionPhrase}\` ` +
+                `publishes a Scalar boolean (presence/threshold is true-or-false), but the concept ` +
+                `declares \`shape is ${c.shape}\`${vtClause}. Declare \`- shape is Scalar.\` with ` +
+                `\`value type is boolean\`.`,
+              c.definition.location,
+            ),
+          );
+          continue;
+        }
+      } else {
+        // `most recent this` — TWO active cells, discriminated by the concept's declared shape:
+        //  · `shape is Scalar` (#189 Slice B2a) READS the newest record's value element. Scoped to a single
+        //    `value type is boolean` (the FHIR case-feature lane is boolean-locked — `closureOrchestrator.ts`
+        //    — so a non-boolean value read would round-trip-break on the DTR lane; disc 433). A value-bearing
+        //    NON-boolean read defers to Slice C (below, after the deriver).
+        //  · `shape is Record` (#189 Slice B2b) SELECTS the newest record (any registry resource, NO value
+        //    read). It reads no value, so it must NOT declare a `value type` (the record resource is `type
+        //    is`); it reuses the B2a select-newest spine with no value filter/read.
+        // `shape is RecordSet` is incoherent: a set publishes its records, not a reduced/selected value.
+        if (c.shape === "RecordSet") {
+          errors.push(
+            mkError(
+              "emit-reduction-shape-incoherent",
+              `Concept "${c.name}": \`definition is most recent this\` on \`shape is RecordSet\` is ` +
+                `incoherent — a RecordSet publishes its records, not a reduced value. Declare ` +
+                `\`- shape is Scalar.\` (read a value) or \`- shape is Record.\` (select the newest record).`,
+              c.definition.location,
+            ),
+          );
+          continue;
+        }
+        if (c.shape !== "Record") {
+          // Scalar (B2a value read) → exactly one `value type` (the datum it reads). A `shape is Record`
+          // select (B2b) gets NO value-type check: per the design of record, a Record's `value type` is
+          // OPTIONAL and, when present, names the record's DATUM — which a bare record select never reads, so
+          // it is metadata the emit ignores. The validator is clean on `shape is Record` + `value type` +
+          // `most recent this` (`representationShapeValidator` only errors >1 value types;
+          // `useSiteType.test.ts` proves it valid), so rejecting it here would hard-fail validator-clean
+          // content at emit — the exact validate/emit split the flip must avoid (crl-emit B2b panel #1, both
+          // arms; design `docs/emit-consistency-189-design.md` §1 + reduction table).
+          if (c.valueTypes.length !== 1) {
+            errors.push(
+              mkError(
+                "emit-reduction-shape-incoherent",
+                `Concept "${c.name}": \`definition is most recent this\` needs exactly one \`value type\` ` +
+                  `(the datum it reads); the concept declares ${c.valueTypes.length}.`,
+                c.definition.location,
+              ),
+            );
+            continue;
+          }
+        }
+        // The boolean-vs-non-boolean split (Scalar only) is deferred to AFTER the deriver runs (below): the
+        // deriver's valueless check must fire FIRST so a valueless resource always gets the "author `exists
+        // this`" prompt, NOT a Slice-C defer it will never satisfy (crl-emit B2a impl Claude #1 — e.g.
+        // Condition + `value type is Quantity`, which is PERMANENTLY invalid, not merely deferred).
+      }
+
+      // ---- Slice A2/B1 lowering: `code is` + `exists this`/`count this` → records twin + retargeted
+      //      named reduction. ----
+      // DRY NOTE (crl-emit R1 probe 3): checks (4)–(7) below MIRROR the plain `code is` path's
+      // (4)–(7) and share the same dedup state (`codeValueToConcept`, `seenSyntheticNames`,
+      // `existingTerminologyNames`). Keep the two copies in lock-step — a fix to one must land in the
+      // other (a shared-helper extraction is the intended cleanup once a third caller appears).
+      // (4) Missing `type is`: the records-twin retrieve needs an explicit FHIR resource (NOT
+      //     defaulted to Observation — the records are the concept's OWN natural resource, §4.3).
+      if (c.conceptType === undefined) {
+        errors.push(
+          mkError(
+            "emit-local-code-missing-type",
+            `Concept "${c.name}" has a local \`code is\` + \`${reductionPhrase}\` but no \`type is\`. Its ` +
+              `records twin needs an explicit FHIR resource type for the retrieve (it is NOT ` +
+              `defaulted to Observation).`,
+            loc,
+          ),
+        );
+        continue;
+      }
+      // (5) Duplicate local code VALUE across valid concepts (same dedup domain as the plain path).
+      const priorForCode = codeValueToConcept.get(codeValue);
+      if (priorForCode !== undefined) {
+        errors.push(
+          mkError(
+            "emit-duplicate-local-code",
+            `Local code \`${codeValue}\` is declared by both "${priorForCode}" and "${c.name}". ` +
+              `Each local source code must be unique within the library.`,
+            loc,
+          ),
+        );
+        continue;
+      }
+      // (6) Duplicate synthetic-terminology NAME (the twin's terminology is named after "X", exactly
+      //     as the plain path). Two same-named `code is` concepts would collide in the emitter maps.
+      if (seenSyntheticNames.has(c.name)) {
+        errors.push(
+          mkError(
+            "emit-duplicate-local-concept",
+            `Two local-coded concepts named "${c.name}" would each synthesize a terminology of that ` +
+              `name, colliding in the emitted CQL. Concept names must be unique within the library.`,
+            loc,
+          ),
+        );
+        continue;
+      }
+      // (7) Synthetic-terminology name collides with a hand-authored terminology.
+      if (existingTerminologyNames.has(c.name)) {
+        errors.push(
+          mkError(
+            "emit-local-code-terminology-collision",
+            `Lowering local-coded concept "${c.name}" would synthesize a terminology of the same ` +
+              `name, but a terminology "${c.name}" already exists in this library. Rename one so the ` +
+              `synthesized local code does not collide.`,
+            loc,
+          ),
+        );
+        continue;
+      }
+      // (A2) The synthesized records-twin name "<X> Records" must not collide with any existing
+      //      top-level identifier (a concept/parameter/criterion/terminology/codesystem decl) OR a
+      //      previously synthesized twin — it emits its own `define "<X> Records"`, so a collision
+      //      would produce a duplicate top-level CQL identifier. Diagnose rather than clobber.
+      const recordsTwinName = `${c.name} Records`;
+      if (topLevelIdentifierNames.has(recordsTwinName)) {
+        errors.push(
+          mkError(
+            "emit-records-twin-name-collision",
+            `Lowering \`code is\` + \`${reductionPhrase}\` concept "${c.name}" synthesizes a records-twin ` +
+              `concept "${recordsTwinName}", but a top-level identifier of that name already exists ` +
+              `in library "${ast.library.name}". Rename "${c.name}" (or the conflicting declaration) ` +
+              `so the synthesized "${recordsTwinName}" is unique.`,
+            loc,
+          ),
+        );
+        continue;
+      }
+
+      // #189 Slice B2a — for a `most recent this` VALUE READ, resolve the effective-representation
+      // descriptor (resource value-bearing check, recency sort, value element) via the ONE source of
+      // truth `deriveEffectiveRepresentations`, on the ORIGINAL concept. Run AFTER the (4)–(7)+(A2) twin
+      // checks (Claude #6: so a missing `type is` already hard-errored on the twin rule, NOT the
+      // deriver's `?? "Observation"` default). A derivation error (valueless resource / unmodeled /
+      // not-admitted / unsupported) → the mapped hard error (one taxonomy) + `continue` (before any
+      // dedup-state mutation, so a rejected concept leaves no partial state).
+      let mostRecentDescriptor: EffectiveRepresentationDescriptor | undefined;
+      if (red.kind === "mostRecent") {
+        const owningMeta: OwningLibraryMetadata = {
+          libraryName: ast.library.name,
+          canonicalBase,
+          localDomainId: opts.localDomainId ?? ast.library.name,
+        };
+        const outcome = deriveEffectiveRepresentations(c, owningMeta);
+        if (outcome.status === "error") {
+          const e = outcome.error;
+          // Reuse the T3a error taxonomy (one taxonomy — disc 433); the emit branch OWNS the "author
+          // `exists this`" migration prompt on the valueless cell (the deriver's message does not carry
+          // it — Claude #5). `value-read-valueless` = a scalar value read on a resource with no value.
+          const message =
+            e.kind === "value-read-valueless"
+              ? `Concept "${c.name}": \`most recent this\` reads a value, but ${e.detail} Existence is ` +
+                `forced on a valueless resource — author \`definition is exists this\` instead.`
+              : `Concept "${c.name}": \`most recent this\` — ${e.detail}`;
+          errors.push(mkError(e.kind, message, loc));
+          continue;
+        }
+        if (
+          outcome.status !== "derived" ||
+          outcome.descriptors.length !== 1 ||
+          (outcome.deferredArms?.length ?? 0) > 0
+        ) {
+          // A single-rep `code is` `most recent this` MUST resolve to exactly one local-exact descriptor
+          // and no deferred (source) arms (gpt56 #1); anything else is a multi-rep (deferred #257) or a
+          // compiler/shape defect — fail loud rather than emit an under-resolved read.
+          const detail =
+            outcome.status === "derived"
+              ? `${outcome.descriptors.length} descriptors${(outcome.deferredArms?.length ?? 0) > 0 ? " + deferred source arm(s)" : ""}`
+              : outcome.status;
+          errors.push(
+            mkError(
+              "emit-most-recent-derivation",
+              `Concept "${c.name}": \`most recent this\` did not resolve to a single local representation ` +
+                `(${detail}). A multi-representation \`most recent this\` is deferred to #257.`,
+              loc,
+            ),
+          );
+          continue;
+        }
+        const desc = outcome.descriptors[0];
+        // The arm is always local-exact for a `code is` `most recent this` (a source-only concept
+        // deferred/errored above; the single-descriptor invariant already rejected deferred source arms).
+        // Guard it ONCE, shape-agnostically, then branch the DATUM contract on the concept's declared shape.
+        if (desc.arm !== "local-exact") {
+          errors.push(
+            mkError(
+              "emit-most-recent-derivation",
+              `Concept "${c.name}": \`most recent this\` resolved to a non-local-exact descriptor (arm ` +
+                `"${desc.arm}"), which a single-representation local \`code is\` cannot produce.`,
+              loc,
+            ),
+          );
+          continue;
+        }
+        if (c.shape === "Record") {
+          // B2b — a RECORD SELECT reads no value: the descriptor MUST carry NO datum (valueElement /
+          // datumValueType undefined) and a recency sort, over ANY registry resource (the deriver already
+          // fail-closed `unsupported-resource` for a non-registry / Period-recency resource, e.g. Encounter).
+          // No Observation pin, no boolean check — a Record select works on every registry row. A
+          // datum-bearing or recency-less descriptor here is a deriver/shape defect.
+          if (
+            desc.valueElement !== undefined ||
+            desc.datumValueType !== undefined ||
+            desc.recency === undefined
+          ) {
+            errors.push(
+              mkError(
+                "emit-most-recent-derivation",
+                `Concept "${c.name}": a \`shape is Record\` \`most recent this\` resolved to a datum-bearing ` +
+                  `or recency-less descriptor (resource "${desc.resourceType}", value element ` +
+                  `"${desc.valueElement ?? "(none)"}", datum "${desc.datumValueType ?? "(none)"}"). A record ` +
+                  `select reads no value — this is a compiler invariant that the deriver upholds.`,
+                loc,
+              ),
+            );
+            continue;
+          }
+        } else {
+          // B2a (Scalar) — a value-bearing DERIVED descriptor (a valueless resource errored above with the
+          // exists-this prompt). Explicitly Observation-only (the SOLE value-bearing registry row; the
+          // case-feature round-trip contract was justified on that — disc 433); pin `resourceType ===
+          // "Observation"` EXPLICITLY rather than relying on the registry staying single-value-bearing — a
+          // future value-bearing row would otherwise silently widen B2a (gpt56 impl #6a). An unexpected
+          // descriptor SHAPE here is a compiler defect; a valid NON-boolean value read is a DEFERRAL.
+          if (
+            desc.resourceType !== "Observation" ||
+            desc.valueElement === undefined ||
+            desc.datumValueType === undefined
+          ) {
+            errors.push(
+              mkError(
+                "emit-most-recent-derivation",
+                `Concept "${c.name}": \`most recent this\` resolved to a descriptor outside the Slice-B2a ` +
+                  `Observation value-read cell (resource "${desc.resourceType}", value element ` +
+                  `"${desc.valueElement ?? "(none)"}", datum "${desc.datumValueType ?? "(none)"}"). ` +
+                  `A non-Observation value-bearing read widens at Slice C.`,
+                loc,
+              ),
+            );
+            continue;
+          }
+          if (desc.datumValueType !== "boolean") {
+            // A NON-boolean value read on a value-bearing resource (the deriver already errored a valueless
+            // one with the exists-this prompt — Claude #1). Deferred to Slice C: the FHIR case-feature lane
+            // is boolean-locked and the per-type value conversion (Quantity→ToQuantity, …) is not yet built.
+            errors.push(
+              mkError(
+                EMIT_REDUCTION_NOT_ACTIVE_KIND,
+                `Concept "${c.name}": a NON-boolean \`most recent this\` value read (\`value type is ` +
+                  `${desc.datumValueType}\`) is not yet emittable — the FHIR case-feature lane is ` +
+                  `boolean-locked and the per-type value conversion is deferred (Slice C).`,
+                c.definition.location,
+              ),
+            );
+            continue;
+          }
+        }
+        mostRecentDescriptor = desc;
+      }
+
+      codeValueToConcept.set(codeValue, c.name);
+      seenSyntheticNames.add(c.name);
+      topLevelIdentifierNames.add(recordsTwinName); // guard later twins / concepts against this twin
+
+      // Surface the lowered local code under the AUTHORED concept identity "X" (NOT the synthetic twin
+      // "X Records"). `localCodes.concept` drives the FHIR CodeSystem `display`, the SD
+      // `patternCodeableConcept`, and leaf-eligibility — the PUBLIC clinical identity — exactly as the
+      // plain `code is` path uses `c.name`. The code VALUE is what the CQL `code "X Code"` line and the
+      // twin's retrieve both reference, so CQL and the FHIR CodeSystem stay consistent on the code
+      // while the compiler-internal twin name never becomes FHIR/provenance identity (crl-emit R1 #1b).
+      // `conceptType` is the natural resource (checked non-undefined at (4)).
+      localCodes.push({ concept: c.name, code: codeValue, conceptType: c.conceptType });
+
+      // Synthetic terminology named after "X" (NOT the twin): `detectCollisions` sees it collide with
+      // the retargeted reduction concept "X" and suffixes the emitted code to "X Code"; the twin's
+      // `CodedFromDefinition.terminologyName = "X"` then resolves via `terminologyEmitName` →
+      // `[<resource>: "X Code"]`. Reuses the shared local-domain codesystem decl name + urn.
+      const twinTerminology = buildSyntheticTerminology(c.name, codeValue, localCodesystemName, urn, loc);
+      syntheticTerminologies.push(twinTerminology);
+
+      // The RECORDS TWIN "X Records": a `shape is RecordSet` retrieve over the local code, at the
+      // concept's NATURAL resource (§4.3 — NOT forced Observation; that force is only for the
+      // boolean-determination LocalSource retrieve of a plain `code is`). `retrieveResourceType` is
+      // set explicitly (= the natural resource) so the F7 LocalConcepts⟺LocalSource discriminator
+      // stays in sync for the layered path (Slice C). `shape: "RecordSet"` is what `emitConceptBody`'s
+      // Slice-A gate keys on to emit `exists ("X Records")`.
+      const twinCodedFrom: CodedFromDefinition = {
+        type: "CodedFromDefinition",
+        terminologyName: c.name,
+        retrieveResourceType: c.conceptType,
+        location: loc,
+      };
+
+      // R2 CO-INVARIANT ASSERT (F7) — hoisted from the plain-path site (crl-emit R1 probe 4): the twin's
+      // two LocalConcepts⟺LocalSource discriminators (synthetic `TerminologySystem.name` and
+      // `retrieveResourceType`) MUST be set together, or the Slice-C layered split would emit a
+      // cross-family include. True by construction here, but the assert exists to catch a future edit.
+      const twinHasDomainName = twinTerminology.body.some(
+        (line) => line.type === "TerminologySystem" && line.name !== undefined,
       );
+      if (!twinHasDomainName || twinCodedFrom.retrieveResourceType === undefined) {
+        throw new Error(
+          `internal invariant violated: records twin "${recordsTwinName}" has a desynced source-family ` +
+            `discriminator — synthetic TerminologySystem.name ${twinHasDomainName ? "set" : "UNSET"}, ` +
+            `CodedFromDefinition.retrieveResourceType ` +
+            `${twinCodedFrom.retrieveResourceType === undefined ? "UNSET" : "set"}. Both must be set ` +
+            `together (LocalConcepts ⟺ LocalSource) or the layered split would emit a cross-family include.`,
+        );
+      }
+      const recordsTwin: Concept = {
+        ...c,
+        name: recordsTwinName,
+        shape: "RecordSet",
+        // The twin publishes the concept's own RECORDS, not the scalar boolean — carry NO scalar value
+        // type (do NOT inherit the parent's `value type is boolean`; a RecordSet's value type would
+        // describe the record datum, which a bare existence retrieve does not project — crl-emit R1 #4).
+        valueTypes: [],
+        definition: twinCodedFrom,
+        representations: [],
+        // #189 Slice C 2a — a compiler-internal RecordSet retrieve, not a boolean determination; the ledger
+        // enrollment manufactures `not-applicable` for it (never inheriting an authored obligation).
+        __loweringRole: "records-impl",
+      };
+      delete recordsTwin.code;
+      // The twin is a compiler-internal retrieve, not an authored concept — do NOT republish the
+      // author's `meta is` / evidence on it (those stay on the public determination "X").
+      delete recordsTwin.meta;
+      delete recordsTwin.evidence;
+      recordsTwins.push(recordsTwin);
+
+      // The retargeted reduction concept "X": keep it a `ReductionDefinition` but point the reduction at
+      // the NAMED twin instead of `this`, PRESERVING its kind + `count` threshold. `emitConceptBody` emits
+      // `exists ("X Records")` / `Count("X Records") >= N` / the `most recent` select-newest read.
+      // (#189 Slice C: a `ReductionDefinition` now CLASSIFIES into the Inferred layer — `classifyStatementLayer`
+      // — so a decision-bearing reduction library routes `interface` and the reduction re-exports through the
+      // Interface. The earlier "stays unclassifiable → routes none" invariant was retired at the flip.)
+      // `code` cleared. A `most recent this` also carries the resolved `__effectiveDescriptor` so
+      // `emitConceptBody` renders the recency sort + value read from ONE source of truth (Slice B2a).
+      const retargetedTarget: ReductionConceptRef = {
+        type: "ReductionConceptRef",
+        ref: recordsTwinName,
+        location: loc,
+      };
+      const retargetedReductionNode: Reduction =
+        red.kind === "count"
+          ? { kind: "count", atLeast: red.atLeast, target: retargetedTarget }
+          : red.kind === "mostRecent"
+            ? { kind: "mostRecent", target: retargetedTarget }
+            : { kind: "exists", target: retargetedTarget };
+      const retargetedReduction: Concept = {
+        ...c,
+        definition: {
+          type: "ReductionDefinition",
+          reduction: retargetedReductionNode,
+          location: c.definition.location,
+        },
+        ...(mostRecentDescriptor !== undefined ? { __effectiveDescriptor: mostRecentDescriptor } : {}),
+        // #189 Slice C 2a — the emitted PUBLIC determination (the reduction re-export); the ledger
+        // enrollment inherits its AUTHORED obligation (classified on the pre-lowering `c`). NOTE this
+        // concept ALSO carries `__effectiveDescriptor` for a `most recent this` — the role tag (not
+        // marker presence) is what routes obligation source (disc 439 crit #1).
+        __loweringRole: "public-determination",
+      };
+      delete retargetedReduction.code;
+      loweredConcepts.push(retargetedReduction);
       continue;
     }
 
@@ -639,15 +1084,21 @@ export function lowerLocalCodes(
 
     // Replace the concept's `code` with a CodedFromDefinition bare-ref'ing the
     // synthetic code's NAME. Clearing `code` makes the transform idempotent.
-    // Force the LOCAL-SOURCE retrieve to `[Observation: …]`: every `code is`
-    // query is an Observation/boolean determination, regardless of the author's
-    // `type is`. `retrieveResourceType` overrides ONLY the emitted retrieve
-    // resource; the concept keeps its `conceptType` (and the `localCodes` entry
-    // keeps the author's source type) for the Phase-2/3 inferred transform.
+    // Retrieve resource is SHAPE-CONDITIONAL (the flip consults `shape`): a SCALAR
+    // `code is` is a boolean/existence determination → force `[Observation: …]`
+    // regardless of `type is` (that premise holds only for the scalar boolean). A
+    // `shape is RecordSet | Record` concept is a RECORD PUBLISHER — it retrieves
+    // its OWN records at the NATURAL resource (charter §3 / design §2 `(none)/RecordSet`
+    // — resource from `type is`); forcing Observation there emits the wrong retrieve
+    // and diverges from A2's `exists this` twin (which is natural). `conceptType` is
+    // defined for a non-Scalar lowered concept (the (4) missing-type guard above), so
+    // the `?? "Observation"` only backstops the F7 non-undefined invariant. The concept
+    // keeps its `conceptType` (and the `localCodes` entry the author's source type) for
+    // the Phase-2/3 inferred transform.
     const codedFrom: CodedFromDefinition = {
       type: "CodedFromDefinition",
       terminologyName: c.name,
-      retrieveResourceType: "Observation",
+      retrieveResourceType: c.shape === "Scalar" ? "Observation" : (c.conceptType ?? "Observation"),
       location: loc,
     };
 
@@ -677,7 +1128,19 @@ export function lowerLocalCodes(
     // lowered concept). `definition` is replaced with the synthetic retrieve and
     // `code` cleared (idempotent). For a both-rep concept this is the direct
     // local-source half; its `defined as` lives on the Inferred twin below.
-    const lowered: Concept = { ...c, definition: codedFrom };
+    // #189 Slice C 2a — the LocalSource retrieve's lowering ROLE: for a both-representation split it is the
+    // implementation HALF (`source-impl` → manufactured `not-applicable`; the determination is the Inferred
+    // twin below); for a PURE `code is` concept it IS the sole public determination (`public-determination`
+    // → inherits the authored obligation — a bare-scalar boolean's authored `rejected`, or a RecordSet's
+    // `not-applicable`). Both share the authored name, so the ROLE is what disambiguates them at enrollment
+    // (a name-keyed map alone cannot — disc 439 crit #2).
+    const hasInferredTwin =
+      bothRepDefinedAs !== undefined || (bothRepDefinitionIs !== undefined && bothRepRecency !== null);
+    const lowered: Concept = {
+      ...c,
+      definition: codedFrom,
+      __loweringRole: hasInferredTwin ? "source-impl" : "public-determination",
+    };
     delete lowered.code;
     loweredConcepts.push(lowered);
 
@@ -698,6 +1161,9 @@ export function lowerLocalCodes(
         definition: bothRepDefinedAs,
         __bothRepFoldInLocalSource: c.name,
         __bothRepMerge: "union",
+        // #189 Slice C 2a — the both-rep public determination; inherits the authored obligation (the
+        // `code is` + `defined as` fold is an E1 `rejected` today, surfaced by the emit proof on its List).
+        __loweringRole: "public-determination",
       };
       delete inferredTwin.code;
       bothRepInferredTwins.push(inferredTwin);
@@ -712,6 +1178,8 @@ export function lowerLocalCodes(
         __recencyComputeFn: bothRepRecency.computeFn,
         __recencyOverrideId: ageMerge!.overrideId,
         __synthesizedFromPosrep: true,
+        // #189 Slice C 2a — the age recency public determination (patient-age carve-out).
+        __loweringRole: "public-determination",
       };
       delete inferredTwin.code;
       bothRepInferredTwins.push(inferredTwin);
@@ -730,8 +1198,12 @@ export function lowerLocalCodes(
   // (representation lane) or errored. Return the input AST UNTOUCHED (===) so
   // callers that key off identity to detect "did this library synthesize a
   // local codesystem?" (e.g. `imports/emit.ts`'s `didLower = lowered.ast !==
-  // entry.ast`) don't get a false positive from a same-content clone.
-  if (loweredConcepts.length === 0) {
+  // entry.ast`) don't get a false positive from a same-content clone. A records
+  // twin is always paired with a retargeted concept in `loweredConcepts`, so
+  // `loweredConcepts.length === 0` ⟹ `recordsTwins.length === 0`; the second
+  // clause documents that invariant so a future edit can't add twins without a
+  // matching lowered concept and slip past this identity guard.
+  if (loweredConcepts.length === 0 && recordsTwins.length === 0) {
     return { ast, errors, localCodes };
   }
 
@@ -750,7 +1222,7 @@ export function lowerLocalCodes(
     // `rewritten`, so they cannot be the in-place replacement and must be added
     // as additional statements. The emitter sections by kind/layer, so absolute
     // position is immaterial beyond stable intra-layer ordering.
-    statements: [...syntheticTerminologies, ...rewritten, ...bothRepInferredTwins],
+    statements: [...syntheticTerminologies, ...rewritten, ...recordsTwins, ...bothRepInferredTwins],
   };
 
   return { ast: outAst, errors, localCodes };
@@ -801,6 +1273,9 @@ export function lowerStandaloneAgePosreps(ast: CRL): { ast: CRL; errors: CRLErro
         location: rep.valueProjection!.location,
       },
       __synthesizedFromPosrep: true,
+      // #189 Slice C 2a — the standalone patient-age determination (age carve-out); inherits the authored
+      // obligation classified on the raw posrep concept (a `requires-boundary` age).
+      __loweringRole: "public-determination",
     };
     return synth;
   });

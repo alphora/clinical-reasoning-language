@@ -53,6 +53,7 @@ library "P".
 concept "Gate":
 - type is Observation.
 - code is \`gate\`.
+- shape is RecordSet.
 ${crit.join("\n")}
 decision "D":
 first:
@@ -103,12 +104,15 @@ library "P".
 concept "A":
 - type is Observation.
 - code is \`a\`.
+- shape is RecordSet.
 concept "B":
 - type is Observation.
 - code is \`b\`.
+- shape is RecordSet.
 concept "C":
 - type is Observation.
 - code is \`c\`.
+- shape is RecordSet.
 criterion "Eligible":
 - when ( "A" and ( "B" or "C" ) ).
 decision "D":
@@ -160,9 +164,11 @@ library "P".
 concept "A":
 - type is Observation.
 - code is \`a\`.
+- shape is RecordSet.
 concept "B":
 - type is Observation.
 - code is \`b\`.
+- shape is RecordSet.
 criterion "Elig":
 - when ( "A" and "B" ).
 decision "D":

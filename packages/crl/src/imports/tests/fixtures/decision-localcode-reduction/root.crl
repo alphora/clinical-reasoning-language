@@ -14,9 +14,14 @@ concept "Adult Patient":
 - value type is boolean.
 - code is `adult-18-or-older`.
 
+concept "Trial Records":
+- type is Observation.
+- shape is RecordSet.
+- code is `step-therapy-trial`.
+
 concept "Enough Trials":
 - value type is boolean.
-- definition is exists "Adult Patient".
+- definition is exists "Trial Records".
 
 activity "Refer to GI":
 - request CPGServiceRequest.

@@ -51,6 +51,10 @@ import type { CRLError } from "../types/errors";
 import { catalogFhirLibraries } from "../cql-emitter/catalog/loadCatalog";
 import { lowerLocalCodes, astHasConceptLocalCode, preLowerAge } from "../cql-emitter/lowerLocalCodes";
 import type { LowerLocalCodesResult } from "../cql-emitter/lowerLocalCodes";
+// #189 Slice-C boundary 1 — the decision guard-surface concept names (the SAME set the CQL Interface
+// re-exports), used to loud-gate a decision that guards ON a reduction (single source of truth, no drift).
+import { interfaceConceptNames } from "../cql-emitter/layeredEmit";
+import { flattenDefinedAsBody } from "../ast/inferenceWalk";
 
 import { emitActivityDefinitionsForLibrary, type TerminologyResolver } from "./activity";
 import {
@@ -1575,6 +1579,82 @@ export function emitFhirDefClosure(
       ? collectCaseFeatures(lowered, lib.decisions, lib.libraryName)
       : { inputsByCondition: new Map(), unionConcepts: [] };
 
+    // #189 Slice-C boundary 1 — LOUD GATE on a decision that GUARDS ON a reduction. Detection keys on the
+    // decision GUARD SURFACE (`interfaceConceptNames` — the when/action-guard/criterion atoms, the SAME set
+    // the CQL Interface re-exports), NOT on case-feature collection. Emitting a reduction case-feature is
+    // unsupported for TWO distinct reasons, and a collection-based gate misses one of them:
+    //   • CODE-BEARING reduction ("X" = `code is` + `exists this`): its `code is` still registers under "X",
+    //     so it IS collected — but the case-feature SD's `cpg-featureExpression` targets `LocalSource."X"`,
+    //     which does NOT exist there (LocalSource holds `define "X Records"`; the boolean determination is
+    //     in Inferred/Interface). The featureExpression DANGLES: it resolves at neither translator-load nor
+    //     emit, failing only at `$apply` — a broken artifact under success:true.
+    //   • NAMED/code-less reduction ("Enough Trials" = `count "Trial Records" at least 2`, no own `code is`):
+    //     `collectCaseFeatures` never returns it (no code → not collected, and the collector does not descend
+    //     `ReductionConceptRef` targets), so a `unionConcepts` filter is SILENT and the decision would emit
+    //     an empty-input / no-SD VACUOUS guard under success:true — the plan's original "silent demotion"
+    //     (impl-panel round 1, both arms — critical A; the earlier collection-based gate missed this form).
+    // The CORRECT reduction case-feature SD (which library the featureExpression targets; whether an
+    // Observation-boolean profile faithfully represents a Condition/Procedure existence reduction; the
+    // patternCodeableConcept code is the reduction's own code on an Observation profile) is genuine
+    // unconverged design (§4.6 / G1). Until then, fail LOUD and suppress this source's decision +
+    // case-feature emit rather than ship a dangling or vacuous artifact. (A reduction reached only as a
+    // `defined as` OPERAND — not a direct guard atom — is caught on the CQL lane by the truth-set
+    // composition guard, whose `emit-reduction-in-composition` error folds into this result.)
+    const reductionNames = new Set<string>(
+      lowered.ast.statements
+        .filter(
+          (s): s is Concept =>
+            s.type === "Concept" && s.name !== undefined && s.definition?.type === "ReductionDefinition",
+        )
+        .map((s) => s.name as string),
+    );
+    // #189 Slice C 2b.2 — WIDEN to the guard atom's same-lib `defined as` TRANSITIVE operand closure (disc 444
+    // #1/#4). Pre-2b.2 a `defined as "R"` alias guard was blocked TRANSITIVELY by the CQL truth-set throw
+    // (`assertNotReductionTruthSetOperand` → `emit-reduction-in-composition` folded into this result); 2b.2 FLIPS
+    // that alias so it emits successfully, and the transitive loudness DISAPPEARS — so re-erect it here. A guard
+    // atom whose `defined as` closure REACHES a reduction is blocked (the reduction case-feature SD is still
+    // unconverged). Do NOT follow `definition is` COMPARATOR operands (a comparator is a leaf, not a reduction —
+    // an alias-to-comparator is a valid case-feature, disc 444 #4): the walk only descends `defined as` edges.
+    const conceptByNameForGate = new Map<string, Concept>();
+    for (const s of lowered.ast.statements) {
+      if (s.type === "Concept" && s.name !== undefined) conceptByNameForGate.set(s.name, s);
+    }
+    const reachesReduction = (start: string): boolean => {
+      const visiting = new Set<string>();
+      const dfs = (n: string): boolean => {
+        if (visiting.has(n)) return false; // cycle/diamond guard
+        visiting.add(n);
+        if (reductionNames.has(n)) return true; // direct reduction OR a reduction reached transitively
+        const c = conceptByNameForGate.get(n);
+        if (c?.definition?.type !== "DefinedAsDefinition") return false; // only `defined as` edges are followed
+        for (const ref of flattenDefinedAsBody(c.definition.body)) {
+          const local = normalizeLocalRef(ref, lib.libraryName);
+          if (isQualifiedRef(local)) continue; // genuinely-foreign operand — unsupported/deferred (§4.5)
+          if (dfs(getRefName(local))) return true;
+        }
+        return false;
+      };
+      return dfs(start);
+    };
+    const reductionGuardConcepts = interfaceConceptNames(lowered.ast).filter((n) => reachesReduction(n));
+    const reductionCaseFeatureBlocked = reductionGuardConcepts.length > 0;
+    if (reductionCaseFeatureBlocked) {
+      errors.push({
+        type: "Validation",
+        kind: "unsupported-casefeature-reduction",
+        message:
+          `Decision-bearing source "${lib.libraryName}" guards on concept(s) ` +
+          `${reductionGuardConcepts.map((n) => `"${n}"`).join(", ")} that resolve to a reduction (directly, or ` +
+          `via a \`defined as\` alias). A reduction cannot yet be a decision case-feature: for a code-bearing ` +
+          `reduction the case-feature \`cpg-featureExpression\` target LocalSource."<X>" would DANGLE (the ` +
+          `retrieve is on the twin "<X> Records"; the boolean determination is in the Inferred/Interface layer), ` +
+          `and a named/code-less reduction is not collected at all (a vacuous empty-input guard). Emitting a ` +
+          `reduction case-feature StructureDefinition is deferred to a later #189 boundary; this source's ` +
+          `decision + case-feature emit is suppressed rather than ship an artifact that dangles or is vacuous ` +
+          `at $apply.`,
+      });
+    }
+
     // F3 (impl-review) — direct-caller trap. The deliverable always threads a
     // manifest (`emitFhirDefFromPath`), so a decision-bearing code-is policy
     // ALWAYS carries a LocalSource layer and the gate opens. But a direct caller
@@ -1617,7 +1697,7 @@ export function emitFhirDefClosure(
     // builds). Threaded to the decision emit so a guard referencing a criterion is expanded
     // at `emitWhenBlock` entry (sole-ref collapse + the overflow diagnostic live there).
     const libCriterionTable = buildCriterionTable(lib.ast.statements);
-    for (const decision of hasDecisionLibraryTarget ? lib.decisions : []) {
+    for (const decision of hasDecisionLibraryTarget && !reductionCaseFeatureBlocked ? lib.decisions : []) {
       const decKey = qualifiedKey([lib.libraryName, decision.name]);
       if (classification.cycleMemberKeys.has(decKey)) continue;
       const isRoot = classification.rootKeys.has(decKey);
@@ -1660,7 +1740,7 @@ export function emitFhirDefClosure(
     //
     // The `cpg-featureExpression.reference` resolves to the `<policyId>-LocalSource`
     // Library (where the `code is` define lives) via `localSourceReferenceSuffix`.
-    if (caseFeatureGateOpen) {
+    if (caseFeatureGateOpen && !reductionCaseFeatureBlocked) {
       for (const { name, code } of caseFeatures.unionConcepts) {
         const cfResult = emitCaseFeatureStructureDefinition(
           name,

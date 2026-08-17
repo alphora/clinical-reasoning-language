@@ -27,22 +27,17 @@ define "Qualifying Encounter":
 define "BMI Observation During MP":
   CRLCommon.During(Cms69RecordSource."BMI Observations", "Measurement Period")
 
-define "BMI Observation Has Positive Value":
-  // FIXME: Exceeds is inherently boolean; refinement consumer cannot use it as a list
-  CRLCommon.Exceeds(Cms69RecordSource."BMI Observations", 0 'kg/m2')
-
 define "BMI During Measurement Period":
   "BMI Observation During MP"
-    intersect "BMI Observation Has Positive Value"
 
 define "BMI During MP Low":
-  CRLCommon.Low("BMI During Measurement Period")
+  Coalesce(CRLCommon.Low("BMI During Measurement Period"), false)
 
 define "BMI During MP High":
-  CRLCommon.High("BMI During Measurement Period")
+  Coalesce(CRLCommon.High("BMI During Measurement Period"), false)
 
 define "BMI During MP Normal":
-  CRLCommon.Normal("BMI During Measurement Period")
+  Coalesce(CRLCommon.Normal("BMI During Measurement Period"), false)
 
 define "Documented Low BMI":
   "BMI During MP Low"
@@ -54,7 +49,7 @@ define "Normal BMI Range":
   "BMI During MP Normal"
 
 define "Without Documented Abnormal BMI":
-  CRLCommon.Without('documented', ("Documented High BMI" union "Documented Low BMI"))
+  Coalesce(CRLCommon.Without('documented', ("Documented High BMI" union "Documented Low BMI")), false)
 
 define "Has Normal BMI":
   "Normal BMI Range"
@@ -300,7 +295,7 @@ define "Is Pregnant During Measurement Period":
     or "Verified Pregnancy Status"
 
 define "Age At Start Of MP At Least 18 Years":
-  CRLCommon.AtLeast(CRLCommon.AgeAt(start of "Measurement Period"), 18 'years')
+  Coalesce(CRLCommon.AtLeast(CRLCommon.AgeAt(start of "Measurement Period"), 18 'years'), false)
 
 define "Aged 18+ at Measurement Period Start":
   "Age At Start Of MP At Least 18 Years"

@@ -143,9 +143,16 @@ describe("valueReadValueTypes — coherence pins", () => {
   });
 });
 
-describe("T3a inertness — allowlist import boundary", () => {
-  it("no production module OUTSIDE src/fhir-model/ imports fhirValueModel (only tests do)", () => {
+describe("T3a wiring boundary — allowlisted importers of fhirValueModel", () => {
+  it("outside src/fhir-model/, only the T4 migration inventory + the §4.1 T1 deriver import fhirValueModel", () => {
+    // T3a is a LANE-NEUTRAL query with two legitimate production consumers: T4's migration inventory
+    // (`migration/migrationInventory.ts`, pre-existing) and — as of #189 §4.1 — the T1 deriver
+    // (`emit/effectiveRepresentation.ts`). This boundary asserts EXACTLY those two: match an actual IMPORT
+    // (not a comment mention — the old substring scan false-positived on migration/*.ts docstrings), and
+    // flag anything else outside src/fhir-model/.
     const srcRoot = join(__dirname, "..", ".."); // packages/crl/src
+    const IMPORT_RE = /from\s+["'][^"']*\/fhirValueModel["']/;
+    const ALLOW = new Set(["emit/effectiveRepresentation.ts", "migration/migrationInventory.ts"]);
     const offenders: string[] = [];
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -156,15 +163,15 @@ describe("T3a inertness — allowlist import boundary", () => {
             continue;
           walk(p);
         } else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts")) {
-          const text = readFileSync(p, "utf8");
-          if (text.includes("fhirValueModel")) offenders.push(p.slice(srcRoot.length + 1));
+          const rel = p.slice(srcRoot.length + 1).replace(/\\/g, "/");
+          if (IMPORT_RE.test(readFileSync(p, "utf8")) && !ALLOW.has(rel)) offenders.push(rel);
         }
       }
     };
     walk(srcRoot);
     expect(
       offenders,
-      `fhirValueModel is INERT — no production importer expected, found: ${offenders.join(", ")}`,
+      `unexpected fhirValueModel importers (outside src/fhir-model/ + the §4.1 allowlist): ${offenders.join(", ")}`,
     ).toEqual([]);
   });
 

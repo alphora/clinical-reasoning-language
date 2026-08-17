@@ -407,24 +407,316 @@ concept "Mixed":
     expect(errors.find((e) => e.kind === "emit-mixed-code-and-definition")!.message).toMatch(/Mixed/);
   });
 
-  it("`code is` + `definition is` REDUCTION → emit-reduction-not-active (NOT the generic mixed error; #189 IMPL 3)", () => {
-    // A reduction is validate-only this slice. lowerLocalCodes catches the `code is` + reduction case
-    // BEFORE the generic mixed check and raises the dedicated `emit-reduction-not-active` sentinel with
-    // a reduction-specific message — not `emit-mixed-code-and-definition` interpolating the raw type name.
+  it("#189 Slice B2a — a NON-boolean `most recent this` value read is DEFERRED (emit-reduction-not-active; not the generic mixed error)", () => {
+    // B2a activates only the Scalar BOOLEAN `most recent this` (the case-feature lane is boolean-locked).
+    // A non-boolean value read stays validate-only (Slice C) — the dedicated `emit-reduction-not-active`
+    // sentinel, NOT `emit-mixed-code-and-definition` interpolating the raw type name.
     const ast = parse(
       lib(`
 concept "C":
-- value type is boolean.
+- type is Observation.
+- value type is Quantity.
 - code is \`c\`.
-- definition is exists this.
+- definition is most recent this.
 `),
     );
     const { errors } = lowerLocalCodes(ast);
     expect(errors.some((e) => e.kind === "emit-reduction-not-active")).toBe(true);
     expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(false);
     const msg = errors.find((e) => e.kind === "emit-reduction-not-active")!.message;
-    expect(msg).toMatch(/reduction/);
+    expect(msg).toMatch(/most recent this/);
+    expect(msg).toMatch(/boolean-locked|Slice C/);
     expect(msg).not.toMatch(/ReductionDefinition/); // no raw AST type name
+  });
+
+  it("#189 Slice B2a — a Scalar boolean `most recent this` lowers to a records twin + a retargeted mostRecent reduction carrying the descriptor", () => {
+    const ast = parse(
+      lib(`
+concept "C":
+- type is Observation.
+- value type is boolean.
+- code is \`c\`.
+- definition is most recent this.
+`),
+    );
+    const { ast: out, errors } = lowerLocalCodes(ast);
+    expect(errors).toHaveLength(0);
+    const concepts = out.statements.filter((s): s is Concept => s.type === "Concept");
+    expect(concepts.find((c) => c.name === "C Records")?.shape).toBe("RecordSet");
+    const reduced = concepts.find((c) => c.name === "C");
+    const red = (reduced!.definition as { reduction: { kind: string; target: { type: string; ref?: unknown } } })
+      .reduction;
+    expect(red.kind).toBe("mostRecent");
+    expect(red.target.type).toBe("ReductionConceptRef");
+    expect(red.target.ref).toBe("C Records");
+    // The resolved effective-representation descriptor is attached for emit (recency + value element).
+    const desc = (reduced as { __effectiveDescriptor?: { arm?: string; valueElement?: string } }).__effectiveDescriptor;
+    expect(desc?.arm).toBe("local-exact");
+    expect(desc?.valueElement).toBe("value");
+  });
+
+  it("#189 Slice B2b — a `shape is Record` `most recent this` lowers to a records twin + a retargeted mostRecent reduction carrying a DATUM-LESS descriptor (any registry resource)", () => {
+    const ast = parse(
+      lib(`
+concept "C":
+- type is Procedure.
+- shape is Record.
+- code is \`c\`.
+- definition is most recent this.
+`),
+    );
+    const { ast: out, errors } = lowerLocalCodes(ast);
+    expect(errors).toHaveLength(0);
+    const concepts = out.statements.filter((s): s is Concept => s.type === "Concept");
+    // The records twin is a RecordSet retrieve at the NATURAL resource (Procedure, not forced-Observation).
+    expect(concepts.find((c) => c.name === "C Records")?.shape).toBe("RecordSet");
+    const reduced = concepts.find((c) => c.name === "C");
+    const red = (reduced!.definition as { reduction: { kind: string; target: { type: string; ref?: unknown } } })
+      .reduction;
+    expect(red.kind).toBe("mostRecent");
+    expect(red.target.type).toBe("ReductionConceptRef");
+    expect(red.target.ref).toBe("C Records");
+    // A record select reads NO value: the descriptor carries a recency but NO datum (valueElement /
+    // datumValueType undefined), over the natural (non-Observation) resource.
+    const desc = (
+      reduced as {
+        __effectiveDescriptor?: {
+          arm?: string;
+          resourceType?: string;
+          valueElement?: string;
+          datumValueType?: string;
+          recency?: unknown;
+        };
+      }
+    ).__effectiveDescriptor;
+    expect(desc?.arm).toBe("local-exact");
+    expect(desc?.resourceType).toBe("Procedure");
+    expect(desc?.valueElement).toBeUndefined();
+    expect(desc?.datumValueType).toBeUndefined();
+    expect(desc?.recency).toBeDefined();
+  });
+
+  it("#189 Slice B2a — a boolean `most recent this` on a VALUELESS resource (Condition) errors `value-read-valueless` + the `exists this` migration prompt", () => {
+    const ast = parse(
+      lib(`
+concept "C":
+- type is Condition.
+- value type is boolean.
+- code is \`c\`.
+- definition is most recent this.
+`),
+    );
+    const { errors } = lowerLocalCodes(ast);
+    const e = errors.find((x) => x.kind === "value-read-valueless");
+    expect(e).toBeDefined();
+    expect(e!.message).toMatch(/exists this/);
+  });
+
+  it("#189 Slice B2a/B2b — `most recent this` coherence/defer matrix (shape × value-type × resource)", () => {
+    const run = (body: string) => lowerLocalCodes(parse(lib(`concept "C":\n${body}\n`)));
+    const kinds = (body: string) => run(body).errors.map((e) => e.kind);
+    // Record shape, NO value type → ACTIVE (B2b: select the newest RECORD) — lowers cleanly, no error.
+    expect(
+      kinds("- type is Procedure.\n- shape is Record.\n- code is `c`.\n- definition is most recent this."),
+    ).toHaveLength(0);
+    // Record shape WITH an OPTIONAL value type (the record's DATUM, design §1) → ALSO active: a bare record
+    // select ignores the datum. The validator is clean on this cell (`useSiteType.test.ts`), so emit must be
+    // too — NOT an emit-only rejection (crl-emit B2b panel #1, both arms).
+    expect(
+      kinds("- type is Procedure.\n- shape is Record.\n- value type is boolean.\n- code is `c`.\n- definition is most recent this."),
+    ).toHaveLength(0);
+    // RecordSet shape → incoherent (a set publishes its records, not a reduced value).
+    expect(
+      kinds("- type is Observation.\n- shape is RecordSet.\n- value type is boolean.\n- code is `c`.\n- definition is most recent this."),
+    ).toContain("emit-reduction-shape-incoherent");
+    // Multiple value types → incoherent.
+    expect(
+      kinds("- type is Observation.\n- value type is boolean.\n- value type is Quantity.\n- code is `c`.\n- definition is most recent this."),
+    ).toContain("emit-reduction-shape-incoherent");
+    // Single non-boolean value type on a VALUE-BEARING resource → deferred (Slice C).
+    expect(
+      kinds("- type is Observation.\n- value type is integer.\n- code is `c`.\n- definition is most recent this."),
+    ).toContain("emit-reduction-not-active");
+    // Single non-boolean value type on a VALUELESS resource → the PERMANENT valueless error + exists-this
+    // prompt, NOT the Slice-C defer (Claude #1: the deriver's valueless check runs before the non-boolean
+    // split, so Condition never gets told to "wait for Slice C" for a form Slice C can't fix).
+    const condQ = run("- type is Condition.\n- value type is Quantity.\n- code is `c`.\n- definition is most recent this.");
+    expect(condQ.errors.map((e) => e.kind)).toContain("value-read-valueless");
+    expect(condQ.errors.map((e) => e.kind)).not.toContain("emit-reduction-not-active");
+    expect(condQ.errors.find((e) => e.kind === "value-read-valueless")!.message).toMatch(/exists this/);
+    // Zero value types → incoherent (needs exactly one).
+    expect(
+      kinds("- type is Observation.\n- code is `c`.\n- definition is most recent this."),
+    ).toContain("emit-reduction-shape-incoherent");
+    // Unsupported resource (Encounter is not a registry row) → `unsupported-resource` (no exists-this prompt).
+    const enc = run("- type is Encounter.\n- value type is boolean.\n- code is `c`.\n- definition is most recent this.");
+    expect(enc.errors.map((e) => e.kind)).toContain("unsupported-resource");
+    expect(enc.errors.every((e) => !/exists this/.test(e.message ?? ""))).toBe(true);
+  });
+
+  it("#189 Slice B2a — a rejected `most recent this` leaves NO dedup residue for a later valid concept reusing the name/code shape", () => {
+    // The derive-error `continue`s BEFORE any dedup-state mutation, so a valid concept declared after a
+    // rejected one must NOT inherit a spurious duplicate/collision error (gpt56 impl #1).
+    const ast = parse(
+      lib(`
+concept "C":
+- type is Condition.
+- value type is boolean.
+- code is \`c\`.
+- definition is most recent this.
+
+concept "D":
+- type is Observation.
+- value type is boolean.
+- code is \`d\`.
+- definition is exists this.
+`),
+    );
+    const { ast: out, errors } = lowerLocalCodes(ast);
+    // "C" errors (valueless), but "D" still lowers cleanly with no dup/collision fallout.
+    expect(errors.some((e) => e.kind === "value-read-valueless")).toBe(true);
+    expect(errors.some((e) => /duplicate|collision/.test(e.kind ?? ""))).toBe(false);
+    const concepts = out.statements.filter((s): s is Concept => s.type === "Concept");
+    expect(concepts.find((c) => c.name === "D Records")?.shape).toBe("RecordSet");
+  });
+
+  it("#189 Slice B1 — `code is` + `count this at least N` lowers to a records twin + a retargeted count reduction (atLeast preserved)", () => {
+    const ast = parse(
+      lib(`
+concept "C":
+- type is Condition.
+- value type is boolean.
+- code is \`c\`.
+- definition is count this at least 2.
+`),
+    );
+    const { ast: out, errors, localCodes } = lowerLocalCodes(ast);
+    expect(errors).toHaveLength(0);
+    const concepts = out.statements.filter((s): s is Concept => s.type === "Concept");
+    expect(concepts.find((c) => c.name === "C Records")?.shape).toBe("RecordSet");
+    const reduced = concepts.find((c) => c.name === "C");
+    expect(reduced!.definition?.type).toBe("ReductionDefinition");
+    const red = (reduced!.definition as { reduction: { kind: string; atLeast?: number; target: { type: string; ref?: unknown } } })
+      .reduction;
+    expect(red.kind).toBe("count");
+    expect(red.atLeast).toBe(2);
+    expect(red.target.type).toBe("ReductionConceptRef");
+    expect(red.target.ref).toBe("C Records");
+    expect(localCodes).toEqual([{ concept: "C", code: "c", conceptType: "Condition" }]);
+  });
+
+  it("#189 Slice A2 — `code is` + `exists this` SPLITS into a records twin + a retargeted named `exists`", () => {
+    // "C" lowers to: (1) a synthetic terminology "C" (drives the "C Code" collision-suffixed code);
+    // (2) a records twin concept "C Records" — `shape is RecordSet`, a CodedFromDefinition at the
+    // NATURAL resource (Condition, NOT forced Observation); (3) the retargeted reduction concept "C"
+    // (`exists "C Records"`), still a ReductionDefinition so the library routes `none`. Both concepts
+    // clear `code`. The lowered local code is surfaced on the TWIN.
+    const ast = parse(
+      lib(`
+concept "C":
+- type is Condition.
+- value type is boolean.
+- code is \`c\`.
+- definition is exists this.
+`),
+    );
+    const { ast: out, errors, localCodes } = lowerLocalCodes(ast);
+    expect(errors).toHaveLength(0);
+
+    const concepts = out.statements.filter((s): s is Concept => s.type === "Concept");
+    const twin = concepts.find((c) => c.name === "C Records");
+    const reduced = concepts.find((c) => c.name === "C");
+
+    // (2) the records twin — RecordSet retrieve at the natural resource, code cleared, NO inherited
+    //     scalar value type (it publishes records, not the boolean).
+    expect(twin).toBeDefined();
+    expect(twin!.shape).toBe("RecordSet");
+    expect(twin!.code).toBeUndefined();
+    expect(twin!.valueTypes).toEqual([]);
+    expect(twin!.definition?.type).toBe("CodedFromDefinition");
+    const twinDef = twin!.definition as { retrieveResourceType?: string; terminologyName?: unknown };
+    expect(twinDef.retrieveResourceType).toBe("Condition");
+    expect(twinDef.terminologyName).toBe("C"); // resolves to "C Code" via the collision suffix at emit
+
+    // (3) the retargeted reduction concept — `exists "C Records"`, still a ReductionDefinition, code cleared.
+    expect(reduced).toBeDefined();
+    expect(reduced!.code).toBeUndefined();
+    expect(reduced!.definition?.type).toBe("ReductionDefinition");
+    const red = (reduced!.definition as { reduction: { kind: string; target: { type: string; ref?: unknown } } })
+      .reduction;
+    expect(red.kind).toBe("exists");
+    expect(red.target.type).toBe("ReductionConceptRef");
+    expect(red.target.ref).toBe("C Records");
+
+    // (1) the synthetic terminology named after the concept.
+    expect(out.statements.some((s) => s.type === "Terminology" && s.name === "C")).toBe(true);
+
+    // The lowered local code is surfaced under the AUTHORED identity "C" (NOT the synthetic twin) so
+    // the FHIR CodeSystem display / SD / leaf-eligibility use the public concept, at the natural resource.
+    expect(localCodes).toEqual([{ concept: "C", code: "c", conceptType: "Condition" }]);
+  });
+
+  it("#189 Slice A2 — an INCOHERENT `code is` + `exists this` (non-Scalar shape / non-boolean value type) is a hard error, not a lowered Boolean", () => {
+    // `exists this` publishes a Scalar boolean; a `shape is RecordSet` or `value type is Quantity`
+    // declaration contradicts that. emitCQL runs no validator, so lowering enforces it (charter: never
+    // emit a value shape the declaration denies) rather than manufacture a Boolean.
+    const recordSetShape = parse(
+      lib(`
+concept "C":
+- type is Condition.
+- shape is RecordSet.
+- code is \`c\`.
+- definition is exists this.
+`),
+    );
+    const r1 = lowerLocalCodes(recordSetShape);
+    expect(r1.errors.some((e) => e.kind === "emit-reduction-shape-incoherent")).toBe(true);
+    expect(r1.localCodes).toEqual([]); // nothing lowered
+
+    const nonBooleanVt = parse(
+      lib(`
+concept "C":
+- type is Observation.
+- value type is Quantity.
+- code is \`c\`.
+- definition is exists this.
+`),
+    );
+    const r2 = lowerLocalCodes(nonBooleanVt);
+    expect(r2.errors.some((e) => e.kind === "emit-reduction-shape-incoherent")).toBe(true);
+
+    // Absent value type is ALSO incoherent — the classifier requires exactly one `boolean`, and an
+    // absent value type on a Scalar concept is itself an A.10 validator error (guard ⊆ classifier).
+    const absentVt = parse(
+      lib(`
+concept "C":
+- type is Observation.
+- code is \`c\`.
+- definition is exists this.
+`),
+    );
+    const r3 = lowerLocalCodes(absentVt);
+    expect(r3.errors.some((e) => e.kind === "emit-reduction-shape-incoherent")).toBe(true);
+  });
+
+  it("#189 Slice A2 — a records-twin name that collides with an existing top-level identifier is diagnosed, not clobbered", () => {
+    // "C" would synthesize a twin "C Records", but the library already declares a concept "C Records".
+    // The twin's `define "C Records"` would duplicate that identifier — diagnose instead of clobber.
+    const ast = parse(
+      lib(`
+concept "C":
+- type is Condition.
+- value type is boolean.
+- code is \`c\`.
+- definition is exists this.
+
+concept "C Records":
+- type is Observation.
+- code is \`c-records\`.
+`),
+    );
+    const { errors } = lowerLocalCodes(ast);
+    expect(errors.some((e) => e.kind === "emit-records-twin-name-collision")).toBe(true);
   });
 
   it("`code is` + `defined as` (both-representation) is NOT a mixed error — it SPLITS", () => {
@@ -599,7 +891,7 @@ concept "Age Rep":
     expect(recencyTwin).toBeUndefined();
   });
 
-  it("emits the recency merge in the Inferred lane (CFH.recencyAgeTruths + newest-Observation filter + computed AtLeast(AgeAt(), Q)), carrying the @business-logic-deferred block comment", () => {
+  it("emits the recency merge in the Inferred lane (Coalesce(CFH.recencyAgeSelected, false) + newest-Observation filter + computed AtLeast(AgeAt(), Q)), carrying the @business-logic-deferred block comment", () => {
     const ast = parse(
       lib(`
 concept "Age 18 Or Older":
@@ -633,7 +925,11 @@ concept "Age 18 Or Older":
       },
     });
     expect(r.success).toBe(true);
-    expect(r.result).toContain("CFH.recencyAgeTruths(");
+    // #189 Slice C 2b.3b.1 — the recency merge is now a TOTAL boolean `Coalesce(CFH.recencyAgeSelected(...), false)`,
+    // NOT the retired `recencyAgeTruths` List lift.
+    expect(r.result).toContain("Coalesce(");
+    expect(r.result).toContain("CFH.recencyAgeSelected(");
+    expect(r.result).not.toContain("CFH.recencyAgeTruths(");
     expect(r.result).toContain('"T LocalSource"."Age 18 Or Older"');
     // NO status filter (extracted answers aren't stamped `final`); recency keys on
     // `effective` (what DTR extraction populates), with a deterministic `id` tie-break.
@@ -688,7 +984,7 @@ concept "${name}":
     expect(twin.__bothRepRecencyOp).toBe("AtMost");
     const r = emitRecency(out, twin);
     expect(r.success).toBe(true);
-    expect(r.result).toContain("CFH.recencyAgeTruths(");
+    expect(r.result).toContain("CFH.recencyAgeSelected(");
     expect(r.result).toContain("CRLCommon.AtMost(CRLCommon.AgeAt(), 21 'years')");
     expect(r.result).not.toContain("CRLCommon.AtLeast(");
   });
@@ -742,7 +1038,7 @@ concept "${name}":
       expect(twin.__recencyOverrideId, pred).toBe("age-today-over-patient-birthdate");
       const r = emitRecency(out, twin);
       expect(r.success, pred).toBe(true);
-      expect(r.result, pred).toContain("CFH.recencyAgeTruths(");
+      expect(r.result, pred).toContain("CFH.recencyAgeSelected(");
       expect(r.result, pred).toContain(`CRLCommon.${op}(CRLCommon.AgeInMonths(), ${threshold})`);
       // The years compute fn must NOT appear on a months age (the #215 miscompile shape).
       expect(r.result, pred).not.toContain("CRLCommon.AgeAt()");

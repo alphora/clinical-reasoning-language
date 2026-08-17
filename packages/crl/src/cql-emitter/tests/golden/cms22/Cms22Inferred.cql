@@ -55,31 +55,31 @@ define "Last Diastolic on Qualifying Encounter Day":
   "Diastolic Code Component of Last BP Panel On Encounter Day"
 
 define "Last Systolic Below 120":
-  CRLCommon.Below("Last Systolic on Qualifying Encounter Day", 120 'mm[Hg]')
+  Coalesce(CRLCommon.Below("Last Systolic on Qualifying Encounter Day", 120 'mm[Hg]'), false)
 
 define "Last Diastolic Below 80":
-  CRLCommon.Below("Last Diastolic on Qualifying Encounter Day", 80 'mm[Hg]')
+  Coalesce(CRLCommon.Below("Last Diastolic on Qualifying Encounter Day", 80 'mm[Hg]'), false)
 
 define "Last Systolic Between 120 and 129":
-  CRLCommon.Between("Last Systolic on Qualifying Encounter Day", 120 'mm[Hg]', 129 'mm[Hg]')
+  Coalesce(CRLCommon.Between("Last Systolic on Qualifying Encounter Day", 120 'mm[Hg]', 129 'mm[Hg]'), false)
 
 define "Last Systolic At Least 130":
-  CRLCommon.AtLeast("Last Systolic on Qualifying Encounter Day", 130 'mm[Hg]')
+  Coalesce(CRLCommon.AtLeast("Last Systolic on Qualifying Encounter Day", 130 'mm[Hg]'), false)
 
 define "Last Diastolic At Least 80":
-  CRLCommon.AtLeast("Last Diastolic on Qualifying Encounter Day", 80 'mm[Hg]')
+  Coalesce(CRLCommon.AtLeast("Last Diastolic on Qualifying Encounter Day", 80 'mm[Hg]'), false)
 
 define "Last Systolic Between 130 and 139":
-  CRLCommon.Between("Last Systolic on Qualifying Encounter Day", 130 'mm[Hg]', 139 'mm[Hg]')
+  Coalesce(CRLCommon.Between("Last Systolic on Qualifying Encounter Day", 130 'mm[Hg]', 139 'mm[Hg]'), false)
 
 define "Last Diastolic Between 80 and 89":
-  CRLCommon.Between("Last Diastolic on Qualifying Encounter Day", 80 'mm[Hg]', 89 'mm[Hg]')
+  Coalesce(CRLCommon.Between("Last Diastolic on Qualifying Encounter Day", 80 'mm[Hg]', 89 'mm[Hg]'), false)
 
 define "Last Systolic At Least 140":
-  CRLCommon.AtLeast("Last Systolic on Qualifying Encounter Day", 140 'mm[Hg]')
+  Coalesce(CRLCommon.AtLeast("Last Systolic on Qualifying Encounter Day", 140 'mm[Hg]'), false)
 
 define "Last Diastolic At Least 90":
-  CRLCommon.AtLeast("Last Diastolic on Qualifying Encounter Day", 90 'mm[Hg]')
+  Coalesce(CRLCommon.AtLeast("Last Diastolic on Qualifying Encounter Day", 90 'mm[Hg]'), false)
 
 define "Normal BP Reading":
   "Last Systolic Below 120"
@@ -112,17 +112,17 @@ define "Prior-Year Last Diastolic":
   "Diastolic Code Component of Prior-Year Last BP Panel"
 
 define "Prior-Year Last Systolic At Least 130":
-  CRLCommon.AtLeast("Prior-Year Last Systolic", 130 'mm[Hg]')
+  Coalesce(CRLCommon.AtLeast("Prior-Year Last Systolic", 130 'mm[Hg]'), false)
 
 define "Prior-Year Last Diastolic At Least 80":
-  CRLCommon.AtLeast("Prior-Year Last Diastolic", 80 'mm[Hg]')
+  Coalesce(CRLCommon.AtLeast("Prior-Year Last Diastolic", 80 'mm[Hg]'), false)
 
 define "Prior-Year Hypertensive Reading":
   "Prior-Year Last Systolic At Least 130"
     or "Prior-Year Last Diastolic At Least 80"
 
 define "Without Record Of Prior-Year Hypertensive Reading":
-  CRLCommon.Without('record-of', "Prior-Year Hypertensive Reading")
+  Coalesce(CRLCommon.Without('record-of', "Prior-Year Hypertensive Reading"), false)
 
 define "First Hypertensive Reading":
   "Hypertensive Reading"
@@ -382,7 +382,7 @@ define "HTN Followup Declined By Patient":
     or "Second HTN 140+ With Declined Followup"
 
 define "Age At Start Of MP At Least 18 Years":
-  CRLCommon.AtLeast(CRLCommon.AgeAt(start of "Measurement Period"), 18 'years')
+  Coalesce(CRLCommon.AtLeast(CRLCommon.AgeAt(start of "Measurement Period"), 18 'years'), false)
 
 define "Aged 18+ at Measurement Period Start":
   "Age At Start Of MP At Least 18 Years"

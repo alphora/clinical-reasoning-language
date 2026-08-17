@@ -518,6 +518,25 @@ export interface Concept extends ASTNode {
    */
   __interfaceSourceLayer?: InterfaceSourceLayer;
   /**
+   * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). #189 Slice-C
+   * boundary 1 — the TOTALITY mode of an Interface re-export whose source layer is
+   * `"Inferred"`, deciding how the façade collapses it to the decision's boolean
+   * surface:
+   *   - `"total-boolean"` → the source Inferred concept is a REDUCTION that publishes
+   *     a TOTAL boolean (`exists`/`Count`/a `Coalesce(...)`-guarded `most recent`), so
+   *     the re-export is a BARE re-export `<Inferred>."X"` (a plain CQL Boolean has no
+   *     `.satisfied()` method — calling it would be ill-typed).
+   *   - `"truth-set"` (or ABSENT) → the source Inferred concept is a `defined as`
+   *     truth-set determination, collapsed with `<Inferred>."X".satisfied()` (the
+   *     legacy lane).
+   * Set at SYNTHESIS time in `buildInterfaceReexports` (which can see the source
+   * concept's definition + declared shape); the façade emit (`emitConceptBody`)
+   * cannot re-derive it because its per-layer `conceptByName` is layer-isolated.
+   * Only meaningful when `__interfaceSourceLayer === "Inferred"`. Absent on every
+   * other concept.
+   */
+  __interfaceReexportMode?: "total-boolean" | "truth-set";
+  /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). Marks the
    * INFERRED half of a both-representation (`code is` + `defined as`) concept that
    * `lowerLocalCodes` SPLIT into a LocalSource retrieve twin + this Inferred twin.
@@ -595,6 +614,39 @@ export interface Concept extends ASTNode {
    * never encounters it.
    */
   __synthesizedFromPosrep?: boolean;
+  /**
+   * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). #189 Slice B2a — the resolved
+   * `local-exact` effective-representation descriptor (`emit/effectiveRepresentation.ts`
+   * `EffectiveRepresentationDescriptor`), derived from the ORIGINAL authored concept in
+   * `lowerLocalCodes` (BEFORE `code` is cleared) and attached to the retargeted `most recent this`
+   * reduction concept so `emitConceptBody` renders the select-newest sort (`recency`) + value read
+   * (`valueElement`/`datumValueType`) from ONE source of truth. Typed `unknown` DELIBERATELY: the AST
+   * layer must not depend on the emit layer (`effectiveRepresentation` imports FROM `ast/types`); the
+   * emit read site casts to `EffectiveRepresentationDescriptor`. This is the general §4.2 attachment
+   * (Slice C broadens it to the full `DerivationOutcome` on both twins). Absent on every other concept.
+   */
+  __effectiveDescriptor?: unknown;
+  /**
+   * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). #189 Slice C boundary 2 (2a) — the
+   * LOWERING ROLE of a concept the lowering passes produced/retargeted, so the totality-ledger enrollment
+   * (`emitConcept`) picks its obligation SOURCE without marker-sniffing (disc 439 crit #1/#2):
+   *   - `"records-impl"`         — a reduction-lane records twin `"X Records"` (a RecordSet retrieve; no
+   *                                boolean define) → manufactured `not-applicable`.
+   *   - `"source-impl"`          — the LocalSource retrieve HALF of a both-representation split (its
+   *                                determination is the sibling Inferred twin) → manufactured `not-applicable`.
+   *   - `"public-determination"` — the emitted PUBLIC determination (a retargeted reduction, a pure `code is`
+   *                                lowered form, a both-rep Inferred twin, a standalone age posrep) → inherits
+   *                                the AUTHORED obligation (`EmitOptions.authoredObligations`, keyed by name).
+   *   - `"interface-facade"`     — a `buildInterfaceReexports` façade → manufactured obligation (a
+   *                                `…satisfied()` façade is intrinsically total; a bare total-boolean
+   *                                re-export delegates to its source reduction).
+   * ABSENT ⇒ an authored concept no pass mutated (the none-lane fast-path returns the input untouched); such
+   * a concept is classified in place at enrollment. This is a STRING union so `ast/types` gains no emit-layer
+   * import (the obligation TYPE lives in `emit/booleanTotality`; only the emit read site references it).
+   * (A dedicated `age-helper` role is deferred to 2b — patient-age determinations currently tag
+   * `public-determination` and inherit the authored age obligation; no separate helper define is synthesized.)
+   */
+  __loweringRole?: "records-impl" | "source-impl" | "public-determination" | "interface-facade";
 }
 
 /** The sanctioned patient-age comparator ops (#215), carried as canonical
@@ -759,16 +811,77 @@ export function reductionNotActiveMessage(where: string): string {
   );
 }
 
-/** The #189 emit sentinel as a TYPED error (carries the filterable `kind` + an optional source
- * `location`), so a lane's top-level `catch` surfaces it as a structured `emit-reduction-not-active`
- * diagnostic rather than a bare `type: "Exception"` with only a message. */
-export class ReductionNotActiveError extends Error {
-  readonly kind = EMIT_REDUCTION_NOT_ACTIVE_KIND;
+/** Base for a TYPED emit error that carries a filterable `kind` + an optional source `location`, so a
+ * lane's top-level `catch` surfaces it as a STRUCTURED `Validation` diagnostic (with the kind) rather
+ * than a bare `type: "Exception"` with only a message. The deep emit paths run validator-free (direct
+ * `emitCQL`/MCP/CLI callers), so a coherence/threshold defect a reduction hits at emit must fail loud
+ * with a specific kind, not a generic exception. */
+export abstract class StructuredEmitError extends Error {
+  abstract readonly kind: string;
   readonly location?: Location;
-  constructor(where: string, location?: Location) {
-    super(reductionNotActiveMessage(where));
-    this.name = "ReductionNotActiveError";
+  constructor(message: string, location?: Location) {
+    super(message);
     this.location = location;
+  }
+}
+
+/** The #189 emit sentinel as a TYPED error — a `ReductionDefinition` reached a deep emit path while
+ * reductions are still validate-only for its form. */
+export class ReductionNotActiveError extends StructuredEmitError {
+  readonly kind = EMIT_REDUCTION_NOT_ACTIVE_KIND;
+  constructor(where: string, location?: Location) {
+    super(reductionNotActiveMessage(where), location);
+    this.name = "ReductionNotActiveError";
+  }
+}
+
+/** A reduction whose RESULT concept's declared shape/value-type contradicts the Scalar boolean an
+ * `exists`/`count` reduction publishes (charter: never emit a value shape the declaration denies). The
+ * `code is` + `this` path is guarded in `lowerLocalCodes`; this typed error is the NAMED-operand path's
+ * mirror (`emitConceptBody`), which is validator-free. */
+export class ReductionShapeIncoherentError extends StructuredEmitError {
+  readonly kind = "emit-reduction-shape-incoherent";
+  constructor(message: string, location?: Location) {
+    super(message, location);
+    this.name = "ReductionShapeIncoherentError";
+  }
+}
+
+/** A `count … at least N` with N < 1 — trivially true (every set has ≥ N members). An AUTHOR error at
+ * emit (never a "not yet emittable" form), so it must not surface the not-active sentinel. */
+export class CountThresholdTrivialError extends StructuredEmitError {
+  readonly kind = "emit-count-threshold-trivial";
+  constructor(message: string, location?: Location) {
+    super(message, location);
+    this.name = "CountThresholdTrivialError";
+  }
+}
+
+/** #189 Slice B2a — a lowered `most recent this` concept reached the emit read site with a missing or
+ * malformed `__effectiveDescriptor` (or a descriptor/declaration the boolean value read cannot honor).
+ * `lowerLocalCodes` guarantees a well-formed descriptor on valid input, so this fires only on a
+ * hand-built AST fed to the public `emitCQLFromAST` — surfaced with a filterable kind (matching the
+ * lowering-side `emit-most-recent-derivation`) rather than a bare `type: "Exception"`. */
+export class MostRecentDerivationError extends StructuredEmitError {
+  readonly kind = "emit-most-recent-derivation";
+  constructor(message: string, location?: Location) {
+    super(message, location);
+    this.name = "MostRecentDerivationError";
+  }
+}
+
+/** #189 Slice-C boundary 1 — a `defined as` truth-set composition (union/intersect/except) references a
+ * REDUCTION operand, which publishes a TOTAL boolean rather than a truth-set. The truth-set lane renders
+ * siblings as `.asTruths()` lists and set-combines them, so a bare-boolean reduction operand yields
+ * ill-typed CQL (`<boolean> union <List<Boolean>>`) the translator rejects at load. Composing `defined as`
+ * over TOTAL booleans is a boundary-2 change; until then this fires a CRL-level diagnostic instead of
+ * emitting CQL that fails downstream. Only reachable once the reduction flip classifies reductions Inferred
+ * (before it, a reduction-bearing library stayed on the per-CRL path and never layered its compositions). */
+export class ReductionInCompositionError extends StructuredEmitError {
+  readonly kind = "emit-reduction-in-composition";
+  constructor(message: string, location?: Location) {
+    super(message, location);
+    this.name = "ReductionInCompositionError";
   }
 }
 

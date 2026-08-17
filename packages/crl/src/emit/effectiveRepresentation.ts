@@ -9,6 +9,7 @@
 import type { Concept } from "../ast/types";
 import { localCodeSystemUrl } from "../fhir-emitter/slug";
 import { relativeElementPath } from "../fhir-model/elementPath";
+import { valueReadValueTypes } from "../fhir-model/fhirValueModel";
 import type { ConceptValueType } from "../grammar/conceptValueTypes";
 import type { ResultType } from "../grammar/resultType";
 import { conceptResultType } from "../grammar/resultType";
@@ -68,6 +69,12 @@ export type DerivationErrorKind =
   | "unsupported-resource"
   | "indeterminate-result-type"
   | "value-element-unmappable"
+  // #189 §4.1 T1 extension — the three DISTINCT fail-closed diagnostics of a `most recent this` typed value
+  // read (design §8 "value-type-must-match-a-real-element"): the element is unmodeled (fail closed), the
+  // resource is modeled-valueless (∅, no value to read), or the declared value type is not admitted.
+  | "value-read-unmodeled"
+  | "value-read-valueless"
+  | "value-type-not-admitted"
   | "unsupported-reduction-form"
   | "invalid-owning-library-metadata"
   | "malformed-representation";
@@ -238,20 +245,36 @@ function computeLocalDatum(
       }
       return { valueElement: "value", datumValueType: "boolean" as ConceptValueType };
     }
-    case "mostRecent":
-      if (row.valueless || !boolean) {
+    case "mostRecent": {
+      // #189 §4.1 T1 EXTENSION — a `most recent this` publishes a TYPED value read; consult the FHIR
+      // value-read model (T3a `valueReadValueTypes`) for the resource's element rather than assuming
+      // Observation-boolean. The read path is the authored value element (relative) or the standard `value`
+      // carrier. Three DISTINCT fail-closed diagnostics: the element is unmodeled (`undefined`), the resource
+      // is modeled-valueless (`∅`), or the declared value type is not admitted by the element (design §8).
+      const readPath = authored ?? "value";
+      const admitted = valueReadValueTypes(resourceType, readPath);
+      if (admitted === undefined) {
         return {
-          errorKind: "value-element-unmappable",
-          detail: `\`most recent this\` value read on ${resourceType} needs a mapped boolean value element; T1 supports only Observation-boolean (§8)`,
+          errorKind: "value-read-unmodeled",
+          detail: `\`most recent this\` reads ${resourceType}.${readPath}, which is not a modeled value-read element (T3a, §8) — fail closed`,
         };
       }
-      if (authored !== undefined && authored !== "value") {
+      if (admitted.size === 0) {
         return {
-          errorKind: "value-element-unmappable",
-          detail: `authored value element \`${authored}\` on ${resourceType} is not mappable in T1 (only \`value\`; §8)`,
+          errorKind: "value-read-valueless",
+          detail: `\`most recent this\` on ${resourceType} (a modeled-valueless resource) has no value element to read (§2)`,
         };
       }
-      return { valueElement: "value", datumValueType: "boolean" as ConceptValueType };
+      // Scalar concepts reach here only after `conceptResultType` validated exactly one value type.
+      const declared = concept.valueTypes[0];
+      if (!admitted.has(declared)) {
+        return {
+          errorKind: "value-type-not-admitted",
+          detail: `\`most recent this\` on ${resourceType}.${readPath} admits {${[...admitted].join(", ")}}, but the concept declares value type \`${declared}\``,
+        };
+      }
+      return { valueElement: readPath, datumValueType: declared };
+    }
     default:
       // `defined as` / `definition is <derivation>` / bare `code is` — not a `this`-reduction. The local-exact
       // datum of a general both-representation / derived form is out of T1 scope (deferred, #257).
@@ -305,7 +328,10 @@ function notAgeLocalExact(
         ...base,
         kind: datum.errorKind,
         resourceType,
-        ...(datum.errorKind === "value-element-unmappable"
+        ...(datum.errorKind === "value-element-unmappable" ||
+        datum.errorKind === "value-read-unmodeled" ||
+        datum.errorKind === "value-read-valueless" ||
+        datum.errorKind === "value-type-not-admitted"
           ? { field: "valueElement" as const }
           : datum.errorKind === "indeterminate-result-type"
             ? { field: "resultType" as const }

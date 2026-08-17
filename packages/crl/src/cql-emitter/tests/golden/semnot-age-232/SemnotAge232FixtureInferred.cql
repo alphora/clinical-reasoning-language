@@ -10,14 +10,17 @@ include SemnotAge232FixtureLocalSource
 context Patient
 
 define "Under Age 21":
-  ({ true } except ("Age 21 Or Older"))
+  not ("Age 21 Or Older")
 
 define "Age 21 Or Older":
-  CFH.recencyAgeTruths(
-    Last(
-      (SemnotAge232FixtureLocalSource."Age 21 Or Older") O
-        where O.value is FHIR.boolean
-        sort by (effective as FHIR.dateTime).value, id
+  Coalesce(
+    CFH.recencyAgeSelected(
+      Last(
+        (SemnotAge232FixtureLocalSource."Age 21 Or Older") O
+          where O.value is FHIR.boolean
+          sort by (effective as FHIR.dateTime).value, id
+      ),
+      CRLCommon.AtLeast(CRLCommon.AgeAt(), 21 'years')
     ),
-    CRLCommon.AtLeast(CRLCommon.AgeAt(), 21 'years')
+    false
   )

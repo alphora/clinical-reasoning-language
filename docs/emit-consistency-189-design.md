@@ -12,6 +12,12 @@ Grounded in **`docs/CRL-NORTH-STAR.md`** (authoritative CRL model) — read that
 **How to resume:** read the charter, then §0 (scope) and §10 (deferred/resume) here, then the section for the
 slice you're building. The sequencing in §9 is the build order.
 
+**Source-tree paths (verified 2026-08-14 — the CQL emitter is NOT under `emit/`):** `emitCQL.ts` and
+`layeredEmit.ts` live in `packages/crl/src/cql-emitter/`; `decision.ts` in `packages/crl/src/fhir-emitter/`;
+the CEL emitter `emitFhir.ts` in `packages/crl/src/cel/emitter/`; the T1/T2/T3b inert infra
+(`effectiveRepresentation.ts`, `resourceEmitRegistry.ts`, `booleanTotality.ts`) in `packages/crl/src/emit/`.
+Line citations below drift as the code moves — trust the function name over the number.
+
 ---
 
 ## 0. Scope (operator decision D2 — 2026-08-11)
@@ -83,7 +89,7 @@ rows:
 | (none) | Scalar | scalar | — | **validation error** (no bare scalar `code is`) |
 | named `exists "X"` / `most recent "X"` / `count "X"` | per above | per above, `X` a `RecordSet` | per above | `X` must resolve to a `RecordSet`; else resolution error |
 
-Notes: `most recent` sort is the engine-proven form (`emitCQL.ts:1281-1285` — **`where` precedes `sort`**):
+Notes: `most recent` sort is the engine-proven form (`cql-emitter/emitCQL.ts:1405-1410`, in `emitRecencyMerge` — **`where` precedes `sort`**):
 `Last([<R>: X] O where O.value is FHIR.boolean sort by (O.effective as FHIR.dateTime).value, O.id)`. The sort
 **element is per representation, from the descriptor** (§4) — Condition→`recordedDate`, ServiceRequest→
 `authoredOn`, Observation→`effective`. **Period-typed recency** (Encounter/EpisodeOfCare/Flag) breaks
@@ -165,7 +171,7 @@ returns true for a fact meant absent. Replace with:
 value-element rep uses value-filtered `exists (… where value is true)`, so `valueBoolean:false` correctly
 yields false. On a valueless rep, `explicit false` is a **validation error** (nothing to carry the false).
 
-**Fail-closed = case-ATOMIC ERROR** (not warn-and-skip; `emitFhir.ts:453-475` today leaves a misleading
+**Fail-closed = case-ATOMIC ERROR** (not warn-and-skip; `cel/emitter/emitFhir.ts:453-475` today leaves a misleading
 partial fixture): an unresolved concept / missing writer path / missing canonicalBase → error + ZERO
 resources for that case, diagnostic naming case/fact/concept/owning-library/field.
 
@@ -204,7 +210,7 @@ author-token drift lane).
   `docs/defined-as-is-semantic-composition.md` + `docs/cql-to-crl-type-valuetype-rule.md §7` — both **updated in
   IMPL 4** with superseding banners (done, not deferred).
 - **Interface = pure façade** (`define "X": Inferred."X"`): keeps the `library[]` rebind-target job, loses
-  boolean-wrapping. Negated-guard `Coalesce` (`decision.ts:636-646`) stays (sits below its `not`); NOT
+  boolean-wrapping. Negated-guard `Coalesce` (`fhir-emitter/decision.ts:659-674`, `guardApplicabilityCondition`) stays (sits below its `not`); NOT
   generalized to a terminal Coalesce.
 - **Layer-placement contract** (specify atomically with the flip): where the natural retrieve lives
   (LocalSource), the total scalar define (Inferred), what `Interface."X"` aliases, what the case-feature
@@ -306,7 +312,7 @@ when picked up (memory is not backlog).**
 ### Implementation-detail obligations carried into the build
 - **Resource-writer registry** (§4/§7) — a supported {resourceType → codingElement, valueElement, recency
   element/type, choice-element JSON mapping} table + fail-closed for unsupported; today CEL writes only
-  `.code` and Observation values (`emitFhir.ts:513,517-525`).
+  `.code` and Observation values (`cel/emitter/emitFhir.ts:513,519-527`).
 - **Boolean-totality effect metadata** (§3 rule 5) — the proof system behind the totality assertion. **Spec'd
   in `docs/emit-189-boolean-totality.md`; folded into T5 (not an inert precursor) per disc 426.**
 - **`valueElement` population rule** (§4) — auto-map vs `value element is`.

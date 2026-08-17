@@ -10,4 +10,4 @@ include SemnotAge232FixtureInferred
 context Patient
 
 define "Under Age 21":
-  SemnotAge232FixtureInferred."Under Age 21".satisfied()
+  SemnotAge232FixtureInferred."Under Age 21"

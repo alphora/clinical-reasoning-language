@@ -5,7 +5,13 @@ all criticals verified against the code). Metrics **VERIFIED** against real arti
 CQL-DEFINE DAG (§2)** — emit each criterion once as a named per-operand-totalized boolean CQL define, referenced
 by one `text/cql-identifier` condition. ⚠ The sub-PD / `definitionCanonical` shape (an earlier draft) was
 **KILLED as a category error** (§1a) — do NOT resurrect it. **§3 = the resolved atomic BUILD CONTRACT (A–J).**
-NEEDS BUILD — no code yet. Operator override 2026-08-12: correctness-first, **#236 is the priority build**. The
+**SHIPPED 2026-08-13** — the emit-side flip `7f9aaf1` (criterion inline-expansion retired; criteria lower once
+to named CQL defines, tree→DAG) + kit flip `649d0ea` (schemaVersion 1.25). Validated on the KE's real ~6.3M-line
+policy: coverage-determination PD **6,329,533 → 11,715 lines (~540× smaller)**, 0 questions dropped,
+questionnaire-identical. ⚠ This doc is now a **historical design record**, not a pending build — do NOT read
+"#236 is the priority build" (a stale 2026-08-12 operator note) as live: the flip already landed, *before* the
+#189 T1–T4 precursors. **Remaining for #236:** KE runtime + cockpit validation, which needs a testable
+build/vsix — the SAME build the #189 emit flip (T5–T7) is gated on; batch them. The
 two **[HARNESS]** gaps are now **CLOSED (verified 2026-08-12, cqf-fhir-cr-cli 4.7.0)**: (1) the translator
 **tolerates forward references** (a define resolves one declared later) → emit needs **no topological sort**; (2)
 the CQL engine **memoizes ExpressionDef evaluation per patient context** (a 2⁴⁰-path, non-foldable doubling DAG
@@ -303,12 +309,12 @@ model). The `criterion-expansion-overflow`/criterion-atom bound was retired from
 ## 5. Sequence
 1. **[DONE]** payer metrics verified (§1); panel R1 (disc 417) killed shape 1, converged on shape 2; operator
    blessed; panel R2 (disc 417 R2) produced the §3 build contract — both arms converged, all criticals verified.
-2. **[NEXT — needs operator greenlight]** Build the §3 ATOMIC contract. It is a **multi-seam change best run as a
-   decomposed per-todo build** (roughly: A criterion index + B collision-safe ids · C define emission + total
-   emitter · D guard lowering + resolvers · E criterion-keyed inputs · F CRE reference-eval + viewModel lockstep ·
-   G caps retire/replace · H provenance · I diagnostics+kit · J acceptance incl. the synthetic doubling-DAG
-   fixture + trace-linearity assertion). **All land atomically** (or behind a flag) — no two-lane-inconsistent
-   intermediate release. HOLD on code.
+2. **[DONE — shipped `7f9aaf1` emit flip + `649d0ea` kit flip, 2026-08-13]** Built the §3 ATOMIC contract as a
+   decomposed per-todo build (A criterion index `6b564f3` + C total-boolean emitter `09e65b0` landed inert first,
+   then the atomic flip wired B guard-ids · D guard lowering + resolvers · E criterion-keyed inputs · F CRE
+   reference-eval + viewModel lockstep · G caps retire/replace · H provenance · I diagnostics+kit · J acceptance
+   incl. the synthetic doubling-DAG fixture + trace-linearity assertion — all in `7f9aaf1`). Landed atomically,
+   no two-lane-inconsistent intermediate release.
 3. **[HARNESS ✔ 2026-08-12 — CLOSED]** both verification gaps closed on cqf-fhir-cr-cli 4.7.0: translator
    forward-ref tolerance CONFIRMED (no topological sort needed); engine ExpressionDef memoization per context
    CONFIRMED (criterion DAG linear at eval-time; CRE must replicate). Tests in the session scratchpad

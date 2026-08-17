@@ -36,6 +36,7 @@ library "Policy".
 concept "Gate Concept":
 - type is Observation.
 - code is \`gate\`.
+- shape is RecordSet.
 criterion "Eligible":
 - when ( "Gate Concept" ).
 decision "PolicyDec":
@@ -55,6 +56,7 @@ library "Policy".
 concept "Gate Concept":
 - type is Observation.
 - code is \`gate\`.
+- shape is RecordSet.
 ${criteria.join("\n")}
 decision "PolicyDec":
 first:
@@ -108,9 +110,11 @@ library "Policy".
 concept "Inline":
 - type is Observation.
 - code is \`inline\`.
+- shape is RecordSet.
 concept "Gate Concept":
 - type is Observation.
 - code is \`gate\`.
+- shape is RecordSet.
 criterion "Eligible":
 - when ( "Gate Concept" ).
 decision "PolicyDec":
@@ -156,9 +160,11 @@ library "Policy".
 concept "Gate Concept":
 - type is Observation.
 - code is \`gate\`.
+- shape is RecordSet.
 concept "Blocker":
 - type is Observation.
 - code is \`blocker\`.
+- shape is RecordSet.
 decision "PolicyDec":
 first:
 - when "Gate Concept" then:
