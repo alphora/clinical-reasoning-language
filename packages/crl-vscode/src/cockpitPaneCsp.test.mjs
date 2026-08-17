@@ -25,11 +25,35 @@ describe("cockpitPaneCsp", () => {
     }
   });
 
-  it("relaxes ONLY style-src for fhirQuestionnaire, and drops the style nonce", () => {
+  it("relaxes style-src and img-src for fhirQuestionnaire, and drops the style nonce", () => {
     const csp = cockpitPaneCsp("fhirQuestionnaire", A);
-    assert.equal(csp, `default-src 'none'; style-src 'unsafe-inline' ${A.cspSource}; script-src 'nonce-${A.nonce}';`);
+    assert.equal(
+      csp,
+      `default-src 'none'; img-src ${A.cspSource}; style-src 'unsafe-inline' ${A.cspSource}; script-src 'nonce-${A.nonce}';`,
+    );
     assert.ok(!csp.includes(`nonce-${A.styleNonce}`), "style nonce must be dropped, not supplemented");
-    assert.ok(!csp.includes("img-src"), "img-src stays shut — never violated for group/boolean items");
+  });
+
+  it("permits img-src ONLY from cspSource — no data:, no blob:, no wildcard", () => {
+    // The vendored image set is CLOSED: two local PNGs referenced from styles.css (the autocompleter's dropdown
+    // arrow and search icon, which `choice`/`open-choice` items pull). The bundles contain no other image
+    // reference, no @font-face and no remote host, so nothing justifies widening this. The one `data:` image
+    // route is markdown-it's link validator, reachable only via rendering-markdown/rendering-xhtml item text,
+    // which the producer contract forbids and `unrenderableQuestionnaireFeatures` detects.
+    const csp = cockpitPaneCsp("fhirQuestionnaire", A);
+    assert.match(csp, new RegExp(`img-src ${A.cspSource};`), "img-src must be present and cspSource-scoped");
+    assert.ok(!/img-src[^;]*data:/.test(csp), "img-src must not permit data:");
+    assert.ok(!/img-src[^;]*blob:/.test(csp), "img-src must not permit blob:");
+    assert.ok(!/img-src[^;]*\*/.test(csp), "img-src must not be wildcarded");
+  });
+
+  it("never opens connect-src — this pane does no computation, so it does no fetching", () => {
+    // The bundles carry live fetch/XHR sites (ValueSet expansion, external autocomplete). `$apply` runs upstream
+    // at build time; the pane loads two JSON files. An outbound request from a clinician's webview is out of
+    // scope by design, and default-src 'none' is what enforces it.
+    for (const p of PANES) {
+      assert.ok(!cockpitPaneCsp(p, A).includes("connect-src"), `${p} opened connect-src`);
+    }
   });
 
   it("keeps script-src nonce-only for every pane", () => {

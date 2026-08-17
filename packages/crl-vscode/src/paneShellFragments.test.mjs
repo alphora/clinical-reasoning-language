@@ -57,11 +57,22 @@ describe("paneShellFragments", () => {
     assert.ok(!bodyScripts.includes("addEventListener"), "hooks must not drift into the body fragment");
   });
 
-  it("captures all THREE failure channels, which do not overlap", () => {
+  it("captures all FOUR failure channels, which do not overlap", () => {
     const { head } = frag("fhirQuestionnaire");
     assert.ok(head.includes("'404 '"), "404s (error with a target src) unreported");
     assert.ok(head.includes("'threw '"), "throws (error with no target src) unreported");
     assert.ok(head.includes("'CSP '"), "CSP blocks (securitypolicyviolation only) unreported");
+    // The first three are all SYNCHRONOUS. LForms fails asynchronously in the paths the all-item-types contract
+    // reaches — `loadAnswerValueSets` rejects outright when no terminology server and no FHIR context are
+    // configured (neither is, deliberately), with no network attempt and so no CSP violation either. Nothing
+    // listened for that, so it read as a clean load with an empty dropdown.
+    assert.ok(head.includes("'rejected '"), "promise rejections (unhandledrejection only) unreported");
+  });
+
+  it("registers the unhandledrejection hook on window, before the vendor scripts", () => {
+    const { head, bodyScripts } = frag("fhirQuestionnaire");
+    assert.ok(head.includes("addEventListener('unhandledrejection'"), "no unhandledrejection hook");
+    assert.ok(!bodyScripts.includes("unhandledrejection"), "the hook must stay in the head fragment");
   });
 
   it("nonces every <script> it emits", () => {

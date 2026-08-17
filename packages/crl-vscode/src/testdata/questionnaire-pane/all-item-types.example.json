@@ -1,0 +1,188 @@
+{
+  "_comment": [
+    "MEASUREMENT FIXTURE — every R4 Questionnaire.item.type, used to re-walk the CSP ladder against the whole",
+    "producer contract instead of the group/boolean subset the original measurement used.",
+    "",
+    "It DELIBERATELY breaches the producer contract in one place: it carries a `reference` item. The vendored",
+    "LForms converter's _getDataType switch has no case for `reference`, so it returns the initializer \"string\"",
+    "— not an LForms dataType (ST is) — and no renderer branch matches: no widget, no throw, no CSP violation.",
+    "Keeping it here is how that degradation stays MEASURED rather than assumed, and it doubles as the live",
+    "proof that unrenderableQuestionnaireFeatures() reports a breach.",
+    "",
+    "The attachment answer carries real base64 image data on purpose: that is the only path by which an",
+    "attachment could ask the renderer for an image preview, and img-src deliberately excludes data:.",
+    "",
+    "R4 defines a 17th code, `question`, which is abstract and not for use. It is excluded on purpose.",
+    "",
+    "No answerValueSet, no preferredTerminologyServer, no answerExpression, no x-fhir-query: those need a",
+    "terminology server or FHIR context that this pane does not configure, and connect-src is shut."
+  ],
+  "lane": "local",
+  "warnings": [],
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "id": "crl-all-item-types-measurement",
+    "url": "http://example.org/crl/measurement/Questionnaire/all-item-types",
+    "version": "0.0.0-fixture",
+    "name": "AllItemTypesMeasurement",
+    "title": "MEASUREMENT FIXTURE - all R4 item types",
+    "status": "active",
+    "subjectType": ["Patient"],
+    "item": [
+      {
+        "linkId": "banner",
+        "type": "display",
+        "text": "This is the ALL-ITEM-TYPES measurement fixture, not a real case. If you are looking at this while reviewing a clinical case, the wrong fixture is seeded."
+      },
+      {
+        "linkId": "primitives",
+        "type": "group",
+        "text": "Primitive types",
+        "item": [
+          { "linkId": "p-boolean", "type": "boolean", "text": "boolean" },
+          { "linkId": "p-decimal", "type": "decimal", "text": "decimal" },
+          { "linkId": "p-integer", "type": "integer", "text": "integer" },
+          { "linkId": "p-date", "type": "date", "text": "date" },
+          { "linkId": "p-dateTime", "type": "dateTime", "text": "dateTime" },
+          { "linkId": "p-time", "type": "time", "text": "time" },
+          { "linkId": "p-string", "type": "string", "text": "string" },
+          { "linkId": "p-text", "type": "text", "text": "text" },
+          { "linkId": "p-url", "type": "url", "text": "url" }
+        ]
+      },
+      {
+        "linkId": "coded",
+        "type": "group",
+        "text": "Coded types - these are the items that pull the autocompleter PNGs (img-src)",
+        "item": [
+          {
+            "linkId": "c-choice",
+            "type": "choice",
+            "text": "choice (inline answerOption, as the contract requires)",
+            "answerOption": [
+              { "valueCoding": { "system": "http://example.org/crl/measurement", "code": "yes", "display": "Yes" } },
+              { "valueCoding": { "system": "http://example.org/crl/measurement", "code": "no", "display": "No" } },
+              { "valueCoding": { "system": "http://example.org/crl/measurement", "code": "unk", "display": "Unknown" } }
+            ]
+          },
+          {
+            "linkId": "c-open-choice",
+            "type": "open-choice",
+            "text": "open-choice (inline answerOption)",
+            "answerOption": [
+              { "valueCoding": { "system": "http://example.org/crl/measurement", "code": "a", "display": "Option A" } },
+              { "valueCoding": { "system": "http://example.org/crl/measurement", "code": "b", "display": "Option B" } }
+            ]
+          },
+          { "linkId": "c-quantity", "type": "quantity", "text": "quantity" }
+        ]
+      },
+      {
+        "linkId": "complex",
+        "type": "group",
+        "text": "Complex types",
+        "item": [
+          { "linkId": "x-attachment", "type": "attachment", "text": "attachment" },
+          {
+            "linkId": "x-reference",
+            "type": "reference",
+            "text": "reference - EXPECTED TO RENDER NO WIDGET (see _comment)"
+          },
+          {
+            "linkId": "nested",
+            "type": "group",
+            "text": "Nested group - exercises the recursive walk",
+            "item": [{ "linkId": "n-string", "type": "string", "text": "nested string" }]
+          }
+        ]
+      }
+    ]
+  },
+  "questionnaireResponse": {
+    "resourceType": "QuestionnaireResponse",
+    "id": "crl-all-item-types-measurement-response",
+    "questionnaire": "http://example.org/crl/measurement/Questionnaire/all-item-types|0.0.0-fixture",
+    "status": "completed",
+    "authored": "2026-08-17T00:00:00Z",
+    "item": [
+      {
+        "linkId": "primitives",
+        "text": "Primitive types",
+        "item": [
+          { "linkId": "p-boolean", "text": "boolean", "answer": [{ "valueBoolean": true }] },
+          { "linkId": "p-decimal", "text": "decimal", "answer": [{ "valueDecimal": 12.5 }] },
+          { "linkId": "p-integer", "text": "integer", "answer": [{ "valueInteger": 42 }] },
+          { "linkId": "p-date", "text": "date", "answer": [{ "valueDate": "2026-08-17" }] },
+          { "linkId": "p-dateTime", "text": "dateTime", "answer": [{ "valueDateTime": "2026-08-17T09:30:00Z" }] },
+          { "linkId": "p-time", "text": "time", "answer": [{ "valueTime": "09:30:00" }] },
+          { "linkId": "p-string", "text": "string", "answer": [{ "valueString": "a string answer" }] },
+          { "linkId": "p-text", "text": "text", "answer": [{ "valueString": "a longer text answer\nspanning two lines" }] },
+          { "linkId": "p-url", "text": "url", "answer": [{ "valueUri": "http://example.org/crl/measurement" }] }
+        ]
+      },
+      {
+        "linkId": "coded",
+        "text": "Coded types - these are the items that pull the autocompleter PNGs (img-src)",
+        "item": [
+          {
+            "linkId": "c-choice",
+            "text": "choice (inline answerOption, as the contract requires)",
+            "answer": [
+              { "valueCoding": { "system": "http://example.org/crl/measurement", "code": "yes", "display": "Yes" } }
+            ]
+          },
+          {
+            "linkId": "c-open-choice",
+            "text": "open-choice (inline answerOption)",
+            "answer": [
+              { "valueCoding": { "system": "http://example.org/crl/measurement", "code": "b", "display": "Option B" } }
+            ]
+          },
+          {
+            "linkId": "c-quantity",
+            "text": "quantity",
+            "answer": [
+              {
+                "valueQuantity": {
+                  "value": 70,
+                  "unit": "kg",
+                  "system": "http://unitsofmeasure.org",
+                  "code": "kg"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "linkId": "complex",
+        "text": "Complex types",
+        "item": [
+          {
+            "linkId": "x-attachment",
+            "text": "attachment",
+            "answer": [
+              {
+                "valueAttachment": {
+                  "contentType": "image/png",
+                  "title": "one-pixel.png",
+                  "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+                }
+              }
+            ]
+          },
+          {
+            "linkId": "x-reference",
+            "text": "reference - EXPECTED TO RENDER NO WIDGET (see _comment)",
+            "answer": [{ "valueReference": { "reference": "Patient/measurement-example", "display": "Example Patient" } }]
+          },
+          {
+            "linkId": "nested",
+            "text": "Nested group - exercises the recursive walk",
+            "item": [{ "linkId": "n-string", "text": "nested string", "answer": [{ "valueString": "nested answer" }] }]
+          }
+        ]
+      }
+    ]
+  }
+}
