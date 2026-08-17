@@ -13,6 +13,10 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// Imported so the package.json default and the spec's fallback are pinned to each other — two sources of truth
+// for "what MV shows with no setting" would otherwise diverge silently.
+import { MEDICAL_VALIDATION_PANE_SPEC } from "./paneOrder.ts";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgPath = resolve(here, "../package.json");
 const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
@@ -164,18 +168,24 @@ check("contributes the crl.medical-validation.paneOrder setting (enum + ALL-pane
   const prop = c.configuration?.properties?.["crl.medical-validation.paneOrder"];
   assert.ok(prop, "expected crl.medical-validation.paneOrder in contributes.configuration.properties");
   assert.equal(prop.type, "array");
-  const ALL = ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"];
-  assert.deepEqual(prop.items?.enum, ALL);
-  // MV defaults to ALL its panes and the user narrows from there. The setting is the source of truth: an
-  // explicit order is honored exactly and nothing is appended back, so the default must be the full set or a
-  // pane would be undiscoverable.
-  assert.deepEqual(prop.default, ALL);
+  assert.deepEqual(prop.items?.enum, ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"]);
+  // Operator's default (2026-08-16). Deliberately a SUBSET of the enum: the setting is the source of truth, so
+  // the rest are opt-in via the enum a user editing this setting is already looking at. Defaulting to all seven
+  // was tried and reverted — seven webviews side by side on a browser-only clinician's screen.
+  assert.deepEqual(prop.default, ["source", "fhirQuestionnaire", "tree"]);
   assert.equal(prop.scope, "window");
 });
 
-check("the enum and the default agree — every offered pane is on by default", () => {
+check("the package default and the MV spec's fallback are the SAME list", () => {
+  // Two sources of truth for "what MV shows with no setting" would diverge silently: package.json supplies the
+  // value when the setting is unset, spec.canonical when it is set to a non-array.
   const prop = c.configuration?.properties?.["crl.medical-validation.paneOrder"];
-  assert.deepEqual([...prop.default].sort(), [...prop.items.enum].sort());
+  assert.deepEqual([...MEDICAL_VALIDATION_PANE_SPEC.canonical], prop.default);
+});
+
+check("every default pane is a valid pane", () => {
+  const prop = c.configuration?.properties?.["crl.medical-validation.paneOrder"];
+  assert.ok(prop.default.every((p) => prop.items.enum.includes(p)), "a default pane is missing from the enum");
 });
 
 check("no crl.dev.* command or setting ships to users", () => {

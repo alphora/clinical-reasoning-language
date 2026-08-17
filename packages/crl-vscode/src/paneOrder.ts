@@ -42,12 +42,17 @@ export const COCKPIT_PANE_SPEC: PaneSpec = {
  *  not-canonical, so a MV user can open the read-only CEL alongside the worklist. No alias (dropped when worklist split
  *  from cel — pane split, disc 179): listing both `worklist` and `cel` now opens BOTH (they're different internal panes). */
 export const MEDICAL_VALIDATION_PANE_SPEC: PaneSpec = {
-  // `canonical` here is the FALLBACK (see normalizePaneOrder) — what MV shows when the setting is unset, not a
-  // set of panes forced into an explicit order. Every pane below, worklist included, can be omitted by writing
-  // an order without it, and an empty order shows nothing.
-  // MV defaults to ALL its panes; a user narrows from there.
+  // `canonical` here is the FALLBACK (see normalizePaneOrder) — not a set of panes forced into an explicit
+  // order. Every pane below, worklist included, can be omitted by writing an order without it, and an empty
+  // order shows nothing.
+  //
+  // MUST MATCH `crl.medical-validation.paneOrder`'s `default` in package.json (pinned by package.test.mjs).
+  // Defaulting to all seven was briefly tried and reverted: it put seven retainContextWhenHidden webviews —
+  // including the 1.85 MB LForms shell — side by side on a browser-only clinician's screen, for panes most of
+  // them never open. Discoverability comes from the settings enum, which is where someone editing paneOrder
+  // already is.
   valid: ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"],
-  canonical: ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"],
+  canonical: ["source", "fhirQuestionnaire", "tree"],
 };
 
 const VALID_PANES: ReadonlySet<Pane> = new Set<Pane>(["source", "crl", "cel", "tree", "questionnaire", "fhirQuestionnaire", "worklist"]);
