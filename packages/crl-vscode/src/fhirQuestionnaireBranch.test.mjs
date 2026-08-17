@@ -46,7 +46,29 @@ describe("fhirQuestionnaire webview branch", () => {
     // addFormToPage can resolve without painting when the item tree is unrecognised; Angular Elements also
     // upgrades asynchronously, so a single-frame check would report a false zero.
     assert.match(branch, /getBoundingClientRect\(\)\.height>0/);
-    assert.ok(branch.includes("The questionnaire did not render."), "no message for the empty-mount case");
+    assert.ok(branch.includes("has not rendered yet"), "no message for the empty-mount case");
+  });
+
+  it("the no-paint poll cannot outlive its own render", () => {
+    // It closes over the mount element. Without an identity check, a slow case A's poll fires after case B has
+    // mounted and would tear down B's LIVE form, labelled with A.
+    assert.match(branch, /const mine=m\.key/);
+    assert.match(branch, /window\.__aqKey!==mine\)return/);
+  });
+
+  it("the no-paint timeout does NOT tear down the container", () => {
+    // Angular Elements can still be upgrading on a cold codespace; destroying the mount to report slowness
+    // would turn a slow render into a permanently blank one.
+    const poll = branch.slice(branch.indexOf("const mine=m.key"));
+    assert.ok(!poll.includes("replaceChildren"), "the poll must report, not destroy");
+  });
+
+  it("latches the skip-remount key ONLY after a successful mount", () => {
+    // Latching up-front latched FAILURES: "could not find data" would stick for a case even after the producer
+    // wrote its artifacts, because the same key returned early forever.
+    assert.match(branch, /window\.__aqKey=undefined/, "the key must be cleared on entry");
+    const afterMount = branch.slice(branch.indexOf("addFormToPage"));
+    assert.match(afterMount, /window\.__aqKey=m\.key/, "the key must be set after addFormToPage, not before");
   });
 
   it("distinguishes NO CASE SELECTED from NO DATA FOUND", () => {

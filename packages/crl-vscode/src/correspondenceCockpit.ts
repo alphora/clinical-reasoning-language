@@ -196,7 +196,10 @@ const PRIMARY_PANES: PrimaryPane[] = ["source", "crl", "cel"];
 // cel are DISTINCT internal panes, so MV's valid set is up to 6 (worklist, cel, source, tree, questionnaire, crl) — a user
 // paneOrder listing all six must get a 6th column instead of piling onto column One via the `?? One` fallback (VS Code
 // supports up to 9). The default MV set stays 4 (worklist/source/tree/questionnaire); this only bounds the overflow case.
-const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.ViewColumn.Three, vscode.ViewColumn.Four, vscode.ViewColumn.Five, vscode.ViewColumn.Six];
+// NINE slots. MV now has SEVEN panes and defaults to all of them, so a six-slot list left the seventh falling
+// back to `?? One` and piling on top of the first pane — reachable on a fresh install, not an edge case.
+// Nine is VS Code's own maximum, so this cannot under-provision again as panes are added.
+const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.ViewColumn.Three, vscode.ViewColumn.Four, vscode.ViewColumn.Five, vscode.ViewColumn.Six, vscode.ViewColumn.Seven, vscode.ViewColumn.Eight, vscode.ViewColumn.Nine];
 // The two questionnaire panes are named by their SOURCE, which is the whole point of showing both: "CRL
 // Questionnaire" is the projection of what the CRL says, "FHIR Questionnaire" is what the emitted artifact
 // actually produced via $apply. Naming one of them "$apply" would name the mechanism rather than the thing.
@@ -625,9 +628,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** Reconcile OPEN panels to the (normalized) paneOrder, then place columns. Unlike applyPaneOrder (reorder-only), this
    *  OPENS a now-listed visible pane (rendering it immediately so it isn't blank) and DISPOSES an open pane dropped from
    *  the order — so toggling the opt-in tree pane in settings takes effect live, without re-running "Show Cockpit". Only
-   *  the tree pane can ever be disposed here: normalizePaneOrder always re-adds the 3 canonical panes. */
+   *  ⚠ CHANGED 2026-08-16: ANY pane can now be disposed here. normalizePaneOrder no longer re-adds "canonical"
+   *  panes to an explicit order (the setting is the source of truth), so a user can drop source/CRL/CEL/
+   *  worklist/either questionnaire — not just the opt-in tree. Anything here that assumed a pane is always
+   *  present must not. */
   const reconcilePaneOrder = (): void => {
-    for (const pane of [...views.keys()]) if (!paneOrder.includes(pane)) views.get(pane)?.panel.dispose(); // dispose dropped (tree only)
+    for (const pane of [...views.keys()]) if (!paneOrder.includes(pane)) views.get(pane)?.panel.dispose(); // dispose any dropped pane
     let opened = false;
     for (const pane of paneOrder) {
       if (!state.paneVisibility[pane]) continue;
@@ -2096,8 +2102,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       {
         const focused = focusedScenario();
         const cid = focusedCaseId(state);
-        // Render identity: remount only when the case's CONTENT changes. Swap to the producer's revision or
-        // content hash when #277 supplies one.
+        // Render identity — currently SELECTION identity, not content identity. It suppresses remounts on
+        // unrelated cockpit re-renders (rebuild/applyShowKeys), which is what it is for. It does NOT detect a
+        // Q/QR that changed on disk for the still-selected case; that needs the producer's revision or content
+        // hash (requested on #277). Do not describe this as content-based until it is.
         const key = focused ? `${focused.decision?.libraryName ?? ""}::${cid ?? ""}` : undefined;
         // Same derivation the CRL Questionnaire pane uses (questionnairePaneHtml.ts:331) — strips the authored
         // `-> outcome` suffix — so the two panes show an identical case header.
@@ -2107,7 +2115,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           void v.panel.webview.postMessage({ type: "fhirQuestionnaire", gen, indexVersion, key, label, q, qr, lookedFor });
         };
         if (!focused || !cid) post();
-        else void loadFhirQuestionnaireCase(cid).then((r) => post(r.q, r.qr, r.lookedFor));
+        else void loadFhirQuestionnaireCase(cid, focused.decision?.libraryName).then((r) => post(r.q, r.qr, r.lookedFor));
       }
     } else {
       // questionnaire (#177 slice 3) — a STATIC, read-only projection of the FOCUSED cel case's fired path. Gets the
@@ -2155,29 +2163,48 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    */
   async function loadFhirQuestionnaireCase(
     caseId: string,
+    libraryName: string | undefined,
   ): Promise<{ q?: unknown; qr?: unknown; lookedFor: string }> {
-    const slug = caseId
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-    const lookedFor = `**/tests/data/fhir/patient/*/${slug}*/{Questionnaire,QuestionnaireResponse}/*.json`;
+    const slugify = (s: string): string =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    const slug = slugify(caseId);
+    // The case DIRECTORY carries an outcome suffix the case id does not, so the glob must be a prefix — but a
+    // prefix glob also matches any SIBLING whose slug extends this one (`denied` matches `denied-emergency-met`).
+    // findFiles order is unspecified, so first-wins would render another case's form under this case's header:
+    // a silent wrong-content state on a validation surface. The glob stays broad for the filesystem; the
+    // accepted directory names are then checked EXACTLY.
+    const acceptedCaseDirs = new Set([slug, `${slug}-met`, `${slug}-unmet`]);
+    // Scope by library too when we know it — two libraries can carry the same case slug, and in a multi-root
+    // workspace findFiles spans every folder.
+    const libSeg = libraryName ? `${slugify(libraryName)}-cases` : "*";
+    const lookedFor = `**/tests/data/fhir/patient/${libSeg}/${slug}*/{Questionnaire,QuestionnaireResponse}/*.json`;
     const out: { q?: unknown; qr?: unknown; lookedFor: string } = { lookedFor };
-    if (!slug) return out;
+    if (!slug) return { ...out, lookedFor: "(no case id — nothing was searched)" };
+    let hits: readonly vscode.Uri[] = [];
     try {
-      const hits = await vscode.workspace.findFiles(lookedFor, "**/node_modules/**", 20);
-      for (const uri of hits) {
-        const parent = uri.path.split("/").slice(-2, -1)[0]; // the <ResourceType> dir holding the file
-        if (parent !== "Questionnaire" && parent !== "QuestionnaireResponse") continue;
-        if (parent === "Questionnaire" && out.q) continue; // first wins; a case has one of each
-        if (parent === "QuestionnaireResponse" && out.qr) continue;
-        const text = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8");
-        const json: unknown = JSON.parse(text);
-        if (parent === "Questionnaire") out.q = json;
-        else out.qr = json;
-      }
+      hits = await vscode.workspace.findFiles(lookedFor, "**/node_modules/**", 200);
     } catch {
-      // A malformed or unreadable file is reported to the pane as "not found" rather than thrown — the pane
-      // says what it looked for, which is more useful than a stack trace in a channel nobody has open.
+      return out;
+    }
+    for (const uri of hits) {
+      const segs = uri.path.split("/");
+      const type = segs[segs.length - 2]; // the <ResourceType> dir holding the file
+      const caseDir = segs[segs.length - 3]; // the <case-slug> dir holding that
+      if (type !== "Questionnaire" && type !== "QuestionnaireResponse") continue;
+      if (!caseDir || !acceptedCaseDirs.has(caseDir)) continue; // reject a prefix sibling
+      if (type === "Questionnaire" && out.q) continue; // a case has one of each
+      if (type === "QuestionnaireResponse" && out.qr) continue;
+      // Per-FILE try: one malformed document must not abort the search and hide a valid one later in the list.
+      try {
+        const json: unknown = JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8"));
+        if (type === "Questionnaire") out.q = json;
+        else out.qr = json;
+      } catch {
+        // skip this file; keep looking
+      }
     }
     return out;
   }
@@ -2271,6 +2298,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.criterionOccurrences = []; // #224 ii.3 Slice 2b: reset the criterion-verdict substrate too (symmetry)
       v.flaggableGids = [];
       v.startNodeGid = undefined;
+      if (pane === "fhirQuestionnaire") {
+        // This pane owns its own DOM and holds a render-identity key in the webview. The generic `render`
+        // message would replace #root (destroying the LForms mount) WITHOUT clearing that key, so re-selecting
+        // the same case afterwards would hit the skip-remount check and never rebuild the form. Its own
+        // data-only message clears the key and paints the placeholder.
+        void v.panel.webview.postMessage({ type: "fhirQuestionnaire", gen, indexVersion, key: undefined, label: undefined });
+        continue;
+      }
       void v.panel.webview.postMessage({ type: "render", html: `<p class="placeholder">${escapeHtml(message)}</p>`, gen, indexVersion, mode });
     }
   }
@@ -2566,9 +2601,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function ensurePane(pane: Pane): PaneView {
     let v = views.get(pane);
     if (v) return v;
-    // The $apply pane loads the vendored LForms runtime from media/lforms/. Without localResourceRoots the
-    // webview refuses those URIs outright — no CSP violation, just a silent 404 and a blank pane. Scoped to that
-    // one directory; every other pane keeps the default (no local resources at all).
+    // The $apply pane loads the vendored LForms runtime from media/lforms/. Setting localResourceRoots NARROWS
+    // the webview to that one directory. (Omitting it does NOT mean "no local resources" — VS Code's default is
+    // the workspace folders plus the extension directory; the other panes are protected by their
+    // `default-src 'none'` CSP, not by an empty root list.)
     const lformsRoot = vscode.Uri.joinPath(context.extensionUri, "media", "lforms");
     const panel = vscode.window.createWebviewPanel(
       `crlCockpit.${pane}`,
@@ -5468,8 +5504,13 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // (rebuild/applyShowKeys/renderEmpty) reaches every pane, and remounting a 1.85 MB Angular app on an
   // unrelated render would churn and discard in-progress answers.
   `else if(m.type==='fhirQuestionnaire'){` +
+  // The skip-remount latch is set ONLY after a successful mount (bottom of the try). Latching it up-front
+  // latched FAILURES too: select a case with no artifacts -> "could not find" paints and the key sticks -> the
+  // producer (or the seed script) writes the files -> every later render posts the same key and returns early,
+  // so the pane shows "could not find" until you select a different case and come back. That is precisely the
+  // workflow this pane exists for.
   `if(m.key&&m.key===window.__aqKey)return;` +
-  `window.__aqKey=m.key;` +
+  `window.__aqKey=undefined;` +
   `const host=document.getElementById('root');` +
   // The case header mirrors the CRL Questionnaire pane's, so the two panes read as the same case side by side.
   `const head=(t)=>{const h=document.createElement('p');h.className='aq-case';h.textContent=t;return h;};` +
@@ -5489,9 +5530,20 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(!form){fail('convertFHIRQuestionnaireToLForms returned nothing.');return;}` +
   `if(m.qr)form=LForms.Util.mergeFHIRDataIntoLForms('QuestionnaireResponse',m.qr,form,'R4');` +
   `LForms.Util.addFormToPage(form,'aqMount',{prepopulate:false});` +
+  `window.__aqKey=m.key;` + // latch ONLY on success — see the note at the top of this branch
+
   // addFormToPage can resolve without painting (an unrecognised item tree yields an empty form). Angular
   // Elements upgrades asynchronously, so poll briefly rather than measuring on the next frame.
-  `let n=0;const chk=()=>{if(mount.getBoundingClientRect().height>0)return;if(++n>40){fail('The questionnaire did not render.');return;}setTimeout(chk,50);};setTimeout(chk,50);` +
+  // The no-paint poll must not outlive its own render. It closes over `mount`, and on timeout it used to call
+  // fail(), which clears #root — so a slow case A could wipe the LIVE form of case B selected moments later,
+  // and label the wreckage with A. It now bails if the latch moved on, and reports WITHOUT tearing down a form
+  // that may still be upgrading (Angular Elements can be slow on a cold codespace).
+  `const mine=m.key;let n=0;const chk=()=>{if(window.__aqKey!==mine)return;` +
+  `if(mount.getBoundingClientRect().height>0)return;` +
+  `if(++n>40){const w=document.createElement('p');w.className='aq-warning';` +
+  `w.textContent='The questionnaire has not rendered yet. If it stays blank, the form did not paint.';` +
+  `if(!mount.previousElementSibling||!mount.previousElementSibling.classList.contains('aq-warning'))host.insertBefore(w,mount);return;}` +
+  `setTimeout(chk,50);};setTimeout(chk,50);` +
   `}catch(e){fail('Could not render the questionnaire: '+((e&&e.message)?e.message:String(e)));}` +
   `}` +
   // #211: the create-flag drawer's OWN region — set (or clear with '') its html. The render handler never touches it, so a
