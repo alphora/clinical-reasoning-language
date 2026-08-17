@@ -10,7 +10,12 @@
 //   <content-repo>/**/tests/data/fhir/patient/<library-slug>-cases/<case-slug>/Questionnaire/<id>.json
 //   <content-repo>/**/tests/data/fhir/patient/<library-slug>-cases/<case-slug>/QuestionnaireResponse/<id>.json
 //
-// Usage:
+// Usage (from the WORKTREE ROOT — E:\src\mv-plandefinition-questionnaire):
+//   npm run seed:questionnaire -- --root <content-repo> --all
+//   npm run seed:questionnaire -- --root <content-repo> --case <case-slug-or-prefix>
+//   npm run seed:questionnaire -- --root <content-repo> --all --clean
+//
+// Or directly:
 //   node scripts/seed-questionnaire-fixture.mjs --root <content-repo> --all
 //   node scripts/seed-questionnaire-fixture.mjs --root <content-repo> --case <case-slug-or-prefix>
 //   node scripts/seed-questionnaire-fixture.mjs --root <content-repo> --all --clean
