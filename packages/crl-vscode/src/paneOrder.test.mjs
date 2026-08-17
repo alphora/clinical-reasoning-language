@@ -42,8 +42,10 @@ check("a NON-array (unset / malformed type) falls back to the spec's canonical s
   }
 });
 
-check("MV defaults to ALL its panes, so a user narrows rather than discovers", () => {
-  assert.deepEqual(mv(undefined), ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"]);
+check("MV's fallback is the operator's three-pane set, NOT every pane", () => {
+  // Defaulting to all seven was tried and reverted: seven retainContextWhenHidden webviews side by side on a
+  // browser-only clinician's screen, including the 1.85 MB LForms shell, for panes most never open.
+  assert.deepEqual(mv(undefined), ["source", "fhirQuestionnaire", "tree"]);
 });
 
 // ── repair rules that survive unchanged ──
