@@ -2114,8 +2114,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           if (v.gen !== gen) return; // a newer render superseded this async load
           void v.panel.webview.postMessage({ type: "fhirQuestionnaire", gen, indexVersion, key, label, q, qr, lookedFor });
         };
-        if (!focused || !cid) post();
-        else void loadFhirQuestionnaireCase(cid, focused.decision?.libraryName).then((r) => post(r.q, r.qr, r.lookedFor));
+        // The FULL authored name (arrow suffix included) is the artifact-directory key — see the note on
+        // loadFhirQuestionnaireCase. `label` above is the display form, which deliberately strips it.
+        const caseName = focused?.case?.name ?? "";
+        if (!focused || !cid || !caseName) post();
+        else void loadFhirQuestionnaireCase(caseName, focused.decision?.libraryName).then((r) => post(r.q, r.qr, r.lookedFor));
       }
     } else {
       // questionnaire (#177 slice 3) — a STATIC, read-only projection of the FOCUSED cel case's fired path. Gets the
@@ -2162,25 +2165,25 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    * trailing `*` on the slug.
    */
   async function loadFhirQuestionnaireCase(
-    caseId: string,
+    caseName: string,
     libraryName: string | undefined,
   ): Promise<{ q?: unknown; qr?: unknown; lookedFor: string }> {
-    const slugify = (s: string): string =>
-      s
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
-    const slug = slugify(caseId);
-    // The case DIRECTORY carries an outcome suffix the case id does not, so the glob must be a prefix — but a
-    // prefix glob also matches any SIBLING whose slug extends this one (`denied` matches `denied-emergency-met`).
-    // findFiles order is unspecified, so first-wins would render another case's form under this case's header:
-    // a silent wrong-content state on a validation surface. The glob stays broad for the filesystem; the
-    // accepted directory names are then checked EXACTLY.
-    const acceptedCaseDirs = new Set([slug, `${slug}-met`, `${slug}-unmet`]);
+    const slugify = artifactSlug;
+    // ⚠ Keyed on the case's FULL AUTHORED NAME, including its `-> outcome` suffix — that is what the emitter
+    // slugifies into the directory name:
+    //   "exclusion overrides full documentation -> unmet (ordered precedence)"
+    //     → exclusion-overrides-full-documentation-unmet-ordered-precedence
+    // NOT the caseId (which is a different, shorter identifier — `exclusion-overrides-precedence` here) and NOT
+    // caseDisplayName (which strips the arrow, and the outcome is part of the directory name). Keying on the
+    // caseId matched by luck on cases whose id happened to prefix the directory, and silently missed otherwise.
+    //
+    // Because the whole name is used, the match is EXACT — no prefix glob, so no risk of binding a sibling case
+    // whose slug extends this one.
+    const slug = slugify(caseName);
     // Scope by library too when we know it — two libraries can carry the same case slug, and in a multi-root
     // workspace findFiles spans every folder.
     const libSeg = libraryName ? `${slugify(libraryName)}-cases` : "*";
-    const lookedFor = `**/tests/data/fhir/patient/${libSeg}/${slug}*/{Questionnaire,QuestionnaireResponse}/*.json`;
+    const lookedFor = `**/tests/data/fhir/patient/${libSeg}/${slug}/{Questionnaire,QuestionnaireResponse}/*.json`;
     const out: { q?: unknown; qr?: unknown; lookedFor: string } = { lookedFor };
     if (!slug) return { ...out, lookedFor: "(no case id — nothing was searched)" };
     let hits: readonly vscode.Uri[] = [];
@@ -2194,7 +2197,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const type = segs[segs.length - 2]; // the <ResourceType> dir holding the file
       const caseDir = segs[segs.length - 3]; // the <case-slug> dir holding that
       if (type !== "Questionnaire" && type !== "QuestionnaireResponse") continue;
-      if (!caseDir || !acceptedCaseDirs.has(caseDir)) continue; // reject a prefix sibling
+      if (caseDir !== slug) continue; // exact case-directory match; belt and braces against a glob surprise
       if (type === "Questionnaire" && out.q) continue; // a case has one of each
       if (type === "QuestionnaireResponse" && out.qr) continue;
       // Per-FILE try: one malformed document must not abort the search and hide a valid one later in the list.
@@ -5134,6 +5137,19 @@ export function cockpitPaneCsp(
   }
   return `default-src 'none'; style-src 'nonce-${a.styleNonce}'; script-src 'nonce-${a.nonce}';`;
 }
+
+/**
+ * The emitter's directory-name derivation: lowercase, non-alphanumerics collapsed to `-`, trimmed.
+ *
+ * Pure + exported so the ONE thing that decides whether a case's artifacts are found at all is pinned by tests
+ * against real directory names. Applied to a case's FULL AUTHORED NAME (arrow suffix included) it yields the
+ * case artifact directory; applied to a library name plus `-cases` it yields the library segment.
+ */
+export const artifactSlug = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
 /**
  * The pane-specific pieces of the shell document, split by WHERE they must go. Pure + exported because every
