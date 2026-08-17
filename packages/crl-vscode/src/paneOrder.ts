@@ -42,13 +42,13 @@ export const COCKPIT_PANE_SPEC: PaneSpec = {
  *  not-canonical, so a MV user can open the read-only CEL alongside the worklist. No alias (dropped when worklist split
  *  from cel — pane split, disc 179): listing both `worklist` and `cel` now opens BOTH (they're different internal panes). */
 export const MEDICAL_VALIDATION_PANE_SPEC: PaneSpec = {
-  // `applyQuestionnaire` (the $apply/LForms pane) is valid-but-NOT-canonical: strictly opt-in via paneOrder, so
+  // `fhirQuestionnaire` (the $apply/LForms pane) is valid-but-NOT-canonical: strictly opt-in via paneOrder, so
   // the default MV set stays [worklist, source, tree, questionnaire] and nothing changes for existing users.
-  valid: ["worklist", "source", "tree", "questionnaire", "applyQuestionnaire", "crl", "cel"],
+  valid: ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"],
   canonical: ["worklist", "source", "tree", "questionnaire"],
 };
 
-const VALID_PANES: ReadonlySet<Pane> = new Set<Pane>(["source", "crl", "cel", "tree", "questionnaire", "applyQuestionnaire", "worklist"]);
+const VALID_PANES: ReadonlySet<Pane> = new Set<Pane>(["source", "crl", "cel", "tree", "questionnaire", "fhirQuestionnaire", "worklist"]);
 
 /** Resolve a PUBLIC key to an InternalPane via the spec's aliases (identity when unmapped); undefined if the result is
  *  not a real pane (so an alias can never introduce a non-pane). */

@@ -10,23 +10,23 @@ import { describe, it } from "vitest";
 import { cockpitPaneCsp } from "./correspondenceCockpit.ts";
 
 // Must stay in lockstep with `Pane` in correspondenceEngine.ts — that union is not enumerable at runtime.
-const PANES = ["source", "crl", "cel", "tree", "questionnaire", "applyQuestionnaire", "worklist"];
+const PANES = ["source", "crl", "cel", "tree", "questionnaire", "fhirQuestionnaire", "worklist"];
 const A = { nonce: "N", styleNonce: "S", cspSource: "vscode-webview://host" };
 
 /** The policy as it stood before the seam was introduced (correspondenceCockpit.ts:4986). */
 const HISTORICAL = "default-src 'none'; style-src 'nonce-S'; script-src 'nonce-N';";
 
 describe("cockpitPaneCsp", () => {
-  it("leaves every pane BUT applyQuestionnaire on the historical policy, byte for byte", () => {
+  it("leaves every pane BUT fhirQuestionnaire on the historical policy, byte for byte", () => {
     // The relaxation must stay confined to the one pane that needs it. Each pane is its own WebviewPanel with
     // its own document, so this is a real containment guarantee, not a convention.
-    for (const p of PANES.filter((p) => p !== "applyQuestionnaire")) {
+    for (const p of PANES.filter((p) => p !== "fhirQuestionnaire")) {
       assert.equal(cockpitPaneCsp(p, A), HISTORICAL, `${p} pane's CSP drifted from the pre-seam policy`);
     }
   });
 
-  it("relaxes ONLY style-src for applyQuestionnaire, and drops the style nonce", () => {
-    const csp = cockpitPaneCsp("applyQuestionnaire", A);
+  it("relaxes ONLY style-src for fhirQuestionnaire, and drops the style nonce", () => {
+    const csp = cockpitPaneCsp("fhirQuestionnaire", A);
     assert.equal(csp, `default-src 'none'; style-src 'unsafe-inline' ${A.cspSource}; script-src 'nonce-${A.nonce}';`);
     assert.ok(!csp.includes(`nonce-${A.styleNonce}`), "style nonce must be dropped, not supplemented");
     assert.ok(!csp.includes("img-src"), "img-src stays shut — never violated for group/boolean items");
