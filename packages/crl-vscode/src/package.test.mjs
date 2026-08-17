@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 // Imported so the package.json default and the spec's fallback are pinned to each other — two sources of truth
 // for "what MV shows with no setting" would otherwise diverge silently.
-import { MEDICAL_VALIDATION_PANE_SPEC } from "./paneOrder.ts";
+import { MEDICAL_VALIDATION_PANE_SPEC, COCKPIT_PANE_SPEC } from "./paneOrder.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgPath = resolve(here, "../package.json");
@@ -174,6 +174,14 @@ check("contributes the crl.medical-validation.paneOrder setting (enum + ALL-pane
   // was tried and reverted — seven webviews side by side on a browser-only clinician's screen.
   assert.deepEqual(prop.default, ["source", "fhirQuestionnaire", "tree"]);
   assert.equal(prop.scope, "window");
+});
+
+check("the package default and the COCKPIT spec's fallback are the SAME list", () => {
+  // Same trap as MV: cockpit canonical omitted `tree` (right when canonical meant "always appended", wrong now
+  // that it means "what you get with no usable setting") while the package default included it — so deleting
+  // the setting gave four panes and a mistyped setting gave three.
+  const prop = c.configuration?.properties?.["crl.cockpit.paneOrder"];
+  assert.deepEqual([...COCKPIT_PANE_SPEC.canonical], prop.default);
 });
 
 check("the package default and the MV spec's fallback are the SAME list", () => {

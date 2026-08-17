@@ -30,11 +30,13 @@ export interface PaneSpec {
   aliases?: Record<PublicPaneKey, InternalPane>;
 }
 
-/** The cockpit spec — BYTE-IDENTICAL to the pre-spec behavior: valid = the 4 panes, canonical = the 3 always-present
- *  (tree opt-in), no aliases. Keep this in lockstep with `crl.cockpit.paneOrder`'s enum + default. */
+/** The cockpit spec. `canonical` is the FALLBACK (see normalizePaneOrder), so it MUST equal
+ *  `crl.cockpit.paneOrder`'s `default` in package.json — otherwise deleting the setting and setting it to a
+ *  non-array give different panels. It previously omitted `tree` (correct when canonical meant "always
+ *  appended", wrong now that it means "what you get with no usable setting"); pinned by package.test.mjs. */
 export const COCKPIT_PANE_SPEC: PaneSpec = {
   valid: ["source", "crl", "cel", "tree"],
-  canonical: ["source", "crl", "cel"],
+  canonical: ["source", "crl", "cel", "tree"],
 };
 
 /** The medical-validation spec — `worklist` is now a FIRST-CLASS internal pane (the review surface), DISTINCT from `cel`
