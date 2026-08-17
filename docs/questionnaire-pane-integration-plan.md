@@ -1,9 +1,28 @@
 # MV `$apply`-Questionnaire pane — cockpit integration plan
 
-**Status:** design converged (round 1, both arms). Follows the spike (`8786bc6`) and impl review (disc 439).
-**Branch:** `feat/mv-plandefinition-questionnaire`.
+**Status:** **BUILT.** Design converged round 1 (both arms); A-prime implemented and rendering end-to-end in
+the VS Code web workbench against real `hcsc-content` and `iehp-content`.
+**Branch:** `feat/mv-plandefinition-questionnaire` (15 commits, rebased on develop).
 **Decision:** **A-prime** — data-only render message, shell owns the DOM. The iframe option is rejected on
 evidence; see §4.
+
+### What shipped, against what this plan proposed
+
+| plan said | as built |
+|---|---|
+| pane id, TBD | `fhirQuestionnaire`, titled "Medical Validation - FHIR Questionnaire" |
+| CSP relaxed for one pane | `cockpitPaneCsp(pane, …)`; only this pane gets `style-src 'unsafe-inline' <cspSource>` |
+| vendor scripts in the pane shell | in the shell **`<body>`**, not `<head>` — LForms bootstraps against `document.body` |
+| data-only render message | `{ type:"fhirQuestionnaire", key, label, q, qr, lookedFor }`, no `html` |
+| mount gated on render identity | `key` = `library::caseId`; the shell skips remount when unchanged |
+| Q/QR from the producer | reads the **real qa path** already; the producer just starts writing there |
+
+Three things the plan did not anticipate, all found by running it:
+
+1. `renderPane` had to be called on **case selection** — `rebuild()` alone runs before any case is focused.
+2. `ensurePane` set **no `localResourceRoots`**, so the vendored bundles 404'd silently.
+3. Diagnosing that needed **three** failure channels instrumented (404 / throw / CSP), not one — each is
+   invisible to the others and all three present as "LForms is undefined".
 
 ## 1. The problem
 
@@ -95,17 +114,41 @@ re-run the `serve-web` recipe. Do not adopt it on argument alone.
    logic as core functions exported from `@smile-digital-health/crl`, with the MCP tools as thin wrappers. The
    pane's host then calls the core function — no protocol, no subprocess, one implementation.
 
-   Genuinely still open: how a cockpit selection maps to `{libraryId, caseSlug}`;
-   loading/unavailable/malformed/warning states; and **stale-result handling** when case A resolves after the
-   user has selected case B (generation or case-identity check). Also requested from the emit side: a
-   render-identity key (revision/content hash) on `getQuestionnaireCase`, so the shell remounts on content
-   change rather than on every cockpit re-render.
+   **Now BUILT, not open.** The host loads Q/QR straight off the qa path (§5a) with
+   `loadFhirQuestionnaireCase`, so no tool is needed to render at all — the producer simply starts writing to
+   the path already being read. Selection maps to `{library, caseId}` via the focused scenario, the case-slug
+   glob tolerates the `-met`/`-unmet` suffix the directory carries and the case id does not, and the async post
+   is **gen-guarded** so a slow load for case A cannot paint over a newly-selected case B. Load/unavailable
+   states render a message naming the exact glob searched.
+
+   Still wanted from the emit side (#277), but neither blocks: core-function exports with thin MCP wrappers, and
+   a **render-identity key** (revision or content hash) to replace `library::caseId`, so remount tracks content
+   rather than selection.
 2. **Questionnaire item types are unpinned, so `img-src` is fixture-bound, not contract-bound.** The measured
    fixture is `group`/`boolean` only; `choice`/`open-choice` pull the vendored PNGs via `styles.css`. Either pin
-   the accepted item types in the producer contract or schedule a re-walk of the ladder.
-3. ~~**Pane identity.**~~ **SETTLED.** `applyQuestionnaire`, titled "Questionnaire ($apply)", valid-but-not-
-   canonical in the MV spec so it is strictly opt-in and the default MV pane set is unchanged. It sits alongside
-   the existing `questionnaire` pane, not in place of it.
+   the accepted item types in the producer contract or schedule a re-walk of the ladder. **The one genuinely
+   open item on our side.**
+3. ~~**Pane identity.**~~ **SETTLED + BUILT.** `fhirQuestionnaire`, titled "Medical Validation - FHIR
+   Questionnaire", alongside the CRL Questionnaire pane rather than replacing it. Both panes are named by their
+   SOURCE — what the CRL says vs what the emitted artifact produced — which is the point of showing both.
+
+## 5b. SETTLED: the paneOrder setting is the source of truth
+
+A change this plan did not foresee, forced by having two questionnaire panes (2026-08-16).
+
+Panes used to be force-appended when a user's `paneOrder` omitted them, so **no pane could be turned off** —
+asking for `[source, fhirQuestionnaire, tree]` silently returned the CRL questionnaire as well. New contract in
+`normalizePaneOrder`:
+
+- any **array** the user writes is honored **exactly**; nothing is appended;
+- an **empty array** means an empty panel, not a repopulated default;
+- `canonical` is only the **fallback** for a setting that is unset or not an array;
+- MV therefore **defaults to all seven panes** — with nothing added back, a pane missing from the default would
+  be undiscoverable.
+
+Applied to the cockpit spec too, not special-cased to MV: two modes disagreeing about whether settings are
+authoritative would be worse than either rule alone. Consequence accepted by the operator: an existing user
+whose explicit order omitted a pane and relied on the append loses it.
 
 ## 5a. SETTLED: where the built Questionnaires live
 
