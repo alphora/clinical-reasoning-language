@@ -165,9 +165,9 @@ check("contributes the crl.medical-validation.paneOrder setting (enum incl workl
   assert.ok(prop, "expected crl.medical-validation.paneOrder in contributes.configuration.properties");
   assert.equal(prop.type, "array");
   // #177 slice 3: questionnaire is now a valid MV pane key + part of the canonical default (the operator's 4-panel set).
-  // `applyQuestionnaire` ($apply/LForms pane) is in the enum but NOT in the default below: valid-but-not-canonical,
+  // `fhirQuestionnaire` ($apply/LForms pane) is in the enum but NOT in the default below: valid-but-not-canonical,
   // so it is strictly opt-in and the default MV pane set is unchanged.
-  assert.deepEqual(prop.items?.enum, ["worklist", "source", "tree", "questionnaire", "applyQuestionnaire", "crl", "cel"]);
+  assert.deepEqual(prop.items?.enum, ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"]);
   assert.deepEqual(prop.default, ["worklist", "source", "tree", "questionnaire"]);
   assert.equal(prop.scope, "window");
 });

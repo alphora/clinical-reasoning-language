@@ -16,14 +16,14 @@ import { COCKPIT_WEBVIEW_SCRIPT } from "./correspondenceCockpit.ts";
  * and fail on it. (It did.)
  */
 const branch = (() => {
-  const marker = "m.type==='applyQuestionnaire'";
+  const marker = "m.type==='fhirQuestionnaire'";
   const start = COCKPIT_WEBVIEW_SCRIPT.indexOf(marker);
-  assert.ok(start > 0, "the applyQuestionnaire branch is missing from the webview script");
+  assert.ok(start > 0, "the fhirQuestionnaire branch is missing from the webview script");
   const next = COCKPIT_WEBVIEW_SCRIPT.indexOf("m.type===", start + marker.length);
   return COCKPIT_WEBVIEW_SCRIPT.slice(start, next > 0 ? next : undefined);
 })();
 
-describe("applyQuestionnaire webview branch", () => {
+describe("fhirQuestionnaire webview branch", () => {
   it("is DATA-ONLY — it never assigns m.html anywhere", () => {
     // A fragment carrying <script> would be inert (innerHTML does not execute scripts) and re-rendering would
     // tear down the mounted form. The whole design turns on this pane not receiving html.

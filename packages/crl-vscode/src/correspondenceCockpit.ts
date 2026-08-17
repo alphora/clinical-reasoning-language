@@ -187,7 +187,7 @@ import { caseDisplayName } from "./caseDisplayName";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
 
-const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "applyQuestionnaire", "worklist"]; // all panes (render/clearPending/reveal fan-out); tree/questionnaire/applyQuestionnaire/worklist opt-in; MUST stay in lockstep with engine `Pane` (silent-failure list — not compiler-checked; disc 179)
+const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "fhirQuestionnaire", "worklist"]; // all panes (render/clearPending/reveal fan-out); tree/questionnaire/fhirQuestionnaire/worklist opt-in; MUST stay in lockstep with engine `Pane` (silent-failure list — not compiler-checked; disc 179)
 // The panes the navigator can WALK (primary/cycle/config-primary). tree is render+reveal+peek-only, never a primary —
 // so it is absent here. Used to build the setPrimary quickpick + guard config-primary against a stray "tree".
 const PRIMARY_PANES: PrimaryPane[] = ["source", "crl", "cel"];
@@ -200,7 +200,7 @@ const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.Vi
 // The two questionnaire panes are named by their SOURCE, which is the whole point of showing both: "CRL
 // Questionnaire" is the projection of what the CRL says, "FHIR Questionnaire" is what the emitted artifact
 // actually produced via $apply. Naming one of them "$apply" would name the mechanism rather than the thing.
-const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "CRL Questionnaire", applyQuestionnaire: "FHIR Questionnaire", worklist: "Worklist" };
+const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "CRL Questionnaire", fhirQuestionnaire: "FHIR Questionnaire", worklist: "Worklist" };
 // Perf gate (disc 118): the measured full-render floor. Over → fall back to a navigation-only placeholder, don't freeze.
 const MAX_SOURCE_CHARS = 200_000;
 const MAX_SOURCE_MARKS = 2000;
@@ -744,7 +744,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         nextCaseId: focusedCaseId(next),
         // Either questionnaire pane being open is reason enough to run this hook — they render the same case
         // from different sources (CRL projection vs the emitted artifact) and both must follow the selection.
-        paneOpen: views.has("questionnaire") || views.has("applyQuestionnaire"),
+        paneOpen: views.has("questionnaire") || views.has("fhirQuestionnaire"),
         mode,
       })
     ) {
@@ -754,7 +754,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // runs before any case is focused — so it would sit permanently on its "select a case" placeholder while
       // the static questionnaire beside it updated. Its own render-identity guard makes a no-change render a
       // cheap no-op, so re-rendering here cannot churn the mounted form.
-      renderPane("applyQuestionnaire");
+      renderPane("fhirQuestionnaire");
       // #177 slice 4: the questionnaire just re-rendered for the new case (no focused question) — re-drive the "this node" marker
       // across all panes. CORRECTNESS MODEL (mirrors driveDoneOverlay): the PANE-ACK re-drive (onWebviewMessage's `ready` →
       // driveThisNode, fires on every marker-bearing pane render) is the guarantee — a freshly rendered pane always re-paints
@@ -2083,7 +2083,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.flaggableGids = r.flaggableGids;
       v.startNodeGid = r.startNodeGid; // the chrome-mirror count badge's node
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode });
-    } else if (pane === "applyQuestionnaire") {
+    } else if (pane === "fhirQuestionnaire") {
       // The $apply-driven pane (LForms). Per the integration design it receives DATA ONLY — never `html` — so
       // there is no innerHTML swap for the mounted form to survive and no dead-script trap (scripts inserted via
       // innerHTML never execute). The vendor bundles live in this pane's own shell document.
@@ -2104,7 +2104,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         const label = focused ? caseDisplayName(focused.case?.name ?? "") : undefined;
         const post = (q?: unknown, qr?: unknown, lookedFor?: string): void => {
           if (v.gen !== gen) return; // a newer render superseded this async load
-          void v.panel.webview.postMessage({ type: "applyQuestionnaire", gen, indexVersion, key, label, q, qr, lookedFor });
+          void v.panel.webview.postMessage({ type: "fhirQuestionnaire", gen, indexVersion, key, label, q, qr, lookedFor });
         };
         if (!focused || !cid) post();
         else void loadFhirQuestionnaireCase(cid).then((r) => post(r.q, r.qr, r.lookedFor));
@@ -2577,7 +2577,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        ...(pane === "applyQuestionnaire" ? { localResourceRoots: [lformsRoot] } : {}),
+        ...(pane === "fhirQuestionnaire" ? { localResourceRoots: [lformsRoot] } : {}),
       },
     );
     panel.webview.html = shellHtml(pane, panel.webview.cspSource, (f: string) =>
@@ -5089,7 +5089,7 @@ export function cockpitPaneCsp(
   pane: Pane,
   a: { nonce: string; styleNonce: string; cspSource: string },
 ): string {
-  if (pane === "applyQuestionnaire") {
+  if (pane === "fhirQuestionnaire") {
     // The style nonce is DROPPED, not supplemented: a nonce present makes browsers ignore 'unsafe-inline',
     // so keeping both would silently remain nonce-only and LForms would render unstyled. `cspSource` is needed
     // for the vendored styles.css <link>, which style-src also governs. Measured clean on Desktop AND the web
@@ -5273,7 +5273,7 @@ ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
     // `root.innerHTML`, and <script> inserted that way never runs. Zone.js first (the concatenated bundle
     // deliberately excludes it, and without it Angular never bootstraps and the form silently paints nothing).
     // The stylesheet <link> needs no nonce here because this pane's style-src is 'unsafe-inline' + cspSource.
-    (pane === "applyQuestionnaire"
+    (pane === "fhirQuestionnaire"
       ? // Capture-phase error listener FIRST, before anything it needs to observe. A <script src> that 404s
         // raises no CSP violation and no visible console error — it just silently does not run, and the only
         // symptom is `LForms is undefined` with no cause. This records which resources failed so the mount can
@@ -5300,7 +5300,7 @@ ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
     // Zone.js still first: the concatenated bundle deliberately excludes it and Angular will not bootstrap
     // without it. These are classic (non-module) scripts, so parse order is execution order, and the message
     // listener below registers in the same synchronous pass — message dispatch is async, so it cannot be missed.
-    (pane === "applyQuestionnaire"
+    (pane === "fhirQuestionnaire"
       ? `<script nonce="${nonce}" src="${asset("zone.min.js")}"></script>` +
         `<script nonce="${nonce}" src="${asset("lhc-forms.js")}"></script>` +
         `<script nonce="${nonce}" src="${asset("lformsFHIR.min.js")}"></script>`
@@ -5467,7 +5467,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // `key` is the render identity: remount ONLY when the case's CONTENT changes. Every cockpit re-render
   // (rebuild/applyShowKeys/renderEmpty) reaches every pane, and remounting a 1.85 MB Angular app on an
   // unrelated render would churn and discard in-progress answers.
-  `else if(m.type==='applyQuestionnaire'){` +
+  `else if(m.type==='fhirQuestionnaire'){` +
   `if(m.key&&m.key===window.__aqKey)return;` +
   `window.__aqKey=m.key;` +
   `const host=document.getElementById('root');` +

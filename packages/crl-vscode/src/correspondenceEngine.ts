@@ -13,11 +13,11 @@ import type { CycleStep } from "./provenanceViewer";
 // become the typed-hole editor, #71/#156). Like `tree`/`questionnaire` it is a reveal target but NOT a navigable primary:
 // a case selection stays `{primary:"cel", caseId}` and its `celCase` reveal fans out to the worklist too, so clicking a
 // worklist row and selecting a case highlight in lockstep across both case-display panes without a new selection kind.
-// `applyQuestionnaire` is the $apply-driven pane (LForms), DISTINCT from `questionnaire` (the static read-only
+// `fhirQuestionnaire` is the $apply-driven pane (LForms), DISTINCT from `questionnaire` (the static read-only
 // projection of the fired path). Both can be open at once — comparing what the CRL says with what the emitted
 // artifact does is the point. It is valid-but-not-canonical in the MV spec, so it is strictly opt-in and the
 // default MV pane set is unchanged.
-export type Pane = "source" | "crl" | "cel" | "tree" | "questionnaire" | "applyQuestionnaire" | "worklist";
+export type Pane = "source" | "crl" | "cel" | "tree" | "questionnaire" | "fhirQuestionnaire" | "worklist";
 export type PrimaryPane = "source" | "crl" | "cel";
 
 /** Compact engine input — derived by the shell from C1's ViewerModel. No bulky content. */
@@ -85,9 +85,9 @@ export function initialState(): State {
   // questionnaire (the MV read-only questionnaire pane, #177) is visibility-eligible like tree: the shell only opens a
   // pane that appears in the user's paneOrder. It is in the MV spec's canonical default (so it opens in MV) and absent
   // from the cockpit spec (so it never opens in cockpit) — this `true` just means "open it when it's in the order".
-  // applyQuestionnaire ($apply/LForms) is visibility-eligible on the same terms, but it is valid-but-NOT-canonical
+  // fhirQuestionnaire ($apply/LForms) is visibility-eligible on the same terms, but it is valid-but-NOT-canonical
   // in the MV spec, so this `true` only lets it open when a user has explicitly put it in their paneOrder.
-  return { primary: "source", paneVisibility: { source: true, crl: true, cel: true, tree: true, questionnaire: true, applyQuestionnaire: true, worklist: true } };
+  return { primary: "source", paneVisibility: { source: true, crl: true, cel: true, tree: true, questionnaire: true, fhirQuestionnaire: true, worklist: true } };
 }
 
 /** Headless navigator model — the items the navigator (a TreeView in C2a; a webview adapter later) renders. */
