@@ -160,16 +160,30 @@ check("contributes the crl.medical-validation.primary setting (enum source|cel; 
   assert.equal(prop.scope, "window");
 });
 
-check("contributes the crl.medical-validation.paneOrder setting (enum incl worklist+questionnaire; default [worklist,source,tree,questionnaire], window scope) (#156 slice 3 / #177 slice 3)", () => {
+check("contributes the crl.medical-validation.paneOrder setting (enum + ALL-panes default, window scope)", () => {
   const prop = c.configuration?.properties?.["crl.medical-validation.paneOrder"];
   assert.ok(prop, "expected crl.medical-validation.paneOrder in contributes.configuration.properties");
   assert.equal(prop.type, "array");
-  // #177 slice 3: questionnaire is now a valid MV pane key + part of the canonical default (the operator's 4-panel set).
-  // `fhirQuestionnaire` ($apply/LForms pane) is in the enum but NOT in the default below: valid-but-not-canonical,
-  // so it is strictly opt-in and the default MV pane set is unchanged.
-  assert.deepEqual(prop.items?.enum, ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"]);
-  assert.deepEqual(prop.default, ["worklist", "source", "tree", "questionnaire"]);
+  const ALL = ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"];
+  assert.deepEqual(prop.items?.enum, ALL);
+  // MV defaults to ALL its panes and the user narrows from there. The setting is the source of truth: an
+  // explicit order is honored exactly and nothing is appended back, so the default must be the full set or a
+  // pane would be undiscoverable.
+  assert.deepEqual(prop.default, ALL);
   assert.equal(prop.scope, "window");
+});
+
+check("the enum and the default agree — every offered pane is on by default", () => {
+  const prop = c.configuration?.properties?.["crl.medical-validation.paneOrder"];
+  assert.deepEqual([...prop.default].sort(), [...prop.items.enum].sort());
+});
+
+check("no crl.dev.* command or setting ships to users", () => {
+  // The CSP harness is a dev-host instrument, not a feature: no command, no palette entry, no setting.
+  const props = Object.keys(c.configuration?.properties ?? {});
+  assert.deepEqual(props.filter((k) => k.startsWith("crl.dev.")), []);
+  assert.deepEqual((c.commands ?? []).map((x) => x.command).filter((k) => k.startsWith("crl.dev.")), []);
+  assert.deepEqual((c.menus?.commandPalette ?? []).map((m) => m.command).filter((k) => k.startsWith("crl.dev.")), []);
 });
 
 check("contributes the crl.medical-validation.showKeys setting (boolean, default true, window scope) (#156 slice 3)", () => {
