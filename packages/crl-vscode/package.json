@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL→CQL + CEL→FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "4.112.0",
+  "version": "4.113.0",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.95.0"
@@ -170,10 +170,6 @@
       {
         "command": "crl.agent.chat",
         "title": "CRL: Open CRL Assist"
-      },
-      {
-        "command": "crl.dev.applyQuestionnaireHarness",
-        "title": "CRL Dev: $apply Questionnaire CSP harness"
       }
     ],
     "viewsContainers": {
@@ -315,10 +311,6 @@
         {
           "command": "crl.cockpit.toggleKeys",
           "when": "crl.active"
-        },
-        {
-          "command": "crl.dev.applyQuestionnaireHarness",
-          "when": "config.crl.dev.enableCspHarness"
         }
       ]
     },
@@ -422,10 +414,13 @@
             "worklist",
             "source",
             "tree",
-            "questionnaire"
+            "questionnaire",
+            "fhirQuestionnaire",
+            "crl",
+            "cel"
           ],
           "scope": "window",
-          "description": "Left-to-right column order of the Medical Validation panel's panes. 'worklist' (the review surface — verdicts + notes), 'source', 'tree', and 'questionnaire' (the read-only path questionnaire for the selected case) are shown by default; 'crl' and 'cel' (the read-only case list) can be added. 'worklist' and 'cel' are now SEPARATE panes, so listing both opens both. Set it in User settings to persist across all projects, or in Workspace settings for one project. A malformed list is repaired automatically. Changes apply live to open panes."
+          "description": "Left-to-right column order of the Medical Validation panel's panes. THE SETTING IS THE SOURCE OF TRUTH: the list is honored exactly as written, nothing is added back, and an empty list shows no panes. Defaults to all of them; narrow from there. 'worklist' is the review surface (verdicts + notes); 'questionnaire' is the CRL path questionnaire (what the CRL says); 'fhirQuestionnaire' renders the FHIR Questionnaire produced from the emitted artifact by $apply; 'cel' is the read-only case list, a SEPARATE pane from 'worklist'. Set it in User settings to persist across projects, or in Workspace settings for one project. Unknown entries are dropped. Changes apply live to open panes."
         },
         "crl.medical-validation.showKeys": {
           "type": "boolean",
@@ -454,11 +449,6 @@
           "default": "claude-sonnet-5",
           "scope": "window",
           "description": "The Anthropic model id the agent requests. Used only when crl.agent.provider is 'anthropic'."
-        },
-        "crl.dev.enableCspHarness": {
-          "type": "boolean",
-          "default": false,
-          "description": "Developer tool. Show the \"$apply Questionnaire CSP harness\" command, used to re-walk the Content-Security-Policy ladder for the vendored LForms renderer (see media/lforms/README.md). Needed in the VS Code web workbench, where testing requires an installed VSIX."
         }
       }
     }

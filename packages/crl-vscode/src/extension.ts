@@ -225,7 +225,13 @@ export function activate(context: vscode.ExtensionContext): void {
   registerScenarioRunner(context);
   registerProvenancePanel(context);
   registerCorrespondenceCockpit(context);
-  registerApplyQuestionnaireHarness(context, getOutputChannel());
+  // DEV-HOST ONLY. The CSP harness is an instrument, not a feature: it answered the LForms policy question and
+  // is kept for re-walking the ladder on an LForms upgrade (media/lforms/README.md). It contributes no command
+  // and no setting, so it never appears in a user's palette or settings UI — it is reachable only when running
+  // under `--extensionDevelopmentPath`.
+  if (context.extensionMode === vscode.ExtensionMode.Development) {
+    registerApplyQuestionnaireHarness(context, getOutputChannel());
+  }
   registerDiagnostics(context, index);
   registerCelDiagnostics(context, index);
 
