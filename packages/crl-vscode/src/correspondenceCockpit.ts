@@ -5135,6 +5135,48 @@ export function cockpitPaneCsp(
   return `default-src 'none'; style-src 'nonce-${a.styleNonce}'; script-src 'nonce-${a.nonce}';`;
 }
 
+/**
+ * The pane-specific pieces of the shell document, split by WHERE they must go. Pure + exported because every
+ * silent failure this pane has had lived here, and none of them was catchable by typecheck or by the message
+ * tests — each presented identically, as "LForms is undefined" over a blank pane:
+ *
+ *   - vendor scripts in <head> → they run before <body> exists, LForms throws on `document.body.appendChild`
+ *     and never defines its global;
+ *   - `zone.min.js` after `lhc-forms.js` → Angular never bootstraps (the bundle deliberately excludes Zone.js);
+ *   - the error hooks after the scripts they exist to observe → the cause is unreported;
+ *   - a nonce on the <link> → under this pane's `style-src 'unsafe-inline' <cspSource>` (nonce DROPPED) a
+ *     nonced link would be blocked, and the form renders unstyled rather than failing loudly.
+ *
+ * Every one of those is a change a reasonable refactor would make, so they are pinned by tests rather than by
+ * comments alone.
+ */
+export function paneShellFragments(
+  pane: Pane,
+  a: { nonce: string; asset: (f: string) => string },
+): { head: string; bodyScripts: string } {
+  if (pane !== "fhirQuestionnaire") return { head: "", bodyScripts: "" };
+  const head =
+    // Capture-phase error listener FIRST, before anything it needs to observe. THREE distinct failure channels
+    // that do not overlap: a 404 gives an `error` whose target has a src; a script that loads then THROWS gives
+    // an `error` with no target src; a CSP-blocked script raises `securitypolicyviolation` and neither of the
+    // others. Listening to one makes the other two indistinguishable from "loaded fine and defined nothing".
+    `<script nonce="${a.nonce}">window.__aqErrs=[];` +
+    `window.addEventListener('error',function(e){var t=e&&e.target;` +
+    `if(t&&(t.src||t.href)){window.__aqErrs.push('404 '+String(t.src||t.href).split('/').pop());}` +
+    `else{window.__aqErrs.push('threw '+((e&&e.message)?e.message:'(no message)'));}},true);` +
+    `document.addEventListener('securitypolicyviolation',function(e){window.__aqErrs.push('CSP '+e.violatedDirective+' blocked '+String(e.blockedURI||'').split('/').pop());});` +
+    `</script>` +
+    // NO nonce on the link — this pane's style-src is 'unsafe-inline' + cspSource, with the nonce dropped.
+    `<link rel="stylesheet" href="${a.asset("styles.css")}">` +
+    `<style>#root{white-space:normal}</style>`; // the shell's body{white-space:pre-wrap} would mangle the form
+  // BODY, after the divs — see the throw described above. Zone.js first.
+  const bodyScripts =
+    `<script nonce="${a.nonce}" src="${a.asset("zone.min.js")}"></script>` +
+    `<script nonce="${a.nonce}" src="${a.asset("lhc-forms.js")}"></script>` +
+    `<script nonce="${a.nonce}" src="${a.asset("lformsFHIR.min.js")}"></script>`;
+  return { head, bodyScripts };
+}
+
 function shellHtml(pane: Pane, cspSource: string, asset: (f: string) => string): string {
   const nonce = randomBytes(16).toString("base64");
   const styleNonce = randomBytes(16).toString("base64");
@@ -5309,24 +5351,7 @@ ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
     // `root.innerHTML`, and <script> inserted that way never runs. Zone.js first (the concatenated bundle
     // deliberately excludes it, and without it Angular never bootstraps and the form silently paints nothing).
     // The stylesheet <link> needs no nonce here because this pane's style-src is 'unsafe-inline' + cspSource.
-    (pane === "fhirQuestionnaire"
-      ? // Capture-phase error listener FIRST, before anything it needs to observe. A <script src> that 404s
-        // raises no CSP violation and no visible console error — it just silently does not run, and the only
-        // symptom is `LForms is undefined` with no cause. This records which resources failed so the mount can
-        // name them instead of shrugging. (The harness learned this the hard way; reusing it here.)
-        `<script nonce="${nonce}">window.__aqErrs=[];` +
-        // THREE distinct failure channels, and they do not overlap. A 404 gives an `error` whose target has a
-        // src. A script that loads then THROWS gives an `error` with no target src (a message instead). A
-        // CSP-blocked script gives NEITHER — it raises `securitypolicyviolation` only. Listening to just one
-        // makes the other two look identical to "loaded fine but defined nothing".
-        `window.addEventListener('error',function(e){var t=e&&e.target;` +
-        `if(t&&(t.src||t.href)){window.__aqErrs.push('404 '+String(t.src||t.href).split('/').pop());}` +
-        `else{window.__aqErrs.push('threw '+((e&&e.message)?e.message:'(no message)'));}},true);` +
-        `document.addEventListener('securitypolicyviolation',function(e){window.__aqErrs.push('CSP '+e.violatedDirective+' blocked '+String(e.blockedURI||'').split('/').pop());});` +
-        `</script>` +
-        `<link rel="stylesheet" href="${asset("styles.css")}">` +
-        `<style>#root{white-space:normal}</style>` // the shell's body{white-space:pre-wrap} would mangle the form
-      : "") +
+    paneShellFragments(pane, { nonce, asset }).head +
     `</head><body><div id="fcChrome"></div><div id="root"></div><div id="flagDrawer"></div>` +
     // ⚠ The vendor runtime loads in the BODY, after the divs — NOT in <head>. LForms bootstraps against
     // `document.body`, so loading it from <head> throws
@@ -5336,11 +5361,7 @@ ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
     // Zone.js still first: the concatenated bundle deliberately excludes it and Angular will not bootstrap
     // without it. These are classic (non-module) scripts, so parse order is execution order, and the message
     // listener below registers in the same synchronous pass — message dispatch is async, so it cannot be missed.
-    (pane === "fhirQuestionnaire"
-      ? `<script nonce="${nonce}" src="${asset("zone.min.js")}"></script>` +
-        `<script nonce="${nonce}" src="${asset("lhc-forms.js")}"></script>` +
-        `<script nonce="${nonce}" src="${asset("lformsFHIR.min.js")}"></script>`
-      : "") +
+    paneShellFragments(pane, { nonce, asset }).bodyScripts +
     `<script nonce="${nonce}">` +
     COCKPIT_WEBVIEW_SCRIPT +
     `</script></body></html>`
