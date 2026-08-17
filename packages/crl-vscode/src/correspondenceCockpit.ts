@@ -5216,8 +5216,20 @@ export function unrenderableQuestionnaireFeatures(q: unknown): string[] {
             : "no terminology server or FHIR context is configured in this pane"),
       );
     }
+    // MEASURED against the all-item-types fixture in the web workbench, 2026-08-17 — not predicted. Both of
+    // these render a control that looks answerable and can never show its answer, which is worse than rendering
+    // nothing: a reviewer reads them as unanswered questions rather than unsupported ones.
     if (o.type === "reference" && typeof o.linkId === "string") {
-      found.add(`item type 'reference'${at(o)} — the vendored LForms converter maps it to no widget, silently`);
+      found.add(
+        `item type 'reference'${at(o)} — renders an empty text input that can never hold the valueReference ` +
+          `answer (_getDataType has no 'reference' case, so it falls through to the initializer "string")`,
+      );
+    }
+    if (o.type === "url" && typeof o.linkId === "string") {
+      found.add(
+        `item type 'url'${at(o)} — renders, but the answer never populates: LForms maps dataType URL to ` +
+          `'valueUrl', and R4 QuestionnaireResponse.item.answer has no valueUrl (R4 uses valueUri)`,
+      );
     }
     if (typeof o.url === "string") {
       const u = o.url;

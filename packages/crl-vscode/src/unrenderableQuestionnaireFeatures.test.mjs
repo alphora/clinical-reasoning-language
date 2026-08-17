@@ -46,8 +46,20 @@ describe("unrenderableQuestionnaireFeatures", () => {
     assert.match(f, /expanded via a server, not read locally/);
   });
 
-  it("flags a reference item", () => {
-    assert.match(one(q({ linkId: "r", type: "reference" })), /item type 'reference' \(linkId r\).*no widget/);
+  it("flags a reference item, and says it renders an input rather than nothing", () => {
+    // Measured in the workbench: the prediction was "no widget", the reality is an empty text input. The
+    // distinction matters to whoever reads the banner — a blank control reads as an unanswered question.
+    const f = one(q({ linkId: "r", type: "reference" }));
+    assert.match(f, /item type 'reference' \(linkId r\)/);
+    assert.match(f, /empty text input that can never hold the valueReference answer/);
+  });
+
+  it("flags a url item — the control renders but the answer never populates", () => {
+    // LForms maps dataType URL to the FHIR field 'Url' (so it reads valueUrl); R4
+    // QuestionnaireResponse.item.answer has no valueUrl — R4 uses valueUri. Measured empty in the workbench.
+    const f = one(q({ linkId: "u", type: "url" }));
+    assert.match(f, /item type 'url' \(linkId u\)/);
+    assert.match(f, /valueUrl.*valueUri/);
   });
 
   it("does NOT flag a `reference` string that is not an item type", () => {

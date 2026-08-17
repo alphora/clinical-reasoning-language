@@ -3,11 +3,20 @@
     "MEASUREMENT FIXTURE — every R4 Questionnaire.item.type, used to re-walk the CSP ladder against the whole",
     "producer contract instead of the group/boolean subset the original measurement used.",
     "",
-    "It DELIBERATELY breaches the producer contract in one place: it carries a `reference` item. The vendored",
-    "LForms converter's _getDataType switch has no case for `reference`, so it returns the initializer \"string\"",
-    "— not an LForms dataType (ST is) — and no renderer branch matches: no widget, no throw, no CSP violation.",
-    "Keeping it here is how that degradation stays MEASURED rather than assumed, and it doubles as the live",
-    "proof that unrenderableQuestionnaireFeatures() reports a breach.",
+    "It DELIBERATELY carries the two types that DEGRADE, so the degradation stays MEASURED rather than assumed,",
+    "and so the fixture doubles as live proof that unrenderableQuestionnaireFeatures() reports them.",
+    "",
+    "MEASURED IN THE WEB WORKBENCH 2026-08-17 (both differed from the prediction, and both matter because the",
+    "control LOOKS answerable while being permanently blank — a reviewer reads that as an unanswered question):",
+    "  reference — predicted 'no widget'. Actually renders an empty TEXT INPUT that can never hold the",
+    "              valueReference answer. _getDataType has no `reference` case, so it returns the initializer",
+    "              \"string\", which is not an LForms dataType (ST is).",
+    "  url       — predicted to render normally. The control renders, but the answer never populates:",
+    "              _lformsTypesToFHIRFields maps URL -> \"Url\", so LForms reads valueUrl, and R4",
+    "              QuestionnaireResponse.item.answer has no valueUrl (R4 uses valueUri).",
+    "",
+    "Everything else rendered and populated correctly, including the coded items that pull the autocompleter",
+    "PNGs — no CSP violation, and nothing reached LForms' 6-second JSONP icon loader.",
     "",
     "The attachment answer carries real base64 image data on purpose: that is the only path by which an",
     "attachment could ask the renderer for an image preview, and img-src deliberately excludes data:.",
@@ -47,7 +56,7 @@
           { "linkId": "p-time", "type": "time", "text": "time" },
           { "linkId": "p-string", "type": "string", "text": "string" },
           { "linkId": "p-text", "type": "text", "text": "text" },
-          { "linkId": "p-url", "type": "url", "text": "url" }
+          { "linkId": "p-url", "type": "url", "text": "url - DEGRADES: answer never populates (see _comment)" }
         ]
       },
       {
@@ -86,7 +95,7 @@
           {
             "linkId": "x-reference",
             "type": "reference",
-            "text": "reference - EXPECTED TO RENDER NO WIDGET (see _comment)"
+            "text": "reference - DEGRADES: renders an input that can never show its answer (see _comment)"
           },
           {
             "linkId": "nested",
@@ -117,7 +126,11 @@
           { "linkId": "p-time", "text": "time", "answer": [{ "valueTime": "09:30:00" }] },
           { "linkId": "p-string", "text": "string", "answer": [{ "valueString": "a string answer" }] },
           { "linkId": "p-text", "text": "text", "answer": [{ "valueString": "a longer text answer\nspanning two lines" }] },
-          { "linkId": "p-url", "text": "url", "answer": [{ "valueUri": "http://example.org/crl/measurement" }] }
+          {
+            "linkId": "p-url",
+            "text": "url - DEGRADES: answer never populates (see _comment)",
+            "answer": [{ "valueUri": "http://example.org/crl/measurement" }]
+          }
         ]
       },
       {
@@ -173,7 +186,7 @@
           },
           {
             "linkId": "x-reference",
-            "text": "reference - EXPECTED TO RENDER NO WIDGET (see _comment)",
+            "text": "reference - DEGRADES: renders an input that can never show its answer (see _comment)",
             "answer": [{ "valueReference": { "reference": "Patient/measurement-example", "display": "Example Patient" } }]
           },
           {

@@ -161,6 +161,15 @@ The operator has since pinned the producer contract to **all R4 item types**, so
 autocompleter — `choice` / `open-choice` items pull them. Re-measure with the all-item-types fixture
 (`npm run seed:questionnaire -- --root <repo> --all --fixture all-types`), not the basic one.
 
+**Measured 2026-08-17, web workbench, all 16 non-abstract R4 item types: CLEAN.** Every type rendered, the
+coded items pulled both PNGs, **no `img-src` violation and no violation of any other directive**, and nothing
+reached the JSONP icon loader (no 6-second stall). Two types degrade for reasons unrelated to CSP —
+`reference` renders an input that can never hold its answer, and `url` never populates because LForms reads
+`valueUrl` while R4 answers carry `valueUri` — both detected and reported by
+`unrenderableQuestionnaireFeatures()`. This is the first ladder reading taken against the full contract rather
+than a `group`/`boolean` subset, and unlike the two false negatives below, LForms was definitely running: the
+form painted with populated answers.
+
 **The image set is CLOSED, so this needs no further widening.** Verified against the vendored files, not assumed:
 `styles.css` contains exactly two `url()` references (both above, both local); there is no `@font-face` and no
 font file anywhere in the bundle; there are no `data:` URIs; there is no remote asset host. Specifically **do not
