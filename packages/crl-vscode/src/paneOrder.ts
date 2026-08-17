@@ -50,7 +50,19 @@ export const MEDICAL_VALIDATION_PANE_SPEC: PaneSpec = {
   canonical: ["worklist", "source", "tree", "questionnaire"],
 };
 
-const VALID_PANES: ReadonlySet<Pane> = new Set<Pane>(["source", "crl", "cel", "tree", "questionnaire", "fhirQuestionnaire", "worklist"]);
+/** Every internal pane, in a stable order — the ONE authoritative list. Anything that needs to enumerate panes
+ *  (the valid set below, the webview view types, the serializer registration) derives from this rather than
+ *  repeating it, because the repeated copies have already drifted once: `fhirQuestionnaire` was added to the
+ *  cockpit's list and to this file but missed in `correspondenceEngine.PANES`, silently costing that pane its
+ *  reveal effects. None of those lists is compiler-checked against the `Pane` union. */
+export const ALL_PANES: readonly Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "fhirQuestionnaire", "worklist"];
+
+/** The webview view type for a pane's panel. Shared so the panel that is CREATED and the serializer that
+ *  RECLAIMS it after a window reload can never disagree — a mismatch there is invisible until a restored tab
+ *  refuses to go away. */
+export const cockpitViewType = (pane: Pane): string => `crlCockpit.${pane}`;
+
+const VALID_PANES: ReadonlySet<Pane> = new Set<Pane>(ALL_PANES);
 
 /** Resolve a PUBLIC key to an InternalPane via the spec's aliases (identity when unmapped); undefined if the result is
  *  not a real pane (so an alias can never introduce a non-pane). */
