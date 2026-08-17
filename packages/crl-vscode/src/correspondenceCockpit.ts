@@ -183,10 +183,7 @@ import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordina
 import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE, policyIdFromSrc } from "./provenanceFindings";
 import { resolveLaunchTarget } from "./policyLaunchTarget";
 import { flagIssueBody, flagIssueTitle, replaceIssueTypeLine } from "./flagIssueText";
-// ⚠ FIXTURE, temporary: stands in for the $apply producer until issue #277 lands. Imported (not read from
-// disk) because `.vscodeignore` excludes `src/**` from the VSIX — esbuild inlines it, so dev and packaged
-// behave identically.
-import APPLY_QUESTIONNAIRE_FIXTURE from "./testdata/questionnaire-pane/get-case.example.json";
+import { caseDisplayName } from "./caseDisplayName";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
 
@@ -2094,21 +2091,24 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // pane id would silently render the STATIC questionnaire instead.
       v.anchors = {};
       v.reveals = {};
-      // ⚠ FIXTURE-BACKED until the producer exists (issue #277). The real source is a case lookup keyed off the
-      // focused case; the message SHAPE is already final, so swapping the source is a one-line change here and
-      // nothing downstream moves.
-      const focused = focusedScenario();
-      const aq = focused ? APPLY_QUESTIONNAIRE_FIXTURE : undefined;
-      void v.panel.webview.postMessage({
-        type: "applyQuestionnaire",
-        gen,
-        indexVersion,
-        // Render identity: remount only when the case's CONTENT changes. Once the producer supplies a revision
-        // or content hash (requested on #277), use that instead of the case id.
-        key: focused ? `${focused.decision?.libraryName ?? ""}::${focusedCaseId(state) ?? ""}` : undefined,
-        q: aq?.questionnaire,
-        qr: aq?.questionnaireResponse,
-      });
+      // Reads the REAL qa path, not a compiled-in fixture — the same path the producer (#277) will write to, so
+      // nothing here changes when it lands. Async, hence the gen guard.
+      {
+        const focused = focusedScenario();
+        const cid = focusedCaseId(state);
+        // Render identity: remount only when the case's CONTENT changes. Swap to the producer's revision or
+        // content hash when #277 supplies one.
+        const key = focused ? `${focused.decision?.libraryName ?? ""}::${cid ?? ""}` : undefined;
+        // Same derivation the CRL Questionnaire pane uses (questionnairePaneHtml.ts:331) — strips the authored
+        // `-> outcome` suffix — so the two panes show an identical case header.
+        const label = focused ? caseDisplayName(focused.case?.name ?? "") : undefined;
+        const post = (q?: unknown, qr?: unknown, lookedFor?: string): void => {
+          if (v.gen !== gen) return; // a newer render superseded this async load
+          void v.panel.webview.postMessage({ type: "applyQuestionnaire", gen, indexVersion, key, label, q, qr, lookedFor });
+        };
+        if (!focused || !cid) post();
+        else void loadFhirQuestionnaireCase(cid).then((r) => post(r.q, r.qr, r.lookedFor));
+      }
     } else {
       // questionnaire (#177 slice 3) — a STATIC, read-only projection of the FOCUSED cel case's fired path. Gets the
       // selected-case `sv` via the SAME `scenarioByCaseId` join `driveFailedCriteriaPeek` uses + a frame-aware
@@ -2139,6 +2139,49 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** The FOCUSED cel case's `ScenarioViewModel` — the questionnaire's input. Resolved via the SAME frozen
    *  `scenarioByCaseId` join the failed-criterion peek uses (caseId → sv; ambiguous/unfrozen cases excluded in
    *  rebuild). undefined when the selection is not a cel case (or no case is selected) → the pane shows a placeholder. */
+  /**
+   * Read the FHIR Questionnaire + QuestionnaireResponse for a case FROM DISK, at the settled qa layout
+   * (docs/questionnaire-pane-integration-plan.md §5a):
+   *
+   *   <artifact>/tests/data/fhir/patient/<library-slug>-cases/<case-slug>/Questionnaire/*.json
+   *   <artifact>/tests/data/fhir/patient/<library-slug>-cases/<case-slug>/QuestionnaireResponse/*.json
+   *
+   * This is deliberately a real filesystem read and not a compiled-in fixture: it exercises the exact path the
+   * producer (issue #277) will write to, so when the producer lands nothing here changes. To test it today,
+   * copy a Questionnaire/QuestionnaireResponse pair into a case directory.
+   *
+   * The case directory carries an outcome suffix (`…-met` / `…-unmet`) that the case id does not, hence the
+   * trailing `*` on the slug.
+   */
+  async function loadFhirQuestionnaireCase(
+    caseId: string,
+  ): Promise<{ q?: unknown; qr?: unknown; lookedFor: string }> {
+    const slug = caseId
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    const lookedFor = `**/tests/data/fhir/patient/*/${slug}*/{Questionnaire,QuestionnaireResponse}/*.json`;
+    const out: { q?: unknown; qr?: unknown; lookedFor: string } = { lookedFor };
+    if (!slug) return out;
+    try {
+      const hits = await vscode.workspace.findFiles(lookedFor, "**/node_modules/**", 20);
+      for (const uri of hits) {
+        const parent = uri.path.split("/").slice(-2, -1)[0]; // the <ResourceType> dir holding the file
+        if (parent !== "Questionnaire" && parent !== "QuestionnaireResponse") continue;
+        if (parent === "Questionnaire" && out.q) continue; // first wins; a case has one of each
+        if (parent === "QuestionnaireResponse" && out.qr) continue;
+        const text = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8");
+        const json: unknown = JSON.parse(text);
+        if (parent === "Questionnaire") out.q = json;
+        else out.qr = json;
+      }
+    } catch {
+      // A malformed or unreadable file is reported to the pane as "not found" rather than thrown — the pane
+      // says what it looked for, which is more useful than a stack trace in a channel nobody has open.
+    }
+    return out;
+  }
+
   function focusedScenario(): ScenarioViewModel | undefined {
     const sel = state.selection;
     return sel && sel.primary === "cel" ? scenarioByCaseId.get(sel.caseId) : undefined;
@@ -5428,14 +5471,20 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(m.key&&m.key===window.__aqKey)return;` +
   `window.__aqKey=m.key;` +
   `const host=document.getElementById('root');` +
-  `const fail=(t)=>{host.replaceChildren();const p=document.createElement('p');p.className='placeholder';p.textContent=t;host.appendChild(p);};` +
-  `if(!m.q){fail('Select a case to see its $apply questionnaire.');return;}` +
+  // The case header mirrors the CRL Questionnaire pane's, so the two panes read as the same case side by side.
+  `const head=(t)=>{const h=document.createElement('p');h.className='aq-case';h.textContent=t;return h;};` +
+  `const fail=(t)=>{host.replaceChildren();if(m.label)host.appendChild(head('Case - '+m.label));const p=document.createElement('p');p.className='placeholder';p.textContent=t;host.appendChild(p);};` +
+  `if(!m.label){fail('Select a case to see its FHIR questionnaire.');return;}` +
+  // Distinguish "nothing selected" from "selected, but the producer has written nothing for it" — the second is
+  // the normal state until #277 lands, and saying WHERE we looked is what makes it actionable.
+  `if(!m.q){fail('Could not find FHIR Questionnaire data for this case.'+(m.lookedFor?(' Looked for: '+m.lookedFor):''));return;}` +
   `if(typeof LForms==='undefined'||!LForms.Util){` +
   `const errs=(window.__aqErrs||[]);` +
   `fail('The LForms runtime did not load. '+(errs.length?('Failures: '+errs.join(' | ')):'No 404, no throw, no CSP violation — the scripts ran and defined no LForms global. Check load ORDER (zone.js must precede lhc-forms.js).'));` +
   `return;}` +
   `try{` +
-  `host.replaceChildren();const mount=document.createElement('div');host.appendChild(mount);mount.id='aqMount';` +
+  `host.replaceChildren();host.appendChild(head('Case - '+m.label));` +
+  `const mount=document.createElement('div');host.appendChild(mount);mount.id='aqMount';` +
   `let form=LForms.Util.convertFHIRQuestionnaireToLForms(m.q,'R4');` +
   `if(!form){fail('convertFHIRQuestionnaireToLForms returned nothing.');return;}` +
   `if(m.qr)form=LForms.Util.mergeFHIRDataIntoLForms('QuestionnaireResponse',m.qr,form,'R4');` +
