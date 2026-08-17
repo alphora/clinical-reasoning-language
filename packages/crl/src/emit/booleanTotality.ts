@@ -37,6 +37,7 @@ import type {
   ReferenceName,
 } from "../ast/types";
 import { refDisplay } from "../ast/types";
+import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import { matchNarrative } from "../template-match/matcher";
 import { resolveAgeConcept } from "../template-match/recencyProjectionOverride";
 import {
@@ -298,6 +299,18 @@ export function classifyBooleanTotality(concept: Concept): BooleanTotalityObliga
     if (b.type === "DefinedAsBareRef") {
       // A bare-ref alias is total iff its referent is total (delegated, §2 composite).
       return { kind: "composite", operands: [b.ref], cell: "§2 `defined as` bare ref (delegated to referent)" };
+    }
+    if (b.type === "DefinedAsBooleanComposition") {
+      // T1: boolean composition — total iff every operand is a total boolean (delegate, §2 composite).
+      // Collect operand refs from the BranchCondition tree; lowering/enforcement activates at T3.
+      const boolOperands: ReferenceName[] = [];
+      for (const r of branchConditionConceptRefsStrict(b.expression, "booleanTotality"))
+        boolOperands.push(r.ref);
+      return {
+        kind: "composite",
+        operands: boolOperands,
+        cell: "§2 `defined as` boolean composition (every operand total)",
+      };
     }
     // DefinedAsComposition — sem-or/sem-and/sem-not over refs; total iff every resolved operand is total.
     const operands: ReferenceName[] = [];

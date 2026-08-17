@@ -40,7 +40,7 @@ import type {
   ReferenceName,
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
-import { branchConditionRefs } from "../ast/branchCondition";
+import { branchConditionRefs, branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import { buildCRL } from "../index";
 import { validateCRLImports } from "../imports/validate";
 import { canonicalizeFsPath } from "../imports/paths";
@@ -500,6 +500,19 @@ function walkConceptEdges(concept: Concept, filePath: string, lib: string | unde
           add(body.ref, lib, { ...owner, edgeKind: "defined-as-target", line: lineOf(body.location) });
         } else if (body.type === "DefinedAsComposition") {
           walkCompositionEdges(body.expression, filePath, lib, concept.name, add);
+        } else if (body.type === "DefinedAsBooleanComposition") {
+          // T1 concept-boolean-composition: each operand of a `defined as ("A" and "B")` is a consumer edge of
+          // its referent, exactly like a sem-composition operand. Without this branch the #189 flip-safety
+          // inventory would SILENTLY UNDER-REPORT a concept consumed only through a boolean composition (this
+          // if/else has no exhaustiveness guard). Recorded as `composition-operand` — its resolver slot is the
+          // shared `defined-as` slot, and a distinct edge kind would ripple into ALL_EDGE_KINDS + the KE guide.
+          for (const r of branchConditionConceptRefsStrict(body.expression, "migration inventory")) {
+            add(r.ref, lib, {
+              ...owner,
+              edgeKind: "composition-operand",
+              line: lineOf(r.location),
+            });
+          }
         }
         break;
       }

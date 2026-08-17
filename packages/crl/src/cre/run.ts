@@ -60,6 +60,7 @@ import type {
   CRL,
   Decision,
   DefinedAsBareRef,
+  DefinedAsBooleanComposition,
   DefinedAsComposition,
   DefinedAsExists,
   Location,
@@ -67,7 +68,7 @@ import type {
   WhenBlockBody,
 } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
-import { soleRef, describeBranchCondition } from "../ast/branchCondition";
+import { soleRef, describeBranchCondition, branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import type { BranchCondition } from "../ast/types";
 // #236 — the CRE evaluates a decision's criterion-guard refs BY REFERENCE (memoized per case),
 // never by up-front expansion. `runCel` runs NO semantic validation, so a cyclic/undefined
@@ -318,7 +319,7 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
 }
 
 function walkDefinedAs(
-  body: DefinedAsBareRef | DefinedAsExists | DefinedAsComposition,
+  body: DefinedAsBareRef | DefinedAsExists | DefinedAsComposition | DefinedAsBooleanComposition,
   lib: string,
   ctx: Ctx,
 ): CompositionTrace {
@@ -342,6 +343,23 @@ function walkDefinedAs(
     );
     return { op: "ref", concept: getRefName(body.ref), satisfied: false };
   }
+  if (body.type === "DefinedAsBooleanComposition") {
+    // T1: boolean composition (`("A" and "B")`) is not lowered on the run_decision/CEL evaluator yet (T3).
+    // MIRROR the `defined as exists` precedent above — DO NOT throw: `walkDefinedAs` runs inside the read-only
+    // `runCel` path, which has NO converting catch, so a throw would crash `run_decision`/viewModel. Set
+    // `runtimeError` (⇒ status:"error", produced discarded) + a diagnostic + an unsatisfied leaf so the run never
+    // reports an authoritative pass/fail derived from an UNEVALUATED boolean composition. Like exists, this is a
+    // sanctioned `runtimeError` writer reachable from `evalConcept`, neutralized by `truthOf`'s `{...ctx}` spread.
+    ctx.runtimeError = true;
+    const operands = branchConditionConceptRefsStrict(body.expression, "cre walkDefinedAs").map((r) => r.ref);
+    ctx.diagnostics.push(
+      `\`defined as\` boolean composition (${operands
+        .map((r) => labelOf(getRefLibrary(r) ?? lib, getRefName(r)))
+        .join(", ")}) is not yet evaluated by run_decision — lowering to one compound total boolean lands at ` +
+        `T3; run marked error`,
+    );
+    return { op: "ref", concept: operands[0] ? getRefName(operands[0]) : "", satisfied: false };
+  }
   return body.type === "DefinedAsBareRef"
     ? refTrace(body.ref, lib, ctx)
     : walkExpr(body.expression, lib, ctx);
@@ -354,8 +372,9 @@ function walkDefinedAs(
  * shared, and that is safe: `evalConcept` is MONOTONIC (early-returns on any existing entry; only ever ADDS a cycle-free
  * result; never overwrites) and the main run already completed, so added cache entries cannot alter produced/trace.
  * LOAD-BEARING INVARIANT: this routes ONLY through `evalConcept`. `walkBranches`/`emitAction`/`executeBody` are the
- * writers of `produced`/`trace`/`delegationStack`; `runtimeError` has ONE additional writer reachable from `evalConcept`
- * — `walkDefinedAs` sets it for an unlowered `defined as exists` (concept-model Todo 1). Isolation still holds: the
+ * writers of `produced`/`trace`/`delegationStack`; `runtimeError` has additional writers reachable from `evalConcept`
+ * — `walkDefinedAs` sets it for an unlowered `defined as exists` (concept-model Todo 1) OR an unlowered `defined as`
+ * boolean composition (concept-boolean-composition T1). Isolation still holds: the
  * scratch ctx below spreads `{...ctx}`, so its `runtimeError` is a fresh by-value boolean — an off-path exists marks the
  * SCRATCH errored (discarded) and never the real run. So an eager off-path truth is unaffected (just `false`). Keep it
  * that way — any NEW `runtimeError` writer reachable from `evalConcept` must likewise be neutralized by this spread.

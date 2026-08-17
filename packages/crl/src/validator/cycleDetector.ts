@@ -16,6 +16,7 @@ import type {
   Location,
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
+import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import type { LibraryScope, SourceContext } from "../imports/scopes";
 import { lookupKnownLibrary } from "../imports/scopes";
 
@@ -360,6 +361,11 @@ export class CycleDetector {
             scope,
             currentLibName,
           );
+        } else if (body.type === "DefinedAsBooleanComposition") {
+          // T1: a boolean composition fans out one edge per operand — else a self-cycle
+          // `defined as ("A" and …)` would go UNDETECTED (this if/else has no exhaustiveness guard).
+          for (const r of branchConditionConceptRefsStrict(body.expression, "cycleDetector"))
+            this.addEdge(r.ref, refs, scope, currentLibName);
         }
         return;
       }

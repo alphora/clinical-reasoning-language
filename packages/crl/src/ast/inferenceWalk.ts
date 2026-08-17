@@ -24,11 +24,13 @@
 import type {
   CompositionExpression,
   DefinedAsBareRef,
+  DefinedAsBooleanComposition,
   DefinedAsComposition,
   DefinedAsExists,
   ReferenceName,
 } from "./types";
 import { getRefName, isQualifiedRef, normalizeLocalRef } from "./types";
+import { branchConditionConceptRefsStrict } from "./branchCondition";
 
 /**
  * Flatten a `defined as` body to its operand refs, left-to-right. A bare-ref body → `[ref]`; an inline
@@ -36,13 +38,19 @@ import { getRefName, isQualifiedRef, normalizeLocalRef } from "./types";
  * every `CompositionRef` is collected in written order). Mirrors the FHIR lane's prior `visitComposition`.
  */
 export function flattenDefinedAsBody(
-  body: DefinedAsBareRef | DefinedAsExists | DefinedAsComposition,
+  body: DefinedAsBareRef | DefinedAsExists | DefinedAsComposition | DefinedAsBooleanComposition,
 ): ReferenceName[] {
   // Bare ref and `exists ("X")` both name a single concept operand — its reference is the
   // one leaf, tracked so the inference-order walk (FHIR case-feature + provenance lanes)
   // surfaces it. (`exists` lowering itself is Todo 2/3; the operand still walks.)
   if (body.type === "DefinedAsBareRef") return [body.ref];
   if (body.type === "DefinedAsExists") return [body.ref];
+  // T1 boolean composition (`("A" and "B")`): operands are tracked like refs (no lowering here). Collect
+  // ALL concept refs from the BranchCondition tree, left-to-right; the strict collector throws on any
+  // (unclassified) criterion ref — criterion refs are illegal at the `defined as` site.
+  if (body.type === "DefinedAsBooleanComposition") {
+    return branchConditionConceptRefsStrict(body.expression, "flattenDefinedAsBody").map((r) => r.ref);
+  }
   const refs: ReferenceName[] = [];
   const visit = (expr: CompositionExpression): void => {
     switch (expr.type) {

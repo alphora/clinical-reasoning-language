@@ -88,6 +88,7 @@ import {
 } from "../ast/types";
 import type { EffectiveRepresentationDescriptor } from "../emit/effectiveRepresentation";
 import type { ReferenceName } from "../ast/types";
+import { BooleanCompositionNotActiveError } from "../ast/types";
 import { emitCriterionDefine } from "./emitCriterionDefine";
 import type { CRLError } from "../types/errors";
 import { ageComputeFnForUnit } from "../template-match/agePredicate";
@@ -1670,6 +1671,13 @@ class Emitter {
       case "CodedFromDefinition":
         return this.emitCodedFrom(c, def);
       case "DefinedAsDefinition":
+        // T1: boolean composition (`("A" and "B")`) parses + builds but does NOT lower yet (T3). Fail
+        // LOUD with the typed sentinel rather than misclassify it as a sem-* composition.
+        if (def.body.type === "DefinedAsBooleanComposition")
+          throw new BooleanCompositionNotActiveError(
+            "emitConceptBody (standard / case-feature CQL dispatch)",
+            def.body.location,
+          );
         return this.emitDefinedAs(c, def.body);
       case "DefinitionIsDefinition":
         return this.emitDefinitionIs(c, def);
@@ -2784,6 +2792,9 @@ class Emitter {
         // the conservative no-guess sentinel for the sem-not refusal path (like `definition is`),
         // never a composition-shaped guess. (Emit lowering itself landed in #265.)
         if (da.type === "DefinedAsExists") return "unknown";
+        // A boolean composition is a boolean determination, not a truth-set/resource-list flavor — return
+        // the conservative no-guess sentinel (like `exists`). Emit is inert until T3.
+        if (da.type === "DefinedAsBooleanComposition") return "unknown";
         return this.classifyNegationOperand(da.expression, next);
       }
       case "CodedFromDefinition":

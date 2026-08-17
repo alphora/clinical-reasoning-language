@@ -32,7 +32,7 @@ import type {
 } from "../ast/types";
 import type { WhenBlock } from "../ast/types";
 import { getRefName, getRefLibrary } from "../ast/types";
-import { branchConditionRefs } from "../ast/branchCondition";
+import { branchConditionRefs, branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import { buildCriterionIndex, guardConceptClosure, type CriterionIndex } from "../ast/criterionIndex";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { RegistryEntry } from "../imports/types";
@@ -196,6 +196,9 @@ export function definitionConceptRefs(c: Concept): ReferenceName[] {
     // Bare ref and `exists ("X")` each contribute their single concept ref as a direct edge.
     if (def.body.type === "DefinedAsBareRef" || def.body.type === "DefinedAsExists")
       out.push(def.body.ref);
+    else if (def.body.type === "DefinedAsBooleanComposition")
+      for (const r of branchConditionConceptRefsStrict(def.body.expression, "provenance definitionConceptRefs"))
+        out.push(r.ref);
     else compositionRefs(def.body.expression, out);
   } else if (def?.type === "DefinitionIsDefinition") {
     narrativeRefs(def.body.elements, out);
@@ -482,6 +485,9 @@ export function buildProvenanceIndex(
       // Bare ref and `exists ("X")` each reach their single concept operand.
       if (def.body.type === "DefinedAsBareRef" || def.body.type === "DefinedAsExists")
         refs.push(def.body.ref);
+      else if (def.body.type === "DefinedAsBooleanComposition")
+        for (const r of branchConditionConceptRefsStrict(def.body.expression, "provenance structural"))
+          refs.push(r.ref);
       else compositionRefs(def.body.expression, refs);
       relation = "inference-operand";
     } else if (def?.type === "DefinitionIsDefinition") {

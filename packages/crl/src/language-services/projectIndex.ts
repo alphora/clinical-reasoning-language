@@ -676,6 +676,12 @@ function walkDefinedAsBody(
     addRef(b.ref, "concept", owningLib, filePath, source, b.location, out);
   } else if (b.type === "DefinedAsComposition") {
     walkComposition(b.expression, owningLib, filePath, source, out);
+  } else if (b.type === "DefinedAsBooleanComposition") {
+    // T1: index every operand ref of a boolean composition for find-refs / rename (non-strict collector —
+    // a language service must not throw). Its expression is a `BranchCondition` tree, not a composition.
+    for (const atom of branchConditionRefs(b.expression as BranchCondition)) {
+      if (atom.location) addRef(atom.ref, "concept", owningLib, filePath, source, atom.location, out);
+    }
   }
 }
 

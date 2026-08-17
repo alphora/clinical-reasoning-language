@@ -40,6 +40,7 @@ import type {
 import { getRefLibrary, isQualifiedRef } from "../ast/types";
 import { buildCriterionTable, type CriterionTable } from "../ast/criterionExpansion";
 import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex";
+import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 
 import { buildLibraryScopes, lookupKnownLibrary } from "./scopes";
 import type { LibraryScope } from "./scopes";
@@ -276,6 +277,10 @@ function visitConceptDefinitionRefs(concept: Concept, visit: (ref: ReferenceName
         visit(body.ref);
       } else if (body.type === "DefinedAsComposition") {
         visitComposition((body as DefinedAsComposition).expression, visit);
+      } else if (body.type === "DefinedAsBooleanComposition") {
+        // T1: pull every operand of a boolean composition into the emit closure (else cross-lib operands
+        // are silently dropped — no exhaustiveness guard here).
+        for (const r of branchConditionConceptRefsStrict(body.expression, "emit closure")) visit(r.ref);
       }
       break;
     }

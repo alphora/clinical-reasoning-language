@@ -558,10 +558,24 @@ definedAsBody
     : DASH DEFINED_AS daBody DOT
     ;
 
+// `defined as` composition. Two parenthesized families, disambiguated by the OPERATOR token:
+//   - `sem-or`/`sem-and`/`sem-not` (SEM_* tokens) → SUBSUMPTION set algebra over records
+//     (`compositionExpression`);
+//   - `and`/`or`/`not` (AND/OR/NOT tokens) → BOOLEAN composition over separate boolean facts, REUSING the
+//     decision-guard `branchCondition` rule + `BranchCondition` AST family under the `DefinedAsBooleanComposition`
+//     wrapper (design of record `tmp/DESIGN-concept-boolean-composition.md`; T1). The wrapper marks the
+//     attachment point so the concept lowering (ONE compound total boolean) never shares the decision lowering
+//     (DNF/cockpit). Criterion refs are NOT classified at this site (concept-only). Mixed bare `and`/`or` is
+//     rejected by the shared builder, exactly as in a `when` guard.
+// The operator-free degenerate `("A")` is a genuine ATN ambiguity resolved by ALTERNATIVE ORDER (min alt
+// number → `DefinedAsComposition`). The builder does NOT normalize it to a bare ref — it STAYS a
+// `DefinedAsComposition` (a single `CompositionRef`); treating it as a value-preserving alias of `defined as
+// "A"` is the T2 alias-invariant obligation, not a T1 AST rewrite. Intentional; not operator-token-disambiguated.
 daBody
     : conceptReference                                  # DefinedAsBareRef
     | EXISTS LPAREN conceptReference RPAREN              # DefinedAsExists
     | LPAREN compositionExpression RPAREN               # DefinedAsComposition
+    | LPAREN branchCondition RPAREN                      # DefinedAsBooleanComposition
     ;
 
 compositionExpression

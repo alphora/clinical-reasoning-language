@@ -36,6 +36,7 @@ import {
   DefinedAsBareRefContext,
   DefinedAsExistsContext,
   DefinedAsCompositionContext,
+  DefinedAsBooleanCompositionContext,
   CompositionExpressionContext,
   SemOrContext,
   SemAndContext,
@@ -107,6 +108,7 @@ import {
   DefinedAsBareRef,
   DefinedAsExists,
   DefinedAsComposition,
+  DefinedAsBooleanComposition,
   CompositionExpression,
   SemOrExpression,
   SemAndExpression,
@@ -377,32 +379,37 @@ export class CRLAstBuilder
   // a ref (its OWN location, for per-operand find-refs). A MIXED bare chain
   // (`A and B or C`) is reported here (parenthesize) — degraded, never thrown,
   // so language services survive ANTLR error-recovery on partial buffers.
-  private branchConditionFrom(ctx: BranchConditionContext): BranchCondition {
+  // `context` names the attachment point in diagnostics — a decision `when` guard by default, but the
+  // `defined as` boolean-composition site reuses this same rule (T1) and must not report "`when` guard".
+  private branchConditionFrom(
+    ctx: BranchConditionContext,
+    context = "`when` guard",
+  ): BranchCondition {
     const atoms = ctx.bcAtom();
     if (atoms.length === 0) {
       // ANTLR error-recovery can yield an empty branchCondition. Report it and
       // return a placeholder ref so downstream NEVER sees an empty `and`/`or`
       // (which would evaluate vacuously true/false).
-      this.reportError("a `when` guard must have at least one condition", ctx);
+      this.reportError(`a ${context} must have at least one condition`, ctx);
       return { type: "BranchConditionRef", ref: "", location: getLocation(ctx) };
     }
-    if (atoms.length === 1) return this.bcAtomToCondition(atoms[0]!);
+    if (atoms.length === 1) return this.bcAtomToCondition(atoms[0]!, context);
     const ands = ctx.AND();
     const ors = ctx.OR();
     if (ands.length > 0 && ors.length > 0) {
       this.reportError(
-        "mixed 'and'/'or' in a `when` guard requires parentheses, e.g. `(A or B) and C`",
+        `mixed 'and'/'or' in a ${context} requires parentheses, e.g. \`(A or B) and C\``,
         ctx,
       );
     }
-    const operands = atoms.map((a) => this.bcAtomToCondition(a));
+    const operands = atoms.map((a) => this.bcAtomToCondition(a, context));
     const location = getLocation(ctx);
     return ors.length > 0 && ands.length === 0
       ? { type: "BranchConditionOr", operands, location }
       : { type: "BranchConditionAnd", operands, location };
   }
 
-  private bcAtomToCondition(ctx: BcAtomContext): BranchCondition {
+  private bcAtomToCondition(ctx: BcAtomContext, context = "`when` guard"): BranchCondition {
     if (ctx instanceof BcRefContext) {
       const refCtx = ctx.conceptReference();
       return {
@@ -412,7 +419,7 @@ export class CRLAstBuilder
       };
     }
     if (ctx instanceof BcGroupContext) {
-      return this.branchConditionFrom(ctx.branchCondition());
+      return this.branchConditionFrom(ctx.branchCondition(), context);
     }
     // #224 iii.2: `not <atom>` — a unary negation. ANTLR error-recovery can yield a
     // BcNot with no inner atom (`when not then …` mid-typing); return a placeholder ref
@@ -430,7 +437,7 @@ export class CRLAstBuilder
       }
       return {
         type: "BranchConditionNot",
-        operand: this.bcAtomToCondition(inner),
+        operand: this.bcAtomToCondition(inner, context),
         location: getLocation(ctx),
       };
     }
@@ -1161,6 +1168,21 @@ export class CRLAstBuilder
     };
   }
 
+  // `defined as ("A" and "B")` — BOOLEAN composition (T1). Reuses `branchConditionFrom` (chain-flatten,
+  // single-ref-stays-ref, mixed-`and`/`or` rejection — identical to a `when` guard), wrapped so the CONCEPT
+  // attachment point is distinct from a decision guard. Criterion classification is NOT run here — operands
+  // stay concept refs (concept-only site). Emit stays inert until T3 (`BooleanCompositionNotActiveError`).
+  visitDefinedAsBooleanComposition(
+    ctx: DefinedAsBooleanCompositionContext,
+  ): DefinedAsBooleanComposition {
+    const expr = this.branchConditionFrom(ctx.branchCondition(), "`defined as` boolean composition");
+    return {
+      type: "DefinedAsBooleanComposition",
+      expression: expr,
+      location: getLocation(ctx),
+    };
+  }
+
   visitCompositionExpression(ctx: CompositionExpressionContext): CompositionExpression {
     return this.visit(ctx.semOr()) as CompositionExpression;
   }
@@ -1210,7 +1232,8 @@ export class CRLAstBuilder
     const body = this.visit(daBodyCtx) as
       | DefinedAsBareRef
       | DefinedAsExists
-      | DefinedAsComposition;
+      | DefinedAsComposition
+      | DefinedAsBooleanComposition;
     return {
       type: "DefinedAsDefinition",
       body,

@@ -64,6 +64,7 @@ import type {
   BlockMember,
   ActionStatement,
   InterfaceSourceLayer,
+  BranchCondition,
 } from "../ast/types";
 import {
   getRefName,
@@ -72,6 +73,7 @@ import {
   normalizeLocalRef,
 } from "../ast/types";
 import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex";
+import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import { pascalCaseNameForId } from "../fhir-emitter/slug";
 
 import type { CRLError } from "../types/errors";
@@ -523,6 +525,9 @@ function visitDefinitionRefs(
       // library-dependency computation. Only a composition carries an expression.
       if (def.body.type === "DefinedAsBareRef" || def.body.type === "DefinedAsExists")
         visit(def.body.ref);
+      else if (def.body.type === "DefinedAsBooleanComposition")
+        for (const r of branchConditionConceptRefsStrict(def.body.expression, "layeredEmit deps"))
+          visit(r.ref);
       else visitCompositionRefs(def.body.expression, visit);
       return;
     case "DefinitionIsDefinition":
@@ -671,6 +676,41 @@ function requalifyComposition(
   }
 }
 
+// T1: requalify a `defined as` BOOLEAN composition (`("A" and "B")`) across a layer boundary. Mirrors
+// `requalifyComposition` but over the reused `BranchCondition` family (decisions are out of scope for
+// layering, so this is its only requalification site). Criterion refs are illegal at the `defined as` site
+// (never classified there) — a `BranchConditionCriterionRef` here is a hard error.
+function requalifyBranchCondition(
+  bc: BranchCondition,
+  currentLayer: Layer,
+  maps: NameLayerMaps,
+  lib: string,
+  policyId: string,
+  partition: Partition,
+): BranchCondition {
+  switch (bc.type) {
+    case "BranchConditionRef":
+      return { ...bc, ref: requalifyRef(bc.ref, "concept", currentLayer, maps, lib, policyId, partition) };
+    case "BranchConditionNot":
+      return bc.operand
+        ? { ...bc, operand: requalifyBranchCondition(bc.operand, currentLayer, maps, lib, policyId, partition) }
+        : bc;
+    case "BranchConditionAnd":
+    case "BranchConditionOr":
+      return {
+        ...bc,
+        operands: bc.operands.map((o) =>
+          requalifyBranchCondition(o, currentLayer, maps, lib, policyId, partition),
+        ),
+      };
+    case "BranchConditionCriterionRef":
+      throw new Error(
+        "criterion ref in a `defined as` boolean composition — criterion refs are illegal at the concept " +
+          "attachment point (they are never classified there)",
+      );
+  }
+}
+
 /** Re-qualify an `ArgValue` (narrative arg-position concept refs). Concept slot. */
 function requalifyArgValue(
   arg: ArgValue,
@@ -772,6 +812,18 @@ function requalifyDefinition(
         out.body = {
           ...def.body,
           ref: requalifyRef(def.body.ref, "concept", currentLayer, maps, lib, policyId, partition),
+        };
+      } else if (def.body.type === "DefinedAsBooleanComposition") {
+        out.body = {
+          ...def.body,
+          expression: requalifyBranchCondition(
+            def.body.expression,
+            currentLayer,
+            maps,
+            lib,
+            policyId,
+            partition,
+          ),
         };
       } else {
         out.body = {

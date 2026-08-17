@@ -18,7 +18,7 @@ import type {
   ReferenceName,
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
-import { branchConditionRefs } from "../ast/branchCondition";
+import { branchConditionRefs, branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import type { LibraryScope, SourceContext } from "../imports/scopes";
 import { lookupKnownLibrary } from "../imports/scopes";
 
@@ -247,6 +247,11 @@ export class ReferenceResolver {
               ctx,
               errors,
             );
+          } else if (body.type === "DefinedAsBooleanComposition") {
+            // T1: resolve every operand ref of a boolean composition (else undefined-ref diagnostics
+            // stay silent on its operands — this if/else has no exhaustiveness guard).
+            for (const r of branchConditionConceptRefsStrict(body.expression, "defined-as boolean composition"))
+              this.checkRef(r.ref, CONCEPT_REF_KINDS, r.location, ctx, errors, "defined-as");
           }
           break;
         }

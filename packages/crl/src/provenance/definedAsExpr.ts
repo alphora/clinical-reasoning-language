@@ -277,7 +277,10 @@ export function buildDefExprIndex(
       // plain leaf ref (its dependency is tracked by the provenance indexer), rather than
       // flattening it into a bare-ref alias that this operator-PRESERVING model would then
       // render identically to `defined as "X"`.
-      if (daBody.type !== "DefinedAsExists") return buildBody(daBody, lib, new Set(path).add(name));
+      // `exists ("X")` and boolean composition (`("A" and "B")`) have no operator-preserving DefExpr body in
+      // increment 1 — fall through to a plain leaf ref; their dependencies are tracked by the provenance indexer.
+      if (daBody.type !== "DefinedAsExists" && daBody.type !== "DefinedAsBooleanComposition")
+        return buildBody(daBody, lib, new Set(path).add(name));
     }
     return { kind: "ref", ref: { name, lib, crossLib: false, leafEligible: false, hasDefinedAs: false } };
   };
@@ -323,7 +326,9 @@ export function buildDefExprIndex(
     const daBody =
       ast?.definition?.type === "DefinedAsDefinition" ? ast.definition.body : undefined;
     const body =
-      daBody && daBody.type !== "DefinedAsExists" ? buildBody(daBody, c.lib, new Set()) : undefined;
+      daBody && daBody.type !== "DefinedAsExists" && daBody.type !== "DefinedAsBooleanComposition"
+        ? buildBody(daBody, c.lib, new Set())
+        : undefined;
     index.set(c.nodeKey, {
       nodeKey: c.nodeKey,
       lib: c.lib,

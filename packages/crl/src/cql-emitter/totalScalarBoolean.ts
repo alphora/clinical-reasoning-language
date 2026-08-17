@@ -175,6 +175,18 @@ function computeTotality(
         // emit on this same predicate, so emit + discharge + façade agree by construction.
         return compositionAllOperandsTotal(body.expression, resolve, nextVisiting, memo);
       }
+      if (body.type === "DefinedAsBooleanComposition") {
+        // T1 concept-boolean-composition — this predicate (`emitsTotalScalarBoolean`) is the T3 FLIP GATE
+        // (`emitCQL.ts` gates the boolean-lane pivot on it). Emit is INERT until T3: the CQL emit dispatch throws
+        // `BooleanCompositionNotActiveError` before any artifact ships, so returning `false` here is correct for
+        // now — a boolean composition does NOT flip to the bare-scalar-boolean lane in T1. ⚠ DELIBERATE DIVERGENCE
+        // from `emit/booleanTotality.ts`, which classifies it composite/delegated (potentially total): that machine
+        // computes whole-boundary null-totality obligations; THIS predicate gates the emit pivot and MUST stay
+        // closed until T3 replaces this with the real "every operand is a proven-total boolean" recursion. Keeping
+        // the branch EXPLICIT (not a silent fall-through into the exists `return false`) is what stops T3 from
+        // silently never flipping boolean compositions.
+        return false;
+      }
       // `defined as exists` in the SAME-LAYER (truth-set/case-feature) lane is non-total. A FOREIGN none/off-lane
       // `defined as exists` emits a total `exists(...)`, but that totality is delivered by the cross-library
       // resolver's lane-aware TERMINAL verdict, never by recursing this same-layer arm.
