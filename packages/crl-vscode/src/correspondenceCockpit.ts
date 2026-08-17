@@ -200,7 +200,10 @@ const PRIMARY_PANES: PrimaryPane[] = ["source", "crl", "cel"];
 // paneOrder listing all six must get a 6th column instead of piling onto column One via the `?? One` fallback (VS Code
 // supports up to 9). The default MV set stays 4 (worklist/source/tree/questionnaire); this only bounds the overflow case.
 const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.ViewColumn.Three, vscode.ViewColumn.Four, vscode.ViewColumn.Five, vscode.ViewColumn.Six];
-const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "Questionnaire", applyQuestionnaire: "Questionnaire ($apply)", worklist: "Worklist" };
+// The two questionnaire panes are named by their SOURCE, which is the whole point of showing both: "CRL
+// Questionnaire" is the projection of what the CRL says, "FHIR Questionnaire" is what the emitted artifact
+// actually produced via $apply. Naming one of them "$apply" would name the mechanism rather than the thing.
+const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "CRL Questionnaire", applyQuestionnaire: "FHIR Questionnaire", worklist: "Worklist" };
 // Perf gate (disc 118): the measured full-render floor. Over → fall back to a navigation-only placeholder, don't freeze.
 const MAX_SOURCE_CHARS = 200_000;
 const MAX_SOURCE_MARKS = 2000;
@@ -407,7 +410,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  "CRL Medical Validation" prefix. Since the pane split (disc 179) the `worklist` pane carries its own title ("Worklist")
    *  and the `cel` pane reads "CEL" in BOTH modes (it's the read-only case-list now, not the worklist). */
   const paneTitle = (pane: Pane): string =>
-    mode === "medical-validation" ? `CRL Medical Validation · ${PANE_TITLE[pane]}` : PANE_TITLE[pane];
+    mode === "medical-validation" ? `Medical Validation - ${PANE_TITLE[pane]}` : PANE_TITLE[pane];
   /** The navigable primary panes for the current mode (#156 slice 3, FIX 2). MV's primary enum is [source, cel] (no crl —
    *  it has no CRL pane in the default and its config enum excludes crl), so the set-primary quickpick + the persisted
    *  guard must reject "crl" in MV mode. Cockpit keeps the full [source, crl, cel]. */
@@ -742,12 +745,19 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       shouldRerenderQuestionnaire({
         prevCaseId,
         nextCaseId: focusedCaseId(next),
+        // Either questionnaire pane being open is reason enough to run this hook — they render the same case
+        // from different sources (CRL projection vs the emitted artifact) and both must follow the selection.
+        paneOpen: views.has("questionnaire") || views.has("applyQuestionnaire"),
         mode,
-        paneOpen: views.has("questionnaire"),
       })
     ) {
       currentQuestionIndex = -1; // a new case starts with NO question focused
       renderPane("questionnaire");
+      // The $apply pane follows the SAME case selection. Without this it is rendered only by rebuild() — which
+      // runs before any case is focused — so it would sit permanently on its "select a case" placeholder while
+      // the static questionnaire beside it updated. Its own render-identity guard makes a no-change render a
+      // cheap no-op, so re-rendering here cannot churn the mounted form.
+      renderPane("applyQuestionnaire");
       // #177 slice 4: the questionnaire just re-rendered for the new case (no focused question) — re-drive the "this node" marker
       // across all panes. CORRECTNESS MODEL (mirrors driveDoneOverlay): the PANE-ACK re-drive (onWebviewMessage's `ready` →
       // driveThisNode, fires on every marker-bearing pane render) is the guarantee — a freshly rendered pane always re-paints
@@ -5221,13 +5231,37 @@ ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
     // deliberately excludes it, and without it Angular never bootstraps and the form silently paints nothing).
     // The stylesheet <link> needs no nonce here because this pane's style-src is 'unsafe-inline' + cspSource.
     (pane === "applyQuestionnaire"
-      ? `<link rel="stylesheet" href="${asset("styles.css")}">` +
-        `<style>#root{white-space:normal}</style>` + // the shell's body{white-space:pre-wrap} would mangle the form
-        `<script nonce="${nonce}" src="${asset("zone.min.js")}"></script>` +
+      ? // Capture-phase error listener FIRST, before anything it needs to observe. A <script src> that 404s
+        // raises no CSP violation and no visible console error — it just silently does not run, and the only
+        // symptom is `LForms is undefined` with no cause. This records which resources failed so the mount can
+        // name them instead of shrugging. (The harness learned this the hard way; reusing it here.)
+        `<script nonce="${nonce}">window.__aqErrs=[];` +
+        // THREE distinct failure channels, and they do not overlap. A 404 gives an `error` whose target has a
+        // src. A script that loads then THROWS gives an `error` with no target src (a message instead). A
+        // CSP-blocked script gives NEITHER — it raises `securitypolicyviolation` only. Listening to just one
+        // makes the other two look identical to "loaded fine but defined nothing".
+        `window.addEventListener('error',function(e){var t=e&&e.target;` +
+        `if(t&&(t.src||t.href)){window.__aqErrs.push('404 '+String(t.src||t.href).split('/').pop());}` +
+        `else{window.__aqErrs.push('threw '+((e&&e.message)?e.message:'(no message)'));}},true);` +
+        `document.addEventListener('securitypolicyviolation',function(e){window.__aqErrs.push('CSP '+e.violatedDirective+' blocked '+String(e.blockedURI||'').split('/').pop());});` +
+        `</script>` +
+        `<link rel="stylesheet" href="${asset("styles.css")}">` +
+        `<style>#root{white-space:normal}</style>` // the shell's body{white-space:pre-wrap} would mangle the form
+      : "") +
+    `</head><body><div id="fcChrome"></div><div id="root"></div><div id="flagDrawer"></div>` +
+    // ⚠ The vendor runtime loads in the BODY, after the divs — NOT in <head>. LForms bootstraps against
+    // `document.body`, so loading it from <head> throws
+    // "Cannot read properties of null (reading 'appendChild')" before it can define the `LForms` global, and
+    // lformsFHIR then dies looking for `UcumLhcUtils`. Neither is a 404 or a CSP violation, so the only visible
+    // symptom is "LForms is undefined".
+    // Zone.js still first: the concatenated bundle deliberately excludes it and Angular will not bootstrap
+    // without it. These are classic (non-module) scripts, so parse order is execution order, and the message
+    // listener below registers in the same synchronous pass — message dispatch is async, so it cannot be missed.
+    (pane === "applyQuestionnaire"
+      ? `<script nonce="${nonce}" src="${asset("zone.min.js")}"></script>` +
         `<script nonce="${nonce}" src="${asset("lhc-forms.js")}"></script>` +
         `<script nonce="${nonce}" src="${asset("lformsFHIR.min.js")}"></script>`
       : "") +
-    `</head><body><div id="fcChrome"></div><div id="root"></div><div id="flagDrawer"></div>` +
     `<script nonce="${nonce}">` +
     COCKPIT_WEBVIEW_SCRIPT +
     `</script></body></html>`
@@ -5396,7 +5430,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `const host=document.getElementById('root');` +
   `const fail=(t)=>{host.replaceChildren();const p=document.createElement('p');p.className='placeholder';p.textContent=t;host.appendChild(p);};` +
   `if(!m.q){fail('Select a case to see its $apply questionnaire.');return;}` +
-  `if(typeof LForms==='undefined'||!LForms.Util){fail('The LForms runtime did not load.');return;}` +
+  `if(typeof LForms==='undefined'||!LForms.Util){` +
+  `const errs=(window.__aqErrs||[]);` +
+  `fail('The LForms runtime did not load. '+(errs.length?('Failures: '+errs.join(' | ')):'No 404, no throw, no CSP violation — the scripts ran and defined no LForms global. Check load ORDER (zone.js must precede lhc-forms.js).'));` +
+  `return;}` +
   `try{` +
   `host.replaceChildren();const mount=document.createElement('div');host.appendChild(mount);mount.id='aqMount';` +
   `let form=LForms.Util.convertFHIRQuestionnaireToLForms(m.q,'R4');` +
