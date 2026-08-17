@@ -411,12 +411,16 @@
             ]
           },
           "default": [
+            "worklist",
             "source",
+            "tree",
+            "questionnaire",
             "fhirQuestionnaire",
-            "tree"
+            "crl",
+            "cel"
           ],
           "scope": "window",
-          "description": "Left-to-right column order of the Medical Validation panel's panes. THE SETTING IS THE SOURCE OF TRUTH: the list is honored exactly as written, nothing is added back, and an empty list shows no panes. Available panes: 'source', 'tree', 'worklist' (the review surface — verdicts + notes, and how you pick a case), 'questionnaire' (the CRL path questionnaire — what the CRL says), 'fhirQuestionnaire' (the FHIR Questionnaire produced from the emitted artifact by $apply), 'cel' (the read-only case list, a SEPARATE pane from 'worklist'), and 'crl'. Set it in User settings to persist across projects, or in Workspace settings for one project. Unknown entries are dropped. Changes apply live to open panes."
+          "description": "Left-to-right column order of the Medical Validation panel's panes. THE SETTING IS THE SOURCE OF TRUTH: the list is honored exactly as written, nothing is added back, and an empty list shows no panes. Defaults to all of them; narrow from there. 'worklist' is the review surface (verdicts + notes); 'questionnaire' is the CRL path questionnaire (what the CRL says); 'fhirQuestionnaire' renders the FHIR Questionnaire produced from the emitted artifact by $apply; 'cel' is the read-only case list, a SEPARATE pane from 'worklist'. Set it in User settings to persist across projects, or in Workspace settings for one project. Unknown entries are dropped. Changes apply live to open panes."
         },
         "crl.medical-validation.showKeys": {
           "type": "boolean",
