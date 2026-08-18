@@ -2,15 +2,16 @@
 library "Pol".
 
 // A decision + `code is` library whose decision guard is a `defined as exists`
-// concept. `defined as exists` lowers on the STANDARD lane (#265) but NOT on the
-// case-feature Inferred lane (#270), which the interface split uses — so
-// `emitConceptBody` throws the UNTYPED `definedAsExistsNotLowered`. The FHIR fold
-// must treat that kind-less throw as manifest-failing (not drop it) so
-// `emitFhirDefFromPath` does NOT report a misleading `success:true`.
+// concept. `defined as exists` lowers on the STANDARD lane (#265) AND, since #270
+// (Slice 0a), on the case-feature Inferred lane the interface split uses — to the
+// same bare scalar `exists(<X>)` (`emitCQL.emitExistsBridge`), re-exported BARE by
+// the Interface façade (`srcIsExists`). This fixture now emits successfully on both
+// the CQL and FHIR lanes; before #270 it threw the untyped `definedAsExistsNotLowered`
+// and the FHIR fold sank success (regression pinned in closureOrchestrator.test.ts).
 
 concept "Adult Patient":
 - type is Observation.
-- value type is boolean.
+- shape is RecordSet.
 - code is `adult`.
 
 concept "Has Adult":

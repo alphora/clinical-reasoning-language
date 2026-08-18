@@ -766,26 +766,6 @@ export interface DefinedAsExists extends ASTNode {
   ref: ReferenceName;
 }
 
-/**
- * Guard for `defined as exists (...)` code paths that do NOT lower it. The construct PARSES and
- * builds — its reference is tracked by every reference walker (resolution, cycles, emit closure,
- * project index, provenance). STANDARD-lane CQL lowering landed in #265 (`emitDefinedAs` →
- * `exists (<X>)`; CMS69's `Active Pregnancy Diagnosis` is the first consumer). The paths that STILL
- * call this — the case-feature truth-set ("inferred") emit lane and the run_decision/CEL evaluator —
- * do not yet lower existence (tracked in #270); they call this to fail LOUD rather than misread the
- * node. Originally the safety net the design review (disc 394, gpt56 point #1) required once the
- * `DefinedAsDefinition.body` union was widened.
- */
-export function definedAsExistsNotLowered(where: string): never {
-  throw new Error(
-    "`defined as exists` is not lowered on this path (" +
-      where +
-      ") — STANDARD-lane CQL lowering landed in #265, but the case-feature truth-set lane and the " +
-      "run_decision evaluator do not yet lower existence (#270). The construct parses and its " +
-      "reference is tracked like a bare ref.",
-  );
-}
-
 export interface DefinedAsComposition extends ASTNode {
   type: "DefinedAsComposition";
   expression: CompositionExpression;
@@ -902,7 +882,8 @@ export class ReductionInCompositionError extends StructuredEmitError {
 /** The diagnostic kind for the T1 boolean-composition emit sentinel — a `DefinedAsBooleanComposition`
  * (`defined as ("A" and "B")`) reached an emit/lowering path while boolean composition is still validate-only
  * (lowering lands in T3). Filterable kind so tooling names the exact error. Parallel to
- * `EMIT_REDUCTION_NOT_ACTIVE_KIND` / `definedAsExistsNotLowered`. */
+ * `EMIT_REDUCTION_NOT_ACTIVE_KIND` (the `defined as exists` analogue, `definedAsExistsNotLowered`, was
+ * retired once #270 lowered existence on every lane). */
 export const EMIT_BOOLEAN_COMPOSITION_NOT_ACTIVE_KIND = "emit-boolean-composition-not-active";
 
 export function booleanCompositionNotActiveMessage(where: string): string {

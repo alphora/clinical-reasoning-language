@@ -205,8 +205,9 @@ concept "D":
 `);
     const lowered = lowerLocalCodes(a);
     expect(lowered.errors).toEqual([]);
-    // Direct (none-path) emit — the truth-set lane throws `definedAsExistsNotLowered` separately; this
-    // pins the none-path arm's reduction guard.
+    // Direct (none-path) emit — this pins the shared exists bridge's operand refusal (a reduction operand
+    // emits a total scalar boolean, so `exists` over it is ill-typed). Since #270 the inferred lane lowers
+    // via the SAME bridge, so the refusal is lane-shared.
     const result = emitCQLFromAST(lowered.ast, { libraryName: "Pol" });
     expect(result.success).toBe(false);
     expect(result.errors?.map((e) => e.kind)).toContain("emit-reduction-in-composition");
@@ -231,5 +232,52 @@ concept "D":
     const result = emitCQLFromAST(lowered.ast, { libraryName: "Pol" });
     expect(result.success, JSON.stringify(result.errors)).toBe(true);
     expect(result.result).toMatch(/define "D":\s*\n\s*exists \("Trials"\)/);
+  });
+
+  it("#270 (disc 461 code review G2) — a `shape is RecordSet` concept with a `defined as exists` body is a COHERENCE error (a record shape cannot publish an existence boolean)", () => {
+    // The useSiteType validator documents this as a deferred gap it does not catch, and `emitCQLFromAST`
+    // is validator-free — so `emitExistsBridge` refuses it rather than emit a scalar `exists(...)` under a
+    // record declaration (charter §3 cardinality authoritative).
+    const a = ast(`library "Pol".
+
+concept "Trials":
+- type is Observation.
+- shape is RecordSet.
+- code is \`t\`.
+
+concept "Bad":
+- type is Observation.
+- shape is RecordSet.
+- defined as exists ( "Trials" ).
+`);
+    const lowered = lowerLocalCodes(a);
+    const result = emitCQLFromAST(lowered.ast, { libraryName: "Pol" });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.errors)).toMatch(/publishes a Scalar boolean/);
+  });
+
+  it("#270 (disc 461 code review G3/Claude-7) — `defined as exists` over another total scalar boolean (an exists concept) is loud-refused (singleton-promotion inversion)", () => {
+    // The operand must publish a RECORD SET. `exists` over an already-total scalar boolean silently inverts
+    // (`exists({false})` = true). Widened from "reduction operand" to "operand emits a total scalar boolean"
+    // (the ONE classifier, now exists-aware), so exists-over-exists is caught.
+    const a = ast(`library "Pol".
+
+concept "Trials":
+- type is Observation.
+- shape is RecordSet.
+- code is \`t\`.
+
+concept "Has Trials":
+- value type is boolean.
+- defined as exists ( "Trials" ).
+
+concept "Double":
+- value type is boolean.
+- defined as exists ( "Has Trials" ).
+`);
+    const lowered = lowerLocalCodes(a);
+    const result = emitCQLFromAST(lowered.ast, { libraryName: "Pol" });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.errors)).toMatch(/already emits a TOTAL scalar boolean/);
   });
 });

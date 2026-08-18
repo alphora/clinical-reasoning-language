@@ -1898,8 +1898,8 @@ export function emitFhirDefFromPath(
   const cqlImports = emitCQLImports(rootPath);
   // Fold kind-LESS `type:"Exception"` throws too (panel R2 Fable [important]): this predicate exists to
   // skip EXCLUDED KINDS (the FHIR lane surfaces those itself), NOT to skip Exceptions. A kind-less throw
-  // — e.g. `definedAsExistsNotLowered` (a `defined as exists` on the case-feature Inferred lane, #270),
-  // or any future untyped emit throw — is a genuine CQL-lane hard failure. The old `e.kind !== undefined`
+  // — its original concrete vehicle, `definedAsExistsNotLowered`, was retired when #270 lowered existence
+  // on every lane, but ANY future untyped emit throw — is a genuine CQL-lane hard failure. The old `e.kind !== undefined`
   // guard dropped it, so `cqlManifestFailed` stayed false and `emitFhirDefFromPath` could report a
   // MISLEADING `success:true` off the empty-manifest fallback — the exact D2 class this file exists to
   // guard. Keeping kind-less errors folds them so `success` sinks; only truly-EXCLUDED kinds are dropped.

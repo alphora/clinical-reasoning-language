@@ -78,7 +78,6 @@ import {
   getRefName,
   getRefLibrary,
   isQualifiedRef,
-  definedAsExistsNotLowered,
   reductionNotEmittable,
   StructuredEmitError,
   ReductionShapeIncoherentError,
@@ -1256,6 +1255,15 @@ class Emitter {
       case "DefinedAsDefinition": {
         // The truth-set lanes (inferred/interface) emit a List; the boolean subject is the façade.
         if (this.caseFeature.kind !== "off") {
+          // #270 (disc 461 code review, both arms) — a `defined as exists` on the case-feature lane emits a
+          // bare scalar `exists(...)` (a TOTAL boolean, `emitExistsBridge`), NOT a truth-set List. Its
+          // totality is delivered by the ONE classifier: `emitsTotalScalarBoolean` now returns true for a
+          // coherent `Scalar<boolean>` `defined as exists` (`totalScalarBoolean.ts` DefinedAsExists arm),
+          // so this discharge, the pivot, `refIsTotal` (alias-to-exists / composition-over-exists), and the
+          // Interface façade all read the SAME verdict — no body-tag override, no drift. It discharges
+          // `composite-delegated` here (existence is intrinsically total; the closure proof's
+          // `intrinsically-total` obligation for a `defined as exists`, `booleanTotality.ts:292`,
+          // reconciles against the emitted bare Boolean).
           // #189 Slice C 2b.2 — a FLIPPED bare-ref alias to a total boolean discharges `composite-delegated`: its
           // authored obligation is already `composite` over [referent] (`booleanTotality.ts:296`), so the closure
           // proof delegates to the referent's own total. `emitsTotalScalarBoolean(c)` gates on `c`'s OWN boolean
@@ -2220,12 +2228,31 @@ class Emitter {
     // leaf. (A bare-ref `defined as` to another Inferred concept is a truth-set
     // alias — emit the qualified ref with NO `.asTruths()`.)
     if (this.caseFeature.kind === "inferred") {
-      // `defined as exists` inside the case-feature truth-set lane has no lowering — no content
-      // exercises it, and an existence collapse over a normalized truth-set is not a set-op form
-      // this lane models. Guard loud rather than guess (#265 lowered the STANDARD lane only). The
-      // guard narrows `body` to bare-ref | composition for the truth-set rendering below.
+      // #270 — `defined as exists ("X")` lowers on the case-feature INFERRED lane too, to the SAME bare
+      // scalar `exists (<X>)` as the standard lane (`emitExistsBridge`, shared). Existence is a TOTAL
+      // boolean (the ONE classifier `emitsTotalScalarBoolean` now returns true for it), so it does NOT join
+      // the truth-set set-op weave below — it re-exports bare via the Interface façade, like an
+      // inferred-lane `definition is exists` reduction. Before #270 this threw `definedAsExistsNotLowered`
+      // (no content exercised the inferred lane); the shared bridge retires that. The early return narrows
+      // `body` to bare-ref | composition for the truth-set rendering below.
       if (body.type === "DefinedAsExists") {
-        definedAsExistsNotLowered("cql-emitter emitDefinedAs (case-feature truth-set lane)");
+        // Claude-3 (disc 461 code review, both arms): a both-rep `code is` + `defined as exists` twin
+        // (`__bothRepFoldInLocalSource` set) would fold `LocalSource."X".asTruths() union exists(...)` — a
+        // truth-set List union a scalar Boolean, ill-typed, silently DROPPING the concept's own local-code
+        // records from its truth. The `code is` + `defined as` fold is validator-rejected (E1) but
+        // `emitCQLFromAST` is validator-free, so refuse loud here (mirrors the bare-ref both-rep guard below)
+        // rather than emit a wrong answer on the canonical local-domain path (charter §2).
+        if (c.__bothRepFoldInLocalSource !== undefined) {
+          throw new ReductionInCompositionError(
+            `Concept "${c.name}" carries a local \`code is\` and \`defined as exists\` (a both-representation ` +
+              `merge). Existence publishes a scalar boolean, which cannot fold into the local-code truth-set ` +
+              `union (\`LocalSource.asTruths() union exists(...)\` is ill-typed). Model existence over the ` +
+              `local records with \`- shape is RecordSet.\` on a records concept + a separate ` +
+              `\`defined as exists\`, or drop one representation arm.`,
+            body.location,
+          );
+        }
+        return this.emitExistsBridge(c, body);
       }
       // Both-representation fold-in: the Inferred twin of a `code is` + `defined
       // as` concept must UNION the direct local-source retrieve with its inferred
@@ -2366,35 +2393,7 @@ class Emitter {
       }
       return inner;
     }
-    if (body.type === "DefinedAsExists") {
-      // `defined as exists ("X")` → a boolean existence determination over concept X's define
-      // (a resource/refinement list): `exists (<X>)`. Mirrors the bare-ref lane's cross-lib
-      // qualification; the reference is tracked like a bare ref (ast/types.ts). (#265)
-      //
-      // #189 Slice-C boundary 1 (impl-panel round 2, Claude) — the none-path `defined as exists` arm is a
-      // THIRD truth-set-adjacent entry a reduction operand can reach (besides the composition operand and
-      // the bare-ref alias, both guarded by `assertNotReductionTruthSetOperand`). A reduction is ALREADY a
-      // total boolean (`define "R": exists(...)`), so `exists ("R")` applies `exists` to a scalar Boolean:
-      // ill-typed at translator load, or SILENTLY INVERTED if the translator promotes the singleton to a
-      // list (`exists({false})` = true). `defined as exists` is for a RECORD SET / refinement operand; to
-      // reference a reduction's boolean directly, use `defined as "R"`. Loud-refuse rather than ship it.
-      if (this.crossLibraryOf(body.ref) === null) {
-        const operand = this.conceptByName.get(getRefName(body.ref));
-        if (operand?.definition?.type === "ReductionDefinition") {
-          throw new ReductionInCompositionError(
-            `\`defined as exists ("${operand.name}")\` applies \`exists\` to reduction "${operand.name}", ` +
-              `which is already a TOTAL boolean — \`exists\` over a scalar boolean is ill-typed (and may ` +
-              `silently invert via singleton promotion). Reference the reduction directly with ` +
-              `\`defined as "${operand.name}"\`, or apply \`exists\` to a record set.`,
-            typeof body.ref === "string" ? undefined : body.ref.location,
-          );
-        }
-      }
-      const crossLib = this.crossLibraryOf(body.ref);
-      const refName = getRefName(body.ref);
-      const ref = crossLib !== null ? cqlQualifiedRef(crossLib, refName) : cqlIdent(refName);
-      return `exists (${ref})`;
-    }
+    if (body.type === "DefinedAsExists") return this.emitExistsBridge(c, body);
     if (body.type === "DefinedAsBareRef") {
       const crossLib = this.crossLibraryOf(body.ref);
       const refName = getRefName(body.ref);
@@ -2405,6 +2404,75 @@ class Emitter {
     }
     const shape = this.shapeForComposition(c, body.expression);
     return this.emitComposition(body.expression, shape);
+  }
+
+  /**
+   * #270 — lower `defined as exists ( "X" )` to a bare scalar `exists (<X>)`. SHARED by the off/standard
+   * lane (#265) AND the case-feature INFERRED lane (#270), so the two lanes cannot drift (impl-plan disc
+   * 461 banner C — ONE target-shape check at the exists lowering). The operand is X's RAW define — a
+   * `code is` retrieve, a `coded from`/list-pattern retrieve, or a refinement list — resolved via the
+   * shared cross-library/cross-layer qualification (the requalifier has already qualified a cross-LAYER
+   * ref, `layeredEmit.ts:811`). NOT `.asTruths()`: existence is over the RAW records ("any record
+   * exists"), mirroring the standard lane and an inferred-lane `definition is exists` REDUCTION — which
+   * also emits a bare `exists(...)` and re-exports bare (the reduction precedent, `totalScalarBoolean.ts:143`
+   * + the reduction lowering above). A `defined as exists` is a TOTAL boolean (existence is never null),
+   * so its ledger discharge is `intrinsic-exists` and its Interface façade re-exports BARE (the
+   * `DefinedAsExists` arms at the discharge + `layeredEmit`'s `srcIsExists`), NOT the truth-set
+   * `.satisfied()` path. Emitting a truth-set lift here instead would DIVERGE from both the standard lane
+   * and reductions (disc 461: the "truth-set lift" option missed the reduction precedent).
+   *
+   * Two guards (disc 461 code review, both arms): (1) RESULT coherence — the result concept must be a
+   * `Scalar<boolean>` (a record shape cannot publish an existence boolean); (2) OPERAND must publish a
+   * record set — refuse ANY same-lib operand that emits a total scalar boolean (exists / reduction /
+   * comparator / flipped alias), because `exists` over a scalar boolean is ill-typed or silently inverts.
+   * A cross-layer/cross-lib operand skips guard (2) (`crossLibraryOf !== null`) — its shape is proven at the
+   * resolver seam (0c), not here.
+   */
+  private emitExistsBridge(c: Concept, body: DefinedAsExists): string {
+    // RESULT COHERENCE (disc 461 code review G2, both arms; charter §3 cardinality authoritative). `defined
+    // as exists` publishes a SCALAR BOOLEAN (existence is true-or-false), so the result concept must declare
+    // exactly `shape is Scalar` + a single `value type is boolean`. A `shape is Record/RecordSet` +
+    // `defined as exists` is incoherent (a record shape cannot publish an existence boolean) — the
+    // useSiteType validator documents this as a DEFERRED gap it does not yet catch, and `emitCQLFromAST` is
+    // validator-free, so enforce it HERE rather than emit a scalar `exists(...)` under a record declaration.
+    // Mirrors the reduction coherence guard (`ReductionShapeIncoherentError`).
+    if (c.shape !== "Scalar" || c.valueTypes.length !== 1 || c.valueTypes[0] !== "boolean") {
+      const vtClause =
+        c.valueTypes.length === 1
+          ? ` and \`value type is ${c.valueTypes[0]}\``
+          : c.valueTypes.length > 1
+            ? ` and ${c.valueTypes.length} value types (needs exactly one \`boolean\`)`
+            : " and no `value type`";
+      throw new ReductionShapeIncoherentError(
+        `Concept "${c.name}": \`defined as exists\` publishes a Scalar boolean (existence is true-or-false), ` +
+          `but the concept declares \`shape is ${c.shape}\`${vtClause}. Declare \`- shape is Scalar.\` with ` +
+          `\`value type is boolean\`.`,
+        body.location,
+      );
+    }
+    // OPERAND must publish a RECORD SET (disc 461 code review G3/Claude-7, both arms; the #269 gap). `exists`
+    // over an already-total scalar boolean — another `defined as exists`, a reduction, a boolean comparator,
+    // a flipped total alias — is ill-typed at translator load, or SILENTLY INVERTS if the translator
+    // promotes the singleton to a list (`exists({false})` = true). Refuse ANY same-lib operand that emits a
+    // total scalar boolean (the ONE classifier, now exists-aware — so exists-over-exists is caught
+    // transitively), not merely a `ReductionDefinition`. A cross-layer/cross-lib operand skips this
+    // (`crossLibraryOf !== null`) — its shape is proven at the resolver seam (0c), not here.
+    if (this.crossLibraryOf(body.ref) === null) {
+      const operand = this.conceptByName.get(getRefName(body.ref));
+      if (operand && emitsTotalScalarBoolean(operand, sameLayerResolver((n) => this.conceptByName.get(n)))) {
+        throw new ReductionInCompositionError(
+          `\`defined as exists ("${operand.name}")\` applies \`exists\` to "${operand.name}", which already ` +
+            `emits a TOTAL scalar boolean — \`exists\` over a scalar boolean is ill-typed (and may silently ` +
+            `invert via singleton promotion). Reference it directly with \`defined as "${operand.name}"\`, ` +
+            `or apply \`exists\` to a record set.`,
+          typeof body.ref === "string" ? undefined : body.ref.location,
+        );
+      }
+    }
+    const crossLib = this.crossLibraryOf(body.ref);
+    const refName = getRefName(body.ref);
+    const ref = crossLib !== null ? cqlQualifiedRef(crossLib, refName) : cqlIdent(refName);
+    return `exists (${ref})`;
   }
 
   /**

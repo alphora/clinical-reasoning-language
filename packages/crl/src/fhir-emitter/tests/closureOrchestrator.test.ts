@@ -208,14 +208,18 @@ describe("closureOrchestrator — #189: unactivated reductions fail the FHIR lan
     expect(result.success).toBe(false);
   });
 
-  it("a kind-LESS CQL throw (`defined as exists` on the Inferred lane, #270) sinks FHIR success — no misleading success (panel R2 Fable)", () => {
-    // `defined as exists` lowers on the standard lane (#265) but throws the UNTYPED
-    // `definedAsExistsNotLowered` on the case-feature Inferred lane the interface split uses. The fold
-    // now keeps kind-less exceptions (they are genuine hard failures), so `success` sinks instead of a
-    // misleading `success:true` off the empty-manifest fallback.
-    const KINDLESS = join(ROOT, "src/imports/tests/fixtures/decision-defined-as-exists/root.crl");
-    const result = emitFhirDefFromPath(KINDLESS, { clock: FIXED_CLOCK });
-    expect(result.success).toBe(false);
+  it("#270 — `defined as exists` on the case-feature Inferred lane now LOWERS (heals the FHIR fold): the fixture emits successfully", () => {
+    // BEFORE #270 this fixture threw the UNTYPED `definedAsExistsNotLowered` on the case-feature Inferred
+    // lane the interface split uses, and the D2 fold sank FHIR success (no misleading success:true off the
+    // empty-manifest fallback). #270 now lowers `defined as exists` on that lane to a bare scalar
+    // `exists(...)` (Slice 0a, `emitCQL.emitExistsBridge`) — the exact shape the standard lane (#265) emits —
+    // so the CQL manifest no longer fails and the FHIR fold heals automatically (no orchestrator edit). This
+    // is the positive #270 regression. The kind-less-fold safety property (a truly untyped throw sinks
+    // success) is retained defensively in `closureOrchestrator.ts` for any FUTURE untyped emit throw; #270
+    // retired its only concrete vehicle — flag for a synthetic kind-less unit if that coverage is wanted.
+    const HEALED = join(ROOT, "src/imports/tests/fixtures/decision-defined-as-exists/root.crl");
+    const result = emitFhirDefFromPath(HEALED, { clock: FIXED_CLOCK });
+    expect(result.success).toBe(true);
   });
 
   it("#189 Slice-C flip — case (b) a decision + `code is` + reduction library EMITS successfully (the reduction classifies Inferred → the library splits, so the case-feature lane has its LocalSource target)", () => {

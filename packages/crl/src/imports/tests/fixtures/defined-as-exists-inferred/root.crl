@@ -1,0 +1,43 @@
+# defined-as-exists-inferred (#270 disc 461 code-review cases)
+library "Pol".
+
+// #270 inferred-lane `defined as exists` consumers that pre-flip would have thrown
+// or mis-lowered. Each is a coherent bare-scalar boolean on the inferred lane:
+//   - `Has Adult`      : exists over a records concept (the baseline #270 form).
+//   - `Adult Alias`    : a bare-ref ALIAS to an exists concept (Claude #1) — must
+//     re-export BARE, never `.satisfied()` a scalar.
+//   - `Adult Or Senior`: a `sem-or` composition OVER two exists concepts (Claude #2)
+//     — must flip to boolean `or`, never `union` two scalar Booleans.
+
+concept "Adult Records":
+- type is Observation.
+- shape is RecordSet.
+- code is `adult`.
+
+concept "Senior Records":
+- type is Observation.
+- shape is RecordSet.
+- code is `senior`.
+
+concept "Has Adult":
+- value type is boolean.
+- defined as exists ( "Adult Records" ).
+
+concept "Has Senior":
+- value type is boolean.
+- defined as exists ( "Senior Records" ).
+
+concept "Adult Alias":
+- value type is boolean.
+- defined as "Has Adult".
+
+concept "Adult Or Senior":
+- value type is boolean.
+- defined as ( "Has Adult" sem-or "Has Senior" ).
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Adult Alias" then recommend activity "Refer".
+- when "Adult Or Senior" then recommend activity "Refer".

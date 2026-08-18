@@ -1,0 +1,26 @@
+# defined-as-exists-bothrep (#270 disc 461 Claude-3)
+library "Pol".
+
+// A both-representation `code is` + `defined as exists` twin. lowerLocalCodes builds
+// a union fold-in twin for ANY `defined as` body; folding `LocalSource.asTruths()
+// union exists(...)` mixes a truth-set List with a scalar Boolean (ill-typed) and
+// would SILENTLY drop the concept's own local records from its truth. The `code is` +
+// `defined as` fold is validator-rejected (E1) but emitCQLFromAST is validator-free,
+// so the inferred-lane emit refuses it loud.
+
+concept "Other Records":
+- type is Observation.
+- shape is RecordSet.
+- code is `other`.
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is `adult`.
+- defined as exists ( "Other Records" ).
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Adult Patient" then recommend activity "Refer".

@@ -15,7 +15,6 @@ import {
   DefinedAsExists,
   DefinitionIsDefinition,
   NWord,
-  definedAsExistsNotLowered,
   getRefLibrary,
   getRefName,
 } from "../types";
@@ -289,10 +288,6 @@ concept "B":
 });
 
 describe("increment-1 lowering guard", () => {
-  it("definedAsExistsNotLowered throws a diagnostic naming the boundary (the paths that still guard, #270)", () => {
-    expect(() => definedAsExistsNotLowered("test-site")).toThrow(/not lowered on this path \(test-site\)/);
-  });
-
   it("emit_cql LOWERS an exists concept to a boolean `exists (<X>)` (#265; was a guarded structured error pre-#265)", () => {
     const ast = parseInput(`library "T".
 concept "Present":

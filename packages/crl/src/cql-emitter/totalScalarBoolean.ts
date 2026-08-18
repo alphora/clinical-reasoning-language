@@ -187,10 +187,19 @@ function computeTotality(
         // silently never flipping boolean compositions.
         return false;
       }
-      // `defined as exists` in the SAME-LAYER (truth-set/case-feature) lane is non-total. A FOREIGN none/off-lane
-      // `defined as exists` emits a total `exists(...)`, but that totality is delivered by the cross-library
-      // resolver's lane-aware TERMINAL verdict, never by recursing this same-layer arm.
-      return false;
+      // #270 — `defined as exists` is a TOTAL scalar boolean (existence is never null; `exists(...)` never
+      // returns null), on EVERY lane. Since #270 the case-feature INFERRED lane lowers it to a bare scalar
+      // `exists(<X>)` (`emitCQL.emitExistsBridge`), exactly like the off/standard lane and an inferred-lane
+      // `definition is exists` reduction (the reduction arm above returns `isScalarBoolean` for the same
+      // reason). The `isScalarBoolean(concept)` gate at the top of this arm has already rejected a
+      // non-scalar / non-boolean exists concept (the §4 shape-vs-form incoherence — a `shape is RecordSet`
+      // + `defined as exists`), so reaching here means a coherent `Scalar<boolean>` existence determination.
+      // This is the SINGLE totality verdict every consumer reads — the emit pivot, `refIsTotal` recursion
+      // (alias-to-exists, composition-over-exists), the discharge, and the façade — so they cannot drift
+      // (module header). A FOREIGN (cross-library) `defined as exists`'s totality WILL be delivered by
+      // `DeclaredResultIndex`'s lane-aware verdict, which 0c builds (today `sameLayerResolver` returns
+      // `total:false` for a qualified ref — 0c names this exact cell).
+      return true;
     }
     default:
       return false; // `coded from` retrieve etc. → not a boolean
