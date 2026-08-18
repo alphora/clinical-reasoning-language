@@ -22,8 +22,11 @@
  *      operand resolving to neither a concept nor a fact emits a diagnostic
  *      (silent-false under `sem-not` would invert to a spurious `true`). Cyclic
  *      `defined as` (validator-rejected) terminates with a diagnostic and is not
- *      memoized. Still NOT evaluated (deferred): `definition is` predicates
- *      (count/temporal/value), `coded from` / external value sets.
+ *      memoized. EVALUATED (#270 Slice 0a-cre): `defined as exists ("X")` and a named `definition is
+ *      exists "X"` reduction — closed-world existence over X (`refTrace`). REFUSED loud (run marked error,
+ *      never a fabricated presence answer): a `count ... at least N` / `most recent this` reduction. Still
+ *      NOT evaluated (deferred): a NAMED `most recent "X"` / temporal / value `definition is` predicate
+ *      (presence-evaluated under the general rule), `coded from` / external value sets.
  *  - Decision walk: `first:` (ordered, first match wins, short-circuit),
  *    `all:` (every matching branch fires), `any:`/`all:` over actions (members
  *    enter the produced set; qualifier recorded), `otherwise` (catch-all), and
@@ -308,13 +311,53 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
   let composition: CompositionTrace | undefined;
   let composed = false;
   const def = entry?.node.definition;
+  const runtimeErrorBefore = ctx.runtimeError;
   if (def && def.type === "DefinedAsDefinition") {
     composition = walkDefinedAs(def.body, entry!.lib, ctx);
     composed = composition.satisfied;
+  } else if (def && def.type === "ReductionDefinition") {
+    const red = def.reduction;
+    if (red.kind === "exists" && red.target.type === "ReductionConceptRef") {
+      // #270 Slice 0a-cre (disc 462 code review, both arms) — a NAMED `definition is exists "X"` reduction IS
+      // existence of X: identical to `defined as exists ("X")` and to its CQL lowering `exists(<X>)`. Evaluate
+      // the TARGET (via `refTrace`), NOT `directFacts.has(self)` — the case asserts X's records, not this
+      // derived concept, so a presence answer here is always-false: a silent Deny of every eligible case, the
+      // exact fabrication the count/most-recent arm below refuses. (`exists this` — a `ThisRecords` target — is
+      // the concept's OWN records, sound as `directFacts` presence, so it needs no arm and falls through.)
+      composition = refTrace(red.target.ref, entry!.lib, ctx);
+      composed = composition.satisfied;
+    } else if (red.kind === "count" || red.kind === "mostRecent") {
+      // A `count ... at least N` / `most recent this` reduction CANNOT be soundly evaluated by the presence
+      // model (count needs record COUNTS — present/absent would pass a sub-threshold case; `most recent` needs
+      // record-level value/recency). Mark the run ERROR rather than FABRICATE a presence answer (charter
+      // no-fabricated-authority), mirroring the boolean-composition precedent below.
+      // ⚠ SPELLING ASYMMETRY (disc 462, both arms): a NAMED `most recent "X"` deliberately stays a
+      // `DefinitionIsDefinition` (`types.ts:979`), NOT a `ReductionDefinition`, so it does NOT reach this arm —
+      // it presence-evaluates under the general "`definition is` predicates deferred" rule (file header) and is
+      // silently false. Distinguishing a value-read `most recent "X"` from a sound list-pattern records concept
+      // needs the narrative matcher + pattern-return-shape classification (the emit-side machinery); a full CRE
+      // value-read/reduction evaluation is a deferred effort. Documented here rather than half-built.
+      ctx.runtimeError = true;
+      ctx.diagnostics.push(
+        `\`definition is ${red.kind === "count" ? "count" : "most recent"}\` reduction concept ` +
+          `${labelOf(entry!.lib, entry!.node.name)} is not evaluated by run_decision — a count/most-recent ` +
+          `reduction needs record-level evaluation the engine's presence model does not provide; run marked ` +
+          `error rather than fabricate a presence-based answer.`,
+      );
+    }
+    // `exists this` (ThisRecords) → no arm; `directFacts` presence (the case asserting the concept's own
+    // records) IS its existence, so it is sound.
   }
   ctx.stack.delete(id);
   const result: ConceptEval = { sat: direct || composed, ...(composition ? { composition } : {}) };
-  if (ctx.cycleHits === cyclesBefore) ctx.cache.set(id, result); // memoize cycle-free evals only
+  // Memoize only cycle-free AND non-runtimeError-tainted evals (disc 462 Claude #2). A cached tainted result
+  // would mask the per-concept unevaluable signal `truthOf`/`collectConceptTruth` read off the scratch
+  // `runtimeError` to OMIT the row (never publish a fabricated presence answer). `runtimeErrorBefore` scopes
+  // this to errors raised DURING this eval (directly or via a consumed operand — transitive), mirroring the
+  // existing cycle-taint exclusion; a tainted eval is on the error path and never trusted, so not caching it
+  // costs only a re-eval.
+  const erroredThisEval = ctx.runtimeError && !runtimeErrorBefore;
+  if (ctx.cycleHits === cyclesBefore && !erroredThisEval) ctx.cache.set(id, result);
   return result;
 }
 
@@ -323,25 +366,25 @@ function walkDefinedAs(
   lib: string,
   ctx: Ctx,
 ): CompositionTrace {
-  // `exists ("X")` evaluation (existence over a possibly-non-boolean concept, closed-world) is
-  // Todo 2/3 semantics, not increment 1. Do NOT throw — `walkDefinedAs` runs inside the
-  // read-only `runCel` path, which has no converting catch, so a throw would crash
-  // `run_decision`/viewModel. Instead set `runtimeError` (⇒ `status:"error"`, produced
-  // discarded) so the run does NOT report an authoritative pass/fail derived from an
-  // UNEVALUATED existence expression — a plain `satisfied:false` would let a caller reading
-  // only `status` accept a fabricated result — plus a diagnostic, plus an unsatisfied leaf so
-  // the trace is well-formed. On the OFF-path `truthOf` route this runs in an isolated scratch
-  // ctx (runtimeError is a by-value boolean copied by the `{...ctx}` spread), so it never
-  // pollutes the real run — the concept's off-path truth is just `false`. The run_decision/CEL
-  // evaluator does not lower `exists` (the cql-emitter standard lane does, #265; engine
-  // evaluation is tracked in #270); cms69, a measure, is not reached through this path.
+  // #270 (Slice 0a-cre) — `defined as exists ("X")` is CLOSED-WORLD existence over X's records: X exists
+  // iff it is directly asserted by a case fact OR its own definition evaluates satisfied (`evalConcept`,
+  // via `refTrace`). In the closed-world fact model, existence of a records concept IS its satisfaction —
+  // exactly the CQL bare `exists(<X>)` the emitter lowers (`emitExistsBridge`), which is total (never
+  // null). So NO `runtimeError`: an existence determination is now authoritative, matching the emit lane.
+  // It traces as `op:"ref"` ("X is present") — the trace op union has no distinct `exists` node; a
+  // dedicated one can ride 0b's viewModel schema bump. (The emit refuses `exists` over a scalar boolean /
+  // reduction operand — `emitExistsBridge` guard (2) — so a well-formed exists target is a records/refinement
+  // concept, for which `refTrace`'s satisfaction is the presence answer.)
+  //
+  // ⚠ REFINEMENT-TARGET DIVERGENCE (disc 462, gpt56 G1 / Claude): when X is a `defined as (A sem-and B)` /
+  // `sem-not` refinement, CRE approximates record INTERSECTION/COMPLEMENT by boolean presence conjunction
+  // (`walkExpr`), so `exists(X)` can read true where the emitted CQL `exists(A intersect B)` is empty
+  // (disjoint records). This is a PRE-EXISTING systemic model coarseness — it applies to EVERY consumer of a
+  // refinement concept's satisfaction (a plain `when "X"` guard over a refinement already approximates), not
+  // to `exists` specifically — so `exists` inheriting it consistently is correct; loud-erroring only the
+  // `exists` cell would be incoherent. Record-level refinement evaluation is a deferred CRE effort.
   if (body.type === "DefinedAsExists") {
-    ctx.runtimeError = true;
-    ctx.diagnostics.push(
-      `\`defined as exists\` (${labelOf(getRefLibrary(body.ref) ?? lib, getRefName(body.ref))}) is not yet ` +
-        `evaluated by run_decision — engine existence evaluation is tracked in #270; run marked error`,
-    );
-    return { op: "ref", concept: getRefName(body.ref), satisfied: false };
+    return refTrace(body.ref, lib, ctx);
   }
   if (body.type === "DefinedAsBooleanComposition") {
     // T1: boolean composition (`("A" and "B")`) is not lowered on the run_decision/CEL evaluator yet (T3).
@@ -373,20 +416,27 @@ function walkDefinedAs(
  * result; never overwrites) and the main run already completed, so added cache entries cannot alter produced/trace.
  * LOAD-BEARING INVARIANT: this routes ONLY through `evalConcept`. `walkBranches`/`emitAction`/`executeBody` are the
  * writers of `produced`/`trace`/`delegationStack`; `runtimeError` has additional writers reachable from `evalConcept`
- * — `walkDefinedAs` sets it for an unlowered `defined as exists` (concept-model Todo 1) OR an unlowered `defined as`
- * boolean composition (concept-boolean-composition T1). Isolation still holds: the
- * scratch ctx below spreads `{...ctx}`, so its `runtimeError` is a fresh by-value boolean — an off-path exists marks the
- * SCRATCH errored (discarded) and never the real run. So an eager off-path truth is unaffected (just `false`). Keep it
- * that way — any NEW `runtimeError` writer reachable from `evalConcept` must likewise be neutralized by this spread.
+ * — `walkDefinedAs` sets it for an unlowered `defined as` boolean composition (concept-boolean-composition T1), and
+ * `evalConcept` itself sets it for a `count`/`most recent` reduction concept (#270 Slice 0a-cre). (`defined as exists`
+ * and a named `exists "X"` reduction now EVALUATE, so they no longer write it.) Isolation still holds: the scratch ctx
+ * below RESETS `runtimeError` to a fresh `false`, so an off-path unevaluable node marks the SCRATCH errored and never
+ * the real run. Any NEW `runtimeError` writer reachable from `evalConcept` inherits this isolation — keep it that way.
+ *
+ * The reset also makes the scratch `runtimeError` a per-concept "this off-path answer is NON-AUTHORITATIVE" signal:
+ * `collectConceptTruth` reads it to OMIT the row (the `ConceptTruthRow` "absent ⇒ unknown" contract) rather than
+ * publish a fabricated presence `false` for a concept the engine refuses to evaluate (disc 462 Claude #2 / gpt56 G4).
  */
-function truthOf(id: Id, ctx: Ctx): ConceptEval {
-  return evalConcept(id, {
+function truthOf(id: Id, ctx: Ctx): { eval: ConceptEval; authoritative: boolean } {
+  const scratch: Ctx = {
     ...ctx,
     diagnostics: [],
     stack: new Set(),
     cycleHits: 0,
     reportedUnresolved: new Set(ctx.reportedUnresolved),
-  });
+    runtimeError: false, // fresh — detect ONLY this off-path eval's unevaluable verdict
+  };
+  const ev = evalConcept(id, scratch);
+  return { eval: ev, authoritative: !scratch.runtimeError };
 }
 
 /**
@@ -414,7 +464,13 @@ function truthOf(id: Id, ctx: Ctx): ConceptEval {
 function collectConceptTruth(ctx: Ctx): ConceptTruthRow[] {
   const rows: ConceptTruthRow[] = [];
   for (const [id, entry] of ctx.concepts) {
-    rows.push({ lib: entry.lib, name: entry.node.name, satisfied: truthOf(id, ctx).sat });
+    const { eval: ev, authoritative } = truthOf(id, ctx);
+    // OMIT a non-authoritative concept (a `count`/`most recent` reduction, or a boolean composition, that
+    // the engine refuses to evaluate) — an ABSENT row is UNKNOWN (render blank), never a fabricated `false`
+    // (disc 462 Claude #2 / gpt56 G4). Publishing false would tell a pane a `count≥2` determination is
+    // authoritatively unmet on a case that may satisfy it.
+    if (!authoritative) continue;
+    rows.push({ lib: entry.lib, name: entry.node.name, satisfied: ev.sat });
   }
   rows.sort((a, b) => a.lib.localeCompare(b.lib) || a.name.localeCompare(b.name));
   return rows;

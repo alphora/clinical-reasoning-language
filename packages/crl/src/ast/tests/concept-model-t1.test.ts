@@ -303,7 +303,7 @@ concept "Has Present":
     expect(res.result ?? "").not.toContain("not yet lowered");
   });
 
-  it("run_decision (runCel) on an exists concept does NOT throw — it surfaces a diagnostic and treats it as unsatisfied", () => {
+  it("run_decision (runCel) EVALUATES a `defined as exists` guard closed-world (#270 Slice 0a-cre) — no runtimeError", () => {
     const M = `# M
 library "M".
 concept "Present":
@@ -352,14 +352,168 @@ case "no present":
         diagnostics: [],
       };
     })();
-    // The assertion that matters: runCel RETURNS (no uncaught throw out of the read API).
+    // #270 Slice 0a-cre: `defined as exists` now EVALUATES on the engine. Closed-world — the case asserts
+    // NO `Present` fact, so `Has Present` is false → the decision falls to `otherwise` → "Deny", which
+    // MATCHES the case expectation, so the run PASSES. No runtimeError, no "not yet evaluated" diagnostic.
     const [run] = runCel(graph).runs;
     expect(run).toBeDefined();
-    // An on-path `defined as exists` reaches the engine's unlowered path → the run is marked
-    // ERROR (runtimeError), NOT an authoritative pass/fail derived from an unevaluated
-    // existence expression, and the reason is a diagnostic.
+    expect(run.status).toBe("pass");
+    expect(run.diagnostics.some((d) => /not yet evaluated/i.test(d))).toBe(false);
+    // The closed-world existence answer is authoritative: `Has Present` is false (no `Present` record).
+    const hasPresent = run.conceptTruth.find((r) => r.name === "Has Present");
+    expect(hasPresent?.satisfied).toBe(false);
+  });
+
+  it("run_decision marks a `count`/`most recent` reduction guard ERROR, never a fabricated presence answer (#270 Slice 0a-cre)", () => {
+    // A named `count ... at least N` reduction is never in `directFacts` (the case asserts the underlying
+    // records, not the derived concept), so a presence answer would silently Deny an eligible case. The
+    // engine refuses it loud rather than fabricate authority (banner E) — unlike `defined as exists`, which
+    // IS sound as presence and evaluates (above).
+    const M = `# M
+library "M".
+concept "Trial Records":
+- type is Observation.
+- shape is RecordSet.
+- code is \`trial\`.
+concept "Enough Trials":
+- value type is boolean.
+- definition is count "Trial Records" at least 2.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ap\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`dn\`.
+decision "D":
+first:
+- when "Enough Trials" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+    const cel = `# MC
+library "MC".
+covers "M".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+case "some":
+- subject is "Pat".
+- result is "D" is "Deny".`;
+    const graph: ResolvedCelGraph = (() => {
+      const crl = parseInput(M);
+      const built = buildCEL(cel);
+      if (!built.success || !built.result)
+        throw new Error("CEL build failed: " + JSON.stringify(built.errors));
+      const coversTarget: RegistryEntry = {
+        name: crl.library.name,
+        filePath: "inline.crl",
+        ast: crl,
+        isRoot: true,
+        origin: "root",
+      };
+      return { filePath: "inline.cel", cel: built.result, coversTarget, celParseErrors: [], diagnostics: [] };
+    })();
+    const [run] = runCel(graph).runs;
+    expect(run).toBeDefined();
     expect(run.status).toBe("error");
-    expect(run.diagnostics.some((d) => /defined as exists.*not yet evaluated/i.test(d))).toBe(true);
+    expect(run.diagnostics.some((d) => /count.*reduction.*is not evaluated/i.test(d))).toBe(true);
+  });
+
+  it("run_decision — a SATISFIED `defined as exists` guard (a record present) → true → Approve (#270 Slice 0a-cre positive twin)", () => {
+    // The negative twin (above) proves closed-world false; this proves a present record makes it TRUE (an
+    // impl hardcoding `false` would fail here — disc 462 Claude #4).
+    const M = `# M
+library "M".
+concept "Present":
+- type is Observation.
+- shape is RecordSet.
+- code is \`present\`.
+concept "Has Present":
+- value type is boolean.
+- defined as exists ( "Present" ).
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ap\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`dn\`.
+decision "D":
+first:
+- when "Has Present" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+    const cel = `# MC
+library "MC".
+covers "M".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "A Present Record":
+- code is "http://example.org/x|present".
+- defined by "Present".
+case "has present":
+- subject is "Pat".
+- fact is "A Present Record".
+- result is "D" is "Approve".`;
+    const graph: ResolvedCelGraph = (() => {
+      const crl = parseInput(M);
+      const built = buildCEL(cel);
+      if (!built.success || !built.result) throw new Error("CEL build failed: " + JSON.stringify(built.errors));
+      const coversTarget: RegistryEntry = { name: crl.library.name, filePath: "inline.crl", ast: crl, isRoot: true, origin: "root" };
+      return { filePath: "inline.cel", cel: built.result, coversTarget, celParseErrors: [], diagnostics: [] };
+    })();
+    const [run] = runCel(graph).runs;
+    expect(run).toBeDefined();
+    expect(run.status).toBe("pass");
+    expect(run.conceptTruth.find((r) => r.name === "Has Present")?.satisfied).toBe(true);
+  });
+
+  it("run_decision — a NAMED `definition is exists \"X\"` reduction EVALUATES its target (records present → true → Approve), not a silent Deny (#270 Slice 0a-cre, disc 462 Claude #1)", () => {
+    // Pre-fix a named-exists reduction fell through to `directFacts.has(self)` = always false → silent Deny of
+    // an eligible case. It now evaluates existence of the TARGET, identical to `defined as exists`.
+    const M = `# M
+library "M".
+concept "Trial Records":
+- type is Observation.
+- shape is RecordSet.
+- code is \`trial\`.
+concept "Has Trials":
+- value type is boolean.
+- definition is exists "Trial Records".
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ap\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`dn\`.
+decision "D":
+first:
+- when "Has Trials" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+    const cel = `# MC
+library "MC".
+covers "M".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "A Trial Record":
+- code is "http://example.org/x|trial".
+- defined by "Trial Records".
+case "has trials":
+- subject is "Pat".
+- fact is "A Trial Record".
+- result is "D" is "Approve".`;
+    const graph: ResolvedCelGraph = (() => {
+      const crl = parseInput(M);
+      const built = buildCEL(cel);
+      if (!built.success || !built.result) throw new Error("CEL build failed: " + JSON.stringify(built.errors));
+      const coversTarget: RegistryEntry = { name: crl.library.name, filePath: "inline.crl", ast: crl, isRoot: true, origin: "root" };
+      return { filePath: "inline.cel", cel: built.result, coversTarget, celParseErrors: [], diagnostics: [] };
+    })();
+    const [run] = runCel(graph).runs;
+    expect(run).toBeDefined();
+    expect(run.status, JSON.stringify(run.diagnostics)).toBe("pass");
+    expect(run.conceptTruth.find((r) => r.name === "Has Trials")?.satisfied).toBe(true);
   });
 });
 
