@@ -42,8 +42,9 @@
 
 import { matchNarrative } from "../template-match";
 import { PATTERN_RETURN_SHAPE } from "./patternReturnShape";
-import type { Concept, ReferenceName, CompositionExpression } from "../ast/types";
+import type { Concept, ReferenceName, CompositionExpression, BranchCondition } from "../ast/types";
 import { getRefName, getRefLibrary } from "../ast/types";
+import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 
 // #189 Slice C 2b.3b.0 — the resolve SEAM, generalized from name-based to `ReferenceName`-based so the ONE shared
 // predicate is the single totality source at every consult site (pivot / discharge / façade), incl. cross-library
@@ -176,16 +177,18 @@ function computeTotality(
         return compositionAllOperandsTotal(body.expression, resolve, nextVisiting, memo);
       }
       if (body.type === "DefinedAsBooleanComposition") {
-        // T1 concept-boolean-composition — this predicate (`emitsTotalScalarBoolean`) is the T3 FLIP GATE
-        // (`emitCQL.ts` gates the boolean-lane pivot on it). Emit is INERT until T3: the CQL emit dispatch throws
-        // `BooleanCompositionNotActiveError` before any artifact ships, so returning `false` here is correct for
-        // now — a boolean composition does NOT flip to the bare-scalar-boolean lane in T1. ⚠ DELIBERATE DIVERGENCE
-        // from `emit/booleanTotality.ts`, which classifies it composite/delegated (potentially total): that machine
-        // computes whole-boundary null-totality obligations; THIS predicate gates the emit pivot and MUST stay
-        // closed until T3 replaces this with the real "every operand is a proven-total boolean" recursion. Keeping
-        // the branch EXPLICIT (not a silent fall-through into the exists `return false`) is what stops T3 from
-        // silently never flipping boolean compositions.
-        return false;
+        // #189 Slice 0b — a `defined as` BOOLEAN composition (`("A" and "B")`, the neutral
+        // `BranchCondition` family) is a total scalar boolean IFF EVERY operand is a proven-total scalar
+        // boolean (plan banner A/D). DELEGATE to the boolean-family walker, which recurses each operand
+        // back through THIS shared predicate (`refIsTotal`) under the SAME `visiting` cycle guard and
+        // `memo` — so the emit pivot, the discharge gate, and the façade all read ONE verdict and cannot
+        // drift (the single-classifier lesson 0a-cql learned; module header). The `isScalarBoolean(concept)`
+        // gate at the top of this arm has already required the composition PARENT be a coherent
+        // `Scalar<boolean>`. A composition over a truth-set / non-total operand stays NON-total → the pivot
+        // keeps it OFF the bare-boolean lane and emits a LOUD error (no fabricated terminal `Coalesce`,
+        // charter §4 no-magic). This REPLACES the T1 inert `return false`; `emit/booleanTotality.ts` (the
+        // whole-boundary obligation machine) already classified it composite/delegated.
+        return branchCompositionAllOperandsTotal(body.expression, resolve, nextVisiting, memo);
       }
       // #270 — `defined as exists` is a TOTAL scalar boolean (existence is never null; `exists(...)` never
       // returns null), on EVERY lane. Since #270 the case-feature INFERRED lane lowers it to a bare scalar
@@ -238,4 +241,22 @@ function compositionAllOperandsTotal(
     case "SemOrExpression":
       return expr.terms.every((t) => compositionAllOperandsTotal(t, resolve, visiting, memo));
   }
+}
+
+/** #189 Slice 0b — every operand of a `defined as` BOOLEAN composition (`("A" and "B")`, the neutral
+ *  `BranchCondition` family — NOT the sem-* `CompositionExpression`) is a proven-total scalar boolean: the
+ *  boolean-composition flip gate (plan banner A). Collects the concept-ref leaves with the SAME strict
+ *  collector the totality CLASSIFIER (`emit/booleanTotality.ts`) uses — `branchConditionConceptRefsStrict`,
+ *  which THROWS on an un-expanded `BranchConditionCriterionRef` (a criterion is a decision-guard construct,
+ *  never a boolean-composition operand) — then checks each leaf via `refIsTotal`, so a bare-alias / sem-* /
+ *  `defined as exists` operand recurses back through the shared `emitsTotalScalarBoolean` under the SAME
+ *  `visiting` cycle guard and `memo` (mutual recursion legacy↔family, banner A). */
+function branchCompositionAllOperandsTotal(
+  expr: BranchCondition,
+  resolve: ReferenceResolver,
+  visiting: ReadonlySet<string>,
+  memo: Map<string, boolean>,
+): boolean {
+  const refs = branchConditionConceptRefsStrict(expr, "totalScalarBoolean boolean-composition");
+  return refs.every((r) => refIsTotal(r.ref, resolve, visiting, memo));
 }

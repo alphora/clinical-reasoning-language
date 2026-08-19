@@ -16,7 +16,7 @@ import { Validator } from "../validator";
 // contract (design §2/§6; plan-panel disc 457). A boolean composition must publish a declared `Scalar<Boolean>`,
 // its operands must each resolve to a `Scalar<Boolean>` (by RESULT type, not datum value type), and the concept is
 // PURE-DERIVED (no local `code is` / source rep). ALL three constrain ONLY the new family, so zero existing corpus
-// is touched. Emit stays sentinel-inert until T3. Assertions are DELTAS (the specific `use-site-type-mismatch`
+// is touched. #189 Slice 0b LOWERS the family (emit + CRE). Assertions are DELTAS (the specific `use-site-type-mismatch`
 // rule), never "zero errors overall" — helper concepts carry unrelated migration warnings.
 
 // A clean record source concept the exists-reduced boolean operands read from.

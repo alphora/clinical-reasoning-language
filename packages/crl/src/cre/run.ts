@@ -71,7 +71,7 @@ import type {
   WhenBlockBody,
 } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
-import { soleRef, describeBranchCondition, branchConditionConceptRefsStrict } from "../ast/branchCondition";
+import { soleRef, describeBranchCondition } from "../ast/branchCondition";
 import type { BranchCondition } from "../ast/types";
 // #236 — the CRE evaluates a decision's criterion-guard refs BY REFERENCE (memoized per case),
 // never by up-front expansion. `runCel` runs NO semantic validation, so a cyclic/undefined
@@ -106,13 +106,15 @@ export interface ProducedRec {
 }
 
 /** Sub-evaluation of a `defined as` composition — so the trace shows WHY a
- *  composite was (un)satisfied (which operand failed), for adversarial review. */
+ *  composite was (un)satisfied (which operand failed), for adversarial review.
+ *  `sem-and`/`sem-or`/`sem-not` are the semantic-inference (record-space) ops; `and`/`or`/`not` are the
+ *  #189 Slice 0b BOOLEAN-composition ops (over SEPARATE boolean facts) — same shape, distinct semantics. */
 export interface CompositionTrace {
-  op: "sem-and" | "sem-or" | "sem-not" | "ref";
+  op: "sem-and" | "sem-or" | "sem-not" | "and" | "or" | "not" | "ref";
   satisfied: boolean;
   concept?: string; // op === "ref"
-  operands?: CompositionTrace[]; // op === "sem-and" | "sem-or"
-  operand?: CompositionTrace; // op === "sem-not"
+  operands?: CompositionTrace[]; // op === "sem-and" | "sem-or" | "and" | "or"
+  operand?: CompositionTrace; // op === "sem-not" | "not"
   composition?: CompositionTrace; // op === "ref" to a composite — its own sub-evaluation
 }
 
@@ -387,21 +389,20 @@ function walkDefinedAs(
     return refTrace(body.ref, lib, ctx);
   }
   if (body.type === "DefinedAsBooleanComposition") {
-    // T1: boolean composition (`("A" and "B")`) is not lowered on the run_decision/CEL evaluator yet (T3).
-    // MIRROR the `defined as exists` precedent above — DO NOT throw: `walkDefinedAs` runs inside the read-only
-    // `runCel` path, which has NO converting catch, so a throw would crash `run_decision`/viewModel. Set
-    // `runtimeError` (⇒ status:"error", produced discarded) + a diagnostic + an unsatisfied leaf so the run never
-    // reports an authoritative pass/fail derived from an UNEVALUATED boolean composition. Like exists, this is a
-    // sanctioned `runtimeError` writer reachable from `evalConcept`, neutralized by `truthOf`'s `{...ctx}` spread.
-    ctx.runtimeError = true;
-    const operands = branchConditionConceptRefsStrict(body.expression, "cre walkDefinedAs").map((r) => r.ref);
-    ctx.diagnostics.push(
-      `\`defined as\` boolean composition (${operands
-        .map((r) => labelOf(getRefLibrary(r) ?? lib, getRefName(r)))
-        .join(", ")}) is not yet evaluated by run_decision — lowering to one compound total boolean lands at ` +
-        `T3; run marked error`,
-    );
-    return { op: "ref", concept: operands[0] ? getRefName(operands[0]) : "", satisfied: false };
+    // #189 Slice 0b — CLOSED-WORLD eval of a `defined as` BOOLEAN composition (`("A" and "B")`): `and`/`or`/
+    // `not` over the evaluated operand booleans (each operand a concept ref → `refTrace`). REPLACES the T1 loud
+    // sentinel. ⚠ SCOPE (disc 464, both arms — it matches the emitted CQL for VALIDATOR-CLEAN, same-lib content
+    // over EVALUABLE operands, NOT unconditionally):
+    //   - a `runtimeError`-writing operand (a `count`/`most recent` reduction, or the criterion arm in
+    //     `walkBoolExpr`) DOES propagate → run status "error";
+    //   - an UNRESOLVED or CYCLIC operand degrades CLOSED-WORLD-FALSE (`refTrace`/`evalConcept` set no
+    //     `runtimeError`) — the SAME posture as a decision guard / `sem-*` composition; the validator owns them
+    //     (a composition over an unresolved operand is T2-rejected);
+    //   - a boolean COMPARATOR / value-read operand inherits the presence-model approximation (backlog #283),
+    //     IDENTICAL to a plain `when "X"` guard over the same operand — not worsened here. Documented, not loud,
+    //     consistent with the operator-affirmed G1 stance (single-cell loud-erroring would contradict the rest
+    //     of the CRE). Full record/value-level CRE eval is the deferred #283 effort.
+    return walkBoolExpr(body.expression, lib, ctx);
   }
   return body.type === "DefinedAsBareRef"
     ? refTrace(body.ref, lib, ctx)
@@ -416,9 +417,10 @@ function walkDefinedAs(
  * result; never overwrites) and the main run already completed, so added cache entries cannot alter produced/trace.
  * LOAD-BEARING INVARIANT: this routes ONLY through `evalConcept`. `walkBranches`/`emitAction`/`executeBody` are the
  * writers of `produced`/`trace`/`delegationStack`; `runtimeError` has additional writers reachable from `evalConcept`
- * — `walkDefinedAs` sets it for an unlowered `defined as` boolean composition (concept-boolean-composition T1), and
- * `evalConcept` itself sets it for a `count`/`most recent` reduction concept (#270 Slice 0a-cre). (`defined as exists`
- * and a named `exists "X"` reduction now EVALUATE, so they no longer write it.) Isolation still holds: the scratch ctx
+ * — `walkBoolExpr`'s criterion-operand arm sets it for a criterion inside a `defined as` boolean composition (#189
+ * Slice 0b), and `evalConcept` itself sets it for a `count`/`most recent` reduction concept (#270 Slice 0a-cre).
+ * (`defined as exists`, a named `exists "X"` reduction, and a boolean composition over EVALUABLE operands now
+ * EVALUATE, so they no longer write it.) Isolation still holds: the scratch ctx
  * below RESETS `runtimeError` to a fresh `false`, so an off-path unevaluable node marks the SCRATCH errored and never
  * the real run. Any NEW `runtimeError` writer reachable from `evalConcept` inherits this isolation — keep it that way.
  *
@@ -465,8 +467,8 @@ function collectConceptTruth(ctx: Ctx): ConceptTruthRow[] {
   const rows: ConceptTruthRow[] = [];
   for (const [id, entry] of ctx.concepts) {
     const { eval: ev, authoritative } = truthOf(id, ctx);
-    // OMIT a non-authoritative concept (a `count`/`most recent` reduction, or a boolean composition, that
-    // the engine refuses to evaluate) — an ABSENT row is UNKNOWN (render blank), never a fabricated `false`
+    // OMIT a non-authoritative concept (a `count`/`most recent` reduction, or a boolean composition over a
+    // criterion operand, that the engine refuses to evaluate) — an ABSENT row is UNKNOWN (render blank), never a fabricated `false`
     // (disc 462 Claude #2 / gpt56 G4). Publishing false would tell a pane a `count≥2` determination is
     // authoritatively unmet on a case that may satisfy it.
     if (!authoritative) continue;
@@ -518,6 +520,40 @@ function walkExpr(expr: CompositionExpression, lib: string, ctx: Ctx): Compositi
       return walkExpr(expr.expression, lib, ctx); // parentheses are transparent
     case "CompositionRef":
       return refTrace(expr.ref, lib, ctx);
+  }
+}
+
+/** #189 Slice 0b — closed-world eval of a `defined as` BOOLEAN composition's `BranchCondition` tree:
+ *  `and`/`or`/`not` over evaluated operand booleans, mirroring the emitted CQL `and`/`or`/`not`. The
+ *  decision-guard analogue is `evalBranchCondition` (which also handles criteria + the decision frame); this
+ *  is the `defined as` (concept) analogue, producing a `CompositionTrace` so `conceptTruth` / the cockpit
+ *  renders the operands. Operand existence/refinement inherits `refTrace`'s closed-world verdict. */
+function walkBoolExpr(expr: BranchCondition, lib: string, ctx: Ctx): CompositionTrace {
+  switch (expr.type) {
+    case "BranchConditionAnd": {
+      const operands = expr.operands.map((t) => walkBoolExpr(t, lib, ctx));
+      return { op: "and", operands, satisfied: operands.every((o) => o.satisfied) };
+    }
+    case "BranchConditionOr": {
+      const operands = expr.operands.map((t) => walkBoolExpr(t, lib, ctx));
+      return { op: "or", operands, satisfied: operands.some((o) => o.satisfied) };
+    }
+    case "BranchConditionNot": {
+      const operand = walkBoolExpr(expr.operand, lib, ctx);
+      return { op: "not", operand, satisfied: !operand.satisfied };
+    }
+    case "BranchConditionRef":
+      return refTrace(expr.ref, lib, ctx);
+    case "BranchConditionCriterionRef":
+      // A criterion is NOT a boolean-composition operand (emit's `branchConditionConceptRefsStrict` rejects it);
+      // the closed-world evaluator cannot treat a decision-guard construct as a boolean fact. Mark the run error
+      // rather than fabricate a presence answer (charter no-fabricated-authority), mirroring the emit refusal.
+      ctx.runtimeError = true;
+      ctx.diagnostics.push(
+        `\`defined as\` boolean composition references criterion "${getRefName(expr.ref)}" — a criterion is a ` +
+          "decision-guard construct, not a boolean fact; run marked error rather than fabricate a boolean.",
+      );
+      return { op: "ref", concept: getRefName(expr.ref), satisfied: false };
   }
 }
 

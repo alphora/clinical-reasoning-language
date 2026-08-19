@@ -779,7 +779,8 @@ export interface DefinedAsComposition extends ASTNode {
 // rejection). Criterion refs are NOT classified at this site (concept-only). Every `defined as` reference
 // walker (resolution, cycles, emit closure, project index, provenance, inference-order) MUST collect ALL
 // concept refs in the `expression` tree (via `branchConditionConceptRefsStrict`) so operands are tracked like
-// refs — this is a TREE, not a single ref. Emit is inert until T3 (`BooleanCompositionNotActiveError`).
+// refs — this is a TREE, not a single ref. #189 Slice 0b LOWERS it to one compound total boolean `and`/`or`/
+// `not` (`emitCQL.emitBooleanComposition`), gated on every operand being a proven-total scalar boolean.
 export interface DefinedAsBooleanComposition extends ASTNode {
   type: "DefinedAsBooleanComposition";
   expression: BranchCondition;
@@ -876,34 +877,6 @@ export class ReductionInCompositionError extends StructuredEmitError {
   constructor(message: string, location?: Location) {
     super(message, location);
     this.name = "ReductionInCompositionError";
-  }
-}
-
-/** The diagnostic kind for the T1 boolean-composition emit sentinel — a `DefinedAsBooleanComposition`
- * (`defined as ("A" and "B")`) reached an emit/lowering path while boolean composition is still validate-only
- * (lowering lands in T3). Filterable kind so tooling names the exact error. Parallel to
- * `EMIT_REDUCTION_NOT_ACTIVE_KIND` (the `defined as exists` analogue, `definedAsExistsNotLowered`, was
- * retired once #270 lowered existence on every lane). */
-export const EMIT_BOOLEAN_COMPOSITION_NOT_ACTIVE_KIND = "emit-boolean-composition-not-active";
-
-export function booleanCompositionNotActiveMessage(where: string): string {
-  return (
-    "`defined as` boolean composition (`and`/`or`/`not`) is accepted by the grammar for validate-only " +
-    "migration but CANNOT yet be emitted (" +
-    where +
-    ") — lowering to one compound total boolean lands at T3 (concept-boolean-composition design)."
-  );
-}
-
-/** T1 emit sentinel as a TYPED error — a `DefinedAsBooleanComposition` reached a lowering lane before T3.
- * The construct PARSES and BUILDS; its operand refs are tracked by every reference walker (resolution, cycles,
- * emit closure, project index, provenance). Only the LOWERING lanes throw this — the walker lanes track refs
- * and never throw, so a dependency is never silently dropped. */
-export class BooleanCompositionNotActiveError extends StructuredEmitError {
-  readonly kind = EMIT_BOOLEAN_COMPOSITION_NOT_ACTIVE_KIND;
-  constructor(where: string, location?: Location) {
-    super(booleanCompositionNotActiveMessage(where), location);
-    this.name = "BooleanCompositionNotActiveError";
   }
 }
 

@@ -301,8 +301,24 @@ export function classifyBooleanTotality(concept: Concept): BooleanTotalityObliga
       return { kind: "composite", operands: [b.ref], cell: "§2 `defined as` bare ref (delegated to referent)" };
     }
     if (b.type === "DefinedAsBooleanComposition") {
-      // T1: boolean composition — total iff every operand is a total boolean (delegate, §2 composite).
-      // Collect operand refs from the BranchCondition tree; lowering/enforcement activates at T3.
+      // #189 Slice 0b (banner G) — a boolean composition classifies `composite` (total iff every operand is a
+      // total boolean) ONLY when the PARENT is a scalar boolean. A NON-Scalar parent (`shape is Record`/
+      // `RecordSet`) already short-circuited to `not-applicable` at the shape gate above; this guard catches the
+      // REMAINING case — a `Scalar` parent whose value type is NOT boolean (e.g. `Scalar<Quantity>`) — which
+      // `emitCQLFromAST` (validator-free) could otherwise classify total. Mirrors the `exists`/`count` reduction
+      // arms (reject a boolean produced under a non-boolean declaration). The emit pivot (`emitBooleanComposition`)
+      // independently rejects BOTH non-scalar and non-boolean parents LOUD, so no incoherent CQL ships regardless;
+      // this only keeps the obligation classifier from certifying a non-boolean-valued form as total.
+      if (!boolean) {
+        return {
+          kind: "rejected",
+          reason:
+            "`defined as` boolean composition produces one scalar boolean, but the concept is not a " +
+            `\`Scalar\` \`boolean\` (shape \`${concept.shape ?? "(none)"}\`, value type \`${concept.valueTypes?.join("/") || "(none)"}\`)`,
+        };
+      }
+      // Total iff every operand is a total boolean (delegate, §2 composite). Collect operand refs from the
+      // BranchCondition tree — the SAME strict collector the emit-side family predicate uses (Slice 0b).
       const boolOperands: ReferenceName[] = [];
       for (const r of branchConditionConceptRefsStrict(b.expression, "booleanTotality"))
         boolOperands.push(r.ref);

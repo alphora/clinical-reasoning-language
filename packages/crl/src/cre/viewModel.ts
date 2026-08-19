@@ -61,7 +61,12 @@ import {
 //   analogue of the emit DAG). v4 also DROPS the retired `sourcedFromCriterion` marker field (it
 //   marked expanded criterion bodies, which no longer exist): a criterion boundary is now the
 //   first-class `op:"criterion"` node; a consumer that pinned the marker reads that node instead.
-export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 4;
+// v5 (#189 Slice 0b): `ExplanationView` (the `defined as` composition projection) gains `{ op: "and" | "or" }`
+//   (n-ary) and `{ op: "not" }` (UNARY) variants — a `defined as` BOOLEAN composition (`("A" and "B")`, over
+//   SEPARATE boolean facts) evaluated closed-world by the CRE, distinct from the `sem-*` inference ops. An
+//   exhaustive `ExplanationView.op` decoder MUST handle them. (`BranchConditionView` already carried
+//   `and`/`or`/`not` for decision guards; this bump is for the CONCEPT-space composition view.)
+export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 5;
 
 type ActionKind = "recommend-activity" | "use-decision";
 export type ConceptView = { name: string; libraryName?: string };
@@ -215,10 +220,12 @@ export interface ActionView {
   expanded?: boolean;
 }
 
-/** VM-native projection of the `defined as` composition sub-evaluation. */
+/** VM-native projection of the `defined as` composition sub-evaluation. `sem-and`/`sem-or`/`sem-not` are the
+ *  semantic-inference (record-space) ops; `and`/`or`/`not` are the #189 Slice 0b BOOLEAN-composition ops (over
+ *  separate boolean facts) — same view shape, distinct semantics (`not` is UNARY in both families). */
 export type ExplanationView =
-  | { op: "sem-and" | "sem-or"; satisfied: boolean; operands: ExplanationView[] }
-  | { op: "sem-not"; satisfied: boolean; operand: ExplanationView }
+  | { op: "sem-and" | "sem-or" | "and" | "or"; satisfied: boolean; operands: ExplanationView[] }
+  | { op: "sem-not" | "not"; satisfied: boolean; operand: ExplanationView }
   | { op: "ref"; satisfied: boolean; concept: ConceptView; explanation?: ExplanationView };
 
 /** Run the CRE over a resolved CEL graph and project each case to a ScenarioViewModel. `opts.case`
@@ -957,13 +964,16 @@ function mapComposition(ct: CompositionTrace): ExplanationView {
   switch (ct.op) {
     case "sem-and":
     case "sem-or":
+    case "and":
+    case "or":
       return {
         op: ct.op,
         satisfied: ct.satisfied,
         operands: (ct.operands ?? []).map(mapComposition),
       };
     case "sem-not":
-      return { op: "sem-not", satisfied: ct.satisfied, operand: mapComposition(ct.operand!) };
+    case "not":
+      return { op: ct.op, satisfied: ct.satisfied, operand: mapComposition(ct.operand!) };
     case "ref":
       return {
         op: "ref",

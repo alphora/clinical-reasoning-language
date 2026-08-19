@@ -1171,7 +1171,7 @@ export class CRLAstBuilder
   // `defined as ("A" and "B")` — BOOLEAN composition (T1). Reuses `branchConditionFrom` (chain-flatten,
   // single-ref-stays-ref, mixed-`and`/`or` rejection — identical to a `when` guard), wrapped so the CONCEPT
   // attachment point is distinct from a decision guard. Criterion classification is NOT run here — operands
-  // stay concept refs (concept-only site). Emit stays inert until T3 (`BooleanCompositionNotActiveError`).
+  // stay concept refs (concept-only site). #189 Slice 0b LOWERS it (`emitCQL.emitBooleanComposition`).
   visitDefinedAsBooleanComposition(
     ctx: DefinedAsBooleanCompositionContext,
   ): DefinedAsBooleanComposition {

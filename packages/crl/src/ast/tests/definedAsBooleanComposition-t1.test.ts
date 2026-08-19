@@ -265,44 +265,89 @@ describe("defined as ( boolean composition ) — corpus parse superset", () => {
   });
 });
 
-describe("defined as ( boolean composition ) — emit is INERT behind the sentinel (until T3)", () => {
-  // The lowering lanes must fail LOUD (typed sentinel), never silently mis-lower. Panel round 1 (disc 456):
-  // gpt56 [important] "the sentinel contract is untested"; verifying it revealed the CRE lane was a CRASH.
+describe("defined as ( boolean composition ) — #189 Slice 0b: LOWERS to and/or/not (emit) + EVALUATES (CRE)", () => {
+  // Slice 0b activates the boolean family. Emit lowers `("A" and "B")` to ONE compound total boolean; the
+  // operands must be proven-total scalar booleans (the migration's `defined as exists` shape). A non-total
+  // operand or a non-scalar-boolean parent is a LOUD emit error — NO fabricated `Coalesce` (charter §4).
+  // run_decision now EVALUATES it closed-world (`and`/`or`/`not` over operand booleans), replacing the T1
+  // sentinel/crash the earlier round guarded. ⚠ Operands are `defined as exists` (total scalar booleans post
+  // #270 Slice 0a); a bare `code is` records concept is NOT total and is rejected below.
 
-  it("emit_cql refuses a boolean-composition concept with the typed sentinel (success:false, filterable kind)", () => {
-    const ast = parseInput(`library "T".
-concept "Present":
+  // Two `defined as exists` operands over local record sets — the canonical migration shape.
+  const BASE = `library "T".
+concept "Present Records":
 - type is Observation.
-- value type is boolean.
+- shape is RecordSet.
 - code is \`present\`.
-concept "AlsoPresent":
+concept "Also Records":
 - type is Observation.
-- value type is boolean.
+- shape is RecordSet.
 - code is \`also\`.
-concept "Both":
+concept "Has Present":
 - value type is boolean.
-- defined as ("Present" and "AlsoPresent").`);
-    const res = emitCQLFromAST(ast, { canonicalBase: "http://example.org/crl/test" });
-    expect(res.success).toBe(false);
-    expect(JSON.stringify(res.errors)).toContain("emit-boolean-composition-not-active");
+- defined as exists ( "Present Records" ).
+concept "Has Also":
+- value type is boolean.
+- defined as exists ( "Also Records" ).`;
+
+  const emit = (bothDecl: string) =>
+    emitCQLFromAST(parseInput(`${BASE}\nconcept "Both":\n${bothDecl}`), {
+      canonicalBase: "http://example.org/crl/test",
+    });
+
+  it("`and` lowers to a BARE compound boolean `\"Has Present\" and \"Has Also\"` (no Coalesce — operands gate-proven total)", () => {
+    const res = emit(`- value type is boolean.\n- defined as ( "Has Present" and "Has Also" ).`);
+    expect(res.success, JSON.stringify(res.errors)).toBe(true);
+    const cql = res.result ?? "";
+    expect(cql).toContain(`define "Both":`);
+    expect(cql).toContain(`"Has Present" and "Has Also"`);
+    // The composition leaf policy references operands BARE — a defensive `Coalesce` there would MASK a
+    // totality-proof failure (charter §4 no-magic), unlike the criterion-define policy.
+    expect(cql).not.toContain(`Coalesce("Has Present"`);
   });
 
-  it("run_decision (runCel) does NOT throw on a boolean-composition concept — it degrades to status error", () => {
-    // ⚠ REGRESSION GUARD for the round-1 crash fix. `walkDefinedAs` runs inside the read-only `runCel` path,
-    // which has NO converting catch, so THROWING the sentinel there (the original T1 code) crashed
-    // run_decision/viewModel. It must mirror `defined as exists`: set runtimeError ⇒ status "error" + diagnostic,
-    // never throw. This test would have caught the crash; keep it.
-    const M = `# M
+  it("`or` and `not` lower structurally with minimal parens", () => {
+    const res = emit(`- value type is boolean.\n- defined as ( "Has Present" or not "Has Also" ).`);
+    expect(res.success, JSON.stringify(res.errors)).toBe(true);
+    expect(res.result ?? "").toContain(`"Has Present" or not "Has Also"`);
+  });
+
+  it("a NON-total operand → LOUD emit error (emit-boolean-composition-operand-not-total), naming the offender", () => {
+    // "Present Records" is a `shape is RecordSet` records concept — NOT a total scalar boolean. Composing it
+    // directly (instead of `exists`-wrapping) must fail loud, never fabricate a `Coalesce`.
+    const res = emit(`- value type is boolean.\n- defined as ( "Has Present" and "Present Records" ).`);
+    expect(res.success).toBe(false);
+    const errs = JSON.stringify(res.errors);
+    expect(errs).toContain("emit-boolean-composition-operand-not-total");
+    expect(errs).toContain("Present Records");
+  });
+
+  it("a non-`Scalar<boolean>` PARENT (value type Quantity) → rejected (emit-boolean-composition-parent-not-scalar-boolean)", () => {
+    const res = emit(`- value type is Quantity.\n- defined as ( "Has Present" and "Has Also" ).`);
+    expect(res.success).toBe(false);
+    expect(JSON.stringify(res.errors)).toContain("emit-boolean-composition-parent-not-scalar-boolean");
+  });
+
+  // --- CRE truth table: run_decision EVALUATES the composition (was the T1 loud sentinel / crash) ---
+  const decisionLib = `# M
 library "M".
-concept "Present":
+concept "Present Records":
 - type is Observation.
+- shape is RecordSet.
 - code is \`present\`.
-concept "AlsoPresent":
+concept "Also Records":
 - type is Observation.
+- shape is RecordSet.
 - code is \`also\`.
+concept "Has Present":
+- value type is boolean.
+- defined as exists ( "Present Records" ).
+concept "Has Also":
+- value type is boolean.
+- defined as exists ( "Also Records" ).
 concept "Both":
 - value type is boolean.
-- defined as ("Present" and "AlsoPresent").
+- defined as ( "Has Present" and "Has Also" ).
 activity "Approve":
 - request CPGCommunicationRequest.
 - with \`ap\`.
@@ -313,6 +358,8 @@ decision "D":
 first:
 - when "Both" then recommend activity "Approve".
 - otherwise then recommend activity "Deny".`;
+
+  const runCase = (celCase: string) => {
     const cel = `# MC
 library "MC".
 covers "M".
@@ -320,34 +367,58 @@ fact "Pat":
 - name is "Pat".
 - birth date is "1970-01-01".
 - defined by "Patient".
-case "no present":
-- subject is "Pat".
-- result is "D" is "Deny".`;
-    const graph: ResolvedCelGraph = (() => {
-      const crl = parseInput(M);
-      const built = buildCEL(cel);
-      if (!built.success || !built.result)
-        throw new Error("CEL build failed: " + JSON.stringify(built.errors));
-      const coversTarget: RegistryEntry = {
-        name: crl.library.name,
-        filePath: "inline.crl",
-        ast: crl,
-        isRoot: true,
-        origin: "root",
-      };
-      return {
-        filePath: "inline.cel",
-        cel: built.result,
-        coversTarget,
-        celParseErrors: [],
-        diagnostics: [],
-      };
-    })();
-    // The assertion that matters: runCel RETURNS (no uncaught throw out of the read API).
+fact "A Present Record":
+- code is "http://example.org/x|present".
+- defined by "Present Records".
+fact "An Also Record":
+- code is "http://example.org/x|also".
+- defined by "Also Records".
+${celCase}`;
+    const crl = parseInput(decisionLib);
+    const built = buildCEL(cel);
+    if (!built.success || !built.result)
+      throw new Error("CEL build failed: " + JSON.stringify(built.errors));
+    const coversTarget: RegistryEntry = {
+      name: crl.library.name,
+      filePath: "inline.crl",
+      ast: crl,
+      isRoot: true,
+      origin: "root",
+    };
+    const graph: ResolvedCelGraph = {
+      filePath: "inline.cel",
+      cel: built.result,
+      coversTarget,
+      celParseErrors: [],
+      diagnostics: [],
+    };
     const [run] = runCel(graph).runs;
     expect(run).toBeDefined();
-    expect(run.status).toBe("error");
-    expect(run.diagnostics.some((d) => /boolean composition.*not yet evaluated/i.test(d))).toBe(true);
+    return run;
+  };
+
+  it("BOTH operands present → `and` true → Approve (the composition EVALUATES, not a runtimeError)", () => {
+    const run = runCase(`case "both":
+- subject is "Pat".
+- fact is "A Present Record".
+- fact is "An Also Record".
+- result is "D" is "Approve".`);
+    expect(run.status).toBe("pass"); // produced Approve = expected → and-of-exists evaluated true
+  });
+
+  it("ONE operand present → `and` false → Deny (closed-world; the missing exists falsifies the `and`)", () => {
+    const run = runCase(`case "only present":
+- subject is "Pat".
+- fact is "A Present Record".
+- result is "D" is "Deny".`);
+    expect(run.status).toBe("pass"); // produced Deny = expected → an impl that ignored the missing operand would fail
+  });
+
+  it("NEITHER operand present → `and` false → Deny", () => {
+    const run = runCase(`case "neither":
+- subject is "Pat".
+- result is "D" is "Deny".`);
+    expect(run.status).toBe("pass");
   });
 });
 
@@ -381,5 +452,129 @@ concept "C":
     const edges = buildEdgeIndex([{ filePath: "L.crl", ast }]).get(declKey("L", "X")) ?? [];
     expect(edges.map((e) => e.edgeKind)).toContain("composition-operand");
     expect(edges.some((e) => e.ownerName === "C")).toBe(true);
+  });
+});
+
+describe("defined as ( boolean composition ) — #189 Slice 0b: or/not CRE truth table + both-rep (disc 464 rework)", () => {
+  // Round-1 code review (both arms): only `and` was CRE-tested; `not` is where the closed-world subtleties
+  // live. A parameterized decision `when "Both"` where "Both" is the given composition body, over two
+  // `defined as exists` operands.
+  const runComp = (bothBody: string, celCase: string) => {
+    const M = `# M
+library "M".
+concept "Present Records":
+- type is Observation.
+- shape is RecordSet.
+- code is \`present\`.
+concept "Also Records":
+- type is Observation.
+- shape is RecordSet.
+- code is \`also\`.
+concept "Has Present":
+- value type is boolean.
+- defined as exists ( "Present Records" ).
+concept "Has Also":
+- value type is boolean.
+- defined as exists ( "Also Records" ).
+concept "Both":
+- value type is boolean.
+- defined as ${bothBody}.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ap\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`dn\`.
+decision "D":
+first:
+- when "Both" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+    const cel = `# MC
+library "MC".
+covers "M".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "A Present Record":
+- code is "http://example.org/x|present".
+- defined by "Present Records".
+fact "An Also Record":
+- code is "http://example.org/x|also".
+- defined by "Also Records".
+${celCase}`;
+    const crl = parseInput(M);
+    const built = buildCEL(cel);
+    if (!built.success || !built.result)
+      throw new Error("CEL build failed: " + JSON.stringify(built.errors));
+    const coversTarget: RegistryEntry = {
+      name: crl.library.name,
+      filePath: "inline.crl",
+      ast: crl,
+      isRoot: true,
+      origin: "root",
+    };
+    const graph: ResolvedCelGraph = {
+      filePath: "inline.cel",
+      cel: built.result,
+      coversTarget,
+      celParseErrors: [],
+      diagnostics: [],
+    };
+    const [run] = runCel(graph).runs;
+    expect(run).toBeDefined();
+    return run;
+  };
+
+  const present = `- subject is "Pat".\n- fact is "A Present Record".`;
+  const both = `- subject is "Pat".\n- fact is "A Present Record".\n- fact is "An Also Record".`;
+  const neither = `- subject is "Pat".`;
+
+  it("`or`: neither → Deny, one → Approve, both → Approve", () => {
+    const b = `( "Has Present" or "Has Also" )`;
+    expect(runComp(b, `case "n":\n${neither}\n- result is "D" is "Deny".`).status).toBe("pass");
+    expect(runComp(b, `case "o":\n${present}\n- result is "D" is "Approve".`).status).toBe("pass");
+    expect(runComp(b, `case "b":\n${both}\n- result is "D" is "Approve".`).status).toBe("pass");
+  });
+
+  it("`not`: operand ABSENT → not-true → Approve; operand PRESENT → not-false → Deny (closed-world)", () => {
+    const b = `( not "Has Present" )`;
+    expect(runComp(b, `case "absent":\n${neither}\n- result is "D" is "Approve".`).status).toBe("pass");
+    expect(runComp(b, `case "present":\n${present}\n- result is "D" is "Deny".`).status).toBe("pass");
+  });
+
+  it("nested `not ( A or B )`: neither → Approve, one → Deny", () => {
+    const b = `( not ( "Has Present" or "Has Also" ) )`;
+    expect(runComp(b, `case "neither":\n${neither}\n- result is "D" is "Approve".`).status).toBe("pass");
+    expect(runComp(b, `case "one":\n${present}\n- result is "D" is "Deny".`).status).toBe("pass");
+  });
+
+  it("a `code is` + boolean composition (both-rep) → LOUD `emit-boolean-composition-both-rep`, not a phantom `(unknown)` operand", () => {
+    // disc 464 Claude #2b: `lowerLocalCodes` folds a `code is` + boolean composition into the both-rep union;
+    // the folded twin's predicate is false, and the error path used to report offender "(unknown)". The
+    // dedicated both-rep guard now refuses on the right axis (#257-deferred multi-representation).
+    const res = emitCQLFromAST(
+      parseInput(`library "T".
+concept "Present Records":
+- type is Observation.
+- shape is RecordSet.
+- code is \`present\`.
+concept "Has Present":
+- value type is boolean.
+- defined as exists ( "Present Records" ).
+concept "Also Present":
+- value type is boolean.
+- defined as exists ( "Present Records" ).
+concept "Both":
+- type is Observation.
+- value type is boolean.
+- code is \`both\`.
+- defined as ( "Has Present" and "Also Present" ).`),
+      { canonicalBase: "http://example.org/crl/test" },
+    );
+    expect(res.success).toBe(false);
+    const errs = JSON.stringify(res.errors);
+    expect(errs).toContain("emit-boolean-composition-both-rep");
+    expect(errs).not.toContain("(unknown)");
   });
 });

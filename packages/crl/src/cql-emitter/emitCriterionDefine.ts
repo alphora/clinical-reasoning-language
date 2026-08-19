@@ -19,12 +19,13 @@
 // or a sibling criterion define) is a layered-emit wiring concern, supplied by the caller.
 // This keeps the structure + totality rules pure and unit-testable.
 
-import type { BranchCondition } from "../ast/types";
+import type { BranchCondition, BranchConditionCriterionRef } from "../ast/types";
 import { getRefName } from "../ast/types";
 
 /** Resolve a guard leaf (a concept ref or a sibling criterion ref) to the CQL identifier its
  *  define is referenced by — bare `"Name"` for a same-library define, `Lib."Name"` for a
- *  cross-library re-export. The emitter wraps whatever this returns in `Coalesce(…, false)`. */
+ *  cross-library re-export. Whether the emitter then totalizes what this returns (`Coalesce(…,
+ *  false)`) or references it BARE is the `RenderLeafPolicy`'s call, not this resolver's. */
 export type QualifyLeaf = (name: string, kind: "concept" | "criterion") => string;
 
 // CQL boolean operator precedence (higher binds tighter): a leaf is atomic; `not` > `and` >
@@ -45,31 +46,59 @@ function totalLeaf(qualified: string): string {
   return `Coalesce(${qualified}, false)`;
 }
 
-function renderNode(n: BranchCondition, qualify: QualifyLeaf): Rendered {
+/**
+ * Leaf-rendering policy — the ONE axis on which the two total-boolean lowerings differ. Everything
+ * structural (precedence, parenthesisation, `not`/`and`/`or`) is SHARED via `renderNode`, so a
+ * criterion define and a `defined as` boolean composition CANNOT drift on shape (#189 Slice 0b,
+ * plan banner gpt56-5/Claude-7):
+ *   - criterion define (`criterionDefineLeafPolicy`): every leaf is defensively totalized
+ *     `Coalesce(<ref>, false)` — a criterion re-export may be nullable — and a criterion ref is a
+ *     legal define→define edge.
+ *   - boolean composition (`compositionLeafPolicy`, in `emitCQL`): a concept leaf is a BARE
+ *     gate-proven ref (the emit pivot has ALREADY proven every operand a TOTAL scalar boolean via
+ *     `emitsTotalScalarBoolean`; a `Coalesce` here would MASK that proof failure — charter §4
+ *     no-magic), and a criterion ref is NOT a member of the boolean-composition family → it throws.
+ */
+export interface RenderLeafPolicy {
+  /** Render a positive concept leaf from its already-qualified CQL identifier. */
+  concept: (qualified: string) => string;
+  /** Render — or reject — a criterion-ref leaf, given the node and the layer `qualify` resolver. */
+  criterionRef: (node: BranchConditionCriterionRef, qualify: QualifyLeaf) => string;
+}
+
+/** The criterion-define leaf policy — byte-identical to the pre-parameterization behavior (every
+ *  leaf `Coalesce`-totalized; criterion refs are define→define edges). */
+export const criterionDefineLeafPolicy: RenderLeafPolicy = {
+  concept: (qualified) => totalLeaf(qualified),
+  criterionRef: (node, qualify) => totalLeaf(qualify(getRefName(node.ref), "criterion")),
+};
+
+/** Render a well-formed boolean guard tree STRUCTURALLY (no NNF/DNF), parameterized by `leaf` (the
+ *  criterion-define vs boolean-composition leaf policy). `not` > `and` > `or`; a child is
+ *  parenthesised iff its precedence is LOWER than its parent's (minimal, meaning-preserving). */
+function renderNode(n: BranchCondition, qualify: QualifyLeaf, leaf: RenderLeafPolicy): Rendered {
   switch (n.type) {
     case "BranchConditionRef":
-      return { str: totalLeaf(qualify(getRefName(n.ref), "concept")), prec: PREC.leaf };
+      return { str: leaf.concept(qualify(getRefName(n.ref), "concept")), prec: PREC.leaf };
     case "BranchConditionCriterionRef":
-      // A sub-criterion reference — resolves to that criterion's OWN totalized define
-      // (define→define edge), never its inline expansion.
-      return { str: totalLeaf(qualify(getRefName(n.ref), "criterion")), prec: PREC.leaf };
+      return { str: leaf.criterionRef(n, qualify), prec: PREC.leaf };
     case "BranchConditionNot": {
-      const child = renderNode(n.operand, qualify);
-      // `not Coalesce("A", false)` for a leaf operand; `not (…)` for a compound one. The
-      // totality already sits on each leaf INSIDE the operand, so `not` never re-totalizes.
+      const child = renderNode(n.operand, qualify, leaf);
+      // `not <leaf>` for a leaf operand; `not (…)` for a compound one. The totality (per policy)
+      // already sits on each leaf INSIDE the operand, so `not` never re-totalizes.
       const inner = child.prec < PREC.not ? `(${child.str})` : child.str;
       return { str: `not ${inner}`, prec: PREC.not };
     }
     case "BranchConditionAnd": {
       const parts = n.operands.map((o) => {
-        const c = renderNode(o, qualify);
+        const c = renderNode(o, qualify, leaf);
         return c.prec < PREC.and ? `(${c.str})` : c.str;
       });
       return { str: parts.join(" and "), prec: PREC.and };
     }
     case "BranchConditionOr": {
       const parts = n.operands.map((o) => {
-        const c = renderNode(o, qualify);
+        const c = renderNode(o, qualify, leaf);
         return c.prec < PREC.or ? `(${c.str})` : c.str;
       });
       return { str: parts.join(" or "), prec: PREC.or };
@@ -78,19 +107,25 @@ function renderNode(n: BranchCondition, qualify: QualifyLeaf): Rendered {
 }
 
 /**
- * The per-operand-total boolean CQL expression for a criterion's guard `cond`. Every concept
- * or sub-criterion leaf is `Coalesce(<qualify(...)>, false)`; `not` sits over the totalized
- * leaf (or a parenthesised compound); `and`/`or` compose already-total operands with minimal
- * parenthesisation. The tree is emitted STRUCTURALLY (no NNF, no DNF) — CQL handles arbitrary
- * boolean nesting, and the define is referenced as one identifier regardless of its internal
- * shape (so the parent guard never multiplies).
- *
- * PRECONDITION: a well-formed guard (`assertWellFormedBranchCondition`) — every `and`/`or` has
- * ≥2 operands, every `not` exactly one. Criterion refs are EXPECTED here (unlike the emit-DNF
- * seams) — they are the define→define edges of the DAG.
+ * The total boolean CQL expression for a well-formed guard `cond`, under leaf policy `leaf`. The
+ * tree is emitted STRUCTURALLY (no NNF, no DNF) — CQL handles arbitrary boolean nesting, and the
+ * define is referenced as one identifier regardless of its internal shape (so a parent guard never
+ * multiplies). PRECONDITION: a well-formed guard (`assertWellFormedBranchCondition`) — every
+ * `and`/`or` has ≥2 operands, every `not` exactly one.
  */
+export function emitTotalBooleanExpr(
+  cond: BranchCondition,
+  qualify: QualifyLeaf,
+  leaf: RenderLeafPolicy,
+): string {
+  return renderNode(cond, qualify, leaf).str;
+}
+
+/** The criterion define BODY — every concept/sub-criterion leaf `Coalesce`-totalized; criterion
+ *  refs EXPECTED (define→define edges of the DAG). A thin wrapper over `emitTotalBooleanExpr` under
+ *  the criterion-define policy (byte-invariant vs the pre-0b behavior). */
 export function emitTotalBooleanGuard(cond: BranchCondition, qualify: QualifyLeaf): string {
-  return renderNode(cond, qualify).str;
+  return emitTotalBooleanExpr(cond, qualify, criterionDefineLeafPolicy);
 }
 
 /** `define "<defineId>":\n  <total boolean body>` — the full criterion define statement. The

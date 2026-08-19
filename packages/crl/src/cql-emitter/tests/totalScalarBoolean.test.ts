@@ -37,6 +37,33 @@ describe("emitsTotalScalarBoolean — #189 Slice C 2b.2 shared totality predicat
     expect(emitsTotalScalarBoolean(m.get("R"), resolverFor(m))).toBe(true);
   });
 
+  it("a MIXED boolean-composition ↔ sem-composition cycle is non-total, not a stack overflow (#189 Slice 0b, disc 464 gpt56 #2)", () => {
+    // The 0b delegation (`branchCompositionAllOperandsTotal` → `refIsTotal` → `emitsTotalScalarBoolean`) shares
+    // the ONE `visiting` guard with the sem-* recursion, so a cycle that crosses the two families
+    // (`C` = boolean `( "D" and "E" )`, `D` = sem `( "C" sem-or "E" )`) terminates at the guard, non-total.
+    const m = conceptsOf(
+      parse(`concept "R":
+- type is Observation.
+- shape is RecordSet.
+- code is \`r\`.
+
+concept "E":
+- value type is boolean.
+- defined as exists ( "R" ).
+
+concept "C":
+- value type is boolean.
+- defined as ( "D" and "E" ).
+
+concept "D":
+- value type is boolean.
+- defined as ( "C" sem-or "E" ).
+`),
+    );
+    expect(emitsTotalScalarBoolean(m.get("C"), resolverFor(m))).toBe(false);
+    expect(emitsTotalScalarBoolean(m.get("D"), resolverFor(m))).toBe(false);
+  });
+
   it("a same-layer bare-ref alias to a reduction is total (one hop)", () => {
     const m = conceptsOf(
       parse(`concept "R":

@@ -66,6 +66,7 @@ import type {
   Criterion,
   CodedFromDefinition,
   DefinedAsBareRef,
+  DefinedAsBooleanComposition,
   DefinedAsComposition,
   DefinedAsExists,
   DefinitionIsDefinition,
@@ -87,8 +88,9 @@ import {
 } from "../ast/types";
 import type { EffectiveRepresentationDescriptor } from "../emit/effectiveRepresentation";
 import type { ReferenceName } from "../ast/types";
-import { BooleanCompositionNotActiveError } from "../ast/types";
-import { emitCriterionDefine } from "./emitCriterionDefine";
+import { emitCriterionDefine, emitTotalBooleanExpr } from "./emitCriterionDefine";
+import type { QualifyLeaf, RenderLeafPolicy } from "./emitCriterionDefine";
+import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import type { CRLError } from "../types/errors";
 import { ageComputeFnForUnit } from "../template-match/agePredicate";
 import { recencyOverrideById } from "../template-match/recencyProjectionOverride";
@@ -325,6 +327,22 @@ const cqlString = cqlStringLiteral;
 // Delegate to the shared quoter (cqlStrings) so the CQL lane and the FHIR lane's
 // inline `text/cql-expression` guard can't drift. Escapes `\` first, then `"`.
 const cqlIdent = cqlQuotedIdentifier;
+
+// #189 Slice 0b — the boolean-composition leaf policy for the SHARED renderer (`emitTotalBooleanExpr`).
+// A concept leaf is referenced BARE: the emit pivot (`emitBooleanComposition`) has ALREADY proven every
+// operand a total scalar boolean via `emitsTotalScalarBoolean`, so a `Coalesce` here would MASK a proof
+// failure (charter §4 no-magic — contrast the criterion-define policy, whose leaves are defensively
+// `Coalesce`-totalized). A criterion ref is not a boolean-composition operand and is UNREACHABLE (the
+// totality gate's `branchConditionConceptRefsStrict` throws on it first), so its arm is a defensive invariant.
+const compositionLeafPolicy: RenderLeafPolicy = {
+  concept: (qualified) => qualified,
+  criterionRef: (node) => {
+    throw new Error(
+      `INVARIANT: a criterion operand ("${getRefName(node.ref)}") reached the boolean-composition renderer; ` +
+        "the totality gate (`branchConditionConceptRefsStrict`) should have rejected it first.",
+    );
+  },
+};
 
 // CQL simple identifier: starts with letter or underscore, then word chars.
 // Library identifiers that match this can be emitted unquoted, EXCEPT when
@@ -1283,6 +1301,16 @@ class Emitter {
         //     operands happen to be total booleans).
         const body = def.body;
         if (body.type === "DefinedAsExists") return total("intrinsic-exists");
+        // #189 Slice 0b — a boolean composition discharges total IFF the family predicate proves every
+        // operand a total scalar boolean (the SAME verdict the emit pivot + the case-feature discharge
+        // above read, banner A). A non-total composition emits a LOUD error (not a define), so it must NOT
+        // certify a total it cannot emit — the `declaredShapeOfConcept` check below (a value-type test, not
+        // a totality proof) would wrongly do so.
+        if (body.type === "DefinedAsBooleanComposition") {
+          return emitsTotalScalarBoolean(c, sameLayerResolver((n) => this.conceptByName.get(n)))
+            ? total("composite-delegated")
+            : notBoolean("boolean composition with a non-total operand (emit error)");
+        }
         // Boolean-vs-refinement is the emitter's OWN `declaredShapeOfConcept` rule (`valueTypes.includes
         // ("boolean")`), NOT `isBooleanScalarConcept` (exactly-one) — a multi-value-type concept including
         // `boolean` emits boolean CQL (round-2 code review). (A composition/alias's declared value type is
@@ -1679,13 +1707,12 @@ class Emitter {
       case "CodedFromDefinition":
         return this.emitCodedFrom(c, def);
       case "DefinedAsDefinition":
-        // T1: boolean composition (`("A" and "B")`) parses + builds but does NOT lower yet (T3). Fail
-        // LOUD with the typed sentinel rather than misclassify it as a sem-* composition.
+        // #189 Slice 0b — a `defined as` BOOLEAN composition (`("A" and "B")`) lowers to ONE compound total
+        // boolean `and`/`or`/`not` via its OWN renderer. `emitDefinedAs`'s parameter type structurally
+        // EXCLUDES it (it is NOT a sem-* truth-set composition — its operands are separate boolean facts),
+        // so the dispatch routes it here, on BOTH lanes.
         if (def.body.type === "DefinedAsBooleanComposition")
-          throw new BooleanCompositionNotActiveError(
-            "emitConceptBody (standard / case-feature CQL dispatch)",
-            def.body.location,
-          );
+          return this.emitBooleanComposition(c, def.body);
         return this.emitDefinedAs(c, def.body);
       case "DefinitionIsDefinition":
         return this.emitDefinitionIs(c, def);
@@ -2214,6 +2241,125 @@ class Emitter {
    */
   private shapeForComposition(parent: Concept, _expr: CompositionExpression): CompositionShape {
     return this.declaredShapeOfConcept(parent);
+  }
+
+  /**
+   * #189 Slice 0b — lower a `defined as` BOOLEAN composition (`("A" and "B")`) to ONE compound total
+   * boolean `and`/`or`/`not`. This is NOT the sem-* truth-set path (`emitDefinedAs`/`emitComposition`): the
+   * operands are SEPARATE boolean facts, referenced BARE (gate-proven) via `compositionLeafPolicy` — never
+   * `.asTruths()`-lifted or `exists`-bridged. Lane-independent: a same-lib operand references bare
+   * `cqlIdent(name)` on BOTH the off/standard and case-feature Inferred lanes (the composition and its
+   * operands both classify Inferred → same layer). SAME-LIB operands only in 0b (cross-lib proof rides 0c).
+   *
+   * GATE on the family predicate `emitsTotalScalarBoolean(c)` — parent `Scalar<boolean>` ∧ EVERY operand a
+   * proven-total scalar boolean, the SAME verdict the discharge + façade read (banner A). A non-total operand
+   * or a non-scalar-boolean parent is a LOUD emit error, NEVER a fabricated terminal `Coalesce` (charter §4).
+   */
+  private emitBooleanComposition(c: Concept, body: DefinedAsBooleanComposition): string {
+    // A `code is` + `defined as (boolean composition)` both-representation concept: a boolean composition
+    // publishes ONE scalar boolean, which cannot fold into the local-code truth-set union (the SAME ill-typing
+    // as `code is` + `defined as exists`, refused in `emitDefinedAs`; the multi-representation both-rep case is
+    // #257-deferred — `classifyBooleanTotality` rejects its obligation). `lowerLocalCodes` admits it into the
+    // union fold, so refuse LOUD here on the RIGHT axis (the both-rep fold) rather than fall through to the
+    // generic "(unknown)" non-total-operand error (code review disc 464, Claude #2b).
+    if (c.__bothRepMerge !== undefined || c.__bothRepFoldInLocalSource !== undefined) {
+      const loc = body.expression.location.start;
+      this.emitErrors.push({
+        type: "Validation",
+        kind: "emit-boolean-composition-both-rep",
+        line: loc.line,
+        column: loc.column,
+        message:
+          `Concept "${c.name}" carries a local \`code is\` AND a \`defined as\` boolean composition (a both-` +
+          `representation merge). A boolean composition publishes one scalar boolean, which cannot fold into the ` +
+          `local-code truth-set union (ill-typed, like \`code is\` + \`defined as exists\`). Multi-representation ` +
+          `is #257-deferred — model the boolean over the local records with a separate concept, or drop one arm.`,
+      });
+      return `/* FIXME: emit-boolean-composition-both-rep (${c.name}) */ CRLCommon.BooleanCompositionBothRep('${c.name}')`;
+    }
+    const resolver = sameLayerResolver((n) => this.conceptByName.get(n));
+    if (!emitsTotalScalarBoolean(c, resolver)) {
+      return this.emitBooleanCompositionError(c, body);
+    }
+    // The gate passed → every operand is a proven-total scalar boolean, which in 0b necessarily means SAME-LIB
+    // (a qualified operand is non-total under `sameLayerResolver` and would have failed the gate). Assert it, so
+    // 0c — which rewires the resolver to prove CROSS-LIB operands total — FAILS LOUD here instead of silently
+    // rendering a qualified operand BARE (`cqlIdent(getRefName(...))` drops the library → a dangling CQL
+    // reference; code review disc 464, Claude #1). 0c must make the renderer library-aware before relaxing this.
+    const qualifiedOperand = branchConditionConceptRefsStrict(body.expression, "emitBooleanComposition").find(
+      (r) => getRefLibrary(r.ref) !== null,
+    );
+    if (qualifiedOperand !== undefined) {
+      const loc = body.expression.location.start;
+      this.emitErrors.push({
+        type: "Validation",
+        kind: "emit-boolean-composition-qualified-operand",
+        line: loc.line,
+        column: loc.column,
+        message:
+          `INVARIANT (#189 Slice 0b): operand "${getRefName(qualifiedOperand.ref)}" of boolean composition ` +
+          `"${c.name}" is a qualified/cross-library reference that passed the totality gate. 0b renders operands ` +
+          `BARE (dropping the library), so this must not ship — Slice 0c must make the renderer library-aware ` +
+          `before proving cross-library operands total.`,
+      });
+      return `/* FIXME: emit-boolean-composition-qualified-operand (${c.name} -> ${getRefName(qualifiedOperand.ref)}) */ CRLCommon.BooleanCompositionQualifiedOperand('${c.name}')`;
+    }
+    const qualify: QualifyLeaf = (name) => cqlIdent(name);
+    return emitTotalBooleanExpr(body.expression, qualify, compositionLeafPolicy);
+  }
+
+  /** The LOUD, actionable emit error for a boolean composition that cannot flip (charter §4 — never a
+   *  fabricated total). Distinguishes a non-`Scalar<boolean>` PARENT from a non-total OPERAND (naming the first
+   *  offender). A qualified operand is reported as `operand-not-total` with a cross-library note (NOT a separate
+   *  kind — that misdiagnosed a same-lib CROSS-LAYER requalified operand as cross-library; disc 464 Claude #2a).
+   *  Mirrors the sem-* pivot's `emitErrors.push` + FIXME-return pattern (accumulate, don't crash the emit). */
+  private emitBooleanCompositionError(c: Concept, body: DefinedAsBooleanComposition): string {
+    const loc = body.expression.location.start;
+    const parentIsScalarBoolean =
+      c.shape === "Scalar" && (c.valueTypes?.length ?? 0) === 1 && c.valueTypes?.[0] === "boolean";
+    if (!parentIsScalarBoolean) {
+      this.emitErrors.push({
+        type: "Validation",
+        kind: "emit-boolean-composition-parent-not-scalar-boolean",
+        line: loc.line,
+        column: loc.column,
+        message:
+          `Concept "${c.name}" is a \`defined as\` boolean composition (\`and\`/\`or\`/\`not\`) but its parent is ` +
+          `not a scalar boolean. Declare it \`- shape is Scalar.\` + \`- value type is boolean.\` — a boolean ` +
+          `composition publishes ONE total boolean (charter §3: cardinality is authoritative).`,
+      });
+      return `/* FIXME: emit-boolean-composition-parent-not-scalar-boolean (${c.name}) */ CRLCommon.BooleanCompositionParentNotScalarBoolean('${c.name}')`;
+    }
+    const resolver = sameLayerResolver((n) => this.conceptByName.get(n));
+    const refs = branchConditionConceptRefsStrict(body.expression, "emitBooleanComposition");
+    // A QUALIFIED operand is non-total under `sameLayerResolver` (0b is SAME-LIB scope; cross-lib totality proof
+    // is 0c), and so is a records/comparator operand that emits no total scalar boolean. Report BOTH as
+    // `operand-not-total` naming the first offender — a genuinely cross-library operand gets a note. (An earlier
+    // separate `operand-cross-lib` kind was dropped: on the layered lane `requalifyBranchCondition` rewrites a
+    // same-lib cross-LAYER operand into a `"<policy>-LocalSource"."X"` qualified ref, which that kind
+    // misdiagnosed as cross-library — disc 464 Claude #2a.)
+    const nonTotal = refs.find(
+      (r) =>
+        getRefLibrary(r.ref) !== null ||
+        !emitsTotalScalarBoolean(this.conceptByName.get(getRefName(r.ref)), resolver),
+    );
+    const offender = nonTotal !== undefined ? getRefName(nonTotal.ref) : "(unknown)";
+    const crossLibNote =
+      nonTotal !== undefined && getRefLibrary(nonTotal.ref) !== null
+        ? " (a cross-library reference — cross-library boolean-composition operands gain a totality proof in #189 Slice 0c)"
+        : "";
+    this.emitErrors.push({
+      type: "Validation",
+      kind: "emit-boolean-composition-operand-not-total",
+      line: loc.line,
+      column: loc.column,
+      message:
+        `Concept "${c.name}" is a boolean \`defined as\` composition but operand "${offender}"${crossLibNote} does ` +
+        `not emit a TOTAL scalar boolean. Every operand must be a proven-total boolean (a reduction \`exists\`/` +
+        `\`count\`, a boolean comparator, a \`defined as exists\`, or a boolean composition/alias over such). A ` +
+        `boolean composition never fabricates totality (no terminal \`Coalesce\` — charter §4); make it total.`,
+    });
+    return `/* FIXME: emit-boolean-composition-operand-not-total (${c.name} -> ${offender}) */ CRLCommon.BooleanCompositionOperandNotTotal('${c.name}')`;
   }
 
   private emitDefinedAs(

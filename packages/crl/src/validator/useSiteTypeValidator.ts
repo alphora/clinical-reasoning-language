@@ -275,8 +275,8 @@ export class UseSiteTypeValidator {
       // 2d. BOOLEAN COMPOSITION (`defined as ("A" and "B")`) — concept-boolean-composition T2 (design §2/§6).
       // A NEW family (T1): zero corpus, so ALL three checks are hard errors enforced NOW — no legacy warn-window
       // like the `defined as exists` record-shape deferral (that hole predates + is migration-gated; digging a
-      // second one for new syntax has no excuse — plan-panel disc 457 both arms). Emit stays sentinel-inert until
-      // T3; these checks are what makes the family internally consistent within the release.
+      // second one for new syntax has no excuse — plan-panel disc 457 both arms). #189 Slice 0b now LOWERS the
+      // family (emit + CRE); these checks are what keeps it internally consistent within the release.
       if (body.type === "DefinedAsBooleanComposition") {
         this.checkBooleanComposition(concept, body, vts, ctx, attribution, errors);
       }
@@ -334,7 +334,7 @@ export class UseSiteTypeValidator {
 
   // concept-boolean-composition T2 (design §2/§6; plan-panel disc 457) — validate the `defined as
   // ( <boolean> )` family. Three hard checks; ALL constrain ONLY the new family, so zero existing corpus is
-  // touched. Emit is sentinel-inert until T3; this is what keeps the T1-parsed family internally consistent.
+  // touched. #189 Slice 0b LOWERS the family (emit + CRE); this is what keeps the parsed family consistent.
   private checkBooleanComposition(
     concept: Concept,
     body: DefinedAsBooleanComposition,

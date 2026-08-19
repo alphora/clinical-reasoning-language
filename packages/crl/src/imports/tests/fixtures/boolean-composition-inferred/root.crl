@@ -1,0 +1,40 @@
+# boolean-composition-inferred (#189 Slice 0b — case-feature / layered INFERRED lane)
+library "Pol".
+
+// A `code is` records concept forces the LocalSource split → the case-feature INFERRED lane. A `defined as`
+// BOOLEAN composition (`and`/`or`/`not`) over `defined as exists` operands must lower to a bare compound
+// boolean on the Inferred lane (never `.asTruths()` / `union`), and the Interface façade must re-export it
+// BARE (a truth-set would be `.satisfied()`). The production KE lane — code review disc 464 asked for it.
+
+concept "Adult Records":
+- type is Observation.
+- shape is RecordSet.
+- code is `adult`.
+
+concept "Senior Records":
+- type is Observation.
+- shape is RecordSet.
+- code is `senior`.
+
+concept "Has Adult":
+- value type is boolean.
+- defined as exists ( "Adult Records" ).
+
+concept "Has Senior":
+- value type is boolean.
+- defined as exists ( "Senior Records" ).
+
+concept "Adult And Senior":
+- value type is boolean.
+- defined as ( "Has Adult" and "Has Senior" ).
+
+concept "Adult Or Not Senior":
+- value type is boolean.
+- defined as ( "Has Adult" or not "Has Senior" ).
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Adult And Senior" then recommend activity "Refer".
+- when "Adult Or Not Senior" then recommend activity "Refer".

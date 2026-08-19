@@ -26,6 +26,23 @@ const concept = (src: string, name: string): Concept => {
 const classify = (src: string, name: string): BooleanTotalityObligation =>
   classifyBooleanTotality(concept(src, name));
 
+describe("classifyBooleanTotality — boolean composition (#189 Slice 0b, banner G)", () => {
+  const COMP = (parentDecl: string): string =>
+    `library "T".\nconcept "A":\n- value type is boolean.\n- code is \`a\`.\nconcept "B":\n- value type is boolean.\n- code is \`b\`.\nconcept "C":\n${parentDecl}\n- defined as ( "A" and "B" ).\n`;
+
+  it("`Scalar<boolean>` parent → composite (operands listed for the ledger proof)", () => {
+    expect(classify(COMP("- value type is boolean."), "C").kind).toBe("composite");
+  });
+
+  it("`Scalar<Quantity>` parent → rejected (boolean composition under a non-boolean declaration; validator-free lane)", () => {
+    expect(classify(COMP("- value type is Quantity."), "C").kind).toBe("rejected");
+  });
+
+  it("`shape is Record` parent → not-applicable (the shape gate short-circuits before the composition arm)", () => {
+    expect(classify(COMP("- type is Observation.\n- shape is Record."), "C").kind).toBe("not-applicable");
+  });
+});
+
 describe("classifyBooleanTotality — reduction forms", () => {
   it("`exists this` (valueless Condition) → intrinsically-total", () => {
     expect(
