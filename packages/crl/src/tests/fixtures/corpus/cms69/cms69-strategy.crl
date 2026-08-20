@@ -36,12 +36,23 @@ Statement types:
                      - `definition is` (catalog-matched narrative predicate)
 
 `defined as` body shapes:
-  - bare ref:        `- defined as "X".`
-  - composition:     `- defined as ( "A" sem-and "B" ).` (uses sem-or/sem-and/sem-not)
+  - bare ref:            `- defined as "X".`
+  - record composition:  `- defined as ( "A" sem-and "B" ).` (value-preserving
+                         sem-or/sem-and/sem-not over records — publishes a RecordSet)
+  - boolean composition: `- defined as ( not "A" and "B" ).` (scalar-boolean
+                         and/or/not over scalar-boolean concepts — publishes a boolean; #189)
+  - existence reduction: `- defined as exists ( "X" ).` (a scalar boolean:
+                         does the RecordSet "X" contain any record? #189)
+
+Bright line (#189): `sem-*` composes RECORDS (value-preserving), plain
+`and`/`or`/`not` composes scalar BOOLEANS. A boolean parent over record leaves
+is bridged EXPLICITLY via a `defined as exists ( … )` wrapper, never by an
+implicit `sem-*`.
 
 Narrative inside a `definition is` body uses lowercase `or` / `and` for
 in-arg disjunction (e.g. `("Medical Reasons" or "Patient Declined Reasons")`),
-which is distinct from the `sem-or`/`sem-and` in concept composition.
+which is distinct from the `sem-or`/`sem-and` (record) and `and`/`or`/`not`
+(boolean) operators in concept composition.
 See docs/CRL Compilation Pipeline.md and the
 project_sem-composition-operators memory for the rationale.
 
@@ -214,7 +225,13 @@ concept "Underweight Diagnoses":
 concept "Pregnancy Diagnoses":
 - type is Condition.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - coded from "Pregnancy Diagnoses VS".
+
+concept "Pregnancy Diagnoses Exists":
+- type is Condition.
+- value type is boolean.
+- defined as exists ( "Pregnancy Diagnoses" ).
 
 concept "Weight Assessment Referrals":
 - type is ServiceRequest.
@@ -234,12 +251,24 @@ concept "Low BMI Follow-up Service Requests":
 concept "Medical Reasons":
 - type is Observation.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - coded from "Medical Reason VS".
+
+concept "Medical Reasons Exists":
+- type is Observation.
+- value type is boolean.
+- defined as exists ( "Medical Reasons" ).
 
 concept "Patient Declined Reasons":
 - type is Observation.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - coded from "Patient Declined VS".
+
+concept "Patient Declined Reasons Exists":
+- type is Observation.
+- value type is boolean.
+- defined as exists ( "Patient Declined Reasons" ).
 
 concept "Anti-Obesity Medication Contraindication":
 - type is Observation.
@@ -320,19 +349,21 @@ concept "BMI With Confirmed Height-Weight Source":
 // --- Cognitive-support predicates (narrative bodies feeding the decision) ---
 
 // Eligibility = "could this encounter satisfy CMS69?" The decision
-// short-circuits when this is false. Sem-not on Pregnancy carves out
-// CMS69's denominator exclusion; sem-not on the reason concepts carves
-// out the denominator exceptions.
+// short-circuits when this is false. A boolean `not` over the Pregnancy
+// existence wrapper carves out CMS69's denominator exclusion; `not` over the
+// reason existence wrappers carves out the denominator exceptions. Each
+// `... Exists` wrapper is `defined as exists ( "<RecordSet>" )` — the explicit
+// existence reduction of the referenced `coded from` RecordSet (#189).
 concept "Patient Eligible For BMI Screening":
 - type is Observation.
 - value type is boolean.
 - defined as
 (
-   sem-not "Pregnancy Diagnoses"
-   sem-and
-   sem-not "Medical Reasons"
-   sem-and
-   sem-not "Patient Declined Reasons"
+   not "Pregnancy Diagnoses Exists"
+   and
+   not "Medical Reasons Exists"
+   and
+   not "Patient Declined Reasons Exists"
 ).
 
 concept "BMI Not Documented During Measurement Period":
