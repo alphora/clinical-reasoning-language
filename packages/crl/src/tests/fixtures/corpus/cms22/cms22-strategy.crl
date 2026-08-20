@@ -18,10 +18,15 @@ documented appropriate follow-up plan)?
 
 Same grammar conventions as the CMS69 example — see that file for the
 surface rules. This file's structural variety:
-  - `defined as ( ... sem-or ... )`: multi-source composition
-    (BP reading from a panel OR standalone systolic/diastolic obs).
-  - `defined as ( "X" sem-and sem-not "Y" )`: the sem-not example
-    (last reading is hypertensive but NOT yet diagnosed).
+  - `defined as ( ... sem-or ... )`: record-space multi-source composition
+    (a BP reading from a panel OR standalone systolic/diastolic obs —
+    value-preserving `sem-*` over records; `BP Reading` will publish a RecordSet
+    once its cardinality is promoted — promotion pending #287).
+  - `defined as ( "X" and not "Y Exists" )`: boolean composition mixing a
+    scalar-boolean predicate with an existence reduction of a record concept
+    (last reading is hypertensive but NOT yet diagnosed). #189 bright line:
+    `and`/`or`/`not` compose scalar BOOLEANS; a boolean parent over a record
+    leaf bridges EXPLICITLY via a `defined as exists ( … )` wrapper, never `sem-*`.
   - `definition is X high`, `definition is X performed`,
     `definition is X documented`: narrative-predicate body kinds.
   - `any:` / `all:` recommendation blocks inside `when/then` bodies.
@@ -153,7 +158,13 @@ concept "Standalone Diastolic BP Observations":
 concept "Hypertension Diagnoses":
 - type is Condition.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - coded from "Hypertension Diagnoses VS".
+
+concept "Hypertension Diagnoses Exists":
+- type is Condition.
+- value type is boolean.
+- defined as exists ( "Hypertension Diagnoses" ).
 
 concept "Antihypertensive Medications":
 - type is MedicationRequest.
@@ -178,12 +189,24 @@ concept "Antihypertensive Contraindication":
 concept "Medical Reasons":
 - type is Observation.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - coded from "Medical Reason VS".
+
+concept "Medical Reasons Exists":
+- type is Observation.
+- value type is boolean.
+- defined as exists ( "Medical Reasons" ).
 
 concept "Patient Declined Reasons":
 - type is Observation.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - coded from "Patient Declined VS".
+
+concept "Patient Declined Reasons Exists":
+- type is Observation.
+- value type is boolean.
+- defined as exists ( "Patient Declined Reasons" ).
 
 
 // --- Composition concepts: multi-source BP reading ---
@@ -218,33 +241,40 @@ concept "Last BP Reading At This Encounter":
 - defined as "Last BP Reading At This Encounter Selection".
 
 
-// --- sem-not example: hypertensive reading without confirmed diagnosis ---
+// --- boolean composition (mixed): hypertensive reading without confirmed diagnosis ---
 
 // The patient's last reading is hypertensive, but no Hypertension
 // Diagnoses are on file — a single high reading is not yet a durable
-// diagnosis under CMS22. The cognitive support layer flags this so
-// the clinician confirms across encounters before committing.
+// diagnosis under CMS22. `"Has Hypertensive Reading" and not "Hypertension
+// Diagnoses Exists"` mixes a scalar-boolean predicate with the existence
+// reduction of the record concept (#189 bright line: boolean over booleans,
+// `sem-*` over records). The cognitive support layer flags this so the
+// clinician confirms across encounters before committing.
 concept "Hypertensive Reading Without Diagnosis":
 - type is Observation.
 - value type is boolean.
 - defined as
 (
    "Has Hypertensive Reading"
-   sem-and
-   sem-not "Hypertension Diagnoses"
+   and
+   not "Hypertension Diagnoses Exists"
 ).
 
 
 // --- Cognitive-support predicates (narrative bodies feeding the decision) ---
 
+// Eligibility carves out CMS22's denominator exceptions: a boolean `not` over
+// each reason existence wrapper. Each `... Exists` wrapper is
+// `defined as exists ( "<RecordSet>" )` — the explicit existence reduction of the
+// referenced `coded from` RecordSet (#189: boolean over booleans, `sem-*` over records).
 concept "Patient Eligible For BP Cognitive Support":
 - type is Observation.
 - value type is boolean.
 - defined as
 (
-   sem-not "Medical Reasons"
-   sem-and
-   sem-not "Patient Declined Reasons"
+   not "Medical Reasons Exists"
+   and
+   not "Patient Declined Reasons Exists"
 ).
 
 concept "No BP Reading At This Encounter":
@@ -263,7 +293,7 @@ concept "Has Normal Reading With Hypertension On File":
 - defined as
 (
    "Has Normal Reading"
-   sem-and
+   and
    "Has Confirmed Hypertension Diagnosis"
 ).
 

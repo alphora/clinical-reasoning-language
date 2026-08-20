@@ -28,6 +28,14 @@ const UPDATE = process.env.UPDATE_GOLDEN === "1";
 const CORPORA: Record<string, string> = {
   cms22: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22.crl"),
   cms69: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69/cms69.crl"),
+  // The cognitive-support STRATEGY libraries are separate top-level entrypoints
+  // (a decision-lane facet), NOT in the measure roots' import closure — so the
+  // `cms22`/`cms69` goldens above never emit their concept CQL. Pin them here so
+  // the #189 boolean-composition migration of their guard concepts (cms69-strategy
+  // inc-4, cms22-strategy inc-6) has a durable emit oracle, not just a one-off
+  // review diff (disc 471 nit / disc 473 gpt56 [important]).
+  "cms22-strategy": path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22-strategy.crl"),
+  "cms69-strategy": path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69/cms69-strategy.crl"),
   // Slice 2 (layeredEmit): a single multi-layer CRL library that auto-splits
   // into `Layered Basic Concepts` / `Layered Basic Asserted` /
   // `Layered Basic Inferred`. Lives under the test dir (not the corpus tree)
