@@ -44,13 +44,20 @@ fact "Normal Diastolic Component":
 // ============ Cases ============
 
 case "Maria has normal BP at her wellness visit":
-- description is `Maria's last systolic and diastolic readings on her
-  qualifying encounter day are both below the Normal-BP thresholds (118/76).
-  She satisfies the Numerator via the Normal BP Reading path.`.
+- description is `Maria's systolic (118) and diastolic (76) readings on her
+  qualifying-encounter day are both below the Normal-BP thresholds, so the
+  clinical intent is a Normal BP Reading numerator hit. But CEL cannot yet model
+  an Observation's systolic/diastolic as components nested inside the 85354-9 BP
+  panel (a fact-model gap tracked in #285); the readings can only be authored as
+  standalone Observations. The emitted Normal BP Reading reads the systolic and
+  diastolic as a component of the panel, which is empty for this data, so every
+  Numerator path evaluates false and the Numerator is false here. This asserts the
+  hand-traced determination, not the clinical intent; result-is execution is also
+  deferred (#70).`.
 - subject is "Maria Garcia".
 - fact is "Annual Wellness Visit".
 - fact is "Normal BP Panel".
 - fact is "Normal Systolic Component".
 - fact is "Normal Diastolic Component".
 - result is "Initial Population" is true.
-- result is "Numerator" is true.
+- result is "Numerator" is false.

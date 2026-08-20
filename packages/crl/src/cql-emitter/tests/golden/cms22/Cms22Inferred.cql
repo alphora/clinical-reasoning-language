@@ -82,16 +82,13 @@ define "Last Diastolic At Least 90":
   Coalesce(CRLCommon.AtLeast("Last Diastolic on Qualifying Encounter Day", 90 'mm[Hg]'), false)
 
 define "Normal BP Reading":
-  "Last Systolic Below 120"
-    and "Last Diastolic Below 80"
+  "Last Systolic Below 120" and "Last Diastolic Below 80"
 
 define "Elevated BP Reading":
-  "Last Systolic Between 120 and 129"
-    and "Last Diastolic Below 80"
+  "Last Systolic Between 120 and 129" and "Last Diastolic Below 80"
 
 define "Hypertensive Reading":
-  "Last Systolic At Least 130"
-    or "Last Diastolic At Least 80"
+  "Last Systolic At Least 130" or "Last Diastolic At Least 80"
 
 define "Last BP Panels Within Year Prior To Qualifying Encounter":
   { CRLCommon.LastOf(Cms22RecordSource."Blood Pressure Panels", CRLCommon.BeforeStartOf(1 'year', "Qualifying Encounter")) }
@@ -118,33 +115,25 @@ define "Prior-Year Last Diastolic At Least 80":
   Coalesce(CRLCommon.AtLeast("Prior-Year Last Diastolic", 80 'mm[Hg]'), false)
 
 define "Prior-Year Hypertensive Reading":
-  "Prior-Year Last Systolic At Least 130"
-    or "Prior-Year Last Diastolic At Least 80"
+  "Prior-Year Last Systolic At Least 130" or "Prior-Year Last Diastolic At Least 80"
 
 define "Without Record Of Prior-Year Hypertensive Reading":
   Coalesce(CRLCommon.Without('record-of', "Prior-Year Hypertensive Reading"), false)
 
 define "First Hypertensive Reading":
-  "Hypertensive Reading"
-    and "Without Record Of Prior-Year Hypertensive Reading"
+  "Hypertensive Reading" and "Without Record Of Prior-Year Hypertensive Reading"
 
 define "Second Hypertensive Reading 130s Body":
-  ("Last Systolic Between 130 and 139"
-    or "Last Diastolic Between 80 and 89")
-    and not (("Last Systolic At Least 140"
-    or "Last Diastolic At Least 90"))
+  ("Last Systolic Between 130 and 139" or "Last Diastolic Between 80 and 89") and not ("Last Systolic At Least 140" or "Last Diastolic At Least 90")
 
 define "Second Hypertensive Reading 130s":
-  "Second Hypertensive Reading 130s Body"
-    and "Prior-Year Hypertensive Reading"
+  "Second Hypertensive Reading 130s Body" and "Prior-Year Hypertensive Reading"
 
 define "Second Hypertensive Reading 140+ Body":
-  "Last Systolic At Least 140"
-    or "Last Diastolic At Least 90"
+  "Last Systolic At Least 140" or "Last Diastolic At Least 90"
 
 define "Second Hypertensive Reading 140+":
-  "Second Hypertensive Reading 140+ Body"
-    and "Prior-Year Hypertensive Reading"
+  "Second Hypertensive Reading 140+ Body" and "Prior-Year Hypertensive Reading"
 
 define "Follow-up Within 4 Weeks Ordered":
   CRLCommon.WasOrdered(Cms22RecordSource."Follow-up Within 4 Weeks")
@@ -201,59 +190,62 @@ define "Referral for Hypertensive Reading":
 define "Six-Month Rescreen Order Same Day As Qualifying Encounter":
   CRLCommon.SameDay("Six-Month Rescreen Order", "Qualifying Encounter")
 
+define "Six-Month Rescreen Order Same Day As Qualifying Encounter Exists":
+  exists ("Six-Month Rescreen Order Same Day As Qualifying Encounter")
+
 define "Non-Pharm Recommendation Order Same Day As Qualifying Encounter":
   CRLCommon.SameDay("Non-Pharmacological Recommendation Order", "Qualifying Encounter")
+
+define "Non-Pharm Recommendation Order Same Day As Qualifying Encounter Exists":
+  exists ("Non-Pharm Recommendation Order Same Day As Qualifying Encounter")
 
 define "Referral for Hypertensive Reading Same Day As Qualifying Encounter":
   CRLCommon.SameDay("Referral for Hypertensive Reading", "Qualifying Encounter")
 
+define "Referral for Hypertensive Reading Same Day As Qualifying Encounter Exists":
+  exists ("Referral for Hypertensive Reading Same Day As Qualifying Encounter")
+
 define "Four-Week Rescreen Order Same Day As Qualifying Encounter":
   CRLCommon.SameDay("Four-Week Rescreen Order", "Qualifying Encounter")
+
+define "Four-Week Rescreen Order Same Day As Qualifying Encounter Exists":
+  exists ("Four-Week Rescreen Order Same Day As Qualifying Encounter")
 
 define "Hypertension Lab or ECG Order Same Day As Qualifying Encounter":
   CRLCommon.SameDay("Hypertension Lab or ECG Order", "Qualifying Encounter")
 
+define "Hypertension Lab or ECG Order Same Day As Qualifying Encounter Exists":
+  exists ("Hypertension Lab or ECG Order Same Day As Qualifying Encounter")
+
 define "Antihypertensive Medication Order Same Day As Qualifying Encounter":
   CRLCommon.SameDay("Antihypertensive Medication Order", "Qualifying Encounter")
 
+define "Antihypertensive Medication Order Same Day As Qualifying Encounter Exists":
+  exists ("Antihypertensive Medication Order Same Day As Qualifying Encounter")
+
 define "Elevated BP Followup Bundle":
-  (exists ("Six-Month Rescreen Order Same Day As Qualifying Encounter")
-    and exists ("Non-Pharm Recommendation Order Same Day As Qualifying Encounter"))
-    or exists ("Referral for Hypertensive Reading Same Day As Qualifying Encounter")
+  "Six-Month Rescreen Order Same Day As Qualifying Encounter Exists" and "Non-Pharm Recommendation Order Same Day As Qualifying Encounter Exists" or "Referral for Hypertensive Reading Same Day As Qualifying Encounter Exists"
 
 define "First HTN Followup Bundle":
-  (exists ("Four-Week Rescreen Order Same Day As Qualifying Encounter")
-    and exists ("Non-Pharm Recommendation Order Same Day As Qualifying Encounter"))
-    or exists ("Referral for Hypertensive Reading Same Day As Qualifying Encounter")
+  "Four-Week Rescreen Order Same Day As Qualifying Encounter Exists" and "Non-Pharm Recommendation Order Same Day As Qualifying Encounter Exists" or "Referral for Hypertensive Reading Same Day As Qualifying Encounter Exists"
 
 define "Second HTN 130s Followup Bundle":
-  (exists ("Six-Month Rescreen Order Same Day As Qualifying Encounter")
-    and exists ("Hypertension Lab or ECG Order Same Day As Qualifying Encounter")
-    and exists ("Non-Pharm Recommendation Order Same Day As Qualifying Encounter"))
-    or exists ("Referral for Hypertensive Reading Same Day As Qualifying Encounter")
+  "Six-Month Rescreen Order Same Day As Qualifying Encounter Exists" and "Hypertension Lab or ECG Order Same Day As Qualifying Encounter Exists" and "Non-Pharm Recommendation Order Same Day As Qualifying Encounter Exists" or "Referral for Hypertensive Reading Same Day As Qualifying Encounter Exists"
 
 define "Second HTN 140+ Followup Bundle":
-  (exists ("Four-Week Rescreen Order Same Day As Qualifying Encounter")
-    and exists ("Hypertension Lab or ECG Order Same Day As Qualifying Encounter")
-    and exists ("Non-Pharm Recommendation Order Same Day As Qualifying Encounter")
-    and exists ("Antihypertensive Medication Order Same Day As Qualifying Encounter"))
-    or exists ("Referral for Hypertensive Reading Same Day As Qualifying Encounter")
+  "Four-Week Rescreen Order Same Day As Qualifying Encounter Exists" and "Hypertension Lab or ECG Order Same Day As Qualifying Encounter Exists" and "Non-Pharm Recommendation Order Same Day As Qualifying Encounter Exists" and "Antihypertensive Medication Order Same Day As Qualifying Encounter Exists" or "Referral for Hypertensive Reading Same Day As Qualifying Encounter Exists"
 
 define "Elevated BP With Followup":
-  "Elevated BP Reading"
-    and "Elevated BP Followup Bundle"
+  "Elevated BP Reading" and "Elevated BP Followup Bundle"
 
 define "First HTN With Followup":
-  "First Hypertensive Reading"
-    and "First HTN Followup Bundle"
+  "First Hypertensive Reading" and "First HTN Followup Bundle"
 
 define "Second HTN 130s With Followup":
-  "Second Hypertensive Reading 130s"
-    and "Second HTN 130s Followup Bundle"
+  "Second Hypertensive Reading 130s" and "Second HTN 130s Followup Bundle"
 
 define "Second HTN 140+ With Followup":
-  "Second Hypertensive Reading 140+"
-    and "Second HTN 140+ Followup Bundle"
+  "Second Hypertensive Reading 140+" and "Second HTN 140+ Followup Bundle"
 
 define "Hypertension Diagnoses Verified":
   CRLCommon.IsVerified(Cms22RecordSource."Hypertension Diagnoses")
@@ -321,65 +313,65 @@ define "Antihypertensive Medication Declined":
 define "Primary-Care Referral Declined Same Day As Qualifying Encounter":
   CRLCommon.SameDay("Primary-Care Referral Declined", "Qualifying Encounter")
 
+define "Primary-Care Referral Declined Same Day As Qualifying Encounter Exists":
+  exists ("Primary-Care Referral Declined Same Day As Qualifying Encounter")
+
 define "Six-Month Rescreen Declined Same Day As Qualifying Encounter":
   CRLCommon.SameDay("Six-Month Rescreen Declined", "Qualifying Encounter")
+
+define "Six-Month Rescreen Declined Same Day As Qualifying Encounter Exists":
+  exists ("Six-Month Rescreen Declined Same Day As Qualifying Encounter")
 
 define "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter":
   CRLCommon.SameDay("Non-Pharm Recommendation Declined", "Qualifying Encounter")
 
+define "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter Exists":
+  exists ("Non-Pharm Recommendation Declined Same Day As Qualifying Encounter")
+
 define "Four-Week Rescreen Declined Same Day As Qualifying Encounter":
   CRLCommon.SameDay("Four-Week Rescreen Declined", "Qualifying Encounter")
+
+define "Four-Week Rescreen Declined Same Day As Qualifying Encounter Exists":
+  exists ("Four-Week Rescreen Declined Same Day As Qualifying Encounter")
 
 define "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter":
   CRLCommon.SameDay("Hypertension Lab or ECG Declined", "Qualifying Encounter")
 
+define "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter Exists":
+  exists ("Hypertension Lab or ECG Declined Same Day As Qualifying Encounter")
+
 define "Antihypertensive Medication Declined Same Day As Qualifying Encounter":
   CRLCommon.SameDay("Antihypertensive Medication Declined", "Qualifying Encounter")
 
+define "Antihypertensive Medication Declined Same Day As Qualifying Encounter Exists":
+  exists ("Antihypertensive Medication Declined Same Day As Qualifying Encounter")
+
 define "Elevated BP Declined Bundle":
-  exists ("Primary-Care Referral Declined Same Day As Qualifying Encounter")
-    or exists ("Six-Month Rescreen Declined Same Day As Qualifying Encounter")
-    or exists ("Non-Pharm Recommendation Declined Same Day As Qualifying Encounter")
+  "Primary-Care Referral Declined Same Day As Qualifying Encounter Exists" or "Six-Month Rescreen Declined Same Day As Qualifying Encounter Exists" or "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter Exists"
 
 define "First HTN Declined Bundle":
-  exists ("Four-Week Rescreen Declined Same Day As Qualifying Encounter")
-    or exists ("Primary-Care Referral Declined Same Day As Qualifying Encounter")
-    or exists ("Non-Pharm Recommendation Declined Same Day As Qualifying Encounter")
+  "Four-Week Rescreen Declined Same Day As Qualifying Encounter Exists" or "Primary-Care Referral Declined Same Day As Qualifying Encounter Exists" or "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter Exists"
 
 define "Second HTN 130s Declined Bundle":
-  exists ("Primary-Care Referral Declined Same Day As Qualifying Encounter")
-    or exists ("Six-Month Rescreen Declined Same Day As Qualifying Encounter")
-    or exists ("Hypertension Lab or ECG Declined Same Day As Qualifying Encounter")
-    or exists ("Non-Pharm Recommendation Declined Same Day As Qualifying Encounter")
+  "Primary-Care Referral Declined Same Day As Qualifying Encounter Exists" or "Six-Month Rescreen Declined Same Day As Qualifying Encounter Exists" or "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter Exists" or "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter Exists"
 
 define "Second HTN 140+ Declined Bundle":
-  exists ("Primary-Care Referral Declined Same Day As Qualifying Encounter")
-    or exists ("Four-Week Rescreen Declined Same Day As Qualifying Encounter")
-    or exists ("Antihypertensive Medication Declined Same Day As Qualifying Encounter")
-    or exists ("Hypertension Lab or ECG Declined Same Day As Qualifying Encounter")
-    or exists ("Non-Pharm Recommendation Declined Same Day As Qualifying Encounter")
+  "Primary-Care Referral Declined Same Day As Qualifying Encounter Exists" or "Four-Week Rescreen Declined Same Day As Qualifying Encounter Exists" or "Antihypertensive Medication Declined Same Day As Qualifying Encounter Exists" or "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter Exists" or "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter Exists"
 
 define "Elevated BP With Declined Followup":
-  "Elevated BP Reading"
-    and "Elevated BP Declined Bundle"
+  "Elevated BP Reading" and "Elevated BP Declined Bundle"
 
 define "First HTN With Declined Followup":
-  "First Hypertensive Reading"
-    and "First HTN Declined Bundle"
+  "First Hypertensive Reading" and "First HTN Declined Bundle"
 
 define "Second HTN 130s With Declined Followup":
-  "Second Hypertensive Reading 130s"
-    and "Second HTN 130s Declined Bundle"
+  "Second Hypertensive Reading 130s" and "Second HTN 130s Declined Bundle"
 
 define "Second HTN 140+ With Declined Followup":
-  "Second Hypertensive Reading 140+"
-    and "Second HTN 140+ Declined Bundle"
+  "Second Hypertensive Reading 140+" and "Second HTN 140+ Declined Bundle"
 
 define "HTN Followup Declined By Patient":
-  "Elevated BP With Declined Followup"
-    or "First HTN With Declined Followup"
-    or "Second HTN 130s With Declined Followup"
-    or "Second HTN 140+ With Declined Followup"
+  "Elevated BP With Declined Followup" or "First HTN With Declined Followup" or "Second HTN 130s With Declined Followup" or "Second HTN 140+ With Declined Followup"
 
 define "Age At Start Of MP At Least 18 Years":
   Coalesce(CRLCommon.AtLeast(CRLCommon.AgeAt(start of "Measurement Period"), 18 'years'), false)

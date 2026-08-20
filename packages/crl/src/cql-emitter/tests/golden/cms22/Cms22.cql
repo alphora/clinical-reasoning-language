@@ -18,11 +18,7 @@ define "Denominator Exclusions":
   Cms22Inferred."Verified Hypertension As Of Qualifying Encounter"
 
 define "Numerator":
-  exists (Cms22Inferred."Normal BP Reading")
-    or exists (Cms22Inferred."Elevated BP With Followup")
-    or exists (Cms22Inferred."First HTN With Followup")
-    or exists (Cms22Inferred."Second HTN 130s With Followup")
-    or exists (Cms22Inferred."Second HTN 140+ With Followup")
+  Cms22Inferred."Normal BP Reading" or Cms22Inferred."Elevated BP With Followup" or Cms22Inferred."First HTN With Followup" or Cms22Inferred."Second HTN 130s With Followup" or Cms22Inferred."Second HTN 140+ With Followup"
 
 define "Denominator Exceptions":
   exists (Cms22Inferred."BP Measurement Not Done With Reason")

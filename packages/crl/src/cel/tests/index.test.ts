@@ -199,7 +199,11 @@ describe("CEL Todo 2 — AST shape spot-checks", () => {
     const numerator = c.body.find(
       (b) => b.type === "CELResultField" && (b as { leafName: string }).leafName === "Numerator",
     );
-    expect((numerator as { value: { type: string; value: boolean } }).value.value).toBe(true);
+    // #189 Slice 1 / #285: Maria's Numerator was reframed true→false — the constant-true
+    // `exists(<boolean>)` miscompile was corrected to a real disjunction, and CEL cannot model
+    // her systolic/diastolic as `component of` the BP panel, so Normal BP Reading is false here.
+    // Still exercises the boolean-valued `result is` parse (false is as first-class as true).
+    expect((numerator as { value: { type: string; value: boolean } }).value.value).toBe(false);
 
     const strat = buildCEL(readSource(CORPUS.cms22Strategy));
     const stratCase = (strat.result as CEL).statements.find(

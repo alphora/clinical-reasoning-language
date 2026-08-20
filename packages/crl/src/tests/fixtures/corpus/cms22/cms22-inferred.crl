@@ -155,7 +155,7 @@ concept "Normal BP Reading":
 - defined as
 (
    "Last Systolic Below 120"
-   sem-and
+   and
    "Last Diastolic Below 80"
 ).
 
@@ -165,7 +165,7 @@ concept "Elevated BP Reading":
 - defined as
 (
    "Last Systolic Between 120 and 129"
-   sem-and
+   and
    "Last Diastolic Below 80"
 ).
 
@@ -175,7 +175,7 @@ concept "Hypertensive Reading":
 - defined as
 (
    "Last Systolic At Least 130"
-   sem-or
+   or
    "Last Diastolic At Least 80"
 ).
 
@@ -228,7 +228,7 @@ concept "Prior-Year Hypertensive Reading":
 - defined as
 (
    "Prior-Year Last Systolic At Least 130"
-   sem-or
+   or
    "Prior-Year Last Diastolic At Least 80"
 ).
 
@@ -243,7 +243,7 @@ concept "First Hypertensive Reading":
 - defined as
 (
    "Hypertensive Reading"
-   sem-and
+   and
    "Without Record Of Prior-Year Hypertensive Reading"
 ).
 
@@ -257,14 +257,14 @@ concept "Second Hypertensive Reading 130s Body":
 (
    (
       "Last Systolic Between 130 and 139"
-      sem-or
+      or
       "Last Diastolic Between 80 and 89"
    )
-   sem-and
-   sem-not
+   and
+   not
    (
       "Last Systolic At Least 140"
-      sem-or
+      or
       "Last Diastolic At Least 90"
    )
 ).
@@ -275,7 +275,7 @@ concept "Second Hypertensive Reading 130s":
 - defined as
 (
    "Second Hypertensive Reading 130s Body"
-   sem-and
+   and
    "Prior-Year Hypertensive Reading"
 ).
 
@@ -285,7 +285,7 @@ concept "Second Hypertensive Reading 140+ Body":
 - defined as
 (
    "Last Systolic At Least 140"
-   sem-or
+   or
    "Last Diastolic At Least 90"
 ).
 
@@ -295,7 +295,7 @@ concept "Second Hypertensive Reading 140+":
 - defined as
 (
    "Second Hypertensive Reading 140+ Body"
-   sem-and
+   and
    "Prior-Year Hypertensive Reading"
 ).
 
@@ -406,32 +406,68 @@ concept "Referral for Hypertensive Reading":
 concept "Six-Month Rescreen Order Same Day As Qualifying Encounter":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Six-Month Rescreen Order" same day as "Qualifying Encounter".
+
+concept "Six-Month Rescreen Order Same Day As Qualifying Encounter Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "Six-Month Rescreen Order Same Day As Qualifying Encounter" ).
 
 concept "Non-Pharm Recommendation Order Same Day As Qualifying Encounter":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Non-Pharmacological Recommendation Order" same day as "Qualifying Encounter".
+
+concept "Non-Pharm Recommendation Order Same Day As Qualifying Encounter Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "Non-Pharm Recommendation Order Same Day As Qualifying Encounter" ).
 
 concept "Referral for Hypertensive Reading Same Day As Qualifying Encounter":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Referral for Hypertensive Reading" same day as "Qualifying Encounter".
+
+concept "Referral for Hypertensive Reading Same Day As Qualifying Encounter Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "Referral for Hypertensive Reading Same Day As Qualifying Encounter" ).
 
 concept "Four-Week Rescreen Order Same Day As Qualifying Encounter":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Four-Week Rescreen Order" same day as "Qualifying Encounter".
+
+concept "Four-Week Rescreen Order Same Day As Qualifying Encounter Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "Four-Week Rescreen Order Same Day As Qualifying Encounter" ).
 
 concept "Hypertension Lab or ECG Order Same Day As Qualifying Encounter":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Hypertension Lab or ECG Order" same day as "Qualifying Encounter".
+
+concept "Hypertension Lab or ECG Order Same Day As Qualifying Encounter Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "Hypertension Lab or ECG Order Same Day As Qualifying Encounter" ).
 
 concept "Antihypertensive Medication Order Same Day As Qualifying Encounter":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Antihypertensive Medication Order" same day as "Qualifying Encounter".
+
+concept "Antihypertensive Medication Order Same Day As Qualifying Encounter Exists":
+- type is MedicationRequest.
+- value type is boolean.
+- defined as exists ( "Antihypertensive Medication Order Same Day As Qualifying Encounter" ).
 
 concept "Elevated BP Followup Bundle":
 - type is Observation.
@@ -439,12 +475,12 @@ concept "Elevated BP Followup Bundle":
 - defined as
 (
    (
-      "Six-Month Rescreen Order Same Day As Qualifying Encounter"
-      sem-and
-      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter"
+      "Six-Month Rescreen Order Same Day As Qualifying Encounter Exists"
+      and
+      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter Exists"
    )
-   sem-or
-   "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+   or
+   "Referral for Hypertensive Reading Same Day As Qualifying Encounter Exists"
 ).
 
 concept "First HTN Followup Bundle":
@@ -453,12 +489,12 @@ concept "First HTN Followup Bundle":
 - defined as
 (
    (
-      "Four-Week Rescreen Order Same Day As Qualifying Encounter"
-      sem-and
-      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter"
+      "Four-Week Rescreen Order Same Day As Qualifying Encounter Exists"
+      and
+      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter Exists"
    )
-   sem-or
-   "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+   or
+   "Referral for Hypertensive Reading Same Day As Qualifying Encounter Exists"
 ).
 
 concept "Second HTN 130s Followup Bundle":
@@ -467,14 +503,14 @@ concept "Second HTN 130s Followup Bundle":
 - defined as
 (
    (
-      "Six-Month Rescreen Order Same Day As Qualifying Encounter"
-      sem-and
-      "Hypertension Lab or ECG Order Same Day As Qualifying Encounter"
-      sem-and
-      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter"
+      "Six-Month Rescreen Order Same Day As Qualifying Encounter Exists"
+      and
+      "Hypertension Lab or ECG Order Same Day As Qualifying Encounter Exists"
+      and
+      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter Exists"
    )
-   sem-or
-   "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+   or
+   "Referral for Hypertensive Reading Same Day As Qualifying Encounter Exists"
 ).
 
 concept "Second HTN 140+ Followup Bundle":
@@ -483,16 +519,16 @@ concept "Second HTN 140+ Followup Bundle":
 - defined as
 (
    (
-      "Four-Week Rescreen Order Same Day As Qualifying Encounter"
-      sem-and
-      "Hypertension Lab or ECG Order Same Day As Qualifying Encounter"
-      sem-and
-      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter"
-      sem-and
-      "Antihypertensive Medication Order Same Day As Qualifying Encounter"
+      "Four-Week Rescreen Order Same Day As Qualifying Encounter Exists"
+      and
+      "Hypertension Lab or ECG Order Same Day As Qualifying Encounter Exists"
+      and
+      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter Exists"
+      and
+      "Antihypertensive Medication Order Same Day As Qualifying Encounter Exists"
    )
-   sem-or
-   "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+   or
+   "Referral for Hypertensive Reading Same Day As Qualifying Encounter Exists"
 ).
 
 
@@ -504,7 +540,7 @@ concept "Elevated BP With Followup":
 - defined as
 (
    "Elevated BP Reading"
-   sem-and
+   and
    "Elevated BP Followup Bundle"
 ).
 
@@ -514,7 +550,7 @@ concept "First HTN With Followup":
 - defined as
 (
    "First Hypertensive Reading"
-   sem-and
+   and
    "First HTN Followup Bundle"
 ).
 
@@ -524,7 +560,7 @@ concept "Second HTN 130s With Followup":
 - defined as
 (
    "Second Hypertensive Reading 130s"
-   sem-and
+   and
    "Second HTN 130s Followup Bundle"
 ).
 
@@ -534,7 +570,7 @@ concept "Second HTN 140+ With Followup":
 - defined as
 (
    "Second Hypertensive Reading 140+"
-   sem-and
+   and
    "Second HTN 140+ Followup Bundle"
 ).
 
@@ -662,43 +698,79 @@ concept "Antihypertensive Medication Declined":
 concept "Primary-Care Referral Declined Same Day As Qualifying Encounter":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Primary-Care Referral Declined" same day as "Qualifying Encounter".
+
+concept "Primary-Care Referral Declined Same Day As Qualifying Encounter Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "Primary-Care Referral Declined Same Day As Qualifying Encounter" ).
 
 concept "Six-Month Rescreen Declined Same Day As Qualifying Encounter":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Six-Month Rescreen Declined" same day as "Qualifying Encounter".
+
+concept "Six-Month Rescreen Declined Same Day As Qualifying Encounter Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "Six-Month Rescreen Declined Same Day As Qualifying Encounter" ).
 
 concept "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Non-Pharm Recommendation Declined" same day as "Qualifying Encounter".
+
+concept "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter" ).
 
 concept "Four-Week Rescreen Declined Same Day As Qualifying Encounter":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Four-Week Rescreen Declined" same day as "Qualifying Encounter".
+
+concept "Four-Week Rescreen Declined Same Day As Qualifying Encounter Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "Four-Week Rescreen Declined Same Day As Qualifying Encounter" ).
 
 concept "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Hypertension Lab or ECG Declined" same day as "Qualifying Encounter".
+
+concept "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter" ).
 
 concept "Antihypertensive Medication Declined Same Day As Qualifying Encounter":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Antihypertensive Medication Declined" same day as "Qualifying Encounter".
+
+concept "Antihypertensive Medication Declined Same Day As Qualifying Encounter Exists":
+- type is MedicationRequest.
+- value type is boolean.
+- defined as exists ( "Antihypertensive Medication Declined Same Day As Qualifying Encounter" ).
 
 concept "Elevated BP Declined Bundle":
 - type is Observation.
 - value type is boolean.
 - defined as
 (
-   "Primary-Care Referral Declined Same Day As Qualifying Encounter"
-   sem-or
-   "Six-Month Rescreen Declined Same Day As Qualifying Encounter"
-   sem-or
-   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+   "Primary-Care Referral Declined Same Day As Qualifying Encounter Exists"
+   or
+   "Six-Month Rescreen Declined Same Day As Qualifying Encounter Exists"
+   or
+   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter Exists"
 ).
 
 concept "First HTN Declined Bundle":
@@ -706,11 +778,11 @@ concept "First HTN Declined Bundle":
 - value type is boolean.
 - defined as
 (
-   "Four-Week Rescreen Declined Same Day As Qualifying Encounter"
-   sem-or
-   "Primary-Care Referral Declined Same Day As Qualifying Encounter"
-   sem-or
-   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+   "Four-Week Rescreen Declined Same Day As Qualifying Encounter Exists"
+   or
+   "Primary-Care Referral Declined Same Day As Qualifying Encounter Exists"
+   or
+   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter Exists"
 ).
 
 concept "Second HTN 130s Declined Bundle":
@@ -718,13 +790,13 @@ concept "Second HTN 130s Declined Bundle":
 - value type is boolean.
 - defined as
 (
-   "Primary-Care Referral Declined Same Day As Qualifying Encounter"
-   sem-or
-   "Six-Month Rescreen Declined Same Day As Qualifying Encounter"
-   sem-or
-   "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter"
-   sem-or
-   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+   "Primary-Care Referral Declined Same Day As Qualifying Encounter Exists"
+   or
+   "Six-Month Rescreen Declined Same Day As Qualifying Encounter Exists"
+   or
+   "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter Exists"
+   or
+   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter Exists"
 ).
 
 concept "Second HTN 140+ Declined Bundle":
@@ -732,15 +804,15 @@ concept "Second HTN 140+ Declined Bundle":
 - value type is boolean.
 - defined as
 (
-   "Primary-Care Referral Declined Same Day As Qualifying Encounter"
-   sem-or
-   "Four-Week Rescreen Declined Same Day As Qualifying Encounter"
-   sem-or
-   "Antihypertensive Medication Declined Same Day As Qualifying Encounter"
-   sem-or
-   "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter"
-   sem-or
-   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+   "Primary-Care Referral Declined Same Day As Qualifying Encounter Exists"
+   or
+   "Four-Week Rescreen Declined Same Day As Qualifying Encounter Exists"
+   or
+   "Antihypertensive Medication Declined Same Day As Qualifying Encounter Exists"
+   or
+   "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter Exists"
+   or
+   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter Exists"
 ).
 
 concept "Elevated BP With Declined Followup":
@@ -749,7 +821,7 @@ concept "Elevated BP With Declined Followup":
 - defined as
 (
    "Elevated BP Reading"
-   sem-and
+   and
    "Elevated BP Declined Bundle"
 ).
 
@@ -759,7 +831,7 @@ concept "First HTN With Declined Followup":
 - defined as
 (
    "First Hypertensive Reading"
-   sem-and
+   and
    "First HTN Declined Bundle"
 ).
 
@@ -769,7 +841,7 @@ concept "Second HTN 130s With Declined Followup":
 - defined as
 (
    "Second Hypertensive Reading 130s"
-   sem-and
+   and
    "Second HTN 130s Declined Bundle"
 ).
 
@@ -779,7 +851,7 @@ concept "Second HTN 140+ With Declined Followup":
 - defined as
 (
    "Second Hypertensive Reading 140+"
-   sem-and
+   and
    "Second HTN 140+ Declined Bundle"
 ).
 
@@ -789,11 +861,11 @@ concept "HTN Followup Declined By Patient":
 - defined as
 (
    "Elevated BP With Declined Followup"
-   sem-or
+   or
    "First HTN With Declined Followup"
-   sem-or
+   or
    "Second HTN 130s With Declined Followup"
-   sem-or
+   or
    "Second HTN 140+ With Declined Followup"
 ).
 

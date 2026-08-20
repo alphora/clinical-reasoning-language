@@ -30,16 +30,23 @@ concept "Numerator":
 - defined as
 (
    "cms22-Inferred"."Normal BP Reading"
-   sem-or
+   or
    "cms22-Inferred"."Elevated BP With Followup"
-   sem-or
+   or
    "cms22-Inferred"."First HTN With Followup"
-   sem-or
+   or
    "cms22-Inferred"."Second HTN 130s With Followup"
-   sem-or
+   or
    "cms22-Inferred"."Second HTN 140+ With Followup"
 ).
 
+// #189 KNOWN-WRONG PENDING SLICE 2: this define still emits the pre-#189 squat miscompile —
+// `exists(<total scalar boolean>) or exists(<total scalar boolean>)`, i.e. constant-true — because
+// BOTH operands emit total scalar booleans (`HTN Followup Declined By Patient` was flipped to a real
+// boolean disjunction in Slice-1 increment 5; `BP Measurement Not Done With Reason` is a §4 record
+// composition that is NOT yet a provably-total boolean). It is deliberately LEFT `sem-or` here: flipping
+// to `or` now would trip the boolean-composition operand-totality gate on the un-migrated §4 operand.
+// Slice 2 migrates the §4 `BP Measurement …` chain and THEN flips this root `sem-or` → `or`. Tracked: #189.
 concept "Denominator Exceptions":
 - type is Observation.
 - value type is boolean.
