@@ -119,7 +119,7 @@ concept "Has Normal BMI":
 - defined as
 (
    "Normal BMI Range"
-   sem-and
+   and
    "Without Documented Abnormal BMI"
 ).
 
@@ -129,11 +129,13 @@ concept "Has Normal BMI":
 concept "Overweight or Obese Diagnoses Active":
 - type is Condition.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Overweight or Obese Diagnoses" active.
 
 concept "Underweight Diagnoses Active":
 - type is Condition.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Underweight Diagnoses" active.
 
 
@@ -142,16 +144,19 @@ concept "Underweight Diagnoses Active":
 concept "High BMI Follow-up Justified by Overweight Diagnosis":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."High BMI Follow-up Service Requests" justified by "cms69-RecordSource"."Overweight or Obese Diagnoses".
 
 concept "High BMI Follow-up Preceded by Overweight Diagnosis":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."High BMI Follow-up Service Requests" on day of or after "Overweight or Obese Diagnoses Active".
 
 concept "High BMI Follow-up Order":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    "High BMI Follow-up Justified by Overweight Diagnosis"
@@ -159,19 +164,27 @@ concept "High BMI Follow-up Order":
    "High BMI Follow-up Preceded by Overweight Diagnosis"
 ).
 
+concept "High BMI Follow-up Order Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "High BMI Follow-up Order" ).
+
 concept "Weight Assessment Referral Justified by Overweight Diagnosis":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" justified by "cms69-RecordSource"."Overweight or Obese Diagnoses".
 
 concept "Weight Assessment Referral Preceded by Overweight Diagnosis":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" on day of or after "Overweight or Obese Diagnoses Active".
 
 concept "High BMI Weight Assessment Referral":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    "Weight Assessment Referral Justified by Overweight Diagnosis"
@@ -179,19 +192,27 @@ concept "High BMI Weight Assessment Referral":
    "Weight Assessment Referral Preceded by Overweight Diagnosis"
 ).
 
+concept "High BMI Weight Assessment Referral Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "High BMI Weight Assessment Referral" ).
+
 concept "High BMI Medication Justified by Overweight Diagnosis":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."High BMI Medications" justified by "cms69-RecordSource"."Overweight or Obese Diagnoses".
 
 concept "High BMI Medication Preceded by Overweight Diagnosis":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."High BMI Medications" on day of or after "Overweight or Obese Diagnoses Active".
 
 concept "High BMI Medication Order":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    "High BMI Medication Justified by Overweight Diagnosis"
@@ -199,16 +220,21 @@ concept "High BMI Medication Order":
    "High BMI Medication Preceded by Overweight Diagnosis"
 ).
 
+concept "High BMI Medication Order Exists":
+- type is MedicationRequest.
+- value type is boolean.
+- defined as exists ( "High BMI Medication Order" ).
+
 concept "High BMI Interventions Ordered":
 - type is Observation.
 - value type is boolean.
 - defined as
 (
-   "High BMI Follow-up Order"
-   sem-or
-   "High BMI Weight Assessment Referral"
-   sem-or
-   "High BMI Medication Order"
+   "High BMI Follow-up Order Exists"
+   or
+   "High BMI Weight Assessment Referral Exists"
+   or
+   "High BMI Medication Order Exists"
 ).
 
 
@@ -217,16 +243,19 @@ concept "High BMI Interventions Ordered":
 concept "High BMI Procedure Justified by Overweight Diagnosis":
 - type is Procedure.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."High BMI Follow-up Procedures" justified by "cms69-RecordSource"."Overweight or Obese Diagnoses".
 
 concept "High BMI Procedure Preceded by Overweight Diagnosis":
 - type is Procedure.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."High BMI Follow-up Procedures" on day of or after "Overweight or Obese Diagnoses Active".
 
 concept "High BMI Procedure Performed":
 - type is Procedure.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    "High BMI Procedure Justified by Overweight Diagnosis"
@@ -234,10 +263,10 @@ concept "High BMI Procedure Performed":
    "High BMI Procedure Preceded by Overweight Diagnosis"
 ).
 
-concept "High BMI Interventions Performed":
+concept "High BMI Procedure Performed Exists":
 - type is Procedure.
-- value type is CodeableConcept.
-- defined as "High BMI Procedure Performed".
+- value type is boolean.
+- defined as exists ( "High BMI Procedure Performed" ).
 
 
 // --- High BMI And Follow Up Provided ---
@@ -254,11 +283,11 @@ concept "High BMI And Follow Up Provided":
 - defined as
 (
    "Documented High BMI"
-   sem-and
+   and
    (
       "High BMI Interventions Ordered"
-      sem-or
-      "High BMI Interventions Performed"
+      or
+      "High BMI Procedure Performed Exists"
    )
 ).
 
@@ -268,21 +297,25 @@ concept "High BMI And Follow Up Provided":
 concept "Low BMI Follow-up Justified by Underweight Diagnosis":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Service Requests" justified by "cms69-RecordSource"."Underweight Diagnoses".
 
 concept "Low BMI Follow-up Orders During MP":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Service Requests" during "Measurement Period".
 
 concept "Low BMI Follow-up Preceded by Underweight During MP":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Low BMI Follow-up Orders During MP" on day of or after "Underweight Diagnoses Active".
 
 concept "Low BMI Follow-up Order":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    "Low BMI Follow-up Justified by Underweight Diagnosis"
@@ -290,24 +323,33 @@ concept "Low BMI Follow-up Order":
    "Low BMI Follow-up Preceded by Underweight During MP"
 ).
 
+concept "Low BMI Follow-up Order Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "Low BMI Follow-up Order" ).
+
 concept "Weight Assessment Referral Justified by Underweight Diagnosis":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" justified by "cms69-RecordSource"."Underweight Diagnoses".
 
 concept "Weight Assessment Referral During MP":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" during "Measurement Period".
 
 concept "Weight Assessment Referral Preceded by Underweight During MP":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Weight Assessment Referral During MP" on day of or after "Underweight Diagnoses Active".
 
 concept "Low BMI Weight Assessment Referral":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    "Weight Assessment Referral Justified by Underweight Diagnosis"
@@ -315,24 +357,33 @@ concept "Low BMI Weight Assessment Referral":
    "Weight Assessment Referral Preceded by Underweight During MP"
 ).
 
+concept "Low BMI Weight Assessment Referral Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "Low BMI Weight Assessment Referral" ).
+
 concept "Low BMI Medication Justified by Underweight Diagnosis":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Low BMI Medications" justified by "cms69-RecordSource"."Underweight Diagnoses".
 
 concept "Low BMI Medication Orders During MP":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Low BMI Medications" during "Measurement Period".
 
 concept "Low BMI Medication Preceded by Underweight During MP":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Low BMI Medication Orders During MP" on day of or after "Underweight Diagnoses Active".
 
 concept "Low BMI Medication Order":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    "Low BMI Medication Justified by Underweight Diagnosis"
@@ -340,16 +391,21 @@ concept "Low BMI Medication Order":
    "Low BMI Medication Preceded by Underweight During MP"
 ).
 
+concept "Low BMI Medication Order Exists":
+- type is MedicationRequest.
+- value type is boolean.
+- defined as exists ( "Low BMI Medication Order" ).
+
 concept "Low BMI Interventions Ordered":
 - type is Observation.
 - value type is boolean.
 - defined as
 (
-   "Low BMI Follow-up Order"
-   sem-or
-   "Low BMI Weight Assessment Referral"
-   sem-or
-   "Low BMI Medication Order"
+   "Low BMI Follow-up Order Exists"
+   or
+   "Low BMI Weight Assessment Referral Exists"
+   or
+   "Low BMI Medication Order Exists"
 ).
 
 
@@ -358,26 +414,31 @@ concept "Low BMI Interventions Ordered":
 concept "Low BMI Procedure Justified by Underweight Diagnosis":
 - type is Procedure.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Procedures" justified by "cms69-RecordSource"."Underweight Diagnoses".
 
 concept "Low BMI Follow-up Procedures Performed":
 - type is Procedure.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Procedures" performed.
 
 concept "Low BMI Procedures During MP":
 - type is Procedure.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Procedures" during "Measurement Period".
 
 concept "Low BMI Procedure Preceded by Underweight During MP":
 - type is Procedure.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "Low BMI Procedures During MP" on day of or after "Underweight Diagnoses Active".
 
 concept "Low BMI Procedure Performed":
 - type is Procedure.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    (
@@ -389,10 +450,10 @@ concept "Low BMI Procedure Performed":
    "Low BMI Procedure Preceded by Underweight During MP"
 ).
 
-concept "Low BMI Interventions Performed":
+concept "Low BMI Procedure Performed Exists":
 - type is Procedure.
-- value type is CodeableConcept.
-- defined as "Low BMI Procedure Performed".
+- value type is boolean.
+- defined as exists ( "Low BMI Procedure Performed" ).
 
 
 // --- Low BMI And Follow Up Provided ---
@@ -406,11 +467,11 @@ concept "Low BMI And Follow Up Provided":
 - defined as
 (
    "Documented Low BMI"
-   sem-and
+   and
    (
       "Low BMI Interventions Ordered"
-      sem-or
-      "Low BMI Interventions Performed"
+      or
+      "Low BMI Procedure Performed Exists"
    )
 ).
 

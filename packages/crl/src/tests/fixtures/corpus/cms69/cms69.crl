@@ -30,9 +30,9 @@ concept "Numerator":
 - defined as
 (
    "cms69-Inferred"."High BMI And Follow Up Provided"
-   sem-or
+   or
    "cms69-Inferred"."Low BMI And Follow Up Provided"
-   sem-or
+   or
    "cms69-Inferred"."Has Normal BMI"
 ).
 

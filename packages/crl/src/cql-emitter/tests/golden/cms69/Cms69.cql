@@ -18,9 +18,7 @@ define "Denominator Exclusions":
   Cms69Inferred."Is Pregnant During Measurement Period"
 
 define "Numerator":
-  exists (Cms69Inferred."High BMI And Follow Up Provided")
-    or exists (Cms69Inferred."Low BMI And Follow Up Provided")
-    or exists (Cms69Inferred."Has Normal BMI")
+  Cms69Inferred."High BMI And Follow Up Provided" or Cms69Inferred."Low BMI And Follow Up Provided" or Cms69Inferred."Has Normal BMI"
 
 define "Denominator Exceptions":
   exists (Cms69Inferred."Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI")

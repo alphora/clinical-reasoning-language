@@ -46,14 +46,21 @@ fact "Follow-up Normal BMI":
 // ============ Cases ============
 
 case "Jane's high BMI is followed up with a weight assessment referral":
-- description is `Jane's baseline BMI at her wellness visit is high.
-  She receives a weight assessment referral and her follow-up reading
-  later in the measurement period is normal. She satisfies the Numerator
-  via the High-BMI-and-Follow-Up path.`.
+- description is `Jane's baseline BMI at her wellness visit is high and she
+  receives a weight assessment referral. No overweight/obese diagnosis is
+  documented, so the referral is neither justified by nor preceded by a
+  qualifying diagnosis — the intervention does not count toward the CMS69
+  numerator. Jane is in the denominator but NOT the numerator: a care gap.
+  (The CEL fact model cannot yet express a Condition's onset, clinicalStatus,
+  or reasonCode (issue #285), so a numerator-satisfying case cannot be
+  authored; and the result assertions are not executed locally (issue #70),
+  so these are hand-traced language-correct oracles, not execution-proven
+  determinations.)`.
 - subject is "Jane Doe".
 - fact is "Baseline Wellness Visit".
 - fact is "High Baseline BMI".
 - fact is "Weight Assessment Referral Order".
 - fact is "Follow-up Normal BMI".
 - result is "Initial Population" is true.
-- result is "Numerator" is true.
+- result is "Denominator Exclusions" is false.
+- result is "Numerator" is false.

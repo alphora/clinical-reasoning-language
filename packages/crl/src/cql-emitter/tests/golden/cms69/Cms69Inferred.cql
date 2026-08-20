@@ -52,8 +52,7 @@ define "Without Documented Abnormal BMI":
   Coalesce(CRLCommon.Without('documented', ("Documented High BMI" union "Documented Low BMI")), false)
 
 define "Has Normal BMI":
-  "Normal BMI Range"
-    and "Without Documented Abnormal BMI"
+  "Normal BMI Range" and "Without Documented Abnormal BMI"
 
 define "Overweight or Obese Diagnoses Active":
   CRLCommon.Active(Cms69RecordSource."Overweight or Obese Diagnoses")
@@ -71,6 +70,9 @@ define "High BMI Follow-up Order":
   "High BMI Follow-up Justified by Overweight Diagnosis"
     union "High BMI Follow-up Preceded by Overweight Diagnosis"
 
+define "High BMI Follow-up Order Exists":
+  exists ("High BMI Follow-up Order")
+
 define "Weight Assessment Referral Justified by Overweight Diagnosis":
   CRLCommon.Justified(Cms69RecordSource."Weight Assessment Referrals", Cms69RecordSource."Overweight or Obese Diagnoses")
 
@@ -80,6 +82,9 @@ define "Weight Assessment Referral Preceded by Overweight Diagnosis":
 define "High BMI Weight Assessment Referral":
   "Weight Assessment Referral Justified by Overweight Diagnosis"
     union "Weight Assessment Referral Preceded by Overweight Diagnosis"
+
+define "High BMI Weight Assessment Referral Exists":
+  exists ("High BMI Weight Assessment Referral")
 
 define "High BMI Medication Justified by Overweight Diagnosis":
   CRLCommon.Justified(Cms69RecordSource."High BMI Medications", Cms69RecordSource."Overweight or Obese Diagnoses")
@@ -91,10 +96,11 @@ define "High BMI Medication Order":
   "High BMI Medication Justified by Overweight Diagnosis"
     union "High BMI Medication Preceded by Overweight Diagnosis"
 
+define "High BMI Medication Order Exists":
+  exists ("High BMI Medication Order")
+
 define "High BMI Interventions Ordered":
-  exists ("High BMI Follow-up Order")
-    or exists ("High BMI Weight Assessment Referral")
-    or exists ("High BMI Medication Order")
+  "High BMI Follow-up Order Exists" or "High BMI Weight Assessment Referral Exists" or "High BMI Medication Order Exists"
 
 define "High BMI Procedure Justified by Overweight Diagnosis":
   CRLCommon.Justified(Cms69RecordSource."High BMI Follow-up Procedures", Cms69RecordSource."Overweight or Obese Diagnoses")
@@ -106,13 +112,11 @@ define "High BMI Procedure Performed":
   "High BMI Procedure Justified by Overweight Diagnosis"
     union "High BMI Procedure Preceded by Overweight Diagnosis"
 
-define "High BMI Interventions Performed":
-  "High BMI Procedure Performed"
+define "High BMI Procedure Performed Exists":
+  exists ("High BMI Procedure Performed")
 
 define "High BMI And Follow Up Provided":
-  "Documented High BMI"
-    and ("High BMI Interventions Ordered"
-    or exists ("High BMI Interventions Performed"))
+  "Documented High BMI" and ("High BMI Interventions Ordered" or "High BMI Procedure Performed Exists")
 
 define "Low BMI Follow-up Justified by Underweight Diagnosis":
   CRLCommon.Justified(Cms69RecordSource."Low BMI Follow-up Service Requests", Cms69RecordSource."Underweight Diagnoses")
@@ -127,6 +131,9 @@ define "Low BMI Follow-up Order":
   "Low BMI Follow-up Justified by Underweight Diagnosis"
     union "Low BMI Follow-up Preceded by Underweight During MP"
 
+define "Low BMI Follow-up Order Exists":
+  exists ("Low BMI Follow-up Order")
+
 define "Weight Assessment Referral Justified by Underweight Diagnosis":
   CRLCommon.Justified(Cms69RecordSource."Weight Assessment Referrals", Cms69RecordSource."Underweight Diagnoses")
 
@@ -139,6 +146,9 @@ define "Weight Assessment Referral Preceded by Underweight During MP":
 define "Low BMI Weight Assessment Referral":
   "Weight Assessment Referral Justified by Underweight Diagnosis"
     union "Weight Assessment Referral Preceded by Underweight During MP"
+
+define "Low BMI Weight Assessment Referral Exists":
+  exists ("Low BMI Weight Assessment Referral")
 
 define "Low BMI Medication Justified by Underweight Diagnosis":
   CRLCommon.Justified(Cms69RecordSource."Low BMI Medications", Cms69RecordSource."Underweight Diagnoses")
@@ -153,10 +163,11 @@ define "Low BMI Medication Order":
   "Low BMI Medication Justified by Underweight Diagnosis"
     union "Low BMI Medication Preceded by Underweight During MP"
 
+define "Low BMI Medication Order Exists":
+  exists ("Low BMI Medication Order")
+
 define "Low BMI Interventions Ordered":
-  exists ("Low BMI Follow-up Order")
-    or exists ("Low BMI Weight Assessment Referral")
-    or exists ("Low BMI Medication Order")
+  "Low BMI Follow-up Order Exists" or "Low BMI Weight Assessment Referral Exists" or "Low BMI Medication Order Exists"
 
 define "Low BMI Procedure Justified by Underweight Diagnosis":
   CRLCommon.Justified(Cms69RecordSource."Low BMI Follow-up Procedures", Cms69RecordSource."Underweight Diagnoses")
@@ -175,13 +186,11 @@ define "Low BMI Procedure Performed":
     intersect "Low BMI Follow-up Procedures Performed")
     union "Low BMI Procedure Preceded by Underweight During MP"
 
-define "Low BMI Interventions Performed":
-  "Low BMI Procedure Performed"
+define "Low BMI Procedure Performed Exists":
+  exists ("Low BMI Procedure Performed")
 
 define "Low BMI And Follow Up Provided":
-  "Documented Low BMI"
-    and ("Low BMI Interventions Ordered"
-    or exists ("Low BMI Interventions Performed"))
+  "Documented Low BMI" and ("Low BMI Interventions Ordered" or "Low BMI Procedure Performed Exists")
 
 define "BMI Observation Not Done With Reason":
   CRLCommon.NotDoneWithReason(Cms69RecordSource."BMI Observations", (Cms69RecordSource."Medical Reasons" union Cms69RecordSource."Patient Declined Reasons"))
