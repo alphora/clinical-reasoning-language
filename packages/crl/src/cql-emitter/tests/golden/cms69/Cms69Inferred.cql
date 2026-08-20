@@ -216,6 +216,9 @@ define "High BMI Follow-up Not Done With Reason":
     intersect "High BMI Follow-up Same Day As Qualifying Encounter"
     intersect "High BMI Follow-up Performed"
 
+define "High BMI Follow-up Not Done With Reason Exists":
+  exists ("High BMI Follow-up Not Done With Reason")
+
 define "Low BMI Follow-up Not Done With Medical Reason":
   CRLCommon.NotDoneWithReason(Cms69RecordSource."Low BMI Follow-up Service Requests", Cms69RecordSource."Medical Reasons")
 
@@ -229,6 +232,9 @@ define "Low BMI Follow-up Not Done With Reason":
   "Low BMI Follow-up Not Done With Medical Reason"
     intersect "Low BMI Follow-up Same Day As Qualifying Encounter"
     intersect "Low BMI Follow-up Performed"
+
+define "Low BMI Follow-up Not Done With Reason Exists":
+  exists ("Low BMI Follow-up Not Done With Reason")
 
 define "Weight Assessment Referral Not Done With Medical Reason":
   CRLCommon.NotDoneWithReason(Cms69RecordSource."Weight Assessment Referrals", Cms69RecordSource."Medical Reasons")
@@ -244,6 +250,9 @@ define "Weight Assessment Referral Not Done With Reason":
     intersect "Weight Assessment Referral Same Day As Qualifying Encounter"
     intersect "Weight Assessment Referral Performed"
 
+define "Weight Assessment Referral Not Done With Reason Exists":
+  exists ("Weight Assessment Referral Not Done With Reason")
+
 define "High BMI Medication Not Done With Medical Reason":
   CRLCommon.NotDoneWithReason(Cms69RecordSource."High BMI Medications", Cms69RecordSource."Medical Reasons")
 
@@ -257,6 +266,9 @@ define "High BMI Medication Not Done With Reason":
   "High BMI Medication Not Done With Medical Reason"
     intersect "High BMI Medication Same Day As Qualifying Encounter"
     intersect "High BMI Medication Performed"
+
+define "High BMI Medication Not Done With Reason Exists":
+  exists ("High BMI Medication Not Done With Reason")
 
 define "Low BMI Medication Not Done With Medical Reason":
   CRLCommon.NotDoneWithReason(Cms69RecordSource."Low BMI Medications", Cms69RecordSource."Medical Reasons")
@@ -272,12 +284,11 @@ define "Low BMI Medication Not Done With Reason":
     intersect "Low BMI Medication Same Day As Qualifying Encounter"
     intersect "Low BMI Medication Performed"
 
+define "Low BMI Medication Not Done With Reason Exists":
+  exists ("Low BMI Medication Not Done With Reason")
+
 define "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI":
-  exists ("High BMI Follow-up Not Done With Reason")
-    or exists ("Low BMI Follow-up Not Done With Reason")
-    or exists ("Weight Assessment Referral Not Done With Reason")
-    or exists ("High BMI Medication Not Done With Reason")
-    or exists ("Low BMI Medication Not Done With Reason")
+  "High BMI Follow-up Not Done With Reason Exists" or "Low BMI Follow-up Not Done With Reason Exists" or "Weight Assessment Referral Not Done With Reason Exists" or "High BMI Medication Not Done With Reason Exists" or "Low BMI Medication Not Done With Reason Exists"
 
 define "Pregnancy Diagnoses Active During MP":
   CRLCommon.Active(Cms69RecordSource."Pregnancy Diagnoses", "Measurement Period")

@@ -504,21 +504,25 @@ concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
 concept "High BMI Follow-up Not Done With Medical Reason":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."High BMI Follow-up Service Requests" not done with reason "cms69-RecordSource"."Medical Reasons".
 
 concept "High BMI Follow-up Same Day As Qualifying Encounter":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."High BMI Follow-up Service Requests" same day as "Qualifying Encounter".
 
 concept "High BMI Follow-up Performed":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."High BMI Follow-up Service Requests" performed.
 
 concept "High BMI Follow-up Not Done With Reason":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    "High BMI Follow-up Not Done With Medical Reason"
@@ -528,24 +532,33 @@ concept "High BMI Follow-up Not Done With Reason":
    "High BMI Follow-up Performed"
 ).
 
+concept "High BMI Follow-up Not Done With Reason Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "High BMI Follow-up Not Done With Reason" ).
+
 concept "Low BMI Follow-up Not Done With Medical Reason":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Service Requests" not done with reason "cms69-RecordSource"."Medical Reasons".
 
 concept "Low BMI Follow-up Same Day As Qualifying Encounter":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Service Requests" same day as "Qualifying Encounter".
 
 concept "Low BMI Follow-up Performed":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Low BMI Follow-up Service Requests" performed.
 
 concept "Low BMI Follow-up Not Done With Reason":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    "Low BMI Follow-up Not Done With Medical Reason"
@@ -555,24 +568,33 @@ concept "Low BMI Follow-up Not Done With Reason":
    "Low BMI Follow-up Performed"
 ).
 
+concept "Low BMI Follow-up Not Done With Reason Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "Low BMI Follow-up Not Done With Reason" ).
+
 concept "Weight Assessment Referral Not Done With Medical Reason":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" not done with reason "cms69-RecordSource"."Medical Reasons".
 
 concept "Weight Assessment Referral Same Day As Qualifying Encounter":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" same day as "Qualifying Encounter".
 
 concept "Weight Assessment Referral Performed":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Weight Assessment Referrals" performed.
 
 concept "Weight Assessment Referral Not Done With Reason":
 - type is ServiceRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    "Weight Assessment Referral Not Done With Medical Reason"
@@ -582,24 +604,33 @@ concept "Weight Assessment Referral Not Done With Reason":
    "Weight Assessment Referral Performed"
 ).
 
+concept "Weight Assessment Referral Not Done With Reason Exists":
+- type is ServiceRequest.
+- value type is boolean.
+- defined as exists ( "Weight Assessment Referral Not Done With Reason" ).
+
 concept "High BMI Medication Not Done With Medical Reason":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."High BMI Medications" not done with reason "cms69-RecordSource"."Medical Reasons".
 
 concept "High BMI Medication Same Day As Qualifying Encounter":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."High BMI Medications" same day as "Qualifying Encounter".
 
 concept "High BMI Medication Performed":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."High BMI Medications" performed.
 
 concept "High BMI Medication Not Done With Reason":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    "High BMI Medication Not Done With Medical Reason"
@@ -609,24 +640,33 @@ concept "High BMI Medication Not Done With Reason":
    "High BMI Medication Performed"
 ).
 
+concept "High BMI Medication Not Done With Reason Exists":
+- type is MedicationRequest.
+- value type is boolean.
+- defined as exists ( "High BMI Medication Not Done With Reason" ).
+
 concept "Low BMI Medication Not Done With Medical Reason":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Low BMI Medications" not done with reason "cms69-RecordSource"."Medical Reasons".
 
 concept "Low BMI Medication Same Day As Qualifying Encounter":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Low BMI Medications" same day as "Qualifying Encounter".
 
 concept "Low BMI Medication Performed":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Low BMI Medications" performed.
 
 concept "Low BMI Medication Not Done With Reason":
 - type is MedicationRequest.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    "Low BMI Medication Not Done With Medical Reason"
@@ -636,20 +676,25 @@ concept "Low BMI Medication Not Done With Reason":
    "Low BMI Medication Performed"
 ).
 
+concept "Low BMI Medication Not Done With Reason Exists":
+- type is MedicationRequest.
+- value type is boolean.
+- defined as exists ( "Low BMI Medication Not Done With Reason" ).
+
 concept "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI":
 - type is Observation.
 - value type is boolean.
 - defined as
 (
-   "High BMI Follow-up Not Done With Reason"
-   sem-or
-   "Low BMI Follow-up Not Done With Reason"
-   sem-or
-   "Weight Assessment Referral Not Done With Reason"
-   sem-or
-   "High BMI Medication Not Done With Reason"
-   sem-or
-   "Low BMI Medication Not Done With Reason"
+   "High BMI Follow-up Not Done With Reason Exists"
+   or
+   "Low BMI Follow-up Not Done With Reason Exists"
+   or
+   "Weight Assessment Referral Not Done With Reason Exists"
+   or
+   "High BMI Medication Not Done With Reason Exists"
+   or
+   "Low BMI Medication Not Done With Reason Exists"
 ).
 
 
