@@ -21,5 +21,4 @@ define "Numerator":
   Cms69Inferred."High BMI And Follow Up Provided" or Cms69Inferred."Low BMI And Follow Up Provided" or Cms69Inferred."Has Normal BMI"
 
 define "Denominator Exceptions":
-  exists (Cms69Inferred."Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI")
-    or exists (Cms69Inferred."Medical Reason Or Patient Reason For Not Performing BMI Exam")
+  Cms69Inferred."Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI" or Cms69Inferred."Medical Reason Or Patient Reason For Not Performing BMI Exam"

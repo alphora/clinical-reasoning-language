@@ -21,5 +21,4 @@ define "Numerator":
   Cms22Inferred."Normal BP Reading" or Cms22Inferred."Elevated BP With Followup" or Cms22Inferred."First HTN With Followup" or Cms22Inferred."Second HTN 130s With Followup" or Cms22Inferred."Second HTN 140+ With Followup"
 
 define "Denominator Exceptions":
-  exists (Cms22Inferred."BP Measurement Not Done With Reason")
-    or exists (Cms22Inferred."HTN Followup Declined By Patient")
+  Cms22Inferred."BP Measurement Not Done With Reason" or Cms22Inferred."HTN Followup Declined By Patient"

@@ -481,22 +481,35 @@ concept "Low BMI And Follow Up Provided":
 concept "BMI Observation Not Done With Reason":
 - type is Observation.
 - value type is Quantity.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."BMI Observations" not done with reason ("cms69-RecordSource"."Medical Reasons" or "cms69-RecordSource"."Patient Declined Reasons").
 
 concept "BMI Observation Same Day As Qualifying Encounter":
 - type is Observation.
 - value type is Quantity.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."BMI Observations" same day as "Qualifying Encounter".
 
-concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
+// #189 Slice 2 — intersect-first. The SAME BMI observation must be BOTH not-done-with-reason AND
+// same-day-as-encounter (a BMI not performed on the encounter day for a documented reason). The pre-#189
+// squat emitted `exists(A) and exists(B)` (INDEPENDENT existence — a not-done BMI on one day plus a
+// DIFFERENT same-day BMI would falsely satisfy it). The record `sem-and` restores the correlation
+// (emits `intersect`); the determination is `exists` over it.
+concept "BMI Observations Not Done On Encounter Day":
 - type is Observation.
-- value type is boolean.
+- value type is Quantity.
+- shape is RecordSet.
 - defined as
 (
    "BMI Observation Not Done With Reason"
    sem-and
    "BMI Observation Same Day As Qualifying Encounter"
 ).
+
+concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
+- type is Observation.
+- value type is boolean.
+- defined as exists ( "BMI Observations Not Done On Encounter Day" ).
 
 
 // --- BMI follow-up not documented with reason ---
@@ -703,6 +716,7 @@ concept "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI
 concept "Pregnancy Diagnoses Active During MP":
 - type is Condition.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Pregnancy Diagnoses" active during "Measurement Period".
 
 concept "Active Pregnancy Diagnosis":
@@ -716,21 +730,29 @@ concept "Active Pregnancy Diagnosis":
 concept "Pregnancy Status Overlaps MP":
 - type is Observation.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Pregnancy Status Observations" overlaps "Measurement Period".
 
 concept "Pregnancy Status Verified":
 - type is Observation.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Pregnancy Status Observations" verified.
 
 concept "Pregnancy Status Documented As Pregnancy Related":
 - type is Observation.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "cms69-RecordSource"."Pregnancy Status Observations" documented as "cms69-RecordSource"."Pregnancy or Other Related Diagnoses".
 
-concept "Verified Pregnancy Status":
+// #189 Slice 2 — intersect-first (3-way). The SAME pregnancy-status observation must overlap the MP AND
+// be verified AND be documented-as-pregnancy-related; the pre-#189 squat emitted `exists(A) and exists(B)
+// and exists(C)` (independent existence across possibly-different observations). The record `sem-and`
+// (emits `intersect`) restores same-record correlation; the determination is `exists` over it.
+concept "Verified Pregnancy Status Observations":
 - type is Observation.
-- value type is boolean.
+- value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    "Pregnancy Status Overlaps MP"
@@ -740,13 +762,18 @@ concept "Verified Pregnancy Status":
    "Pregnancy Status Documented As Pregnancy Related"
 ).
 
+concept "Verified Pregnancy Status":
+- type is Observation.
+- value type is boolean.
+- defined as exists ( "Verified Pregnancy Status Observations" ).
+
 concept "Is Pregnant During Measurement Period":
 - type is Observation.
 - value type is boolean.
 - defined as
 (
    "Active Pregnancy Diagnosis"
-   sem-or
+   or
    "Verified Pregnancy Status"
 ).
 

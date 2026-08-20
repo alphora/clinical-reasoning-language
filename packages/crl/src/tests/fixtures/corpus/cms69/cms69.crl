@@ -42,6 +42,6 @@ concept "Denominator Exceptions":
 - defined as
 (
    "cms69-Inferred"."Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI"
-   sem-or
+   or
    "cms69-Inferred"."Medical Reason Or Patient Reason For Not Performing BMI Exam"
 ).

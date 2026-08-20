@@ -615,22 +615,34 @@ concept "BP Measurement Sources":
 concept "BP Measurement Sources Not Done With Reason":
 - type is Observation.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "BP Measurement Sources" not done with reason ("cms22-RecordSource"."Medical Reasons" or "cms22-RecordSource"."Patient Declined Reasons").
 
 concept "BP Measurement Sources Same Day As Qualifying Encounter":
 - type is Observation.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - definition is "BP Measurement Sources" same day as "Qualifying Encounter".
 
-concept "BP Measurement Not Done With Reason":
+// #189 Slice 2 — intersect-first. The SAME BP-measurement source must be BOTH not-done-with-reason AND
+// same-day-as-encounter; the pre-#189 squat emitted `exists(A) and exists(B)` (independent existence).
+// The record `sem-and` (emits `intersect`) restores same-record correlation; the determination is `exists`
+// over it.
+concept "BP Measurement Sources Not Done On Encounter Day":
 - type is Observation.
-- value type is boolean.
+- value type is CodeableConcept.
+- shape is RecordSet.
 - defined as
 (
    "BP Measurement Sources Not Done With Reason"
    sem-and
    "BP Measurement Sources Same Day As Qualifying Encounter"
 ).
+
+concept "BP Measurement Not Done With Reason":
+- type is Observation.
+- value type is boolean.
+- defined as exists ( "BP Measurement Sources Not Done On Encounter Day" ).
 
 
 // --- Exception branch 2: HTN follow-up declined by patient ---

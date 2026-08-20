@@ -198,9 +198,12 @@ define "BMI Observation Not Done With Reason":
 define "BMI Observation Same Day As Qualifying Encounter":
   CRLCommon.SameDay(Cms69RecordSource."BMI Observations", "Qualifying Encounter")
 
+define "BMI Observations Not Done On Encounter Day":
+  "BMI Observation Not Done With Reason"
+    intersect "BMI Observation Same Day As Qualifying Encounter"
+
 define "Medical Reason Or Patient Reason For Not Performing BMI Exam":
-  exists ("BMI Observation Not Done With Reason")
-    and exists ("BMI Observation Same Day As Qualifying Encounter")
+  exists ("BMI Observations Not Done On Encounter Day")
 
 define "High BMI Follow-up Not Done With Medical Reason":
   CRLCommon.NotDoneWithReason(Cms69RecordSource."High BMI Follow-up Service Requests", Cms69RecordSource."Medical Reasons")
@@ -305,14 +308,16 @@ define "Pregnancy Status Verified":
 define "Pregnancy Status Documented As Pregnancy Related":
   CRLCommon.DocumentedAs(Cms69RecordSource."Pregnancy Status Observations", Cms69RecordSource."Pregnancy or Other Related Diagnoses")
 
+define "Verified Pregnancy Status Observations":
+  "Pregnancy Status Overlaps MP"
+    intersect "Pregnancy Status Verified"
+    intersect "Pregnancy Status Documented As Pregnancy Related"
+
 define "Verified Pregnancy Status":
-  exists ("Pregnancy Status Overlaps MP")
-    and exists ("Pregnancy Status Verified")
-    and exists ("Pregnancy Status Documented As Pregnancy Related")
+  exists ("Verified Pregnancy Status Observations")
 
 define "Is Pregnant During Measurement Period":
-  "Active Pregnancy Diagnosis"
-    or "Verified Pregnancy Status"
+  "Active Pregnancy Diagnosis" or "Verified Pregnancy Status"
 
 define "Age At Start Of MP At Least 18 Years":
   Coalesce(CRLCommon.AtLeast(CRLCommon.AgeAt(start of "Measurement Period"), 18 'years'), false)

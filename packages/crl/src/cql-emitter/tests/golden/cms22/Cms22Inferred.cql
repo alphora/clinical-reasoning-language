@@ -270,9 +270,12 @@ define "BP Measurement Sources Not Done With Reason":
 define "BP Measurement Sources Same Day As Qualifying Encounter":
   CRLCommon.SameDay("BP Measurement Sources", "Qualifying Encounter")
 
+define "BP Measurement Sources Not Done On Encounter Day":
+  "BP Measurement Sources Not Done With Reason"
+    intersect "BP Measurement Sources Same Day As Qualifying Encounter"
+
 define "BP Measurement Not Done With Reason":
-  exists ("BP Measurement Sources Not Done With Reason")
-    and exists ("BP Measurement Sources Same Day As Qualifying Encounter")
+  exists ("BP Measurement Sources Not Done On Encounter Day")
 
 define "Follow-up Within 4 Weeks Declined by Patient":
   CRLCommon.NotDoneWithReason(Cms22RecordSource."Follow-up Within 4 Weeks", Cms22RecordSource."Patient Declined Reasons")

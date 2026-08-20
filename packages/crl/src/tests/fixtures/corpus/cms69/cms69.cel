@@ -64,3 +64,4 @@ case "Jane's high BMI is followed up with a weight assessment referral":
 - result is "Initial Population" is true.
 - result is "Denominator Exclusions" is false.
 - result is "Numerator" is false.
+- result is "Denominator Exceptions" is false.

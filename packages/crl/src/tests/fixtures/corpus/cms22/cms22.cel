@@ -61,3 +61,4 @@ case "Maria has normal BP at her wellness visit":
 - fact is "Normal Diastolic Component".
 - result is "Initial Population" is true.
 - result is "Numerator" is false.
+- result is "Denominator Exceptions" is false.
