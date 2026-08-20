@@ -61,11 +61,36 @@ export type ReferentResolution =
 
 export type ReferenceResolver = (ref: ReferenceName) => ReferentResolution;
 
+// #189 Slice 0c — the PER-ARM family switch (plan-panel disc 465, both arms — the round's central outcome). The
+// qualified-ref totality verdict is decided by the CONSULTING ARM's FAMILY, threaded through the recursion, NOT
+// chosen per consult-site (v1's per-site design was rejected as a consumption-context rule violating the charter's
+// context-free §3/§4 — it left silent alias→boolean-comp / sem-*→boolean-comp mismatches). ONLY the boolean-
+// composition arm's qualified operands consult the `family` resolver (the cross-library `DeclaredResultIndex`
+// totality verdict, wired in step 3); EVERY legacy arm — the bare-ref alias and the sem-* composition — keeps the
+// `legacy` resolver (inert `total:false` for a qualified ref). Because a concept's verdict is thereby a pure
+// function of its OWN definition (which arm each of its refs enters), it is IDENTICAL at pivot / discharge / façade
+// (banner A by construction), and any concept whose verdict CHANGES must transitively contain a
+// `DefinedAsBooleanComposition` — a family absent from the legacy golden corpus, so a top-level sem-or `Numerator`
+// is provably byte-invariant (banner I by containment). When `legacy === family` (the seam-refactor step and every
+// same-library consult) the pair is byte-for-byte the pre-0c single-resolver behavior — see `uniformResolvers`.
+export type Resolvers = {
+  legacy: ReferenceResolver; //  the bare-ref alias arm + the sem-* composition arm (qualified → inert)
+  family: ReferenceResolver; // the boolean-composition arm (qualified → cross-lib index totality verdict)
+};
+
+/** Both arms share ONE resolver — byte-for-byte the pre-0c single-resolver behavior. Used for the seam-refactor
+ *  step (0c introduces the split but wires the real `family` resolver only in step 3) and for every consult over a
+ *  purely same-library concept map (no cross-library operand can be proven total, so `legacy` suffices for both). */
+export function uniformResolvers(resolve: ReferenceResolver): Resolvers {
+  return { legacy: resolve, family: resolve };
+}
+
 /**
  * The INERT resolver from a same-layer name→Concept map (2b.3b.0): a bare ref resolves to the same-layer concept; a
  * qualified (cross-library) ref resolves to a NON-total terminal verdict — reproducing the pre-flip "a qualified
  * alias is not the same-layer flip" behavior byte-for-byte (`getRefLibrary(ref) !== null → false`). The lane-aware
- * cross-library verdict (via the `DeclaredResultIndex`) is wired at every consult site in 2b.3b.1.
+ * cross-library verdict (via the `DeclaredResultIndex`) is wired as the `family` resolver at the boolean-composition
+ * consult sites in 0c step 3.
  */
 export function sameLayerResolver(byName: (name: string) => Concept | undefined): ReferenceResolver {
   return (ref) =>
@@ -108,7 +133,7 @@ function declaredBoolean(c: Concept): boolean {
  */
 export function emitsTotalScalarBoolean(
   concept: Concept | undefined,
-  resolve: ReferenceResolver,
+  resolvers: Resolvers,
   visiting: ReadonlySet<string> = new Set(),
   memo: Map<string, boolean> = new Map(),
 ): boolean {
@@ -116,7 +141,7 @@ export function emitsTotalScalarBoolean(
   const cached = memo.get(concept.name);
   if (cached !== undefined) return cached;
   if (visiting.has(concept.name)) return false; // cycle guard — a self/mutually-referential alias is not total
-  const result = computeTotality(concept, concept.name, resolve, visiting, memo);
+  const result = computeTotality(concept, concept.name, resolvers, visiting, memo);
   memo.set(concept.name, result);
   return result;
 }
@@ -124,7 +149,7 @@ export function emitsTotalScalarBoolean(
 function computeTotality(
   concept: Concept,
   name: string,
-  resolve: ReferenceResolver,
+  resolvers: Resolvers,
   visiting: ReadonlySet<string>,
   memo: Map<string, boolean>,
 ): boolean {
@@ -165,8 +190,9 @@ function computeTotality(
       const nextVisiting = new Set(visiting).add(name);
       if (body.type === "DefinedAsBareRef") {
         // A same-layer BARE alias → recurse the referent (validator ALLOWS alias chains, `A→B→R`); a QUALIFIED
-        // (cross-library) alias → the resolver's TERMINAL index verdict (inert `false` under `sameLayerResolver`).
-        return refIsTotal(body.ref, resolve, nextVisiting, memo);
+        // (cross-library) alias → the LEGACY resolver's TERMINAL verdict (inert `false`). An alias is NOT a
+        // boolean composition, so it never gains a cross-library totality proof — charter §4 no-magic (0c step 2).
+        return refIsTotal(body.ref, "legacy", resolvers, nextVisiting, memo);
       }
       if (body.type === "DefinedAsComposition") {
         // #189 Slice C 2b.3b.1 — a boolean-declared `defined as` COMPOSITION is total IFF EVERY operand is total
@@ -174,7 +200,7 @@ function computeTotality(
         // admit marks `example-nested`'s `"A And B"` total while it emits truth-set → mixed RED; the recursion
         // keeps it non-total → all-non-total → byte-invariant). The pivot (`emitDefinedAs`) gates its boolean-lane
         // emit on this same predicate, so emit + discharge + façade agree by construction.
-        return compositionAllOperandsTotal(body.expression, resolve, nextVisiting, memo);
+        return compositionAllOperandsTotal(body.expression, resolvers, nextVisiting, memo);
       }
       if (body.type === "DefinedAsBooleanComposition") {
         // #189 Slice 0b — a `defined as` BOOLEAN composition (`("A" and "B")`, the neutral
@@ -188,7 +214,7 @@ function computeTotality(
         // keeps it OFF the bare-boolean lane and emits a LOUD error (no fabricated terminal `Coalesce`,
         // charter §4 no-magic). This REPLACES the T1 inert `return false`; `emit/booleanTotality.ts` (the
         // whole-boundary obligation machine) already classified it composite/delegated.
-        return branchCompositionAllOperandsTotal(body.expression, resolve, nextVisiting, memo);
+        return branchCompositionAllOperandsTotal(body.expression, resolvers, nextVisiting, memo);
       }
       // #270 — `defined as exists` is a TOTAL scalar boolean (existence is never null; `exists(...)` never
       // returns null), on EVERY lane. Since #270 the case-feature INFERRED lane lowers it to a bare scalar
@@ -199,9 +225,9 @@ function computeTotality(
       // + `defined as exists`), so reaching here means a coherent `Scalar<boolean>` existence determination.
       // This is the SINGLE totality verdict every consumer reads — the emit pivot, `refIsTotal` recursion
       // (alias-to-exists, composition-over-exists), the discharge, and the façade — so they cannot drift
-      // (module header). A FOREIGN (cross-library) `defined as exists`'s totality WILL be delivered by
-      // `DeclaredResultIndex`'s lane-aware verdict, which 0c builds (today `sameLayerResolver` returns
-      // `total:false` for a qualified ref — 0c names this exact cell).
+      // (module header). A FOREIGN (cross-library) `defined as exists` reached as a BOOLEAN-COMPOSITION operand
+      // is delivered by the `family` resolver's `DeclaredResultIndex` totality verdict (0c); every LEGACY arm
+      // (bare-ref alias, sem-*) keeps the inert `sameLayerResolver` verdict (`total:false`) for a qualified ref.
       return true;
     }
     default:
@@ -210,16 +236,31 @@ function computeTotality(
 }
 
 /** A composition/alias operand ref → total? A BARE ref recurses the predicate (same-layer, cycle-guarded via
- *  `visiting`); a QUALIFIED (cross-library) ref returns the resolver's TERMINAL index verdict (never recursed). */
+ *  `visiting`); a QUALIFIED (cross-library) ref returns the terminal verdict of the CALLING ARM's resolver (never
+ *  recursed). `family` selects that resolver: the boolean-composition arm consults the cross-lib index totality
+ *  (`"boolean"`), every legacy arm consults the inert `"legacy"` resolver (0c per-arm switch, disc 465). The FULL
+ *  `resolvers` pair is threaded into the recursion so a bare-ref referent's OWN arms each re-pick their family —
+ *  the switch is per-ARM, not per-call-tree (a boolean comp over a same-lib sem-* comp recurses into the sem-*
+ *  arm's LEGACY verdict, dissolving the transitive cross-lib edge to the existing `operand-not-total`). */
 function refIsTotal(
   ref: ReferenceName,
-  resolve: ReferenceResolver,
+  family: "legacy" | "boolean",
+  resolvers: Resolvers,
   visiting: ReadonlySet<string>,
   memo: Map<string, boolean>,
 ): boolean {
-  const res = resolve(ref);
+  const res = (family === "boolean" ? resolvers.family : resolvers.legacy)(ref);
   if (res.kind === "total") return res.total;
-  return emitsTotalScalarBoolean(res.concept, resolve, visiting, memo);
+  return emitsTotalScalarBoolean(res.concept, resolvers, visiting, memo);
+}
+
+/** #189 Slice 0c — is ONE boolean-composition operand a proven-total scalar boolean, under the SAME family-arm
+ *  policy the flip gate uses (qualified → the cross-lib index verdict; bare → same-layer recursion)? Exported so the
+ *  emit FAILURE path (`emitBooleanCompositionError`) names the genuinely non-total operand — NOT any qualified ref
+ *  (0c makes a qualified operand provable, so the 0b "qualified ⇒ offender" rule mis-blames a proven-total foreign
+ *  operand; disc 466 both arms). Fresh `visiting`/`memo`: a single-operand check is its own call tree. */
+export function branchCompositionOperandTotal(ref: ReferenceName, resolvers: Resolvers): boolean {
+  return refIsTotal(ref, "boolean", resolvers, new Set(), new Map());
 }
 
 /** Every operand of a boolean `defined as` composition is total — the composition-flip gate (§4.1/§4.2). Walks the
@@ -227,19 +268,21 @@ function refIsTotal(
  *  `refIsTotal`. An empty conjunction cannot occur (the grammar requires ≥2 terms / a ref). */
 function compositionAllOperandsTotal(
   expr: CompositionExpression,
-  resolve: ReferenceResolver,
+  resolvers: Resolvers,
   visiting: ReadonlySet<string>,
   memo: Map<string, boolean>,
 ): boolean {
   switch (expr.type) {
     case "CompositionRef":
-      return refIsTotal(expr.ref, resolve, visiting, memo);
+      // LEGACY arm — a sem-* composition operand never gains a cross-library totality proof (banner I: this is one
+      // of the two legacy arms whose qualified verdict stays inert, keeping the golden corpus byte-invariant).
+      return refIsTotal(expr.ref, "legacy", resolvers, visiting, memo);
     case "CompositionGroup":
     case "SemNotExpression":
-      return compositionAllOperandsTotal(expr.expression, resolve, visiting, memo);
+      return compositionAllOperandsTotal(expr.expression, resolvers, visiting, memo);
     case "SemAndExpression":
     case "SemOrExpression":
-      return expr.terms.every((t) => compositionAllOperandsTotal(t, resolve, visiting, memo));
+      return expr.terms.every((t) => compositionAllOperandsTotal(t, resolvers, visiting, memo));
   }
 }
 
@@ -253,10 +296,13 @@ function compositionAllOperandsTotal(
  *  `visiting` cycle guard and `memo` (mutual recursion legacy↔family, banner A). */
 function branchCompositionAllOperandsTotal(
   expr: BranchCondition,
-  resolve: ReferenceResolver,
+  resolvers: Resolvers,
   visiting: ReadonlySet<string>,
   memo: Map<string, boolean>,
 ): boolean {
   const refs = branchConditionConceptRefsStrict(expr, "totalScalarBoolean boolean-composition");
-  return refs.every((r) => refIsTotal(r.ref, resolve, visiting, memo));
+  // FAMILY arm — the ONLY arm 0c changes: a QUALIFIED (cross-library) operand consults the `family` resolver (the
+  // `DeclaredResultIndex` lane-aware totality verdict), so a cross-lib boolean composition over a foreign total
+  // boolean is provable. A bare operand still recurses same-layer through `emitsTotalScalarBoolean`.
+  return refs.every((r) => refIsTotal(r.ref, "boolean", resolvers, visiting, memo));
 }

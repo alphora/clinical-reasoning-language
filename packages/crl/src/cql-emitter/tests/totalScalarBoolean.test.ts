@@ -1,6 +1,8 @@
 import { buildCRL } from "../../index";
-import { emitsTotalScalarBoolean, sameLayerResolver } from "../totalScalarBoolean";
+import { emitsTotalScalarBoolean, sameLayerResolver, uniformResolvers } from "../totalScalarBoolean";
+import type { Resolvers, ReferenceResolver } from "../totalScalarBoolean";
 import type { CRL, Concept } from "../../ast/types";
+import { getRefLibrary } from "../../ast/types";
 
 // #189 Slice C 2b.2 — unit tests for the shared totality predicate. These pin the reduction/instance leaves, the
 // same-layer bare-ref alias RECURSION (incl. chains) with its cycle guard, the alias's OWN-declaration gate
@@ -21,7 +23,10 @@ function conceptsOf(crl: CRL): Map<string, Concept> {
   return m;
 }
 
-const resolverFor = (m: Map<string, Concept>) => sameLayerResolver((name: string) => m.get(name));
+// #189 Slice 0c — the predicate now takes a `{legacy, family}` resolver PAIR (per-arm family switch). A same-layer
+// unit test drives both arms with the SAME same-layer resolver (`uniformResolvers`), byte-for-byte the pre-0c
+// behavior; the cross-library `family` resolver is exercised in the emit-level fixtures (`booleanCompositionCrossLib`).
+const resolverFor = (m: Map<string, Concept>) => uniformResolvers(sameLayerResolver((name: string) => m.get(name)));
 
 describe("emitsTotalScalarBoolean — #189 Slice C 2b.2 shared totality predicate", () => {
   it("a Scalar-boolean `exists` reduction is total", () => {
@@ -316,5 +321,69 @@ concept "Bare":
     expect(emitsTotalScalarBoolean(mkConcept({ __bothRepMerge: "recency", shape: "Record" }), empty)).toBe(false);
     expect(emitsTotalScalarBoolean(mkConcept({ __bothRepMerge: "recency", valueTypes: ["boolean", "Quantity"] }), empty)).toBe(false);
     expect(emitsTotalScalarBoolean(mkConcept({ __bothRepMerge: "recency", valueTypes: ["Quantity"] }), empty)).toBe(false);
+  });
+});
+
+describe("emitsTotalScalarBoolean — #189 Slice 0c per-arm family switch (banner I containment)", () => {
+  // An EAGER family resolver: it would prove ANY qualified operand total. The containment claim is that ONLY the
+  // boolean-composition arm consults `family` — every LEGACY arm (bare-ref alias, sem-*) keeps the inert `legacy`
+  // verdict — so a legacy concept's totality is UNCHANGED by the family resolver (a top-level `Numerator` in the
+  // pre-0c golden corpus is byte-invariant). These pin that directly at the seam.
+  const eagerFamily = (m: Map<string, Concept>): Resolvers => {
+    const legacy = sameLayerResolver((n) => m.get(n));
+    const family: ReferenceResolver = (ref) =>
+      getRefLibrary(ref) !== null ? { kind: "total", total: true } : legacy(ref);
+    return { legacy, family };
+  };
+
+  it("a bare-ref ALIAS to a qualified ref stays NON-total under an eager family resolver (alias arm = legacy)", () => {
+    const m = conceptsOf(
+      parse(`concept "Alias":
+- shape is Scalar.
+- value type is boolean.
+- defined as "Other"."X".
+`),
+    );
+    // The eager family WOULD say `"Other"."X"` is total — but the alias arm consults `legacy` (qualified ⇒ inert),
+    // so the alias is non-total, exactly as under `uniformResolvers`. This is why a scalar-boolean bare alias to a
+    // foreign total boolean does NOT flip (banner I).
+    expect(emitsTotalScalarBoolean(m.get("Alias"), eagerFamily(m))).toBe(false);
+  });
+
+  it("a sem-* composition over a qualified operand stays NON-total under an eager family resolver (sem-* arm = legacy)", () => {
+    const m = conceptsOf(
+      parse(`concept "Sem Cross":
+- shape is Scalar.
+- value type is boolean.
+- defined as ( "Other"."X" sem-or "Local" ).
+concept "Local":
+- type is Condition.
+- value type is boolean.
+- code is \`l\`.
+- definition is exists this.
+`),
+    );
+    // Only the boolean-composition arm changed in 0c; the sem-* arm keeps the legacy resolver, so a sem-* concept
+    // never gains a cross-library totality proof — the direct-foreign-sem-* leaf stays legacy (banner I).
+    expect(emitsTotalScalarBoolean(m.get("Sem Cross"), eagerFamily(m))).toBe(false);
+  });
+
+  it("a boolean COMPOSITION over the SAME qualified operand DOES read the family verdict (the one arm that changed)", () => {
+    const m = conceptsOf(
+      parse(`concept "Local":
+- type is Condition.
+- value type is boolean.
+- code is \`l\`.
+- definition is exists this.
+concept "Bool Cross":
+- value type is boolean.
+- defined as ( "Other"."X" and "Local" ).
+`),
+    );
+    // Contrast: the boolean-composition arm consults `family`, so with the eager family both operands are total →
+    // total. (Under `uniformResolvers` this is false — the qualified operand is inert.) This is the asymmetry that
+    // makes 0c's cross-lib proof work while leaving the legacy arms byte-invariant.
+    expect(emitsTotalScalarBoolean(m.get("Bool Cross"), eagerFamily(m))).toBe(true);
+    expect(emitsTotalScalarBoolean(m.get("Bool Cross"), resolverFor(m))).toBe(false);
   });
 });

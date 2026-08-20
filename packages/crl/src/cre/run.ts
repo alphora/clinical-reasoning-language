@@ -543,6 +543,18 @@ function walkBoolExpr(expr: BranchCondition, lib: string, ctx: Ctx): Composition
       return { op: "not", operand, satisfied: !operand.satisfied };
     }
     case "BranchConditionRef":
+      // #189 Slice 0c — a boolean-composition operand may be a CROSS-LIBRARY qualified ref (`"Sib"."Sib Flag"`).
+      // `refTrace` resolves it against its explicit qualifier over the loaded closure (the registry-built concept
+      // map, ~line 1155) and evaluates it CLOSED-WORLD. POSTURE (operator-affirmed G1 "document, not loud"): the
+      // EMIT lane proves the operand total from the WHOLE-closure `DeclaredResultIndex`, so emit succeeds; a
+      // `run_decision` invoked WITHOUT the foreign library in scope cannot resolve the operand and `refTrace`
+      // pushes an UNRESOLVED DIAGNOSTIC. Two honest caveats on that diagnosed-unresolved verdict (disc 466, both
+      // arms) — both PRE-EXISTING closed-world limits (backlog #283), NOT 0c regressions, and identical to a bare
+      // unresolved operand: (1) the operand still evaluates to closed-world FALSE, so under `not` it INVERTS to a
+      // diagnosed `true` that can drive a recommendation — a diagnosed false, not a prevented one; (2) `refTrace`
+      // resolves the qualifier by RAW token (`idOf(refLib, name)`), NOT scope-first like emit, so under
+      // `local-package-same-name` the CRE can evaluate a DIFFERENT library's concept than emit. The CRE is a
+      // presence-model approximation, not the shipped artifact — these are documented, not loud-gated.
       return refTrace(expr.ref, lib, ctx);
     case "BranchConditionCriterionRef":
       // A criterion is NOT a boolean-composition operand (emit's `branchConditionConceptRefsStrict` rejects it);

@@ -12,6 +12,8 @@ import { getRefLibrary, isQualifiedRef } from "../ast/types";
 import { emitCQLFromAST, infoForParameterStatement, buildAuthoredObligations } from "../cql-emitter/emitCQL";
 import type { AstParameterInfo } from "../cql-emitter/emitCQL";
 import type { BooleanTotalityObligation, EmittedDefineEntry } from "../emit/booleanTotality";
+import { buildDeclaredResultIndex } from "../emit/declaredResultIndex";
+import type { ResolveRawLibrary } from "../emit/declaredResultIndex";
 import {
   emitPartitioned,
   isLayerSplittable,
@@ -819,6 +821,33 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   // Emit each library independently.
   const cqlByLibrary: PerLibraryEmit[] = [];
   const suppressedActivityBindings: SuppressedActivityBinding[] = [];
+
+  // #189 Slice 0c — the pre-emit cross-library DECLARED-RESULT + TOTALITY index over the WHOLE lowered closure, plus
+  // the per-referrer scope resolver (raw library token → stable `filePath` identity). Threaded into every emit call
+  // as `crossLibraryTotality` so the boolean-composition FAMILY arm of `emitsTotalScalarBoolean` can prove a
+  // cross-library operand total (a `defined as ( "Lib"."X" and "Y" )` that errored `operand-not-total` in 0b now
+  // emits). Built ONCE here from the same `emitClosure` the loop emits, so the index is faithful to what ships. The
+  // family arm stays inert for direct CLI/test callers that pass no service (same-library only, byte-invariant).
+  const declaredResultIndex = buildDeclaredResultIndex(
+    emitClosure.map((entry) => ({
+      sourceIdentity: entry.filePath,
+      concepts: entry.ast.statements.filter((s): s is Concept => s.type === "Concept"),
+    })),
+  );
+  const totalityScopes = buildLibraryScopes(
+    graph.resolvedLibraries,
+    graph.localLibraries,
+    graph.registry ?? { byNameLocal: new Map(), byNamePackage: new Map() },
+  );
+  // Scope-FIRST resolution (`local-package-same-name`): the raw library token is resolved through the REFERRER's
+  // scope to the target's stable `filePath`, never a direct token match. A scope miss → `undefined` (the family
+  // resolver then treats the operand as non-total → a LOUD `operand-not-total`, never a silent wrong emit).
+  const resolveRawLibrary: ResolveRawLibrary = (fromIdentity, rawLibraryName) => {
+    const scope = totalityScopes.get(fromIdentity);
+    if (scope === undefined) return undefined;
+    return lookupKnownLibrary(scope, rawLibraryName)?.filePath;
+  };
+
   for (const entry of emitClosure) {
     // Skip parse-error placeholders (`null` name or empty-string library
     // synthesized after a parse error). The parse-failure diagnostic is
@@ -869,6 +898,10 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
         // sibling; render that `include`/qualified-ref through `S` so it matches the
         // renamed target's header. Layered sibling names aren't in the map (identity).
         libraryRenames,
+        // #189 Slice 0c — the cross-library totality service, bound to THIS source's identity. `emitPartitioned`
+        // augments it with this source's synthesized layer names (rendered-layer classification) per layer emit,
+        // and passes the base service to the pre-split Interface façade.
+        crossLibraryTotality: { index: declaredResultIndex, fromIdentity: entry.filePath, resolveRawLibrary },
       });
       if (!partitioned.success) {
         return {
@@ -975,6 +1008,9 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       // #198 — per-entry local domain: a `none`/per-CRL sibling `code is` library
       // still gets its disambiguated `codesystem '<url>'` decl (primary unchanged).
       localDomainId: entryLocalDomainId,
+      // #189 Slice 0c — the cross-library totality service (this single-layer `none` lane has no rendered-layer
+      // tokens; a bare operand resolves same-layer, a foreign qualifier via the index).
+      crossLibraryTotality: { index: declaredResultIndex, fromIdentity: entry.filePath, resolveRawLibrary },
     });
     if (!emit.success || !emit.result) {
       return {

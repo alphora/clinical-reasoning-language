@@ -1,0 +1,34 @@
+# boolean-composition-cross-lib root (#189 Slice 0c — cross-library boolean-composition operand)
+library "Root".
+
+// A `code is` records concept + a decision force the LocalSource/Interface split (the production KE lane), so
+// the composition is exercised at ALL THREE banner-A consumers: the Inferred pivot, the ledger discharge, and
+// the Interface façade. "Cross Both" composes a CROSS-LIBRARY total boolean (`"Sib"."Sib Flag"`) with a same-lib
+// total boolean ("Root Flag"). In 0b this errored `operand-not-total`; in 0c the family arm proves it total.
+
+concept "Root Records":
+- type is Observation.
+- shape is RecordSet.
+- code is `root-rec`.
+
+concept "Root Flag":
+- value type is boolean.
+- defined as exists ( "Root Records" ).
+
+concept "Cross Both":
+- value type is boolean.
+- defined as ( "Sib"."Sib Flag" and "Root Flag" ).
+
+// The alias counterexample (disc 465/466): a same-lib scalar-boolean ALIAS to the cross-lib boolean composition
+// must AGREE with the composition's bare Boolean form — the legacy alias arm recurses same-layer into "Cross Both",
+// whose boolean-comp arm proves it total, so the alias re-exports BARE (never `.satisfied()` a Boolean).
+concept "Cross Both Alias":
+- value type is boolean.
+- defined as "Cross Both".
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Cross Both" then recommend activity "Refer".
+- when "Cross Both Alias" then recommend activity "Refer".

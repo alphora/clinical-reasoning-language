@@ -38,7 +38,15 @@ import { matchNarrative } from "../template-match";
 import { cqlStringLiteral, cqlQuotedIdentifier } from "./cqlStrings";
 import { PATTERN_RETURN_SHAPE } from "./patternReturnShape";
 import type { PatternReturnShape } from "./patternReturnShape";
-import { emitsTotalScalarBoolean, sameLayerResolver } from "./totalScalarBoolean";
+import {
+  emitsTotalScalarBoolean,
+  sameLayerResolver,
+  uniformResolvers,
+  branchCompositionOperandTotal,
+} from "./totalScalarBoolean";
+import type { Resolvers } from "./totalScalarBoolean";
+import { makeTotalityFamilyResolver } from "../emit/declaredResultIndex";
+import type { CrossLibraryTotality } from "../emit/declaredResultIndex";
 import { conceptResultType, renderResultType } from "../grammar/resultType";
 import type { ResultType } from "../grammar/resultType";
 import type {
@@ -248,6 +256,14 @@ export interface EmitOptions {
    * caller's map (its own input is already lowered). REPORT-MODE metadata only in 2a (no proof gate consumes it).
    */
   authoredObligations?: ReadonlyMap<string, BooleanTotalityObligation>;
+  /**
+   * #189 Slice 0c — the cross-library totality service (see `CrossLibraryTotality`). When present, the FAMILY arm
+   * of `emitsTotalScalarBoolean` (the boolean-composition operand walk) proves a cross-library / cross-layer operand
+   * total via the pre-emit `DeclaredResultIndex`, so a `defined as ( "Lib"."X" and "Y" )` emits `Lib."X" and "Y"`.
+   * ABSENT ⇒ the family arm stays inert (same-library only) — direct CLI/test callers are byte-invariant. The legacy
+   * arms (bare-ref alias, sem-*) never consult it, so a top-level sem-or `Numerator` is byte-invariant (banner I).
+   */
+  crossLibraryTotality?: CrossLibraryTotality;
 }
 
 /**
@@ -690,7 +706,9 @@ type CaseFeatureMode =
 
 class Emitter {
   private readonly ast: CRL;
-  private readonly options: Required<EmitOptions>;
+  // `crossLibraryTotality` is stored on its own field (`this.crossLibraryTotality`), not defaulted into this
+  // Required shape — it is genuinely optional (absent for direct callers), so it is `Omit`ted here (#189 Slice 0c).
+  private readonly options: Required<Omit<EmitOptions, "crossLibraryTotality">>;
   /** Normalized case-feature truth-set emit mode (see `CaseFeatureMode`). */
   private readonly caseFeature: CaseFeatureMode;
   /** Names declared as terminologies (separate set since a name can be BOTH a terminology and a concept in the corpus). */
@@ -783,8 +801,14 @@ class Emitter {
   // section assembly, byte-identical.
   private readonly ledger = new DefineLedger();
 
+  // #189 Slice 0c — the optional cross-library totality service (see `EmitOptions.crossLibraryTotality`). Stored
+  // OUTSIDE the `Required<EmitOptions>`-shaped `this.options` because it is genuinely absent for direct CLI/test
+  // callers (the family arm then stays inert — same-library only). Read by `totalityResolvers()`.
+  private readonly crossLibraryTotality?: CrossLibraryTotality;
+
   constructor(ast: CRL, options: EmitOptions) {
     this.ast = ast;
+    this.crossLibraryTotality = options.crossLibraryTotality;
     this.options = {
       libraryName: options.libraryName ?? ast.library.name,
       fhirHelpersVersion: options.fhirHelpersVersion ?? DEFAULT_FHIRHELPERS_VERSION,
@@ -1024,7 +1048,10 @@ class Emitter {
   private emitCriteria(criteria: Criterion[]): string {
     return criteria
       .map((c) => {
-        const cql = emitCriterionDefine(c.name, c.condition, (name) => cqlIdent(name), cqlIdent);
+        // A criterion's leaves are all beside it (same library — see the method doc; cross-library criterion refs
+        // are out of scope in v0, `cycleDetector.ts`), so this DELIBERATELY renders bare, dropping any library
+        // token — byte-invariant under the 0c `ReferenceName` signature (was `cqlIdent(name)`, name = getRefName).
+        const cql = emitCriterionDefine(c.name, c.condition, (ref) => cqlIdent(getRefName(ref)), cqlIdent);
         this.enrollCriterion(c.name, cql);
         return cql;
       })
@@ -1287,7 +1314,7 @@ class Emitter {
           // proof delegates to the referent's own total. `emitsTotalScalarBoolean(c)` gates on `c`'s OWN boolean
           // declaration + the referent's totality — LOCK-STEP with the emit flip. Every OTHER truth-set
           // `defined as` (a composition, a non-boolean-declared or non-total alias) stays a List.
-          if (emitsTotalScalarBoolean(c, sameLayerResolver((n) => this.conceptByName.get(n)))) {
+          if (emitsTotalScalarBoolean(c, this.totalityResolvers())) {
             return total("composite-delegated");
           }
           return notBoolean("truth-set defined-as (List)");
@@ -1307,7 +1334,7 @@ class Emitter {
         // certify a total it cannot emit — the `declaredShapeOfConcept` check below (a value-type test, not
         // a totality proof) would wrongly do so.
         if (body.type === "DefinedAsBooleanComposition") {
-          return emitsTotalScalarBoolean(c, sameLayerResolver((n) => this.conceptByName.get(n)))
+          return emitsTotalScalarBoolean(c, this.totalityResolvers())
             ? total("composite-delegated")
             : notBoolean("boolean composition with a non-total operand (emit error)");
         }
@@ -2180,7 +2207,7 @@ class Emitter {
       }
     };
     walk(expr);
-    const resolver = sameLayerResolver((n) => this.conceptByName.get(n));
+    const resolver = this.totalityResolvers();
     let hasQualifiedOperand = false;
     let anyTotal = false;
     let firstUnresolvedBareName: string | undefined;
@@ -2255,6 +2282,33 @@ class Emitter {
    * proven-total scalar boolean, the SAME verdict the discharge + façade read (banner A). A non-total operand
    * or a non-scalar-boolean parent is a LOUD emit error, NEVER a fabricated terminal `Coalesce` (charter §4).
    */
+  /**
+   * The `{legacy, family}` totality-resolver pair for the ONE classifier `emitsTotalScalarBoolean` (0c per-arm
+   * family switch, disc 465). In the same-library emit phase BOTH arms use the same-layer name→concept resolver, so
+   * a qualified operand is inert (non-total) — byte-for-byte the pre-0c single-resolver behavior. 0c step 3 overrides
+   * `family` with a cross-library `DeclaredResultIndex`-backed resolver (bound to this library's source identity) so a
+   * boolean composition over a foreign total boolean proves total; the legacy arms (bare-ref alias, sem-*) keep the
+   * inert resolver, so a top-level sem-or `Numerator` stays byte-invariant (banner I containment). Centralizing the
+   * pair here means the pivot, the ledger discharge, and every operand walk read ONE resolver policy (banner A).
+   */
+  private totalityResolvers(): Resolvers {
+    const sameLayer = sameLayerResolver((n) => this.conceptByName.get(n));
+    const svc = this.crossLibraryTotality;
+    if (svc === undefined) return uniformResolvers(sameLayer); // no service → same-library only (byte-invariant)
+    const renderedLayerNames = svc.renderedLayerNames;
+    const family = makeTotalityFamilyResolver({
+      sameLayer,
+      index: svc.index,
+      fromIdentity: svc.fromIdentity,
+      ...(svc.resolveRawLibrary !== undefined ? { resolveRawLibrary: svc.resolveRawLibrary } : {}),
+      // Rendered-layer classification is layered-lane only; on the `none` lane there are no rendered tokens.
+      ...(renderedLayerNames !== undefined
+        ? { isRenderedLayerToken: (lib: string) => renderedLayerNames.has(lib) }
+        : {}),
+    });
+    return { legacy: sameLayer, family };
+  }
+
   private emitBooleanComposition(c: Concept, body: DefinedAsBooleanComposition): string {
     // A `code is` + `defined as (boolean composition)` both-representation concept: a boolean composition
     // publishes ONE scalar boolean, which cannot fold into the local-code truth-set union (the SAME ill-typing
@@ -2277,34 +2331,45 @@ class Emitter {
       });
       return `/* FIXME: emit-boolean-composition-both-rep (${c.name}) */ CRLCommon.BooleanCompositionBothRep('${c.name}')`;
     }
-    const resolver = sameLayerResolver((n) => this.conceptByName.get(n));
+    const resolver = this.totalityResolvers();
     if (!emitsTotalScalarBoolean(c, resolver)) {
       return this.emitBooleanCompositionError(c, body);
     }
-    // The gate passed → every operand is a proven-total scalar boolean, which in 0b necessarily means SAME-LIB
-    // (a qualified operand is non-total under `sameLayerResolver` and would have failed the gate). Assert it, so
-    // 0c — which rewires the resolver to prove CROSS-LIB operands total — FAILS LOUD here instead of silently
-    // rendering a qualified operand BARE (`cqlIdent(getRefName(...))` drops the library → a dangling CQL
-    // reference; code review disc 464, Claude #1). 0c must make the renderer library-aware before relaxing this.
-    const qualifiedOperand = branchConditionConceptRefsStrict(body.expression, "emitBooleanComposition").find(
-      (r) => getRefLibrary(r.ref) !== null,
-    );
-    if (qualifiedOperand !== undefined) {
+    // The gate passed → every operand is a proven-total scalar boolean (a cross-library operand proven via the
+    // `DeclaredResultIndex` family arm, 0c). Render library-aware: a cross-library / cross-layer operand qualifies
+    // through the emit's rename map (`crossLibraryOf` — self-ref → null → bare; a rendered-layer sibling → its layer
+    // library; a genuine foreign ref → `S`), a bare same-layer operand stays bare. This reuses the EXACT
+    // qualification every other cross-lib emit path uses (`emitCQL.ts:2664/2757`), so the emitted qualifier matches
+    // the emitted `include` line (and the include-alias/rename spelling).
+    const qualify: QualifyLeaf = (ref) => {
+      const crossLib = this.crossLibraryOf(ref);
+      const refName = getRefName(ref);
+      return crossLib !== null ? cqlQualifiedRef(crossLib, refName) : cqlIdent(refName);
+    };
+    // Defense-in-depth (0c, NARROWED from the 0b blanket qualified-operand refusal — plan §3): a qualified operand
+    // whose RAW library token is not among this emit's `crossLibraryIncludes` would emit a DANGLING reference (no
+    // matching `include`). The include collector (`visitConceptDefinitionRefs`) walks the SAME boolean-composition
+    // operands, so this cannot fire in correct operation — it is a tripwire for a future collector/emit divergence,
+    // refusing LOUD rather than shipping dangling CQL. (A self-qualified operand → `crossLibraryOf` null → excluded.)
+    const danglingOperand = branchConditionConceptRefsStrict(body.expression, "emitBooleanComposition").find((r) => {
+      const lib = getRefLibrary(r.ref);
+      return lib !== null && this.crossLibraryOf(r.ref) !== null && !this.options.crossLibraryIncludes.includes(lib);
+    });
+    if (danglingOperand !== undefined) {
       const loc = body.expression.location.start;
       this.emitErrors.push({
         type: "Validation",
-        kind: "emit-boolean-composition-qualified-operand",
+        kind: "emit-boolean-composition-operand-missing-include",
         line: loc.line,
         column: loc.column,
         message:
-          `INVARIANT (#189 Slice 0b): operand "${getRefName(qualifiedOperand.ref)}" of boolean composition ` +
-          `"${c.name}" is a qualified/cross-library reference that passed the totality gate. 0b renders operands ` +
-          `BARE (dropping the library), so this must not ship — Slice 0c must make the renderer library-aware ` +
-          `before proving cross-library operands total.`,
+          `INVARIANT (#189 Slice 0c): operand "${getRefName(danglingOperand.ref)}" of boolean composition ` +
+          `"${c.name}" renders a qualified reference to library "${getRefLibrary(danglingOperand.ref)}", not among ` +
+          `this library's cross-library includes — the emitted CQL would dangle. The include collector and the ` +
+          `emitter have diverged on boolean-composition operands.`,
       });
-      return `/* FIXME: emit-boolean-composition-qualified-operand (${c.name} -> ${getRefName(qualifiedOperand.ref)}) */ CRLCommon.BooleanCompositionQualifiedOperand('${c.name}')`;
+      return `/* FIXME: emit-boolean-composition-operand-missing-include (${c.name} -> ${getRefName(danglingOperand.ref)}) */ CRLCommon.BooleanCompositionOperandMissingInclude('${c.name}')`;
     }
-    const qualify: QualifyLeaf = (name) => cqlIdent(name);
     return emitTotalBooleanExpr(body.expression, qualify, compositionLeafPolicy);
   }
 
@@ -2330,23 +2395,19 @@ class Emitter {
       });
       return `/* FIXME: emit-boolean-composition-parent-not-scalar-boolean (${c.name}) */ CRLCommon.BooleanCompositionParentNotScalarBoolean('${c.name}')`;
     }
-    const resolver = sameLayerResolver((n) => this.conceptByName.get(n));
+    const resolvers = this.totalityResolvers();
     const refs = branchConditionConceptRefsStrict(body.expression, "emitBooleanComposition");
-    // A QUALIFIED operand is non-total under `sameLayerResolver` (0b is SAME-LIB scope; cross-lib totality proof
-    // is 0c), and so is a records/comparator operand that emits no total scalar boolean. Report BOTH as
-    // `operand-not-total` naming the first offender — a genuinely cross-library operand gets a note. (An earlier
-    // separate `operand-cross-lib` kind was dropped: on the layered lane `requalifyBranchCondition` rewrites a
-    // same-lib cross-LAYER operand into a `"<policy>-LocalSource"."X"` qualified ref, which that kind
-    // misdiagnosed as cross-library — disc 464 Claude #2a.)
-    const nonTotal = refs.find(
-      (r) =>
-        getRefLibrary(r.ref) !== null ||
-        !emitsTotalScalarBoolean(this.conceptByName.get(getRefName(r.ref)), resolver),
-    );
+    // Name the FIRST genuinely non-total operand under the SAME family-arm policy the gate used
+    // (`branchCompositionOperandTotal`: a qualified operand consults the cross-lib index verdict, a bare operand
+    // recurses same-layer). 0c PROVES a qualified operand total, so the 0b "any qualified operand ⇒ offender" rule
+    // now mis-blames a proven-total foreign operand in a mixed `foreign-total and local-non-total` composition
+    // (disc 466, both arms). A qualified offender that is STILL non-total gets an accurate note (its foreign define
+    // is non-total, or it is unresolvable in this library's scope — never a promise of a proof that just failed).
+    const nonTotal = refs.find((r) => !branchCompositionOperandTotal(r.ref, resolvers));
     const offender = nonTotal !== undefined ? getRefName(nonTotal.ref) : "(unknown)";
     const crossLibNote =
       nonTotal !== undefined && getRefLibrary(nonTotal.ref) !== null
-        ? " (a cross-library reference — cross-library boolean-composition operands gain a totality proof in #189 Slice 0c)"
+        ? " (a cross-library operand whose foreign define does not emit a total scalar boolean, or is unresolvable in this library's scope)"
         : "";
     this.emitErrors.push({
       type: "Validation",
@@ -2417,7 +2478,7 @@ class Emitter {
       // non-boolean-declared alias keeps the load-bearing guard + the `.asTruths()` path. Fold-in (a both-rep
       // concept, `__bothRepMerge` set) is orthogonal — the predicate already refuses it, and `foldIn === undefined`
       // keeps the flip out of the union path (whose weave is guarded next).
-      if (body.type === "DefinedAsBareRef" && foldIn === undefined && emitsTotalScalarBoolean(c, sameLayerResolver((n) => this.conceptByName.get(n)))) {
+      if (body.type === "DefinedAsBareRef" && foldIn === undefined && emitsTotalScalarBoolean(c, this.totalityResolvers())) {
         return cqlIdent(getRefName(body.ref));
       }
       // #189 Slice C 2b.2 (code review, Claude #3) — a both-rep UNION whose inferred bare-ref operand is a TOTAL
@@ -2428,7 +2489,7 @@ class Emitter {
         body.type === "DefinedAsBareRef" &&
         foldIn !== undefined &&
         getRefLibrary(body.ref) === null &&
-        emitsTotalScalarBoolean(this.conceptByName.get(getRefName(body.ref)), sameLayerResolver((n) => this.conceptByName.get(n)))
+        emitsTotalScalarBoolean(this.conceptByName.get(getRefName(body.ref)), this.totalityResolvers())
       ) {
         throw new ReductionInCompositionError(
           `Concept "${getRefName(body.ref)}" emits a TOTAL boolean and cannot be the inferred operand of a ` +
@@ -2457,7 +2518,7 @@ class Emitter {
       //     + façade — NOT the classifier, which only SELECTS the honest error when the parent is scalar-boolean but
       //     the composition does not flip.
       if (body.type === "DefinedAsComposition" && foldIn === undefined && this.declaredShapeOfConcept(c) === "boolean") {
-        const resolver = sameLayerResolver((n) => this.conceptByName.get(n));
+        const resolver = this.totalityResolvers();
         const cls = this.classifyBooleanCompositionOperands(body.expression);
         const parentIsScalarBoolean =
           c.shape === "Scalar" && (c.valueTypes?.length ?? 0) === 1 && c.valueTypes?.[0] === "boolean";
@@ -2605,7 +2666,7 @@ class Emitter {
     // (`crossLibraryOf !== null`) — its shape is proven at the resolver seam (0c), not here.
     if (this.crossLibraryOf(body.ref) === null) {
       const operand = this.conceptByName.get(getRefName(body.ref));
-      if (operand && emitsTotalScalarBoolean(operand, sameLayerResolver((n) => this.conceptByName.get(n)))) {
+      if (operand && emitsTotalScalarBoolean(operand, this.totalityResolvers())) {
         throw new ReductionInCompositionError(
           `\`defined as exists ("${operand.name}")\` applies \`exists\` to "${operand.name}", which already ` +
             `emits a TOTAL scalar boolean — \`exists\` over a scalar boolean is ill-typed (and may silently ` +
@@ -2758,7 +2819,7 @@ class Emitter {
           if (
             this.caseFeature.kind !== "off" &&
             getRefLibrary(expr.ref) === null &&
-            emitsTotalScalarBoolean(this.conceptByName.get(getRefName(expr.ref)), sameLayerResolver((n) => this.conceptByName.get(n)))
+            emitsTotalScalarBoolean(this.conceptByName.get(getRefName(expr.ref)), this.totalityResolvers())
           ) {
             throw new ReductionInCompositionError(
               `Concept "${getRefName(expr.ref)}" emits a TOTAL scalar boolean and cannot be a truth-set operand in ` +

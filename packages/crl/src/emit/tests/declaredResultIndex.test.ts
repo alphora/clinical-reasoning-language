@@ -3,10 +3,12 @@ import type { CRL, Concept, ReferenceName } from "../../ast/types";
 import {
   buildDeclaredResultIndex,
   makeDeclaredResultResolver,
+  makeTotalityFamilyResolver,
   resultTypeOf,
   type LibraryConcepts,
   type ResolveRawLibrary,
 } from "../declaredResultIndex";
+import { sameLayerResolver } from "../../cql-emitter/totalScalarBoolean";
 
 // #189 Slice C 2b.3a — unit tests for the pre-emit cross-library DECLARED-RESULT index (the `ResultType`
 // compatibility half + the scope-resolved resolver). This slice is UNCONSUMED (byte-invariant); these tests are the
@@ -24,6 +26,10 @@ function conceptOf(body: string, name: string): Concept {
   const c = crl.statements.find((s) => s.type === "Concept" && s.name === name) as Concept | undefined;
   if (!c) throw new Error(`concept "${name}" not found`);
   return c;
+}
+
+function conceptsOf(body: string): Concept[] {
+  return parse(body).statements.filter((s): s is Concept => s.type === "Concept");
 }
 
 const BOOL_SCALAR = conceptOf(
@@ -189,5 +195,119 @@ describe("makeDeclaredResultResolver — #189 Slice C 2b.3a token spaces", () =>
   it("an unknown qualified token (no scope, no direct source) → `miss`", () => {
     const resolve = makeDeclaredResultResolver(index);
     expect(resolve("Referrer", qref("Ghost", "Sib"))).toEqual({ kind: "miss" });
+  });
+});
+
+describe("lookupTotality — #189 Slice 0c (the lane-aware totality projection)", () => {
+  it("a total scalar boolean (an `exists` reduction) → `{ total: true }`", () => {
+    const idx = buildDeclaredResultIndex([{ sourceIdentity: "Lib", concepts: [BOOL_SCALAR] }]);
+    expect(idx.lookupTotality("Lib", "R")).toEqual({ kind: "total", total: true });
+  });
+
+  it("a NON-total but coherent concept (a RecordSet) → `{ total: false }` (a hit, verdict false — NOT indeterminate)", () => {
+    const idx = buildDeclaredResultIndex([{ sourceIdentity: "Lib", concepts: [RECORDSET] }]);
+    expect(idx.lookupTotality("Lib", "Recs")).toEqual({ kind: "total", total: false });
+  });
+
+  it("a same-lib boolean COMPOSITION over same-lib total booleans → `{ total: true }`", () => {
+    const concepts = conceptsOf(
+      `concept "A":
+- type is Condition.
+- value type is boolean.
+- code is \`a\`.
+- definition is exists this.
+concept "B":
+- type is Condition.
+- value type is boolean.
+- code is \`b\`.
+- definition is exists this.
+concept "Comp":
+- value type is boolean.
+- defined as ( "A" and "B" ).
+`,
+    );
+    const idx = buildDeclaredResultIndex([{ sourceIdentity: "Lib", concepts }]);
+    expect(idx.lookupTotality("Lib", "Comp")).toEqual({ kind: "total", total: true });
+  });
+
+  it("CHAINED cross-lib: a boolean composition with its OWN qualified operand projects NON-total (Option-(a) conservative-loud, NOT a silent wrong verdict)", () => {
+    // The projection runs `uniformResolvers` (both arms same-layer), so the qualified operand `"Foreign"."X"` is
+    // terminal-inert → `Comp` reads non-total. A root referencing `Comp` in a boolean composition then gets a LOUD
+    // `operand-not-total` (never a silent wrong emit) — the documented conservative behavior; Option-(b)'s
+    // topological projection that would match emit exactly is deferred.
+    const concepts = conceptsOf(
+      `concept "Local Flag":
+- type is Condition.
+- value type is boolean.
+- code is \`lf\`.
+- definition is exists this.
+concept "Comp":
+- value type is boolean.
+- defined as ( "Foreign"."X" and "Local Flag" ).
+`,
+    );
+    const idx = buildDeclaredResultIndex([{ sourceIdentity: "Lib", concepts }]);
+    expect(idx.lookupTotality("Lib", "Comp")).toEqual({ kind: "total", total: false });
+  });
+
+  it("preserves DISTINCT non-total causes: indeterminate / ambiguous / miss (NOT flattened to `total:false`)", () => {
+    const zero: Concept = { ...BOOL_SCALAR, name: "Zero", valueTypes: [] };
+    const dupA: Concept = { ...BOOL_SCALAR, name: "Dup" };
+    const dupB: Concept = { ...RECORDSET, name: "Dup" };
+    const idx = buildDeclaredResultIndex([{ sourceIdentity: "Lib", concepts: [zero, dupA, dupB] }]);
+    expect(idx.lookupTotality("Lib", "Zero")).toEqual({ kind: "indeterminate" });
+    expect(idx.lookupTotality("Lib", "Dup")).toEqual({ kind: "ambiguous" });
+    expect(idx.lookupTotality("Lib", "Nope")).toEqual({ kind: "miss" });
+    expect(idx.lookupTotality("Other", "R")).toEqual({ kind: "miss" });
+  });
+});
+
+describe("makeTotalityFamilyResolver — #189 Slice 0c (the boolean-composition family arm)", () => {
+  const foreignTotal = { ...BOOL_SCALAR, name: "X" };
+  const foreignRecs = { ...RECORDSET, name: "Y" };
+  const index = buildDeclaredResultIndex([
+    { sourceIdentity: "Referrer", concepts: [{ ...BOOL_SCALAR, name: "Local" }] },
+    { sourceIdentity: "ForeignId", concepts: [foreignTotal, foreignRecs] },
+  ]);
+  // The referrer's OWN same-layer map (bare refs recurse here, identical to the legacy arm).
+  const localByName = new Map<string, Concept>([["Local", { ...BOOL_SCALAR, name: "Local" }]]);
+  const sameLayer = sameLayerResolver((n) => localByName.get(n));
+  const resolveRawLibrary: ResolveRawLibrary = (from, raw) =>
+    from === "Referrer" && raw === "Foreign" ? "ForeignId" : undefined;
+
+  it("a BARE ref recurses SAME-LAYER (returns a `concept` resolution, identical to the legacy arm)", () => {
+    const resolve = makeTotalityFamilyResolver({ sameLayer, index, fromIdentity: "Referrer", resolveRawLibrary });
+    expect(resolve("Local")).toEqual({ kind: "concept", concept: localByName.get("Local") });
+  });
+
+  it("a genuinely-FOREIGN qualified ref → the index totality verdict (total)", () => {
+    const resolve = makeTotalityFamilyResolver({ sameLayer, index, fromIdentity: "Referrer", resolveRawLibrary });
+    expect(resolve(qref("Foreign", "X"))).toEqual({ kind: "total", total: true });
+  });
+
+  it("a foreign qualified ref to a NON-total foreign concept → `{ total: false }`", () => {
+    const resolve = makeTotalityFamilyResolver({ sameLayer, index, fromIdentity: "Referrer", resolveRawLibrary });
+    expect(resolve(qref("Foreign", "Y"))).toEqual({ kind: "total", total: false });
+  });
+
+  it("a scope MISS with a resolver armed → `{ total: false }` (loud downstream, never a raw-token hit)", () => {
+    const resolve = makeTotalityFamilyResolver({ sameLayer, index, fromIdentity: "Referrer", resolveRawLibrary });
+    expect(resolve(qref("Ghost", "X"))).toEqual({ kind: "total", total: false });
+  });
+
+  it("a RENDERED-LAYER token (classified positively) → a SAME-SOURCE index lookup, NOT a foreign resolution", () => {
+    // A cross-LAYER operand `"Referrer-LocalSource"."Local"` is same-SOURCE (Local is in the referrer's own
+    // pre-split concepts) — classified positively BEFORE the cross-lib resolver so it does not scope-miss.
+    const withLocalInIndex = buildDeclaredResultIndex([
+      { sourceIdentity: "Referrer", concepts: [{ ...BOOL_SCALAR, name: "Local" }] },
+    ]);
+    const resolve = makeTotalityFamilyResolver({
+      sameLayer,
+      index: withLocalInIndex,
+      fromIdentity: "Referrer",
+      resolveRawLibrary,
+      isRenderedLayerToken: (lib) => lib === "Referrer-LocalSource",
+    });
+    expect(resolve(qref("Referrer-LocalSource", "Local"))).toEqual({ kind: "total", total: true });
   });
 });

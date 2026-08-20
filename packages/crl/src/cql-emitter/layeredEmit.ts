@@ -80,7 +80,10 @@ import type { CRLError } from "../types/errors";
 
 import { emitCQLFromAST } from "./emitCQL";
 import type { EmitResult, EmitOptions } from "./emitCQL";
-import { emitsTotalScalarBoolean, sameLayerResolver } from "./totalScalarBoolean";
+import { emitsTotalScalarBoolean, sameLayerResolver, uniformResolvers } from "./totalScalarBoolean";
+import type { Resolvers } from "./totalScalarBoolean";
+import { makeTotalityFamilyResolver } from "../emit/declaredResultIndex";
+import type { CrossLibraryTotality } from "../emit/declaredResultIndex";
 
 /**
  * A partition VALUE — the bucket a statement is assigned to for emit. The FULL
@@ -1156,6 +1159,7 @@ function buildInterfaceReexports(
   ast: CRL,
   policyId: string,
   maps: NameLayerMaps,
+  totalitySvc?: CrossLibraryTotality,
 ): { reexports: Concept[]; errors: CRLError[] } {
   const reexports: Concept[] = [];
   const errors: CRLError[] = [];
@@ -1176,6 +1180,27 @@ function buildInterfaceReexports(
     if (existing !== undefined && isPublicTwin(existing) && !isPublicTwin(stmt)) continue;
     sourceConceptByName.set(stmt.name, stmt);
   }
+  // #189 Slice 0c — the `{legacy, family}` totality pair the façade's re-export-mode gate reads. The façade runs
+  // PRE-SPLIT, so a bare operand resolves same-layer over the full pre-split source (all layers visible) and there
+  // are NO rendered-layer tokens (requalification happens at split) — hence no `isRenderedLayerToken`. A genuinely
+  // FOREIGN operand's totality comes from the cross-library index (family arm), so a source concept that is a
+  // boolean composition over a foreign total boolean re-exports BARE (`total-boolean`) rather than `.satisfied()`.
+  // Absent a service (direct callers) both arms are same-layer → byte-invariant.
+  const srcSameLayer = sameLayerResolver((n) => sourceConceptByName.get(n));
+  const srcTotalityResolvers: Resolvers =
+    totalitySvc === undefined
+      ? uniformResolvers(srcSameLayer)
+      : {
+          legacy: srcSameLayer,
+          family: makeTotalityFamilyResolver({
+            sameLayer: srcSameLayer,
+            index: totalitySvc.index,
+            fromIdentity: totalitySvc.fromIdentity,
+            ...(totalitySvc.resolveRawLibrary !== undefined
+              ? { resolveRawLibrary: totalitySvc.resolveRawLibrary }
+              : {}),
+          }),
+        };
   for (const name of interfaceConceptNames(ast)) {
     const rawSourceLayer = maps.concept.get(name);
     // Only a concept that classified into a re-exportable SOURCE layer can be
@@ -1246,7 +1271,7 @@ function buildInterfaceReexports(
     // SAME predicate — so the façade cannot `.satisfied()` a bare Boolean (an alias/comparator source) nor
     // bare-re-export a truth-set. The non-boolean-reduction HARD ERROR above still fires for a DIRECT reduction
     // guard; an alias to a non-boolean reduction is caught loud at emit (its referent trips the retained guard).
-    const srcEmitsTotalBoolean = emitsTotalScalarBoolean(src, sameLayerResolver((n) => sourceConceptByName.get(n)));
+    const srcEmitsTotalBoolean = emitsTotalScalarBoolean(src, srcTotalityResolvers);
     const targetLib = layerLibraryName(policyId, sourceLayer);
     const qualified: QualifiedReference = {
       type: "QualifiedReference",
@@ -1345,7 +1370,7 @@ export function emitPartitioned(
   // `ast` above, so the synthetics never pollute the name maps.
   const reexportResult =
     partition === FULL_PARTITION
-      ? buildInterfaceReexports(ast, policyId, maps)
+      ? buildInterfaceReexports(ast, policyId, maps, baseOptions.crossLibraryTotality)
       : { reexports: [] as Concept[], errors: [] as CRLError[] };
   // F3 — a non-source-typed decision concept is a hard error; abort BEFORE
   // emitting any layer (a partial emit with a silently-empty Interface is exactly
@@ -1383,6 +1408,15 @@ export function emitPartitioned(
     ? partition.libraryNameFor(policyId, "RecordSource")
     : undefined;
 
+  // #189 Slice 0c — the set of THIS source's synthesized layer library names, so a per-layer boolean-composition
+  // consult can classify a rendered-layer (same-source cross-LAYER) qualifier as same-source BEFORE the cross-lib
+  // totality resolver (else it scope-misses and is misdiagnosed cross-library; disc 464 / plan §4). Augmented onto
+  // the per-layer `crossLibraryTotality` below.
+  const renderedLayerNames = new Set<string>();
+  for (const value of partition.order) {
+    if (present.has(value)) renderedLayerNames.add(partition.libraryNameFor(policyId, value));
+  }
+
   const entries: LayeredEmitEntry[] = [];
   let success = true;
   for (const value of partition.order) {
@@ -1407,6 +1441,11 @@ export function emitPartitioned(
       libraryName,
       crossLibraryIncludes,
       conceptShapesByName,
+      // #189 Slice 0c — augment the source-bound totality service with THIS source's rendered-layer names, so the
+      // per-layer pivot/discharge classify a cross-layer operand as same-source (not misread as cross-library).
+      ...(baseOptions.crossLibraryTotality !== undefined
+        ? { crossLibraryTotality: { ...baseOptions.crossLibraryTotality, renderedLayerNames } }
+        : {}),
       ...(caseFeature ? { caseFeature } : {}),
     });
     if (!result.success) success = false;

@@ -1,0 +1,26 @@
+# chained cross-lib — the ROOT
+library "Root".
+
+// Composes over `"Sib"."Sib Chained"`, a foreign boolean comp that has its OWN cross-lib operand. Per Option-(a)
+// (disc 465 §1) the index projects "Sib Chained" NON-total (conservative), so the root LOUD-fails `operand-not-
+// total` — even though Sib really emits "Sib Chained" total. This is the documented conservative-loud behavior:
+// never a silent wrong emit; the topological Option-(b) projection is deferred.
+
+concept "Root Records":
+- type is Observation.
+- shape is RecordSet.
+- code is `root-rec`.
+
+concept "Root Flag":
+- value type is boolean.
+- defined as exists ( "Root Records" ).
+
+concept "Cross Chained":
+- value type is boolean.
+- defined as ( "Sib"."Sib Chained" and "Root Flag" ).
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Cross Chained" then recommend activity "Refer".

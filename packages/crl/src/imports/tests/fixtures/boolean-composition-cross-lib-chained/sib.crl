@@ -1,0 +1,30 @@
+# chained cross-lib — the MIDDLE library
+library "Sib".
+
+// "Sib Chained" is a boolean composition with its OWN cross-lib operand (`"Third"."Third Flag"`). Sib's OWN emit
+// proves it total (Sib's family arm resolves Third via the index), so Sib emits "Sib Chained" as a bare total
+// boolean. But the pre-emit index projects "Sib Chained" NON-total (it runs the uniform resolver, under which
+// Third's operand is inert) — the Option-(a) conservative projection.
+
+concept "Sib Cond":
+- type is Condition.
+- shape is RecordSet.
+- coded from "Sib VS".
+
+concept "Sib Local":
+- type is Condition.
+- value type is boolean.
+- defined as exists ( "Sib Cond" ).
+
+concept "Sib Chained":
+- value type is boolean.
+- defined as ( "Third"."Third Flag" and "Sib Local" ).
+
+terminology "Sib VS":
+- valueset is `urn:sib-vs`.
+
+activity "Sib Refer":
+- request CPGServiceRequest.
+
+decision "Sib Triage":
+- when "Sib Chained" then recommend activity "Sib Refer".

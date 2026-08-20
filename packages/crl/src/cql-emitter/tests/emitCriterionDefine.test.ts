@@ -9,6 +9,7 @@ import type {
   BranchConditionRef,
   Location,
 } from "../../ast/types";
+import { getRefName } from "../../ast/types";
 import {
   emitTotalBooleanGuard,
   emitCriterionDefine,
@@ -48,8 +49,12 @@ const not = (operand: BranchCondition): BranchConditionNot => ({
 });
 
 // A qualifier that quotes concept names and PREFIXES criterion names, so tests can see the
-// kind routing (the real caller returns bare `"Name"` or `Lib."Name"` per layer).
-const q: QualifyLeaf = (name, kind) => (kind === "criterion" ? `Crit."${name}"` : `"${name}"`);
+// kind routing (the real caller returns bare `"Name"` or `Lib."Name"` per layer). #189 Slice 0c —
+// `QualifyLeaf` now receives the full `ReferenceName`; extract the name via `getRefName`.
+const q: QualifyLeaf = (ref, kind) => {
+  const name = getRefName(ref);
+  return kind === "criterion" ? `Crit."${name}"` : `"${name}"`;
+};
 
 const emit = (c: BranchCondition): string => emitTotalBooleanGuard(c, q);
 

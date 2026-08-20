@@ -1,0 +1,26 @@
+# boolean-composition-cross-lib foreign library (#189 Slice 0c)
+library "Sib".
+
+// "Sib Flag" is a TOTAL scalar boolean (a `defined as exists` over a `coded from` records concept) that the
+// root composes over cross-library: `defined as ( "Sib"."Sib Flag" and "Root Flag" )`. Sib carries a decision
+// (no `code is`), so it stays a SINGLE-LAYER `none` library named "Sib" — the foreign operand a real cross-lib
+// composition references (a cross-library ref into an auto-SPLIT library is a separate unsupported slice).
+
+concept "Sib Cond":
+- type is Condition.
+- shape is RecordSet.
+- coded from "Sib VS".
+
+concept "Sib Flag":
+- type is Condition.
+- value type is boolean.
+- defined as exists ( "Sib Cond" ).
+
+terminology "Sib VS":
+- valueset is `urn:sib-vs`.
+
+activity "Sib Refer":
+- request CPGServiceRequest.
+
+decision "Sib Triage":
+- when "Sib Flag" then recommend activity "Sib Refer".

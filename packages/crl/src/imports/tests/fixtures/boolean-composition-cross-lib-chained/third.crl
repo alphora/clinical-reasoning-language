@@ -1,0 +1,21 @@
+# chained cross-lib — the THIRD library (a plain total boolean, no cross-lib operand of its own)
+library "Third".
+
+concept "Third Cond":
+- type is Condition.
+- shape is RecordSet.
+- coded from "Third VS".
+
+concept "Third Flag":
+- type is Condition.
+- value type is boolean.
+- defined as exists ( "Third Cond" ).
+
+terminology "Third VS":
+- valueset is `urn:third-vs`.
+
+activity "Third Refer":
+- request CPGServiceRequest.
+
+decision "Third Triage":
+- when "Third Flag" then recommend activity "Third Refer".

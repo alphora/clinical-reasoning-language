@@ -19,14 +19,16 @@
 // or a sibling criterion define) is a layered-emit wiring concern, supplied by the caller.
 // This keeps the structure + totality rules pure and unit-testable.
 
-import type { BranchCondition, BranchConditionCriterionRef } from "../ast/types";
-import { getRefName } from "../ast/types";
+import type { BranchCondition, BranchConditionCriterionRef, ReferenceName } from "../ast/types";
 
 /** Resolve a guard leaf (a concept ref or a sibling criterion ref) to the CQL identifier its
  *  define is referenced by — bare `"Name"` for a same-library define, `Lib."Name"` for a
- *  cross-library re-export. Whether the emitter then totalizes what this returns (`Coalesce(…,
- *  false)`) or references it BARE is the `RenderLeafPolicy`'s call, not this resolver's. */
-export type QualifyLeaf = (name: string, kind: "concept" | "criterion") => string;
+ *  cross-library re-export. Receives the FULL `ReferenceName` (#189 Slice 0c) — a name alone
+ *  cannot distinguish `"A"."X"` from `"B"."X"` or a bare `"X"` from a qualified one, so a
+ *  cross-library operand must qualify from the ref's own library token, not a name key. Whether
+ *  the emitter then totalizes what this returns (`Coalesce(…, false)`) or references it BARE is
+ *  the `RenderLeafPolicy`'s call, not this resolver's. */
+export type QualifyLeaf = (ref: ReferenceName, kind: "concept" | "criterion") => string;
 
 // CQL boolean operator precedence (higher binds tighter): a leaf is atomic; `not` > `and` >
 // `or`. A child is parenthesised iff its precedence is LOWER than its parent's — the minimal
@@ -70,7 +72,7 @@ export interface RenderLeafPolicy {
  *  leaf `Coalesce`-totalized; criterion refs are define→define edges). */
 export const criterionDefineLeafPolicy: RenderLeafPolicy = {
   concept: (qualified) => totalLeaf(qualified),
-  criterionRef: (node, qualify) => totalLeaf(qualify(getRefName(node.ref), "criterion")),
+  criterionRef: (node, qualify) => totalLeaf(qualify(node.ref, "criterion")),
 };
 
 /** Render a well-formed boolean guard tree STRUCTURALLY (no NNF/DNF), parameterized by `leaf` (the
@@ -79,7 +81,7 @@ export const criterionDefineLeafPolicy: RenderLeafPolicy = {
 function renderNode(n: BranchCondition, qualify: QualifyLeaf, leaf: RenderLeafPolicy): Rendered {
   switch (n.type) {
     case "BranchConditionRef":
-      return { str: leaf.concept(qualify(getRefName(n.ref), "concept")), prec: PREC.leaf };
+      return { str: leaf.concept(qualify(n.ref, "concept")), prec: PREC.leaf };
     case "BranchConditionCriterionRef":
       return { str: leaf.criterionRef(n, qualify), prec: PREC.leaf };
     case "BranchConditionNot": {
