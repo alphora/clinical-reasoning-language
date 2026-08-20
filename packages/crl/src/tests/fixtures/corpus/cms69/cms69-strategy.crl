@@ -38,7 +38,9 @@ Statement types:
 `defined as` body shapes:
   - bare ref:            `- defined as "X".`
   - record composition:  `- defined as ( "A" sem-and "B" ).` (value-preserving
-                         sem-or/sem-and/sem-not over records — publishes a RecordSet)
+                         sem-or/sem-and/sem-not set algebra over record operands; the
+                         published cardinality is DECLARED via `shape is` — `Scalar` by
+                         default — never inferred from the composition)
   - boolean composition: `- defined as ( not "A" and "B" ).` (scalar-boolean
                          and/or/not over scalar-boolean concepts — publishes a boolean; #189)
   - existence reduction: `- defined as exists ( "X" ).` (a scalar boolean:

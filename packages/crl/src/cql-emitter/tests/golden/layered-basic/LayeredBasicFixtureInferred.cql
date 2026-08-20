@@ -8,6 +8,11 @@ include LayeredBasicFixtureRecordSource
 
 context Patient
 
-define "Inferred Concept":
+define "Asserted Concept A Exists":
   exists (LayeredBasicFixtureRecordSource."Asserted Concept A")
-    or exists (LayeredBasicFixtureRecordSource."Asserted Concept B")
+
+define "Asserted Concept B Exists":
+  exists (LayeredBasicFixtureRecordSource."Asserted Concept B")
+
+define "Inferred Concept":
+  "Asserted Concept A Exists" or "Asserted Concept B Exists"

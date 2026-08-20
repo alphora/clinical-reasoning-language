@@ -2,11 +2,12 @@
 library "Layered Basic".
 
 // A single multi-layer library: two `terminology` declarations (Concepts
-// layer), two `coded from` concepts (Asserted layer), and one `defined as`
-// concept (Inferred layer) composing over the asserted ones. Emitting this
-// exercises the auto-split: the Inferred layer's bare refs to the asserted
-// concepts MUST be re-qualified to "Layered Basic Asserted"."...", and the
-// Asserted concepts' terminology refs MUST be re-qualified to
+// layer), two `coded from` RecordSet concepts (Asserted layer), and three
+// `defined as` concepts (Inferred layer) — two `... Exists` existence-reduction
+// wrappers (#189) plus the boolean `Inferred Concept` composing `or` over them.
+// Emitting this exercises the auto-split: the Inferred layer's refs to the
+// asserted concepts MUST be re-qualified to "Layered Basic Asserted"."...", and
+// the Asserted concepts' terminology refs MUST be re-qualified to
 // "Layered Basic Concepts"."...".
 
 // ============ Concepts (terminology) ============
@@ -22,12 +23,24 @@ terminology "Example Valueset B":
 concept "Asserted Concept A":
 - type is Observation.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - coded from "Example Valueset A".
+
+concept "Asserted Concept A Exists":
+- type is Observation.
+- value type is boolean.
+- defined as exists ( "Asserted Concept A" ).
 
 concept "Asserted Concept B":
 - type is Observation.
 - value type is CodeableConcept.
+- shape is RecordSet.
 - coded from "Example Valueset B".
+
+concept "Asserted Concept B Exists":
+- type is Observation.
+- value type is boolean.
+- defined as exists ( "Asserted Concept B" ).
 
 // ============ Inferred (defined as) ============
 
@@ -36,7 +49,7 @@ concept "Inferred Concept":
 - value type is boolean.
 - defined as
 (
-   "Asserted Concept A"
-   sem-or
-   "Asserted Concept B"
+   "Asserted Concept A Exists"
+   or
+   "Asserted Concept B Exists"
 ).
