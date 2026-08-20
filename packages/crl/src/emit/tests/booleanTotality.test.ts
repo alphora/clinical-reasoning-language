@@ -333,7 +333,7 @@ describe("proveWholeBoundaryTotality", () => {
   it("FAILS an enrolled `rejected` obligation (E1 forms must fail by non-enrollment)", () => {
     const rejected = entry({
       name: "BothRep",
-      obligation: { kind: "rejected", reason: "both-rep fold" },
+      obligation: { kind: "rejected", code: "e1-defined-as", reason: "both-rep fold" },
       discharge: { booleanEffect: "total", dischargedBy: "intrinsic-exists" },
     });
     const r = proveWholeBoundaryTotality([rejected]);

@@ -50,6 +50,29 @@ import {
 // ===========================================================================
 
 /**
+ * A structured discriminant on the `rejected` arm (§4 reject seam). The T5 reject seam fires ONLY on the
+ * MIGRATION cells — the bare-scalar `code is` (`bare-scalar`) and the three E1 both-rep forms (`e1-*`) — and
+ * carries a #257/migration prompt. The remaining codes tag `rejected` verdicts that are ALREADY caught by
+ * other validation (malformed value-type/age, non-boolean exists/count/composition, trivial threshold,
+ * boolean-with-no-definition); the seam must NOT sweep them, so they get their own codes rather than sharing
+ * a migration cell. A free-text `reason` still accompanies every code.
+ */
+export type BooleanRejectCode =
+  // ── The four T5 reject-seam cells (fire the emit-boundary reject + migration prompt) ──
+  | "bare-scalar" // bare Scalar `code is`, no reduction/shape — the `no-bare-scalar-code` flip form (retiring 2e)
+  | "e1-defined-as" // `code is` + `defined as` (both-rep fold) — #257
+  | "e1-coded-from" // `code is` + `coded from` (local + external source) — #257
+  | "e1-source-rep" // `code is` + `source representation` (local + source multi-rep) — #257
+  // ── Pre-existing invalid forms (NOT swept by the seam; caught by other validation) ──
+  | "malformed-age" // malformed patient-age concept
+  | "malformed-value-type" // 0 or >1 value types in boolean position
+  | "non-boolean-exists" // `exists` produces boolean but concept declares a non-boolean value type
+  | "count-threshold-trivial" // `count … at least 0` — always true (emit-count-threshold-trivial)
+  | "non-boolean-count" // `count` produces boolean but concept declares a non-boolean value type
+  | "non-boolean-composition" // `defined as` boolean composition but concept is not Scalar boolean
+  | "boolean-no-definition"; // boolean Scalar with no definition/reduction — nothing to make total
+
+/**
  * The totality obligation a concept's boolean form owes, per `docs/emit-189-boolean-totality.md` §2.
  * `rejected` (invalid-in-boolean-position) and `unclassified` (a boolean form the emitter may emit but the
  * classifier cannot yet certify) are DISTINCT (§2): the proof enumerates-and-reports `unclassified` (the
@@ -76,7 +99,7 @@ export type BooleanTotalityObligation =
   // multi-rep). A flip validation/emit error; MUST NOT reach the ledger. `staging` (2b.4a) FORM-KEYS the ONE
   // still-live reject the scoped gate reports-not-fails (the pre-flip bare-scalar `code is`, retiring 2e); an
   // E1 #257 reject leaves it UNSET so the gate blocks it (the kind alone must not exempt — disc 454 gpt56 #1).
-  | { kind: "rejected"; reason: string; staging?: StagingExclusion }
+  | { kind: "rejected"; code: BooleanRejectCode; reason: string; staging?: StagingExclusion }
   // A boolean form the emitter may emit but the classifier cannot yet certify (unknown narrative; an
   // instance-shape catalog read whose value-vs-presence lowering is decided at T5, §4 gap 3; a known catalog
   // pattern absent from the return-shape table). ENUMERATED by the proof; renders the result INCOMPLETE (§2).
@@ -191,7 +214,7 @@ export function classifyBooleanTotality(concept: Concept): BooleanTotalityObliga
   // rewrite is its discharge), and it is EXEMPT from the E1 code+source reject below.
   const age = resolveAgeConcept(concept);
   if (age.kind === "error") {
-    return { kind: "rejected", reason: `malformed patient-age concept: ${age.errorKind}: ${age.message}` };
+    return { kind: "rejected", code: "malformed-age", reason: `malformed patient-age concept: ${age.errorKind}: ${age.message}` };
   }
   if (age.kind === "recency" || age.kind === "standalone") {
     return {
@@ -208,13 +231,13 @@ export function classifyBooleanTotality(concept: Concept): BooleanTotalityObliga
   const hasCode = concept.code !== undefined;
   if (hasCode) {
     if (concept.definition?.type === "DefinedAsDefinition") {
-      return { kind: "rejected", reason: "`code is` + `defined as` (both-rep fold) is deferred to #257 — rejected at the flip (§4.7)" };
+      return { kind: "rejected", code: "e1-defined-as", reason: "`code is` + `defined as` (both-rep fold) is deferred to #257 — rejected at the flip (§4.7)" };
     }
     if (concept.definition?.type === "CodedFromDefinition") {
-      return { kind: "rejected", reason: "`code is` + `coded from` (local + external source) is deferred to #257 — rejected at the flip (§4.7)" };
+      return { kind: "rejected", code: "e1-coded-from", reason: "`code is` + `coded from` (local + external source) is deferred to #257 — rejected at the flip (§4.7)" };
     }
     if (concept.representations.length > 0) {
-      return { kind: "rejected", reason: "`code is` + `source representation` (local + source multi-rep) is deferred to #257 — rejected at the flip (§4.7)" };
+      return { kind: "rejected", code: "e1-source-rep", reason: "`code is` + `source representation` (local + source multi-rep) is deferred to #257 — rejected at the flip (§4.7)" };
     }
   }
 
@@ -222,6 +245,7 @@ export function classifyBooleanTotality(concept: Concept): BooleanTotalityObliga
   if (concept.valueTypes.length !== 1) {
     return {
       kind: "rejected",
+      code: "malformed-value-type",
       reason: `Scalar concept declares ${concept.valueTypes.length} value types (needs exactly 1) — invalid in boolean position`,
     };
   }
@@ -244,10 +268,10 @@ export function classifyBooleanTotality(concept: Concept): BooleanTotalityObliga
               form: `exists ${r.target.type === "ThisRecords" ? "this" : refDisplay(r.target.ref)}`,
               cell: "§2 `exists this`/`exists \"X\"` → exists([R:X])",
             }
-          : { kind: "rejected", reason: `\`exists\` produces a boolean, but the concept declares value type \`${concept.valueTypes.join("/") || "(none)"}\`` };
+          : { kind: "rejected", code: "non-boolean-exists", reason: `\`exists\` produces a boolean, but the concept declares value type \`${concept.valueTypes.join("/") || "(none)"}\`` };
       case "count":
         if (r.atLeast <= 0) {
-          return { kind: "rejected", reason: "`count … at least 0` is always true — author error (§2)" };
+          return { kind: "rejected", code: "count-threshold-trivial", reason: "`count … at least 0` is always true — author error (§2)" };
         }
         return boolean
           ? {
@@ -257,7 +281,7 @@ export function classifyBooleanTotality(concept: Concept): BooleanTotalityObliga
               // plan §3 discharge list) — do NOT trim that gate in step 8 (disc 429 C12).
               cell: "§2 `count this … at least N` → Count(…) >= N (bare; runtime-pin gated)",
             }
-          : { kind: "rejected", reason: `\`count\` produces a boolean, but the concept declares value type \`${concept.valueTypes.join("/") || "(none)"}\`` };
+          : { kind: "rejected", code: "non-boolean-count", reason: `\`count\` produces a boolean, but the concept declares value type \`${concept.valueTypes.join("/") || "(none)"}\`` };
       case "mostRecent":
         // `most recent "X"` (named) is NOT normalized into a ReductionDefinition (builder keeps it a
         // `DefinitionIsDefinition`, ast/types.ts:844) — so a named target here is unreachable in practice;
@@ -312,6 +336,7 @@ export function classifyBooleanTotality(concept: Concept): BooleanTotalityObliga
       if (!boolean) {
         return {
           kind: "rejected",
+          code: "non-boolean-composition",
           reason:
             "`defined as` boolean composition produces one scalar boolean, but the concept is not a " +
             `\`Scalar\` \`boolean\` (shape \`${concept.shape ?? "(none)"}\`, value type \`${concept.valueTypes?.join("/") || "(none)"}\`)`,
@@ -350,6 +375,7 @@ export function classifyBooleanTotality(concept: Concept): BooleanTotalityObliga
   if (hasCode) {
     return {
       kind: "rejected",
+      code: "bare-scalar",
       reason: "bare Scalar `code is` with no reduction — invalid in boolean position (§2)",
       // 2b.4a — the pre-flip `no-bare-scalar-code` form; the scoped gate REPORTS it (does not fail) until 2e
       // flips it. Form-keyed here so an E1 #257 reject (which leaves `staging` unset) still blocks.
@@ -360,7 +386,7 @@ export function classifyBooleanTotality(concept: Concept): BooleanTotalityObliga
     return { kind: "not-applicable", nullable: false, reason: "source-only concept (no local `code is`) — deferred external arm (design §10)" };
   }
   return boolean
-    ? { kind: "rejected", reason: "boolean Scalar with no definition/reduction — nothing to make total" }
+    ? { kind: "rejected", code: "boolean-no-definition", reason: "boolean Scalar with no definition/reduction — nothing to make total" }
     : { kind: "not-applicable", nullable: false, reason: "non-boolean Scalar with no reduction (no boolean define)" };
 }
 
