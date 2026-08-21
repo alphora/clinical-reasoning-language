@@ -917,6 +917,32 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
     expect(action.input).toEqual([cfInput("Active Crohns Disease", CF_URL)]);
   });
 
+  it("#189 2d (inert precursor): a resolver-supplied `resourceType` becomes `action.input.type`; absent → `Observation` fallback", () => {
+    // The atomic activation resolves `resourceType` from the concept's descriptor (Condition,
+    // MedicationRequest, …). Until then the live resolver omits it and the fallback keeps the
+    // forced-`Observation` shape byte-identical — this test pins BOTH ends of the seam.
+    const naturalResolver: CaseFeatureInputResolver = (name) =>
+      name === "Active Crohns Disease"
+        ? [{ name: "Active Crohns Disease", canonical: CF_URL, resourceType: "Condition" }]
+        : [];
+    const d = decision("Triage", [when("Active Crohns Disease", leaf(recommend("Refer to GI")))]);
+    const { resource } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", naturalResolver,
+    );
+    const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
+    const inputs = action.input as Array<{ type: string; profile: string[] }>;
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]!.type).toBe("Condition");
+    expect(inputs[0]!.profile).toEqual([CF_URL]);
+
+    // Fallback arm: the current `cfResolver` (no `resourceType`) still yields `type: "Observation"`.
+    const { resource: fbResource } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,
+    );
+    const fbAction = (fbResource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
+    expect((fbAction.input as Array<{ type: string }>)[0]!.type).toBe("Observation");
+  });
+
   it("a `when` condition the resolver returns null for (RecordSource/Inferred — no case-feature SD) gets NO input", () => {
     const d = decision("Triage", [when("Referral Reason", leaf(recommend("Refer to GI")))]);
     const { resource } = emitDecisionPlanDefinition(
