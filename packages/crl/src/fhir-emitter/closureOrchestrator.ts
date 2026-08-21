@@ -391,12 +391,17 @@ function classifyClosureDecisions(
  * union (deduped by name) over all decision conditions of their recursive
  * collections, and the per-condition ordered list drives the `action.input[]`.
  *
- * LOCALSOURCE-ALWAYS-BOOLEAN RULE (locked): a concept is a boolean case-feature iff
- * it has a lowered local `code is` — REGARDLESS of its declared `value type is`.
- * There is no value-type gate (the old `resolvesToBoolean` /
- * `emit-casefeature-non-boolean` diagnostic is gone); `code is` ⟹ boolean
- * Observation case-feature. This unblocks coded-presence concepts that carry no
- * `value type is`.
+ * ⚠⚠ #189 2d IN PROGRESS — the "always boolean Observation" wording below is the HACK being REMOVED, NOT the
+ * model. AUTHORITY: `docs/CRL-NORTH-STAR.md` §4 "Case-features are ANY resource". A case-feature is typed by the
+ * concept's OWN natural resource (`type is`); a valueless record (Condition/…) has no boolean (truth = `exists`);
+ * only NON-EPHEMERAL local `code is` records are case-features (derived/computed concepts are CQL only, their
+ * case-features are the records they derive from). There is NO Observation-only fallback. 2d flips the collection
+ * + SD emit to be descriptor-driven and gated to the proven resource subset (Condition+Observation+Patient; #290).
+ *
+ * (Historical, the hack:) LOCALSOURCE-ALWAYS-BOOLEAN RULE — a concept was a boolean case-feature iff it had a
+ * lowered local `code is`, REGARDLESS of its declared `value type is`; there was no value-type gate (the old
+ * `resolvesToBoolean` / `emit-casefeature-non-boolean` diagnostic is gone); `code is` ⟹ boolean Observation
+ * case-feature.
  *
  * Both consumers (the action-level `input` resolver in step 5a and the
  * case-feature SD emit in step 6) run off the SAME `CaseFeatureCollection`, so the

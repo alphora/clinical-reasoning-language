@@ -2,13 +2,15 @@
  * CRL decision case-feature concept → FHIR `StructureDefinition` (case-feature
  * profile) emit.
  *
- * Per collected case-feature concept (a `code is` / LocalSource concept reached by
- * the recursive `code is` closure of a decision `when` condition — the
- * LocalSource-always-boolean rule: every `code is` concept is a boolean case
- * feature regardless of declared value type), emit ONE `StructureDefinition`
- * constraining `Observation` — a CPG publishable case feature. The PA app's
- * questionnaire submits an instance of this profile to assert the local-source
- * boolean determination.
+ * ⚠⚠ #189 2d IN PROGRESS — DO NOT read the "always Observation / always boolean" wording below as the model.
+ * It describes the HACK being REMOVED. The AUTHORITY is `docs/CRL-NORTH-STAR.md` §4 "Case-features are ANY
+ * resource": a case-feature SD is typed by the concept's OWN natural resource (`type is` — Condition, …), NEVER
+ * forced to Observation; the boolean is `exists` in CQL (valueless record) or a value read (a value-bearing
+ * Observation), NEVER a coerced `Observation.valueBoolean`; there is NO "Observation-only fallback" (that IS the
+ * hack). The differential is now built by `caseFeatureDifferential` from a registry `CaseFeatureProfileShape`;
+ * the transitional pinned-Observation profile is being flipped to the concept's descriptor. (Historical note,
+ * the hack:) the old emit collected every `code is` concept as a boolean Observation case feature regardless of
+ * declared value type ("LocalSource-always-boolean") and constrained `Observation`.
  *
  * Reference shape verified against the DTR
  * `aslp-paa-comorbid-screening-casefeature.json` example. Deviations from that
