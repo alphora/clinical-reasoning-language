@@ -663,7 +663,7 @@ export function lowerLocalCodes(
       //      top-level identifier (a concept/parameter/criterion/terminology/codesystem decl) OR a
       //      previously synthesized twin — it emits its own `define "<X> Records"`, so a collision
       //      would produce a duplicate top-level CQL identifier. Diagnose rather than clobber.
-      const recordsTwinName = `${c.name} Records`;
+      const recordsTwinName = recordsTwinDefineName(c.name);
       if (topLevelIdentifierNames.has(recordsTwinName)) {
         errors.push(
           mkError(
@@ -1395,4 +1395,16 @@ export function leafEligibleConcepts(ast: CRL): Set<string> {
   } catch {
     return new Set();
   }
+}
+
+/**
+ * The synthesized RECORDS-TWIN define name for a `code is` + reduction concept `X` — `"<X> Records"`
+ * (#189 Slice A2). The records twin holds the concept's own natural-resource records (`[<R>: <local code>]`);
+ * the retargeted reduction concept `"<X>"` reads it (`exists "<X> Records"`). SINGLE SOURCE OF TRUTH: this is the
+ * lowering's twin-name rule (used at the twin synthesis above); the #189 2d case-feature lane reuses it so the
+ * `cpg-featureExpression` target (`LocalSource."<X> Records"`) byte-equals the emitted define — the featureExpression
+ * points at the RECORDS define, NOT the ephemeral boolean `"<X>"` (charter §4; panel disc 481/482).
+ */
+export function recordsTwinDefineName(conceptName: string): string {
+  return `${conceptName} Records`;
 }
