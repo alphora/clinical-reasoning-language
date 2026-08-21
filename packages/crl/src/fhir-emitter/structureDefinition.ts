@@ -36,6 +36,7 @@
  */
 
 import type { CRLError } from "../types/errors";
+import type { CaseFeatureProfileShape } from "../emit/resourceEmitRegistry";
 
 import { localCodeSystemUrl } from "./slug";
 import { libraryCanonicalUrl } from "./library";
@@ -73,6 +74,73 @@ function sdcExtractValue(profileUrl: string, elementId: string, expression: stri
       },
     ],
   };
+}
+
+/**
+ * The case-feature StructureDefinition `differential.element[]` for a concept's NATURAL resource — #189 2d, the
+ * per-resource generalization of the old hardcoded Observation profile (charter §4 "case-features are ANY
+ * resource"). Driven entirely by the registry `CaseFeatureProfileShape` — NO resource switch here (panel disc
+ * 481). Emits: the resource root; the coding element (`Condition.code` / `MedicationRequest.medication[x]`) with a
+ * `patternCodeableConcept` fixing the concept's local code; a `value[x]` element ONLY when the concept READS a
+ * value (a valueless-existence `exists this` concept carries NONE — the old always-boolean `value[x]` was the
+ * hack); and the `sdc-questionnaire-definitionExtractValue`-wired `subject` + recency elements.
+ *
+ * The DTR-answerability form of the valueless coding element (a `binding`/`answerOption` making it a questionnaire
+ * question, verified in the `$apply` harness) is a SEPARATE step; the `patternCodeableConcept` here fixes the code
+ * correctly for the CQL/CEL round-trip (`[<R>: <code>]` matches the emitted record).
+ */
+export function caseFeatureDifferential(
+  profile: CaseFeatureProfileShape,
+  coding: { system: string; code: string; display: string },
+  sdUrl: string,
+): Array<Record<string, unknown>> {
+  const rt = profile.resourceType;
+  const codingIsChoice = profile.codingElementPath.endsWith("[x]");
+  const elements: Array<Record<string, unknown>> = [
+    { id: rt, path: rt },
+    {
+      id: `${rt}.${profile.codingElementPath}`,
+      path: `${rt}.${profile.codingElementPath}`,
+      min: 1,
+      max: "1",
+      mustSupport: true,
+      // A choice coding element (`medication[x]`) must pin the CodeableConcept variant; a plain `code` element is
+      // already a CodeableConcept.
+      ...(codingIsChoice ? { type: [{ code: "CodeableConcept" }] } : {}),
+      patternCodeableConcept: {
+        coding: [{ system: coding.system, code: coding.code, display: coding.display }],
+      },
+    },
+  ];
+  if (profile.value !== undefined) {
+    elements.push({
+      id: `${rt}.${profile.value.elementPath}`,
+      path: `${rt}.${profile.value.elementPath}`,
+      min: 1,
+      max: "1",
+      mustSupport: true,
+      type: [{ code: profile.value.typeCode }],
+    });
+  }
+  elements.push({
+    extension: [sdcExtractValue(sdUrl, `${rt}.${profile.subjectElementPath}`, "%resource.subject")],
+    id: `${rt}.${profile.subjectElementPath}`,
+    path: `${rt}.${profile.subjectElementPath}`,
+    min: 1,
+    max: "1",
+    mustSupport: true,
+    type: [{ code: "Reference", targetProfile: [PATIENT_SD] }],
+  });
+  elements.push({
+    extension: [sdcExtractValue(sdUrl, `${rt}.${profile.recencyElementPath}`, "%resource.authored")],
+    id: `${rt}.${profile.recencyElementPath}`,
+    path: `${rt}.${profile.recencyElementPath}`,
+    min: 1,
+    max: "1",
+    mustSupport: true,
+    type: [{ code: "dateTime" }],
+  });
+  return elements;
 }
 
 /**

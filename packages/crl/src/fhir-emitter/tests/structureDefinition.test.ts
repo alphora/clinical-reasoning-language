@@ -9,9 +9,11 @@ import {
 } from "../closureOrchestrator";
 import {
   caseFeatureCanonicalUrl,
+  caseFeatureDifferential,
   caseFeatureId,
   emitCaseFeatureStructureDefinition,
 } from "../structureDefinition";
+import { caseFeatureProfileShape } from "../../emit/resourceEmitRegistry";
 import { CPG_FEATURE_EXPRESSION_EXT } from "../types";
 import type { CpgMetadata, EmittedResource } from "../types";
 
@@ -310,5 +312,59 @@ describe("case-feature emit — dangling featureExpression reference is caught b
     };
     const errors = applyInvariant2([sdWithRef(target), lib], new Set(), METADATA);
     expect(errors.some((e) => e.kind === "unresolved-feature-expression-reference")).toBe(false);
+  });
+});
+
+describe("#189 2d — caseFeatureDifferential (natural-resource, descriptor-driven)", () => {
+  const SDURL = "http://ex.org/StructureDefinition/g-flag";
+  const CODING = { system: "http://ex.org/CodeSystem/g-local", code: "g-flag", display: "G Flag" };
+  const idsOf = (els: Array<Record<string, unknown>>) => els.map((e) => e.id);
+
+  it("a VALUELESS Condition (`exists this`) → Condition, code pattern, subject + recordedDate, NO value[x]", () => {
+    const els = caseFeatureDifferential(caseFeatureProfileShape("Condition")!, CODING, SDURL);
+    expect(idsOf(els)).toEqual(["Condition", "Condition.code", "Condition.subject", "Condition.recordedDate"]);
+    // code element carries the local coding as a pattern, no value element anywhere.
+    const codeEl = els.find((e) => e.id === "Condition.code")!;
+    expect(codeEl.patternCodeableConcept).toEqual({ coding: [CODING] });
+    expect(els.some((e) => String(e.id).includes("value"))).toBe(false);
+    // recency element is the plain `recordedDate` (not `effectiveDateTime`, not `effective[x]`), dateTime-typed.
+    const rec = els.find((e) => e.id === "Condition.recordedDate")!;
+    expect(rec.type).toEqual([{ code: "dateTime" }]);
+  });
+
+  it("a VALUELESS Observation (`exists this`) → Observation, code pattern, subject + effective[x], NO value[x]", () => {
+    const els = caseFeatureDifferential(caseFeatureProfileShape("Observation")!, CODING, SDURL);
+    expect(idsOf(els)).toEqual([
+      "Observation",
+      "Observation.code",
+      "Observation.subject",
+      "Observation.effective[x]",
+    ]);
+    expect(els.some((e) => String(e.id).includes("value"))).toBe(false);
+  });
+
+  it("a VALUE-READING Observation (`most recent this`, boolean) → adds Observation.value[x] boolean", () => {
+    const profile = caseFeatureProfileShape("Observation", { valueElement: "value", datumValueType: "boolean" })!;
+    const els = caseFeatureDifferential(profile, CODING, SDURL);
+    expect(idsOf(els)).toEqual([
+      "Observation",
+      "Observation.code",
+      "Observation.value[x]",
+      "Observation.subject",
+      "Observation.effective[x]",
+    ]);
+    const valEl = els.find((e) => e.id === "Observation.value[x]")!;
+    expect(valEl.type).toEqual([{ code: "boolean" }]);
+  });
+
+  it("subject + recency carry the sdc-questionnaire-definitionExtractValue extension wired to %resource", () => {
+    const els = caseFeatureDifferential(caseFeatureProfileShape("Condition")!, CODING, SDURL);
+    const subject = els.find((e) => e.id === "Condition.subject")! as { extension: Array<{ extension: Array<{ url: string; valueExpression?: { expression: string } }> }> };
+    const expr = subject.extension[0].extension.find((x) => x.url === "expression")!;
+    expect(expr.valueExpression!.expression).toBe("%resource.subject");
+    const rec = els.find((e) => e.id === "Condition.recordedDate")! as typeof subject;
+    expect(rec.extension[0].extension.find((x) => x.url === "expression")!.valueExpression!.expression).toBe(
+      "%resource.authored",
+    );
   });
 });
