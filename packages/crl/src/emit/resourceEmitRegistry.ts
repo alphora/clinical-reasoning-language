@@ -191,3 +191,65 @@ export function recencyStampJsonName(recency: RecencyAccess): JsonNameResult {
       return { jsonName: choiceElementJsonName(expr, "dateTime") }; // choice populated with the dateTime variant
   }
 }
+
+// ── #189 2d: case-feature StructureDefinition profile shape ───────────────────────────────────────────────
+// The SD-DIFFERENTIAL model spelling — a THIRD spelling distinct from the CQL-read row (`effective`) and the
+// JSON-write name (`effectiveDateTime`): an SD element `id`/`path` uses the FHIR MODEL name — a choice element
+// keeps its `[x]` (`Observation.effective[x]`), a plain element is itself (`Condition.recordedDate`). Deriving
+// the case-feature profile from the registry (not a second resource switch in `structureDefinition.ts`) keeps the
+// per-resource knowledge in one place (panel disc 481). Consumes a resourceType + the concept's value datum;
+// fail-closed `undefined` for an unlisted resource (the caller emits `unsupported-casefeature-resource`).
+
+/** The SD-model element name for a resource's retrieve coding: a plain `CodeableConcept` is its own element
+ *  (`code`); a choice element keeps its `[x]` (`medication[x]`). NOT the JSON write name (`medicationCodeableConcept`
+ *  — that is `codingJsonName`), NOT the CQL read (`medication`). */
+function codingElementModelPath(coding: CodingStrategy): string {
+  return coding.kind === "codeable-concept" ? coding.field : `${coding.field}[x]`;
+}
+
+/** The SD-model element name for a resource's recency stamp: a `cast:"dateTime"` sort is a choice element
+ *  (`effective[x]`/`performed[x]`); a `cast:"none"` sort is a plain top-level element (`recordedDate`/`authoredOn`). */
+function recencyElementModelPath(recency: RecencyAccess): string {
+  return recency.cast === "dateTime" ? `${recency.sortExpr}[x]` : recency.sortExpr;
+}
+
+/** The differential shape a case-feature StructureDefinition needs for one resource — the natural-resource
+ *  generalization of the old hardcoded Observation profile (#189 2d; charter §4 "case-features are ANY resource").
+ *  `value` is present iff the concept READS a value (a value-reading reduction on a value-bearing resource); a
+ *  valueless-existence concept (`exists this`, the common case) carries NO value element regardless of the
+ *  resource's inherent value-bearing-ness. `subject` is the invariant patient-reference element — constant across
+ *  every registry resource (Condition/Observation/Procedure/ServiceRequest/MedicationRequest all use `.subject`). */
+export interface CaseFeatureProfileShape {
+  resourceType: string;
+  baseDefinition: string;
+  codingElementPath: string;
+  recencyElementPath: string;
+  /** Always `subject` for the registry subset — pinned as an invariant, not a per-row field. */
+  subjectElementPath: string;
+  /** Present iff the concept reads a value (never for `exists this`). `elementPath` is the model `value[x]`
+   *  carrier; `typeCode` is the concept's datum value type. */
+  value?: { elementPath: string; typeCode: string };
+}
+
+/** Derive the case-feature SD profile shape for a resource, or `undefined` when the resource is not in the emit
+ *  registry (caller fails closed with `unsupported-casefeature-resource`). `valueDatum` is the concept's read
+ *  value (from the effective-representation descriptor) — omitted for a valueless-existence concept. Only the
+ *  standard `value[x]` carrier is mapped (matching T2's `valueJsonName` boundary); a non-`value` carrier is the
+ *  T3 model-info concern (design §8) and must be gated by the caller before calling this. */
+export function caseFeatureProfileShape(
+  resourceType: string,
+  valueDatum?: { valueElement: string; datumValueType: string },
+): CaseFeatureProfileShape | undefined {
+  const row = resourceEmitRow(resourceType);
+  if (row === undefined) return undefined;
+  return {
+    resourceType,
+    baseDefinition: `http://hl7.org/fhir/StructureDefinition/${resourceType}`,
+    codingElementPath: codingElementModelPath(row.coding),
+    recencyElementPath: recencyElementModelPath(row.recency),
+    subjectElementPath: "subject",
+    ...(valueDatum !== undefined && valueDatum.valueElement === "value"
+      ? { value: { elementPath: "value[x]", typeCode: valueDatum.datumValueType } }
+      : {}),
+  };
+}

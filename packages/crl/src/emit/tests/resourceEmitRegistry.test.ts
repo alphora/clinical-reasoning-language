@@ -8,6 +8,7 @@ import {
 } from "../effectiveRepresentation";
 import {
   RESOURCE_EMIT_REGISTRY,
+  caseFeatureProfileShape,
   codingJsonName,
   valueJsonName,
   recencyStampJsonName,
@@ -95,6 +96,54 @@ describe("T2 write-name resolvers — valueJsonName (name axis; SPELLING, not le
       "errorKind",
       "value-element-unmappable",
     );
+  });
+});
+
+describe("#189 2d — caseFeatureProfileShape (SD-model spelling, the THIRD spelling)", () => {
+  // The SD-element model spelling per row — distinct from BOTH the JSON write name (`effectiveDateTime`) and the
+  // CQL read (`effective`). A choice element keeps its `[x]`; a plain element is itself. Keyed by resourceType so
+  // a row mutation fails the pin (same discipline as the T2 matrix above).
+  const EXPECTED_MODEL: Record<string, { coding: string; recency: string; base: string }> = {
+    Observation: { coding: "code", recency: "effective[x]", base: "http://hl7.org/fhir/StructureDefinition/Observation" },
+    Condition: { coding: "code", recency: "recordedDate", base: "http://hl7.org/fhir/StructureDefinition/Condition" },
+    Procedure: { coding: "code", recency: "performed[x]", base: "http://hl7.org/fhir/StructureDefinition/Procedure" },
+    ServiceRequest: { coding: "code", recency: "authoredOn", base: "http://hl7.org/fhir/StructureDefinition/ServiceRequest" },
+    MedicationRequest: { coding: "medication[x]", recency: "authoredOn", base: "http://hl7.org/fhir/StructureDefinition/MedicationRequest" },
+  };
+
+  it("EXPECTED_MODEL covers exactly the registry rows (a new row cannot ship without its SD-model pin)", () => {
+    expect(Object.keys(EXPECTED_MODEL).sort()).toEqual(Object.keys(RESOURCE_EMIT_REGISTRY).sort());
+  });
+
+  for (const [resourceType, expected] of Object.entries(EXPECTED_MODEL)) {
+    it(`${resourceType} → coding element \`${expected.coding}\`, recency element \`${expected.recency}\``, () => {
+      const shape = caseFeatureProfileShape(resourceType);
+      expect(shape, `${resourceType} must produce a shape`).toBeDefined();
+      expect(shape!.codingElementPath).toBe(expected.coding);
+      expect(shape!.recencyElementPath).toBe(expected.recency);
+      expect(shape!.baseDefinition).toBe(expected.base);
+      expect(shape!.subjectElementPath).toBe("subject"); // invariant across the subset
+    });
+  }
+
+  it("valueless-existence (no value datum) → NO value element", () => {
+    const shape = caseFeatureProfileShape("Condition");
+    expect(shape!.value).toBeUndefined();
+  });
+
+  it("a value-reading concept → a value[x] element carrying the datum type (spelling, not legality)", () => {
+    const shape = caseFeatureProfileShape("Observation", { valueElement: "value", datumValueType: "boolean" });
+    expect(shape!.value).toEqual({ elementPath: "value[x]", typeCode: "boolean" });
+  });
+
+  it("a non-standard value carrier is NOT mapped here (T3 model-info boundary) → no value element", () => {
+    const shape = caseFeatureProfileShape("Observation", { valueElement: "interpretation", datumValueType: "boolean" });
+    expect(shape!.value).toBeUndefined();
+  });
+
+  it("fail-closed: an unlisted resource → undefined (caller emits unsupported-casefeature-resource)", () => {
+    expect(caseFeatureProfileShape("Encounter")).toBeUndefined();
+    expect(caseFeatureProfileShape("DiagnosticReport", { valueElement: "value", datumValueType: "boolean" })).toBeUndefined();
   });
 });
 
