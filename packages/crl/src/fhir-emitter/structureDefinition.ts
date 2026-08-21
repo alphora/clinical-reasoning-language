@@ -36,6 +36,7 @@
  */
 
 import type { CRLError } from "../types/errors";
+import { caseFeatureProfileShape } from "../emit/resourceEmitRegistry";
 import type { CaseFeatureProfileShape } from "../emit/resourceEmitRegistry";
 
 import { localCodeSystemUrl } from "./slug";
@@ -53,7 +54,6 @@ import type { CpgMetadata, EmitOptions, EmittedResource } from "./types";
 // source for the case-feature profile shape).
 const CPG_CASEFEATURE_PROFILE =
   "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-publishablecasefeature";
-const OBSERVATION_SD = "http://hl7.org/fhir/StructureDefinition/Observation";
 const PATIENT_SD = "http://hl7.org/fhir/StructureDefinition/Patient";
 const SDC_DEFINITION_EXTRACT_VALUE =
   "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue";
@@ -267,6 +267,16 @@ export function emitCaseFeatureStructureDefinition(
   // `text/cql-identifier`).
   const featureExpressionCanonical = libraryCanonicalUrl(metadata, featureExpressionLibrarySuffix);
 
+  // #189 2d (transitional): the differential is now built from a `CaseFeatureProfileShape` via
+  // `caseFeatureDifferential`. This step pins the Observation+boolean profile — BYTE-IDENTICAL to the prior
+  // hardcoded profile — so the refactor is a pure no-op on the goldens; the next step derives the profile from
+  // the concept's effective-representation descriptor (natural resource, valueless-aware). `Observation` is always
+  // a registry row, so the shape is defined.
+  const caseFeatureProfile = caseFeatureProfileShape("Observation", {
+    valueElement: "value",
+    datumValueType: "boolean",
+  })!;
+
   const resource: Record<string, unknown> = {
     resourceType: "StructureDefinition",
     id,
@@ -291,54 +301,11 @@ export function emitCaseFeatureStructureDefinition(
     description,
     kind: "resource",
     abstract: false,
-    type: "Observation",
-    baseDefinition: OBSERVATION_SD,
+    type: caseFeatureProfile.resourceType,
+    baseDefinition: caseFeatureProfile.baseDefinition,
     derivation: "constraint",
     differential: {
-      element: [
-        { id: "Observation", path: "Observation" },
-        {
-          id: "Observation.code",
-          path: "Observation.code",
-          min: 1,
-          max: "1",
-          mustSupport: true,
-          patternCodeableConcept: {
-            coding: [{ system, code, display: conceptName }],
-          },
-        },
-        {
-          id: "Observation.value[x]",
-          path: "Observation.value[x]",
-          min: 1,
-          max: "1",
-          mustSupport: true,
-          type: [{ code: "boolean" }],
-        },
-        {
-          // sdc-questionnaire-definitionExtractValue: populate the EXTRACTED
-          // Observation's subject from the QuestionnaireResponse (`%resource`)
-          // so it is in-context (not an orphan) for downstream evaluation.
-          extension: [sdcExtractValue(url, "Observation.subject", "%resource.subject")],
-          id: "Observation.subject",
-          path: "Observation.subject",
-          min: 1,
-          max: "1",
-          mustSupport: true,
-          type: [{ code: "Reference", targetProfile: [PATIENT_SD] }],
-        },
-        {
-          // Effective time extracted from the QuestionnaireResponse.authored so
-          // the extracted Observation carries a clinically-meaningful timestamp.
-          extension: [sdcExtractValue(url, "Observation.effective[x]", "%resource.authored")],
-          id: "Observation.effective[x]",
-          path: "Observation.effective[x]",
-          min: 1,
-          max: "1",
-          mustSupport: true,
-          type: [{ code: "dateTime" }],
-        },
-      ],
+      element: caseFeatureDifferential(caseFeatureProfile, { system, code, display: conceptName }, url),
     },
   };
 
