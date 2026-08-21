@@ -219,6 +219,63 @@ is **false**. Explicit absence is an ordinary **absence code** (a record), not a
 - **`canonicalBase` is required** — absent/empty is an error, no `urn:` fallback. The local CodeSystem is
   always `<canonicalBase>/CodeSystem/<domain>-local`.
 
+### ⭐ Case-features are ANY resource — "Observation.boolean-only" is a HACK we are deleting
+
+**Read this before touching the case-feature / decision-input / DTR emit. It is the single most-repeated wrong
+turn.** A decision's **case-feature StructureDefinition is typed by the concept's own natural resource** — the
+concept's `type is` (Condition, Procedure, ServiceRequest, MedicationRequest, Observation, …), derived from its
+effective-representation descriptor. It is **never forced to Observation**.
+
+The old emitter restricted *every* `code is` concept's case-feature to an **`Observation` with a boolean
+`value[x]`** (the "LocalSource-always-boolean rule" in `structureDefinition.ts` / `closureOrchestrator.ts`).
+**That is a HACK** — a stopgap that squeezed all determinations into `Observation.valueBoolean` to stand up early
+Prior Auth. #189 (the emit-consistency flip) and its FHIR half (2d) **remove it**. The doctrine comments in that
+code describe the hack; they are **not** the model. When you see a `type is Condition` boolean concept emit an
+`Observation` case-feature SD, that is **the bug we are fixing**, not a constraint to respect.
+
+**Not every concept is a case feature — only NON-EPHEMERAL facts get an SD.** A case feature is a concept that
+denotes a **persistable / gatherable record** — an actual FHIR resource instance (Condition, Procedure, …) with a
+`code is` / representation. Those, and only those, get a case-feature StructureDefinition and a DTR questionnaire
+input. A **purely derived** concept — a reduction (`count`, `most recent`, `exists`), a `defined as` composition,
+any computed boolean — is **ephemeral**: it exists only as a value computed during CQL evaluation, has no resource
+of its own, and gets **CQL, not an SD**. Its case-features are the non-ephemeral **records it derives from**
+(collect *through* a reduction/composition to the code/representation-bearing operands). A concept that is *both*
+a record and a reduction (e.g. `code is` + `exists this`) is a case feature **via its record** — the SD describes
+the Condition, and its `featureExpression` targets the records define; the boolean is the ephemeral CQL reading.
+(A concept whose dependency closure reaches no `code is` / representation at all is authored null-forever — a
+validator concern, issue #291, not an emit one.)
+
+How the boolean is represented depends on the concept's natural resource — the descriptor's `valueless` flag is
+the discriminator:
+
+- **Valueless resource** (Condition, Procedure, ServiceRequest, MedicationRequest — the record has no value
+  element): the determination's truth is **`exists`, computed in CQL** over the record — closed-world (present =
+  true, absent = false). There is **no boolean value on the resource**; do NOT fabricate one (a Condition has no
+  boolean slot). DTR gathers the record **by its code** (verified: SDC `$extract` creates a Condition whose coding
+  element is the answer slot); existence of the coded record = the determination.
+- **Value-bearing Observation** (`type is Observation`, `value type is boolean` — the record genuinely carries a
+  value): the boolean **legitimately lives in `Observation.value`** and is **read** in CQL. This is a real
+  representation, **NOT** the hack.
+
+**The hack is not "storing a boolean" — it is FORCING every concept into `Observation.valueBoolean` regardless of
+its declared `type is`.** A genuine boolean Observation is fine; coercing a `type is Condition` (valueless) concept
+into one is the bug. The two distinct types (charter §3) remain: the **representation datum** (the record — for a
+valueless resource, coding with no value element) and the **published result** (`Scalar<Boolean>`, from `exists`
+for a valueless record or from *reading* the value for a boolean Observation).
+
+**Therefore, when reasoning about case-features / DTR / `$apply`, do NOT:**
+
+- fabricate a boolean value on a **valueless** resource (Condition/Procedure/…) — its determination is `exists`
+  (a genuine boolean Observation carrying `value` is a different, legitimate case);
+- treat "fall back to Observation-only" as an acceptable outcome (**that IS the hack** — the fix is per-resource
+  case-features; a resource that cannot yet be proven fails **loud** (`unsupported-casefeature-resource`), it is
+  never quietly re-hacked to Observation);
+- read the `structureDefinition.ts` / `closureOrchestrator.ts` "always-boolean" doctrine as authoritative — it is
+  the code we are removing.
+
+**Patient is the one supplied exception** (charter §2): PA supplies the Patient resource, so a Patient/age
+determination is *read*, not gathered via a questionnaire case-feature.
+
 ---
 
 ## 5. Scope & maturity — read the examples correctly
@@ -245,6 +302,9 @@ When you review CRL logic, emit, or representation design, measure it against **
 - A concept is **self-describing**: its **value type** decides whether a reduction is owed; its **cardinality**
   is declared; its CQL is **context-free**.
 - The emitter manufactures **nothing** — flag any place a value appears that the concept didn't declare.
+- **Case-features are any resource** (§4): flag any reasoning that forces a case-feature to Observation, invents a
+  boolean value to store on a resource, or treats "Observation-only fallback" as acceptable — that is the hack
+  being removed, not the model.
 - QM artifacts are **provisional**; the capabilities they exercised (`sem-and`/`sem-not`) are not.
 
 ---
