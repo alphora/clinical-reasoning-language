@@ -1,6 +1,6 @@
-# CMS22 Inferred Concepts
+# CMS22 Inferences Concepts
 
-library "cms22-Inferred".
+library "cms22-Inferences".
 
 // ============ Runtime parameters ============
 // "Measurement Period" is a runtime CQL parameter (issue #59) — declared in
@@ -20,9 +20,9 @@ concept "BP Evaluation Encounter (not virtual)":
 - value type is CodeableConcept.
 - defined as
 (
-   "cms22-RecordSource"."BP Screening Encounters"
+   "cms22-ExternalPrimitives"."BP Screening Encounters"
    sem-and
-   sem-not "cms22-RecordSource"."Virtual Encounters"
+   sem-not "cms22-ExternalPrimitives"."Virtual Encounters"
 ).
 
 concept "BP Evaluation Encounter (not virtual) During MP":
@@ -51,12 +51,12 @@ concept "Qualifying Encounter":
 concept "Systolic Code Component of BP Panels":
 - type is Observation.
 - value type is Quantity.
-- definition is "cms22-RecordSource"."Systolic Blood Pressure Code" component of "cms22-RecordSource"."Blood Pressure Panels".
+- definition is "cms22-ExternalPrimitives"."Systolic Blood Pressure Code" component of "cms22-ExternalPrimitives"."Blood Pressure Panels".
 
 concept "Diastolic Code Component of BP Panels":
 - type is Observation.
 - value type is Quantity.
-- definition is "cms22-RecordSource"."Diastolic Blood Pressure Code" component of "cms22-RecordSource"."Blood Pressure Panels".
+- definition is "cms22-ExternalPrimitives"."Diastolic Blood Pressure Code" component of "cms22-ExternalPrimitives"."Blood Pressure Panels".
 
 concept "Systolic BP Reading":
 - type is Observation.
@@ -74,7 +74,7 @@ concept "Diastolic BP Reading":
 concept "Last BP Panels On Qualifying Encounter Day":
 - type is Observation.
 - value type is CodeableConcept.
-- definition is last "cms22-RecordSource"."Blood Pressure Panels" on day of "Qualifying Encounter".
+- definition is last "cms22-ExternalPrimitives"."Blood Pressure Panels" on day of "Qualifying Encounter".
 
 concept "Last BP Panel on Qualifying Encounter Day":
 - type is Observation.
@@ -84,12 +84,12 @@ concept "Last BP Panel on Qualifying Encounter Day":
 concept "Systolic Code Component of Last BP Panel On Encounter Day":
 - type is Observation.
 - value type is Quantity.
-- definition is "cms22-RecordSource"."Systolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
+- definition is "cms22-ExternalPrimitives"."Systolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
 
 concept "Diastolic Code Component of Last BP Panel On Encounter Day":
 - type is Observation.
 - value type is Quantity.
-- definition is "cms22-RecordSource"."Diastolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
+- definition is "cms22-ExternalPrimitives"."Diastolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
 
 concept "Last Systolic on Qualifying Encounter Day":
 - type is Observation.
@@ -185,7 +185,7 @@ concept "Hypertensive Reading":
 concept "Last BP Panels Within Year Prior To Qualifying Encounter":
 - type is Observation.
 - value type is CodeableConcept.
-- definition is last "cms22-RecordSource"."Blood Pressure Panels" within 1 year before start of "Qualifying Encounter".
+- definition is last "cms22-ExternalPrimitives"."Blood Pressure Panels" within 1 year before start of "Qualifying Encounter".
 
 concept "Last BP Panel Within Year Prior to Qualifying Encounter":
 - type is Observation.
@@ -195,12 +195,12 @@ concept "Last BP Panel Within Year Prior to Qualifying Encounter":
 concept "Systolic Code Component of Prior-Year Last BP Panel":
 - type is Observation.
 - value type is Quantity.
-- definition is "cms22-RecordSource"."Systolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
+- definition is "cms22-ExternalPrimitives"."Systolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
 
 concept "Diastolic Code Component of Prior-Year Last BP Panel":
 - type is Observation.
 - value type is Quantity.
-- definition is "cms22-RecordSource"."Diastolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
+- definition is "cms22-ExternalPrimitives"."Diastolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
 
 concept "Prior-Year Last Systolic":
 - type is Observation.
@@ -305,12 +305,12 @@ concept "Second Hypertensive Reading 140+":
 concept "Follow-up Within 4 Weeks Ordered":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- definition is "cms22-RecordSource"."Follow-up Within 4 Weeks" ordered.
+- definition is "cms22-ExternalPrimitives"."Follow-up Within 4 Weeks" ordered.
 
 concept "Follow-up Within 6 Months Ordered":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- definition is "cms22-RecordSource"."Follow-up Within 6 Months" ordered.
+- definition is "cms22-ExternalPrimitives"."Follow-up Within 6 Months" ordered.
 
 concept "Four-Week Rescreen Order":
 - type is ServiceRequest.
@@ -327,15 +327,15 @@ concept "Non-Pharmacological Recommendations":
 - value type is CodeableConcept.
 - defined as
 (
-   "cms22-RecordSource"."Lifestyle Recommendations"
+   "cms22-ExternalPrimitives"."Lifestyle Recommendations"
    sem-or
-   "cms22-RecordSource"."Weight Reduction Recommendations"
+   "cms22-ExternalPrimitives"."Weight Reduction Recommendations"
    sem-or
-   "cms22-RecordSource"."Dietary Recommendations"
+   "cms22-ExternalPrimitives"."Dietary Recommendations"
    sem-or
-   "cms22-RecordSource"."Physical Activity Recommendations"
+   "cms22-ExternalPrimitives"."Physical Activity Recommendations"
    sem-or
-   "cms22-RecordSource"."Alcohol Counseling Referrals"
+   "cms22-ExternalPrimitives"."Alcohol Counseling Referrals"
 ).
 
 concept "Non-Pharmacological Recommendations Ordered":
@@ -353,11 +353,11 @@ concept "Hypertension Lab or ECG Requests":
 - value type is CodeableConcept.
 - defined as
 (
-   "cms22-RecordSource"."EKG 12-Lead Panel Requests"
+   "cms22-ExternalPrimitives"."EKG 12-Lead Panel Requests"
    sem-or
-   "cms22-RecordSource"."EKG Study Requests"
+   "cms22-ExternalPrimitives"."EKG Study Requests"
    sem-or
-   "cms22-RecordSource"."Hypertension Lab Tests"
+   "cms22-ExternalPrimitives"."Hypertension Lab Tests"
 ).
 
 concept "Hypertension Lab or ECG Requests Ordered":
@@ -373,7 +373,7 @@ concept "Hypertension Lab or ECG Order":
 concept "Antihypertensive Medications Ordered":
 - type is MedicationRequest.
 - value type is CodeableConcept.
-- definition is "cms22-RecordSource"."Antihypertensive Medications" ordered.
+- definition is "cms22-ExternalPrimitives"."Antihypertensive Medications" ordered.
 
 concept "Antihypertensive Medication Order":
 - type is MedicationRequest.
@@ -383,12 +383,12 @@ concept "Antihypertensive Medication Order":
 concept "Primary-Care Referral Justified by Hypertensive Reading":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- definition is "cms22-RecordSource"."Primary-Care Referrals" justified by "cms22-RecordSource"."Hypertensive Reading Findings".
+- definition is "cms22-ExternalPrimitives"."Primary-Care Referrals" justified by "cms22-ExternalPrimitives"."Hypertensive Reading Findings".
 
 concept "Primary-Care Referrals Ordered":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- definition is "cms22-RecordSource"."Primary-Care Referrals" ordered.
+- definition is "cms22-ExternalPrimitives"."Primary-Care Referrals" ordered.
 
 concept "Referral for Hypertensive Reading":
 - type is ServiceRequest.
@@ -580,7 +580,7 @@ concept "Second HTN 140+ With Followup":
 concept "Hypertension Diagnoses Verified":
 - type is Condition.
 - value type is CodeableConcept.
-- definition is "cms22-RecordSource"."Hypertension Diagnoses" verified.
+- definition is "cms22-ExternalPrimitives"."Hypertension Diagnoses" verified.
 
 concept "Verified Hypertension":
 - type is Condition.
@@ -605,18 +605,18 @@ concept "BP Measurement Sources":
 - value type is CodeableConcept.
 - defined as
 (
-   "cms22-RecordSource"."Blood Pressure Panels"
+   "cms22-ExternalPrimitives"."Blood Pressure Panels"
    sem-or
-   "cms22-RecordSource"."Standalone Systolic BP Observations"
+   "cms22-ExternalPrimitives"."Standalone Systolic BP Observations"
    sem-or
-   "cms22-RecordSource"."Standalone Diastolic BP Observations"
+   "cms22-ExternalPrimitives"."Standalone Diastolic BP Observations"
 ).
 
 concept "BP Measurement Sources Not Done With Reason":
 - type is Observation.
 - value type is CodeableConcept.
 - shape is RecordSet.
-- definition is "BP Measurement Sources" not done with reason ("cms22-RecordSource"."Medical Reasons" or "cms22-RecordSource"."Patient Declined Reasons").
+- definition is "BP Measurement Sources" not done with reason ("cms22-ExternalPrimitives"."Medical Reasons" or "cms22-ExternalPrimitives"."Patient Declined Reasons").
 
 concept "BP Measurement Sources Same Day As Qualifying Encounter":
 - type is Observation.
@@ -650,32 +650,32 @@ concept "BP Measurement Not Done With Reason":
 concept "Follow-up Within 4 Weeks Declined by Patient":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- definition is "cms22-RecordSource"."Follow-up Within 4 Weeks" not done with reason "cms22-RecordSource"."Patient Declined Reasons".
+- definition is "cms22-ExternalPrimitives"."Follow-up Within 4 Weeks" not done with reason "cms22-ExternalPrimitives"."Patient Declined Reasons".
 
 concept "Follow-up Within 6 Months Declined by Patient":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- definition is "cms22-RecordSource"."Follow-up Within 6 Months" not done with reason "cms22-RecordSource"."Patient Declined Reasons".
+- definition is "cms22-ExternalPrimitives"."Follow-up Within 6 Months" not done with reason "cms22-ExternalPrimitives"."Patient Declined Reasons".
 
 concept "Primary-Care Referrals Declined by Patient":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- definition is "cms22-RecordSource"."Primary-Care Referrals" not done with reason "cms22-RecordSource"."Patient Declined Reasons".
+- definition is "cms22-ExternalPrimitives"."Primary-Care Referrals" not done with reason "cms22-ExternalPrimitives"."Patient Declined Reasons".
 
 concept "Non-Pharmacological Recommendations Declined by Patient":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- definition is "Non-Pharmacological Recommendations" not done with reason "cms22-RecordSource"."Patient Declined Reasons".
+- definition is "Non-Pharmacological Recommendations" not done with reason "cms22-ExternalPrimitives"."Patient Declined Reasons".
 
 concept "Hypertension Lab or ECG Requests Declined by Patient":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- definition is "Hypertension Lab or ECG Requests" not done with reason "cms22-RecordSource"."Patient Declined Reasons".
+- definition is "Hypertension Lab or ECG Requests" not done with reason "cms22-ExternalPrimitives"."Patient Declined Reasons".
 
 concept "Antihypertensive Medications Declined by Patient":
 - type is MedicationRequest.
 - value type is CodeableConcept.
-- definition is "cms22-RecordSource"."Antihypertensive Medications" not done with reason "cms22-RecordSource"."Patient Declined Reasons".
+- definition is "cms22-ExternalPrimitives"."Antihypertensive Medications" not done with reason "cms22-ExternalPrimitives"."Patient Declined Reasons".
 
 concept "Four-Week Rescreen Declined":
 - type is ServiceRequest.

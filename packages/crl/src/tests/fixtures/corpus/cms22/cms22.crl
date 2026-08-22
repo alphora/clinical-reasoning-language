@@ -12,7 +12,7 @@ library "cms22".
 concept "Initial Population":
 - type is Observation.
 - value type is boolean.
-- defined as "cms22-Inferred"."Aged 18+ at Measurement Period Start".
+- defined as "cms22-Inferences"."Aged 18+ at Measurement Period Start".
 
 concept "Denominator":
 - type is Observation.
@@ -22,22 +22,22 @@ concept "Denominator":
 concept "Denominator Exclusions":
 - type is Observation.
 - value type is CodeableConcept.
-- defined as "cms22-Inferred"."Verified Hypertension As Of Qualifying Encounter".
+- defined as "cms22-Inferences"."Verified Hypertension As Of Qualifying Encounter".
 
 concept "Numerator":
 - type is Observation.
 - value type is boolean.
 - defined as
 (
-   "cms22-Inferred"."Normal BP Reading"
+   "cms22-Inferences"."Normal BP Reading"
    or
-   "cms22-Inferred"."Elevated BP With Followup"
+   "cms22-Inferences"."Elevated BP With Followup"
    or
-   "cms22-Inferred"."First HTN With Followup"
+   "cms22-Inferences"."First HTN With Followup"
    or
-   "cms22-Inferred"."Second HTN 130s With Followup"
+   "cms22-Inferences"."Second HTN 130s With Followup"
    or
-   "cms22-Inferred"."Second HTN 140+ With Followup"
+   "cms22-Inferences"."Second HTN 140+ With Followup"
 ).
 
 concept "Denominator Exceptions":
@@ -45,7 +45,7 @@ concept "Denominator Exceptions":
 - value type is boolean.
 - defined as
 (
-   "cms22-Inferred"."BP Measurement Not Done With Reason"
+   "cms22-Inferences"."BP Measurement Not Done With Reason"
    or
-   "cms22-Inferred"."HTN Followup Declined By Patient"
+   "cms22-Inferences"."HTN Followup Declined By Patient"
 ).

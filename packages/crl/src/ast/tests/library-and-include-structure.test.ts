@@ -95,7 +95,7 @@ include "Bar" version '1.0.0'.
 library "CMS22".
 include "CMS22 Concepts".
 include "CMS22 Asserted".
-include "CMS22 Inferred".
+include "CMS22 Inferences".
 include "CMS22 Interface".
 `;
       const ast: CRL = parseInput(input);

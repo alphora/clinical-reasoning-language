@@ -1,5 +1,5 @@
 # CMS22 inferred concepts (test)
-library "CMS22 Inferred".
+library "CMS22 Inferences".
 include "CMS22 Asserted".
 
 concept "Qualifying Encounter":

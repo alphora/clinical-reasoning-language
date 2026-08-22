@@ -159,7 +159,7 @@ describe("library — emitLibrariesForClosure (Δ5 collision)", () => {
     const { resources, errors } = emitLibrariesForClosure(
       [
         { libraryName: "Cms22Asserted", dependsOnCanonicals: [], cqlFileName: "Cms22Asserted.cql", libraryIdentity: "Cms22Asserted" },
-        { libraryName: "Cms22Inferred", dependsOnCanonicals: [VS_ANTI], cqlFileName: "Cms22Inferred.cql", libraryIdentity: "Cms22Inferred" },
+        { libraryName: "Cms22Inferences", dependsOnCanonicals: [VS_ANTI], cqlFileName: "Cms22Inferences.cql", libraryIdentity: "Cms22Inferences" },
       ],
       METADATA,
       { clock: FIXED_CLOCK },

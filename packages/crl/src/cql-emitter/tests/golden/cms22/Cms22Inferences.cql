@@ -1,18 +1,18 @@
-library Cms22Inferred
+library Cms22Inferences
 
 using FHIR version '4.0.1'
 
 include FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
-include Cms22RecordSource
+include Cms22ExternalPrimitives
 
 parameter "Measurement Period" Interval<DateTime>
 
 context Patient
 
 define "BP Evaluation Encounter (not virtual)":
-  Cms22RecordSource."BP Screening Encounters"
-    except Cms22RecordSource."Virtual Encounters"
+  Cms22ExternalPrimitives."BP Screening Encounters"
+    except Cms22ExternalPrimitives."Virtual Encounters"
 
 define "BP Evaluation Encounter (not virtual) During MP":
   CRLCommon.During("BP Evaluation Encounter (not virtual)", "Measurement Period")
@@ -25,10 +25,10 @@ define "Qualifying Encounter":
     intersect "BP Evaluation Encounter (not virtual) Performed"
 
 define "Systolic Code Component of BP Panels":
-  CRLCommon.ComponentOf(Cms22RecordSource."Blood Pressure Panels", Cms22RecordSource."Systolic Blood Pressure Code")
+  CRLCommon.ComponentOf(Cms22ExternalPrimitives."Blood Pressure Panels", Cms22ExternalPrimitives."Systolic Blood Pressure Code")
 
 define "Diastolic Code Component of BP Panels":
-  CRLCommon.ComponentOf(Cms22RecordSource."Blood Pressure Panels", Cms22RecordSource."Diastolic Blood Pressure Code")
+  CRLCommon.ComponentOf(Cms22ExternalPrimitives."Blood Pressure Panels", Cms22ExternalPrimitives."Diastolic Blood Pressure Code")
 
 define "Systolic BP Reading":
   "Systolic Code Component of BP Panels"
@@ -37,16 +37,16 @@ define "Diastolic BP Reading":
   "Diastolic Code Component of BP Panels"
 
 define "Last BP Panels On Qualifying Encounter Day":
-  { CRLCommon.LastOf(Cms22RecordSource."Blood Pressure Panels", CRLCommon.OnDayOf("Qualifying Encounter")) }
+  { CRLCommon.LastOf(Cms22ExternalPrimitives."Blood Pressure Panels", CRLCommon.OnDayOf("Qualifying Encounter")) }
 
 define "Last BP Panel on Qualifying Encounter Day":
   "Last BP Panels On Qualifying Encounter Day"
 
 define "Systolic Code Component of Last BP Panel On Encounter Day":
-  CRLCommon.ComponentOf("Last BP Panel on Qualifying Encounter Day", Cms22RecordSource."Systolic Blood Pressure Code")
+  CRLCommon.ComponentOf("Last BP Panel on Qualifying Encounter Day", Cms22ExternalPrimitives."Systolic Blood Pressure Code")
 
 define "Diastolic Code Component of Last BP Panel On Encounter Day":
-  CRLCommon.ComponentOf("Last BP Panel on Qualifying Encounter Day", Cms22RecordSource."Diastolic Blood Pressure Code")
+  CRLCommon.ComponentOf("Last BP Panel on Qualifying Encounter Day", Cms22ExternalPrimitives."Diastolic Blood Pressure Code")
 
 define "Last Systolic on Qualifying Encounter Day":
   "Systolic Code Component of Last BP Panel On Encounter Day"
@@ -91,16 +91,16 @@ define "Hypertensive Reading":
   "Last Systolic At Least 130" or "Last Diastolic At Least 80"
 
 define "Last BP Panels Within Year Prior To Qualifying Encounter":
-  { CRLCommon.LastOf(Cms22RecordSource."Blood Pressure Panels", CRLCommon.BeforeStartOf(1 'year', "Qualifying Encounter")) }
+  { CRLCommon.LastOf(Cms22ExternalPrimitives."Blood Pressure Panels", CRLCommon.BeforeStartOf(1 'year', "Qualifying Encounter")) }
 
 define "Last BP Panel Within Year Prior to Qualifying Encounter":
   "Last BP Panels Within Year Prior To Qualifying Encounter"
 
 define "Systolic Code Component of Prior-Year Last BP Panel":
-  CRLCommon.ComponentOf("Last BP Panel Within Year Prior to Qualifying Encounter", Cms22RecordSource."Systolic Blood Pressure Code")
+  CRLCommon.ComponentOf("Last BP Panel Within Year Prior to Qualifying Encounter", Cms22ExternalPrimitives."Systolic Blood Pressure Code")
 
 define "Diastolic Code Component of Prior-Year Last BP Panel":
-  CRLCommon.ComponentOf("Last BP Panel Within Year Prior to Qualifying Encounter", Cms22RecordSource."Diastolic Blood Pressure Code")
+  CRLCommon.ComponentOf("Last BP Panel Within Year Prior to Qualifying Encounter", Cms22ExternalPrimitives."Diastolic Blood Pressure Code")
 
 define "Prior-Year Last Systolic":
   "Systolic Code Component of Prior-Year Last BP Panel"
@@ -136,10 +136,10 @@ define "Second Hypertensive Reading 140+":
   "Second Hypertensive Reading 140+ Body" and "Prior-Year Hypertensive Reading"
 
 define "Follow-up Within 4 Weeks Ordered":
-  CRLCommon.WasOrdered(Cms22RecordSource."Follow-up Within 4 Weeks")
+  CRLCommon.WasOrdered(Cms22ExternalPrimitives."Follow-up Within 4 Weeks")
 
 define "Follow-up Within 6 Months Ordered":
-  CRLCommon.WasOrdered(Cms22RecordSource."Follow-up Within 6 Months")
+  CRLCommon.WasOrdered(Cms22ExternalPrimitives."Follow-up Within 6 Months")
 
 define "Four-Week Rescreen Order":
   "Follow-up Within 4 Weeks Ordered"
@@ -148,11 +148,11 @@ define "Six-Month Rescreen Order":
   "Follow-up Within 6 Months Ordered"
 
 define "Non-Pharmacological Recommendations":
-  Cms22RecordSource."Lifestyle Recommendations"
-    union Cms22RecordSource."Weight Reduction Recommendations"
-    union Cms22RecordSource."Dietary Recommendations"
-    union Cms22RecordSource."Physical Activity Recommendations"
-    union Cms22RecordSource."Alcohol Counseling Referrals"
+  Cms22ExternalPrimitives."Lifestyle Recommendations"
+    union Cms22ExternalPrimitives."Weight Reduction Recommendations"
+    union Cms22ExternalPrimitives."Dietary Recommendations"
+    union Cms22ExternalPrimitives."Physical Activity Recommendations"
+    union Cms22ExternalPrimitives."Alcohol Counseling Referrals"
 
 define "Non-Pharmacological Recommendations Ordered":
   CRLCommon.WasOrdered("Non-Pharmacological Recommendations")
@@ -161,9 +161,9 @@ define "Non-Pharmacological Recommendation Order":
   "Non-Pharmacological Recommendations Ordered"
 
 define "Hypertension Lab or ECG Requests":
-  Cms22RecordSource."EKG 12-Lead Panel Requests"
-    union Cms22RecordSource."EKG Study Requests"
-    union Cms22RecordSource."Hypertension Lab Tests"
+  Cms22ExternalPrimitives."EKG 12-Lead Panel Requests"
+    union Cms22ExternalPrimitives."EKG Study Requests"
+    union Cms22ExternalPrimitives."Hypertension Lab Tests"
 
 define "Hypertension Lab or ECG Requests Ordered":
   CRLCommon.WasOrdered("Hypertension Lab or ECG Requests")
@@ -172,16 +172,16 @@ define "Hypertension Lab or ECG Order":
   "Hypertension Lab or ECG Requests Ordered"
 
 define "Antihypertensive Medications Ordered":
-  CRLCommon.WasOrdered(Cms22RecordSource."Antihypertensive Medications")
+  CRLCommon.WasOrdered(Cms22ExternalPrimitives."Antihypertensive Medications")
 
 define "Antihypertensive Medication Order":
   "Antihypertensive Medications Ordered"
 
 define "Primary-Care Referral Justified by Hypertensive Reading":
-  CRLCommon.Justified(Cms22RecordSource."Primary-Care Referrals", Cms22RecordSource."Hypertensive Reading Findings")
+  CRLCommon.Justified(Cms22ExternalPrimitives."Primary-Care Referrals", Cms22ExternalPrimitives."Hypertensive Reading Findings")
 
 define "Primary-Care Referrals Ordered":
-  CRLCommon.WasOrdered(Cms22RecordSource."Primary-Care Referrals")
+  CRLCommon.WasOrdered(Cms22ExternalPrimitives."Primary-Care Referrals")
 
 define "Referral for Hypertensive Reading":
   "Primary-Care Referral Justified by Hypertensive Reading"
@@ -248,7 +248,7 @@ define "Second HTN 140+ With Followup":
   "Second Hypertensive Reading 140+" and "Second HTN 140+ Followup Bundle"
 
 define "Hypertension Diagnoses Verified":
-  CRLCommon.IsVerified(Cms22RecordSource."Hypertension Diagnoses")
+  CRLCommon.IsVerified(Cms22ExternalPrimitives."Hypertension Diagnoses")
 
 define "Verified Hypertension":
   "Hypertension Diagnoses Verified"
@@ -260,12 +260,12 @@ define "Verified Hypertension As Of Qualifying Encounter":
   "Verified Hypertension As Of Qualifying Encounter Narrative"
 
 define "BP Measurement Sources":
-  Cms22RecordSource."Blood Pressure Panels"
-    union Cms22RecordSource."Standalone Systolic BP Observations"
-    union Cms22RecordSource."Standalone Diastolic BP Observations"
+  Cms22ExternalPrimitives."Blood Pressure Panels"
+    union Cms22ExternalPrimitives."Standalone Systolic BP Observations"
+    union Cms22ExternalPrimitives."Standalone Diastolic BP Observations"
 
 define "BP Measurement Sources Not Done With Reason":
-  CRLCommon.NotDoneWithReason("BP Measurement Sources", (Cms22RecordSource."Medical Reasons" union Cms22RecordSource."Patient Declined Reasons"))
+  CRLCommon.NotDoneWithReason("BP Measurement Sources", (Cms22ExternalPrimitives."Medical Reasons" union Cms22ExternalPrimitives."Patient Declined Reasons"))
 
 define "BP Measurement Sources Same Day As Qualifying Encounter":
   CRLCommon.SameDay("BP Measurement Sources", "Qualifying Encounter")
@@ -278,22 +278,22 @@ define "BP Measurement Not Done With Reason":
   exists ("BP Measurement Sources Not Done On Encounter Day")
 
 define "Follow-up Within 4 Weeks Declined by Patient":
-  CRLCommon.NotDoneWithReason(Cms22RecordSource."Follow-up Within 4 Weeks", Cms22RecordSource."Patient Declined Reasons")
+  CRLCommon.NotDoneWithReason(Cms22ExternalPrimitives."Follow-up Within 4 Weeks", Cms22ExternalPrimitives."Patient Declined Reasons")
 
 define "Follow-up Within 6 Months Declined by Patient":
-  CRLCommon.NotDoneWithReason(Cms22RecordSource."Follow-up Within 6 Months", Cms22RecordSource."Patient Declined Reasons")
+  CRLCommon.NotDoneWithReason(Cms22ExternalPrimitives."Follow-up Within 6 Months", Cms22ExternalPrimitives."Patient Declined Reasons")
 
 define "Primary-Care Referrals Declined by Patient":
-  CRLCommon.NotDoneWithReason(Cms22RecordSource."Primary-Care Referrals", Cms22RecordSource."Patient Declined Reasons")
+  CRLCommon.NotDoneWithReason(Cms22ExternalPrimitives."Primary-Care Referrals", Cms22ExternalPrimitives."Patient Declined Reasons")
 
 define "Non-Pharmacological Recommendations Declined by Patient":
-  CRLCommon.NotDoneWithReason("Non-Pharmacological Recommendations", Cms22RecordSource."Patient Declined Reasons")
+  CRLCommon.NotDoneWithReason("Non-Pharmacological Recommendations", Cms22ExternalPrimitives."Patient Declined Reasons")
 
 define "Hypertension Lab or ECG Requests Declined by Patient":
-  CRLCommon.NotDoneWithReason("Hypertension Lab or ECG Requests", Cms22RecordSource."Patient Declined Reasons")
+  CRLCommon.NotDoneWithReason("Hypertension Lab or ECG Requests", Cms22ExternalPrimitives."Patient Declined Reasons")
 
 define "Antihypertensive Medications Declined by Patient":
-  CRLCommon.NotDoneWithReason(Cms22RecordSource."Antihypertensive Medications", Cms22RecordSource."Patient Declined Reasons")
+  CRLCommon.NotDoneWithReason(Cms22ExternalPrimitives."Antihypertensive Medications", Cms22ExternalPrimitives."Patient Declined Reasons")
 
 define "Four-Week Rescreen Declined":
   "Follow-up Within 4 Weeks Declined by Patient"

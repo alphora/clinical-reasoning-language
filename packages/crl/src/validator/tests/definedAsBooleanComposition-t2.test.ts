@@ -247,7 +247,7 @@ describe("T2 — corpus is untouched (no new boolean-composition diagnostics)", 
   // These two worked-corpus libraries build single-file today (T1 parse-superset). Assert build success (no
   // silent vacuous pass — disc 457) AND that the T2 family fires zero rules on them, in EITHER kind (the
   // structural guarantee is that the rules key on `DefinedAsBooleanComposition`, which no corpus form produces).
-  it.each(["cms22/cms22-inferred.crl", "cms69/cms69-inferred.crl"])(
+  it.each(["cms22/cms22-inferences.crl", "cms69/cms69-inferences.crl"])(
     "%s builds and introduces ZERO boolean-composition-* diagnostics",
     (rel) => {
       const built = buildCRL(readFileSync(path.join(CORPUS, rel), "utf8"));

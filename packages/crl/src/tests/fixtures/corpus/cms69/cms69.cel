@@ -22,13 +22,13 @@ fact "Jane Doe":
 fact "Baseline Wellness Visit":
 - code is "http://www.ama-assn.org/go/cpt|99395".
 - date is "2026-01-15".
-- defined by "cms69-RecordSource"."Encounters to Evaluate BMI".
+- defined by "cms69-ExternalPrimitives"."Encounters to Evaluate BMI".
 
 fact "High Baseline BMI":
 - code is "http://loinc.org|39156-5".
 - date is "2026-01-15".
 - value is 32.4.
-- defined by "cms69-RecordSource"."BMI Observations".
+- defined by "cms69-ExternalPrimitives"."BMI Observations".
 
 fact "Weight Assessment Referral Order":
 - code is "http://snomed.info/sct|306163007".
@@ -40,7 +40,7 @@ fact "Follow-up Normal BMI":
 - code is "http://loinc.org|39156-5".
 - date is "2026-07-15".
 - value is 24.1.
-- defined by "cms69-RecordSource"."BMI Observations".
+- defined by "cms69-ExternalPrimitives"."BMI Observations".
 
 
 // ============ Cases ============

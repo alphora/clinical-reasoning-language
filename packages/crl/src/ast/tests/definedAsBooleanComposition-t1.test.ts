@@ -244,14 +244,14 @@ describe("defined as ( boolean composition ) — corpus parse superset", () => {
   const CORPUS = path.join(REPO_ROOT, "src/tests/fixtures/corpus");
   const files = [
     "cms22/cms22.crl",
-    "cms22/cms22-inferred.crl",
-    "cms22/cms22-recordconcepts.crl",
-    "cms22/cms22-recordsource.crl",
+    "cms22/cms22-inferences.crl",
+    "cms22/cms22-externalconcepts.crl",
+    "cms22/cms22-externalprimitives.crl",
     "cms22/cms22-strategy.crl",
     "cms69/cms69.crl",
-    "cms69/cms69-inferred.crl",
-    "cms69/cms69-recordconcepts.crl",
-    "cms69/cms69-recordsource.crl",
+    "cms69/cms69-inferences.crl",
+    "cms69/cms69-externalconcepts.crl",
+    "cms69/cms69-externalprimitives.crl",
     "cms69/cms69-strategy.crl",
   ];
 

@@ -14,7 +14,7 @@ describe("resolveImports (end-to-end)", () => {
     expect(graph.resolvedLibraries.map((e) => e.name)).toEqual([
       "CMS22 Concepts",
       "CMS22 Asserted",
-      "CMS22 Inferred",
+      "CMS22 Inferences",
       "CMS22",
     ]);
     expect(graph.namespace.concepts.has("Initial Population")).toBe(true);

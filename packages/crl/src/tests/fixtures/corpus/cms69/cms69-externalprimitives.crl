@@ -1,6 +1,6 @@
 # CMS69 Asserted Concepts
 
-library "cms69-RecordSource".
+library "cms69-ExternalPrimitives".
 
 // "Pregnancy or Other Related Diagnoses" is a valueset (declared in
 // CMS69 Concepts) referenced as a classification argument in
@@ -10,7 +10,7 @@ library "cms69-RecordSource".
 concept "Pregnancy or Other Related Diagnoses":
 - type is Condition.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Pregnancy or Other Related Diagnoses".
+- coded from "cms69-ExternalConcepts"."Pregnancy or Other Related Diagnoses".
 
 
 // ============ Asserted concepts (unchanged) ============
@@ -18,79 +18,79 @@ concept "Pregnancy or Other Related Diagnoses":
 concept "BMI Observations":
 - type is Observation.
 - value type is Quantity.
-- coded from "cms69-RecordConcepts"."Body Mass Index Observations".
+- coded from "cms69-ExternalConcepts"."Body Mass Index Observations".
 
 concept "Pregnancy Diagnoses":
 - type is Condition.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Pregnancy or Other Related Diagnoses".
+- coded from "cms69-ExternalConcepts"."Pregnancy or Other Related Diagnoses".
 
 concept "Pregnancy Status Observations":
 - type is Observation.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Pregnancy Status".
+- coded from "cms69-ExternalConcepts"."Pregnancy Status".
 
 concept "Overweight or Obese Diagnoses":
 - type is Condition.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Overweight or Obese".
+- coded from "cms69-ExternalConcepts"."Overweight or Obese".
 
 concept "Underweight Diagnoses":
 - type is Condition.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Underweight".
+- coded from "cms69-ExternalConcepts"."Underweight".
 
 concept "Encounters to Evaluate BMI":
 - type is Encounter.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Encounter to Evaluate BMI".
+- coded from "cms69-ExternalConcepts"."Encounter to Evaluate BMI".
 
 concept "Virtual Encounters":
 - type is Encounter.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Virtual Encounter Class".
+- coded from "cms69-ExternalConcepts"."Virtual Encounter Class".
 
 concept "High BMI Follow-up Service Requests":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Follow Up for Above Normal BMI".
+- coded from "cms69-ExternalConcepts"."Follow Up for Above Normal BMI".
 
 concept "Low BMI Follow-up Service Requests":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Follow Up for Below Normal BMI".
+- coded from "cms69-ExternalConcepts"."Follow Up for Below Normal BMI".
 
 concept "Weight Assessment Referrals":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Referrals Where Weight Assessment May Occur".
+- coded from "cms69-ExternalConcepts"."Referrals Where Weight Assessment May Occur".
 
 concept "High BMI Medications":
 - type is MedicationRequest.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Medications for Above Normal BMI".
+- coded from "cms69-ExternalConcepts"."Medications for Above Normal BMI".
 
 concept "Low BMI Medications":
 - type is MedicationRequest.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Medications for Below Normal BMI".
+- coded from "cms69-ExternalConcepts"."Medications for Below Normal BMI".
 
 concept "High BMI Follow-up Procedures":
 - type is Procedure.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Follow Up for Above Normal BMI Procedures".
+- coded from "cms69-ExternalConcepts"."Follow Up for Above Normal BMI Procedures".
 
 concept "Low BMI Follow-up Procedures":
 - type is Procedure.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Follow Up for Below Normal BMI Procedures".
+- coded from "cms69-ExternalConcepts"."Follow Up for Below Normal BMI Procedures".
 
 concept "Medical Reasons":
 - type is Observation.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Medical Reason".
+- coded from "cms69-ExternalConcepts"."Medical Reason".
 
 concept "Patient Declined Reasons":
 - type is Observation.
 - value type is CodeableConcept.
-- coded from "cms69-RecordConcepts"."Patient Declined".
+- coded from "cms69-ExternalConcepts"."Patient Declined".

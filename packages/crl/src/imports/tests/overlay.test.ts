@@ -45,16 +45,16 @@ describe("overlay support (Chunk B prep)", () => {
 
   it("uses overlay text for a NON-root file in the project (live sibling edits)", () => {
     const rootPath = path.join(FIXTURES, "cms22-split", "cms22.crl");
-    const inferredPath = path.join(FIXTURES, "cms22-split", "cms22-inferred.crl");
+    const inferredPath = path.join(FIXTURES, "cms22-split", "cms22-inferences.crl");
     // Overlay rewrites the inferred sibling to declare a renamed concept.
     const overlays = new Map<string, string>([
       [
         inferredPath,
-        `# Overlay inferred\nlibrary "CMS22 Inferred".\ninclude "CMS22 Asserted".\n\nconcept "Renamed Encounter":\n- type is Encounter.\n- definition is "CMS22 Asserted"."Qualifying Encounter Source" performed.\n`,
+        `# Overlay inferred\nlibrary "CMS22 Inferences".\ninclude "CMS22 Asserted".\n\nconcept "Renamed Encounter":\n- type is Encounter.\n- definition is "CMS22 Asserted"."Qualifying Encounter Source" performed.\n`,
       ],
     ]);
     const result = validateCRLImports(rootPath, { overlays });
-    // The on-disk cms22.crl interface references "CMS22 Inferred"."Qualifying Encounter"
+    // The on-disk cms22.crl interface references "CMS22 Inferences"."Qualifying Encounter"
     // which no longer exists in the overlay sibling. Expect qualified-ref-unresolved.
     const err = result.validationErrors.find(
       (e) => e.kind === "qualified-ref-unresolved" && /Qualifying Encounter/.test(e.message),

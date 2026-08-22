@@ -47,10 +47,10 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // 4 layers: cms22 (interface) → inferred → asserted → concepts.
     // #227 — each name-keeping-root (`none`-path) library now emits under its
     // unified identity `S = pascalCaseNameForId(<name>)` (hyphen/space-free
-    // PascalCase), so `CMS22 Inferred` → `CMS22Inferred` etc. `CMS22` is already
+    // PascalCase), so `CMS22 Inferences` → `CMS22Inferences` etc. `CMS22` is already
     // PascalCase, so it is unchanged.
     const names = policyLibNames(result);
-    expect(names).toEqual(["CMS22", "CMS22Asserted", "CMS22Concepts", "CMS22Inferred"]);
+    expect(names).toEqual(["CMS22", "CMS22Asserted", "CMS22Concepts", "CMS22Inferences"]);
 
     // The interface library (the unsuffixed file) emits as `library CMS22`
     // — simple identifier, unquoted (CQL convention for the public entry
@@ -62,11 +62,11 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // The cms22 (interface) library has its IP concept + an include of
     // the inferred layer — rendered under the sibling's unified `S`.
     expect(cms22).toMatch(/define "Initial Population"/);
-    expect(cms22).toMatch(/include CMS22Inferred/);
+    expect(cms22).toMatch(/include CMS22Inferences/);
 
     // #227 — the space-carrying name renders under `S` (unquoted PascalCase id).
-    const inferred = findLib(result, "CMS22Inferred") ?? "";
-    expect(inferred).toMatch(/library CMS22Inferred\n/);
+    const inferred = findLib(result, "CMS22Inferences") ?? "";
+    expect(inferred).toMatch(/library CMS22Inferences\n/);
 
     // Cross-library qualified ref renders through `S`: `"CMS22 Asserted"."…"` →
     // `CMS22Asserted."Qualifying Encounter Source"`.
@@ -460,10 +460,10 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     const cms22 = result.cqlByLibrary.find((e) => e.libraryName === "CMS22");
     expect(cms22?.outputFilename).toBe("CMS22.cql");
     // #227 — the filename is derived from the unified identity `S`, so a
-    // space-carrying name emits `CMS22Inferred.cql` (was `CMS22 Inferred.cql`);
+    // space-carrying name emits `CMS22Inferences.cql` (was `CMS22 Inferences.cql`);
     // header, id, url-tail and filename now agree.
-    const inferred = result.cqlByLibrary.find((e) => e.libraryName === "CMS22Inferred");
-    expect(inferred?.outputFilename).toBe("CMS22Inferred.cql");
+    const inferred = result.cqlByLibrary.find((e) => e.libraryName === "CMS22Inferences");
+    expect(inferred?.outputFilename).toBe("CMS22Inferences.cql");
   });
 
   // v2.2 Todo 3 (issue #59) — cross-library parameter refs.

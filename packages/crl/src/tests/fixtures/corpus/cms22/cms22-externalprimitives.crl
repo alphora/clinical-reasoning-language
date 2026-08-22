@@ -1,122 +1,122 @@
 # CMS22 Asserted Concepts
 
-library "cms22-RecordSource".
+library "cms22-ExternalPrimitives".
 
 // ============ Asserted concepts (unchanged) ============
 
 concept "BP Screening Encounters":
 - type is Encounter.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Encounter to Screen for Blood Pressure".
+- coded from "cms22-ExternalConcepts"."Encounter to Screen for Blood Pressure".
 
 concept "Virtual Encounters":
 - type is Encounter.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Virtual Encounter Class".
+- coded from "cms22-ExternalConcepts"."Virtual Encounter Class".
 
 concept "Hypertension Diagnoses":
 - type is Condition.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Diagnosis of Hypertension".
+- coded from "cms22-ExternalConcepts"."Diagnosis of Hypertension".
 
 concept "Blood Pressure Panels":
 - type is Observation.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Blood pressure panel with all children optional".
+- coded from "cms22-ExternalConcepts"."Blood pressure panel with all children optional".
 
 concept "Systolic Blood Pressure Code":
 - type is Observation.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Systolic Blood Pressure Code".
+- coded from "cms22-ExternalConcepts"."Systolic Blood Pressure Code".
 
 concept "Diastolic Blood Pressure Code":
 - type is Observation.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Diastolic Blood Pressure Code".
+- coded from "cms22-ExternalConcepts"."Diastolic Blood Pressure Code".
 
 concept "Standalone Systolic BP Observations":
 - type is Observation.
 - value type is Quantity.
-- coded from "cms22-RecordConcepts"."Systolic Blood Pressure Code".
+- coded from "cms22-ExternalConcepts"."Systolic Blood Pressure Code".
 
 concept "Standalone Diastolic BP Observations":
 - type is Observation.
 - value type is Quantity.
-- coded from "cms22-RecordConcepts"."Diastolic Blood Pressure Code".
+- coded from "cms22-ExternalConcepts"."Diastolic Blood Pressure Code".
 
 concept "Follow-up Within 4 Weeks":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Follow Up Within 4 Weeks".
+- coded from "cms22-ExternalConcepts"."Follow Up Within 4 Weeks".
 
 concept "Follow-up Within 6 Months":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Follow Up Within 6 Months".
+- coded from "cms22-ExternalConcepts"."Follow Up Within 6 Months".
 
 concept "Lifestyle Recommendations":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Lifestyle Recommendation".
+- coded from "cms22-ExternalConcepts"."Lifestyle Recommendation".
 
 concept "Weight Reduction Recommendations":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Weight Reduction Recommended".
+- coded from "cms22-ExternalConcepts"."Weight Reduction Recommended".
 
 concept "Dietary Recommendations":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Dietary Recommendations".
+- coded from "cms22-ExternalConcepts"."Dietary Recommendations".
 
 concept "Physical Activity Recommendations":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Recommendation to Increase Physical Activity".
+- coded from "cms22-ExternalConcepts"."Recommendation to Increase Physical Activity".
 
 concept "Alcohol Counseling Referrals":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Referral or Counseling for Alcohol Consumption".
+- coded from "cms22-ExternalConcepts"."Referral or Counseling for Alcohol Consumption".
 
 concept "Primary-Care Referrals":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Referral to Primary Care or Alternate Provider".
+- coded from "cms22-ExternalConcepts"."Referral to Primary Care or Alternate Provider".
 
 concept "Hypertension Lab Tests":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Laboratory Tests for Hypertension".
+- coded from "cms22-ExternalConcepts"."Laboratory Tests for Hypertension".
 
 concept "EKG 12-Lead Panel Requests":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."EKG 12 Lead Panel Code".
+- coded from "cms22-ExternalConcepts"."EKG 12 Lead Panel Code".
 
 concept "EKG Study Requests":
 - type is ServiceRequest.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."EKG Study Code".
+- coded from "cms22-ExternalConcepts"."EKG Study Code".
 
 concept "Antihypertensive Medications":
 - type is MedicationRequest.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Pharmacologic Therapy for Hypertension".
+- coded from "cms22-ExternalConcepts"."Pharmacologic Therapy for Hypertension".
 
 concept "Hypertensive Reading Findings":
 - type is Observation.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Finding of Elevated Blood Pressure or Hypertension".
+- coded from "cms22-ExternalConcepts"."Finding of Elevated Blood Pressure or Hypertension".
 
 concept "Medical Reasons":
 - type is Observation.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Medical Reason".
+- coded from "cms22-ExternalConcepts"."Medical Reason".
 
 concept "Patient Declined Reasons":
 - type is Observation.
 - value type is CodeableConcept.
-- coded from "cms22-RecordConcepts"."Patient Declined".
+- coded from "cms22-ExternalConcepts"."Patient Declined".
 
 

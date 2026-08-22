@@ -12,7 +12,7 @@ library "cms69".
 concept "Initial Population":
 - type is Observation.
 - value type is boolean.
-- defined as "cms69-Inferred"."Aged 18+ at Measurement Period Start".
+- defined as "cms69-Inferences"."Aged 18+ at Measurement Period Start".
 
 concept "Denominator":
 - type is Observation.
@@ -22,18 +22,18 @@ concept "Denominator":
 concept "Denominator Exclusions":
 - type is Observation.
 - value type is boolean.
-- defined as "cms69-Inferred"."Is Pregnant During Measurement Period".
+- defined as "cms69-Inferences"."Is Pregnant During Measurement Period".
 
 concept "Numerator":
 - type is Observation.
 - value type is boolean.
 - defined as
 (
-   "cms69-Inferred"."High BMI And Follow Up Provided"
+   "cms69-Inferences"."High BMI And Follow Up Provided"
    or
-   "cms69-Inferred"."Low BMI And Follow Up Provided"
+   "cms69-Inferences"."Low BMI And Follow Up Provided"
    or
-   "cms69-Inferred"."Has Normal BMI"
+   "cms69-Inferences"."Has Normal BMI"
 ).
 
 concept "Denominator Exceptions":
@@ -41,7 +41,7 @@ concept "Denominator Exceptions":
 - value type is boolean.
 - defined as
 (
-   "cms69-Inferred"."Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI"
+   "cms69-Inferences"."Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI"
    or
-   "cms69-Inferred"."Medical Reason Or Patient Reason For Not Performing BMI Exam"
+   "cms69-Inferences"."Medical Reason Or Patient Reason For Not Performing BMI Exam"
 ).
