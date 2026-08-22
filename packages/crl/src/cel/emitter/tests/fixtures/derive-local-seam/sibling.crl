@@ -1,0 +1,12 @@
+# Seam Sibling — code-bearing concept library (DISAMBIGUATED domain: cross-lib sibling).
+library "Seam Sibling".
+
+/* Reached ONLY by a qualified ref from root (`when "Seam Sibling"."Sibling Finding"`),
+   NOT by an include — so it is a cross-lib SIBLING (not in walkIncludes(root)) and its
+   local domain is DISAMBIGUATED to <policyId>-<librarySlug>. derive-local must match. */
+
+concept "Sibling Finding":
+- type is Observation.
+- value type is boolean.
+- code is `sibling-finding`.
+- definition is exists this.
