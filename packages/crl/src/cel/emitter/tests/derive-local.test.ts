@@ -1,7 +1,9 @@
+import { readFileSync } from "fs";
 import * as path from "path";
 
 import { describe, expect, it } from "vitest";
 
+import { canonicalizeFsPath } from "../../../imports/paths";
 import { resolveCelImports } from "../../imports";
 import { emitCelToFhir } from "../emitFhir";
 
@@ -62,5 +64,32 @@ describe("#189 T3b derive-local (dme101-030)", () => {
     for (const r of obs) {
       expect(r.body.status).toBe("final");
     }
+  });
+
+  it("§5 loud floor — a local fact carrying an authored `code is` is a conflict error and is SKIPPED", () => {
+    // Inject an authored code onto the local "Documented Tibial Nonunion" fact via an overlay (its code must
+    // DERIVE from the concept — never silently prefer authored vs derived, disc 490 [critical]).
+    const original = readFileSync(DME_CEL, "utf-8");
+    const conflictSrc = original.replace(
+      'fact "Documented Tibial Nonunion":\n- date is "2026-02-01".',
+      'fact "Documented Tibial Nonunion":\n- code is "http://example.org/authored|foo".\n- date is "2026-02-01".',
+    );
+    expect(conflictSrc).not.toBe(original); // the replace actually fired
+    const canonical = canonicalizeFsPath(DME_CEL);
+    const graph = resolveCelImports(DME_CEL, { overlays: new Map([[canonical, conflictSrc]]) });
+    const r = emitCelToFhir(graph);
+
+    // The conflict is a typed error, not a silent choice.
+    const conflicts = r.diagnostics.filter((d) => d.kind === "local-authored-code-conflict");
+    expect(conflicts.length).toBeGreaterThan(0);
+    expect(conflicts[0].severity).toBe("error");
+
+    // The conflicting fact is SKIPPED — no Observation carries the authored code (never a partial instance).
+    const authored = r.emittedCases
+      .flatMap((c) => c.resources)
+      .map((res) => coding(res.body))
+      .filter((x): x is { system?: string; code?: string } => x !== undefined)
+      .some((c) => c.system === "http://example.org/authored");
+    expect(authored).toBe(false);
   });
 });
