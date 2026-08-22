@@ -46,7 +46,7 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalSource"
+      "resource": "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureInferred"
     }
   ],
   "content": [

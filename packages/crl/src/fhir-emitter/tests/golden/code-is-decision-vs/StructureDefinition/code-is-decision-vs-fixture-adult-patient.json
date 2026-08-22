@@ -27,7 +27,7 @@
       "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-featureExpression",
       "valueExpression": {
         "language": "text/cql-identifier",
-        "expression": "Adult Patient",
+        "expression": "Adult Patient Records",
         "reference": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalSource"
       }
     }
