@@ -877,21 +877,22 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
   // New array contract: each condition resolves to its ORDERED recursive `code is`
   // closure (here each test condition is a single direct `code is` concept → one
   // entry). Returns [] for an ineligible condition.
-  const cfResolver = (name: string): ReadonlyArray<{ name: string; canonical: string }> =>
+  // #189 2d — the resolver carries each input's NATURAL resource type (REQUIRED; no Observation fallback).
+  const cfResolver: CaseFeatureInputResolver = (name) =>
     name === "Active Crohns Disease"
-      ? [{ name: "Active Crohns Disease", canonical: CF_URL }]
+      ? [{ name: "Active Crohns Disease", canonical: CF_URL, resourceType: "Condition" }]
       : name === "Severe Flare"
-        ? [{ name: "Severe Flare", canonical: CF_URL_2 }]
+        ? [{ name: "Severe Flare", canonical: CF_URL_2, resourceType: "Condition" }]
         : [];
 
-  // A case-feature input carries BOTH the cpg-input-text label and the
-  // cpg-input-description (valueMarkdown), per the truth-set example goldens.
-  const cfInput = (name: string, canonical: string): Record<string, unknown> => ({
+  // A case-feature input carries BOTH the cpg-input-text label and the cpg-input-description
+  // (valueMarkdown), per the truth-set example goldens, and its NATURAL resource `type` (#189 2d).
+  const cfInput = (name: string, canonical: string, resourceType: string): Record<string, unknown> => ({
     extension: [
       { url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text", valueString: `${name}?` },
       { url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description", valueMarkdown: name },
     ],
-    type: "Observation",
+    type: resourceType,
     profile: [canonical],
   });
 
@@ -914,33 +915,27 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
       d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,
     );
     const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
-    expect(action.input).toEqual([cfInput("Active Crohns Disease", CF_URL)]);
+    expect(action.input).toEqual([cfInput("Active Crohns Disease", CF_URL, "Condition")]);
   });
 
-  it("#189 2d (inert precursor): a resolver-supplied `resourceType` becomes `action.input.type`; absent → `Observation` fallback", () => {
-    // The atomic activation resolves `resourceType` from the concept's descriptor (Condition,
-    // MedicationRequest, …). Until then the live resolver omits it and the fallback keeps the
-    // forced-`Observation` shape byte-identical — this test pins BOTH ends of the seam.
-    const naturalResolver: CaseFeatureInputResolver = (name) =>
+  it("#189 2d: the resolver's NATURAL `resourceType` becomes `action.input.type` (no Observation fallback)", () => {
+    // The flip resolves `resourceType` from the concept's descriptor (Condition, MedicationRequest, …); it is
+    // REQUIRED on every input and there is NO forced-`Observation` fallback (that was the hack). A concept that
+    // does not resolve to a gatherable record yields NO input at all (the orchestrator handles that upstream),
+    // so an emitted input always carries a type the case-feature lane stands behind.
+    const medResolver: CaseFeatureInputResolver = (name) =>
       name === "Active Crohns Disease"
-        ? [{ name: "Active Crohns Disease", canonical: CF_URL, resourceType: "Condition" }]
+        ? [{ name: "Active Crohns Disease", canonical: CF_URL, resourceType: "MedicationRequest" }]
         : [];
     const d = decision("Triage", [when("Active Crohns Disease", leaf(recommend("Refer to GI")))]);
     const { resource } = emitDecisionPlanDefinition(
-      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", naturalResolver,
+      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", medResolver,
     );
     const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
     const inputs = action.input as Array<{ type: string; profile: string[] }>;
     expect(inputs).toHaveLength(1);
-    expect(inputs[0]!.type).toBe("Condition");
+    expect(inputs[0]!.type).toBe("MedicationRequest"); // the descriptor's natural type, verbatim
     expect(inputs[0]!.profile).toEqual([CF_URL]);
-
-    // Fallback arm: the current `cfResolver` (no `resourceType`) still yields `type: "Observation"`.
-    const { resource: fbResource } = emitDecisionPlanDefinition(
-      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,
-    );
-    const fbAction = (fbResource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
-    expect((fbAction.input as Array<{ type: string }>)[0]!.type).toBe("Observation");
   });
 
   it("a `when` condition the resolver returns null for (RecordSource/Inferred — no case-feature SD) gets NO input", () => {
@@ -990,10 +985,10 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
     );
     const top = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
     // Top carries ONLY its own input (Active Crohns Disease), not the descendant's.
-    expect(top.input).toEqual([cfInput("Active Crohns Disease", CF_URL)]);
+    expect(top.input).toEqual([cfInput("Active Crohns Disease", CF_URL, "Condition")]);
     const child = (top.action as Array<Record<string, unknown>>)[0]!;
     // Nested when-action carries its OWN condition's input.
-    expect(child.input).toEqual([cfInput("Severe Flare", CF_URL_2)]);
+    expect(child.input).toEqual([cfInput("Severe Flare", CF_URL_2, "Condition")]);
   });
 
   it("a nested `when` the resolver returns null for gets NO input (its OWN condition is not case-feature-eligible)", () => {
@@ -1026,7 +1021,7 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
       d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,
     );
     const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
-    expect(action.input).toEqual([cfInput("Active Crohns Disease", CF_URL)]);
+    expect(action.input).toEqual([cfInput("Active Crohns Disease", CF_URL, "Condition")]);
   });
 });
 

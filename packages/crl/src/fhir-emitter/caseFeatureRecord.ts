@@ -85,7 +85,21 @@ export function resolveCaseFeatureRecord(
   // status === "derived": prefer the LOCAL gatherable record; Patient/uncoded is supplied (no SD).
   const local = outcome.descriptors.find((d): d is LocalExactDescriptor => d.arm === "local-exact");
   if (local) {
-    return { kind: "record", descriptor: local, recordsDefineId: recordsTwinDefineName(concept.name) };
+    // REFACTOR:grounded (charter §4) — the `cpg-featureExpression` must target the define that ACTUALLY holds
+    // the records retrieve. That define depends on the lowering:
+    //   - a `ThisRecords` reduction (`exists this` / `count this` / `most recent this`) synthesizes a SEPARATE
+    //     `"<X> Records"` retrieve twin, with the reduction result published under `"<X>"` — so target the twin;
+    //   - EVERY OTHER local-exact concept (a `shape is RecordSet` publisher, an age/both-rep concept whose local
+    //     `code is` is the human-asserted answer record) publishes its retrieve directly under its OWN name
+    //     `"<X>"` (no twin) — so target the concept name. Assuming a `"<X> Records"` twin for these DANGLES.
+    const reduction =
+      concept.definition?.type === "ReductionDefinition" ? concept.definition.reduction : undefined;
+    const hasRecordsTwin = reduction !== undefined && reduction.target.type === "ThisRecords";
+    return {
+      kind: "record",
+      descriptor: local,
+      recordsDefineId: hasRecordsTwin ? recordsTwinDefineName(concept.name) : concept.name,
+    };
   }
   const uncoded = outcome.descriptors.find((d) => d.arm === "uncoded");
   if (uncoded) return { kind: "supplied-patient" };

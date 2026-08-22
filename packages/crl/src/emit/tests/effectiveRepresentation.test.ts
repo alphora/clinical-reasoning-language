@@ -100,8 +100,10 @@ describe("deriveEffectiveRepresentations — local-exact arm", () => {
     );
     if (d.arm !== "local-exact") throw new Error("expected local-exact");
     expect(d.resourceType).toBe("Observation");
-    expect(d.valueElement).toBe("value"); // Observation is value-bearing → value-filtered exists
-    expect(d.datumValueType).toBe("boolean");
+    // `exists this` is PRESENCE — it reads no value, even on a value-bearing Observation (the value is
+    // orthogonal to existence). No value datum → no `value[x]` on the SD. A value READ is `most recent this`.
+    expect(d.valueElement).toBeUndefined();
+    expect(d.datumValueType).toBeUndefined();
   });
 
   it("MedicationRequest → choice-codeable-concept@medication coding (the one non-default T1 strategy)", () => {

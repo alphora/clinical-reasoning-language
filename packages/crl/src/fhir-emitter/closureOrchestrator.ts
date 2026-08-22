@@ -62,7 +62,7 @@ import {
   type CollectedCodeIsConcept,
 } from "./caseFeatureCollection";
 import { caseFeatureCanonicalUrl, emitCaseFeatureStructureDefinition } from "./structureDefinition";
-import { resolveCaseFeatureRecord, type CaseFeatureRecord } from "./caseFeatureRecord";
+import { resolveCaseFeatureRecord, type CaseFeatureRecordResolution } from "./caseFeatureRecord";
 import { emitLocalCodeSystem } from "./codeSystem";
 import {
   emitDecisionPlanDefinition,
@@ -1682,13 +1682,16 @@ export function emitFhirDefClosure(
     for (const s of lib.ast.statements) {
       if (s.type === "Concept" && s.name !== undefined) rawConceptByName.set(s.name, s);
     }
-    const caseFeatureRecordByName = new Map<string, CaseFeatureRecord>();
+    // REFACTOR:grounded (charter §4) — store the FULL resolution, not just records. Step 6 and the input
+    // resolver both switch on it: `record` → SD + gathered natural-resource input; `supplied-patient` (the
+    // uncoded Patient arm, charter §2) → no SD, no input, NO error; a genuine reject (`unsupported-resource` /
+    // `not-a-record`) → LOUD at step 6 with the skip's OWN kind + detail (so a bare-scalar / unmodeled-resource /
+    // hybrid each get their correct migration prompt, not a generic message).
+    const resolutionByName = new Map<string, CaseFeatureRecordResolution>();
     for (const { name } of caseFeatures.unionConcepts) {
       const raw = rawConceptByName.get(name);
       if (raw === undefined) continue;
-      const res = resolveCaseFeatureRecord(raw, owningLibMeta);
-      if (res.kind === "record") caseFeatureRecordByName.set(name, res);
-      // Non-record resolutions (unsupported-resource / not-a-record / …) are surfaced loudly at the emit site (6).
+      resolutionByName.set(name, resolveCaseFeatureRecord(raw, owningLibMeta));
     }
 
     // F3 (impl-review) — direct-caller trap. The deliverable always threads a
@@ -1719,15 +1722,23 @@ export function emitFhirDefClosure(
         });
       }
     }
+    // REFACTOR:grounded (charter §4) — a decision `action.input` is emitted ONLY for a concept that resolves to
+    // a gatherable `record`, carrying its NATURAL resource type (so `action.input.type` == the emitted SD `type`
+    // by construction). A `supplied-patient` concept (the uncoded Patient arm, READ not gathered) contributes NO
+    // input; an unsupported/not-a-record concept contributes no input either (step 6 raises the loud diagnostic).
+    // There is NO Observation fallback — an input never carries a resource type the case-feature lane can't stand behind.
     const caseFeatureInputResolver: CaseFeatureInputResolver = (name) =>
-      (caseFeatures.inputsByCondition.get(name) ?? []).map((c) => ({
-        name: c.name,
-        canonical: caseFeatureCanonicalUrl(metadata, c.name),
-        // #189 2d — the NATURAL resource type (Condition/MedicationRequest/…) so `action.input.type` matches the
-        // emitted SD `type`; undefined only if the concept didn't resolve (buildActionInputs then keeps the
-        // transitional Observation fallback, and step 6 raises the loud diagnostic).
-        resourceType: caseFeatureRecordByName.get(c.name)?.descriptor.resourceType,
-      }));
+      (caseFeatures.inputsByCondition.get(name) ?? []).flatMap((c) => {
+        const res = resolutionByName.get(c.name);
+        if (res?.kind !== "record") return [];
+        return [
+          {
+            name: c.name,
+            canonical: caseFeatureCanonicalUrl(metadata, c.name),
+            resourceType: res.descriptor.resourceType,
+          },
+        ];
+      });
 
     // When the contract is violated we skip THIS source's decision emit (handled by
     // the loop guard below); there are no later per-lib steps, so a plain guarded
@@ -1770,32 +1781,44 @@ export function emitFhirDefClosure(
     // cms69 carry NO decisions → structural no-op, keeping their goldens
     // byte-identical. (`caseFeatureGateOpen` is the SAME gate used for step 5a.)
     //
-    // LOCALSOURCE-ALWAYS-BOOLEAN: every collected concept has a lowered `code is`
-    // (the collector appends iff a local code exists), so each emits a boolean
-    // Observation case-feature regardless of declared value type — there is no
-    // value-type gate and no `emit-casefeature-non-boolean` diagnostic. The
-    // `emit-casefeature-missing-code` contradiction guard is structurally
-    // unreachable from the collection (the collector never appends a code-less
-    // concept), so it is dropped here too.
+    // REFACTOR:grounded (charter §4) — each collected concept emits its case-feature by its resolution:
+    //   - `record`       → a StructureDefinition typed by the concept's NATURAL resource (Condition/
+    //                      MedicationRequest/Observation/…), coding on that resource's own element, valueless
+    //                      unless a value READ (`most recent this`) supplies a datum; featureExpression → the
+    //                      `"<X> Records"` retrieve twin. (The old forced-Observation-boolean rule is DELETED.)
+    //   - `supplied-*`   → NO SD and NO error — the determination is READ from the supplied Patient, not
+    //                      gathered via a questionnaire case-feature (charter §2; patient-age).
+    //   - reject         → LOUD, carrying the skip's OWN kind + detail (bare-scalar → author `exists this`;
+    //                      unmodeled resource → model it; hybrid → park) — never a silent Observation fallback.
     //
     // The `cpg-featureExpression.reference` resolves to the `<policyId>-LocalSource`
-    // Library (where the `code is` define lives) via `localSourceReferenceSuffix`.
+    // Library (where the records-twin define lives) via `localSourceReferenceSuffix`.
     if (caseFeatureGateOpen && !reductionCaseFeatureBlocked) {
       for (const { name, code } of caseFeatures.unionConcepts) {
-        const record = caseFeatureRecordByName.get(name);
-        if (record === undefined) {
-          // The concept didn't resolve to a gatherable natural-resource record (unsupported resource type, or an
-          // unmappable representation). Fail LOUD — never fall back to a forced Observation (charter §4).
+        const resolution = resolutionByName.get(name);
+        if (resolution === undefined || resolution.kind === "supplied-patient") {
+          // Supplied/read (the uncoded Patient arm — charter §2) or not collected — no gathered SD, NOT an error.
+          continue;
+        }
+        if (resolution.kind !== "record") {
+          // A genuine reject (`unsupported-resource` / `deferred-sourced` / `not-a-record`). Fail LOUD with the
+          // skip's OWN kind + detail — never fall back to a forced Observation (charter §4).
+          const detail =
+            resolution.kind === "unsupported-resource"
+              ? `natural resource "${resolution.resourceType}" is not in the case-feature emit registry: ${resolution.detail}`
+              : resolution.kind === "deferred-sourced"
+                ? `a purely-sourced concept (no local \`code is\`) is deferred (E1/#257)`
+                : resolution.detail;
           errors.push({
             type: "Validation",
             kind: "unsupported-casefeature-resource",
             message:
-              `Case-feature concept "${name}" in source "${lib.libraryName}" did not resolve to a gatherable ` +
-              `natural-resource record (unsupported resource type or an unmappable representation); no ` +
-              `case-feature StructureDefinition emitted.`,
+              `Case-feature concept "${name}" in source "${lib.libraryName}" is not a gatherable ` +
+              `natural-resource record; no case-feature StructureDefinition emitted. ${detail}`,
           });
           continue;
         }
+        const record = resolution;
         const valueDatum =
           record.descriptor.valueElement !== undefined && record.descriptor.datumValueType !== undefined
             ? { valueElement: record.descriptor.valueElement, datumValueType: record.descriptor.datumValueType }
