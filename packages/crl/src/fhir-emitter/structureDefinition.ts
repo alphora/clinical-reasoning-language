@@ -2,15 +2,17 @@
  * CRL decision case-feature concept → FHIR `StructureDefinition` (case-feature
  * profile) emit.
  *
- * ⚠⚠ #189 2d IN PROGRESS — DO NOT read the "always Observation / always boolean" wording below as the model.
- * It describes the HACK being REMOVED. The AUTHORITY is `docs/CRL-NORTH-STAR.md` §4 "Case-features are ANY
- * resource": a case-feature SD is typed by the concept's OWN natural resource (`type is` — Condition, …), NEVER
- * forced to Observation; the boolean is `exists` in CQL (valueless record) or a value read (a value-bearing
- * Observation), NEVER a coerced `Observation.valueBoolean`; there is NO "Observation-only fallback" (that IS the
- * hack). The differential is now built by `caseFeatureDifferential` from a registry `CaseFeatureProfileShape`;
- * the transitional pinned-Observation profile is being flipped to the concept's descriptor. (Historical note,
- * the hack:) the old emit collected every `code is` concept as a boolean Observation case feature regardless of
- * declared value type ("LocalSource-always-boolean") and constrained `Observation`.
+ * MODEL (`docs/CRL-NORTH-STAR.md` §4 "Case-features are ANY resource"): a case-feature SD is typed by the
+ * concept's OWN natural resource (`type is` — Condition, MedicationRequest, …), NEVER forced to Observation.
+ * The differential is built by `caseFeatureDifferential` from the descriptor's registry `CaseFeatureProfileShape`.
+ * The determination's boolean is `exists` in CQL over the record (a valueless record carries NO `value[x]`); a
+ * value is constrained on the SD ONLY when the determination READS one (a `most recent this` value read) — NOT
+ * because the resource happens to be value-bearing (presence is orthogonal to the record's value). An
+ * unmodeled resource fails LOUD (`unsupported-casefeature-resource`); there is NO Observation fallback.
+ *
+ * (Historical: #189 2d REMOVED the "LocalSource-always-boolean" hack — the old emit forced every `code is`
+ * concept into a boolean `Observation.valueBoolean` case feature regardless of its declared `type is`. That is
+ * gone; do not reintroduce it.)
  *
  * Reference shape verified against the DTR
  * `aslp-paa-comorbid-screening-casefeature.json` example. Deviations from that
@@ -83,9 +85,10 @@ function sdcExtractValue(profileUrl: string, elementId: string, expression: stri
  * per-resource generalization of the old hardcoded Observation profile (charter §4 "case-features are ANY
  * resource"). Driven entirely by the registry `CaseFeatureProfileShape` — NO resource switch here (panel disc
  * 481). Emits: the resource root; the coding element (`Condition.code` / `MedicationRequest.medication[x]`) with a
- * `patternCodeableConcept` fixing the concept's local code; a `value[x]` element ONLY when the concept READS a
- * value (a valueless-existence `exists this` concept carries NONE — the old always-boolean `value[x]` was the
- * hack); and the `sdc-questionnaire-definitionExtractValue`-wired `subject` + recency elements.
+ * `patternCodeableConcept` fixing the concept's local code; a `value[x]` element ONLY when the determination
+ * READS a value (`most recent this`) — an `exists this` concept carries NONE, because presence reads no value
+ * on ANY resource (the old always-boolean `value[x]` on every case-feature was the hack); and the
+ * `sdc-questionnaire-definitionExtractValue`-wired `subject` + recency elements.
  *
  * The DTR-answerability form of the valueless coding element (a `binding`/`answerOption` making it a questionnaire
  * question, verified in the `$apply` harness) is a SEPARATE step; the `patternCodeableConcept` here fixes the code
@@ -182,11 +185,12 @@ export function caseFeatureCanonicalUrl(metadata: CpgMetadata, conceptName: stri
 }
 
 /**
- * Emit ONE case-feature StructureDefinition for a LocalSource boolean interface
- * concept. The caller (closureOrchestrator) collects the eligible concept (a
- * `code is` concept reachable from a decision `when` condition, the LocalSource-
- * always-boolean rule) and supplies the resolved `code` (from
- * `lowerLocalCodes().localCodes`).
+ * Emit ONE case-feature StructureDefinition for a decision case-feature concept,
+ * typed by its NATURAL resource (`resourceType`, from the descriptor — charter §4).
+ * The caller (closureOrchestrator) collects the eligible concept (a `code is`
+ * concept reachable from a decision `when` condition) and supplies the resolved
+ * `code` (from `lowerLocalCodes().localCodes`) + the descriptor-derived
+ * `resourceType` / `recordsDefineId` / `valueDatum`.
  *
  * `featureExpressionLibrarySuffix` is the #186 unified IDENTITY `S` of the
  * LocalSource library (the opaque hyphen-free PascalCase name, e.g.
@@ -275,9 +279,10 @@ export function emitCaseFeatureStructureDefinition(
   // `codesystem '<url>'` (one source of truth — the per-library local domain, #198).
   const system = localCodeSystemSystemUrl(metadata, localDomainId);
 
-  // The featureExpression references the LocalSource library by canonical (where
-  // the `code is` define lives); its `expression` is the bare concept name (a
-  // `text/cql-identifier`).
+  // The featureExpression references the LocalSource library by canonical (where the records-retrieve define
+  // lives); its `expression` is the caller-supplied `recordsDefineId` (a `text/cql-identifier`) — the
+  // `"<X> Records"` twin for a reduction, or the concept name for a RecordSet / both-rep retrieve. NOT the
+  // ephemeral boolean `"<X>"` (a natural-resource SD bound to a Boolean expr is type-incoherent — charter §4).
   const featureExpressionCanonical = libraryCanonicalUrl(metadata, featureExpressionLibrarySuffix);
 
   // #189 2d: the differential is built from the concept's NATURAL resource (charter §4) via

@@ -408,9 +408,9 @@ concept "Mixed":
   });
 
   it("#189 Slice B2a — a NON-boolean `most recent this` value read is DEFERRED (emit-reduction-not-active; not the generic mixed error)", () => {
-    // B2a activates only the Scalar BOOLEAN `most recent this` (the case-feature lane is boolean-locked).
-    // A non-boolean value read stays validate-only (Slice C) — the dedicated `emit-reduction-not-active`
-    // sentinel, NOT `emit-mixed-code-and-definition` interpolating the raw type name.
+    // B2a activates only the Scalar BOOLEAN `most recent this` value read; a NON-boolean value read stays
+    // validate-only (Slice C — the per-type FHIR value conversion is not yet built) via the dedicated
+    // `emit-reduction-not-active` sentinel, NOT `emit-mixed-code-and-definition` interpolating the raw type.
     const ast = parse(
       lib(`
 concept "C":
@@ -425,7 +425,7 @@ concept "C":
     expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(false);
     const msg = errors.find((e) => e.kind === "emit-reduction-not-active")!.message;
     expect(msg).toMatch(/most recent this/);
-    expect(msg).toMatch(/boolean-locked|Slice C/);
+    expect(msg).toMatch(/Slice C/);
     expect(msg).not.toMatch(/ReductionDefinition/); // no raw AST type name
   });
 

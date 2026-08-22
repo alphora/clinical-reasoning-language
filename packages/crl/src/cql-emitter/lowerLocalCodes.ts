@@ -554,9 +554,9 @@ export function lowerLocalCodes(
       } else {
         // `most recent this` — TWO active cells, discriminated by the concept's declared shape:
         //  · `shape is Scalar` (#189 Slice B2a) READS the newest record's value element. Scoped to a single
-        //    `value type is boolean` (the FHIR case-feature lane is boolean-locked — `closureOrchestrator.ts`
-        //    — so a non-boolean value read would round-trip-break on the DTR lane; disc 433). A value-bearing
-        //    NON-boolean read defers to Slice C (below, after the deriver).
+        //    `value type is boolean`: the per-type FHIR value conversion (Quantity, CodeableConcept, …) is not
+        //    yet built, so a NON-boolean value read would round-trip-break on the DTR lane (disc 433). A
+        //    value-bearing NON-boolean read defers to Slice C (below, after the deriver).
         //  · `shape is Record` (#189 Slice B2b) SELECTS the newest record (any registry resource, NO value
         //    read). It reads no value, so it must NOT declare a `value type` (the record resource is `type
         //    is`); it reuses the B2a select-newest spine with no value filter/read.
@@ -792,14 +792,14 @@ export function lowerLocalCodes(
           }
           if (desc.datumValueType !== "boolean") {
             // A NON-boolean value read on a value-bearing resource (the deriver already errored a valueless
-            // one with the exists-this prompt — Claude #1). Deferred to Slice C: the FHIR case-feature lane
-            // is boolean-locked and the per-type value conversion (Quantity→ToQuantity, …) is not yet built.
+            // one with the exists-this prompt — Claude #1). Deferred to Slice C: the per-type FHIR value
+            // conversion (Quantity→ToQuantity, CodeableConcept, …) is not yet built.
             errors.push(
               mkError(
                 EMIT_REDUCTION_NOT_ACTIVE_KIND,
                 `Concept "${c.name}": a NON-boolean \`most recent this\` value read (\`value type is ` +
-                  `${desc.datumValueType}\`) is not yet emittable — the FHIR case-feature lane is ` +
-                  `boolean-locked and the per-type value conversion is deferred (Slice C).`,
+                  `${desc.datumValueType}\`) is not yet emittable — the per-type FHIR value conversion is ` +
+                  `deferred (Slice C).`,
                 c.definition.location,
               ),
             );

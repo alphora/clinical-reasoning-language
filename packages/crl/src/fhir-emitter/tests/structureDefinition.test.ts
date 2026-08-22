@@ -21,15 +21,15 @@ import type { CpgMetadata, EmittedResource } from "../types";
  * Case-feature StructureDefinition emit — eligibility boundary + diagnostics.
  *
  * The example FHIR goldens pin the byte-for-byte happy paths (a `code is` decision
- * concept → exactly one StructureDefinition; the recursive `defined as` closure
- * reaching a `code is` leaf). These tests pin the REMAINING boundary cases that
- * have no golden. Under the LOCALSOURCE-ALWAYS-BOOLEAN rule, every `code is`
- * concept (regardless of declared value type) is a boolean Observation
- * case-feature, so there is NO value-type gate and NO `emit-casefeature-non-boolean`
- * diagnostic:
+ * concept → exactly one StructureDefinition typed by its natural resource; the
+ * recursive `defined as` closure reaching a `code is` leaf). These tests pin the
+ * REMAINING boundary cases that have no golden. Post-#189-2d the case-feature is
+ * typed by the concept's own `type is` (charter §4) — the LocalSource-always-boolean
+ * hack is gone:
  *   - an INFERRED decision condition reaches its `code is` leaf through the
  *     recursive collection (one SD for the leaf),
- *   - a NON-boolean `code is` decision concept STILL gets a boolean SD,
+ *   - a NON-boolean value-read `code is` concept is Slice-C deferred and FAILS LOUD
+ *     (`emit-reduction-not-active`) — never coerced to a boolean Observation,
  *   - the `emit-casefeature-missing-code` defensive guard (F1) hard-errors when a
  *     DIRECT caller passes an empty/undefined code rather than emitting an
  *     empty-code patternCodeableConcept (unreachable from the orchestrated path),
