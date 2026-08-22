@@ -30,7 +30,8 @@ import {
   preLowerAge,
 } from "../cql-emitter/lowerLocalCodes";
 import { readCanonicalBase, readPolicyId } from "../fhir-emitter/metadata";
-import { localDomainIdFor, pascalCaseNameForId, localCodeSystemUrl } from "../fhir-emitter/slug";
+import { pascalCaseNameForId, localCodeSystemUrl } from "../fhir-emitter/slug";
+import { createLocalDomainResolver } from "../fhir-emitter/localDomain";
 import type { CRLError } from "../types/errors";
 
 import { resolveImports } from "./index";
@@ -436,23 +437,19 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   const codeIsSeedPaths = new Set(
     rawEmitClosure.filter((e) => astHasConceptLocalCode(e.ast)).map((e) => e.filePath),
   );
-  const domainIdFor = (entry: RegistryEntry): string | undefined => {
-    if (localDomainId === undefined) return undefined;
-    const isPrimarySeed = primarySeedPaths.has(entry.filePath);
-    const disambiguate = !isPrimarySeed && codeIsSeedPaths.has(entry.filePath);
-    return localDomainIdFor(localDomainId, entry.name ?? "", !disambiguate);
-  };
-  // #198 C1 — the disambiguated base ONLY when the entry is actually disambiguated (a
-  // cross-lib `code is` sibling); `undefined` otherwise (primary seed, non-`code is`,
-  // or metadata-less). `domainIdFor` returns the BARE policy id for a non-disambiguated
-  // entry; this returns `undefined` there so the manifest field cleanly signals "no
-  // disambiguation" and the FHIR lane keeps the byte-identical `policyIdBase` fallback.
-  const disambiguatedBaseFor = (entry: RegistryEntry): string | undefined => {
-    if (localDomainId === undefined) return undefined;
-    const isPrimarySeed = primarySeedPaths.has(entry.filePath);
-    const disambiguate = !isPrimarySeed && codeIsSeedPaths.has(entry.filePath);
-    return disambiguate ? localDomainIdFor(localDomainId, entry.name ?? "", false) : undefined;
-  };
+  // #189 CEL-writer T3b (disc 490) — the two inline domainId/disambiguatedBase closures are now the ONE shared
+  // `createLocalDomainResolver` (fhir-emitter/localDomain.ts), so the CQL lane, the FHIR lane, and the CEL
+  // instance lane compose byte-identical local-domain ids. `codeIsSeedPaths` is captured above at the RAW
+  // pre-lowering boundary (lowering clears `Concept.code`) — the resolver takes it as a stable set, never a
+  // callback that could re-evaluate a lowered ast.
+  const localDomainResolver = createLocalDomainResolver({
+    primarySeedPaths,
+    localCodePaths: codeIsSeedPaths,
+    policyId: localDomainId,
+  });
+  const domainIdFor = (entry: RegistryEntry): string | undefined => localDomainResolver.domainIdFor(entry);
+  const disambiguatedBaseFor = (entry: RegistryEntry): string | undefined =>
+    localDomainResolver.disambiguatedBaseFor(entry);
   // Track libraries that actually synthesized a local codesystem (lowered at
   // least one `code is` concept), keyed by the deterministic codesystem URL — so
   // the per-policy collision preflight below can fire when 2+ libraries resolve to

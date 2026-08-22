@@ -248,7 +248,8 @@ function makeResolversForSourceLibrary(
 
 /* ─── slug helpers (mirror per-emit-module slug rules) ──────────────── */
 
-import { localDomainIdFor, pascalCaseNameForId, policyIdBase, slugify } from "./slug";
+import { pascalCaseNameForId, policyIdBase, slugify } from "./slug";
+import { createLocalDomainResolver } from "./localDomain";
 import { decisionId } from "./decision";
 import { recommendationId } from "./recommendation";
 import { tarjanSCC } from "./tarjan";
@@ -1151,12 +1152,28 @@ export function emitFhirDefClosure(
   // makes the SAME determination from the SAME graph, so the two lanes' urls agree.
   const primarySeedPaths = new Set(graph.resolvedLibraries.map((e) => e.filePath));
 
+  // #189 CEL-writer T3b (disc 490) — the ONE shared local-domain resolver, replacing the inline
+  // `disambiguateDomain`/`localDomainIdFor` pair below. `localCodePaths` is captured HERE at the RAW boundary:
+  // `lowerLocalCodes` runs later per-library (and is pure — `entry.ast` stays raw), but capturing the `code is`
+  // predicate up front keeps this lane byte-identical to the CQL lane, which reads its equivalent set from the
+  // raw pre-lowering closure. `metadata.name` is always present on the FHIR lane, so `domainIdFor` never falls
+  // to the metadata-less `undefined` arm here.
+  const localCodePaths = new Set(
+    expandedClosure.filter((e) => astHasConceptLocalCode(e.ast)).map((e) => e.filePath),
+  );
+  const localDomainResolver = createLocalDomainResolver({
+    primarySeedPaths,
+    localCodePaths,
+    policyId: metadata.name,
+  });
+
   // Filter out parse-error placeholders (null/empty names — parse-failure
   // diagnostic is the real signal).
   const libraries = expandedClosure
     .filter((entry) => entry.name !== null && entry.name !== "")
     .map((entry) => {
       const libraryName = entry.name as string;
+      const filePath = entry.filePath;
       const isPrimarySeed = primarySeedPaths.has(entry.filePath);
       const statements = entry.ast.statements;
       const activities = statements.filter((s): s is Activity => s.type === "Activity");
@@ -1177,7 +1194,7 @@ export function emitFhirDefClosure(
         });
         cqlFileName = `../../cql/${libraryName}.cql`; // best-effort placeholder; the error already flagged
       }
-      return { libraryName, isPrimarySeed, ast: entry.ast, activities, concepts, decisions, terminologies, cqlFileName };
+      return { libraryName, filePath, isPrimarySeed, ast: entry.ast, activities, concepts, decisions, terminologies, cqlFileName };
     });
 
   // Build the index ONCE (O(N) over closure).
@@ -1235,8 +1252,13 @@ export function emitFhirDefClosure(
     // libraryName, isPrimary, hasCodeIs) inputs, so the lowering's synthetic
     // `codesystem '<url>'`, this FHIR `CodeSystem.url/id`, and the case-feature
     // `patternCodeableConcept.coding.system` all byte-agree.
-    const disambiguateDomain = !lib.isPrimarySeed && astHasConceptLocalCode(lib.ast);
-    const entryLocalDomainId = localDomainIdFor(metadata.name, lib.libraryName, !disambiguateDomain);
+    // #189 T3b (disc 490) — via the shared resolver; byte-identical to the prior inline
+    // `!isPrimarySeed && astHasConceptLocalCode` disambiguation. `metadata.name` is always present, so the
+    // resolver never returns the metadata-less `undefined` arm here.
+    const entryLocalDomainId = localDomainResolver.domainIdFor({
+      filePath: lib.filePath,
+      name: lib.libraryName,
+    }) as string;
     // #257 (age slice) T1 — the shared AGE pre-pipeline (retirement scan + standalone posrep
     // synthesis) BEFORE `lowerLocalCodes`, so the retirement fires on the FHIR-only path too (MCP
     // `emit_crl_fhir` never runs the Validator). The standalone transform adds no local code, so the
