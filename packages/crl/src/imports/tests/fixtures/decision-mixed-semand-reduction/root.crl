@@ -1,0 +1,30 @@
+# decision-mixed-semand-reduction root (#189 2d panel round 2 — mixed guard loud-gate)
+library "Pol".
+
+// A decision whose guard MIXES a code-bearing `exists this` reduction AND a code-LESS
+// `count` reduction via `sem-and`. The code-less "Enough Trials" contributes no gatherable
+// case-feature (the collector does not descend a reduction's operand "Trial Records"), so the
+// guard is INCOMPLETE — it must LOUD-GATE (unsupported-casefeature-reduction), not ship a
+// partial guard that can never be satisfied at $apply.
+
+concept "Code Bearing":
+- type is Condition.
+- value type is boolean.
+- code is `cb`.
+- definition is exists this.
+concept "Trial Records":
+- type is Procedure.
+- shape is RecordSet.
+- code is `trial`.
+concept "Enough Trials":
+- value type is boolean.
+- definition is count "Trial Records" at least 2.
+concept "Mixed Guard":
+- value type is boolean.
+- defined as ( "Code Bearing" sem-and "Enough Trials" ).
+
+activity "Refer to GI":
+- request CPGServiceRequest.
+
+decision "Cov Determination":
+- when "Mixed Guard" then recommend activity "Refer to GI".

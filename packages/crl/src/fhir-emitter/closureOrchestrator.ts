@@ -692,7 +692,10 @@ export function applyFeatureExpressionDefineInvariant(
   if (cqlByLibrary.length === 0) return errors; // no emitted CQL to check against — no-op (Inv-4 pattern)
 
   // Per-library set of emitted define names (parsed from the CQL text). `define "<Name>":`, tolerating a
-  // leading `private`/`function` qualifier (case-feature targets are plain defines, but be lenient).
+  // leading `private`/`function` qualifier (case-feature targets are plain defines, but be lenient). LIMITATION
+  // (panel round 2, both arms — a nit): `[^"]+` truncates at an escaped `\"` inside a delimited identifier, so a
+  // concept name literally containing a `"` could false-dangle. No such name exists in-repo; if one appears,
+  // switch to a define-name list carried structurally on `PerLibraryEmit` rather than a regex over the text.
   const definesByLibrary = new Map<string, Set<string>>();
   for (const e of cqlByLibrary) {
     const names = new Set<string>();
@@ -1660,13 +1663,14 @@ export function emitFhirDefClosure(
     //     `ReductionConceptRef` targets), so a `unionConcepts` filter is SILENT and the decision would emit
     //     an empty-input / no-SD VACUOUS guard under success:true — the plan's original "silent demotion"
     //     (impl-panel round 1, both arms — critical A; the earlier collection-based gate missed this form).
-    // The CORRECT reduction case-feature SD (which library the featureExpression targets; whether an
-    // Observation-boolean profile faithfully represents a Condition/Procedure existence reduction; the
-    // patternCodeableConcept code is the reduction's own code on an Observation profile) is genuine
-    // unconverged design (§4.6 / G1). Until then, fail LOUD and suppress this source's decision +
-    // case-feature emit rather than ship a dangling or vacuous artifact. (A reduction reached only as a
-    // `defined as` OPERAND — not a direct guard atom — is caught on the CQL lane by the truth-set
-    // composition guard, whose `emit-reduction-in-composition` error folds into this result.)
+    // Descending a code-LESS reduction to its code-bearing operand records so THEY become the gathered
+    // case-features is genuine unconverged design (§4.6 / G1, operator decision A). Until then, fail LOUD and
+    // suppress this source's decision + case-feature emit rather than ship an incomplete guard. NOTE: a
+    // code-less reduction reached only as a `defined as` OPERAND (not a direct guard atom) is NOT caught by any
+    // CQL-lane backstop — the 2b.3b.1ii boolean pivot (`emitCQL.ts`) flips a `Scalar<boolean>` `defined as`
+    // composition over total operands to the boolean lane and emits SUCCESSFULLY (no `emit-reduction-in-
+    // composition` folds in). So the loud gate below (which walks the guard's `defined as` closure to any
+    // code-less reduction) is the ONLY thing catching the mixed/operand form (panel round 2, both arms).
     const reductionNames = new Set<string>(
       lowered.ast.statements
         .filter(
@@ -1686,47 +1690,59 @@ export function emitFhirDefClosure(
     for (const s of lowered.ast.statements) {
       if (s.type === "Concept" && s.name !== undefined) conceptByNameForGate.set(s.name, s);
     }
-    const reachesReduction = (start: string): boolean => {
+    // REFACTOR:grounded (panel round 2, both arms) — the concepts that HAVE a local `code is` record (raw AST;
+    // lowering CLEARS `Concept.code`, so read `lib.ast`). A reduction WITH a code (`code is` + `exists this` — the
+    // 2d flagship) is gatherable via its own record; a code-LESS reduction (`count`/`exists`/`most recent` over a
+    // NAMED ref, no own code) is NOT — the collector does not descend a `ReductionDefinition` target, so the
+    // operand records (e.g. `count "Trial Records"` → the "Trial Records" Procedure) are never gathered.
+    const codeBearingConcepts = new Set<string>(
+      lib.ast.statements
+        .filter((s): s is Concept => s.type === "Concept" && s.name !== undefined && s.code !== undefined)
+        .map((s) => s.name as string),
+    );
+    // Walk a guard atom's same-lib `defined as` closure and collect every CODE-LESS reduction it reaches. Blocking
+    // keys on THIS (not on "the condition collected zero inputs" — the old proxy that MISSED the mixed case: a
+    // guard `defined as ( CodeBearing and CodelessCount )` collects the code-bearing leaf, so its input set is
+    // non-empty, yet the code-less reduction's operand is silently dropped → a partial guard that can never fire at
+    // $apply). A reduction is a leaf for this walk (only `defined as` edges are descended). Descending code-less
+    // reductions to their code-bearing operands is a later boundary (operator decision A) — until then, fail LOUD.
+    const codelessReductionsReached = (start: string): string[] => {
+      const found = new Set<string>();
       const visiting = new Set<string>();
-      const dfs = (n: string): boolean => {
-        if (visiting.has(n)) return false; // cycle/diamond guard
+      const dfs = (n: string): void => {
+        if (visiting.has(n)) return; // cycle/diamond guard
         visiting.add(n);
-        if (reductionNames.has(n)) return true; // direct reduction OR a reduction reached transitively
+        if (reductionNames.has(n)) {
+          if (!codeBearingConcepts.has(n)) found.add(n); // a code-BEARING reduction is gatherable via its record
+          return; // a reduction is a leaf for the gate walk
+        }
         const c = conceptByNameForGate.get(n);
-        if (c?.definition?.type !== "DefinedAsDefinition") return false; // only `defined as` edges are followed
+        if (c?.definition?.type !== "DefinedAsDefinition") return; // only `defined as` edges are followed
         for (const ref of flattenDefinedAsBody(c.definition.body)) {
           const local = normalizeLocalRef(ref, lib.libraryName);
           if (isQualifiedRef(local)) continue; // genuinely-foreign operand — unsupported/deferred (§4.5)
-          if (dfs(getRefName(local))) return true;
+          dfs(getRefName(local));
         }
-        return false;
       };
-      return dfs(start);
+      dfs(start);
+      return [...found];
     };
-    const reductionGuardConcepts = interfaceConceptNames(lowered.ast).filter((n) => reachesReduction(n));
-    // #189 2d — a reduction guard concept is now a VALID case-feature when it collects a code-bearing record
-    // (a `code is` + `exists this` reduction — the flagship form): the SD describes the natural resource and its
-    // `cpg-featureExpression` targets the `"<X> Records"` twin (no dangle). It is BLOCKED only in the VACUOUS case
-    // — a code-less named reduction (`count "X Records" at least N` with no own `code is`) that collects NO input,
-    // because the collector does not descend the reduction's operands, so the guard would emit an empty-input/no-SD
-    // artifact at $apply. Descending to the code-bearing operands is a later boundary (operator decision A); until
-    // then fail LOUD on the vacuous case only, instead of the old blanket reduction suppression.
-    const vacuousReductionGuards = reductionGuardConcepts.filter(
-      (n) => (caseFeatures.inputsByCondition.get(n) ?? []).length === 0,
+    const blockedGuards = interfaceConceptNames(lowered.ast).flatMap((guard) =>
+      codelessReductionsReached(guard).map((reduction) => ({ guard, reduction })),
     );
-    const reductionCaseFeatureBlocked = vacuousReductionGuards.length > 0;
+    const reductionCaseFeatureBlocked = blockedGuards.length > 0;
     if (reductionCaseFeatureBlocked) {
       errors.push({
         type: "Validation",
         kind: "unsupported-casefeature-reduction",
         message:
-          `Decision-bearing source "${lib.libraryName}" guards on reduction concept(s) ` +
-          `${vacuousReductionGuards.map((n) => `"${n}"`).join(", ")} that collect NO code-bearing case-feature ` +
-          `input — a code-less named reduction (e.g. \`count "X Records" at least N\` with no own \`code is\`). ` +
-          `The collector does not yet descend into the reduction's operands, so the guard would emit a vacuous ` +
-          `empty-input / no-SD artifact at $apply. Descending to the code-bearing operands is a later #189 ` +
-          `boundary (operator decision A); this source's decision + case-feature emit is suppressed rather than ` +
-          `ship a vacuous guard.`,
+          `Decision-bearing source "${lib.libraryName}" guards on concept(s) that reach a CODE-LESS reduction ` +
+          `whose operand records the case-feature collector does not gather: ` +
+          `${blockedGuards.map((b) => `"${b.guard}" → "${b.reduction}"`).join(", ")} (e.g. ` +
+          `\`count "X Records" at least N\` with no own \`code is\`). The collector does not yet descend into a ` +
+          `reduction's operands, so the guard would emit an incomplete case-feature set that can never be ` +
+          `satisfied at $apply. Descending to the code-bearing operands is a later #189 boundary (operator ` +
+          `decision A); this source's decision + case-feature emit is suppressed rather than ship an incomplete guard.`,
       });
     }
 
@@ -1843,22 +1859,37 @@ export function emitFhirDefClosure(
     // byte-identical. (`caseFeatureGateOpen` is the SAME gate used for step 5a.)
     //
     // REFACTOR:grounded (charter §4) — each collected concept emits its case-feature by its resolution:
-    //   - `record`       → a StructureDefinition typed by the concept's NATURAL resource (Condition/
-    //                      MedicationRequest/Observation/…), coding on that resource's own element, valueless
-    //                      unless a value READ (`most recent this`) supplies a datum; featureExpression → the
-    //                      `"<X> Records"` retrieve twin. (The old forced-Observation-boolean rule is DELETED.)
-    //   - `supplied-*`   → NO SD and NO error — the determination is READ from the supplied Patient, not
-    //                      gathered via a questionnaire case-feature (charter §2; patient-age).
-    //   - reject         → LOUD, carrying the skip's OWN kind + detail (bare-scalar → author `exists this`;
-    //                      unmodeled resource → model it; hybrid → park) — never a silent Observation fallback.
+    //   - `record`          → a StructureDefinition typed by the concept's NATURAL resource (Condition/
+    //                         MedicationRequest/Observation/…), coding on that resource's own element, valueless
+    //                         unless a value READ (`most recent this`) supplies a datum; featureExpression → the
+    //                         records-retrieve define (the `"<X> Records"` twin for a reduction, else the concept
+    //                         name `"<X>"`). (The old forced-Observation-boolean rule is DELETED.)
+    //   - `supplied-patient` → NO SD and NO error — the determination is READ from the supplied Patient, not
+    //                         gathered via a questionnaire case-feature (charter §2; the uncoded Patient arm).
+    //   - reject            → LOUD, carrying the skip's OWN kind + detail (bare-scalar → author `exists this`;
+    //                         unmodeled resource → model it; hybrid → park) — never a silent Observation fallback.
     //
     // The `cpg-featureExpression.reference` resolves to the `<policyId>-LocalSource`
-    // Library (where the records-twin define lives) via `localSourceReferenceSuffix`.
+    // Library (where the records-retrieve define lives) via `localSourceReferenceSuffix`.
     if (caseFeatureGateOpen && !reductionCaseFeatureBlocked) {
       for (const { name, code } of caseFeatures.unionConcepts) {
         const resolution = resolutionByName.get(name);
-        if (resolution === undefined || resolution.kind === "supplied-patient") {
-          // Supplied/read (the uncoded Patient arm — charter §2) or not collected — no gathered SD, NOT an error.
+        if (resolution === undefined) {
+          // A collected case-feature concept with NO resolution means the collection index and `resolutionByName`
+          // (both built from `caseFeatures.unionConcepts` / `lib.ast`) disagreed — an internal inconsistency, not a
+          // legitimate supplied/read. Fail LOUD rather than silently drop the case-feature (gpt56 round-2 refine).
+          errors.push({
+            type: "Validation",
+            kind: "internal-casefeature-resolution-missing",
+            message:
+              `Internal: collected case-feature concept "${name}" in source "${lib.libraryName}" has no ` +
+              `resolution entry (the case-feature collection and the record-resolution index disagree). This is ` +
+              `an emitter invariant violation, not an authoring error.`,
+          });
+          continue;
+        }
+        if (resolution.kind === "supplied-patient") {
+          // Supplied/read (the uncoded Patient arm — charter §2) — no gathered SD, NOT an error.
           continue;
         }
         if (resolution.kind !== "record") {

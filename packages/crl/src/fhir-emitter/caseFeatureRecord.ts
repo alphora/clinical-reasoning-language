@@ -1,17 +1,19 @@
-// #189 2d P2 — per-concept case-feature RECORD resolution (option-C inert precursor).
+// #189 2d P2 — per-concept case-feature RECORD resolution.
 //
-// The single pure function the atomic activation will call to answer, for ONE concept: "is this a gatherable
+// The single pure function the case-feature lane calls to answer, for ONE concept: "is this a gatherable
 // case-feature, and if so, what natural resource + records-define does it emit?" It composes the T1 descriptor
 // deriver (`deriveEffectiveRepresentations`) with the records-twin name rule (`recordsTwinDefineName`) and maps the
 // deriver's outcomes onto the case-feature lane's vocabulary. Charter §4 (`docs/CRL-NORTH-STAR.md`): a case-feature
 // is typed by the concept's OWN natural resource (Condition/MedicationRequest/Observation/…), never forced to
 // Observation; only NON-EPHEMERAL local `code is` records are case-features; the boolean is ephemeral CQL; the
-// `cpg-featureExpression` targets the RECORDS define (`"<X> Records"`), not the boolean `"<X>"`.
+// `cpg-featureExpression` targets the RECORDS-retrieve define — the `"<X> Records"` twin for a `ThisRecords`
+// reduction, or the concept's own name `"<X>"` for a RecordSet publisher / age both-rep (no twin) — NOT the
+// boolean `"<X>"` result.
 //
-// INERT PRECURSOR: nothing wires this into the live emit yet. The live case-feature lane still emits the old
-// forced-Observation hack for the (pre-migration, bare-scalar) corpus. The deriver REJECTS a bare-scalar `code is`
-// (`unsupported-reduction-form`), so this resolver only yields a `record` for a MIGRATED concept (`code is` +
-// `exists this` / `most recent this`); the atomic activation migrates the corpus and wires this in.
+// WIRED (#189 2d): `closureOrchestrator` calls this per collected case-feature concept; a `record` → SD + input,
+// `supplied-patient` → read (no SD), a reject → loud. The deriver REJECTS a bare-scalar `code is`
+// (`unsupported-reduction-form`), so this yields a `record` only for a MIGRATED concept (`code is` + a reduction,
+// or a `shape is RecordSet` publisher).
 
 import type { Concept } from "../ast/types";
 import { recordsTwinDefineName } from "../cql-emitter/lowerLocalCodes";

@@ -313,6 +313,37 @@ describe("closureOrchestrator — #189: unactivated reductions fail the FHIR lan
     expect(decisionPd).toBe(true);
     expect(result.errors.some((e) => e.kind === "unresolved-action-input-profile")).toBe(false);
   });
+
+  // #189 2d panel round 2 (both arms) — the MIXED guard: a `defined as` over a code-bearing `exists this`
+  // reduction AND a code-LESS `count` reduction. The old gate ("condition collects zero inputs") MISSED this —
+  // the code-bearing leaf makes the input set non-empty, so it passed while the code-less reduction's operand
+  // ("Trial Records") was silently dropped → a partial guard that can never fire at $apply. The re-keyed gate
+  // (reaches ANY code-less reduction) now loud-gates it. Pinned for BOTH spellings — `and` is the forward-
+  // canonical boolean composition (`DefinedAsBooleanComposition` body); `sem-and` reaches the same closure via
+  // `flattenDefinedAsBody`, so it must gate identically (a validator reject of sem-*-over-booleans is the
+  // boolean-composition family's own separate migration and would NOT close this spelling-independent hole).
+  for (const spelling of ["and", "semand"] as const) {
+    it(`#189 2d — a MIXED guard (code-bearing exists + code-LESS count, via \`${spelling}\`) LOUD-GATES (incomplete guard, not shipped)`, () => {
+      const root = join(ROOT, `src/imports/tests/fixtures/decision-mixed-${spelling}-reduction/root.crl`);
+      const result = emitFhirDefFromPath(root, { clock: FIXED_CLOCK });
+      expect(result.success).toBe(false);
+      expect(result.errors.some((e) => e.kind === "unsupported-casefeature-reduction")).toBe(true);
+      // The error names the code-less reduction, not just the guard atom.
+      const gate = result.errors.find((e) => e.kind === "unsupported-casefeature-reduction")!;
+      expect(gate.message).toContain("Enough Trials");
+      // Zero partial output: no decision PD and no case-feature SD survive.
+      expect(
+        result.resources.some((r) =>
+          r.relativePath.includes("PlanDefinition/decision-mixed-" + spelling + "-reduction-cov-determination"),
+        ),
+      ).toBe(false);
+      expect(
+        result.resources.filter(
+          (r) => (r.resource as { resourceType?: string }).resourceType === "StructureDefinition",
+        ),
+      ).toEqual([]);
+    });
+  }
 });
 
 describe("closureOrchestrator — malformed crl.dispositions (C2 regression)", () => {
