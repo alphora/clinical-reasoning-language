@@ -958,8 +958,8 @@ function collectLayerIncludes(
   // cross-family CQL `include`. Mirrors the `computeSplitPlan` D5 invariant-throw:
   // truly-unreachable on valid deliverable input, so a structured soft-error
   // channel would be the wrong shape.
-  const familyOf = (layer: Layer): "local" | "record" | "neutral" =>
-    layer.startsWith("Local") ? "local" : layer.startsWith("Record") ? "record" : "neutral";
+  const familyOf = (layer: Layer): "local" | "external" | "neutral" =>
+    layer.startsWith("Local") ? "local" : layer.startsWith("External") ? "external" : "neutral";
   const currentFamily = familyOf(currentLayer);
   if (currentFamily !== "neutral") {
     // Reverse-map each SIBLING include name back to its partition value to read
@@ -976,8 +976,8 @@ function collectLayerIncludes(
         throw new Error(
           `internal invariant violated: layer library "${currentLibraryName}" ` +
             `(${currentFamily} family) would \`include\` cross-family sibling ` +
-            `"${name}" (${sibFamily} family). A Local* library must never include a ` +
-            `Record* library (or vice-versa) — this signals the deferred ` +
+            `"${name}" (${sibFamily} family). A Local* library must never include an ` +
+            `External* library (or vice-versa) — this signals the deferred ` +
             `both-representation case reached the layered emit path.`,
         );
       }
