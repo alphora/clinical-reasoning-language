@@ -101,7 +101,7 @@
                   "valueMarkdown": "Diagnosis A"
                 }
               ],
-              "type": "Observation",
+              "type": "Condition",
               "profile": [
                 "http://example.org/hcsc/rx501-007/StructureDefinition/example-semand-diagnosis-a"
               ]
@@ -117,7 +117,7 @@
                   "valueMarkdown": "Diagnosis B"
                 }
               ],
-              "type": "Observation",
+              "type": "Condition",
               "profile": [
                 "http://example.org/hcsc/rx501-007/StructureDefinition/example-semand-diagnosis-b"
               ]

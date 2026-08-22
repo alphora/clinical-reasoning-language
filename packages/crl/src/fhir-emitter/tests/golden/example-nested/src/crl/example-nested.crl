@@ -4,14 +4,17 @@ concept "Diagnosis A":
 - type is Condition.
 - value type is boolean.
 - code is `a`.
+- definition is exists this.
 concept "Diagnosis B":
 - type is Condition.
 - value type is boolean.
 - code is `b`.
+- definition is exists this.
 concept "Diagnosis C":
 - type is Condition.
 - value type is boolean.
 - code is `c`.
+- definition is exists this.
 concept "A And B":
 - value type is boolean.
 - defined as ( "Diagnosis A" sem-and "Diagnosis B" ).

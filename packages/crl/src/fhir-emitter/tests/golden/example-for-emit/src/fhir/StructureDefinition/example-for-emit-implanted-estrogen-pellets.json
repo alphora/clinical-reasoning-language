@@ -27,7 +27,7 @@
       "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-featureExpression",
       "valueExpression": {
         "language": "text/cql-identifier",
-        "expression": "Implanted Estrogen Pellets",
+        "expression": "Implanted Estrogen Pellets Records",
         "reference": "http://example.org/hcsc/rx501-007/Library/ExampleForEmitLocalSource"
       }
     }
@@ -43,21 +43,26 @@
   "description": "Implanted Estrogen Pellets case feature determination",
   "kind": "resource",
   "abstract": false,
-  "type": "Observation",
-  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Observation",
+  "type": "MedicationRequest",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/MedicationRequest",
   "derivation": "constraint",
   "differential": {
     "element": [
       {
-        "id": "Observation",
-        "path": "Observation"
+        "id": "MedicationRequest",
+        "path": "MedicationRequest"
       },
       {
-        "id": "Observation.code",
-        "path": "Observation.code",
+        "id": "MedicationRequest.medication[x]",
+        "path": "MedicationRequest.medication[x]",
         "min": 1,
         "max": "1",
         "mustSupport": true,
+        "type": [
+          {
+            "code": "CodeableConcept"
+          }
+        ],
         "patternCodeableConcept": {
           "coding": [
             {
@@ -69,25 +74,13 @@
         }
       },
       {
-        "id": "Observation.value[x]",
-        "path": "Observation.value[x]",
-        "min": 1,
-        "max": "1",
-        "mustSupport": true,
-        "type": [
-          {
-            "code": "boolean"
-          }
-        ]
-      },
-      {
         "extension": [
           {
             "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
             "extension": [
               {
                 "url": "definition",
-                "valueCanonical": "http://example.org/hcsc/rx501-007/StructureDefinition/example-for-emit-implanted-estrogen-pellets#Observation.subject"
+                "valueCanonical": "http://example.org/hcsc/rx501-007/StructureDefinition/example-for-emit-implanted-estrogen-pellets#MedicationRequest.subject"
               },
               {
                 "url": "expression",
@@ -99,8 +92,8 @@
             ]
           }
         ],
-        "id": "Observation.subject",
-        "path": "Observation.subject",
+        "id": "MedicationRequest.subject",
+        "path": "MedicationRequest.subject",
         "min": 1,
         "max": "1",
         "mustSupport": true,
@@ -120,7 +113,7 @@
             "extension": [
               {
                 "url": "definition",
-                "valueCanonical": "http://example.org/hcsc/rx501-007/StructureDefinition/example-for-emit-implanted-estrogen-pellets#Observation.effective[x]"
+                "valueCanonical": "http://example.org/hcsc/rx501-007/StructureDefinition/example-for-emit-implanted-estrogen-pellets#MedicationRequest.authoredOn"
               },
               {
                 "url": "expression",
@@ -132,8 +125,8 @@
             ]
           }
         ],
-        "id": "Observation.effective[x]",
-        "path": "Observation.effective[x]",
+        "id": "MedicationRequest.authoredOn",
+        "path": "MedicationRequest.authoredOn",
         "min": 1,
         "max": "1",
         "mustSupport": true,
