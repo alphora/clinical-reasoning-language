@@ -231,7 +231,9 @@ describe("deriveEffectiveRepresentations — source arms, deferral, pure-derived
 });
 
 describe("deriveEffectiveRepresentations — fail-closed errors", () => {
-  it("unsupported resourceType → error{unsupported-resource}", () => {
+  it("a CEL-writer-only row (Encounter, caseFeature:false) → error{unsupported-resource} — the A′ deriver gate", () => {
+    // The deriver is a DEFINITION-lane consumer: Encounter HAS a registry row (the CEL writer emits it) but
+    // `caseFeature: false`, so it derives no case-feature descriptor. Distinct branch from a no-row resource.
     const out = deriveEffectiveRepresentations(
       concept(
         `library "T".\nconcept "Enc":\n- type is Encounter.\n- value type is boolean.\n- code is \`enc\`.\n- definition is exists this.\n`,
@@ -240,7 +242,25 @@ describe("deriveEffectiveRepresentations — fail-closed errors", () => {
       OWNING,
     );
     expect(out.status).toBe("error");
-    if (out.status === "error") expect(out.error.kind).toBe("unsupported-resource");
+    if (out.status === "error") {
+      expect(out.error.kind).toBe("unsupported-resource");
+      expect(out.error.detail).toContain("CEL-writer-only");
+    }
+  });
+
+  it("a resource with NO registry row (Goal) → error{unsupported-resource} — the not-in-registry branch", () => {
+    const out = deriveEffectiveRepresentations(
+      concept(
+        `library "T".\nconcept "G":\n- type is Goal.\n- value type is boolean.\n- code is \`g\`.\n- definition is exists this.\n`,
+        "G",
+      ),
+      OWNING,
+    );
+    expect(out.status).toBe("error");
+    if (out.status === "error") {
+      expect(out.error.kind).toBe("unsupported-resource");
+      expect(out.error.detail).toContain("not in the emit registry");
+    }
   });
 
   it("empty owning-library field → error{invalid-owning-library-metadata}", () => {
@@ -405,7 +425,13 @@ describe("#189-flip import boundary — effectiveRepresentation / resourceEmitRe
       "cql-emitter/emitCQL.ts",
       "fhir-emitter/caseFeatureRecord.ts",
     ]);
-    const REGISTRY_ALLOW = new Set(["fhir-emitter/structureDefinition.ts"]);
+    // `cel/emitter/emitFhir.ts` joins at the #189 CEL-writer flip (T2): the CEL instance lane genuinely consults
+    // the registry's coding PLACEMENT (`resourceCodingPlacement`) to write each fact's coding on the natural
+    // element — the sanctioned wiring design §9/disc 486 anticipated, no longer the premature-wiring hazard.
+    const REGISTRY_ALLOW = new Set([
+      "fhir-emitter/structureDefinition.ts",
+      "cel/emitter/emitFhir.ts",
+    ]);
     const erOffenders: string[] = [];
     const registryOffenders: string[] = [];
     const walk = (dir: string): void => {

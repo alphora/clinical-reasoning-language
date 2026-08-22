@@ -117,7 +117,11 @@ describe("valueReadValueTypes — coherence pins", () => {
     // already restructures T1's consumers) may collapse to deriving `valueless` from here (emit importing a
     // lane-neutral leaf is the permitted direction). Not collapsed now — the cross-check is the inert-precursor
     // right-sized choice.
+    // Only case-feature datum rows (`caseFeature: true`) are value-read resources this model must cover; a
+    // CEL-writer-only row (`caseFeature: false`, e.g. Encounter — #189 CEL-writer T2) is never a case-feature
+    // value-read, so it is intentionally OUT of `fhirValueModel`'s scope.
     for (const [resourceType, row] of Object.entries(RESOURCE_EMIT_REGISTRY)) {
+      if (!row.caseFeature) continue;
       const s = valueReadValueTypes(resourceType, "value");
       expect(s, `${resourceType} must be modeled by the value-read model`).toBeDefined();
       expect(row.valueless, `${resourceType}: valueless flag must match ∅`).toBe(s!.size === 0);
@@ -138,7 +142,14 @@ describe("valueReadValueTypes — coherence pins", () => {
   it("the model's keyset is EXACTLY the emit-registry resources ∪ {Patient} (model→registry, both directions)", () => {
     // Registry→model is pinned by the valueless↔∅ loop above (a new registry row forces a model row). This pins
     // the OTHER direction: a stray model row (e.g. a future `Encounter`) would silently widen the stated scope.
-    const expected = [...Object.keys(RESOURCE_EMIT_REGISTRY), "Patient"].sort();
+    // Scope = the CASE-FEATURE (value-read) registry rows ∪ {Patient}; CEL-writer-only rows (`caseFeature:
+    // false`, e.g. Encounter) are excluded — they carry no value-read element and are never a case-feature.
+    const expected = [
+      ...Object.entries(RESOURCE_EMIT_REGISTRY)
+        .filter(([, row]) => row.caseFeature)
+        .map(([rt]) => rt),
+      "Patient",
+    ].sort();
     expect([...MODELED_RESOURCE_TYPES].sort()).toEqual(expected);
   });
 });

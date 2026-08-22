@@ -7,6 +7,7 @@ import {
   type Concept,
 } from "../../ast/types";
 import { hasLocalCode, hasSourceBinding } from "../../emit/conceptDatumSignals";
+import { resourceCodingPlacement } from "../../emit/resourceEmitRegistry";
 import type { ResolvedCelGraph } from "../imports/types";
 import type {
   CELFact,
@@ -575,9 +576,23 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
     }
   }
 
-  // Code.
+  // Code — #189 CEL-writer T2: registry-driven coding PLACEMENT on the resource's natural element. Placement is a
+  // RESOURCE-level fact (the registry row), NOT role-gated: a fact carrying a code places it on that resource's
+  // natural element regardless of role — Observation/Condition/ServiceRequest → `code`, MedicationRequest →
+  // `medicationCodeableConcept`, Encounter → `type[]` (killing the universal `.code` that was invalid for
+  // non-`.code` resources). This applies equally to a `coded from` (remote) fact, a bare `defined by <Type>`
+  // fact, and — at T3 — a local fact (whose `{system, code}` is DERIVED from the concept rather than authored on
+  // the fact). A resource with NO registry row (an activity-only resource like Task/CommunicationRequest, or any
+  // unlisted type) keeps the pre-flip `.code` write — category-3 activity coding + unlisted fail-closed are T4.
+  // (Role governs the code VALUE/system — derive-local vs authored, T3 — not the coding element, which is T2.)
   if (typeof body.code === "string") {
-    resourceBody.code = codeableConcept(body.code);
+    const cc = codeableConcept(body.code);
+    const placement = resourceCodingPlacement(fhirType);
+    if (placement) {
+      resourceBody[placement.jsonName] = placement.array ? [cc] : cc;
+    } else {
+      resourceBody.code = cc;
+    }
   }
 
   // Value (boolean, numeric, or string) — Observation primarily. #189 S1 — a boolean value lowers

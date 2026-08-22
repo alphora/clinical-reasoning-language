@@ -15,15 +15,14 @@
 //
 // T2 — the WRITE-name resolvers (`codingJsonName` / `valueJsonName` / `recencyStampJsonName`) DERIVE the
 // serialized JSON name from a read row via one FHIR polymorphic-element spelling rule (`choiceElementJsonName`),
-// rather than storing a second write table that could drift (design §4/§7/§10). INERT in T2 — nothing production
-// calls them; the CEL lane wires them at the flip (T5/T6) and, in the same commit, SUPERSEDES + DELETES the
-// parallel prior write authority in `packages/crl/src/cel/emitter/emitFhir.ts`: the `applyDateField` stored
-// date map, the universal `resourceBody.code` write, and the type-switched value write (today at :355-371,
-// :512-513, :519-527 respectively — SYMBOLS lead; the line refs are as-of and will drift). BLAST RADIUS the
-// flip must inherit, not discover: `applyDateField`'s map covers 15 resource types while this registry has 5,
-// so the deletion converts the other 10 (Encounter, MedicationStatement, DiagnosticReport, …) into
-// descriptor-resolution `unsupported-resource` failures — the intended fail-closed behavior (design §5/§9), a
-// stated consequence. Until the flip this is inert infrastructure ALONGSIDE the old authority.
+// rather than storing a second write table that could drift (design §4/§7/§10). REFACTOR:grounded — the CEL lane
+// wires these across the #189 CEL-writer flip (T2–T4): T2 wired CODING placement (`resourceCodingPlacement`,
+// consumed by `packages/crl/src/cel/emitter/emitFhir.ts`, SUPERSEDING the universal `resourceBody.code` write);
+// the `applyDateField` stored date map and the type-switched value write are SUPERSEDED at T4 (SYMBOLS lead;
+// line refs drift). BLAST RADIUS the flip inherits, not discovers: `applyDateField`'s map covers 15 resource
+// types; a resource with NO registry row (MedicationStatement, DiagnosticReport, …) becomes a fail-closed
+// `unsupported-resource` at the definition lane and a `.code`-fallback → T4 case-atomic at the CEL lane.
+// Encounter, once among those, now has a CEL-writer-only (`caseFeature: false`) row (added T2).
 //
 // SPELLING ≠ LEGALITY: a resolver spells a JSON name correctly for any variant; it does NOT assert the target
 // element admits that variant. `conceptValueTypes` is CRL-wide (includes `date`/`Attachment`), but e.g.
@@ -47,7 +46,8 @@ import { conceptValueTypes } from "../grammar/conceptValueTypes";
  *  default — every supported resource declares its strategy explicitly (panel R1 P4). */
 export type CodingStrategy =
   | { kind: "codeable-concept"; field: string } // a `CodeableConcept` at <field> (e.g. Observation.code)
-  | { kind: "choice-codeable-concept"; field: string }; // a choice element (e.g. MedicationRequest.medication)
+  | { kind: "choice-codeable-concept"; field: string } // a choice element (e.g. MedicationRequest.medication)
+  | { kind: "codeable-concept-array"; field: string }; // a `CodeableConcept[]` at <field> (e.g. Encounter.type)
 
 /** A normalized recency sort-key access strategy (panel R2 Q2). `cast:"dateTime"` renders
  *  `(<sortExpr> as FHIR.dateTime).value` — a CHOICE element (`effective`/`performed`), null-sort-safe on the
@@ -75,19 +75,21 @@ export interface ResourceEmitRow {
    *  resource the CEL writer emits but no case-feature has YET been proven to read (e.g. Encounter as an
    *  ambient/QM-operand datum, added by the CEL-writer flip): the definition lane's case-feature gate skips it;
    *  flipping `false`→`true` later is the intended one-line reversibility, NOT a category impossibility.
-   *  IMPORTANT — row consultation is ROLE-gated, not resourceType-gated: a row governs a fact only when that
-   *  fact's resolved role is a concept-datum role (local/remote). An ACTIVITY-role fact never reads its row even
-   *  where one exists — ServiceRequest and MedicationRequest carry `caseFeature: true` rows AND are activity
-   *  instance targets (`CPG_TO_FHIR`), and an activity instance carries no concept-datum coding. Keying row
-   *  consultation off `resourceType` alone would miswrite those.
+   *  SCOPE — this marker gates ONLY the DEFINITION lane (case-feature SD + `action.input` profiling via
+   *  `caseFeatureProfileShape`, and the value-read model): those consumers honor a row only when `caseFeature`.
+   *  It does NOT gate the CEL instance writer's coding-ELEMENT placement, which is RESOURCE-level (a fact emitting
+   *  resource R places its coding on R's natural element regardless of role or `caseFeature`, via
+   *  `resourceCodingPlacement`): an Encounter fact codes on `type[]` whether it is `coded from`, bare
+   *  `defined by Encounter`, or (later) local. Role governs the code VALUE/system (derive-local vs authored, T3),
+   *  not the coding element.
    *  ONE table, one row per resource, a marker instead of a second write table that could drift from the retrieve
    *  invariant (the anti-drift purpose of this file's T2 header). Every current row is a proven case-feature
    *  datum, so all are `true` — the marker is output-neutral until the flip adds a `false` row. */
   caseFeature: boolean;
 }
 
-/** The T1 subset (proven local cells). Unlisted → fail-closed `unsupported-resource`. `codeable-concept-array`
- *  (e.g. Encounter.type) is intentionally absent — no resource in this subset needs it (panel R2 nit). */
+/** The emit subset. Unlisted → fail-closed `unsupported-resource`. `codeable-concept-array` (Encounter.type)
+ *  landed with the #189 CEL-writer flip (T2) — a CEL-writer-only (`caseFeature: false`) row. */
 export const RESOURCE_EMIT_REGISTRY: Readonly<Record<string, ResourceEmitRow>> = {
   Observation: {
     coding: { kind: "codeable-concept", field: "code" },
@@ -118,6 +120,19 @@ export const RESOURCE_EMIT_REGISTRY: Readonly<Record<string, ResourceEmitRow>> =
     recency: { sortExpr: "authoredOn", cast: "none" },
     valueless: true,
     caseFeature: true,
+  },
+  // REFACTOR:grounded (#189 CEL-writer T2, disc 486 A′). A CEL-WRITER-ONLY row (`caseFeature: false`): the CEL
+  // instance lane emits Encounters (ambient/QM-operand context, read by an external-lane `[Encounter: …]`
+  // retrieve on `type`), but no case-feature has `type is Encounter`, so the definition lane's case-feature gate
+  // skips this row. Coding is the `type[]` ARRAY (a visit code is `Encounter.type`, NOT `.code` — R4 Encounter
+  // has no `.code`). `recency` is the nested `period.start`; nested-Period recency is CONSUMED at T4
+  // (applyDateField-by-role) — it is NOT read by T2's coding path, and the T2 recency resolvers (which reject a
+  // dotted path) are never reached for Encounter (caseFeature-gated off the definition lane).
+  Encounter: {
+    coding: { kind: "codeable-concept-array", field: "type" }, // Encounter.type[] — a visit code, NOT `.code`
+    recency: { sortExpr: "period.start", cast: "none" }, // nested Period; consumed at T4, not by T2 coding
+    valueless: true,
+    caseFeature: false,
   },
 };
 
@@ -158,7 +173,25 @@ export function codingJsonName(strategy: CodingStrategy): string {
       return strategy.field;
     case "choice-codeable-concept":
       return choiceElementJsonName(strategy.field, "CodeableConcept");
+    case "codeable-concept-array":
+      return strategy.field; // a plain (repeating) element — its own name, e.g. `type` (Encounter.type[])
   }
+}
+
+/** REFACTOR:grounded (#189 CEL-writer T2). The CEL instance lane's coding-PLACEMENT resolver: WHERE a resource's
+ *  coding is written (the JSON name) and whether it is an ARRAY element — or `undefined` for a resource with no
+ *  registry row (the CEL writer then keeps its pre-flip behavior / fails closed at T4). Coding placement is a
+ *  RESOURCE-level fact (the registry's own authority), independent of local vs remote — so the CEL writer places
+ *  an authored (remote) code, and at T3 a derived local code, on the natural element (Observation→`code`,
+ *  MedicationRequest→`medicationCodeableConcept`, Encounter→`type[]`) instead of a universal `.code`. This is
+ *  distinct from concept-descriptor resolution (the value / derive-local chokepoint through
+ *  `deriveEffectiveRepresentations`, T3), which the descriptor deriver DEFERS for a remote-only concept. */
+export function resourceCodingPlacement(
+  resourceType: string,
+): { jsonName: string; array: boolean } | undefined {
+  const row = resourceEmitRow(resourceType);
+  if (row === undefined) return undefined;
+  return { jsonName: codingJsonName(row.coding), array: row.coding.kind === "codeable-concept-array" };
 }
 
 /** The JSON write name for a concept's datum value — the NAME axis of the design §4 value-population rule (the
@@ -193,15 +226,15 @@ export function valueJsonName(
  *  its `<base>DateTime` variant, which `(<base> as FHIR.dateTime).value` reads null-sort-safely). Rejects a
  *  DOTTED-or-EMPTY `sortExpr` FIRST, before either branch (it does NOT validate general FHIR element-name syntax
  *  — whitespace/bracket spellings are unreachable per the consumption contract, so unguarded by design):
- *  `meta.lastUpdated` (uncoded Patient — a server-assigned stamp the resource-writer never emits) and, later,
- *  design §2's Period recency (`period.start`) are dotted paths, not top-level stamps, until T3; a naive
- *  `cast:"dateTime"` derivation would spell an invalid nested `period.startDateTime`. */
+ *  `meta.lastUpdated` (uncoded Patient — a server-assigned stamp the resource-writer never emits) and the
+ *  Encounter row's `period.start` (nested Period; its recency-write lands at T4) are dotted paths, not top-level
+ *  stamps; a naive `cast:"dateTime"` derivation would spell an invalid nested `period.startDateTime`. */
 export function recencyStampJsonName(recency: RecencyAccess): JsonNameResult {
   const expr = recency.sortExpr;
   if (expr.length === 0 || expr.includes(".")) {
     return {
       errorKind: "unsupported-recency-path",
-      detail: `a dotted or empty \`sortExpr\` (\`${expr}\`) is not a top-level writable stamp — recency-path writability is a SEPARATE later concern, NOT the T3a value-read model (current instances: Patient \`meta.lastUpdated\`, server-assigned/never written; §2 Period recency \`period.start\`, out of the resource subset)`,
+      detail: `a dotted or empty \`sortExpr\` (\`${expr}\`) is not a top-level writable stamp — recency-path writability is a SEPARATE later concern, NOT the T3a value-read model (current instances: Patient \`meta.lastUpdated\`, server-assigned/never written; the Encounter row's \`period.start\`, whose nested-Period recency-write lands at T4)`,
     };
   }
   switch (recency.cast) {
@@ -224,7 +257,13 @@ export function recencyStampJsonName(recency: RecencyAccess): JsonNameResult {
  *  (`code`); a choice element keeps its `[x]` (`medication[x]`). NOT the JSON write name (`medicationCodeableConcept`
  *  — that is `codingJsonName`), NOT the CQL read (`medication`). */
 function codingElementModelPath(coding: CodingStrategy): string {
-  return coding.kind === "codeable-concept" ? coding.field : `${coding.field}[x]`;
+  switch (coding.kind) {
+    case "codeable-concept":
+    case "codeable-concept-array":
+      return coding.field; // a plain element keeps its own name (`code`, `type`); array-ness is cardinality
+    case "choice-codeable-concept":
+      return `${coding.field}[x]`;
+  }
 }
 
 /** The SD-model element name for a resource's recency stamp: a `cast:"dateTime"` sort is a choice element
@@ -262,6 +301,9 @@ export function caseFeatureProfileShape(
 ): CaseFeatureProfileShape | undefined {
   const row = resourceEmitRow(resourceType);
   if (row === undefined) return undefined;
+  // A′ gate (#189 CEL-writer T2, disc 486): a CEL-writer-only row (`caseFeature: false`, e.g. Encounter) is never
+  // a case-feature datum — the definition lane must NOT profile an SD for it, even though the CEL writer emits it.
+  if (!row.caseFeature) return undefined;
   return {
     resourceType,
     baseDefinition: `http://hl7.org/fhir/StructureDefinition/${resourceType}`,

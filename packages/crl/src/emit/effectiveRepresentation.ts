@@ -288,8 +288,12 @@ function notAgeLocalExact(
   | { status: "error"; error: DerivationError } {
   const base = { concept: concept.name, owningLibrary: owningLibrary.libraryName };
   const resourceType = concept.conceptType ?? "Observation"; // implicit-standard local Observation (charter §3)
+  // A′ gate (#189 CEL-writer T2): the descriptor deriver is a DEFINITION-lane consumer, so it honors only
+  // case-feature rows. A CEL-writer-only row (`caseFeature: false`, e.g. Encounter) is NOT a case-feature datum —
+  // it derives no descriptor, exactly as an unlisted resource does. (The CEL writer reaches Encounter via the
+  // unrestricted `resourceCodingPlacement`, never this deriver.)
   const row = resourceEmitRow(resourceType);
-  if (!row) {
+  if (!row || !row.caseFeature) {
     return {
       status: "error",
       error: {
@@ -297,7 +301,9 @@ function notAgeLocalExact(
         kind: "unsupported-resource",
         resourceType,
         field: "coding",
-        detail: `resource type \`${resourceType}\` is not in the T1 emit registry`,
+        detail: row
+          ? `resource type \`${resourceType}\` is a CEL-writer-only row (\`caseFeature: false\`) — not a case-feature datum; the definition lane derives no descriptor for it`
+          : `resource type \`${resourceType}\` is not in the emit registry`,
       },
     };
   }

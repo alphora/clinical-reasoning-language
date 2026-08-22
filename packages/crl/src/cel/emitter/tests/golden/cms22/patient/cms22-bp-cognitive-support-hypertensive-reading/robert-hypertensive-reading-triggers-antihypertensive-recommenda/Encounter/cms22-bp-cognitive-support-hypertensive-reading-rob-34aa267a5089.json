@@ -4,14 +4,16 @@
   "subject": {
     "reference": "Patient/cms22-bp-cognitive-support-hypertensive-reading-rob-6fbdeec2c967"
   },
-  "code": {
-    "coding": [
-      {
-        "system": "http://hl7.org/fhir/sid/hcpcs",
-        "code": "G0438"
-      }
-    ]
-  },
+  "type": [
+    {
+      "coding": [
+        {
+          "system": "http://hl7.org/fhir/sid/hcpcs",
+          "code": "G0438"
+        }
+      ]
+    }
+  ],
   "period": {
     "start": "2026-04-12"
   }

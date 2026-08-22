@@ -88,7 +88,7 @@ proves the local lane is resource-general.
 | Remote **Patient + ServiceRequest** CEL read (element placement) | ✅ PA | **In** |
 | Remote **Encounter** element placement (`.code`→`type[]`, array strategy) | required 2nd/3rd example | **In** |
 | Dispatch-by-resolved-role; value-legality (no typeof-sniffing); case-atomic; replace `applyDateField` | infra for all | **In** |
-| Category-3 activity-instance write rule (Task/CommunicationRequest via `CPG_TO_FHIR`) | infra | **In** (else case-atomic kills valid cases) |
+| Category-3 activity-instance write rule (Task/CommunicationRequest via `CPG_TO_FHIR`) | infra | **T4** — must name **CommunicationRequest + ImmunizationRecommendation** (both no R4 `.code`; live `CPG_TO_FHIR` targets); the `.code` fallback must not survive the flip (disc 488) |
 | `$extract` PD.input across ≥2 coding strategies (2d shipped 5 resources) | ✅ | **Done (2d) — assert coverage** |
 | `$extract` PD.condition not Observation-locked (≥1 non-Observation-expressible path) | anti-corner | **In** (assertion/guard) |
 | `$extract` required-field completeness (additional questions) | ✅ PA (non-Obs targets) | Designed; **#290 follow-on** |

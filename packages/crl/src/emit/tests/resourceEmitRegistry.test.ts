@@ -12,11 +12,21 @@ import {
   codingJsonName,
   valueJsonName,
   recencyStampJsonName,
+  resourceCodingPlacement,
 } from "../resourceEmitRegistry";
 
 // T2 — the JSON-write-name resolvers. These derive the serialized-JSON write name from a T1 read row via the
 // one FHIR polymorphic-element spelling rule. The pins below prove the derivation against known-correct names;
 // the fail-closed cells prove T2 refuses (never guesses) beyond its boundary and defers legality to T3.
+
+// The DEFINITION-lane / value-read matrices (recency-stamp write-names, SD-model) pin only `caseFeature: true`
+// rows: a CEL-writer-only row (`caseFeature: false`, e.g. Encounter — #189 CEL-writer T2) has no case-feature SD,
+// and its recency (nested Period) is a T4 concern. Its CEL-relevant surface — coding PLACEMENT — is pinned
+// separately (the `resourceCodingPlacement` block below).
+const CASE_FEATURE_ROWS = Object.entries(RESOURCE_EMIT_REGISTRY)
+  .filter(([, row]) => row.caseFeature)
+  .map(([rt]) => rt)
+  .sort();
 
 describe("T2 write-name resolvers — resource-keyed matrix (the per-cell pin)", () => {
   // Keyed by resourceType so a row mutation (e.g. Procedure.recency.sortExpr → "effective") fails the pin —
@@ -34,7 +44,7 @@ describe("T2 write-name resolvers — resource-keyed matrix (the per-cell pin)",
     // The matrix iterates EXPECTED, so it pins mutations and deletions but would NOT pin an ADDITION — a 6th
     // registry row would ride only the generic totality loop (non-error, not a correct NAME). That is exactly
     // the hole derive-over-store was argued to need covered (plan). Force every new row to arrive with its pin.
-    expect(Object.keys(RESOURCE_EMIT_REGISTRY).sort()).toEqual(Object.keys(EXPECTED).sort());
+    expect(CASE_FEATURE_ROWS).toEqual(Object.keys(EXPECTED).sort());
   });
 
   for (const [resourceType, expected] of Object.entries(EXPECTED)) {
@@ -47,10 +57,13 @@ describe("T2 write-name resolvers — resource-keyed matrix (the per-cell pin)",
     });
   }
 
-  it("every coded subset row resolves coding + recency stamp to a NON-error (totality over the subset)", () => {
-    for (const row of Object.values(RESOURCE_EMIT_REGISTRY)) {
-      expect(typeof codingJsonName(row.coding)).toBe("string");
-      expect(recencyStampJsonName(row.recency)).toHaveProperty("jsonName");
+  it("every case-feature row resolves coding + recency stamp to a NON-error (totality over the definition subset)", () => {
+    // caseFeature rows only: a CEL-writer-only row (Encounter) has a nested-Period recency the T2 stamp resolver
+    // intentionally rejects until T4 — it is not part of this definition-lane totality.
+    for (const [resourceType, row] of Object.entries(RESOURCE_EMIT_REGISTRY)) {
+      if (!row.caseFeature) continue;
+      expect(typeof codingJsonName(row.coding), resourceType).toBe("string");
+      expect(recencyStampJsonName(row.recency), resourceType).toHaveProperty("jsonName");
     }
   });
 });
@@ -112,7 +125,7 @@ describe("#189 2d — caseFeatureProfileShape (SD-model spelling, the THIRD spel
   };
 
   it("EXPECTED_MODEL covers exactly the registry rows (a new row cannot ship without its SD-model pin)", () => {
-    expect(Object.keys(EXPECTED_MODEL).sort()).toEqual(Object.keys(RESOURCE_EMIT_REGISTRY).sort());
+    expect(Object.keys(EXPECTED_MODEL).sort()).toEqual(CASE_FEATURE_ROWS);
   });
 
   for (const [resourceType, expected] of Object.entries(EXPECTED_MODEL)) {
@@ -213,5 +226,54 @@ describe("T2 write-name resolvers — recency guard against the LIVE uncoded des
       "errorKind",
       "unsupported-recency-path",
     );
+  });
+});
+
+describe("#189 CEL-writer T2 — coding PLACEMENT + the Encounter (caseFeature:false) row", () => {
+  it("resourceCodingPlacement writes each strategy on the natural element", () => {
+    // plain CodeableConcept → the field itself, scalar
+    expect(resourceCodingPlacement("Observation")).toEqual({ jsonName: "code", array: false });
+    expect(resourceCodingPlacement("Condition")).toEqual({ jsonName: "code", array: false });
+    expect(resourceCodingPlacement("ServiceRequest")).toEqual({ jsonName: "code", array: false });
+    // choice element → the CodeableConcept variant, scalar (NOT `.code`)
+    expect(resourceCodingPlacement("MedicationRequest")).toEqual({
+      jsonName: "medicationCodeableConcept",
+      array: false,
+    });
+    // array element → the field itself, ARRAY (Encounter.type[], NOT `.code`)
+    expect(resourceCodingPlacement("Encounter")).toEqual({ jsonName: "type", array: true });
+    // unlisted → undefined (CEL writer keeps `.code` / fails closed at T4)
+    expect(resourceCodingPlacement("Task")).toBeUndefined();
+    expect(resourceCodingPlacement("CommunicationRequest")).toBeUndefined();
+  });
+
+  it("codingJsonName covers the codeable-concept-array strategy", () => {
+    expect(codingJsonName({ kind: "codeable-concept-array", field: "type" })).toBe("type");
+  });
+
+  it("the Encounter row is CEL-writer-only: caseFeature:false, type[] coding, valueless", () => {
+    const enc = RESOURCE_EMIT_REGISTRY.Encounter;
+    expect(enc).toBeDefined();
+    expect(enc.caseFeature).toBe(false);
+    expect(enc.coding).toEqual({ kind: "codeable-concept-array", field: "type" });
+    expect(enc.valueless).toBe(true);
+  });
+
+  it("Encounter's recency stamp is pinned AS unsupported-recency-path — a RED pin T4 must consciously flip", () => {
+    // The Encounter row carries the honest nested-Period read path `period.start`; T2's stamp resolver rejects
+    // it by design, and T4 (nested-Period recency-write) is the named successor. Pinning the error (rather than
+    // relying on a totality loop) forces T4 to flip a red pin, and keeps the row's recency out of the coding path.
+    expect(recencyStampJsonName(RESOURCE_EMIT_REGISTRY.Encounter.recency)).toHaveProperty(
+      "errorKind",
+      "unsupported-recency-path",
+    );
+  });
+
+  it("A′ gate: caseFeatureProfileShape returns undefined for a caseFeature:false row (Encounter)", () => {
+    // Encounter is emitted by the CEL writer but is NEVER a case-feature datum — the definition lane must not
+    // profile an SD for it, even though it has a registry row.
+    expect(caseFeatureProfileShape("Encounter")).toBeUndefined();
+    // a caseFeature:true row still profiles.
+    expect(caseFeatureProfileShape("Condition")).toBeDefined();
   });
 });
