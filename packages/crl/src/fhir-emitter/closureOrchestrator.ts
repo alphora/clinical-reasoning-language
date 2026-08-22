@@ -675,6 +675,67 @@ export function applyInvariant2(
 }
 
 /**
+ * Inv 2(d) — StructureDefinition cpg-featureExpression DEFINE integrity. The companion to Inv 2(c): (c)
+ * checks the referenced LIBRARY exists; (d) checks the referenced DEFINE exists IN that library's emitted
+ * CQL. A case-feature `valueExpression.expression` is a bare CQL define identifier (`"<X> Records"` for a
+ * reduction, `"<X>"` for a RecordSet / age-both-rep) in the LocalSource library. If it names a define that
+ * was NOT emitted, the featureExpression DANGLES — it resolves at neither translator-load nor emit, failing
+ * only at `$apply`. This is the general backstop for the #189 2d dangle class (both round-1 criticals were
+ * green-over-a-broken-artifact precisely because nothing checked featureExpression targets). No-op when the
+ * manifest carries no CQL (direct graph-only unit callers, `cqlByLibrary: []`) — like Inv 4.
+ */
+export function applyFeatureExpressionDefineInvariant(
+  resources: ReadonlyArray<EmittedResource>,
+  cqlByLibrary: ReadonlyArray<PerLibraryEmit>,
+): CRLError[] {
+  const errors: CRLError[] = [];
+  if (cqlByLibrary.length === 0) return errors; // no emitted CQL to check against — no-op (Inv-4 pattern)
+
+  // Per-library set of emitted define names (parsed from the CQL text). `define "<Name>":`, tolerating a
+  // leading `private`/`function` qualifier (case-feature targets are plain defines, but be lenient).
+  const definesByLibrary = new Map<string, Set<string>>();
+  for (const e of cqlByLibrary) {
+    const names = new Set<string>();
+    for (const m of e.cql.matchAll(/^\s*define\s+(?:private\s+|function\s+)?"([^"]+)"\s*[:(]/gm)) {
+      names.add(m[1]!);
+    }
+    definesByLibrary.set(e.libraryName, names);
+  }
+
+  for (const r of resources) {
+    if (r.resourceType !== "StructureDefinition") continue;
+    const ext = (
+      r.resource as {
+        extension?: Array<{ url?: string; valueExpression?: { expression?: unknown; reference?: unknown } }>;
+      }
+    ).extension;
+    if (!Array.isArray(ext)) continue;
+    for (const e of ext) {
+      if (e.url !== CPG_FEATURE_EXPRESSION_EXT) continue;
+      const expr = e.valueExpression?.expression;
+      const ref = e.valueExpression?.reference;
+      if (typeof expr !== "string" || typeof ref !== "string") continue;
+      // The referenced Library canonical's url-tail IS the CQL library name (Inv 6: id == name == url-tail).
+      const libName = ref.split("/").pop() ?? ref;
+      const defines = definesByLibrary.get(libName);
+      // Only check when we HAVE this library's emitted defines; a missing library is Inv 2(c)'s concern.
+      if (defines === undefined) continue;
+      if (!defines.has(expr)) {
+        errors.push({
+          type: "Validation",
+          kind: "dangling-feature-expression-define",
+          message:
+            `StructureDefinition "${r.sourceName ?? r.relativePath}" cpg-featureExpression targets define ` +
+            `"${expr}", which is NOT emitted in library "${libName}". The featureExpression would resolve at ` +
+            `neither translator-load nor emit, failing only at $apply — a dangling case-feature target.`,
+        });
+      }
+    }
+  }
+  return errors;
+}
+
+/**
  * Inv 6 (#186) — LIBRARY IDENTITY AGREEMENT. cqf resolves a layered library by
  * matching `Library.name` to the id `VersionedIdentifiers.forUrl` derives from a
  * referrer's canonical url-TAIL (or the CQL `include` name). So for EVERY emitted
@@ -1901,7 +1962,11 @@ export function emitFhirDefClosure(
     cqlByLibrary.filter((e) => !e.isSharedCatalog).map((e) => e.libraryName),
   );
   const inv6errors = applyLibraryIdentityInvariant(inv1.surviving, metadata, enforcedIdentities);
-  errors.push(...inv2errors, ...inv3errors, ...inv4errors, ...inv5errors, ...inv6errors);
+  // Inv 2(d) — case-feature cpg-featureExpression DEFINE integrity: the referenced define must exist in the
+  // referenced library's emitted CQL (the general backstop for the #189 2d dangle class). No-op when the
+  // manifest carries no CQL (`cqlByLibrary: []`, graph-only unit callers), like Inv 4.
+  const inv2dErrors = applyFeatureExpressionDefineInvariant(inv1.surviving, cqlByLibrary);
+  errors.push(...inv2errors, ...inv2dErrors, ...inv3errors, ...inv4errors, ...inv5errors, ...inv6errors);
 
   // Round-5 gpt55 [important]: severity-aware success (warnings don't sink
   // success). Hard errors (non-warning CRLErrors) + any unmatched still flip
