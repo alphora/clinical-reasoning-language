@@ -1,0 +1,20 @@
+{
+  "resourceType": "Observation",
+  "id": "local-cms69-bmi-screening-janes-high-bmi-is-follo-ac9afa8f59c2",
+  "subject": {
+    "reference": "Patient/local-cms69-bmi-screening-janes-high-bmi-is-follo-425a5b862767"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "39156-5"
+      }
+    ]
+  },
+  "status": "final",
+  "valueQuantity": {
+    "value": 24.1
+  },
+  "effectiveDateTime": "2026-07-15"
+}

@@ -1,0 +1,10 @@
+{
+  "resourceType": "Patient",
+  "id": "local-cms22-blood-pressure-screening-maria-has-no-2cad6987aaa3",
+  "name": [
+    {
+      "text": "Maria Garcia"
+    }
+  ],
+  "birthDate": "1972-08-22"
+}

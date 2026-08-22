@@ -1,0 +1,16 @@
+{
+  "resourceType": "Condition",
+  "id": "local-cms22-bp-cognitive-support-hypertensive-rea-b934401ae16b",
+  "subject": {
+    "reference": "Patient/local-cms22-bp-cognitive-support-hypertensive-rea-6fbdeec2c967"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://hl7.org/fhir/sid/icd-10-cm",
+        "code": "I10"
+      }
+    ]
+  },
+  "recordedDate": "2024-05-12"
+}

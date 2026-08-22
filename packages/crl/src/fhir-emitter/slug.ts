@@ -119,10 +119,17 @@ function capSlug(slug: string): string {
  * `"unnamed"`. Those never reach the `> 64` branch, so the hash can't separate
  * them; the `closure-resource-*-collision` backstop catches them instead.
  */
-export function uniqueCapSlug(raw: string): string {
-  if (raw.length <= SLUG_MAX_LEN) return raw;
+export function uniqueCapSlug(raw: string, maxLen: number = SLUG_MAX_LEN): string {
+  // `maxLen` defaults to the FHIR id ceiling (64) — the fhir-emitter lane passes nothing and is
+  // byte-unchanged. The CEL channel scheme passes a SMALLER cap (56 = 64 − longest `<channel>-`
+  // prefix `mixture-`) so a channel-prefixed id is still <= 64; the hash is still over the FULL
+  // `raw`, so a cap-56 base stays byte-identical across the three channel prefixes.
+  if (maxLen < UNIQUE_HASH_LEN + 1) {
+    throw new Error(`uniqueCapSlug: maxLen ${maxLen} too small for a <hash> id (need >= ${UNIQUE_HASH_LEN + 1})`);
+  }
+  if (raw.length <= maxLen) return raw;
   const hash = createHash("sha256").update(raw, "utf8").digest("hex").slice(0, UNIQUE_HASH_LEN);
-  const stem = raw.slice(0, SLUG_MAX_LEN - UNIQUE_HASH_LEN - 1).replace(/^-+|-+$/g, "");
+  const stem = raw.slice(0, maxLen - UNIQUE_HASH_LEN - 1).replace(/^-+|-+$/g, "");
   return stem ? `${stem}-${hash}` : hash;
 }
 

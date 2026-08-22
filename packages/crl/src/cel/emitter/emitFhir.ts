@@ -33,7 +33,15 @@ import type {
   EmitDiagnostic,
   EmittedCase,
   EmittedResource,
+  EmitCelOptions,
+  Channel,
 } from "./types";
+import { ALL_CHANNELS } from "./types";
+
+/** REFACTOR:grounded (#189 remote-data channel, disc 492). Cap for the UNPREFIXED CEL id composite: 64 (FHIR id
+ *  ceiling) minus the longest `<channel>-` prefix `mixture-` (8), so a channel-prefixed id is always <= 64. The
+ *  hash is over the full composite, so the same base is byte-identical across all three channel prefixes. */
+const CEL_ID_BASE_MAX = 56;
 
 const CONCEPT_TYPE_SET: Set<string> = new Set<string>(conceptTypes as readonly ConceptType[]);
 
@@ -459,6 +467,14 @@ interface EmitContext {
    * the full discriminating tail. `c.name` already carries the raw case name.
    */
   libraryName: string;
+  /** #189 (disc 492) — the channel this pass emits; becomes the `<channel>-` id prefix + compartment prefix. */
+  channel: Channel;
+  /**
+   * #189 (disc 492) — the subject Patient's channel-prefixed id, i.e. the KALM compartment directory every
+   * resource in this case sits under (`patient/<patientCompartmentId>/<type>/...`). Set once in `emitCase`
+   * after the (required) subject resolves; "" before that.
+   */
+  patientCompartmentId: string;
   anchors: AnchorMap;
   /** Maps fact-name → emitted resource id (within this case), for cross-resource references. */
   emittedIds: Map<string, { id: string; resourceType: string }>;
@@ -471,7 +487,13 @@ interface EmitContext {
 // `rawSlug` composite of the raw library/case/fact names — one id formatter across
 // both lanes, ids always ≤64.
 function makeResourceId(ctx: EmitContext, factName: string): string {
-  return uniqueCapSlug(`${rawSlug(ctx.libraryName)}-${rawSlug(ctx.c.name)}-${rawSlug(factName)}`);
+  // #189 (disc 492): cap the UNPREFIXED composite at 56 (hash stable across channels), then prepend `<channel>-`
+  // so the KALM compartment directory carries the channel and the final FHIR id stays <= 64.
+  const base = uniqueCapSlug(
+    `${rawSlug(ctx.libraryName)}-${rawSlug(ctx.c.name)}-${rawSlug(factName)}`,
+    CEL_ID_BASE_MAX,
+  );
+  return `${ctx.channel}-${base}`;
 }
 
 // T12 / #91: per-case namespace prefix so subject Patient ids don't collide
@@ -503,7 +525,7 @@ function emitSubjectPatient(ctx: EmitContext, patientFact: CELFact): EmittedReso
   return {
     resourceType: "Patient",
     id,
-    outputPath: `patient/${ctx.librarySlug}/${ctx.caseSlug}/Patient`,
+    outputPath: `patient/${ctx.patientCompartmentId}/patient`,
     body: out,
   };
 }
@@ -807,7 +829,8 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   return {
     resourceType: fhirType,
     id,
-    outputPath: `patient/${ctx.librarySlug}/${ctx.caseSlug}/${fhirType}`,
+    // #189 (disc 492): KALM Patient-compartment — dir = the subject Patient's prefixed id, type lowercased.
+    outputPath: `patient/${ctx.patientCompartmentId}/${fhirType.toLowerCase()}`,
     body: resourceBody,
   };
 }
@@ -852,14 +875,27 @@ function applyCrossResource(
 function emitCase(ctx: EmitContext): EmittedCase | undefined {
   const resources: EmittedResource[] = [];
 
-  // 1. Subject Patient.
+  // 1. Subject Patient — REQUIRED (disc 492): the KALM compartment directory is the subject Patient's id, so a
+  //    case with no resolved subject has no compartment. Per source-atomic gating the WHOLE case is skipped
+  //    (loud), never emitted into an invented directory.
   const subject = findSubject(ctx);
-  if (subject) {
-    const pat = emitSubjectPatient(ctx, subject);
-    if (pat) {
-      resources.push(pat);
-      ctx.emittedIds.set(subject.name, { id: pat.id, resourceType: "Patient" });
-    }
+  if (!subject) {
+    ctx.diagnostics.push({
+      kind: "missing-subject",
+      severity: "error",
+      message: `Case "${ctx.c.name}" has no resolved subject Patient; skipped (no Patient compartment to place its resources under).`,
+      caseSlug: ctx.caseSlug,
+      filePath: ctx.graph.filePath,
+    });
+    return undefined;
+  }
+  // The compartment id = the subject Patient's channel-prefixed id; compute BEFORE emitting any resource so
+  // every resource's outputPath points at the one compartment.
+  ctx.patientCompartmentId = makeResourceId(ctx, subject.name);
+  const pat = emitSubjectPatient(ctx, subject);
+  if (pat) {
+    resources.push(pat);
+    ctx.emittedIds.set(subject.name, { id: pat.id, resourceType: "Patient" });
   }
 
   // 2. Encounter (case-level ambient).
@@ -902,18 +938,43 @@ function emitCase(ctx: EmitContext): EmittedCase | undefined {
   return {
     caseSlug: ctx.caseSlug,
     librarySlug: ctx.librarySlug,
+    channel: ctx.channel,
     resources,
   };
 }
 
 /**
- * Emit FHIR JSON instance fixtures for every case in a CEL file. Per-case
- * atomic: if a case fails (precondition / unsupported-yet on a required fact)
- * it's skipped and a diagnostic is emitted; per-file partial.
+ * #189 (disc 492) — validate the requested channel list at the ONE boundary CLI + MCP share. Undefined/empty ⇒
+ * all three; otherwise reject an unknown token, a duplicate, or more than three (there are only three channels).
+ * Returns the channels in canonical (`ALL_CHANNELS`) order. THROWS on invalid input (a programmer/CLI error).
  */
-export function emitCelToFhir(graph: ResolvedCelGraph): EmitResult {
+export function resolveChannels(channels: Channel[] | undefined): Channel[] {
+  if (!channels || channels.length === 0) return [...ALL_CHANNELS];
+  const seen = new Set<string>();
+  for (const ch of channels) {
+    if (!ALL_CHANNELS.includes(ch)) {
+      throw new Error(`emit channel "${ch}" is unknown; valid channels are ${ALL_CHANNELS.join(", ")}`);
+    }
+    if (seen.has(ch)) throw new Error(`emit channel "${ch}" is duplicated; each channel may be selected at most once`);
+    seen.add(ch);
+  }
+  // Canonical order, independent of the caller's order.
+  return ALL_CHANNELS.filter((ch) => seen.has(ch));
+}
+
+/**
+ * Emit FHIR JSON instance fixtures for every case in a CEL file, per selected CHANNEL. Per-case-per-channel
+ * atomic: if a {case,channel} fails (precondition / missing subject / unsupported-yet / id collision) it is
+ * skipped with a diagnostic; the rest proceed. Each emitted resource lands in the KALM Patient compartment
+ * `patient/<channel>-<patientId>/<type>/…`.
+ *
+ * T1 scope: the `local` channel is fully built; `remote`/`mixture` (posrep/blend content) are T2/T3 and emit a
+ * loud `channel-not-implemented` diagnostic with no output until then.
+ */
+export function emitCelToFhir(graph: ResolvedCelGraph, opts?: EmitCelOptions): EmitResult {
   const diagnostics: EmitDiagnostic[] = [];
   const emittedCases: EmittedCase[] = [];
+  const channels = resolveChannels(opts?.channels);
 
   const cel = graph.cel;
   if (!cel) {
@@ -951,27 +1012,64 @@ export function emitCelToFhir(graph: ResolvedCelGraph): EmitResult {
     if (s.type === "CELFact") facts.set(s.name, s);
   }
 
-  // Walk cases.
-  for (const s of cel.statements) {
-    if (s.type !== "CELCase") continue;
-    const c = s;
-    const ctx: EmitContext = {
-      graph,
-      facts,
-      c,
-      caseSlug: slugify(c.name),
-      librarySlug,
-      libraryName: cel.library.name,
-      anchors: buildAnchors(c),
-      emittedIds: new Map(),
-      diagnostics: [],
-    };
+  // #189 (disc 492) — id-collision backstop: the CEL lane has no closure invariant, so track every written
+  // relative path `<outputPath>/<id>.json` across the whole emit and refuse a duplicate (which would silently
+  // overwrite on disk / collapse a golden Map) BEFORE keeping the offending case.
+  const writtenPaths = new Set<string>();
 
-    const emitted = emitCase(ctx);
-    if (emitted) {
+  // Walk channels, then cases. A fresh EmitContext (and `emittedIds`) per {case,channel} pass so cross-resource
+  // references pick up the same pass's prefixed ids.
+  for (const channel of channels) {
+    if (channel !== "local") {
+      // T1: posrep (`remote`) and blend (`mixture`) content emission is T2/T3. Fail loud, emit nothing — never
+      // a `remote-`/`mixture-` compartment filled with local content (that false-green is the misuse we avoid).
+      diagnostics.push({
+        kind: "channel-not-implemented",
+        severity: "warning",
+        message: `emit channel "${channel}" is not built yet (T2/T3 emit posrep/blend content); no ${channel}- compartments were emitted.`,
+        filePath: graph.filePath,
+      });
+      continue;
+    }
+    for (const s of cel.statements) {
+      if (s.type !== "CELCase") continue;
+      const c = s;
+      const ctx: EmitContext = {
+        graph,
+        facts,
+        c,
+        caseSlug: slugify(c.name),
+        librarySlug,
+        libraryName: cel.library.name,
+        channel,
+        patientCompartmentId: "",
+        anchors: buildAnchors(c),
+        emittedIds: new Map(),
+        diagnostics: [],
+      };
+
+      const emitted = emitCase(ctx);
+      diagnostics.push(...ctx.diagnostics);
+      if (!emitted) continue;
+
+      // Check the case's resource paths for collisions before keeping it (source-atomic: reject the whole case).
+      const keys = emitted.resources.map((r) => `${r.outputPath}/${r.id}.json`);
+      const collision =
+        keys.find((k) => writtenPaths.has(k)) ??
+        keys.find((k, i) => keys.indexOf(k) !== i);
+      if (collision) {
+        diagnostics.push({
+          kind: "id-collision",
+          severity: "error",
+          message: `Case "${c.name}" (channel ${channel}) produces a duplicate output path "${collision}"; skipped to avoid a silent overwrite.`,
+          caseSlug: ctx.caseSlug,
+          filePath: graph.filePath,
+        });
+        continue;
+      }
+      for (const k of keys) writtenPaths.add(k);
       emittedCases.push(emitted);
     }
-    diagnostics.push(...ctx.diagnostics);
   }
 
   return { emittedCases, diagnostics };

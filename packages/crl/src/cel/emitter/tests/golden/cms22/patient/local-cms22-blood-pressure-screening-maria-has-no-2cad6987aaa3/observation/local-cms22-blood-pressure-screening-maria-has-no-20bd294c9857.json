@@ -1,0 +1,20 @@
+{
+  "resourceType": "Observation",
+  "id": "local-cms22-blood-pressure-screening-maria-has-no-20bd294c9857",
+  "subject": {
+    "reference": "Patient/local-cms22-blood-pressure-screening-maria-has-no-2cad6987aaa3"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "8462-4"
+      }
+    ]
+  },
+  "status": "final",
+  "valueQuantity": {
+    "value": 76
+  },
+  "effectiveDateTime": "2026-03-10"
+}

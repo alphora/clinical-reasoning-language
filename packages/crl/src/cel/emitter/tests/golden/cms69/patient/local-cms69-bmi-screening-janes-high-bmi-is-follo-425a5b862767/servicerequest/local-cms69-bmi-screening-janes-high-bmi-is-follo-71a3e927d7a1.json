@@ -1,0 +1,22 @@
+{
+  "resourceType": "ServiceRequest",
+  "id": "local-cms69-bmi-screening-janes-high-bmi-is-follo-71a3e927d7a1",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-servicerequest"
+    ]
+  },
+  "subject": {
+    "reference": "Patient/local-cms69-bmi-screening-janes-high-bmi-is-follo-425a5b862767"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://snomed.info/sct",
+        "code": "306163007"
+      }
+    ]
+  },
+  "intent": "order",
+  "authoredOn": "2026-01-15"
+}

@@ -1,0 +1,10 @@
+{
+  "resourceType": "Patient",
+  "id": "local-cms69-bmi-screening-janes-high-bmi-is-follo-425a5b862767",
+  "name": [
+    {
+      "text": "Jane Doe"
+    }
+  ],
+  "birthDate": "1980-01-01"
+}

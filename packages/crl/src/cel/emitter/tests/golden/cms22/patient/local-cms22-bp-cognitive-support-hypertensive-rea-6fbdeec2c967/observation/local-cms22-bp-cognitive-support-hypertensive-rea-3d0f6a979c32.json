@@ -1,0 +1,20 @@
+{
+  "resourceType": "Observation",
+  "id": "local-cms22-bp-cognitive-support-hypertensive-rea-3d0f6a979c32",
+  "subject": {
+    "reference": "Patient/local-cms22-bp-cognitive-support-hypertensive-rea-6fbdeec2c967"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "8462-4"
+      }
+    ]
+  },
+  "status": "final",
+  "valueQuantity": {
+    "value": 96
+  },
+  "effectiveDateTime": "2026-04-12"
+}

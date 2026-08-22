@@ -1,0 +1,20 @@
+{
+  "resourceType": "Encounter",
+  "id": "local-cms69-bmi-screening-janes-high-bmi-is-follo-8720e12e9bf5",
+  "subject": {
+    "reference": "Patient/local-cms69-bmi-screening-janes-high-bmi-is-follo-425a5b862767"
+  },
+  "type": [
+    {
+      "coding": [
+        {
+          "system": "http://www.ama-assn.org/go/cpt",
+          "code": "99395"
+        }
+      ]
+    }
+  ],
+  "period": {
+    "start": "2026-01-15"
+  }
+}

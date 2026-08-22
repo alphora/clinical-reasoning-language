@@ -1,0 +1,10 @@
+{
+  "resourceType": "Patient",
+  "id": "local-cms22-bp-cognitive-support-hypertensive-rea-6fbdeec2c967",
+  "name": [
+    {
+      "text": "Robert Lee"
+    }
+  ],
+  "birthDate": "1958-11-04"
+}
