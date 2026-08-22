@@ -69,6 +69,12 @@ refactor is finished when, across everything you set out to change:
 
 Do NOT gate "done" on *removing* markers — that is backwards. Deleting a `grounded` marker to "reach
 done" just relabels verified code as presumed-wrong (unmarked). `grounded` markers are the EVIDENCE of
-completion. Only **after** the gate passes and the work is verified + merged do you optionally strip the
-now-redundant `grounded` markers in a final cosmetic sweep — that cleanup is not the definition of done,
-and you never strip one to make the gate pass.
+completion.
+
+**Strip markers only when the WHOLE refactor is done — not per sub-phase.** A large refactor often lands in
+phases (an emit flip's definition lane, then its instance lane, then a grammar migration), sharing the same
+files. As long as ANY phase is still open, leave every `grounded` marker in place: they tell the next phase's
+work (and its reviewers) which code in these shared files has already been re-derived from the target model
+vs. which is still presumed-wrong. Stripping them mid-refactor throws away exactly the signal that stops the
+next phase from re-anchoring. Only once the entire set of phases has landed do you strip all `grounded`
+markers in one final cosmetic sweep — and you never strip one to make a phase's gate pass.
