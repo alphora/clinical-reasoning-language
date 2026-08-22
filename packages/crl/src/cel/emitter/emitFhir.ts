@@ -1,5 +1,12 @@
 import { conceptTypes, type ConceptType } from "../../grammar/conceptTypes";
-import { isQualifiedRef, getRefName, getRefLibrary, type Statement } from "../../ast/types";
+import {
+  isQualifiedRef,
+  getRefName,
+  getRefLibrary,
+  type Statement,
+  type Concept,
+} from "../../ast/types";
+import { hasLocalCode, hasSourceBinding } from "../../emit/conceptDatumSignals";
 import type { ResolvedCelGraph } from "../imports/types";
 import type {
   CELFact,
@@ -24,6 +31,42 @@ import type {
 } from "./types";
 
 const CONCEPT_TYPE_SET: Set<string> = new Set<string>(conceptTypes as readonly ConceptType[]);
+
+/** REFACTOR:grounded (#189 CEL-writer, design panel disc 486 + impl round disc 487). A CEL fact's RESOLVED
+ *  SEMANTIC ROLE — the axis the CEL instance writer dispatches on (NOT the raw resourceType). It determines HOW
+ *  coding is produced:
+ *   - "local"    : the backing concept carries a local `code is`. Its LOCAL arm is LIVE → coding is DERIVED from
+ *                  the concept (local domain code + `<canonicalBase>/CodeSystem/<domain>-local`, design §4
+ *                  derive-local). A concept that ALSO carries a `coded from`/`source representation` (a bothrep,
+ *                  INCLUDING patient-age's Patient projection) is STILL "local" here: the source arm is DEFERRED
+ *                  (#189 D2), never a reason to fail — the local arm emits. This mirrors the descriptor deriver,
+ *                  which returns a live `derived[local-exact, …]` for exactly these (effectiveRepresentation.ts).
+ *   - "remote"   : source-ONLY — a `coded from` / `source representation` with NO local `code is`. Basic emit
+ *                  places the AUTHORED external code on the natural element WHEN one exists; an UNCODED posrep
+ *                  (Patient/birthDate, no `coded from`) has no authored code — todo 2 splits coded-vs-uncoded or
+ *                  fails closed. The full sourced model (external-VS validation, selective-rep) is #257-deferred.
+ *   - "activity" : an Activity-derived OUTPUT instance (Task/CommunicationRequest/… via CPG_TO_FHIR) — category 3;
+ *                  its own dating/coding rules, no concept-datum coding.
+ *   - "bare-type": a bare `defined by <FhirType>` ref with no backing concept — an OPEN cell (todo 4: sniff/reject).
+ *   - "derived"  : a concept with NO datum (no `code is`, no source binding; a pure `defined as`/code-less
+ *                  reduction boolean) — ephemeral, not directly assertable as a CEL fact; the writer fails closed
+ *                  (case-atomic, todo 4).
+ *  ONE authority: the datum signals come from the SHARED `hasLocalCode`/`hasSourceBinding` predicates the
+ *  descriptor deriver uses, so this cannot drift from the definition lane. INERT in todo 1 (computed + returned,
+ *  consumed by NO write path yet). Todos 2/3 dispatch the write on this role AND resolve the effective-
+ *  representation descriptor from the carried `Concept` + owning library (the single authority; the role tag is
+ *  the dispatch discriminant, the descriptor is the payload). */
+export type FactRole = "local" | "remote" | "activity" | "bare-type" | "derived";
+
+/** Classify a resolved backing concept's representation role for the CEL writer (see `FactRole`). A local
+ *  `code is` WINS (its local arm is live; any source arm is #189-D2-deferred, not fail-closed) — so a bothrep and
+ *  patient-age both classify "local". Source-only (`coded from`/posrep, no code) → "remote". Neither datum →
+ *  "derived" (ephemeral). Uses the SHARED datum predicates so it never drifts from the descriptor deriver. */
+export function classifyConceptRole(c: Concept): FactRole {
+  if (hasLocalCode(c)) return "local";
+  if (hasSourceBinding(c)) return "remote";
+  return "derived";
+}
 
 /**
  * Activity (CPG profile) → FHIR resource type mapping (per pitch v4 critical
@@ -99,6 +142,21 @@ interface DerivedType {
    * contraindication scenarios.
    */
   definitionalDoNotPerform?: boolean;
+  /** REFACTOR:grounded (#189 CEL-writer, disc 486/487). The fact's resolved semantic role — the CEL writer's
+   *  dispatch axis. REQUIRED: every successful `deriveFhirType` return sets it (the early `undefined` returns
+   *  never construct a `DerivedType`), so an absent role would be an impossible state. INERT in todo 1 (consumed
+   *  by no write path yet). */
+  role: FactRole;
+  /** REFACTOR:grounded (#189 CEL-writer, disc 487 — panel: role alone is an insufficient payload). The resolved
+   *  backing `Concept`, present ONLY for a `role: "local" | "remote" | "derived"` (concept-backed) derivation;
+   *  absent for `activity` / `bare-type`. Carried so todos 2/3 resolve the effective-representation descriptor
+   *  (derive-local `{system, code}`, value legality) from the SINGLE authority at the write site, rather than
+   *  routing from a bare `{fhirType, role}` tag. INERT in todo 1. */
+  concept?: Concept;
+  /** REFACTOR:grounded (#189 CEL-writer, disc 487). The owning library NAME of `concept` — the identity todos 2/3
+   *  pair with the project canonicalBase to compose the local CodeSystem URL (derive-local). Present iff `concept`
+   *  is. INERT in todo 1. */
+  owningLibrary?: string;
 }
 
 /**
@@ -114,7 +172,7 @@ function deriveFhirType(
 
   if (!isQualifiedRef(ref)) {
     const name = getRefName(ref);
-    if (CONCEPT_TYPE_SET.has(name)) return { fhirType: name };
+    if (CONCEPT_TYPE_SET.has(name)) return { fhirType: name, role: "bare-type" };
     return undefined;
   }
 
@@ -137,7 +195,15 @@ function deriveFhirType(
 
   if (target.type === "Concept") {
     const c = target.conceptType;
-    if (c && CONCEPT_TYPE_SET.has(c)) return { fhirType: c, kind: "Concept" };
+    if (c && CONCEPT_TYPE_SET.has(c)) {
+      return {
+        fhirType: c,
+        kind: "Concept",
+        role: classifyConceptRole(target),
+        concept: target,
+        owningLibrary: libName,
+      };
+    }
     return undefined;
   }
 
@@ -151,6 +217,7 @@ function deriveFhirType(
     return {
       fhirType: fhir,
       kind: "Activity",
+      role: "activity",
       ...(cpgProfile ? { profileUrl: cpgProfile.targetProfile } : {}),
       ...(target.body.request.doNotPerform === true ? { definitionalDoNotPerform: true } : {}),
     };

@@ -7,6 +7,7 @@
 // sourced/external arms are deferred (design §10).
 
 import type { Concept } from "../ast/types";
+import { hasLocalCode, hasSourceBinding } from "./conceptDatumSignals";
 import { localCodeSystemUrl } from "../fhir-emitter/slug";
 import { relativeElementPath } from "../fhir-model/elementPath";
 import { valueReadValueTypes } from "../fhir-model/fhirValueModel";
@@ -435,10 +436,8 @@ export function deriveEffectiveRepresentations(
 
   // 3. Not age. A concept-level `coded from` is an external read-only base (charter §3) — a source arm, deferred
   //    by D2 like a `source representation` block; it must NOT read as a pure-derived `derived{[]}` (panel).
-  const hasCode = concept.code !== undefined;
-  const hasCodedFrom = concept.definition?.type === "CodedFromDefinition";
-  const hasSourceReps = concept.representations.length > 0;
-  const hasDeferredSource = hasSourceReps || hasCodedFrom;
+  const hasCode = hasLocalCode(concept);
+  const hasDeferredSource = hasSourceBinding(concept);
   if (hasCode) {
     const local = notAgeLocalExact(concept, owningLibMeta);
     if (local.status === "error") return local;

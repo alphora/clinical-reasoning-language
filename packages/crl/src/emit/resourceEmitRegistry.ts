@@ -69,6 +69,21 @@ export interface ResourceEmitRow {
    *  resource. `false` for a value-bearing resource (Observation), whose boolean value element a value-reading
    *  reduction reads. Drives the descriptor's datum discrimination (design §2). */
   valueless: boolean;
+  /** REFACTOR:grounded (#189 CEL-writer, design panel disc 486 — A′). The row's CAPABILITY marker: which
+   *  consumers may honor it. `true` = a case-feature datum resource PROVEN so far, honored by the definition lane
+   *  (`caseFeatureProfileShape` / descriptor derivation, which profile an SD + `action.input`). `false` = a
+   *  resource the CEL writer emits but no case-feature has YET been proven to read (e.g. Encounter as an
+   *  ambient/QM-operand datum, added by the CEL-writer flip): the definition lane's case-feature gate skips it;
+   *  flipping `false`→`true` later is the intended one-line reversibility, NOT a category impossibility.
+   *  IMPORTANT — row consultation is ROLE-gated, not resourceType-gated: a row governs a fact only when that
+   *  fact's resolved role is a concept-datum role (local/remote). An ACTIVITY-role fact never reads its row even
+   *  where one exists — ServiceRequest and MedicationRequest carry `caseFeature: true` rows AND are activity
+   *  instance targets (`CPG_TO_FHIR`), and an activity instance carries no concept-datum coding. Keying row
+   *  consultation off `resourceType` alone would miswrite those.
+   *  ONE table, one row per resource, a marker instead of a second write table that could drift from the retrieve
+   *  invariant (the anti-drift purpose of this file's T2 header). Every current row is a proven case-feature
+   *  datum, so all are `true` — the marker is output-neutral until the flip adds a `false` row. */
+  caseFeature: boolean;
 }
 
 /** The T1 subset (proven local cells). Unlisted → fail-closed `unsupported-resource`. `codeable-concept-array`
@@ -78,26 +93,31 @@ export const RESOURCE_EMIT_REGISTRY: Readonly<Record<string, ResourceEmitRow>> =
     coding: { kind: "codeable-concept", field: "code" },
     recency: { sortExpr: "effective", cast: "dateTime" }, // effective[x] is a choice element
     valueless: false, // value-bearing (Observation.value)
+    caseFeature: true,
   },
   Condition: {
     coding: { kind: "codeable-concept", field: "code" },
     recency: { sortExpr: "recordedDate", cast: "none" }, // recordedDate is a plain dateTime
     valueless: true,
+    caseFeature: true,
   },
   Procedure: {
     coding: { kind: "codeable-concept", field: "code" },
     recency: { sortExpr: "performed", cast: "dateTime" }, // performed[x] is a choice element
     valueless: true,
+    caseFeature: true,
   },
   ServiceRequest: {
     coding: { kind: "codeable-concept", field: "code" },
     recency: { sortExpr: "authoredOn", cast: "none" }, // authoredOn is a plain dateTime
     valueless: true,
+    caseFeature: true,
   },
   MedicationRequest: {
     coding: { kind: "choice-codeable-concept", field: "medication" }, // medication[x] choice, NOT `.code`
     recency: { sortExpr: "authoredOn", cast: "none" },
     valueless: true,
+    caseFeature: true,
   },
 };
 
