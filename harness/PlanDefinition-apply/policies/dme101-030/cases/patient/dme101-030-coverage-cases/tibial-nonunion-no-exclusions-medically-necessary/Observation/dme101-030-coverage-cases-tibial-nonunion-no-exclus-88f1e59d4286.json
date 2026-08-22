@@ -1,0 +1,17 @@
+{
+  "resourceType": "Observation",
+  "id": "dme101-030-coverage-cases-tibial-nonunion-no-exclus-88f1e59d4286",
+  "subject": {
+    "reference": "Patient/dme101-030-coverage-cases-tibial-nonunion-no-exclus-a0f80f20e4bb"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://example.org/hcsc/dme101-030/CodeSystem/dme101-030-local",
+        "code": "documented-fracture-nonunion"
+      }
+    ]
+  },
+  "status": "final",
+  "effectiveDateTime": "2026-02-01"
+}

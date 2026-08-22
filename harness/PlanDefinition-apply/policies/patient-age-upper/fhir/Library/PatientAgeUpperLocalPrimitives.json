@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "TwostepInterface",
+  "id": "PatientAgeUpperLocalPrimitives",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/twostep/Library/TwostepInterface",
+  "url": "http://example.org/crl/patient-age-upper/Library/PatientAgeUpperLocalPrimitives",
   "version": "0.0.0",
-  "name": "TwostepInterface",
-  "title": "TwostepInterface",
+  "name": "PatientAgeUpperLocalPrimitives",
+  "title": "PatientAgeUpperLocalPrimitives",
   "status": "draft",
   "experimental": true,
-  "date": "2026-01-01T00:00:00.000Z",
+  "date": "2026-07-30T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "TwostepInterface",
+  "description": "PatientAgeUpperLocalPrimitives",
   "type": {
     "coding": [
       {
@@ -46,13 +46,13 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/twostep/Library/TwostepLocalPrimitives"
+      "resource": "http://example.org/crl/patient-age-upper/Library/PatientAgeUpperLocalConcepts"
     }
   ],
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/TwostepInterface.cql"
+      "url": "../../cql/PatientAgeUpperLocalPrimitives.cql"
     }
   ]
 }

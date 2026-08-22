@@ -1,6 +1,6 @@
 {
   "resourceType": "StructureDefinition",
-  "id": "twostep-q2",
+  "id": "dme101-030-fracture-of-skull-or-vertebrae",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-publishablecasefeature"
@@ -27,20 +27,20 @@
       "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-featureExpression",
       "valueExpression": {
         "language": "text/cql-identifier",
-        "expression": "Q2",
-        "reference": "http://example.org/crl/twostep/Library/TwostepLocalPrimitives"
+        "expression": "Fracture Of Skull Or Vertebrae Records",
+        "reference": "http://example.org/hcsc/dme101-030/Library/Dme101030LocalPrimitives"
       }
     }
   ],
-  "url": "http://example.org/crl/twostep/StructureDefinition/twostep-q2",
-  "version": "0.0.0",
-  "name": "Q2",
-  "title": "Q2",
+  "url": "http://example.org/hcsc/dme101-030/StructureDefinition/dme101-030-fracture-of-skull-or-vertebrae",
+  "version": "1.0.0",
+  "name": "FractureOfSkullOrVertebrae",
+  "title": "Fracture Of Skull Or Vertebrae",
   "status": "draft",
   "experimental": true,
   "date": "2026-01-01T00:00:00.000Z",
-  "publisher": "unknown",
-  "description": "Q2 case feature determination",
+  "publisher": "Smile Digital Health",
+  "description": "Fracture Of Skull Or Vertebrae case feature determination",
   "kind": "resource",
   "abstract": false,
   "type": "Observation",
@@ -61,24 +61,12 @@
         "patternCodeableConcept": {
           "coding": [
             {
-              "system": "http://example.org/crl/twostep/CodeSystem/twostep-local",
-              "code": "q2",
-              "display": "Q2"
+              "system": "http://example.org/hcsc/dme101-030/CodeSystem/dme101-030-local",
+              "code": "skull-or-vertebrae-fracture",
+              "display": "Fracture Of Skull Or Vertebrae"
             }
           ]
         }
-      },
-      {
-        "id": "Observation.value[x]",
-        "path": "Observation.value[x]",
-        "min": 1,
-        "max": "1",
-        "mustSupport": true,
-        "type": [
-          {
-            "code": "boolean"
-          }
-        ]
       },
       {
         "extension": [
@@ -87,7 +75,7 @@
             "extension": [
               {
                 "url": "definition",
-                "valueCanonical": "http://example.org/crl/twostep/StructureDefinition/twostep-q2#Observation.subject"
+                "valueCanonical": "http://example.org/hcsc/dme101-030/StructureDefinition/dme101-030-fracture-of-skull-or-vertebrae#Observation.subject"
               },
               {
                 "url": "expression",
@@ -120,7 +108,7 @@
             "extension": [
               {
                 "url": "definition",
-                "valueCanonical": "http://example.org/crl/twostep/StructureDefinition/twostep-q2#Observation.effective[x]"
+                "valueCanonical": "http://example.org/hcsc/dme101-030/StructureDefinition/dme101-030-fracture-of-skull-or-vertebrae#Observation.effective[x]"
               },
               {
                 "url": "expression",

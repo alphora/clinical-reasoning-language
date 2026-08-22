@@ -20,7 +20,7 @@ library CaseFeatureCommon version '1.0.0'
  * `satisfied` collapses a truth-set back to a boolean for the Interface layer.
  *
  * Both functions are FLUENT, so call sites invoke them method-style
- * (`LocalSource."X".asTruths()`, `Inferred."Y".satisfied()`) and do not need
+ * (`LocalPrimitives."X".asTruths()`, `Inferences."Y".satisfied()`) and do not need
  * the `CFH.` qualifier — only the `include` is required.
  */
 
@@ -42,7 +42,7 @@ define fluent function satisfied(truths List<System.Boolean>):
  * Selects between a locally-asserted age boolean (the newest valid
  * `age-…` Observation) and a live computed age boolean (`AtLeast(AgeAt(), n)`),
  * then LIFTS the selection back to a truth-set so it composes in the
- * Inferred/Interface truth-set lane. This does NOT use `asTruths` — that reads
+ * Inferences/Interface truth-set lane. This does NOT use `asTruths` — that reads
  * only `value.value is true`, discarding the Observation and ERASING an explicit
  * `false`. The recency select must see the raw asserted boolean (incl. false).
  *

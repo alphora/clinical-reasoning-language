@@ -5,12 +5,12 @@ using FHIR version '4.0.1'
 include FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
 include CaseFeatureCommon called CFH
-include PatientAgeUpperInferred
+include PatientAgeUpperInferences
 
 context Patient
 
 define "Under Twenty One":
-  PatientAgeUpperInferred."Under Twenty One".satisfied()
+  PatientAgeUpperInferences."Under Twenty One".satisfied()
 
 define "At Most Twenty One":
-  PatientAgeUpperInferred."At Most Twenty One".satisfied()
+  PatientAgeUpperInferences."At Most Twenty One".satisfied()

@@ -1,0 +1,49 @@
+# DME101.030 — Ultrasonic Osteogenesis Stimulator — caseload
+library "DME101.030 Coverage Cases".
+covers "Ultrasonic Osteogenesis Stimulator Coverage".
+
+// One approve path + two deny paths, exercising the criteria gate.
+
+// ============ Patient ============
+
+fact "Pat Jones":
+- name is "Pat Jones".
+- birth date is "1970-03-15".
+- defined by "Patient".
+
+// ============ Clinical facts ============
+
+// T3b derive-local: the fact names its backing concept via `defined by`; the local
+// `{system, code}` is DERIVED from the concept (NOT authored here). An authored `code is`
+// on a local-concept fact is now a §5 conflict error.
+fact "Documented Tibial Nonunion":
+- date is "2026-02-01".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Documented Fracture Nonunion".
+
+fact "Skull Fracture Finding":
+- date is "2026-02-01".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Fracture Of Skull Or Vertebrae".
+
+// ============ Cases ============
+
+case "Tibial nonunion, no exclusions → medically necessary":
+- description is `A long-bone (tibial) fracture nonunion is documented, with no
+  skull/vertebrae or tumor involvement and no concurrent noninvasive
+  stimulator. All four coverage criteria hold → medically necessary.`.
+- subject is "Pat Jones".
+- fact is "Documented Tibial Nonunion".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage" is "certify.Approve".
+
+case "Skull fracture → not medically necessary (exclusion)":
+- description is `A documented nonunion, but the fracture is of the skull — the
+  skull/vertebrae exclusion fails the criteria → not medically necessary.`.
+- subject is "Pat Jones".
+- fact is "Documented Tibial Nonunion".
+- fact is "Skull Fracture Finding".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage" is "not-certify.Deny".
+
+case "No documented nonunion (fresh fracture) → not medically necessary":
+- description is `No documented fracture nonunion (e.g. a fresh fracture or
+  delayed union) → the nonunion criterion fails → not medically necessary.`.
+- subject is "Pat Jones".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage" is "not-certify.Deny".

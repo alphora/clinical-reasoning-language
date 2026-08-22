@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "TwostepInterface",
+  "id": "TwostepLocalPrimitives",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/twostep/Library/TwostepInterface",
+  "url": "http://example.org/crl/twostep/Library/TwostepLocalPrimitives",
   "version": "0.0.0",
-  "name": "TwostepInterface",
-  "title": "TwostepInterface",
+  "name": "TwostepLocalPrimitives",
+  "title": "TwostepLocalPrimitives",
   "status": "draft",
   "experimental": true,
   "date": "2026-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "TwostepInterface",
+  "description": "TwostepLocalPrimitives",
   "type": {
     "coding": [
       {
@@ -46,13 +46,13 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/twostep/Library/TwostepLocalPrimitives"
+      "resource": "http://example.org/crl/twostep/Library/TwostepLocalConcepts"
     }
   ],
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/TwostepInterface.cql"
+      "url": "../../cql/TwostepLocalPrimitives.cql"
     }
   ]
 }

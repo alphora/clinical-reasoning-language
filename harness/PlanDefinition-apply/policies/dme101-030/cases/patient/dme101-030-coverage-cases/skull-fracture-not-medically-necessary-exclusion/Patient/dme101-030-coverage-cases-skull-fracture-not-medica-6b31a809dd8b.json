@@ -1,0 +1,10 @@
+{
+  "resourceType": "Patient",
+  "id": "dme101-030-coverage-cases-skull-fracture-not-medica-6b31a809dd8b",
+  "name": [
+    {
+      "text": "Pat Jones"
+    }
+  ],
+  "birthDate": "1970-03-15"
+}

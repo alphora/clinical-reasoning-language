@@ -28,7 +28,7 @@
       "valueExpression": {
         "language": "text/cql-identifier",
         "expression": "Under Twenty One",
-        "reference": "http://example.org/crl/patient-age-upper/Library/PatientAgeUpperLocalSource"
+        "reference": "http://example.org/crl/patient-age-upper/Library/PatientAgeUpperLocalPrimitives"
       }
     }
   ],

@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "TwostepInterface",
+  "id": "Dme101030LocalConcepts",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/twostep/Library/TwostepInterface",
-  "version": "0.0.0",
-  "name": "TwostepInterface",
-  "title": "TwostepInterface",
+  "url": "http://example.org/hcsc/dme101-030/Library/Dme101030LocalConcepts",
+  "version": "1.0.0",
+  "name": "Dme101030LocalConcepts",
+  "title": "Dme101030LocalConcepts",
   "status": "draft",
   "experimental": true,
   "date": "2026-01-01T00:00:00.000Z",
-  "publisher": "unknown",
-  "description": "TwostepInterface",
+  "publisher": "Smile Digital Health",
+  "description": "HCSC Medical Policy DME101.030 — Ultrasonic Osteogenesis Stimulator — CRL/CEL encoding",
   "type": {
     "coding": [
       {
@@ -46,13 +46,13 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/twostep/Library/TwostepLocalPrimitives"
+      "resource": "http://example.org/hcsc/dme101-030/CodeSystem/dme101-030-local"
     }
   ],
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/TwostepInterface.cql"
+      "url": "../../cql/Dme101030LocalConcepts.cql"
     }
   ]
 }

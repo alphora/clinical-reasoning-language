@@ -46,7 +46,7 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/patient-age-upper/Library/PatientAgeUpperInferred"
+      "resource": "http://example.org/crl/patient-age-upper/Library/PatientAgeUpperInferences"
     }
   ],
   "content": [

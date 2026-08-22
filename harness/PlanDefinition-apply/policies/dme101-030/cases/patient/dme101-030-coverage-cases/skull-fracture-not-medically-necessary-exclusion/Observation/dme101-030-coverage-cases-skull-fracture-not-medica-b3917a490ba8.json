@@ -1,0 +1,17 @@
+{
+  "resourceType": "Observation",
+  "id": "dme101-030-coverage-cases-skull-fracture-not-medica-b3917a490ba8",
+  "subject": {
+    "reference": "Patient/dme101-030-coverage-cases-skull-fracture-not-medica-6b31a809dd8b"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://example.org/hcsc/dme101-030/CodeSystem/dme101-030-local",
+        "code": "documented-fracture-nonunion"
+      }
+    ]
+  },
+  "status": "final",
+  "effectiveDateTime": "2026-02-01"
+}

@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "TwostepInterface",
+  "id": "CRLCommon",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/twostep/Library/TwostepInterface",
-  "version": "0.0.0",
-  "name": "TwostepInterface",
-  "title": "TwostepInterface",
+  "url": "http://example.org/hcsc/dme101-030/Library/CRLCommon",
+  "version": "0.2.0",
+  "name": "CRLCommon",
+  "title": "CRLCommon",
   "status": "draft",
   "experimental": true,
   "date": "2026-01-01T00:00:00.000Z",
-  "publisher": "unknown",
-  "description": "TwostepInterface",
+  "publisher": "Smile Digital Health",
+  "description": "Shared CRL catalog library CRLCommon.",
   "type": {
     "coding": [
       {
@@ -43,16 +43,10 @@
       }
     ]
   },
-  "relatedArtifact": [
-    {
-      "type": "depends-on",
-      "resource": "http://example.org/crl/twostep/Library/TwostepLocalPrimitives"
-    }
-  ],
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/TwostepInterface.cql"
+      "url": "../../cql/CRLCommon.cql"
     }
   ]
 }
