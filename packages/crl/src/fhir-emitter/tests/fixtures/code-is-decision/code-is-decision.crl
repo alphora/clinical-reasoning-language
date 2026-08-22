@@ -13,11 +13,13 @@ concept "Adult Patient":
 - type is Observation.
 - value type is boolean.
 - code is `adult-18-or-older`.
+- definition is exists this.
 
 concept "Active Crohns Disease":
 - type is Condition.
 - value type is boolean.
 - code is `active-crohns-disease`.
+- definition is exists this.
 
 activity "Refer to GI":
 - request CPGServiceRequest.

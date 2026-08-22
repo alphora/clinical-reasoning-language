@@ -442,7 +442,7 @@ describe("reductions emit progressively (#189 flip): `exists` + `count` + Scalar
 
   it("`most recent this` NON-boolean `code is` reductions still fail loud (`emit-reduction-not-active`; Slice C)", () => {
     // B2a activates only the boolean value read; a non-boolean `most recent this` stays validate-only
-    // (Slice C — the case-feature lane is boolean-locked + per-type conversion deferred).
+    // (Slice C — the per-type FHIR value conversion is deferred; the case-feature SD itself is natural-resource).
     const src =
       `library "T".\nconcept "C":\n- type is Observation.\n- value type is Quantity.\n- code is \`c\`.\n- definition is most recent this.\n`;
     const r = emitCQL(src, { libraryName: "T", canonicalBase: "http://example.org/crl/t" });

@@ -88,9 +88,12 @@ describe("CRL → FHIR partial-split AUTHOR-VS golden (code-is-decision-vs)", ()
     const libs = result.resources.filter(
       (r) => r.resourceType === "Library" && !CATALOG_LIB_IDS.has(r.resource.id as string),
     );
-    // 5 layer Libraries: LocalConcepts, RecordConcepts, LocalSource, RecordSource,
-    // Interface (no Inferred — this fixture has no `defined as`).
-    expect(libs).toHaveLength(5);
+    // 6 layer Libraries: LocalConcepts, RecordConcepts, LocalSource, RecordSource,
+    // Inferred, Interface. #189 2d — "Adult Patient" migrated to `code is` +
+    // `definition is exists this` is now a DERIVATION (`exists("… Records")`), so an
+    // INFERRED layer is emitted even though this fixture has no `defined as`
+    // (the exists reduction is itself the inference).
+    expect(libs).toHaveLength(6);
     const byId = new Map(
       libs.map((l) => [l.resource.id as string, l.resource as Record<string, unknown>]),
     );

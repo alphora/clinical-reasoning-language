@@ -14,11 +14,13 @@ concept "History Of Recurrent Skin Maceration With Bacterial Infection":
 - type is Condition.
 - value type is boolean.
 - code is `skin-maceration-bacterial`.
+- definition is exists this.
 
 concept "History Of Recurrent Skin Maceration With Fungal Infection":
 - type is Condition.
 - value type is boolean.
 - code is `skin-maceration-fungal`.
+- definition is exists this.
 
 concept "Recurrent Skin Maceration Infection":
 - value type is boolean.

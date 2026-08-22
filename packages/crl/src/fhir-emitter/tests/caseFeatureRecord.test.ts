@@ -1,7 +1,8 @@
 // #189 2d P2 — tests for the per-concept case-feature RECORD resolver (inert precursor).
-// Grounded in the deriver's verified output shapes (see emit/tests/effectiveRepresentation.test.ts): Condition/
-// MedicationRequest + `exists this` → valueless local-exact; Observation → value-bearing local-exact; Encounter →
-// unsupported-resource; bare-scalar → unsupported-reduction-form; Patient age → uncoded (supplied).
+// Grounded in the deriver's verified output shapes (see emit/tests/effectiveRepresentation.test.ts): `exists this`
+// on ANY resource → NO value datum (presence is orthogonal to the record's value — a value-bearing Observation is
+// still read by presence, not by its value); Encounter → unsupported-resource; bare-scalar →
+// unsupported-reduction-form; Patient age → uncoded (supplied).
 
 import { describe, it, expect } from "vitest";
 
@@ -50,7 +51,7 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     expect(r.recordsDefineId).toBe("Active Rx Records");
   });
 
-  it("Observation + boolean + exists this → a VALUE-bearing record (the legitimate value read, not the hack)", () => {
+  it("Observation + boolean + exists this → a valueless record (exists is PRESENCE; the Observation's value is orthogonal and NOT read)", () => {
     const r = resolve(
       `concept "Screen Positive":\n- type is Observation.\n- value type is boolean.\n- code is \`sp\`.\n- definition is exists this.\n`,
       "Screen Positive",
@@ -58,7 +59,11 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     expect(r.kind).toBe("record");
     if (r.kind !== "record") return;
     expect(r.descriptor.resourceType).toBe("Observation");
-    expect(r.descriptor.valueElement).toBe("value"); // Observation is value-bearing → value-filtered exists
+    // `exists([Observation: code])` is true when a record EXISTS regardless of its value (a present
+    // `value=false` Observation still exists → true). There is no "value-filtered exists" — no value datum,
+    // so the SD carries no `value[x]`. A value READ is `most recent this`, a different reduction.
+    expect(r.descriptor.valueElement).toBeUndefined();
+    expect(r.recordsDefineId).toBe("Screen Positive Records");
   });
 
   it("Encounter (no registry row) → unsupported-resource (NOT re-hacked to Observation)", () => {

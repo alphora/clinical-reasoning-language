@@ -146,14 +146,13 @@ export interface CaseFeatureInput {
   /** the canonical url of the concept's emitted case-feature StructureDefinition. */
   canonical: string;
   /**
-   * #189 2d — the case-feature's NATURAL FHIR resource type (`action.input.type`),
-   * from the concept's effective-representation descriptor (Condition, MedicationRequest,
-   * Observation, …). The forced-`Observation` `action.input.type` is the hack #189 removes
-   * (charter §4). INERT PRECURSOR: the live resolver does not populate this yet, so
-   * `buildActionInputs` falls back to `"Observation"` and the goldens stay byte-identical;
-   * the atomic activation makes it REQUIRED (always from the descriptor) and drops the fallback.
+   * REFACTOR:grounded (charter §4) — the case-feature's NATURAL FHIR resource type (`action.input.type`),
+   * from the concept's effective-representation descriptor (Condition, MedicationRequest, Observation, …).
+   * REQUIRED: the resolver only yields an input for a concept that resolved to a gatherable `record`, so this
+   * is always present. There is NO `"Observation"` fallback — the forced-Observation `action.input.type` was
+   * the hack #189 removes; an input never carries a type the case-feature lane can't stand behind.
    */
-  resourceType?: string;
+  resourceType: string;
 }
 
 /**
@@ -613,10 +612,9 @@ function buildActionInputs(
           { url: CPG_INPUT_TEXT_EXT, valueString: `${name}?` },
           { url: CPG_INPUT_DESCRIPTION_EXT, valueMarkdown: name },
         ],
-        // #189 2d — the case-feature's NATURAL resource type when the descriptor supplies it
-        // (`resourceType`); the `?? "Observation"` is the pre-activation hack fallback (the live
-        // resolver does not set `resourceType` yet), retired atomically when the flip activates.
-        type: resourceType ?? "Observation",
+        // REFACTOR:grounded (charter §4) — the case-feature's NATURAL resource type (always present; the
+        // resolver only yields an input for a resolved record). No `"Observation"` fallback — that was the hack.
+        type: resourceType,
         profile: [canonical],
       });
     }

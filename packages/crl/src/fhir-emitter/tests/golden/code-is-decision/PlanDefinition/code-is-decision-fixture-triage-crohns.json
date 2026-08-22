@@ -81,7 +81,7 @@
               "valueMarkdown": "Active Crohns Disease"
             }
           ],
-          "type": "Observation",
+          "type": "Condition",
           "profile": [
             "http://example.org/crl/code-is-decision/StructureDefinition/code-is-decision-fixture-active-crohns-disease"
           ]

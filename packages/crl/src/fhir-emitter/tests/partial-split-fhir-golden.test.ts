@@ -88,19 +88,25 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     expect(allCql).toContain(`'${csUrl}'`);
   });
 
-  it("emits the R2 source-typed split Libraries (LocalConcepts + LocalSource + Interface) with the layered dep routing", () => {
+  it("emits the R2 source-typed split Libraries (LocalConcepts + LocalSource + Inferred + Interface) with the layered dep routing", () => {
     // R2 — `code-is-decision` (a DECISION-bearing library WITH local `code is`)
     // now routes to the `interface` split kind: a FULL source-typed split
     // (LocalConcepts → LocalSource) PLUS a synthesized `<policyId>-Interface`
     // re-export library (the decision/action-guard surface). It NO LONGER takes
     // the pre-R2 partial (Root + Concepts) path.
+    // #189 2d — the migrated `code is` + `definition is exists this` concepts are
+    // DERIVATIONS (`exists("<X> Records")` over their own records twin), so the
+    // split now also carries an INFERRED layer (LocalSource → Inferred → Interface)
+    // where the pre-flip bare `code is` had none (the boolean was the inline
+    // `.asTruths()` hack). This is the correct layered model: `exists this` is an
+    // inference over the concept's records.
     // #187 — exclude the always-emitted shared catalog Libraries
-    // (CRLCommon/CaseFeatureCommon); this asserts the 3 POLICY layer Libraries.
+    // (CRLCommon/CaseFeatureCommon); this asserts the 4 POLICY layer Libraries.
     const CATALOG_LIB_IDS = new Set(["CRLCommon", "CaseFeatureCommon"]);
     const libs = result.resources.filter(
       (r) => r.resourceType === "Library" && !CATALOG_LIB_IDS.has(r.resource.id as string),
     );
-    expect(libs).toHaveLength(3);
+    expect(libs).toHaveLength(4);
 
     // #186 — ids are the UNIFIED hyphen-free `S` (id == url-tail == name), the
     // cap-safe PascalCase of `<policyId>-<layer>` the CQL lane stamps as the
@@ -111,14 +117,17 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     );
     const localConcepts = byId.get("CodeIsDecisionFixtureLocalConcepts")!;
     const localSource = byId.get("CodeIsDecisionFixtureLocalSource")!;
+    const inferred = byId.get("CodeIsDecisionFixtureInferred")!;
     const iface = byId.get("CodeIsDecisionFixtureInterface")!;
     expect(localConcepts).toBeDefined();
     expect(localSource).toBeDefined();
+    expect(inferred).toBeDefined();
     expect(iface).toBeDefined();
     // id == name == url-tail (the #186 identity agreement).
     for (const [id, res] of [
       ["CodeIsDecisionFixtureLocalConcepts", localConcepts],
       ["CodeIsDecisionFixtureLocalSource", localSource],
+      ["CodeIsDecisionFixtureInferred", inferred],
       ["CodeIsDecisionFixtureInterface", iface],
     ] as const) {
       expect(res.name).toBe(id);
@@ -149,14 +158,27 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
       "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalConcepts",
     ]);
 
-    // Interface re-exports the decision surface; depends-on LocalSource.
+    // Inferred owns the `exists("<X> Records")` derivations; depends-on LocalSource.
+    expect((inferred.content as Array<{ url?: string }>)[0]?.url).toBe(
+      "../../cql/CodeIsDecisionFixtureInferred.cql",
+    );
+    expect(
+      (inferred.relatedArtifact as Array<{ type?: string; resource?: string }>).map(
+        (e) => e.resource,
+      ),
+    ).toEqual([
+      "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalSource",
+    ]);
+
+    // Interface re-exports the decision surface; depends-on Inferred (the boolean
+    // derivations the decision guards read), which transitively reaches LocalSource.
     expect((iface.content as Array<{ url?: string }>)[0]?.url).toBe(
       "../../cql/CodeIsDecisionFixtureInterface.cql",
     );
     expect(
       (iface.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource),
     ).toEqual([
-      "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalSource",
+      "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureInferred",
     ]);
   });
 

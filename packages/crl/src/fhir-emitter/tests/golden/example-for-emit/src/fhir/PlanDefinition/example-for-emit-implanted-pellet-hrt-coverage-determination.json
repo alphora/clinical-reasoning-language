@@ -101,7 +101,7 @@
                   "valueMarkdown": "Implanted Estrogen Pellets"
                 }
               ],
-              "type": "Observation",
+              "type": "MedicationRequest",
               "profile": [
                 "http://example.org/hcsc/rx501-007/StructureDefinition/example-for-emit-implanted-estrogen-pellets"
               ]
@@ -117,7 +117,7 @@
                   "valueMarkdown": "Implanted Estradiol Pellets"
                 }
               ],
-              "type": "Observation",
+              "type": "MedicationRequest",
               "profile": [
                 "http://example.org/hcsc/rx501-007/StructureDefinition/example-for-emit-implanted-estradiol-pellets"
               ]

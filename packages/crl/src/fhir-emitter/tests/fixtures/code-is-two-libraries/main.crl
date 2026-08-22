@@ -12,6 +12,7 @@ concept "Feature Main":
 - type is Observation.
 - value type is boolean.
 - code is `feature-main`.
+- definition is exists this.
 
 decision "Main Determination":
 first:

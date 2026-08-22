@@ -273,8 +273,42 @@ for a valueless record or from *reading* the value for a boolean Observation).
 - read the `structureDefinition.ts` / `closureOrchestrator.ts` "always-boolean" doctrine as authoritative — it is
   the code we are removing.
 
-**Patient is the one supplied exception** (charter §2): PA supplies the Patient resource, so a Patient/age
-determination is *read*, not gathered via a questionnaire case-feature.
+**Patient is the one both-representation exception** (charter §2). PA today runs on local `code is` alone —
+it has **no** remote clinical/claims data, so its concepts define no `source representation` (there'd be no
+data to populate one). **Patient is the exception:** PA *does* receive the Patient resource, so a Patient
+concept legitimately carries **both** a local `code is` **and** a `source representation` off the supplied
+Patient, recency-merged — the patient-age both-rep. This does **not** make Patient/age read-only: its local
+side is fully **assertable/gatherable** (the human-asserted age Observation is a real case-feature with its own
+SD). Age is simply the one determination that *also* has real remote data (birthDate) to read and merge, which
+no other PA concept does. A **purely** Patient-sourced read (a `source representation` with no local `code is`
+— e.g. birthDate read directly) is the only "supplied, not gathered" case: read from the Patient, no SD.
+
+### ⭐ Case-feature COMPLETENESS — gather every FHIR-required element (a VALID resource, or it's worthless)
+
+A case-feature must emit a **complete, valid** resource, not just its coding. A resource with required
+elements beyond coding (MedicationRequest → `status`+`intent`; ServiceRequest → `status`+`intent`; Procedure
+/ Observation → `status`) must **gather them all**, so DTR `$extract` yields a resource that validates. The
+determination stays the boolean (`action.condition = exists([<R>: code])`); the **record the user asserts**
+(`action.input`) carries every required element as an answerable question.
+
+Those required non-coding elements (`status`/`intent`/…) are **answered** — gathered from the user with a
+sensible default they can override — **never hardcoded** (that fabricates facts the author never stated) and
+**never dropped / failed-closed** (that ships an invalid resource, or refuses one CRL can fully describe).
+This is the whole point of CRL: the author writes the declarative minimum and the toolchain expands it into
+**complete and correct** FHIR. The division of labor:
+
+- **Human** authors the declarative minimum (`type is`, `code is`, `value type is`, `definition is`).
+- **Emitter** (deterministic) applies a per-resource **floor default** for every required element → always a
+  valid resource; and reads any values the CRL carries.
+- **AI enrichment** writes the *semantically-correct* values **into the CRL** (a concept slot) — never into
+  the emit output. The emitter can't derive semantics; the AI's judgment must persist in the **source** (which
+  is reviewable/diffable/versioned), and the deterministic emitter reads it. AI-on-source is auditable;
+  AI-on-output is not.
+
+Currently the emit stops at coding+subject+recency — the completeness build is **deferred to T5/T6**. The full
+design (the three layers, the AI-edits-source rule, and the OPEN grammar question for the concept "slot") is
+captured in `docs/emit-189-casefeature-completeness.md` and tracked at **#290**. Do not re-derive it from
+memory — read that doc.
 
 ---
 

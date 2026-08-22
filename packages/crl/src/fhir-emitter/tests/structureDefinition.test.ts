@@ -21,15 +21,15 @@ import type { CpgMetadata, EmittedResource } from "../types";
  * Case-feature StructureDefinition emit — eligibility boundary + diagnostics.
  *
  * The example FHIR goldens pin the byte-for-byte happy paths (a `code is` decision
- * concept → exactly one StructureDefinition; the recursive `defined as` closure
- * reaching a `code is` leaf). These tests pin the REMAINING boundary cases that
- * have no golden. Under the LOCALSOURCE-ALWAYS-BOOLEAN rule, every `code is`
- * concept (regardless of declared value type) is a boolean Observation
- * case-feature, so there is NO value-type gate and NO `emit-casefeature-non-boolean`
- * diagnostic:
+ * concept → exactly one StructureDefinition typed by its natural resource; the
+ * recursive `defined as` closure reaching a `code is` leaf). These tests pin the
+ * REMAINING boundary cases that have no golden. Post-#189-2d the case-feature is
+ * typed by the concept's own `type is` (charter §4) — the LocalSource-always-boolean
+ * hack is gone:
  *   - an INFERRED decision condition reaches its `code is` leaf through the
  *     recursive collection (one SD for the leaf),
- *   - a NON-boolean `code is` decision concept STILL gets a boolean SD,
+ *   - a NON-boolean value-read `code is` concept is Slice-C deferred and FAILS LOUD
+ *     (`emit-reduction-not-active`) — never coerced to a boolean Observation,
  *   - the `emit-casefeature-missing-code` defensive guard (F1) hard-errors when a
  *     DIRECT caller passes an empty/undefined code rather than emitting an
  *     empty-code patternCodeableConcept (unreachable from the orchestrated path),
@@ -73,9 +73,11 @@ describe("case-feature emit — eligibility boundary (end-to-end)", () => {
     );
 
     // patternCodeableConcept system byte-equals the local CodeSystem url; code is
-    // the lowered local code.
+    // the lowered local code. #189 2d — "Active Crohns Disease" is `type is Condition`,
+    // so its case-feature is a natural Condition (coding on `Condition.code`), NOT the
+    // old forced-Observation.
     const diff = sd.differential as { element: Array<Record<string, unknown>> };
-    const codeEl = diff.element.find((e) => e.id === "Observation.code")!;
+    const codeEl = diff.element.find((e) => e.id === "Condition.code")!;
     const coding = (codeEl.patternCodeableConcept as { coding: Array<Record<string, unknown>> }).coding[0]!;
     expect(coding.system).toBe(
       "http://example.org/crl/code-is-decision/CodeSystem/code-is-decision-fixture-local",
@@ -97,22 +99,22 @@ describe("case-feature emit — eligibility boundary (end-to-end)", () => {
     expect((sds[0]!.resource as { id: string }).id).toBe("casefeature-inferred-fixture-base");
   });
 
-  it("a NON-boolean `code is` decision concept STILL gets a boolean SD (LocalSource-always-boolean rule)", () => {
-    // "Coded Determination" is a `code is` concept whose declared value type is
-    // CodeableConcept — but the locked rule is that EVERY `code is` concept is a
-    // boolean Observation case-feature regardless of declared value type. So it
-    // emits exactly ONE SD (value[x] boolean), success stays true, and NO
-    // `emit-casefeature-non-boolean` diagnostic fires (that kind was removed).
+  it("a NON-boolean value-read `code is` decision concept FAILS LOUD (Slice-C deferred) — never a forced boolean SD", () => {
+    // #189 2d — the OLD `LocalSource-always-boolean` rule (every `code is` concept
+    // forced to a boolean Observation regardless of declared value type) is the HACK
+    // this flip removes (charter §4). "Coded Determination" is `value type is
+    // CodeableConcept` and correctly authored `- definition is most recent this.` (a
+    // value read). A NON-boolean value-read case-feature is a RECOGNIZED but DEFERRED
+    // form (Slice C — the per-type FHIR value conversion is not built yet), so emit
+    // FAILS LOUD with `emit-reduction-not-active` and emits NO StructureDefinition —
+    // rather than silently coercing it to a boolean Observation.value[x].
     const fixture = path.join(HERE, "fixtures", "casefeature-non-boolean", "casefeature-non-boolean.crl");
     const result = emitFhirDefFromPath(fixture, FIXED);
-    expect(result.errors).toEqual([]);
-    expect(result.success).toBe(true);
-    expect(result.errors.some((e) => e.kind === "emit-casefeature-non-boolean")).toBe(false);
+    expect(result.success).toBe(false);
+    expect(result.errors.some((e) => e.kind === "emit-reduction-not-active")).toBe(true);
+    // NO silent boolean-Observation hack: no SD, and specifically no boolean value[x].
     const sds = result.resources.filter((r) => r.resourceType === "StructureDefinition");
-    expect(sds).toHaveLength(1);
-    const sd = sds[0]!.resource as { differential: { element: Array<Record<string, unknown>> } };
-    const valueEl = sd.differential.element.find((e) => e.id === "Observation.value[x]")!;
-    expect(valueEl.type).toEqual([{ code: "boolean" }]);
+    expect(sds).toHaveLength(0);
   });
 
   it("two overlength divergent `code is` leaves → distinct hashed SD ids/urls that byte-equal their recursive action.input profiles (truncation-collision regression)", () => {
@@ -165,6 +167,11 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
       METADATA,
       FIXED,
       "CasefeatureFixtureLocalSource",
+      // #189 2d — natural resource (valueless Condition existence), the records-twin
+      // featureExpression target, and no value datum (the boolean is `exists` in CQL).
+      "Condition",
+      "Adult Patient Records",
+      undefined,
     );
     expect(errors).toEqual([]);
     const r = resource!.resource as Record<string, unknown>;
@@ -186,7 +193,16 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
 
   it("an empty featureExpression-library suffix throws (a root-pointing reference must never be emitted silently)", () => {
     expect(() =>
-      emitCaseFeatureStructureDefinition("Adult Patient", "adult-18-or-older", METADATA, FIXED, ""),
+      emitCaseFeatureStructureDefinition(
+        "Adult Patient",
+        "adult-18-or-older",
+        METADATA,
+        FIXED,
+        "",
+        "Condition",
+        "Adult Patient Records",
+        undefined,
+      ),
     ).toThrow(/empty featureExpressionLibrarySuffix/);
   });
 
@@ -202,6 +218,9 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
       METADATA,
       FIXED,
       "CasefeatureFixtureLocalSource",
+      "Condition",
+      "Adult Patient Records",
+      undefined,
     );
     expect(resource).toBeNull();
     expect(errors.some((e) => e.kind === "emit-casefeature-missing-code")).toBe(true);
@@ -214,6 +233,9 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
       METADATA,
       FIXED,
       "CasefeatureFixtureLocalSource",
+      "Condition",
+      "Adult Patient Records",
+      undefined,
     );
     expect(resource).toBeNull();
     expect(errors.some((e) => e.kind === "emit-casefeature-missing-code")).toBe(true);

@@ -12,6 +12,7 @@ concept "Active Severe Crohns":
 - type is Condition.
 - value type is boolean.
 - code is `active-severe-crohns`.
+- definition is exists this.
 
 activity "Shared Deny":
 - request CPGCommunicationRequest.

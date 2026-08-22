@@ -100,8 +100,10 @@ describe("deriveEffectiveRepresentations — local-exact arm", () => {
     );
     if (d.arm !== "local-exact") throw new Error("expected local-exact");
     expect(d.resourceType).toBe("Observation");
-    expect(d.valueElement).toBe("value"); // Observation is value-bearing → value-filtered exists
-    expect(d.datumValueType).toBe("boolean");
+    // `exists this` is PRESENCE — it reads no value, even on a value-bearing Observation (the value is
+    // orthogonal to existence). No value datum → no `value[x]` on the SD. A value READ is `most recent this`.
+    expect(d.valueElement).toBeUndefined();
+    expect(d.datumValueType).toBeUndefined();
   });
 
   it("MedicationRequest → choice-codeable-concept@medication coding (the one non-default T1 strategy)", () => {
@@ -384,16 +386,26 @@ describe("deriveEffectiveRepresentations — most recent this typed value reads 
   });
 });
 
-describe("#189-flip import boundary — effectiveRepresentation wired ONLY at the sanctioned CQL-lane sites", () => {
-  it("only the flip's CQL-lane consumers import effectiveRepresentation; resourceEmitRegistry stays emit-internal", () => {
+describe("#189-flip import boundary — effectiveRepresentation / resourceEmitRegistry wired ONLY at the sanctioned lane sites", () => {
+  it("only the flip's sanctioned consumers import effectiveRepresentation / resourceEmitRegistry", () => {
     const srcRoot = join(__dirname, "..", ".."); // packages/crl/src
-    // The #189 flip (Slice B2a) WIRES the effective-representation deriver into the CQL emit lane at
-    // EXACTLY two sites: `lowerLocalCodes` (derives + attaches the `most recent this` descriptor) and
-    // `emitCQL` (reads it, type-only). Every OTHER production module importing `effectiveRepresentation` —
-    // and ANY import of `resourceEmitRegistry` (which carries the cross-todo cast contract) OUTSIDE
-    // src/emit/ — is still the premature-wiring hazard this boundary guards. Match an actual IMPORT, NOT a
-    // comment mention (the substring scan false-positived on migration/*.ts docstrings citing line numbers).
-    const ER_ALLOW = new Set(["cql-emitter/lowerLocalCodes.ts", "cql-emitter/emitCQL.ts"]);
+    // The #189 flip WIRES the effective-representation deriver into BOTH emit lanes at a small, fixed set of
+    // sanctioned sites:
+    //   - CQL lane (Slice B2a): `lowerLocalCodes` (derives + attaches the `most recent this` descriptor) and
+    //     `emitCQL` (reads it, type-only).
+    //   - FHIR case-feature lane (#189 2d): `fhir-emitter/caseFeatureRecord` (resolves a concept's natural
+    //     resource record via the deriver).
+    // `resourceEmitRegistry` (the per-resource emit table) is consumed via `effectiveRepresentation` PLUS, at
+    // the 2d flip, directly by `fhir-emitter/structureDefinition` (the case-feature SD profile shape —
+    // `caseFeatureProfileShape`). Any OTHER production importer of either module is still the premature-wiring
+    // hazard this boundary guards. Match an actual IMPORT, NOT a comment mention (the substring scan
+    // false-positived on migration/*.ts docstrings citing line numbers).
+    const ER_ALLOW = new Set([
+      "cql-emitter/lowerLocalCodes.ts",
+      "cql-emitter/emitCQL.ts",
+      "fhir-emitter/caseFeatureRecord.ts",
+    ]);
+    const REGISTRY_ALLOW = new Set(["fhir-emitter/structureDefinition.ts"]);
     const erOffenders: string[] = [];
     const registryOffenders: string[] = [];
     const walk = (dir: string): void => {
@@ -410,7 +422,9 @@ describe("#189-flip import boundary — effectiveRepresentation wired ONLY at th
           if (/from\s+["'][^"']*\/effectiveRepresentation["']/.test(text) && !ER_ALLOW.has(rel)) {
             erOffenders.push(rel);
           }
-          if (/from\s+["'][^"']*\/resourceEmitRegistry["']/.test(text)) registryOffenders.push(rel);
+          if (/from\s+["'][^"']*\/resourceEmitRegistry["']/.test(text) && !REGISTRY_ALLOW.has(rel)) {
+            registryOffenders.push(rel);
+          }
         }
       }
     };
@@ -421,7 +435,7 @@ describe("#189-flip import boundary — effectiveRepresentation wired ONLY at th
     ).toEqual([]);
     expect(
       registryOffenders,
-      `resourceEmitRegistry must stay emit-internal (import via effectiveRepresentation), found: ${registryOffenders.join(", ")}`,
+      `resourceEmitRegistry may be imported ONLY via effectiveRepresentation or the sanctioned 2d site (${[...REGISTRY_ALLOW].join(", ")}); found: ${registryOffenders.join(", ")}`,
     ).toEqual([]);
   });
 });

@@ -101,7 +101,7 @@
                   "valueMarkdown": "Qualifying Diagnosis"
                 }
               ],
-              "type": "Observation",
+              "type": "Condition",
               "profile": [
                 "http://example.org/hcsc/rx501-007/StructureDefinition/example-direct-qualifying-diagnosis"
               ]

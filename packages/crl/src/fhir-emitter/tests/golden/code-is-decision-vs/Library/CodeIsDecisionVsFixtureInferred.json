@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "CodeIsDecisionVsFixtureInterface",
+  "id": "CodeIsDecisionVsFixtureInferred",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,10 +26,10 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureInterface",
+  "url": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureInferred",
   "version": "1.0.0",
-  "name": "CodeIsDecisionVsFixtureInterface",
-  "title": "CodeIsDecisionVsFixtureInterface",
+  "name": "CodeIsDecisionVsFixtureInferred",
+  "title": "CodeIsDecisionVsFixtureInferred",
   "status": "draft",
   "experimental": true,
   "date": "2020-01-01T00:00:00.000Z",
@@ -46,17 +46,13 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureRecordSource"
-    },
-    {
-      "type": "depends-on",
-      "resource": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureInferred"
+      "resource": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalSource"
     }
   ],
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/CodeIsDecisionVsFixtureInterface.cql"
+      "url": "../../cql/CodeIsDecisionVsFixtureInferred.cql"
     }
   ]
 }

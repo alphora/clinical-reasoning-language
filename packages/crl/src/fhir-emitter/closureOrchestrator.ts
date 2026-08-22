@@ -62,6 +62,7 @@ import {
   type CollectedCodeIsConcept,
 } from "./caseFeatureCollection";
 import { caseFeatureCanonicalUrl, emitCaseFeatureStructureDefinition } from "./structureDefinition";
+import { resolveCaseFeatureRecord, type CaseFeatureRecordResolution } from "./caseFeatureRecord";
 import { emitLocalCodeSystem } from "./codeSystem";
 import {
   emitDecisionPlanDefinition,
@@ -670,6 +671,70 @@ export function applyInvariant2(
     }
   }
 
+  return errors;
+}
+
+/**
+ * Inv 2(d) — StructureDefinition cpg-featureExpression DEFINE integrity. The companion to Inv 2(c): (c)
+ * checks the referenced LIBRARY exists; (d) checks the referenced DEFINE exists IN that library's emitted
+ * CQL. A case-feature `valueExpression.expression` is a bare CQL define identifier (`"<X> Records"` for a
+ * reduction, `"<X>"` for a RecordSet / age-both-rep) in the LocalSource library. If it names a define that
+ * was NOT emitted, the featureExpression DANGLES — it resolves at neither translator-load nor emit, failing
+ * only at `$apply`. This is the general backstop for the #189 2d dangle class (both round-1 criticals were
+ * green-over-a-broken-artifact precisely because nothing checked featureExpression targets). No-op when the
+ * manifest carries no CQL (direct graph-only unit callers, `cqlByLibrary: []`) — like Inv 4.
+ */
+export function applyFeatureExpressionDefineInvariant(
+  resources: ReadonlyArray<EmittedResource>,
+  cqlByLibrary: ReadonlyArray<PerLibraryEmit>,
+): CRLError[] {
+  const errors: CRLError[] = [];
+  if (cqlByLibrary.length === 0) return errors; // no emitted CQL to check against — no-op (Inv-4 pattern)
+
+  // Per-library set of emitted define names (parsed from the CQL text). `define "<Name>":`, tolerating a
+  // leading `private`/`function` qualifier (case-feature targets are plain defines, but be lenient). LIMITATION
+  // (panel round 2, both arms — a nit): `[^"]+` truncates at an escaped `\"` inside a delimited identifier, so a
+  // concept name literally containing a `"` could false-dangle. No such name exists in-repo; if one appears,
+  // switch to a define-name list carried structurally on `PerLibraryEmit` rather than a regex over the text.
+  const definesByLibrary = new Map<string, Set<string>>();
+  for (const e of cqlByLibrary) {
+    const names = new Set<string>();
+    for (const m of e.cql.matchAll(/^\s*define\s+(?:private\s+|function\s+)?"([^"]+)"\s*[:(]/gm)) {
+      names.add(m[1]!);
+    }
+    definesByLibrary.set(e.libraryName, names);
+  }
+
+  for (const r of resources) {
+    if (r.resourceType !== "StructureDefinition") continue;
+    const ext = (
+      r.resource as {
+        extension?: Array<{ url?: string; valueExpression?: { expression?: unknown; reference?: unknown } }>;
+      }
+    ).extension;
+    if (!Array.isArray(ext)) continue;
+    for (const e of ext) {
+      if (e.url !== CPG_FEATURE_EXPRESSION_EXT) continue;
+      const expr = e.valueExpression?.expression;
+      const ref = e.valueExpression?.reference;
+      if (typeof expr !== "string" || typeof ref !== "string") continue;
+      // The referenced Library canonical's url-tail IS the CQL library name (Inv 6: id == name == url-tail).
+      const libName = ref.split("/").pop() ?? ref;
+      const defines = definesByLibrary.get(libName);
+      // Only check when we HAVE this library's emitted defines; a missing library is Inv 2(c)'s concern.
+      if (defines === undefined) continue;
+      if (!defines.has(expr)) {
+        errors.push({
+          type: "Validation",
+          kind: "dangling-feature-expression-define",
+          message:
+            `StructureDefinition "${r.sourceName ?? r.relativePath}" cpg-featureExpression targets define ` +
+            `"${expr}", which is NOT emitted in library "${libName}". The featureExpression would resolve at ` +
+            `neither translator-load nor emit, failing only at $apply — a dangling case-feature target.`,
+        });
+      }
+    }
+  }
   return errors;
 }
 
@@ -1598,13 +1663,14 @@ export function emitFhirDefClosure(
     //     `ReductionConceptRef` targets), so a `unionConcepts` filter is SILENT and the decision would emit
     //     an empty-input / no-SD VACUOUS guard under success:true — the plan's original "silent demotion"
     //     (impl-panel round 1, both arms — critical A; the earlier collection-based gate missed this form).
-    // The CORRECT reduction case-feature SD (which library the featureExpression targets; whether an
-    // Observation-boolean profile faithfully represents a Condition/Procedure existence reduction; the
-    // patternCodeableConcept code is the reduction's own code on an Observation profile) is genuine
-    // unconverged design (§4.6 / G1). Until then, fail LOUD and suppress this source's decision +
-    // case-feature emit rather than ship a dangling or vacuous artifact. (A reduction reached only as a
-    // `defined as` OPERAND — not a direct guard atom — is caught on the CQL lane by the truth-set
-    // composition guard, whose `emit-reduction-in-composition` error folds into this result.)
+    // Descending a code-LESS reduction to its code-bearing operand records so THEY become the gathered
+    // case-features is genuine unconverged design (§4.6 / G1, operator decision A). Until then, fail LOUD and
+    // suppress this source's decision + case-feature emit rather than ship an incomplete guard. NOTE: a
+    // code-less reduction reached only as a `defined as` OPERAND (not a direct guard atom) is NOT caught by any
+    // CQL-lane backstop — the 2b.3b.1ii boolean pivot (`emitCQL.ts`) flips a `Scalar<boolean>` `defined as`
+    // composition over total operands to the boolean lane and emits SUCCESSFULLY (no `emit-reduction-in-
+    // composition` folds in). So the loud gate below (which walks the guard's `defined as` closure to any
+    // code-less reduction) is the ONLY thing catching the mixed/operand form (panel round 2, both arms).
     const reductionNames = new Set<string>(
       lowered.ast.statements
         .filter(
@@ -1624,40 +1690,85 @@ export function emitFhirDefClosure(
     for (const s of lowered.ast.statements) {
       if (s.type === "Concept" && s.name !== undefined) conceptByNameForGate.set(s.name, s);
     }
-    const reachesReduction = (start: string): boolean => {
+    // REFACTOR:grounded (panel round 2, both arms) — the concepts that HAVE a local `code is` record (raw AST;
+    // lowering CLEARS `Concept.code`, so read `lib.ast`). A reduction WITH a code (`code is` + `exists this` — the
+    // 2d flagship) is gatherable via its own record; a code-LESS reduction (`count`/`exists`/`most recent` over a
+    // NAMED ref, no own code) is NOT — the collector does not descend a `ReductionDefinition` target, so the
+    // operand records (e.g. `count "Trial Records"` → the "Trial Records" Procedure) are never gathered.
+    const codeBearingConcepts = new Set<string>(
+      lib.ast.statements
+        .filter((s): s is Concept => s.type === "Concept" && s.name !== undefined && s.code !== undefined)
+        .map((s) => s.name as string),
+    );
+    // Walk a guard atom's same-lib `defined as` closure and collect every CODE-LESS reduction it reaches. Blocking
+    // keys on THIS (not on "the condition collected zero inputs" — the old proxy that MISSED the mixed case: a
+    // guard `defined as ( CodeBearing and CodelessCount )` collects the code-bearing leaf, so its input set is
+    // non-empty, yet the code-less reduction's operand is silently dropped → a partial guard that can never fire at
+    // $apply). A reduction is a leaf for this walk (only `defined as` edges are descended). Descending code-less
+    // reductions to their code-bearing operands is a later boundary (operator decision A) — until then, fail LOUD.
+    const codelessReductionsReached = (start: string): string[] => {
+      const found = new Set<string>();
       const visiting = new Set<string>();
-      const dfs = (n: string): boolean => {
-        if (visiting.has(n)) return false; // cycle/diamond guard
+      const dfs = (n: string): void => {
+        if (visiting.has(n)) return; // cycle/diamond guard
         visiting.add(n);
-        if (reductionNames.has(n)) return true; // direct reduction OR a reduction reached transitively
+        if (reductionNames.has(n)) {
+          if (!codeBearingConcepts.has(n)) found.add(n); // a code-BEARING reduction is gatherable via its record
+          return; // a reduction is a leaf for the gate walk
+        }
         const c = conceptByNameForGate.get(n);
-        if (c?.definition?.type !== "DefinedAsDefinition") return false; // only `defined as` edges are followed
+        if (c?.definition?.type !== "DefinedAsDefinition") return; // only `defined as` edges are followed
         for (const ref of flattenDefinedAsBody(c.definition.body)) {
           const local = normalizeLocalRef(ref, lib.libraryName);
           if (isQualifiedRef(local)) continue; // genuinely-foreign operand — unsupported/deferred (§4.5)
-          if (dfs(getRefName(local))) return true;
+          dfs(getRefName(local));
         }
-        return false;
       };
-      return dfs(start);
+      dfs(start);
+      return [...found];
     };
-    const reductionGuardConcepts = interfaceConceptNames(lowered.ast).filter((n) => reachesReduction(n));
-    const reductionCaseFeatureBlocked = reductionGuardConcepts.length > 0;
+    const blockedGuards = interfaceConceptNames(lowered.ast).flatMap((guard) =>
+      codelessReductionsReached(guard).map((reduction) => ({ guard, reduction })),
+    );
+    const reductionCaseFeatureBlocked = blockedGuards.length > 0;
     if (reductionCaseFeatureBlocked) {
       errors.push({
         type: "Validation",
         kind: "unsupported-casefeature-reduction",
         message:
-          `Decision-bearing source "${lib.libraryName}" guards on concept(s) ` +
-          `${reductionGuardConcepts.map((n) => `"${n}"`).join(", ")} that resolve to a reduction (directly, or ` +
-          `via a \`defined as\` alias). A reduction cannot yet be a decision case-feature: for a code-bearing ` +
-          `reduction the case-feature \`cpg-featureExpression\` target LocalSource."<X>" would DANGLE (the ` +
-          `retrieve is on the twin "<X> Records"; the boolean determination is in the Inferred/Interface layer), ` +
-          `and a named/code-less reduction is not collected at all (a vacuous empty-input guard). Emitting a ` +
-          `reduction case-feature StructureDefinition is deferred to a later #189 boundary; this source's ` +
-          `decision + case-feature emit is suppressed rather than ship an artifact that dangles or is vacuous ` +
-          `at $apply.`,
+          `Decision-bearing source "${lib.libraryName}" guards on concept(s) that reach a CODE-LESS reduction ` +
+          `whose operand records the case-feature collector does not gather: ` +
+          `${blockedGuards.map((b) => `"${b.guard}" → "${b.reduction}"`).join(", ")} (e.g. ` +
+          `\`count "X Records" at least N\` with no own \`code is\`). The collector does not yet descend into a ` +
+          `reduction's operands, so the guard would emit an incomplete case-feature set that can never be ` +
+          `satisfied at $apply. Descending to the code-bearing operands is a later #189 boundary (operator ` +
+          `decision A); this source's decision + case-feature emit is suppressed rather than ship an incomplete guard.`,
       });
+    }
+
+    // #189 2d — resolve each collected (code-bearing) concept to its NATURAL resource + records-define via the
+    // descriptor deriver (P2 `resolveCaseFeatureRecord`), keyed by concept name. Both the case-feature SD emit
+    // (step 6) and the `action.input` resolver consume this map, so the SD `type` and `action.input.type` agree by
+    // construction. The deriver reads the RAW concept (`lib.ast`, pre-lowering — lowering CLEARS `Concept.code`).
+    const owningLibMeta = {
+      libraryName: lib.libraryName,
+      canonicalBase: metadata.canonicalBase,
+      localDomainId: entryLocalDomainId,
+    };
+    const rawConceptByName = new Map<string, Concept>();
+    for (const s of lib.ast.statements) {
+      if (s.type === "Concept" && s.name !== undefined) rawConceptByName.set(s.name, s);
+    }
+    // REFACTOR:grounded (charter §4) — store the FULL resolution, not just records. Step 6 and the input
+    // resolver both switch on it: `record` → SD + gathered natural-resource input; `supplied-patient` (the
+    // uncoded Patient arm, charter §2) → no SD, no input, NO error; a genuine reject (`unsupported-resource` /
+    // `not-a-record`) → LOUD at step 6 with the skip's OWN kind + detail (so a bare-scalar / unmodeled-resource /
+    // hybrid each get their correct migration prompt, not a generic message).
+    const resolutionByName = new Map<string, CaseFeatureRecordResolution>();
+    for (const { name } of caseFeatures.unionConcepts) {
+      const raw = rawConceptByName.get(name);
+      if (raw === undefined) continue;
+      resolutionByName.set(name, resolveCaseFeatureRecord(raw, owningLibMeta));
     }
 
     // F3 (impl-review) — direct-caller trap. The deliverable always threads a
@@ -1688,11 +1799,23 @@ export function emitFhirDefClosure(
         });
       }
     }
+    // REFACTOR:grounded (charter §4) — a decision `action.input` is emitted ONLY for a concept that resolves to
+    // a gatherable `record`, carrying its NATURAL resource type (so `action.input.type` == the emitted SD `type`
+    // by construction). A `supplied-patient` concept (the uncoded Patient arm, READ not gathered) contributes NO
+    // input; an unsupported/not-a-record concept contributes no input either (step 6 raises the loud diagnostic).
+    // There is NO Observation fallback — an input never carries a resource type the case-feature lane can't stand behind.
     const caseFeatureInputResolver: CaseFeatureInputResolver = (name) =>
-      (caseFeatures.inputsByCondition.get(name) ?? []).map((c) => ({
-        name: c.name,
-        canonical: caseFeatureCanonicalUrl(metadata, c.name),
-      }));
+      (caseFeatures.inputsByCondition.get(name) ?? []).flatMap((c) => {
+        const res = resolutionByName.get(c.name);
+        if (res?.kind !== "record") return [];
+        return [
+          {
+            name: c.name,
+            canonical: caseFeatureCanonicalUrl(metadata, c.name),
+            resourceType: res.descriptor.resourceType,
+          },
+        ];
+      });
 
     // When the contract is violated we skip THIS source's decision emit (handled by
     // the loop guard below); there are no later per-lib steps, so a plain guarded
@@ -1735,18 +1858,63 @@ export function emitFhirDefClosure(
     // cms69 carry NO decisions → structural no-op, keeping their goldens
     // byte-identical. (`caseFeatureGateOpen` is the SAME gate used for step 5a.)
     //
-    // LOCALSOURCE-ALWAYS-BOOLEAN: every collected concept has a lowered `code is`
-    // (the collector appends iff a local code exists), so each emits a boolean
-    // Observation case-feature regardless of declared value type — there is no
-    // value-type gate and no `emit-casefeature-non-boolean` diagnostic. The
-    // `emit-casefeature-missing-code` contradiction guard is structurally
-    // unreachable from the collection (the collector never appends a code-less
-    // concept), so it is dropped here too.
+    // REFACTOR:grounded (charter §4) — each collected concept emits its case-feature by its resolution:
+    //   - `record`          → a StructureDefinition typed by the concept's NATURAL resource (Condition/
+    //                         MedicationRequest/Observation/…), coding on that resource's own element, valueless
+    //                         unless a value READ (`most recent this`) supplies a datum; featureExpression → the
+    //                         records-retrieve define (the `"<X> Records"` twin for a reduction, else the concept
+    //                         name `"<X>"`). (The old forced-Observation-boolean rule is DELETED.)
+    //   - `supplied-patient` → NO SD and NO error — the determination is READ from the supplied Patient, not
+    //                         gathered via a questionnaire case-feature (charter §2; the uncoded Patient arm).
+    //   - reject            → LOUD, carrying the skip's OWN kind + detail (bare-scalar → author `exists this`;
+    //                         unmodeled resource → model it; hybrid → park) — never a silent Observation fallback.
     //
     // The `cpg-featureExpression.reference` resolves to the `<policyId>-LocalSource`
-    // Library (where the `code is` define lives) via `localSourceReferenceSuffix`.
+    // Library (where the records-retrieve define lives) via `localSourceReferenceSuffix`.
     if (caseFeatureGateOpen && !reductionCaseFeatureBlocked) {
       for (const { name, code } of caseFeatures.unionConcepts) {
+        const resolution = resolutionByName.get(name);
+        if (resolution === undefined) {
+          // A collected case-feature concept with NO resolution means the collection index and `resolutionByName`
+          // (both built from `caseFeatures.unionConcepts` / `lib.ast`) disagreed — an internal inconsistency, not a
+          // legitimate supplied/read. Fail LOUD rather than silently drop the case-feature (gpt56 round-2 refine).
+          errors.push({
+            type: "Validation",
+            kind: "internal-casefeature-resolution-missing",
+            message:
+              `Internal: collected case-feature concept "${name}" in source "${lib.libraryName}" has no ` +
+              `resolution entry (the case-feature collection and the record-resolution index disagree). This is ` +
+              `an emitter invariant violation, not an authoring error.`,
+          });
+          continue;
+        }
+        if (resolution.kind === "supplied-patient") {
+          // Supplied/read (the uncoded Patient arm — charter §2) — no gathered SD, NOT an error.
+          continue;
+        }
+        if (resolution.kind !== "record") {
+          // A genuine reject (`unsupported-resource` / `deferred-sourced` / `not-a-record`). Fail LOUD with the
+          // skip's OWN kind + detail — never fall back to a forced Observation (charter §4).
+          const detail =
+            resolution.kind === "unsupported-resource"
+              ? `natural resource "${resolution.resourceType}" is not in the case-feature emit registry: ${resolution.detail}`
+              : resolution.kind === "deferred-sourced"
+                ? `a purely-sourced concept (no local \`code is\`) is deferred (E1/#257)`
+                : resolution.detail;
+          errors.push({
+            type: "Validation",
+            kind: "unsupported-casefeature-resource",
+            message:
+              `Case-feature concept "${name}" in source "${lib.libraryName}" is not a gatherable ` +
+              `natural-resource record; no case-feature StructureDefinition emitted. ${detail}`,
+          });
+          continue;
+        }
+        const record = resolution;
+        const valueDatum =
+          record.descriptor.valueElement !== undefined && record.descriptor.datumValueType !== undefined
+            ? { valueElement: record.descriptor.valueElement, datumValueType: record.descriptor.datumValueType }
+            : undefined;
         const cfResult = emitCaseFeatureStructureDefinition(
           name,
           code,
@@ -1755,6 +1923,11 @@ export function emitFhirDefClosure(
           // Non-undefined here (the gate requires a LocalSource entry); the `?? ""`
           // preserves the emitter's own empty-suffix throw-guard as a backstop.
           localSourceReferenceSuffix ?? "",
+          // #189 2d — the concept's NATURAL resource + records-twin define (from the descriptor); the SD `type`
+          // and `cpg-featureExpression` follow them, replacing the forced-Observation hack.
+          record.descriptor.resourceType,
+          record.recordsDefineId,
+          valueDatum,
           // #198 — the sibling's disambiguated local domain, so the case-feature
           // `patternCodeableConcept.coding.system` matches THIS library's CodeSystem.
           entryLocalDomainId,
@@ -1820,7 +1993,11 @@ export function emitFhirDefClosure(
     cqlByLibrary.filter((e) => !e.isSharedCatalog).map((e) => e.libraryName),
   );
   const inv6errors = applyLibraryIdentityInvariant(inv1.surviving, metadata, enforcedIdentities);
-  errors.push(...inv2errors, ...inv3errors, ...inv4errors, ...inv5errors, ...inv6errors);
+  // Inv 2(d) — case-feature cpg-featureExpression DEFINE integrity: the referenced define must exist in the
+  // referenced library's emitted CQL (the general backstop for the #189 2d dangle class). No-op when the
+  // manifest carries no CQL (`cqlByLibrary: []`, graph-only unit callers), like Inv 4.
+  const inv2dErrors = applyFeatureExpressionDefineInvariant(inv1.surviving, cqlByLibrary);
+  errors.push(...inv2errors, ...inv2dErrors, ...inv3errors, ...inv4errors, ...inv5errors, ...inv6errors);
 
   // Round-5 gpt55 [important]: severity-aware success (warnings don't sink
   // success). Hard errors (non-warning CRLErrors) + any unmatched still flip

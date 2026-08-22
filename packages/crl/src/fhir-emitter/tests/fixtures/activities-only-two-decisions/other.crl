@@ -5,6 +5,7 @@ concept "C2":
 - type is Condition.
 - value type is boolean.
 - code is `c2`.
+- definition is exists this.
 
 decision "Other Decision":
 first:

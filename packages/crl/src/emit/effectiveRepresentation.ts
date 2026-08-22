@@ -224,26 +224,19 @@ function computeLocalDatum(
           detail: `\`${reduction!.kind} this\` produces a boolean, but the concept declares value type \`${concept.valueTypes.join("/") || "(none)"}\``,
         };
       }
-      // Neither `count this` nor `exists this` on a valueless resource reads a value — an authored value element
-      // has nothing to bind to (never silently drop it, per this module's stated invariant).
-      const readsNoValue = reduction!.kind === "count" || row.valueless;
-      if (readsNoValue) {
-        if (authored !== undefined) {
-          return {
-            errorKind: "value-element-unmappable",
-            detail: `\`${reduction!.kind} this\`${row.valueless ? ` on valueless ${resourceType}` : ""} reads no value; the authored value element \`${authored}\` cannot bind`,
-          };
-        }
-        return {};
-      }
-      // value-bearing `exists` (Observation) → value-filtered exists on the standard `value` carrier.
-      if (authored !== undefined && authored !== "value") {
+      // `exists this` (presence) and `count this` (threshold) NEVER read a value — this is ORTHOGONAL to
+      // whether the resource is value-bearing. `exists([Observation: code])` is pure presence: it is true
+      // when a record exists REGARDLESS of that record's value (a present `value=false` Observation still
+      // exists → true). There is no such thing as a "value-filtered exists". So neither reduction produces a
+      // value datum, and an authored value element has nothing to bind to (never silently drop it, per this
+      // module's stated invariant). Only a `most recent this` value read (below) reads a value.
+      if (authored !== undefined) {
         return {
           errorKind: "value-element-unmappable",
-          detail: `authored value element \`${authored}\` on ${resourceType} is not mappable in T1 (only \`value\`; model-info registry deferred, §8)`,
+          detail: `\`${reduction!.kind} this\` reads no value (${reduction!.kind === "exists" ? "presence" : "a threshold"} is orthogonal to the record's value); the authored value element \`${authored}\` cannot bind`,
         };
       }
-      return { valueElement: "value", datumValueType: "boolean" as ConceptValueType };
+      return {};
     }
     case "mostRecent": {
       // #189 §4.1 T1 EXTENSION — a `most recent this` publishes a TYPED value read; consult the FHIR
