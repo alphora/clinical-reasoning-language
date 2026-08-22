@@ -5,6 +5,7 @@ concept "C1":
 - type is Condition.
 - value type is boolean.
 - code is `c1`.
+- definition is exists this.
 
 decision "Main Decision":
 first:

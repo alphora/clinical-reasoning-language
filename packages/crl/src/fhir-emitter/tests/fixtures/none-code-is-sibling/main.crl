@@ -5,6 +5,7 @@ concept "Feature A":
 - type is Observation.
 - value type is boolean.
 - code is `feature-a`.
+- definition is exists this.
 
 decision "Main Determination":
 first:

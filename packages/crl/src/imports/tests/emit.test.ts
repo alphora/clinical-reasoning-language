@@ -639,12 +639,16 @@ decision "Triage":
     expect(inferred).toMatch(
       /define "Enough Trials":\s*\n\s*exists \(CrlTestFixtureLocalSource\."Trial Records"\)/,
     );
-    // The decision surface concept ("Adult Patient", a `code is`) is re-exported BARE-through-satisfied by
-    // the Interface layer; the reduction is not a decision case-feature here, so it stays Inferred-only.
-    const iface = findLib(result, "CrlTestFixtureInterface") ?? "";
-    expect(iface).toMatch(
-      /define "Adult Patient":\s*\n\s*CrlTestFixtureLocalSource\."Adult Patient"\.asTruths\(\)\.satisfied\(\)/,
+    // #189 2d — the decision surface concept "Adult Patient" is now `code is` + `definition is exists this`,
+    // so it is a DERIVATION: it emits `exists(… "Adult Patient Records")` in the Inferred layer (a TOTAL
+    // boolean) and the Interface re-exports it BARE (`Inferred."Adult Patient"`) — NOT the old
+    // `.asTruths().satisfied()` truth-set collapse (that was the pre-flip bare-`code is` hack).
+    expect(inferred).toMatch(
+      /define "Adult Patient":\s*\n\s*exists \(CrlTestFixtureLocalSource\."Adult Patient Records"\)/,
     );
+    const iface = findLib(result, "CrlTestFixtureInterface") ?? "";
+    expect(iface).toMatch(/define "Adult Patient":\s*\n\s*CrlTestFixtureInferred\."Adult Patient"\s*\n/);
+    expect(iface).not.toMatch(/\.asTruths\(\)\.satisfied\(\)/);
   });
 
   it("#189 Slice-C flip façade totality: a decision guarding ON a reduction re-exports it BARE through the Interface (a total boolean has no `.satisfied()`)", () => {

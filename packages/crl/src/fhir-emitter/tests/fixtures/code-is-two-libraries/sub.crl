@@ -12,6 +12,7 @@ concept "Feature Sub":
 - type is Observation.
 - value type is boolean.
 - code is `feature-sub`.
+- definition is exists this.
 
 activity "Refer":
 - request CPGCommunicationRequest.

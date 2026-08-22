@@ -13,6 +13,7 @@ concept "Active Crohns Disease":
 - type is Condition.
 - value type is boolean.
 - code is `active-crohns-disease`.
+- definition is exists this.
 
 decision "Triage Crohns":
 - when "Active Crohns Disease" then use decision "Shared"."Sub Triage".

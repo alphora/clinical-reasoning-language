@@ -238,30 +238,36 @@ describe("closureOrchestrator — #189: unactivated reductions fail the FHIR lan
     expect(result.success, JSON.stringify(result.errors)).toBe(true); // Slice-C: the split now emits case-features
   });
 
-  it("#189 Slice-C boundary 1 — a decision guarding ON a reduction LOUD-GATES the FHIR case-feature lane (no dangling featureExpression, zero partial decision output)", () => {
-    // When a decision's `when` condition IS a reduction ("Cov" = `code is` + `exists this`), the reduction
-    // is collected as a boolean case-feature by NAME (its `code is` still registers under "Cov"), so the
-    // emit would otherwise produce a case-feature SD whose `cpg-featureExpression` targets
-    // `LocalSource."Cov"` — which does NOT exist there (the LocalSource layer has "Cov Records"; the boolean
-    // determination lives in Inferred/Interface). That featureExpression DANGLES: it resolves at neither
-    // translator-load nor emit, only failing at `$apply`. The correct reduction case-feature SD is deferred
-    // to a later boundary (§4.6/G1), so boundary 1 fails LOUD and suppresses this source's decision +
-    // case-feature emit — never shipping the dangling artifact.
+  it("#189 2d — a decision guarding on a `code is` + `exists this` reduction EMITS its record case-feature (featureExpression → the Records twin, no dangle)", () => {
+    // #189 2d flip (charter §4): a concept that is BOTH a record and a reduction ("Cov" = `code is`
+    // Condition + `exists this`) is a case feature VIA ITS RECORD — the SD describes the natural Condition,
+    // and its `cpg-featureExpression` targets the "Cov Records" retrieve twin (which DOES exist in the
+    // LocalSource layer), NOT the ephemeral boolean "Cov". Pre-flip this featureExpression dangled at
+    // `LocalSource."Cov"`, so the lane loud-gated (deferral §4.6/G1); the flip retargets it to "Cov Records",
+    // removing the dangle — so the emit now SUCCEEDS with a real Condition case-feature. (Contrast the
+    // code-LESS `count` reduction below, which has no own record and correctly STILL loud-gates.)
     const root = join(ROOT, "src/imports/tests/fixtures/decision-when-reduction/root.crl");
     const result = emitFhirDefFromPath(root, { clock: FIXED_CLOCK });
-    expect(result.success).toBe(false);
-    expect(result.errors.some((e) => e.kind === "unsupported-casefeature-reduction")).toBe(true);
-    // ZERO partial DECISION/case-feature output (gpt56 #4 — the layer Libraries/CodeSystem/ADs legitimately
-    // remain; `success:false` gates the write): no case-feature StructureDefinition and no decision
-    // PlanDefinition survive. Attribute semantically by resourceType, not only by path substring.
+    expect(result.success, JSON.stringify(result.errors)).toBe(true);
+    expect(result.errors.some((e) => e.kind === "unsupported-casefeature-reduction")).toBe(false);
+    // Exactly one case-feature SD — the natural Condition — with featureExpression → the Records twin.
     const sds = result.resources.filter(
       (r) => (r.resource as { resourceType?: string }).resourceType === "StructureDefinition",
     );
-    expect(sds).toEqual([]);
+    expect(sds).toHaveLength(1);
+    const sd = sds[0]!.resource as {
+      type: string;
+      extension: Array<{ url: string; valueExpression?: { expression?: string } }>;
+    };
+    expect(sd.type).toBe("Condition");
+    const fe = sd.extension.find((e) => e.url === CPG_FEATURE_EXPRESSION_EXT)!;
+    expect(fe.valueExpression?.expression).toBe("Cov Records");
+    // The decision PlanDefinition IS emitted and its input profile resolves to the emitted Cov SD.
     const decisionPd = result.resources.some((r) =>
       r.relativePath.includes("PlanDefinition/decision-when-reduction-cov-determination"),
     );
-    expect(decisionPd).toBe(false);
+    expect(decisionPd).toBe(true);
+    expect(result.errors.some((e) => e.kind === "unresolved-action-input-profile")).toBe(false);
   });
 
   it("#189 Slice-C boundary 1 — a decision guarding on a NAMED/code-less reduction is ALSO loud-gated (the collection-based gate missed this form)", () => {
@@ -279,24 +285,33 @@ describe("closureOrchestrator — #189: unactivated reductions fail the FHIR lan
     expect(decisionPd).toBe(false);
   });
 
-  it("#189 Slice-C boundary 2 (2b.2) — a decision guarding on a `defined as` ALIAS to a reduction is loud-gated via the TRANSITIVE operand closure", () => {
-    // Post-2b.2 the alias ("Cov Alias" = `defined as "Cov"`, Cov a reduction) FLIPS: it emits a total boolean at
-    // the CQL lane rather than throwing, so the transitive loudness that previously blocked its case-feature
-    // disappears. The widened `unsupported-casefeature-reduction` gate re-erects the block by walking the guard
-    // atom's same-lib `defined as` closure to the reduction — the direct-reduction gate (`reductionNames`) would
-    // MISS the alias (a `DefinedAsDefinition`). (disc 444 #1/#4.)
+  it("#189 2d — a decision guarding on a `defined as` ALIAS to a `code is`+`exists this` reduction emits the underlying record case-feature via the transitive closure", () => {
+    // #189 2d flip: the guard atom "Cov Alias" = `defined as "Cov"`, where "Cov" = `code is` Condition +
+    // `exists this` (a record+reduction). The recursive case-feature collection walks the alias's `defined as`
+    // closure to the record-bearing "Cov" and emits ITS natural Condition case-feature (featureExpression →
+    // "Cov Records"). Pre-flip this was loud-gated (the reduction case-feature was deferred + would dangle);
+    // the flip retargets the featureExpression to the Records twin, so the alias now resolves cleanly to a
+    // real Condition case-feature and the whole emit SUCCEEDS.
     const root = join(ROOT, "src/imports/tests/fixtures/decision-when-alias-to-reduction/root.crl");
     const result = emitFhirDefFromPath(root, { clock: FIXED_CLOCK });
-    expect(result.success).toBe(false);
-    expect(result.errors.some((e) => e.kind === "unsupported-casefeature-reduction")).toBe(true);
+    expect(result.success, JSON.stringify(result.errors)).toBe(true);
+    expect(result.errors.some((e) => e.kind === "unsupported-casefeature-reduction")).toBe(false);
     const sds = result.resources.filter(
       (r) => (r.resource as { resourceType?: string }).resourceType === "StructureDefinition",
     );
-    expect(sds).toEqual([]);
+    expect(sds).toHaveLength(1);
+    const sd = sds[0]!.resource as {
+      type: string;
+      extension: Array<{ url: string; valueExpression?: { expression?: string } }>;
+    };
+    expect(sd.type).toBe("Condition");
+    const fe = sd.extension.find((e) => e.url === CPG_FEATURE_EXPRESSION_EXT)!;
+    expect(fe.valueExpression?.expression).toBe("Cov Records");
     const decisionPd = result.resources.some((r) =>
       r.relativePath.includes("PlanDefinition/decision-when-alias-to-reduction-cov-determination"),
     );
-    expect(decisionPd).toBe(false);
+    expect(decisionPd).toBe(true);
+    expect(result.errors.some((e) => e.kind === "unresolved-action-input-profile")).toBe(false);
   });
 });
 
@@ -709,10 +724,14 @@ describe("closureOrchestrator — two `code is` libraries disambiguate their loc
       .sort();
     // Primary (Two Lib Main) → clean `CodeIsTwoLibFixture<Layer>`; sibling
     // (Two Lib Sub) → disambiguated `CodeIsTwoLibFixtureTwoLibSub<Layer>`.
+    // #189 2d — each library's `code is` concept migrated to `exists this` is now a
+    // DERIVATION, so BOTH libraries also carry an INFERRED layer.
     expect(policyLibIds).toEqual([
+      "CodeIsTwoLibFixtureInferred",
       "CodeIsTwoLibFixtureInterface",
       "CodeIsTwoLibFixtureLocalConcepts",
       "CodeIsTwoLibFixtureLocalSource",
+      "CodeIsTwoLibFixtureTwoLibSubInferred",
       "CodeIsTwoLibFixtureTwoLibSubInterface",
       "CodeIsTwoLibFixtureTwoLibSubLocalConcepts",
       "CodeIsTwoLibFixtureTwoLibSubLocalSource",

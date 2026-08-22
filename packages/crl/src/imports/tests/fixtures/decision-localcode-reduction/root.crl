@@ -13,6 +13,7 @@ concept "Adult Patient":
 - type is Observation.
 - value type is boolean.
 - code is `adult-18-or-older`.
+- definition is exists this.
 
 concept "Trial Records":
 - type is Observation.
