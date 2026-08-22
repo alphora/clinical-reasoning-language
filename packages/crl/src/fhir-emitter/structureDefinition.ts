@@ -205,6 +205,17 @@ export function emitCaseFeatureStructureDefinition(
   metadata: CpgMetadata,
   opts: EmitOptions,
   featureExpressionLibrarySuffix: string,
+  // #189 2d — the concept's NATURAL FHIR resource (Condition, MedicationRequest, …) from its
+  // effective-representation descriptor. The SD `type`/`baseDefinition`/differential follow it (charter §4);
+  // the forced-`Observation` profile was the hack. `undefined` from `caseFeatureProfileShape` → the resource is
+  // not in the emit registry → a structured `unsupported-casefeature-resource` (never a silent Observation fallback).
+  resourceType: string,
+  // The records-twin define the `cpg-featureExpression` targets (`"<X> Records"` in the LocalSource library) —
+  // the natural-resource retrieve, NOT the ephemeral boolean `"<X>"` (charter §4; panel disc 481/482).
+  recordsDefineId: string,
+  // Present iff the concept READS a value (a value-bearing Observation determination); a valueless-existence
+  // concept passes `undefined` → no `value[x]` element (the boolean is `exists`, computed in CQL).
+  valueDatum: { valueElement: string; datumValueType: string } | undefined,
   // #198 (Option B) — the per-library local-domain BASE whose CodeSystem this
   // case-feature's code lives in. Defaults to the policy id (`metadata.name`) —
   // byte-identical to pre-#198 for a PRIMARY library. A SIBLING `code is` library
@@ -269,15 +280,18 @@ export function emitCaseFeatureStructureDefinition(
   // `text/cql-identifier`).
   const featureExpressionCanonical = libraryCanonicalUrl(metadata, featureExpressionLibrarySuffix);
 
-  // #189 2d (transitional): the differential is now built from a `CaseFeatureProfileShape` via
-  // `caseFeatureDifferential`. This step pins the Observation+boolean profile — BYTE-IDENTICAL to the prior
-  // hardcoded profile — so the refactor is a pure no-op on the goldens; the next step derives the profile from
-  // the concept's effective-representation descriptor (natural resource, valueless-aware). `Observation` is always
-  // a registry row, so the shape is defined.
-  const caseFeatureProfile = caseFeatureProfileShape("Observation", {
-    valueElement: "value",
-    datumValueType: "boolean",
-  })!;
+  // #189 2d: the differential is built from the concept's NATURAL resource (charter §4) via
+  // `caseFeatureProfileShape` + `caseFeatureDifferential`. `undefined` = the resource is not in the emit
+  // registry → fail LOUD (`unsupported-casefeature-resource`), never a silent Observation fallback (that IS the hack).
+  const caseFeatureProfile = caseFeatureProfileShape(resourceType, valueDatum);
+  if (caseFeatureProfile === undefined) {
+    errors.push({
+      type: "Validation",
+      kind: "unsupported-casefeature-resource",
+      message: `Case-feature concept "${conceptName}" has natural resource type "${resourceType}", which is not in the case-feature emit registry (Condition, Observation, Procedure, ServiceRequest, MedicationRequest). A case-feature StructureDefinition for it is unsupported; model the resource before authoring a decision case-feature over it.`,
+    });
+    return { resource: null, errors };
+  }
 
   const resource: Record<string, unknown> = {
     resourceType: "StructureDefinition",
@@ -289,7 +303,9 @@ export function emitCaseFeatureStructureDefinition(
     // bare `code is` define).
     extension: cpgCaseFeatureExtensions(level, {
       language: "text/cql-identifier",
-      expression: conceptName,
+      // #189 2d — target the RECORDS twin define (`"<X> Records"` = the natural-resource retrieve), NOT the
+      // ephemeral boolean `"<X>"` (a Condition SD bound to a Boolean expr is type-incoherent — charter §4).
+      expression: recordsDefineId,
       reference: featureExpressionCanonical,
     }),
     url,

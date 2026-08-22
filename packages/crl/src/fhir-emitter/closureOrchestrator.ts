@@ -62,6 +62,7 @@ import {
   type CollectedCodeIsConcept,
 } from "./caseFeatureCollection";
 import { caseFeatureCanonicalUrl, emitCaseFeatureStructureDefinition } from "./structureDefinition";
+import { resolveCaseFeatureRecord, type CaseFeatureRecord } from "./caseFeatureRecord";
 import { emitLocalCodeSystem } from "./codeSystem";
 import {
   emitDecisionPlanDefinition,
@@ -1642,22 +1643,52 @@ export function emitFhirDefClosure(
       return dfs(start);
     };
     const reductionGuardConcepts = interfaceConceptNames(lowered.ast).filter((n) => reachesReduction(n));
-    const reductionCaseFeatureBlocked = reductionGuardConcepts.length > 0;
+    // #189 2d — a reduction guard concept is now a VALID case-feature when it collects a code-bearing record
+    // (a `code is` + `exists this` reduction — the flagship form): the SD describes the natural resource and its
+    // `cpg-featureExpression` targets the `"<X> Records"` twin (no dangle). It is BLOCKED only in the VACUOUS case
+    // — a code-less named reduction (`count "X Records" at least N` with no own `code is`) that collects NO input,
+    // because the collector does not descend the reduction's operands, so the guard would emit an empty-input/no-SD
+    // artifact at $apply. Descending to the code-bearing operands is a later boundary (operator decision A); until
+    // then fail LOUD on the vacuous case only, instead of the old blanket reduction suppression.
+    const vacuousReductionGuards = reductionGuardConcepts.filter(
+      (n) => (caseFeatures.inputsByCondition.get(n) ?? []).length === 0,
+    );
+    const reductionCaseFeatureBlocked = vacuousReductionGuards.length > 0;
     if (reductionCaseFeatureBlocked) {
       errors.push({
         type: "Validation",
         kind: "unsupported-casefeature-reduction",
         message:
-          `Decision-bearing source "${lib.libraryName}" guards on concept(s) ` +
-          `${reductionGuardConcepts.map((n) => `"${n}"`).join(", ")} that resolve to a reduction (directly, or ` +
-          `via a \`defined as\` alias). A reduction cannot yet be a decision case-feature: for a code-bearing ` +
-          `reduction the case-feature \`cpg-featureExpression\` target LocalSource."<X>" would DANGLE (the ` +
-          `retrieve is on the twin "<X> Records"; the boolean determination is in the Inferred/Interface layer), ` +
-          `and a named/code-less reduction is not collected at all (a vacuous empty-input guard). Emitting a ` +
-          `reduction case-feature StructureDefinition is deferred to a later #189 boundary; this source's ` +
-          `decision + case-feature emit is suppressed rather than ship an artifact that dangles or is vacuous ` +
-          `at $apply.`,
+          `Decision-bearing source "${lib.libraryName}" guards on reduction concept(s) ` +
+          `${vacuousReductionGuards.map((n) => `"${n}"`).join(", ")} that collect NO code-bearing case-feature ` +
+          `input — a code-less named reduction (e.g. \`count "X Records" at least N\` with no own \`code is\`). ` +
+          `The collector does not yet descend into the reduction's operands, so the guard would emit a vacuous ` +
+          `empty-input / no-SD artifact at $apply. Descending to the code-bearing operands is a later #189 ` +
+          `boundary (operator decision A); this source's decision + case-feature emit is suppressed rather than ` +
+          `ship a vacuous guard.`,
       });
+    }
+
+    // #189 2d — resolve each collected (code-bearing) concept to its NATURAL resource + records-define via the
+    // descriptor deriver (P2 `resolveCaseFeatureRecord`), keyed by concept name. Both the case-feature SD emit
+    // (step 6) and the `action.input` resolver consume this map, so the SD `type` and `action.input.type` agree by
+    // construction. The deriver reads the RAW concept (`lib.ast`, pre-lowering — lowering CLEARS `Concept.code`).
+    const owningLibMeta = {
+      libraryName: lib.libraryName,
+      canonicalBase: metadata.canonicalBase,
+      localDomainId: entryLocalDomainId,
+    };
+    const rawConceptByName = new Map<string, Concept>();
+    for (const s of lib.ast.statements) {
+      if (s.type === "Concept" && s.name !== undefined) rawConceptByName.set(s.name, s);
+    }
+    const caseFeatureRecordByName = new Map<string, CaseFeatureRecord>();
+    for (const { name } of caseFeatures.unionConcepts) {
+      const raw = rawConceptByName.get(name);
+      if (raw === undefined) continue;
+      const res = resolveCaseFeatureRecord(raw, owningLibMeta);
+      if (res.kind === "record") caseFeatureRecordByName.set(name, res);
+      // Non-record resolutions (unsupported-resource / not-a-record / …) are surfaced loudly at the emit site (6).
     }
 
     // F3 (impl-review) — direct-caller trap. The deliverable always threads a
@@ -1692,6 +1723,10 @@ export function emitFhirDefClosure(
       (caseFeatures.inputsByCondition.get(name) ?? []).map((c) => ({
         name: c.name,
         canonical: caseFeatureCanonicalUrl(metadata, c.name),
+        // #189 2d — the NATURAL resource type (Condition/MedicationRequest/…) so `action.input.type` matches the
+        // emitted SD `type`; undefined only if the concept didn't resolve (buildActionInputs then keeps the
+        // transitional Observation fallback, and step 6 raises the loud diagnostic).
+        resourceType: caseFeatureRecordByName.get(c.name)?.descriptor.resourceType,
       }));
 
     // When the contract is violated we skip THIS source's decision emit (handled by
@@ -1747,6 +1782,24 @@ export function emitFhirDefClosure(
     // Library (where the `code is` define lives) via `localSourceReferenceSuffix`.
     if (caseFeatureGateOpen && !reductionCaseFeatureBlocked) {
       for (const { name, code } of caseFeatures.unionConcepts) {
+        const record = caseFeatureRecordByName.get(name);
+        if (record === undefined) {
+          // The concept didn't resolve to a gatherable natural-resource record (unsupported resource type, or an
+          // unmappable representation). Fail LOUD — never fall back to a forced Observation (charter §4).
+          errors.push({
+            type: "Validation",
+            kind: "unsupported-casefeature-resource",
+            message:
+              `Case-feature concept "${name}" in source "${lib.libraryName}" did not resolve to a gatherable ` +
+              `natural-resource record (unsupported resource type or an unmappable representation); no ` +
+              `case-feature StructureDefinition emitted.`,
+          });
+          continue;
+        }
+        const valueDatum =
+          record.descriptor.valueElement !== undefined && record.descriptor.datumValueType !== undefined
+            ? { valueElement: record.descriptor.valueElement, datumValueType: record.descriptor.datumValueType }
+            : undefined;
         const cfResult = emitCaseFeatureStructureDefinition(
           name,
           code,
@@ -1755,6 +1808,11 @@ export function emitFhirDefClosure(
           // Non-undefined here (the gate requires a LocalSource entry); the `?? ""`
           // preserves the emitter's own empty-suffix throw-guard as a backstop.
           localSourceReferenceSuffix ?? "",
+          // #189 2d — the concept's NATURAL resource + records-twin define (from the descriptor); the SD `type`
+          // and `cpg-featureExpression` follow them, replacing the forced-Observation hack.
+          record.descriptor.resourceType,
+          record.recordsDefineId,
+          valueDatum,
           // #198 — the sibling's disambiguated local domain, so the case-feature
           // `patternCodeableConcept.coding.system` matches THIS library's CodeSystem.
           entryLocalDomainId,

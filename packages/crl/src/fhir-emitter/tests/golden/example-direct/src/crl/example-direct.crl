@@ -4,6 +4,7 @@ concept "Qualifying Diagnosis":
 - type is Condition.
 - value type is boolean.
 - code is `qualifying-diagnosis`.
+- definition is exists this.
 
 
 decision "Qualifying Diagnosis Coverage Determination":
