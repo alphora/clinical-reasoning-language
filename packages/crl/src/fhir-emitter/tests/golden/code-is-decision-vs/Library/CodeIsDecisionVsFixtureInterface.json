@@ -46,11 +46,11 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureRecordSource"
+      "resource": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureExternalPrimitives"
     },
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureInferred"
+      "resource": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureInferences"
     }
   ],
   "content": [

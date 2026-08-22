@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "ExampleForEmitInferred",
+  "id": "CodeIsDecisionFixtureInferences",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/hcsc/rx501-007/Library/ExampleForEmitInferred",
-  "version": "0.0.0",
-  "name": "ExampleForEmitInferred",
-  "title": "ExampleForEmitInferred",
+  "url": "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureInferences",
+  "version": "1.0.0",
+  "name": "CodeIsDecisionFixtureInferences",
+  "title": "CodeIsDecisionFixtureInferences",
   "status": "draft",
   "experimental": true,
-  "date": "2026-01-01T00:00:00.000Z",
+  "date": "2020-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "ExampleForEmitInferred",
+  "description": "R2 code-is-decision fixture — source-typed split + Interface re-export FHIR closure",
   "type": {
     "coding": [
       {
@@ -46,13 +46,13 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/hcsc/rx501-007/Library/ExampleForEmitLocalSource"
+      "resource": "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalPrimitives"
     }
   ],
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/ExampleForEmitInferred.cql"
+      "url": "../../cql/CodeIsDecisionFixtureInferences.cql"
     }
   ]
 }

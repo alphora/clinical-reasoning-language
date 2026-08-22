@@ -28,7 +28,7 @@
       "valueExpression": {
         "language": "text/cql-identifier",
         "expression": "Implanted Estrogen Pellets Records",
-        "reference": "http://example.org/hcsc/rx501-007/Library/ExampleForEmitLocalSource"
+        "reference": "http://example.org/hcsc/rx501-007/Library/ExampleForEmitLocalPrimitives"
       }
     }
   ],

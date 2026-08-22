@@ -738,8 +738,8 @@ concept "Both":
     );
     const { ast: out, errors } = lowerLocalCodes(ast);
     expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(false);
-    // The both-rep concept SPLITS into a LocalSource retrieve twin (CodedFromDefinition,
-    // forced Observation) + an Inferred fold-in twin (its `defined as`, marked).
+    // The both-rep concept SPLITS into a LocalPrimitives retrieve twin (CodedFromDefinition,
+    // forced Observation) + an Inferences fold-in twin (its `defined as`, marked).
     const both = out.statements.filter(
       (s): s is Concept => s.type === "Concept" && s.name === "Both",
     );
@@ -751,7 +751,7 @@ concept "Both":
       "Observation",
     );
     expect(inferredTwin).toBeDefined();
-    expect(inferredTwin!.__bothRepFoldInLocalSource).toBe("Both");
+    expect(inferredTwin!.__bothRepFoldInLocalPrimitives).toBe("Both");
     expect(localTwin!.code).toBeUndefined();
     expect(inferredTwin!.code).toBeUndefined();
   });
@@ -779,7 +779,7 @@ concept "Age 18 Or Older":
     const inferredTwin = twins.find((c) => c.definition?.type === "DefinitionIsDefinition");
     expect(localTwin).toBeDefined();
     expect(inferredTwin).toBeDefined();
-    expect(inferredTwin!.__bothRepFoldInLocalSource).toBe("Age 18 Or Older");
+    expect(inferredTwin!.__bothRepFoldInLocalPrimitives).toBe("Age 18 Or Older");
     expect(inferredTwin!.__bothRepMerge).toBe("recency");
     expect(inferredTwin!.__bothRepRecencyThreshold).toBe("18 'years'");
     expect(inferredTwin!.__bothRepRecencyOp).toBe("AtLeast");
@@ -884,14 +884,14 @@ concept "Age Rep":
     const { ast: out, errors } = lowerLocalCodes(ast);
     expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(true);
     expect(errors.find((e) => e.kind === "emit-mixed-code-and-definition")!.message).toMatch(/Age Rep/);
-    // NOT silently split/passed: no recency Inferred twin was synthesized.
+    // NOT silently split/passed: no recency Inferences twin was synthesized.
     const recencyTwin = out.statements.find(
       (s): s is Concept => s.type === "Concept" && s.__bothRepMerge === "recency",
     );
     expect(recencyTwin).toBeUndefined();
   });
 
-  it("emits the recency merge in the Inferred lane (Coalesce(CFH.recencyAgeSelected, false) + newest-Observation filter + computed AtLeast(AgeAt(), Q)), carrying the @business-logic-deferred block comment", () => {
+  it("emits the recency merge in the Inferences lane (Coalesce(CFH.recencyAgeSelected, false) + newest-Observation filter + computed AtLeast(AgeAt(), Q)), carrying the @business-logic-deferred block comment", () => {
     const ast = parse(
       lib(`
 concept "Age 18 Or Older":
@@ -907,7 +907,7 @@ concept "Age 18 Or Older":
     );
     const { ast: lowered, errors } = lowerLocalCodes(ast);
     expect(errors).toHaveLength(0);
-    // Emit only the Inferred twin in the inferred truth-set lane.
+    // Emit only the Inferences twin in the inferred truth-set lane.
     const inferredTwin = lowered.statements.find(
       (s): s is Concept =>
         s.type === "Concept" &&
@@ -915,13 +915,13 @@ concept "Age 18 Or Older":
         s.__bothRepMerge === "recency",
     );
     expect(inferredTwin).toBeDefined();
-    const syntheticInferred: CRL = { ...lowered, statements: [inferredTwin!] };
-    const r = emitCQLFromAST(syntheticInferred, {
-      libraryName: "T Inferred",
+    const syntheticInferences: CRL = { ...lowered, statements: [inferredTwin!] };
+    const r = emitCQLFromAST(syntheticInferences, {
+      libraryName: "T Inferences",
       caseFeature: {
         kind: "inferred",
-        localSourceLibrary: "T LocalSource",
-        inferredLibrary: "T Inferred",
+        localSourceLibrary: "T LocalPrimitives",
+        inferredLibrary: "T Inferences",
       },
     });
     expect(r.success).toBe(true);
@@ -930,14 +930,14 @@ concept "Age 18 Or Older":
     expect(r.result).toContain("Coalesce(");
     expect(r.result).toContain("CFH.recencyAgeSelected(");
     expect(r.result).not.toContain("CFH.recencyAgeTruths(");
-    expect(r.result).toContain('"T LocalSource"."Age 18 Or Older"');
+    expect(r.result).toContain('"T LocalPrimitives"."Age 18 Or Older"');
     // NO status filter (extracted answers aren't stamped `final`); recency keys on
     // `effective` (what DTR extraction populates), with a deterministic `id` tie-break.
     expect(r.result).not.toContain("O.status in");
     expect(r.result).toContain("O.value is FHIR.boolean");
     expect(r.result).toContain("sort by (effective as FHIR.dateTime).value, id");
     expect(r.result).toContain("CRLCommon.AtLeast(CRLCommon.AgeAt(), 18 'years')");
-    // The @business-logic-deferred marker lands as a block comment above the Inferred define.
+    // The @business-logic-deferred marker lands as a block comment above the Inferences define.
     expect(r.result).toMatch(
       /\/\*[\s\S]*@business-logic-deferred:[\s\S]*\*\/\ndefine "Age 18 Or Older":/,
     );
@@ -970,8 +970,8 @@ concept "${name}":
     emitCQLFromAST(
       { ...lowered, statements: [twin] },
       {
-        libraryName: "T Inferred",
-        caseFeature: { kind: "inferred", localSourceLibrary: "T LocalSource", inferredLibrary: "T Inferred" },
+        libraryName: "T Inferences",
+        caseFeature: { kind: "inferred", localSourceLibrary: "T LocalPrimitives", inferredLibrary: "T Inferences" },
       },
     );
 
@@ -1008,7 +1008,7 @@ concept "${name}":
     expect(tUnder.__bothRepRecencyOp).toBe("Below");
     expect(tYounger.__bothRepRecencyOp).toBe("Below");
     expect(tYounger.__bothRepRecencyThreshold).toBe(tUnder.__bothRepRecencyThreshold);
-    // The ENTIRE emitted Inferred result is byte-identical (same name/code/threshold/op),
+    // The ENTIRE emitted Inferences result is byte-identical (same name/code/threshold/op),
     // so the two spellings are provably one canonical semantic — not merely both-contain-Below.
     const rUnder = emitRecency(under.ast, tUnder).result;
     const rYounger = emitRecency(younger.ast, tYounger).result;

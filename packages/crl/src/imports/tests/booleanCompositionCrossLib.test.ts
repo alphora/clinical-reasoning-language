@@ -10,7 +10,7 @@ import { emitCQLImports } from "../emit";
  * `emit-boolean-composition-operand-not-total` (a qualified operand was inert under
  * `sameLayerResolver`); in 0c the FAMILY arm of `emitsTotalScalarBoolean` proves the foreign
  * operand total via the pre-emit `DeclaredResultIndex`, so it emits. The positive proof is
- * asserted at ALL THREE banner-A consumers — the Inferred pivot, the ledger discharge (the emit
+ * asserted at ALL THREE banner-A consumers — the Inferences pivot, the ledger discharge (the emit
  * succeeds ⇒ the discharge agreed), and the Interface façade (bare re-export, never `.satisfied()`).
  */
 const FIXTURES = path.resolve(__dirname, "fixtures");
@@ -39,15 +39,15 @@ describe("#189 Slice 0c — cross-library boolean-composition operand (positive 
     expect(result.success, JSON.stringify(result.errors)).toBe(true);
   });
 
-  it("consumer 1 — the Inferred pivot emits `Sib.\"Sib Flag\" and \"Root Flag\"` (foreign operand QUALIFIED, bare same-lib operand)", () => {
-    const inferred = libBySuffix(result, "Inferred");
+  it("consumer 1 — the Inferences pivot emits `Sib.\"Sib Flag\" and \"Root Flag\"` (foreign operand QUALIFIED, bare same-lib operand)", () => {
+    const inferred = libBySuffix(result, "Inferences");
     expect(inferred).toMatch(/define "Cross Both":\s*\n\s*Sib\."Sib Flag" and "Root Flag"/);
     // Never a fabricated Coalesce (charter §4) nor a truth-set weave (`union`/`.asTruths()`).
     expect(inferred).not.toMatch(/"Cross Both":[\s\S]*?(Coalesce|union|\.asTruths\(\))/);
   });
 
-  it("the Inferred layer `include`s the foreign source library `Sib` (no dangling qualified reference)", () => {
-    const inferred = libBySuffix(result, "Inferred");
+  it("the Inferences layer `include`s the foreign source library `Sib` (no dangling qualified reference)", () => {
+    const inferred = libBySuffix(result, "Inferences");
     expect(inferred).toMatch(/\ninclude Sib\b/);
   });
 
@@ -59,7 +59,7 @@ describe("#189 Slice 0c — cross-library boolean-composition operand (positive 
 
   it("consumer 3 — the Interface façade re-exports the cross-lib composition BARE (never `.satisfied()` a scalar boolean)", () => {
     const iface = libBySuffix(result, "Interface");
-    expect(iface).toMatch(/define "Cross Both":\s*\n\s*\S+Inferred\."Cross Both"/);
+    expect(iface).toMatch(/define "Cross Both":\s*\n\s*\S+Inferences\."Cross Both"/);
     expect(iface).not.toMatch(/"Cross Both":[\s\S]*?\.satisfied\(\)/);
   });
 
@@ -70,13 +70,13 @@ describe("#189 Slice 0c — cross-library boolean-composition operand (positive 
 
   it("the ALIAS counterexample (disc 465/466) — a same-lib alias to the cross-lib composition AGREES with its bare Boolean form", () => {
     // The legacy bare-ref alias arm recurses same-layer into "Cross Both", whose boolean-comp arm proves it total,
-    // so the alias re-exports BARE — never a truth-set `.asTruths()` (Inferred) nor `.satisfied()` on a Boolean
+    // so the alias re-exports BARE — never a truth-set `.asTruths()` (Inferences) nor `.satisfied()` on a Boolean
     // (Interface). This is the exact direction v1's per-consult-site design broke.
-    const inferred = libBySuffix(result, "Inferred");
+    const inferred = libBySuffix(result, "Inferences");
     expect(inferred).toMatch(/define "Cross Both Alias":\s*\n\s*"Cross Both"/);
     expect(inferred).not.toMatch(/"Cross Both Alias":[\s\S]*?\.asTruths\(\)/);
     const iface = libBySuffix(result, "Interface");
-    expect(iface).toMatch(/define "Cross Both Alias":\s*\n\s*\S+Inferred\."Cross Both Alias"/);
+    expect(iface).toMatch(/define "Cross Both Alias":\s*\n\s*\S+Inferences\."Cross Both Alias"/);
     expect(iface).not.toMatch(/"Cross Both Alias":[\s\S]*?\.satisfied\(\)/);
   });
 });

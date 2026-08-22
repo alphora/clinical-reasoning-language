@@ -273,10 +273,10 @@ export function pascalCaseName(name: string): string {
  *
  * PRESERVES each token's internal casing — it uppercases only the FIRST character
  * and keeps the rest verbatim, so a token that is ALREADY PascalCase stays intact:
- * `LocalSource` → `LocalSource` (NOT `Localsource`), `RecordConcepts`,
+ * `LocalPrimitives` → `LocalPrimitives` (NOT `Localsource`), `ExternalConcepts`,
  * `Interface`, an abbreviation like `BP` → `BP`. (A leading `.toLowerCase()` used
- * to flatten these — #186 layer tokens LocalSource/LocalConcepts/RecordSource/
- * RecordConcepts came out `Localsource`/…). In real emit `pascalCaseName` only ever
+ * to flatten these — #186 layer tokens LocalPrimitives/LocalConcepts/ExternalPrimitives/
+ * ExternalConcepts came out `Localsource`/…). In real emit `pascalCaseName` only ever
  * receives a lowercased `slugify` output EXCEPT the layered `S` input
  * (`layerLibraryName`'s raw `<policyId>-<Layer>`), so this preservation changes
  * ONLY the layer identifiers, nothing else.

@@ -346,8 +346,8 @@ export function lowerLocalCodes(
   const loweredConcepts: Concept[] = [];
   // Both-representation INFERRED twins (`code is` + `defined as`): the inference
   // half of a split, appended to the statement list AFTER the rewrite. Each keeps
-  // the original `defined as` and carries `__bothRepFoldInLocalSource` so the emit
-  // unions in the direct LocalSource retrieve. Keyed in declaration order.
+  // the original `defined as` and carries `__bothRepFoldInLocalPrimitives` so the emit
+  // unions in the direct LocalPrimitives retrieve. Keyed in declaration order.
   const bothRepInferredTwins: Concept[] = [];
   // #189 Slice A2 — the RECORDS TWINS of `code is` + `exists this` concepts. A concept "X" with a
   // local `code is` AND `definition is exists this` lowers to TWO statements: this RecordSet
@@ -831,8 +831,8 @@ export function lowerLocalCodes(
 
       // The RECORDS TWIN "X Records": a `shape is RecordSet` retrieve over the local code, at the
       // concept's NATURAL resource (§4.3 — NOT forced Observation; that force is only for the
-      // boolean-determination LocalSource retrieve of a plain `code is`). `retrieveResourceType` is
-      // set explicitly (= the natural resource) so the F7 LocalConcepts⟺LocalSource discriminator
+      // boolean-determination LocalPrimitives retrieve of a plain `code is`). `retrieveResourceType` is
+      // set explicitly (= the natural resource) so the F7 LocalConcepts⟺LocalPrimitives discriminator
       // stays in sync for the layered path (Slice C). `shape: "RecordSet"` is what `emitConceptBody`'s
       // Slice-A gate keys on to emit `exists ("X Records")`.
       const twinCodedFrom: CodedFromDefinition = {
@@ -843,7 +843,7 @@ export function lowerLocalCodes(
       };
 
       // R2 CO-INVARIANT ASSERT (F7) — hoisted from the plain-path site (crl-emit R1 probe 4): the twin's
-      // two LocalConcepts⟺LocalSource discriminators (synthetic `TerminologySystem.name` and
+      // two LocalConcepts⟺LocalPrimitives discriminators (synthetic `TerminologySystem.name` and
       // `retrieveResourceType`) MUST be set together, or the Slice-C layered split would emit a
       // cross-family include. True by construction here, but the assert exists to catch a future edit.
       const twinHasDomainName = twinTerminology.body.some(
@@ -855,7 +855,7 @@ export function lowerLocalCodes(
             `discriminator — synthetic TerminologySystem.name ${twinHasDomainName ? "set" : "UNSET"}, ` +
             `CodedFromDefinition.retrieveResourceType ` +
             `${twinCodedFrom.retrieveResourceType === undefined ? "UNSET" : "set"}. Both must be set ` +
-            `together (LocalConcepts ⟺ LocalSource) or the layered split would emit a cross-family include.`,
+            `together (LocalConcepts ⟺ LocalPrimitives) or the layered split would emit a cross-family include.`,
         );
       }
       const recordsTwin: Concept = {
@@ -882,7 +882,7 @@ export function lowerLocalCodes(
       // The retargeted reduction concept "X": keep it a `ReductionDefinition` but point the reduction at
       // the NAMED twin instead of `this`, PRESERVING its kind + `count` threshold. `emitConceptBody` emits
       // `exists ("X Records")` / `Count("X Records") >= N` / the `most recent` select-newest read.
-      // (#189 Slice C: a `ReductionDefinition` now CLASSIFIES into the Inferred layer — `classifyStatementLayer`
+      // (#189 Slice C: a `ReductionDefinition` now CLASSIFIES into the Inferences layer — `classifyStatementLayer`
       // — so a decision-bearing reduction library routes `interface` and the reduction re-exports through the
       // Interface. The earlier "stays unclassifiable → routes none" invariant was retired at the flip.)
       // `code` cleared. A `most recent this` also carries the resolved `__effectiveDescriptor` so
@@ -918,8 +918,8 @@ export function lowerLocalCodes(
     }
 
     // (2) MIXED `code` + top-level `definition`. BOTH-REPRESENTATION is SUPPORTED (the
-    //     case-feature model): the concept SPLITS into a LocalSource retrieve twin (the
-    //     direct local code) + an Inferred twin. Supported both-rep flavors:
+    //     case-feature model): the concept SPLITS into a LocalPrimitives retrieve twin (the
+    //     direct local code) + an Inferences twin. Supported both-rep flavors:
     //       - `code is` + `defined as`                 → UNION fold-in (historical).
     //       - `code is` + an age `source representation` → RECENCY merge (patient-age;
     //         handled by the (AGE) block above, which strips the posrep + synthesizes the
@@ -1103,12 +1103,12 @@ export function lowerLocalCodes(
     };
 
     // R2 CO-INVARIANT ASSERT (F7) — the two synthetic-only discriminators
-    // `classifyStatementLayer` keys on (LocalConcepts vs RecordConcepts; LocalSource
-    // vs RecordSource) MUST be set TOGETHER for one lowered `code is` concept. The
+    // `classifyStatementLayer` keys on (LocalConcepts vs ExternalConcepts; LocalPrimitives
+    // vs ExternalPrimitives) MUST be set TOGETHER for one lowered `code is` concept. The
     // synthetic Terminology's `TerminologySystem.name` marks LocalConcepts; the
-    // synthetic `CodedFromDefinition.retrieveResourceType` marks LocalSource. A
+    // synthetic `CodedFromDefinition.retrieveResourceType` marks LocalPrimitives. A
     // future edit that sets one without the other would silently desync the two
-    // source families (a LocalConcepts code with a RecordSource retrieve, or the
+    // source families (a LocalConcepts code with a ExternalPrimitives retrieve, or the
     // inverse) → a cross-family include downstream. Fail loudly here, matching the
     // loudness bar of the cross-family throw in `collectLayerIncludes`.
     const hasSyntheticDomainName = syntheticTerminology.body.some(
@@ -1120,16 +1120,16 @@ export function lowerLocalCodes(
           `desynced source-family discriminator — synthetic TerminologySystem.name ` +
           `${hasSyntheticDomainName ? "set" : "UNSET"}, CodedFromDefinition.retrieveResourceType ` +
           `${codedFrom.retrieveResourceType === undefined ? "UNSET" : "set"}. Both must be set ` +
-          `together (LocalConcepts ⟺ LocalSource) or the layered split would emit a cross-family include.`,
+          `together (LocalConcepts ⟺ LocalPrimitives) or the layered split would emit a cross-family include.`,
       );
     }
 
-    // The LocalSource retrieve twin (or, for a pure `code is` concept, THE
+    // The LocalPrimitives retrieve twin (or, for a pure `code is` concept, THE
     // lowered concept). `definition` is replaced with the synthetic retrieve and
     // `code` cleared (idempotent). For a both-rep concept this is the direct
-    // local-source half; its `defined as` lives on the Inferred twin below.
-    // #189 Slice C 2a — the LocalSource retrieve's lowering ROLE: for a both-representation split it is the
-    // implementation HALF (`source-impl` → manufactured `not-applicable`; the determination is the Inferred
+    // local-source half; its `defined as` lives on the Inferences twin below.
+    // #189 Slice C 2a — the LocalPrimitives retrieve's lowering ROLE: for a both-representation split it is the
+    // implementation HALF (`source-impl` → manufactured `not-applicable`; the determination is the Inferences
     // twin below); for a PURE `code is` concept it IS the sole public determination (`public-determination`
     // → inherits the authored obligation — a bare-scalar boolean's authored `rejected`, or a RecordSet's
     // `not-applicable`). Both share the authored name, so the ROLE is what disambiguates them at enrollment
@@ -1145,9 +1145,9 @@ export function lowerLocalCodes(
     loweredConcepts.push(lowered);
 
     // BOTH-REPRESENTATION: also synthesize the INFERRED twin carrying the original
-    // definition, marked so the emit merges in the direct LocalSource retrieve.
-    // Same name as the LocalSource twin — they land in different layer libraries;
-    // `buildNameLayerMaps` resolves the name to Inferred (the public determination).
+    // definition, marked so the emit merges in the direct LocalPrimitives retrieve.
+    // Same name as the LocalPrimitives twin — they land in different layer libraries;
+    // `buildNameLayerMaps` resolves the name to Inferences (the public determination).
     //   - `defined as` twin → `__bothRepMerge: "union"` (asTruths() union inference).
     //   - age posrep twin → `__bothRepMerge: "recency"` (raw-Observation recency vs live
     //     computed age); the twin carries the threshold + comparator op + compute fn (`AgeAt`
@@ -1159,7 +1159,7 @@ export function lowerLocalCodes(
       const inferredTwin: Concept = {
         ...c,
         definition: bothRepDefinedAs,
-        __bothRepFoldInLocalSource: c.name,
+        __bothRepFoldInLocalPrimitives: c.name,
         __bothRepMerge: "union",
         // #189 Slice C 2a — the both-rep public determination; inherits the authored obligation (the
         // `code is` + `defined as` fold is an E1 `rejected` today, surfaced by the emit proof on its List).
@@ -1171,7 +1171,7 @@ export function lowerLocalCodes(
       const inferredTwin: Concept = {
         ...c,
         definition: bothRepDefinitionIs,
-        __bothRepFoldInLocalSource: c.name,
+        __bothRepFoldInLocalPrimitives: c.name,
         __bothRepMerge: "recency",
         __bothRepRecencyThreshold: bothRepRecency.threshold,
         __bothRepRecencyOp: bothRepRecency.op,
@@ -1217,8 +1217,8 @@ export function lowerLocalCodes(
   const outAst: CRL = {
     ...ast,
     // Synthetic local terminologies at the FRONT (Concepts layer); the
-    // both-representation INFERRED twins APPENDED at the end (Inferred layer) —
-    // they share a name with their LocalSource twin already present in
+    // both-representation INFERRED twins APPENDED at the end (Inferences layer) —
+    // they share a name with their LocalPrimitives twin already present in
     // `rewritten`, so they cannot be the in-place replacement and must be added
     // as additional statements. The emitter sections by kind/layer, so absolute
     // position is immaterial beyond stable intra-layer ordering.
@@ -1232,7 +1232,7 @@ export function lowerLocalCodes(
  * #257 (age slice) T1 — lower STANDALONE (1-representation) patient-age posreps: a concept with
  * a single age `source representation`, NO `code is` (no local override), and NO top-level
  * `definition`. This is the age determination WITHOUT a recency merge — there is no local twin, so
- * it simply becomes an Inferred `definition is` concept whose `definition` is SYNTHESIZED from the
+ * it simply becomes an Inferences `definition is` concept whose `definition` is SYNTHESIZED from the
  * posrep's `value projection` (flagged `__synthesizedFromPosrep`). It then rides the ordinary
  * `emitDefinitionIs` path — byte-identical to the retired standalone `definition is age today`.
  *
@@ -1402,7 +1402,7 @@ export function leafEligibleConcepts(ast: CRL): Set<string> {
  * (#189 Slice A2). The records twin holds the concept's own natural-resource records (`[<R>: <local code>]`);
  * the retargeted reduction concept `"<X>"` reads it (`exists "<X> Records"`). SINGLE SOURCE OF TRUTH: this is the
  * lowering's twin-name rule (used at the twin synthesis above); the #189 2d case-feature lane reuses it so the
- * `cpg-featureExpression` target (`LocalSource."<X> Records"`) byte-equals the emitted define — the featureExpression
+ * `cpg-featureExpression` target (`LocalPrimitives."<X> Records"`) byte-equals the emitted define — the featureExpression
  * points at the RECORDS define, NOT the ephemeral boolean `"<X>"` (charter §4; panel disc 481/482).
  */
 export function recordsTwinDefineName(conceptName: string): string {

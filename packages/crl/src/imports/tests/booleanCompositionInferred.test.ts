@@ -28,21 +28,21 @@ describe("#189 Slice 0b — boolean composition on the case-feature/layered INFE
     expect(result.success, JSON.stringify(result.errors)).toBe(true);
   });
 
-  it("`and` over exists operands → bare compound boolean on the Inferred lane (never union / `.asTruths()`)", () => {
-    const inferred = libBySuffix(result, "Inferred");
+  it("`and` over exists operands → bare compound boolean on the Inferences lane (never union / `.asTruths()`)", () => {
+    const inferred = libBySuffix(result, "Inferences");
     expect(inferred).toMatch(/define "Adult And Senior":\s*\n\s*"Has Adult" and "Has Senior"/);
     expect(inferred).not.toMatch(/"Adult And Senior":[\s\S]*?(union|\.asTruths\(\))/);
   });
 
   it("`or not` lowers structurally (bare leaves, no fabricated Coalesce)", () => {
-    const inferred = libBySuffix(result, "Inferred");
+    const inferred = libBySuffix(result, "Inferences");
     expect(inferred).toMatch(/define "Adult Or Not Senior":\s*\n\s*"Has Adult" or not "Has Senior"/);
     expect(inferred).not.toMatch(/"Adult Or Not Senior":[\s\S]*?Coalesce\("Has Adult"/);
   });
 
   it("the Interface façade re-exports the composition BARE (never `.satisfied()` a scalar boolean)", () => {
     const iface = libBySuffix(result, "Interface");
-    expect(iface).toMatch(/define "Adult And Senior":\s*\n\s*\S+Inferred\."Adult And Senior"/);
+    expect(iface).toMatch(/define "Adult And Senior":\s*\n\s*\S+Inferences\."Adult And Senior"/);
     expect(iface).not.toMatch(/"Adult And Senior":[\s\S]*?\.satisfied\(\)/);
   });
 });

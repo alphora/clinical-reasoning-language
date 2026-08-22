@@ -162,7 +162,7 @@ export interface CaseFeatureInput {
  * ORDERED list of case-feature inputs for that condition — the recursive `code is`
  * closure of the condition in INFERENCE ORDER (the condition's own `code is` first,
  * then its `defined as` operands left-to-right; see `caseFeatureCollection.ts`).
- * Returns `[]` for a condition with no reachable `code is` concept (non-LocalSource,
+ * Returns `[]` for a condition with no reachable `code is` concept (non-LocalPrimitives,
  * genuinely cross-library, or a source whose case-feature emit was gated off).
  * Built ONCE per source in `closureOrchestrator` from the SAME per-condition
  * collection the case-feature SD emit consumes, so an `action.input` profile can

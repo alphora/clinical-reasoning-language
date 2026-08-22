@@ -4,14 +4,14 @@
  *
  * SLICE 2 of the CRL CQL emit deliverable. A single CRL `library "X".` whose
  * concepts span more than one layer is emitted as SEPARATE per-layer libraries
- * (`X Concepts`, `X Asserted`, `X Inferred`), each `include`-ing the layer
+ * (`X Concepts`, `X Asserted`, `X Inferences`), each `include`-ing the layer
  * below — reproducing the hand-split structure (cf. the cms22 golden) but from
  * ONE source file.
  *
  * The three layers (slice 2 scope — NO `code is`, NO interface/decision split):
  *   - Concepts : `terminology` statements (valueset/codesystem/code).
  *   - Asserted : concepts whose definition is `coded from` (a retrieve).
- *   - Inferred : concepts whose definition is `defined as` / `definition is`.
+ *   - Inferences : concepts whose definition is `defined as` / `definition is`.
  *
  * Mechanism:
  *   1. Classify each statement → its primary layer; build slot-aware
@@ -88,8 +88,8 @@ import type { CrossLibraryTotality } from "../emit/declaredResultIndex";
 /**
  * A partition VALUE — the bucket a statement is assigned to for emit. The FULL
  * partition produces the six SOURCE-TYPED layers (R2-mechanism): two concept
- * layers (LocalConcepts / RecordConcepts), two source layers (LocalSource /
- * RecordSource), the Inferred layer, and the synthesized Interface layer. The
+ * layers (LocalConcepts / ExternalConcepts), two source layers (LocalPrimitives /
+ * ExternalPrimitives), the Inferences layer, and the synthesized Interface layer. The
  * type is a bare `string`: `classifyStatementLayer` (the FULL classifier)
  * returns one of these (or null), but a partition's own `classify` may map them
  * onto a different value set.
@@ -105,11 +105,11 @@ export type Layer = string;
  * R2-mechanism source-typing — the layer set is split by SOURCE FAMILY:
  *   - `LocalConcepts`  : a SYNTHETIC local terminology (lowered `code is`) — its
  *                        `TerminologySystem.name` is set by `lowerLocalCodes`.
- *   - `RecordConcepts` : a hand-authored terminology (no synthetic name).
- *   - `LocalSource`    : a concept whose retrieve is the SYNTHETIC local-source
+ *   - `ExternalConcepts` : a hand-authored terminology (no synthetic name).
+ *   - `LocalPrimitives`    : a concept whose retrieve is the SYNTHETIC local-source
  *                        retrieve (`CodedFromDefinition.retrieveResourceType` set).
- *   - `RecordSource`   : a hand-authored `coded from` concept (retrieve type unset).
- *   - `Inferred`       : a top-level `defined as` / `definition is` concept.
+ *   - `ExternalPrimitives`   : a hand-authored `coded from` concept (retrieve type unset).
+ *   - `Inferences`       : a top-level `defined as` / `definition is` concept.
  *   - `Interface`      : the SYNTHESIZED re-export concepts (decision/action-guard
  *                        surface), pre-qualified to each concept's OWN source layer.
  *
@@ -121,10 +121,10 @@ export type Layer = string;
  */
 export const LAYER_ORDER: readonly Layer[] = [
   "LocalConcepts",
-  "RecordConcepts",
-  "LocalSource",
-  "RecordSource",
-  "Inferred",
+  "ExternalConcepts",
+  "LocalPrimitives",
+  "ExternalPrimitives",
+  "Inferences",
   "Interface",
 ] as const;
 
@@ -180,7 +180,7 @@ export interface LayeredEmitEntry {
 export interface LayeredEmitResult {
   /** True when EVERY emitted layer succeeded AND no synthesis-level error fired. */
   success: boolean;
-  /** One entry per NON-EMPTY layer, in dependency order (Concepts → Inferred). */
+  /** One entry per NON-EMPTY layer, in dependency order (Concepts → Inferences). */
   entries: LayeredEmitEntry[];
   /**
    * Synthesis-level errors NOT attached to any single emitted layer entry — e.g.
@@ -213,16 +213,16 @@ interface NameLayerMaps {
  * `code-is-decision-vs` hand-authored coded-from fixture):
  *
  *   - `Terminology` whose `TerminologySystem.name` is SET → `LocalConcepts`;
- *     absent → `RecordConcepts`. `TerminologySystem.name` is set ONLY by
+ *     absent → `ExternalConcepts`. `TerminologySystem.name` is set ONLY by
  *     `lowerLocalCodes` (the shared local-domain codesystem decl name); the CRL
  *     builder never sets it (`ast/builder.ts` constructs `TerminologySystem`
  *     with no `name`).
  *   - `Concept` whose `CodedFromDefinition.retrieveResourceType !== undefined`
- *     → `LocalSource`; `=== undefined` → `RecordSource`. `retrieveResourceType`
+ *     → `LocalPrimitives`; `=== undefined` → `ExternalPrimitives`. `retrieveResourceType`
  *     is set ONLY by `lowerLocalCodes` (forced `"Observation"`); hand-authored
  *     `coded from` always leaves it undefined — EVEN WHEN `type is Observation`
  *     — so we do NOT key off `conceptType === "Observation"`.
- *   - top-level `defined as` / `definition is` → `Inferred`.
+ *   - top-level `defined as` / `definition is` → `Inferences`.
  *   - a SYNTHESIZED Interface re-export (`Concept.__interfaceReexport`) →
  *     `Interface`.
  *
@@ -231,7 +231,7 @@ interface NameLayerMaps {
  * `CodedFromDefinition`) in the SAME loop iteration for one `code is` concept —
  * they CANNOT diverge per-concept. A future edit to lowering MUST keep both or
  * neither: keeping only the terminology name would yield a LocalConcepts code
- * with a RecordSource retrieve (a cross-family include); keeping only the
+ * with a ExternalPrimitives retrieve (a cross-family include); keeping only the
  * retrieve type the inverse. This co-invariant is NOT left implicit — the
  * synthesis site in `lowerLocalCodes` (F7) asserts both signals are set together
  * and THROWS if they desync, so a future one-sided edit fails loudly there.
@@ -243,11 +243,11 @@ export function classifyStatementLayer(stmt: Statement): Layer | null {
   if (stmt.type === "Terminology") {
     // A synthetic local-domain codesystem decl name on the system line marks a
     // lowered `code is` terminology (LocalConcepts); a hand-authored terminology
-    // has no such name (RecordConcepts).
+    // has no such name (ExternalConcepts).
     const hasSyntheticDomainName = stmt.body.some(
       (line) => line.type === "TerminologySystem" && line.name !== undefined,
     );
-    return hasSyntheticDomainName ? "LocalConcepts" : "RecordConcepts";
+    return hasSyntheticDomainName ? "LocalConcepts" : "ExternalConcepts";
   }
   if (stmt.type === "Concept") {
     // A SYNTHESIZED Interface re-export (decision/action-guard surface) is its
@@ -259,7 +259,7 @@ export function classifyStatementLayer(stmt: Statement): Layer | null {
     // and `emitCQLFromAST`) into a synthetic Terminology + `CodedFromDefinition`
     // with `stmt.code` CLEARED. So by classification time an in-scope
     // local-coded concept presents as an ordinary `CodedFromDefinition` whose
-    // `retrieveResourceType` is set → LocalSource.
+    // `retrieveResourceType` is set → LocalPrimitives.
     //
     // A concept that STILL carries `stmt.code` is out of scope (a `code` +
     // `possible representation:` concept — the external-source-representation
@@ -278,23 +278,23 @@ export function classifyStatementLayer(stmt: Statement): Layer | null {
         // SOURCE-TYPED: synthetic local-source retrieve (lowered `code is`) vs a
         // hand-authored `coded from` (external record source).
         return stmt.definition.retrieveResourceType !== undefined
-          ? "LocalSource"
-          : "RecordSource";
+          ? "LocalPrimitives"
+          : "ExternalPrimitives";
       case "DefinedAsDefinition":
       case "DefinitionIsDefinition":
-        return "Inferred";
+        return "Inferences";
       case "ReductionDefinition":
         // #189 Slice-C boundary 1 — a reduction over a `shape is RecordSet` operand is a TOTAL
-        // determination (`exists`/`Count`/`most recent`), so it classifies INTO the Inferred layer
+        // determination (`exists`/`Count`/`most recent`), so it classifies INTO the Inferences layer
         // exactly like a `defined as`. Its records operand (the `<X> Records` twin) classifies
-        // LocalSource; `requalifyDefinition`'s ReductionDefinition arm requalifies the target ref
+        // LocalPrimitives; `requalifyDefinition`'s ReductionDefinition arm requalifies the target ref
         // across that boundary, and `emitConceptBody` renders the qualified operand (resolving its
-        // shape via `conceptShapesByName`, since the Inferred layer's own `conceptByName` cannot see
-        // the twin). Flipping this null→"Inferred" ALSO opens the `interface` route
+        // shape via `conceptShapesByName`, since the Inferences layer's own `conceptByName` cannot see
+        // the twin). Flipping this null→"Inferences" ALSO opens the `interface` route
         // (`imports/emit.ts` `hasUnclassifiableConcept` narrows), so the façade totality marker
         // (`buildInterfaceReexports`) and the FHIR case-feature gate (`closureOrchestrator`) are now
         // load-bearing, not optional.
-        return "Inferred";
+        return "Inferences";
     }
   }
   // #236 — a `criterion` is a decision-facing boolean define: co-locate it with the decision's
@@ -320,28 +320,28 @@ function buildNameLayerMaps(ast: CRL, partition: Partition): NameLayerMaps {
   for (const stmt of ast.statements) {
     // R2 — EXCLUDE the synthesized Interface re-exports from the name maps. An
     // Interface re-export is a `define "X"` whose body is PRE-QUALIFIED to X's
-    // OWN source layer (`<policyId>-LocalSource."X"` etc.), so the re-qualifier
+    // OWN source layer (`<policyId>-LocalPrimitives."X"` etc.), so the re-qualifier
     // is never consulted for it. Registering it would map name "X" to layer
     // "Interface" and SELF-COLLIDE with the source-layer concept "X" it
     // re-exports (the maps key on name), corrupting cross-layer resolution.
     if (stmt.type === "Concept" && stmt.__interfaceReexport) continue;
     // CRITICAL (slice 4c): classify via the PARTITION, not the bare
     // `classifyStatementLayer`. Under a non-FULL partition a concept that the
-    // FULL classifier calls "Inferred" may be a different partition value; the
+    // FULL classifier calls "Inferences" may be a different partition value; the
     // maps must hold the PARTITION value so a same-value ref compares equal in
     // `requalifyRef` and stays BARE.
     const layer = partition.classify(stmt);
     if (layer === null) continue;
     if (stmt.type === "Concept" && stmt.name) {
       // BOTH-REPRESENTATION (`code is` + `defined as`): `lowerLocalCodes` splits
-      // the concept into a LocalSource retrieve twin + an Inferred fold-in twin,
+      // the concept into a LocalPrimitives retrieve twin + an Inferences fold-in twin,
       // BOTH carrying the same name. The single concept→layer map would otherwise
-      // be order-dependent. The PUBLIC meaning of the name is the Inferred
-      // determination (its define folds in the LocalSource retrieve), so a ref to
+      // be order-dependent. The PUBLIC meaning of the name is the Inferences
+      // determination (its define folds in the LocalPrimitives retrieve), so a ref to
       // the name (an Interface re-export, or a nested `defined as` operand) must
-      // resolve to Inferred — make Inferred win deterministically over its twin.
+      // resolve to Inferences — make Inferences win deterministically over its twin.
       const prior = concept.get(stmt.name);
-      if (prior === "Inferred" && layer !== "Inferred") continue;
+      if (prior === "Inferences" && layer !== "Inferences") continue;
       concept.set(stmt.name, layer);
     } else if (stmt.type === "Terminology" && stmt.name) {
       terminology.set(stmt.name, layer);
@@ -358,7 +358,7 @@ function buildNameLayerMaps(ast: CRL, partition: Partition): NameLayerMaps {
  * `conceptByName` holds only that layer's statements. Keyed by BARE name (boundary 1
  * single-rep reductions synthesize distinct twin names, e.g. `"X Records"`); a
  * both-representation same-name pair (out of boundary-1 scope) resolves RecordSet-wins
- * so a reduction operand ref to the retrieve twin reads `RecordSet`, never the Inferred
+ * so a reduction operand ref to the retrieve twin reads `RecordSet`, never the Inferences
  * fold. Synthetic Interface re-exports are EXCLUDED (mirrors `buildNameLayerMaps`),
  * so a `define "X"` façade never shadows the real "X"'s shape.
  */
@@ -847,7 +847,7 @@ function requalifyDefinition(
       // #189 Slice-C boundary 1 — requalify the reduction's operand ref across the layer boundary,
       // exactly like a `defined as` bare ref. A NAMED operand (`ReductionConceptRef`, e.g. the lowered
       // `<X> Records` twin) resolves against the CONCEPT slot → a cross-layer target rewrites to
-      // `<policyId>-LocalSource."X Records"`; a same-layer target stays bare.
+      // `<policyId>-LocalPrimitives."X Records"`; a same-layer target stays bare.
       const target = def.reduction.target;
       if (target.type === "ThisRecords") {
         // INVARIANT: `lowerLocalCodes` retargets every `this` reduction to a named records twin
@@ -918,23 +918,23 @@ function collectLayerIncludes(
     if (refLib !== null && refLib !== currentLibraryName) referenced.add(refLib);
   });
 
-  // Both-representation SELF fold-in include. An Inferred twin folds in its OWN
-  // LocalSource retrieve (`LocalSource."X"…`) via the `__bothRepFoldInLocalSource`
+  // Both-representation SELF fold-in include. An Inferences twin folds in its OWN
+  // LocalPrimitives retrieve (`LocalPrimitives."X"…`) via the `__bothRepFoldInLocalPrimitives`
   // marker — a synthetic emit-string reference, NOT an AST `DefinitionRef`, so the
   // ref-walk above cannot see it. When the twin's inference references OTHER
-  // LocalSource operands (the `union` case) the include rides in on those; but a
+  // LocalPrimitives operands (the `union` case) the include rides in on those; but a
   // `recency` twin (patient-age) has a narrative body with NO concept operands, so
-  // the self fold-in is the ONLY LocalSource reference. Add the LocalSource sibling
+  // the self fold-in is the ONLY LocalPrimitives reference. Add the LocalPrimitives sibling
   // explicitly whenever a fold-in marker is present in this layer.
   //
-  // Guard on `partition.order.includes("LocalSource")`: a custom/partial partition
-  // WITHOUT a LocalSource value must not get a bogus `libraryNameFor(...,"LocalSource")`
-  // include (the fold-in only arises in a split that HAS a LocalSource layer).
-  if (partition.order.includes("LocalSource")) {
-    const localSourceLib = partition.libraryNameFor(policyId, "LocalSource");
+  // Guard on `partition.order.includes("LocalPrimitives")`: a custom/partial partition
+  // WITHOUT a LocalPrimitives value must not get a bogus `libraryNameFor(...,"LocalPrimitives")`
+  // include (the fold-in only arises in a split that HAS a LocalPrimitives layer).
+  if (partition.order.includes("LocalPrimitives")) {
+    const localSourceLib = partition.libraryNameFor(policyId, "LocalPrimitives");
     if (localSourceLib !== currentLibraryName) {
       for (const stmt of requalifiedStatements) {
-        if (stmt.type === "Concept" && stmt.__bothRepFoldInLocalSource !== undefined) {
+        if (stmt.type === "Concept" && stmt.__bothRepFoldInLocalPrimitives !== undefined) {
           referenced.add(localSourceLib);
           break;
         }
@@ -953,7 +953,7 @@ function collectLayerIncludes(
   // `code is` concept's retrieve pointing at a hand-authored terminology (or the
   // inverse) — the DEFERRED both-representation case. For the deliverable this
   // cannot arise (a lowered concept's `coded from` bare-refs its OWN synthetic
-  // local terminology — same family, LocalSource→LocalConcepts), so this guards a
+  // local terminology — same family, LocalPrimitives→LocalConcepts), so this guards a
   // future both-representation regression LOUDLY instead of emitting a silent
   // cross-family CQL `include`. Mirrors the `computeSplitPlan` D5 invariant-throw:
   // truly-unreachable on valid deliverable input, so a structured soft-error
@@ -1035,9 +1035,9 @@ function buildLayerAst(
  * (deduped, in stable first-seen order) the
  * synthesis emits ONE re-export `Concept` whose body is a `defined as` bare-ref
  * PRE-QUALIFIED to the concept's OWN source layer:
- *   - `code is` concept  → `<policyId>-LocalSource."X"`
- *   - `coded from`       → `<policyId>-RecordSource."X"`
- *   - `defined as`       → `<policyId>-Inferred."X"`
+ *   - `code is` concept  → `<policyId>-LocalPrimitives."X"`
+ *   - `coded from`       → `<policyId>-ExternalPrimitives."X"`
+ *   - `defined as`       → `<policyId>-Inferences."X"`
  *
  * "Pre-qualified" means the re-qualifier is never consulted for the body: the
  * `<policyId>-<layer>` qualifier is genuinely-foreign vs the SOURCE library name
@@ -1047,7 +1047,7 @@ function buildLayerAst(
  * concept of the same name).
  *
  * A WhenBlock/ActionGuard ref to a concept NOT classifiable into a source layer
- * (an unknown name, or one not in {LocalSource, RecordSource, Inferred}) is a
+ * (an unknown name, or one not in {LocalPrimitives, ExternalPrimitives, Inferences}) is a
  * HARD ERROR (F3): it cannot be source-typed, so no re-export is synthesizable.
  * Pre-F3 it was SILENTLY SKIPPED — but if EVERY interface concept is skipped the
  * Interface layer is empty, no `role:"interface"` manifest entry is produced, and
@@ -1061,8 +1061,8 @@ export function interfaceConceptNames(ast: CRL): string[] {
 
 /**
  * One entry of the INTERFACE SURFACE — a decision/action-guard-referenced concept
- * paired with the SOURCE layer it classifies into (LocalSource / RecordSource /
- * Inferred), or `undefined` when the name does not classify into any source layer
+ * paired with the SOURCE layer it classifies into (LocalPrimitives / ExternalPrimitives /
+ * Inferences), or `undefined` when the name does not classify into any source layer
  * (unknown name, or out of the source-layer set). The `sourceLayer` is read from
  * `buildNameLayerMaps(ast, FULL_PARTITION).concept` — the SAME map that drives the
  * Interface re-export synthesis (`buildInterfaceReexports`) — so a downstream
@@ -1078,7 +1078,7 @@ export function interfaceConceptNames(ast: CRL): string[] {
  * NOTE: pass the LOWERED ast (post-`lowerLocalCodes`). A raw `code is` concept
  * still carries `stmt.code`, so `classifyStatementLayer` returns `null` (out of
  * scope) and its `sourceLayer` would be `undefined`; the lowered form presents as
- * a `CodedFromDefinition` → `LocalSource`.
+ * a `CodedFromDefinition` → `LocalPrimitives`.
  */
 export function interfaceSurface(ast: CRL): { name: string; sourceLayer: Layer | undefined }[] {
   const maps = buildNameLayerMaps(ast, FULL_PARTITION);
@@ -1205,17 +1205,17 @@ function buildInterfaceReexports(
     const rawSourceLayer = maps.concept.get(name);
     // Only a concept that classified into a re-exportable SOURCE layer can be
     // re-exported (its target library is `<policyId>-<sourceLayer>`). F3 — a
-    // decision concept that is NOT source-typed (unknown, or out of {LocalSource,
-    // RecordSource, Inferred}) is a HARD ERROR, not a silent skip: skipping it
+    // decision concept that is NOT source-typed (unknown, or out of {LocalPrimitives,
+    // ExternalPrimitives, Inferences}) is a HARD ERROR, not a silent skip: skipping it
     // could empty the Interface and silently demote the decision downstream.
     // Fix 4 — narrow to the closed `InterfaceSourceLayer` union here (the `Layer`
     // alias is bare `string`, so the negative guard below would NOT narrow it);
     // the positive membership test gives the typed `sourceLayer` the assignment
     // to `__interfaceSourceLayer` requires.
     const sourceLayer: InterfaceSourceLayer | undefined =
-      rawSourceLayer === "LocalSource" ||
-      rawSourceLayer === "RecordSource" ||
-      rawSourceLayer === "Inferred"
+      rawSourceLayer === "LocalPrimitives" ||
+      rawSourceLayer === "ExternalPrimitives" ||
+      rawSourceLayer === "Inferences"
         ? rawSourceLayer
         : undefined;
     if (sourceLayer === undefined) {
@@ -1225,31 +1225,31 @@ function buildInterfaceReexports(
         kind: "emit-decision-concept-not-source-typed",
         message:
           `decision references concept "${name}" which is not a source-typed ` +
-          `determination (LocalSource/RecordSource/Inferred) and cannot be ` +
+          `determination (LocalPrimitives/ExternalPrimitives/Inferences) and cannot be ` +
           `re-exported into the Interface layer.`,
         ...(src?.location ? { line: src.location.start.line, column: src.location.start.column } : {}),
       });
       continue;
     }
     const src = sourceConceptByName.get(name);
-    // #189 Slice-C boundary 1 — TOTALITY mode for an Inferred re-export. A REDUCTION that publishes a
+    // #189 Slice-C boundary 1 — TOTALITY mode for an Inferences re-export. A REDUCTION that publishes a
     // Scalar boolean (`exists`/`Count`/a `Coalesce`-guarded `most recent`) is a TOTAL boolean, so the
     // façade re-exports it BARE (a plain CQL Boolean has no `.satisfied()`); a `defined as` truth-set
     // determination stays `.satisfied()`.
     const srcIsReduction = src?.definition?.type === "ReductionDefinition";
     const srcIsScalarBoolean =
       src?.shape === "Scalar" && src.valueTypes.length === 1 && src.valueTypes[0] === "boolean";
-    // HARD ERROR (impl-panel round 1, both arms — critical B): a REDUCTION Inferred source that is NOT a
+    // HARD ERROR (impl-panel round 1, both arms — critical B): a REDUCTION Inferences source that is NOT a
     // Scalar boolean (a `shape is Record` `most recent this`, or a non-boolean scalar reduction) has NO
     // valid boolean Interface collapse — `.satisfied()` on a record / non-boolean is a category error, and
     // a bare re-export would publish a non-boolean as a decision guard surface. The old else-branch silently
-    // marked it `"truth-set"` → the façade emitted `Inferred."X".satisfied()` on a record (ill-typed CQL,
+    // marked it `"truth-set"` → the façade emitted `Inferences."X".satisfied()` on a record (ill-typed CQL,
     // shipped under success:true). Reachable validator-clean via the record-shaped-guard cell (still a
     // warning until T7) AND permanently via the validator-free `emitCQLFromAST`/MCP entry. Refuse LOUD here,
     // mirroring the F3 not-source-typed guard above, rather than emit ill-typed CQL. Only a Scalar-boolean
     // reduction re-exports as a total boolean; a non-boolean *Scalar* most-recent is already loud at emit
     // (the B2a value-read guard throws), so this specifically closes the Record / non-boolean-scalar hole.
-    if (sourceLayer === "Inferred" && srcIsReduction && !srcIsScalarBoolean) {
+    if (sourceLayer === "Inferences" && srcIsReduction && !srcIsScalarBoolean) {
       errors.push({
         type: "Validation",
         kind: "emit-reduction-nonboolean-interface",
@@ -1264,7 +1264,7 @@ function buildInterfaceReexports(
       });
       continue;
     }
-    // #189 Slice C 2b.2 — a total-boolean re-export is granted to ANY source whose Inferred define emits a total
+    // #189 Slice C 2b.2 — a total-boolean re-export is granted to ANY source whose Inferences define emits a total
     // Scalar boolean (a Scalar-boolean reduction, a boolean comparator, a boolean list-pattern, OR a bare-ref
     // alias transitively resolving to one — `emitsTotalScalarBoolean`), NOT only a direct `ReductionDefinition`
     // (disc 444 #1/#2). Consistent BY CONSTRUCTION with the emit flip + the ledger discharge, which consult the
@@ -1300,9 +1300,9 @@ function buildInterfaceReexports(
       // case-feature Interface emit to pick the define body (`…satisfied()` /
       // `…asTruths().satisfied()` / legacy plain re-export). See emitCQL.ts.
       __interfaceSourceLayer: sourceLayer,
-      // #189 Slice-C boundary 1 — totality mode (Inferred source only): a total-boolean reduction
+      // #189 Slice-C boundary 1 — totality mode (Inferences source only): a total-boolean reduction
       // re-exports BARE, a truth-set determination collapses with `.satisfied()`.
-      ...(sourceLayer === "Inferred"
+      ...(sourceLayer === "Inferences"
         ? {
             __interfaceReexportMode: (srcEmitsTotalBoolean
               ? "total-boolean"
@@ -1389,23 +1389,23 @@ export function emitPartitioned(
     if (v !== null) present.add(v);
   }
   // Case-feature truth-set gate (the LOCKED case-feature model). The truth-set
-  // shape (`.asTruths()`/`.satisfied()`/CFH) is the LocalSource/`code is` family's
-  // CQL realization; a measure split (`coded from`/RecordSource, NO LocalSource
+  // shape (`.asTruths()`/`.satisfied()`/CFH) is the LocalPrimitives/`code is` family's
+  // CQL realization; a measure split (`coded from`/ExternalPrimitives, NO LocalPrimitives
   // layer — e.g. cms22/cms69) keeps its LEGACY CQL byte-for-byte. So enable
-  // truth-set mode for the Inferred/Interface layers ONLY when a LocalSource layer
+  // truth-set mode for the Inferences/Interface layers ONLY when a LocalPrimitives layer
   // is present in this split. The sibling layer library names are passed so the
-  // Inferred/Interface Emitter classifies a requalified composition ref's target
-  // layer exactly (LocalSource leaf → `.asTruths()`; Inferred operand → bare).
-  const isCaseFeatureSplit = present.has("LocalSource");
-  const localSourceLibrary = partition.libraryNameFor(policyId, "LocalSource");
-  const inferredLibrary = partition.libraryNameFor(policyId, "Inferred");
-  // Fix 2 — the RecordSource sibling library name, threaded ONLY when a
-  // RecordSource layer is actually present, so the Inferred/Interface emit can
-  // detect a RecordSource operand woven into a truth-set composition (the future
+  // Inferences/Interface Emitter classifies a requalified composition ref's target
+  // layer exactly (LocalPrimitives leaf → `.asTruths()`; Inferences operand → bare).
+  const isCaseFeatureSplit = present.has("LocalPrimitives");
+  const localSourceLibrary = partition.libraryNameFor(policyId, "LocalPrimitives");
+  const inferredLibrary = partition.libraryNameFor(policyId, "Inferences");
+  // Fix 2 — the ExternalPrimitives sibling library name, threaded ONLY when a
+  // ExternalPrimitives layer is actually present, so the Inferences/Interface emit can
+  // detect a ExternalPrimitives operand woven into a truth-set composition (the future
   // `code is` + `coded from` weave) and hard-error. Undefined for the deliverable
-  // (`code is` only → no RecordSource layer).
-  const recordSourceLibrary = present.has("RecordSource")
-    ? partition.libraryNameFor(policyId, "RecordSource")
+  // (`code is` only → no ExternalPrimitives layer).
+  const recordSourceLibrary = present.has("ExternalPrimitives")
+    ? partition.libraryNameFor(policyId, "ExternalPrimitives")
     : undefined;
 
   // #189 Slice 0c — the set of THIS source's synthesized layer library names, so a per-layer boolean-composition
@@ -1424,13 +1424,13 @@ export function emitPartitioned(
     const libraryName = partition.libraryNameFor(policyId, value);
     const { synthetic, requalified } = buildLayerAst(workingAst, value, maps, lib, policyId, partition);
     const crossLibraryIncludes = collectLayerIncludes(requalified, libraryName, value, policyId, partition);
-    // Per-layer case-feature mode: ONLY the Inferred + Interface layers emit the
-    // truth-set shape (NOT LocalConcepts/LocalSource). `kind` keys the emit:
+    // Per-layer case-feature mode: ONLY the Inferences + Interface layers emit the
+    // truth-set shape (NOT LocalConcepts/LocalPrimitives). `kind` keys the emit:
     // `"inferred"` (set-op truth-sets) vs `"interface"` (`…satisfied()`).
     const caseFeature =
-      isCaseFeatureSplit && (value === "Inferred" || value === "Interface")
+      isCaseFeatureSplit && (value === "Inferences" || value === "Interface")
         ? {
-            kind: (value === "Inferred" ? "inferred" : "interface") as "inferred" | "interface",
+            kind: (value === "Inferences" ? "inferred" : "interface") as "inferred" | "interface",
             localSourceLibrary,
             inferredLibrary,
             ...(recordSourceLibrary !== undefined ? { recordSourceLibrary } : {}),

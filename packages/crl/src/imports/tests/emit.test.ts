@@ -157,7 +157,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
 
   it("auto-splits a multi-layer library into dependency-ordered source-typed layer libraries", () => {
     // R2 (layeredEmit): a SINGLE multi-layer library emits as separate
-    // source-typed `<policyId>-RecordConcepts` / `-RecordSource` / `-Inferred`
+    // source-typed `<policyId>-ExternalConcepts` / `-ExternalPrimitives` / `-Inferences`
     // CQL libraries (the fixture is hand-authored terminology + `coded from` +
     // `defined as`, i.e. the RECORD source family). Names use the policy id
     // (package.json `name`, "layered-basic-fixture").
@@ -175,17 +175,17 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(result.success).toBe(true);
     const names = policyLibNames(result);
     expect(names).toEqual([
-      "LayeredBasicFixtureInferred",
-      "LayeredBasicFixtureRecordConcepts",
-      "LayeredBasicFixtureRecordSource",
+      "LayeredBasicFixtureExternalConcepts",
+      "LayeredBasicFixtureExternalPrimitives",
+      "LayeredBasicFixtureInferences",
     ]);
-    const asserted = findLib(result, "LayeredBasicFixtureRecordSource") ?? "";
+    const asserted = findLib(result, "LayeredBasicFixtureExternalPrimitives") ?? "";
     // #186 — S is a simple identifier, emitted UNQUOTED in include + qualified refs.
-    expect(asserted).toMatch(/include LayeredBasicFixtureRecordConcepts\b/);
-    expect(asserted).toMatch(/LayeredBasicFixtureRecordConcepts\."Example Valueset A"/);
-    const inferred = findLib(result, "LayeredBasicFixtureInferred") ?? "";
-    expect(inferred).toMatch(/include LayeredBasicFixtureRecordSource\b/);
-    expect(inferred).toMatch(/LayeredBasicFixtureRecordSource\."Asserted Concept A"/);
+    expect(asserted).toMatch(/include LayeredBasicFixtureExternalConcepts\b/);
+    expect(asserted).toMatch(/LayeredBasicFixtureExternalConcepts\."Example Valueset A"/);
+    const inferred = findLib(result, "LayeredBasicFixtureInferences") ?? "";
+    expect(inferred).toMatch(/include LayeredBasicFixtureExternalPrimitives\b/);
+    expect(inferred).toMatch(/LayeredBasicFixtureExternalPrimitives\."Asserted Concept A"/);
   });
 
   it("fails loudly when a library qualified-refs an auto-split (multi-layer) library", () => {
@@ -259,35 +259,35 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // Closure PRESERVED: "Other" is still emitted (auto-split into policy-id
     // layer libraries) even though the referrer does not `include` it.
     const names = policyLibNames(result);
-    expect(names).toContain("CrlReprFixtureRecordConcepts");
-    expect(names).toContain("CrlReprFixtureRecordSource");
+    expect(names).toContain("CrlReprFixtureExternalConcepts");
+    expect(names).toContain("CrlReprFixtureExternalPrimitives");
   });
 
   it("R2: source-name layer collision class is eliminated by policy-id naming (real `X Asserted` sibling no longer clashes)", () => {
     // PRE-R2 this fixture FAILED with `layered-name-collision`: the multi-layer
-    // `library "X"` auto-split into `X Concepts` / `X Asserted` / `X Inferred`,
+    // `library "X"` auto-split into `X Concepts` / `X Asserted` / `X Inferences`,
     // and the generated `X Asserted` clashed with the real sibling `library
     // "X Asserted"`. Under R2 the layer libraries are named from the POLICY ID
-    // (`crl-test-fixture-RecordConcepts/-RecordSource/-Inferred`), so they can
+    // (`crl-test-fixture-ExternalConcepts/-ExternalPrimitives/-Inferences`), so they can
     // NEVER collide with a source-derived sibling name — the whole collision
     // class is gone. The closure now emits cleanly; `Top`'s foreign ref to
-    // "X Asserted" survives as a cross-library include on the Inferred layer.
+    // "X Asserted" survives as a cross-library include on the Inferences layer.
     // (The `layered-name-collision` preflight remains correct for a genuine
     // policy-id-based clash; this fixture simply no longer triggers it.)
     const root = path.join(FIXTURES, "layered-name-collision", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
     // #227 — the foreign `none` sibling `X Asserted` now emits under its unified
-    // identity `XAsserted`, and the Inferred LAYER's foreign `include` renders
+    // identity `XAsserted`, and the Inferences LAYER's foreign `include` renders
     // through it (the layered path threads the same raw→S rename map).
     const names = policyLibNames(result);
     expect(names).toEqual([
-      "CrlTestFixtureInferred",
-      "CrlTestFixtureRecordConcepts",
-      "CrlTestFixtureRecordSource",
+      "CrlTestFixtureExternalConcepts",
+      "CrlTestFixtureExternalPrimitives",
+      "CrlTestFixtureInferences",
       "XAsserted",
     ]);
-    const inferred = findLib(result, "CrlTestFixtureInferred") ?? "";
+    const inferred = findLib(result, "CrlTestFixtureInferences") ?? "";
     expect(inferred).toMatch(/include XAsserted/);
   });
 
@@ -309,7 +309,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // rx501-147-shaped motivating case. A `decision` disqualifies the FULL
     // source-typed auto-split, but the library carries concept-level `code is`,
     // so R2 takes the `interface` split: the lowered local codes/codesystem land
-    // in `<policyId>-LocalConcepts`, the retrieves in `<policyId>-LocalSource`,
+    // in `<policyId>-LocalConcepts`, the retrieves in `<policyId>-LocalPrimitives`,
     // and the decision/action-guard surface is re-published in a synthesized
     // `<policyId>-Interface` library (pre-qualified to each concept's OWN source
     // layer). The FHIR lane (next half) rewires PlanDef `library[]` onto the
@@ -322,7 +322,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(names).toEqual([
       "CrlTestFixtureInterface",
       "CrlTestFixtureLocalConcepts",
-      "CrlTestFixtureLocalSource",
+      "CrlTestFixtureLocalPrimitives",
     ]);
 
     // Manifest (A→E contract): role + sourceLibraryName + includes.
@@ -330,7 +330,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
       (e) => e.libraryName === "CrlTestFixtureLocalConcepts",
     );
     const sourceEntry = result.cqlByLibrary.find(
-      (e) => e.libraryName === "CrlTestFixtureLocalSource",
+      (e) => e.libraryName === "CrlTestFixtureLocalPrimitives",
     );
     const interfaceEntry = result.cqlByLibrary.find(
       (e) => e.libraryName === "CrlTestFixtureInterface",
@@ -342,7 +342,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(sourceEntry?.includes).toEqual(["CrlTestFixtureLocalConcepts"]);
     expect(interfaceEntry?.role).toBe("interface");
     expect(interfaceEntry?.sourceLibraryName).toBe("Code Is Decision");
-    expect(interfaceEntry?.includes).toEqual(["CrlTestFixtureLocalSource"]);
+    expect(interfaceEntry?.includes).toEqual(["CrlTestFixtureLocalPrimitives"]);
 
     // LocalConcepts library: ONE shared codesystem decl + BARE code names (NO
     // ` Code` suffix — codes live alone here, no co-resident concept to collide).
@@ -361,7 +361,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     );
     expect(concepts).not.toMatch(/ Code"/);
 
-    // LocalSource library: include of the LocalConcepts sibling + cross-library-
+    // LocalPrimitives library: include of the LocalConcepts sibling + cross-library-
     // qualified retrieves, always `[Observation: …]` (local-source rule).
     const sourceCql = sourceEntry?.cql ?? "";
     // #186 — S emits UNQUOTED (simple identifier) in include + qualified refs.
@@ -374,15 +374,15 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
 
     // Interface library: ONE re-export — the decision `when` concept only
     // ("Active Crohns Disease"), pre-qualified to its OWN source layer
-    // (LocalSource). "Adult Patient" is NOT referenced by the decision, so it is
+    // (LocalPrimitives). "Adult Patient" is NOT referenced by the decision, so it is
     // NOT re-exported. Case-feature truth-set: a DIRECT `code is` condition (no
-    // `defined as`) collapses the LocalSource retrieve to a boolean via
+    // `defined as`) collapses the LocalPrimitives retrieve to a boolean via
     // `…asTruths().satisfied()`, and the Interface layer includes CFH.
     const interfaceCql = interfaceEntry?.cql ?? "";
-    expect(interfaceCql).toMatch(/include CrlTestFixtureLocalSource\b/);
+    expect(interfaceCql).toMatch(/include CrlTestFixtureLocalPrimitives\b/);
     expect(interfaceCql).toMatch(/include CaseFeatureCommon called CFH/);
     expect(interfaceCql).toMatch(
-      /define "Active Crohns Disease":\s*CrlTestFixtureLocalSource\."Active Crohns Disease"\.asTruths\(\)\.satisfied\(\)/,
+      /define "Active Crohns Disease":\s*CrlTestFixtureLocalPrimitives\."Active Crohns Disease"\.asTruths\(\)\.satisfied\(\)/,
     );
     expect(interfaceCql).not.toMatch(/define "Adult Patient"/);
     expect(interfaceCql).not.toMatch(/^codesystem /m);
@@ -500,7 +500,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
   it("computeSplitPlan: decision-bearing + `code is` library → `interface` (source-typed split + Interface)", () => {
     // R2 — a decision disqualifies the FULL split (isLayerSplittable=false), but
     // the concept-level `code is` (localCodesCount > 0) triggers the `interface`
-    // split: the source-typed layers (LocalConcepts + LocalSource) PLUS the
+    // split: the source-typed layers (LocalConcepts + LocalPrimitives) PLUS the
     // synthesized `<policyId>-Interface` library (the decision `when` surface).
     const src = parse(`library "Pol".
 
@@ -524,7 +524,7 @@ decision "Triage":
     expect(plan.kind).toBe("interface");
     expect(plan.emittedLibraryNames).toEqual([
       "PolLocalConcepts",
-      "PolLocalSource",
+      "PolLocalPrimitives",
       "PolInterface",
     ]);
     expect(plan.partition).toBeDefined();
@@ -559,11 +559,11 @@ activity "Refer":
     expect(plan.policyId).toBe("Pol");
   });
 
-  it("#189 Slice-C flip: a decision + `code is` + REDUCTION library routes to `interface` (the reduction now classifies Inferred, so it is emitted, never dropped)", () => {
+  it("#189 Slice-C flip: a decision + `code is` + REDUCTION library routes to `interface` (the reduction now classifies Inferences, so it is emitted, never dropped)", () => {
     // PRE-FLIP this asserted `none`: a `ReductionDefinition` classified NULL, so the `interface` split's
     // `buildLayerAst` would have SILENTLY DROPPED it — the guard forced the per-CRL path to avoid that.
-    // The Slice-C flip CLASSIFIES a reduction into the Inferred layer (`classifyStatementLayer`), so it is
-    // no longer droppable: the library routes `interface`, the reduction lands in `<policyId>Inferred`, and
+    // The Slice-C flip CLASSIFIES a reduction into the Inferences layer (`classifyStatementLayer`), so it is
+    // no longer droppable: the library routes `interface`, the reduction lands in `<policyId>Inferences`, and
     // `emitConceptBody` renders it there (or fails LOUD if its operand is not a RecordSet — as here,
     // `exists "Adult Patient"` over a Scalar boolean — which is an EMIT-time loud fail, not a routing skip).
     // Contrast the sibling test below: a `source representation` concept STILL null-classifies → still `none`.
@@ -587,9 +587,9 @@ decision "Triage":
     const lowered = lowerLocalCodes(src);
     expect(lowered.localCodes.length).toBe(1);
     const plan = computeSplitPlan(lowered.ast, "Pol", "Pol", lowered.localCodes.length);
-    expect(plan.kind).toBe("interface"); // the reduction classifies Inferred → interface (NOT forced to `none`)
-    // The reduction concept lands in the Inferred layer — proof it is NOT dropped by the split.
-    expect(plan.emittedLibraryNames).toContain("PolInferred");
+    expect(plan.kind).toBe("interface"); // the reduction classifies Inferences → interface (NOT forced to `none`)
+    // The reduction concept lands in the Inferences layer — proof it is NOT dropped by the split.
+    expect(plan.emittedLibraryNames).toContain("PolInferences");
   });
 
   it("#189 IMPL 3: a decision + `code is` library carrying a REPRESENTATION-bearing concept ALSO routes to `none` (the general null-classify guard; panel R2 gpt56 #1)", () => {
@@ -622,39 +622,39 @@ decision "Triage":
     expect(plan.kind).toBe("none"); // the representation concept keeps the library on the per-CRL path
   });
 
-  it("#189 Slice-C flip end-to-end: a decision + `code is` + named-`exists` reduction library EMITS layered (the reduction lands in the Inferred layer, cross-layer-qualified, not dropped)", () => {
+  it("#189 Slice-C flip end-to-end: a decision + `code is` + named-`exists` reduction library EMITS layered (the reduction lands in the Inferences layer, cross-layer-qualified, not dropped)", () => {
     const root = path.join(FIXTURES, "decision-localcode-reduction", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success, JSON.stringify(result.errors ?? [])).toBe(true);
     expect((result.errors ?? []).some((e) => e.kind === "emit-reduction-not-active")).toBe(false);
     // POST-FLIP: the decision + `code is` library routes `interface` (the reduction now classifies
-    // Inferred), so it fans into layered libraries rather than the single `Pol`. The reduction
-    // "Enough Trials" is emitted in the Inferred layer over its records operand — cross-layer-QUALIFIED
-    // (`PolLocalSource."Trial Records"`), the boundary-1 cross-lib operand resolution — proving it is
+    // Inferences), so it fans into layered libraries rather than the single `Pol`. The reduction
+    // "Enough Trials" is emitted in the Inferences layer over its records operand — cross-layer-QUALIFIED
+    // (`PolLocalPrimitives."Trial Records"`), the boundary-1 cross-lib operand resolution — proving it is
     // present, not silently dropped by `buildLayerAst`.
     // `emitCQLImports` bases the emitted `S` on the POLICY id (package name `crl-test-fixture`), so the
     // layered libraries are `CrlTestFixture*`, not `Pol*`.
-    expect(policyLibNames(result)).toContain("CrlTestFixtureInferred");
-    const inferred = findLib(result, "CrlTestFixtureInferred") ?? "";
+    expect(policyLibNames(result)).toContain("CrlTestFixtureInferences");
+    const inferred = findLib(result, "CrlTestFixtureInferences") ?? "";
     expect(inferred).toMatch(
-      /define "Enough Trials":\s*\n\s*exists \(CrlTestFixtureLocalSource\."Trial Records"\)/,
+      /define "Enough Trials":\s*\n\s*exists \(CrlTestFixtureLocalPrimitives\."Trial Records"\)/,
     );
     // #189 2d — the decision surface concept "Adult Patient" is now `code is` + `definition is exists this`,
-    // so it is a DERIVATION: it emits `exists(… "Adult Patient Records")` in the Inferred layer (a TOTAL
-    // boolean) and the Interface re-exports it BARE (`Inferred."Adult Patient"`) — NOT the old
+    // so it is a DERIVATION: it emits `exists(… "Adult Patient Records")` in the Inferences layer (a TOTAL
+    // boolean) and the Interface re-exports it BARE (`Inferences."Adult Patient"`) — NOT the old
     // `.asTruths().satisfied()` truth-set collapse (that was the pre-flip bare-`code is` hack).
     expect(inferred).toMatch(
-      /define "Adult Patient":\s*\n\s*exists \(CrlTestFixtureLocalSource\."Adult Patient Records"\)/,
+      /define "Adult Patient":\s*\n\s*exists \(CrlTestFixtureLocalPrimitives\."Adult Patient Records"\)/,
     );
     const iface = findLib(result, "CrlTestFixtureInterface") ?? "";
-    expect(iface).toMatch(/define "Adult Patient":\s*\n\s*CrlTestFixtureInferred\."Adult Patient"\s*\n/);
+    expect(iface).toMatch(/define "Adult Patient":\s*\n\s*CrlTestFixtureInferences\."Adult Patient"\s*\n/);
     expect(iface).not.toMatch(/\.asTruths\(\)\.satisfied\(\)/);
   });
 
   it("#189 Slice-C flip façade totality: a decision guarding ON a reduction re-exports it BARE through the Interface (a total boolean has no `.satisfied()`)", () => {
     // The step-5 façade crux: when a decision's `when` guard IS a reduction concept ("Cov" = `code is` +
-    // `exists this`), the reduction classifies Inferred and publishes a TOTAL boolean (`exists(...)`). The
-    // Interface re-export MUST be BARE (`Inferred."Cov"`), NOT `Inferred."Cov".satisfied()` — a plain CQL
+    // `exists this`), the reduction classifies Inferences and publishes a TOTAL boolean (`exists(...)`). The
+    // Interface re-export MUST be BARE (`Inferences."Cov"`), NOT `Inferences."Cov".satisfied()` — a plain CQL
     // Boolean has no `.satisfied()` method (that is the truth-set collapse for a `defined as` determination).
     // The totality marker is set at Interface SYNTHESIS (`buildInterfaceReexports`), since the Interface
     // emitter's own `conceptByName` cannot see the source concept's definition. Contrast the code-is case
@@ -662,21 +662,21 @@ decision "Triage":
     const root = path.join(FIXTURES, "decision-when-reduction", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success, JSON.stringify(result.errors ?? [])).toBe(true);
-    const inferred = findLib(result, "DecisionWhenReductionInferred") ?? "";
+    const inferred = findLib(result, "DecisionWhenReductionInferences") ?? "";
     expect(inferred).toMatch(
-      /define "Cov":\s*\n\s*exists \(DecisionWhenReductionLocalSource\."Cov Records"\)/,
+      /define "Cov":\s*\n\s*exists \(DecisionWhenReductionLocalPrimitives\."Cov Records"\)/,
     );
     const iface = findLib(result, "DecisionWhenReductionInterface") ?? "";
     // BARE re-export — the whole define body is the qualified ref, NOTHING appended.
-    expect(iface).toMatch(/define "Cov":\s*\n\s*DecisionWhenReductionInferred\."Cov"\s*\n/);
-    expect(iface).not.toMatch(/DecisionWhenReductionInferred\."Cov"\.satisfied\(\)/);
+    expect(iface).toMatch(/define "Cov":\s*\n\s*DecisionWhenReductionInferences\."Cov"\s*\n/);
+    expect(iface).not.toMatch(/DecisionWhenReductionInferences\."Cov"\.satisfied\(\)/);
   });
 
   it("#189 Slice-C flip routing-tripwire: decision+reduction → `interface`; Activity+reduction (unclassifiable sibling) → `none`", () => {
     // A2 splits "Enough Trials" into a records twin (a `CodedFromDefinition`) + a retargeted
-    // `ReductionDefinition`. POST-FLIP the reduction classifies Inferred, so it no longer forces `none` by
-    // itself — the routing is now decided exactly as for a `defined as` Inferred concept:
-    //   - WITH a decision → `interface` (the reduction lands in Inferred, twin in LocalSource, decision
+    // `ReductionDefinition`. POST-FLIP the reduction classifies Inferences, so it no longer forces `none` by
+    // itself — the routing is now decided exactly as for a `defined as` Inferences concept:
+    //   - WITH a decision → `interface` (the reduction lands in Inferences, twin in LocalPrimitives, decision
     //     surface re-exported).
     //   - WITH an Activity but NO decision → `none`: the Activity is UNCLASSIFIABLE, so `isLayerSplittable`
     //     is false (no `full`) AND `hasDecision` is false (no `interface`) — the per-CRL path preserves the
@@ -735,11 +735,11 @@ activity "Refer":
     // PRE-R2 this fixture FAILED: the partial-split of "Pol" generated a `Pol
     // Concepts` sibling that clashed with the REAL `library "Pol Concepts"`.
     // Under R2 "Pol" takes the `interface` split and its layers are named from
-    // the POLICY ID (`crl-test-fixture-LocalConcepts/-LocalSource/-Inferred/
+    // the POLICY ID (`crl-test-fixture-LocalConcepts/-LocalPrimitives/-Inferences/
     // -Interface`), so they can never collide with the source-derived `Pol
     // Concepts` sibling — the collision class is gone. The closure emits cleanly;
     // `From Sibling`'s foreign ref to "Pol Concepts" survives as a cross-library
-    // include on the Inferred layer.
+    // include on the Inferences layer.
     const root = path.join(FIXTURES, "partial-concepts-name-collision", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
@@ -749,13 +749,13 @@ activity "Refer":
     // manifest's dependency-resolution keys.
     const names = policyLibNames(result);
     expect(names).toEqual([
-      "CrlTestFixtureInferred",
+      "CrlTestFixtureInferences",
       "CrlTestFixtureInterface",
       "CrlTestFixtureLocalConcepts",
-      "CrlTestFixtureLocalSource",
+      "CrlTestFixtureLocalPrimitives",
       "PolConcepts",
     ]);
-    const inferred = result.cqlByLibrary.find((e) => e.libraryName === "CrlTestFixtureInferred");
+    const inferred = result.cqlByLibrary.find((e) => e.libraryName === "CrlTestFixtureInferences");
     expect(inferred?.includes).toContain("Pol Concepts");
   });
 
@@ -863,14 +863,14 @@ decision "Triage":
 });
 
 describe("#257 (age slice) — standalone Patient age posrep in the imports/interface lane", () => {
-  it("a standalone age posrep in a decision-bearing (code-is) library rides the Inferred lane, not dropped to a null layer", () => {
+  it("a standalone age posrep in a decision-bearing (code-is) library rides the Inferences lane, not dropped to a null layer", () => {
     // Regression guard for the impl-round [critical]: pre-migration a standalone `definition is age
-    // today` classified Inferred and emitted here; the migrated posrep form must NOT silently drop
+    // today` classified Inferences and emitted here; the migrated posrep form must NOT silently drop
     // (classify null) when the library also has a `code is` concept forcing the interface split.
     const root = path.join(FIXTURES, "standalone-age", "standalone-age.crl");
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
-    // The age determination emits the generic computed call in SOME emitted library (the Inferred
+    // The age determination emits the generic computed call in SOME emitted library (the Inferences
     // layer) — proving "Adult" was classified + emitted, not dropped.
     const allCql = result.cqlByLibrary.map((e) => e.cql).join("\n\n");
     expect(allCql).toContain("CRLCommon.AtLeast(CRLCommon.AgeAt(), 18 'years')");

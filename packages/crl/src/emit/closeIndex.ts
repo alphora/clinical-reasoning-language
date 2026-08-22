@@ -1,16 +1,16 @@
 // #189 Slice C 2b.0 — the §4.5 closure metadata index + public-reference routing map.
 //
 // The totality proof runs at CLOSURE level (not per-library — a façade's composite operand lives in the
-// sibling Inferred library). Two structures, both PROJECTIONS of the aggregated per-library ledger entries
+// sibling Inferences library). Two structures, both PROJECTIONS of the aggregated per-library ledger entries
 // surfaced through `PerLibraryEmit.ledgerEntries`:
 //
 //   • the METADATA INDEX (`lookup`) — given an EMITTED identity `{libraryIdentity, defineName}`, its entry
-//     (result / visibility / discharge). Keyed by BOTH library and name, so the LocalSource `source-impl`
-//     twin and the Inferred public determination (same authored name) resolve to DISTINCT entries.
+//     (result / visibility / discharge). Keyed by BOTH library and name, so the LocalPrimitives `source-impl`
+//     twin and the Inferences public determination (same authored name) resolve to DISTINCT entries.
 //   • the PUBLIC-REFERENCE ROUTING MAP (`route`) — given a CRL public reference `{sourceLibraryName,
 //     publicName}`, the EMITTED identity it denotes. Only `visibility === "public"` entries are routing
-//     targets: the Inferred determination is public and its LocalSource/Records `impl` twins + Interface
-//     `facade` are NOT candidates, which is exactly the `buildNameLayerMaps` "Inferred wins" public-name
+//     targets: the Inferences determination is public and its LocalPrimitives/Records `impl` twins + Interface
+//     `facade` are NOT candidates, which is exactly the `buildNameLayerMaps` "Inferences wins" public-name
 //     winner rule. "Ambiguous" is reserved for a `{source, name}` that STILL has ≥2 public candidates after
 //     that filter (never a both-rep concept, whose impl twin is filtered out).
 //

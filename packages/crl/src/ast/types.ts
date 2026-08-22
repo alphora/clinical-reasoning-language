@@ -438,7 +438,7 @@ export interface ActivityBecause extends ASTNode {
  * `ast → cql-emitter` import cycle; `buildInterfaceReexports` only ever assigns
  * one of these (its F3 guard rejects every other layer).
  */
-export type InterfaceSourceLayer = "LocalSource" | "RecordSource" | "Inferred";
+export type InterfaceSourceLayer = "LocalPrimitives" | "ExternalPrimitives" | "Inferences";
 
 // A representation's explicit `value element is <path>.` — the FHIR model-info property path
 // of its datum, plus the path's own source location so Todo 2's validator can anchor a
@@ -503,12 +503,12 @@ export interface Concept extends ASTNode {
   __interfaceReexport?: boolean;
   /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). The SOURCE
-   * layer (`"LocalSource"` / `"RecordSource"` / `"Inferred"`) an Interface
+   * layer (`"LocalPrimitives"` / `"ExternalPrimitives"` / `"Inferences"`) an Interface
    * re-export concept (`__interfaceReexport`) re-publishes from. The case-feature
    * CQL emit reads it to pick the Interface define body:
-   *   - `"Inferred"`     → `Inferred."X".satisfied()`
-   *   - `"LocalSource"`  → `LocalSource."X".asTruths().satisfied()`
-   *   - `"RecordSource"` → plain re-export `RecordSource."X"` (legacy, non-truth-set lane).
+   *   - `"Inferences"`     → `Inferences."X".satisfied()`
+   *   - `"LocalPrimitives"`  → `LocalPrimitives."X".asTruths().satisfied()`
+   *   - `"ExternalPrimitives"` → plain re-export `ExternalPrimitives."X"` (legacy, non-truth-set lane).
    * Set by `buildInterfaceReexports`. Absent on every other concept.
    *
    * Fix 4 [nit] — typed as the closed `InterfaceSourceLayer` union (not bare
@@ -520,41 +520,41 @@ export interface Concept extends ASTNode {
   /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). #189 Slice-C
    * boundary 1 — the TOTALITY mode of an Interface re-export whose source layer is
-   * `"Inferred"`, deciding how the façade collapses it to the decision's boolean
+   * `"Inferences"`, deciding how the façade collapses it to the decision's boolean
    * surface:
-   *   - `"total-boolean"` → the source Inferred concept is a REDUCTION that publishes
+   *   - `"total-boolean"` → the source Inferences concept is a REDUCTION that publishes
    *     a TOTAL boolean (`exists`/`Count`/a `Coalesce(...)`-guarded `most recent`), so
-   *     the re-export is a BARE re-export `<Inferred>."X"` (a plain CQL Boolean has no
+   *     the re-export is a BARE re-export `<Inferences>."X"` (a plain CQL Boolean has no
    *     `.satisfied()` method — calling it would be ill-typed).
-   *   - `"truth-set"` (or ABSENT) → the source Inferred concept is a `defined as`
-   *     truth-set determination, collapsed with `<Inferred>."X".satisfied()` (the
+   *   - `"truth-set"` (or ABSENT) → the source Inferences concept is a `defined as`
+   *     truth-set determination, collapsed with `<Inferences>."X".satisfied()` (the
    *     legacy lane).
    * Set at SYNTHESIS time in `buildInterfaceReexports` (which can see the source
    * concept's definition + declared shape); the façade emit (`emitConceptBody`)
    * cannot re-derive it because its per-layer `conceptByName` is layer-isolated.
-   * Only meaningful when `__interfaceSourceLayer === "Inferred"`. Absent on every
+   * Only meaningful when `__interfaceSourceLayer === "Inferences"`. Absent on every
    * other concept.
    */
   __interfaceReexportMode?: "total-boolean" | "truth-set";
   /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). Marks the
    * INFERRED half of a both-representation (`code is` + `defined as`) concept that
-   * `lowerLocalCodes` SPLIT into a LocalSource retrieve twin + this Inferred twin.
-   * The case-feature Inferred emit must FOLD IN the direct local-source retrieve,
-   * emitting `LocalSource."X".asTruths() union (<the original defined-as inference>)`.
+   * `lowerLocalCodes` SPLIT into a LocalPrimitives retrieve twin + this Inferences twin.
+   * The case-feature Inferences emit must FOLD IN the direct local-source retrieve,
+   * emitting `LocalPrimitives."X".asTruths() union (<the original defined-as inference>)`.
    * The string value is the concept's own name; the emit synthesizes the explicit
    * `<localSourceLibrary>."X"` qualified leaf (NOT a bare same-name ref, which would
-   * be ambiguous against — or self-recurse into — the Inferred twin). Absent on
+   * be ambiguous against — or self-recurse into — the Inferences twin). Absent on
    * every other concept.
    */
-  __bothRepFoldInLocalSource?: string;
+  __bothRepFoldInLocalPrimitives?: string;
   /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). The
-   * MERGE POLICY for a both-representation split (set on the Inferred twin
-   * ALONGSIDE `__bothRepFoldInLocalSource`). Decided at lowering/match time so
+   * MERGE POLICY for a both-representation split (set on the Inferences twin
+   * ALONGSIDE `__bothRepFoldInLocalPrimitives`). Decided at lowering/match time so
    * the emitter branches on the marker rather than pattern-sniffing the body:
    *   - `"union"`   — the historical `code is` + `defined as` fold-in
-   *     (`LocalSource."X".asTruths() union (<inference>)`). Every existing
+   *     (`LocalPrimitives."X".asTruths() union (<inference>)`). Every existing
    *     both-rep is "union"; behavior is unchanged.
    *   - `"recency"` — the `code is` + `definition is age today <cmp> <Q>`
    *     patient-age merge (`<cmp>` = a sanctioned age comparator, #215):
@@ -564,7 +564,7 @@ export interface Concept extends ASTNode {
    */
   __bothRepMerge?: "union" | "recency";
   /**
-   * SYNTHETIC-EMITTER-ONLY. For a `"recency"` both-rep Inferred twin, the
+   * SYNTHETIC-EMITTER-ONLY. For a `"recency"` both-rep Inferences twin, the
    * threshold of the `age today <cmp> <Q>` computed arm, as an already-emitted CQL
    * quantity literal (e.g. `18 'years'` / `6 'months'`, #257 T2). Carried so the
    * recency emit renders `CRLCommon.<op>(CRLCommon.<computeFn>(), <this>)` without
@@ -573,7 +573,7 @@ export interface Concept extends ASTNode {
    */
   __bothRepRecencyThreshold?: string;
   /**
-   * SYNTHETIC-EMITTER-ONLY. For a `"recency"` both-rep Inferred twin, the age
+   * SYNTHETIC-EMITTER-ONLY. For a `"recency"` both-rep Inferences twin, the age
    * COMPARATOR op (#215): `"AtLeast"` (≥, `at least`), `"AtMost"` (≤, `at most`),
    * or `"Below"` (<, `under` / `younger than`). Set in LOCK-STEP with
    * `__bothRepRecencyThreshold` and `__recencyComputeFn`; the recency emit renders
@@ -608,7 +608,7 @@ export interface Concept extends ASTNode {
    * migration), NOT authored. The `definition is age today` retirement (validator +
    * emit-boundary guard) must NEVER fire on such a definition: the narrative is
    * compiler-internal (a projection re-homed as a definition to satisfy the current
-   * Inferred classification / `emitDefinitionIs` path), not an authorable surface form. A
+   * Inferences classification / `emitDefinitionIs` path), not an authorable surface form. A
    * vestige to remove when posrep emit is first-class (#257). Absent on every authored
    * concept, so a scan of the AUTHORED AST (validation + the pre-lowering retirement scan)
    * never encounters it.
@@ -632,10 +632,10 @@ export interface Concept extends ASTNode {
    * (`emitConcept`) picks its obligation SOURCE without marker-sniffing (disc 439 crit #1/#2):
    *   - `"records-impl"`         — a reduction-lane records twin `"X Records"` (a RecordSet retrieve; no
    *                                boolean define) → manufactured `not-applicable`.
-   *   - `"source-impl"`          — the LocalSource retrieve HALF of a both-representation split (its
-   *                                determination is the sibling Inferred twin) → manufactured `not-applicable`.
+   *   - `"source-impl"`          — the LocalPrimitives retrieve HALF of a both-representation split (its
+   *                                determination is the sibling Inferences twin) → manufactured `not-applicable`.
    *   - `"public-determination"` — the emitted PUBLIC determination (a retargeted reduction, a pure `code is`
-   *                                lowered form, a both-rep Inferred twin, a standalone age posrep) → inherits
+   *                                lowered form, a both-rep Inferences twin, a standalone age posrep) → inherits
    *                                the AUTHORED obligation (`EmitOptions.authoredObligations`, keyed by name).
    *   - `"interface-facade"`     — a `buildInterfaceReexports` façade → manufactured obligation (a
    *                                `…satisfied()` façade is intrinsically total; a bare total-boolean
@@ -870,7 +870,7 @@ export class MostRecentDerivationError extends StructuredEmitError {
  * siblings as `.asTruths()` lists and set-combines them, so a bare-boolean reduction operand yields
  * ill-typed CQL (`<boolean> union <List<Boolean>>`) the translator rejects at load. Composing `defined as`
  * over TOTAL booleans is a boundary-2 change; until then this fires a CRL-level diagnostic instead of
- * emitting CQL that fails downstream. Only reachable once the reduction flip classifies reductions Inferred
+ * emitting CQL that fails downstream. Only reachable once the reduction flip classifies reductions Inferences
  * (before it, a reduction-bearing library stayed on the per-CRL path and never layered its compositions). */
 export class ReductionInCompositionError extends StructuredEmitError {
   readonly kind = "emit-reduction-in-composition";

@@ -1,4 +1,4 @@
-// #189 Slice C boundary 2, slice 2b.2 — the SHARED "does this concept's emitted Inferred define compute a total
+// #189 Slice C boundary 2, slice 2b.2 — the SHARED "does this concept's emitted Inferences define compute a total
 // Scalar boolean?" predicate. ONE structural classifier consulted at every site that decides whether a
 // determination re-exports/composes as a bare total boolean vs a truth-set List, so they cannot DRIFT (disc 444,
 // both arms — the round's central outcome: my draft used AST-label checks `ReductionDefinition` at three sites,
@@ -118,7 +118,7 @@ function declaredBoolean(c: Concept): boolean {
 }
 
 /**
- * True iff `concept`'s emitted Inferred define is a TOTAL Scalar boolean (a bare CQL Boolean that is null-safe at
+ * True iff `concept`'s emitted Inferences define is a TOTAL Scalar boolean (a bare CQL Boolean that is null-safe at
  * its boundary), so it may re-export bare / compose as a boolean rather than lift to a truth-set. A cross-lib /
  * cross-layer referent (except via the resolver's TERMINAL verdict), an instance-pattern, a `code is` retrieve, a
  * both-rep UNION merge, and a `defined as exists` (same-layer) are all NON-total (return false) — the conservative

@@ -870,7 +870,7 @@ describe("decision — otherwise and first emit", () => {
 
 describe("decision — action-level case-feature `input` (DTR pattern)", () => {
   // A resolver that returns a case-feature SD canonical for a single eligible
-  // (LocalSource boolean) concept name, null otherwise — the orchestrator builds
+  // (LocalPrimitives boolean) concept name, null otherwise — the orchestrator builds
   // exactly this shape.
   const CF_URL = `${METADATA.canonicalBase}/StructureDefinition/lib-active-crohns-disease`;
   const CF_URL_2 = `${METADATA.canonicalBase}/StructureDefinition/lib-severe-flare`;
@@ -909,7 +909,7 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
     };
   }
 
-  it("a `when` LocalSource-boolean concept gets one action.input with the right profile + cpg-input-text \"<name>?\"", () => {
+  it("a `when` LocalPrimitives-boolean concept gets one action.input with the right profile + cpg-input-text \"<name>?\"", () => {
     const d = decision("Triage", [when("Active Crohns Disease", leaf(recommend("Refer to GI")))]);
     const { resource } = emitDecisionPlanDefinition(
       d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,
@@ -938,7 +938,7 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
     expect(inputs[0]!.profile).toEqual([CF_URL]);
   });
 
-  it("a `when` condition the resolver returns null for (RecordSource/Inferred — no case-feature SD) gets NO input", () => {
+  it("a `when` condition the resolver returns null for (ExternalPrimitives/Inferences — no case-feature SD) gets NO input", () => {
     const d = decision("Triage", [when("Referral Reason", leaf(recommend("Refer to GI")))]);
     const { resource } = emitDecisionPlanDefinition(
       d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,
@@ -969,7 +969,7 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
     expect(action.input).toBeUndefined();
   });
 
-  it("a NESTED `when` on an eligible LocalSource-boolean concept gets its OWN action.input (no aggregation, any depth)", () => {
+  it("a NESTED `when` on an eligible LocalPrimitives-boolean concept gets its OWN action.input (no aggregation, any depth)", () => {
     // Both the top `when` AND the nested `when` reference eligible concepts. Each
     // when-action carries its OWN condition's input — the nested one is NOT skipped
     // for being nested, and the top one carries only ITS own input (no descendant
@@ -992,7 +992,7 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
   });
 
   it("a nested `when` the resolver returns null for gets NO input (its OWN condition is not case-feature-eligible)", () => {
-    // Top `when` LocalSource (gets input) nesting a `when` the resolver returns
+    // Top `when` LocalPrimitives (gets input) nesting a `when` the resolver returns
     // null for. The child's lack of input is because ITS condition is ineligible,
     // NOT because it is nested.
     const d = decision("Triage", [

@@ -17,10 +17,10 @@ import type { CRL } from "../../ast/types";
  * Impl-review guards for the truth-set case-feature CQL emit (gpt55 + Claude):
  *   - Fix 1: a both-representation (`code is` + `defined as`) concept reaching a
  *     NON-truth-set emit path hard-errors instead of mis-emitting (duplicate
- *     define / fold-in-less Inferred).
- *   - Fix 2: a RecordSource (`coded from`) operand woven into a truth-set
+ *     define / fold-in-less Inferences).
+ *   - Fix 2: a ExternalPrimitives (`coded from`) operand woven into a truth-set
  *     `defined as` composition hard-errors (`emit-mixed-source-inference-unsupported`).
- *   - Fix 3: a bare ref to a NON-existent Inferred name under case-feature mode
+ *   - Fix 3: a bare ref to a NON-existent Inferences name under case-feature mode
  *     does NOT silently become `<inferredLib>."name"`.
  */
 
@@ -51,7 +51,7 @@ concept "Estrogen Or Estradiol Pellets":
   it("a both-rep concept emitted via a DIRECT (non-truth-set) path hard-errors", () => {
     const lowered = lowerLocalCodes(bothRep());
     expect(lowered.errors).toEqual([]);
-    // Direct emit: no caseFeature mode → the Inferred twin's fold-in never fires
+    // Direct emit: no caseFeature mode → the Inferences twin's fold-in never fires
     // and both twins collide in one library. The guard must surface it.
     const result = emitCQLFromAST(lowered.ast, { libraryName: "Both" });
     expect(result.success).toBe(false);
@@ -69,21 +69,21 @@ concept "Estrogen Or Estradiol Pellets":
     expect(lowered.errors).toEqual([]);
     const result = emitPartitioned(lowered.ast, "Both", "Both", FULL_PARTITION);
     expect(result.success).toBe(true);
-    // The Inferred twin folds in the LocalSource retrieve; no guard error fires.
+    // The Inferences twin folds in the LocalPrimitives retrieve; no guard error fires.
     const allKinds = result.entries.flatMap((e) => e.result.errors?.map((x) => x.kind) ?? []);
     expect(allKinds).not.toContain("emit-both-rep-requires-case-feature-lane");
-    const inferred = result.entries.find((e) => e.layer === "Inferred");
+    const inferred = result.entries.find((e) => e.layer === "Inferences");
     expect(inferred?.result.result).toContain(".asTruths()");
     expect(inferred?.result.result).toContain("union");
   });
 });
 
-describe("Fix 2 — mixed LocalSource/RecordSource `defined as` hard-errors", () => {
-  it("a truth-set `defined as` over a RecordSource (`coded from`) operand is unsupported", () => {
-    // `Mixed` is `defined as` over a `code is` LEAF (LocalSource) and a
-    // `coded from` LEAF (RecordSource). The split routes the local leaf to
-    // LocalSource and the record leaf to RecordSource; the Inferred emit then sees
-    // a RecordSource operand inside the truth-set union → hard error.
+describe("Fix 2 — mixed LocalPrimitives/ExternalPrimitives `defined as` hard-errors", () => {
+  it("a truth-set `defined as` over a ExternalPrimitives (`coded from`) operand is unsupported", () => {
+    // `Mixed` is `defined as` over a `code is` LEAF (LocalPrimitives) and a
+    // `coded from` LEAF (ExternalPrimitives). The split routes the local leaf to
+    // LocalPrimitives and the record leaf to ExternalPrimitives; the Inferences emit then sees
+    // a ExternalPrimitives operand inside the truth-set union → hard error.
     const a = ast(`library "Mix".
 
 terminology "RecVS":
@@ -113,12 +113,12 @@ concept "Mixed":
   });
 });
 
-describe("Fix 3 — bare ref to a non-existent Inferred name does not fabricate a qualifier", () => {
-  it("an unknown bare ref under case-feature mode is NOT silently qualified to the Inferred lib", () => {
+describe("Fix 3 — bare ref to a non-existent Inferences name does not fabricate a qualifier", () => {
+  it("an unknown bare ref under case-feature mode is NOT silently qualified to the Inferences lib", () => {
     // `Top` is `defined as` a bare-ref to `Ghost`, which does not exist. Under
     // case-feature inferred mode the bare branch must NOT fabricate
-    // `"…-Inferred"."Ghost"`; it falls through to legacy handling so the dangling
-    // ref surfaces (a bare `"Ghost"` identifier, not an Inferred-qualified one).
+    // `"…-Inferences"."Ghost"`; it falls through to legacy handling so the dangling
+    // ref surfaces (a bare `"Ghost"` identifier, not an Inferences-qualified one).
     const a = ast(`library "Pol".
 
 concept "Diagnosis A":
@@ -134,21 +134,21 @@ concept "Top":
     const lowered = lowerLocalCodes(a);
     expect(lowered.errors).toEqual([]);
     const result = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
-    const inferred = result.entries.find((e) => e.layer === "Inferred");
+    const inferred = result.entries.find((e) => e.layer === "Inferences");
     const cql = inferred?.result.result ?? "";
     // The fabricated qualified ref must NOT appear.
-    expect(cql).not.toContain('"Pol-Inferred"."Ghost"');
+    expect(cql).not.toContain('"Pol-Inferences"."Ghost"');
     // The unknown name still appears (surfaced as a bare/legacy ref), not vanished.
     expect(cql).toContain("Ghost");
   });
 
-  it("a VALID same-library Inferred sibling bare ref stays BARE (a library cannot qualify its own define)", () => {
-    // `Top` bare-refs `A And B`, a real Inferred sibling in the SAME emitted
-    // `Pol-Inferred` library. A define MUST NOT be referenced via its own library
-    // name (`"Pol-Inferred"."A And B"` makes the CQL translator reject
-    // `Could not resolve identifier Pol-Inferred`); the same-library ref stays
+  it("a VALID same-library Inferences sibling bare ref stays BARE (a library cannot qualify its own define)", () => {
+    // `Top` bare-refs `A And B`, a real Inferences sibling in the SAME emitted
+    // `Pol-Inferences` library. A define MUST NOT be referenced via its own library
+    // name (`"Pol-Inferences"."A And B"` makes the CQL translator reject
+    // `Could not resolve identifier Pol-Inferences`); the same-library ref stays
     // BARE (`"A And B"`), matching the measure lane. Only genuinely cross-library
-    // Inferred operands are qualified.
+    // Inferences operands are qualified.
     const a = ast(`library "Pol".
 
 concept "Diagnosis A":
@@ -175,11 +175,11 @@ concept "Top":
     expect(lowered.errors).toEqual([]);
     const result = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
     expect(result.success).toBe(true);
-    const inferred = result.entries.find((e) => e.layer === "Inferred");
+    const inferred = result.entries.find((e) => e.layer === "Inferences");
     const cql = inferred?.result.result ?? "";
     // BARE same-library ref, NOT the self-qualified form.
     expect(cql).toContain('"A And B"');
-    expect(cql).not.toContain('"Pol-Inferred"."A And B"');
+    expect(cql).not.toContain('"Pol-Inferences"."A And B"');
   });
 });
 

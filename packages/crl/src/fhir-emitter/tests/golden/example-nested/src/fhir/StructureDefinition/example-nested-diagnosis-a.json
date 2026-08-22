@@ -28,7 +28,7 @@
       "valueExpression": {
         "language": "text/cql-identifier",
         "expression": "Diagnosis A Records",
-        "reference": "http://example.org/hcsc/rx501-007/Library/ExampleNestedLocalSource"
+        "reference": "http://example.org/hcsc/rx501-007/Library/ExampleNestedLocalPrimitives"
       }
     }
   ],

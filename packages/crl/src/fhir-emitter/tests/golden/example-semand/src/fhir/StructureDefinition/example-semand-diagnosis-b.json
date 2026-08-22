@@ -28,7 +28,7 @@
       "valueExpression": {
         "language": "text/cql-identifier",
         "expression": "Diagnosis B Records",
-        "reference": "http://example.org/hcsc/rx501-007/Library/ExampleSemandLocalSource"
+        "reference": "http://example.org/hcsc/rx501-007/Library/ExampleSemandLocalPrimitives"
       }
     }
   ],

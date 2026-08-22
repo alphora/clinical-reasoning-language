@@ -46,7 +46,7 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/hcsc/rx501-007/Library/ExampleForEmitInferred"
+      "resource": "http://example.org/hcsc/rx501-007/Library/ExampleForEmitInferences"
     }
   ],
   "content": [

@@ -29,7 +29,7 @@ function emit(src: string): {
     entries: { layer: string; result: { result?: string; errors?: { kind: string }[] } }[];
   };
   const kinds = res.entries.flatMap((e) => e.result.errors ?? []).map((err) => err.kind);
-  const inferred = res.entries.find((e) => e.layer === "Inferred")?.result.result ?? "";
+  const inferred = res.entries.find((e) => e.layer === "Inferences")?.result.result ?? "";
   return { success: res.success, kinds, inferred };
 }
 
@@ -49,7 +49,7 @@ activity "a.A":
 - request CPGCommunicationRequest.
 - with \`ok\`.`;
 
-// A same-layer (Inferred) NON-total boolean: a `defined as` truth-set composition over local `code is` booleans.
+// A same-layer (Inferences) NON-total boolean: a `defined as` truth-set composition over local `code is` booleans.
 const TRUTH_SET = `concept "L1":
 - type is Observation.
 - value type is boolean.
@@ -65,7 +65,7 @@ concept "TS":
 - value type is boolean.
 - defined as ( "L1" sem-or "L2" ).`;
 
-// A same-layer (Inferred) non-boolean concept: a `defined as` CodeableConcept refinement composition.
+// A same-layer (Inferences) non-boolean concept: a `defined as` CodeableConcept refinement composition.
 const CC_REFINEMENT = `terminology "VS":
 - valueset is \`http://example.org/vs\`.
 

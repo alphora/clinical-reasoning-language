@@ -8,7 +8,7 @@ import { emitFhirDefFromPath } from "../closureOrchestrator";
  * Patient-age both-representation RECENCY merge — end-to-end CRL → FHIR/CQL.
  *
  * The fixture concept "Age 18 Or Older" carries BOTH a `code is` local assertion
- * AND a `definition is age today at least 18 years` computation. The Inferred
+ * AND a `definition is age today at least 18 years` computation. The Inferences
  * layer must RECENCY-MERGE them (newest valid local Observation vs the live
  * computed age) via `CFH.recencyAgeTruths(...)`, and the age concept must STILL
  * get its case-feature input/StructureDefinition (the case-3 human-assert
@@ -30,13 +30,13 @@ describe("patient-age both-rep recency merge (CRL → FHIR/CQL)", () => {
     expect(r.metadataErrors).toEqual([]);
   });
 
-  it("emits the four-layer split incl. the Inferred Library (recency merge lives in its sibling CQL)", () => {
+  it("emits the four-layer split incl. the Inferences Library (recency merge lives in its sibling CQL)", () => {
     // The recency CQL SHAPE (CFH.recencyAgeTruths + newest-Observation filter +
     // computed AtLeast(AgeAt(), Q)) is asserted directly in the cql-emitter suite
     // (lowerLocalCodes.test.ts); here we confirm the FHIR closure emits the
-    // Inferred Library whose content attachment points at that CQL.
+    // Inferences Library whose content attachment points at that CQL.
     const inferred = r.resources.find(
-      (res) => res.relativePath === "Library/PatientAgeInferred.json",
+      (res) => res.relativePath === "Library/PatientAgeInferences.json",
     );
     expect(inferred).toBeDefined();
   });

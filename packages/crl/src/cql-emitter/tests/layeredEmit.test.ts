@@ -218,20 +218,20 @@ concept "Top":
 `);
     const r = emitLayered(a, "Basic");
     expect(r.success).toBe(true);
-    // R2 source-typed layers: hand-authored terminology → RecordConcepts,
-    // `coded from` → RecordSource, `defined as` → Inferred. #186: names are the
+    // R2 source-typed layers: hand-authored terminology → ExternalConcepts,
+    // `coded from` → ExternalPrimitives, `defined as` → Inferences. #186: names are the
     // unified hyphen-free `S` = layerLibraryName(policyId, layer) (policyId ===
     // source name for direct callers), emitted UNQUOTED in refs (simple ident).
-    const rc = layerLibraryName("Basic", "RecordConcepts");
-    const rs = layerLibraryName("Basic", "RecordSource");
-    const inf = layerLibraryName("Basic", "Inferred");
+    const rc = layerLibraryName("Basic", "ExternalConcepts");
+    const rs = layerLibraryName("Basic", "ExternalPrimitives");
+    const inf = layerLibraryName("Basic", "Inferences");
     expect(r.entries.map((e) => e.libraryName)).toEqual([rc, rs, inf]);
-    // RecordSource retrieves the RecordConcepts-layer valueset + includes it.
-    const asserted = layer(r, "RecordSource")!;
+    // ExternalPrimitives retrieves the ExternalConcepts-layer valueset + includes it.
+    const asserted = layer(r, "ExternalPrimitives")!;
     expect(asserted.crossLibraryIncludes).toEqual([rc]);
     expect(asserted.result.result).toContain(`[Observation: ${rc}."VS"]`);
-    // Inferred refs the RecordSource leaf + includes it.
-    const inferred = layer(r, "Inferred")!;
+    // Inferences refs the ExternalPrimitives leaf + includes it.
+    const inferred = layer(r, "Inferences")!;
     expect(inferred.crossLibraryIncludes).toEqual([rs]);
     expect(inferred.result.result).toContain(`${rs}."Leaf"`);
   });
@@ -253,16 +253,16 @@ concept "Top":
 `);
     const r = emitLayered(a, "Self");
     expect(r.success).toBe(true);
-    // The source self-qualified `"Self"."VS"` must become the RecordConcepts
+    // The source self-qualified `"Self"."VS"` must become the ExternalConcepts
     // layer's unified `S` ref, NOT a dangling `Self."VS"` (library `Self` no
     // longer exists after split).
-    const rc = layerLibraryName("Self", "RecordConcepts");
-    const rs = layerLibraryName("Self", "RecordSource");
-    const asserted = layer(r, "RecordSource")!;
+    const rc = layerLibraryName("Self", "ExternalConcepts");
+    const rs = layerLibraryName("Self", "ExternalPrimitives");
+    const asserted = layer(r, "ExternalPrimitives")!;
     expect(asserted.crossLibraryIncludes).toEqual([rc]);
     expect(asserted.result.result).toContain(`${rc}."VS"`);
     expect(asserted.result.result).not.toMatch(/\bSelf\."VS"/);
-    const inferred = layer(r, "Inferred")!;
+    const inferred = layer(r, "Inferences")!;
     expect(inferred.crossLibraryIncludes).toEqual([rs]);
     expect(inferred.result.result).toContain(`${rs}."Leaf"`);
   });
@@ -284,11 +284,11 @@ concept "Top":
 `);
     const r = emitLayered(a, "Mix");
     expect(r.success).toBe(true);
-    const inferred = layer(r, "Inferred")!;
+    const inferred = layer(r, "Inferences")!;
     // Foreign `"Shared"."External"` survives untouched + earns an include.
     // "Shared" is a simple CQL identifier so it emits unquoted: `Shared."External"`.
     expect(inferred.crossLibraryIncludes).toEqual([
-      layerLibraryName("Mix", "RecordSource"),
+      layerLibraryName("Mix", "ExternalPrimitives"),
       "Shared",
     ]);
     expect(inferred.result.result).toContain(`Shared."External"`);
@@ -307,13 +307,13 @@ concept "BMI":
     expect(isLayerSplittable(a)).toBe(true);
     const r = emitLayered(a, "Ck");
     expect(r.success).toBe(true);
-    // The terminology BMI lands in RecordConcepts; the concept BMI in
-    // RecordSource, and the concept's `coded from "BMI"` resolves (via the
-    // terminology slot) to the RecordConcepts-layer valueset.
-    const concepts = layer(r, "RecordConcepts")!;
+    // The terminology BMI lands in ExternalConcepts; the concept BMI in
+    // ExternalPrimitives, and the concept's `coded from "BMI"` resolves (via the
+    // terminology slot) to the ExternalConcepts-layer valueset.
+    const concepts = layer(r, "ExternalConcepts")!;
     expect(concepts.result.result).toContain(`valueset "BMI"`);
-    const rc = layerLibraryName("Ck", "RecordConcepts");
-    const asserted = layer(r, "RecordSource")!;
+    const rc = layerLibraryName("Ck", "ExternalConcepts");
+    const asserted = layer(r, "ExternalPrimitives")!;
     expect(asserted.crossLibraryIncludes).toEqual([rc]);
     expect(asserted.result.result).toContain(`${rc}."BMI"`);
   });
@@ -321,7 +321,7 @@ concept "BMI":
   it("re-qualifies cross-layer narrative `definition is` refs + includes the target layer (fix 1)", () => {
     // A catalog-matchable `definition is` narrative carrying TWO cross-layer
     // concept refs (`"X" component of "Y"`): both NConceptRefs must be
-    // requalified to "Nar Asserted"."..." and the Inferred layer must include
+    // requalified to "Nar Asserted"."..." and the Inferences layer must include
     // "Nar Asserted". (A bare `"X" or "Y"` is not a catalog pattern and would
     // emit an unmatched-narrative sentinel; `component of` is matchable, so the
     // narrative requalification path is exercised end-to-end.)
@@ -345,8 +345,8 @@ concept "Top":
 `);
     const r = emitLayered(a, "Nar");
     expect(r.success).toBe(true);
-    const rs = layerLibraryName("Nar", "RecordSource");
-    const inferred = layer(r, "Inferred")!;
+    const rs = layerLibraryName("Nar", "ExternalPrimitives");
+    const inferred = layer(r, "Inferences")!;
     expect(inferred.crossLibraryIncludes).toEqual([rs]);
     expect(inferred.result.result).toContain(`${rs}."Asserted Leaf"`);
     expect(inferred.result.result).toContain(`${rs}."Other Asserted"`);
@@ -370,15 +370,15 @@ concept "NotLeaf":
 `);
     const r = emitLayered(a, "Sn");
     expect(r.success).toBe(true);
-    const rs = layerLibraryName("Sn", "RecordSource");
-    const inferred = layer(r, "Inferred")!;
+    const rs = layerLibraryName("Sn", "ExternalPrimitives");
+    const inferred = layer(r, "Inferences")!;
     expect(inferred.crossLibraryIncludes).toEqual([rs]);
     expect(inferred.result.result).toContain(`${rs}."Leaf"`);
   });
 
   it("same-layer self-qualified ref emits BARE, not `X.\"...\"` (fix 4)", () => {
     // Two inferred concepts, one self-qualified-referencing the other:
-    // `"Sl"."Other Inferred"` from inside the Inferred layer is a KNOWN
+    // `"Sl"."Other Inferences"` from inside the Inferences layer is a KNOWN
     // same-layer target, so the qualifier drops to a bare local ref. It must
     // NOT surface as a dangling `"Sl"."..."` (library "Sl" no longer exists).
     const a = ast(`library "Sl".
@@ -390,26 +390,26 @@ concept "Leaf":
 - type is Observation.
 - coded from "VS".
 
-concept "Other Inferred":
+concept "Other Inferences":
 - type is Observation.
 - value type is boolean.
 - defined as "Leaf".
 
-concept "Top Inferred":
+concept "Top Inferences":
 - type is Observation.
 - value type is boolean.
-- defined as "Sl"."Other Inferred".
+- defined as "Sl"."Other Inferences".
 `);
     const r = emitLayered(a, "Sl");
     expect(r.success).toBe(true);
-    const inferred = layer(r, "Inferred")!;
+    const inferred = layer(r, "Inferences")!;
     // The self-qualified same-layer ref emits bare.
-    expect(inferred.result.result).toContain(`"Other Inferred"`);
-    expect(inferred.result.result).not.toMatch(/"Sl"\."Other Inferred"/);
-    expect(inferred.result.result).not.toMatch(/\bSl\."Other Inferred"/);
+    expect(inferred.result.result).toContain(`"Other Inferences"`);
+    expect(inferred.result.result).not.toMatch(/"Sl"\."Other Inferences"/);
+    expect(inferred.result.result).not.toMatch(/\bSl\."Other Inferences"/);
     // It does NOT earn a self-include (same layer).
     expect(inferred.crossLibraryIncludes).not.toContain("Sl");
-    expect(inferred.crossLibraryIncludes).not.toContain(layerLibraryName("Sl", "Inferred"));
+    expect(inferred.crossLibraryIncludes).not.toContain(layerLibraryName("Sl", "Inferences"));
   });
 });
 
@@ -439,7 +439,7 @@ concept "Self":
 
 describe("layeredEmit — F3 non-source-typed decision concept hard error", () => {
   it("emitPartitioned hard-errors when a decision when-concept is not source-typed", () => {
-    // A `code is` concept makes the library `interface`-eligible (LocalSource), but
+    // A `code is` concept makes the library `interface`-eligible (LocalPrimitives), but
     // the decision references a SECOND concept "Ghost" that is representation-bearing
     // → `classifyStatementLayer` returns null (out of scope) → NOT a re-exportable
     // source layer. Pre-F3 it was silently skipped (emptying the Interface → silent
@@ -554,19 +554,19 @@ decision "Cover":
     const r = emitPartitioned(lowered.ast, "Cascade", "example-semand", FULL_PARTITION);
     expect(r.success).toBe(true);
     // The unified S for each present layer (what the FHIR lane will also use).
-    const localSource = layerLibraryName("example-semand", "LocalSource");
-    const inferred = layerLibraryName("example-semand", "Inferred");
+    const localSource = layerLibraryName("example-semand", "LocalPrimitives");
+    const inferred = layerLibraryName("example-semand", "Inferences");
 
-    // Inferred body qualifies LocalSource truth-sets → `LocalSource."A".asTruths()`;
-    // its header MUST `include <LocalSource>` (byte-identical, unquoted).
-    const inf = layer(r, "Inferred")!;
+    // Inferences body qualifies LocalPrimitives truth-sets → `LocalPrimitives."A".asTruths()`;
+    // its header MUST `include <LocalPrimitives>` (byte-identical, unquoted).
+    const inf = layer(r, "Inferences")!;
     expect(inf.result.result).toContain(`${localSource}."A".asTruths()`);
     expect(inf.result.result).toContain(`${localSource}."B".asTruths()`);
     expect(inf.result.result).toContain(`include ${localSource}`);
     expect(inf.crossLibraryIncludes).toContain(localSource);
 
-    // Interface re-exports the Inferred determination → `Inferred."A And B".satisfied()`;
-    // its header MUST `include <Inferred>`.
+    // Interface re-exports the Inferences determination → `Inferences."A And B".satisfied()`;
+    // its header MUST `include <Inferences>`.
     const iface = layer(r, "Interface")!;
     expect(iface.result.result).toContain(`${inferred}."A And B".satisfied()`);
     expect(iface.result.result).toContain(`include ${inferred}`);
@@ -590,10 +590,10 @@ describe("layeredEmit — #189 Slice-C boundary 1: layered emit for every reduct
     expect(lowered.errors).toEqual([]);
     const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
     expect(r.success, JSON.stringify(r.errors)).toBe(true);
-    return layer(r, "Inferred")!.result.result;
+    return layer(r, "Inferences")!.result.result;
   };
 
-  it("layered `count \"X\" at least N` → `Count(<S>-LocalSource.\"X Records\") >= N` (cross-layer-qualified)", () => {
+  it("layered `count \"X\" at least N` → `Count(<S>-LocalPrimitives.\"X Records\") >= N` (cross-layer-qualified)", () => {
     const inf = inferredOf(`library "Pol".
 
 concept "Trials":
@@ -611,7 +611,7 @@ activity "R":
 decision "D":
 - when "Enough" then recommend activity "R".
 `);
-    expect(inf).toMatch(/define "Enough":\s*\n\s*Count\(PolLocalSource\."Trials"\) >= 2/);
+    expect(inf).toMatch(/define "Enough":\s*\n\s*Count\(PolLocalPrimitives\."Trials"\) >= 2/);
   });
 
   it("layered Scalar-boolean `most recent this` (B2a) → `Coalesce(FHIRHelpers.ToBoolean((Last(...)))...)` over the qualified twin", () => {
@@ -631,7 +631,7 @@ decision "D":
 - when "Fever" then recommend activity "R".
 `);
     // The select operand is the cross-layer-qualified records twin; the value read + Coalesce wrap the select.
-    expect(inf).toContain(`(PolLocalSource."Fever Records") O`);
+    expect(inf).toContain(`(PolLocalPrimitives."Fever Records") O`);
     expect(inf).toMatch(/where O\.value is FHIR\.boolean/);
     expect(inf).toMatch(/sort by \(effective as FHIR\.dateTime\)\.value, id/);
     expect(inf).toMatch(/Coalesce\(\s*\n\s*FHIRHelpers\.ToBoolean\(/);
@@ -639,7 +639,7 @@ decision "D":
 
   it("layered Record `most recent this` (B2b) — decisionless full split, both recency casts, over the qualified twin", () => {
     // A Record `most recent` cannot be a decision guard (that hard-errors — see the façade test below), so
-    // it reaches the Inferred layer via a decisionless FULL split. dateTime cast (Procedure.performed):
+    // it reaches the Inferences layer via a decisionless FULL split. dateTime cast (Procedure.performed):
     const proc = inferredOf(`library "Pol".
 
 concept "Last Proc":
@@ -649,7 +649,7 @@ concept "Last Proc":
 - definition is most recent this.
 `);
     expect(proc).toMatch(
-      /define "Last Proc":\s*\n\s*Last\(\s*\n\s*\(PolLocalSource\."Last Proc Records"\) O\s*\n\s*sort by \(performed as FHIR\.dateTime\)\.value, id/,
+      /define "Last Proc":\s*\n\s*Last\(\s*\n\s*\(PolLocalPrimitives\."Last Proc Records"\) O\s*\n\s*sort by \(performed as FHIR\.dateTime\)\.value, id/,
     );
     // none cast (Condition.recordedDate — no `as FHIR.dateTime`):
     const cond = inferredOf(`library "Pol".
@@ -661,7 +661,7 @@ concept "Last Cond":
 - definition is most recent this.
 `);
     expect(cond).toMatch(
-      /define "Last Cond":\s*\n\s*Last\(\s*\n\s*\(PolLocalSource\."Last Cond Records"\) O\s*\n\s*sort by recordedDate\.value, id/,
+      /define "Last Cond":\s*\n\s*Last\(\s*\n\s*\(PolLocalPrimitives\."Last Cond Records"\) O\s*\n\s*sort by recordedDate\.value, id/,
     );
   });
 });
@@ -669,7 +669,7 @@ concept "Last Cond":
 describe("layeredEmit — #189 Slice-C boundary 1: non-boolean reduction on the Interface surface (façade hard-error)", () => {
   it("a decision guarding a Record `most recent this` reduction HARD-ERRORS (no `.satisfied()` on a record)", () => {
     // impl-panel round 1, both arms — critical B. A Record reduction has no valid boolean Interface
-    // collapse; the old else-branch emitted `Inferred."X".satisfied()` on a record select (ill-typed CQL
+    // collapse; the old else-branch emitted `Inferences."X".satisfied()` on a record select (ill-typed CQL
     // under success:true). Synthesis must refuse loud.
     const a = ast(`library "Pol".
 
@@ -695,10 +695,10 @@ decision "D":
 
 describe("layeredEmit — #189 Slice-C boundary 1: composition loud-guard", () => {
   it("a `defined as` truth-set composition over a REDUCTION operand fails LOUD (emit-reduction-in-composition), not ill-typed CQL", () => {
-    // The step-7 guard: post-flip a reduction ("R" = `code is` + `exists this`) classifies Inferred, so a
+    // The step-7 guard: post-flip a reduction ("R" = `code is` + `exists this`) classifies Inferences, so a
     // `defined as ( "R" sem-or "S" )` becomes layer-emittable. But the truth-set lane renders siblings as
     // `.asTruths()` lists and `union`s them, while "R" is a bare CQL Boolean → `"R" union
-    // <LocalSource>."S".asTruths()` fails to type-check at translator load. Composing `defined as` over
+    // <LocalPrimitives>."S".asTruths()` fails to type-check at translator load. Composing `defined as` over
     // TOTAL booleans is a boundary-2 change; until then the emitter refuses LOUD with a CRL-level kind.
     const a = ast(`library "Pol".
 
@@ -729,13 +729,13 @@ decision "Cover":
     expect(lowered.errors).toEqual([]);
     const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
     expect(r.success).toBe(false);
-    // The Inferred layer (which emits "Combo") carries the loud, filterable diagnostic.
-    const inferred = r.entries.find((e) => e.layer === "Inferred");
+    // The Inferences layer (which emits "Combo") carries the loud, filterable diagnostic.
+    const inferred = r.entries.find((e) => e.layer === "Inferences");
     expect(inferred?.result.errors?.some((e) => e.kind === "emit-reduction-in-composition")).toBe(true);
   });
 
   it("#189 2b.2 — a BARE-REF alias `defined as \"R\"` to a reduction FLIPS: the reduction's total boolean re-exports DIRECTLY", () => {
-    // Pre-2b.2 this failed loud (`assertNotReductionTruthSetOperand`). The flip: D's Inferred define emits the
+    // Pre-2b.2 this failed loud (`assertNotReductionTruthSetOperand`). The flip: D's Inferences define emits the
     // reduction bare (`"R"`, NOT `.asTruths()`), and D's Interface façade re-exports BARE (total-boolean mode),
     // NOT `.satisfied()` on a Boolean. The classifier consults the shared `emitsTotalScalarBoolean` predicate at
     // the emit site, the façade, and the ledger in lock-step (disc 444).
@@ -763,14 +763,14 @@ decision "Cover":
     expect(lowered.errors).toEqual([]);
     const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
     expect(r.success).toBe(true);
-    const inferred = layer(r, "Inferred");
+    const inferred = layer(r, "Inferences");
     // D re-exports R's total boolean directly — bare `"R"`, no truth-set lift.
     expect(inferred?.result.result).toMatch(/define "D":\s*\n\s*"R"/);
     expect(inferred?.result.result).not.toContain(`"D".asTruths()`);
     expect(inferred?.result.result).not.toContain(`"R".asTruths()`);
     // D's Interface façade re-exports BARE (total-boolean), not `.satisfied()`.
     const iface = layer(r, "Interface");
-    expect(iface?.result.result).toMatch(/define "D":\s*\n\s*PolInferred\."D"/);
+    expect(iface?.result.result).toMatch(/define "D":\s*\n\s*PolInferences\."D"/);
     expect(iface?.result.result).not.toMatch(/define "D":[\s\S]*?\.satisfied\(\)/);
   });
 
@@ -812,7 +812,7 @@ decision "Cover":
     expect(lowered.errors).toEqual([]);
     const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
     expect(r.success).toBe(false);
-    const inferred = r.entries.find((e) => e.layer === "Inferred");
+    const inferred = r.entries.find((e) => e.layer === "Inferences");
     expect(inferred?.result.errors?.some((e) => e.kind === "emit-reduction-in-composition")).toBe(true);
   });
 
@@ -842,14 +842,14 @@ decision "Cover":
     const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
     expect(r.success, JSON.stringify(r.entries.flatMap((e) => e.result.errors ?? []))).toBe(true);
     const iface = layer(r, "Interface");
-    expect(iface?.result.result).toMatch(/define "Sys Below 120":\s*\n\s*PolInferred\."Sys Below 120"/);
+    expect(iface?.result.result).toMatch(/define "Sys Below 120":\s*\n\s*PolInferences\."Sys Below 120"/);
     expect(iface?.result.result).not.toMatch(/define "Sys Below 120":[\s\S]*?\.satisfied\(\)/);
   });
 
   it("#189 2b.2 — a both-rep `code is` + `defined as` to a TOTAL comparator fails LOUD, not `List union Boolean` (code review, Claude #3)", () => {
     // The both-rep union twin keeps the bare-ref body and is excluded from the flip (`foldIn !== undefined`); the
     // retained reduction guard misses a comparator (a `DefinitionIsDefinition`). Without the fold-in weave guard,
-    // the union would emit `LocalSource."Merged".asTruths() union ("C")` — a truth-set List `union` a total
+    // the union would emit `LocalPrimitives."Merged".asTruths() union ("C")` — a truth-set List `union` a total
     // Boolean, ill-typed under success:true. The weave guard rejects it.
     const a = ast(`library "Pol".
 
@@ -878,7 +878,7 @@ decision "Cover":
     expect(lowered.errors).toEqual([]);
     const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
     expect(r.success).toBe(false);
-    const inferred = r.entries.find((e) => e.layer === "Inferred");
+    const inferred = r.entries.find((e) => e.layer === "Inferences");
     expect(inferred?.result.errors?.some((e) => e.kind === "emit-reduction-in-composition")).toBe(true);
   });
 
@@ -912,7 +912,7 @@ decision "Cover":
     expect(lowered.errors).toEqual([]);
     const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
     expect(r.success).toBe(true);
-    const inferred = layer(r, "Inferred");
+    const inferred = layer(r, "Inferences");
     expect(inferred?.result.result).toMatch(/define "A":\s*\n\s*"D"/);
     expect(inferred?.result.result).not.toContain(`"D".asTruths()`);
   });

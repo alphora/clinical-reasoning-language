@@ -296,7 +296,7 @@ describe("makeTotalityFamilyResolver — #189 Slice 0c (the boolean-composition 
   });
 
   it("a RENDERED-LAYER token (classified positively) → a SAME-SOURCE index lookup, NOT a foreign resolution", () => {
-    // A cross-LAYER operand `"Referrer-LocalSource"."Local"` is same-SOURCE (Local is in the referrer's own
+    // A cross-LAYER operand `"Referrer-LocalPrimitives"."Local"` is same-SOURCE (Local is in the referrer's own
     // pre-split concepts) — classified positively BEFORE the cross-lib resolver so it does not scope-miss.
     const withLocalInIndex = buildDeclaredResultIndex([
       { sourceIdentity: "Referrer", concepts: [{ ...BOOL_SCALAR, name: "Local" }] },
@@ -306,8 +306,8 @@ describe("makeTotalityFamilyResolver — #189 Slice 0c (the boolean-composition 
       index: withLocalInIndex,
       fromIdentity: "Referrer",
       resolveRawLibrary,
-      isRenderedLayerToken: (lib) => lib === "Referrer-LocalSource",
+      isRenderedLayerToken: (lib) => lib === "Referrer-LocalPrimitives",
     });
-    expect(resolve(qref("Referrer-LocalSource", "Local"))).toEqual({ kind: "total", total: true });
+    expect(resolve(qref("Referrer-LocalPrimitives", "Local"))).toEqual({ kind: "total", total: true });
   });
 });

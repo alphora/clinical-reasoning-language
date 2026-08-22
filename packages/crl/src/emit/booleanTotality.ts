@@ -398,7 +398,7 @@ export function classifyBooleanTotality(concept: Concept): BooleanTotalityObliga
  *  is closed so "compare the ledger against ALL emitted define headers" has a bounded origin space. */
 export type DefineOrigin =
   | "authored" // an authored concept's define (classified by `classifyBooleanTotality`)
-  | "interface-facade" // `define "X": Inferred."X"` — total iff the aliased define is total
+  | "interface-facade" // `define "X": Inferences."X"` — total iff the aliased define is total
   | "age-helper" // an age-recency synthesized define/helper — §5/§7 total-boolean boundary is the discharge
   | "criterion-axiom" // a #236 criterion define — per-operand-totalized by construction (axiom)
   | "catalog-axiom"; // CRLCommon/CaseFeatureCommon/FHIRHelpers library define (total by construction)
@@ -410,7 +410,7 @@ export type DischargeKind =
   | "boundary-coalesce" // `Coalesce(<predicate>, false)` — discharges requires-boundary
   | "age-recency-total" // the §5/§7 age-recency total-boolean rewrite — discharges requires-boundary (age)
   | "composite-delegated" // boolean `or`/`and`/`not` over total operands — discharges composite
-  | "facade-delegated" // bare `Inferred."X"` re-export — total IFF X is (delegated); discharges composite
+  | "facade-delegated" // bare `Inferences."X"` re-export — total IFF X is (delegated); discharges composite
   | "facade-satisfied" // `…satisfied()` = `exists(truths)` (CaseFeatureCommon) — total by its OWN existence
   //                       wrapper, INDEPENDENT of the truth-set operand's totality; discharges intrinsically-total
   | "axiom"; // criterion / catalog define, total by construction
@@ -439,8 +439,8 @@ export type DefineResult =
   | { shape: "opaque"; form: string };
 
 /** #189 Slice C 2b.0 — the routing visibility of an emitted define. Public-reference routing must distinguish
- *  the PUBLIC determination other CRL references denote (the Inferred determination wins over its
- *  LocalSource/Records implementation twin, per `buildNameLayerMaps`) from its `impl` twin (never a routing
+ *  the PUBLIC determination other CRL references denote (the Inferences determination wins over its
+ *  LocalPrimitives/Records implementation twin, per `buildNameLayerMaps`) from its `impl` twin (never a routing
  *  target) and its Interface `facade`. Derived from `Concept.__loweringRole` at enrollment; an untagged
  *  authored concept and a criterion define are `public`, and a façade is `facade` ONLY under the same
  *  `caseFeature.kind === "interface"` gate `enrollConcept` uses for façade treatment (else it emitted a legacy
@@ -452,8 +452,8 @@ export type DefineVisibility = "public" | "impl" | "facade";
  *  ALONE (discharge metadata is evidence about a subject, never authority to remove it, disc 429 #1). The
  *  emitted `cql` body is stored ON the entry (disc 429 C8) so the classifier↔lowering agreement test can
  *  check the discharge against the actual text without reconstructing the pairing. `library` + `name` are
- *  the emitted identity — the ledger keys by BOTH (a bare name conflates the LocalSource RecordSet twin and
- *  the Inferred Scalar twin, §4.5). */
+ *  the emitted identity — the ledger keys by BOTH (a bare name conflates the LocalPrimitives RecordSet twin and
+ *  the Inferences Scalar twin, §4.5). */
 export type EmittedDefineEntry = {
   library: string;
   name: string;

@@ -40,7 +40,7 @@ export type CaseFeatureRecordSkip =
   | { kind: "not-a-record"; derivationKind: string; detail: string };
 
 /** A gatherable case-feature record: its natural-resource descriptor + the records-define the featureExpression
- *  targets. `recordsDefineId` is a bare CQL define identifier in the concept's OWNING LocalSource library. */
+ *  targets. `recordsDefineId` is a bare CQL define identifier in the concept's OWNING LocalPrimitives library. */
 export type CaseFeatureRecord = {
   kind: "record";
   descriptor: LocalExactDescriptor;

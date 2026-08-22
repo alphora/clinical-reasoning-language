@@ -1,4 +1,4 @@
-library CodeIsBasicFixtureLocalSource
+library CodeIsBasicFixtureLocalPrimitives
 
 using FHIR version '4.0.1'
 

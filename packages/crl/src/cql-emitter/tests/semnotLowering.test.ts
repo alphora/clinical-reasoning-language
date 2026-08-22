@@ -32,7 +32,7 @@ const FIX = (name: string): string =>
 
 const inferredCql = (result: any): string =>
   (result.cqlByLibrary ?? [])
-    .filter((l: any) => String(l.outputFilename).includes("Inferred"))
+    .filter((l: any) => String(l.outputFilename).includes("Inferences"))
     .map((l: any) => l.cql)
     .join("\n");
 
@@ -46,7 +46,7 @@ describe("#232 — sem-not lowering (truth-set lane)", () => {
   it("lowers a STANDALONE no-base sem-not to the unit-universe complement", () => {
     const cql = inferredCql(result);
     expect(cql).toMatch(
-      /define "Not Alpha":\s*\n\s*\(\{ true \} except \(Semnot232FixtureLocalSource\."Alpha"\.asTruths\(\)\)\)/,
+      /define "Not Alpha":\s*\n\s*\(\{ true \} except \(Semnot232FixtureLocalPrimitives\."Alpha"\.asTruths\(\)\)\)/,
     );
     // The old silent-inversion signature must be gone.
     expect(cql).not.toContain("FIXME");
@@ -56,7 +56,7 @@ describe("#232 — sem-not lowering (truth-set lane)", () => {
     // `B union ({ true } except (A))` must NOT degrade to `(B union { true }) except A`.
     const cql = inferredCql(result);
     expect(cql).toMatch(
-      /define "Beta Or Not Alpha":[\s\S]*?\.asTruths\(\)\s*\n\s*union \(\{ true \} except \(Semnot232FixtureLocalSource\."Alpha"\.asTruths\(\)\)\)/,
+      /define "Beta Or Not Alpha":[\s\S]*?\.asTruths\(\)\s*\n\s*union \(\{ true \} except \(Semnot232FixtureLocalPrimitives\."Alpha"\.asTruths\(\)\)\)/,
     );
   });
 
@@ -74,7 +74,7 @@ describe("#232 — sem-not lowering (truth-set lane)", () => {
     const bodies = cql.match(/define "Beta And (Grouped )?Not Alpha":\s*\n\s*([\s\S]*?)(?=\ndefine |\s*$)/g) ?? [];
     expect(bodies.length).toBe(2);
     for (const b of bodies) {
-      expect(b).toContain('except Semnot232FixtureLocalSource."Alpha".asTruths()');
+      expect(b).toContain('except Semnot232FixtureLocalPrimitives."Alpha".asTruths()');
       expect(b).not.toContain("{ true }");
     }
   });

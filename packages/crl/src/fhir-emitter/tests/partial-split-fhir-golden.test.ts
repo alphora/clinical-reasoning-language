@@ -88,15 +88,15 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     expect(allCql).toContain(`'${csUrl}'`);
   });
 
-  it("emits the R2 source-typed split Libraries (LocalConcepts + LocalSource + Inferred + Interface) with the layered dep routing", () => {
+  it("emits the R2 source-typed split Libraries (LocalConcepts + LocalPrimitives + Inferences + Interface) with the layered dep routing", () => {
     // R2 — `code-is-decision` (a DECISION-bearing library WITH local `code is`)
     // now routes to the `interface` split kind: a FULL source-typed split
-    // (LocalConcepts → LocalSource) PLUS a synthesized `<policyId>-Interface`
+    // (LocalConcepts → LocalPrimitives) PLUS a synthesized `<policyId>-Interface`
     // re-export library (the decision/action-guard surface). It NO LONGER takes
     // the pre-R2 partial (Root + Concepts) path.
     // #189 2d — the migrated `code is` + `definition is exists this` concepts are
     // DERIVATIONS (`exists("<X> Records")` over their own records twin), so the
-    // split now also carries an INFERRED layer (LocalSource → Inferred → Interface)
+    // split now also carries an INFERRED layer (LocalPrimitives → Inferences → Interface)
     // where the pre-flip bare `code is` had none (the boolean was the inline
     // `.asTruths()` hack). This is the correct layered model: `exists this` is an
     // inference over the concept's records.
@@ -116,8 +116,8 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
       libs.map((l) => [l.resource.id as string, l.resource as Record<string, unknown>]),
     );
     const localConcepts = byId.get("CodeIsDecisionFixtureLocalConcepts")!;
-    const localSource = byId.get("CodeIsDecisionFixtureLocalSource")!;
-    const inferred = byId.get("CodeIsDecisionFixtureInferred")!;
+    const localSource = byId.get("CodeIsDecisionFixtureLocalPrimitives")!;
+    const inferred = byId.get("CodeIsDecisionFixtureInferences")!;
     const iface = byId.get("CodeIsDecisionFixtureInterface")!;
     expect(localConcepts).toBeDefined();
     expect(localSource).toBeDefined();
@@ -126,8 +126,8 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     // id == name == url-tail (the #186 identity agreement).
     for (const [id, res] of [
       ["CodeIsDecisionFixtureLocalConcepts", localConcepts],
-      ["CodeIsDecisionFixtureLocalSource", localSource],
-      ["CodeIsDecisionFixtureInferred", inferred],
+      ["CodeIsDecisionFixtureLocalPrimitives", localSource],
+      ["CodeIsDecisionFixtureInferences", inferred],
       ["CodeIsDecisionFixtureInterface", iface],
     ] as const) {
       expect(res.name).toBe(id);
@@ -146,9 +146,9 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
       "http://example.org/crl/code-is-decision/CodeSystem/code-is-decision-fixture-local",
     ]);
 
-    // LocalSource depends-on its LocalConcepts sibling.
+    // LocalPrimitives depends-on its LocalConcepts sibling.
     expect((localSource.content as Array<{ url?: string }>)[0]?.url).toBe(
-      "../../cql/CodeIsDecisionFixtureLocalSource.cql",
+      "../../cql/CodeIsDecisionFixtureLocalPrimitives.cql",
     );
     expect(
       (localSource.relatedArtifact as Array<{ type?: string; resource?: string }>).map(
@@ -158,27 +158,27 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
       "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalConcepts",
     ]);
 
-    // Inferred owns the `exists("<X> Records")` derivations; depends-on LocalSource.
+    // Inferences owns the `exists("<X> Records")` derivations; depends-on LocalPrimitives.
     expect((inferred.content as Array<{ url?: string }>)[0]?.url).toBe(
-      "../../cql/CodeIsDecisionFixtureInferred.cql",
+      "../../cql/CodeIsDecisionFixtureInferences.cql",
     );
     expect(
       (inferred.relatedArtifact as Array<{ type?: string; resource?: string }>).map(
         (e) => e.resource,
       ),
     ).toEqual([
-      "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalSource",
+      "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalPrimitives",
     ]);
 
-    // Interface re-exports the decision surface; depends-on Inferred (the boolean
-    // derivations the decision guards read), which transitively reaches LocalSource.
+    // Interface re-exports the decision surface; depends-on Inferences (the boolean
+    // derivations the decision guards read), which transitively reaches LocalPrimitives.
     expect((iface.content as Array<{ url?: string }>)[0]?.url).toBe(
       "../../cql/CodeIsDecisionFixtureInterface.cql",
     );
     expect(
       (iface.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource),
     ).toEqual([
-      "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureInferred",
+      "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureInferences",
     ]);
   });
 
@@ -381,7 +381,7 @@ describe("emitFhirDefClosure — structured-error guards on a malformed manifest
     const graph = resolveImports(FIXTURE);
     const cql = emitCQLImports(FIXTURE);
     expect(cql.success).toBe(true);
-    // R2 — the real `interface`-kind manifest is [LocalConcepts, LocalSource,
+    // R2 — the real `interface`-kind manifest is [LocalConcepts, LocalPrimitives,
     // Interface]; the Decision/Activity `library[]` resolves to the Interface
     // entry. Demote the Interface entry's role to "layer" so the manifest still
     // has 3 entries (multi-entry branch) but NO entry the decision surface can
@@ -428,7 +428,7 @@ describe("emitFhirDefClosure — structured-error guards on a malformed manifest
 
   // F3 (impl-review) — direct-caller trap. A decision-bearing source with valid
   // `code is` decision conditions, passed DIRECTLY with NO manifest (the graph-
-  // only / unit-test path), has no LocalSource layer → the case-feature gate
+  // only / unit-test path), has no LocalPrimitives layer → the case-feature gate
   // stays closed and the lane would be SILENTLY skipped (no SDs, no inputs) while
   // success stays true. The guard must hard-error so the missing lane cannot pass
   // unnoticed.
@@ -440,7 +440,7 @@ describe("emitFhirDefClosure — structured-error guards on a malformed manifest
     expect(err).toBeDefined();
     // The message names the would-be case-feature(s) the lane would have skipped.
     expect(err!.message).toMatch(/would emit case-features/);
-    expect(err!.message).toMatch(/no LocalSource layer/);
+    expect(err!.message).toMatch(/no LocalPrimitives layer/);
     // No case-feature StructureDefinition was emitted on this path.
     expect(result.resources.filter((r) => r.resourceType === "StructureDefinition")).toHaveLength(
       0,

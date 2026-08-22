@@ -8,7 +8,7 @@ import { join } from "path";
  *   - `CRLCommon.cql`        — the CRL→CQL emitter's narrative-pattern target
  *                              library (`Has`/`HasHistoryOf`/`Without`/…).
  *   - `CaseFeatureCommon.cql` — the truth-set helpers (`asTruths`/`satisfied`)
- *                              the Inferred/Interface layers call fluently
+ *                              the Inferences/Interface layers call fluently
  *                              (renamed from `CaseFeatureHelpers` in #187).
  *   - `FHIRHelpers.cql`      — the engine-bundled FHIRHelpers 4.0.1 source, so
  *                              a human KE's CQL tooling resolves the include

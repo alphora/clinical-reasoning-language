@@ -89,7 +89,7 @@ concept "Flag":
 `;
 
 // Bucket 2 — a decision + `code is` leaves + `defined as` guard → Interface `.satisfied()` façade over the
-// Inferred truth-set List, plus the bare-scalar leaves (which also enroll `rejected`, disc 439 #2).
+// Inferences truth-set List, plus the bare-scalar leaves (which also enroll `rejected`, disc 439 #2).
 const FACADE = `library "Pol".
 concept "A":
 - type is Condition.
@@ -220,7 +220,7 @@ terminology "HbvVS":
     expect(r.status).toBe("failed");
     // The façade is NOT among the failures — it proves total.
     expect(r.failures.some((f) => f.name === "A And B")).toBe(false);
-    // The `code is` leaves enroll `rejected` (their LocalSource retrieve) → the real bucket-3 failures.
+    // The `code is` leaves enroll `rejected` (their LocalPrimitives retrieve) → the real bucket-3 failures.
     expect(r.failures.some((f) => f.name === "A" && f.reason.includes("rejected"))).toBe(true);
     expect(r.failures.some((f) => f.name === "B" && f.reason.includes("rejected"))).toBe(true);
   });
@@ -357,13 +357,13 @@ decision "D":
     const facade = entries.find((e) => e.name === "Dx" && e.origin === "interface-facade");
     expect(facade?.discharge).toEqual({ booleanEffect: "total", dischargedBy: "facade-delegated" });
     expect(facade?.obligation.kind).toBe("composite");
-    // The façade's composite operand is the sibling Inferred reduction (a QUALIFIED cross-layer ref); the
-    // default resolver must key-match it to the Inferred `"Dx"` entry, else the façade phantom-fails.
+    // The façade's composite operand is the sibling Inferences reduction (a QUALIFIED cross-layer ref); the
+    // default resolver must key-match it to the Inferences `"Dx"` entry, else the façade phantom-fails.
     const r = proveWholeBoundaryTotality(entries);
     expect(r.failures.some((f) => f.name === "Dx")).toBe(false);
   });
 
-  it("#189 2b.2 — a FLIPPED bare-ref alias to a reduction enrolls `total`/composite-delegated (Inferred) + facade-delegated, and PROVES", () => {
+  it("#189 2b.2 — a FLIPPED bare-ref alias to a reduction enrolls `total`/composite-delegated (Inferences) + facade-delegated, and PROVES", () => {
     const { entries } = emitLayered(`library "AliasRedx".
 concept "Dx":
 - type is Condition.
@@ -379,7 +379,7 @@ activity "R":
 decision "D":
 - when "Dx Alias" then recommend activity "R".
 `, "AliasRedx");
-    // The Inferred alias define re-exports Dx's total boolean directly — discharged `composite-delegated`
+    // The Inferences alias define re-exports Dx's total boolean directly — discharged `composite-delegated`
     // (delegates to the referent's own total), NOT the pre-flip `not-boolean` truth-set List.
     const inferred = entries.find((e) => e.name === "Dx Alias" && e.origin !== "interface-facade");
     expect(inferred?.discharge).toEqual({ booleanEffect: "total", dischargedBy: "composite-delegated" });
@@ -393,7 +393,7 @@ decision "D":
     expect(r.failures.some((f) => f.name === "Dx Alias")).toBe(false);
   });
 
-  it("LocalSource `.asTruths().satisfied()` façade (a direct `code is` decision guard) enrolls facade-satisfied", () => {
+  it("LocalPrimitives `.asTruths().satisfied()` façade (a direct `code is` decision guard) enrolls facade-satisfied", () => {
     const { entries } = emitLayered(`library "Direct".
 concept "A":
 - type is Condition.
@@ -429,7 +429,7 @@ decision "D":
     const guard = entries.find((e) => e.name === "Guard" && e.origin === "criterion-axiom");
     expect(guard?.discharge).toEqual({ booleanEffect: "total", dischargedBy: "axiom" });
     expect(guard?.resultType).toBe("Boolean");
-    // The criterion itself proves (its leaf `A` is a separate LocalSource reject, but the criterion axiom is
+    // The criterion itself proves (its leaf `A` is a separate LocalPrimitives reject, but the criterion axiom is
     // total by construction — per-leaf Coalesce).
     expect(entries.some((e) => e.name === "Guard")).toBe(true);
   });

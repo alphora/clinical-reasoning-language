@@ -10,7 +10,7 @@
  * because the resource happens to be value-bearing (presence is orthogonal to the record's value). An
  * unmodeled resource fails LOUD (`unsupported-casefeature-resource`); there is NO Observation fallback.
  *
- * (Historical: #189 2d REMOVED the "LocalSource-always-boolean" hack — the old emit forced every `code is`
+ * (Historical: #189 2d REMOVED the "LocalPrimitives-always-boolean" hack — the old emit forced every `code is`
  * concept into a boolean `Observation.valueBoolean` case feature regardless of its declared `type is`. That is
  * gone; do not reintroduce it.)
  *
@@ -25,7 +25,7 @@
  *     unioned per source in `closureOrchestrator.collectCaseFeatures`) — the SAME
  *     single source the action-level `input[]` resolver consumes, so an emitted SD
  *     and the `action.input` that addresses it are the same set by construction.
- *     The `cpg-featureExpression` then points at the policy's `-LocalSource`
+ *     The `cpg-featureExpression` then points at the policy's `-LocalPrimitives`
  *     Library (where the `code is` define lives), NOT the Interface re-export.
  *   - The `patternCodeableConcept` `code` comes from `lowerLocalCodes().localCodes`
  *     (keyed by concept name) — the SAME `localCodes` that drives the local
@@ -193,14 +193,14 @@ export function caseFeatureCanonicalUrl(metadata: CpgMetadata, conceptName: stri
  * `resourceType` / `recordsDefineId` / `valueDatum`.
  *
  * `featureExpressionLibrarySuffix` is the #186 unified IDENTITY `S` of the
- * LocalSource library (the opaque hyphen-free PascalCase name, e.g.
+ * LocalPrimitives library (the opaque hyphen-free PascalCase name, e.g.
  * `ExampleSemandLocalsource`) — where the concept's `code is` define lives — used
  * to build the `cpg-featureExpression.reference` canonical
  * (`libraryCanonicalUrl(metadata, S)`). The truth-set lane points the
- * featureExpression at the LocalSource Library (NOT the Interface re-export), so
+ * featureExpression at the LocalPrimitives Library (NOT the Interface re-export), so
  * the case-feature submission resolves the bare `code is` boolean retrieve.
  * REQUIRED + non-empty: the caller only invokes this once it has confirmed the
- * LocalSource Library is in the manifest. An empty identity would build a
+ * LocalPrimitives Library is in the manifest. An empty identity would build a
  * ROOT-pointing reference (a silent dangling/wrong target) — fail fast instead.
  */
 export function emitCaseFeatureStructureDefinition(
@@ -214,7 +214,7 @@ export function emitCaseFeatureStructureDefinition(
   // the forced-`Observation` profile was the hack. `undefined` from `caseFeatureProfileShape` → the resource is
   // not in the emit registry → a structured `unsupported-casefeature-resource` (never a silent Observation fallback).
   resourceType: string,
-  // The records-twin define the `cpg-featureExpression` targets (`"<X> Records"` in the LocalSource library) —
+  // The records-twin define the `cpg-featureExpression` targets (`"<X> Records"` in the LocalPrimitives library) —
   // the natural-resource retrieve, NOT the ephemeral boolean `"<X>"` (charter §4; panel disc 481/482).
   recordsDefineId: string,
   // Present iff the concept READS a value (a value-bearing Observation determination); a valueless-existence
@@ -232,7 +232,7 @@ export function emitCaseFeatureStructureDefinition(
     throw new Error(
       `internal invariant violated: emitCaseFeatureStructureDefinition for "${conceptName}" was ` +
         `called with an empty featureExpressionLibrarySuffix. The case-feature featureExpression ` +
-        `reference must resolve to the policy's LocalSource Library (where the \`code is\` define ` +
+        `reference must resolve to the policy's LocalPrimitives Library (where the \`code is\` define ` +
         `lives); the caller must confirm a \`localsource\` manifest entry before emitting any ` +
         `case-feature profile.`,
     );
@@ -279,7 +279,7 @@ export function emitCaseFeatureStructureDefinition(
   // `codesystem '<url>'` (one source of truth — the per-library local domain, #198).
   const system = localCodeSystemSystemUrl(metadata, localDomainId);
 
-  // The featureExpression references the LocalSource library by canonical (where the records-retrieve define
+  // The featureExpression references the LocalPrimitives library by canonical (where the records-retrieve define
   // lives); its `expression` is the caller-supplied `recordsDefineId` (a `text/cql-identifier`) — the
   // `"<X> Records"` twin for a reduction, or the concept name for a RecordSet / both-rep retrieve. NOT the
   // ephemeral boolean `"<X>"` (a natural-resource SD bound to a Boolean expr is type-incoherent — charter §4).
@@ -304,7 +304,7 @@ export function emitCaseFeatureStructureDefinition(
     meta: { profile: [CPG_CASEFEATURE_PROFILE] },
     // CPG IG extensions (cpg-, NOT cqf-): knowledgeCapability (DROP `executable` —
     // no run-time forms), knowledgeRepresentationLevel `structured`, and the
-    // featureExpression pointing at the LocalSource library's CQL identifier (the
+    // featureExpression pointing at the LocalPrimitives library's CQL identifier (the
     // bare `code is` define).
     extension: cpgCaseFeatureExtensions(level, {
       language: "text/cql-identifier",

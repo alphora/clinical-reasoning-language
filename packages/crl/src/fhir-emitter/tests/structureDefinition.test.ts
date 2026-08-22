@@ -24,7 +24,7 @@ import type { CpgMetadata, EmittedResource } from "../types";
  * concept → exactly one StructureDefinition typed by its natural resource; the
  * recursive `defined as` closure reaching a `code is` leaf). These tests pin the
  * REMAINING boundary cases that have no golden. Post-#189-2d the case-feature is
- * typed by the concept's own `type is` (charter §4) — the LocalSource-always-boolean
+ * typed by the concept's own `type is` (charter §4) — the LocalPrimitives-always-boolean
  * hack is gone:
  *   - an INFERRED decision condition reaches its `code is` leaf through the
  *     recursive collection (one SD for the leaf),
@@ -35,7 +35,7 @@ import type { CpgMetadata, EmittedResource } from "../types";
  *     empty-code patternCodeableConcept (unreachable from the orchestrated path),
  *   - capped-id collisions are caught by Inv 1,
  *   - a dangling `cpg-featureExpression` reference is caught by Inv 2,
- *   - an empty LocalSource-library suffix fails fast rather than emitting a
+ *   - an empty LocalPrimitives-library suffix fails fast rather than emitting a
  *     root-pointing reference.
  */
 
@@ -59,7 +59,7 @@ const METADATA: CpgMetadata = {
 /* ─── End-to-end eligibility boundary (real CRL closures) ──────────────── */
 
 describe("case-feature emit — eligibility boundary (end-to-end)", () => {
-  it("a LocalSource boolean decision concept → exactly one StructureDefinition (id/url/system/code)", () => {
+  it("a LocalPrimitives boolean decision concept → exactly one StructureDefinition (id/url/system/code)", () => {
     const fixture = path.join(HERE, "fixtures", "code-is-decision", "code-is-decision.crl");
     const result = emitFhirDefFromPath(fixture, FIXED);
     expect(result.success).toBe(true);
@@ -86,7 +86,7 @@ describe("case-feature emit — eligibility boundary (end-to-end)", () => {
   });
 
   it("an INFERRED decision condition (`defined as`) → its recursive `code is` leaf gets a StructureDefinition", () => {
-    // condition "Derived" = `defined as "Base"`; "Base" is a LocalSource boolean
+    // condition "Derived" = `defined as "Base"`; "Base" is a LocalPrimitives boolean
     // `code is` concept. The recursive collection reaches "Base" THROUGH the
     // inference, so exactly ONE SD (Base) is emitted — the deliverable's recursive
     // case-feature behavior (previously this skipped, emitting ZERO).
@@ -100,7 +100,7 @@ describe("case-feature emit — eligibility boundary (end-to-end)", () => {
   });
 
   it("a NON-boolean value-read `code is` decision concept FAILS LOUD (Slice-C deferred) — never a forced boolean SD", () => {
-    // #189 2d — the OLD `LocalSource-always-boolean` rule (every `code is` concept
+    // #189 2d — the OLD `LocalPrimitives-always-boolean` rule (every `code is` concept
     // forced to a boolean Observation regardless of declared value type) is the HACK
     // this flip removes (charter §4). "Coded Determination" is `value type is
     // CodeableConcept` and correctly authored `- definition is most recent this.` (a
@@ -166,7 +166,7 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
       "adult-18-or-older",
       METADATA,
       FIXED,
-      "CasefeatureFixtureLocalSource",
+      "CasefeatureFixtureLocalPrimitives",
       // #189 2d — natural resource (valueless Condition existence), the records-twin
       // featureExpression target, and no value datum (the boolean is `exists` in CQL).
       "Condition",
@@ -181,13 +181,13 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
     expect(r.description).toBe("Adult Patient case feature determination");
     expect(r.description).not.toBe(METADATA.description);
 
-    // The featureExpression references the LocalSource library (where the `code is`
+    // The featureExpression references the LocalPrimitives library (where the `code is`
     // define lives), NOT the Interface re-export.
     const fe = (r.extension as Array<Record<string, unknown>>).find(
       (e) => e.url === CPG_FEATURE_EXPRESSION_EXT,
     )!;
     expect((fe.valueExpression as { reference: string }).reference).toBe(
-      "http://example.org/crl/casefeature/Library/CasefeatureFixtureLocalSource",
+      "http://example.org/crl/casefeature/Library/CasefeatureFixtureLocalPrimitives",
     );
   });
 
@@ -217,7 +217,7 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
       "",
       METADATA,
       FIXED,
-      "CasefeatureFixtureLocalSource",
+      "CasefeatureFixtureLocalPrimitives",
       "Condition",
       "Adult Patient Records",
       undefined,
@@ -232,7 +232,7 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
       undefined as unknown as string,
       METADATA,
       FIXED,
-      "CasefeatureFixtureLocalSource",
+      "CasefeatureFixtureLocalPrimitives",
       "Condition",
       "Adult Patient Records",
       undefined,

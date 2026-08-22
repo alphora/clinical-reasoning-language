@@ -28,7 +28,7 @@
       "valueExpression": {
         "language": "text/cql-identifier",
         "expression": "Active Crohns Disease Records",
-        "reference": "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalSource"
+        "reference": "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalPrimitives"
       }
     }
   ],

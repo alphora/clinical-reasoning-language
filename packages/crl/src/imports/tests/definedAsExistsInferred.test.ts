@@ -28,29 +28,29 @@ describe("#270 — `defined as exists` inferred-lane consumers (disc 461 code re
     expect(result.success, JSON.stringify(result.errors)).toBe(true);
   });
 
-  it("baseline — `defined as exists` over a records concept → bare scalar `exists (<LocalSource>.\"X\")`", () => {
-    const inferred = libBySuffix(result, "Inferred");
-    expect(inferred).toMatch(/define "Has Adult":\s*\n\s*exists \(\S+LocalSource\."Adult Records"\)/);
+  it("baseline — `defined as exists` over a records concept → bare scalar `exists (<LocalPrimitives>.\"X\")`", () => {
+    const inferred = libBySuffix(result, "Inferences");
+    expect(inferred).toMatch(/define "Has Adult":\s*\n\s*exists \(\S+LocalPrimitives\."Adult Records"\)/);
   });
 
   it("Claude #1 — a bare-ref ALIAS to an exists concept re-exports BARE (never `.asTruths()` / never `.satisfied()` a scalar)", () => {
-    const inferred = libBySuffix(result, "Inferred");
-    // Inferred: bare same-layer ref, NOT lifted to a truth-set `.asTruths()`.
+    const inferred = libBySuffix(result, "Inferences");
+    // Inferences: bare same-layer ref, NOT lifted to a truth-set `.asTruths()`.
     expect(inferred).toMatch(/define "Adult Alias":\s*\n\s*"Has Adult"\s*\n/);
     expect(inferred).not.toMatch(/"Adult Alias":\s*\n\s*"Has Adult"\.asTruths\(\)/);
     // Interface: bare re-export, NO `.satisfied()` on a scalar Boolean.
     const iface = libBySuffix(result, "Interface");
-    expect(iface).toMatch(/define "Adult Alias":\s*\n\s*\S+Inferred\."Adult Alias"\s*\n/);
+    expect(iface).toMatch(/define "Adult Alias":\s*\n\s*\S+Inferences\."Adult Alias"\s*\n/);
     expect(iface).not.toMatch(/"Adult Alias":[\s\S]*?\.satisfied\(\)/);
   });
 
   it("Claude #2 — a `sem-or` composition OVER two exists concepts flips to boolean `or` (never `union` two scalar Booleans)", () => {
-    const inferred = libBySuffix(result, "Inferred");
+    const inferred = libBySuffix(result, "Inferences");
     expect(inferred).toMatch(/define "Adult Or Senior":\s*\n\s*"Has Adult"\s*\n\s*or "Has Senior"/);
     expect(inferred).not.toMatch(/"Adult Or Senior":[\s\S]*?union/);
     // Interface re-exports it BARE (a truth-set would be `.satisfied()`).
     const iface = libBySuffix(result, "Interface");
-    expect(iface).toMatch(/define "Adult Or Senior":\s*\n\s*\S+Inferred\."Adult Or Senior"/);
+    expect(iface).toMatch(/define "Adult Or Senior":\s*\n\s*\S+Inferences\."Adult Or Senior"/);
     expect(iface).not.toMatch(/"Adult Or Senior":[\s\S]*?\.satisfied\(\)/);
   });
 });

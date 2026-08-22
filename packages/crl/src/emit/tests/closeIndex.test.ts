@@ -55,7 +55,7 @@ function policyLedgers(result: ReturnType<typeof emitCQLImports>): LibraryLedger
 describe("closeIndex — metadata index (§4.5)", () => {
   it("keys by {libraryIdentity, defineName}, resolving same-named impl twin and public entry to DISTINCT entries", () => {
     const impl = boolEntry({
-      library: "Pol-LocalSource",
+      library: "Pol-LocalPrimitives",
       name: "Adult Patient",
       resultType: "non-Boolean(source-impl)",
       obligation: { kind: "not-applicable", nullable: false, reason: "impl twin" },
@@ -64,13 +64,13 @@ describe("closeIndex — metadata index (§4.5)", () => {
       result: { shape: "RecordSet", resourceType: "Observation" },
       visibility: "impl",
     });
-    const pub = boolEntry({ library: "Pol-Inferred", name: "Adult Patient", visibility: "public" });
+    const pub = boolEntry({ library: "Pol-Inferences", name: "Adult Patient", visibility: "public" });
     const index = buildClosureIndex([
-      { libraryIdentity: "Pol-LocalSource", sourceLibraryName: "Pol", cql: impl.cql, entries: [impl] },
-      { libraryIdentity: "Pol-Inferred", sourceLibraryName: "Pol", cql: pub.cql, entries: [pub] },
+      { libraryIdentity: "Pol-LocalPrimitives", sourceLibraryName: "Pol", cql: impl.cql, entries: [impl] },
+      { libraryIdentity: "Pol-Inferences", sourceLibraryName: "Pol", cql: pub.cql, entries: [pub] },
     ]);
-    const gotImpl = index.lookup({ library: "Pol-LocalSource", name: "Adult Patient" });
-    const gotPub = index.lookup({ library: "Pol-Inferred", name: "Adult Patient" });
+    const gotImpl = index.lookup({ library: "Pol-LocalPrimitives", name: "Adult Patient" });
+    const gotPub = index.lookup({ library: "Pol-Inferences", name: "Adult Patient" });
     expect(gotImpl).not.toBe(gotPub);
     expect(gotImpl?.result).toEqual({ shape: "RecordSet", resourceType: "Observation" });
     expect(gotImpl?.visibility).toBe("impl");
@@ -81,16 +81,16 @@ describe("closeIndex — metadata index (§4.5)", () => {
 
 // ── §4.5 public-reference routing map (winner rule) ──────────────────────────
 describe("closeIndex — public-reference routing (§4.5)", () => {
-  it("routes {source, name} to the UNIQUE public entry — the impl twin and façade are NOT candidates (Inferred-wins)", () => {
-    const impl = boolEntry({ library: "Pol-LocalSource", name: "D", visibility: "impl", discharge: { booleanEffect: "not-boolean" }, resultType: "non-Boolean(source-impl)" });
-    const pub = boolEntry({ library: "Pol-Inferred", name: "D", visibility: "public" });
+  it("routes {source, name} to the UNIQUE public entry — the impl twin and façade are NOT candidates (Inferences-wins)", () => {
+    const impl = boolEntry({ library: "Pol-LocalPrimitives", name: "D", visibility: "impl", discharge: { booleanEffect: "not-boolean" }, resultType: "non-Boolean(source-impl)" });
+    const pub = boolEntry({ library: "Pol-Inferences", name: "D", visibility: "public" });
     const facade = boolEntry({ library: "Pol-Interface", name: "D", visibility: "facade", origin: "interface-facade", discharge: { booleanEffect: "total", dischargedBy: "facade-satisfied" } });
     const index = buildClosureIndex([
-      { libraryIdentity: "Pol-LocalSource", sourceLibraryName: "Pol", cql: impl.cql, entries: [impl] },
-      { libraryIdentity: "Pol-Inferred", sourceLibraryName: "Pol", cql: pub.cql, entries: [pub] },
+      { libraryIdentity: "Pol-LocalPrimitives", sourceLibraryName: "Pol", cql: impl.cql, entries: [impl] },
+      { libraryIdentity: "Pol-Inferences", sourceLibraryName: "Pol", cql: pub.cql, entries: [pub] },
       { libraryIdentity: "Pol-Interface", sourceLibraryName: "Pol", cql: facade.cql, entries: [facade] },
     ]);
-    expect(index.route("Pol", "D")).toEqual({ kind: "resolved", id: { library: "Pol-Inferred", name: "D" } });
+    expect(index.route("Pol", "D")).toEqual({ kind: "resolved", id: { library: "Pol-Inferences", name: "D" } });
   });
 
   it("returns MISSING for an unknown reference and AMBIGUOUS only when ≥2 PUBLIC entries remain after the winner rule", () => {
@@ -108,62 +108,62 @@ describe("closeIndex — public-reference routing (§4.5)", () => {
 
 // ── §4.5 resolver — three ref key-spaces + fail-closed ───────────────────────
 describe("closeIndex — OperandResolver key-spaces (§4.5)", () => {
-  const pub = boolEntry({ library: "Pol-Inferred", name: "D", visibility: "public" });
+  const pub = boolEntry({ library: "Pol-Inferences", name: "D", visibility: "public" });
   const facade = boolEntry({
     library: "Pol-Interface",
     name: "D",
     visibility: "facade",
     origin: "interface-facade",
-    obligation: { kind: "composite", operands: [qref("Pol-Inferred", "D")], cell: "façade" },
+    obligation: { kind: "composite", operands: [qref("Pol-Inferences", "D")], cell: "façade" },
     discharge: { booleanEffect: "total", dischargedBy: "facade-delegated" },
-    cql: `define "D": Pol-Inferred."D"`,
+    cql: `define "D": Pol-Inferences."D"`,
   });
   const index = buildClosureIndex([
-    { libraryIdentity: "Pol-Inferred", sourceLibraryName: "Pol", cql: pub.cql, entries: [pub] },
+    { libraryIdentity: "Pol-Inferences", sourceLibraryName: "Pol", cql: pub.cql, entries: [pub] },
     { libraryIdentity: "Pol-Interface", sourceLibraryName: "Pol", cql: facade.cql, entries: [facade] },
   ]);
   const resolve = makeClosureOperandResolver(index);
 
   it("(a) a RENDERED qualified façade operand resolves directly to the enrolled identity", () => {
-    expect(resolve("Pol-Interface", qref("Pol-Inferred", "D"))).toEqual({ library: "Pol-Inferred", name: "D" });
+    expect(resolve("Pol-Interface", qref("Pol-Inferences", "D"))).toEqual({ library: "Pol-Inferences", name: "D" });
   });
 
   it("(a) a bare ref into its OWN emitted library resolves directly", () => {
-    expect(resolve("Pol-Inferred", "D")).toEqual({ library: "Pol-Inferred", name: "D" });
+    expect(resolve("Pol-Inferences", "D")).toEqual({ library: "Pol-Inferences", name: "D" });
   });
 
   it("(b) a bare ref maps fromLibrary→source, then routes to the public identity", () => {
     // From the Interface library, a bare "D" is not in Pol-Interface's own defines (only the façade "D" is,
     // which IS there) — use a fromLibrary with no own "D" to force the source-route path.
     const idx2 = buildClosureIndex([
-      { libraryIdentity: "Pol-Inferred", sourceLibraryName: "Pol", cql: pub.cql, entries: [pub] },
+      { libraryIdentity: "Pol-Inferences", sourceLibraryName: "Pol", cql: pub.cql, entries: [pub] },
       { libraryIdentity: "Pol-Root", sourceLibraryName: "Pol", cql: "", entries: [] },
     ]);
-    expect(makeClosureOperandResolver(idx2)("Pol-Root", "D")).toEqual({ library: "Pol-Inferred", name: "D" });
+    expect(makeClosureOperandResolver(idx2)("Pol-Root", "D")).toEqual({ library: "Pol-Inferences", name: "D" });
   });
 
   it("(c) a raw qualified ref routes via the injected scope resolver", () => {
     const raw = makeClosureOperandResolver(index, (_from, rawLib) => (rawLib === "PolAlias" ? "Pol" : undefined));
-    expect(raw("Pol-Inferred", qref("PolAlias", "D"))).toEqual({ library: "Pol-Inferred", name: "D" });
+    expect(raw("Pol-Inferences", qref("PolAlias", "D"))).toEqual({ library: "Pol-Inferences", name: "D" });
   });
 
   it("FAIL-CLOSED: an unroutable operand returns a sentinel identity (never enrolled) — no throw", () => {
-    const miss = resolve("Pol-Inferred", "does-not-exist");
+    const miss = resolve("Pol-Inferences", "does-not-exist");
     expect(miss.library).toBe(UNRESOLVED_LIBRARY);
     expect(index.lookup(miss)).toBeUndefined();
   });
 
   it("an UNRESOLVED composite operand yields a ProofFailure that NAMES the miss (fail-closed at proof time)", () => {
     const composite = boolEntry({
-      library: "Pol-Inferred",
+      library: "Pol-Inferences",
       name: "C",
       visibility: "public",
-      obligation: { kind: "composite", operands: [qref("Pol-Inferred", "ghost")], cell: "test" },
+      obligation: { kind: "composite", operands: [qref("Pol-Inferences", "ghost")], cell: "test" },
       discharge: { booleanEffect: "total", dischargedBy: "composite-delegated" },
-      cql: `define "C": Pol-Inferred."ghost"`,
+      cql: `define "C": Pol-Inferences."ghost"`,
     });
     const idx = buildClosureIndex([
-      { libraryIdentity: "Pol-Inferred", sourceLibraryName: "Pol", cql: composite.cql, entries: [composite] },
+      { libraryIdentity: "Pol-Inferences", sourceLibraryName: "Pol", cql: composite.cql, entries: [composite] },
     ]);
     const report = proveWholeBoundaryTotality(idx.entries(), undefined, makeClosureOperandResolver(idx));
     const f = report.failures.find((x) => x.name === "C");
@@ -195,8 +195,8 @@ describe("closeIndex — closure REPORT proof over a real closure", () => {
     expect(report.status).toBe("proven");
   });
 
-  it("CLOSURE inventory pin: a façade composite resolves CROSS-LAYER to its Inferred determination (proven)", () => {
-    // decision-when-reduction emits a façade "Cov" = a COMPOSITE delegating to the sibling Inferred library's
+  it("CLOSURE inventory pin: a façade composite resolves CROSS-LAYER to its Inferences determination (proven)", () => {
+    // decision-when-reduction emits a façade "Cov" = a COMPOSITE delegating to the sibling Inferences library's
     // "Cov" determination. The closure resolver must route that operand ACROSS libraries for the façade to
     // prove total — a per-library proof (or a resolver regression) would fail it. This is the pinned
     // cross-layer discharge the closure index exists for (code review #1).

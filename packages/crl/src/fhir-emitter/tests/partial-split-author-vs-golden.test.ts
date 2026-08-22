@@ -51,7 +51,7 @@ const CS_CANONICAL =
 const LOCALCONCEPTS_CANONICAL =
   "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalConcepts";
 const RECORDCONCEPTS_CANONICAL =
-  "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureRecordConcepts";
+  "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureExternalConcepts";
 
 function listGolden(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -76,11 +76,11 @@ describe("CRL → FHIR partial-split AUTHOR-VS golden (code-is-decision-vs)", ()
     expect(result.success).toBe(true);
   });
 
-  it("the relocated terminology routes by SOURCE FAMILY: local CodeSystem → LocalConcepts, author ValueSet → RecordConcepts", () => {
+  it("the relocated terminology routes by SOURCE FAMILY: local CodeSystem → LocalConcepts, author ValueSet → ExternalConcepts", () => {
     // R2 — the source-typed split fans the relocated terminology into TWO concept
     // layers by family: the synthetic local CodeSystem (from `code is`) lives in
     // `LocalConcepts`; the hand-authored author ValueSet (from `coded from`) lives
-    // in `RecordConcepts`. NEITHER leaks onto the consuming source layers or the
+    // in `ExternalConcepts`. NEITHER leaks onto the consuming source layers or the
     // Interface re-export.
     // #187 — exclude the always-emitted shared catalog Libraries
     // (CRLCommon/CaseFeatureCommon); this asserts the POLICY layer Libraries.
@@ -88,8 +88,8 @@ describe("CRL → FHIR partial-split AUTHOR-VS golden (code-is-decision-vs)", ()
     const libs = result.resources.filter(
       (r) => r.resourceType === "Library" && !CATALOG_LIB_IDS.has(r.resource.id as string),
     );
-    // 6 layer Libraries: LocalConcepts, RecordConcepts, LocalSource, RecordSource,
-    // Inferred, Interface. #189 2d — "Adult Patient" migrated to `code is` +
+    // 6 layer Libraries: LocalConcepts, ExternalConcepts, LocalPrimitives, ExternalPrimitives,
+    // Inferences, Interface. #189 2d — "Adult Patient" migrated to `code is` +
     // `definition is exists this` is now a DERIVATION (`exists("… Records")`), so an
     // INFERRED layer is emitted even though this fixture has no `defined as`
     // (the exists reduction is itself the inference).
@@ -98,9 +98,9 @@ describe("CRL → FHIR partial-split AUTHOR-VS golden (code-is-decision-vs)", ()
       libs.map((l) => [l.resource.id as string, l.resource as Record<string, unknown>]),
     );
     const localConcepts = byId.get("CodeIsDecisionVsFixtureLocalConcepts")!;
-    const recordConcepts = byId.get("CodeIsDecisionVsFixtureRecordConcepts")!;
-    const localSource = byId.get("CodeIsDecisionVsFixtureLocalSource")!;
-    const recordSource = byId.get("CodeIsDecisionVsFixtureRecordSource")!;
+    const recordConcepts = byId.get("CodeIsDecisionVsFixtureExternalConcepts")!;
+    const localSource = byId.get("CodeIsDecisionVsFixtureLocalPrimitives")!;
+    const recordSource = byId.get("CodeIsDecisionVsFixtureExternalPrimitives")!;
     expect(localConcepts).toBeDefined();
     expect(recordConcepts).toBeDefined();
 
@@ -111,7 +111,7 @@ describe("CRL → FHIR partial-split AUTHOR-VS golden (code-is-decision-vs)", ()
 
     // LocalConcepts owns the local CodeSystem (only) — NOT the author ValueSet.
     expect(depsOf(localConcepts)).toEqual([CS_CANONICAL]);
-    // RecordConcepts owns the author ValueSet (only) — NOT the local CodeSystem.
+    // ExternalConcepts owns the author ValueSet (only) — NOT the local CodeSystem.
     expect(depsOf(recordConcepts)).toEqual([VS_CANONICAL]);
 
     // The source layers depend-on their OWN-family concepts sibling; the terminology

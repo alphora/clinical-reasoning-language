@@ -79,10 +79,10 @@ export interface PerLibraryEmit {
   //   - `root`     : the per-CRL (`none`) emit OR the partial-split Root (keeps
   //                  the source name).
   //   - `concepts` : the terminology-owning entry (partial Concepts sibling OR
-  //                  full-split LocalConcepts/RecordConcepts — owns the
+  //                  full-split LocalConcepts/ExternalConcepts — owns the
   //                  CodeSystem/author-ValueSet depends-on edges).
-  //   - `layer`    : a full-split source/inference layer (LocalSource /
-  //                  RecordSource / Inferred) that consumes lower layers.
+  //   - `layer`    : a full-split source/inference layer (LocalPrimitives /
+  //                  ExternalPrimitives / Inferences) that consumes lower layers.
   //   - `interface`: the synthesized `<policyId>-Interface` re-export library
   //                  (decision/action-guard surface). The FHIR lane rewires
   //                  decision/activity/recommendation `library[]` onto it and
@@ -90,8 +90,8 @@ export interface PerLibraryEmit {
   //                  role — that wiring is the FHIR half; here we just expose it.
   role: "root" | "concepts" | "layer" | "interface";
   // #186 — the RAW source-typed partition value this entry was emitted under
-  // (`LocalConcepts` / `RecordConcepts` / `LocalSource` / `RecordSource` /
-  // `Inferred` / `Interface`), or `undefined` for the per-CRL/`none` Root (no
+  // (`LocalConcepts` / `ExternalConcepts` / `LocalPrimitives` / `ExternalPrimitives` /
+  // `Inferences` / `Interface`), or `undefined` for the per-CRL/`none` Root (no
   // layer). The FHIR lane derives the layered Library identity `S` DIRECTLY from
   // `layerLibraryName(policyId, layer)` off this field — it does NOT parse `S`
   // back out of the CQL `libraryName` string (that string-strip broke once S went
@@ -732,7 +732,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   // Slice 2 (layeredEmit) — generated-name collision preflight. The full set
   // of emitted CQL library names = every UNSPLIT entry's own name PLUS every
   // SPLIT entry's generated layer names (`<X> Concepts` / `<X> Asserted` /
-  // `<X> Inferred`). If a generated layer name collides with another emitted
+  // `<X> Inferences`). If a generated layer name collides with another emitted
   // name (e.g. a multi-layer `library "X"` whose split yields `X Asserted`,
   // and a separate real `library "X Asserted"` elsewhere in the closure), we
   // would otherwise emit two libraries with the same id/filename and silently
@@ -930,15 +930,15 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
         }
         // Manifest role (R2) — keyed off the source-typed partition VALUE
         // (`part.layer`), the one source of truth:
-        //   - LocalConcepts / RecordConcepts → "concepts": OWNS the terminology
+        //   - LocalConcepts / ExternalConcepts → "concepts": OWNS the terminology
         //     declarations (the FHIR lane routes the CodeSystem / author-ValueSet
         //     depends-on edges onto this entry).
         //   - Interface → "interface": the synthesized re-export library (the
         //     FHIR lane rewires decision/activity `library[]` onto it).
-        //   - LocalSource / RecordSource / Inferred → "layer": a consuming
+        //   - LocalPrimitives / ExternalPrimitives / Inferences → "layer": a consuming
         //     source/inference layer (depends-on its lower siblings via `includes`).
         const role: PerLibraryEmit["role"] =
-          part.layer === "LocalConcepts" || part.layer === "RecordConcepts"
+          part.layer === "LocalConcepts" || part.layer === "ExternalConcepts"
             ? "concepts"
             : part.layer === "Interface"
               ? "interface"

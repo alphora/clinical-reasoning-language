@@ -38,13 +38,13 @@ const CORPORA: Record<string, string> = {
   "cms69-strategy": path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69/cms69-strategy.crl"),
   // Slice 2 (layeredEmit): a single multi-layer CRL library that auto-splits
   // into `Layered Basic Concepts` / `Layered Basic Asserted` /
-  // `Layered Basic Inferred`. Lives under the test dir (not the corpus tree)
+  // `Layered Basic Inferences`. Lives under the test dir (not the corpus tree)
   // since it's a standalone single-file fixture with no imports.
   "layered-basic": path.join(__dirname, "fixtures", "layered-basic", "layered-basic.crl"),
   // Slice 3 (lowerLocalCodes): a single multi-layer CRL library whose leaves
   // carry `code is` local source codes. The lowering pass synthesizes a local
   // codesystem (URN) + per-concept code into the Concepts layer and a retrieve
-  // into the Asserted layer; a `defined as` concept lands in the Inferred layer.
+  // into the Asserted layer; a `defined as` concept lands in the Inferences layer.
   // Exercises the full code-is fan-out + cross-layer re-qualification.
   "code-is-basic": path.join(__dirname, "fixtures", "code-is-basic", "code-is-basic.crl"),
   // Slice 4c (always-extract-Concepts PARTIAL split) — a single library
