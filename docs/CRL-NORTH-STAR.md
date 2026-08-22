@@ -273,8 +273,15 @@ for a valueless record or from *reading* the value for a boolean Observation).
 - read the `structureDefinition.ts` / `closureOrchestrator.ts` "always-boolean" doctrine as authoritative — it is
   the code we are removing.
 
-**Patient is the one supplied exception** (charter §2): PA supplies the Patient resource, so a Patient/age
-determination is *read*, not gathered via a questionnaire case-feature.
+**Patient is the one both-representation exception** (charter §2). PA today runs on local `code is` alone —
+it has **no** remote clinical/claims data, so its concepts define no `source representation` (there'd be no
+data to populate one). **Patient is the exception:** PA *does* receive the Patient resource, so a Patient
+concept legitimately carries **both** a local `code is` **and** a `source representation` off the supplied
+Patient, recency-merged — the patient-age both-rep. This does **not** make Patient/age read-only: its local
+side is fully **assertable/gatherable** (the human-asserted age Observation is a real case-feature with its own
+SD). Age is simply the one determination that *also* has real remote data (birthDate) to read and merge, which
+no other PA concept does. A **purely** Patient-sourced read (a `source representation` with no local `code is`
+— e.g. birthDate read directly) is the only "supplied, not gathered" case: read from the Patient, no SD.
 
 ### ⭐ Case-feature COMPLETENESS — gather every FHIR-required element (a VALID resource, or it's worthless)
 
