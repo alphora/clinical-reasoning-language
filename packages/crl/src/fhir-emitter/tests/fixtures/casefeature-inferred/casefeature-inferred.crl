@@ -13,6 +13,7 @@ concept "Base":
 - type is Observation.
 - value type is boolean.
 - code is `base-code`.
+- definition is exists this.
 
 concept "Derived":
 - type is Observation.

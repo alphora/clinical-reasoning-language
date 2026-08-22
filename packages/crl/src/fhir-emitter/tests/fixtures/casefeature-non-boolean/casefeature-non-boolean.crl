@@ -12,6 +12,7 @@ concept "Coded Determination":
 - type is Observation.
 - value type is CodeableConcept.
 - code is `coded-det`.
+- definition is most recent this.
 
 activity "Refer":
 - request CPGServiceRequest.
