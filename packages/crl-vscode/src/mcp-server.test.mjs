@@ -302,7 +302,7 @@ check("leading BOM is stripped → parses like the fixture", async () => {
   // resolves them through the resolved-imports graph.
   const cms22Inferred = resolve(
     here,
-    "../../crl/src/tests/fixtures/corpus/cms22/cms22-inferred.crl"
+    "../../crl/src/tests/fixtures/corpus/cms22/cms22-inferences.crl"
   );
 
 check("validate_crl via path → project mode resolves sibling libraries", async () => {
