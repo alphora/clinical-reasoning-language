@@ -3,38 +3,39 @@ library "Ultrasonic Osteogenesis Stimulator Coverage".
 
 /*
 Prior-authorization coverage model for ultrasonic osteogenesis stimulators.
-`first:` makes the branches ordered (first match wins): the three exclusions are
-tested before the approval branch so a denial wins by position, and `otherwise`
-is the catch-all (deny). See docs/decision-shapes.md.
+`first:` makes the branches ordered (first match wins): the exclusions are tested
+before the approval branch so a denial wins by position, and `otherwise` is the
+catch-all (deny). See docs/decision-shapes.md.
 
-Per the PA authoring approach:
-- the four conditions are local case-features, each carrying its own LOCAL domain
-  `code is` (no value sets / `coded from`, no terminology — source-representation
-  expansion is a later phase);
-- the dispositions are the shareable `Approve` / `Deny` determination activities.
+The clinical determinations are LOCAL-CODE OBSERVATIONS: each is a reviewer-asserted
+analytical inference (system of insight, not system of record), so its FHIR datum is
+an Observation carrying the local domain code — NOT a clinical Condition/Device
+(coding an analytics inference onto a Condition/Device would advertise a clinical
+resource nothing reads). Existence of the coded Observation IS the determination
+(`definition is exists this`, closed-world). The request-being-authorized
+(ServiceRequest) and Patient arrive via `source representation` (supplied), added
+next.
 */
 
-// ============ Concepts (local case-features) ============
+// ============ Concepts (local-code Observations — asserted determinations) ============
 
 concept "Fracture Of Skull Or Vertebrae":
-- type is Condition.
+- type is Observation.
 - value type is boolean.
 - code is `skull-or-vertebrae-fracture`.
+- definition is exists this.
 
 concept "Tumor-Related Fracture":
-- type is Condition.
+- type is Observation.
 - value type is boolean.
 - code is `tumor-related-fracture`.
-
-concept "Concurrent Noninvasive Stimulator In Use":
-- type is Device.
-- value type is boolean.
-- code is `concurrent-noninvasive-stimulator`.
+- definition is exists this.
 
 concept "Documented Fracture Nonunion":
-- type is Condition.
+- type is Observation.
 - value type is boolean.
 - code is `documented-fracture-nonunion`.
+- definition is exists this.
 
 // ============ Decision ============
 
@@ -42,7 +43,6 @@ decision "Ultrasonic Osteogenesis Stimulator Coverage":
 first:
 - when "Fracture Of Skull Or Vertebrae" then recommend activity "not-certify.Deny".
 - when "Tumor-Related Fracture" then recommend activity "not-certify.Deny".
-- when "Concurrent Noninvasive Stimulator In Use" then recommend activity "not-certify.Deny".
 - when "Documented Fracture Nonunion" then recommend activity "certify.Approve".
 - otherwise then recommend activity "not-certify.Deny".
 

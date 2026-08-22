@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 
 import { buildCEL } from "../index";
-import { findProjectRoot, buildRegistry } from "../../imports";
+import { findProjectRoot, buildRegistry, walkIncludes } from "../../imports";
 import { canonicalizeFsPath } from "../../imports/paths";
 
 import type { ResolvedCelGraph, CelImportDiagnostic } from "./types";
@@ -84,12 +84,27 @@ export function resolveCelImports(
     });
   }
 
+  // 5. #189 CEL-writer T3b (disc 490) — include-walk the closure seeded from `coversTarget`, the CEL analog of
+  // the definition lane's `graph.resolvedLibraries`. Reuses the ALREADY-built registry via the exact same
+  // `walkIncludes` unit the CQL/FHIR lane uses (NOT a second `resolveImports`, which would rebuild the registry,
+  // re-find the project root, and drop `options.overlays` — disc 490 [critical]). Its diagnostics (include
+  // cycles, unresolved includes) pass through as `crl-import` so the CEL lane surfaces the same errors.
+  let resolvedLibraryPaths: ReadonlySet<string> | undefined;
+  if (coversTarget) {
+    const walk = walkIncludes(coversTarget, registry);
+    resolvedLibraryPaths = new Set(walk.resolvedLibraries.map((e) => e.filePath));
+    for (const d of walk.diagnostics) {
+      diagnostics.push({ kind: "crl-import", severity: d.severity, underlying: d });
+    }
+  }
+
   return {
     filePath: canonical,
     ...(cel ? { cel } : {}),
     projectRoot,
     crlRegistry: registry,
     ...(coversTarget ? { coversTarget } : {}),
+    ...(resolvedLibraryPaths ? { resolvedLibraryPaths } : {}),
     celParseErrors,
     diagnostics,
   };

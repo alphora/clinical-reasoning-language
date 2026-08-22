@@ -17,6 +17,18 @@ export interface ResolvedCelGraph {
   crlRegistry?: Registry;
   /** CRL RegistryEntry matching the `covers` declaration's library name. Absent when unresolved or no covers. */
   coversTarget?: RegistryEntry;
+  /**
+   * #189 CEL-writer T3b (disc 490). filePaths of the include-walked closure seeded from `coversTarget` — the CEL
+   * analog of the CQL/FHIR lane's `graph.resolvedLibraries` (both are `walkIncludes(seed, registry)`). The
+   * instance emitter's derive-local uses it as the `primarySeedPaths` for the shared local-domain resolver, so a
+   * local fact's `{system, code}` byte-matches the CQL retrieve's CodeSystem by construction. Absent when there
+   * is no covers target (derive-local then fails loudly — no silent fallback, disc 490 [critical]).
+   *
+   * ⚠ By-construction byte-match holds ONLY when the covered library IS the project's emit entry (disc 490
+   * Fable #1): `graph.resolvedLibraries` on the definition lane is the walk from the EMIT ENTRY, and the two
+   * walks coincide only then. Covering a non-entry library is outside the guarantee for now.
+   */
+  resolvedLibraryPaths?: ReadonlySet<string>;
   /** Lex/parse diagnostics from buildCEL. */
   celParseErrors: CRLError[];
   /** Bridge diagnostics: project-root-not-found, unresolved-covers, covers-missing-but-cases-present, plus CRL-side pass-through. */

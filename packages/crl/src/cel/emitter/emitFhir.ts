@@ -8,6 +8,10 @@ import {
 } from "../../ast/types";
 import { hasLocalCode, hasSourceBinding } from "../../emit/conceptDatumSignals";
 import { resourceCodingPlacement } from "../../emit/resourceEmitRegistry";
+import { readCanonicalBase, readPolicyId } from "../../fhir-emitter/metadata";
+import { createLocalDomainResolver } from "../../fhir-emitter/localDomain";
+import { astHasConceptLocalCode } from "../../cql-emitter/lowerLocalCodes";
+import type { Registry, RegistryEntry } from "../../imports/types";
 import type { ResolvedCelGraph } from "../imports/types";
 import type {
   CELFact,
@@ -120,7 +124,7 @@ const CPG_TO_FHIR: Record<string, string> = {
 // share one helper. v2.3.0-FHIR-Todo-1 also added a 64-char truncation
 // cap matching the FHIR `id` regex — CEL slugify wasn't hitting the cap
 // in the corpus, but inheriting the cap is correct.
-import { rawSlug, slugify, uniqueCapSlug } from "../../fhir-emitter/slug";
+import { rawSlug, slugify, uniqueCapSlug, localCodeSystemUrl } from "../../fhir-emitter/slug";
 import { lookupCpgActivityProfile } from "../../fhir-emitter/cpgActivityProfiles";
 
 interface DerivedType {
@@ -158,6 +162,10 @@ interface DerivedType {
    *  pair with the project canonicalBase to compose the local CodeSystem URL (derive-local). Present iff `concept`
    *  is. INERT in todo 1. */
   owningLibrary?: string;
+  /** REFACTOR:grounded (#189 CEL-writer T3b, disc 490). The RESOLVED owning `RegistryEntry` of `concept` — the
+   *  derive-local identity keyed on `filePath` (name ALONE collides local-vs-package; disc 490 gpt56 #6). Carries
+   *  the raw `ast.library.name` fallback used when the project has no policy id. Present iff `concept` is. */
+  owningEntry?: RegistryEntry;
 }
 
 /**
@@ -203,6 +211,7 @@ function deriveFhirType(
         role: classifyConceptRole(target),
         concept: target,
         owningLibrary: libName,
+        owningEntry: lib,
       };
     }
     return undefined;
@@ -321,8 +330,7 @@ function parseCanonicalToken(raw: string): CodeParts {
   return { system: raw.slice(0, pipe), code: raw.slice(pipe + 1) };
 }
 
-function codeableConcept(raw: string): Record<string, unknown> {
-  const cp = parseCanonicalToken(raw);
+function codeableConceptFromParts(cp: CodeParts): Record<string, unknown> {
   return {
     coding: [
       {
@@ -331,6 +339,89 @@ function codeableConcept(raw: string): Record<string, unknown> {
       },
     ],
   };
+}
+
+function codeableConcept(raw: string): Record<string, unknown> {
+  return codeableConceptFromParts(parseCanonicalToken(raw));
+}
+
+/** #189 CEL-writer T3b (disc 490). filePaths of every registry library that declares concept-level `code is`,
+ *  computed at the RAW-AST boundary (the CEL registry is never lowered, so `astHasConceptLocalCode` is stable).
+ *  Feeds the shared local-domain resolver's `localCodePaths`. Recomputed per local fact (pure/cheap; memoize per
+ *  graph only if a large caseload shows it). */
+function computeLocalCodePaths(registry: Registry): Set<string> {
+  const out = new Set<string>();
+  for (const e of registry.byNameLocal.values()) if (astHasConceptLocalCode(e.ast)) out.add(e.filePath);
+  for (const e of registry.byNamePackage.values()) if (astHasConceptLocalCode(e.ast)) out.add(e.filePath);
+  return out;
+}
+
+/** #189 CEL-writer T3b (disc 490). DERIVE a local `code is` fact's `{system, code}` from the concept via the
+ *  SAME project resolution the CQL definition lane uses, so the instance coding byte-matches the retrieve's
+ *  CodeSystem BY CONSTRUCTION. Returns the parts, or a case-atomic error (the fact is then SKIPPED — never
+ *  emitted coding-less, which `$apply` drops silently). Scope of the by-construction guarantee (disc 490):
+ *  covers-target ≡ the project emit entry, and only the shapes `lowerLocalCodes` actually lowers (a `code is`
+ *  bothrep-with-`source representation` is preserved-but-not-lowered on the shipped CQL lane — its round-trip is
+ *  UNVERIFIED against the definition lane here; dme101-030 is pure-local so unaffected). */
+function deriveLocalCoding(
+  ctx: EmitContext,
+  derived: DerivedType,
+  factName: string,
+): { parts: CodeParts } | { error: EmitDiagnostic } {
+  const graph = ctx.graph;
+  const mkErr = (message: string): { error: EmitDiagnostic } => ({
+    error: {
+      kind: "local-coding-derivation-failed",
+      severity: "error",
+      message,
+      caseSlug: ctx.caseSlug,
+      factName,
+      filePath: graph.filePath,
+    },
+  });
+
+  const concept = derived.concept;
+  const owningEntry = derived.owningEntry;
+  if (!concept || !owningEntry) return mkErr(`local fact "${factName}" has no resolved concept/owning library`);
+
+  // Empty concept code → derivation failure (disc 490 Fable #6: never emit `coding.code: ""`).
+  const code = concept.code;
+  if (typeof code !== "string" || code.trim() === "") {
+    return mkErr(`local concept "${concept.name}" carries no \`code is\`; cannot derive a local coding`);
+  }
+
+  // canonicalBase — ONE consuming-project value (disc 490 D1). Missing base → hard failure (charter forbids a
+  // urn/manufactured fallback). NOTE: a file-level precondition gated on ≥1 local fact (disc 490 D3 REFINE) is
+  // a T3c ergonomic follow-up; the write-site guard here is the loud floor that satisfies "never silent partial."
+  const base = graph.projectRoot ? readCanonicalBase(graph.projectRoot) : undefined;
+  if (!base) {
+    return mkErr(`project has no \`crl.canonicalBase\`; cannot compose the local CodeSystem url for "${concept.name}"`);
+  }
+
+  // The include-walked covers closure (primary seed). Absent → no covers target → fail loudly (disc 490
+  // [critical]: NO sole-primary fallback — it would over-disambiguate included code-bearing libraries).
+  const seed = graph.resolvedLibraryPaths;
+  if (!seed) return mkErr(`no resolved covers closure; cannot resolve the local domain for "${concept.name}"`);
+  const registry = graph.crlRegistry;
+  if (!registry) return mkErr(`no CRL registry; cannot resolve the local domain for "${concept.name}"`);
+
+  const policyId = graph.projectRoot ? readPolicyId(graph.projectRoot) : undefined;
+  const resolver = createLocalDomainResolver({
+    primarySeedPaths: seed,
+    localCodePaths: computeLocalCodePaths(registry),
+    policyId,
+  });
+  // Metadata-less fallback mirrors the CQL lowering: `ast.library.name`, NOT the nullable `RegistryEntry.name`
+  // (disc 490 Fable #12).
+  const domainId = resolver.domainIdFor(owningEntry) ?? owningEntry.ast.library.name;
+
+  let system: string;
+  try {
+    system = localCodeSystemUrl(base, domainId);
+  } catch (e) {
+    return mkErr(`local CodeSystem url composition failed for "${concept.name}": ${(e as Error).message}`);
+  }
+  return { parts: { system, code } };
 }
 
 /** Read body fields from a fact into a flat lookup. */
@@ -585,8 +676,36 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   // the fact). A resource with NO registry row (an activity-only resource like Task/CommunicationRequest, or any
   // unlisted type) keeps the pre-flip `.code` write — category-3 activity coding + unlisted fail-closed are T4.
   // (Role governs the code VALUE/system — derive-local vs authored, T3 — not the coding element, which is T2.)
-  if (typeof body.code === "string") {
-    const cc = codeableConcept(body.code);
+  // #189 CEL-writer T3b (disc 490): a LOCAL-role fact DERIVES its `{system, code}` from the concept (byte-match
+  // with the CQL retrieve BY CONSTRUCTION); remote/bare-type/activity keep T2's authored-code placement. The
+  // loud floor: a local derivation failure or an authored-code §5 conflict SKIPS the fact (return undefined) —
+  // never a coding-less or ambiguously-coded partial instance (which `$apply` drops silently → wrong PA
+  // determination, the dme101-030 failure class). Full case-atomic discard/unwire is T3c.
+  let coding: CodeParts | undefined;
+  if (derived.role === "local") {
+    if (typeof body.code === "string") {
+      // §5 — the code must derive from the concept; never silently prefer authored vs derived.
+      ctx.diagnostics.push({
+        kind: "local-authored-code-conflict",
+        severity: "error",
+        message: `Fact "${factName}" is backed by a local concept but also carries an authored \`code is\` — the code must derive from the concept; remove the fact's code.`,
+        caseSlug: ctx.caseSlug,
+        factName,
+        filePath: ctx.graph.filePath,
+      });
+      return undefined;
+    }
+    const local = deriveLocalCoding(ctx, derived, factName);
+    if ("error" in local) {
+      ctx.diagnostics.push(local.error);
+      return undefined;
+    }
+    coding = local.parts;
+  } else if (typeof body.code === "string") {
+    coding = parseCanonicalToken(body.code);
+  }
+  if (coding) {
+    const cc = codeableConceptFromParts(coding);
     const placement = resourceCodingPlacement(fhirType);
     if (placement) {
       resourceBody[placement.jsonName] = placement.array ? [cc] : cc;

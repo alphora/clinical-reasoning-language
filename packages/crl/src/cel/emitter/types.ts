@@ -36,7 +36,14 @@ export type EmitDiagnosticKind =
   /** A `result is` line was parsed but not emitted (deferred to #70/metric). */
   | "result-deferred"
   /** Pre-condition for emit failed (parse error, unresolved covers, etc.) — case skipped. */
-  | "precondition-failed";
+  | "precondition-failed"
+  /** #189 T3b — a local `code is` fact could not derive its `{system, code}` (no canonicalBase, no covers
+   *  closure, empty concept code, or url composition threw). The fact is SKIPPED, never emitted coding-less
+   *  (a coding-less instance is silently dropped by `$apply` → wrong PA determination). */
+  | "local-coding-derivation-failed"
+  /** #189 T3b — a LOCAL-concept fact ALSO carries its own authored `code` token. The code must derive from the
+   *  concept; §5 forbids silently preferring one, so the fact is SKIPPED with this error. */
+  | "local-authored-code-conflict";
 
 export interface EmitResult {
   /** Cases that emitted at least one resource (per-case atomic). */

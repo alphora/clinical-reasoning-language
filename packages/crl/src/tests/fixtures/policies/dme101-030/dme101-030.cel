@@ -13,13 +13,14 @@ fact "Pat Jones":
 
 // ============ Clinical facts ============
 
+// T3b derive-local: the fact names its backing concept via `defined by`; the local
+// `{system, code}` is DERIVED from the concept (NOT authored here). An authored `code is`
+// on a local-concept fact is now a §5 conflict error.
 fact "Documented Tibial Nonunion":
-- code is "http://snomed.info/sct|263212004".
 - date is "2026-02-01".
 - defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Documented Fracture Nonunion".
 
 fact "Skull Fracture Finding":
-- code is "http://snomed.info/sct|208394000".
 - date is "2026-02-01".
 - defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Fracture Of Skull Or Vertebrae".
 
