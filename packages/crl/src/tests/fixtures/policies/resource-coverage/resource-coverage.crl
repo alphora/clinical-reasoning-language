@@ -1,0 +1,41 @@
+# Resource-type coverage
+library "Resource Coverage".
+
+/*
+Exercises base-QI-Core case-feature emit across three resource types. Each concept is a local
+`code is` existence determination (charter §4: a valueless record's existence IS the determination;
+the boolean is the ephemeral CQL reading). Used by the CEL-emit resource-coverage test to prove
+Observation/Procedure/MedicationRequest instances emit with their QI-Core required elements +
+`meta.profile`.
+*/
+
+concept "Screening Assessment":
+- type is Observation.
+- value type is boolean.
+- code is `screening-assessment`.
+- definition is exists this.
+
+concept "Stimulator Procedure":
+- type is Procedure.
+- value type is boolean.
+- code is `stimulator-procedure`.
+- definition is exists this.
+
+concept "Requested Medication":
+- type is MedicationRequest.
+- value type is boolean.
+- code is `requested-medication`.
+- definition is exists this.
+
+decision "Resource Coverage":
+first:
+- when "Screening Assessment" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
+
+activity "certify.Approve":
+- request CPGCommunicationRequest.
+- with `Approved.`.
+
+activity "not-certify.Deny":
+- request CPGCommunicationRequest.
+- with `Denied.`.

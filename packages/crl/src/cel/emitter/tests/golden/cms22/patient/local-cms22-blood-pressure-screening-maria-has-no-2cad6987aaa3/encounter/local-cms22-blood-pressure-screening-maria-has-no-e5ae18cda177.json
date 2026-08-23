@@ -1,6 +1,11 @@
 {
   "resourceType": "Encounter",
   "id": "local-cms22-blood-pressure-screening-maria-has-no-e5ae18cda177",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-encounter"
+    ]
+  },
   "subject": {
     "reference": "Patient/local-cms22-blood-pressure-screening-maria-has-no-2cad6987aaa3"
   },

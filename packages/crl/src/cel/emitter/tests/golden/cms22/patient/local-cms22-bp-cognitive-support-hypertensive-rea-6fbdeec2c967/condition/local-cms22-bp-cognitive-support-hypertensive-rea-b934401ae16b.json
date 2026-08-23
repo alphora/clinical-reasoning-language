@@ -1,6 +1,11 @@
 {
   "resourceType": "Condition",
   "id": "local-cms22-bp-cognitive-support-hypertensive-rea-b934401ae16b",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-condition-problems-health-concerns"
+    ]
+  },
   "subject": {
     "reference": "Patient/local-cms22-bp-cognitive-support-hypertensive-rea-6fbdeec2c967"
   },

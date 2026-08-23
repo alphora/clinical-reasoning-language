@@ -1,0 +1,20 @@
+{
+  "name": "resource-coverage",
+  "version": "1.0.0",
+  "private": true,
+  "description": "QI-Core resource-type coverage — exercises Observation/Procedure/MedicationRequest case-feature emit",
+  "author": "CRL tests",
+  "crl": {
+    "canonicalBase": "http://example.org/test/resource-coverage",
+    "status": "draft",
+    "experimental": true,
+    "date": "2026-01-01T00:00:00.000Z",
+    "dispositions": {
+      "mode": "standalone",
+      "options": {
+        "certify": { "Approve": { "label": "Approve" } },
+        "not-certify": { "Deny": { "label": "Deny" } }
+      }
+    }
+  }
+}

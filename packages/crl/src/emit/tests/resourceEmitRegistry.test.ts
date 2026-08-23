@@ -17,6 +17,8 @@ import {
   requiredStructuralElements,
   defaultValueJson,
   resourceCodingPlacement,
+  QICORE_BASE_PROFILE,
+  qicoreBaseProfile,
 } from "../resourceEmitRegistry";
 
 // T2 — the JSON-write-name resolvers. These derive the serialized-JSON write name from a T1 read row via the
@@ -440,5 +442,27 @@ describe("case-feature-emittable set ↔ registry caseFeature flags (lane-neutra
     expect(RESOURCE_EMIT_REGISTRY.Encounter).toBeDefined();
     expect(RESOURCE_EMIT_REGISTRY.Encounter.caseFeature).toBe(false);
     expect(CASE_FEATURE_EMITTABLE_TYPES.has("Encounter")).toBe(false);
+  });
+});
+
+// #189 base QI-Core (disc 495) — the instance `meta.profile` stamping map.
+describe("QICORE_BASE_PROFILE — base QI-Core profile per stamped resource type", () => {
+  it("covers every fact-emitted registry row + Patient (the stamped set)", () => {
+    for (const rt of Object.keys(RESOURCE_EMIT_REGISTRY)) {
+      expect(qicoreBaseProfile(rt), `${rt} must have a base QI-Core profile`).toBeDefined();
+    }
+    expect(qicoreBaseProfile("Patient"), "Patient (no registry row) is stamped").toBeDefined();
+  });
+
+  it("returns undefined for an unlisted type (stays unstamped) + prototype-pollution guard", () => {
+    expect(qicoreBaseProfile("DiagnosticReport")).toBeUndefined();
+    expect(qicoreBaseProfile("toString")).toBeUndefined();
+  });
+
+  it("every canonical is an UNVERSIONED qicore StructureDefinition URL (disc 495 Q3)", () => {
+    for (const url of Object.values(QICORE_BASE_PROFILE)) {
+      expect(url).toMatch(/^http:\/\/hl7\.org\/fhir\/us\/qicore\/StructureDefinition\/qicore-/);
+      expect(url, "wire canonical is unversioned (no |version)").not.toContain("|");
+    }
   });
 });

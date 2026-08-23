@@ -1,6 +1,11 @@
 {
   "resourceType": "Patient",
   "id": "local-cms69-bmi-cognitive-support-high-bmi-jane-d-54cd0ddbd937",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-patient"
+    ]
+  },
   "identifier": [
     {
       "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/identifier/cel-test-patient",

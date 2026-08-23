@@ -1,6 +1,11 @@
 {
   "resourceType": "Encounter",
   "id": "local-cms69-bmi-screening-janes-high-bmi-is-follo-8720e12e9bf5",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-encounter"
+    ]
+  },
   "subject": {
     "reference": "Patient/local-cms69-bmi-screening-janes-high-bmi-is-follo-425a5b862767"
   },

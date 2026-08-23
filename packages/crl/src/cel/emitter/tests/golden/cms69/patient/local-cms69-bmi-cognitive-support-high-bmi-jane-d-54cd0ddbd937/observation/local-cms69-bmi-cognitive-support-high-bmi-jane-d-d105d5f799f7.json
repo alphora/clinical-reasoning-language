@@ -1,6 +1,11 @@
 {
   "resourceType": "Observation",
   "id": "local-cms69-bmi-cognitive-support-high-bmi-jane-d-d105d5f799f7",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-simple-observation"
+    ]
+  },
   "subject": {
     "reference": "Patient/local-cms69-bmi-cognitive-support-high-bmi-jane-d-54cd0ddbd937"
   },

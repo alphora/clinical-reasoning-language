@@ -349,6 +349,31 @@ export function defaultValueJson(value: DefaultValue): unknown {
   return value.kind === "coding" ? coding : { coding: [coding] };
 }
 
+// ── #189 base QI-Core (disc 495) — instance `meta.profile` stamping ──────────────────────────────────────
+/** The base QI-Core profile canonical per fact-emitted resource type, stamped as instance `meta.profile`.
+ *  UNVERSIONED (canonical URLs are version-stable; the pinned VERSION — QI-Core 7.0.2 / US Core 7.0.0 — is a
+ *  build/validation concern, not the wire value; disc 495 Q3). Condition defaults to problems-health-concerns
+ *  (an analytical determination is a health-concern, NOT an encounter-diagnosis — charter §2; the concept→profile
+ *  selection is #296). Patient has no RESOURCE_EMIT_REGISTRY row (it is the case subject, not a case-feature
+ *  datum) but IS stamped. Consumed by the CEL instance writer additively — never clobbers an existing (CPG) profile. */
+export const QICORE_BASE_PROFILE: Readonly<Record<string, string>> = {
+  Patient: "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-patient",
+  Observation: "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-simple-observation",
+  Condition: "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-condition-problems-health-concerns",
+  Procedure: "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-procedure",
+  ServiceRequest: "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-servicerequest",
+  MedicationRequest: "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-medicationrequest",
+  Encounter: "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-encounter",
+};
+
+/** The base QI-Core profile canonical for a fact-emitted resource type, or `undefined` (a type with no base
+ *  QI-Core mapping — e.g. an activity-output Task — stays unstamped). Own-property guarded (prototype-pollution). */
+export function qicoreBaseProfile(resourceType: string): string | undefined {
+  return Object.prototype.hasOwnProperty.call(QICORE_BASE_PROFILE, resourceType)
+    ? QICORE_BASE_PROFILE[resourceType]
+    : undefined;
+}
+
 // ── T2: JSON-write-name resolvers ────────────────────────────────────────────────────────────────────────
 // The serialized-JSON write names the CEL lane needs at the flip, DERIVED from the read row via the one FHIR
 // polymorphic-element spelling rule. See the SCOPE / SPELLING≠LEGALITY / CONSUMPTION notes in the file header.

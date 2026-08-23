@@ -11,6 +11,7 @@ import {
   resourceCodingPlacement,
   requiredStructuralElements,
   defaultValueJson,
+  qicoreBaseProfile,
 } from "../../emit/resourceEmitRegistry";
 import { readCanonicalBase, readPolicyId } from "../../fhir-emitter/metadata";
 import { createLocalDomainResolver } from "../../fhir-emitter/localDomain";
@@ -516,9 +517,11 @@ function makePatientId(ctx: EmitContext, factName: string): string {
 function emitSubjectPatient(ctx: EmitContext, patientFact: CELFact): EmittedResource | undefined {
   const body = readFactBody(patientFact);
   const id = makePatientId(ctx, patientFact.name);
+  const patientProfile = qicoreBaseProfile("Patient");
   const out: Record<string, unknown> = {
     resourceType: "Patient",
     id,
+    ...(patientProfile ? { meta: { profile: [patientProfile] } } : {}),
   };
   // #189 base QI-Core (disc 495): QI-Core Patient requires `identifier` 1..* and `name` 1..*. The case Patient is
   // SYNTHETIC test data (an identity the case author invented — not a real member, not clinical data), so the
@@ -677,17 +680,30 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
 
   const body = readFactBody(fact);
   const id = makeResourceId(ctx, factName);
+  // #189 base QI-Core (disc 495) + T12/#89: stamp `meta.profile` ADDITIVELY — any CPG instance profile (activity
+  // output) AND the base QI-Core profile for the resource type; an activity-output resource conforms to both. CPG
+  // first (more specific), then the base QI-Core canonical. A type with no QI-Core mapping stays unstamped.
+  const profiles = [derived.profileUrl, qicoreBaseProfile(fhirType)].filter(
+    (p): p is string => typeof p === "string",
+  );
   const resourceBody: Record<string, unknown> = {
     resourceType: fhirType,
     id,
-    // T12 / #89: stamp the CPG instance profile canonical when known.
-    ...(derived.profileUrl ? { meta: { profile: [derived.profileUrl] } } : {}),
+    ...(profiles.length ? { meta: { profile: profiles } } : {}),
   };
 
   // Subject reference.
   const subject = findSubject(ctx);
   if (subject && SUBJECT_RESOURCES.has(fhirType)) {
     resourceBody.subject = { reference: `Patient/${makePatientId(ctx, subject.name)}` };
+  }
+
+  // #189 base QI-Core (disc 495): QI-Core MedicationRequest requires `requester` when intent is an order-type
+  // (us-core-21), and the floor defaults intent=order. For SYNTHETIC test data the requester is the case subject
+  // (a valid requester reference type) — administrative scaffolding, not a clinical claim. (Procedure `performed`
+  // — us-core-7, required when status=completed — is already satisfied for a dated fact by `applyDateField`.)
+  if (fhirType === "MedicationRequest" && subject) {
+    resourceBody.requester = { reference: `Patient/${makePatientId(ctx, subject.name)}` };
   }
 
   // Encounter reference (case-level ambient; cross-resource `during encounter` may override later).

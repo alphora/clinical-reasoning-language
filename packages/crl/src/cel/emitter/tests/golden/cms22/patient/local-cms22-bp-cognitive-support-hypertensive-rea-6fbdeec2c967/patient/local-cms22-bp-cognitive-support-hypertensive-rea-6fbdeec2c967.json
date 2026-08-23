@@ -1,6 +1,11 @@
 {
   "resourceType": "Patient",
   "id": "local-cms22-bp-cognitive-support-hypertensive-rea-6fbdeec2c967",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-patient"
+    ]
+  },
   "identifier": [
     {
       "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/identifier/cel-test-patient",

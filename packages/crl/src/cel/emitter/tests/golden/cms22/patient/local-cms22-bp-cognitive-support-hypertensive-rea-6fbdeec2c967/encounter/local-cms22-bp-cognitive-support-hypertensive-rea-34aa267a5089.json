@@ -1,6 +1,11 @@
 {
   "resourceType": "Encounter",
   "id": "local-cms22-bp-cognitive-support-hypertensive-rea-34aa267a5089",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-encounter"
+    ]
+  },
   "subject": {
     "reference": "Patient/local-cms22-bp-cognitive-support-hypertensive-rea-6fbdeec2c967"
   },

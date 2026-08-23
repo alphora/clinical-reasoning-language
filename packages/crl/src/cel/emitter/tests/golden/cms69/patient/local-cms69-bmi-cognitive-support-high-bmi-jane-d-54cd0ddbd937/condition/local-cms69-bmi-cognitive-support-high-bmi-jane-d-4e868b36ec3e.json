@@ -1,6 +1,11 @@
 {
   "resourceType": "Condition",
   "id": "local-cms69-bmi-cognitive-support-high-bmi-jane-d-4e868b36ec3e",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-condition-problems-health-concerns"
+    ]
+  },
   "subject": {
     "reference": "Patient/local-cms69-bmi-cognitive-support-high-bmi-jane-d-54cd0ddbd937"
   },

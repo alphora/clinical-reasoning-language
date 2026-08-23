@@ -1,0 +1,31 @@
+# Resource-type coverage — caseload
+library "Resource Coverage Cases".
+covers "Resource Coverage".
+
+fact "Test Patient":
+- name is "Test Patient".
+- birth date is "1980-01-01".
+- defined by "Patient".
+
+// Each fact's local `{system, code}` is DERIVED from its backing concept (T3b derive-local),
+// not authored here; the `date is` drives the per-resource date element (Procedure.performedDateTime,
+// Observation.effectiveDateTime, MedicationRequest.authoredOn).
+fact "Assessment Done":
+- date is "2026-02-01".
+- defined by "Resource Coverage"."Screening Assessment".
+
+fact "Procedure Performed":
+- date is "2026-02-01".
+- defined by "Resource Coverage"."Stimulator Procedure".
+
+fact "Medication Ordered":
+- date is "2026-02-01".
+- defined by "Resource Coverage"."Requested Medication".
+
+case "All resource types present":
+- description is `Exercises Observation + Procedure + MedicationRequest case-feature emit.`.
+- subject is "Test Patient".
+- fact is "Assessment Done".
+- fact is "Procedure Performed".
+- fact is "Medication Ordered".
+- result is "Resource Coverage" is "certify.Approve".
