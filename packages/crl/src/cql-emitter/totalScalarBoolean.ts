@@ -146,6 +146,50 @@ export function emitsTotalScalarBoolean(
   return result;
 }
 
+/**
+ * #189 B3 — true iff `concept`'s emitted define publishes a Scalar VALUE (a NON-boolean scalar datum), as opposed
+ * to a record list, a total scalar boolean, or a truth-set. The `defined as exists ("X")` bridge (`emitExistsBridge`)
+ * + its discharge dispatch on this: a scalar-VALUE operand lowers to `("X" is not null)` (null-presence, total by
+ * construction), NOT `exists(<scalar>)` (ill-typed — disc 496). SIBLING of `emitsTotalScalarBoolean`, same
+ * resolver/cycle discipline so a bare-ref alias resolves consistently.
+ *
+ * The scalar-value producers are a `most recent this` VALUE read (Slice C / the B2 cross-rep merge — the newest
+ * record's non-boolean value). A `coded from` (`CodedFromDefinition`) is DELIBERATELY excluded: it declares
+ * `Scalar<CodeableConcept>` by default but EMITS a record retrieve (`[Condition: VS]`), so `is not null` on it is
+ * vacuously true — the exact `Overweight Diagnoses` trap the crl-emit panel (disc 500) caught. A cross-lib operand
+ * returns false (B3 leaves cross-lib on `exists`; the scalar-value cross-lib cell is dispatched at the flip via the
+ * `DeclaredResultIndex` result-type). INERT today: every corpus scalar-value producer is GATED (Slice C / F), so
+ * no emittable `defined as exists` operand is scalar-value — this returns false for the whole corpus.
+ */
+export function emitsScalarValue(
+  concept: Concept | undefined,
+  resolvers: Resolvers,
+  visiting: ReadonlySet<string> = new Set(),
+): boolean {
+  if (concept === undefined || concept.name === undefined) return false;
+  if (visiting.has(concept.name)) return false; // cycle guard (an alias chain is bounded)
+  // Only a Scalar, NON-boolean concept can publish a scalar value (a boolean is a total-scalar-boolean, not a
+  // value; a Record/RecordSet publishes records). Cardinality/value-type are DECLARED (charter §3, authoritative).
+  if (concept.shape !== "Scalar") return false;
+  if (!(concept.valueTypes.length === 1 && concept.valueTypes[0] !== "boolean")) return false;
+  const def = concept.definition;
+  if (def === undefined) return false;
+  // A `most recent this` value read publishes the newest record's VALUE — the Slice-C / both-rep-merge scalar-value
+  // producer. (`coded from` is a `CodedFromDefinition`, NOT a `ReductionDefinition` → excluded here, emits records.)
+  if (def.type === "ReductionDefinition") {
+    const r = def.reduction;
+    return r.kind === "mostRecent" && r.target.type === "ThisRecords";
+  }
+  // A same-layer bare-ref alias to a scalar-value concept publishes that value (recurse, cycle-guarded). A QUALIFIED
+  // (cross-library) alias returns false in B3 (cross-lib scalar-value is dispatched at the flip).
+  if (def.type === "DefinedAsDefinition" && def.body.type === "DefinedAsBareRef") {
+    const res = resolvers.legacy(def.body.ref);
+    if (res.kind === "total") return false; // cross-lib terminal verdict answers TOTALITY, not value-shape → not here
+    return emitsScalarValue(res.concept, resolvers, new Set(visiting).add(concept.name));
+  }
+  return false;
+}
+
 function computeTotality(
   concept: Concept,
   name: string,
