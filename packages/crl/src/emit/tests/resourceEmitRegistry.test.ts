@@ -8,10 +8,12 @@ import {
 } from "../effectiveRepresentation";
 import {
   RESOURCE_EMIT_REGISTRY,
+  REQUIRED_STRUCTURAL_ELEMENTS,
   caseFeatureProfileShape,
   codingJsonName,
   valueJsonName,
   recencyStampJsonName,
+  requiredStructuralElements,
   resourceCodingPlacement,
 } from "../resourceEmitRegistry";
 
@@ -275,5 +277,46 @@ describe("#189 CEL-writer T2 — coding PLACEMENT + the Encounter (caseFeature:f
     expect(caseFeatureProfileShape("Encounter")).toBeUndefined();
     // a caseFeature:true row still profiles.
     expect(caseFeatureProfileShape("Condition")).toBeDefined();
+  });
+
+});
+
+// ── #189 remote-channel: required STRUCTURAL-element schema (homeostasis-core, disc 493) ──────────────────────
+describe("required structural-element schema (Patient + ServiceRequest)", () => {
+  it("ServiceRequest: status/intent are defaulted; subject is wired to the case Patient", () => {
+    expect(requiredStructuralElements("ServiceRequest")).toEqual([
+      { element: "status", fulfillment: { via: "default", value: "active" } },
+      { element: "intent", fulfillment: { via: "default", value: "order" } },
+      { element: "subject", fulfillment: { via: "wired", binding: "case-subject" } },
+    ]);
+  });
+
+  it("Patient: no structural required elements — genuinely [] (birthDate is concept-required, descriptor-derived)", () => {
+    expect(requiredStructuralElements("Patient")).toEqual([]);
+  });
+
+  it("exact coverage: only Patient + ServiceRequest are schema'd in this slice (a new row must update this pin)", () => {
+    expect(Object.keys(REQUIRED_STRUCTURAL_ELEMENTS).sort()).toEqual(["Patient", "ServiceRequest"]);
+  });
+
+  it("every structural element has a well-formed fulfillment (default carries a non-empty value)", () => {
+    for (const [resourceType, elems] of Object.entries(REQUIRED_STRUCTURAL_ELEMENTS)) {
+      for (const e of elems) {
+        const where = `${resourceType}.${e.element}`;
+        if (e.fulfillment.via === "default") {
+          expect(e.fulfillment.value, `${where} default value`).toBeTypeOf("string");
+          expect(e.fulfillment.value.length, `${where} default must be non-empty`).toBeGreaterThan(0);
+        } else if (e.fulfillment.via === "wired") {
+          expect(e.fulfillment.binding, `${where} wired binding`).toBe("case-subject");
+        }
+      }
+    }
+  });
+
+  it("an unlisted resource fails closed (undefined), NOT an empty list", () => {
+    // Absence ("no schema modeled yet") must be distinguishable from `[]` ("known, no structural required")
+    // so a caller can't silently ship an incomplete resource for an unmodeled type.
+    expect(requiredStructuralElements("Condition")).toBeUndefined();
+    expect(requiredStructuralElements("toString")).toBeUndefined(); // prototype-pollution guard
   });
 });

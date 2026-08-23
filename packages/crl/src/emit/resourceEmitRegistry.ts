@@ -146,6 +146,80 @@ export function resourceEmitRow(resourceType: string): ResourceEmitRow | undefin
     : undefined;
 }
 
+// ── #189 remote-channel: required STRUCTURAL-element schema (homeostasis-core, #76 folded in — disc 492/493) ─
+// #76's "a concept is an SD for CRL": a remote-channel resource must be COMPLETE + valid FHIR, not just coded.
+// TWO senses of required (operator 2026-08-22), with TWO authorities so neither can drift from the other (panel
+// disc 493, both arms):
+//   - STRUCTURAL (1.a): FHIR-cardinality-required, CONCEPT-INDEPENDENT — every instance of the type needs it
+//     regardless of which concept it backs (ServiceRequest `status`/`intent`/`subject`). Lives HERE.
+//   - CONCEPT (1.b): the datum the concept's own READ PATH is load-bearing on — the retrieve coding element, or
+//     the value element (ServiceRequest `code`; the Patient age posrep's `birthDate`). It is NOT stored here:
+//     it is DERIVED from the effective-representation descriptor (`coding`/`valueElement`, via `codingJsonName`/
+//     the value resolvers), the single authority for a concept's read spelling — duplicating it as a literal
+//     string would drift from the descriptor and would spell choice elements wrong (`medication[x]`). Recency
+//     stamps (`authoredOn`/`effective`) are READ but are NOT concept-required: absence is null-sort-safe (§3
+//     closed-world), so a stamp-less remote fact still evaluates. NB `birthDate` is not FHIR-required either — a
+//     birthDate-less Patient is legal (age → null → false); it is required to EXERCISE the age read in a remote
+//     case, which the descriptor's uncoded arm already pins.
+//
+// So this table is STRUCTURAL-ONLY. Defaultability is DECOUPLED from requiredness (Fable disc 493): a structural
+// element is satisfied by a `default` (administrative floor, overridable), by `wired` emit machinery (subject →
+// the case Patient reference — NOT a string literal), or `authored` (FHIR-required AND clinical, no safe default;
+// none in the Patient+SR subset, but the model admits it so a future Immunization.occurrence[x] has an honest cell).
+//
+// INERT in this slice — no emit/validate path reads it yet. CONSUMER CONTRACT for the next steps (write the
+// per-consumer behavior when each lands, disc 493): step 6 (remote-emit floor) is Patient+SR-scoped → `undefined`
+// = hard error. Steps 2 (validate rule) + 3 (case-feature SD `min=1`) span ALL `caseFeature:true` rows, four of
+// which (Condition/Observation/Procedure/MedicationRequest) have NO structural schema yet — those consumers must
+// EITHER fill the rows (small, known: Observation/Procedure→status, MedicationRequest→status/intent) OR gate to
+// the schema'd subset; they must NOT fail closed on `undefined` for a proven case-feature row (that would regress
+// it). SCOPE now: Patient + ServiceRequest only (operator "start with just Patient and SR").
+
+/** How a STRUCTURAL (FHIR-cardinality-required, concept-independent) element is satisfied when the source doesn't
+ *  supply it. Requiredness and defaultability are independent — a FHIR-required element can be clinical and thus
+ *  un-defaultable (`authored`), or satisfied by emit machinery rather than a value (`wired`). */
+export type StructuralFulfillment =
+  | { via: "default"; value: string } // an overridable administrative floor literal (status=`active`)
+  | { via: "wired"; binding: "case-subject" } // satisfied by emit machinery (subject → the case Patient reference)
+  | { via: "authored" }; // FHIR-required AND clinical → must be authored, no safe default (none in Patient+SR yet)
+
+/** One structural required element. `element` is the FHIR MODEL element name — a choice element keeps its `[x]`
+ *  (none in the current non-choice subset); step 3 (SD) uses it as-is, step 6 (JSON write) derives the write name
+ *  the same way the coding row does. Discriminated `fulfillment` makes the invariant compile-time (no `default?`
+ *  that a `wired`/`authored` element could illegally carry). */
+export interface StructuralRequiredElement {
+  element: string;
+  fulfillment: StructuralFulfillment;
+}
+
+/** The STRUCTURAL required-element schema per resourceType. Concept-required (1.b) is descriptor-derived, NOT
+ *  here (see the section header). Patient + ServiceRequest only in this slice. `[]` = "known, no structural
+ *  required elements" (Patient); an UNLISTED resource returns `undefined` (fail-closed — a caller must not treat
+ *  absence as `[]`, which could ship an incomplete resource silently). */
+export const REQUIRED_STRUCTURAL_ELEMENTS: Readonly<Record<string, readonly StructuralRequiredElement[]>> = {
+  // Patient has NO FHIR-cardinality-required elements. Its concept-required `birthDate` (the age posrep datum) is
+  // descriptor-derived, not listed here — so this is genuinely `[]`.
+  Patient: [],
+  // ServiceRequest (the request being authorized): `status`+`intent` are FHIR 1..1 with safe administrative
+  // defaults; `subject` is 1..1 satisfied by the emit wiring (the case Patient reference), NOT a literal. `code`
+  // (the requested item's identity) is the CONCEPT datum → descriptor-derived, not here.
+  ServiceRequest: [
+    { element: "status", fulfillment: { via: "default", value: "active" } },
+    { element: "intent", fulfillment: { via: "default", value: "order" } },
+    { element: "subject", fulfillment: { via: "wired", binding: "case-subject" } },
+  ],
+};
+
+/** The structural required-element schema for a resource, or `undefined` when the resource has no schema in this
+ *  slice (caller fails closed per the section header's consumer contract — must NOT treat absence as `[]`). */
+export function requiredStructuralElements(
+  resourceType: string,
+): readonly StructuralRequiredElement[] | undefined {
+  return Object.prototype.hasOwnProperty.call(REQUIRED_STRUCTURAL_ELEMENTS, resourceType)
+    ? REQUIRED_STRUCTURAL_ELEMENTS[resourceType]
+    : undefined;
+}
+
 // ── T2: JSON-write-name resolvers ────────────────────────────────────────────────────────────────────────
 // The serialized-JSON write names the CEL lane needs at the flip, DERIVED from the read row via the one FHIR
 // polymorphic-element spelling rule. See the SCOPE / SPELLING≠LEGALITY / CONSUMPTION notes in the file header.
