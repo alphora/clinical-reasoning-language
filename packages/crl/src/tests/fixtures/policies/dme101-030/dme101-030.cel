@@ -24,6 +24,18 @@ fact "Skull Fracture Finding":
 - date is "2026-02-01".
 - defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Fracture Of Skull Or Vertebrae".
 
+// The request being authorized — a covered-device stimulator. Supplying it clears the coverage
+// gate so each case reaches its clinical determination. (Pat Jones, born 1970, clears the age gate.)
+fact "Covered Stimulator Ordered":
+- date is "2026-02-01".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Covered Device".
+
+// Adult age asserted via the LOCAL arm of the both-rep age concept (the birthDate posrep
+// computation is the emit/$apply path; the CRE reads the local assertion). Pat Jones is 55+.
+fact "Adult Age Confirmed":
+- date is "2026-02-01".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Adult Eighteen Or Older".
+
 // ============ Cases ============
 
 case "Tibial nonunion, no exclusions → medically necessary":
@@ -31,6 +43,8 @@ case "Tibial nonunion, no exclusions → medically necessary":
   skull/vertebrae or tumor involvement and no concurrent noninvasive
   stimulator. All four coverage criteria hold → medically necessary.`.
 - subject is "Pat Jones".
+- fact is "Covered Stimulator Ordered".
+- fact is "Adult Age Confirmed".
 - fact is "Documented Tibial Nonunion".
 - result is "Ultrasonic Osteogenesis Stimulator Coverage" is "certify.Approve".
 
@@ -38,6 +52,8 @@ case "Skull fracture → not medically necessary (exclusion)":
 - description is `A documented nonunion, but the fracture is of the skull — the
   skull/vertebrae exclusion fails the criteria → not medically necessary.`.
 - subject is "Pat Jones".
+- fact is "Covered Stimulator Ordered".
+- fact is "Adult Age Confirmed".
 - fact is "Documented Tibial Nonunion".
 - fact is "Skull Fracture Finding".
 - result is "Ultrasonic Osteogenesis Stimulator Coverage" is "not-certify.Deny".
@@ -46,4 +62,6 @@ case "No documented nonunion (fresh fracture) → not medically necessary":
 - description is `No documented fracture nonunion (e.g. a fresh fracture or
   delayed union) → the nonunion criterion fails → not medically necessary.`.
 - subject is "Pat Jones".
+- fact is "Covered Stimulator Ordered".
+- fact is "Adult Age Confirmed".
 - result is "Ultrasonic Osteogenesis Stimulator Coverage" is "not-certify.Deny".

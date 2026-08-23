@@ -189,6 +189,45 @@ no value element); the **published result** is `Scalar<Boolean>` produced by `ex
 result. The "value type must match a real element" rule applies only to a representation read as a value
 **without** a reduction — never to the output of `exists` / a threshold / an age calculation.
 
+### ⭐ The value/interface both-rep convention (CANONICAL)
+
+**When a determination is both locally assertable AND remotely sourced, and its remote datum is a *value*
+(a code, a measurement, a date) — split it into TWO concepts.** This is the canonical shape; do not conflate
+them into one.
+
+- **A VALUE concept** holds the datum. It is **both-representation**: a local `code is` arm that SETS/OVERRIDES
+  the value, and a `source representation` arm that DEFAULTS it from supplied data, **recency-merged** (newest
+  wins — `definition is most recent this`, or the built age `value projection`). Its concept-level `value type`
+  is the **datum** type (`CodeableConcept`, `Quantity`, `dateTime`, …), and the source rep's `value type`
+  **matches** it (a rep read without a projection is read *as* the concept value — the two must agree).
+- **A BOOLEAN INTERFACE concept** derives the determination *over* the value concept — `defined as exists
+  ("Value")`, a threshold (`definition is "Value" at least N …`), a temporal window, etc. **This is the concept
+  the decision reads.** It is directly assertable via its own local `code is`.
+
+**Why the split is mandatory, not stylistic:** a `boolean` concept **cannot** carry a `CodeableConcept` (or
+other non-boolean) `source representation` — the validator rejects it (`use-site-type-mismatch`: a rep with no
+projection is read as the concept's value, so their value types must match). The datum's type lives on the
+value concept; the boolean lives on the interface. Trying to cram a coded source rep onto a boolean `exists`
+concept is the wrong turn this convention prevents.
+
+**Valueset membership ("is the value covered?") has no dedicated derivation.** Express it by scoping the value
+concept's rep with `coded from "VS"` and letting `exists` over it be the boolean: a non-member simply does not
+populate the value (closed-world → absent → false). The `coded from` filter *is* the membership test.
+
+**Exemplars:** the mammogram fixture (`Mammogram` value ⟵ `Had Mammogram` / `Up To Date On Mammography`
+interface); **patient age is the one both-rep whose recency EMITS today** (its `value projection` recency is the
+special-cased #257 age slice), so it is the working exemplar.
+
+**⚠ Emit maturity — the model is correct; the emitter catches up to it.** A coded **general external
+`source representation`** (a posrep like `ServiceRequest.code coded from "VS"`), and the
+`code is` + reduction + `source representation` **3-way recency**, are **emit-deferred** (#257 general posrep +
+#189 reduction slices) — they **validate clean** but do not yet emit. **Author the correct value/interface model
+anyway. Do NOT reshape a determination to whatever emits today** — dropping the local override, collapsing to a
+source-only concept, or downgrading the both-rep to a bare boolean *loses the canonical model* and is exactly the
+"fix" that reverts hard-won work. The fixture is the oracle; the deferred emit implementation is what must catch
+up. (`dme101-030` is the reference: its `Covered Device` value concept + `Covered Device Requested` interface are
+authored correctly and emit-deferred; the age both-rep beside them emits.)
+
 ### Cardinality is declared, not inferred
 
 Every concept has a declared result shape — `RecordSet` (a retrieve/union), `Record` (a selection like `most
@@ -339,6 +378,11 @@ When you review CRL logic, emit, or representation design, measure it against **
 - **Case-features are any resource** (§4): flag any reasoning that forces a case-feature to Observation, invents a
   boolean value to store on a resource, or treats "Observation-only fallback" as acceptable — that is the hack
   being removed, not the model.
+- **Value/interface both-rep convention** (§3): a locally-assertable + remotely-sourced determination whose remote
+  datum is a value splits into a both-rep VALUE concept + a BOOLEAN INTERFACE concept. Do **not** recommend
+  conflating them (a coded `source representation` on a `boolean` concept is a validator error), and do **not**
+  recommend reshaping the model to whatever emits today (source-only, dropped local override, downgraded boolean) —
+  the fixture is correct and the emit catches up. Coverage/membership is `coded from` + `exists`, not a value∈valueset derivation.
 - QM artifacts are **provisional**; the capabilities they exercised (`sem-and`/`sem-not`) are not.
 
 ---

@@ -1,0 +1,24 @@
+# Patient Age Remote — caseload
+library "Patient Age Remote Cases".
+covers "Patient Age Remote".
+
+// Two subjects supplying a birth date (the age source arm reads it off the subject Patient).
+fact "Adult Patient":
+- name is "Adult Patient".
+- birth date is "1980-01-01".
+- defined by "Patient".
+
+fact "Minor Patient":
+- name is "Minor Patient".
+- birth date is "2015-01-01".
+- defined by "Patient".
+
+case "Adult -> eligible":
+- description is `Born 1980 -> age >= 18 -> the age both-rep is true -> approve.`.
+- subject is "Adult Patient".
+- result is "Patient Age Remote" is "certify.Approve".
+
+case "Minor -> not eligible":
+- description is `Born 2015 -> age < 18 -> the age both-rep is false -> deny.`.
+- subject is "Minor Patient".
+- result is "Patient Age Remote" is "not-certify.Deny".

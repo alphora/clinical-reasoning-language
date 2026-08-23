@@ -1,0 +1,16 @@
+{
+  "name": "patient-age-remote",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Age both-representation posrep round-trip proof (#189 b) — CRL/CEL",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/patient-age-remote",
+    "dispositions": {
+      "mode": "standalone",
+      "options": {
+        "certify": { "Approve": { "label": "Approve" } },
+        "not-certify": { "Deny": { "label": "Deny" } }
+      }
+    }
+  }
+}

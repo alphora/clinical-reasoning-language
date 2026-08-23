@@ -1,0 +1,35 @@
+# Patient Age Remote — age both-rep round-trip proof
+library "Patient Age Remote".
+
+/*
+The bounded EMITTABLE proof for the both-representation posrep round-trip (#189 (b)).
+
+`Adult Eighteen Or Older` is a BOTH-representation age determination (North Star §2/§3): a local
+`code is` assertion arm PLUS a Patient `source representation` whose `value projection` computes live
+age over the SUPPLIED `Patient.birthDate`. Age is the one both-rep whose recency merge is already built
+(#257 age slice), so it emits today. Its source arm reads the SUBJECT Patient's birthDate — emitted on
+every channel — so this proves the supplied-data round-trip without the (deferred) remote-channel
+instance emit. dme101-030 carries the coded-device both-rep (emit-deferred to the #189 flip; disc 496).
+*/
+
+concept "Adult Eighteen Or Older":
+- value type is boolean.
+- code is `adult-18-or-older`.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 18 years.
+
+decision "Adult Eligibility":
+first:
+- when "Adult Eighteen Or Older" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
+
+activity "certify.Approve":
+- request CPGCommunicationRequest.
+- with `Eligibility: APPROVE / adult.`.
+
+activity "not-certify.Deny":
+- request CPGCommunicationRequest.
+- with `Eligibility: DENY / not an adult.`.

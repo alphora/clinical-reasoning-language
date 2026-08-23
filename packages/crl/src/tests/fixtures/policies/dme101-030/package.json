@@ -14,7 +14,7 @@
       "mode": "standalone",
       "options": {
         "certify": { "Approve": { "label": "Approve" } },
-        "not-certify": { "Deny": { "label": "Deny" } }
+        "not-certify": { "Deny": { "label": "Deny" }, "Unmet": { "label": "Unmet" } }
       }
     }
   }

@@ -3,21 +3,83 @@ library "Ultrasonic Osteogenesis Stimulator Coverage".
 
 /*
 Prior-authorization coverage model for ultrasonic osteogenesis stimulators.
-`first:` makes the branches ordered (first match wins): the exclusions are tested
-before the approval branch so a denial wins by position, and `otherwise` is the
-catch-all (deny). See docs/decision-shapes.md.
+`first:` makes the branches ordered (first match wins): coverage is gated first
+(a non-covered request is Unmet), then the exclusions, then the age gate, then the
+indication; and `otherwise` is the catch-all (deny). See docs/decision-shapes.md.
 
 The clinical determinations are LOCAL-CODE OBSERVATIONS: each is a reviewer-asserted
 analytical inference (system of insight, not system of record), so its FHIR datum is
-an Observation carrying the local domain code — NOT a clinical Condition/Device
-(coding an analytics inference onto a Condition/Device would advertise a clinical
-resource nothing reads). Existence of the coded Observation IS the determination
-(`definition is exists this`, closed-world). The request-being-authorized
-(ServiceRequest) and Patient arrive via `source representation` (supplied), added
-next.
+an Observation carrying the local domain code. Existence of the coded Observation IS
+the determination (`definition is exists this`, closed-world).
+
+The requested device and the patient age are BOTH-representation determinations
+(North Star §3 — the value/interface convention): a VALUE concept holds the datum
+(remote arm DEFAULTS it from supplied data, local arm SETS/OVERRIDES it, recency
+merges the two), and a BOOLEAN INTERFACE concept over that value is what the decision
+reads. The remote channel emits the supplied side (a `Patient.birthDate`, a
+`ServiceRequest` coded from the covered-device value set); the same CRL emits CQL that
+reads them — so emitted FHIR and emitted CQL agree, proven end-to-end by $apply.
+
+⚠ EMIT-CATCH-UP: this fixture is the CORRECT model of record, and it VALIDATES clean.
+Two pieces are not yet emittable and the emit implementation must catch up to them:
+(1) the both-rep device value concept "Covered Device" — a coded EXTERNAL `source
+representation` is the general posrep (#257), and its `code is` + `most recent this`
+recency + `source representation` 3-way is an emit-deferred #189 slice; and (2) the
+"Covered Devices" value-set content/emission (its codes are made-up test codes we own).
+The age concept is the one both-rep whose posrep recency is already built (#257 age
+slice), so it emits today. Do NOT reshape the model to what emits now — build the emit.
 */
 
-// ============ Concepts (local-code Observations — asserted determinations) ============
+// ============ Supplied determinations — value concept + boolean interface (both-rep convention) ============
+
+// The covered-device value set (North Star §3). The real payer binding is intensional; for this
+// round-trip fixture we control the terminology with made-up codes we own, so it is a small explicit
+// set the $apply engine can expand. (VS content/emission is emit-catch-up — see the header.)
+terminology "Covered Devices":
+- valueset is `http://example.org/hcsc/dme101-030/ValueSet/covered-devices`.
+
+// Patient age — a BOTH-representation BOOLEAN determination (North Star §2, Patient is the one
+// both-rep exception). Two assertion points: assert `adult-18-or-older` (the boolean) directly,
+// OR supply `Patient.birthDate` and let the `value projection` compute it. The remote channel
+// supplies the birth date on the subject Patient; the projection reads it. There is no numeric
+// "assert an age" path — supplying birthDate IS the value-side assertion. This both-rep EMITS
+// today (its posrep recency is the built #257 age slice). Mirrors fhir-emitter/tests/fixtures/patient-age.
+concept "Adult Eighteen Or Older":
+- value type is boolean.
+- code is `adult-18-or-older`.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 18 years.
+
+// The requested device — the VALUE concept (North Star §3). A `CodeableConcept` datum, both-rep:
+// the REMOTE arm DEFAULTS the code from the supplied `ServiceRequest.code`; the LOCAL arm SETS or
+// OVERRIDES it, and `most recent this` recency-merges them (newest wins). `coded from "Covered
+// Devices"` scopes it to the covered set, so a non-covered request does not populate it (closed-world
+// → absent). EMIT-CATCH-UP (#257 general posrep + the `code is`+reduction+`source representation`
+// 3-way #189 slice) — validates clean today; emit must catch up. Do not delete or downgrade.
+concept "Covered Device":
+- type is Observation.
+- value type is CodeableConcept.
+- code is `covered-device`.
+- definition is most recent this.
+- source representation:
+  - type is ServiceRequest.
+  - value element is ServiceRequest.code.
+  - value type is CodeableConcept.
+  - coded from "Covered Devices".
+
+// The coverage determination — the BOOLEAN INTERFACE concept (North Star §3). It USES the value
+// concept: `defined as exists ("Covered Device")` is true when a covered device is present (from
+// either arm), false otherwise. Directly assertable via its own local `code is`.
+concept "Covered Device Requested":
+- type is Observation.
+- value type is boolean.
+- code is `covered-device-requested`.
+- defined as exists ("Covered Device").
+
+// ============ Clinical determinations (local-code Observations — asserted inferences) ============
 
 concept "Fracture Of Skull Or Vertebrae":
 - type is Observation.
@@ -41,8 +103,10 @@ concept "Documented Fracture Nonunion":
 
 decision "Ultrasonic Osteogenesis Stimulator Coverage":
 first:
+- when not "Covered Device Requested" then recommend activity "not-certify.Unmet".
 - when "Fracture Of Skull Or Vertebrae" then recommend activity "not-certify.Deny".
 - when "Tumor-Related Fracture" then recommend activity "not-certify.Deny".
+- when not "Adult Eighteen Or Older" then recommend activity "not-certify.Deny".
 - when "Documented Fracture Nonunion" then recommend activity "certify.Approve".
 - otherwise then recommend activity "not-certify.Deny".
 
@@ -55,3 +119,7 @@ activity "certify.Approve":
 activity "not-certify.Deny":
 - request CPGCommunicationRequest.
 - with `Prior authorization request denied.`.
+
+activity "not-certify.Unmet":
+- request CPGCommunicationRequest.
+- with `Coverage criteria not met: the requested device is not a covered ultrasonic osteogenesis stimulator.`.
