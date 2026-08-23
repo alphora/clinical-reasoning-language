@@ -1,6 +1,12 @@
 {
   "resourceType": "Patient",
   "id": "local-cms22-bp-cognitive-support-hypertensive-rea-6fbdeec2c967",
+  "identifier": [
+    {
+      "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/identifier/cel-test-patient",
+      "value": "local-cms22-bp-cognitive-support-hypertensive-rea-6fbdeec2c967"
+    }
+  ],
   "name": [
     {
       "text": "Robert Lee"

@@ -520,9 +520,18 @@ function emitSubjectPatient(ctx: EmitContext, patientFact: CELFact): EmittedReso
     resourceType: "Patient",
     id,
   };
-  if (typeof body.name === "string") {
-    out.name = [{ text: body.name }];
+  // #189 base QI-Core (disc 495): QI-Core Patient requires `identifier` 1..* and `name` 1..*. The case Patient is
+  // SYNTHETIC test data (an identity the case author invented — not a real member, not clinical data), so the
+  // emitter completes these administrative fields. The identifier lives in a DEDICATED synthetic namespace
+  // (`<canonicalBase>/identifier/cel-test-patient`), NOT the bare canonicalBase (which is the CodeSystem/SD
+  // namespace — conflating them would make a fixture identifier look like a real member-id namespace). `name`
+  // falls back to a VISIBLY-synthetic text when the fact carries none. (us-core-6 family/given is only a WARNING,
+  // so text-only satisfies validation — disc 495 invariant sweep.)
+  const base = ctx.graph.projectRoot ? readCanonicalBase(ctx.graph.projectRoot) : undefined;
+  if (base) {
+    out.identifier = [{ system: `${base}/identifier/cel-test-patient`, value: id }];
   }
+  out.name = typeof body.name === "string" ? [{ text: body.name }] : [{ text: `Synthetic Patient ${id}` }];
   if (typeof body.birthDate === "string") {
     out.birthDate = body.birthDate;
   }

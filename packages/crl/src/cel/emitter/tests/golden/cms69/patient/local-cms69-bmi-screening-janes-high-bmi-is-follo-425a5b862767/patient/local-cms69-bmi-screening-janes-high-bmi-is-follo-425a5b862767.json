@@ -1,6 +1,12 @@
 {
   "resourceType": "Patient",
   "id": "local-cms69-bmi-screening-janes-high-bmi-is-follo-425a5b862767",
+  "identifier": [
+    {
+      "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/identifier/cel-test-patient",
+      "value": "local-cms69-bmi-screening-janes-high-bmi-is-follo-425a5b862767"
+    }
+  ],
   "name": [
     {
       "text": "Jane Doe"

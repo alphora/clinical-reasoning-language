@@ -1,6 +1,12 @@
 {
   "resourceType": "Patient",
   "id": "local-cms69-bmi-cognitive-support-high-bmi-jane-d-54cd0ddbd937",
+  "identifier": [
+    {
+      "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/identifier/cel-test-patient",
+      "value": "local-cms69-bmi-cognitive-support-high-bmi-jane-d-54cd0ddbd937"
+    }
+  ],
   "name": [
     {
       "text": "Jane Doe"
