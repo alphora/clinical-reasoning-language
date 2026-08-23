@@ -3,10 +3,15 @@
 // The descriptor is the single structured source both emit lanes will (at the flip) read to derive a LOCAL
 // concept's `{resourceType, coding, value, result type, recency}`. T1 is ADDITIVE and INERT: this module ships
 // the types + a pure deriver + tests, wired into NEITHER lane (no production module outside `src/emit/` imports
-// it). Two arms per design §0: `local-exact` (a `code is` concept) and `uncoded` (Patient/birthDate age posrep);
-// sourced/external arms are deferred (design §10).
+// it). Arms: `local-exact` (a `code is` concept), `uncoded` (Patient/birthDate age posrep), and — as of #189 B1 —
+// `source` (a `source representation:` posrep's coded external value-read; design §4/§6). The `source` arm is
+// DESCRIBED but INERT: it is derived only as the SECOND arm of a both-rep (local `code is` + `source
+// representation`) concept so the descriptor confronts §6 ("the descriptor list is all in-scope arms") rather than
+// surfacing an opaque `deferredArms` stub; NO emit consumer reads it yet (the atomic flip F wires it), and a
+// source-ONLY concept stays `status:"deferred"` (out of #189 scope past F — sourced-CEL is #257, design §10).
+// Extending the union to `source` supersedes design §0/§4's "two arms only" (see the decision-log amendment).
 
-import type { Concept } from "../ast/types";
+import type { Concept, Representation, ReferenceName } from "../ast/types";
 import { hasLocalCode, hasSourceBinding } from "./conceptDatumSignals";
 import { localCodeSystemUrl } from "../fhir-emitter/slug";
 import { relativeElementPath } from "../fhir-model/elementPath";
@@ -60,11 +65,37 @@ export type EffectiveRepresentationDescriptor =
       datumValueType: ConceptValueType;
       resultType: ResultType;
       recency: RecencyAccess;
+    }
+  | {
+      // #189 B1 — a `source representation:` posrep's coded external value-read (design §4/§6). The coding axis
+      // (`coding` — the MEMBERSHIP retrieve element, e.g. `ServiceRequest.code`/`Observation.code`) is SEPARATE
+      // from the datum axis (`valueElement` — the value READ, e.g. `Observation.value`); they coincide for
+      // `ServiceRequest.code` but must not be conflated (disc 496). `terminologyRef` PRESERVES the `coded from`
+      // reference's qualified identity (URL resolution + membership is B5). `resultType` is the CONCEPT's published
+      // result (duplicated per arm like `local-exact`, so a both-rep's two arms cannot drift). INERT in B1 — no
+      // emit consumer reads it (the flip F wires it).
+      arm: "source";
+      resourceType: string;
+      coding: CodingStrategy;
+      valueElement: string;
+      datumValueType: ConceptValueType;
+      terminologyRef: ReferenceName;
+      resultType: ResultType;
+      recency: RecencyAccess;
+      owningLibrary: OwningLibraryMetadata;
     };
 
-/** An in-scope arm the deriver DID NOT emit, surfaced so the flip must confront design §6 (the descriptor list
- *  is "all in-scope arms", not "all arms") rather than silently narrowing a local+source concept to local-only. */
-export type DeferredArm = { kind: "source"; detail: string };
+/** The reason a source arm was DEFERRED (not derived to a `source` descriptor): a genuine `DerivationErrorKind`,
+ *  or `source-binding-unsupported` (a valid value read with NO `coded from` — `coded from` is optional, A.1, so
+ *  its absence is a coding-axis deferral, NOT a value-path error), or `out-of-scope` (a projection/age source rep,
+ *  or a concept-level `coded from` base with no posrep to derive). */
+export type SourceDeferralReason = DerivationErrorKind | "source-binding-unsupported" | "out-of-scope";
+
+/** An in-scope arm the deriver DID NOT derive to a descriptor, surfaced (with its TYPED reason) so the flip must
+ *  confront design §6 (the descriptor list is "all in-scope arms") rather than silently narrowing a local+source
+ *  concept to local-only. Post-B1 a SUPPORTED source arm becomes a `source` descriptor instead; this carries only
+ *  the unsupported/out-of-scope reps. */
+export type DeferredArm = { kind: "source"; reason: SourceDeferralReason; detail: string };
 
 export type DerivationErrorKind =
   | "unsupported-resource"
@@ -76,6 +107,9 @@ export type DerivationErrorKind =
   | "value-read-unmodeled"
   | "value-read-valueless"
   | "value-type-not-admitted"
+  // #189 B1 (disc 497) — a LOCAL value read whose element IS the resource's coding element returns the concept's
+  // own identity code, not a datum (the disc-496 value-path conflation on the local arm).
+  | "value-read-is-coding-element"
   | "unsupported-reduction-form"
   | "invalid-owning-library-metadata"
   | "malformed-representation";
@@ -98,10 +132,17 @@ export type DerivationError = {
   detail: string;
 };
 
-/** Tri-state (panel R2 Q3): a `derived` concept publishes 0+ local descriptors (empty = a legitimately
- *  instance-less pure-derived concept); `deferred` is a valid-but-out-of-#189-scope concept the CQL lane still
- *  emits but the CEL lane fails closed on at the flip; `error` is malformed/unmappable. `[]` is RESERVED for
- *  pure-derived — a source-only concept is `deferred`, never `derived{[]}`. */
+/** Tri-state (panel R2 Q3): a `derived` concept publishes 0+ descriptors (empty = a legitimately
+ *  instance-less pure-derived concept); `deferred` is a source-ONLY valid-but-out-of-#189-scope concept the CQL
+ *  lane still emits but the CEL lane fails closed on at the flip; `error` is malformed/unmappable. `[]` is RESERVED
+ *  for pure-derived — a source-ONLY concept is `deferred`, never `derived{[]}`.
+ *
+ *  #189 B1 CONTRACT CHANGE: `descriptors` now may contain a `source` arm ALONGSIDE `local-exact` (a both-rep
+ *  concept → `[local-exact, source]`). Presence-in-`descriptors` therefore NO LONGER implies "emittable by the
+ *  current emitter": the `source` arm is INERT until the flip F. Today's consumers stay correct only because they
+ *  either enforce the single-descriptor invariant (`lowerLocalCodes` `most recent this`) or `.find` a specific arm
+ *  (`caseFeatureRecord` finds `local-exact`, ignoring `source`). A FUTURE consumer that ITERATES `descriptors`
+ *  assuming every entry is emittable is the next drift lane — gate on `arm` explicitly. */
 export type DerivationOutcome =
   | {
       status: "derived";
@@ -246,6 +287,18 @@ function computeLocalDatum(
       // carrier. Three DISTINCT fail-closed diagnostics: the element is unmodeled (`undefined`), the resource
       // is modeled-valueless (`∅`), or the declared value type is not admitted by the element (design §8).
       const readPath = authored ?? "value";
+      // #189 B1 (disc 497, Claude #1) — a LOCAL value read whose element IS the resource's coding element returns
+      // the concept's OWN identity code, not a datum (the disc-496 value-path conflation on the local arm; the same
+      // trap as `Observation.code` / `MedicationRequest.medication`). Reject it BEFORE consulting the value-read
+      // model — which legitimately admits e.g. `ServiceRequest.code` as a read for the SOURCE arm (B1 modeled it),
+      // so without this guard a `type is ServiceRequest` + `value element is ServiceRequest.code` local concept
+      // would silently read its own coding as a value.
+      if (readPath === row.coding.field) {
+        return {
+          errorKind: "value-read-is-coding-element",
+          detail: `\`most recent this\` reads ${resourceType}.${readPath}, the resource's coding element — a local value read of it returns the concept's own identity code, not a datum`,
+        };
+      }
       const admitted = valueReadValueTypes(resourceType, readPath);
       if (admitted === undefined) {
         return {
@@ -331,7 +384,8 @@ function notAgeLocalExact(
         ...(datum.errorKind === "value-element-unmappable" ||
         datum.errorKind === "value-read-unmodeled" ||
         datum.errorKind === "value-read-valueless" ||
-        datum.errorKind === "value-type-not-admitted"
+        datum.errorKind === "value-type-not-admitted" ||
+        datum.errorKind === "value-read-is-coding-element"
           ? { field: "valueElement" as const }
           : datum.errorKind === "indeterminate-result-type"
             ? { field: "resultType" as const }
@@ -357,11 +411,105 @@ function notAgeLocalExact(
   };
 }
 
+/** Derive ONE `source representation:` posrep's arm — a `source` descriptor (a coded external value-read) or a
+ *  TYPED deferred arm. #189 B1: fail closed on every rep shape the coded-value-read arm does not cover, never
+ *  silently dropping a rep (§6). Keeps the LOCAL and SOURCE value-reads INDEPENDENT (the source datum is the rep's
+ *  own `value element is`, e.g. `ServiceRequest.code` — NOT re-derived from the local arm). */
+function deriveOneSourceArm(
+  concept: Concept,
+  rep: Representation,
+  owningLibMeta: OwningLibraryMetadata,
+): { descriptor: EffectiveRepresentationDescriptor } | { deferred: DeferredArm } {
+  const mk = (reason: SourceDeferralReason, detail: string): { deferred: DeferredArm } => ({
+    deferred: { kind: "source", reason, detail },
+  });
+  // A projection source rep (patient-age `value projection`) is the age/recency lane (`uncoded`), not this
+  // coded-value-read arm.
+  if (rep.valueProjection) {
+    return mk("out-of-scope", `source representation carries a \`value projection\` (age/recency lane), not a \`coded from\` value read`);
+  }
+  const resourceType = rep.conceptType;
+  if (!resourceType) return mk("unsupported-resource", `source representation has no \`type is\` resource`);
+  // Honor the same case-feature gate as the local arm (a `caseFeature: false` row, e.g. Encounter, has an
+  // unproven value-read/recency cell — a B2/#257 decision, not silently admitted here).
+  const row = resourceEmitRow(resourceType);
+  if (!row || !row.caseFeature) {
+    return mk(
+      "unsupported-resource",
+      row
+        ? `source resource \`${resourceType}\` is a CEL-writer-only row (\`caseFeature: false\`) — its value-read/recency cell is not proven (a B2/#257 decision)`
+        : `source resource \`${resourceType}\` is not in the emit registry`,
+    );
+  }
+  if (!rep.valueElement) {
+    return mk("value-element-unmappable", `source representation on \`${resourceType}\` has no \`value element is\` — a source datum needs an authored value read`);
+  }
+  if (rep.valueTypes.length !== 1) {
+    return mk("indeterminate-result-type", `source representation declares ${rep.valueTypes.length} value types (needs exactly 1)`);
+  }
+  const declared = rep.valueTypes[0];
+  // A projection-free rep is read AS the concept value (charter §3) — the two value types must agree (no
+  // manufacturing). Only checked when the concept declares exactly one (a 0/2+ concept fails its own gate).
+  if (concept.valueTypes.length === 1 && concept.valueTypes[0] !== declared) {
+    return mk("value-type-not-admitted", `source rep value type \`${declared}\` disagrees with the concept value type \`${concept.valueTypes[0]}\` (a projection-free rep is read AS the concept value)`);
+  }
+  const readPath = relativePath(rep.valueElement.path, resourceType);
+  const admitted = valueReadValueTypes(resourceType, readPath);
+  if (admitted === undefined) {
+    return mk("value-read-unmodeled", `source value read ${resourceType}.${readPath} is not a modeled value-read element (§8)`);
+  }
+  if (admitted.size === 0) {
+    return mk("value-read-valueless", `source value read ${resourceType}.${readPath} is a modeled-valueless element`);
+  }
+  if (!admitted.has(declared)) {
+    return mk("value-type-not-admitted", `source value read ${resourceType}.${readPath} admits {${[...admitted].join(", ")}}, not \`${declared}\``);
+  }
+  // `coded from` is OPTIONAL on a rep (A.1); its ABSENCE is a coding-axis deferral, NOT a value-path error.
+  if (rep.terminologyName === undefined) {
+    return mk("source-binding-unsupported", `source representation on \`${resourceType}\` has no \`coded from\` — an uncoded source value read is out of B1 scope (the coding axis, §10)`);
+  }
+  const resultType = conceptResultType(concept.shape, concept.valueTypes, resourceType);
+  if (!resultType) {
+    return mk("indeterminate-result-type", `concept declares ${concept.valueTypes.length} value types (needs exactly 1 for the source arm's result type)`);
+  }
+  return {
+    descriptor: {
+      arm: "source",
+      resourceType,
+      coding: row.coding, // membership coding axis — SEPARATE from `valueElement` (datum), even when they coincide
+      valueElement: readPath,
+      datumValueType: declared,
+      terminologyRef: rep.terminologyName, // PRESERVE qualified identity (URL/membership = B5)
+      resultType,
+      recency: row.recency,
+      owningLibrary: owningLibMeta,
+    },
+  };
+}
+
+/** Derive the SOURCE arm(s) of a both-rep concept — one per `source representation:` posrep in declaration order
+ *  (§6 "all in-scope arms"). Returns derived `source` descriptors + typed deferred arms; the concept-level
+ *  `CodedFromDefinition` is NOT a rep (handled by the caller). */
+function deriveSourceArms(
+  concept: Concept,
+  owningLibMeta: OwningLibraryMetadata,
+): { descriptors: EffectiveRepresentationDescriptor[]; deferred: DeferredArm[] } {
+  const descriptors: EffectiveRepresentationDescriptor[] = [];
+  const deferred: DeferredArm[] = [];
+  for (const rep of concept.representations) {
+    const d = deriveOneSourceArm(concept, rep, owningLibMeta);
+    if ("descriptor" in d) descriptors.push(d.descriptor);
+    else deferred.push(d.deferred);
+  }
+  return { descriptors, deferred };
+}
+
 /**
  * Derive a concept's effective LOCAL representation(s) — design §4. Pure over `(concept, owningLibMeta)`; the
  * caller resolves the OWNING library (design §4 sibling-lib rule). Per-representation (design §6): a patient-age
  * recency concept yields BOTH a `local-exact` (boolean Observation) and an `uncoded` arm; a normal local concept
- * yields one `local-exact`; a standalone age concept one `uncoded`.
+ * yields one `local-exact`; a both-rep concept yields `[local-exact, source]`; a standalone age concept one
+ * `uncoded`; a source-ONLY concept `status:"deferred"`.
  */
 export function deriveEffectiveRepresentations(
   concept: Concept,
@@ -447,21 +595,32 @@ export function deriveEffectiveRepresentations(
   if (hasCode) {
     const local = notAgeLocalExact(concept, owningLibMeta);
     if (local.status === "error") return local;
+    // #189 B1 — DERIVE the source arm(s) so a both-rep concept's descriptor DESCRIBES `[local-exact, source]`
+    // (§6 "all in-scope arms") rather than surfacing an opaque `deferredArms` stub. Each `source representation:`
+    // posrep becomes a `source` descriptor or a typed deferred arm; a concept-level `CodedFromDefinition` (no
+    // posrep) has nothing to derive → a typed deferred arm. INERT: no emit consumer reads the `source` arm (F wires
+    // it); today's consumers stay correct via the single-descriptor invariant / `.find(local-exact)`.
+    const { descriptors: sourceDescriptors, deferred } = deriveSourceArms(concept, owningLibMeta);
+    const codedFromOnly =
+      concept.definition?.type === "CodedFromDefinition" && concept.representations.length === 0;
+    const deferredArms: DeferredArm[] = [
+      ...deferred,
+      ...(codedFromOnly
+        ? [
+            {
+              kind: "source" as const,
+              reason: "out-of-scope" as const,
+              detail: `concept-level \`coded from\` base is a source arm deferred by D2 (no \`source representation\` posrep to derive)`,
+            },
+          ]
+        : []),
+    ];
     return {
       status: "derived",
-      descriptors: [local.descriptor],
-      ...(hasDeferredSource
-        ? {
-            deferredArms: [
-              {
-                kind: "source" as const,
-                detail: `external source binding(s) deferred (#189 D2 local scope)`,
-              },
-            ],
-          }
-        : {}),
+      descriptors: [local.descriptor, ...sourceDescriptors],
+      ...(deferredArms.length > 0 ? { deferredArms } : {}),
     };
   }
-  if (hasDeferredSource) return { status: "deferred", reason: "sourced" }; // source-only / coded-from — out of #189 scope
+  if (hasDeferredSource) return { status: "deferred", reason: "sourced" }; // source-ONLY / coded-from — out of #189 scope (F/#257)
   return { status: "derived", descriptors: [] }; // pure derived (`defined as` / `definition is`) — no local instances
 }

@@ -24,8 +24,14 @@ Line citations below drift as the code moves — trust the function name over th
 
 **#189 is scoped to the LOCAL path.** The local `code is` domain is the canonical production representation
 CRL logic runs on (charter §2); it is where #189's round-trip pain lives (PA runs exclusively off local codes,
-Patient excepted). The descriptor (§4) therefore has two arms only: **`local-exact`** and **`uncoded`**
-(Patient/birthDate — a value element, no `coded from`).
+Patient excepted). The descriptor (§4) primarily has two arms: **`local-exact`** and **`uncoded`**
+(Patient/birthDate — a value element, no `coded from`). **#189 B1 amendment (2026-08-23, disc 497):** the
+descriptor gained a THIRD arm, **`source`** (a `source representation:` posrep's coded external value-read), so
+that a both-rep concept's descriptor DESCRIBES `[local-exact, source]` (design §6 "all in-scope arms") rather
+than surfacing an opaque deferred stub. The `source` arm is DESCRIBED but INERT — no emit consumer reads it until
+the atomic flip (§9 step 4); a source-ONLY concept still resolves to `status:"deferred"` (its emission is #257
+sourced-CEL, out of #189 scope even past the flip — §10). `source` is the same concept §10 sketches as
+`external-valueset` / `external-code-set`; the code uses `source`.
 
 **Deferred to when source representations land (~#257 territory) — see §10:** all sourced-CEL emission,
 external ValueSet membership validation, `verificationStatus`/refutation filtering, and
@@ -127,14 +133,23 @@ Every boolean-valued define the emitter can produce is **total**. Rules:
 ## 4. Effective-representation descriptor (local-only per §0; F4, F5)
 
 One descriptor is the single source both lanes read; a CEL fact resolves to it or the case fails closed (§5).
-**Two arms** (local scope):
+**Three arms** (local scope + the B1 `source` arm — the third is DESCRIBED but INERT until the flip, §0/§9):
 
 ```
 descriptor :=
   | local-exact { resourceType, codingElement, system, code,
                   datumValueType?, resultType/cardinality, recencyElement(+type), owningLibrary, valueElement? }
   | uncoded     { resourceType, valueElement, datumValueType, resultType/cardinality, recencyElement(+type) }   // Patient/birthDate
+  | source      { resourceType, coding, valueElement, datumValueType, terminologyRef,                           // #189 B1 — a `source
+                  resultType/cardinality, recencyElement(+type), owningLibrary }                                //   representation:` coded value-read
 ```
+
+The `source` arm keeps the CODING axis (`coding` — the membership retrieve element) SEPARATE from the DATUM axis
+(`valueElement` — the value read), even when they coincide (`ServiceRequest.code`); `terminologyRef` preserves the
+`coded from` reference's qualified identity (URL resolution + membership is deferred to the flip / §10). `source`
+descriptors sit ALONGSIDE `local-exact` in `descriptors`, so presence-in-`descriptors` no longer implies
+"emittable by the current emitter" — consumers gate on `arm` (the flip wires the `source` arm; today's consumers
+enforce the single-descriptor invariant or `.find(local-exact)`).
 
 - **`datumValueType` (the record's value) is separate from `resultType`/cardinality (the concept's published
   result)** — F4. E.g. `Condition` datum (no value) → `Scalar<Boolean>` via `exists`; `Observation.value`
@@ -330,6 +345,7 @@ when picked up (memory is not backlog).**
 | C | Coding identity = 3rd round-trip axis; derive-local / (defer)validate-external | 2026-08-11 |
 | D1 | Cardinality is **declared** (`- shape is Scalar \| Record \| RecordSet.`, `Scalar` default — grammar-shipped in the validation slice), not inferred | 2026-08-11 |
 | D2 | #189 scoped to the LOCAL path; sourced-CEL deferred | 2026-08-11 |
+| B1 | descriptor gains a THIRD `source` arm (a `source representation:` coded external value-read), DESCRIBED-but-INERT until the flip; both-rep → `[local-exact, source]`; coding axis kept separate from datum axis; source-ONLY stays `status:"deferred"` (§10/#257); a LOCAL value-read of the coding element is rejected (`value-read-is-coding-element`, the disc-496 conflation on the local arm). Supersedes §0/§4 "two arms". disc 497. | 2026-08-23 |
 
 Full round history + per-point processing: `.vibe-tools/discussions/413-emit189-context-free-total-boolean.md`
 (ROUND 1, 2, 2R, FINAL). Companion working notes: `tmp/DECISIONS-concept-model-and-189.md`.

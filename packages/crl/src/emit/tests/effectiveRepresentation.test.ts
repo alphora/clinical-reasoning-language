@@ -193,8 +193,85 @@ describe("deriveEffectiveRepresentations — source arms, deferral, pure-derived
     if (out.status !== "derived") return;
     expect(out.descriptors).toHaveLength(1);
     expect(out.descriptors[0].arm).toBe("local-exact");
+    // #189 B1 — the source arm is still visible (§6, never silently dropped), now with a TYPED reason: a `Quantity`
+    // source rep on a `boolean` concept is a rep-vs-concept value-type disagreement (charter §3).
     expect(out.deferredArms).toEqual([
-      { kind: "source", detail: expect.stringContaining("deferred") },
+      { kind: "source", reason: "value-type-not-admitted", detail: expect.stringContaining("disagrees") },
+    ]);
+  });
+
+  it("both-rep (code is + most recent this + coded source rep) → [local-exact, source] (#189 B1)", () => {
+    const ds = derived(
+      `library "T".\nconcept "CoveredDevice":\n- type is Observation.\n- value type is CodeableConcept.\n- code is \`covered-device\`.\n- definition is most recent this.\n- source representation:\n  - type is ServiceRequest.\n  - value element is ServiceRequest.code.\n  - value type is CodeableConcept.\n  - coded from "Covered Devices".\n`,
+      "CoveredDevice",
+    );
+    expect(ds.map((d) => d.arm)).toEqual(["local-exact", "source"]);
+    const [local, source] = ds;
+    // The LOCAL arm reads its OWN datum (Observation.value), INDEPENDENT of the source arm (disc 496: no common
+    // `.code` that would return the identity code).
+    if (local.arm === "local-exact") {
+      expect(local.resourceType).toBe("Observation");
+      expect(local.valueElement).toBe("value");
+      expect(local.datumValueType).toBe("CodeableConcept");
+    }
+    if (source.arm === "source") {
+      expect(source.resourceType).toBe("ServiceRequest");
+      expect(source.coding).toEqual({ kind: "codeable-concept", field: "code" }); // membership axis
+      expect(source.valueElement).toBe("code"); // datum axis (SR.code) — a SEPARATE axis that coincides here
+      expect(source.datumValueType).toBe("CodeableConcept");
+      expect(source.terminologyRef).toBe("Covered Devices"); // qualified identity preserved (URL/membership = B5)
+      expect(source.resultType).toEqual({ shape: "Scalar", valueType: "CodeableConcept" }); // the concept's result
+      expect(source.recency).toEqual({ sortExpr: "authoredOn", cast: "none" }); // ServiceRequest recency
+    }
+  });
+
+  it("local value read of the resource's CODING element → value-read-is-coding-element (#189 B1, disc 497)", () => {
+    // A local `type is ServiceRequest` concept authored to read its OWN coding element (ServiceRequest.code) as a
+    // most-recent value returns the concept's identity code, not a datum — rejected BEFORE the value-read model
+    // (which legitimately admits SR.code for the SOURCE arm). The disc-496 conflation, closed on the local arm.
+    const out = deriveEffectiveRepresentations(
+      concept(
+        `library "T".\nconcept "SelfCode":\n- type is ServiceRequest.\n- value type is CodeableConcept.\n- code is \`self-code\`.\n- value element is ServiceRequest.code.\n- definition is most recent this.\n`,
+        "SelfCode",
+      ),
+      OWNING,
+    );
+    expect(out.status).toBe("error");
+    if (out.status === "error") {
+      expect(out.error.kind).toBe("value-read-is-coding-element");
+      expect(out.error.field).toBe("valueElement");
+    }
+  });
+
+  it("source rep with a value read but NO `coded from` → source-binding-unsupported (coding axis, not value-path)", () => {
+    const out = deriveEffectiveRepresentations(
+      concept(
+        `library "T".\nconcept "UncodedSrc":\n- type is Observation.\n- value type is CodeableConcept.\n- code is \`uncoded-src\`.\n- definition is most recent this.\n- source representation:\n  - type is ServiceRequest.\n  - value element is ServiceRequest.code.\n  - value type is CodeableConcept.\n`,
+        "UncodedSrc",
+      ),
+      OWNING,
+    );
+    expect(out.status).toBe("derived");
+    if (out.status !== "derived") return;
+    expect(out.descriptors.map((d) => d.arm)).toEqual(["local-exact"]); // no source descriptor
+    expect(out.deferredArms).toEqual([
+      { kind: "source", reason: "source-binding-unsupported", detail: expect.stringContaining("coded from") },
+    ]);
+  });
+
+  it("source rep on an unmodeled resource → unsupported-resource deferred arm (fail closed, §6)", () => {
+    const out = deriveEffectiveRepresentations(
+      concept(
+        `library "T".\nconcept "UnmodeledSrc":\n- type is Observation.\n- value type is CodeableConcept.\n- code is \`unmodeled-src\`.\n- definition is most recent this.\n- source representation:\n  - type is Immunization.\n  - value element is Immunization.vaccineCode.\n  - value type is CodeableConcept.\n  - coded from "Vaccines".\n`,
+        "UnmodeledSrc",
+      ),
+      OWNING,
+    );
+    expect(out.status).toBe("derived");
+    if (out.status !== "derived") return;
+    expect(out.descriptors.map((d) => d.arm)).toEqual(["local-exact"]);
+    expect(out.deferredArms).toEqual([
+      { kind: "source", reason: "unsupported-resource", detail: expect.stringContaining("Immunization") },
     ]);
   });
 

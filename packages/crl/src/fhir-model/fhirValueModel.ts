@@ -12,9 +12,12 @@ import { type ConceptValueType } from "../grammar/conceptValueTypes";
 // ── THE RETURN CONTRACT (∅ vs `undefined` — load-bearing, design panel disc 425) ────────────────────────────
 //   • a NON-EMPTY set → the element exists and admits exactly these concept value-types (consumer checks
 //     membership: declared value type ∈ set ⟹ legal).
-//   • the EMPTY set ∅ → MODELED, and positively HAS NO value-read element (a value-read / `most recent this`
-//     publishing a typed value is invalid here — e.g. Condition). An existing element admits ≥1 type, so ∅ is
-//     unambiguously "known-valueless", never "unknown".
+//   • the EMPTY set ∅ → the QUERIED ELEMENT is MODELED and positively carries no readable value (a value-read /
+//     `most recent this` on THIS element is invalid — e.g. `Condition.value`, `ServiceRequest.value`). ∅ is a
+//     per-ELEMENT claim, NOT a resource-level one: a resource may have `value → ∅` (its standard carrier bears no
+//     value) AND a DIFFERENT element that IS a value-read (`ServiceRequest.code → {CodeableConcept}`, the source
+//     datum, #189 B1). An existing value-read element admits ≥1 type, so ∅ is unambiguously "this element
+//     known-valueless", never "unknown".
 //   • `undefined` → UNMODELED, no knowledge (out of T3a scope). A consumer keeps failing closed, and any
 //     diagnostic must say *unsupported/unmodeled*, NEVER *absent* — claiming `Observation.interpretation` "is
 //     not a real element" (it is, just unmodeled) would fabricate a fact.
@@ -25,10 +28,14 @@ import { type ConceptValueType } from "../grammar/conceptValueTypes";
 //
 // ── SCOPE ────────────────────────────────────────────────────────────────────────────────────────────────
 // The effective-representation subset: the 5 `RESOURCE_EMIT_REGISTRY` resources + the uncoded Patient age arm
-// (T1 `uncodedDescriptor` reads `Patient.birthDate` as `date`). Only VALUE-READ elements are modeled — coding /
-// recency elements are structural and already asserted by `RESOURCE_EMIT_REGISTRY` (T1/T2), NOT this model.
-// Authored non-`value` elements and every other resource stay `undefined` → fail closed (nothing in the corpus
-// reads them; T4's inventory confirms before the flip enforces).
+// (T1 `uncodedDescriptor` reads `Patient.birthDate` as `date`). VALUE-READ elements are modeled; recency elements
+// are structural and asserted by `RESOURCE_EMIT_REGISTRY` (T1/T2), NOT this model. The ONE modeled element that
+// doubles as a coding element is `ServiceRequest.code` (#189 B1): for a SOURCE representation the external
+// request's `code` IS the datum read (which covered device was requested), so it is a genuine CodeableConcept
+// value-read. That the same element is the LOCAL arm's identity coding is an ARM-specific fact the deriver
+// enforces (`computeLocalDatum` rejects a local value-read of the coding element — the disc-496 conflation on the
+// local arm), NOT a fact this arm-agnostic model asserts. Other authored non-`value` elements and every other
+// resource stay `undefined` → fail closed (nothing else in the corpus reads them; T4's inventory confirms).
 //
 // Patient is modeled ONLY for `birthDate` (the uncoded age arm). Its standard `value` carrier is deliberately
 // left `undefined`, NOT ∅: Patient is not a value-read resource on the standard carrier (Patient concepts route
@@ -72,7 +79,13 @@ const FHIR_VALUE_READ_MODEL: Readonly<
   Patient: { birthDate: new Set<ConceptValueType>(["date"]) }, // the uncoded age arm's value-read
   Condition: { value: new Set<ConceptValueType>() }, // ∅ — modeled, valueless (presence via `exists`)
   Procedure: { value: new Set<ConceptValueType>() }, // ∅
-  ServiceRequest: { value: new Set<ConceptValueType>() }, // ∅
+  ServiceRequest: {
+    value: new Set<ConceptValueType>(), // ∅ — the standard `value` carrier is modeled-valueless
+    // #189 B1 — the SOURCE datum read: `ServiceRequest.code` (which covered device was requested) is a genuine
+    // CodeableConcept value-read, DISTINCT from the ∅ `value` carrier. (Local-arm identity-coding conflation is
+    // guarded in `computeLocalDatum`, not here — this model states the honest FHIR fact that SR.code admits CC.)
+    code: new Set<ConceptValueType>(["CodeableConcept"]),
+  },
   MedicationRequest: { value: new Set<ConceptValueType>() }, // ∅
 };
 

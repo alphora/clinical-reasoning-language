@@ -83,6 +83,17 @@ describe("valueReadValueTypes — ∅ (modeled valueless) vs `undefined` (unmode
     expect([...s!]).toEqual(["date"]);
   });
 
+  it("ServiceRequest.code → { CodeableConcept } (#189 B1 — the SOURCE datum read), while .value stays ∅", () => {
+    // The one modeled element that doubles as a coding element: for a SOURCE rep the external request's `code`
+    // IS the datum. `.value` remains ∅ (the standard carrier is valueless) — the two coexist per the element-level
+    // ∅ contract. (The local-arm identity-coding conflation is guarded in the deriver, not this model.)
+    const code = valueReadValueTypes("ServiceRequest", "code");
+    expect(code).toBeDefined();
+    expect([...code!]).toEqual(["CodeableConcept"]);
+    expect(valueReadValueTypes("ServiceRequest", "value")!.size).toBe(0); // ∅ unchanged
+    expect(valueReadValueTypes("ServiceRequest", "status")).toBeUndefined(); // only `code` is modeled, not status
+  });
+
   it("an unmodeled RESOURCE → undefined (no knowledge; never asserts `absent`)", () => {
     expect(valueReadValueTypes("Encounter", "value")).toBeUndefined();
     expect(valueReadValueTypes("Immunization", "value")).toBeUndefined();

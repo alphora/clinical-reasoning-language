@@ -149,6 +149,20 @@ concept "P":
 `);
     expect(valueReadPathBlocker(conceptNamed(ast, "P"))).toBeNull();
   });
+
+  it("ServiceRequest.code value-read → no blocker (#189 B1 — SR.code is now modeled; was `unmodeled`)", () => {
+    // The one deliberate NON-emit classification shift of B1 (gpt56 disc 497): before B1
+    // `valueReadValueTypes("ServiceRequest","code")` was `undefined` (blocker "unmodeled"); B1 models SR.code as a
+    // CodeableConcept value-read (the source datum), so the inventory now classifies this shape as viable.
+    const ast = parse(`library "T".
+concept "SR Code":
+- type is ServiceRequest.
+- value element is ServiceRequest.code.
+- value type is CodeableConcept.
+- code is \`sr\`.
+`);
+    expect(valueReadPathBlocker(conceptNamed(ast, "SR Code"))).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------------------------
