@@ -185,7 +185,10 @@ export function resourceEmitRow(resourceType: string): ResourceEmitRow | undefin
 export type DefaultValue =
   | { kind: "code"; code: string } // a primitive `code` element (Encounter/ServiceRequest.status, .intent)
   | { kind: "coding"; system: string; code: string; display?: string } // a `Coding` element (Encounter.class)
-  | { kind: "codeable-concept"; system: string; code: string; display?: string }; // a `CodeableConcept` (Condition.clinicalStatus/verificationStatus)
+  | { kind: "codeable-concept"; system: string; code: string; display?: string } // a `CodeableConcept` (Condition.clinicalStatus/verificationStatus)
+  // #189 base-QI-Core (disc 495) — a `CodeableConcept[]` element (`Observation.category` / `Condition.category`
+  // are 1..*). Each concept writes ONE coding; the array carries ≥1 so a `min: 1..*` element is satisfied.
+  | { kind: "codeable-concept-array"; concepts: ReadonlyArray<{ system: string; code: string; display?: string }> };
 
 /** How a STRUCTURAL (FHIR-cardinality-required, concept-independent) element is satisfied when the source doesn't
  *  supply it. Requiredness and defaultability are independent — a FHIR-required element can be clinical and thus
@@ -242,13 +245,41 @@ export const REQUIRED_STRUCTURAL_ELEMENTS: Readonly<Record<string, readonly Stru
   // Observation (value-bearing case-feature): R4 `status` 1..1 (`code` is the concept datum). An asserted
   // analytical determination HOLDS at emit → `final` (was a hardcoded emitter special case; unified here so the
   // validate/SD steps see it too). `subject` is 0..1 (optional), so not required.
-  Observation: [{ element: "status", fulfillment: { via: "default", value: { kind: "code", code: "final" } } }],
+  // `category` 1..* is QI-Core Simple Observation (base preferred + us-core slice required); `survey` (an
+  // assessed/derived-score category) is honest for an analytical determination and is a member of BOTH bindings
+  // (disc 495 verification). NOT a retrieve key → safe administrative default.
+  Observation: [
+    { element: "status", fulfillment: { via: "default", value: { kind: "code", code: "final" } } },
+    {
+      element: "category",
+      fulfillment: {
+        via: "default",
+        value: {
+          kind: "codeable-concept-array",
+          concepts: [{ system: "http://terminology.hl7.org/CodeSystem/observation-category", code: "survey" }],
+        },
+      },
+    },
+  ],
   // Condition: `subject` (1..1) is emit-wired. `clinicalStatus`/`verificationStatus` are 0..1 in base R4 but
   // profile-required and expected downstream — defaulted (operator) to `active`/`confirmed` CodeableConcepts (an
   // asserted, confirmed current condition). `code` is the concept datum. (con-3 holds: verificationStatus is not
   // entered-in-error, so a present clinicalStatus is valid.)
   Condition: [
     { element: "subject", fulfillment: { via: "wired", binding: "case-subject" } },
+    // `category` 1..* is QI-Core Condition (problems-health-concerns): the us-core slice is a REQUIRED binding
+    // (`us-core-problem-or-health-concern`). `health-concern` — ⚠ from the US CORE CodeSystem, NOT THO — is the
+    // honest asserted-determination member (disc 495 verification). NOT a retrieve key → safe administrative default.
+    {
+      element: "category",
+      fulfillment: {
+        via: "default",
+        value: {
+          kind: "codeable-concept-array",
+          concepts: [{ system: "http://hl7.org/fhir/us/core/CodeSystem/condition-category", code: "health-concern" }],
+        },
+      },
+    },
     {
       element: "clinicalStatus",
       fulfillment: {
@@ -304,6 +335,12 @@ export function requiredStructuralElements(
  *  [...]}`. */
 export function defaultValueJson(value: DefaultValue): unknown {
   if (value.kind === "code") return value.code;
+  if (value.kind === "codeable-concept-array") {
+    // `CodeableConcept[]` (e.g. `Observation.category` / `Condition.category`, 1..*): each concept is ONE coding.
+    return value.concepts.map((c) => ({
+      coding: [{ system: c.system, code: c.code, ...(c.display !== undefined ? { display: c.display } : {}) }],
+    }));
+  }
   const coding = {
     system: value.system,
     code: value.code,

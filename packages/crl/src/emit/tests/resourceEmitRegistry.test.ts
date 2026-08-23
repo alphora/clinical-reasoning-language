@@ -356,6 +356,12 @@ describe("required structural-element schema (Patient + ServiceRequest)", () => 
           const v = e.fulfillment.value;
           if (v.kind === "code") {
             expect(v.code.length, `${where} code default must be non-empty`).toBeGreaterThan(0);
+          } else if (v.kind === "codeable-concept-array") {
+            expect(v.concepts.length, `${where} codeable-concept-array must be non-empty`).toBeGreaterThan(0);
+            for (const c of v.concepts) {
+              expect(c.system.length, `${where} array coding system`).toBeGreaterThan(0);
+              expect(c.code.length, `${where} array coding code`).toBeGreaterThan(0);
+            }
           } else {
             expect(v.system.length, `${where} coding system`).toBeGreaterThan(0);
             expect(v.code.length, `${where} coding code`).toBeGreaterThan(0);
@@ -379,11 +385,23 @@ describe("required structural-element schema (Patient + ServiceRequest)", () => 
     expect(
       defaultValueJson({ kind: "codeable-concept", system: "http://x", code: "active", display: "Active" }),
     ).toEqual({ coding: [{ system: "http://x", code: "active", display: "Active" }] });
+    // codeable-concept-array (category, 1..*) → an ARRAY of CodeableConcepts, each one coding.
+    expect(
+      defaultValueJson({
+        kind: "codeable-concept-array",
+        concepts: [{ system: "http://x", code: "survey" }],
+      }),
+    ).toEqual([{ coding: [{ system: "http://x", code: "survey" }] }]);
   });
 
   it("Condition: subject wired + clinicalStatus=active + verificationStatus=confirmed (CodeableConcepts)", () => {
     const req = requiredStructuralElements("Condition");
-    expect(req?.map((e) => e.element)).toEqual(["subject", "clinicalStatus", "verificationStatus"]);
+    expect(req?.map((e) => e.element)).toEqual([
+      "subject",
+      "category",
+      "clinicalStatus",
+      "verificationStatus",
+    ]);
     const cs = req?.find((e) => e.element === "clinicalStatus");
     expect(cs?.fulfillment.via === "default" && cs.fulfillment.value).toEqual({
       kind: "codeable-concept",

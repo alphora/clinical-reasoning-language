@@ -13,6 +13,16 @@
     ]
   },
   "recordedDate": "2024-09-08",
+  "category": [
+    {
+      "coding": [
+        {
+          "system": "http://hl7.org/fhir/us/core/CodeSystem/condition-category",
+          "code": "health-concern"
+        }
+      ]
+    }
+  ],
   "clinicalStatus": {
     "coding": [
       {
