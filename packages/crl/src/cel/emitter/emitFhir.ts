@@ -740,15 +740,11 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
     }
   }
 
-  // Status — #189 CEL-writer T3 (REFACTOR:grounded vs CRL-NORTH-STAR §4 + FHIR R4/R5 Observation).
-  // `Observation.status` is REQUIRED (cardinality 1..1); an Observation emitted without it is invalid FHIR
-  // and the $apply engine drops it SILENTLY (→ the retrieve finds nothing → wrong PA determination). A local
-  // `code is` determination is a reviewer-asserted analytical inference that HOLDS at emit time — its FHIR
-  // status is `final`. This is unconditional for Observation (a valueless `exists this` determination still
-  // needs it), so it sits OUTSIDE the value block below.
-  if (fhirType === "Observation") {
-    resourceBody.status = "final";
-  }
+  // Status — #189 homeostasis-core (disc 493): `Observation.status` (REQUIRED 1..1; an Observation emitted
+  // without it is invalid FHIR and `$apply` drops it SILENTLY → wrong PA determination) is now the registry
+  // structural default `final` (an asserted analytical determination HOLDS at emit), applied by
+  // `applyStructuralDefaults` below — unified with every other resource's required-element floor rather than a
+  // per-resource hardcode.
 
   // Value (boolean, numeric, or string) — Observation primarily. #189 S1 — a boolean value lowers
   // to `Observation.valueBoolean` (a `value type is boolean` determination), the shape the local

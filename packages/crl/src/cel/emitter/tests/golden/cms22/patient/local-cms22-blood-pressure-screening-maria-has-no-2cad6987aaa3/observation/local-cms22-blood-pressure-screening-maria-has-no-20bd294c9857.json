@@ -12,9 +12,9 @@
       }
     ]
   },
-  "status": "final",
   "valueQuantity": {
     "value": 76
   },
-  "effectiveDateTime": "2026-03-10"
+  "effectiveDateTime": "2026-03-10",
+  "status": "final"
 }

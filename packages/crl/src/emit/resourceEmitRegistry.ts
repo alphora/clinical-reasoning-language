@@ -174,15 +174,18 @@ export function resourceEmitRow(resourceType: string): ResourceEmitRow | undefin
 // reflection (step 3) span ALL `caseFeature:true` rows, some of which have no structural schema yet — those
 // consumers must EITHER fill the rows (small, known: Observation/Procedure→status, MedicationRequest→status/intent)
 // OR gate to the schema'd subset; they must NOT fail closed on `undefined` for a proven case-feature row (that
-// would regress it). SCOPE now: Patient + ServiceRequest (remote channel) + Encounter (emit-floor-only; it was
-// emitting invalid, missing status/class).
+// would regress it). SCOPE: every FACT-emitted resource type (the `RESOURCE_EMIT_REGISTRY` set) is now wired for
+// R4 — Observation/Condition/Procedure/ServiceRequest/MedicationRequest/Encounter + Patient. ACTIVITY-OUTPUT
+// resources (CommunicationRequest/Task via the CPG activity path, not `emitOneFact`) are NOT covered by this
+// floor yet — a separate follow-up if they emit incomplete.
 
-/** The value shape for an overridable `default` fulfillment — a primitive `code` element (`status`) or a `Coding`
- *  element (`Encounter.class`). The emitter writes this verbatim into the FHIR element, so it must be the exact
- *  serialized shape (not a token/CEL literal — the axis gpt56 flagged as ambiguous, disc 493). */
+/** The value shape for an overridable `default` fulfillment, by the target element's FHIR type — a primitive
+ *  `code` (`status`), a `Coding` (`Encounter.class`), or a `CodeableConcept` (`Condition.clinicalStatus`). The
+ *  emitter writes the exact serialized shape (not a token/CEL literal — the axis gpt56 flagged, disc 493). */
 export type DefaultValue =
   | { kind: "code"; code: string } // a primitive `code` element (Encounter/ServiceRequest.status, .intent)
-  | { kind: "coding"; system: string; code: string; display?: string }; // a `Coding` element (Encounter.class)
+  | { kind: "coding"; system: string; code: string; display?: string } // a `Coding` element (Encounter.class)
+  | { kind: "codeable-concept"; system: string; code: string; display?: string }; // a `CodeableConcept` (Condition.clinicalStatus/verificationStatus)
 
 /** How a STRUCTURAL (FHIR-cardinality-required, concept-independent) element is satisfied when the source doesn't
  *  supply it. Requiredness and defaultability are independent — a FHIR-required element can be clinical and thus
@@ -236,6 +239,54 @@ export const REQUIRED_STRUCTURAL_ELEMENTS: Readonly<Record<string, readonly Stru
       },
     },
   ],
+  // Observation (value-bearing case-feature): R4 `status` 1..1 (`code` is the concept datum). An asserted
+  // analytical determination HOLDS at emit → `final` (was a hardcoded emitter special case; unified here so the
+  // validate/SD steps see it too). `subject` is 0..1 (optional), so not required.
+  Observation: [{ element: "status", fulfillment: { via: "default", value: { kind: "code", code: "final" } } }],
+  // Condition: `subject` (1..1) is emit-wired. `clinicalStatus`/`verificationStatus` are 0..1 in base R4 but
+  // profile-required and expected downstream — defaulted (operator) to `active`/`confirmed` CodeableConcepts (an
+  // asserted, confirmed current condition). `code` is the concept datum. (con-3 holds: verificationStatus is not
+  // entered-in-error, so a present clinicalStatus is valid.)
+  Condition: [
+    { element: "subject", fulfillment: { via: "wired", binding: "case-subject" } },
+    {
+      element: "clinicalStatus",
+      fulfillment: {
+        via: "default",
+        value: {
+          kind: "codeable-concept",
+          system: "http://terminology.hl7.org/CodeSystem/condition-clinical",
+          code: "active",
+          display: "Active",
+        },
+      },
+    },
+    {
+      element: "verificationStatus",
+      fulfillment: {
+        via: "default",
+        value: {
+          kind: "codeable-concept",
+          system: "http://terminology.hl7.org/CodeSystem/condition-verification",
+          code: "confirmed",
+          display: "Confirmed",
+        },
+      },
+    },
+  ],
+  // Procedure: R4 `status` 1..1 + `subject` 1..1 (`code` is the concept datum). An asserted procedure that
+  // occurred → `completed`.
+  Procedure: [
+    { element: "status", fulfillment: { via: "default", value: { kind: "code", code: "completed" } } },
+    { element: "subject", fulfillment: { via: "wired", binding: "case-subject" } },
+  ],
+  // MedicationRequest: R4 `status`+`intent` 1..1 (like ServiceRequest) + `subject` 1..1 (`medication[x]` is the
+  // concept datum, a choice element — descriptor-derived, not here).
+  MedicationRequest: [
+    { element: "status", fulfillment: { via: "default", value: { kind: "code", code: "active" } } },
+    { element: "intent", fulfillment: { via: "default", value: { kind: "code", code: "order" } } },
+    { element: "subject", fulfillment: { via: "wired", binding: "case-subject" } },
+  ],
 };
 
 /** The structural required-element schema for a resource, or `undefined` when the resource has no schema in this
@@ -248,12 +299,17 @@ export function requiredStructuralElements(
     : undefined;
 }
 
-/** The FHIR JSON value a `default` fulfillment writes verbatim into its element: a primitive `code` element
- *  writes the bare code string; a `Coding` element writes a `{system, code, display?}` object. */
+/** The FHIR JSON value a `default` fulfillment writes verbatim into its element: a primitive `code` writes the
+ *  bare string; a `Coding` writes `{system, code, display?}`; a `CodeableConcept` wraps that Coding in `{coding:
+ *  [...]}`. */
 export function defaultValueJson(value: DefaultValue): unknown {
-  return value.kind === "code"
-    ? value.code
-    : { system: value.system, code: value.code, ...(value.display !== undefined ? { display: value.display } : {}) };
+  if (value.kind === "code") return value.code;
+  const coding = {
+    system: value.system,
+    code: value.code,
+    ...(value.display !== undefined ? { display: value.display } : {}),
+  };
+  return value.kind === "coding" ? coding : { coding: [coding] };
 }
 
 // ── T2: JSON-write-name resolvers ────────────────────────────────────────────────────────────────────────

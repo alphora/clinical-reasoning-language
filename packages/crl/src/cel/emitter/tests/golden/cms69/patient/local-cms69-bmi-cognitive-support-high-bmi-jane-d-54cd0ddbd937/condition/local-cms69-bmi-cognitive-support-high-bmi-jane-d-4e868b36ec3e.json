@@ -12,5 +12,23 @@
       }
     ]
   },
-  "recordedDate": "2024-09-08"
+  "recordedDate": "2024-09-08",
+  "clinicalStatus": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+        "code": "active",
+        "display": "Active"
+      }
+    ]
+  },
+  "verificationStatus": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/condition-verification",
+        "code": "confirmed",
+        "display": "Confirmed"
+      }
+    ]
+  }
 }

@@ -314,8 +314,37 @@ describe("required structural-element schema (Patient + ServiceRequest)", () => 
     expect(requiredStructuralElements("Patient")).toEqual([]);
   });
 
-  it("exact coverage: only Patient + ServiceRequest + Encounter are schema'd (a new row must update this pin)", () => {
-    expect(Object.keys(REQUIRED_STRUCTURAL_ELEMENTS).sort()).toEqual(["Encounter", "Patient", "ServiceRequest"]);
+  it("the R4 status/intent defaults per resource type", () => {
+    const codeDefaultOf = (rt: string, element: string): string | undefined => {
+      const e = requiredStructuralElements(rt)?.find((x) => x.element === element);
+      return e?.fulfillment.via === "default" && e.fulfillment.value.kind === "code"
+        ? e.fulfillment.value.code
+        : undefined;
+    };
+    expect(codeDefaultOf("Observation", "status")).toBe("final");
+    expect(codeDefaultOf("Procedure", "status")).toBe("completed");
+    expect(codeDefaultOf("MedicationRequest", "status")).toBe("active");
+    expect(codeDefaultOf("MedicationRequest", "intent")).toBe("order");
+    // Condition has no status default (base R4 requires only subject).
+    expect(codeDefaultOf("Condition", "status")).toBeUndefined();
+  });
+
+  it("exact coverage: every fact-emitted resource type is schema'd for R4 (a new row must update this pin)", () => {
+    expect(Object.keys(REQUIRED_STRUCTURAL_ELEMENTS).sort()).toEqual([
+      "Condition",
+      "Encounter",
+      "MedicationRequest",
+      "Observation",
+      "Patient",
+      "Procedure",
+      "ServiceRequest",
+    ]);
+  });
+
+  it("every RESOURCE_EMIT_REGISTRY row has a structural schema (fact-emitted resources are R4-complete)", () => {
+    for (const resourceType of Object.keys(RESOURCE_EMIT_REGISTRY)) {
+      expect(requiredStructuralElements(resourceType), `${resourceType} must be schema'd`).toBeDefined();
+    }
   });
 
   it("every structural element has a well-formed fulfillment (default carries a non-empty code/coding)", () => {
@@ -337,7 +366,7 @@ describe("required structural-element schema (Patient + ServiceRequest)", () => 
     }
   });
 
-  it("defaultValueJson: a code writes the bare string; a Coding writes {system,code,display}", () => {
+  it("defaultValueJson: code → bare string; coding → {system,code,display}; codeable-concept → {coding:[...]}", () => {
     expect(defaultValueJson({ kind: "code", code: "finished" })).toBe("finished");
     expect(
       defaultValueJson({ kind: "coding", system: "http://x", code: "OBSENC", display: "observation encounter" }),
@@ -346,12 +375,28 @@ describe("required structural-element schema (Patient + ServiceRequest)", () => 
       system: "http://x",
       code: "c",
     }); // display omitted when absent
+    expect(
+      defaultValueJson({ kind: "codeable-concept", system: "http://x", code: "active", display: "Active" }),
+    ).toEqual({ coding: [{ system: "http://x", code: "active", display: "Active" }] });
+  });
+
+  it("Condition: subject wired + clinicalStatus=active + verificationStatus=confirmed (CodeableConcepts)", () => {
+    const req = requiredStructuralElements("Condition");
+    expect(req?.map((e) => e.element)).toEqual(["subject", "clinicalStatus", "verificationStatus"]);
+    const cs = req?.find((e) => e.element === "clinicalStatus");
+    expect(cs?.fulfillment.via === "default" && cs.fulfillment.value).toEqual({
+      kind: "codeable-concept",
+      system: "http://terminology.hl7.org/CodeSystem/condition-clinical",
+      code: "active",
+      display: "Active",
+    });
   });
 
   it("an unlisted resource fails closed (undefined), NOT an empty list", () => {
     // Absence ("no schema modeled yet") must be distinguishable from `[]` ("known, no structural required")
-    // so a caller can't silently ship an incomplete resource for an unmodeled type.
-    expect(requiredStructuralElements("Condition")).toBeUndefined();
+    // so a caller can't silently ship an incomplete resource for an unmodeled type. DiagnosticReport is a real
+    // FHIR type we don't fact-emit (no registry row).
+    expect(requiredStructuralElements("DiagnosticReport")).toBeUndefined();
     expect(requiredStructuralElements("toString")).toBeUndefined(); // prototype-pollution guard
   });
 });
