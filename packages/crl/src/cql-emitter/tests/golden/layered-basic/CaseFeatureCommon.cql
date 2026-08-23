@@ -37,6 +37,28 @@ define fluent function satisfied(truths List<System.Boolean>):
   exists truths
 
 /*
+ * recencyLocalWins — the SHARED cross-representation recency tie-break (#189 B2).
+ *
+ * Given the LOCAL arm's recency timestamp and the SOURCE/other arm's recency
+ * timestamp, returns TRUE iff the LOCAL arm should win the recency arbitration.
+ * Policy (engine-PINNED via the cqf `cql` evaluator, #189 B2 / disc 498; operator
+ * decision D1=A, 2026-08-23):
+ *   - SOURCE wins ONLY when POSITIVELY newer — `sourceTs after localTs` is true.
+ *   - LOCAL wins on EVERYTHING else, INCLUDING every indeterminacy: either
+ *     timestamp null, a precision mismatch (`after` → null), OR equal timestamps.
+ * The single `not Coalesce(sourceTs after localTs, false)` makes "indeterminate
+ * recency → LOCAL wins" true BY CONSTRUCTION: the `Coalesce` sits on the
+ * SOURCE-newer predicate, so an `after`-null can NEVER silently flip to source
+ * (the exact bug it fixes in the pre-B2 age merge — see recencyAgeAssertedWins).
+ * LOCAL is the canonical/production representation (charter §2), so it is the safe
+ * default on any recency uncertainty. ONE tie-break consulted by BOTH the patient-
+ * age merge (below) AND, at the #189 flip, the general cross-rep value merge — so
+ * they cannot DRIFT.
+ */
+define function recencyLocalWins(localTs System.DateTime, sourceTs System.DateTime):
+  not Coalesce(sourceTs after localTs, false)
+
+/*
  * recencyAgeTruths — the patient-age both-representation RECENCY merge.
  *
  * Selects between a locally-asserted age boolean (the newest valid
@@ -53,19 +75,26 @@ define fluent function satisfied(truths List<System.Boolean>):
  *   3. else if assertion present → the ASSERTED boolean (fallback, no computed age).
  *   4. else → NOT DETERMINED (empty truth-set).
  *
- * RESOLVED recency clock + null-lastUpdated behavior (operator decision 2026-07-01):
+ * RESOLVED recency clock (operator decisions 2026-07-01; #189 B2 D1=A, 2026-08-23):
  *   - Recency keys on `Observation.effective`: a DTR/SDC `definitionExtractValue`
  *     extraction (ProcessDefinitionItem) populates `effective` from
  *     QuestionnaireResponse.authored, NOT `issued` — so the merge reads `effective`
  *     and the call site takes the MOST RECENT (`Last(... sort by effective, id)`).
- *   - When recency is INDETERMINATE — `Patient.meta.lastUpdated` absent (we can't
- *     prove the computed/live state is fresher), OR `effective` null — the
- *     LOCAL-SOURCE WINS. This KEEPS the prior null-lastUpdated behavior and REJECTS
- *     the reviewers' proposed flip to computed. It is safe because the case-3
- *     local-source answer is SESSION-FRESH (not persisted beyond the client session
- *     — see the `@business-logic-deferred:` marker on the authoring concept and
- *     backlog #190). The reviewers' stale-assertion concern is mitigated by that
- *     do-not-persist-beyond-session marker.
+ *   - The tie-break is now the SHARED `recencyLocalWins(localTs=effective,
+ *     sourceTs=lastUpdated)` (#189 B2): SOURCE (the computed/live age) wins ONLY when
+ *     positively newer (`lastUpdated after effective` is true); LOCAL-SOURCE wins on
+ *     everything else. Two cells CHANGED from the pre-B2 age merge, BOTH now → LOCAL
+ *     (engine-pinned, disc 498):
+ *       · PRECISION-NULL (effective vs lastUpdated indeterminate → `after` null): a
+ *         BUG FIX — the old `effective after lastUpdated` returned null, which fell
+ *         through to computed, CONTRADICTING this docblock's own "indeterminate →
+ *         local" policy. Now local wins (the `Coalesce` on the source-newer predicate).
+ *       · EQUAL timestamps: a POLICY change (operator D1=A, ratified) — the old lattice
+ *         gave computed on an exact tie; now local wins (charter §2, local is canonical).
+ *   - When recency is INDETERMINATE (`lastUpdated` absent, OR `effective` null, OR a
+ *     precision mismatch) the LOCAL-SOURCE WINS — safe because the local answer is
+ *     SESSION-FRESH (not persisted beyond the client session — the
+ *     `@business-logic-deferred:` marker on the authoring concept + backlog #190).
  *
  * Params:
  *   local    — the newest valid local age Observation (or null). The call site
@@ -81,18 +110,15 @@ define fluent function satisfied(truths List<System.Boolean>):
 // function body). `local` may be null (no valid local Observation).
 //
 // `recencyAgeAssertedWins` is TRUE when the local-source assertion should win:
-// there IS a local Observation AND we CANNOT prove the computed/live age is
-// fresher — i.e. `Patient.meta.lastUpdated` absent, OR `effective` null, OR
-// `effective after lastUpdated` (effective read as FHIR.dateTime — extraction
-// yields effectiveDateTime). Per operator decision 2026-07-01 (see the docblock):
-// indeterminate recency → the (session-fresh) local-source wins.
+// there IS a local Observation AND the shared `recencyLocalWins` tie-break says
+// local wins (local = `effective` read as FHIR.dateTime — extraction yields
+// effectiveDateTime; source = `Patient.meta.lastUpdated`). #189 B2: the local-wins
+// condition is now the ONE shared `recencyLocalWins` (source wins only when
+// positively newer), so this merge and the general cross-rep value merge cannot
+// drift; indeterminate/equal recency → the (session-fresh) local-source wins.
 define function recencyAgeAssertedWins(local FHIR.Observation):
   local is not null
-    and (
-      Patient.meta.lastUpdated.value is null
-      or (local.effective as FHIR.dateTime).value is null
-      or (local.effective as FHIR.dateTime).value after Patient.meta.lastUpdated.value
-    )
+    and recencyLocalWins((local.effective as FHIR.dateTime).value, Patient.meta.lastUpdated.value)
 
 // The recency-selected age boolean, or null when nothing determines it.
 // LOCK-STEP: the `local.value as FHIR.boolean` cast here mirrors the emit
