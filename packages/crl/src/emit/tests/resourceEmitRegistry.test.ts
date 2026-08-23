@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { parseInput } from "../../ast/tests/parseInput";
 import type { Concept } from "../../ast/types";
+import { CASE_FEATURE_EMITTABLE_TYPES } from "../../fhir-model/caseFeatureResources";
 import {
   deriveEffectiveRepresentations,
   type OwningLibraryMetadata,
@@ -398,5 +399,28 @@ describe("required structural-element schema (Patient + ServiceRequest)", () => 
     // FHIR type we don't fact-emit (no registry row).
     expect(requiredStructuralElements("DiagnosticReport")).toBeUndefined();
     expect(requiredStructuralElements("toString")).toBeUndefined(); // prototype-pollution guard
+  });
+});
+
+// #189 / disc 495 Q6 — the CONSISTENCY BRIDGE between the emit registry's per-row `caseFeature` flags and the
+// lane-neutral `CASE_FEATURE_EMITTABLE_TYPES` set that the VALIDATE lane reads (the validate lane may not import
+// this registry — enforced by the effectiveRepresentation import-boundary test — so the neutral set is a
+// SEPARATE representation, and this test is the only thing that keeps the two from drifting).
+describe("case-feature-emittable set ↔ registry caseFeature flags (lane-neutral bridge, disc 495 Q6)", () => {
+  it("the neutral set equals exactly the registry rows with caseFeature: true", () => {
+    const registryCaseFeatureTypes = new Set(
+      Object.entries(RESOURCE_EMIT_REGISTRY)
+        .filter(([, row]) => row.caseFeature)
+        .map(([type]) => type),
+    );
+    // Bidirectional equality: every neutral-set member is a caseFeature:true row, and every caseFeature:true row
+    // is in the neutral set — so a future row (or a flipped flag) can't silently diverge from what validate sees.
+    expect([...CASE_FEATURE_EMITTABLE_TYPES].sort()).toEqual([...registryCaseFeatureTypes].sort());
+  });
+
+  it("Encounter (caseFeature: false) is a registry row but NOT in the neutral set", () => {
+    expect(RESOURCE_EMIT_REGISTRY.Encounter).toBeDefined();
+    expect(RESOURCE_EMIT_REGISTRY.Encounter.caseFeature).toBe(false);
+    expect(CASE_FEATURE_EMITTABLE_TYPES.has("Encounter")).toBe(false);
   });
 });

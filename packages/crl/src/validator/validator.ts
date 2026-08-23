@@ -7,6 +7,7 @@ import { AgePredicateValidator } from "./agePredicateValidator";
 import { CycleDetector } from "./cycleDetector";
 import { DecisionShapeValidator } from "./decisionShapeValidator";
 import { DispositionValidator } from "./dispositionValidator";
+import { EmitCapabilityValidator } from "./emitCapabilityValidator";
 import { MetaTagValidator } from "./metaTagValidator";
 import { NameUniquenessValidator } from "./nameUniquenessValidator";
 import { ReductionShapeValidator } from "./reductionShapeValidator";
@@ -99,7 +100,14 @@ export type ValidationErrorKind =
   // (validate-only; `isValid` stays true) — this slice LEADS the emit flip by one version, teaching
   // the corpus toward the reduction/shape model before emit consults it. The specific rule is on
   // `.rule`; `conceptName` names the offending concept. See ReductionShapeRule + disc 415.
-  | "reduction-shape";
+  | "reduction-shape"
+  // #189 / disc 495 Q6 — the authoring-time EMIT-CAPABILITY warning ("#1"): a concept with a local
+  // `code is` whose effective resource type is NOT a case-feature-emittable registry resource (an
+  // unlisted type, or Encounter's CEL-writer-only row) — `emit_cel` would fail closed on it
+  // (`unsupported-casefeature-resource`); this surfaces it EARLIER at validate time. Intrinsic
+  // WARNING, NEVER an error: the emit registry is a deliberate SUBSET of capability, so a hard error
+  // would turn "not yet emittable" into "invalid CRL" (grammar defines the language, not the registry).
+  | "unsupported-casefeature-resource";
 
 /**
  * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
@@ -502,6 +510,15 @@ export interface ReductionShapeError extends ValidationErrorBase {
   conceptName: string;
 }
 
+// #189 / disc 495 Q6 — the emit-capability WARNING ("#1"). `conceptName` names the offending concept;
+// `resourceType` is its effective (`type is`, defaulted to `Observation`) resource type that the emit
+// registry does not back as a case-feature datum. Intrinsic WARNING severity (never flips isValid).
+export interface EmitCapabilityWarning extends ValidationErrorBase {
+  kind: "unsupported-casefeature-resource";
+  conceptName: string;
+  resourceType: string;
+}
+
 export type ValidationError =
   | EmptyNameError
   | DuplicateNameError
@@ -522,6 +539,7 @@ export type ValidationError =
   | UseSiteTypeMismatchError
   | UseSiteOperandUntypedWarning
   | ReductionShapeError
+  | EmitCapabilityWarning
   | MetaDiagnostic;
 
 export interface ValidationResult {
@@ -581,6 +599,7 @@ export class Validator {
   private readonly representationShapeValidator: RepresentationShapeValidator;
   private readonly reductionShapeValidator: ReductionShapeValidator;
   private readonly useSiteTypeValidator: UseSiteTypeValidator;
+  private readonly emitCapabilityValidator: EmitCapabilityValidator;
 
   constructor() {
     this.nameUniquenessValidator = new NameUniquenessValidator();
@@ -593,6 +612,7 @@ export class Validator {
     this.representationShapeValidator = new RepresentationShapeValidator();
     this.reductionShapeValidator = new ReductionShapeValidator();
     this.useSiteTypeValidator = new UseSiteTypeValidator();
+    this.emitCapabilityValidator = new EmitCapabilityValidator();
   }
 
   /**
@@ -677,6 +697,12 @@ export class Validator {
     // code migration prompt, non-Scalar-needs-type, and the shape-marker-not-emit-active honesty note.
     // Routed through pushSplit; every finding is `severity: "warning"`, so isValid is never flipped.
     pushSplit(this.reductionShapeValidator.validate(ast, sources));
+
+    // #189 / disc 495 Q6 — the authoring-time EMIT-CAPABILITY warning ("#1"): a local `code is` concept whose
+    // `type is` is not a case-feature-emittable registry resource (an unlisted type, or Encounter's CEL-writer-
+    // only row). Intrinsic WARNING (the registry is a deliberate SUBSET of capability — never a hard error);
+    // routed through pushSplit so isValid is never flipped.
+    pushSplit(this.emitCapabilityValidator.validate(ast, sources));
 
     // #154/#203 — registry-backed @tag metadata enforcement (vocabulary / field / cardinality / open-flag).
     // Routed through pushSplit so open-flag/unknown/malformed WARN (not fail) and meta-missing-field soft-demotes.
