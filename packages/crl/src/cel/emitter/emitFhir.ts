@@ -7,7 +7,11 @@ import {
   type Concept,
 } from "../../ast/types";
 import { hasLocalCode, hasSourceBinding } from "../../emit/conceptDatumSignals";
-import { resourceCodingPlacement } from "../../emit/resourceEmitRegistry";
+import {
+  resourceCodingPlacement,
+  requiredStructuralElements,
+  defaultValueJson,
+} from "../../emit/resourceEmitRegistry";
 import { readCanonicalBase, readPolicyId } from "../../fhir-emitter/metadata";
 import { createLocalDomainResolver } from "../../fhir-emitter/localDomain";
 import { astHasConceptLocalCode } from "../../cql-emitter/lowerLocalCodes";
@@ -824,6 +828,12 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   // Date defaults from the fact body — when the case body doesn't pin via `at`/`on`.
   // (Already covered above via body.date fallback.)
 
+  // #189 homeostasis-core (disc 493): apply the registry's STRUCTURAL-default floor — a FHIR-required,
+  // concept-independent element (Encounter `status`/`class`, ServiceRequest `status`/`intent`) gets its
+  // overridable default when the source didn't supply it, so the emitted resource is valid FHIR. Author-set and
+  // already-wired (`subject`) values are preserved (only MISSING elements are filled).
+  applyStructuralDefaults(resourceBody, fhirType);
+
   ctx.emittedIds.set(factName, { id, resourceType: fhirType });
 
   return {
@@ -833,6 +843,20 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
     outputPath: `patient/${ctx.patientCompartmentId}/${fhirType.toLowerCase()}`,
     body: resourceBody,
   };
+}
+
+/** #189 homeostasis-core (disc 493): the registry-driven structural-default floor. For a SCHEMA'D resource,
+ *  writes the `default` fulfillment of every required element the body is missing (`status`, `class`, `intent`);
+ *  `wired` (subject) is already set upstream and `authored` is the author's job, so both are skipped here. An
+ *  UNSCHEMA'D resource is left untouched (no error — its completeness is a separate, tracked gap). */
+function applyStructuralDefaults(resourceBody: Record<string, unknown>, fhirType: string): void {
+  const schema = requiredStructuralElements(fhirType);
+  if (schema === undefined) return;
+  for (const el of schema) {
+    if (el.fulfillment.via === "default" && resourceBody[el.element] === undefined) {
+      resourceBody[el.element] = defaultValueJson(el.fulfillment.value);
+    }
+  }
 }
 
 const CROSS_RESOURCE_FIELD: Record<CrossResourceRelation, string> = {

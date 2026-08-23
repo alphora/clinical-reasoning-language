@@ -167,19 +167,28 @@ export function resourceEmitRow(resourceType: string): ResourceEmitRow | undefin
 // the case Patient reference — NOT a string literal), or `authored` (FHIR-required AND clinical, no safe default;
 // none in the Patient+SR subset, but the model admits it so a future Immunization.occurrence[x] has an honest cell).
 //
-// INERT in this slice — no emit/validate path reads it yet. CONSUMER CONTRACT for the next steps (write the
-// per-consumer behavior when each lands, disc 493): step 6 (remote-emit floor) is Patient+SR-scoped → `undefined`
-// = hard error. Steps 2 (validate rule) + 3 (case-feature SD `min=1`) span ALL `caseFeature:true` rows, four of
-// which (Condition/Observation/Procedure/MedicationRequest) have NO structural schema yet — those consumers must
-// EITHER fill the rows (small, known: Observation/Procedure→status, MedicationRequest→status/intent) OR gate to
-// the schema'd subset; they must NOT fail closed on `undefined` for a proven case-feature row (that would regress
-// it). SCOPE now: Patient + ServiceRequest only (operator "start with just Patient and SR").
+// CONSUMER CONTRACT (per-consumer behavior differs — disc 493): the EMIT-DEFAULT floor (`applyStructuralDefaults`,
+// CEL writer) applies a `default` fulfillment for any missing element of a SCHEMA'D resource and SKIPS an
+// unschema'd one (no error — erroring would break every emitted Observation/Condition; an unschema'd resource's
+// completeness is a separate, tracked gap). The `validate_crl` rule (step 2) + the case-feature SD `min=1`
+// reflection (step 3) span ALL `caseFeature:true` rows, some of which have no structural schema yet — those
+// consumers must EITHER fill the rows (small, known: Observation/Procedure→status, MedicationRequest→status/intent)
+// OR gate to the schema'd subset; they must NOT fail closed on `undefined` for a proven case-feature row (that
+// would regress it). SCOPE now: Patient + ServiceRequest (remote channel) + Encounter (emit-floor-only; it was
+// emitting invalid, missing status/class).
+
+/** The value shape for an overridable `default` fulfillment — a primitive `code` element (`status`) or a `Coding`
+ *  element (`Encounter.class`). The emitter writes this verbatim into the FHIR element, so it must be the exact
+ *  serialized shape (not a token/CEL literal — the axis gpt56 flagged as ambiguous, disc 493). */
+export type DefaultValue =
+  | { kind: "code"; code: string } // a primitive `code` element (Encounter/ServiceRequest.status, .intent)
+  | { kind: "coding"; system: string; code: string; display?: string }; // a `Coding` element (Encounter.class)
 
 /** How a STRUCTURAL (FHIR-cardinality-required, concept-independent) element is satisfied when the source doesn't
  *  supply it. Requiredness and defaultability are independent — a FHIR-required element can be clinical and thus
  *  un-defaultable (`authored`), or satisfied by emit machinery rather than a value (`wired`). */
 export type StructuralFulfillment =
-  | { via: "default"; value: string } // an overridable administrative floor literal (status=`active`)
+  | { via: "default"; value: DefaultValue } // an overridable administrative floor (status=`active`, class=OBSENC)
   | { via: "wired"; binding: "case-subject" } // satisfied by emit machinery (subject → the case Patient reference)
   | { via: "authored" }; // FHIR-required AND clinical → must be authored, no safe default (none in Patient+SR yet)
 
@@ -204,9 +213,28 @@ export const REQUIRED_STRUCTURAL_ELEMENTS: Readonly<Record<string, readonly Stru
   // defaults; `subject` is 1..1 satisfied by the emit wiring (the case Patient reference), NOT a literal. `code`
   // (the requested item's identity) is the CONCEPT datum → descriptor-derived, not here.
   ServiceRequest: [
-    { element: "status", fulfillment: { via: "default", value: "active" } },
-    { element: "intent", fulfillment: { via: "default", value: "order" } },
+    { element: "status", fulfillment: { via: "default", value: { kind: "code", code: "active" } } },
+    { element: "intent", fulfillment: { via: "default", value: { kind: "code", code: "order" } } },
     { element: "subject", fulfillment: { via: "wired", binding: "case-subject" } },
+  ],
+  // Encounter is EMIT-FLOOR-ONLY (`caseFeature: false` — the CEL writer emits it as ambient context, but it is
+  // never a case-feature datum, so no SD; its required elements gate the emit floor, not the SD). R4 `status`
+  // (1..1) + `class` (1..1, a `Coding`) were emitted MISSING → invalid FHIR. `class` defaults to `OBSENC`
+  // (observation encounter, v3-ActCode) per operator; `status` to `finished`.
+  Encounter: [
+    { element: "status", fulfillment: { via: "default", value: { kind: "code", code: "finished" } } },
+    {
+      element: "class",
+      fulfillment: {
+        via: "default",
+        value: {
+          kind: "coding",
+          system: "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          code: "OBSENC",
+          display: "observation encounter",
+        },
+      },
+    },
   ],
 };
 
@@ -218,6 +246,14 @@ export function requiredStructuralElements(
   return Object.prototype.hasOwnProperty.call(REQUIRED_STRUCTURAL_ELEMENTS, resourceType)
     ? REQUIRED_STRUCTURAL_ELEMENTS[resourceType]
     : undefined;
+}
+
+/** The FHIR JSON value a `default` fulfillment writes verbatim into its element: a primitive `code` element
+ *  writes the bare code string; a `Coding` element writes a `{system, code, display?}` object. */
+export function defaultValueJson(value: DefaultValue): unknown {
+  return value.kind === "code"
+    ? value.code
+    : { system: value.system, code: value.code, ...(value.display !== undefined ? { display: value.display } : {}) };
 }
 
 // ── T2: JSON-write-name resolvers ────────────────────────────────────────────────────────────────────────

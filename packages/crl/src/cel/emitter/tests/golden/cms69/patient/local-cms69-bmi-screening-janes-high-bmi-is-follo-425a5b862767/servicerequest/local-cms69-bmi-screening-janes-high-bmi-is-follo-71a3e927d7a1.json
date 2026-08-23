@@ -18,5 +18,6 @@
     ]
   },
   "intent": "order",
-  "authoredOn": "2026-01-15"
+  "authoredOn": "2026-01-15",
+  "status": "active"
 }

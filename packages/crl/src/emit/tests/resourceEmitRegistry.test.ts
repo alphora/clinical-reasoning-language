@@ -14,6 +14,7 @@ import {
   valueJsonName,
   recencyStampJsonName,
   requiredStructuralElements,
+  defaultValueJson,
   resourceCodingPlacement,
 } from "../resourceEmitRegistry";
 
@@ -283,11 +284,29 @@ describe("#189 CEL-writer T2 — coding PLACEMENT + the Encounter (caseFeature:f
 
 // ── #189 remote-channel: required STRUCTURAL-element schema (homeostasis-core, disc 493) ──────────────────────
 describe("required structural-element schema (Patient + ServiceRequest)", () => {
-  it("ServiceRequest: status/intent are defaulted; subject is wired to the case Patient", () => {
+  it("ServiceRequest: status/intent are code defaults; subject is wired to the case Patient", () => {
     expect(requiredStructuralElements("ServiceRequest")).toEqual([
-      { element: "status", fulfillment: { via: "default", value: "active" } },
-      { element: "intent", fulfillment: { via: "default", value: "order" } },
+      { element: "status", fulfillment: { via: "default", value: { kind: "code", code: "active" } } },
+      { element: "intent", fulfillment: { via: "default", value: { kind: "code", code: "order" } } },
       { element: "subject", fulfillment: { via: "wired", binding: "case-subject" } },
+    ]);
+  });
+
+  it("Encounter (emit-floor-only): status defaults finished; class defaults to the OBSENC Coding", () => {
+    expect(requiredStructuralElements("Encounter")).toEqual([
+      { element: "status", fulfillment: { via: "default", value: { kind: "code", code: "finished" } } },
+      {
+        element: "class",
+        fulfillment: {
+          via: "default",
+          value: {
+            kind: "coding",
+            system: "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+            code: "OBSENC",
+            display: "observation encounter",
+          },
+        },
+      },
     ]);
   });
 
@@ -295,22 +314,38 @@ describe("required structural-element schema (Patient + ServiceRequest)", () => 
     expect(requiredStructuralElements("Patient")).toEqual([]);
   });
 
-  it("exact coverage: only Patient + ServiceRequest are schema'd in this slice (a new row must update this pin)", () => {
-    expect(Object.keys(REQUIRED_STRUCTURAL_ELEMENTS).sort()).toEqual(["Patient", "ServiceRequest"]);
+  it("exact coverage: only Patient + ServiceRequest + Encounter are schema'd (a new row must update this pin)", () => {
+    expect(Object.keys(REQUIRED_STRUCTURAL_ELEMENTS).sort()).toEqual(["Encounter", "Patient", "ServiceRequest"]);
   });
 
-  it("every structural element has a well-formed fulfillment (default carries a non-empty value)", () => {
+  it("every structural element has a well-formed fulfillment (default carries a non-empty code/coding)", () => {
     for (const [resourceType, elems] of Object.entries(REQUIRED_STRUCTURAL_ELEMENTS)) {
       for (const e of elems) {
         const where = `${resourceType}.${e.element}`;
         if (e.fulfillment.via === "default") {
-          expect(e.fulfillment.value, `${where} default value`).toBeTypeOf("string");
-          expect(e.fulfillment.value.length, `${where} default must be non-empty`).toBeGreaterThan(0);
+          const v = e.fulfillment.value;
+          if (v.kind === "code") {
+            expect(v.code.length, `${where} code default must be non-empty`).toBeGreaterThan(0);
+          } else {
+            expect(v.system.length, `${where} coding system`).toBeGreaterThan(0);
+            expect(v.code.length, `${where} coding code`).toBeGreaterThan(0);
+          }
         } else if (e.fulfillment.via === "wired") {
           expect(e.fulfillment.binding, `${where} wired binding`).toBe("case-subject");
         }
       }
     }
+  });
+
+  it("defaultValueJson: a code writes the bare string; a Coding writes {system,code,display}", () => {
+    expect(defaultValueJson({ kind: "code", code: "finished" })).toBe("finished");
+    expect(
+      defaultValueJson({ kind: "coding", system: "http://x", code: "OBSENC", display: "observation encounter" }),
+    ).toEqual({ system: "http://x", code: "OBSENC", display: "observation encounter" });
+    expect(defaultValueJson({ kind: "coding", system: "http://x", code: "c" })).toEqual({
+      system: "http://x",
+      code: "c",
+    }); // display omitted when absent
   });
 
   it("an unlisted resource fails closed (undefined), NOT an empty list", () => {
