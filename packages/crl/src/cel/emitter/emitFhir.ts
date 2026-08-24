@@ -12,7 +12,12 @@ import {
   requiredStructuralElements,
   defaultValueJson,
   qicoreBaseProfile,
+  valueJsonName,
 } from "../../emit/resourceEmitRegistry";
+import {
+  deriveEffectiveRepresentations,
+  type OwningLibraryMetadata,
+} from "../../emit/effectiveRepresentation";
 import { readCanonicalBase, readPolicyId } from "../../fhir-emitter/metadata";
 import { createLocalDomainResolver } from "../../fhir-emitter/localDomain";
 import { astHasConceptLocalCode } from "../../cql-emitter/lowerLocalCodes";
@@ -343,6 +348,23 @@ function parseCanonicalToken(raw: string): CodeParts {
   return { system: raw.slice(0, pipe), code: raw.slice(pipe + 1) };
 }
 
+// REFACTOR:grounded (#189 B4, disc 501 — both crl-emit arms #4). The CHECKED token parser for a CodeableConcept
+// `value is` DATUM. Unlike `parseCanonicalToken` (which tolerates a pipe-less/bare code — historical for the
+// identity `code is`), a DATUM must carry `<system>|<code>` in full: a system-less Coding can never match the B5
+// membership read (`coded from "VS"` filters on system+code), so a malformed token fails CLOSED here rather than
+// emitting a value B5 cannot validate. Requires exactly one pipe with non-empty system and code.
+function parseCheckedCanonicalToken(raw: string): { parts: CodeParts } | { error: string } {
+  const segs = raw.split("|");
+  if (segs.length !== 2) {
+    return { error: `a CodeableConcept \`value is\` requires exactly \`<system>|<code>\` (got \`${raw}\`)` };
+  }
+  const [system, code] = segs;
+  if (system.trim() === "" || code.trim() === "") {
+    return { error: `a CodeableConcept \`value is\` requires a non-empty system and code (got \`${raw}\`)` };
+  }
+  return { parts: { system, code } };
+}
+
 function codeableConceptFromParts(cp: CodeParts): Record<string, unknown> {
   return {
     coding: [
@@ -367,6 +389,66 @@ function computeLocalCodePaths(registry: Registry): Set<string> {
   for (const e of registry.byNameLocal.values()) if (astHasConceptLocalCode(e.ast)) out.add(e.filePath);
   for (const e of registry.byNamePackage.values()) if (astHasConceptLocalCode(e.ast)) out.add(e.filePath);
   return out;
+}
+
+/** REFACTOR:grounded (#189 B4, disc 501 #1). Resolve a local fact's `OwningLibraryMetadata` — the
+ *  `{libraryName, canonicalBase, localDomainId}` triple the effective-representation descriptor deriver consumes —
+ *  via the SAME project resolution `deriveLocalCoding` uses. Extracted so the coding-write path and the B4
+ *  value-write path share ONE owning-identity computation (no second-authority drift; disc 501 #1). Fail-closed on
+ *  a missing base / covers closure / registry — the loud floor "never a silent partial." */
+function localOwningMeta(
+  ctx: EmitContext,
+  derived: DerivedType,
+  factName: string,
+): { meta: OwningLibraryMetadata } | { error: EmitDiagnostic } {
+  const graph = ctx.graph;
+  const mkErr = (message: string): { error: EmitDiagnostic } => ({
+    error: {
+      kind: "local-coding-derivation-failed",
+      severity: "error",
+      message,
+      caseSlug: ctx.caseSlug,
+      factName,
+      filePath: graph.filePath,
+    },
+  });
+
+  const concept = derived.concept;
+  const owningEntry = derived.owningEntry;
+  if (!concept || !owningEntry) return mkErr(`local fact "${factName}" has no resolved concept/owning library`);
+
+  // canonicalBase — ONE consuming-project value (disc 490 D1). Missing base → hard failure (charter forbids a
+  // urn/manufactured fallback). NOTE: a file-level precondition gated on ≥1 local fact (disc 490 D3 REFINE) is
+  // a T3c ergonomic follow-up; the write-site guard here is the loud floor that satisfies "never silent partial."
+  const base = graph.projectRoot ? readCanonicalBase(graph.projectRoot) : undefined;
+  if (!base) {
+    return mkErr(`project has no \`crl.canonicalBase\`; cannot compose the local CodeSystem url for "${concept.name}"`);
+  }
+
+  // The include-walked covers closure (primary seed). Absent → no covers target → fail loudly (disc 490
+  // [critical]: NO sole-primary fallback — it would over-disambiguate included code-bearing libraries).
+  const seed = graph.resolvedLibraryPaths;
+  if (!seed) return mkErr(`no resolved covers closure; cannot resolve the local domain for "${concept.name}"`);
+  const registry = graph.crlRegistry;
+  if (!registry) return mkErr(`no CRL registry; cannot resolve the local domain for "${concept.name}"`);
+
+  const policyId = graph.projectRoot ? readPolicyId(graph.projectRoot) : undefined;
+  const resolver = createLocalDomainResolver({
+    primarySeedPaths: seed,
+    localCodePaths: computeLocalCodePaths(registry),
+    policyId,
+  });
+  // Metadata-less fallback mirrors the CQL lowering: `ast.library.name`, NOT the nullable `RegistryEntry.name`
+  // (disc 490 Fable #12).
+  const domainId = resolver.domainIdFor(owningEntry) ?? owningEntry.ast.library.name;
+
+  return {
+    meta: {
+      libraryName: derived.owningLibrary ?? owningEntry.ast.library.name,
+      canonicalBase: base,
+      localDomainId: domainId,
+    },
+  };
 }
 
 /** #189 CEL-writer T3b (disc 490). DERIVE a local `code is` fact's `{system, code}` from the concept via the
@@ -397,44 +479,98 @@ function deriveLocalCoding(
   const owningEntry = derived.owningEntry;
   if (!concept || !owningEntry) return mkErr(`local fact "${factName}" has no resolved concept/owning library`);
 
-  // Empty concept code → derivation failure (disc 490 Fable #6: never emit `coding.code: ""`).
+  // Empty concept code → derivation failure (disc 490 Fable #6: never emit `coding.code: ""`). Checked BEFORE the
+  // owning-metadata resolution to preserve the pre-B4 error priority (code-absent reported ahead of base-absent).
   const code = concept.code;
   if (typeof code !== "string" || code.trim() === "") {
     return mkErr(`local concept "${concept.name}" carries no \`code is\`; cannot derive a local coding`);
   }
 
-  // canonicalBase — ONE consuming-project value (disc 490 D1). Missing base → hard failure (charter forbids a
-  // urn/manufactured fallback). NOTE: a file-level precondition gated on ≥1 local fact (disc 490 D3 REFINE) is
-  // a T3c ergonomic follow-up; the write-site guard here is the loud floor that satisfies "never silent partial."
-  const base = graph.projectRoot ? readCanonicalBase(graph.projectRoot) : undefined;
-  if (!base) {
-    return mkErr(`project has no \`crl.canonicalBase\`; cannot compose the local CodeSystem url for "${concept.name}"`);
-  }
-
-  // The include-walked covers closure (primary seed). Absent → no covers target → fail loudly (disc 490
-  // [critical]: NO sole-primary fallback — it would over-disambiguate included code-bearing libraries).
-  const seed = graph.resolvedLibraryPaths;
-  if (!seed) return mkErr(`no resolved covers closure; cannot resolve the local domain for "${concept.name}"`);
-  const registry = graph.crlRegistry;
-  if (!registry) return mkErr(`no CRL registry; cannot resolve the local domain for "${concept.name}"`);
-
-  const policyId = graph.projectRoot ? readPolicyId(graph.projectRoot) : undefined;
-  const resolver = createLocalDomainResolver({
-    primarySeedPaths: seed,
-    localCodePaths: computeLocalCodePaths(registry),
-    policyId,
-  });
-  // Metadata-less fallback mirrors the CQL lowering: `ast.library.name`, NOT the nullable `RegistryEntry.name`
-  // (disc 490 Fable #12).
-  const domainId = resolver.domainIdFor(owningEntry) ?? owningEntry.ast.library.name;
+  const meta = localOwningMeta(ctx, derived, factName);
+  if ("error" in meta) return meta;
 
   let system: string;
   try {
-    system = localCodeSystemUrl(base, domainId);
+    system = localCodeSystemUrl(meta.meta.canonicalBase, meta.meta.localDomainId);
   } catch (e) {
     return mkErr(`local CodeSystem url composition failed for "${concept.name}": ${(e as Error).message}`);
   }
   return { parts: { system, code } };
+}
+
+/** REFACTOR:grounded (#189 B4, disc 501 — both crl-emit arms). Write a LOCAL fact's CodeableConcept DATUM to the
+ *  resource's value element — the value/interface convention's local-override arm (disc 496: an Observation whose
+ *  `code` is the concept IDENTITY and whose `value` is the case-specific device CodeableConcept). The datum SHAPE
+ *  is resolved from the effective-representation descriptor (the SINGLE authority both lanes read — design §4 /
+ *  disc 501 #1), NEVER raw `concept.valueTypes` (which skips the value-path-is-coding-element guard and would
+ *  diverge the CEL lane from the CQL lane at F). Returns:
+ *   - "written"        — the resource carries a `value<CC>` datum.
+ *   - "error"          — a diagnostic was pushed; the caller SKIPS the fact (never a wrong/partial datum). Full
+ *                        case-atomic discard (zero resources) is F/T3c (disc 501 gpt56 #5); the loud diagnostic +
+ *                        skip here meets the "never silently drop" bar. Fires for ZERO corpus facts.
+ *   - "not-applicable" — this fact's local datum is NOT a CodeableConcept (a boolean/Quantity value, a valueless
+ *                        concept, a coding-element conflation, a deferred/errored derivation): the caller falls
+ *                        through to the legacy value switch, byte-unchanged. Only the CC cell is B4's; routing
+ *                        EVERY value type through the descriptor is the F correctness slice (disc 501 #7).
+ *  Caller-gated to `role === "local"` (remote = sourced-CEL, D2-deferred to F/#257; derived = ephemeral, charter
+ *  §4), so a remote/bare/activity value never reaches the descriptor here (disc 501 gpt56 #3 / Claude #2). */
+function writeCodedLocalValue(
+  ctx: EmitContext,
+  derived: DerivedType,
+  factName: string,
+  rawValue: unknown,
+  resourceBody: Record<string, unknown>,
+): "written" | "error" | "not-applicable" {
+  const concept = derived.concept;
+  if (!concept) return "not-applicable";
+
+  const meta = localOwningMeta(ctx, derived, factName);
+  // Unresolvable owning identity — we cannot yet know if this datum is a CodeableConcept (that lives in the
+  // descriptor we can't compute). The coding path's own loud failure covers a local fact that can't resolve;
+  // don't double-report. Fall through to the legacy switch.
+  if ("error" in meta) return "not-applicable";
+
+  const outcome = deriveEffectiveRepresentations(concept, meta.meta);
+  const localArm =
+    outcome.status === "derived" ? outcome.descriptors.find((d) => d.arm === "local-exact") : undefined;
+  // Only the CodeableConcept local datum is B4's. Every other shape is NOT-APPLICABLE → the legacy switch handles
+  // it byte-unchanged (the inertness contract: the existing numeric `value is` facts derive a Quantity/integer
+  // datum → land here → fall through, verified by the full-corpus diff).
+  if (!localArm || localArm.arm !== "local-exact" || localArm.datumValueType !== "CodeableConcept") {
+    return "not-applicable";
+  }
+
+  // From here B4 OWNS the write: a CodeableConcept-declared local datum MUST emit a CodeableConcept value, never
+  // fall through to a manufactured shape (disc 501 gpt56 #2 / Claude #3).
+  const mkErr = (message: string): "error" => {
+    ctx.diagnostics.push({
+      kind: "local-coded-value-invalid",
+      severity: "error",
+      message,
+      caseSlug: ctx.caseSlug,
+      factName,
+      filePath: ctx.graph.filePath,
+    });
+    return "error";
+  };
+
+  if (!localArm.valueElement) {
+    return mkErr(
+      `local concept "${concept.name}" declares a CodeableConcept value type but its representation reads no value element; cannot place the authored \`value is\``,
+    );
+  }
+  if (typeof rawValue !== "string") {
+    return mkErr(
+      `local concept "${concept.name}" declares a CodeableConcept value type, so its \`value is\` must be a \`<system>|<code>\` token, not ${typeof rawValue === "number" ? "a number" : "a boolean"}`,
+    );
+  }
+  const parsed = parseCheckedCanonicalToken(rawValue);
+  if ("error" in parsed) return mkErr(`fact "${factName}": ${parsed.error}`);
+  const jn = valueJsonName(localArm.valueElement, "CodeableConcept");
+  if ("errorKind" in jn) return mkErr(`fact "${factName}": ${jn.detail}`);
+
+  resourceBody[jn.jsonName] = codeableConceptFromParts(parsed.parts);
+  return "written";
 }
 
 /** Read body fields from a fact into a flat lookup. */
@@ -771,10 +907,25 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   // `applyStructuralDefaults` below — unified with every other resource's required-element floor rather than a
   // per-resource hardcode.
 
-  // Value (boolean, numeric, or string) — Observation primarily. #189 S1 — a boolean value lowers
-  // to `Observation.valueBoolean` (a `value type is boolean` determination), the shape the local
-  // `code is` truth-set retrieve consumes (`asTruths`: `value.value is true`).
-  if (body.value !== undefined && fhirType === "Observation") {
+  // Value — #189 B4 (disc 501): a LOCAL fact's CodeableConcept datum (the value/interface local-override arm,
+  // disc 496) is resolved from the effective-representation descriptor and written to the resource's value[x].
+  // Gated to `role === "local"` (remote = sourced-CEL D2-deferred to F/#257; derived = ephemeral). Fires for ZERO
+  // corpus facts (no `.cel` authors a CodeableConcept `value is`), so this path is emit-byte-inert.
+  let codedValueWritten = false;
+  if (body.value !== undefined && derived.role === "local") {
+    const written = writeCodedLocalValue(ctx, derived, factName, body.value, resourceBody);
+    if (written === "error") return undefined; // diagnostic pushed; skip the fact (never a partial/wrong datum)
+    codedValueWritten = written === "written";
+  }
+
+  // Value (boolean, numeric, or string) — Observation primarily. #189 S1 — a boolean value lowers to
+  // `Observation.valueBoolean` (the shape the local `code is` truth-set retrieve consumes). REFACTOR:suspect
+  // (#189 B4, disc 501 Claude #7): this whole switch is the old-world value writer — it mis-spells non-Observation
+  // value carriers (silent drop), non-Quantity numbers (`integer`→`valueQuantity`), and non-string temporals
+  // (`date`/`dateTime`/`time`→`valueString`). Routing ALL value writes through the descriptor + `valueJsonName` is
+  // the F correctness slice (design §10 obligation); B4 adds only the descriptor-gated CodeableConcept path above
+  // and leaves this switch byte-identical.
+  if (!codedValueWritten && body.value !== undefined && fhirType === "Observation") {
     if (typeof body.value === "boolean") {
       resourceBody.valueBoolean = body.value;
     } else if (typeof body.value === "number") {

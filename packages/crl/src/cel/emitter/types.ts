@@ -60,6 +60,11 @@ export type EmitDiagnosticKind =
   /** #189 T3b — a LOCAL-concept fact ALSO carries its own authored `code` token. The code must derive from the
    *  concept; §5 forbids silently preferring one, so the fact is SKIPPED with this error. */
   | "local-authored-code-conflict"
+  /** #189 B4 (disc 501) — a LOCAL concept declares a CodeableConcept value type but its authored `value is` datum
+   *  is unusable: not a `<system>|<code>` token (a bare/empty/multi-pipe token, or a non-string payload), or the
+   *  concept's representation reads no value element. The fact is SKIPPED (never a manufactured/partial value —
+   *  disc 501 gpt56 #2); full case-atomic discard is F/T3c. */
+  | "local-coded-value-invalid"
   /** #189 remote-channel (disc 492) — a case has no resolved subject Patient, so there is no compartment id to
    *  place its resources under. Per source-atomic gating the WHOLE case is skipped for every channel. */
   | "missing-subject"

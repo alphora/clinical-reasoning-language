@@ -10,6 +10,12 @@
 // surfacing an opaque `deferredArms` stub; NO emit consumer reads it yet (the atomic flip F wires it), and a
 // source-ONLY concept stays `status:"deferred"` (out of #189 scope past F — sourced-CEL is #257, design §10).
 // Extending the union to `source` supersedes design §0/§4's "two arms only" (see the decision-log amendment).
+//
+// #189 B4 (disc 501): the CEL instance lane (`cel/emitter/emitFhir.ts`) is now the FIRST production consumer of
+// `deriveEffectiveRepresentations` — it resolves a LOCAL fact's `local-exact` arm to write a CodeableConcept datum
+// (`valueElement`/`datumValueType`) as `valueCodeableConcept` (the value/interface local-override arm, disc 496),
+// rather than reading raw `concept.valueTypes` (which skips the coding-element-conflation guard). The `source` arm
+// stays INERT (F/#257); only the `local-exact` value datum is read, and only for a `role: "local"` CC concept.
 
 import type { Concept, Representation, ReferenceName } from "../ast/types";
 import { hasLocalCode, hasSourceBinding } from "./conceptDatumSignals";

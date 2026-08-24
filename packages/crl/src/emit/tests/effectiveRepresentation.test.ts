@@ -497,10 +497,15 @@ describe("#189-flip import boundary — effectiveRepresentation / resourceEmitRe
     // `caseFeatureProfileShape`). Any OTHER production importer of either module is still the premature-wiring
     // hazard this boundary guards. Match an actual IMPORT, NOT a comment mention (the substring scan
     // false-positived on migration/*.ts docstrings citing line numbers).
+    // `cel/emitter/emitFhir.ts` joins at #189 B4 (disc 501): the CEL instance lane is the FIRST production
+    // consumer of `deriveEffectiveRepresentations` — it resolves a local fact's CodeableConcept DATUM shape from
+    // the descriptor (the single authority both lanes read) rather than raw `concept.valueTypes` (disc 501 #1),
+    // to write `valueCodeableConcept`. Sanctioned wiring, no longer the premature-wiring hazard.
     const ER_ALLOW = new Set([
       "cql-emitter/lowerLocalCodes.ts",
       "cql-emitter/emitCQL.ts",
       "fhir-emitter/caseFeatureRecord.ts",
+      "cel/emitter/emitFhir.ts",
     ]);
     // `cel/emitter/emitFhir.ts` joins at the #189 CEL-writer flip (T2): the CEL instance lane genuinely consults
     // the registry's coding PLACEMENT (`resourceCodingPlacement`) to write each fact's coding on the natural
