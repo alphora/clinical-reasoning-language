@@ -1,6 +1,6 @@
 {
   "resourceType": "ValueSet",
-  "id": "cms69-anti-obesity-medications-vs",
+  "id": "gi-referral-reasons",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
@@ -22,21 +22,33 @@
       "valueCode": "publishable"
     }
   ],
-  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-anti-obesity-medications-vs",
+  "url": "http://example.org/crl/code-is-decision-vs/ValueSet/gi-referral-reasons",
   "version": "1.0.0",
-  "name": "Cms69StrategyAntiObesityMedicationsVs",
-  "title": "CMS69 BMI Screening demonstration corpus",
+  "name": "CodeIsDecisionVsGiReferralReasons",
+  "title": "D4 — source-typed split author-ValueSet depends-on routing onto LocalConcepts",
   "status": "draft",
   "experimental": true,
   "date": "2020-01-01T00:00:00.000Z",
-  "publisher": "Smile Digital Health",
-  "description": "CMS69 BMI Screening demonstration corpus",
+  "publisher": "unknown",
+  "description": "D4 — source-typed split author-ValueSet depends-on routing onto LocalConcepts",
   "compose": {
     "include": [
       {
-        "valueSet": [
-          "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1561"
+        "system": "http://example.org/crl/code-is-decision-vs/CodeSystem/reference-vs-stub",
+        "concept": [
+          {
+            "code": "gi-referral-reasons"
+          }
         ]
+      }
+    ]
+  },
+  "expansion": {
+    "timestamp": "2020-01-01T00:00:00.000Z",
+    "contains": [
+      {
+        "system": "http://example.org/crl/code-is-decision-vs/CodeSystem/reference-vs-stub",
+        "code": "gi-referral-reasons"
       }
     ]
   }

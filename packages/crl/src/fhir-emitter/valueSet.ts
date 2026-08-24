@@ -21,7 +21,7 @@
  * `compose.include[0].concept[]`.
  */
 
-import type { Terminology, TerminologyBodyLine } from "../ast/types";
+import type { Terminology, TerminologyBodyLine, TerminologyValueset } from "../ast/types";
 import type { CRLError } from "../types/errors";
 
 import { pascalCaseName, slugify, valueSetIdFromPolicyId, valueSetUrl } from "./slug";
@@ -87,10 +87,38 @@ export function emitValueSet(
     });
   }
 
-  // #237/T1 — one exported id helper, collision-safe via `uniqueCapSlug` over the
-  // component-wise `rawSlug` composite (the `url` below derives from `id`, so id↔url
-  // stay byte-equal automatically).
-  const id = valueSetId(metadata, terminology.name);
+  // #189 piece 3 — a PURE single-reference terminology (`valueset is <url>`, no system/code lines) emits a
+  // self-contained membership STUB at the DECLARED canonical, so the FHIR ValueSet resolves at the url the CQL
+  // `valueset` decl already binds. FHIR requirement (verified against ecQM QICore external VSs, 2026-08-24):
+  // `url` = the declared canonical verbatim; `id` = its LAST path segment (the OID / slug tail — a legal FHIR id,
+  // dots allowed), consistent so the resource resolves by canonical AND by `ValueSet/<id>.json`. Our stub
+  // CONVENTION: one per-VS code (the id) under a dedicated `reference-vs-stub` CodeSystem + expansion +
+  // `experimental=true` (a REAL value set is `experimental=false` with real content; packaging swaps the real
+  // content in at the same url at package/runtime and drops the experimental stub).
+  const refLines = terminology.body.filter((l): l is TerminologyValueset => l.type === "TerminologyValueset");
+  const isPureReference =
+    refLines.length === 1 && terminology.body.every((l) => l.type === "TerminologyValueset");
+  let referenceStub: { url: string; id: string; compose: { include: Array<Record<string, unknown>> } } | null = null;
+  if (isPureReference) {
+    const declaredUrl = refLines[0].valuesetName;
+    const refId = declaredUrl.split("/").filter(Boolean).pop() ?? "";
+    // Apply the stub model ONLY to a proper canonical whose last path segment is a legal FHIR id (an http(s)
+    // canonical like `.../ValueSet/<oid>` or `.../ValueSet/<slug>`). A URN / placeholder (e.g.
+    // `urn:example:placeholder`) has no FHIR-id-legal tail → fall back to the pre-existing pointer emission (our
+    // slug id/url), unchanged — it is not a resolvable reference the stub could stand in for.
+    if (/^[A-Za-z0-9.-]{1,64}$/.test(refId)) {
+      referenceStub = {
+        url: declaredUrl,
+        id: refId,
+        compose: { include: [{ system: `${metadata.canonicalBase}/CodeSystem/reference-vs-stub`, concept: [{ code: refId }] }] },
+      };
+    }
+  }
+
+  // #237/T1 — one exported id helper, collision-safe via `uniqueCapSlug` over the component-wise `rawSlug`
+  // composite (for an INSTANTIATED VS the `url` derives from `id`, so id↔url stay byte-equal). A reference stub
+  // instead takes id/url from the declared canonical (above).
+  const id = referenceStub ? referenceStub.id : valueSetId(metadata, terminology.name);
   const computableName = pascalCaseName(`${librarySlug} ${terminologySlug}`);
 
   const title = metadata.title || libraryName;
@@ -108,9 +136,9 @@ export function emitValueSet(
 
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
-  const url = valueSetUrl(metadata.canonicalBase, metadata.name, terminology.name);
+  const url = referenceStub ? referenceStub.url : valueSetUrl(metadata.canonicalBase, metadata.name, terminology.name);
 
-  const compose = buildCompose(terminology.body, terminology, unmatched);
+  const compose = referenceStub ? referenceStub.compose : buildCompose(terminology.body, terminology, unmatched);
 
   // #189 functional-VS slice — a pre-computed `expansion` for an ENUMERATED VS (system+concept includes), so the
   // `$apply` terminology provider evaluates membership from the expansion directly rather than falling back to
@@ -137,7 +165,9 @@ export function emitValueSet(
     name: computableName,
     title,
     status: metadata.status,
-    experimental: metadata.experimental,
+    // #189 piece 3 — a reference STUB is `experimental=true` (authoring/test scaffolding, swapped for the real VS
+    // at package/runtime); an instantiated/own VS keeps the authored package metadata.
+    experimental: referenceStub ? true : metadata.experimental,
     // date: CRMI requires `date` only at publishable+ — omitted below that.
     ...(publishable ? { date: (opts.clock ?? defaultClock)().toISOString() } : {}),
     publisher: metadata.publisher,

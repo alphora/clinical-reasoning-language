@@ -1,6 +1,6 @@
 {
   "resourceType": "ValueSet",
-  "id": "code-is-decision-vs-fixture-gi-referral-reasons",
+  "id": "2.16.840.1.113883.3.600.1.1528",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
@@ -22,21 +22,33 @@
       "valueCode": "publishable"
     }
   ],
-  "url": "http://example.org/crl/code-is-decision-vs/ValueSet/code-is-decision-vs-fixture-gi-referral-reasons",
+  "url": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1528",
   "version": "1.0.0",
-  "name": "CodeIsDecisionVsGiReferralReasons",
-  "title": "D4 — source-typed split author-ValueSet depends-on routing onto LocalConcepts",
+  "name": "Cms69StrategyLowBmiFollowUpServiceRequestsVs",
+  "title": "CMS69 BMI Screening demonstration corpus",
   "status": "draft",
   "experimental": true,
   "date": "2020-01-01T00:00:00.000Z",
-  "publisher": "unknown",
-  "description": "D4 — source-typed split author-ValueSet depends-on routing onto LocalConcepts",
+  "publisher": "Smile Digital Health",
+  "description": "CMS69 BMI Screening demonstration corpus",
   "compose": {
     "include": [
       {
-        "valueSet": [
-          "http://example.org/crl/code-is-decision-vs/ValueSet/gi-referral-reasons"
+        "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/CodeSystem/reference-vs-stub",
+        "concept": [
+          {
+            "code": "2.16.840.1.113883.3.600.1.1528"
+          }
         ]
+      }
+    ]
+  },
+  "expansion": {
+    "timestamp": "2020-01-01T00:00:00.000Z",
+    "contains": [
+      {
+        "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/CodeSystem/reference-vs-stub",
+        "code": "2.16.840.1.113883.3.600.1.1528"
       }
     ]
   }

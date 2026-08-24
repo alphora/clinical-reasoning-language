@@ -1,6 +1,6 @@
 {
   "resourceType": "ValueSet",
-  "id": "cms22-standalone-systolic-bp-vs",
+  "id": "8480-6",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
@@ -22,7 +22,7 @@
       "valueCode": "publishable"
     }
   ],
-  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-standalone-systolic-bp-vs",
+  "url": "http://loinc.org/vs/8480-6",
   "version": "1.0.0",
   "name": "Cms22StrategyStandaloneSystolicBpVs",
   "title": "CMS22 Blood Pressure Control demonstration corpus",
@@ -34,9 +34,21 @@
   "compose": {
     "include": [
       {
-        "valueSet": [
-          "http://loinc.org/vs/8480-6"
+        "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/CodeSystem/reference-vs-stub",
+        "concept": [
+          {
+            "code": "8480-6"
+          }
         ]
+      }
+    ]
+  },
+  "expansion": {
+    "timestamp": "2020-01-01T00:00:00.000Z",
+    "contains": [
+      {
+        "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/CodeSystem/reference-vs-stub",
+        "code": "8480-6"
       }
     ]
   }

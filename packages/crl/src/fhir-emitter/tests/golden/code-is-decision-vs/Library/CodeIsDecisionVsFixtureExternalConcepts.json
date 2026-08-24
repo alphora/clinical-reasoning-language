@@ -46,7 +46,7 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/code-is-decision-vs/ValueSet/code-is-decision-vs-fixture-gi-referral-reasons"
+      "resource": "http://example.org/crl/code-is-decision-vs/ValueSet/gi-referral-reasons"
     }
   ],
   "content": [

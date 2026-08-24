@@ -1,6 +1,6 @@
 {
   "resourceType": "ValueSet",
-  "id": "cms22-medical-reason-vs",
+  "id": "85354-9",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
@@ -22,9 +22,9 @@
       "valueCode": "publishable"
     }
   ],
-  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-medical-reason-vs",
+  "url": "http://loinc.org/vs/85354-9",
   "version": "1.0.0",
-  "name": "Cms22StrategyMedicalReasonVs",
+  "name": "Cms22StrategyBloodPressurePanelsVs",
   "title": "CMS22 Blood Pressure Control demonstration corpus",
   "status": "draft",
   "experimental": true,
@@ -34,9 +34,21 @@
   "compose": {
     "include": [
       {
-        "valueSet": [
-          "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1007"
+        "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/CodeSystem/reference-vs-stub",
+        "concept": [
+          {
+            "code": "85354-9"
+          }
         ]
+      }
+    ]
+  },
+  "expansion": {
+    "timestamp": "2020-01-01T00:00:00.000Z",
+    "contains": [
+      {
+        "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/CodeSystem/reference-vs-stub",
+        "code": "85354-9"
       }
     ]
   }

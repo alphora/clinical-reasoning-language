@@ -40,10 +40,11 @@ const UPDATE = process.env.UPDATE_GOLDEN === "1";
 const FIXED_DATE = new Date("2020-01-01T00:00:00.000Z");
 const ser = (body: unknown): string => JSON.stringify(body, null, 2) + "\n";
 
-// R1 — ids derive from the fixture POLICY ID ("code-is-decision-vs-fixture"),
-// not the library-name slug ("code-is-decision-vs").
+// R1 — LOCAL ids derive from the fixture POLICY ID ("code-is-decision-vs-fixture"), not the library-name slug.
+// #189 piece 3 — a REFERENCE VS instead resolves to its DECLARED canonical (url = declared, id = the url's last
+// path segment `gi-referral-reasons`), so the FHIR ValueSet resolves at the url the CQL `valueset` decl binds.
 const VS_CANONICAL =
-  "http://example.org/crl/code-is-decision-vs/ValueSet/code-is-decision-vs-fixture-gi-referral-reasons";
+  "http://example.org/crl/code-is-decision-vs/ValueSet/gi-referral-reasons";
 const CS_CANONICAL =
   "http://example.org/crl/code-is-decision-vs/CodeSystem/code-is-decision-vs-fixture-local";
 // #186 — Library canonicals are keyed on the unified hyphen-free `S`

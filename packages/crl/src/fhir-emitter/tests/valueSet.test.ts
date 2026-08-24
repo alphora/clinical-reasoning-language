@@ -43,30 +43,43 @@ describe("fhir-emitter valueSet.emitValueSet", () => {
     expect(resource).not.toBeNull();
     const r = resource!.resource as Record<string, unknown>;
     expect(r.resourceType).toBe("ValueSet");
-    // R1 — id BASE is the policy id ("cms22"), not the library-name slug.
-    expect(r.id).toBe("cms22-bp-screening-encounter-codes");
+    // #189 piece 3 — a reference terminology emits a STUB at the DECLARED canonical: id = the url's last path
+    // segment (`bp-screening-encounter`), NOT the library-slug valueSetId.
+    expect(r.id).toBe("bp-screening-encounter");
     // default capability = publishable → additive CRMI profiles (shareable→publishable).
     expect((r.meta as { profile: string[] }).profile).toEqual([
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablevalueset",
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset",
     ]);
-    expect(r.url).toBe(
-      "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-screening-encounter-codes",
-    );
+    // url = the DECLARED canonical verbatim (byte-identical to the CQL `valueset` decl).
+    expect(r.url).toBe("http://example.org/vs/bp-screening-encounter");
     expect(r.name).toBe("Cms22ConceptsBpScreeningEncounterCodes");
     expect(r.title).toBe("CMS22 Demo");
     expect(r.status).toBe("draft");
-    expect(r.experimental).toBe(true);
+    expect(r.experimental).toBe(true); // a reference stub is experimental scaffolding
     expect(r.date).toBe("2026-06-04T15:30:00.000Z");
     expect(r.publisher).toBe("Smile Digital Health");
     expect(r.description).toBe("CMS22 Blood Pressure Control demonstration corpus");
+    // self-contained membership stub (one per-VS code + expansion) — NOT a `{valueSet:[url]}` pointer.
     expect(r.compose).toEqual({
-      include: [{ valueSet: ["http://example.org/vs/bp-screening-encounter"] }],
+      include: [
+        {
+          system: "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/CodeSystem/reference-vs-stub",
+          concept: [{ code: "bp-screening-encounter" }],
+        },
+      ],
     });
-    expect(resource!.relativePath).toBe(
-      "ValueSet/cms22-bp-screening-encounter-codes.json",
-    );
+    expect(r.expansion).toEqual({
+      timestamp: "2026-06-04T15:30:00.000Z",
+      contains: [
+        {
+          system: "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/CodeSystem/reference-vs-stub",
+          code: "bp-screening-encounter",
+        },
+      ],
+    });
+    expect(resource!.relativePath).toBe("ValueSet/bp-screening-encounter.json");
   });
 
   it("emits inline system+code body", () => {

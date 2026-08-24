@@ -1,6 +1,6 @@
 {
   "resourceType": "ValueSet",
-  "id": "cms22-follow-up-within-4-weeks-vs",
+  "id": "2.16.840.1.113883.3.526.3.1563",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
@@ -22,21 +22,33 @@
       "valueCode": "publishable"
     }
   ],
-  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-follow-up-within-4-weeks-vs",
+  "url": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1563",
   "version": "1.0.0",
-  "name": "Cms22StrategyFollowUpWithin4WeeksVs",
-  "title": "CMS22 Blood Pressure Control demonstration corpus",
+  "name": "Cms69StrategyUnderweightDiagnosesVs",
+  "title": "CMS69 BMI Screening demonstration corpus",
   "status": "draft",
   "experimental": true,
   "date": "2020-01-01T00:00:00.000Z",
   "publisher": "Smile Digital Health",
-  "description": "CMS22 Blood Pressure Control demonstration corpus",
+  "description": "CMS69 BMI Screening demonstration corpus",
   "compose": {
     "include": [
       {
-        "valueSet": [
-          "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1578"
+        "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/CodeSystem/reference-vs-stub",
+        "concept": [
+          {
+            "code": "2.16.840.1.113883.3.526.3.1563"
+          }
         ]
+      }
+    ]
+  },
+  "expansion": {
+    "timestamp": "2020-01-01T00:00:00.000Z",
+    "contains": [
+      {
+        "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/CodeSystem/reference-vs-stub",
+        "code": "2.16.840.1.113883.3.526.3.1563"
       }
     ]
   }

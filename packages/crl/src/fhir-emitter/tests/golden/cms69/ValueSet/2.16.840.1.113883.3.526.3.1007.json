@@ -1,6 +1,6 @@
 {
   "resourceType": "ValueSet",
-  "id": "cms69-weight-assessment-referrals-vs",
+  "id": "2.16.840.1.113883.3.526.3.1007",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
@@ -22,9 +22,9 @@
       "valueCode": "publishable"
     }
   ],
-  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-weight-assessment-referrals-vs",
+  "url": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1007",
   "version": "1.0.0",
-  "name": "Cms69StrategyWeightAssessmentReferralsVs",
+  "name": "Cms69StrategyMedicalReasonVs",
   "title": "CMS69 BMI Screening demonstration corpus",
   "status": "draft",
   "experimental": true,
@@ -34,9 +34,21 @@
   "compose": {
     "include": [
       {
-        "valueSet": [
-          "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1527"
+        "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/CodeSystem/reference-vs-stub",
+        "concept": [
+          {
+            "code": "2.16.840.1.113883.3.526.3.1007"
+          }
         ]
+      }
+    ]
+  },
+  "expansion": {
+    "timestamp": "2020-01-01T00:00:00.000Z",
+    "contains": [
+      {
+        "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/CodeSystem/reference-vs-stub",
+        "code": "2.16.840.1.113883.3.526.3.1007"
       }
     ]
   }

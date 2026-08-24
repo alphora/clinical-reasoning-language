@@ -62,35 +62,35 @@
     },
     {
       "type": "depends-on",
-      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-overweight-or-obese-diagnoses-vs"
+      "resource": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1047.502"
     },
     {
       "type": "depends-on",
-      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-underweight-diagnoses-vs"
+      "resource": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1563"
     },
     {
       "type": "depends-on",
-      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-pregnancy-diagnoses-vs"
+      "resource": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1623"
     },
     {
       "type": "depends-on",
-      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-weight-assessment-referrals-vs"
+      "resource": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1527"
     },
     {
       "type": "depends-on",
-      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-anti-obesity-medications-vs"
+      "resource": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1561"
     },
     {
       "type": "depends-on",
-      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-low-bmi-follow-up-service-requests-vs"
+      "resource": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1528"
     },
     {
       "type": "depends-on",
-      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-medical-reason-vs"
+      "resource": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1007"
     },
     {
       "type": "depends-on",
-      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-patient-declined-vs"
+      "resource": "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1582"
     },
     {
       "type": "depends-on",
