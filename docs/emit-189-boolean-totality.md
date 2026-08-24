@@ -51,7 +51,8 @@ under a record-valued parent is set algebra §7, NOT boolean — `not-applicable
 | Form | Class | Discharge / rule |
 |---|---|---|
 | `exists this` / `exists "X"` (`X` resolves `RecordSet`) | intrinsically-total | `exists([R:X])`; value-datum variant `exists([R:X] O where O.value is true)` — totality rides on the **`is true`** spelling (null-decided, rule 4), which must be pinned |
-| `defined as exists ("X")` | intrinsically-total | existence bridge |
+| `defined as exists ("X")`, `X` emits a `RecordSet` | intrinsically-total | existence bridge `exists (<X>)` (`intrinsic-exists`) |
+| `defined as exists ("X")`, `X` emits a Scalar VALUE (the B2 cross-rep merge / a `most recent` value read) | intrinsically-total | **null-presence** `(<X> is not null)` (`null-presence`, #189 B3) — keyed on the LOWERED emitted result (`emitsScalarValue`), NOT declared shape (a `coded from` `Scalar<CC>` EMITS a retrieve → still `exists`, the `Overweight Diagnoses` trap). `X` = Scalar `boolean` / `Record` → error. The obligation stays the one generic `intrinsically-total` (the discharge is operand-aware at emit); the ref targets the MERGE/value define, never the records twin |
 | `count this … at least N` / `count "X" … at least N` | intrinsically-total **(⚠ verify)** | `Count(…) >= N` — **§2's own "verify `Count`→0 on empty at impl" flag is undischarged**; pin the engine behavior for the emitted target type before relying on bare |
 | multi-rep `exists this` | intrinsically-total | union of per-rep existence (§6, in scope for v1) — total regardless of the source arm |
 | catalog pattern, boolean concept, pattern shape `list`/`instance` | intrinsically-total | `exists <call>` / `exists { <call> }` (`cql-emitter/emitCQL.ts:1948-1961`) |

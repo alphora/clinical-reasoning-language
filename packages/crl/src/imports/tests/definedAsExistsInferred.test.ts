@@ -59,6 +59,8 @@ describe("#270 — both-rep `code is` + `defined as exists` is loud-refused (dis
   it("refuses rather than silently drop the local-code fold on the canonical local-domain path", () => {
     const result = emitCQLImports(path.join(FIXTURES, "defined-as-exists-bothrep", "root.crl"));
     expect(result.success).toBe(false);
-    expect(JSON.stringify(result.errors)).toMatch(/both-representation merge|cannot fold into the local-code truth-set/);
+    // #189 B3 — the message no longer coaches downgrading the canonical form (Claude #10, disc 500): it names the
+    // deferred flip activation. The INTENT (loud-refused, not silently dropped) is unchanged.
+    expect(JSON.stringify(result.errors)).toMatch(/canonical value\/interface boolean interface|activates at the #189 flip/);
   });
 });

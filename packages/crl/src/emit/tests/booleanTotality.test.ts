@@ -310,6 +310,18 @@ describe("proveWholeBoundaryTotality", () => {
     expect(proveWholeBoundaryTotality([good]).ok).toBe(true);
   });
 
+  it("proven for intrinsically-total discharged by null-presence (#189 B3 — `<X> is not null`)", () => {
+    // The value/interface boolean interface: `defined as exists (scalar-value)` → `(<X> is not null)`, total by
+    // construction. Its obligation stays the generic `intrinsically-total` (classifyBooleanTotality can't resolve
+    // operands); the emit-side discharge is `null-presence`, which must satisfy it (disc 500).
+    const good = entry({
+      name: "IsPresent",
+      obligation: { kind: "intrinsically-total", form: "defined as exists (scalar-value)", cell: "§2/B3" },
+      discharge: { booleanEffect: "total", dischargedBy: "null-presence" },
+    });
+    expect(proveWholeBoundaryTotality([good]).ok).toBe(true);
+  });
+
   it("FAILS a nullable-effect boolean define (never proven total, disc 429 #1)", () => {
     const nullableEffect = entry({
       name: "Leaky",

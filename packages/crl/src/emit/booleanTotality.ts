@@ -406,6 +406,9 @@ export type DefineOrigin =
 /** The mechanism by which the emitted CQL made a boolean define total (§1 step 2). */
 export type DischargeKind =
   | "intrinsic-exists" // `exists(...)` / `exists <call>` — discharges intrinsically-total
+  | "null-presence" // `(<X> is not null)` — #189 B3: existence of a SCALAR-VALUE operand (the value/interface
+  //                    boolean interface, disc 500); total by construction (`is not null` is never null);
+  //                    discharges intrinsically-total. NOT `exists(<scalar>)` (ill-typed — disc 496).
   | "count-bare" // `Count(...) >= N` — discharges intrinsically-total (count)
   | "boundary-coalesce" // `Coalesce(<predicate>, false)` — discharges requires-boundary
   | "age-recency-total" // the §5/§7 age-recency total-boolean rewrite — discharges requires-boundary (age)
@@ -645,8 +648,15 @@ function dischargeKindMatchesObligation(ob: BooleanTotalityObligation, d: Discha
   switch (ob.kind) {
     case "intrinsically-total":
       // `facade-satisfied` (`…satisfied()` = `exists(truths)`) is intrinsically total — its own existence
-      // wrapper, not a delegation to the truth-set operand (disc 439 code review, gpt56 #1).
-      return d === "intrinsic-exists" || d === "count-bare" || d === "axiom" || d === "facade-satisfied";
+      // wrapper, not a delegation to the truth-set operand (disc 439 code review, gpt56 #1). `null-presence`
+      // (`<X> is not null`, #189 B3) is likewise intrinsically total by construction.
+      return (
+        d === "intrinsic-exists" ||
+        d === "null-presence" ||
+        d === "count-bare" ||
+        d === "axiom" ||
+        d === "facade-satisfied"
+      );
     case "requires-boundary":
       return d === "boundary-coalesce" || d === "age-recency-total";
     case "composite":
@@ -668,6 +678,7 @@ function originMatchesDischarge(origin: DefineOrigin, d: DischargeKind): boolean
     case "age-recency-total":
       return origin === "authored" || origin === "age-helper";
     case "intrinsic-exists":
+    case "null-presence":
     case "count-bare":
     case "boundary-coalesce":
     case "composite-delegated":

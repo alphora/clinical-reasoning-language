@@ -40,6 +40,7 @@ import { PATTERN_RETURN_SHAPE } from "./patternReturnShape";
 import type { PatternReturnShape } from "./patternReturnShape";
 import {
   emitsTotalScalarBoolean,
+  emitsScalarValue,
   sameLayerResolver,
   uniformResolvers,
   branchCompositionOperandTotal,
@@ -1314,6 +1315,14 @@ class Emitter {
           // proof delegates to the referent's own total. `emitsTotalScalarBoolean(c)` gates on `c`'s OWN boolean
           // declaration + the referent's totality — LOCK-STEP with the emit flip. Every OTHER truth-set
           // `defined as` (a composition, a non-boolean-declared or non-total alias) stays a List.
+          // #189 B3 — a `defined as exists` over a SCALAR-VALUE operand discharges `null-presence` (`is not
+          // null`), keyed on the SAME classification as the emitted expression (`existsBridgeIsNullPresence`) so
+          // text ↔ discharge cannot drift (disc 500). Checked BEFORE the generic total-boolean path (a
+          // `defined as exists` is `emitsTotalScalarBoolean`=true, which would otherwise mask it). INERT — no
+          // corpus operand is scalar-value.
+          if (def.body.type === "DefinedAsExists" && this.existsBridgeIsNullPresence(def.body)) {
+            return total("null-presence");
+          }
           if (emitsTotalScalarBoolean(c, this.totalityResolvers())) {
             return total("composite-delegated");
           }
@@ -1327,7 +1336,11 @@ class Emitter {
         //     (labeling it Boolean would pollute the subject set AND false-PASS an ill-typed refinement whose
         //     operands happen to be total booleans).
         const body = def.body;
-        if (body.type === "DefinedAsExists") return total("intrinsic-exists");
+        // #189 B3 — null-presence (`is not null`) for a SCALAR-VALUE operand, `intrinsic-exists` (`exists(...)`)
+        // for a record operand — the SAME `existsBridgeIsNullPresence` classification the emitted expression uses
+        // (disc 500, no drift). INERT (no corpus operand is scalar-value).
+        if (body.type === "DefinedAsExists")
+          return total(this.existsBridgeIsNullPresence(body) ? "null-presence" : "intrinsic-exists");
         // #189 Slice 0b — a boolean composition discharges total IFF the family predicate proves every
         // operand a total scalar boolean (the SAME verdict the emit pivot + the case-feature discharge
         // above read, banner A). A non-total composition emits a LOUD error (not a define), so it must NOT
@@ -2451,11 +2464,12 @@ class Emitter {
         // rather than emit a wrong answer on the canonical local-domain path (charter §2).
         if (c.__bothRepFoldInLocalPrimitives !== undefined) {
           throw new ReductionInCompositionError(
-            `Concept "${c.name}" carries a local \`code is\` and \`defined as exists\` (a both-representation ` +
-              `merge). Existence publishes a scalar boolean, which cannot fold into the local-code truth-set ` +
-              `union (\`LocalPrimitives.asTruths() union exists(...)\` is ill-typed). Model existence over the ` +
-              `local records with \`- shape is RecordSet.\` on a records concept + a separate ` +
-              `\`defined as exists\`, or drop one representation arm.`,
+            `Concept "${c.name}" carries a local \`code is\` and \`defined as exists\` (the canonical ` +
+              `value/interface boolean interface — CRL-NORTH-STAR §3). Its lowering (compose the local-records ` +
+              `existence with the derived arm's null-presence read) activates at the #189 flip, which removes the ` +
+              `\`asTruths\`/\`satisfied\` truth-set lane this fold is currently ill-typed against ` +
+              `(\`LocalPrimitives.asTruths() union exists(...)\`). This is a DEFERRED emit gap, NOT an authoring ` +
+              `error — do not reshape the concept (fixture-is-oracle).`,
             body.location,
           );
         }
@@ -2679,7 +2693,23 @@ class Emitter {
     const crossLib = this.crossLibraryOf(body.ref);
     const refName = getRefName(body.ref);
     const ref = crossLib !== null ? cqlQualifiedRef(crossLib, refName) : cqlIdent(refName);
+    // #189 B3 — a SCALAR-VALUE operand (the B2 cross-rep merge / a `most recent this` value read) lowers to a
+    // NULL-PRESENCE predicate, NOT `exists (<scalar>)` (ill-typed — disc 496). Keyed on the LOWERED result
+    // (`emitsScalarValue`), so a `coded from` Scalar<CodeableConcept> that emits a RECORD retrieve correctly stays
+    // `exists` (the `Overweight Diagnoses` trap, disc 500). `ref` is the operand's PUBLIC name — which the flip
+    // wires to publish the MERGE/value define, never the records twin (Claude referent contract, disc 500).
+    if (this.existsBridgeIsNullPresence(body)) return `(${ref} is not null)`;
     return `exists (${ref})`;
+  }
+
+  /** #189 B3 — is this `defined as exists ("X")`'s operand a SCALAR-VALUE (→ null-presence `is not null`) rather
+   *  than a record list (→ `exists`)? Consulted by BOTH `emitExistsBridge` (the expression) AND the discharge
+   *  (`emittedDischargeAndType`), so the emitted text and the enrolled discharge cannot drift (disc 500). Same-lib
+   *  only — a cross-lib operand stays on `exists` in B3 (its scalar-value cell is dispatched at the flip). INERT
+   *  today: no emittable corpus operand is scalar-value (all are RecordSet / gated). */
+  private existsBridgeIsNullPresence(body: DefinedAsExists): boolean {
+    if (this.crossLibraryOf(body.ref) !== null) return false;
+    return emitsScalarValue(this.conceptByName.get(getRefName(body.ref)), this.totalityResolvers());
   }
 
   /**
