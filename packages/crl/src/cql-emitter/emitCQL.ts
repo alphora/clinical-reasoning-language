@@ -35,6 +35,9 @@ import { buildCRL } from "../index";
 import { parseMetaTag } from "../meta/parseMetaTag";
 import { emitCqlTags, emitsToCql, suppressStatusesOf } from "../meta/registry";
 import { matchNarrative } from "../template-match";
+// #189 functional-VS slice — the SHARED ValueSet-url composition (leaf util; no cql→fhir-emitter cycle since
+// slug.ts imports only node:crypto), so the CQL `valueset '<url>'` byte-matches the FHIR `ValueSet.url`.
+import { valueSetUrl } from "../fhir-emitter/slug";
 import { cqlStringLiteral, cqlQuotedIdentifier } from "./cqlStrings";
 import { PATTERN_RETURN_SHAPE } from "./patternReturnShape";
 import type { PatternReturnShape } from "./patternReturnShape";
@@ -178,6 +181,14 @@ export interface EmitOptions {
    * (pre-R1 behavior).
    */
   localDomainId?: string;
+  /**
+   * #189 functional-VS slice — the POLICY ID (`metadata.name`), used to compose a HAND-AUTHORED functional
+   * terminology's emitted `ValueSet` url (`<canonicalBase>/ValueSet/<valueSetId(policyId, name)>`) so the CQL
+   * `valueset '<url>'` byte-matches the FHIR lane. Distinct from `localDomainId` (which is `localDomainIdFor(...)`
+   * output and diverges for sibling libraries). Absent for direct/test callers → a functional terminology keeps
+   * the legacy per-code emission (the latent multi-code bug persists only off the orchestrated path).
+   */
+  policyId?: string;
   /**
    * Case-feature truth-set emit (the LOCKED case-feature model). When set, this
    * EMITTED LAYER produces the truth-set shape: a `defined as` composition emits
@@ -822,6 +833,8 @@ class Emitter {
       // `localDomainId` (R1) is likewise consumed by `lowerLocalCodes` before
       // construction; kept here only for the Required<EmitOptions> shape.
       localDomainId: options.localDomainId ?? "",
+      // #189 functional-VS slice — the policy id for a hand-authored functional terminology's emitted ValueSet url.
+      policyId: options.policyId ?? "",
       // `caseFeature` is normalized into `this.caseFeature` below; the
       // Required-shape sentinel here is never read (absence === off).
       caseFeature: options.caseFeature ?? {
@@ -1609,6 +1622,27 @@ class Emitter {
     const systemLine = t.body.find(
       (l): l is TerminologySystem => l.type === "TerminologySystem",
     );
+
+    // #189 functional-VS slice — a HAND-AUTHORED functional terminology (`system is`/`code is`, no `valueset is`)
+    // binds its OWN emitted FHIR ValueSet by url (`valueset "X": '<vs-url>'`), the SAME rule the reference form
+    // (`valueset is <url>`) already follows — instead of per-code `code "X"` decls that COLLIDE (invalid CQL) on a
+    // multi-code body. Discriminator: `TerminologySystem.name` is SYNTHETIC-EMITTER-ONLY (ast/types.ts:352-366; the
+    // parser never sets it) — `name === undefined` ⇒ hand-authored; a lowered-local-code terminology has it SET
+    // (the `<Lib> Local Codes` domain) and stays on the UNCHANGED `codesystem`/`code` path below. Gated on
+    // `policyId` (orchestrated path only) so no direct/test caller silently changes; the url is byte-matched to the
+    // FHIR `ValueSet.url` via the shared `valueSetUrl`, so the `[Resource: "X"]` retrieve resolves membership over
+    // ALL the terminology's codes.
+    const hasValueset = t.body.some((l) => l.type === "TerminologyValueset");
+    const hasCode = t.body.some((l) => l.type === "TerminologyCode");
+    const isHandAuthoredFunctional =
+      systemLine !== undefined && systemLine.name === undefined && hasCode && !hasValueset;
+    if (isHandAuthoredFunctional && this.options.canonicalBase && this.options.policyId) {
+      const url = valueSetUrl(this.options.canonicalBase, this.options.policyId, t.name);
+      return `valueset ${cqlIdent(emitName)}: ${cqlString(url)}`;
+    }
+
+    // Reference terminologies (`valueset is`) + synthetic lowered-local-code terminologies (system `name` set):
+    // UNCHANGED per-line emission — this is the "local codes untouched" path.
     const codesystemName =
       systemLine?.name ?? emitName + " System";
     return t.body

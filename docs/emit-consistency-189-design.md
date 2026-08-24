@@ -296,11 +296,23 @@ when picked up (memory is not backlog).**
 ### Deferred by D2 (sourced-CEL / source-representation path) — resume when source reps land (~#257)
 - **Sourced-CEL emission** — emitting CEL cases for external-coded (`source representation` + `coded from`)
   facts. Needs the `external-valueset` / `external-code-set` descriptor arms.
-- **External ValueSet membership validation** — a `coded from` ValueSet admits many `{system, code, version}`;
-  validate the author's coding by **membership in the resolved expansion**, NOT string equality. When no
-  expansion / terminology service is available at build time → **fail closed (case error)**, not
-  "unverified-pass" (final-round ruling; was an option-list). `Coding.version` ≠ `valueSetVersion`; the CEL
-  token `system|code` carries no version → **use version-insensitive membership** (ruled; the smaller change).
+- **External ValueSet membership — ⚠ PRIOR RULING WITHDRAWN (operator 2026-08-24), do NOT read as oracle.** The
+  earlier ruling here — "validate the author's coding by membership in the **resolved expansion**; when no
+  expansion / terminology service is available at build time → **fail closed (case error)**; version-insensitive
+  membership" — is **SUPERSEDED**. CRL is **NOT a membership prover** and does **NOT** resolve reference-VS
+  expansions at build time. This stale ruling kept being re-read as authority and reverting the decision; it is
+  retained here ONLY as a tombstone. The model is **reference-vs-instantiated VS + a mechanical trust stub**
+  (clinical-vs-functional is the unenforced INTENT; the mechanism keys on reference-vs-instantiated):
+  - A **reference** VS (`terminology X: valueset is \`<url>\``) is NOT instantiated in CRL — it points at an
+    external VS resolved at PACKAGE/RUNTIME (intended for clinical VSs). CRL **trusts** it and emits a single-code
+    **STUB** FHIR VS (a PER-VS well-known code); matching CEL data carries that code, so `code in "X"` / `not in`
+    computes mechanically at `$apply` — both lanes share the stub → agree by construction. NO expansion, NO
+    fail-closed-on-missing-VS.
+  - An **instantiated** VS (`terminology X: system is …; code is …`) materializes its codes IN CRL → a **REAL**
+    FHIR VS emits and membership is genuinely evaluable (no stub, no trust).
+  - Always emit a FHIR VS; stubs must NOT ship in packaging (mark filterable — e.g. `status=draft` +
+    `experimental=true`). This is the **F membership sub-design**, settled in its OWN focused design round first
+    (then folded into F), NOT #257-deferred. Full model + open questions: memory `project_crl-valueset-model`.
 - **Refutation / `verificationStatus` path** — `exists this excluding refuted`: a grammar form (not in the §8
   slice), a descriptor `statusElement` + status coding/value + filter policy, and a **resource-specific**
   status/refutation discriminant (`verificationStatus` is Condition-only; ServiceRequest `revoked`,

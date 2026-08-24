@@ -371,6 +371,26 @@ export function policyIdBase(metadata: { name: string }): string {
 }
 
 /**
+ * #189 functional-VS slice — the FHIR `ValueSet` `id` for a terminology, from the policy id + terminology name.
+ * The SINGLE id composition BOTH emit lanes use (the FHIR `ValueSet.id`/`url` and the CQL `valueset '<url>'`) so a
+ * terminology's two lane bindings byte-match by construction. Mirrors the historical `fhir-emitter/valueSet.ts`
+ * `valueSetId` (which now delegates here), so existing FHIR ValueSet ids are byte-identical.
+ */
+export function valueSetIdFromPolicyId(policyId: string, terminologyName: string): string {
+  return uniqueCapSlug(`${policyIdBase({ name: policyId })}-${rawSlug(terminologyName)}`);
+}
+
+/**
+ * #189 functional-VS slice — the FHIR `ValueSet` canonical `url` for a terminology, `<canonicalBase>/ValueSet/<id>`.
+ * Both lanes call THIS (FHIR `ValueSet.url` and the CQL `valueset '<url>'` decl) so they byte-match. Deliberately
+ * does NOT normalize a trailing slash on `canonicalBase` — it reproduces the historical `valueSet.ts:109`
+ * `${metadata.canonicalBase}/ValueSet/${id}` composition verbatim, keeping every existing ValueSet url byte-equal.
+ */
+export function valueSetUrl(canonicalBase: string, policyId: string, terminologyName: string): string {
+  return `${canonicalBase}/ValueSet/${valueSetIdFromPolicyId(policyId, terminologyName)}`;
+}
+
+/**
  * #198 — Option B per-library local-domain / layered-identity BASE.
  *
  * The local CodeSystem url (`<policyId>-local`) AND the base/layered Library

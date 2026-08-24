@@ -20,17 +20,11 @@ valueset "Recommendation to Increase Physical Activity": 'http://cts.nlm.nih.gov
 valueset "Referral or Counseling for Alcohol Consumption": 'http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1583'
 valueset "Referral to Primary Care or Alternate Provider": 'http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1580'
 valueset "Weight Reduction Recommended": 'http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1510'
-codesystem "Blood pressure panel with all children optional System": 'http://loinc.org'
-code "Blood pressure panel with all children optional": '85354-9' from "Blood pressure panel with all children optional System"
-codesystem "Systolic Blood Pressure Code System": 'http://loinc.org'
-code "Systolic Blood Pressure Code": '8480-6' from "Systolic Blood Pressure Code System"
-codesystem "Diastolic Blood Pressure Code System": 'http://loinc.org'
-code "Diastolic Blood Pressure Code": '8462-4' from "Diastolic Blood Pressure Code System"
-codesystem "EKG 12 Lead Panel Code System": 'http://loinc.org'
-code "EKG 12 Lead Panel Code": '34534-8' from "EKG 12 Lead Panel Code System"
-codesystem "EKG Study Code System": 'http://loinc.org'
-code "EKG Study Code": '11524-6' from "EKG Study Code System"
-codesystem "Virtual Encounter Class System": 'http://terminology.hl7.org/CodeSystem/v3-ActCode'
-code "Virtual Encounter Class": 'VR' from "Virtual Encounter Class System"
+valueset "Blood pressure panel with all children optional": 'http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-blood-pressure-panel-with-all-children-optional'
+valueset "Systolic Blood Pressure Code": 'http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-systolic-blood-pressure-code'
+valueset "Diastolic Blood Pressure Code": 'http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-diastolic-blood-pressure-code'
+valueset "EKG 12 Lead Panel Code": 'http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-ekg-12-lead-panel-code'
+valueset "EKG Study Code": 'http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-ekg-study-code'
+valueset "Virtual Encounter Class": 'http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-virtual-encounter-class'
 
 context Patient

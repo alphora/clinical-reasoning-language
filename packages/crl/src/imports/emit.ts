@@ -888,6 +888,11 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
         crossLibraryParameters,
         canonicalBase,
         localDomainId: entryLocalDomainId,
+        // #189 functional-VS slice — the RAW policy id (`metadata.name`, NOT `plan.policyId`/`entryLocalDomainId`
+        // which diverge for siblings) threaded through `emitPartitioned`'s `baseOptions` spread into each layer's
+        // `emitCQLFromAST`, so a hand-authored functional terminology's `valueset '<url>'` byte-matches the FHIR
+        // `ValueSet.url`.
+        policyId: localDomainId,
         // #189 Slice C 2a — authored obligations from the RAW ast (this entry's input was lowered above, so
         // `emitCQLFromAST`'s self-build would classify lowered forms; pass the raw-derived map instead).
         authoredObligations: authoredObligationsByPath.get(entry.filePath),
@@ -1005,6 +1010,10 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       // #198 — per-entry local domain: a `none`/per-CRL sibling `code is` library
       // still gets its disambiguated `codesystem '<url>'` decl (primary unchanged).
       localDomainId: entryLocalDomainId,
+      // #189 functional-VS slice — the RAW policy id (`metadata.name`, NOT the per-entry `entryLocalDomainId`
+      // which diverges for siblings) so a hand-authored functional terminology's `valueset '<url>'` byte-matches
+      // the FHIR `ValueSet.url` (both compose it from `valueSetId(policyId, name)`).
+      policyId: localDomainId,
       // #189 Slice 0c — the cross-library totality service (this single-layer `none` lane has no rendered-layer
       // tokens; a bare operand resolves same-layer, a foreign qualifier via the index).
       crossLibraryTotality: { index: declaredResultIndex, fromIdentity: entry.filePath, resolveRawLibrary },

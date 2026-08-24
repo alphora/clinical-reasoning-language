@@ -24,7 +24,7 @@
 import type { Terminology, TerminologyBodyLine } from "../ast/types";
 import type { CRLError } from "../types/errors";
 
-import { pascalCaseName, policyIdBase, rawSlug, slugify, uniqueCapSlug } from "./slug";
+import { pascalCaseName, slugify, valueSetIdFromPolicyId, valueSetUrl } from "./slug";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,
@@ -42,7 +42,9 @@ import type {
 // `rawSlug` composite; the ValueSet `url` derives from this id, so id↔url stay
 // byte-equal.
 export function valueSetId(metadata: CpgMetadata, terminologyName: string): string {
-  return uniqueCapSlug(`${policyIdBase(metadata)}-${rawSlug(terminologyName)}`);
+  // Delegates to the shared `slug.ts` composition so the FHIR `ValueSet.id`/`url` and the CQL `valueset '<url>'`
+  // cannot drift (#189 functional-VS slice). Byte-identical to the prior inline form for every existing id.
+  return valueSetIdFromPolicyId(metadata.name, terminologyName);
 }
 
 /**
@@ -106,9 +108,20 @@ export function emitValueSet(
 
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
-  const url = `${metadata.canonicalBase}/ValueSet/${id}`;
+  const url = valueSetUrl(metadata.canonicalBase, metadata.name, terminology.name);
 
   const compose = buildCompose(terminology.body, terminology, unmatched);
+
+  // #189 functional-VS slice — a pre-computed `expansion` for an ENUMERATED VS (system+concept includes), so the
+  // `$apply` terminology provider evaluates membership from the expansion directly rather than falling back to
+  // `compose` (which it WARNS "may produce incorrect results" — probe-verified 2026-08-24). A reference
+  // (`{valueSet:[url]}`) include is not enumerated → contributes nothing → a pure-reference VS emits no expansion.
+  const expansionContains = compose.include.flatMap((inc) => {
+    const system = (inc as { system?: string }).system;
+    const concepts = (inc as { concept?: Array<{ code: string }> }).concept;
+    if (system === undefined || concepts === undefined) return [];
+    return concepts.map((c) => ({ system, code: c.code }));
+  });
 
   const resource: Record<string, unknown> = {
     resourceType: "ValueSet",
@@ -131,6 +144,13 @@ export function emitValueSet(
     description,
     compose,
   };
+
+  if (expansionContains.length > 0) {
+    resource.expansion = {
+      timestamp: (opts.clock ?? defaultClock)().toISOString(),
+      contains: expansionContains,
+    };
+  }
 
   // Δ13 — omit empty arrays from JSON.
   if (metadata.contact.length > 0) resource.contact = metadata.contact;

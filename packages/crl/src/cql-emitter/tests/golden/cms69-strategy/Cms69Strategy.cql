@@ -18,8 +18,7 @@ valueset "Low BMI Follow-up Service Requests VS": 'http://cts.nlm.nih.gov/fhir/V
 valueset "Medical Reason VS": 'http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1007'
 valueset "Patient Declined VS": 'http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1582'
 valueset "Anti-Obesity Contraindication VS": 'urn:example:placeholder'
-codesystem "Colonoscopy System": 'http://snomed.info/sct'
-code "Colonoscopy": '73761001' from "Colonoscopy System"
+valueset "Colonoscopy": 'http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-colonoscopy'
 
 context Patient
 

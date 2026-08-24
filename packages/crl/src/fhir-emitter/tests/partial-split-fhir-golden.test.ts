@@ -466,24 +466,25 @@ describe("emitFhirDefFromPath — CQL structural split failures surface (not sil
     expect(result.success).toBe(false);
   });
 
-  // D2 — `emit-codesystem-url-conflict` is a CQL hard error that is NOT one of
-  // the 3 structural-split kinds the pre-D2 allowlist folded, so the FHIR public
-  // path (emit_crl_fhir / MCP) used to report a misleading success while the CQL
-  // lane failed. The D2 denylist inversion folds it.
-  const CODESYSTEM_URL_CONFLICT = path.join(
+  // #189 functional-VS slice — a hand-authored terminology with MULTIPLE `system is` URLs (this fixture's `Dual
+  // System`) USED to fail with `emit-codesystem-url-conflict`: one CQL `codesystem` decl cannot bind two urls. The
+  // uniform functional-VS rule now binds such a terminology to its emitted `ValueSet` (a multi-`include` compose
+  // over BOTH systems, which `$apply` reads natively via the pre-computed expansion) — so the conflict is OBSOLETE
+  // and the terminology emits successfully. The fixture path keeps its historical name. (The D2 denylist's
+  // fold-a-CQL-hard-error-into-the-FHIR-result behavior stays covered by the `emit-local-codesystem-urn-collision`
+  // test above, whose error kind is unaffected by this slice.)
+  const MULTI_SYSTEM_TERMINOLOGY = path.join(
     HERE,
     "fixtures",
     "codesystem-url-conflict",
     "codesystem-url-conflict.crl",
   );
 
-  it("a `emit-codesystem-url-conflict` (NOT a structural-split kind) is folded into the FHIR result (D2 denylist)", () => {
-    const result = emitFhirDefFromPath(CODESYSTEM_URL_CONFLICT, { date: FIXED_DATE });
-    // The conflict is a CQL-lane emit error, not an import-time one.
+  it("a hand-authored MULTI-SYSTEM functional terminology now emits successfully (codesystem-url-conflict obsolete)", () => {
+    const result = emitFhirDefFromPath(MULTI_SYSTEM_TERMINOLOGY, { date: FIXED_DATE });
     expect(result.importDiagnostics.filter((d) => d.severity === "error")).toEqual([]);
-    // Pre-D2 (allowlist) this kind was dropped → FHIR reported success. Post-D2 it
-    // is folded and sinks success.
-    expect(result.errors.some((e) => e.kind === "emit-codesystem-url-conflict")).toBe(true);
-    expect(result.success).toBe(false);
+    // The codesystem-decl url conflict is gone: the functional VS binding subsumes multiple systems.
+    expect(result.errors.some((e) => e.kind === "emit-codesystem-url-conflict")).toBe(false);
+    expect(result.success).toBe(true);
   });
 });

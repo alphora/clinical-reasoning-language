@@ -17,8 +17,7 @@ valueset "Pregnancy or Other Related Diagnoses": 'http://cts.nlm.nih.gov/fhir/Va
 valueset "Referrals Where Weight Assessment May Occur": 'http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1527'
 valueset "Underweight": 'http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1563'
 valueset "Body Mass Index Observations": ''
-codesystem "Virtual Encounter Class System": 'http://terminology.hl7.org/CodeSystem/v3-ActCode'
-code "Virtual Encounter Class": 'VR' from "Virtual Encounter Class System"
+valueset "Virtual Encounter Class": 'http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-virtual-encounter-class'
 valueset "Pregnancy Status": ''
 valueset "Follow Up for Above Normal BMI Procedures": ''
 valueset "Follow Up for Below Normal BMI Procedures": ''
