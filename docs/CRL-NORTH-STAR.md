@@ -214,6 +214,21 @@ concept is the wrong turn this convention prevents.
 concept's rep with `coded from "VS"` and letting `exists` over it be the boolean: a non-member simply does not
 populate the value (closed-world → absent → false). The `coded from` filter *is* the membership test.
 
+**⭐ Matching is MEMBERSHIP — local codes and reference value sets alike; never "presence".** A concept's records
+are the resources whose code is a **member of the concept's value set**. That set is a single local code
+(`code is` — the trusted local domain), a **reference set** (`coded from "VS"` — a single-code **stub** at authoring,
+the real set swapped in for production), or an **instantiated set** (inline codes CRL owns). Membership
+(`code ∈ set`) is evaluated in **both** lanes — `$apply` via the CQL retrieve / `in`, the **CRE** via a code
+comparison against the **same** set — and must be correct for a code that **matches** AND one that does **not** (the
+wrong-code case is core, not optional: an author can pick the wrong code, and an emitted file can be hand-edited). A
+single-code set makes the set **small, not the check absent**: **"presence"** — asking only *whether* a fact exists,
+not *which* code it carries — drops the code comparison, which is exactly the check the wrong-code case needs, so it
+is **never the model**. It is only the *degenerate case* where a bare concept-naming fact carries the concept's own
+code by construction and is trivially a member. **Local vs remote is not a different *kind* of match** — it is one
+membership operation over different sets, so one implementation serves both. (The CRE today implements only the
+degenerate presence case and errors on coded/reduction forms; giving it the code comparison is the gap to close, not
+a redesign — issue #189 / the CRE catch-up.)
+
 **Exemplars:** the mammogram fixture (`Mammogram` value ⟵ `Had Mammogram` / `Up To Date On Mammography`
 interface); **patient age is the one both-rep whose recency EMITS today** (its `value projection` recency is the
 special-cased #257 age slice), so it is the working exemplar.
@@ -250,6 +265,19 @@ is **false**. Explicit absence is an ordinary **absence code** (a record), not a
   consumed (guard vs measure population vs operand). There is no "QM vs decision" CQL fork.
 - **No magic.** The emitter never manufactures a value a concept did not declare. Every set→scalar reduction
   is explicit in the CRL (per the value-type rule above).
+- **⭐ No magic in the EVAL/TEST path either — matching is EXPLICIT MEMBERSHIP, both lanes, local AND remote.**
+  This is the single biggest spin-cause in #189: "clever" shortcuts that *technically work* but are impossible to
+  hold in your head, so they re-confuse every reader and every compaction. **Banned in both the `$apply`/emit lane
+  and the CRE/tree lane, for local and remote alike:** *presence* standing in for membership (asking only *whether*
+  a fact exists, not *which* code it carries); *auto-supplied* codes the emitter picks that the author never stated;
+  *implicit arm-selection* (a fact silently becoming local vs source by channel/role/hash); and *"trusted" skips*
+  (local matching that never checks the code). The model is one operation, visible on the page: **a CEL fact carries
+  a code** (a bare fact defaults to the concept's *declared* local code — a **stated rule**, not inference); **that
+  code is checked, explicitly, against each representation's set** — the local set (`{concept code}`) and any
+  reference/instantiated set (`coded from`) — **in both lanes**; the code populates whichever rep(s) it is a member
+  of, and the concept computes over what is populated. There is no *selector* — the **code**, and which sets it is a
+  member of, is the whole story. Local is not exempt: its check is trivially satisfied for the right code but
+  **catches a wrong one** (an author error, or a hand-edited emitted file). See §3 "Matching is MEMBERSHIP".
 - **Null-safety by construction.** Every boolean-valued define the emitter produces is **total**: `exists(…)`
   is total by construction; a nullable boolean derivation is totalized (`Coalesce(<predicate>, false)`) at its
   own boundary — **per operand, before any `not`** (because `not Coalesce(A,false)` ≠ `Coalesce(not A,false)`
