@@ -1024,10 +1024,10 @@ describe("authoring-kit — getAuthoringKit", () => {
     // prose surface swept to distinguish inline vs named; `criterion-expansion-overflow`/criterion-atom bound retired.
     // CONTENT bump, NO payload-shape change. BOTH hashes move.
     expect(cpg.contentHash).toBe(
-      "4c176043e369138da4271ed4c8d306612ccb8e6056e5d2cedd5e0d7c52e000b6",
+      "840c0129eeaf90fb4d21a35e06830d1716ff9001cd7f5a439b50e189e87b4f66",
     );
     expect(priorAuth.contentHash).toBe(
-      "6e7a8508458c1d920885d87344d3bf2fdf47bc34f95ff688375ec390ac4bd671",
+      "cdd242b356dfb41d3e79c3cc57693634a9caaf12afba93c94b961538049fa646",
     );
   });
 

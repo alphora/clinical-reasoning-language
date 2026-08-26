@@ -59,7 +59,10 @@ function mkFixture(
       name: "p",
       version: "0.0.0",
       private: true,
-      ...(shared.length ? { crl: { sharedLibraries: shared } } : {}),
+      crl: {
+        canonicalBase: "http://example.org/p",
+        ...(shared.length ? { sharedLibraries: shared } : {}),
+      },
     }),
   );
   for (const [name, src] of Object.entries(crls))
@@ -113,15 +116,12 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fSib":
-- code is "http://example.org|sib".
 - date is "2026-01-01".
 - defined by "Sibling"."SibCrit".
 fact "fShr":
-- code is "http://example.org|shr".
 - date is "2026-01-01".
 - defined by "Shared"."ShrCrit".
 case "chain through both":
@@ -225,11 +225,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fCrit":
-- code is "http://example.org|crit".
 - date is "2026-01-01".
 - defined by "Shared"."Crit".
 case "shared chains shared":
@@ -433,15 +431,12 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fSib":
-- code is "http://example.org|sib".
 - date is "2026-01-01".
 - defined by "Sibling"."SibCrit".
 fact "fShr":
-- code is "http://example.org|shr".
 - date is "2026-01-01".
 - defined by "Shared"."ShrCrit".
 case "both yes":
@@ -528,11 +523,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fCrit":
-- code is "http://example.org|crit".
 - date is "2026-01-01".
 - defined by "Shared"."Crit".
 case "same name":
@@ -637,15 +630,12 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fA":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "LibA"."Indic".
 fact "fB":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "LibB"."Indic".
 case "ambig":
@@ -733,7 +723,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fCrit":
-- code is "http://example.org|c".
 - date is "2026-01-01".
 - defined by "Crit".
 case "approve":
@@ -753,7 +742,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fCrit":
-- code is "http://example.org|c".
 - date is "2026-01-01".
 - defined by "Crit".
 case "main":

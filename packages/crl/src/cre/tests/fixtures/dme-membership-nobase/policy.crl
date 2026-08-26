@@ -1,0 +1,29 @@
+# #189 Piece 2 (disc 508) — a real project MISSING crl.canonicalBase
+library "No Base Coverage".
+
+/*
+The project's package.json declares NO `crl.canonicalBase`, so a local concept's
+`{system, code}` set is UNDERIVABLE. An AUTHORED-code local fact then cannot have its
+membership computed; the CRE fails the run LOUD (fabrication-refusal) rather than guess
+— matching the emitter, which also refuses to compose the local CodeSystem url (#271).
+A BARE fact still evaluates (degenerate presence; no system needed).
+*/
+
+concept "Skull Fracture":
+- type is Condition.
+- value type is boolean.
+- code is `skull-fracture`.
+- definition is exists this.
+
+decision "Coverage Determination":
+first:
+- when "Skull Fracture" then recommend activity "deny.skull".
+- otherwise then recommend activity "approve".
+
+activity "deny.skull":
+- request CPGCommunicationRequest.
+- with `Excluded: skull or vertebral fracture.`.
+
+activity "approve":
+- request CPGServiceRequest.
+- with `Approve coverage.`.

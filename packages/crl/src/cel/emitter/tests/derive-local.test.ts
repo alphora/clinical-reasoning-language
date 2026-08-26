@@ -66,30 +66,54 @@ describe("#189 T3b derive-local (dme101-030)", () => {
     }
   });
 
-  it("§5 loud floor — a local fact carrying an authored `code is` is a conflict error and is SKIPPED", () => {
-    // Inject an authored code onto the local "Documented Tibial Nonunion" fact via an overlay (its code must
-    // DERIVE from the concept — never silently prefer authored vs derived, disc 490 [critical]).
+  it("#189 Piece 2 — a local fact's WELL-FORMED authored `code is` is the membership data input, emitted AS authored", () => {
+    // Author a (wrong-code) token onto the local "Documented Tibial Nonunion" fact. Under the membership model
+    // (disc 508) this is no longer a conflict — the code is the DATA INPUT: it routes to the resource coding as
+    // authored, and `$apply`'s system-qualified retrieve computes non-membership (a wrong code → concept false).
     const original = readFileSync(DME_CEL, "utf-8");
-    const conflictSrc = original.replace(
+    const src = original.replace(
       'fact "Documented Tibial Nonunion":\n- date is "2026-02-01".',
       'fact "Documented Tibial Nonunion":\n- code is "http://example.org/authored|foo".\n- date is "2026-02-01".',
     );
-    expect(conflictSrc).not.toBe(original); // the replace actually fired
+    expect(src).not.toBe(original); // the replace actually fired
     const canonical = canonicalizeFsPath(DME_CEL);
-    const graph = resolveCelImports(DME_CEL, { overlays: new Map([[canonical, conflictSrc]]) });
+    const graph = resolveCelImports(DME_CEL, { overlays: new Map([[canonical, src]]) });
     const r = emitCelToFhir(graph);
 
-    // The conflict is a typed error, not a silent choice.
-    const conflicts = r.diagnostics.filter((d) => d.kind === "local-authored-code-conflict");
-    expect(conflicts.length).toBeGreaterThan(0);
-    expect(conflicts[0].severity).toBe("error");
-
-    // The conflicting fact is SKIPPED — no Observation carries the authored code (never a partial instance).
+    // No error — the authored code is legitimate (the validator, not the emitter, warns on a non-member).
+    expect(r.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    // The fact is EMITTED with its authored coding (never skipped).
     const authored = r.emittedCases
       .flatMap((c) => c.resources)
       .map((res) => coding(res.body))
       .filter((x): x is { system?: string; code?: string } => x !== undefined)
+      .some((c) => c.system === "http://example.org/authored" && c.code === "foo");
+    expect(authored).toBe(true);
+  });
+
+  it("#189 Piece 2 — loud floor — a MALFORMED authored `code is` token is an error and is SKIPPED", () => {
+    // An empty-code token (`<system>|`) would emit `coding.code:""` — invalid FHIR `$apply` drops silently. It is
+    // an error + skip (never a partial), distinct from a well-formed non-member (a legitimate wrong-code datum).
+    const original = readFileSync(DME_CEL, "utf-8");
+    const src = original.replace(
+      'fact "Documented Tibial Nonunion":\n- date is "2026-02-01".',
+      'fact "Documented Tibial Nonunion":\n- code is "http://example.org/authored|".\n- date is "2026-02-01".',
+    );
+    expect(src).not.toBe(original);
+    const canonical = canonicalizeFsPath(DME_CEL);
+    const graph = resolveCelImports(DME_CEL, { overlays: new Map([[canonical, src]]) });
+    const r = emitCelToFhir(graph);
+
+    const malformed = r.diagnostics.filter((d) => d.kind === "local-authored-code-malformed");
+    expect(malformed.length).toBeGreaterThan(0);
+    expect(malformed[0].severity).toBe("error");
+
+    // The malformed fact is SKIPPED — no coding carries the authored (empty-code) system.
+    const emittedAuthored = r.emittedCases
+      .flatMap((c) => c.resources)
+      .map((res) => coding(res.body))
+      .filter((x): x is { system?: string; code?: string } => x !== undefined)
       .some((c) => c.system === "http://example.org/authored");
-    expect(authored).toBe(false);
+    expect(emittedAuthored).toBe(false);
   });
 });

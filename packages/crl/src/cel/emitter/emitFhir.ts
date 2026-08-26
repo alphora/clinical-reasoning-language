@@ -19,8 +19,13 @@ import {
   type OwningLibraryMetadata,
 } from "../../emit/effectiveRepresentation";
 import { readCanonicalBase, readPolicyId } from "../../fhir-emitter/metadata";
-import { createLocalDomainResolver } from "../../fhir-emitter/localDomain";
-import { astHasConceptLocalCode } from "../../cql-emitter/lowerLocalCodes";
+import { createLocalDomainResolver, deriveLocalConceptCoding } from "../../fhir-emitter/localDomain";
+import {
+  parseCanonicalToken,
+  classifyCanonicalToken,
+  type CodeParts,
+} from "../canonicalToken";
+import { localCodePathsOf } from "../localMembership";
 import type { Registry, RegistryEntry } from "../../imports/types";
 import type { ResolvedCelGraph } from "../imports/types";
 import type {
@@ -142,7 +147,7 @@ const CPG_TO_FHIR: Record<string, string> = {
 // share one helper. v2.3.0-FHIR-Todo-1 also added a 64-char truncation
 // cap matching the FHIR `id` regex — CEL slugify wasn't hitting the cap
 // in the corpus, but inheriting the cap is correct.
-import { rawSlug, slugify, uniqueCapSlug, localCodeSystemUrl } from "../../fhir-emitter/slug";
+import { rawSlug, slugify, uniqueCapSlug } from "../../fhir-emitter/slug";
 import { lookupCpgActivityProfile } from "../../fhir-emitter/cpgActivityProfiles";
 
 interface DerivedType {
@@ -336,18 +341,6 @@ function resolveAtClause(at: CELAtClause, anchors: AnchorMap): string | undefine
   return undefined;
 }
 
-interface CodeParts {
-  system?: string;
-  code: string;
-}
-
-function parseCanonicalToken(raw: string): CodeParts {
-  // Per pitch v4 critical decision #3: `<system>|<code>`. Tolerate bare codes.
-  const pipe = raw.indexOf("|");
-  if (pipe === -1) return { code: raw };
-  return { system: raw.slice(0, pipe), code: raw.slice(pipe + 1) };
-}
-
 // REFACTOR:grounded (#189 B4, disc 501 — both crl-emit arms #4). The CHECKED token parser for a CodeableConcept
 // `value is` DATUM. Unlike `parseCanonicalToken` (which tolerates a pipe-less/bare code — historical for the
 // identity `code is`), a DATUM must carry `<system>|<code>` in full: a system-less Coding can never match the B5
@@ -378,17 +371,6 @@ function codeableConceptFromParts(cp: CodeParts): Record<string, unknown> {
 
 function codeableConcept(raw: string): Record<string, unknown> {
   return codeableConceptFromParts(parseCanonicalToken(raw));
-}
-
-/** #189 CEL-writer T3b (disc 490). filePaths of every registry library that declares concept-level `code is`,
- *  computed at the RAW-AST boundary (the CEL registry is never lowered, so `astHasConceptLocalCode` is stable).
- *  Feeds the shared local-domain resolver's `localCodePaths`. Recomputed per local fact (pure/cheap; memoize per
- *  graph only if a large caseload shows it). */
-function computeLocalCodePaths(registry: Registry): Set<string> {
-  const out = new Set<string>();
-  for (const e of registry.byNameLocal.values()) if (astHasConceptLocalCode(e.ast)) out.add(e.filePath);
-  for (const e of registry.byNamePackage.values()) if (astHasConceptLocalCode(e.ast)) out.add(e.filePath);
-  return out;
 }
 
 /** REFACTOR:grounded (#189 B4, disc 501 #1). Resolve a local fact's `OwningLibraryMetadata` — the
@@ -435,7 +417,7 @@ function localOwningMeta(
   const policyId = graph.projectRoot ? readPolicyId(graph.projectRoot) : undefined;
   const resolver = createLocalDomainResolver({
     primarySeedPaths: seed,
-    localCodePaths: computeLocalCodePaths(registry),
+    localCodePaths: localCodePathsOf(registry),
     policyId,
   });
   // Metadata-less fallback mirrors the CQL lowering: `ast.library.name`, NOT the nullable `RegistryEntry.name`
@@ -481,21 +463,23 @@ function deriveLocalCoding(
 
   // Empty concept code → derivation failure (disc 490 Fable #6: never emit `coding.code: ""`). Checked BEFORE the
   // owning-metadata resolution to preserve the pre-B4 error priority (code-absent reported ahead of base-absent).
-  const code = concept.code;
-  if (typeof code !== "string" || code.trim() === "") {
+  if (typeof concept.code !== "string" || concept.code.trim() === "") {
     return mkErr(`local concept "${concept.name}" carries no \`code is\`; cannot derive a local coding`);
   }
 
   const meta = localOwningMeta(ctx, derived, factName);
   if ("error" in meta) return meta;
 
-  let system: string;
-  try {
-    system = localCodeSystemUrl(meta.meta.canonicalBase, meta.meta.localDomainId);
-  } catch (e) {
-    return mkErr(`local CodeSystem url composition failed for "${concept.name}": ${(e as Error).message}`);
-  }
-  return { parts: { system, code } };
+  // #189 Piece 2 (disc 508 — D1): the ONE local-concept coding derivation, shared with the CRE membership index so
+  // the instance coding and the tree-lane set are identical by construction.
+  const derivedCoding = deriveLocalConceptCoding({
+    conceptName: concept.name,
+    conceptCode: concept.code,
+    base: meta.meta.canonicalBase,
+    domainId: meta.meta.localDomainId,
+  });
+  if ("error" in derivedCoding) return mkErr(derivedCoding.error);
+  return { parts: { system: derivedCoding.coding.system, code: derivedCoding.coding.code } };
 }
 
 /** REFACTOR:grounded (#189 B4, disc 501 — both crl-emit arms). Write a LOCAL fact's CodeableConcept DATUM to the
@@ -863,31 +847,41 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   // the fact). A resource with NO registry row (an activity-only resource like Task/CommunicationRequest, or any
   // unlisted type) keeps the pre-flip `.code` write — category-3 activity coding + unlisted fail-closed are T4.
   // (Role governs the code VALUE/system — derive-local vs authored, T3 — not the coding element, which is T2.)
-  // #189 CEL-writer T3b (disc 490): a LOCAL-role fact DERIVES its `{system, code}` from the concept (byte-match
-  // with the CQL retrieve BY CONSTRUCTION); remote/bare-type/activity keep T2's authored-code placement. The
-  // loud floor: a local derivation failure or an authored-code §5 conflict SKIPS the fact (return undefined) —
-  // never a coding-less or ambiguously-coded partial instance (which `$apply` drops silently → wrong PA
-  // determination, the dme101-030 failure class). Full case-atomic discard/unwire is T3c.
+  // #189 Piece 2 (disc 508): a LOCAL-role fact's code is its MEMBERSHIP/DATA INPUT (charter §3/§4 — "a CEL fact
+  // carries a code … checked, explicitly, against the concept's set"). A BARE local fact defaults to the concept's
+  // own `{system, code}` (`deriveLocalCoding` — the degenerate case, a member by construction, byte-matching the
+  // CQL retrieve). An AUTHORED local code is routed to the resource coding AS AUTHORED, exactly like the remote
+  // branch — `$apply`'s system-qualified retrieve then computes membership: a matching code populates the concept,
+  // a different one does not (closed-world → the concept's `exists` is false), and BOTH lanes agree by construction.
+  // The loud floor stays: a bare-path derivation failure, or a MALFORMED authored token, SKIPS the fact (never a
+  // `coding.code:""` partial `$apply` drops silently). A well-formed authored NON-member is NOT skipped — it is the
+  // legitimate wrong-code datum (the CEL validator flags it with `fact-code-not-in-local-set`). (This flip replaces
+  // T3b's `local-authored-code-conflict`, whose reject contradicted the membership model.)
   let coding: CodeParts | undefined;
-  if (derived.role === "local") {
-    if (typeof body.code === "string") {
-      // §5 — the code must derive from the concept; never silently prefer authored vs derived.
-      ctx.diagnostics.push({
-        kind: "local-authored-code-conflict",
-        severity: "error",
-        message: `Fact "${factName}" is backed by a local concept but also carries an authored \`code is\` — the code must derive from the concept; remove the fact's code.`,
-        caseSlug: ctx.caseSlug,
-        factName,
-        filePath: ctx.graph.filePath,
-      });
-      return undefined;
-    }
+  if (derived.role === "local" && typeof body.code !== "string") {
+    // Bare local fact → derive the concept's own coding (degenerate membership).
     const local = deriveLocalCoding(ctx, derived, factName);
     if ("error" in local) {
       ctx.diagnostics.push(local.error);
       return undefined;
     }
     coding = local.parts;
+  } else if (derived.role === "local" && typeof body.code === "string") {
+    // Authored local code = data input. Malformed → error + skip; well-formed → route as authored (membership is
+    // computed downstream by the retrieve / the CRE, not here).
+    const cls = classifyCanonicalToken(body.code);
+    if (cls.kind === "malformed") {
+      ctx.diagnostics.push({
+        kind: "local-authored-code-malformed",
+        severity: "error",
+        message: `Fact "${factName}" (local concept "${derived.concept?.name ?? "?"}") authors a malformed \`code is\` token: ${cls.reason}.`,
+        caseSlug: ctx.caseSlug,
+        factName,
+        filePath: ctx.graph.filePath,
+      });
+      return undefined;
+    }
+    coding = cls.parts;
   } else if (typeof body.code === "string") {
     coding = parseCanonicalToken(body.code);
   }
@@ -962,6 +956,21 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
     } else {
       resourceBody.status = "entered-in-error";
     }
+  }
+  // #189 Piece 2 (disc 508 D5(3)) backstop: an intent modifier on a LOCAL determination fact inverts its clinical
+  // meaning, but its resource is retrieved by CODE (which still matches) → `$apply` would read the concept PRESENT,
+  // the opposite of the intent. Reject + skip (never emit a self-contradicting membership resource) until negation
+  // semantics land (#257). Intent on an activity/recommendation fact is legitimate — this is gated to role local.
+  if (derived.role === "local" && factRefField?.intent !== undefined) {
+    ctx.diagnostics.push({
+      kind: "intent-modifier-on-local-fact",
+      severity: "error",
+      message: `Fact "${factName}" (local concept "${derived.concept?.name ?? "?"}") is referenced with an "${factRefField.intent}" intent modifier — a negated/absent local determination would still match its code-based retrieve and read PRESENT (the opposite). Rejected (negation semantics = #257).`,
+      caseSlug: ctx.caseSlug,
+      factName,
+      filePath: ctx.graph.filePath,
+    });
+    return undefined;
   }
   // Status / intent modifiers (fact-level — combine with or override the
   // definitional flag above).

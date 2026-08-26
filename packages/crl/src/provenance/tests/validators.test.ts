@@ -56,7 +56,7 @@ beforeAll(() => {
   root = mkdtempSync(path.join(os.tmpdir(), "prov-val-"));
   writeFileSync(
     path.join(root, "package.json"),
-    JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+    JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
   );
   writeFileSync(path.join(root, "policy.crl"), POLICY_CRL);
   const celPath = path.join(root, "f.cel");

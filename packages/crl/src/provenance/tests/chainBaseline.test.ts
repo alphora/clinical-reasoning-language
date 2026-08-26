@@ -90,7 +90,7 @@ describe("#175 todo-2 — RESOLVED (was the unmapped baseline): the chained case
     root = mkdtempSync(path.join(os.tmpdir(), "prov-chain-"));
     writeFileSync(
       path.join(root, "package.json"),
-      JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
     );
     crlPath = path.join(root, "chain.crl");
     celPath = path.join(root, "chain.cel");

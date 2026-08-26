@@ -21,6 +21,22 @@ export type CELValidationErrorKind =
   | "unresolved-fact-ref"
   | "duplicate-fact-name"
   | "duplicate-case-name"
+  // #189 Piece 2 (disc 508) — a fact naming a LOCAL concept authors a WELL-FORMED `code is` that is NOT the
+  // concept's own local `{system, code}` (a wrong-code / wrong-system / system-less datum). A WARNING, not an
+  // error: this is the legitimate wrong-code test datum (a non-member → closed-world absent → the concept is
+  // false in both lanes), but it is usually an author mistake, so it is surfaced. (A MALFORMED token is the
+  // emitter's `local-authored-code-malformed` error, not this.)
+  | "fact-code-not-in-local-set"
+  // #189 Piece 2 (disc 508 / impl-review gpt56 #4) — a fact naming a LOCAL concept authors a MALFORMED canonical
+  // `code is` token (empty code, or a pipe with an empty system/code). The emitter skips it (invalid FHIR); the
+  // validator flags it lane-neutrally as an ERROR (a KE author validating without emitting still sees it).
+  | "fact-code-malformed-token"
+  // #189 Piece 2 (disc 508 D5(3)) — a case references a LOCAL determination fact (its concept has `code is`) with
+  // an `absent`/`negative` intent modifier. Membership sees only the CODE, so a ruled-out/negated fact would still
+  // be a member → the concept computes PRESENT (the opposite of the author's intent), consistently wrong in BOTH
+  // lanes. Correct negation semantics are #257 (status/refutation); until then this is rejected loud. (Intent on an
+  // ACTIVITY/recommendation fact — a declined proposal — is legitimate and untouched.)
+  | "intent-modifier-on-local-fact"
   // Case id (provenance spec §7)
   | "malformed-case-id"
   | "reserved-case-id"

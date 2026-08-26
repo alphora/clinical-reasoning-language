@@ -1,0 +1,9 @@
+{
+  "name": "dme-membership",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CRE fixture — #189 Piece 2 local code-driven membership round-trip (disc 508)",
+  "crl": {
+    "canonicalBase": "http://example.org/hcsc/dme-membership"
+  }
+}

@@ -1,4 +1,4 @@
-import { localDomainIdFor } from "./slug";
+import { localDomainIdFor, localCodeSystemUrl } from "./slug";
 
 /**
  * REFACTOR:grounded (#189 CEL-writer T3b, panel disc 490). The ONE local-domain-id resolver shared by every
@@ -41,6 +41,43 @@ export interface LocalDomainResolver {
    *  `undefined` otherwise (primary seed, non-`code is`, or metadata-less). Feeds the CQL lane's manifest
    *  `localUrnDisambiguated` signal; no CEL consumer, but kept here so the one resolver owns both outputs. */
   disambiguatedBaseFor(entry: LocalDomainEntryId): string | undefined;
+}
+
+/** A local concept's identity coding — the `{system, code}` half of its local membership set (the `fhirType` half
+ *  is the concept's own `type is`, attached by each lane). */
+export interface LocalConceptCoding {
+  system: string;
+  code: string;
+}
+
+/** REFACTOR:grounded (#189 Piece 2, disc 508 — D1). The ONE derivation of a local concept's `{system, code}`, so
+ *  the CEL emitter's instance coding (`deriveLocalCoding`) and the CRE's membership index (`cre/run.ts`) compute the
+ *  IDENTICAL set — the two-lane agreement #189 protects. Mirrors the CQL definition lane's retrieve CodeSystem by
+ *  construction: `system = localCodeSystemUrl(base, domainId)`, `code = <concept code>`. `base`/`domainId` are the
+ *  values each caller already resolves (`readCanonicalBase` + `resolver.domainIdFor(entry) ?? libraryName` — the
+ *  fallback applied by the caller, so `domainId` arrives non-undefined). Returns a typed error (never a silent
+ *  partial): an empty concept code or an underivable base (charter §4 no-urn-fallback, #271) — the caller turns it
+ *  into its lane's diagnostic (emit: skip the fact; CRE: run error). */
+export function deriveLocalConceptCoding(args: {
+  conceptName: string;
+  conceptCode: string | undefined;
+  base: string | undefined;
+  domainId: string;
+}): { coding: LocalConceptCoding } | { error: string } {
+  const { conceptName, conceptCode, base, domainId } = args;
+  if (typeof conceptCode !== "string" || conceptCode.trim() === "") {
+    return { error: `local concept "${conceptName}" carries no \`code is\`; cannot derive a local coding` };
+  }
+  if (!base) {
+    return { error: `project has no \`crl.canonicalBase\`; cannot compose the local CodeSystem url for "${conceptName}"` };
+  }
+  let system: string;
+  try {
+    system = localCodeSystemUrl(base, domainId);
+  } catch (e) {
+    return { error: `local CodeSystem url composition failed for "${conceptName}": ${(e as Error).message}` };
+  }
+  return { coding: { system, code: conceptCode } };
 }
 
 export function createLocalDomainResolver(args: {

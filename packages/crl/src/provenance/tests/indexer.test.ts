@@ -236,7 +236,7 @@ describe("buildProvenanceIndex — degenerate input", () => {
     try {
       writeFileSync(
         path.join(root, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       const celPath = path.join(root, "f.cel");
       writeFileSync(

@@ -1,0 +1,61 @@
+# #189 Piece 2 (disc 508) — local membership cases
+library "Coverage Membership Cases".
+covers "Coverage Membership".
+
+/*
+Code-driven membership, both verdicts (charter §3): the local CodeSystem is
+`<canonicalBase>/CodeSystem/dme-membership-local` (canonicalBase
+`http://example.org/hcsc/dme-membership`, policy id `dme-membership`). A fact's
+authored `code is` is checked against each concept's local set; a MATCH populates
+the concept, a NON-MATCH does not (closed-world → the concept is false).
+*/
+
+fact "Sample Patient":
+- name is "Sample Patient".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+// Correct explicit code → member of Skull Fracture → deny.skull.
+fact "Skull Correct":
+- code is "http://example.org/hcsc/dme-membership/CodeSystem/dme-membership-local|skull-fracture".
+- date is "2026-01-15".
+- defined by "Coverage Membership"."Skull Fracture".
+
+// Wrong code (right system, not any concept's code) → non-member → Skull absent → approve.
+fact "Skull Wrong Code":
+- code is "http://example.org/hcsc/dme-membership/CodeSystem/dme-membership-local|not-a-real-code".
+- date is "2026-01-15".
+- defined by "Coverage Membership"."Skull Fracture".
+
+// Names Tumor Fracture but carries Skull Fracture's code (both Condition) → populates
+// SKULL (compartment-global; code decides, not name) → deny.skull, NOT deny.tumor.
+fact "Named Tumor Coded Skull":
+- code is "http://example.org/hcsc/dme-membership/CodeSystem/dme-membership-local|skull-fracture".
+- date is "2026-01-15".
+- defined by "Coverage Membership"."Tumor Fracture".
+
+// Bare fact naming Tumor Fracture → degenerate member (the concept's own code by
+// construction) → deny.tumor.
+fact "Tumor Bare":
+- date is "2026-01-15".
+- defined by "Coverage Membership"."Tumor Fracture".
+
+case "correct code populates the named concept -> deny.skull":
+- subject is "Sample Patient".
+- fact is "Skull Correct".
+- result is "Coverage Determination" is "deny.skull".
+
+case "wrong code is a non-member -> concept absent -> approve":
+- subject is "Sample Patient".
+- fact is "Skull Wrong Code".
+- result is "Coverage Determination" is "approve".
+
+case "cross-concept: code decides, not name -> deny.skull":
+- subject is "Sample Patient".
+- fact is "Named Tumor Coded Skull".
+- result is "Coverage Determination" is "deny.skull".
+
+case "bare fact is the degenerate member -> deny.tumor":
+- subject is "Sample Patient".
+- fact is "Tumor Bare".
+- result is "Coverage Determination" is "deny.tumor".

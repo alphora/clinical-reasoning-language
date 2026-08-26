@@ -72,11 +72,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fCrit":
-- code is "http://example.org|crit".
 - date is "2026-01-01".
 - defined by "Shared"."Crit".
 case "qualified crit -> shared sub approves":
@@ -114,7 +112,7 @@ function mkCrossLibFixture(
   const root = mkdtempSync(path.join(os.tmpdir(), prefix));
   writeFileSync(
     path.join(root, "package.json"),
-    JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+    JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
   );
   writeFileSync(path.join(root, "policy.crl"), policyCrl);
   writeFileSync(path.join(root, "shared.crl"), sharedCrl); // a LOCAL sibling (no crl.sharedLibraries → policy-owned by default)
@@ -453,7 +451,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 case "unresolved xlib target":
@@ -469,7 +466,7 @@ describe("#172 todo-3 — honesty: an UNRESOLVED cross-lib target defers (never 
     const root = mkdtempSync(path.join(os.tmpdir(), "xlib-unresolved-"));
     writeFileSync(
       path.join(root, "package.json"),
-      JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
     );
     writeFileSync(path.join(root, "policy.crl"), UNRESOLVED_POLICY_CRL);
     const celPath = path.join(root, "policy.cel");
@@ -517,7 +514,7 @@ describe("#172 todo-3 — name-collision boundary: cross-lib refs bind by lib NA
     try {
       writeFileSync(
         path.join(root, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(path.join(root, "policy.crl"), POLICY_CRL);
       writeFileSync(path.join(root, "shared.crl"), SHARED_CRL);

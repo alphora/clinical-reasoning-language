@@ -64,11 +64,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fDrug":
-- code is "http://example.org|drug".
 - date is "2026-01-01".
 - defined by "Drug Requested".
 fact "fCrit":
-- code is "http://example.org|crit".
 - date is "2026-01-01".
 - defined by "Criterion Met".
 case "approve":
@@ -98,7 +96,7 @@ function mkFixture(prefix: string, crl: string, cel: string): Fixture {
   const root = mkdtempSync(path.join(os.tmpdir(), prefix));
   writeFileSync(
     path.join(root, "package.json"),
-    JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+    JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
   );
   writeFileSync(path.join(root, "policy.crl"), crl);
   const celPath = path.join(root, "f.cel");
@@ -253,11 +251,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fImg":
-- code is "http://example.org|img".
 - date is "2026-01-01".
 - defined by "Needs Imaging".
 fact "fLab":
-- code is "http://example.org|lab".
 - date is "2026-01-01".
 - defined by "Needs Labs".
 case "both":
@@ -309,11 +305,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fDrug":
-- code is "http://example.org|drug".
 - date is "2026-01-01".
 - defined by "Drug Requested".
 fact "fCrit":
-- code is "http://example.org|crit".
 - date is "2026-01-01".
 - defined by "Criterion Met".
 case "approve":
@@ -569,7 +563,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fA":
-- code is "http://example.org|a".
 - date is "2026-01-01".
 - defined by "A".
 case "a-path":
@@ -702,11 +695,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fAge":
-- code is "http://example.org|age".
 - date is "2026-01-01".
 - defined by "Shared Age".
 fact "fCrohn":
-- code is "http://example.org|crohn".
 - date is "2026-01-01".
 - defined by "Crohns Marker".
 case "crohns":

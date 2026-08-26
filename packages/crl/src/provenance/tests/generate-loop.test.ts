@@ -103,7 +103,7 @@ beforeAll(() => {
   root = mkdtempSync(path.join(os.tmpdir(), "prov-gen-loop-"));
   writeFileSync(
     path.join(root, "package.json"),
-    JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+    JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
   );
   writeFileSync(path.join(root, "policy.crl"), POLICY_CRL);
   celPath = path.join(root, "f.cel");
@@ -310,7 +310,7 @@ describe("generateProvenanceFiles — file pipeline end-to-end (anchorMetaFor + 
     try {
       writeFileSync(
         path.join(dir, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
       const fCel = path.join(dir, "f.cel");
@@ -344,7 +344,7 @@ describe("generateProvenanceFiles — file pipeline end-to-end (anchorMetaFor + 
     try {
       writeFileSync(
         path.join(dir, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       // a CEL that covers a library which does not exist in the closure → coversName resolves to null.
       const noCel = path.join(dir, "no.cel");
@@ -371,7 +371,7 @@ describe("validateProvenanceFiles — worklist mode passes a fresh scaffold (wor
     try {
       writeFileSync(
         path.join(dir, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
       const fCel = path.join(dir, "f.cel");
@@ -415,7 +415,7 @@ describe("#250 Todo A — generateProvenanceFiles emits a carrier-relative deriv
     try {
       writeFileSync(
         path.join(dir, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
       const fCel = path.join(dir, "f.cel");
@@ -447,7 +447,7 @@ describe("#250 Todo A — generateProvenanceFiles emits a carrier-relative deriv
     try {
       writeFileSync(
         path.join(dir, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
       const fCel = path.join(dir, "f.cel");
@@ -474,7 +474,7 @@ describe("#250 Todo A — generateProvenanceFiles emits a carrier-relative deriv
       writeFileSync(path.join(repo, ".git"), "gitdir: /elsewhere\n"); // pin the checkout root at repo
       writeFileSync(
         path.join(repo, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(path.join(repo, "policy.crl"), POLICY_CRL);
       const fCel = path.join(repo, "f.cel");
@@ -523,7 +523,7 @@ describe("#250 Todo A — generateProvenanceFiles emits a carrier-relative deriv
     try {
       writeFileSync(
         path.join(dir, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
       const fCel = path.join(dir, "f.cel");
@@ -549,7 +549,7 @@ describe("#250 Todo A — generateProvenanceFiles emits a carrier-relative deriv
     try {
       writeFileSync(
         path.join(dir, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
       const fCel = path.join(dir, "f.cel");
@@ -579,7 +579,7 @@ describe("#250 Todo A — generateProvenanceFiles emits a carrier-relative deriv
     try {
       writeFileSync(
         path.join(dir, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
       const fCel = path.join(dir, "f.cel");
@@ -613,7 +613,7 @@ describe("#250 Todo F — loader wired into the disk read-sites (throw-propagati
     try {
       writeFileSync(
         path.join(dir, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
       const fCel = path.join(dir, "f.cel");
@@ -639,7 +639,7 @@ describe("#250 Todo F — loader wired into the disk read-sites (throw-propagati
     try {
       writeFileSync(
         path.join(dir, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
       const fCel = path.join(dir, "f.cel");

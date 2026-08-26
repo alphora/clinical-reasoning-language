@@ -50,7 +50,7 @@ function mkFx(prefix: string, crl: string, cel: string): Fx {
   const root = mkdtempSync(path.join(os.tmpdir(), prefix));
   writeFileSync(
     path.join(root, "package.json"),
-    JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+    JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
   );
   writeFileSync(path.join(root, "policy.crl"), crl);
   const celPath = path.join(root, "f.cel");
@@ -111,7 +111,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 case "dual":
@@ -167,7 +166,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 case "ambig":
@@ -225,7 +223,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 case "mismatch":
@@ -267,7 +264,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 case "dup":
@@ -389,7 +385,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 case "deep unfrozen":
@@ -443,7 +438,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 case "same":
@@ -536,7 +530,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 case "indic boolean":
@@ -595,7 +588,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fCrit":
-- code is "http://example.org|c".
 - date is "2026-01-01".
 - defined by "Crit".
 case "approve":

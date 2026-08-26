@@ -53,7 +53,7 @@ describe("validateProvenance — #250 Todo D1 (contract-tell invariant)", () => 
     root = mkdtempSync(join(tmpdir(), "crl-d1-"));
     writeFileSync(
       join(root, "package.json"),
-      JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
     );
     writeFileSync(join(root, "policy.crl"), POLICY_CRL);
     const celPath = join(root, "f.cel");
@@ -347,7 +347,7 @@ case "c":
     try {
       writeFileSync(
         join(dir, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(join(dir, "policy.crl"), POLICY);
       const celPath = join(dir, "f.cel");
@@ -426,7 +426,7 @@ case "c":
     try {
       writeFileSync(
         join(dir, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(join(dir, "policy.crl"), POLICY);
       const celPath = join(dir, "f.cel");

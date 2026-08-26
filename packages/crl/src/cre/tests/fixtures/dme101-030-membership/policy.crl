@@ -1,0 +1,42 @@
+# #189 Piece 2 (disc 508) — local code-driven membership round-trip
+library "Coverage Membership".
+
+/*
+Two same-type (Condition) LOCAL concepts + a `first:` decision, to prove CODE-DRIVEN
+membership (charter §3/§4): a fact's `code is` — not its `defined by` NAME — decides
+which local concept it populates, computed the SAME in the CRE and $apply. Because the
+two concepts share a resource type, a mis-coded fact (names one, carries the other's
+code) routes to the concept whose SET the code is a member of — the compartment-global
+behavior that name-gating would hide. Each concept is `code is` + `definition is exists
+this` (the canonical existence reduction; no bare scalar).
+*/
+
+concept "Skull Fracture":
+- type is Condition.
+- value type is boolean.
+- code is `skull-fracture`.
+- definition is exists this.
+
+concept "Tumor Fracture":
+- type is Condition.
+- value type is boolean.
+- code is `tumor-fracture`.
+- definition is exists this.
+
+decision "Coverage Determination":
+first:
+- when "Skull Fracture" then recommend activity "deny.skull".
+- when "Tumor Fracture" then recommend activity "deny.tumor".
+- otherwise then recommend activity "approve".
+
+activity "deny.skull":
+- request CPGCommunicationRequest.
+- with `Excluded: skull or vertebral fracture.`.
+
+activity "deny.tumor":
+- request CPGCommunicationRequest.
+- with `Excluded: tumor-related fracture.`.
+
+activity "approve":
+- request CPGServiceRequest.
+- with `Approve coverage.`.

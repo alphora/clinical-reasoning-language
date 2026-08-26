@@ -173,7 +173,7 @@ case "c":
     try {
       writeFileSync(
         join(dir, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(join(dir, "policy.crl"), POLICY_CRL);
       const celPath = join(dir, "f.cel");

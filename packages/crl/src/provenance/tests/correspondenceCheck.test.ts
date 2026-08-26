@@ -63,11 +63,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fDrug":
-- code is "http://example.org|drug".
 - date is "2026-01-01".
 - defined by "Drug Requested".
 fact "fCrit":
-- code is "http://example.org|crit".
 - date is "2026-01-01".
 - defined by "Criterion Met".
 case "approve":
@@ -108,7 +106,7 @@ beforeAll(() => {
   root = mkdtempSync(path.join(os.tmpdir(), "prov-corr-"));
   writeFileSync(
     path.join(root, "package.json"),
-    JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+    JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
   );
   crlPath = path.join(root, "policy.crl");
   celPath = path.join(root, "f.cel");
@@ -418,7 +416,7 @@ describe("checkCockpitCorrespondence — unchecked reasons (a green gate must me
     const r4 = mkdtempSync(path.join(os.tmpdir(), "prov-render-"));
     writeFileSync(
       path.join(r4, "package.json"),
-      JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
     );
     writeFileSync(path.join(r4, "policy.crl"), POLICY_CRL);
     const celBad = path.join(r4, "f.cel");
@@ -464,7 +462,7 @@ describe("checkCockpitCorrespondence — unchecked reasons (a green gate must me
     const r5 = mkdtempSync(path.join(os.tmpdir(), "prov-collide-"));
     writeFileSync(
       path.join(r5, "package.json"),
-      JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
     );
     writeFileSync(path.join(r5, "policy.crl"), POLICY_CRL);
     const cel5 = path.join(r5, "f.cel");
@@ -533,7 +531,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fDrug":
-- code is "http://example.org|drug".
 - date is "2026-01-01".
 - defined by "Drug Requested".
 case "deleg":
@@ -549,7 +546,7 @@ case "deleg":
     r2 = mkdtempSync(path.join(os.tmpdir(), "prov-deleg-"));
     writeFileSync(
       path.join(r2, "package.json"),
-      JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
     );
     writeFileSync(path.join(r2, "policy.crl"), DELEG_CRL);
     cel2 = path.join(r2, "f.cel");
@@ -754,11 +751,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fAge":
-- code is "http://example.org|age".
 - date is "2026-01-01".
 - defined by "Shared Age".
 fact "fCrohn":
-- code is "http://example.org|crohn".
 - date is "2026-01-01".
 - defined by "Crohns Marker".
 case "crohns":
@@ -775,7 +770,7 @@ case "crohns":
     r2 = mkdtempSync(path.join(os.tmpdir(), "prov-rx147-"));
     writeFileSync(
       path.join(r2, "package.json"),
-      JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
     );
     writeFileSync(path.join(r2, "policy.crl"), SC_CRL);
     cel2 = path.join(r2, "f.cel");
@@ -880,11 +875,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fImg":
-- code is "http://example.org|img".
 - date is "2026-01-01".
 - defined by "Needs Imaging".
 fact "fLab":
-- code is "http://example.org|lab".
 - date is "2026-01-01".
 - defined by "Needs Labs".
 case "both":
@@ -898,7 +891,7 @@ case "both":
     const r3 = mkdtempSync(path.join(os.tmpdir(), "prov-allmenu-"));
     writeFileSync(
       path.join(r3, "package.json"),
-      JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
     );
     writeFileSync(path.join(r3, "policy.crl"), ALL_CRL);
     const cel3 = path.join(r3, "f.cel");

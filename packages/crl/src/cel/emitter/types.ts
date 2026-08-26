@@ -57,9 +57,17 @@ export type EmitDiagnosticKind =
    *  closure, empty concept code, or url composition threw). The fact is SKIPPED, never emitted coding-less
    *  (a coding-less instance is silently dropped by `$apply` → wrong PA determination). */
   | "local-coding-derivation-failed"
-  /** #189 T3b — a LOCAL-concept fact ALSO carries its own authored `code` token. The code must derive from the
-   *  concept; §5 forbids silently preferring one, so the fact is SKIPPED with this error. */
-  | "local-authored-code-conflict"
+  /** #189 Piece 2 (disc 508) — a LOCAL-concept fact authors a MALFORMED canonical `code` token (empty code, or a
+   *  pipe with an empty system/code: `""`, `"|c"`, `"s|"`). Routing it "as authored" would emit `coding.code:""`
+   *  etc. — invalid FHIR `$apply` drops SILENTLY. The fact is SKIPPED. (A WELL-FORMED authored code that is not a
+   *  member of the concept's local set is NOT an error — it is the legitimate wrong-code datum; it emits, and the
+   *  CEL validator flags it with a `fact-code-not-in-local-set` warning.) */
+  | "local-authored-code-malformed"
+  /** #189 Piece 2 (disc 508 D5(3)) — a LOCAL determination fact is referenced with an `absent`/`negative` intent
+   *  modifier. The modifier inverts clinical meaning but membership sees only the code, so the emitted resource
+   *  (retrieved by code) would read PRESENT — the opposite of the intent. Rejected + skipped until negation
+   *  semantics land (#257). Intent on an activity/recommendation fact is legitimate and untouched. */
+  | "intent-modifier-on-local-fact"
   /** #189 B4 (disc 501) — a LOCAL concept declares a CodeableConcept value type but its authored `value is` datum
    *  is unusable: not a `<system>|<code>` token (a bare/empty/multi-pipe token, or a non-string payload), or the
    *  concept's representation reads no value element. The fact is SKIPPED (never a manufactured/partial value —

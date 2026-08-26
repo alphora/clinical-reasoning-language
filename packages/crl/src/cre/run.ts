@@ -81,8 +81,15 @@ import type { BranchCondition } from "../ast/types";
 // source and their `op:"criterion"` traces/spines stay zip-consistent.
 import type { CriterionTable } from "../ast/criterionExpansion";
 import { buildCriterionTablesForGraph } from "./criterionTables";
-import type { CELCase, CELDefinedByField, CELFact, CELResultField } from "../cel/ast/types";
+import type { CELCase, CELCodeField, CELDefinedByField, CELFact, CELResultField } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
+import { classifyCanonicalToken } from "../cel/canonicalToken";
+import {
+  makeLocalDomainContext,
+  localMemberOfConcept,
+  memberKey,
+  type LocalConceptMember,
+} from "../cel/localMembership";
 import type { LsLocation } from "../language-services/contracts";
 import { toZeroBasedRange } from "../language-services/contracts";
 // childId + idOf/nameOf are single-sourced in ast/ (natural layer direction); re-exported here for existing consumers
@@ -220,6 +227,33 @@ export interface CelRunResult {
 interface ConceptEntry {
   node: Concept;
   lib: string;
+  // #189 Piece 2 (disc 508) — the owning-library identity the local-domain resolver needs to derive this concept's
+  // local `{system, code}` set (byte-matching the emitter/CQL lane). `filePath` drives the primary-seed
+  // disambiguation; `entryName` is the `RegistryEntry.name` the resolver keys on; `fallbackLib` is
+  // `ast.library.name` (the metadata-less domain id).
+  filePath: string;
+  entryName: string | null;
+  fallbackLib: string;
+}
+
+/** #189 Piece 2 (disc 508) — the CRE's local membership index. Population is CODE-DRIVEN / compartment-global (§4:
+ *  "there is no selector — the code, and which sets it is a member of, is the whole story"): a fact's effective
+ *  `(fhirType, {system,code})` is looked up in `reverse` to find WHICH local concept it populates (possibly not the
+ *  one it names), exactly as `$apply` populates by `(type, coding)`. `forward` gives a named concept's own set (for
+ *  the bare-fact degenerate default). `underivable` is set when a local concept's set could not be derived (missing
+ *  `canonicalBase`) — a local fact then fails the run LOUD rather than fabricating a member/non-member verdict. */
+interface LocalMembershipIndex {
+  forward: Map<Id, LocalConceptMember>;
+  reverse: Map<string, Id>;
+  /** `(fhirType, system, code)` keys claimed by ≥2 DISTINCT concepts. `concepts` is built from the whole registry
+   *  (broader than the emitted closure `emit-duplicate-local-code` guards), so an unrelated same-domain/type/code
+   *  concept could otherwise silently steal a reverse entry. A fact resolving to a collided key fails the run LOUD
+   *  rather than last-writer-wins. */
+  collisions: Set<string>;
+  /** Whether the graph is a real PROJECT (`projectRoot` set) — an emit/`$apply` lane exists, so an underivable
+   *  local set is a MISCONFIGURATION (run error). An inline/projectless graph has no emit lane to diverge from, so
+   *  membership can't be computed and the CRE falls back to name-based presence (pre-Piece-2 behavior). */
+  hasProject: boolean;
 }
 
 interface ConceptEval {
@@ -991,6 +1025,36 @@ function walkBranches(
   }
 }
 
+/** #189 Piece 2 (disc 508) — derive the local `{fhirType, system, code}` set for every LOCAL concept in the closure
+ *  and index it forward (by concept id) and reverse (by `(fhirType, system, code)`). A concept whose base is
+ *  underivable flips `underivable` (a local fact then fails the run loud, never a fabricated verdict). */
+function buildLocalMembershipIndex(
+  concepts: Map<Id, ConceptEntry>,
+  graph: ResolvedCelGraph,
+): LocalMembershipIndex {
+  const ctx = makeLocalDomainContext(graph);
+  const forward = new Map<Id, LocalConceptMember>();
+  const reverse = new Map<string, Id>();
+  const collisions = new Set<string>();
+  for (const [id, entry] of concepts) {
+    const res = localMemberOfConcept(
+      entry.node,
+      { filePath: entry.filePath, entryName: entry.entryName, fallbackLib: entry.fallbackLib },
+      ctx,
+    );
+    if ("notLocal" in res) continue;
+    // An underivable concept (missing base) is simply absent from `forward` — a local fact naming it then hits the
+    // per-fact "no derivable local code set" guard below (real project → error; inline → presence fallback).
+    if ("error" in res) continue;
+    forward.set(id, res.member);
+    const key = memberKey(res.member.fhirType, res.member.system, res.member.code);
+    const prior = reverse.get(key);
+    if (prior !== undefined && prior !== id) collisions.add(key); // two DISTINCT concepts claim one set → ambiguous
+    else reverse.set(key, id);
+  }
+  return { forward, reverse, collisions, hasProject: graph.projectRoot !== undefined };
+}
+
 function runCase(
   c: CELCase,
   decisions: Map<string, Decision>,
@@ -998,6 +1062,7 @@ function runCase(
   coveredLib: string,
   filePath: string,
   concepts: Map<Id, ConceptEntry>,
+  localIndex: LocalMembershipIndex,
   resolveDecision: (callerLib: string, ref: ReferenceName) => ResolvedDecision | undefined,
   // #236 — per-library criterion tables for reference-and-evaluate (threaded onto Ctx; a criterion
   // guard resolves its body here at eval time instead of being inline-expanded up front).
@@ -1006,16 +1071,32 @@ function runCase(
   const diagnostics: string[] = [];
   let subjectFact: string | undefined;
   const factRefs: string[] = [];
+  // #189 Piece 2 (disc 508 D5(3)) — fact-refs carrying an `absent`/`negative` intent modifier. On a LOCAL
+  // determination fact this silently inverts membership (the code still matches), so it is rejected loud below.
+  const factRefsWithIntent = new Set<string>();
   let result: CELResultField | undefined;
   for (const b of c.body) {
     if (b.type === "CELSubjectField") subjectFact = b.factName;
-    else if (b.type === "CELFactRefField") factRefs.push(b.factName);
-    else if (b.type === "CELResultField") result = b; // v1: single decision-result assertion
+    else if (b.type === "CELFactRefField") {
+      factRefs.push(b.factName);
+      if (b.intent !== undefined) factRefsWithIntent.add(b.factName);
+    } else if (b.type === "CELResultField") result = b; // v1: single decision-result assertion
   }
 
-  // Build the directly-asserted concept set from the case's clinical (non-subject) facts.
+  // #189 Piece 2 (disc 508) — build the directly-populated concept set by CODE-DRIVEN membership (compartment-global,
+  // §4). A fact's `code` — not its `defined by` NAME — decides which local concept it populates (possibly a DIFFERENT
+  // one than it names), exactly as `$apply` populates by `(type, coding)`. The name serves only to (a) default a bare
+  // fact's code and (b) fix the fact's resource type. `directFacts`/`factsByConcept` are derived from the SAME
+  // accepted result, so a dropped non-member never shows in the trace as concept evidence.
   const directFacts = new Set<Id>();
   const factsByConcept = new Map<Id, string[]>();
+  const populate = (id: Id, fn: string): void => {
+    directFacts.add(id);
+    const arr = factsByConcept.get(id) ?? [];
+    arr.push(fn);
+    factsByConcept.set(id, arr);
+  };
+  let membershipError: string | undefined;
   for (const fn of factRefs) {
     if (fn === subjectFact) continue;
     const fact = facts.get(fn);
@@ -1027,11 +1108,102 @@ function runCase(
     if (!db) continue; // a fact with no `defined by` satisfies no concept
     const name = getRefName(db.ref);
     if (name === "Patient") continue; // subject-type fact never satisfies a clinical concept
-    const i = idOf(getRefLibrary(db.ref) ?? coveredLib, name);
-    directFacts.add(i);
-    const arr = factsByConcept.get(i) ?? [];
-    arr.push(fn);
-    factsByConcept.set(i, arr);
+    const namedId = idOf(getRefLibrary(db.ref) ?? coveredLib, name);
+    const namedEntry = concepts.get(namedId);
+    const isLocalShape =
+      !!namedEntry &&
+      typeof namedEntry.node.code === "string" &&
+      namedEntry.node.code.trim() !== "" &&
+      typeof namedEntry.node.conceptType === "string";
+    const codeField = fact.body.find((x): x is CELCodeField => x.type === "CELCodeField");
+
+    // D5(3) backstop: an `absent`/`negative` intent modifier on a LOCAL determination fact inverts its clinical
+    // meaning, but membership sees only the code → the concept would compute PRESENT (the opposite). Refuse loud
+    // (negation semantics = #257); mirrors the validator error for a direct `run_decision` caller that skips it.
+    if (isLocalShape && factRefsWithIntent.has(fn)) {
+      membershipError =
+        `fact "${fn}" names a local determination concept but is referenced with an intent modifier — a negated/` +
+        `absent local fact would compute its concept PRESENT (the opposite); rejected (negation semantics = #257).`;
+      break;
+    }
+
+    // Non-local concept (derived/composed/remote/bare-type): Piece 2 does not change these — name-based population
+    // is preserved (remote/reference membership is Piece 3; a derived concept is evaluated via its own reduction /
+    // the `asserted ∪ composed` model).
+    if (!isLocalShape) {
+      populate(namedId, fn);
+      continue;
+    }
+
+    // LOCAL concept (bare OR coded): its `{system, code}` set must be DERIVABLE. `canonicalBase` is REQUIRED
+    // (charter §4 — no exception): in a real PROJECT a missing base is the misconfiguration the emitter ALSO refuses
+    // (`localCodeSystemUrl` throws, #271), so the CRE fails the run LOUD for BARE and CODED alike — two-lane parity,
+    // never a fabricated verdict. An INLINE/projectless graph (`projectRoot` undefined) is the CRE's logic-unit-test
+    // harness — NOT a project, so there is no `canonicalBase` to require and no emit lane to diverge from; local
+    // facts there are presence-by-name.
+    const namedMember = localIndex.forward.get(namedId);
+    if (!namedMember) {
+      if (localIndex.hasProject) {
+        membershipError =
+          `local concept "${name}" has no derivable local code set (missing \`crl.canonicalBase\`?); ` +
+          `cannot evaluate fact "${fn}" — refusing to fabricate a verdict (charter §4: canonicalBase is required).`;
+        break;
+      }
+      populate(namedId, fn);
+      continue;
+    }
+    // BARE local fact (derivable base) — the DEGENERATE case: a member of the named concept by construction.
+    if (!codeField) {
+      populate(namedId, fn);
+      continue;
+    }
+    // AUTHORED code on a LOCAL fact = the membership/data input (code-driven, compartment-global lookup below).
+    // PIECE-3: for a both-representation concept (`code is` + `source representation`) this checks the LOCAL-exact
+    // set only; a source-set code is a non-member here (dropped). That is deferred-correct today (general source-rep
+    // emit is deferred), but Piece 3 must add source-set membership so such a code populates via the source arm.
+    const cls = classifyCanonicalToken(codeField.value);
+    if (cls.kind !== "coded") {
+      // Malformed (the emitter skips it → no resource → `$apply` false) or system-less (never matches a
+      // system-qualified retrieve) → NON-member. The concept goes false (closed-world), matching `$apply`.
+      diagnostics.push(
+        `fact "${fn}" authors a ${cls.kind} code \`${codeField.value}\` — not a member of any local concept set; ` +
+          `it populates nothing (closed-world → the named concept is false unless another fact populates it).`,
+      );
+      continue;
+    }
+    // Reverse-lookup by the EMITTED resource's `(type, system, code)` — type from the named concept (the fact is
+    // emitted as that resource type), code the authored token. The owner may differ from the named concept.
+    const key = memberKey(namedMember.fhirType, cls.parts.system ?? "", cls.parts.code);
+    if (localIndex.collisions.has(key)) {
+      // Two distinct concepts claim this set (a broader-than-closure registry ambiguity) — refuse rather than
+      // last-writer-wins pick one arbitrarily.
+      membershipError =
+        `fact "${fn}" code \`${cls.parts.system}|${cls.parts.code}\` (type ${namedMember.fhirType}) is claimed by ` +
+        `more than one local concept — ambiguous membership; refusing to fabricate a verdict.`;
+      break;
+    }
+    const ownerId = localIndex.reverse.get(key);
+    if (ownerId) {
+      populate(ownerId, fn);
+    } else {
+      diagnostics.push(
+        `fact "${fn}" code \`${cls.parts.system}|${cls.parts.code}\` is not a member of any local concept set ` +
+          `(named "${name}"); it populates nothing (closed-world → the named concept is false).`,
+      );
+    }
+  }
+
+  if (membershipError) {
+    return {
+      case: c.name,
+      decision: null,
+      status: "error",
+      expected: null,
+      produced: [],
+      trace: [],
+      diagnostics: [...diagnostics, membershipError],
+      conceptTruth: [],
+    };
   }
 
   if (!result || result.value.type !== "CELBranchResult") {
@@ -1171,17 +1343,29 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
   // present. Precedence: package first, then local, then the covered library
   // last — so a local/covered concept wins over a same-named package library.
   const concepts = new Map<Id, ConceptEntry>();
-  const addConcepts = (libName: string, ast: CRL): void => {
+  const addConcepts = (libName: string, ast: CRL, filePath: string, entryName: string | null): void => {
     for (const s of ast.statements) {
-      if (s.type === "Concept") concepts.set(idOf(libName, s.name), { node: s, lib: libName });
+      if (s.type === "Concept")
+        concepts.set(idOf(libName, s.name), {
+          node: s,
+          lib: libName,
+          filePath,
+          entryName,
+          fallbackLib: ast.library.name,
+        });
     }
   };
   if (graph.crlRegistry) {
     for (const e of graph.crlRegistry.byNamePackage.values())
-      if (e.name) addConcepts(e.name, e.ast);
-    for (const e of graph.crlRegistry.byNameLocal.values()) if (e.name) addConcepts(e.name, e.ast);
+      if (e.name) addConcepts(e.name, e.ast, e.filePath, e.name);
+    for (const e of graph.crlRegistry.byNameLocal.values())
+      if (e.name) addConcepts(e.name, e.ast, e.filePath, e.name);
   }
-  addConcepts(coveredLib, graph.coversTarget.ast);
+  addConcepts(coveredLib, graph.coversTarget.ast, graph.coversTarget.filePath, graph.coversTarget.name);
+
+  // #189 Piece 2 (disc 508) — build the local membership index ONCE: derive each local concept's `{system, code}`
+  // set via the SAME resolver the emitter/CQL lane uses, so the tree lane and `$apply` agree by construction.
+  const localIndex = buildLocalMembershipIndex(concepts, graph);
 
   const facts = new Map<string, CELFact>();
   for (const s of graph.cel.statements) {
@@ -1200,6 +1384,7 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
           coveredLib,
           filePath,
           concepts,
+          localIndex,
           resolveDecision,
           criterionTablesByLib,
         ),

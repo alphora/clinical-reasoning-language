@@ -48,16 +48,19 @@ concept "Concurrent Noninvasive Stimulator":
 - type is Device.
 - value type is boolean.
 - code is `concurrent-noninvasive-stimulator`.
+- definition is exists this.
 
 concept "Skull Or Vertebral Fracture":
 - type is Condition.
 - value type is boolean.
 - code is `skull-or-vertebral-fracture`.
+- definition is exists this.
 
 concept "Tumor Related Fracture":
 - type is Condition.
 - value type is boolean.
 - code is `tumor-related-fracture`.
+- definition is exists this.
 
 // ============ Documented Nonunion — NOTE 1 decomposition (local asserted leaves) ============
 
@@ -65,31 +68,37 @@ concept "Nonunion Exists":
 - type is Condition.
 - value type is boolean.
 - code is `nonunion-exists`.
+- definition is exists this.
 
 concept "At Least Two Radiograph Sets":
 - type is Observation.
 - value type is boolean.
 - code is `at-least-two-radiograph-sets`.
+- definition is exists this.
 
 concept "Radiographs Obtained Prior To Treatment":
 - type is Observation.
 - value type is boolean.
 - code is `radiographs-prior-to-treatment`.
+- definition is exists this.
 
 concept "Radiograph Sets At Least Ninety Days Apart":
 - type is Observation.
 - value type is boolean.
 - code is `radiograph-sets-at-least-ninety-days-apart`.
+- definition is exists this.
 
 concept "Multiple Views Per Radiograph Set":
 - type is Observation.
 - value type is boolean.
 - code is `multiple-views-per-radiograph-set`.
+- definition is exists this.
 
 concept "No Clinically Significant Interval Healing":
 - type is Observation.
 - value type is boolean.
 - code is `no-interval-healing-attested`.
+- definition is exists this.
 
 // composite: satisfied iff all six NOTE-1 elements are asserted
 concept "Documented Nonunion":

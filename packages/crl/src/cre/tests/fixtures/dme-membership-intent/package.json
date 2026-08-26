@@ -1,0 +1,9 @@
+{
+  "name": "dme-membership-intent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CRE fixture — #189 Piece 2 D5(3): intent modifier on a local determination fact is rejected (disc 508)",
+  "crl": {
+    "canonicalBase": "http://example.org/hcsc/dme-membership-intent"
+  }
+}

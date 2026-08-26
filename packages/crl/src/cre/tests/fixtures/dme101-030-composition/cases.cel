@@ -15,6 +15,14 @@ run_decision 12/12.
 Leaf coverage of the decision: 4 `when` branches + `otherwise`. The approval leaf
 is exercised through the full NOTE-1 composition (all six elements), and each
 element is proven necessary by a drop-one-leaf case.
+
+#189 Piece 2 (disc 508): the leaf facts are BARE (no `code is`) — a fact NAMING its
+concept is the DEGENERATE/presence case (it carries the concept's own code by
+construction, a member of exactly that concept). Explicit code-driven membership
+(a correct/wrong/cross-concept authored `code is`) is proven separately in the
+`dme101-030-membership` fixture (which carries the project metadata a derivable
+local CodeSystem needs). The nine leaves declare `definition is exists this` — the
+canonical existence reduction (no bare scalar `code is`, charter §3).
 */
 
 // ============ Patient ============
@@ -27,49 +35,40 @@ fact "Sample Patient":
 // ============ NOTE-1 documentation leaves ============
 
 fact "Nonunion Exists Finding":
-- code is "http://example.org/hcsc/dme101-030|nonunion-exists".
 - date is "2026-01-15".
 - defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Nonunion Exists".
 
 fact "Two Sets Finding":
-- code is "http://example.org/hcsc/dme101-030|at-least-two-radiograph-sets".
 - date is "2026-01-15".
 - defined by "Ultrasonic Osteogenesis Stimulator Coverage"."At Least Two Radiograph Sets".
 
 fact "Prior To Treatment Finding":
-- code is "http://example.org/hcsc/dme101-030|radiographs-prior-to-treatment".
 - date is "2026-01-15".
 - defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Radiographs Obtained Prior To Treatment".
 
 fact "Ninety Days Apart Finding":
-- code is "http://example.org/hcsc/dme101-030|radiograph-sets-at-least-ninety-days-apart".
 - date is "2026-01-15".
 - defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Radiograph Sets At Least Ninety Days Apart".
 
 fact "Multiple Views Finding":
-- code is "http://example.org/hcsc/dme101-030|multiple-views-per-radiograph-set".
 - date is "2026-01-15".
 - defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Multiple Views Per Radiograph Set".
 
 fact "No Healing Finding":
-- code is "http://example.org/hcsc/dme101-030|no-interval-healing-attested".
 - date is "2026-01-15".
 - defined by "Ultrasonic Osteogenesis Stimulator Coverage"."No Clinically Significant Interval Healing".
 
 // ============ Exclusion facts ============
 
 fact "Concurrent Stimulator Device":
-- code is "http://example.org/hcsc/dme101-030|concurrent-noninvasive-stimulator".
 - date is "2026-01-15".
 - defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Concurrent Noninvasive Stimulator".
 
 fact "Skull Or Vertebral Fracture Finding":
-- code is "http://example.org/hcsc/dme101-030|skull-or-vertebral-fracture".
 - date is "2026-01-15".
 - defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Skull Or Vertebral Fracture".
 
 fact "Tumor Related Fracture Finding":
-- code is "http://example.org/hcsc/dme101-030|tumor-related-fracture".
 - date is "2026-01-15".
 - defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Tumor Related Fracture".
 

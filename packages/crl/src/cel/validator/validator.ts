@@ -14,6 +14,7 @@ import { CASE_ID_RE, DERIVED_CASE_ID_RE } from "../ast/caseId";
 import type {
   CELFact,
   CELCase,
+  CELCodeField,
   CELIdField,
   CELDefinedByField,
   CELResultField,
@@ -24,6 +25,9 @@ import type {
 import { buildDefinedByCandidates } from "../definedByResolve";
 import { resolveCelImports, type ResolveCelImportsOptions } from "../imports";
 import type { ResolvedCelGraph } from "../imports/types";
+import { classifyCanonicalToken } from "../canonicalToken";
+import { makeLocalDomainContext, localMemberOfConcept, type LocalDomainContext } from "../localMembership";
+import { hasSourceBinding } from "../../emit/conceptDatumSignals";
 
 import type {
   CELValidationError,
@@ -215,7 +219,8 @@ export function validateCEL(
     validateInclude(inc, graph, errors, warnings, fp);
   }
 
-  // 6. Fact body `defined by` resolution.
+  // 6. Fact body `defined by` resolution + #189 Piece 2 local-membership warning.
+  const domainCtx = makeLocalDomainContext(graph);
   for (const f of cel.statements) {
     if (f.type !== "CELFact") continue;
     for (const fb of f.body) {
@@ -223,6 +228,7 @@ export function validateCEL(
         validateDefinedBy(fb, graph, errors, warnings, fp);
       }
     }
+    validateFactCodeMembership(f, graph, domainCtx, errors, warnings, fp);
   }
 
   // 7. Case bodies.
@@ -262,6 +268,20 @@ export function validateCEL(
         }
       } else if (cb.type === "CELFactRefField") {
         validateFactRef(cb, facts, c.name, errors, fp);
+        if (cb.intent !== undefined && factRefNamesLocalConcept(cb.factName, facts, graph)) {
+          errors.push(
+            err(
+              "intent-modifier-on-local-fact",
+              `Case "${c.name}" references local determination fact "${cb.factName}" with an "${cb.intent}" intent ` +
+                `modifier. Membership sees only the code, so a negated/absent local fact would compute its concept ` +
+                `PRESENT (the opposite of the intent), in both lanes. Negation semantics are deferred (#257); ` +
+                `remove the intent modifier, or model the absence as its own local concept. (Intent on an ` +
+                `activity/recommendation fact is fine — this applies only to local \`code is\` determinations.)`,
+              cb.location,
+              fp,
+            ),
+          );
+        }
       } else if (cb.type === "CELResultField") {
         validateResult(
           cb,
@@ -405,6 +425,105 @@ function validateDefinedBy(
         ),
       );
     }
+  }
+}
+
+/** #189 Piece 2 (disc 508 D5(3)) — does a fact name a LOCAL determination concept (one with `code is`)? Used to
+ *  scope the intent-modifier reject: intent on such a fact silently inverts membership; intent on an activity /
+ *  non-local target is legitimate. */
+function factRefNamesLocalConcept(
+  factName: string,
+  facts: Map<string, CELFact>,
+  graph: ResolvedCelGraph,
+): boolean {
+  const f = facts.get(factName);
+  if (!f) return false;
+  const db = f.body.find((b): b is CELDefinedByField => b.type === "CELDefinedByField");
+  if (!db || !isQualifiedRef(db.ref)) return false;
+  const reg = graph.crlRegistry;
+  if (!reg) return false;
+  const libName = getRefLibrary(db.ref);
+  const lib = reg.byNameLocal.get(libName ?? "") ?? reg.byNamePackage.get(libName ?? "");
+  if (!lib) return false;
+  const target = buildDefinedByCandidates(lib.ast.statements).get(getRefName(db.ref));
+  // A local DETERMINATION: `code is` + `type is` (the same shape the CRE's `isLocalShape` and the emitter's
+  // local-role gate use), so all three lanes agree on what the reject applies to.
+  return (
+    !!target &&
+    target.type === "Concept" &&
+    typeof target.code === "string" &&
+    typeof target.conceptType === "string"
+  );
+}
+
+/** #189 Piece 2 (disc 508) — the local membership WARNING. A fact naming a LOCAL concept (`code is` + `type is`)
+ *  that ALSO authors a `code is` token is checked against the NAMED concept's own local `{system, code}` set (the
+ *  local-exact set — reference/source-set membership is Piece 3). A WELL-FORMED token that is not the concept's own
+ *  coding is a non-member — allowed (the legitimate wrong-code datum), but WARNED. A bare fact (degenerate member)
+ *  and a MALFORMED token (the emitter's error) do not warn here. Membership is computed via the SAME derivation the
+ *  emitter/CRE use, so the three lanes agree on what "member" means. */
+function validateFactCodeMembership(
+  f: CELFact,
+  graph: ResolvedCelGraph,
+  domainCtx: LocalDomainContext,
+  errors: CELValidationError[],
+  warnings: CELValidationError[],
+  fp: string,
+): void {
+  const codeField = f.body.find((b): b is CELCodeField => b.type === "CELCodeField");
+  if (!codeField) return; // bare → degenerate member, nothing to check
+  const db = f.body.find((b): b is CELDefinedByField => b.type === "CELDefinedByField");
+  if (!db || !isQualifiedRef(db.ref)) return; // no named concept (bare-type fact) → not a local-concept membership
+  const reg = graph.crlRegistry;
+  if (!reg) return;
+  const libName = getRefLibrary(db.ref);
+  const declName = getRefName(db.ref);
+  const lib = reg.byNameLocal.get(libName ?? "") ?? reg.byNamePackage.get(libName ?? "");
+  if (!lib) return; // unresolved library — validateDefinedBy already reports it
+  const target = buildDefinedByCandidates(lib.ast.statements).get(declName);
+  if (!target || target.type !== "Concept") return;
+
+  // PIECE-3: a both-representation concept (`code is` + `source representation`) has a SOURCE set too. An authored
+  // code that is a member of the source set (not the local-exact set) is a legitimate populating datum once source
+  // membership emits (Piece 3) — so we must NOT warn "not a member" against the local set alone here (the warning
+  // text would lie). Skip the local-exact warning for source-bound concepts until source membership lands.
+  if (hasSourceBinding(target)) return;
+
+  const res = localMemberOfConcept(
+    target,
+    { filePath: lib.filePath, entryName: lib.name, fallbackLib: lib.ast.library.name },
+    domainCtx,
+  );
+  if ("notLocal" in res) return; // not a local concept (no `code is`/`type is`) — no local membership to check
+  if ("error" in res) return; // underivable base — the emitter/CRE own the loud floor; the validator stays advisory
+
+  const cls = classifyCanonicalToken(codeField.value);
+  if (cls.kind === "malformed") {
+    errors.push(
+      err(
+        "fact-code-malformed-token",
+        `Fact "${f.name}" authors a malformed \`code is\` token \`${codeField.value}\`: ${cls.reason}. A local ` +
+          `fact's code must be \`<system>|<code>\` (or bare to default to the concept's own code).`,
+        codeField.location,
+        fp,
+      ),
+    );
+    return;
+  }
+  const isMember =
+    cls.kind === "coded" && cls.parts.system === res.member.system && cls.parts.code === res.member.code;
+  if (!isMember) {
+    warnings.push(
+      warn(
+        "fact-code-not-in-local-set",
+        `Fact "${f.name}" authors code \`${codeField.value}\`, which is not a member of the local set of the ` +
+          `concept it names ("${libName}"."${declName}" = \`${res.member.system}|${res.member.code}\`). If this is ` +
+          `a deliberate wrong-code test datum, ignore; otherwise the fact will not populate "${declName}" (both ` +
+          `lanes compute it absent / false).`,
+        codeField.location,
+        fp,
+      ),
+    );
   }
 }
 

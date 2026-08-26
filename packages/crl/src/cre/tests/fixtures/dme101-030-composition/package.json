@@ -1,0 +1,9 @@
+{
+  "name": "dme101-030",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CRE fixture — DME101.030 NOTE-1 composition + local membership (disc 508)",
+  "crl": {
+    "canonicalBase": "http://example.org/hcsc/dme101-030"
+  }
+}

@@ -161,22 +161,18 @@ fact "Sample Patient":
 // ============ Clinical facts (each linked to a concept) ============
 
 fact "Indication Finding":
-- code is "http://example.org/local|qualifying-indication".
 - date is "2026-01-01".
 - defined by "Imaging Coverage Reference"."Qualifying Indication".
 
 fact "Exclusion Finding":
-- code is "http://example.org/local|hard-exclusion".
 - date is "2026-01-01".
 - defined by "Imaging Coverage Reference"."Hard Exclusion".
 
 fact "Contrast Allergy Finding":
-- code is "http://example.org/local|contrast-allergy".
 - date is "2026-01-01".
 - defined by "Imaging Coverage Reference"."Contrast Allergy".
 
 fact "Complex Case Finding":
-- code is "http://example.org/local|complex-case".
 - date is "2026-01-01".
 - defined by "Imaging Coverage Reference"."Complex Case".
 
@@ -317,27 +313,22 @@ fact "Sample Patient":
 - defined by "Patient".
 
 fact "Diagnosis Finding":
-- code is "http://example.org/local|qualifying-diagnosis".
 - date is "2026-01-01".
 - defined by "Coverage Criteria Reference"."Has Qualifying Diagnosis".
 
 fact "Drug Therapy Failure":
-- code is "http://example.org/local|failed-drug-therapy".
 - date is "2026-01-01".
 - defined by "Coverage Criteria Reference"."Failed Drug Therapy".
 
 fact "Physical Therapy Failure":
-- code is "http://example.org/local|failed-physical-therapy".
 - date is "2026-01-01".
 - defined by "Coverage Criteria Reference"."Failed Physical Therapy".
 
 fact "Viral Load Lab Result":
-- code is "http://example.org/local|viral-load-lab".
 - date is "2026-01-01".
 - defined by "Coverage Criteria Reference"."Viral Load Below Threshold Lab Result".
 
 fact "Viral Suppression Chart Note":
-- code is "http://example.org/local|viral-suppression-charted".
 - date is "2026-01-01".
 - defined by "Coverage Criteria Reference"."Viral Suppression Charted By Clinician".
 
@@ -420,7 +411,6 @@ fact "Sample Patient":
 - defined by "Patient".
 
 fact "Diagnosis Finding":
-- code is "http://example.org/local|qualifying-diagnosis".
 - date is "2026-01-01".
 - defined by "PA Determination Reference"."Has Qualifying Diagnosis".
 
@@ -506,17 +496,14 @@ fact "Sample Patient":
 - defined by "Patient".
 
 fact "Continuation Request Finding":
-- code is "http://example.org/local|continuation-request".
 - date is "2026-01-01".
 - defined by "Source Delegated Decision Reference"."Continuation Request".
 
 fact "Demonstrated Response Finding":
-- code is "http://example.org/local|demonstrated-response".
 - date is "2026-01-01".
 - defined by "Source Delegated Decision Reference"."Demonstrated Response".
 
 fact "Clinically Indicated Finding":
-- code is "http://example.org/local|clinically-indicated".
 - date is "2026-01-01".
 - defined by "Source Delegated Decision Reference"."Clinically Indicated".
 
@@ -639,22 +626,18 @@ fact "Sample Patient":
 - defined by "Patient".
 
 fact "Indication X Finding":
-- code is "http://example.org/local|indication-x".
 - date is "2026-01-01".
 - defined by "Disposition Arbitration Reference"."Has Indication X".
 
 fact "Failed Standard Therapy Finding":
-- code is "http://example.org/local|failed-standard-therapy".
 - date is "2026-01-01".
 - defined by "Disposition Arbitration Reference"."Failed Standard Therapy".
 
 fact "Indication Y Finding":
-- code is "http://example.org/local|indication-y".
 - date is "2026-01-01".
 - defined by "Disposition Arbitration Reference"."Has Indication Y".
 
 fact "Severe Markers Finding":
-- code is "http://example.org/local|severe-markers".
 - date is "2026-01-01".
 - defined by "Disposition Arbitration Reference"."Has Severe Markers".
 

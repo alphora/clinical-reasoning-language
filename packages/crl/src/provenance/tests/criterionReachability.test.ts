@@ -54,7 +54,7 @@ describe("#224 ii.1c — provenance follows criteria into their bodies", () => {
     try {
       writeFileSync(
         path.join(root, "package.json"),
-        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
       );
       writeFileSync(path.join(root, "policy.crl"), POLICY);
       const celPath = path.join(root, "f.cel");

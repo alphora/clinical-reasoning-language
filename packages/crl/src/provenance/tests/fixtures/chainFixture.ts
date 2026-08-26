@@ -55,7 +55,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 case "deep":

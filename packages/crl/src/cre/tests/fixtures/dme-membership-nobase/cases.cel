@@ -1,0 +1,31 @@
+# #189 Piece 2 (disc 508) — missing-canonicalBase cases
+library "No Base Coverage Cases".
+covers "No Base Coverage".
+
+fact "Sample Patient":
+- name is "Sample Patient".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+// An AUTHORED code on a local fact, but the project has no canonicalBase → membership
+// underivable → the run fails loud.
+fact "Skull Coded":
+- code is "http://example.org/whatever|skull-fracture".
+- date is "2026-01-15".
+- defined by "No Base Coverage"."Skull Fracture".
+
+// canonicalBase is REQUIRED (charter §4). A real project that declares a local concept but omits it is misconfigured
+// — the run fails loud for a BARE fact too (the emitter refuses it identically). No exception.
+fact "Skull Bare":
+- date is "2026-01-15".
+- defined by "No Base Coverage"."Skull Fracture".
+
+case "authored code with no canonicalBase -> run error (fabrication refusal)":
+- subject is "Sample Patient".
+- fact is "Skull Coded".
+- result is "Coverage Determination" is "deny.skull".
+
+case "bare fact with no canonicalBase -> run error too (canonicalBase required, no exception)":
+- subject is "Sample Patient".
+- fact is "Skull Bare".
+- result is "Coverage Determination" is "deny.skull".

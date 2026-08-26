@@ -86,7 +86,7 @@ beforeAll(() => {
   root = mkdtempSync(path.join(os.tmpdir(), "prov-merge-"));
   writeFileSync(
     path.join(root, "package.json"),
-    JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+    JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/p" } }),
   );
   writeFileSync(path.join(root, "policy.crl"), POLICY_CRL);
   celPath = path.join(root, "f.cel");

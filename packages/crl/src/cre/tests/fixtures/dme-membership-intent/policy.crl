@@ -1,0 +1,29 @@
+# #189 Piece 2 (disc 508 D5(3)) — intent modifier on a local determination fact
+library "Intent Coverage".
+
+/*
+An `absent`/`negative` intent modifier on a LOCAL determination fact (its concept has
+`code is`) silently inverts membership: the ruled-out fact still carries the code, so
+the concept would compute PRESENT (the opposite of the intent) in both lanes. Correct
+negation is deferred (#257), so it is rejected loud (validator + CRE + emitter). Intent
+on an activity/recommendation fact is legitimate and untouched.
+*/
+
+concept "Skull Fracture":
+- type is Condition.
+- value type is boolean.
+- code is `skull-fracture`.
+- definition is exists this.
+
+decision "Coverage Determination":
+first:
+- when "Skull Fracture" then recommend activity "deny.skull".
+- otherwise then recommend activity "approve".
+
+activity "deny.skull":
+- request CPGCommunicationRequest.
+- with `Excluded: skull or vertebral fracture.`.
+
+activity "approve":
+- request CPGServiceRequest.
+- with `Approve coverage.`.

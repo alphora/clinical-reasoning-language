@@ -69,10 +69,8 @@ fact "Pat":
 - name is "Pat".
 - defined by "Patient".
 fact "fGate":
-- code is "http://e|gate".
 - defined by "Policy"."Gate Concept".
 fact "fOther":
-- code is "http://e|other".
 - defined by "Policy"."Other".
 case "c":
 - subject is "Pat".
