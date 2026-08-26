@@ -20,14 +20,15 @@ reads. The remote channel emits the supplied side (a `Patient.birthDate`, a
 `ServiceRequest` coded from the covered-device value set); the same CRL emits CQL that
 reads them — so emitted FHIR and emitted CQL agree, proven end-to-end by $apply.
 
-⚠ EMIT-CATCH-UP: this fixture is the CORRECT model of record, and it VALIDATES clean.
-Two pieces are not yet emittable and the emit implementation must catch up to them:
-(1) the both-rep device value concept "Covered Device" — a coded EXTERNAL `source
-representation` is the general posrep (#257), and its `code is` + `most recent this`
-recency + `source representation` 3-way is an emit-deferred #189 slice; and (2) the
-"Covered Devices" value-set content/emission (its codes are made-up test codes we own).
-The age concept is the one both-rep whose posrep recency is already built (#257 age
-slice), so it emits today. Do NOT reshape the model to what emits now — build the emit.
+This fixture is the CORRECT model of record; it validates clean AND emits clean (CQL +
+FHIR) as of the #189 Piece 1 flip (disc 502–507). The both-rep device value concept
+"Covered Device" (`code is` + `most recent this` recency + a coded `source
+representation`) now lowers to a 3-output split (local records + source retrieve +
+recency merge), and the boolean interface "Covered Device Requested" emits the
+member-existence fold — proven end-to-end in cqf-fhir $apply (a matching covered-device
+→ covered/left; a non-covered code → Unmet/right). REMAINING emit-catch-up: the
+"Covered Devices" value-set is a made-up test terminology we own (real stub emission +
+the SOURCE ServiceRequest data round-trip are Piece 2/3, needing the CEL writer).
 */
 
 // ============ Supplied determinations — value concept + boolean interface (both-rep convention) ============

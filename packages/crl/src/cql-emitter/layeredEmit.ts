@@ -941,6 +941,23 @@ function collectLayerIncludes(
       }
     }
   }
+  // #189 Piece 1 (disc 506) — the same problem for the EXTERNAL side. A `"recency-value"` merge twin
+  // references its ExternalPrimitives `"<X> Source"` retrieve (in BOTH the merge value select AND the
+  // member-existence fold) via a synthesized emit-string, NOT an AST `DefinitionRef`, so the ref-walk cannot
+  // see it. Whenever a recency-value merge twin is in this layer, the ExternalPrimitives sibling IS referenced
+  // (the merge reads it, and any fold over that referent sits in the same layer) — add it explicitly. Inferences
+  // is a `neutral` family layer, so the cross-family Local⇎Record assertion below does not fire on this include.
+  if (partition.order.includes("ExternalPrimitives")) {
+    const externalSourceLib = partition.libraryNameFor(policyId, "ExternalPrimitives");
+    if (externalSourceLib !== currentLibraryName) {
+      for (const stmt of requalifiedStatements) {
+        if (stmt.type === "Concept" && stmt.__bothRepMerge === "recency-value") {
+          referenced.add(externalSourceLib);
+          break;
+        }
+      }
+    }
+  }
   // Dependency-order the sibling partition libraries (partition `order`, low →
   // high); append any genuinely-foreign libraries sorted for stability.
   const siblingOrder = partition.order.map((v) => partition.libraryNameFor(policyId, v));

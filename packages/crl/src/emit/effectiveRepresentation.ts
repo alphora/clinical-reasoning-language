@@ -37,6 +37,11 @@ import {
   type ResourceEmitRow,
 } from "./resourceEmitRegistry";
 
+// #189 Piece 1 — re-export `RecencyAccess` so the CQL emitter's recency-value merge can type its recency
+// fragments WITHOUT importing `resourceEmitRegistry` directly (the architectural guard: the registry is reached
+// ONLY via this module — `effectiveRepresentation.test.ts` enforces it).
+export type { RecencyAccess } from "./resourceEmitRegistry";
+
 /** The OWNING library's identity — resolved by the caller (the flip resolves which library a concept belongs to;
  *  T1 stays pure over resolved metadata, design §4 sibling-lib rule). All three fields are REQUIRED non-empty:
  *  `localDomainId` feeds `localCodeSystemUrl` (which would otherwise manufacture an `unnamed-local` slug) and
@@ -329,8 +334,42 @@ function computeLocalDatum(
       return { valueElement: readPath, datumValueType: declared };
     }
     default:
-      // `defined as` / `definition is <derivation>` / bare `code is` — not a `this`-reduction. The local-exact
-      // datum of a general both-representation / derived form is out of T1 scope (deferred, #257).
+      // #189 Piece 1 — a `code is` + `defined as exists ("X")` BOOLEAN INTERFACE concept (charter §3
+      // value/interface convention): its LOCAL arm is a boolean-valued Observation carrying its OWN identity
+      // code, directly assertable via `value is true/false`. The interface fold's own-arm leg reads this
+      // boolean value (value-filtered `exists`), so the local-exact datum is a `boolean` value at the standard
+      // `value` carrier (or an authored value element). REFACTOR:grounded — re-derived from charter §3 (the
+      // interface own arm is a genuine boolean Observation datum, NOT the deferred #257 both-rep value case).
+      if (
+        concept.definition?.type === "DefinedAsDefinition" &&
+        concept.definition.body.type === "DefinedAsExists" &&
+        boolean
+      ) {
+        const readPath = authored ?? "value";
+        // The value carrier must not BE the coding element (same conflation guard as `most recent this`).
+        if (readPath === row.coding.field) {
+          return {
+            errorKind: "value-read-is-coding-element",
+            detail: `\`defined as exists\` interface reads ${resourceType}.${readPath}, the coding element — not a boolean value datum`,
+          };
+        }
+        const admitted = valueReadValueTypes(resourceType, readPath);
+        if (admitted === undefined) {
+          return {
+            errorKind: "value-read-unmodeled",
+            detail: `\`defined as exists\` interface's boolean value read ${resourceType}.${readPath} is not modeled (T3a, §8)`,
+          };
+        }
+        if (!admitted.has("boolean" as ConceptValueType)) {
+          return {
+            errorKind: "value-type-not-admitted",
+            detail: `\`defined as exists\` interface needs a boolean value at ${resourceType}.${readPath}, which admits {${[...admitted].join(", ")}}`,
+          };
+        }
+        return { valueElement: readPath, datumValueType: "boolean" as ConceptValueType };
+      }
+      // `defined as` (non-exists) / `definition is <derivation>` / bare `code is` — not a `this`-reduction. The
+      // local-exact datum of a general both-representation / derived form is out of T1 scope (deferred, #257).
       return {
         errorKind: "unsupported-reduction-form",
         detail: `local Scalar concept's reduction is not \`exists this\` / \`most recent this\` / \`count this\` — not a T1 local-exact cell`,

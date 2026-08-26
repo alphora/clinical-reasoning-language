@@ -41,6 +41,10 @@ import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import { matchNarrative } from "../template-match/matcher";
 import { resolveAgeConcept } from "../template-match/recencyProjectionOverride";
 import {
+  resolveRecencyValueConcept,
+  isMemberExistenceInterface,
+} from "../template-match/recencyValueConcept";
+import {
   PATTERN_RETURN_SHAPE,
   type PatternReturnShape,
 } from "../cql-emitter/patternReturnShape";
@@ -199,7 +203,14 @@ function classifyCatalogPattern(concept: Concept, body: NarrativeClause): Boolea
  * Dispatch order matters (disc 429): value type / shape is keyed FIRST, then age (the code+posrep exception),
  * then the E1 rejects (the code+source deferrals #257), then the definition form.
  */
-export function classifyBooleanTotality(concept: Concept): BooleanTotalityObligation {
+export function classifyBooleanTotality(
+  concept: Concept,
+  // #189 Piece 1 (disc 506) — OPTIONAL: reports whether a `defined as exists ("V")` referent name V is a both-rep
+  // RECENCY-VALUE concept (only `buildAuthoredObligations` supplies it — it has the whole library; per-concept
+  // callers leave it undefined and keep the deferred E1 reject). Needed because the member-existence fold's
+  // totality depends on the REFERENT, which this per-concept classifier cannot otherwise resolve.
+  memberExistenceReferent?: (referentName: string) => boolean,
+): BooleanTotalityObligation {
   // Shape decides FIRST (§2): a record/record-set publishes records — no boolean define, whatever the
   // definition form (a reduction on a RecordSet is incoherent and T1 rejects it on its own axis).
   if (concept.shape === "RecordSet") {
@@ -224,6 +235,20 @@ export function classifyBooleanTotality(concept: Concept): BooleanTotalityObliga
     };
   }
 
+  // #189 Piece 1 (disc 506) — the both-rep RECENCY-VALUE merge (`code is` + `most recent this` + a `coded from`
+  // `source representation`, e.g. `Covered Device`) is EXEMPT from the E1 `e1-source-rep` reject below: it now
+  // EMITS (a `Scalar<value-type>`-or-null recency merge), and it is NON-boolean, so it is `not-applicable{nullable}`
+  // in the boolean subject (the interface reads member-EXISTENCE over its records, not this value). Shape-exact via
+  // the SHARED resolver (the concept's OWN shape — no referent resolution), so this narrowing cannot widen the
+  // reject. A boolean recency-value shape cannot occur (the resolver requires a non-boolean value type).
+  if (resolveRecencyValueConcept(concept).kind === "recency-value") {
+    return {
+      kind: "not-applicable",
+      nullable: true,
+      reason: "`code is` + `most recent this` + `coded from` source rep is a non-boolean recency-value merge (the interface reads member-existence, not this value)",
+    };
+  }
+
   // E1 rejects (disc 429 C1) — a local `code is` PLUS a source arm (`defined as` both-rep fold; `coded from`;
   // or `source representation` posreps) is DEFERRED to #257 and rejected at the flip with a migration prompt
   // (§4.7). Without these cells the classifier could never produce `rejected` for an E1 form, leaving the
@@ -231,6 +256,25 @@ export function classifyBooleanTotality(concept: Concept): BooleanTotalityObliga
   const hasCode = concept.code !== undefined;
   if (hasCode) {
     if (concept.definition?.type === "DefinedAsDefinition") {
+      // #189 Piece 1 (disc 506/507) — a `defined as exists ("V")` over a both-rep RECENCY-VALUE referent V is the
+      // ACTIVE value/interface MEMBER-EXISTENCE fold (a total boolean: `<own newest> or exists(LP."V") or
+      // exists(EP."V Source")`, `emitMemberExistenceFold`). Gated by the SHARED shape-exact predicate (disc 507 A/B —
+      // unqualified ref + recency-value referent + own arm a Scalar<boolean> Observation), so the obligation activates
+      // on EXACTLY the shapes emit activates on (no obligation↔emit drift). Existence is intrinsically total →
+      // `intrinsically-total`, reconciling with the emitted `member-existence-fold` discharge. Every other `code is` +
+      // `defined as` (non-recency-value referent, composition, bare ref) stays the deferred E1 reject.
+      if (
+        memberExistenceReferent !== undefined &&
+        isMemberExistenceInterface(concept, memberExistenceReferent)
+      ) {
+        const body = concept.definition.body;
+        const refStr = body.type === "DefinedAsExists" ? refDisplay(body.ref) : "?";
+        return {
+          kind: "intrinsically-total",
+          form: `defined as exists (${refStr}) [value/interface member-existence fold]`,
+          cell: "§2 value/interface member-existence fold → own-newest or exists(LP) or exists(EP)",
+        };
+      }
       return { kind: "rejected", code: "e1-defined-as", reason: "`code is` + `defined as` (both-rep fold) is deferred to #257 — rejected at the flip (§4.7)" };
     }
     if (concept.definition?.type === "CodedFromDefinition") {
@@ -406,9 +450,12 @@ export type DefineOrigin =
 /** The mechanism by which the emitted CQL made a boolean define total (§1 step 2). */
 export type DischargeKind =
   | "intrinsic-exists" // `exists(...)` / `exists <call>` — discharges intrinsically-total
-  | "null-presence" // `(<X> is not null)` — #189 B3: existence of a SCALAR-VALUE operand (the value/interface
-  //                    boolean interface, disc 500); total by construction (`is not null` is never null);
-  //                    discharges intrinsically-total. NOT `exists(<scalar>)` (ill-typed — disc 496).
+  | "null-presence" // `(<X> is not null)` — #189 B3: existence of a SCALAR-VALUE operand; total by construction
+  //                    (`is not null` is never null); discharges intrinsically-total. NOT `exists(<scalar>)`
+  //                    (ill-typed — disc 496). NOTE (disc 507): the value/interface boolean interface is NOT this —
+  //                    it is the MEMBER-EXISTENCE fold (`member-existence-fold` discharge, design v7); a no-`code is`
+  //                    `defined as exists` over a recency-value referent is refused loud in `emitExistsBridge`, so
+  //                    null-presence stays INERT (no corpus operand is scalar-value on this lane).
   | "count-bare" // `Count(...) >= N` — discharges intrinsically-total (count)
   | "boundary-coalesce" // `Coalesce(<predicate>, false)` — discharges requires-boundary
   | "age-recency-total" // the §5/§7 age-recency total-boolean rewrite — discharges requires-boundary (age)
@@ -416,6 +463,11 @@ export type DischargeKind =
   | "facade-delegated" // bare `Inferences."X"` re-export — total IFF X is (delegated); discharges composite
   | "facade-satisfied" // `…satisfied()` = `exists(truths)` (CaseFeatureCommon) — total by its OWN existence
   //                       wrapper, INDEPENDENT of the truth-set operand's totality; discharges intrinsically-total
+  | "member-existence-fold" // #189 Piece 1 (disc 506): the value/interface three-leg fold — `<own newest value>
+  //                            is true or exists(LP."V") or exists(EP."V Source")`. Total by construction (each leg
+  //                            is `is true`/`exists`, never null → the OR is never null); discharges
+  //                            intrinsically-total. A DEDICATED kind (not `intrinsic-exists`, which is a single
+  //                            `exists(...)` the text-check keys on) so the compound OR is not mis-checked (Claude #8).
   | "axiom"; // criterion / catalog define, total by construction
 
 /** How the emitted CQL discharged its obligation. A DISCRIMINATED UNION (disc 429 #12): only a `total`
@@ -655,7 +707,8 @@ function dischargeKindMatchesObligation(ob: BooleanTotalityObligation, d: Discha
         d === "null-presence" ||
         d === "count-bare" ||
         d === "axiom" ||
-        d === "facade-satisfied"
+        d === "facade-satisfied" ||
+        d === "member-existence-fold" // #189 Piece 1 — the value/interface three-leg fold, total by construction
       );
     case "requires-boundary":
       return d === "boundary-coalesce" || d === "age-recency-total";
@@ -682,6 +735,7 @@ function originMatchesDischarge(origin: DefineOrigin, d: DischargeKind): boolean
     case "count-bare":
     case "boundary-coalesce":
     case "composite-delegated":
+    case "member-existence-fold":
       return origin === "authored";
   }
 }

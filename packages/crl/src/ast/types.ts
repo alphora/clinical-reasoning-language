@@ -560,9 +560,16 @@ export interface Concept extends ASTNode {
    *     patient-age merge (`<cmp>` = a sanctioned age comparator, #215):
    *     RECENCY-SELECT between the newest valid local Observation and the live
    *     computed age, then lift back to a truth-set.
+   *   - `"recency-value"` — the #189 Piece 1 GENERAL both-rep value merge
+   *     (`code is` + `definition is most recent this` + a `coded from` `source
+   *     representation`, e.g. `Covered Device`): a `Scalar<value-type>`-or-null
+   *     recency merge (`crossRepRecencyMergeExpr`) between the newest local record's
+   *     value and the newest source record's value. NON-boolean (unlike `"recency"`),
+   *     so it is NOT a total-scalar-boolean; the interface fold reads member-EXISTENCE
+   *     over the LP/EP retrieves, not this merge. Descriptors on `__recencyValueDescriptors`.
    * Absent on non-both-rep concepts.
    */
-  __bothRepMerge?: "union" | "recency";
+  __bothRepMerge?: "union" | "recency" | "recency-value";
   /**
    * SYNTHETIC-EMITTER-ONLY. For a `"recency"` both-rep Inferences twin, the
    * threshold of the `age today <cmp> <Q>` computed arm, as an already-emitted CQL
@@ -626,6 +633,18 @@ export interface Concept extends ASTNode {
    * (Slice C broadens it to the full `DerivationOutcome` on both twins). Absent on every other concept.
    */
   __effectiveDescriptor?: unknown;
+  /**
+   * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). #189 Piece 1 (disc 506) — the resolved
+   * `[local-exact, source]` effective-representation descriptors of a `"recency-value"` both-rep merge twin, derived
+   * from the ORIGINAL authored concept in `lowerLocalCodes` (BEFORE `code`/`representations` are cleared for layer
+   * classification) and attached to the Inferences merge twin so the merge emit renders both arms' value read
+   * (`valueElement`/`datumValueType`) + recency select (`recency`) from ONE source of truth. Shape at runtime is
+   * `{ local: EffectiveRepresentationDescriptor; source: EffectiveRepresentationDescriptor }`. Typed `unknown`
+   * DELIBERATELY (same convention as `__effectiveDescriptor`): the AST layer must not depend on the emit layer
+   * (`effectiveRepresentation` imports FROM `ast/types`); the emit read site casts. Absent unless
+   * `__bothRepMerge === "recency-value"`.
+   */
+  __recencyValueDescriptors?: unknown;
   /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). #189 Slice C boundary 2 (2a) — the
    * LOWERING ROLE of a concept the lowering passes produced/retargeted, so the totality-ledger enrollment

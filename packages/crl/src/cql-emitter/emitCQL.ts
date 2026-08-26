@@ -98,7 +98,10 @@ import {
   MostRecentDerivationError,
   ReductionInCompositionError,
 } from "../ast/types";
-import type { EffectiveRepresentationDescriptor } from "../emit/effectiveRepresentation";
+import type {
+  EffectiveRepresentationDescriptor,
+  RecencyAccess,
+} from "../emit/effectiveRepresentation";
 import type { ReferenceName } from "../ast/types";
 import { emitCriterionDefine, emitTotalBooleanExpr } from "./emitCriterionDefine";
 import type { QualifyLeaf, RenderLeafPolicy } from "./emitCriterionDefine";
@@ -106,8 +109,10 @@ import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import type { CRLError } from "../types/errors";
 import { ageComputeFnForUnit } from "../template-match/agePredicate";
 import { recencyOverrideById } from "../template-match/recencyProjectionOverride";
+import { resolveRecencyValueConcept } from "../template-match/recencyValueConcept";
 
 import { lowerLocalCodes, preLowerAge } from "./lowerLocalCodes";
+import { crossRepRecencyMergeExpr } from "./crossRepRecencyMerge";
 
 /**
  * #187 — the FHIRHelpers version the emitted CQL pins in
@@ -544,10 +549,21 @@ export function infoForParameterStatement(stmt: Parameter): AstParameterInfo {
  */
 export function buildAuthoredObligations(ast: CRL): ReadonlyMap<string, BooleanTotalityObligation> {
   const map = new Map<string, BooleanTotalityObligation>();
+  // #189 Piece 1 (disc 506) — the both-rep RECENCY-VALUE concept names, so a `defined as exists ("V")` interface's
+  // obligation can be classified as the ACTIVE member-existence fold (total) when V is recency-value, rather than
+  // the deferred E1 reject. This classifier is per-concept and cannot resolve the referent alone; the whole-library
+  // scan here supplies it (the SAME `recencyValueNames` set `lowerLocalCodes` computes for the emit side).
+  const recencyValueNames = new Set<string>();
+  for (const s of ast.statements) {
+    if (s.type === "Concept" && s.name && resolveRecencyValueConcept(s).kind === "recency-value") {
+      recencyValueNames.add(s.name);
+    }
+  }
+  const isRecencyValueReferent = (name: string): boolean => recencyValueNames.has(name);
   for (const s of ast.statements) {
     if (s.type !== "Concept" || !s.name) continue;
     try {
-      map.set(s.name, classifyBooleanTotality(s));
+      map.set(s.name, classifyBooleanTotality(s, isRecencyValueReferent));
     } catch (e) {
       map.set(s.name, {
         kind: "unclassified",
@@ -1288,6 +1304,7 @@ class Emitter {
         ? total("boundary-coalesce")
         : notBoolean("malformed recency twin (non-scalar-boolean declaration)");
     }
+    if (c.__bothRepMerge === "recency-value") return notBoolean("both-rep recency-value scalar value merge");
     if (c.__bothRepMerge !== undefined) return notBoolean(`both-rep ${c.__bothRepMerge} truth-set merge`);
 
     const def = c.definition;
@@ -1335,6 +1352,14 @@ class Emitter {
           // corpus operand is scalar-value.
           if (def.body.type === "DefinedAsExists" && this.existsBridgeIsNullPresence(def.body)) {
             return total("null-presence");
+          }
+          // #189 Piece 1 (disc 506) — the value/interface MEMBER-EXISTENCE fold (`code is` + `defined as exists`
+          // over a recency-value referent, `__bothRepFoldInLocalPrimitives` set, NO `__bothRepMerge`) emits the
+          // three-leg total OR (`emitMemberExistenceFold`), NOT the generic `composite-delegated` alias re-export.
+          // Its DEDICATED `member-existence-fold` discharge satisfies the `intrinsically-total` authored obligation
+          // (existence is never null) without being mis-checked as a single `exists(...)` (Claude #8).
+          if (def.body.type === "DefinedAsExists" && c.__bothRepFoldInLocalPrimitives !== undefined) {
+            return total("member-existence-fold");
           }
           if (emitsTotalScalarBoolean(c, this.totalityResolvers())) {
             return total("composite-delegated");
@@ -1766,6 +1791,14 @@ class Emitter {
         // ExternalPrimitives (and any other) → fall through to the legacy re-export.
       }
     }
+    // #189 Piece 1 (disc 506) — the both-representation RECENCY-VALUE merge (`code is` + `most recent this` +
+    // a `coded from` `source representation`, e.g. `Covered Device`): a `Scalar<value-type>`-or-null recency
+    // select between the newest local record's value and the newest source record's value. Marker-driven (the
+    // retargeted reduction body is NEVER rendered). NOT a truth-set boolean (unlike the age `"recency"` merge) —
+    // a plain scalar value define, so it is dispatched here regardless of the case-feature lane.
+    if (c.__bothRepMerge === "recency-value") {
+      return this.emitRecencyValueMerge(c);
+    }
     // Both-representation RECENCY merge (`code is` + `definition is age today at
     // least <Q>`): the Inferences twin recency-selects between the newest valid
     // local Observation and the live computed age, then lifts back to a truth-set.
@@ -2157,6 +2190,70 @@ class Emitter {
     return `Coalesce(\n${indent(selected)},\n  false\n)`;
   }
 
+  /**
+   * #189 Piece 1 (disc 506) — emit the both-representation RECENCY-VALUE merge: a `Scalar<value-type>`-or-null
+   * recency select between the newest local record's value and the newest source record's value. Unlike the age
+   * `"recency"` merge (a truth-set boolean), this is a PLAIN scalar value — NO `Coalesce(…, false)` (charter §4:
+   * a Coalesce would MANUFACTURE a value; a both-absent merge is legitimately null, which the interface fold reads
+   * as member-non-existence). Marker-driven: reads the `[local-exact, source]` descriptors off
+   * `__recencyValueDescriptors` (derived at lowering) + the LP/EP retrieve names. The tie-break policy lives in the
+   * ONE shared `CaseFeatureCommon.recencyLocalWins` (via `crossRepRecencyMergeExpr`), so age and this cannot drift.
+   */
+  private emitRecencyValueMerge(c: Concept): string {
+    const foldIn = c.__bothRepFoldInLocalPrimitives;
+    const marker = c.__recencyValueDescriptors as
+      | { local: EffectiveRepresentationDescriptor; source: EffectiveRepresentationDescriptor }
+      | undefined;
+    if (
+      foldIn === undefined ||
+      marker === undefined ||
+      marker.local?.arm !== "local-exact" ||
+      marker.source?.arm !== "source"
+    ) {
+      throw new Error(
+        `internal invariant violated: recency-value merge twin "${c.name}" is missing its fold-in name or its ` +
+          `[local-exact, source] descriptors — set in lock-step at lowering; a missing pair is a compiler bug ` +
+          `(or an ill-formed hand-built AST).`,
+      );
+    }
+    const local = marker.local;
+    const source = marker.source;
+    const sourceName = `${foldIn} Source`;
+
+    const localLib = this.caseFeature.kind === "inferred" ? this.caseFeature.localSourceLibrary : "";
+    const sourceLib =
+      this.caseFeature.kind === "inferred" ? (this.caseFeature.recordSourceLibrary ?? "") : "";
+    const lpRef = cqlQualifiedRef(localLib, foldIn);
+    const epRef = cqlQualifiedRef(sourceLib, sourceName);
+
+    // A recency timestamp read (`System.DateTime`) off a record expression (`base` = `(<newest>).`) or the bare
+    // element (`base` = "" for the in-query `sort by`). `dateTime` casts the polymorphic `effective[x]` choice.
+    const ts = (rec: RecencyAccess, base: string): string =>
+      rec.cast === "dateTime"
+        ? `(${base}${rec.sortExpr} as FHIR.dateTime).value`
+        : `${base}${rec.sortExpr}.value`;
+
+    // The newest local + newest source record, each a deterministic `Last(… where <value conforms> sort by
+    // <recency>, id)`. NO status filter (a DTR-extracted answer is not stamped `final` — same rule as the age
+    // merge, operator decision 2026-07-01). The value-conforming `where` keeps only rows whose datum is the
+    // declared type (a newer non-conforming row must not mask an older conforming one — disc 506).
+    const localNewest =
+      `Last(\n    (${lpRef}) O\n      where O.${local.valueElement} is FHIR.${local.datumValueType}\n` +
+      `      sort by ${ts(local.recency, "")}, id\n  )`;
+    const sourceNewest =
+      `Last(\n    (${epRef}) O\n      where O.${source.valueElement} is FHIR.${source.datumValueType}\n` +
+      `      sort by ${ts(source.recency, "")}, id\n  )`;
+
+    // The two-tier selection (source-null→local, local-null→source, else recency tie-break). Value reads cast to
+    // the concept's datum type (`local.valueElement` is the polymorphic `value[x]`; the source's own value read).
+    return crossRepRecencyMergeExpr({
+      localValue: `(${localNewest}).${local.valueElement} as FHIR.${local.datumValueType}`,
+      localTs: ts(local.recency, `(${localNewest}).`),
+      sourceValue: `(${sourceNewest}).${source.valueElement} as FHIR.${source.datumValueType}`,
+      sourceTs: ts(source.recency, `(${sourceNewest}).`),
+    });
+  }
+
   private emitCodedFrom(c: Concept, def: CodedFromDefinition): string {
     // A synthetic local-source CodedFromDefinition (from `lowerLocalCodes`)
     // supplies `retrieveResourceType: "Observation"` to force the local-source
@@ -2497,12 +2594,26 @@ class Emitter {
         // `emitCQLFromAST` is validator-free, so refuse loud here (mirrors the bare-ref both-rep guard below)
         // rather than emit a wrong answer on the canonical local-domain path (charter §2).
         if (c.__bothRepFoldInLocalPrimitives !== undefined) {
+          // #189 Piece 1 (disc 506) — the value/interface boolean fold. `code is X` + `defined as exists ("V")`
+          // where V is a both-rep RECENCY-VALUE concept: the interface is member-EXISTENCE, a three-leg total OR
+          //   (i)  own arm — the NEWEST own boolean record's value (NOT `exists(O where value is true)`, which
+          //        erases an explicit `false` over a multi-record history — design v7 §1);
+          //   (ii) `exists(LocalPrimitives."V")` — a local member record;
+          //   (iii)`exists(ExternalPrimitives."V Source")` — a source member record.
+          // All three legs are total (`is true` / `exists`) → the OR is total, no `Coalesce`. NARROWED to a
+          // recency-value referent (Piece 1 scope); any other both-rep fold stays the DEFERRED throw below.
+          // The member-existence fold twin was VALIDATED at lowering (`isMemberExistenceInterface`: unqualified ref
+          // to a recency-value referent, own arm a standard boolean Observation) and marked by the ABSENCE of a
+          // `__bothRepMerge` (an age twin carries `"recency"`, a deferred union `"union"`). So key on that marker,
+          // NOT a re-check of the referent — the interface-shape gate lives at ONE authority (disc 507 A/B).
+          if (c.__bothRepMerge === undefined) {
+            return this.emitMemberExistenceFold(c, getRefName(body.ref));
+          }
           throw new ReductionInCompositionError(
-            `Concept "${c.name}" carries a local \`code is\` and \`defined as exists\` (the canonical ` +
-              `value/interface boolean interface — CRL-NORTH-STAR §3). Its lowering (compose the local-records ` +
-              `existence with the derived arm's null-presence read) activates at the #189 flip, which removes the ` +
-              `\`asTruths\`/\`satisfied\` truth-set lane this fold is currently ill-typed against ` +
-              `(\`LocalPrimitives.asTruths() union exists(...)\`). This is a DEFERRED emit gap, NOT an authoring ` +
+            `Concept "${c.name}" carries a local \`code is\` and \`defined as exists ("${getRefName(body.ref)}")\` ` +
+              `but is not the value/interface member-existence fold (the referent is not a same-library ` +
+              `recency-value concept, or the interface's own arm is not a standard boolean Observation). The ` +
+              `general \`code is\` + \`defined as\` both-rep fold is a DEFERRED emit gap (#257), NOT an authoring ` +
               `error — do not reshape the concept (fixture-is-oracle).`,
             body.location,
           );
@@ -2684,6 +2795,25 @@ class Emitter {
    * resolver seam (0c), not here.
    */
   private emitExistsBridge(c: Concept, body: DefinedAsExists): string {
+    // #189 Piece 1 (disc 507 C) — a NO-`code is` `defined as exists ("V")` whose referent V is a both-rep
+    // RECENCY-VALUE concept: the correct lowering is MEMBER-EXISTENCE (exists V's records, design v7), NOT the B3
+    // scalar null-presence (`V is not null`) — those diverge on the record-with-null-value edge, exactly what v7
+    // fixed. The no-`code is` member-existence interface is NOT built in Piece 1 (only the `code is` + `defined as
+    // exists` fold is), and `emitsScalarValue`'s verdict on the merge twin is an ACCIDENT of the requalify workaround
+    // (lane-divergent), so refuse LOUDLY here rather than inherit it. Same-lib only (a cross-lib operand's shape is
+    // proven at the resolver seam).
+    if (this.crossLibraryOf(body.ref) === null) {
+      const referent = this.conceptByName.get(getRefName(body.ref));
+      if (referent?.__bothRepMerge === "recency-value") {
+        throw new ReductionInCompositionError(
+          `Concept "${c.name}": \`defined as exists ("${getRefName(body.ref)}")\` over a both-representation ` +
+            `recency-value value concept is a MEMBER-EXISTENCE interface (design v7). The no-\`code is\` form is a ` +
+            `DEFERRED emit gap — add a local \`code is\` to author the value/interface boolean (the built fold), or ` +
+            `it activates in a later slice. NOT an authoring error — do not reshape the concept.`,
+          body.location,
+        );
+      }
+    }
     // RESULT COHERENCE (disc 461 code review G2, both arms; charter §3 cardinality authoritative). `defined
     // as exists` publishes a SCALAR BOOLEAN (existence is true-or-false), so the result concept must declare
     // exactly `shape is Scalar` + a single `value type is boolean`. A `shape is Record/RecordSet` +
@@ -2734,6 +2864,37 @@ class Emitter {
     // wires to publish the MERGE/value define, never the records twin (Claude referent contract, disc 500).
     if (this.existsBridgeIsNullPresence(body)) return `(${ref} is not null)`;
     return `exists (${ref})`;
+  }
+
+  /**
+   * #189 Piece 1 (disc 506) — emit the value/interface boolean MEMBER-EXISTENCE fold: a three-leg total OR for a
+   * `code is X` + `defined as exists ("V")` interface whose referent V is a both-rep RECENCY-VALUE concept. Legs:
+   *   (i)   own arm — the NEWEST own boolean record's value (design v7 §1: newest-wins, NOT `exists(O where value
+   *         is true)`, which erases an explicit `false` over a multi-record history);
+   *   (ii)  `exists(LocalPrimitives."V")`      — a local member record of V;
+   *   (iii) `exists(ExternalPrimitives."V Source")` — a source member record of V.
+   * Every leg is total (`FHIRHelpers.ToBoolean(null) is true` → false; `exists` never null), so the OR is a TOTAL
+   * boolean with NO `Coalesce`. The own LP twin is `c`'s own name (`__bothRepFoldInLocalPrimitives`); V's LP/EP
+   * retrieves are `V` / `V Source`. Explicit sibling-QUALIFIED refs (a bare same-name would resolve to the
+   * Inferences merge and self-recurse — `buildNameLayerMaps`).
+   */
+  private emitMemberExistenceFold(c: Concept, referentName: string): string {
+    const foldIn = c.__bothRepFoldInLocalPrimitives!;
+    const localLib = this.caseFeature.kind === "inferred" ? this.caseFeature.localSourceLibrary : "";
+    const sourceLib =
+      this.caseFeature.kind === "inferred" ? (this.caseFeature.recordSourceLibrary ?? "") : "";
+    // (i) own arm — the newest own boolean Observation's value. The standard boolean case-feature read
+    //     (`O.value`/`effective`) is CORRECT because `isMemberExistenceInterface` gated activation on a
+    //     `Scalar<boolean>` Observation at the default value carrier (disc 507 B). NO status filter (a DTR-extracted
+    //     answer is not stamped `final`, mirroring the age merge).
+    const ownNewest =
+      `Last(\n    (${cqlQualifiedRef(localLib, foldIn)}) O\n      where O.value is FHIR.boolean\n` +
+      `      sort by (effective as FHIR.dateTime).value, id\n  )`;
+    const ownArm = `FHIRHelpers.ToBoolean((${ownNewest}).value as FHIR.boolean) is true`;
+    // (ii)/(iii) member records of the referent V.
+    const localMember = `exists (${cqlQualifiedRef(localLib, referentName)})`;
+    const sourceMember = `exists (${cqlQualifiedRef(sourceLib, `${referentName} Source`)})`;
+    return `${ownArm}\n    or ${localMember}\n    or ${sourceMember}`;
   }
 
   /** #189 B3 — is this `defined as exists ("X")`'s operand a SCALAR-VALUE (→ null-presence `is not null`) rather

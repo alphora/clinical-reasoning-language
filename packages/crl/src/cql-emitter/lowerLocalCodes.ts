@@ -117,6 +117,10 @@ import {
 import { localCodeSystemSlug, localCodeSystemUrl } from "../fhir-emitter/slug";
 import { isAgeTodayPrefix } from "../template-match/agePredicate";
 import {
+  resolveRecencyValueConcept,
+  isMemberExistenceInterface,
+} from "../template-match/recencyValueConcept";
+import {
   ageRetirementMessage,
   isRetiredAgeTodayDefinition,
   resolveAgeConcept,
@@ -343,6 +347,17 @@ export function lowerLocalCodes(
   // diagnose it here rather than emit silently-clobbered CQL.
   const seenSyntheticNames = new Set<string>();
 
+  // #189 Piece 1 (disc 506) — the names of RECENCY-VALUE concepts in this library, pre-scanned so the
+  // `code is` + `defined as exists` union path can tell a MEMBER-EXISTENCE fold (its referent is a recency-value
+  // both-rep → the interface emits a TOTAL member-existence boolean) from the deferred truth-set union. A pre-pass
+  // because concept order is arbitrary (a value concept may be declared AFTER the interface that references it).
+  const recencyValueNames = new Set<string>();
+  for (const stmt of ast.statements) {
+    if (stmt.type === "Concept" && resolveRecencyValueConcept(stmt).kind === "recency-value") {
+      recencyValueNames.add(stmt.name);
+    }
+  }
+
   const loweredConcepts: Concept[] = [];
   // Both-representation INFERRED twins (`code is` + `defined as`): the inference
   // half of a split, appended to the statement list AFTER the rewrite. Each keeps
@@ -355,6 +370,10 @@ export function lowerLocalCodes(
   // the retargeted reduction concept "X" (`exists "X Records"`, pushed to `loweredConcepts`). The
   // twins are APPENDED to the statement list (they share no name with an existing statement).
   const recordsTwins: Concept[] = [];
+  // #189 Piece 1 (disc 506) — the synthetic ExternalPrimitives SOURCE concepts (`"<X> Source"`) of a both-rep
+  // RECENCY-VALUE split. Each is a `coded from` retrieve over the source terminology (`[ServiceRequest: "Covered
+  // Devices"]`), appended to the statement list (a new name, no in-place replacement). Sibling of `recordsTwins`.
+  const externalSourceTwins: Concept[] = [];
   const localCodes: Array<{ concept: string; code: string; conceptType: string }> = [];
   const syntheticTerminologies: Terminology[] = [];
   // The local-domain URN slug source: R1 — the POLICY ID (`opts.localDomainId`,
@@ -476,6 +495,198 @@ export function lowerLocalCodes(
     //   `emit-mixed-code-and-definition`. Each remaining form activates in its owning slice.
     if (c.definition?.type === "ReductionDefinition") {
       const red = c.definition.reduction;
+
+      // #189 Piece 1 (disc 506) — the both-rep RECENCY-VALUE 3-OUTPUT split. Intercepted HERE, BEFORE the
+      // single-rep reduction gate below (which rejects a `source representation` 3-way). The shape is classified by
+      // the SHARED `resolveRecencyValueConcept` (mirrors `resolveAgeConcept`), so the lowering gate,
+      // `classifyBooleanTotality`, and the descriptor deriver cannot drift. Synthesizes THREE outputs — a same-name
+      // LocalPrimitives records retrieve, a synthetic ExternalPrimitives `"<X> Source"` retrieve, and the Inferences
+      // `Scalar<value-type>` recency merge (the PUBLIC determination). REFACTOR:grounded — re-derived from the
+      // charter §3 value/interface convention + the layered-emit classification invariants (`classifyStatementLayer`
+      // `retrieveResourceType` set⟺LocalPrimitives / undefined⟺ExternalPrimitives; `requalifyDefinition` ThisRecords
+      // throw; `buildNameLayerMaps` Inferences-wins for same-name).
+      const rv = resolveRecencyValueConcept(c);
+      if (rv.kind === "recency-value") {
+        const localResource = c.conceptType ?? "Observation"; // implicit-standard local Observation (charter §3)
+        // Dedup / collision — the THIRD copy of the (5)-(7)+(A2) mirror (DRY note above; keep lock-step).
+        const priorForCode = codeValueToConcept.get(codeValue);
+        if (priorForCode !== undefined) {
+          errors.push(
+            mkError(
+              "emit-duplicate-local-code",
+              `Local code \`${codeValue}\` is declared by both "${priorForCode}" and "${c.name}". Each ` +
+                `local source code must be unique within the library.`,
+              loc,
+            ),
+          );
+          continue;
+        }
+        if (seenSyntheticNames.has(c.name)) {
+          errors.push(
+            mkError(
+              "emit-duplicate-local-concept",
+              `Two local-coded concepts named "${c.name}" would each synthesize a terminology of that name, ` +
+                `colliding in the emitted CQL. Concept names must be unique within the library.`,
+              loc,
+            ),
+          );
+          continue;
+        }
+        if (existingTerminologyNames.has(c.name)) {
+          errors.push(
+            mkError(
+              "emit-local-code-terminology-collision",
+              `Lowering local-coded concept "${c.name}" would synthesize a terminology of the same name, but a ` +
+                `terminology "${c.name}" already exists in this library. Rename one so the synthesized local code ` +
+                `does not collide.`,
+              loc,
+            ),
+          );
+          continue;
+        }
+        // The synthetic EXTERNAL source concept `"<X> Source"` emits its own top-level `define` — guard its name
+        // against every existing top-level identifier + earlier twin (mirror the records-twin (A2) guard).
+        const sourceName = `${c.name} Source`;
+        if (topLevelIdentifierNames.has(sourceName)) {
+          errors.push(
+            mkError(
+              "emit-records-twin-name-collision",
+              `Lowering both-rep recency-value concept "${c.name}" synthesizes an external source concept ` +
+                `"${sourceName}", but a top-level identifier of that name already exists in library ` +
+                `"${ast.library.name}". Rename "${c.name}" (or the conflicting declaration) so the synthesized ` +
+                `"${sourceName}" is unique.`,
+              loc,
+            ),
+          );
+          continue;
+        }
+
+        // Derive BOTH arms' descriptors from the ORIGINAL authored concept (ONE source of truth — the tested
+        // `deriveEffectiveRepresentations`), carried on the merge twin for the marker-driven emit. A both-rep
+        // recency-value concept resolves to exactly `[local-exact, source]`; anything else is a compiler/shape
+        // defect — fail loud (never a silent under-resolved merge). Run BEFORE any dedup-state mutation.
+        const owningMeta: OwningLibraryMetadata = {
+          libraryName: ast.library.name,
+          canonicalBase,
+          localDomainId: opts.localDomainId ?? ast.library.name,
+        };
+        const outcome = deriveEffectiveRepresentations(c, owningMeta);
+        const localDesc =
+          outcome.status === "derived"
+            ? outcome.descriptors.find((d) => d.arm === "local-exact")
+            : undefined;
+        const sourceDesc =
+          outcome.status === "derived"
+            ? outcome.descriptors.find((d) => d.arm === "source")
+            : undefined;
+        if (
+          outcome.status !== "derived" ||
+          outcome.descriptors.length !== 2 ||
+          localDesc === undefined ||
+          sourceDesc === undefined
+        ) {
+          const detail =
+            outcome.status === "derived"
+              ? `${outcome.descriptors.length} descriptor(s), not a [local-exact, source] pair`
+              : outcome.status === "error"
+                ? `${outcome.error.kind}: ${outcome.error.detail}`
+                : outcome.status;
+          errors.push(
+            mkError(
+              "emit-most-recent-derivation",
+              `Concept "${c.name}": the both-rep recency-value merge did not resolve to a [local-exact, source] ` +
+                `descriptor pair (${detail}).`,
+              loc,
+            ),
+          );
+          continue;
+        }
+
+        // COMMIT dedup state (all guards passed) + register the FHIR local code (drives the CodeSystem / SD).
+        codeValueToConcept.set(codeValue, c.name);
+        seenSyntheticNames.add(c.name);
+        topLevelIdentifierNames.add(sourceName);
+        localCodes.push({ concept: c.name, code: codeValue, conceptType: localResource });
+
+        // The synthetic LOCAL terminology (the local codesystem entry the LP retrieve's `coded from` bare-refs).
+        const localTerminology = buildSyntheticTerminology(c.name, codeValue, localCodesystemName, urn, loc);
+        syntheticTerminologies.push(localTerminology);
+
+        // (a) LP twin — SAME-NAME local records retrieve `[<localResource>: "X"]` (LocalPrimitives). Mirrors the
+        //     both-rep `lowered` concept below; role `source-impl` (its determination is the Inferences merge).
+        const localCodedFrom: CodedFromDefinition = {
+          type: "CodedFromDefinition",
+          terminologyName: c.name,
+          retrieveResourceType: localResource, // SET → LocalPrimitives (classifyStatementLayer)
+          location: loc,
+        };
+        // F7 co-invariant: synthetic TerminologySystem.name (LocalConcepts) ⟺ retrieveResourceType (LocalPrimitives).
+        const localHasDomainName = localTerminology.body.some(
+          (line) => line.type === "TerminologySystem" && line.name !== undefined,
+        );
+        if (!localHasDomainName || localCodedFrom.retrieveResourceType === undefined) {
+          throw new Error(
+            `internal invariant violated: recency-value LP twin "${c.name}" has a desynced source-family ` +
+              `discriminator (LocalConcepts ⟺ LocalPrimitives) — both must be set together.`,
+          );
+        }
+        const lpTwin: Concept = {
+          ...c,
+          representations: [],
+          definition: localCodedFrom,
+          __loweringRole: "source-impl",
+        };
+        delete lpTwin.code;
+        loweredConcepts.push(lpTwin);
+
+        // (b) EP source concept `"<X> Source"` — a hand-authored-style external `coded from` retrieve over the
+        //     SOURCE terminology (`[ServiceRequest: "Covered Devices"]`). `retrieveResourceType: undefined` →
+        //     ExternalPrimitives; `conceptType` (from the posrep's `type is`) drives the retrieve resource. Publishes
+        //     RECORDS (RecordSet, no scalar value — the merge selects newest from it, the fold `exists` over it).
+        const sourceCodedFrom: CodedFromDefinition = {
+          type: "CodedFromDefinition",
+          terminologyName: rv.sourceRep.terminologyName!, // the resolver guarantees `coded from`
+          retrieveResourceType: undefined, // UNDEFINED → ExternalPrimitives (classifyStatementLayer)
+          location: loc,
+        };
+        const epSource: Concept = {
+          ...c,
+          name: sourceName,
+          shape: "RecordSet",
+          valueTypes: [],
+          representations: [],
+          conceptType: rv.sourceRep.conceptType, // the source resource (ServiceRequest)
+          definition: sourceCodedFrom,
+          __loweringRole: "source-impl",
+        };
+        delete epSource.code;
+        delete epSource.meta; // a compiler-internal retrieve — do NOT republish the author's meta/evidence
+        delete epSource.evidence;
+        externalSourceTwins.push(epSource);
+
+        // (c) Inferences MERGE twin — SAME-NAME public determination. The emit is MARKER-DRIVEN
+        //     (`__bothRepMerge === "recency-value"`), so the retargeted `most recent <self>` reduction body is
+        //     NEVER rendered; it exists only to (i) classify Inferences and (ii) survive `requalifyDefinition`
+        //     WITHOUT the `ThisRecords` throw (the bare self-name ref is harmless — unrendered). Carries the
+        //     descriptors + the `__bothRepFoldInLocalPrimitives` self-fold include marker.
+        const mergeReduction: Reduction = {
+          kind: "mostRecent",
+          target: { type: "ReductionConceptRef", ref: c.name, location: loc } as ReductionConceptRef,
+        };
+        const mergeTwin: Concept = {
+          ...c,
+          representations: [],
+          definition: { type: "ReductionDefinition", reduction: mergeReduction, location: loc },
+          __bothRepMerge: "recency-value",
+          __bothRepFoldInLocalPrimitives: c.name, // LP self-fold include (collectLayerIncludes)
+          __recencyValueDescriptors: { local: localDesc, source: sourceDesc },
+          __loweringRole: "public-determination",
+        };
+        delete mergeTwin.code;
+        bothRepInferredTwins.push(mergeTwin);
+        continue;
+      }
+
       // Slice A2 activated `exists this`; B1 added `count this at least N`; B2a a Scalar boolean `most
       // recent this` value read; B2b a `shape is Record` `most recent this` record select. All reduce THIS
       // concept's OWN records (a records twin), so they share ONE lowering — only the retargeted reduction
@@ -1156,13 +1367,23 @@ export function lowerLocalCodes(
     //     posrep projection, so it is
     //     flagged `__synthesizedFromPosrep` (the retirement guard must never fire on it).
     if (bothRepDefinedAs !== undefined) {
+      // #189 Piece 1 (disc 506) — a `defined as exists ("V")` whose referent V is a both-rep RECENCY-VALUE concept
+      // is a MEMBER-EXISTENCE interface fold (a TOTAL boolean: `<own newest> or exists(LP."V") or exists(EP."V
+      // Source")`, emitted by `emitMemberExistenceFold`), NOT the deferred truth-set `asTruths() union`. It carries
+      // NO `__bothRepMerge` marker — that marker forces the non-total truth-set classification at the totality
+      // authorities (`emittedDischargeAndType` / `computeTotality` early-return on `__bothRepMerge !== undefined`),
+      // whereas WITHOUT it those authorities reach their `defined as exists` arm and correctly classify it total
+      // (composite-delegated). The fold DISPATCH keys on `__bothRepFoldInLocalPrimitives` (still set), and the
+      // Interface façade re-exports it BARE. Every OTHER `code is` + `defined as` stays the deferred `"union"`.
+      // disc 507 A/B — shape-EXACT on BOTH the referent AND the interface's own arm (unqualified ref, recency-value
+      // referent, Scalar<boolean> Observation at the default value carrier), via the SHARED predicate every site uses.
+      const isMemberExistenceFold = isMemberExistenceInterface(c, (name) => recencyValueNames.has(name));
       const inferredTwin: Concept = {
         ...c,
         definition: bothRepDefinedAs,
         __bothRepFoldInLocalPrimitives: c.name,
-        __bothRepMerge: "union",
-        // #189 Slice C 2a — the both-rep public determination; inherits the authored obligation (the
-        // `code is` + `defined as` fold is an E1 `rejected` today, surfaced by the emit proof on its List).
+        ...(isMemberExistenceFold ? {} : { __bothRepMerge: "union" as const }),
+        // #189 Slice C 2a — the both-rep public determination; inherits the authored obligation.
         __loweringRole: "public-determination",
       };
       delete inferredTwin.code;
@@ -1222,7 +1443,13 @@ export function lowerLocalCodes(
     // `rewritten`, so they cannot be the in-place replacement and must be added
     // as additional statements. The emitter sections by kind/layer, so absolute
     // position is immaterial beyond stable intra-layer ordering.
-    statements: [...syntheticTerminologies, ...rewritten, ...recordsTwins, ...bothRepInferredTwins],
+    statements: [
+      ...syntheticTerminologies,
+      ...rewritten,
+      ...recordsTwins,
+      ...externalSourceTwins,
+      ...bothRepInferredTwins,
+    ],
   };
 
   return { ast: outAst, errors, localCodes };

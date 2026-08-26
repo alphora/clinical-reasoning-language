@@ -18,6 +18,7 @@
 import type { Concept } from "../ast/types";
 import { recordsTwinDefineName } from "../cql-emitter/lowerLocalCodes";
 import { deriveEffectiveRepresentations } from "../emit/effectiveRepresentation";
+import { resolveRecencyValueConcept } from "../template-match/recencyValueConcept";
 import type {
   EffectiveRepresentationDescriptor,
   OwningLibraryMetadata,
@@ -96,7 +97,14 @@ export function resolveCaseFeatureRecord(
     //     `"<X>"` (no twin) — so target the concept name. Assuming a `"<X> Records"` twin for these DANGLES.
     const reduction =
       concept.definition?.type === "ReductionDefinition" ? concept.definition.reduction : undefined;
-    const hasRecordsTwin = reduction !== undefined && reduction.target.type === "ThisRecords";
+    // #189 Piece 1 (disc 506) — a both-rep RECENCY-VALUE concept (`code is` + `most recent this` + a `coded from`
+    // source rep) HAS a `ThisRecords` reduction, but `lowerLocalCodes` does NOT synthesize a `"<X> Records"` twin
+    // for it — it publishes the local records retrieve under its OWN name `"<X>"` in LocalPrimitives (the both-rep
+    // same-name convention, exactly the case the comment above names). So target the concept name, not the twin
+    // (targeting `"<X> Records"` DANGLES — the Inv-2(d) integrity check catches it).
+    const isRecencyValueBothRep = resolveRecencyValueConcept(concept).kind === "recency-value";
+    const hasRecordsTwin =
+      reduction !== undefined && reduction.target.type === "ThisRecords" && !isRecencyValueBothRep;
     return {
       kind: "record",
       descriptor: local,

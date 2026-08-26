@@ -59,8 +59,10 @@ describe("#270 — both-rep `code is` + `defined as exists` is loud-refused (dis
   it("refuses rather than silently drop the local-code fold on the canonical local-domain path", () => {
     const result = emitCQLImports(path.join(FIXTURES, "defined-as-exists-bothrep", "root.crl"));
     expect(result.success).toBe(false);
-    // #189 B3 — the message no longer coaches downgrading the canonical form (Claude #10, disc 500): it names the
-    // deferred flip activation. The INTENT (loud-refused, not silently dropped) is unchanged.
-    expect(JSON.stringify(result.errors)).toMatch(/canonical value\/interface boolean interface|activates at the #189 flip/);
+    // #189 Piece 1 (disc 506) — the value/interface membership fold now ACTIVATES for a `defined as exists` over a
+    // both-rep RECENCY-VALUE referent. This fixture's referent ("Other Records") is a plain records concept, NOT
+    // recency-value, so it stays DEFERRED — the loud-refusal INTENT (not silently dropped) is unchanged, but the
+    // message now names the narrowed deferral reason (non-recency-value referent).
+    expect(JSON.stringify(result.errors)).toMatch(/not a both-representation recency-value|DEFERRED emit gap/);
   });
 });
