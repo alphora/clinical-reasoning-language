@@ -169,18 +169,20 @@ describe("CEL Todo 4 — qualified `defined by` rule table", () => {
 
   test("qualified ref to Concept with conceptType in allowlist → clean", () => {
     withProject((root) => {
+      // A resource-BEARING concept (has `code is`): typed (Observation, in allowlist) and directly assertable, so
+      // it passes the #189 (a) read-only gate and the type-derivation path is clean. (A resourceless `defined as`-
+      // only concept would be rejected as read-only — covered by its own test below.)
       write(root, "lib.crl", [
         "# L",
         "library \"L\".",
         "concept \"BMI\":",
         "- type is Observation.",
         "- value type is Quantity.",
-        "- defined as \"BMI\".",
+        "- code is `bmi`.",
       ].join("\n"));
       const file = write(root, "f.cel", [
         ...ENC_FACT_HEADER,
         "fact \"Y\":",
-        "- code is \"sys|c\".",
         "- defined by \"L\".\"BMI\".",
         "case \"C\":",
         "- subject is \"Subject\".",
@@ -891,21 +893,83 @@ describe("CEL Todo 4 — CEL include", () => {
   });
 });
 
+describe("CEL #189 (a) — a read-only (resourceless-derived) concept cannot be directly asserted", () => {
+  // A fact `defined by "L"."C"`; assert whether the (a) reject fires for the concept shape in `crl`.
+  const rejectsC = (crlLines: string[]): boolean => {
+    let has = false;
+    withProject((root) => {
+      write(root, "lib.crl", crlLines.join("\n"));
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "fact \"Y\":",
+        "- defined by \"L\".\"C\".",
+        "case \"Case\":",
+        "- subject is \"Subject\".",
+      ].join("\n"));
+      const r = validateCELFile(file);
+      has = r.errors.some((e) => e.kind === "cannot-directly-assert-derived-concept");
+    });
+    return has;
+  };
+
+  test("typed pure composite (type is + defined as, no code/source) → rejected", () => {
+    expect(rejectsC([
+      "# L", "library \"L\".",
+      "concept \"Leaf\":", "- type is Observation.", "- code is `leaf`.",
+      "concept \"C\":", "- type is Observation.", "- value type is boolean.", "- defined as \"Leaf\".",
+    ])).toBe(true);
+  });
+
+  test("untyped pure composite (defined as, no type/code/source) → rejected", () => {
+    expect(rejectsC([
+      "# L", "library \"L\".",
+      "concept \"Leaf\":", "- type is Observation.", "- code is `leaf`.",
+      "concept \"C\":", "- defined as \"Leaf\".",
+    ])).toBe(true);
+  });
+
+  test("code-less existence reduction (definition is exists \"X\", no code/source) → rejected", () => {
+    expect(rejectsC([
+      "# L", "library \"L\".",
+      "concept \"Leaf\":", "- type is Observation.", "- code is `leaf`.",
+      "concept \"C\":", "- type is Observation.", "- value type is boolean.", "- definition is exists \"Leaf\".",
+    ])).toBe(true);
+  });
+
+  test("source-backed concept (coded from, no code) → NOT rejected (the Piece 3 remote lane, not read-only)", () => {
+    expect(rejectsC([
+      "# L", "library \"L\".",
+      "concept \"C\":", "- type is Observation.", "- value type is CodeableConcept.", "- coded from \"Some VS\".",
+    ])).toBe(false);
+  });
+
+  test("local concept (code is + type is) → NOT rejected (directly assertable per charter §3)", () => {
+    expect(rejectsC([
+      "# L", "library \"L\".",
+      "concept \"C\":", "- type is Observation.", "- code is `c`.",
+    ])).toBe(false);
+  });
+});
+
 describe("CEL Todo 4 — soft mode", () => {
   test("unsupported-yet warning is silenced under soft", () => {
     withProject((root) => {
-      // Concept with no derivable type via composition body.
+      // A resource-BEARING concept (has `code is`, so it is NOT read-only under #189 (a)) but with NO `type is`, so
+      // no FHIR type is derivable → `unsupported-yet`. A valid, non-cyclic CRL concept: the canonical existence form
+      // (`code is` + `definition is exists this`), implicitly Observation (`IMPLICIT_LOCAL_TYPE`). (This isolates the
+      // type-derivation warning from the (a) read-only reject, which fires only for a concept with no representation
+      // at all. The self-referential `defined as "Composite"` used before was a CRL cycle — panel disc 511 Claude #6.)
       write(root, "lib.crl", [
         "# L",
         "library \"L\".",
-        "concept \"Composite\":",
-        "- defined as \"Composite\".",
+        "concept \"Untyped Existence\":",
+        "- code is `x`.",
+        "- definition is exists this.",
       ].join("\n"));
       const file = write(root, "f.cel", [
         ...ENC_FACT_HEADER,
         "fact \"Y\":",
-        "- code is \"sys|c\".",
-        "- defined by \"L\".\"Composite\".",
+        "- defined by \"L\".\"Untyped Existence\".",
         "case \"C\":",
         "- subject is \"Subject\".",
       ].join("\n"));

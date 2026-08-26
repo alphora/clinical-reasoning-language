@@ -22,3 +22,16 @@ export function hasLocalCode(concept: Concept): boolean {
 export function hasSourceBinding(concept: Concept): boolean {
   return concept.definition?.type === "CodedFromDefinition" || concept.representations.length > 0;
 }
+
+/** #189 (a) — a concept with NO representation at all: no local `code is` AND no external source binding. It is a
+ *  pure `defined as` composition, a code-less `definition is` reduction, or a null-forever concept — ephemeral CQL
+ *  with NO FHIR resource. Per the charter (§3 "`code is` absent ⇒ read-only", §4 no-magic): such a concept CANNOT
+ *  be directly asserted by a CEL fact — there is nothing to hand `$apply` (you assert its operands and `$apply`
+ *  computes it), so a CRE direct-assert would have no `$apply` equivalent (the divergence #189 removes). This is
+ *  EQUIVALENT to `classifyConceptRole(c) === "derived"` (emitFhir.ts) — factored here as the single authority
+ *  so the validator, the CRE and the emitter gate the `cannot-directly-assert-derived-concept` reject on ONE rule
+ *  and agree by construction. A source-backed derived concept (`source representation`/`coded from` + a reduction,
+ *  no `code is`) is NOT resourceless — its source arm produces a resource — so it is the Piece 3 lane, untouched. */
+export function isResourcelessDerived(concept: Concept): boolean {
+  return !hasLocalCode(concept) && !hasSourceBinding(concept);
+}

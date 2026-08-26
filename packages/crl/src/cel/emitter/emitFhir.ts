@@ -6,7 +6,11 @@ import {
   type Statement,
   type Concept,
 } from "../../ast/types";
-import { hasLocalCode, hasSourceBinding } from "../../emit/conceptDatumSignals";
+import {
+  hasLocalCode,
+  hasSourceBinding,
+  isResourcelessDerived,
+} from "../../emit/conceptDatumSignals";
 import {
   resourceCodingPlacement,
   requiredStructuralElements,
@@ -26,6 +30,7 @@ import {
   type CodeParts,
 } from "../canonicalToken";
 import { localCodePathsOf } from "../localMembership";
+import { buildDefinedByCandidates } from "../definedByResolve";
 import type { Registry, RegistryEntry } from "../../imports/types";
 import type { ResolvedCelGraph } from "../imports/types";
 import type {
@@ -189,6 +194,32 @@ interface DerivedType {
    *  derive-local identity keyed on `filePath` (name ALONE collides local-vs-package; disc 490 gpt56 #6). Carries
    *  the raw `ast.library.name` fallback used when the project has no policy id. Present iff `concept` is. */
   owningEntry?: RegistryEntry;
+}
+
+/** #189 (a) (disc 510) — resolve a `defined by` field to its backing `Concept` AST node, REGARDLESS of whether a
+ *  FHIR type is derivable (`deriveFhirType` returns undefined for an untyped concept; this does not). Used to detect
+ *  a RESOURCELESS DERIVED target BEFORE type derivation, so the loud `cannot-directly-assert-derived-concept` reject
+ *  intercepts BOTH the untyped composite (which would otherwise mis-warn `unsupported-yet`) and the typed composite
+ *  (which would otherwise FABRICATE a resource — a §4 violation). Binds the name through the SHARED
+ *  `buildDefinedByCandidates` (first-write-wins across Concept+Activity — the SAME resolution the validator and
+ *  `deriveFhirType` use), then narrows to Concept: a name a preceding Activity already claims resolves to that
+ *  Activity in all three lanes, so the reject never fires on it (panel disc 511 — a hand-rolled Concept-only scan
+ *  would bind cross-kind name collisions differently and reject a fact the validator passed). Returns undefined for
+ *  a bare-type ref, an Activity-bound name, or an unresolved ref (none is a resourceless-derived concept). */
+function resolveDefinedByConcept(
+  field: CELDefinedByField,
+  graph: ResolvedCelGraph,
+): Concept | undefined {
+  const ref = field.ref;
+  if (!isQualifiedRef(ref)) return undefined;
+  const libName = getRefLibrary(ref);
+  const declName = getRefName(ref);
+  const reg = graph.crlRegistry;
+  if (!reg || libName === null) return undefined;
+  const lib = reg.byNameLocal.get(libName) ?? reg.byNamePackage.get(libName);
+  if (!lib) return undefined;
+  const target = buildDefinedByCandidates(lib.ast.statements).get(declName);
+  return target?.type === "Concept" ? target : undefined;
 }
 
 /**
@@ -778,6 +809,24 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
     });
     return undefined;
   }
+  // #189 (a) (disc 510) — resolve the target concept BEFORE type derivation. A RESOURCELESS DERIVED concept (no
+  // `code is`, no source binding) has no FHIR resource, so it cannot be directly asserted. Reject loud + skip, both
+  // cells: an UNTYPED composite (deriveFhirType would mis-warn `unsupported-yet`) AND a TYPED composite
+  // (deriveFhirType would SUCCEED and fabricate a resource for an ephemeral concept — a §4 violation). The validator
+  // is the primary gate; this backstops emission for a caller that skips it.
+  const targetConcept = resolveDefinedByConcept(definedBy, ctx.graph);
+  if (targetConcept && isResourcelessDerived(targetConcept)) {
+    ctx.diagnostics.push({
+      kind: "cannot-directly-assert-derived-concept",
+      severity: "error",
+      message: `Fact "${factName}" is \`defined by\` concept "${targetConcept.name}", which is read-only — it has no representation (no \`code is\` and no source binding) and no FHIR resource, so it cannot be directly asserted. Assert its operands instead, or give it a \`code is\` + \`type is\`.`,
+      caseSlug: ctx.caseSlug,
+      factName,
+      filePath: ctx.graph.filePath,
+    });
+    return undefined;
+  }
+
   const derived = deriveFhirType(definedBy, ctx.graph);
   if (!derived) {
     ctx.diagnostics.push({

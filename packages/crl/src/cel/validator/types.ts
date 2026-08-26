@@ -37,6 +37,12 @@ export type CELValidationErrorKind =
   // lanes. Correct negation semantics are #257 (status/refutation); until then this is rejected loud. (Intent on an
   // ACTIVITY/recommendation fact — a declined proposal — is legitimate and untouched.)
   | "intent-modifier-on-local-fact"
+  // #189 (a) (disc 510) — a fact is `defined by` a RESOURCELESS DERIVED concept (no `code is` and no source binding:
+  // a pure `defined as` composition, a code-less reduction, or null-forever). Such a concept is read-only — it has
+  // no FHIR resource, so `$apply` has no way to receive "it is true"; a CRE direct-assert would have no `$apply`
+  // equivalent (the `asserted ∪ composed` magic #189 removes). Declaration-level ERROR: assert the concept's
+  // operands instead, or give it a `code is` + `type is` to make it a real record assertable in both lanes.
+  | "cannot-directly-assert-derived-concept"
   // Case id (provenance spec §7)
   | "malformed-case-id"
   | "reserved-case-id"

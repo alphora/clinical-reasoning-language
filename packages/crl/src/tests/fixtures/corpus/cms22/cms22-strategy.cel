@@ -41,7 +41,7 @@ fact "Confirmed Hypertension Diagnosis":
 fact "Hypertensive BP Reading":
 - code is "http://loinc.org|85354-9".
 - date is "2026-04-12".
-- defined by "cms22-strategy"."BP Reading".
+- defined by "cms22-strategy"."Blood Pressure Panels".
 
 fact "Hypertensive Systolic":
 - code is "http://loinc.org|8480-6".

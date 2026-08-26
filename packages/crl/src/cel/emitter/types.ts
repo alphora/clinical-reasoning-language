@@ -68,6 +68,12 @@ export type EmitDiagnosticKind =
    *  (retrieved by code) would read PRESENT — the opposite of the intent. Rejected + skipped until negation
    *  semantics land (#257). Intent on an activity/recommendation fact is legitimate and untouched. */
   | "intent-modifier-on-local-fact"
+  /** #189 (a) (disc 510) — a fact is `defined by` a RESOURCELESS DERIVED concept (no `code is` and no source
+   *  binding: a pure `defined as` composition, a code-less reduction, or null-forever). It has no FHIR resource to
+   *  emit, so the fact is SKIPPED with a loud error — never a fabricated resource for an ephemeral concept (a §4
+   *  violation). The author must assert the concept's operands, or give it a `code is` + `type is`. Shares its
+   *  diagnostic identity with the validator/CRE reject so all three lanes speak with one voice. */
+  | "cannot-directly-assert-derived-concept"
   /** #189 B4 (disc 501) — a LOCAL concept declares a CodeableConcept value type but its authored `value is` datum
    *  is unusable: not a `<system>|<code>` token (a bare/empty/multi-pipe token, or a non-string payload), or the
    *  concept's representation reads no value element. The fact is SKIPPED (never a manufactured/partial value —

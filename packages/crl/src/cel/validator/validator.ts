@@ -27,7 +27,7 @@ import { resolveCelImports, type ResolveCelImportsOptions } from "../imports";
 import type { ResolvedCelGraph } from "../imports/types";
 import { classifyCanonicalToken } from "../canonicalToken";
 import { makeLocalDomainContext, localMemberOfConcept, type LocalDomainContext } from "../localMembership";
-import { hasSourceBinding } from "../../emit/conceptDatumSignals";
+import { hasSourceBinding, isResourcelessDerived } from "../../emit/conceptDatumSignals";
 
 import type {
   CELValidationError,
@@ -414,6 +414,23 @@ function validateDefinedBy(
   }
   // Concept:
   if (target.type === "Concept") {
+    // #189 (a) (disc 510) — a RESOURCELESS DERIVED concept (no `code is` and no source binding) is READ-ONLY: it has
+    // no FHIR resource, so a fact cannot directly assert it and `$apply` has no equivalent (the `asserted ∪ composed`
+    // magic #189 removes). Declaration-level ERROR — a fact `defined by` such a concept is invalid regardless of
+    // whether any case references it (context-free: validity must not depend on use). This precedes the
+    // `unsupported-yet` type-derivation warning (a resourceless concept may also be untyped; the read-only reject is
+    // the right diagnosis, not "no derivable FHIR type").
+    if (isResourcelessDerived(target)) {
+      errors.push(
+        err(
+          "cannot-directly-assert-derived-concept",
+          `Concept "${libName}"."${declName}" is read-only — it has no representation (no \`code is\` and no source binding), so it has no FHIR resource and cannot be directly asserted by a fact. Assert its operands instead, or give it a \`code is\` + \`type is\` to make it a real record assertable in both lanes.`,
+          fb.location,
+          fp,
+        ),
+      );
+      return;
+    }
     const cType = target.conceptType;
     if (cType === undefined || !CONCEPT_TYPE_SET.has(cType)) {
       warnings.push(

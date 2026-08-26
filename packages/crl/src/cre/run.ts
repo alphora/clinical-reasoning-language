@@ -7,16 +7,22 @@
  * CRL/CEL level for fast authoring feedback — it is NOT the engine.
  *
  * SCOPE:
- *  - Concept satisfaction is ASSERTED + COMPOSED:
- *      • asserted — a concept is satisfied when ≥1 of the case's (non-subject)
- *        facts is `defined by` it (resolved to a (library, name) identity);
+ *  - Concept satisfaction is ASSERTED + COMPOSED (REFACTOR:grounded — #189 Piece 2 + (a), disc 508/510/511):
+ *      • asserted — a concept with a REPRESENTATION (a local `code is`, or a `coded from`/`source representation`
+ *        binding) is satisfied when ≥1 of the case's (non-subject) facts is `defined by` it. For a LOCAL concept the
+ *        fact's CODE is the membership input: it populates the concept whose `{system, code}` set it belongs to
+ *        (compartment-global, byte-matching the CQL retrieve — Piece 2), NOT merely the concept it names. A
+ *        RESOURCELESS-DERIVED concept (no `code is` AND no source binding — a pure `defined as`, a code-less
+ *        reduction, or null-forever) is READ-ONLY: it has no FHIR resource, so a fact CANNOT assert it and doing so
+ *        is a per-case run error — `$apply` has no equivalent (#189 (a) removed the old asserted-by-name magic).
  *      • composed (#126) — a concept with a `defined as` body is satisfied when
  *        its boolean composition over operand concepts evaluates true:
  *        `sem-and` = all, `sem-or` = any, `sem-not` = not (closed-world: absence
  *        ⇒ operand false), bare alias = the aliased concept, nesting supported.
- *      A concept that is BOTH directly `defined by` a fact AND `defined as` is
- *      satisfied if EITHER holds (asserted ∪ composed); the composition is still
- *      walked on the asserted path so its trace + diagnostics surface.
+ *      A concept that is BOTH directly assertable (`code is`) AND `defined as` — a CODED composite — is satisfied if
+ *      EITHER holds (asserted ∪ composed); the composition is still walked on the asserted path so its trace +
+ *      diagnostics surface. This union survives ONLY for a coded composite; a resourceless composite has no asserted
+ *      arm at all (read-only, above).
  *    Operand refs: a BARE operand resolves within the DEFINING concept's library
  *      (CRL's local-namespace rule); cross-library operands must be qualified. An
  *      operand resolving to neither a concept nor a fact emits a diagnostic
@@ -84,6 +90,7 @@ import { buildCriterionTablesForGraph } from "./criterionTables";
 import type { CELCase, CELCodeField, CELDefinedByField, CELFact, CELResultField } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import { classifyCanonicalToken } from "../cel/canonicalToken";
+import { isResourcelessDerived } from "../emit/conceptDatumSignals";
 import {
   makeLocalDomainContext,
   localMemberOfConcept,
@@ -381,8 +388,11 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
           `error rather than fabricate a presence-based answer.`,
       );
     }
-    // `exists this` (ThisRecords) → no arm; `directFacts` presence (the case asserting the concept's own
-    // records) IS its existence, so it is sound.
+    // `exists this` (ThisRecords) → no arm; for a CODED concept (`code is` + `definition is exists this`)
+    // `directFacts` presence (the case asserting the concept's own records) IS its existence, so it is sound.
+    // A code-LESS `exists this` (no `code is`, no source) is resourceless-derived: #189 (a) refuses a direct
+    // name-assertion of it (the directFacts loop errors before it can populate), so its presence is always empty
+    // and it computes false — the null-forever (#291) case, no longer a silent presence fabrication.
   }
   ctx.stack.delete(id);
   const result: ConceptEval = { sat: direct || composed, ...(composition ? { composition } : {}) };
@@ -1127,9 +1137,30 @@ function runCase(
       break;
     }
 
-    // Non-local concept (derived/composed/remote/bare-type): Piece 2 does not change these — name-based population
-    // is preserved (remote/reference membership is Piece 3; a derived concept is evaluated via its own reduction /
-    // the `asserted ∪ composed` model).
+    // #189 (a) (disc 510) backstop — a fact naming a RESOURCELESS DERIVED concept (no `code is`, no source binding)
+    // is REJECTED: such a concept has no FHIR resource, so a direct name-assertion has no `$apply` equivalent (the
+    // `asserted ∪ composed` magic this slice removes). The validator is the primary gate; the CRE backstops a direct
+    // `run_decision` caller that skips it. The composite is still satisfiable via its COMPOSITION (assert its
+    // operands) — only the direct name-assertion is refused. Loud (not silent don't-populate): a dropped assertion
+    // would confuse.
+    if (namedEntry && isResourcelessDerived(namedEntry.node)) {
+      membershipError =
+        `fact "${fn}" names concept "${name}", which is read-only — it has no representation (no \`code is\` and ` +
+        `no source binding) and thus no FHIR resource, so it cannot be directly asserted; \`$apply\` has no ` +
+        `equivalent. Assert its operands instead, or give it a \`code is\` + \`type is\` (asserted ∪ composed ` +
+        `removed — #189).`;
+      break;
+    }
+
+    // Remaining non-local facts — name-based population is preserved (Piece 2 does not change these). Three cells
+    // reach here (panel disc 511, Claude #3): (1) a REMOTE fact (`coded from`/`source representation`, no `code is`)
+    // — the Piece-3 lane, where a fact SUPPLIES a source record; (2) a BARE-TYPE fact (`defined by <FhirType>`,
+    // `namedEntry` undefined); (3) a MALFORMED-LOCAL cell — a `code is` that is PRESENT-but-empty, or present with NO
+    // `type is` (implicitly Observation per `IMPLICIT_LOCAL_TYPE`, which this CEL lane does not yet honor). Cells (1)
+    // and (2) are correct. Cell (3) is a RESIDUAL CRE-vs-`$apply` divergence (the CRE satisfies it by name; the
+    // emitter warns `unsupported-yet` / errors on empty-code and emits nothing) — pre-existing, NOT (a)'s scope (a
+    // `code is` concept is assertable per charter §3; the fix is honoring the implicit type / rejecting empty code,
+    // its own slice #299). Do NOT read this as "resource-bearing": cell (3) has a representation but no resource yet.
     if (!isLocalShape) {
       populate(namedId, fn);
       continue;

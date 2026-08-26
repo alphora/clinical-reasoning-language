@@ -124,7 +124,7 @@ case "drop B -> deny":
 case "neither -> deny":
 - subject is "Pat".
 - result is "D" is "Deny".
-case "direct fact satisfies the composite -> approve":
+case "direct fact on pure composite -> rejected":
 - subject is "Pat".
 - fact is "fAB".
 - result is "D" is "Approve".`;
@@ -135,17 +135,68 @@ case "direct fact satisfies the composite -> approve":
       "drop A -> deny:pass",
       "drop B -> deny:pass",
       "neither -> deny:pass",
-      "direct fact satisfies the composite -> approve:pass",
+      // #189 (a): a fact directly asserting the RESOURCELESS composite "A And B" is now rejected — the case
+      // errors (it has no FHIR resource, so `$apply` has no equivalent). The composite is satisfied only via
+      // its operands ("both leaves" above), never by direct name-assertion.
+      "direct fact on pure composite -> rejected:error",
     ]);
   });
 
-  it("asserted ∪ composed: a direct fact on a composite satisfies it even when the composition is false", () => {
+  it("asserted ∪ composed removed (#189 (a)): a direct fact on a RESOURCELESS composite is rejected, not magically satisfied", () => {
     const run = runCel(graphFrom(AND_CRL, AND_CEL)).runs.find((r) =>
-      r.case.startsWith("direct fact satisfies the composite"),
+      r.case.startsWith("direct fact on pure composite"),
     )!;
-    const node = whenNode(run, "A And B")!;
-    expect(node.satisfied).toBe(true); // satisfied by the direct fact
-    expect(node.composition?.satisfied).toBe(false); // composition itself is false (no leaves) — still surfaced
+    expect(run.status).toBe("error");
+    expect(
+      run.diagnostics.some((d) => /read-only/.test(d) && /A And B/.test(d)),
+    ).toBe(true);
+  });
+
+  // ---- coded composite: `direct || composed` SURVIVES for a concept WITH a `code is` (a real record) ----
+  // The (a) reject removes the magic ONLY for a resourceless-derived concept. A composite that ALSO carries a
+  // `code is` + `type is` is a real case-feature: it may be asserted directly (its own resource) OR computed via
+  // its composition — the legitimate union. This exercises the CRE's `direct || composed`; the coded-composite
+  // EMIT of that union is #189-deferred (only the member-existence-fold shape emits total), so this is a
+  // tree-lane test, not an emit-parity claim.
+  const CODED_AND_CRL = `# CA
+library "CodedAndLib".
+concept "Leaf A":
+- type is Observation.
+- code is \`leaf-a\`.
+concept "Leaf B":
+- type is Observation.
+- code is \`leaf-b\`.
+concept "Coded AB":
+- type is Observation.
+- code is \`coded-ab\`.
+- defined as ( "Leaf A" sem-and "Leaf B" ).
+decision "D":
+first:
+- when "Coded AB" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
+${ACTIVITIES}`;
+
+  const CODED_AND_CEL = `# CAC
+library "CodedAndCases".
+covers "CodedAndLib".
+${PATIENT}
+fact "fCodedAB":
+- date is "2026-01-01".
+- defined by "CodedAndLib"."Coded AB".
+case "direct fact on CODED composite -> approve (composition false, direct true)":
+- subject is "Pat".
+- fact is "fCodedAB".
+- result is "D" is "Approve".`;
+
+  // A BARE fact (no authored `code is`) on the coded composite: the DEGENERATE member — a member of the named
+  // concept's local set by construction, so `direct=true` in BOTH the projectless harness and a project lane (panel
+  // disc 511 Claude #5 — an authored token would ride the projectless name-fallback and prove less).
+  it("coded composite: `direct || composed` survives — a directly-asserted coded composite approves even with a false composition", () => {
+    const r = runCel(graphFrom(CODED_AND_CRL, CODED_AND_CEL));
+    expect(r.runs[0].status).toBe("pass");
+    const node = whenNode(r.runs[0], "Coded AB")!;
+    expect(node.satisfied).toBe(true); // satisfied by the direct fact (its own record)
+    expect(node.composition?.satisfied).toBe(false); // composition itself is false (no leaves asserted)
   });
 
   // ---- sem-or ----
