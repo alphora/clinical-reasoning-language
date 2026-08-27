@@ -1,0 +1,21 @@
+{
+  "resourceType": "Patient",
+  "id": "cms22-bp-cognitive-support-hypertensive-rea-6fbdeec2c967",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-patient"
+    ]
+  },
+  "identifier": [
+    {
+      "system": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/identifier/cel-test-patient",
+      "value": "cms22-bp-cognitive-support-hypertensive-rea-6fbdeec2c967"
+    }
+  ],
+  "name": [
+    {
+      "text": "Robert Lee"
+    }
+  ],
+  "birthDate": "1958-11-04"
+}

@@ -120,10 +120,9 @@ function capSlug(slug: string): string {
  * them; the `closure-resource-*-collision` backstop catches them instead.
  */
 export function uniqueCapSlug(raw: string, maxLen: number = SLUG_MAX_LEN): string {
-  // `maxLen` defaults to the FHIR id ceiling (64) — the fhir-emitter lane passes nothing and is
-  // byte-unchanged. The CEL channel scheme passes a SMALLER cap (56 = 64 − longest `<channel>-`
-  // prefix `mixture-`) so a channel-prefixed id is still <= 64; the hash is still over the FULL
-  // `raw`, so a cap-56 base stays byte-identical across the three channel prefixes.
+  // `maxLen` defaults to the FHIR id ceiling (64) — the fhir-emitter lane passes nothing. The CEL
+  // lane passes a smaller cap (56) to stay comfortably under the ceiling; the hash is over the FULL
+  // `raw`, so the base is stable.
   if (maxLen < UNIQUE_HASH_LEN + 1) {
     throw new Error(`uniqueCapSlug: maxLen ${maxLen} too small for a <hash> id (need >= ${UNIQUE_HASH_LEN + 1})`);
   }

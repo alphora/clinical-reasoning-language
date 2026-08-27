@@ -4,10 +4,9 @@ import { resolveCelImports } from "../../imports";
 import { uniqueCapSlug } from "../../../fhir-emitter/slug";
 import { emitCelToFhir } from "../emitFhir";
 
-// #237/T1 + #189 (disc 492) — the CEL FHIR id is `<channel>-<uniqueCapSlug(<library>-<case>-<fact>, 56)>`.
-// The old pre-cap ids used below ARE that composite; compute the current id via the real formatter (base cap 56
-// = 64 − longest `mixture-` prefix) + the `local-` channel prefix (this corpus is pure-local → local channel).
-const idOf = (uncappedComposite: string): string => `local-${uniqueCapSlug(uncappedComposite, 56)}`;
+// #237/T1 — the CEL FHIR id is `uniqueCapSlug(<library>-<case>-<fact>, 56)`. The old pre-cap ids used below ARE
+// that composite; compute the current id via the real formatter (cap 56, comfortably under the 64 FHIR ceiling).
+const idOf = (uncappedComposite: string): string => uniqueCapSlug(uncappedComposite, 56);
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..", "..");
 
@@ -31,9 +30,9 @@ describe("CEL Todo 5 — FHIR emitter on corpus", () => {
     const c = r.emittedCases[0];
     const types = c.resources.map((res) => res.resourceType).sort();
     expect(types).toEqual(["Encounter", "Observation", "Observation", "Observation", "Patient"]);
-    // #189 (disc 492): KALM Patient-compartment — `patient/<channel>-<patientId>/<type-lowercase>`.
+    // #189: KALM Patient-compartment — `patient/<patientId>/<type-lowercase>`.
     for (const res of c.resources) {
-      expect(res.outputPath).toMatch(/^patient\/local-cms22-blood-pressure-screening-[a-z0-9-]+\/[a-z]+$/);
+      expect(res.outputPath).toMatch(/^patient\/cms22-blood-pressure-screening-[a-z0-9-]+\/[a-z]+$/);
     }
   });
 
@@ -98,9 +97,8 @@ describe("CEL Todo 5 — emitted resource shape spot-checks", () => {
     }
     // Lock the namespaced shape — T12 / #91 prevents id collisions in multi-case
     // Bundles: the id carries the library+case namespace prefix. #237/T1 — the id is
-    // collision-safe capped; #189 (disc 492) — it now opens with the `<channel>-` prefix
-    // (this pure-local corpus → `local-`) and the base is capped <= 56 so the prefixed id is <= 64.
-    expect(patient.id.startsWith("local-cms22-blood-pressure-screening")).toBe(true);
+    // collision-safe capped <= 56, comfortably under the 64 FHIR id ceiling.
+    expect(patient.id.startsWith("cms22-blood-pressure-screening")).toBe(true);
     expect(patient.id.length).toBeLessThanOrEqual(64);
   });
 
@@ -185,10 +183,10 @@ describe("CEL Todo 5 — emitted resource shape spot-checks", () => {
 });
 
 describe("CEL Todo 5 — output directory shape (KALM)", () => {
-  test("resource outputPath matches patient/<channel>-<patientId>/<type-lowercase> (KALM compartment) shape", () => {
+  test("resource outputPath matches patient/<patientId>/<type-lowercase> (KALM compartment) shape", () => {
     const r = emit(CORPUS.cms69);
     for (const res of r.emittedCases[0].resources) {
-      expect(res.outputPath).toMatch(/^patient\/local-cms69-bmi-screening-[a-z0-9-]+\/[a-z]+$/);
+      expect(res.outputPath).toMatch(/^patient\/cms69-bmi-screening-[a-z0-9-]+\/[a-z]+$/);
     }
   });
 });
