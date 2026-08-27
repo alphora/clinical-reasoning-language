@@ -13,6 +13,13 @@ export interface ResolvedCelGraph {
   cel?: CEL;
   /** Project root (the directory containing the nearest package.json). Absent when not found. */
   projectRoot?: string;
+  /**
+   * #189 Piece 3 — an inline/harness `canonicalBase` DECLARATION for a graph with no `projectRoot` (the CRE's
+   * logic-unit-test harness). Membership needs a base to derive a concept's `{system, code}`; a projectless graph
+   * that declares one runs the SAME membership as a real project (no name-presence fallback — the charter bans
+   * presence). Ignored when `projectRoot` is set (a real project reads its `crl.canonicalBase`).
+   */
+  canonicalBase?: string;
   /** The CRL registry built from the project closure. Absent when project root not found. */
   crlRegistry?: Registry;
   /** CRL RegistryEntry matching the `covers` declaration's library name. Absent when unresolved or no covers. */

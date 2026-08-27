@@ -97,15 +97,12 @@ library "AndCases".
 covers "AndLib".
 ${PATIENT}
 fact "fA":
-- code is "http://e|leaf-a".
 - date is "2026-01-01".
 - defined by "AndLib"."Leaf A".
 fact "fB":
-- code is "http://e|leaf-b".
 - date is "2026-01-01".
 - defined by "AndLib"."Leaf B".
 fact "fAB":
-- code is "http://e|ab".
 - date is "2026-01-01".
 - defined by "AndLib"."A And B".
 case "both leaves -> approve":
@@ -221,11 +218,9 @@ library "OrCases".
 covers "OrLib".
 ${PATIENT}
 fact "fA":
-- code is "http://e|leaf-a".
 - date is "2026-01-01".
 - defined by "OrLib"."Leaf A".
 fact "fB":
-- code is "http://e|leaf-b".
 - date is "2026-01-01".
 - defined by "OrLib"."Leaf B".
 case "A only -> approve":
@@ -270,11 +265,9 @@ library "NestCases".
 covers "NestLib".
 ${PATIENT}
 fact "fInd":
-- code is "http://e|indication".
 - date is "2026-01-01".
 - defined by "NestLib"."Indication".
 fact "fContra":
-- code is "http://e|contra".
 - date is "2026-01-01".
 - defined by "NestLib"."Contra".
 case "indication, no contra -> approve":
@@ -320,7 +313,6 @@ library "MainCases".
 covers "MainLib".
 ${PATIENT}
 fact "fX":
-- code is "http://e|leaf-x".
 - date is "2026-01-01".
 - defined by "LeavesLib"."Leaf X".
 case "imported leaf present -> approve":
@@ -387,7 +379,6 @@ library "SatCycleCases".
 covers "SatCycleLib".
 ${PATIENT}
 fact "fLeaf":
-- code is "http://e|leaf".
 - date is "2026-01-01".
 - defined by "SatCycleLib"."Leaf".
 case "satisfiable via alternate branch despite cycle -> approve":
@@ -437,7 +428,6 @@ library "NestedCases".
 covers "NestedLib".
 ${PATIENT}
 fact "fD":
-- code is "http://e|leaf-d".
 - date is "2026-01-01".
 - defined by "NestedLib"."Leaf D".
 case "inner composite fails (drop E) -> deny":
@@ -489,15 +479,12 @@ library "GuardCases".
 covers "GuardLib".
 ${PATIENT}
 fact "fT":
-- code is "http://e|trigger".
 - date is "2026-01-01".
 - defined by "GuardLib"."Trigger".
 fact "fA":
-- code is "http://e|leaf-a".
 - date is "2026-01-01".
 - defined by "GuardLib"."Leaf A".
 fact "fB":
-- code is "http://e|leaf-b".
 - date is "2026-01-01".
 - defined by "GuardLib"."Leaf B".
 case "composite guard holds -> extra offered":

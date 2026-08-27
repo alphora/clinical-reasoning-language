@@ -74,13 +74,10 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fCov":
-- code is "http://x|cov".
 - defined by "Covered".
 fact "fExp":
-- code is "http://x|expa".
 - defined by "ExpA".
 fact "fBR":
-- code is "http://x|br".
 - defined by "BR".
 case "${caseName}":
 - subject is "Pat".
@@ -175,7 +172,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fX":
-- code is "http://x|x".
 - defined by "X".
 case "cycle":
 - subject is "Pat".

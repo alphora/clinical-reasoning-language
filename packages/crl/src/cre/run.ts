@@ -1232,21 +1232,17 @@ function runCase(
     }
 
     // LOCAL concept (bare OR coded): its `{system, code}` set must be DERIVABLE. `canonicalBase` is REQUIRED
-    // (charter §4 — no exception): in a real PROJECT a missing base is the misconfiguration the emitter ALSO refuses
-    // (`localCodeSystemUrl` throws, #271), so the CRE fails the run LOUD for BARE and CODED alike — two-lane parity,
-    // never a fabricated verdict. An INLINE/projectless graph (`projectRoot` undefined) is the CRE's logic-unit-test
-    // harness — NOT a project, so there is no `canonicalBase` to require and no emit lane to diverge from; local
-    // facts there are presence-by-name.
+    // (charter §4 — no exception, no name-presence fallback): a real PROJECT reads `crl.canonicalBase`; an INLINE/
+    // projectless harness graph declares one (`graph.canonicalBase`) or gets the default `INLINE_HARNESS_BASE`, so
+    // membership runs the SAME way everywhere. A concept whose member still cannot be derived (e.g. an empty
+    // `code is`) fails the run LOUD — never a fabricated presence verdict.
     const namedMember = localIndex.forward.get(namedId);
     if (!namedMember) {
-      if (localIndex.hasProject) {
-        membershipError =
-          `local concept "${name}" has no derivable local code set (missing \`crl.canonicalBase\`?); ` +
-          `cannot evaluate fact "${fn}" — refusing to fabricate a verdict (charter §4: canonicalBase is required).`;
-        break;
-      }
-      populate(namedId, fn);
-      continue;
+      membershipError =
+        `local concept "${name}" has no derivable local code set (missing \`crl.canonicalBase\`, or empty ` +
+        `\`code is\`); cannot evaluate fact "${fn}" — refusing to fabricate a verdict (canonicalBase is required, ` +
+        `charter §4).`;
+      break;
     }
     // BARE local fact (derivable base) — the DEGENERATE case: a member of the named concept by construction.
     if (!codeField) {

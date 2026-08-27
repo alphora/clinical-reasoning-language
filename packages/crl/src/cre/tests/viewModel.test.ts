@@ -66,7 +66,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 case "indication only":
@@ -170,11 +169,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fContra":
-- code is "http://example.org|contra".
 - date is "2026-01-01".
 - defined by "Contra".
 case "contraindicated":
@@ -245,7 +242,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|i".
 - date is "2026-01-01".
 - defined by "Indic".
 case "uses sub":
@@ -294,7 +290,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|i".
 - date is "2026-01-01".
 - defined by "Indic".
 case "uses cross-lib sub":
@@ -359,11 +354,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fCrit":
-- code is "http://example.org|crit".
 - date is "2026-01-01".
 - defined by "Shared"."Crit".
 case "c":
@@ -445,11 +438,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fA":
-- code is "http://example.org|a".
 - date is "2026-01-01".
 - defined by "A".
 fact "fB":
-- code is "http://example.org|b".
 - date is "2026-01-01".
 - defined by "B".
 case "nested":
@@ -496,11 +487,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fA":
-- code is "http://e|a".
 - date is "2026-01-01".
 - defined by "C"."A".
 fact "fB":
-- code is "http://e|b".
 - date is "2026-01-01".
 - defined by "C"."B".
 case "both -> go":
@@ -551,7 +540,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://e|i".
 - date is "2026-01-01".
 - defined by "Indic".
 case "indic but not eligible -> treat excluded":
@@ -601,7 +589,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fX":
-- code is "http://e|x".
 - date is "2026-01-01".
 - defined by "X".
 case "only X":
@@ -627,7 +614,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fExcl":
-- code is "http://example.org|excl".
 - date is "2026-01-01".
 - defined by "Excl".
 case "exclusion -> deny, indic preempted":

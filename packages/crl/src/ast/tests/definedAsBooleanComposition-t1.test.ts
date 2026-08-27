@@ -368,10 +368,8 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "A Present Record":
-- code is "http://example.org/x|present".
 - defined by "Present Records".
 fact "An Also Record":
-- code is "http://example.org/x|also".
 - defined by "Also Records".
 ${celCase}`;
     const crl = parseInput(decisionLib);
@@ -497,10 +495,8 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "A Present Record":
-- code is "http://example.org/x|present".
 - defined by "Present Records".
 fact "An Also Record":
-- code is "http://example.org/x|also".
 - defined by "Also Records".
 ${celCase}`;
     const crl = parseInput(M);

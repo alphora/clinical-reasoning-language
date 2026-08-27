@@ -448,7 +448,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "A Present Record":
-- code is "http://example.org/x|present".
 - defined by "Present".
 case "has present":
 - subject is "Pat".
@@ -497,7 +496,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "A Trial Record":
-- code is "http://example.org/x|trial".
 - defined by "Trial Records".
 case "has trials":
 - subject is "Pat".

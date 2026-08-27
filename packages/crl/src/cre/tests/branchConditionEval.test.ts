@@ -53,11 +53,9 @@ const CASES = (dec: string) => `library "Cases".
 covers "GuardLib".
 ${PATIENT}
 fact "fA":
-- code is "http://e|leaf-a".
 - date is "2026-01-01".
 - defined by "GuardLib"."Leaf A".
 fact "fB":
-- code is "http://e|leaf-b".
 - date is "2026-01-01".
 - defined by "GuardLib"."Leaf B".
 case "both":
@@ -162,11 +160,9 @@ ${ACTIVITIES}`;
 covers "GuardLib".
 ${PATIENT}
 fact "fA":
-- code is "http://e|leaf-a".
 - date is "2026-01-01".
 - defined by "GuardLib"."Leaf A".
 fact "fC":
-- code is "http://e|leaf-c".
 - date is "2026-01-01".
 - defined by "GuardLib"."Leaf C".
 case "AC":
@@ -217,11 +213,9 @@ ${ACTIVITIES}`;
 covers "GuardLib".
 ${PATIENT}
 fact "fA":
-- code is "http://e|leaf-a".
 - date is "2026-01-01".
 - defined by "GuardLib"."Leaf A".
 fact "fB":
-- code is "http://e|leaf-b".
 - date is "2026-01-01".
 - defined by "GuardLib"."Leaf B".
 case "aPresent":

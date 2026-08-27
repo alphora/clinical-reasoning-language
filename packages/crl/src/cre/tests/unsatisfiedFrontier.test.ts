@@ -309,7 +309,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fA":
-- code is "http://e|leaf-a".
 - date is "2026-01-01".
 - defined by "GuardLib"."Leaf A".
 case "onlyA":

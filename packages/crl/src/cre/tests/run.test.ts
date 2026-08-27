@@ -127,11 +127,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fExcl":
-- code is "http://example.org|excl".
 - date is "2026-01-01".
 - defined by "Excl".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 case "indication only -> approve":
@@ -184,11 +182,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fContra":
-- code is "http://example.org|contra".
 - date is "2026-01-01".
 - defined by "Contra".
 case "no contraindication -> med offered":
@@ -284,11 +280,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fImg":
-- code is "http://example.org|img".
 - date is "2026-01-01".
 - defined by "NeedsImaging".
 fact "fLab":
-- code is "http://example.org|lab".
 - date is "2026-01-01".
 - defined by "NeedsLabs".
 case "both -> imaging fires":
@@ -346,15 +340,12 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fImgElig":
-- code is "http://example.org|eimg".
 - date is "2026-01-01".
 - defined by "ImgEligible".
 fact "fSpecElig":
-- code is "http://example.org|espec".
 - date is "2026-01-01".
 - defined by "SpecEligible".
 case "imaging-eligible -> imaging offered":
@@ -427,11 +418,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fSevere":
-- code is "http://example.org|sev".
 - date is "2026-01-01".
 - defined by "Severe".
 case "severe -> sub escalates":
@@ -486,7 +475,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 case "cycle":
@@ -583,11 +571,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fCrit":
-- code is "http://example.org|crit".
 - date is "2026-01-01".
 - defined by "Shared"."Crit".
 case "qualified crit -> sub approves":
@@ -639,11 +625,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fCritBare":
-- code is "http://example.org|crit".
 - date is "2026-01-01".
 - defined by "Crit".
 case "bare crit -> does NOT satisfy the cross-lib criterion -> sub denies":
@@ -672,7 +656,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 case "missing shared lib":
@@ -719,11 +702,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fCrit":
-- code is "http://example.org|crit".
 - date is "2026-01-01".
 - defined by "Shared"."Crit".
 case "bare missing inside the shared sub":
@@ -773,11 +754,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 fact "fSevere":
-- code is "http://example.org|sev".
 - date is "2026-01-01".
 - defined by "Severe".
 case "self-qualified sub escalates":
@@ -826,11 +805,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fPa":
-- code is "http://example.org|p".
 - date is "2026-01-01".
 - defined by "P".
 fact "fPb":
-- code is "http://example.org|p".
 - date is "2026-01-01".
 - defined by "B"."P".
 case "xlib cycle":
@@ -881,11 +858,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fPa":
-- code is "http://example.org|p".
 - date is "2026-01-01".
 - defined by "P".
 fact "fPb":
-- code is "http://example.org|p".
 - date is "2026-01-01".
 - defined by "B"."P".
 case "distinct-lib subs do not false-cycle":

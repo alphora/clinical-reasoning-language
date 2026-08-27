@@ -624,11 +624,9 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fEarly":
-- code is "http://example.org|early".
 - date is "2026-01-01".
 - defined by "Early".
 fact "fLate":
-- code is "http://example.org|late".
 - date is "2026-01-01".
 - defined by "Late".
 case "pre":
@@ -661,7 +659,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fContra":
-- code is "http://example.org|contra".
 - date is "2026-01-01".
 - defined by "Contra".
 case "neg":
@@ -695,7 +692,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fA":
-- code is "http://example.org|a".
 - date is "2026-01-01".
 - defined by "A".
 case "nc":
@@ -737,7 +733,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fIndic":
-- code is "http://example.org|indic".
 - date is "2026-01-01".
 - defined by "Indic".
 case "deepfail":
@@ -768,7 +763,6 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fContra":
-- code is "http://example.org|contra".
 - date is "2026-01-01".
 - defined by "Contra".
 case "grd":

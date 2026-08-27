@@ -83,11 +83,9 @@ const CASES = `library "Cases".
 covers "GuardLib".
 ${PATIENT}
 fact "fA":
-- code is "http://e|leaf-a".
 - date is "2026-01-01".
 - defined by "GuardLib"."Leaf A".
 fact "fB":
-- code is "http://e|leaf-b".
 - date is "2026-01-01".
 - defined by "GuardLib"."Leaf B".
 case "both":
@@ -203,11 +201,9 @@ describe("#236 — criterion through a `use decision` sub-decision", () => {
 covers "GuardLib".
 ${PATIENT}
 fact "fA":
-- code is "http://e|leaf-a".
 - date is "2026-01-01".
 - defined by "GuardLib"."Leaf A".
 fact "fB":
-- code is "http://e|leaf-b".
 - date is "2026-01-01".
 - defined by "GuardLib"."Leaf B".
 case "both":
@@ -488,7 +484,6 @@ first:
 covers "GuardLib".
 ${PATIENT}
 fact "fA":
-- code is "http://e|leaf-a".
 - date is "2026-01-01".
 - defined by "GuardLib"."Leaf A".
 case "a":
