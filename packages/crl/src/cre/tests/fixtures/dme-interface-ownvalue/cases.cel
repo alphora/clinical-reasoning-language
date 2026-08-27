@@ -1,0 +1,42 @@
+# Interface own-value cases — Option C: explicit direct assertion of the value-reading interface, both lanes agree.
+library "IfaceCases".
+covers "IfaceTest".
+
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+// Explicit true → the interface own-arm reads true → approve.
+fact "Requested True":
+- value is true.
+- date is "2026-01-01".
+- defined by "IfaceTest"."Covered Device Requested".
+
+// Explicit false → own-arm reads false, and no value concept exists → deny (the divergence Option C closes:
+// the CRE used to presence-satisfy this to APPROVE).
+fact "Requested False":
+- value is false.
+- date is "2026-01-01".
+- defined by "IfaceTest"."Covered Device Requested".
+
+// The local value concept — coverage via the value arm (the normal path).
+fact "Local Covered Device":
+- date is "2026-01-01".
+- defined by "IfaceTest"."Covered Device".
+
+case "explicit true -> approve":
+- subject is "Pat".
+- fact is "Requested True".
+- result is "D" is "Approve".
+
+case "explicit false -> deny":
+- subject is "Pat".
+- fact is "Requested False".
+- result is "D" is "Deny".
+
+case "explicit false but value present -> approve via composed arm":
+- subject is "Pat".
+- fact is "Requested False".
+- fact is "Local Covered Device".
+- result is "D" is "Approve".

@@ -31,6 +31,7 @@ import {
 } from "../canonicalToken";
 import { localCodePathsOf } from "../localMembership";
 import { buildDefinedByCandidates } from "../definedByResolve";
+import { isValueReadingBooleanConcept } from "../../template-match/recencyValueConcept";
 import type { Registry, RegistryEntry } from "../../imports/types";
 import type { ResolvedCelGraph } from "../imports/types";
 import type {
@@ -46,6 +47,7 @@ import type {
   CELAtClause,
   CELCrossResourceField,
   CrossResourceRelation,
+  CELValueField,
 } from "../ast/types";
 
 import type {
@@ -816,6 +818,32 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
       filePath: ctx.graph.filePath,
     });
     return undefined;
+  }
+  // #189 Piece 3 (Option C, disc 512/513) — a VALUE-READING boolean concept (member-existence interface) asserted
+  // directly MUST carry an explicit boolean `value is`; its determination IS its value. Author-time gate mirroring the
+  // validator (shared kind name — all three lanes one voice) + the derived-concept backstop above, so a caller that
+  // skips validation (e.g. projectless `emit_cel`) still sees it. Skip the fact: a valueless value-reading Observation
+  // reads false in `$apply` regardless, so the verdict (Deny) is unchanged and both lanes still agree — the CRE reads
+  // it false too (+ a diagnostic). Classification uses the SHARED predicate over the concept's own-library siblings.
+  if (targetConcept) {
+    const libName = getRefLibrary(definedBy.ref);
+    const reg = ctx.graph.crlRegistry;
+    const lib = reg ? (reg.byNameLocal.get(libName ?? "") ?? reg.byNamePackage.get(libName ?? "")) : undefined;
+    const siblings = lib ? lib.ast.statements.filter((s): s is Concept => s.type === "Concept") : [];
+    if (isValueReadingBooleanConcept(targetConcept, siblings)) {
+      const vf = fact.body.find((b): b is CELValueField => b.type === "CELValueField");
+      if (!vf || typeof vf.value !== "boolean") {
+        ctx.diagnostics.push({
+          kind: "value-reading-assertion-needs-boolean",
+          severity: "error",
+          message: `Fact "${factName}" directly asserts value-reading boolean concept "${targetConcept.name}", whose determination is read from its value — state it explicitly: \`value is true\` or \`value is false\` (a bare/non-boolean assertion emits a valueless record read as false).`,
+          caseSlug: ctx.caseSlug,
+          factName,
+          filePath: ctx.graph.filePath,
+        });
+        return undefined;
+      }
+    }
   }
 
   const derived = deriveFhirType(definedBy, ctx.graph);

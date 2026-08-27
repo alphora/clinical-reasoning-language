@@ -58,6 +58,13 @@ export type EmitDiagnosticKind =
    *  violation). The author must assert the concept's operands, or give it a `code is` + `type is`. Shares its
    *  diagnostic identity with the validator/CRE reject so all three lanes speak with one voice. */
   | "cannot-directly-assert-derived-concept"
+  /** #189 Piece 3 (Option C, disc 512/513) — a fact directly asserts a VALUE-READING boolean concept (a
+   *  member-existence interface, whose emitted CQL own-arm reads `.value as FHIR.boolean`) with NO explicit boolean
+   *  `value is`. Its determination IS its value; a bare/non-boolean assertion emits a valueless record read as false.
+   *  AUTHOR-TIME gate (shares the validator's kind name so all three lanes speak with one voice), so a caller that
+   *  skips validation (e.g. projectless `emit_cel`) still sees it. The fact is SKIPPED — a valueless value-reading
+   *  Observation reads false in `$apply` regardless, so the verdict (Deny) is unchanged and both lanes still agree. */
+  | "value-reading-assertion-needs-boolean"
   /** #189 B4 (disc 501) — a LOCAL concept declares a CodeableConcept value type but its authored `value is` datum
    *  is unusable: not a `<system>|<code>` token (a bare/empty/multi-pipe token, or a non-string payload), or the
    *  concept's representation reads no value element. The fact is SKIPPED (never a manufactured/partial value —

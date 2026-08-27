@@ -34,6 +34,24 @@ export type CELValidationErrorKind =
   // not-covered test), but a typo'd stub code is the common mistake, so it is surfaced. Reference-VS membership is
   // the STUB code (`<canonicalBase>/CodeSystem/reference-vs-stub | <VS-url-tail>`), NOT a real terminology code.
   | "fact-code-not-in-source-set"
+  // #189 Piece 3 (Option C, disc 512/513) — a fact directly asserts (by qualified `defined by`) a VALUE-READING
+  // boolean determination (a member-existence interface, whose emitted CQL own-arm reads `.value as FHIR.boolean`)
+  // that POPULATES it (a bare degenerate-member fact, or a fact whose code is the concept's own member) but does NOT
+  // carry an explicit boolean `value is`. Its determination IS its value, so it must be stated: `value is true` /
+  // `value is false`. A non-boolean `value is` (a number/string, which the legacy writer lands in
+  // valueQuantity/valueString and the CQL `where O.value is FHIR.boolean` filter excludes) is the same error. This is
+  // an AUTHOR-TIME gate (ERROR, not a manufactured default — manufacturing `true` is the magic §4 bans), mirrored by
+  // an emitter diagnostic. It is NOT a runtime divergence: at run time a valueless value-reading record reads false in
+  // BOTH `$apply` and the CRE (closed-world → the same Deny verdict). A wrong-code fact (non-member) does NOT reach
+  // this rule (owned by `fact-code-not-in-local-set`); a PRESENCE-based (value-blind) `exists this` boolean is exempt.
+  | "value-reading-assertion-needs-boolean"
+  // #189 Piece 3 (Option C, disc 512) — a fact authors a `value is` on a PRESENCE-based (value-blind) boolean concept
+  // (`code is` + `value type is boolean` but NOT value-reading: `definition is exists this`, a non-recency `defined as
+  // exists`, a boolean composition). Both lanes compute such a concept by EXISTENCE (`exists([R: code])` / presence),
+  // so the authored value is IGNORED — a `value is false` there computes the concept TRUE (the opposite of the author's
+  // apparent intent), the authoring trap Option C's "false denies" rule teaches into existence. WARNING (not an error):
+  // the fact still populates correctly by presence; explicit absence is an absence CODE (a record), not `value is false`.
+  | "value-ignored-on-presence-concept"
   // #189 Piece 2 (disc 508 / impl-review gpt56 #4) — a fact naming a LOCAL concept authors a MALFORMED canonical
   // `code is` token (empty code, or a pipe with an empty system/code). The emitter skips it (invalid FHIR); the
   // validator flags it lane-neutrally as an ERROR (a KE author validating without emitting still sees it).

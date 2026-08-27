@@ -1,0 +1,39 @@
+# Interface own-value fixture — Option C (disc 512) direct assertion of a value-reading boolean interface.
+library "IfaceTest".
+
+// `Covered Device` is a both-rep recency-value concept; `Covered Device Requested` is the value-reading boolean
+// INTERFACE (member-existence: `code is` + `defined as exists`). Option C: a direct assertion of the interface must
+// be EXPLICIT (`value is true|false`) — its determination is read from its value; the CRE reads that value, matching
+// the emitted CQL own-arm `Last(...).value as FHIR.boolean is true`.
+
+terminology "Covered Devices":
+- valueset is `http://example.org/hcsc/dme-iface/ValueSet/covered-devices`.
+
+concept "Covered Device":
+- type is Observation.
+- value type is CodeableConcept.
+- code is `covered-device`.
+- definition is most recent this.
+- source representation:
+  - type is ServiceRequest.
+  - value element is ServiceRequest.code.
+  - value type is CodeableConcept.
+  - coded from "Covered Devices".
+
+concept "Covered Device Requested":
+- type is Observation.
+- value type is boolean.
+- code is `covered-device-requested`.
+- defined as exists ("Covered Device").
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `approve`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `deny`.
+
+decision "D":
+first:
+- when "Covered Device Requested" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".

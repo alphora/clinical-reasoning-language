@@ -87,9 +87,17 @@ import type { BranchCondition } from "../ast/types";
 // source and their `op:"criterion"` traces/spines stay zip-consistent.
 import type { CriterionTable } from "../ast/criterionExpansion";
 import { buildCriterionTablesForGraph } from "./criterionTables";
-import type { CELCase, CELCodeField, CELDefinedByField, CELFact, CELResultField } from "../cel/ast/types";
+import type {
+  CELCase,
+  CELCodeField,
+  CELDefinedByField,
+  CELFact,
+  CELResultField,
+  CELValueField,
+} from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import { classifyCanonicalToken } from "../cel/canonicalToken";
+import { isValueReadingBooleanConcept } from "../template-match/recencyValueConcept";
 import { isResourcelessDerived } from "../emit/conceptDatumSignals";
 import {
   makeLocalDomainContext,
@@ -273,6 +281,15 @@ interface Ctx {
   /** Concepts directly satisfied by a case fact (`defined by`). */
   directFacts: Set<Id>;
   factsByConcept: Map<Id, string[]>;
+  /** #189 Piece 3 (Option C, disc 512) — the ids of VALUE-READING boolean concepts (member-existence interfaces): the
+   *  ones whose emitted CQL own-arm reads `.value as FHIR.boolean` rather than presence. For these, `evalConcept`
+   *  reads the retained own boolean value instead of `directFacts` presence, so the CRE matches `$apply`. */
+  valueReadingIds: Set<Id>;
+  /** #189 Piece 3 (Option C) — the BOOLEAN own values a value-reading concept was populated with (a fact carrying a
+   *  boolean `value is`, code-driven onto whichever concept it is a member of). `evalConcept` reads the value: 0 → false
+   *  (no own record), all-agree → that value; CONFLICTING true+false → refuse loud (the collision posture — the
+   *  newest-wins pick would need the emitted date+id sort the CRE deliberately does not replicate). */
+  ownBoolValues: Map<Id, boolean[]>;
   /** All concept definitions in the closure, by id, with their owning library. */
   concepts: Map<Id, ConceptEntry>;
   // NOTE: the covered-library identity + file moved off Ctx in the #172 frame migration — the library is now `rootLib`
@@ -351,11 +368,16 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
   ctx.stack.add(id);
   const cyclesBefore = ctx.cycleHits;
   const entry = ctx.concepts.get(id);
-  const direct = ctx.directFacts.has(id);
+  // `runtimeErrorBefore` is captured at the TOP, before BOTH error-capable arms (the composition/reduction refuse and
+  // the value-reading direct-arm conflict refuse below), so an error raised while evaluating THIS node (directly or via
+  // a consumed operand) excludes it from memoization. ⚠ It is a monotonic boolean, not a per-eval counter: if a PRIOR
+  // sibling eval already set `ctx.runtimeError`, this eval's own refuse is masked (`erroredThisEval` false) and the
+  // result can memoize — harmless in the main run (the case is already `error`), a pre-existing limitation for the
+  // `truthOf` scratch-cache path (a robust event/counter is a separate follow-up). (disc 513, both arms.)
+  const runtimeErrorBefore = ctx.runtimeError;
   let composition: CompositionTrace | undefined;
   let composed = false;
   const def = entry?.node.definition;
-  const runtimeErrorBefore = ctx.runtimeError;
   if (def && def.type === "DefinedAsDefinition") {
     composition = walkDefinedAs(def.body, entry!.lib, ctx);
     composed = composition.satisfied;
@@ -394,6 +416,39 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
     // A code-LESS `exists this` (no `code is`, no source) is resourceless-derived: #189 (a) refuses a direct
     // name-assertion of it (the directFacts loop errors before it can populate), so its presence is always empty
     // and it computes false — the null-forever (#291) case, no longer a silent presence fabrication.
+  }
+
+  // #189 Piece 3 (Option C, disc 512) — the DIRECT-arm contribution, computed AFTER `composed` so the OR union is
+  // honored. For a value-reading boolean concept (a member-existence interface) the emitted CQL own-arm reads the
+  // newest own record's VALUE (not presence); the CRE mirrors that from the retained own boolean value. Every other
+  // concept keeps PRESENCE (`directFacts.has`) — a valueless record (Condition/`exists this`) has no value to read;
+  // existence IS its truth.
+  let direct: boolean;
+  if (ctx.valueReadingIds.has(id)) {
+    const vals = ctx.ownBoolValues.get(id) ?? [];
+    if (vals.length === 0) {
+      direct = false; // no own boolean record → own-arm `Last(...).value` = null → `is true` = false
+    } else if (vals.every((v) => v === vals[0])) {
+      direct = vals[0]; // agreeing own values → unambiguous; matches `$apply`'s newest-wins under ANY ordering
+    } else if (composed) {
+      // Conflicting own values, BUT the composed `exists` arm is already satisfied → the OR union is true regardless
+      // of which own value `$apply` picks; the conflict is NOT decisive, so no refuse (`sat = direct || composed`).
+      direct = false;
+    } else {
+      // DECISIVE conflict: composed is false, so the own-arm alone decides — and `$apply` would pick the newest by
+      // (effective, id), a sort the CRE does not replicate (charter §4 no-magic — the id is an emitter hash). Refuse
+      // loud, the same posture as a local-membership collision — a LOUD non-decision, never a silent wrong verdict.
+      ctx.runtimeError = true;
+      ctx.diagnostics.push(
+        `value-reading concept ${entry ? labelOf(entry.lib, entry.node.name) : id} was directly asserted with ` +
+          `CONFLICTING own values (both \`value is true\` and \`value is false\`) and no composed evidence; the ` +
+          `newest-wins determination cannot be resolved without the emitted record dating — run marked error rather ` +
+          `than fabricate a verdict.`,
+      );
+      direct = false;
+    }
+  } else {
+    direct = ctx.directFacts.has(id);
   }
   ctx.stack.delete(id);
   const result: ConceptEval = { sat: direct || composed, ...(composition ? { composition } : {}) };
@@ -1147,11 +1202,45 @@ function runCase(
   // accepted result, so a dropped non-member never shows in the trace as concept evidence.
   const directFacts = new Set<Id>();
   const factsByConcept = new Map<Id, string[]>();
-  const populate = (id: Id, fn: string): void => {
+  // #189 Piece 3 (Option C, disc 512) — the value-reading boolean concepts (member-existence interfaces) in the
+  // closure, and the boolean own values facts populate them with. Classification is the SHARED
+  // `isValueReadingBooleanConcept` over each concept's OWN-LIBRARY siblings (the member-existence referent is
+  // same-library), so the CRE agrees with the emitter/validator on which concepts read their value.
+  const conceptsByLib = new Map<string, Concept[]>();
+  for (const e of concepts.values()) {
+    const arr = conceptsByLib.get(e.lib) ?? [];
+    arr.push(e.node);
+    conceptsByLib.set(e.lib, arr);
+  }
+  const valueReadingIds = new Set<Id>();
+  for (const [cid, e] of concepts) {
+    if (isValueReadingBooleanConcept(e.node, conceptsByLib.get(e.lib) ?? [])) valueReadingIds.add(cid);
+  }
+  const ownBoolValues = new Map<Id, boolean[]>();
+  const populate = (id: Id, fn: string, boolVal?: boolean): void => {
     directFacts.add(id);
     const arr = factsByConcept.get(id) ?? [];
     arr.push(fn);
     factsByConcept.set(id, arr);
+    // #189 Piece 3 (Option C, disc 512/513) — a value-reading concept's own-arm reads the fact's boolean value. Record
+    // a boolean; a VALUELESS populate (bare fact, or a non-boolean `value is`) records nothing → the own-arm reads it
+    // false (0 own values), exactly as `$apply`'s `Last(where O.value is FHIR.boolean)` = null → false, so both lanes
+    // AGREE (Deny). It is an AUTHORING error, gated LOUD by the validator (+ emitter diagnostic) at author time — NOT a
+    // runtime refusal here (that would diverge from `$apply`'s verdict). Surface a non-fatal debuggability diagnostic.
+    if (valueReadingIds.has(id)) {
+      if (boolVal !== undefined) {
+        const vs = ownBoolValues.get(id) ?? [];
+        vs.push(boolVal);
+        ownBoolValues.set(id, vs);
+      } else {
+        const e = concepts.get(id);
+        diagnostics.push(
+          `fact "${fn}" populates value-reading concept ${e ? labelOf(e.lib, e.node.name) : id} with no boolean ` +
+            `value — its own-arm reads false (matching \`$apply\`). State \`value is true\` / \`value is false\` to ` +
+            `assert its determination (the validator errors on a bare/non-boolean direct assertion).`,
+        );
+      }
+    }
   };
   let membershipError: string | undefined;
   for (const fn of factRefs) {
@@ -1173,6 +1262,10 @@ function runCase(
       namedEntry.node.code.trim() !== "" &&
       typeof namedEntry.node.conceptType === "string";
     const codeField = fact.body.find((x): x is CELCodeField => x.type === "CELCodeField");
+    // #189 Piece 3 (Option C, disc 512) — the fact's boolean `value is`, if any (non-boolean → undefined). A
+    // value-reading concept's own-arm reads this; a fact carrying it is recorded per populated concept in `populate`.
+    const valueField = fact.body.find((x): x is CELValueField => x.type === "CELValueField");
+    const boolVal = typeof valueField?.value === "boolean" ? valueField.value : undefined;
 
     // D5(3) backstop: an `absent`/`negative` intent modifier on a LOCAL determination fact inverts its clinical
     // meaning, but membership sees only the code → the concept would compute PRESENT (the opposite). Refuse loud
@@ -1222,12 +1315,12 @@ function runCase(
         if (scls.kind === "coded") {
           const owners = sourceIndex.get(memberKey(name, scls.parts.system ?? "", scls.parts.code));
           if (owners && owners.length > 0) {
-            for (const o of owners) populate(o, fn);
+            for (const o of owners) populate(o, fn, boolVal);
             continue;
           }
         }
       }
-      populate(namedId, fn);
+      populate(namedId, fn, boolVal);
       continue;
     }
 
@@ -1246,7 +1339,7 @@ function runCase(
     }
     // BARE local fact (derivable base) — the DEGENERATE case: a member of the named concept by construction.
     if (!codeField) {
-      populate(namedId, fn);
+      populate(namedId, fn, boolVal);
       continue;
     }
     // AUTHORED code on a LOCAL fact = the membership/data input (code-driven, compartment-global lookup below).
@@ -1276,7 +1369,7 @@ function runCase(
     }
     const ownerId = localIndex.reverse.get(key);
     if (ownerId) {
-      populate(ownerId, fn);
+      populate(ownerId, fn, boolVal);
     } else {
       diagnostics.push(
         `fact "${fn}" code \`${cls.parts.system}|${cls.parts.code}\` is not a member of any local concept set ` +
@@ -1331,6 +1424,8 @@ function runCase(
   const ctx: Ctx = {
     directFacts,
     factsByConcept,
+    valueReadingIds,
+    ownBoolValues,
     concepts,
     cache: new Map(),
     stack: new Set(),

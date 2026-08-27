@@ -265,6 +265,24 @@ is **false**. Explicit absence is an ordinary **absence code** (a record), not a
   consumed (guard vs measure population vs operand). There is no "QM vs decision" CQL fork.
 - **No magic.** The emitter never manufactures a value a concept did not declare. Every set→scalar reduction
   is explicit in the CRL (per the value-type rule above).
+- **⭐ A VALUE-READING boolean determination requires an explicit `value is` — a bare direct assertion is an
+  AUTHOR-TIME ERROR, never a manufactured default.** A **value-reading** boolean concept is one whose emitted
+  CQL own-arm READS `.value as FHIR.boolean` rather than presence — today the **member-existence interface**
+  (`code is` + `defined as exists("V")` over a recency-value referent; extends to the deferred B2a boolean
+  `most recent this` when it emits). Its determination IS its value, so it must be stated. The honest fix is
+  **explicitness, not a default**: *defaulting a bare fact to `valueBoolean=true` would manufacture a value the
+  author never stated* — exactly the magic the bullet above bans, and the need to defend it against
+  re-litigation is the tell. The gate is **author-time**: the CEL **validator** rejects a bare / non-boolean
+  direct assertion (with a matching **emitter** diagnostic, so a caller that skips validation still sees it) and
+  tells the author to write `value is true` / `value is false`. **At runtime the two lanes still AGREE without a
+  refusal:** a valueless value-reading record reads **false** in *both* `$apply` (`Last(where value is boolean)`
+  = null → false) and the CRE (0 own boolean values → false) → both compute the same verdict (closed-world
+  Deny). The CRE refuses loud ONLY where it genuinely cannot replicate `$apply` — conflicting `true`+`false`
+  own assertions, whose newest-wins pick needs the emitted `(effective, id)` sort. A **presence-based
+  (value-blind)** boolean concept (`definition is exists this`, a `defined as` over records) is untouched —
+  bare = present = **true**, and an authored `value is` there is **ignored** (a warning: `value is false` on it
+  computes *true*; explicit absence is an absence code, not `value is false`). (disc 512/513; classification is
+  the shared `isValueReadingBooleanConcept`.)
 - **⭐ No magic in the EVAL/TEST path either — matching is EXPLICIT MEMBERSHIP, both lanes, local AND remote.**
   This is the single biggest spin-cause in #189: "clever" shortcuts that *technically work* but are impossible to
   hold in your head, so they re-confuse every reader and every compaction. **Banned in both the `$apply`/emit lane

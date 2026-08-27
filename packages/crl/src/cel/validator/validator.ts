@@ -21,7 +21,10 @@ import type {
   CELFactRefField,
   CELCrossResourceField,
   CELInclude,
+  CELValueField,
 } from "../ast/types";
+import type { Concept } from "../../ast/types";
+import { isValueReadingBooleanConcept } from "../../template-match/recencyValueConcept";
 import { buildDefinedByCandidates } from "../definedByResolve";
 import { resolveCelImports, type ResolveCelImportsOptions } from "../imports";
 import type { ResolvedCelGraph } from "../imports/types";
@@ -232,6 +235,7 @@ export function validateCEL(
     }
     validateFactCodeMembership(f, graph, domainCtx, errors, warnings, fp);
     validateSourceFactMembership(f, sourceMemberKeys, sourceTypes, warnings, fp);
+    validateBooleanValueRules(f, graph, domainCtx, errors, warnings, fp);
   }
 
   // 7. Case bodies.
@@ -541,6 +545,105 @@ function validateFactCodeMembership(
           `a deliberate wrong-code test datum, ignore; otherwise the fact will not populate "${declName}" (both ` +
           `lanes compute it absent / false).`,
         codeField.location,
+        fp,
+      ),
+    );
+  }
+}
+
+/** #189 Piece 3 (Option C, disc 512) — the VALUE-READING boolean assertion rules. A fact that directly asserts (by
+ *  qualified `defined by`) a value-reading boolean determination (a member-existence interface) MUST carry an explicit
+ *  boolean `value is` — its determination IS its value, so a bare assertion (which emits a valueless Observation the
+ *  own-arm reads as null → false, while the CRE would presence-satisfy it → true) is an ERROR that tells the author to
+ *  be explicit; a non-boolean value is the same error. Conversely, an authored `value is` on a PRESENCE-based
+ *  (value-blind) boolean concept is a WARNING — both lanes read it by existence, so the value is ignored (a
+ *  `value is false` there computes the concept TRUE). Classification is the SHARED `isValueReadingBooleanConcept`, so
+ *  the validator, the CRE, and the emitter agree on which concepts read their value. */
+function validateBooleanValueRules(
+  f: CELFact,
+  graph: ResolvedCelGraph,
+  domainCtx: LocalDomainContext,
+  errors: CELValidationError[],
+  warnings: CELValidationError[],
+  fp: string,
+): void {
+  const db = f.body.find((b): b is CELDefinedByField => b.type === "CELDefinedByField");
+  if (!db || !isQualifiedRef(db.ref)) return; // only a direct (qualified) concept assertion; bare-type facts are not this rule
+  const reg = graph.crlRegistry;
+  if (!reg) return;
+  const libName = getRefLibrary(db.ref);
+  const declName = getRefName(db.ref);
+  const lib = reg.byNameLocal.get(libName ?? "") ?? reg.byNamePackage.get(libName ?? "");
+  if (!lib) return; // unresolved library — validateDefinedBy already reports it
+  const target = buildDefinedByCandidates(lib.ast.statements).get(declName);
+  if (!target || target.type !== "Concept") return;
+
+  const siblings = lib.ast.statements.filter((s): s is Concept => s.type === "Concept");
+  const valueField = f.body.find((b): b is CELValueField => b.type === "CELValueField");
+  const codeField = f.body.find((b): b is CELCodeField => b.type === "CELCodeField");
+  const isBooleanValued = target.valueTypes.length === 1 && target.valueTypes[0] === "boolean";
+  const hasCode = typeof target.code === "string" && target.code.trim() !== "";
+
+  // MEMBERSHIP-SCOPED (disc 513, both arms): these rules concern a fact that actually POPULATES the NAMED concept — a
+  // bare fact (degenerate member of its own code) OR an authored code equal to the concept's own local member. A
+  // WRONG-code fact populates a different/no concept (owned by `fact-code-not-in-local-set`), so it must NOT trigger
+  // the value rule (that was the name-vs-membership false-positive gpt56 flagged).
+  let populatesNamed = !codeField;
+  if (codeField) {
+    const res = localMemberOfConcept(
+      target,
+      { filePath: lib.filePath, entryName: lib.name, fallbackLib: lib.ast.library.name },
+      domainCtx,
+    );
+    if (!("notLocal" in res) && !("error" in res)) {
+      const cls = classifyCanonicalToken(codeField.value);
+      populatesNamed =
+        cls.kind === "coded" && cls.parts.system === res.member.system && cls.parts.code === res.member.code;
+    } else {
+      populatesNamed = false; // cannot determine membership — stay silent rather than mis-fire
+    }
+  }
+  if (!populatesNamed) return;
+
+  if (isValueReadingBooleanConcept(target, siblings)) {
+    // Its determination is read from its value → require an explicit boolean value.
+    if (!valueField) {
+      errors.push(
+        err(
+          "value-reading-assertion-needs-boolean",
+          `Fact "${f.name}" directly asserts value-reading boolean concept "${libName}"."${declName}", whose ` +
+            `determination is read from its value — a bare assertion would emit a valueless record (read as false by ` +
+            `\`$apply\`, true by presence in the engine). State it explicitly: \`- value is true.\` or ` +
+            `\`- value is false.\``,
+          db.location,
+          fp,
+        ),
+      );
+    } else if (typeof valueField.value !== "boolean") {
+      errors.push(
+        err(
+          "value-reading-assertion-needs-boolean",
+          `Fact "${f.name}" asserts value-reading boolean concept "${libName}"."${declName}" with a non-boolean ` +
+            `\`value is ${JSON.stringify(valueField.value)}\`; it must be \`value is true\` or \`value is false\` (a ` +
+            `non-boolean value lands off the \`FHIR.boolean\` own-arm read and is dropped).`,
+          valueField.location,
+          fp,
+        ),
+      );
+    }
+    return;
+  }
+
+  // A PRESENCE-based (value-blind) boolean concept: an authored value is ignored by both lanes → warn.
+  if (isBooleanValued && hasCode && valueField) {
+    warnings.push(
+      warn(
+        "value-ignored-on-presence-concept",
+        `Fact "${f.name}" authors \`value is ${JSON.stringify(valueField.value)}\` on presence-based boolean concept ` +
+          `"${libName}"."${declName}", whose determination is computed by EXISTENCE — the value is ignored (both ` +
+          `lanes compute it true when the record is present, regardless of the value). To assert it false, omit the ` +
+          `fact (closed-world absence); explicit absence is an absence code, not \`value is false\`.`,
+        valueField.location,
         fp,
       ),
     );

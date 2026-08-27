@@ -1,0 +1,9 @@
+{
+  "name": "dme-iface",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CRE fixture — #189 Piece 3 Option C (disc 512): direct assertion of a value-reading boolean interface reads its own value in both lanes",
+  "crl": {
+    "canonicalBase": "http://example.org/hcsc/dme-iface"
+  }
+}

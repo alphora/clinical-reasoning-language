@@ -100,5 +100,28 @@ export function isMemberExistenceInterface(
   if (!(concept.valueTypes.length === 1 && concept.valueTypes[0] === "boolean")) return false;
   if (concept.conceptType !== undefined && concept.conceptType !== "Observation") return false;
   if (concept.valueElement !== undefined) return false; // an authored non-default value carrier defers
+  // The interface's OWN arm is a pure local `code is` + `defined as exists` — it carries NO `source representation`.
+  // A boolean interface with its own source rep type-validates (charter §3) but the emitter hard-errors the 3-way
+  // (`emit-mixed-code-and-definition`, lowerLocalCodes.ts) — classifying it value-reading would let the validator/CRE
+  // read a source-populated boolean as an OWN value for an emit-rejected concept. Exclude it so the shape-exact
+  // contract holds on both arms. (disc 513, Claude nit.)
+  if ((concept.representations ?? []).length !== 0) return false;
   return true;
+}
+
+/**
+ * #189 Piece 3 (Option C, disc 512) — is `concept` a VALUE-READING boolean determination: one whose emitted CQL
+ * own-arm READS `.value as FHIR.boolean` (rather than presence/`exists`)? Today this is exactly the
+ * member-existence interface; the deferred B2a boolean `most recent this` cell (recencyValueConcept.ts:52) will join
+ * the class when it emits, at which point it is added here — the SAME single predicate the CEL validator (bare/
+ * non-boolean value rules) and the CRE (own-value read) both consult, so all lanes classify identically and cannot
+ * drift. `siblingConcepts` is the concept's OWN-LIBRARY concept list (the member-existence referent is unqualified /
+ * same-library, recencyValueConcept.ts:95), from which the per-library recency-value referent set is derived — a
+ * cross-library same-named concept must NEVER activate it (disc 512, both arms).
+ */
+export function isValueReadingBooleanConcept(concept: Concept, siblingConcepts: readonly Concept[]): boolean {
+  const recencyReferents = new Set(
+    siblingConcepts.filter((c) => resolveRecencyValueConcept(c).kind === "recency-value").map((c) => c.name),
+  );
+  return isMemberExistenceInterface(concept, (name) => recencyReferents.has(name));
 }

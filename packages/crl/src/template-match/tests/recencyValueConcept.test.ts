@@ -2,7 +2,11 @@ import { describe, it, expect } from "vitest";
 
 import { buildCRL } from "../../index";
 import type { CRL, Concept } from "../../ast/types";
-import { resolveRecencyValueConcept, isMemberExistenceInterface } from "../recencyValueConcept";
+import {
+  resolveRecencyValueConcept,
+  isMemberExistenceInterface,
+  isValueReadingBooleanConcept,
+} from "../recencyValueConcept";
 
 // #189 Piece 1 (disc 506 Claude #2) — the shared recency-value shape classifier. Parses against the WORKING-TREE
 // parser (`buildCRL`), NOT the CRL MCP tool (which lags the branch). SHAPE-EXACT: only the exact both-rep
@@ -170,5 +174,49 @@ describe("isMemberExistenceInterface (#189 Piece 1, disc 507 A/B)", () => {
   it("REJECTS a `defined as` that is not `exists` (a bare ref / composition)", () => {
     const c = cdr("", '- defined as "Covered Device".\n');
     expect(isMemberExistenceInterface(c, isCovered)).toBe(false);
+  });
+});
+
+// #189 Piece 3 (Option C, disc 512) — the SHARED value-reading classifier the validator + CRE consult. It resolves
+// the member-existence referent from the concept's OWN-LIBRARY siblings (the recency-value referent set), so a
+// cross-library same-named concept never activates it.
+describe("isValueReadingBooleanConcept (#189 Piece 3, disc 512)", () => {
+  function conceptsOf(src: string): Concept[] {
+    const parsed = buildCRL(src);
+    if (!parsed.success || !parsed.result) throw new Error(`parse failed: ${JSON.stringify(parsed.errors)}`);
+    return parsed.result.statements.filter((s): s is Concept => s.type === "Concept");
+  }
+  const RECENCY_VALUE =
+    'concept "Covered Device":\n- type is Observation.\n- value type is CodeableConcept.\n- code is `covered-device`.\n' +
+    "- definition is most recent this.\n- source representation:\n  - type is ServiceRequest.\n" +
+    "  - value element is ServiceRequest.code.\n  - value type is CodeableConcept.\n  - coded from \"Covered Devices\".\n";
+  const INTERFACE =
+    'concept "Covered Device Requested":\n- type is Observation.\n- value type is boolean.\n' +
+    "- code is `covered-device-requested`.\n- defined as exists (\"Covered Device\").\n";
+  const byName = (cs: Concept[], n: string) => cs.find((c) => c.name === n)!;
+
+  it("ACCEPTS the interface when its recency-value referent is a same-library sibling", () => {
+    const cs = conceptsOf(HEADER + RECENCY_VALUE + INTERFACE);
+    expect(isValueReadingBooleanConcept(byName(cs, "Covered Device Requested"), cs)).toBe(true);
+  });
+
+  it("REJECTS the interface when the referent sibling is NOT recency-value (a plain `exists this`)", () => {
+    const plain =
+      'concept "Covered Device":\n- type is Observation.\n- value type is boolean.\n- code is `covered-device`.\n- definition is exists this.\n';
+    const cs = conceptsOf(HEADER + plain + INTERFACE);
+    expect(isValueReadingBooleanConcept(byName(cs, "Covered Device Requested"), cs)).toBe(false);
+  });
+
+  it("REJECTS the recency-value value concept itself (it is not the boolean interface)", () => {
+    const cs = conceptsOf(HEADER + RECENCY_VALUE + INTERFACE);
+    expect(isValueReadingBooleanConcept(byName(cs, "Covered Device"), cs)).toBe(false);
+  });
+
+  it("REJECTS a presence-based (`exists this`) boolean concept", () => {
+    const cs = conceptsOf(
+      HEADER +
+        'concept "Has Widget":\n- type is Observation.\n- value type is boolean.\n- code is `has-widget`.\n- definition is exists this.\n',
+    );
+    expect(isValueReadingBooleanConcept(byName(cs, "Has Widget"), cs)).toBe(false);
   });
 });
