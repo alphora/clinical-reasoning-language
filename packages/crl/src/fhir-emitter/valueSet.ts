@@ -47,6 +47,22 @@ export function valueSetId(metadata: CpgMetadata, terminologyName: string): stri
   return valueSetIdFromPolicyId(metadata.name, terminologyName);
 }
 
+/** #189 Piece 3 — the SINGLE authority for a REFERENCE-VS stub coding (`valueset is <url>`). The emitted stub is one
+ *  per-VS code (the canonical's last path segment) under a dedicated `reference-vs-stub` CodeSystem. Returns null
+ *  when the canonical has no FHIR-id-legal tail (a URN / placeholder) — such a reference cannot be mechanically
+ *  stubbed and falls back to pointer emission. Factored out of `emitValueSet` so the CEL source-membership lane
+ *  (`cel/sourceMembership.ts`, the CRE) derives the IDENTICAL `{system, code}` the FHIR ValueSet emits — both lanes
+ *  compute membership against the same mechanical set, never a runtime VS resolution (charter §3/§4). The base is the
+ *  EMITTING closure's `canonicalBase` (the same one `emitValueSet` uses), so the CRE must pass that same base. */
+export function referenceStubCoding(
+  declaredUrl: string,
+  canonicalBase: string,
+): { system: string; code: string } | null {
+  const refId = declaredUrl.split("/").filter(Boolean).pop() ?? "";
+  if (!/^[A-Za-z0-9.-]{1,64}$/.test(refId)) return null;
+  return { system: `${canonicalBase}/CodeSystem/reference-vs-stub`, code: refId };
+}
+
 /**
  * Emit one cpg-shareableValueSet from a single CRL Terminology.
  *
@@ -101,16 +117,17 @@ export function emitValueSet(
   let referenceStub: { url: string; id: string; compose: { include: Array<Record<string, unknown>> } } | null = null;
   if (isPureReference) {
     const declaredUrl = refLines[0].valuesetName;
-    const refId = declaredUrl.split("/").filter(Boolean).pop() ?? "";
-    // Apply the stub model ONLY to a proper canonical whose last path segment is a legal FHIR id (an http(s)
-    // canonical like `.../ValueSet/<oid>` or `.../ValueSet/<slug>`). A URN / placeholder (e.g.
-    // `urn:example:placeholder`) has no FHIR-id-legal tail → fall back to the pre-existing pointer emission (our
-    // slug id/url), unchanged — it is not a resolvable reference the stub could stand in for.
-    if (/^[A-Za-z0-9.-]{1,64}$/.test(refId)) {
+    // The stub model applies ONLY to a canonical whose last path segment is a legal FHIR id (an http(s) canonical
+    // like `.../ValueSet/<oid>` or `.../ValueSet/<slug>`). A URN / placeholder (`urn:example:placeholder`) has no
+    // FHIR-id-legal tail → `referenceStubCoding` returns null → fall back to the pre-existing pointer emission (our
+    // slug id/url), unchanged — it is not a resolvable reference the stub could stand in for. The derivation is the
+    // shared `referenceStubCoding` (single authority), byte-identical to the prior inline form.
+    const coding = referenceStubCoding(declaredUrl, metadata.canonicalBase);
+    if (coding) {
       referenceStub = {
         url: declaredUrl,
-        id: refId,
-        compose: { include: [{ system: `${metadata.canonicalBase}/CodeSystem/reference-vs-stub`, concept: [{ code: refId }] }] },
+        id: coding.code,
+        compose: { include: [{ system: coding.system, concept: [{ code: coding.code }] }] },
       };
     }
   }

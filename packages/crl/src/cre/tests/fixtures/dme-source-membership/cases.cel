@@ -1,0 +1,37 @@
+# Source-membership cases.
+library "SourceCases".
+covers "SourceTest".
+
+// A source ServiceRequest is authored as a bare `defined by "ServiceRequest"` + a code (the type is stated by the
+// bare FHIR type; the code decides membership — compartment-global). The stub code for the reference VS
+// "Covered Devices" is `<canonicalBase>/CodeSystem/reference-vs-stub | covered-devices` (its canonical's last path
+// segment) — the SAME mechanical stub the FHIR ValueSet + CQL retrieve use.
+
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+fact "Covered SR":
+- code is "http://example.org/hcsc/dme-source/CodeSystem/reference-vs-stub|covered-devices".
+- date is "2026-01-01".
+- defined by "ServiceRequest".
+
+fact "NonCovered SR":
+- code is "http://example.org/hcsc/dme-source/CodeSystem/reference-vs-stub|some-other-device".
+- date is "2026-01-01".
+- defined by "ServiceRequest".
+
+case "covered ServiceRequest → approve":
+- subject is "Pat".
+- fact is "Covered SR".
+- result is "D" is "Approve".
+
+case "non-covered ServiceRequest → deny":
+- subject is "Pat".
+- fact is "NonCovered SR".
+- result is "D" is "Deny".
+
+case "no ServiceRequest → deny":
+- subject is "Pat".
+- result is "D" is "Deny".

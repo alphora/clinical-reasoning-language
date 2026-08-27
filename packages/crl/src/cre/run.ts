@@ -97,6 +97,7 @@ import {
   memberKey,
   type LocalConceptMember,
 } from "../cel/localMembership";
+import { sourceMembersOfConcept } from "../cel/sourceMembership";
 import type { LsLocation } from "../language-services/contracts";
 import { toZeroBasedRange } from "../language-services/contracts";
 // childId + idOf/nameOf are single-sourced in ast/ (natural layer direction); re-exported here for existing consumers
@@ -430,7 +431,9 @@ function walkDefinedAs(
   // to `exists` specifically — so `exists` inheriting it consistently is correct; loud-erroring only the
   // `exists` cell would be incoherent. Record-level refinement evaluation is a deferred CRE effort.
   if (body.type === "DefinedAsExists") {
-    return refTrace(body.ref, lib, ctx);
+    // #189 Piece 3 (v7 §3) — via `existsTrace`, so `exists` over a `most recent this` / `count` value concept reads
+    // record EXISTENCE instead of erroring on the value reduction (the `Covered Device` both-rep coverage gate).
+    return existsTrace(body.ref, lib, ctx);
   }
   if (body.type === "DefinedAsBooleanComposition") {
     // #189 Slice 0b — CLOSED-WORLD eval of a `defined as` BOOLEAN composition (`("A" and "B")`): `and`/`or`/
@@ -544,6 +547,25 @@ function refTrace(ref: ReferenceName, lib: string, ctx: Ctx): CompositionTrace {
     satisfied: ev.sat,
     ...(ev.composition ? { composition: ev.composition } : {}),
   };
+}
+
+/** #189 Piece 3 (v7 §3) — the existence reach-through for `defined as exists ("X")`. `exists(X)` = "does a member
+ *  record of X exist". When X is a VALUE concept whose datum is a `most recent this` / `count` reduction (the
+ *  both-rep `Covered Device` shape), the reduction selects/aggregates a VALUE over X's OWN records — it does NOT
+ *  gate their EXISTENCE. `evalConcept` marks such a reduction a `runtimeError` (it cannot evaluate the value), which
+ *  would poison an existence read that never needed the value. So here existence is X's `directFacts` presence
+ *  (a local- or source-member fact populated it), computed WITHOUT evaluating the reduction — matching the emitted
+ *  CQL `exists(<X records>)`, which is total. Every OTHER target (plain records, `exists this`, `exists "Y"`, a
+ *  `defined as` composition) does not error in `evalConcept`, so it keeps the existing `refTrace` presence answer. */
+function existsTrace(ref: ReferenceName, lib: string, ctx: Ctx): CompositionTrace {
+  const refLib = getRefLibrary(ref) ?? lib;
+  const name = getRefName(ref);
+  const id = idOf(refLib, name);
+  const def = ctx.concepts.get(id)?.node.definition;
+  if (def?.type === "ReductionDefinition" && (def.reduction.kind === "count" || def.reduction.kind === "mostRecent")) {
+    return { op: "ref", concept: name, satisfied: ctx.directFacts.has(id) };
+  }
+  return refTrace(ref, lib, ctx);
 }
 
 function walkExpr(expr: CompositionExpression, lib: string, ctx: Ctx): CompositionTrace {
@@ -1065,6 +1087,30 @@ function buildLocalMembershipIndex(
   return { forward, reverse, collisions, hasProject: graph.projectRoot !== undefined };
 }
 
+/** #189 Piece 3 — the SOURCE-membership reverse index: `(fhirType, system, code)` → the concept id(s) whose source
+ *  set contains it, derived from the SAME mechanical set the FHIR/CQL lane emits (`sourceMembersOfConcept`). A
+ *  MULTIMAP (not single-owner like the local index): two concepts may legitimately `coded from` the same reference
+ *  VS and share its stub coding — BOTH populate, matching `$apply`'s two independent retrieves (charter §4 "the code
+ *  populates whichever rep(s) it is a member of"; the local-local collision refuse does NOT extend to source overlap,
+ *  which is well-formed). The fhirType in the key is the POSREP's `type is` (e.g. ServiceRequest). */
+function buildSourceMembershipIndex(
+  concepts: Map<Id, ConceptEntry>,
+  graph: ResolvedCelGraph,
+): Map<string, Id[]> {
+  const base = makeLocalDomainContext(graph).base;
+  const registry = graph.crlRegistry;
+  const reverse = new Map<string, Id[]>();
+  for (const [id, entry] of concepts) {
+    for (const m of sourceMembersOfConcept(entry.node, base, registry)) {
+      const key = memberKey(m.fhirType, m.system, m.code);
+      const arr = reverse.get(key) ?? [];
+      arr.push(id);
+      reverse.set(key, arr);
+    }
+  }
+  return reverse;
+}
+
 function runCase(
   c: CELCase,
   decisions: Map<string, Decision>,
@@ -1073,6 +1119,7 @@ function runCase(
   filePath: string,
   concepts: Map<Id, ConceptEntry>,
   localIndex: LocalMembershipIndex,
+  sourceIndex: Map<string, Id[]>,
   resolveDecision: (callerLib: string, ref: ReferenceName) => ResolvedDecision | undefined,
   // #236 — per-library criterion tables for reference-and-evaluate (threaded onto Ctx; a criterion
   // guard resolves its body here at eval time instead of being inline-expanded up front).
@@ -1162,6 +1209,24 @@ function runCase(
     // `code is` concept is assertable per charter §3; the fix is honoring the implicit type / rejecting empty code,
     // its own slice #299). Do NOT read this as "resource-bearing": cell (3) has a representation but no resource yet.
     if (!isLocalShape) {
+      // #189 Piece 3 — SOURCE membership (compartment-global, the code decides): a fact carrying a coded token —
+      // typically a bare `defined by "<FhirType>"` + `code is <member>`, whose fhirType is `name` — populates EVERY
+      // concept whose SOURCE set contains `(name, system, code)`, the SAME mechanical set the FHIR ValueSet + CQL
+      // retrieve use (a covered ServiceRequest → the `Covered Device` source rep). ADDITIVE: a fact that matches a
+      // source set is intercepted here; anything else (a non-member code, or a top-level `coded from` concept whose
+      // source membership is a later slice) falls through UNCHANGED to the existing name-population below — so a
+      // non-covered ServiceRequest still leaves `Covered Device` unpopulated (name-populates a concept-less type id
+      // that nothing reads → not covered), matching `$apply`, without regressing the pre-Piece-3 cells.
+      if (codeField) {
+        const scls = classifyCanonicalToken(codeField.value);
+        if (scls.kind === "coded") {
+          const owners = sourceIndex.get(memberKey(name, scls.parts.system ?? "", scls.parts.code));
+          if (owners && owners.length > 0) {
+            for (const o of owners) populate(o, fn);
+            continue;
+          }
+        }
+      }
       populate(namedId, fn);
       continue;
     }
@@ -1397,6 +1462,7 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
   // #189 Piece 2 (disc 508) — build the local membership index ONCE: derive each local concept's `{system, code}`
   // set via the SAME resolver the emitter/CQL lane uses, so the tree lane and `$apply` agree by construction.
   const localIndex = buildLocalMembershipIndex(concepts, graph);
+  const sourceIndex = buildSourceMembershipIndex(concepts, graph);
 
   const facts = new Map<string, CELFact>();
   for (const s of graph.cel.statements) {
@@ -1416,6 +1482,7 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
           filePath,
           concepts,
           localIndex,
+          sourceIndex,
           resolveDecision,
           criterionTablesByLib,
         ),

@@ -68,18 +68,33 @@ function assertProducedSubsetOfArms(crlSrc: string, celSrc: string): void {
 describe("CRE — runCel", () => {
   // DEFERRED (disc 496 — "tooling catches up to the oracle"): dme101-030 is now the #189-flip
   // acceptance oracle and carries the both-representation device + age concepts. The CRE evaluates the
-  // decision LOGIC correctly (device gate passes, age-via-local-arm passes, nonunion → Approve — verified
-  // in the trace), but the run reports status=error because the CRE's concept-evaluation does not yet
-  // handle the both-rep POSREP (the age `value projection is age today …`) — a CRE gap parallel to the emit
-  // flip deferral. `it.fails` documents this and SELF-TRACKS: when the CRE learns to evaluate the age posrep
-  // (the both-rep concept-eval), this test starts passing and `it.fails` flags it for un-deferral. Tracked
-  // on the #189 flip issue (CRE both-rep posrep catch-up).
-  it.fails("dme101-030: all 3 real cases pass against the fixture (end-to-end) — DEFERRED, CRE both-rep posrep", () => {
+  // #189 Piece 3 — NOW PASSES. The run previously errored because `Covered Device Requested = exists ("Covered
+  // Device")` evaluated `Covered Device`'s `most recent this` reduction, which the CRE marks a runtimeError. The
+  // Piece-3 existence reach-through (`existsTrace`, v7 §3) reads record EXISTENCE instead: the bare
+  // `Covered Stimulator Ordered` fact is a local degenerate member of `Covered Device` (Piece 2), so
+  // `exists("Covered Device")` is true without touching the value reduction. (Age passes via its LOCAL arm — a bare
+  // degenerate member — as before; the age `value projection` $apply path is separate and unexercised in the CRE.)
+  it("dme101-030: all 3 real cases pass against the fixture (end-to-end)", () => {
     const celPath = join(__dirname, "../../tests/fixtures/policies/dme101-030/dme101-030.cel");
     const r = runCel(resolveCelImports(celPath));
     expect(r.success).toBe(true);
     expect(r.runs.length).toBe(3);
     expect(r.runs.every((x) => x.status === "pass")).toBe(true);
+  });
+
+  // #189 Piece 3 — SOURCE-set membership: a ServiceRequest coded member of the reference VS "Covered Devices"
+  // populates the both-rep `Covered Device` via its SOURCE arm (the code decides, compartment-global), the boolean
+  // interface `exists ("Covered Device")` reads it → covered. A non-member ServiceRequest (wrong code) is closed-
+  // world absent → not covered. Membership is the mechanical stub set, IDENTICAL to what the FHIR ValueSet + CQL
+  // retrieve use — so the CRE agrees with `$apply` by construction.
+  it("source membership: a covered ServiceRequest populates the source arm; a non-member does not", () => {
+    const celPath = join(__dirname, "fixtures/dme-source-membership/cases.cel");
+    const r = runCel(resolveCelImports(celPath));
+    expect(r.runs.map((x) => `${x.case}:${x.status}`)).toEqual([
+      "covered ServiceRequest → approve:pass",
+      "non-covered ServiceRequest → deny:pass",
+      "no ServiceRequest → deny:pass",
+    ]);
   });
 
   const COVERAGE_CRL = `# T

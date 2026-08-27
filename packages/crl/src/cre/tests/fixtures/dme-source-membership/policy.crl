@@ -1,0 +1,38 @@
+# Source-membership fixture — the Covered Device both-rep coverage gate.
+library "SourceTest".
+
+// The VALUE concept `Covered Device` has a local Observation arm AND a ServiceRequest source arm scoped to a
+// reference VS (North Star §3 value/interface convention); the BOOLEAN INTERFACE reads member existence. This
+// exercises the SOURCE arm — a ServiceRequest coded member of "Covered Devices" populates `Covered Device`.
+
+terminology "Covered Devices":
+- valueset is `http://example.org/hcsc/dme-source/ValueSet/covered-devices`.
+
+concept "Covered Device":
+- type is Observation.
+- value type is CodeableConcept.
+- code is `covered-device`.
+- definition is most recent this.
+- source representation:
+  - type is ServiceRequest.
+  - value element is ServiceRequest.code.
+  - value type is CodeableConcept.
+  - coded from "Covered Devices".
+
+concept "Covered Device Requested":
+- type is Observation.
+- value type is boolean.
+- code is `covered-device-requested`.
+- defined as exists ("Covered Device").
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `approve`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `deny`.
+
+decision "D":
+first:
+- when "Covered Device Requested" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
