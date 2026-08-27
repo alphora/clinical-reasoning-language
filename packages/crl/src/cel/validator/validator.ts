@@ -26,7 +26,8 @@ import { buildDefinedByCandidates } from "../definedByResolve";
 import { resolveCelImports, type ResolveCelImportsOptions } from "../imports";
 import type { ResolvedCelGraph } from "../imports/types";
 import { classifyCanonicalToken } from "../canonicalToken";
-import { makeLocalDomainContext, localMemberOfConcept, type LocalDomainContext } from "../localMembership";
+import { makeLocalDomainContext, localMemberOfConcept, memberKey, type LocalDomainContext } from "../localMembership";
+import { sourceMembersOfConcept } from "../sourceMembership";
 import { hasSourceBinding, isResourcelessDerived } from "../../emit/conceptDatumSignals";
 
 import type {
@@ -219,8 +220,9 @@ export function validateCEL(
     validateInclude(inc, graph, errors, warnings, fp);
   }
 
-  // 6. Fact body `defined by` resolution + #189 Piece 2 local-membership warning.
+  // 6. Fact body `defined by` resolution + #189 Piece 2 local-membership + Piece 3 source-membership warnings.
   const domainCtx = makeLocalDomainContext(graph);
+  const { keys: sourceMemberKeys, types: sourceTypes } = buildSourceMembership(graph, domainCtx.base);
   for (const f of cel.statements) {
     if (f.type !== "CELFact") continue;
     for (const fb of f.body) {
@@ -229,6 +231,7 @@ export function validateCEL(
       }
     }
     validateFactCodeMembership(f, graph, domainCtx, errors, warnings, fp);
+    validateSourceFactMembership(f, sourceMemberKeys, sourceTypes, warnings, fp);
   }
 
   // 7. Case bodies.
@@ -537,6 +540,64 @@ function validateFactCodeMembership(
           `concept it names ("${libName}"."${declName}" = \`${res.member.system}|${res.member.code}\`). If this is ` +
           `a deliberate wrong-code test datum, ignore; otherwise the fact will not populate "${declName}" (both ` +
           `lanes compute it absent / false).`,
+        codeField.location,
+        fp,
+      ),
+    );
+  }
+}
+
+/** #189 Piece 3 — the compartment-global SOURCE membership: every `(fhirType, system, code)` any concept publishes
+ *  across its `source representation:` posreps (the mechanical stub/inline set, `sourceMembersOfConcept`), plus the
+ *  set of resource TYPES that appear as a source rep. A bare-type source fact is checked against these. */
+function buildSourceMembership(
+  graph: ResolvedCelGraph,
+  base: string | undefined,
+): { keys: Set<string>; types: Set<string> } {
+  const keys = new Set<string>();
+  const types = new Set<string>();
+  const reg = graph.crlRegistry;
+  if (!reg || !base) return { keys, types };
+  for (const e of [...reg.byNamePackage.values(), ...reg.byNameLocal.values()]) {
+    for (const s of e.ast.statements) {
+      if (s.type !== "Concept") continue;
+      for (const m of sourceMembersOfConcept(s, base, reg)) {
+        keys.add(memberKey(m.fhirType, m.system, m.code));
+        types.add(m.fhirType);
+      }
+    }
+  }
+  return { keys, types };
+}
+
+/** #189 Piece 3 — the SOURCE-membership WARNING. A BARE-TYPE fact (`defined by "<FhirType>"` + `code is <token>`,
+ *  the sanctioned source authoring) whose FhirType matches a concept's source rep but whose code is a member of NO
+ *  source set populates nothing. Scoped to source-rep TYPES so a plain bare-type resource (e.g. a context Encounter)
+ *  is never warned. Advisory (a deliberate non-covered datum is legitimate), like the local wrong-code warning. */
+function validateSourceFactMembership(
+  f: CELFact,
+  sourceMemberKeys: Set<string>,
+  sourceTypes: Set<string>,
+  warnings: CELValidationError[],
+  fp: string,
+): void {
+  const codeField = f.body.find((b): b is CELCodeField => b.type === "CELCodeField");
+  if (!codeField) return; // bare fact — no authored code to check
+  const db = f.body.find((b): b is CELDefinedByField => b.type === "CELDefinedByField");
+  if (!db || isQualifiedRef(db.ref)) return; // only a BARE-TYPE fact (a qualified concept ref is the local lane)
+  const fhirType = getRefName(db.ref);
+  if (!sourceTypes.has(fhirType)) return; // not a source-rep type → a plain bare-type resource, nothing to check
+  const cls = classifyCanonicalToken(codeField.value);
+  if (cls.kind !== "coded") return; // malformed / systemless → a non-member anyway, not this warning's concern
+  const key = memberKey(fhirType, cls.parts.system ?? "", cls.parts.code);
+  if (!sourceMemberKeys.has(key)) {
+    warnings.push(
+      warn(
+        "fact-code-not-in-source-set",
+        `Fact "${f.name}" (type ${fhirType}) authors code \`${codeField.value}\`, which is a member of no concept's ` +
+          `source set. If this is a deliberate non-covered datum, ignore; otherwise it populates nothing (both lanes ` +
+          `compute the concept absent / false). A reference-VS member is the STUB code ` +
+          `\`<canonicalBase>/CodeSystem/reference-vs-stub|<valueset-url-tail>\`, not a real terminology code.`,
         codeField.location,
         fp,
       ),

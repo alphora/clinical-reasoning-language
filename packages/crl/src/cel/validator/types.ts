@@ -27,6 +27,13 @@ export type CELValidationErrorKind =
   // false in both lanes), but it is usually an author mistake, so it is surfaced. (A MALFORMED token is the
   // emitter's `local-authored-code-malformed` error, not this.)
   | "fact-code-not-in-local-set"
+  // #189 Piece 3 — a BARE-TYPE source fact (`defined by "<FhirType>"` + `code is <token>`, the sanctioned source
+  // authoring) whose `(fhirType, system, code)` is a member of NO concept's SOURCE set (the mechanical stub set of
+  // a `coded from` reference/instantiated VS). It populates nothing (closed-world → the concept it would feed is
+  // false in BOTH lanes). A WARNING, not an error: a deliberate non-covered datum is legitimate (that IS the
+  // not-covered test), but a typo'd stub code is the common mistake, so it is surfaced. Reference-VS membership is
+  // the STUB code (`<canonicalBase>/CodeSystem/reference-vs-stub | <VS-url-tail>`), NOT a real terminology code.
+  | "fact-code-not-in-source-set"
   // #189 Piece 2 (disc 508 / impl-review gpt56 #4) — a fact naming a LOCAL concept authors a MALFORMED canonical
   // `code is` token (empty code, or a pipe with an empty system/code). The emitter skips it (invalid FHIR); the
   // validator flags it lane-neutrally as an ERROR (a KE author validating without emitting still sees it).
