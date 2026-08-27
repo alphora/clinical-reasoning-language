@@ -49,6 +49,10 @@ function terminologyMembers(term: Terminology, base: string): { system: string; 
   let lastSystem: string | null = null;
   for (const line of term.body) {
     if (line.type === "TerminologySystem") lastSystem = (line as TerminologySystem).system;
+    // A `valueset is` line resets the current system to null — EXACTLY as `valueSet.ts buildCompose` does, so a
+    // `code is` following it (a mixed/validator-bypassing body) is skipped in BOTH lanes rather than mis-paired to
+    // the preceding system (panel sanity pass — a real drift the emit lane does not have).
+    else if (line.type === "TerminologyValueset") lastSystem = null;
     else if (line.type === "TerminologyCode" && lastSystem !== null) {
       out.push({ system: lastSystem, code: (line as TerminologyCode).code });
     }
