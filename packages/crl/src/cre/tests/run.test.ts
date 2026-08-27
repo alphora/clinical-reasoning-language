@@ -87,13 +87,15 @@ describe("CRE — runCel", () => {
   // interface `exists ("Covered Device")` reads it → covered. A non-member ServiceRequest (wrong code) is closed-
   // world absent → not covered. Membership is the mechanical stub set, IDENTICAL to what the FHIR ValueSet + CQL
   // retrieve use — so the CRE agrees with `$apply` by construction.
-  it("source membership: a covered ServiceRequest populates the source arm; a non-member does not", () => {
+  it("source membership: the coverage gate is reached via local, remote, or mixed facts; a non-member is not covered", () => {
     const celPath = join(__dirname, "fixtures/dme-source-membership/cases.cel");
     const r = runCel(resolveCelImports(celPath));
     expect(r.runs.map((x) => `${x.case}:${x.status}`)).toEqual([
-      "covered ServiceRequest → approve:pass",
+      "local only → approve:pass",
+      "remote only → approve:pass",
+      "mixture (local + remote) → approve:pass",
       "non-covered ServiceRequest → deny:pass",
-      "no ServiceRequest → deny:pass",
+      "no device → deny:pass",
     ]);
   });
 

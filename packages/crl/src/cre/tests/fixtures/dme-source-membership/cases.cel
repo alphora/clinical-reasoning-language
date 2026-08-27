@@ -1,37 +1,61 @@
-# Source-membership cases.
+# Source-membership cases — the same coverage gate reached three ways.
 library "SourceCases".
 covers "SourceTest".
 
-// A source ServiceRequest is authored as a bare `defined by "ServiceRequest"` + a code (the type is stated by the
-// bare FHIR type; the code decides membership — compartment-global). The stub code for the reference VS
-// "Covered Devices" is `<canonicalBase>/CodeSystem/reference-vs-stub | covered-devices` (its canonical's last path
-// segment) — the SAME mechanical stub the FHIR ValueSet + CQL retrieve use.
+// There is NO channel setting: a case is local / remote / mixed purely by which codes its facts carry. The stub
+// code for the reference VS "Covered Devices" is `<canonicalBase>/CodeSystem/reference-vs-stub | covered-devices`
+// (its canonical's last path segment) — the SAME mechanical stub the FHIR ValueSet + CQL retrieve use.
 
 fact "Pat":
 - name is "Pat".
 - birth date is "1970-01-01".
 - defined by "Patient".
 
-fact "Covered SR":
+// LOCAL arm: a bare `defined by "<concept>"` is the degenerate member of the concept's LOCAL set (emits an
+// Observation with the concept's own `covered-device` code).
+fact "Local Covered Device":
+- date is "2026-01-01".
+- defined by "SourceTest"."Covered Device".
+
+// SOURCE arm: a bare `defined by "ServiceRequest"` + the stub code — the type is the bare FHIR type, the code
+// decides membership. Emits a ServiceRequest carrying the stub code.
+fact "Source Covered SR":
 - code is "http://example.org/hcsc/dme-source/CodeSystem/reference-vs-stub|covered-devices".
 - date is "2026-01-01".
 - defined by "ServiceRequest".
 
-fact "NonCovered SR":
+// A NON-covered ServiceRequest — a real request, code is NOT the stub member → member of no set → closed-world.
+fact "Source NonCovered SR":
 - code is "http://example.org/hcsc/dme-source/CodeSystem/reference-vs-stub|some-other-device".
 - date is "2026-01-01".
 - defined by "ServiceRequest".
 
-case "covered ServiceRequest → approve":
+// LOCAL-only: coverage via the local Observation arm.
+case "local only → approve":
 - subject is "Pat".
-- fact is "Covered SR".
+- fact is "Local Covered Device".
 - result is "D" is "Approve".
 
+// REMOTE-only: coverage via the source ServiceRequest arm.
+case "remote only → approve":
+- subject is "Pat".
+- fact is "Source Covered SR".
+- result is "D" is "Approve".
+
+// MIXTURE: both arms present (a local Observation AND a source ServiceRequest) — still covered.
+case "mixture (local + remote) → approve":
+- subject is "Pat".
+- fact is "Local Covered Device".
+- fact is "Source Covered SR".
+- result is "D" is "Approve".
+
+// NOT covered: a ServiceRequest whose code is not the covered member.
 case "non-covered ServiceRequest → deny":
 - subject is "Pat".
-- fact is "NonCovered SR".
+- fact is "Source NonCovered SR".
 - result is "D" is "Deny".
 
-case "no ServiceRequest → deny":
+// No device at all → not covered.
+case "no device → deny":
 - subject is "Pat".
 - result is "D" is "Deny".
