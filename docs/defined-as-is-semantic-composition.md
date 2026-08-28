@@ -18,11 +18,11 @@
 
 ## The principle, in one paragraph
 
-In CRL, a concept declared with `defined as ( ... )` is a NEW concept whose `type` and `valuetype` are declared by the AUTHOR. The inference body — `sem-and`, `sem-or`, `sem-not` — describes HOW the meaning of the new concept is inferred from existing concepts (semantic intersection / union / exclusion of ONE concept's representations, components, or facets). It does NOT type-check the operands against each other or against the result. The author owns the semantic claim; the implementation (the CQL emitter, the runtime) is responsible for figuring out HOW to combine the operands' values to produce the declared result.
+In CRL, a concept declared with `defined as ( ... )` is a NEW concept whose `type` and `valuetype` are declared by the AUTHOR. The inference body — `sem-and`, `sem-or`, `sem-not` — describes HOW the meaning of the new concept is inferred from existing concepts (semantic intersection / union / exclusion of ONE concept's representations, components, or facets). It does NOT type-check the operands against each other or against the result. The author owns the semantic claim; the implementation (the CQL emitter, the runtime) is responsible for figuring out HOW to combine the operands' values to produce the declared result — where **HOW is the TARGET-language realization (which CQL expression, which FHIR element), NEVER a CRL operation the author could have written**. See [CRL-NORTH-STAR.md](CRL-NORTH-STAR.md) §0.
 
 `sem-and` is NOT boolean `AND` with strict operand-type matching. It is a SEMANTIC operator: "the resulting concept's meaning is the intersection of the operand concepts' meanings, interpreted in the result's type/valuetype." Same for `sem-or` (union of meanings) and `sem-not` (exclusion of meaning).
 
-This is the same "What not How" principle CRL applies elsewhere: the author declares WHAT a concept means; the implementation handles HOW to compute it.
+This is the same "What not How" principle CRL applies elsewhere: the author declares WHAT a concept means; the implementation handles HOW to compute it — where **HOW is the TARGET-language realization (which CQL expression, which FHIR element), NEVER a CRL operation the author could have written**. See [CRL-NORTH-STAR.md](CRL-NORTH-STAR.md) §0.
 
 ---
 
@@ -143,7 +143,7 @@ Two reasons.
 
 **Authoring ergonomics.** CRL is meant to be authored by clinicians and clinical-content modelers, not type-system specialists. Forcing them to maintain operand-type alignment across composition bodies — including refactoring composition trees when types change — is a productivity tax for no semantic gain. Let them declare what they mean.
 
-**"What not How" as a discipline.** CRL deliberately separates declarative intent (author-facing) from implementation strategy (emitter-facing). Type-checking sem-* operands strictly is mixing the two layers: it pushes implementation concerns (how the CQL will compose) into the authoring layer. The principle says: keep them separate. Authors declare; emitters translate.
+**"What not How" as a discipline.** CRL deliberately separates declarative intent (author-facing) from implementation strategy (emitter-facing). Type-checking sem-* operands strictly is mixing the two layers: it pushes implementation concerns (how the CQL will compose) into the authoring layer. The principle says: keep them separate. Authors declare; emitters **translate** — translate, and nothing more — where **HOW is the TARGET-language realization (which CQL expression, which FHIR element), NEVER a CRL operation the author could have written**. See [CRL-NORTH-STAR.md](CRL-NORTH-STAR.md) §0. Inserting an `exists` the author did not write is not translating the declaration; it is writing CRL on their behalf, which is why the implicit bridge retires.
 
 ---
 

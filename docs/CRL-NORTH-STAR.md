@@ -10,6 +10,44 @@ current; see "Reconciliation" at the end.
 
 ---
 
+## 0. ⭐ The design priority: ease of use → CLARITY of use
+
+**This is a reading rule for the whole document — and for every rule anywhere in this project.**
+
+CRL began by optimizing for a **human** author: fewer keystrokes, less to state, the toolchain filling in the
+rest. **That is no longer the priority.** The authors are overwhelmingly **AI agents**, and the asymmetry that
+governs them runs the other way:
+
+- **Writing explicit, verbose CRL is nearly free** for an AI author.
+- **An invisible gap between what the CRL says and what it does is expensive** — it costs a fumble, a drop
+  into CQL / FHIR / trace / `$apply` to diagnose it, and then a workaround permanently encoded *around* the
+  tool.
+
+So the property CRL optimizes for is **written == executed**: a determination behaves the way its CRL reads,
+with nothing inserted in between. **Verbosity is a price worth paying for that; convenience is not a reason to
+break it.** §4.0 is this principle applied to the emitter.
+
+⚠ **Anything you find in OPPOSITION to this should be QUESTIONED — including a rule in ALL CAPS, including an
+operator escalation, including a sentence in this document.** Emphasis is not evidence. A great deal of the
+existing doctrine was written under the OLD priority, so it optimizes for the author saying *less* — which is
+exactly what now needs re-examining, and it will not announce itself.
+
+That is **question**, not overrule. A QUOTED operator requirement is retired only by the operator
+(`.claude/skills/stale-requirements`). It means: **raise it, say which priority it was written under, and get
+a ruling** — instead of deferring to the loudest formatting on the page.
+
+### The rule most often misread this way: "What not How"
+
+It **stands**. Authors declare WHAT a concept means; the emitter decides HOW. But **"How" is the TARGET-language
+realization** — which CQL expression, which FHIR element, which retrieve — **never a CRL operation.**
+
+⚠ Where older docs say the implementation "figures out HOW to compute the declared result," that has been read
+as licence to *insert CRL semantics* the author didn't write (the implicit `exists` bridge is the live
+example). **If the "how" the emitter picked is something the author could have written in CRL, the principle
+was misapplied** — that is §4.0's test, and it is the narrowing, not a new rule.
+
+---
+
 ## 1. What CRL is
 
 CRL (Clinical Reasoning Language) is a **declarative** language for clinical logic. Authors declare **what**
@@ -307,11 +345,76 @@ closed-world (absent record = `false`) and never pauses. Only a concept with a s
 
 ## 4. Emit principles
 
+### ⭐ 4.0 THE TEST for emitter magic — *"does it invent CRL expression?"*
+
+**QUOTED (operator, 2026-08-28) — this is the test; use it and no other:**
+
+> *"The emitter should translate natural CRL into CQL/FHIR, where one CRL can be many of one or even both.
+> That's the true intent of emit. **What it shouldn't do is invent CRL expression.**"*
+
+**Does the emitter write something the author could and should have written IN CRL?** Yes ⇒ magic, remove it.
+No ⇒ it is translation, which is the job.
+
+**QUOTED (the KE consumers of CRL, 2026-08-28) — why the category is a net negative:**
+
+> - Emitter magic that inserts/bridges semantics I didn't write is a net negative **as a category** — not for
+>   keystrokes (free for an AI author) but because it breaks **written == executed**, the property I lean on
+>   hardest.
+> - The fumble has a **fixed shape** — write intent → runs green → behaviour diverges from how it reads → I
+>   catch it only by dropping to a lower layer (CQL/FHIR/trace/`$apply`) → then encode around the tool. Magic
+>   only ever feeds that loop.
+> - I want full, uniform, **nestable** expressivity everywhere — the parts of CRL I can already nest
+>   (`defined as`, compound `when`) are the parts I **never** fumble; every fumble is where the expressive form
+>   is absent and I route around it (extra declarations, asserting paths through the trace).
+> - The asymmetry that should drive the call: generating explicit/verbose is nearly free for me; an invisible
+>   intent↔execution gap is expensive. So: **make me write it** — provided the expressive form exists, or the
+>   "workaround" is just tedious magic of another kind.
+
+⭐ **That last clause is a PRECONDITION, not a caveat.** "Make me write it" is only honest where the CRL form
+EXISTS. Deleting a bridge before the author can express the same thing strands them — so the expressive form
+lands **first**, and the bridge becomes an author-time error **after**. (The live instance: reduction nesting
+must precede removing the `exists` shape bridges.)
+
+#### ⚠ TWO WRONG TESTS — do not re-derive them
+
+1. **"Does the emitter choose among defensible semantics?"** — fires on every **target-language** decision:
+   the FHIR envelope, record selection, and null handling **that does not change a determination's value**.
+   None of those are CRL meaning. **Measured: five false positives out of eight rows** in the 2026-08-28
+   audit, including the alarming-and-wrong conclusion that #189's own fix was built out of the same magic.
+   ⚠ **The qualifier is load-bearing, and it was missing for one round.** Null handling that SUPPLIES a
+   determination value — `Coalesce(<unanswered question>, false)` publishes `false` where no representation
+   stated it — is banned by the determination-value bullet below, whatever it is called. Both review arms
+   caught the unqualified version shielding exactly that defect class.
+2. **Treating "hiding unrelated target considerations" as magic** — that is what emit is FOR. Plumbing the
+   author *cannot* write in CRL can never be an invented CRL expression.
+
+#### The two carve-outs this test settles
+
+- **The FHIR structural floor is NOT magic.** `Observation.status`, `Condition.clinicalStatus`, `category` are
+  **not expressible in CRL at all**, so there is no CRL syntax the emitter is standing in for. Supplying a
+  valid FHIR envelope is emit doing its job. ⚠ The "never manufactures a value" bullet below means the
+  **concept's DETERMINATION value** — *not* any FHIR element value. Reading it as the latter conflates CRL
+  semantics with target plumbing; it is a category error and it has been made.
+- **PAUSE is NOT magic.** There is no CRL syntax for "pause" and there should not be. What the author declares
+  is *a boolean determination with a local `code is` and no derivation*. From that, **"nothing can compute
+  this" follows necessarily** — it is not a choice among semantics — and "a decision cannot proceed past
+  something with no value" follows from that. written==executed holds: what is **written** (nothing can
+  compute this) is what **executes** (unknown → halt).
+
+  ⚠ **DERIVED — two invariants. If either breaks, pause BECOMES magic:**
+  1. The classification stays **derivable from the declaration** (mechanical — `isPureQuestionConcept`),
+     never a judgment the emitter makes.
+  2. The **CRE pauses identically**, so the author learns the behaviour from the lane they already run,
+     without having to express it.
+
+---
+
 - **Representations emit FHIR instances; `defined as` / `definition is` emit CQL (logic), not instances.**
 - **CQL is context-free.** A concept's CQL is a pure function of its own definition — never of how it is
   consumed (guard vs measure population vs operand). There is no "QM vs decision" CQL fork.
-- **No magic.** The emitter never manufactures a value a concept did not declare. Every set→scalar reduction
-  is explicit in the CRL (per the value-type rule above) — where "explicit" means **it has a declared source**,
+- **No magic** (§4.0 is the test). The emitter never manufactures a concept's **determination value** — the
+  value CRL declares. (It DOES supply target-language plumbing CRL cannot express; that is not this rule.)
+  Every set→scalar reduction is explicit in the CRL (per the value-type rule above) — where "explicit" means **it has a declared source**,
   either a written reduction (`exists this` / `most recent this` / a `defined as`) or a REPRESENTATION whose
   semantics supply it. The two representation-supplied reductions are the `value projection` posrep
   (patient age) and the **pure question**'s newest-answer read (§3). Both are declared on the page; neither is
@@ -506,7 +609,17 @@ When you review CRL logic, emit, or representation design, measure it against **
   as a test shim or push concepts toward chart-matching source reps to "fix" round-trip.
 - A concept is **self-describing**: its **value type** decides whether a reduction is owed; its **cardinality**
   is declared; its CQL is **context-free**.
-- The emitter manufactures **nothing** — flag any place a value appears that the concept didn't declare.
+- **Apply §4.0's test to any "magic" finding before you file it:** does the emitter write something the author
+  could and should have written **in CRL**? If yes, flag it. If the emitter is supplying **target-language
+  plumbing CRL cannot express** (a FHIR required element, a null-handling choice, a record selection), that is
+  translation — emit's job — and a finding against it is a false positive. The rule is that the emitter
+  manufactures no **determination value**, not that it emits no value.
+- **§4.0 is the test for MAGIC — it is not the only test.** Two independent rules catch what it does not, and
+  a finding under either stands on its own:
+  - **No manufactured determination value.** Flag any place the emitted logic supplies a determination value
+    no representation stated — including via null handling.
+  - **written == executed (§0).** Flag any place **two CRL forms that read the same execute differently**, or
+    where behaviour is only discoverable by dropping to the emitted CQL/FHIR.
 - **Case-features are any resource** (§4): flag any reasoning that forces a case-feature to Observation, invents a
   boolean value to store on a resource, or treats "Observation-only fallback" as acceptable — that is the hack
   being removed, not the model.
