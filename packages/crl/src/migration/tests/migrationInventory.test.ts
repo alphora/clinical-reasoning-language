@@ -41,9 +41,14 @@ describe("oracle — isBareScalarCodeTarget", () => {
   const ast = parse(`library "T".
 
 concept "Bare Bool":
-- type is Observation.
+- type is Condition.
 - value type is boolean.
 - code is \`x\`.
+
+concept "Pure Question":
+- type is Observation.
+- value type is boolean.
+- code is \`q\`.
 
 concept "Has Reduction":
 - type is Observation.
@@ -70,7 +75,15 @@ concept "Record Set":
 `);
 
   it("flags a bare Scalar code-is concept", () => {
+    // `type is Condition` deliberately — see the pure-question exemption directly below.
     expect(isBareScalarCodeTarget(conceptNamed(ast, "Bare Bool"))).toBe(true);
+  });
+  // #189 null/pause (panel disc 517) — a PURE QUESTION must never reach the migration worklist: the
+  // `boolean-presence` step ("add `- definition is exists this.`") would convert a question that PAUSES
+  // into a derivation that never can. The oracle imports the shared predicate rather than re-deriving it,
+  // so it cannot drift from the validator on the one exemption whose absence deletes the pause.
+  it("does NOT flag a PURE QUESTION — migrating it would delete the pause", () => {
+    expect(isBareScalarCodeTarget(conceptNamed(ast, "Pure Question"))).toBe(false);
   });
   it("does NOT flag a code-is + reduction", () => {
     expect(isBareScalarCodeTarget(conceptNamed(ast, "Has Reduction"))).toBe(false);
@@ -233,7 +246,11 @@ describe("runInventory — integration over real fixture sub-roots", () => {
     expect(rep.reconcile.ok).toBe(true);
     expect(rep.failures).toEqual([]);
     const names = rep.targets.map((t) => t.decl.conceptName);
-    expect(names).toContain("Adult Patient");
+    // #189: "Adult Patient" is `type is Observation` + boolean + `code is` = a PURE QUESTION, so it is
+    // EXEMPT and off the worklist — its `Observation.value[x]` IS the answer slot and `exists this` would
+    // destroy the pause. "Active Crohns Disease" is `type is Condition`: nowhere to store a boolean, so it
+    // is not a question and IS still a migration target.
+    expect(names).not.toContain("Adult Patient");
     expect(names).toContain("Active Crohns Disease");
     expect(names).not.toContain("Adult With Crohns");
     expect(rep.targets.every((t) => t.migrationClass === "boolean-presence")).toBe(true);

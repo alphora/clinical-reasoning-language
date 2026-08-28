@@ -120,8 +120,51 @@ export function isMemberExistenceInterface(
  * cross-library same-named concept must NEVER activate it (disc 512, both arms).
  */
 export function isValueReadingBooleanConcept(concept: Concept, siblingConcepts: readonly Concept[]): boolean {
+  // #189 null/pause — a PURE QUESTION is value-reading too: its determination IS its value (the emitted
+  // Interface read is `answeredValue()`, which reads `.value as FHIR.boolean`). Joining the class is what
+  // makes the CEL validator demand an explicit `value is true/false` on it and the CRE read the own value —
+  // exactly the extension this predicate's doc anticipated for new value-reading cells.
+  if (isPureQuestionConcept(concept)) return true;
   const recencyReferents = new Set(
     siblingConcepts.filter((c) => resolveRecencyValueConcept(c).kind === "recency-value").map((c) => c.name),
   );
   return isMemberExistenceInterface(concept, (name) => recencyReferents.has(name));
+}
+
+/**
+ * #189 null/pause — is `concept` a PURE QUESTION?
+ *
+ * A pure question is a locally-coded boolean determination that **nothing can compute**: no derivation, no
+ * source representation. There is no evidence to fall back on and no rule to evaluate, so it is **UNKNOWN
+ * until a human answers it** — and it is the ONLY shape a `when` guard may gate on, because only a stored
+ * boolean lets a user answer true / false / leave-unanswered (design of record
+ * `tmp/DESIGN-apply-null-pause.md` §3.1).
+ *
+ * Contrast the neighbouring shapes, none of which are questions:
+ *   - `definition is exists this`  — a derivation over the concept's OWN records; absence is closed-world
+ *     FALSE, so it never pauses (a "predicate dressed as a fact").
+ *   - a `source representation`    — external data DEFAULTS the determination; absent evidence is FALSE.
+ *   - no `code is`                 — read-only/derived; a local code is the ONLY way to create an answer,
+ *     and you can never ask a question about a representation (that is system-of-record clinical data).
+ *
+ * A pure question is therefore VALUE-READING (its determination IS its value), which is why its emitted read
+ * is the three-state `answeredValue()` rather than the truth-set `asTruths().satisfied()` collapse.
+ *
+ * Shared predicate, deliberately alongside `isValueReadingBooleanConcept`: the emitter, the CEL validator and
+ * the CRE must classify identically or the two lanes drift while both look correct.
+ */
+export function isPureQuestionConcept(concept: Concept): boolean {
+  if (concept.code === undefined) return false; // no local code → no answer slot
+  if (concept.definition !== undefined) return false; // a derivation computes it → closed-world
+  if ((concept.representations ?? []).length !== 0) return false; // a source rep defaults it → closed-world
+  // REFACTOR:grounded (#189, panel finding disc 517) — CARDINALITY IS DECLARED, NOT INFERRED (charter §3).
+  // A pure question publishes ONE answer, so it must declare `shape is Scalar` (the builder's normalization
+  // for an omitted `shape is`). Without this check a `shape is RecordSet` boolean Observation with a local
+  // code was classified as a question and emitted `.answeredValue()` — a SCALAR selected from its records —
+  // silently contradicting the cardinality the author declared. A record set is not an answer slot.
+  if (concept.shape !== "Scalar") return false;
+  // Only a resource with a stored boolean can carry an answer; a pure question is Observation by construction
+  // (the implicit-standard local resource when `type is` is omitted — charter §3).
+  if ((concept.conceptType ?? "Observation") !== "Observation") return false;
+  return concept.valueTypes.length === 1 && concept.valueTypes[0] === "boolean";
 }

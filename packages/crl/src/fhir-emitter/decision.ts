@@ -39,7 +39,7 @@
  *
  * #224 iii.3 NEGATION (`when not X`, `when A and not B`): `toNNF` pushes every `not` to the
  * ref LEAVES, so each DNF arm is a conjunction of SIGNED literals. A NEGATED literal lowers to
- * the per-atom `not Coalesce("<Lib>"."<C>", false)` carrier (`guardApplicabilityCondition`,
+ * the per-atom negation carrier (`guardApplicabilityCondition` — `not "<Lib>"."<C>"` for a BRANCH guard,
  * shared with iii.1's `unless`); a positive one to the bare `text/cql-identifier`. The
  * decision boolean STILL never lowers to one opaque CQL expression — negation stays per-literal.
  *
@@ -77,6 +77,7 @@ import type {
   BlockMember,
   BlockQualifier,
   BranchBlock,
+  BranchCondition,
   BranchConditionRef,
   BranchConditionCriterionRef,
   BranchConditionLiteral,
@@ -398,8 +399,15 @@ export function emitDecisionPlanDefinition(
     guardQualifierLibraryName:
       guardQualifierLibraryName ?? libraryId(metadata, libraryReferenceSuffix),
   };
-  const topLevelResults = decision.body.statements.map((branch) =>
-    emitBranch(branch, ctx, decision.body.qualifier),
+  // #189 null/pause — under an ordered `first:`, each branch also carries the NEGATION of its prior
+  // siblings' guards, so an unknown earlier guard poisons every later arm and traversal HALTS (V4).
+  const topLevelResults = decision.body.statements.map((branch, i) =>
+    withPriorityExclusions(
+      emitBranch(branch, ctx, decision.body.qualifier),
+      decision.body.qualifier === "first"
+        ? priorityExclusions(decision.body.statements.slice(0, i), ctx)
+        : [],
+    ),
   );
   const topLevelActions = topLevelResults
     .filter((r): r is { kind: "emitted"; actions: Record<string, unknown>[] } => r.kind === "emitted")
@@ -654,33 +662,213 @@ function atomKey(normalized: ReferenceName): string {
  * positive/negated single-atom conditions. A decision boolean NEVER lowers to one
  * opaque CQL expression (the load-bearing #224 invariant).
  *
- * ⚠ NULL-SAFE by construction — `not Coalesce(<ref>, false)`. Most guard-reachable
- * Interface defines terminate in `.satisfied()` = `exists(...)` (CaseFeatureCommon.cql),
- * a TOTAL non-null Boolean. But the guard slot admits ANY concept (`CONCEPT_REF_KINDS`),
- * and the Interface layer has a "legacy plain re-export" define shape (layeredEmit.ts)
- * that is not `satisfied()`-wrapped and could be null. `not null` = null → `$apply`
- * would EXCLUDE the item, DIVERGING from the CRE `evalGuard` semantics (`unless:
- * excluded = sat`; a missing concept → sat=false → item INCLUDED). Wrapping in
- * `Coalesce(<ref>, false)` makes the negation two-valued for EVERY define shape and
- * provably matches CRE (missing/null → false → not → true → INCLUDED). The positive
- * `only when` form needs no coalesce (null → excluded already matches CRE's missing →
- * excluded).
+ * ⚠ REFACTOR:grounded (#189 null/pause) — the `carrier` argument decides whether a NEGATED atom propagates
+ * null, and the two carriers genuinely want OPPOSITE answers. Getting this wrong is not cosmetic: it was a
+ * PROVEN lane divergence (`tmp/NOTES-apply-null-behavior.md` §10) in which `$apply` APPROVED a prior
+ * authorization whose contraindication question was never answered, while the CRE paused on the same case.
+ *
+ * `"action-guard"` (per-action `unless` / `only when`) → `not Coalesce(<ref>, false)`, TWO-VALUED.
+ * The CRE's `evalGuard` is deliberately two-valued for action guards (design §3.6): `unless: excluded = sat`,
+ * so a missing concept → sat=false → item INCLUDED. `not null` = null would make `$apply` EXCLUDE it instead.
+ * The coalesce makes the negation two-valued for EVERY define shape — necessary because the guard slot admits
+ * ANY concept (`CONCEPT_REF_KINDS`) and the Interface layer's "legacy plain re-export" shape (layeredEmit.ts)
+ * is not `satisfied()`-wrapped and can be null. An action guard must never pause.
+ *
+ * `"branch-guard"` (a `when` branch's DNF arm) → `not <ref>`, NULL-PROPAGATING.
+ * A decision guard composes in strong Kleene (design §3.3): `not unknown = unknown`, and an unknown guard must
+ * make its arm NOT APPLICABLE so traversal halts and DTR asks the question. Coalescing here reads an unanswered
+ * question as "no" and fires the arm — closed-world, the exact defect #189 exists to remove. (The `otherwise`
+ * priority exclusion has always emitted this bare form, so the engine is known to handle it.)
+ *
+ * A POSITIVE atom needs no distinction: `text/cql-identifier` with a null value is already not-applicable, which
+ * is the pause for a branch guard and matches CRE's missing → excluded for an action guard.
  */
 function guardApplicabilityCondition(
   polarity: "positive" | "negated",
   conceptCqlId: string,
   qualifierLibraryName: string,
+  carrier: "branch-guard" | "action-guard",
 ): Record<string, unknown> {
+  const qualified = `${cqlQuotedIdentifier(qualifierLibraryName)}.${cqlQuotedIdentifier(conceptCqlId)}`;
   const expression =
     polarity === "negated"
       ? {
           language: "text/cql-expression",
-          expression: `not Coalesce(${cqlQuotedIdentifier(qualifierLibraryName)}.${cqlQuotedIdentifier(
-            conceptCqlId,
-          )}, false)`,
+          expression:
+            carrier === "action-guard" ? `not Coalesce(${qualified}, false)` : `not ${qualified}`,
         }
       : { language: "text/cql-identifier", expression: conceptCqlId };
   return { kind: "applicability", expression };
+}
+
+/**
+ * #189 null/pause — the PRIORITY EXCLUSION condition for a branch in an ordered `first:` block.
+ *
+ * An ordered `first:` says branch 1 OUTRANKS branch 2. `$apply` does not implement that: a guard that
+ * evaluates null merely makes its action NOT APPLICABLE, and first-match-wins then moves to the next
+ * sibling. So with an unknown branch-1 guard and a true branch-2 guard, branch 2 FIRES — the wrong ARM,
+ * with no Questionnaire generated at all (harness run V4, `tmp/NOTES-apply-null-behavior.md` §8), even
+ * though answering branch 1 would have changed the disposition.
+ *
+ * The fix is to give every later branch the negation of its PRIOR branches' guards, so an unknown
+ * earlier guard poisons every later arm → zero arms apply → traversal HALTS and the question is asked.
+ * `$apply` has no halt primitive; a halt is simply "no applicable action at this level", so this is how
+ * one is manufactured.
+ *
+ * ⚠ NO `Coalesce` — deliberately NULL-PROPAGATING, unlike `guardApplicabilityCondition`'s `unless`
+ * carrier. That one Coalesces on purpose, to match the TWO-valued CRE `evalGuard`. Here the whole point
+ * is that `not null` stays null; the CRE gains the matching third value in the same change.
+ *
+ * ⚠ LIBRARY-QUALIFIED, for the same empirically-verified reason as the `unless` carrier (disc 310):
+ * `$apply` compiles a `text/cql-expression` condition as an ISOLATED synthetic library that INCLUDES the
+ * PlanDefinition's primary library under its NAME, so a bare ref fails to resolve.
+ *
+ * ONE condition per prior branch, never a composed expression: `$apply` ANDs multiple `condition[]`
+ * entries, so `not G1 and not G2` is emitted as two single-atom conditions. That respects the #224
+ * invariant (`text/cql-expression` only ever wraps `not <single-atom>`; a decision boolean never lowers
+ * to one opaque CQL expression) AND avoids the cross-product a structural `not (A and B)` would
+ * materialize against the 256-arm cap.
+ */
+function priorityExclusionCondition(
+  conceptCqlId: string,
+  qualifierLibraryName: string,
+): Record<string, unknown> {
+  return {
+    kind: "applicability",
+    expression: {
+      language: "text/cql-expression",
+      expression: `not ${cqlQuotedIdentifier(qualifierLibraryName)}.${cqlQuotedIdentifier(conceptCqlId)}`,
+    },
+  };
+}
+
+/**
+ * Build the priority-exclusion conditions for a branch from the sibling branches BEFORE it.
+ *
+ * Ordered `first:` ONLY — under `all:` / flat, order carries no priority and every applicable sibling
+ * fires, so exclusions there would be a behavior change unrelated to this work.
+ *
+ * ⚠ INCOMPLETE, KNOWN — the `and` prior. ¬G is exact for an ATOM (a concept ref or a criterion ref), a
+ * negated atom (¬¬G = G) and an `or` of atoms (De Morgan → a CONJUNCTION, i.e. N conditions, which `$apply`
+ * ANDs). But an `and` prior negates to a DISJUNCTION (`¬A or ¬B`), which the #224 invariant requires lower
+ * to ARMS and which is precisely the cross-product that would blow the 256-arm cap. Such a prior contributes
+ * NO exclusion, so a later branch can still fire past an unknown atom in it (the V4 wrong-arm case). Needs
+ * the named-define form; it is the next increment.
+ *
+ * ⭐ REFACTOR:grounded (#189, panel disc 517) — EVERY inexpressible prior is now LOUD. A silent skip is not
+ * a missing optimisation, it is a two-lane DIVERGENCE: the CRE `walkBranches` halts on `sat === null`
+ * unconditionally, with no regard for whether emit could express that prior's exclusion, so a skipped prior
+ * means the CRE pauses while `$apply` reaches a disposition. That must never be discoverable only by running
+ * both lanes, so it reports `priority-exclusion-inexpressible` into `ctx.unmatched`.
+ *
+ * A CRITERION prior is fully expressible and no longer skipped: a criterion ref is ONE leaf (#236 — it
+ * lowers to a named boolean define, never its inline expansion), so ¬<criterion> is one condition, exactly
+ * like ¬<concept>. Skipping it was the same defect one indirection away.
+ *
+ * A PARTIAL `or` is EMITTED rather than dropped: each ref conjunct of De Morgan's `¬A and ¬B and …` is a
+ * conjunct of the EXACT exclusion, so emitting a subset can only UNDER-exclude, never over-exclude
+ * (monotone-safe). Dropping all of them forfeits real protection for no gain — but the shortfall is still
+ * reported, because an under-exclusion is exactly the divergence above.
+ */
+function priorityExclusions(
+  priors: readonly { type: string }[],
+  ctx: EmitCtx,
+): Record<string, unknown>[] {
+  const conditions: Record<string, unknown>[] = [];
+  // An ATOM is a concept ref OR a criterion ref. Both resolve to a bare CQL identifier naming a boolean
+  // define, so both are ONE leaf for exclusion purposes (#236: a criterion ref is a first-class guard
+  // literal, never its inline expansion) — the exclusion carrier does not care which kind it names.
+  const atomId = (c: BranchCondition): string | null => {
+    if (c.type === "BranchConditionRef") return ctx.conceptResolver(normalizeLocalRef(c.ref, ctx.libraryName));
+    if (c.type === "BranchConditionCriterionRef")
+      return ctx.criterionIndex.get(getRefName(c.ref))?.defineId ?? null;
+    return null;
+  };
+  const isAtom = (c: BranchCondition): boolean =>
+    c.type === "BranchConditionRef" || c.type === "BranchConditionCriterionRef";
+  // A WARNING (`FHIR_DEF_WARNING_KINDS`), never an `unmatched`: an under-excluded prior still emits a
+  // valid artifact that is correct for every SETTLED case — what it loses is the pause on an unsettled
+  // one. Routing it to `unmatched` would pin `success: false` and fail emit for a whole shape.
+  const inexpressible = (g: BranchCondition, why: string): void => {
+    ctx.errors.push({
+      type: "Validation",
+      kind: "priority-exclusion-inexpressible",
+      message:
+        `Ordered \`first:\` priority exclusion is incomplete: ${why}. Later branches are UNDER-excluded, ` +
+        `so \`$apply\` can reach a disposition past an UNKNOWN determination in that prior while the CRE ` +
+        `halts there (a two-lane divergence). Author the prior as a single guard reference or a named ` +
+        `\`criterion\` to make its exclusion expressible.`,
+      line: g.location?.start.line,
+      column: g.location?.start.column,
+    });
+  };
+
+  for (const p of priors) {
+    if (p.type !== "WhenBlock") continue;
+    const g = (p as unknown as WhenBlock).condition;
+
+    // ¬(G) by shape. De Morgan holds in Kleene, so each case below is EXACT — never an approximation:
+    //   atom           -> ¬atom                     : one negated condition
+    //   not atom       -> atom                      : one POSITIVE condition (¬¬G = G)
+    //   (A or B or …)  -> ¬A and ¬B and …           : N negated conditions ($apply ANDs them)
+    //   (A and B)      -> ¬A or ¬B — a DISJUNCTION, which the #224 invariant requires lower to ARMS.
+    //                     Not expressible as conditions on ONE action; needs the named-define form.
+    // Anything this cannot express is REPORTED, never silently skipped — see the doc comment above.
+    if (isAtom(g)) {
+      const id = atomId(g);
+      if (id !== null) conditions.push(priorityExclusionCondition(id, ctx.guardQualifierLibraryName));
+      else inexpressible(g, "a prior branch guard whose reference does not resolve in this library");
+    } else if (g.type === "BranchConditionNot" && g.operand !== undefined && isAtom(g.operand)) {
+      const id = atomId(g.operand);
+      // ¬¬G = G — the POSITIVE form, byte-identical to the `when` single-ref path.
+      if (id !== null)
+        conditions.push({
+          kind: "applicability",
+          expression: { language: "text/cql-identifier", expression: id },
+        });
+      else inexpressible(g, "a prior negated branch guard whose reference does not resolve in this library");
+    } else if (g.type === "BranchConditionOr") {
+      let missing = 0;
+      for (const o of g.operands) {
+        const id = isAtom(o) ? atomId(o) : null;
+        if (id !== null) conditions.push(priorityExclusionCondition(id, ctx.guardQualifierLibraryName));
+        else missing++;
+      }
+      if (missing > 0)
+        inexpressible(
+          g,
+          `a prior \`or\` branch guard: ${missing} of ${g.operands.length} alternatives are not single ` +
+            `guard references, so its exclusion is only PARTIAL`,
+        );
+    } else {
+      inexpressible(
+        g,
+        "a prior `and` branch guard — its negation is a DISJUNCTION, which cannot lower to conditions " +
+          "on one action (needs the named-define form)",
+      );
+    }
+  }
+  return conditions;
+}
+
+/**
+ * Prepend priority exclusions to every action a branch emitted. A compound `when` emits several DNF arms
+ * — they are ALTERNATIVES OF ONE BRANCH, so each carries the same exclusions. (Exclusions are computed
+ * from prior BRANCHES, never from prior arms: negating between arms of one guard would pause on a
+ * condition Kleene says is settled — `A or B` with `A` null and `B` true is TRUE. Round-2 panel, both arms.)
+ */
+function withPriorityExclusions(
+  result: EmitActionResult,
+  exclusions: readonly Record<string, unknown>[],
+): EmitActionResult {
+  if (exclusions.length === 0 || result.kind !== "emitted") return result;
+  for (const action of result.actions) {
+    const existing = Array.isArray(action.condition) ? (action.condition as unknown[]) : [];
+    // Each arm gets its OWN condition objects. Spreading the shared `exclusions` array put the SAME object
+    // into every sibling arm's `condition[]`, so any later per-arm edit would alias across arms.
+    action.condition = [...exclusions.map((c) => structuredClone(c)), ...existing];
+  }
+  return result;
 }
 
 /**
@@ -735,7 +923,9 @@ function emitWhenBlock(
     title: refName,
     description: refName,
     code: guidelineCareCode(),
-    condition: [guardApplicabilityCondition("positive", conceptCqlId, ctx.guardQualifierLibraryName)],
+    condition: [
+      guardApplicabilityCondition("positive", conceptCqlId, ctx.guardQualifierLibraryName, "branch-guard"),
+    ],
   };
 
   // Action-level `input[]` — skip ONLY when the NORMALIZED ref is still qualified
@@ -903,7 +1093,12 @@ function emitCompoundWhenBlock(
         info.kind === "concept"
           ? conceptAtomKey(normalizeLocalRef(info.atom.ref, ctx.libraryName))
           : criterionAtomKey(getRefName(info.atom.ref));
-      return guardApplicabilityCondition(info.polarity, resolvedByKey.get(key)!, ctx.guardQualifierLibraryName);
+      return guardApplicabilityCondition(
+        info.polarity,
+        resolvedByKey.get(key)!,
+        ctx.guardQualifierLibraryName,
+        "branch-guard",
+      );
     });
     // Arm-aware `input`: a CONCEPT atom contributes itself (non-qualified only); a CRITERION atom
     // contributes its RECURSIVE ATOM CLOSURE (the concepts under it, #236 step E) — DTR surfaces
@@ -996,7 +1191,12 @@ function fillBranchBody(
   // body is BlockBody — recurse into its children. Each child may itself emit 1..N
   // actions (a compound `or` child spliced under this block's `first:`), so flat-map;
   // the childResults stay 1:1 with statements for the cascade-diagnostic index loop.
-  const childResults = body.statements.map((stmt) => emitBlockStatement(stmt, ctx, body.qualifier));
+  const childResults = body.statements.map((stmt, i) =>
+    withPriorityExclusions(
+      emitBlockStatement(stmt, ctx, body.qualifier),
+      body.qualifier === "first" ? priorityExclusions(body.statements.slice(0, i), ctx) : [],
+    ),
+  );
   const survivingChildren = childResults
     .filter((r): r is { kind: "emitted"; actions: Record<string, unknown>[] } => r.kind === "emitted")
     .flatMap((r) => r.actions);
@@ -1110,6 +1310,7 @@ function emitBlockStatement(
         stmt.guard.polarity === "unless" ? "negated" : "positive",
         cqlId,
         ctx.guardQualifierLibraryName,
+        "action-guard",
       );
       // The guard concept is a case feature (its `code is` closure → an SD + input).
       // A still-qualified ref never reaches here (it resolved to null above), so no

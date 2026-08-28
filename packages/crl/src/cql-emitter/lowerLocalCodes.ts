@@ -128,6 +128,7 @@ import {
   type AgeProjectionArgs,
 } from "../template-match/recencyProjectionOverride";
 import type { CRLError } from "../types/errors";
+import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
 
 /** The result of a lowering pass: the (possibly transformed) AST + any hard errors. */
 export interface LowerLocalCodesResult {
@@ -1351,6 +1352,11 @@ export function lowerLocalCodes(
       ...c,
       definition: codedFrom,
       __loweringRole: hasInferredTwin ? "source-impl" : "public-determination",
+      // #189 null/pause — classify the PURE QUESTION here, where the AUTHORED shape is still visible. After
+      // lowering, `definition` is the retrieve, so the predicate can no longer tell a pure question (nothing
+      // can compute it → UNKNOWN until answered) from a derived determination (closed-world false). The
+      // Interface re-export copies this marker and emits the three-state `answeredValue()` read.
+      ...(isPureQuestionConcept(c) ? { __pureQuestion: true as const } : {}),
     };
     delete lowered.code;
     loweredConcepts.push(lowered);

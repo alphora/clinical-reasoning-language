@@ -1026,8 +1026,16 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(cpg.contentHash).toBe(
       "840c0129eeaf90fb4d21a35e06830d1716ff9001cd7f5a439b50e189e87b4f66",
     );
+    // #189 null/pause — the priorAuth payload embeds the reference `.cel` artifacts, which gained explicit
+    // `value is true/false` facts (a NEGATIVE must now be STATED; omission means UNKNOWN and PAUSES). That is
+    // a CORRECTNESS change, not teaching — reverting it fails the CRE proofs — so it lands with the slice
+    // while the schemaVersion bump + doctrine re-teach are BATCHED to one final kit pass
+    // (`tmp/WORKLIST-kit-deltas.md`, operator 2026-08-27). Hence a re-pin at 1.25 with NO bump.
+    // ⚠ The cpg hash is UNCHANGED — that payload does not embed the reference artifacts.
+    // ⚠ DO NOT RELEASE before the kit pass runs: a KE pinning 1.25 + the OLD priorAuth hash re-syncs on a
+    //   hash change with no changelog entry explaining it.
     expect(priorAuth.contentHash).toBe(
-      "cdd242b356dfb41d3e79c3cc57693634a9caaf12afba93c94b961538049fa646",
+      "915edb9e694c04f2c3cd5136e2717dc0c9698e5f7fdde8ecbb64691858b9fe86",
     );
   });
 

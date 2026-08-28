@@ -221,20 +221,24 @@ describe("#236 — criterion in compound guards (one signed literal, no DNF blow
     ]);
   });
 
-  it("`not Elig` → a negated, library-qualified, Coalesce-wrapped condition (closed-world negation)", () => {
-    // A negated criterion literal lowers to `not Coalesce("<lib>"."<crit>", false)` as a
-    // text/cql-expression — the same two-valued closed-world shape a negated concept uses.
+  it("`not Elig` → a negated, library-qualified, NULL-PROPAGATING condition", () => {
+    // A negated criterion literal in a BRANCH guard lowers to `not "<lib>"."<crit>"` as a
+    // text/cql-expression — the same null-propagating shape a negated concept uses there.
+    // #189: NOT `Coalesce`d. A criterion over unanswered questions is unknown, and an unknown
+    // branch guard must make its arm not-applicable so traversal halts; coalescing would read
+    // the unanswered case as "no" and fire the arm. (The per-action `unless` carrier still
+    // Coalesces — see decision.test.ts — because an action guard must never pause.)
     const elig = criterion("Elig", orC(refC("B"), refC("C")));
     const via = decision("Top", [whenC(notC(critRefC("Elig")), leaf(recommend("Act")))]);
     const { resource, errors } = emit(via, [elig]);
     expect(errors).toEqual([]);
     expect(conditionExprs(resource)).toEqual([
-      { language: "text/cql-expression", expression: 'not Coalesce("lib"."Elig", false)' },
+      { language: "text/cql-expression", expression: 'not "lib"."Elig"' },
     ]);
     expect(resource!.action![0]!.title).toBe("not Elig");
   });
 
-  it("`A and not Elig` → ONE arm with a positive identifier condition + a negated Coalesce condition (mixed signed arm)", () => {
+  it("`A and not Elig` → ONE arm with a positive identifier condition + a negated condition (mixed signed arm)", () => {
     // The mixed-signed arm is where a DNF/emit regression on the operand-level negated-criterion
     // literal would hide: a positive concept literal and a NEGATED criterion literal in one arm.
     const elig = criterion("Elig", orC(refC("B"), refC("C")));
@@ -244,7 +248,44 @@ describe("#236 — criterion in compound guards (one signed literal, no DNF blow
     expect(resource!.action).toHaveLength(1); // one arm — the criterion negation did not multiply arms
     expect(conditionExprs(resource)).toEqual([
       { language: "text/cql-identifier", expression: "A" },
-      { language: "text/cql-expression", expression: 'not Coalesce("lib"."Elig", false)' },
+      { language: "text/cql-expression", expression: 'not "lib"."Elig"' },
+    ]);
+  });
+
+  // ⭐ #189 null/pause (panel disc 517) — a CRITERION prior must exclude its successors, exactly like a
+  // concept prior. Skipping it was the §10 unsafe-approve defect ONE INDIRECTION away: a criterion ref is
+  // ONE leaf (#236 — a named boolean define, never its inline expansion), so ¬<criterion> is a single
+  // condition and there was never a reason it could not be emitted.
+  it("a CRITERION prior excludes its successors (#189) — one negated condition, like a concept prior", () => {
+    const elig = criterion("Elig", orC(refC("B"), refC("C")));
+    const via = decision(
+      "Top",
+      [whenC(critRefC("Elig"), leaf(recommend("First"))), whenC(refC("A"), leaf(recommend("Act")))],
+      "first",
+    );
+    const { resource, errors } = emit(via, [elig]);
+    expect(errors).toEqual([]);
+    expect(conditionExprs(resource)).toEqual([
+      { language: "text/cql-identifier", expression: "Elig" },
+      // branch 2's priority exclusion of the criterion prior — null-propagating, no Coalesce.
+      { language: "text/cql-expression", expression: 'not "lib"."Elig"' },
+      { language: "text/cql-identifier", expression: "A" },
+    ]);
+  });
+
+  it("a NEGATED criterion prior excludes positively (¬¬G = G)", () => {
+    const elig = criterion("Elig", orC(refC("B"), refC("C")));
+    const via = decision(
+      "Top",
+      [whenC(notC(critRefC("Elig")), leaf(recommend("First"))), whenC(refC("A"), leaf(recommend("Act")))],
+      "first",
+    );
+    const { resource, errors } = emit(via, [elig]);
+    expect(errors).toEqual([]);
+    expect(conditionExprs(resource)).toEqual([
+      { language: "text/cql-expression", expression: 'not "lib"."Elig"' },
+      { language: "text/cql-identifier", expression: "Elig" },
+      { language: "text/cql-identifier", expression: "A" },
     ]);
   });
 
@@ -259,9 +300,16 @@ describe("#236 — criterion in compound guards (one signed literal, no DNF blow
     );
     const { resource, errors } = emit(via, [elig]);
     expect(errors).toEqual([]);
-    // The two branch conditions, in order: the plain concept then the criterion reference.
+    // The branch conditions, in order: the plain concept, then branch 2's PRIORITY EXCLUSION of it,
+    // then the criterion reference.
+    //
+    // #189 null/pause — under an ordered `first:` a later branch carries the null-propagating negation
+    // of its priors. Without it, an UNKNOWN `A` merely makes branch 1 not-applicable and branch 2 fires
+    // anyway — the wrong ARM, with no Questionnaire generated (V4, `tmp/NOTES-apply-null-behavior.md` §8).
+    // The criterion reference itself is untouched: it stays ONE positive `text/cql-identifier` literal.
     expect(conditionExprs(resource)).toEqual([
       { language: "text/cql-identifier", expression: "A" },
+      { language: "text/cql-expression", expression: 'not "lib"."A"' },
       { language: "text/cql-identifier", expression: "Elig" },
     ]);
   });

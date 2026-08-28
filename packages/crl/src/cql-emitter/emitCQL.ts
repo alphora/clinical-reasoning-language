@@ -1787,7 +1787,16 @@ class Emitter {
           // and cannot see the source concept's definition.
           return c.__interfaceReexportMode === "total-boolean" ? qref : `${qref}.satisfied()`;
         case "LocalPrimitives":
-          return `${qref}.asTruths().satisfied()`;
+          // #189 null/pause — a PURE QUESTION reads THREE-STATE. `asTruths().satisfied()` folds "no answer
+          // record" and "answered false" into the same `false`, so an unanswered question is indistinguishable
+          // from a "no" and the decision DENIES where it must PAUSE and ask. `answeredValue()` keeps them
+          // apart (true / false / null) and is deliberately NOT `Coalesce`d — totality belongs at the ARM,
+          // never per operand (design of record §3.1/§3.3). Marker set at synthesis (`buildInterfaceReexports`)
+          // because this emitter is layer-isolated. REFACTOR:grounded — derived from the design of record and
+          // the reference IGs' case-feature read, not from the adjacent truth-set lane.
+          return c.__pureQuestion === true
+            ? `${qref}.answeredValue()`
+            : `${qref}.asTruths().satisfied()`;
         // ExternalPrimitives (and any other) → fall through to the legacy re-export.
       }
     }

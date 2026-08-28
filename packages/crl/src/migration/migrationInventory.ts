@@ -41,6 +41,7 @@ import type {
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
 import { branchConditionRefs, branchConditionConceptRefsStrict } from "../ast/branchCondition";
+import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
 import { buildCRL } from "../index";
 import { validateCRLImports } from "../imports/validate";
 import { canonicalizeFsPath } from "../imports/paths";
@@ -228,14 +229,21 @@ function hasValueProjectionRep(concept: Concept): boolean {
   return concept.representations?.some((r) => r.valueProjection !== undefined) ?? false;
 }
 
-/** THE ORACLE. `shape === "Scalar" && hasCodeIs && def === undefined && !hasValueProjectionRep`
- *  (reductionShapeValidator.ts:381). */
+/** THE ORACLE. `shape === "Scalar" && hasCodeIs && def === undefined && !hasValueProjectionRep &&
+ *  !isPureQuestionConcept` (reductionShapeValidator.ts:381).
+ *
+ *  REFACTOR:grounded (#189 null/pause) — the PURE QUESTION exemption is a MIGRATION-SET change, not just a
+ *  warning change: a pure question must never appear on this worklist, because the migration step for
+ *  `boolean-presence` ("add `- definition is exists this.`") would convert a question that PAUSES into a
+ *  derivation that can never pause. The predicate is imported, not re-derived, so the oracle and the rule
+ *  cannot drift on the one exemption whose absence silently deletes the pause. */
 export function isBareScalarCodeTarget(concept: Concept): boolean {
   return (
     concept.shape === "Scalar" &&
     concept.code !== undefined &&
     concept.definition === undefined &&
-    !hasValueProjectionRep(concept)
+    !hasValueProjectionRep(concept) &&
+    !isPureQuestionConcept(concept)
   );
 }
 

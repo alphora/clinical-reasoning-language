@@ -1,0 +1,34 @@
+# Age chain — the assertion points for ONE gate, and where the chain breaks today.
+//
+// A gate is a boolean determination. A user must be able to reach it from whatever they actually
+// have, so a chain should offer SEVERAL assertion points (the BMI shape: answer height+weight, OR
+// answer BMI, OR assert Obese). For patient age there are three conceivable points:
+//
+//   1. supply `Patient.birthDate` from the EHR   -> autopopulates          WORKS (source rep)
+//   2. assert a BIRTH DATE as its own answer     -> a sub-question         ⚠ NOT EXPRESSIBLE (below)
+//   3. assert "18 or older" directly             -> the main question      WORKS (`code is`)
+//
+// 1 and 3 live on ONE concept and RECENCY-MERGE (newest wins) — that is why the local arm and the
+// Patient arm are two arms of the same determination rather than two concepts.
+library "AgeChain".
+
+concept "Adult Eighteen Or Older":
+- value type is boolean.
+- code is `adult-18-or-older`.
+- source representation:
+  - type is Patient.
+  - value element is Patient.birthDate.
+  - value type is date.
+  - value projection is age today at least 18 years.
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `approve`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `deny`.
+
+decision "D":
+first:
+- when "Adult Eighteen Or Older" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".

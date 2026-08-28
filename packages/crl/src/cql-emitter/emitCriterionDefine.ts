@@ -7,12 +7,23 @@
 // This emitter produces the define BODY from the criterion's (unexpanded) guard tree.
 //
 // It is DELIBERATELY NOT the `defined as` composition path (`emitComposition`/`emitSemAnd`/
-// `emitSemOr`): that path lowers `sem-*` over truth-sets / refinement lanes and does NOT
-// `Coalesce` — so it is not per-operand total. A criterion body is a plain boolean guard
-// (`and`/`or`/`not` over concept + sub-criterion refs), and North Star §4 requires it to be
-// TWO-VALUED: every leaf is totalized `Coalesce(<leaf>, false)` BEFORE any `not`, never a
-// terminal `Coalesce(<whole>, false)`. A criterion ref is itself total (it resolves to
-// another totalized define), so composition stays two-valued all the way down.
+// `emitSemOr`): that path lowers `sem-*` over truth-sets / refinement lanes. A criterion body is a
+// plain boolean guard (`and`/`or`/`not` over concept + sub-criterion refs).
+//
+// REFACTOR:grounded (#189 null/pause) — a criterion body is STRONG KLEENE, not two-valued. Leaves are
+// rendered BARE. This reverses the pre-#189 rule ("every leaf totalized `Coalesce(<leaf>, false)` BEFORE
+// any `not`, because North Star §4 requires TWO-VALUED"): that rule was rewritten in the charter, because
+// coalescing per operand makes an UNANSWERED question indistinguishable from an answered "no".
+//
+// A criterion is a GUARD, and a guard is where a pause has to be able to happen. With the leaves
+// coalesced, `criterion "Eligible": - when ( "Pure Question" ).` emitted
+// `define "Eligible": Coalesce("Pure Question", false)` — so `$apply` read an unanswered question as
+// `false` and ran on to the next arm, while the CRE evaluated the same criterion as UNKNOWN and paused.
+// A two-lane disagreement on an ordinary supported shape (panel finding, disc 517).
+//
+// Totality belongs at the ARM, not per operand. The REFERENCE SITE re-totalizes where two-valuedness is
+// genuinely required: the per-action `unless` carrier emits `not Coalesce(<ref>, false)` around whatever
+// this define produces, so an action guard over a criterion is still two-valued and still never pauses.
 //
 // The emitter takes a `qualify(name, kind)` callback rather than resolving library prefixes
 // itself: WHICH library a leaf's define lives in (Root / Interface / a concept re-export,
@@ -41,13 +52,6 @@ interface Rendered {
   prec: number;
 }
 
-function totalLeaf(qualified: string): string {
-  // Per-operand totality (North Star §4): a nullable define re-export becomes two-valued.
-  // Applied to POSITIVE leaves too (design §3 C) — a deliberate defensive boundary so the
-  // define body is total regardless of how a referenced concept re-export was declared.
-  return `Coalesce(${qualified}, false)`;
-}
-
 /**
  * Leaf-rendering policy — the ONE axis on which the two total-boolean lowerings differ. Everything
  * structural (precedence, parenthesisation, `not`/`and`/`or`) is SHARED via `renderNode`, so a
@@ -68,11 +72,11 @@ export interface RenderLeafPolicy {
   criterionRef: (node: BranchConditionCriterionRef, qualify: QualifyLeaf) => string;
 }
 
-/** The criterion-define leaf policy — byte-identical to the pre-parameterization behavior (every
- *  leaf `Coalesce`-totalized; criterion refs are define→define edges). */
+/** REFACTOR:grounded (#189) — the criterion-define leaf policy: leaves are rendered BARE so UNKNOWN
+ *  propagates out of the define (criterion refs are define→define edges). */
 export const criterionDefineLeafPolicy: RenderLeafPolicy = {
-  concept: (qualified) => totalLeaf(qualified),
-  criterionRef: (node, qualify) => totalLeaf(qualify(node.ref, "criterion")),
+  concept: (qualified) => qualified,
+  criterionRef: (node, qualify) => qualify(node.ref, "criterion"),
 };
 
 /** Render a well-formed boolean guard tree STRUCTURALLY (no NNF/DNF), parameterized by `leaf` (the

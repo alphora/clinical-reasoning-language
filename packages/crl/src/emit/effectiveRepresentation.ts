@@ -29,6 +29,7 @@ import {
   resolveAgeConcept,
   AGE_TODAY_OVER_BIRTHDATE,
 } from "../template-match/recencyProjectionOverride";
+import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
 
 import {
   resourceEmitRow,
@@ -368,8 +369,57 @@ function computeLocalDatum(
         }
         return { valueElement: readPath, datumValueType: "boolean" as ConceptValueType };
       }
-      // `defined as` (non-exists) / `definition is <derivation>` / bare `code is` — not a `this`-reduction. The
-      // local-exact datum of a general both-representation / derived form is out of T1 scope (deferred, #257).
+      // ⭐ #189 null/pause — a PURE QUESTION: `code is` + `value type is boolean` with NO definition (and no
+      // source rep). NOTHING can compute it, so it is UNKNOWN until a human answers it — and it is the ONLY
+      // shape a `when` guard may gate on, because only a stored boolean lets a user answer true / false /
+      // leave-unanswered (design of record `tmp/DESIGN-apply-null-pause.md` §3.1).
+      //
+      // Its local record IS the answer slot: a boolean-valued Observation carrying its own identity code. So
+      // it derives exactly the same boolean value datum as the `defined as exists` interface arm above — minus
+      // the derivation. Without this cell the concept resolves `not-a-record`, NO case-feature
+      // StructureDefinition is emitted, and the generated Questionnaire contains no question at all: the tree
+      // pauses (or worse, denies) on something the user is never given a way to answer.
+      //
+      // REFACTOR:grounded — re-derived from the design of record §3.1/§3.5 and the reference IGs (all ten of
+      // their case-feature SDs are Observation + fixed code + answerable `value[x]` boolean), NOT from the
+      // adjacent deferred-cell comment.
+      // The cell claims a concept ONLY when the resource can genuinely carry a stored boolean answer. If it
+      // cannot (a valueless resource like Condition), FALL THROUGH to `unsupported-reduction-form` rather than
+      // erroring here — for a valueless resource the right re-authoring is adding `definition is exists this`,
+      // which KEEPS the natural resource, and `cql-to-crl-type-valuetype-rule.md:30` explicitly forbids
+      // steering it to `Observation+boolean`. A "you need a boolean answer slot" diagnostic would push the
+      // author the wrong way.
+      //
+      // ⚠ REFACTOR:grounded (panel disc 517) — the gate is the SHARED `isPureQuestionConcept` predicate, not a
+      // locally re-derived condition. The local condition used to be `definition === undefined && boolean`,
+      // which is LOOSER than the predicate (no `representations` / `shape` check). A `code is` + boolean +
+      // SOURCE-REP concept therefore got an answerable boolean SD here while its Interface read stayed the
+      // presence collapse (`asTruths().satisfied()`, since `__pureQuestion` is false) — an SD advertising an
+      // answer slot whose stated `false` reads back as TRUE. The classifier and the emit cell must agree, or
+      // the artifact disagrees with itself.
+      if (isPureQuestionConcept(concept)) {
+        const readPath = authored ?? "value";
+        if (readPath !== "value") {
+          // The three-state read `answeredValue()` selects `O.value` (CaseFeatureCommon.cql). An authored
+          // `value element is <other>` would put the SD's answer slot somewhere the read never looks: the
+          // user answers one element and the guard reads another. Fail LOUD rather than emit an artifact
+          // that disagrees with itself. (Threading the path into the read is the alternative; it needs a
+          // path-parametric fluent function and no corpus shape asks for it yet.)
+          return {
+            errorKind: "value-element-unmappable",
+            detail: `pure question reads its answer from \`${resourceType}.value[x]\` (the three-state \`answeredValue()\`), so \`value element is ${readPath}\` cannot carry it`,
+          };
+        }
+        // Same conflation guard as the sibling arms: the answer carrier must not BE the coding element.
+        const admitted =
+          readPath === row.coding.field ? undefined : valueReadValueTypes(resourceType, readPath);
+        if (admitted !== undefined && admitted.has("boolean" as ConceptValueType)) {
+          return { valueElement: readPath, datumValueType: "boolean" as ConceptValueType };
+        }
+        // else: not an answerable question — fall through.
+      }
+      // `defined as` (non-exists) / `definition is <derivation>` — not a `this`-reduction. The local-exact datum
+      // of a general both-representation / derived form is out of T1 scope (deferred, #257).
       return {
         errorKind: "unsupported-reduction-form",
         detail: `local Scalar concept's reduction is not \`exists this\` / \`most recent this\` / \`count this\` — not a T1 local-exact cell`,

@@ -97,7 +97,7 @@ import type {
 } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import { classifyCanonicalToken } from "../cel/canonicalToken";
-import { isValueReadingBooleanConcept } from "../template-match/recencyValueConcept";
+import { isValueReadingBooleanConcept, isPureQuestionConcept } from "../template-match/recencyValueConcept";
 import { isResourcelessDerived } from "../emit/conceptDatumSignals";
 import {
   makeLocalDomainContext,
@@ -194,6 +194,14 @@ export interface TraceNode {
   concept?: string;
   satisfied?: boolean;
   evaluated: boolean;
+  /**
+   * #189 null/pause — this ordered branch's guard evaluated UNKNOWN (nothing established it and nothing
+   * could compute it), so the walk HALTED here: no later sibling was evaluated and no disposition was
+   * reached. Distinct from `satisfied: false`, which means the guard was established as NOT holding and the
+   * walk moved on. This is the CRE's side of the pause, and the flag is what lets a test assert a pause
+   * rather than infer it from an absent recommendation.
+   */
+  blockedUnknown?: boolean;
   guardedOut?: boolean;
   guard?: {
     polarity: "unless" | "only-when";
@@ -213,7 +221,11 @@ export interface TraceNode {
 
 /** A per-concept case answer (#187 Todo 2) — the case's truth for concept `(lib,name)`. `satisfied` is the concept's
  *  OVERALL evaluation (a direct fact OR its `defined as` composition), the SAME value whether the concept was on- or
- *  off-path. Fully qualified: same-name concepts in different libraries are distinct rows. Read-only + additive. */
+ *  off-path. Fully qualified: same-name concepts in different libraries are distinct rows. Read-only + additive.
+ *
+ *  ⚠ ABSENT ⇒ UNKNOWN, and a row is only ever emitted for an ESTABLISHED answer. A concept the engine refuses to
+ *  evaluate, and (since #189 null/pause) an UNANSWERED question, both OMIT their row rather than publish `false`.
+ *  Consumers must render a missing row as blank/unknown — never as "not satisfied". */
 export interface ConceptTruthRow {
   lib: string;
   name: string;
@@ -273,7 +285,7 @@ interface LocalMembershipIndex {
 }
 
 interface ConceptEval {
-  sat: boolean;
+  sat: Tri;
   composition?: CompositionTrace;
 }
 
@@ -285,6 +297,8 @@ interface Ctx {
    *  ones whose emitted CQL own-arm reads `.value as FHIR.boolean` rather than presence. For these, `evalConcept`
    *  reads the retained own boolean value instead of `directFacts` presence, so the CRE matches `$apply`. */
   valueReadingIds: Set<Id>;
+  /** #189 null/pause — concepts that nothing can compute, so an absent answer record is UNKNOWN, not false. */
+  pureQuestionIds: Set<Id>;
   /** #189 Piece 3 (Option C) — the BOOLEAN own values a value-reading concept was populated with (a fact carrying a
    *  boolean `value is`, code-driven onto whichever concept it is a member of). `evalConcept` reads the value: 0 → false
    *  (no own record), all-agree → that value; CONFLICTING true+false → refuse loud (the collision posture — the
@@ -316,7 +330,11 @@ interface Ctx {
   /** Per-case memo of criterion satisfaction — a criterion referenced N times (or a doubling DAG)
    *  evaluates ONCE. Keyed `idOf(lib,name)`; mirrors `cache`. Carries the body sub-trace for
    *  first-occurrence tracing; not memoized through a cycle-break (mirrors `cache`). */
-  criterionCache: Map<Id, { sat: boolean; facts: string[]; body: BranchConditionTrace }>;
+  // REFACTOR:grounded (#189 null/pause) — `sat` is `Tri`, NOT `boolean`. Storing `inner.sat === true`
+  // here destroyed UNKNOWN after the FIRST reference: a criterion evaluating null returned null once and
+  // cached `false`, so a second reference (or a `not <criterion>`) silently went two-valued (panel
+  // finding, disc 517). A memo must be transparent — it may not change the value it replays.
+  criterionCache: Map<Id, { sat: Tri; facts: string[]; body: BranchConditionTrace }>;
   /** Criteria currently on the evaluation stack — cycle guard (mirrors `stack`). */
   criterionStack: Set<Id>;
   /** `(lib,name)` of criteria already emitted with a FULL body sub-trace this case; later
@@ -354,6 +372,26 @@ interface Frame {
  * un-revalidated input can't infinite-loop — and don't memoize a result computed
  * through a cycle-break, so it can't poison a node satisfiable on another path).
  */
+/**
+ * #189 null/pause — the CRE's THIRD VALUE.
+ *
+ * `null` means UNKNOWN: nothing has established the determination and nothing can compute it, so the gate
+ * must PAUSE and ask rather than deny. It is NOT an epistemic hedge — unansweredness is read straight off
+ * the case file, deterministically. The CRE gains a third VALUE, not a third BEHAVIOR: no partial state, no
+ * completeness claim, nothing asserted about the outside world (`feedback_cre-is-mechanical-not-runtime`).
+ *
+ * STRONG KLEENE, byte-matching what CQL does natively — which is how the two lanes agree by construction
+ * rather than by hope. `null or true = true` and `null and false = false` are the DON'T-OVER-ASK half: the
+ * arm's outcome is already settled, so the unknown is not decisive and must never be asked about.
+ */
+type Tri = boolean | null;
+
+const kNot = (a: Tri): Tri => (a === null ? null : !a);
+const kAnd = (xs: readonly Tri[]): Tri =>
+  xs.some((x) => x === false) ? false : xs.some((x) => x === null) ? null : true;
+const kOr = (xs: readonly Tri[]): Tri =>
+  xs.some((x) => x === true) ? true : xs.some((x) => x === null) ? null : false;
+
 function evalConcept(id: Id, ctx: Ctx): ConceptEval {
   const cached = ctx.cache.get(id);
   if (cached) return cached;
@@ -423,11 +461,16 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
   // newest own record's VALUE (not presence); the CRE mirrors that from the retained own boolean value. Every other
   // concept keeps PRESENCE (`directFacts.has`) — a valueless record (Condition/`exists this`) has no value to read;
   // existence IS its truth.
-  let direct: boolean;
+  let direct: Tri;
   if (ctx.valueReadingIds.has(id)) {
     const vals = ctx.ownBoolValues.get(id) ?? [];
     if (vals.length === 0) {
-      direct = false; // no own boolean record → own-arm `Last(...).value` = null → `is true` = false
+      // ⭐ #189 null/pause — no own boolean record. For a PURE QUESTION that is UNKNOWN, not false: nothing
+      // else can compute it, so the gate must pause and ask. Matches the emitted `answeredValue()`, which is
+      // deliberately un-`Coalesce`d and yields null on an empty answer set. For every OTHER value-reading
+      // concept a composed arm CAN decide, so the own arm reads false and the composition takes over
+      // (`kOr([false, composed])`).
+      direct = ctx.pureQuestionIds.has(id) ? null : false;
     } else if (vals.every((v) => v === vals[0])) {
       direct = vals[0]; // agreeing own values → unambiguous; matches `$apply`'s newest-wins under ANY ordering
     } else if (composed) {
@@ -451,7 +494,7 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
     direct = ctx.directFacts.has(id);
   }
   ctx.stack.delete(id);
-  const result: ConceptEval = { sat: direct || composed, ...(composition ? { composition } : {}) };
+  const result: ConceptEval = { sat: kOr([direct, composed]), ...(composition ? { composition } : {}) };
   // Memoize only cycle-free AND non-runtimeError-tainted evals (disc 462 Claude #2). A cached tainted result
   // would mask the per-concept unevaluable signal `truthOf`/`collectConceptTruth` read off the scratch
   // `runtimeError` to OMIT the row (never publish a fabricated presence answer). `runtimeErrorBefore` scopes
@@ -574,7 +617,15 @@ function collectConceptTruth(ctx: Ctx): ConceptTruthRow[] {
     // (disc 462 Claude #2 / gpt56 G4). Publishing false would tell a pane a `count≥2` determination is
     // authoritatively unmet on a case that may satisfy it.
     if (!authoritative) continue;
-    rows.push({ lib: entry.lib, name: entry.node.name, satisfied: ev.sat });
+    // ⭐ REFACTOR:grounded (#189 null/pause, panel disc 517) — OMIT an UNKNOWN too, for exactly the reason
+    // above. `satisfied: sat === true` would publish an unanswered QUESTION to the panes as an authoritative
+    // "not satisfied" row — the unanswered≡answered-no conflation this whole change exists to kill,
+    // reintroduced at the surface KE tooling actually reads. The row contract already says ABSENT ⇒ UNKNOWN,
+    // so a question with no answer belongs in the same bucket as a determination the engine won't evaluate.
+    // (Trace nodes keep their two-valued `satisfied`: there, `blockedUnknown` sits alongside and disambiguates.
+    // Nothing distinguishes a truth ROW, which is why it must be omitted rather than coerced.)
+    if (ev.sat === null) continue;
+    rows.push({ lib: entry.lib, name: entry.node.name, satisfied: ev.sat === true });
   }
   rows.sort((a, b) => a.lib.localeCompare(b.lib) || a.name.localeCompare(b.name));
   return rows;
@@ -599,7 +650,7 @@ function refTrace(ref: ReferenceName, lib: string, ctx: Ctx): CompositionTrace {
   return {
     op: "ref",
     concept: name,
-    satisfied: ev.sat,
+    satisfied: ev.sat === true,
     ...(ev.composition ? { composition: ev.composition } : {}),
   };
 }
@@ -694,7 +745,7 @@ function conceptSatisfied(
   ref: ReferenceName,
   ctx: Ctx,
   frame: Frame,
-): { sat: boolean; facts: string[]; composition?: CompositionTrace } {
+): { sat: Tri; facts: string[]; composition?: CompositionTrace } {
   // A bare `when`/guard ref resolves against the CURRENT decision's library (the frame). Same-library is the degenerate
   // case `frame.currentLib === ctx.rootLib`; a cross-library sub carries its own lib so its bare refs bind there (#172).
   const id = idOf(getRefLibrary(ref) ?? frame.currentLib, getRefName(ref));
@@ -717,7 +768,7 @@ function evalBranchCondition(
   cond: BranchCondition,
   ctx: Ctx,
   frame: Frame,
-): { sat: boolean; facts: string[]; trace: BranchConditionTrace } {
+): { sat: Tri; facts: string[]; trace: BranchConditionTrace } {
   if (cond.type === "BranchConditionRef") {
     const { sat, facts, composition } = conceptSatisfied(cond.ref, ctx, frame);
     // Structured RESOLVED identity: a bare ref resolves against the current frame
@@ -729,7 +780,7 @@ function evalBranchCondition(
       facts,
       trace: {
         op: "ref",
-        satisfied: sat,
+        satisfied: sat === true,
         concept: { name: getRefName(cond.ref), libraryName: lib },
         ...(composition ? { composition } : {}),
         ...(facts.length > 0 ? { facts } : {}),
@@ -745,10 +796,10 @@ function evalBranchCondition(
     const cid = idOf(lib, name);
     const crit = ctx.criterionTables?.get(lib)?.get(name);
     const critTrace = (
-      sat: boolean,
+      sat: Tri,
       facts: string[],
       body?: BranchConditionTrace,
-    ): { sat: boolean; facts: string[]; trace: BranchConditionTrace } => {
+    ): { sat: Tri; facts: string[]; trace: BranchConditionTrace } => {
       // FIRST occurrence per (lib,name) with a RESOLVED body carries the body sub-trace; a LATER
       // occurrence of that same (already-bodied) criterion is a `reference` (body shown once — the
       // linearity that keeps the serialized trace linear in DISTINCT criteria). An UNDEFINED or
@@ -764,7 +815,7 @@ function evalBranchCondition(
         facts,
         trace: {
           op: "criterion",
-          satisfied: sat,
+          satisfied: sat === true,
           criterion: { name, libraryName: lib },
           ...(first ? { body } : bodied ? { reference: true } : {}),
           ...(facts.length > 0 ? { facts } : {}),
@@ -799,20 +850,24 @@ function evalBranchCondition(
     return critTrace(inner.sat, inner.facts, inner.trace);
   }
   if (cond.type === "BranchConditionNot") {
-    // #224 iii.2/iii.3: closed-world negation — `not X` is satisfied iff X is NOT established.
-    // This matches the emit-side `not Coalesce(<sat>, false)` (iii.1) two-valued semantics — NOT
-    // three-valued CQL null-logic. `not` is a first-class guard as of iii.3 (validated + emitted).
+    // REFACTOR:grounded (#189 null/pause) — STRONG KLEENE negation: `not unknown = unknown`. This
+    // comment used to say "closed-world negation ... matches the emit-side `not Coalesce(<sat>, false)`
+    // two-valued semantics — NOT three-valued CQL null-logic". Both halves are now false: `kNot` is
+    // three-valued, and the emit side's BRANCH-guard carrier dropped its `Coalesce` to match (the ACTION
+    // guard carrier keeps it, and is evaluated two-valued by `evalGuard` — a different path).
+    // A determination that is absent but DERIVABLE still reads `false` closed-world; only one that
+    // nothing can compute is unknown, so `not X` on ordinary shapes is unchanged.
     // Facts of the operand ARE the evidence consulted, so they propagate (the reason it holds).
     const inner = evalBranchCondition(cond.operand, ctx, frame);
     return {
-      sat: !inner.sat,
+      sat: kNot(inner.sat),
       facts: inner.facts,
-      trace: { op: "not", satisfied: !inner.sat, operand: inner.trace },
+      trace: { op: "not", satisfied: kNot(inner.sat) === true, operand: inner.trace },
     };
   }
   const op: "and" | "or" = cond.type === "BranchConditionAnd" ? "and" : "or";
   const results = cond.operands.map((o) => evalBranchCondition(o, ctx, frame));
-  const sat = op === "and" ? results.every((r) => r.sat) : results.some((r) => r.sat);
+  const sat = op === "and" ? kAnd(results.map((r) => r.sat)) : kOr(results.map((r) => r.sat));
   const seen = new Set<string>();
   const facts: string[] = [];
   for (const r of results) {
@@ -823,7 +878,7 @@ function evalBranchCondition(
       }
     }
   }
-  return { sat, facts, trace: { op, satisfied: sat, operands: results.map((r) => r.trace) } };
+  return { sat, facts, trace: { op, satisfied: sat === true, operands: results.map((r) => r.trace) } };
 }
 
 
@@ -841,13 +896,17 @@ function evalGuard(
 ): { excluded: boolean; info?: TraceNode["guard"] } {
   if (!guard) return { excluded: false };
   const { sat, composition } = conceptSatisfied(guard.conceptName, ctx, frame);
-  const excluded = guard.polarity === "unless" ? sat : !sat;
+  // #189 null/pause — an ACTION guard stays TWO-VALUED. Its emitted carrier is `not Coalesce(<ref>, false)`
+  // (decision.ts), deliberately total so `$apply` and the CRE agree; an unknown there reads FALSE and does
+  // NOT pause. Only DECISION guards (`when`) pause. Coerce here so the two lanes stay byte-aligned.
+  const satTotal = sat === true;
+  const excluded = guard.polarity === "unless" ? satTotal : !satTotal;
   return {
     excluded,
     info: {
       polarity: guard.polarity,
       concept: getRefName(guard.conceptName),
-      satisfied: sat,
+      satisfied: satTotal,
       ...(composition ? { composition } : {}),
     },
   };
@@ -1072,7 +1131,7 @@ function walkBranches(
     // label. A criterion is a named unit end-to-end (eval trace + VM), never an inlined body.
     const label = describeBranchCondition(b.condition, getRefName);
     const soleR = soleRef(b.condition);
-    let sat: boolean;
+    let sat: Tri;
     let node: TraceNode;
     if (soleR) {
       const r = conceptSatisfied(soleR.ref, ctx, frame);
@@ -1083,7 +1142,7 @@ function walkBranches(
         kind: "when",
         source: spanOf(b.location, frame),
         concept: getRefName(soleR.ref),
-        satisfied: sat,
+        satisfied: sat === true,
         evaluated: true,
         facts: r.facts,
         ...(r.composition ? { composition: r.composition } : {}),
@@ -1097,7 +1156,7 @@ function walkBranches(
         nodeId,
         kind: "when",
         source: spanOf(b.location, frame),
-        satisfied: sat,
+        satisfied: sat === true,
         evaluated: true,
         facts: r.facts,
         conditionTrace: r.trace,
@@ -1105,9 +1164,21 @@ function walkBranches(
       };
     }
     into.push(node);
-    if (sat) {
+    if (sat === true) {
       executeBody(b.body, label, ctx, frame, node.children!, nodeId);
       if (ordered) return; // first match wins — remaining branches are not evaluated.
+    } else if (sat === null && ordered) {
+      // ⭐ #189 null/pause — an UNKNOWN guard in an ordered `first:` block HALTS the walk. No later branch
+      // may fire, because an ordered block means THIS branch outranks them: answering it could change which
+      // disposition is reached, so choosing one now would be guessing. The result is no recommendation —
+      // the PAUSE — which is exactly what `$apply` produces once the emitted later branches carry this
+      // branch's null-propagating negation (decision.ts `priorityExclusions`). The two lanes halt on the
+      // same condition BY CONSTRUCTION rather than by coincidence.
+      //
+      // Falling through instead would reproduce the V4 wrong-arm defect in the CRE: a later definite branch
+      // firing past a decisive unknown (`tmp/NOTES-apply-null-behavior.md` §8).
+      node.blockedUnknown = true;
+      return;
     }
   }
 }
@@ -1213,8 +1284,10 @@ function runCase(
     conceptsByLib.set(e.lib, arr);
   }
   const valueReadingIds = new Set<Id>();
+  const pureQuestionIds = new Set<Id>();
   for (const [cid, e] of concepts) {
     if (isValueReadingBooleanConcept(e.node, conceptsByLib.get(e.lib) ?? [])) valueReadingIds.add(cid);
+    if (isPureQuestionConcept(e.node)) pureQuestionIds.add(cid);
   }
   const ownBoolValues = new Map<Id, boolean[]>();
   const populate = (id: Id, fn: string, boolVal?: boolean): void => {
@@ -1234,9 +1307,19 @@ function runCase(
         ownBoolValues.set(id, vs);
       } else {
         const e = concepts.get(id);
+        // REFACTOR:grounded (#189 null/pause) — the outcome differs by SHAPE, and the old single wording
+        // ("reads false (matching `$apply`)") stated the very runtime-agreement claim the charter
+        // correction deletes. A PURE QUESTION with no stated value is UNKNOWN in both lanes and PAUSES;
+        // any other value-reading cell still reads false. Both lanes agree either way — the point is that
+        // they now agree on `unknown` for a question.
+        const pausesHere = pureQuestionIds.has(id);
         diagnostics.push(
           `fact "${fn}" populates value-reading concept ${e ? labelOf(e.lib, e.node.name) : id} with no boolean ` +
-            `value — its own-arm reads false (matching \`$apply\`). State \`value is true\` / \`value is false\` to ` +
+            (pausesHere
+              ? `value — it is an unanswered QUESTION, so its own-arm reads UNKNOWN and the decision PAUSES ` +
+                `there (matching \`$apply\`). `
+              : `value — its own-arm reads false (matching \`$apply\`). `) +
+            `State \`value is true\` / \`value is false\` to ` +
             `assert its determination (the validator errors on a bare/non-boolean direct assertion).`,
         );
       }
@@ -1425,6 +1508,7 @@ function runCase(
     directFacts,
     factsByConcept,
     valueReadingIds,
+    pureQuestionIds,
     ownBoolValues,
     concepts,
     cache: new Map(),

@@ -45,7 +45,7 @@ const RECORDSET_X =
 describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence WARNINGS", () => {
   // The whole point of the slice: every finding is validate-only. `isValid` never flips.
   it("every reduction-shape finding is a WARNING — isValid stays true", () => {
-    const r = validateFull(`library "T".\nconcept "C":\n- value type is boolean.\n- code is \`c\`.\n`);
+    const r = validateFull(`library "T".\nconcept "C":\n- type is Condition.\n- value type is boolean.\n- code is \`c\`.\n`);
     expect(r.isValid).toBe(true);
     expect(r.warnings.some((e) => e.kind === "reduction-shape")).toBe(true);
     expect(r.errors.some((e) => e.kind === "reduction-shape")).toBe(false);
@@ -123,7 +123,7 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
 
     it("does not fire on `exists this` (exists is not multi-rep-ambiguous)", () => {
       const src =
-        `library "T".\nconcept "C":\n- value type is boolean.\n- code is \`c\`.\n` +
+        `library "T".\nconcept "C":\n- type is Condition.\n- value type is boolean.\n- code is \`c\`.\n` +
         `- definition is exists this.\n` +
         `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is boolean.\n`;
       expect(redWarnings(src, "reduction-multi-rep")).toHaveLength(0);
@@ -212,7 +212,7 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
   // ---------------------------------------------------------------- no-bare-scalar-code (⚠ corpus-wide)
   describe("no-bare-scalar-code — THE migration prompt (Scalar bare `code is`, no reduction)", () => {
     it("WARNS a bare boolean `code is`, steering to `exists this` AND warning the reduction bricks emit until the flip (F1)", () => {
-      const src = `library "T".\nconcept "C":\n- value type is boolean.\n- code is \`c\`.\n`;
+      const src = `library "T".\nconcept "C":\n- type is Condition.\n- value type is boolean.\n- code is \`c\`.\n`;
       const w = redWarnings(src, "no-bare-scalar-code", "C");
       expect(w).toHaveLength(1);
       expect(w[0].message).toMatch(/exists this/);
@@ -221,6 +221,40 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
       // else a KE follows it straight into a hard error.
       expect(w[0].message).toMatch(/emit-reduction-not-active/);
       expect(w[0].message).toMatch(/until the flip/);
+    });
+
+    // ⭐ #189 null/pause (panel disc 517) — the exemption that matters most, because this rule's ADVICE is
+    // destructive for the shape it used to fire on. A PURE QUESTION trips every clause of the rule, but its
+    // `Observation.value[x]` IS the answer slot; following "add `- definition is exists this.`" would turn a
+    // question that PAUSES into a derivation that reads closed-world and can never pause — a silent flip
+    // from *ask the user* to *deny*.
+    it("does NOT warn a PURE QUESTION — the advice would destroy the pause (#189)", () => {
+      const src = `library "T".
+concept "C":
+- type is Observation.
+- value type is boolean.
+- code is \`c\`.
+`;
+      expect(redWarnings(src, "no-bare-scalar-code", "C")).toHaveLength(0);
+    });
+
+    it("an OMITTED `type is` is the implicit Observation, so it is exempt too (#189)", () => {
+      const src = `library "T".
+concept "C":
+- value type is boolean.
+- code is \`c\`.
+`;
+      expect(redWarnings(src, "no-bare-scalar-code", "C")).toHaveLength(0);
+    });
+
+    it("a non-Observation boolean `code is` is NOT a question and IS still a target (#189)", () => {
+      const src = `library "T".
+concept "C":
+- type is Condition.
+- value type is boolean.
+- code is \`c\`.
+`;
+      expect(redWarnings(src, "no-bare-scalar-code", "C")).toHaveLength(1);
     });
 
     it("WARNS a bare Quantity `code is`, steering to `most recent this`", () => {
@@ -246,7 +280,7 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
       // multi-rep-ambiguous, so boolean-presence steers to `exists this` regardless of repCount (must
       // NOT recommend promote-to-RecordSet, which is only for value-reading `most recent`).
       const src =
-        `library "T".\nconcept "C":\n- value type is boolean.\n- code is \`c\`.\n` +
+        `library "T".\nconcept "C":\n- type is Condition.\n- value type is boolean.\n- code is \`c\`.\n` +
         `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is boolean.\n`;
       const w = redWarnings(src, "no-bare-scalar-code", "C");
       expect(w).toHaveLength(1);
@@ -315,7 +349,7 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
     });
 
     it("does NOT fire on a default (implicit) Scalar concept", () => {
-      const src = `library "T".\nconcept "C":\n- value type is boolean.\n- code is \`c\`.\n`;
+      const src = `library "T".\nconcept "C":\n- type is Condition.\n- value type is boolean.\n- code is \`c\`.\n`;
       expect(redWarnings(src, "shape-marker-not-emit-active")).toHaveLength(0);
     });
 
@@ -377,7 +411,7 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
     });
 
     it("emits the corpus-wide no-bare-scalar-code migration prompt with project attribution", () => {
-      const src = `library "T".\nconcept "C":\n- value type is boolean.\n- code is \`c\`.\n`;
+      const src = `library "T".\nconcept "C":\n- type is Condition.\n- value type is boolean.\n- code is \`c\`.\n`;
       const w = mfWarnings([{ name: "policy.crl", src }], "policy.crl").filter(
         (e) => e.rule === "no-bare-scalar-code",
       );

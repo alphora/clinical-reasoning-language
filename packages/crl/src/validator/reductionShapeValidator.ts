@@ -10,6 +10,8 @@ import {
   type Statement,
   type Location,
 } from "../ast/types";
+import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
+
 import type { SourceContext } from "../imports/scopes";
 
 import type { ReductionShapeError, ReductionShapeRule, ValidationError } from "./validator";
@@ -378,7 +380,25 @@ export class ReductionShapeValidator {
     // `definition is`/`coded from` MIXED form is out of emit scope already (the emit-mixed hard
     // error owns it) — not double-warned here, and its definition slot is taken so the reduction
     // action would not apply.
-    if (shape === "Scalar" && hasCodeIs && def === undefined && !hasValueProjectionRep) {
+    //
+    // ⭐ REFACTOR:grounded (#189 null/pause, panel disc 517) — a PURE QUESTION is EXEMPT, and this is the
+    // exemption that matters most, because the warning's ADVICE is actively destructive for that shape.
+    // A pure question (Scalar + local `code is` + `value type is boolean` + Observation, no derivation, no
+    // representation) IS a bare scalar `code is` — it trips every clause of this rule. But it is not a
+    // missing reduction: its `Observation.value[x]` IS the answer slot, and the reduction that reads it is
+    // newest-answer (`answeredValue()`), supplied by the answer representation exactly as the patient-age
+    // `value projection` posrep supplies its own (the sibling exemption above).
+    // Following the suggested action here — "add `- definition is exists this.`" — converts a question
+    // that PAUSES into a derivation that reads closed-world and can NEVER pause: a silent flip from
+    // *ask the user* to *deny*, which is the exact defect class #189 removes. Charter §3 carries the
+    // matching carve-out.
+    if (
+      shape === "Scalar" &&
+      hasCodeIs &&
+      def === undefined &&
+      !hasValueProjectionRep &&
+      !isPureQuestionConcept(concept)
+    ) {
       // The suggested reduction is conditioned on value type FIRST, then representation count. A boolean
       // presence determination is `exists this` — valid over MULTIPLE representations too (design §6: the
       // union of each rep's existence, dedup-immune), so repCount is irrelevant there (panel R3 gpt56 #2).

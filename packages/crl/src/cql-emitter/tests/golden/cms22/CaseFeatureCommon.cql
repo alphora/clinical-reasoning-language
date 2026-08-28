@@ -37,6 +37,38 @@ define fluent function satisfied(truths List<System.Boolean>):
   exists truths
 
 /*
+ * answeredValue — the THREE-STATE read of a PURE QUESTION (#189 null/pause).
+ *
+ * `asTruths`/`satisfied` above collapse three DISTINCT states into one: no record at all, a record
+ * valued `false`, and a valueless record all become the empty set, hence `false`. That makes an
+ * UNANSWERED question indistinguishable from one answered "no" — so a decision DENIES where it must
+ * PAUSE and ask. That is the #189 null/pause defect, and this function is the fix:
+ *
+ *   newest answer record valued true   -> true
+ *   newest answer record valued false  -> false
+ *   NO answer record at all            -> null   (unknown: the gate pauses and the question is asked)
+ *
+ * Deliberately NOT `Coalesce`d — totality belongs at the ARM (the branch guard), never per operand.
+ * Coalescing here is exactly what forecloses the pause (design of record §3.3).
+ *
+ * Observation-only by construction: a pure question is `type is Observation` + `value type is boolean`
+ * + `code is`, because only a stored boolean lets a user answer true / false / leave-unanswered
+ * (design §3.1). The `where` keeps a valueless record from winning the recency sort and reading null.
+ *
+ * Newest-wins on (effective, id) — a SORT, not a judgment (design §3.7) — byte-matching the emitter's
+ * own `emitSelectNewest` spelling for Observation (`recency.sortExpr = "effective"`, cast `dateTime`),
+ * so the two cannot drift.
+ */
+define fluent function answeredValue(obs List<FHIR.Observation>):
+  FHIRHelpers.ToBoolean(
+    Last(
+      obs O
+        where O.value is FHIR.boolean
+        sort by (effective as FHIR.dateTime).value, id
+    ).value as FHIR.boolean
+  )
+
+/*
  * recencyLocalWins — the SHARED cross-representation recency tie-break (#189 B2).
  *
  * Given the LOCAL arm's recency timestamp and the SOURCE/other arm's recency

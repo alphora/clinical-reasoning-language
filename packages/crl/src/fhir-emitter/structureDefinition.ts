@@ -40,8 +40,8 @@
  */
 
 import type { CRLError } from "../types/errors";
-import { caseFeatureProfileShape } from "../emit/resourceEmitRegistry";
-import type { CaseFeatureProfileShape } from "../emit/resourceEmitRegistry";
+import { caseFeatureProfileShape, defaultValueJson, requiredStructuralElements } from "../emit/resourceEmitRegistry";
+import type { CaseFeatureProfileShape, DefaultValue } from "../emit/resourceEmitRegistry";
 
 import { localCodeSystemUrl } from "./slug";
 import { libraryCanonicalUrl } from "./library";
@@ -94,6 +94,81 @@ function sdcExtractValue(profileUrl: string, elementId: string, expression: stri
  * question, verified in the `$apply` harness) is a SEPARATE step; the `patternCodeableConcept` here fixes the code
  * correctly for the CQL/CEL round-trip (`[<R>: <code>]` matches the emitted record).
  */
+/** REFACTOR:grounded (#189 null/pause, assertion 6) — the differential element(s) constraining ONE structural
+ *  default. A `pattern` (not a `fixed`) because the case-feature profile describes what an ANSWER RECORD must
+ *  carry, not the only record anyone may ever write.
+ *
+ *  A repeating element (`codeable-concept-array` — `Observation.category` / `Condition.category`, 1..*) gets a
+ *  SLICE, not a bare pattern: in R4 a `pattern[x]` on a repeating element constrains EVERY repetition, which
+ *  would make a legitimate second category invalid. The slice states "at least one category matching this",
+ *  which is both honest and — harness-verified — fillable by `$extract`. (The bare `min: 1` with no pattern that
+ *  this replaces was neither: it declared a floor nothing could fill, and every extracted answer failed its own
+ *  profile.) Shape follows the US Core `Observation.category` idiom. */
+function structuralElements(id: string, path: string, value: DefaultValue): Array<Record<string, unknown>> {
+  const json = defaultValueJson(value);
+  const base = { id, path, min: 1, max: "1", mustSupport: true };
+  if (value.kind === "code") return [{ ...base, patternCode: json }];
+  if (value.kind === "coding") return [{ ...base, patternCoding: json }];
+  if (value.kind === "codeable-concept") return [{ ...base, patternCodeableConcept: json }];
+  const slices = value.concepts.map((c, i) => ({
+    id: `${id}:${c.code}`,
+    path,
+    sliceName: c.code,
+    min: 1,
+    max: "1",
+    mustSupport: true,
+    patternCodeableConcept: (json as unknown[])[i],
+  }));
+  return [
+    {
+      ...base,
+      max: "*",
+      slicing: { discriminator: [{ type: "pattern", path: "$this" }], rules: "open" },
+    },
+    ...slices,
+  ];
+}
+
+/**
+ * REFACTOR:grounded (#189 null/pause) — the STRUCTURAL required elements the resource type needs to be valid
+ * FHIR at all (`Observation.status`, `ServiceRequest.intent`, …), reflected onto the case-feature differential
+ * from `REQUIRED_STRUCTURAL_ELEMENTS` — the single authority the CEL writer's `applyStructuralDefaults` already
+ * reads, so the two lanes cannot state different floors.
+ *
+ * WHY this is not cosmetic: `$extract` materialises a profile's `pattern[x]` into the resource it writes back
+ * (harness-proven — the extracted Observation carries the local `code` even though the QuestionnaireResponse
+ * never mentions it). Before this, an answer extracted from the generated questionnaire came back with NO
+ * `status` and was INVALID against base R4 Observation — the answer round trip (design assertion 6, step 4)
+ * failed validation. Emitting the pattern makes `$extract` fill it.
+ *
+ * `wired` (subject) and the concept's own datum elements are emitted by the caller with their SDC extract
+ * wiring, so anything colliding with an already-emitted path is skipped here — the caller owns those cells.
+ * `authored` (FHIR-required AND clinical, no safe default) gets the cardinality floor and no pattern; there are
+ * none in the registry today, but the branch keeps the model honest rather than silently dropping one.
+ */
+function structuralRequiredElements(
+  profile: CaseFeatureProfileShape,
+  emittedPaths: ReadonlySet<string>,
+): Array<Record<string, unknown>> {
+  const rt = profile.resourceType;
+  const schema = requiredStructuralElements(rt);
+  // An UNSCHEMA'D resource is left alone — fail-open, exactly as `applyStructuralDefaults` does. Failing closed
+  // here would regress every proven case-feature row whose structural schema is not filled in yet.
+  if (schema === undefined) return [];
+  const out: Array<Record<string, unknown>> = [];
+  for (const el of schema) {
+    if (emittedPaths.has(el.element)) continue;
+    if (el.fulfillment.via === "wired") continue;
+    const id = `${rt}.${el.element}`;
+    if (el.fulfillment.via === "default") out.push(...structuralElements(id, id, el.fulfillment.value));
+    // `authored` (FHIR-required AND clinical, no safe default) states only the FLOOR. No `max`: the registry
+    // carries no cardinality, and hardcoding `"1"` would silently mis-profile the first repeating authored
+    // element to enter it. An omitted `max` inherits the base resource's, which is always right.
+    else out.push({ id, path: id, min: 1, mustSupport: true });
+  }
+  return out;
+}
+
 export function caseFeatureDifferential(
   profile: CaseFeatureProfileShape,
   coding: { system: string; code: string; display: string },
@@ -121,6 +196,13 @@ export function caseFeatureDifferential(
     elements.push({
       id: `${rt}.${profile.value.elementPath}`,
       path: `${rt}.${profile.value.elementPath}`,
+      // #189 null/pause — this element IS the answer slot, so DTR turns it into the answerable questionnaire
+      // item. Without `short`/`definition` the generated item is labelled with the raw element path
+      // (`Observation.value[x]`) and the user is asked a question with no words in it — harness-verified.
+      // The concept display is the same text the reference IGs put here; the authored question phrasing lives
+      // on the GROUP (from `cpg-input-text`), exactly as in `ccs-qualifying-age-casefeature`.
+      short: coding.display,
+      definition: coding.display,
       min: 1,
       max: "1",
       mustSupport: true,
@@ -145,6 +227,15 @@ export function caseFeatureDifferential(
     mustSupport: true,
     type: [{ code: "dateTime" }],
   });
+  // The concept's own cells are emitted above with their extract wiring; the structural floor fills in whatever
+  // the RESOURCE (not the concept) additionally requires to be valid FHIR.
+  const emittedPaths = new Set<string>([
+    profile.codingElementPath,
+    profile.subjectElementPath,
+    profile.recencyElementPath,
+    ...(profile.value !== undefined ? [profile.value.elementPath] : []),
+  ]);
+  elements.push(...structuralRequiredElements(profile, emittedPaths));
   return elements;
 }
 

@@ -16,10 +16,15 @@ import {
   type QualifyLeaf,
 } from "../emitCriterionDefine";
 
-// #236/#274 step C — the dedicated total-boolean emitter for a `criterion` define (design
-// §2d/§3 C). Pins: EVERY leaf totalized `Coalesce(<leaf>, false)` (positive included);
-// `not` over the totalized leaf; minimal correct parenthesisation for CQL precedence
-// (`not` > `and` > `or`); concept vs criterion leaves routed to the qualifier by kind.
+// #236/#274 step C — the dedicated boolean emitter for a `criterion` define (design §2d/§3 C).
+// Pins: every leaf rendered BARE; `not` over the bare leaf; minimal correct parenthesisation for
+// CQL precedence (`not` > `and` > `or`); concept vs criterion leaves routed to the qualifier by kind.
+//
+// ⚠ #189 null/pause REVERSED the totality pin. These used to assert `Coalesce(<leaf>, false)` on
+// every leaf, positives included. A criterion is a GUARD, and a guard is where a pause must be able
+// to happen: coalescing per operand made an unanswered question read `false`, so `$apply` ran on to
+// the next arm while the CRE paused on the same case. Totality now belongs at the reference site
+// (the per-action `unless` carrier), not in the define body.
 
 const L = (line = 1): Location => ({ start: { line, column: 0 }, end: { line, column: 1 } });
 const ref = (name: string): BranchConditionRef => ({
@@ -58,59 +63,59 @@ const q: QualifyLeaf = (ref, kind) => {
 
 const emit = (c: BranchCondition): string => emitTotalBooleanGuard(c, q);
 
-describe("emitTotalBooleanGuard — totality", () => {
-  it("totalizes a positive concept leaf (Coalesce applied to positives too)", () => {
-    expect(emit(ref("A"))).toBe(`Coalesce("A", false)`);
+describe("emitTotalBooleanGuard — leaf rendering", () => {
+  it("renders a positive concept leaf BARE — #189: a criterion is a guard, so null must propagate", () => {
+    expect(emit(ref("A"))).toBe(`"A"`);
   });
 
   it("routes a criterion leaf to the qualifier by kind (define→define edge)", () => {
-    expect(emit(cref("Elig"))).toBe(`Coalesce(Crit."Elig", false)`);
+    expect(emit(cref("Elig"))).toBe(`Crit."Elig"`);
   });
 
-  it("negates the totalized leaf, not the raw ref", () => {
-    expect(emit(not(ref("A")))).toBe(`not Coalesce("A", false)`);
+  it("negates the bare leaf — `not null` stays null (strong Kleene)", () => {
+    expect(emit(not(ref("A")))).toBe(`not "A"`);
   });
 });
 
 describe("emitTotalBooleanGuard — composition + precedence", () => {
   it("and of two leaves", () => {
-    expect(emit(and(ref("A"), ref("B")))).toBe(`Coalesce("A", false) and Coalesce("B", false)`);
+    expect(emit(and(ref("A"), ref("B")))).toBe(`"A" and "B"`);
   });
 
   it("or of two leaves", () => {
-    expect(emit(or(ref("A"), ref("B")))).toBe(`Coalesce("A", false) or Coalesce("B", false)`);
+    expect(emit(or(ref("A"), ref("B")))).toBe(`"A" or "B"`);
   });
 
   it("an `or` INSIDE an `and` is parenthesised (or binds looser)", () => {
     // (A or B) and C
     expect(emit(and(or(ref("A"), ref("B")), ref("C")))).toBe(
-      `(Coalesce("A", false) or Coalesce("B", false)) and Coalesce("C", false)`,
+      `("A" or "B") and "C"`,
     );
   });
 
   it("an `and` INSIDE an `or` is NOT parenthesised (and binds tighter)", () => {
     // A or (B and C)  —  no parens needed
     expect(emit(or(ref("A"), and(ref("B"), ref("C"))))).toBe(
-      `Coalesce("A", false) or Coalesce("B", false) and Coalesce("C", false)`,
+      `"A" or "B" and "C"`,
     );
   });
 
   it("`not` over a compound is parenthesised", () => {
     expect(emit(not(or(ref("A"), ref("B"))))).toBe(
-      `not (Coalesce("A", false) or Coalesce("B", false))`,
+      `not ("A" or "B")`,
     );
   });
 
   it("the #236 leaf-gate shape: covered AND (flagA OR flagB), with a criterion cover", () => {
-    // `Coalesce(Crit."Cov", false) and (Coalesce("flagA", false) or Coalesce("flagB", false))`
+    // `Crit."Cov" and ("flagA" or "flagB")`
     expect(emit(and(cref("Cov"), or(ref("flagA"), ref("flagB"))))).toBe(
-      `Coalesce(Crit."Cov", false) and (Coalesce("flagA", false) or Coalesce("flagB", false))`,
+      `Crit."Cov" and ("flagA" or "flagB")`,
     );
   });
 
   it("a router body: OR of three sub-criteria (each one define→define edge)", () => {
     expect(emit(or(cref("General"), cref("Powered"), cref("NonPowered")))).toBe(
-      `Coalesce(Crit."General", false) or Coalesce(Crit."Powered", false) or Coalesce(Crit."NonPowered", false)`,
+      `Crit."General" or Crit."Powered" or Crit."NonPowered"`,
     );
   });
 });
@@ -121,7 +126,7 @@ describe("emitCriterionDefine — full statement", () => {
     expect(
       emitCriterionDefine("Accessory", or(cref("General"), cref("Powered")), q, cqlIdent),
     ).toBe(
-      `define "Accessory":\n  Coalesce(Crit."General", false) or Coalesce(Crit."Powered", false)`,
+      `define "Accessory":\n  Crit."General" or Crit."Powered"`,
     );
   });
 });

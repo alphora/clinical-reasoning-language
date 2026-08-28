@@ -1,0 +1,29 @@
+# #189 null/pause — the PURE QUESTION vs the neighbouring shapes that are NOT questions.
+library "PureQuestion".
+
+// PURE QUESTION: local `code is` + boolean, NO derivation and NO source rep. Nothing can compute it, so it
+// is UNKNOWN until a human answers it → the Interface reads THREE-STATE `answeredValue()`.
+concept "Can Use Equipment At Home":
+- type is Observation.
+- value type is boolean.
+- code is `safe-home-use`.
+
+// NOT a question: `exists this` IS a derivation over the concept's own records, so absence is closed-world
+// FALSE and it never pauses (a "predicate dressed as a fact") → stays on the truth-set collapse.
+concept "Has EDS Evidence":
+- type is Condition.
+- value type is boolean.
+- code is `eds-evidence`.
+- definition is exists this.
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `approve`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `deny`.
+
+decision "D":
+first:
+- when "Can Use Equipment At Home" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".

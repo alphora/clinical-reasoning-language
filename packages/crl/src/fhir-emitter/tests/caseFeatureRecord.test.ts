@@ -83,6 +83,43 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     );
     expect(r.kind).toBe("not-a-record");
     if (r.kind !== "not-a-record") return;
+    // Condition cannot carry a stored boolean, so the PURE-QUESTION cell below deliberately does NOT claim it:
+    // the right re-authoring is `definition is exists this`, which KEEPS the natural resource
+    // (`cql-to-crl-type-valuetype-rule.md:30` forbids steering it to `Observation+boolean`).
+    expect(r.derivationKind).toBe("unsupported-reduction-form");
+  });
+
+  // ⭐ #189 null/pause — the PURE QUESTION cell (`tmp/DESIGN-apply-null-pause.md` §3.1/§3.5).
+  // A local-coded boolean with NO definition and no source rep is the ONLY shape a `when` may gate on: only a
+  // stored boolean lets a user answer true / false / leave-unanswered. Before this cell it resolved
+  // `not-a-record`, NO case-feature StructureDefinition was emitted, and the generated Questionnaire contained
+  // no question at all — the tree denied on something the user was never given a way to answer.
+  it("PURE QUESTION: Observation + boolean + bare `code is` → a record WITH a boolean answer slot", () => {
+    const r = resolve(
+      `concept "Can Use Equipment At Home":\n- type is Observation.\n- value type is boolean.\n- code is \`safe-home-use\`.\n`,
+      "Can Use Equipment At Home",
+    );
+    expect(r.kind).toBe("record");
+    if (r.kind !== "record") return;
+    expect(r.descriptor.resourceType).toBe("Observation");
+    // The answer slot — this is what becomes the answerable `Observation.value[x]` boolean questionnaire item.
+    expect(r.descriptor.valueElement).toBe("value");
+    expect(r.descriptor.datumValueType).toBe("boolean");
+    // No `ThisRecords` reduction → no `"<X> Records"` twin; the featureExpression targets the concept itself.
+    expect(r.recordsDefineId).toBe("Can Use Equipment At Home");
+  });
+
+  // ⚠ BOUNDARY, NOT A TARGET. Pins today's edge of the cell so it cannot move by accident. Non-boolean
+  // questions ("what is the BMI?") ARE in scope for this work (design §7 — there is no deferred list); when
+  // they land, this expectation CHANGES to a record with a Quantity answer slot. Do not read it as the
+  // intended end state.
+  it("PURE QUESTION cell claims ONLY boolean — a bare `code is` Quantity stays not-a-record (for now)", () => {
+    const r = resolve(
+      `concept "Most Recent BMI":\n- type is Observation.\n- value type is Quantity.\n- code is \`bmi\`.\n`,
+      "Most Recent BMI",
+    );
+    expect(r.kind).toBe("not-a-record");
+    if (r.kind !== "not-a-record") return;
     expect(r.derivationKind).toBe("unsupported-reduction-form");
   });
 

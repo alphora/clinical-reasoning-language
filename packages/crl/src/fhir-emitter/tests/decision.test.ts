@@ -409,6 +409,33 @@ describe("decision — per-action guard emit (#224 iii.1)", () => {
     );
   });
 
+  // ⭐ #189 null/pause — the load-bearing asymmetry, pinned in ONE place because a future refactor that
+  // "unifies" the two carriers looks like a cleanup and is a silent correctness regression.
+  //
+  // PROVEN divergence (`tmp/NOTES-apply-null-behavior.md` §10): with the branch guard Coalesced, `$apply`
+  // APPROVED a prior authorization whose contraindication question was never answered — `not null` read as
+  // `not false` = true — while the CRE paused on the same case. Both lanes must halt there.
+  it("BRANCH guards propagate null; ACTION guards do NOT — the same concept, two carriers", () => {
+    const actionGuard = emitGuarded(guardedMenu(guarded(recommend("A"), "unless", "B")));
+    const actionCond = (findAction(
+      actionGuard.resource!.resource as Record<string, unknown>,
+      "A",
+    )!.condition as Cond[])[0]!;
+    // An action guard must NEVER pause: two-valued, matching the CRE's two-valued `evalGuard`.
+    expect(actionCond.expression.expression).toBe(`not Coalesce("${Q}"."B", false)`);
+
+    const branch = decision(
+      "Top",
+      [whenC(notC(refC("B")), leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
+      "first",
+    );
+    const arm = acts(rootActions(emitTop(branch).resource)[0])[0]!;
+    // A branch guard MUST pause: strong Kleene, `not unknown = unknown` → arm not applicable.
+    expect((arm.condition as Array<{ expression: { expression: string } }>)[0]!.expression.expression).toBe(
+      `not "${Q}"."B"`,
+    );
+  });
+
   it("an UNGUARDED menu action emits no condition[] (byte-unchanged from pre-iii.1)", () => {
     const { resource } = emitGuarded(decision("D", [when("Top", block("any", [leaf(recommend("A"))]))], "first"));
     const a = findAction(resource!.resource as Record<string, unknown>, "A")!;
@@ -804,9 +831,19 @@ describe("decision — otherwise and first emit", () => {
     const actions = group.action as Array<Record<string, unknown>>;
     expect(actions).toHaveLength(2);
     // Child ORDER is load-bearing under applicabilityBehavior "any" (first-applicable):
-    // the conditioned branch first, the unconditional `otherwise` LAST (true fallthrough).
+    // the conditioned branch first, `otherwise` LAST.
     expect(actions[0]!.condition).toBeDefined();
-    expect(actions[1]!.condition).toBeUndefined();
+    // #189 null/pause — `otherwise` is NO LONGER unconditional. It carries the null-propagating
+    // negation of the prior branch's guard, which is what turns an UNKNOWN guard into a HALT: an
+    // unconditional fallthrough fires on null and DENIES, where the tree must pause and ask (V4,
+    // `tmp/NOTES-apply-null-behavior.md` §8). Note NO `Coalesce` — that would make it two-valued
+    // again and re-collapse "unanswered" into "no".
+    expect(actions[1]!.condition).toEqual([
+      {
+        kind: "applicability",
+        expression: { language: "text/cql-expression", expression: 'not "lib"."Excl"' },
+      },
+    ]);
     expect(actions[1]!.definitionCanonical).toBeDefined();
   });
 
@@ -1061,6 +1098,15 @@ const notC = (operand: BranchCondition): BranchCondition => ({
   location: LOC,
 });
 
+// #189 null/pause — an ordered `first:` prior whose negation is a DISJUNCTION (an `and` guard) cannot
+// lower to conditions on ONE action, so its successors are UNDER-excluded. That is now reported as the
+// `priority-exclusion-inexpressible` WARNING rather than skipped in silence. It does not flip emit
+// success (`isFhirDefError`), so these shape tests assert on HARD errors and pin the warning separately.
+const hardErrors = (errors: readonly { kind?: string }[]): readonly { kind?: string }[] =>
+  errors.filter((e) => e.kind !== "priority-exclusion-inexpressible");
+const exclusionWarnings = (errors: readonly { kind?: string }[]): readonly { kind?: string }[] =>
+  errors.filter((e) => e.kind === "priority-exclusion-inexpressible");
+
 describe("decision — #224 iii.3 negated guard → per-literal FHIR emit", () => {
   // The negated literal's library qualifier (= the emitted PD `library[]` target id).
   const Q = libraryId(METADATA, undefined);
@@ -1069,20 +1115,22 @@ describe("decision — #224 iii.3 negated guard → per-literal FHIR emit", () =
       (c) => c.expression.language,
     );
 
-  it("`A and not B` → ONE arm, positive `A` (cql-identifier) + negated `not Coalesce(...)` (cql-expression)", () => {
+  it("`A and not B` → ONE arm, positive `A` (cql-identifier) + NULL-PROPAGATING `not <ref>` (cql-expression)", () => {
     const d = decision(
       "Top",
       [whenC(andC(refC("A"), notC(refC("B"))), leaf(recommend("X"))), otherwise(leaf(recommend("Y")))],
       "first",
     );
     const { resource, errors, unmatched } = emitTop(d);
-    expect(errors).toEqual([]);
+    expect(hardErrors(errors)).toEqual([]);
     expect(unmatched).toEqual([]);
+    // The `A and not B` PRIOR is an `and`, so `otherwise` is under-excluded — reported, not silent.
+    expect(exclusionWarnings(errors)).toHaveLength(1);
     const children = acts(rootActions(resource)[0]); // [A∧¬B arm, otherwise]
     expect(children).toHaveLength(2);
     const arm = children[0]!;
     expect(arm.title).toBe("A and not B");
-    expect(condExprs(arm)).toEqual(["A", `not Coalesce("${Q}"."B", false)`]);
+    expect(condExprs(arm)).toEqual(["A", `not "${Q}"."B"`]);
     expect(condLangs(arm)).toEqual(["text/cql-identifier", "text/cql-expression"]);
     expect(children[1]!.title).toBe("otherwise");
   });
@@ -1098,7 +1146,7 @@ describe("decision — #224 iii.3 negated guard → per-literal FHIR emit", () =
     const children = acts(rootActions(resource)[0]);
     const arm = children[0]!;
     expect(arm.title).toBe("not B");
-    expect(condExprs(arm)).toEqual([`not Coalesce("${Q}"."B", false)`]);
+    expect(condExprs(arm)).toEqual([`not "${Q}"."B"`]);
     expect(condLangs(arm)).toEqual(["text/cql-expression"]);
   });
 
@@ -1109,11 +1157,13 @@ describe("decision — #224 iii.3 negated guard → per-literal FHIR emit", () =
       "first",
     );
     const { resource, errors } = emitTop(d);
-    expect(errors).toEqual([]);
+    // A compound (non-atom) PRIOR cannot express its exclusion — warned, not silently skipped.
+    expect(hardErrors(errors)).toEqual([]);
+
     const children = acts(rootActions(resource)[0]); // [¬A arm, ¬B arm, otherwise]
     expect(children.map((c) => c.title)).toEqual(["not A", "not B", "otherwise"]);
-    expect(condExprs(children[0]!)).toEqual([`not Coalesce("${Q}"."A", false)`]);
-    expect(condExprs(children[1]!)).toEqual([`not Coalesce("${Q}"."B", false)`]);
+    expect(condExprs(children[0]!)).toEqual([`not "${Q}"."A"`]);
+    expect(condExprs(children[1]!)).toEqual([`not "${Q}"."B"`]);
   });
 
   it("De Morgan: `not (A or B)` → ONE arm of TWO negated literals (¬A ∧ ¬B)", () => {
@@ -1123,12 +1173,14 @@ describe("decision — #224 iii.3 negated guard → per-literal FHIR emit", () =
       "first",
     );
     const { resource, errors } = emitTop(d);
-    expect(errors).toEqual([]);
+    // A compound (non-atom) PRIOR cannot express its exclusion — warned, not silently skipped.
+    expect(hardErrors(errors)).toEqual([]);
+
     const children = acts(rootActions(resource)[0]); // [¬A∧¬B arm, otherwise]
     expect(children[0]!.title).toBe("not A and not B");
     expect(condExprs(children[0]!)).toEqual([
-      `not Coalesce("${Q}"."A", false)`,
-      `not Coalesce("${Q}"."B", false)`,
+      `not "${Q}"."A"`,
+      `not "${Q}"."B"`,
     ]);
     expect(children[1]!.title).toBe("otherwise");
   });
@@ -1140,7 +1192,7 @@ describe("decision — #224 iii.3 negated guard → per-literal FHIR emit", () =
     expect(hasAnyBehavior(top[0]!)).toBe(true);
     const arms = acts(top[0]);
     expect(arms.map((a) => a.title)).toEqual(["not A", "not B"]);
-    expect(condExprs(arms[0]!)).toEqual([`not Coalesce("${Q}"."A", false)`]);
+    expect(condExprs(arms[0]!)).toEqual([`not "${Q}"."A"`]);
   });
 
   it("a negated atom's concept STILL contributes action.input[] (parity with iii.1 `unless`)", () => {
@@ -1177,7 +1229,9 @@ describe("decision — #224 i.3 compound-guard structural emit", () => {
     );
     const { resource, unmatched, errors } = emitTop(d);
     expect(unmatched).toEqual([]);
-    expect(errors).toEqual([]);
+    expect(hardErrors(errors)).toEqual([]);
+    // The `A and B` PRIOR is an `and` — `otherwise` is under-excluded and the warning says so.
+    expect(exclusionWarnings(errors)).toHaveLength(1);
     const children = acts(rootActions(resource)[0]); // under the first: switch wrapper
     expect(children).toHaveLength(2); // [A∧B arm, otherwise]
     expect(condExprs(children[0]!)).toEqual(["A", "B"]);

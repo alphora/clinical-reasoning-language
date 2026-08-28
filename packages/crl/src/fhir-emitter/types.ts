@@ -73,6 +73,13 @@ export const FHIR_DEF_WARNING_KINDS: ReadonlySet<string> = new Set([
   "non-ascii-slug-fallback",
   "empty-terminology",
   "unresolved-reference-cascade-suppression",
+  // #189 null/pause — an ordered `first:` prior whose null-propagating negation cannot lower to
+  // conditions on one action, so later branches are UNDER-excluded and can fire past an unknown
+  // atom in that prior. A WARNING, not an error: the emitted artifact is still valid and correct
+  // for every settled case; what it loses is the pause on an unsettled one. Loud so the two-lane
+  // divergence (the CRE halts there, `$apply` does not) is discoverable at emit rather than only
+  // by running both lanes.
+  "priority-exclusion-inexpressible",
 ]);
 
 export function isFhirDefWarning(error: CRLError): boolean {

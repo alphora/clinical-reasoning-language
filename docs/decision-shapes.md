@@ -67,8 +67,14 @@ Rules:
   must be the **last** branch, and is **required** at the top level of a
   `first:` decision (so every case reaches a disposition). In a *nested*
   `first:` block `otherwise` is optional (omit it when the inner branches are
-  already exhaustive). `otherwise` carries **no** condition — it is
-  unconditional by construction.
+  already exhaustive). The **author** writes no condition on `otherwise`.
+  ⚠ It is NOT unconditional in the emitted FHIR: since #189 every branch of an
+  ordered `first:` — `otherwise` included — carries the **null-propagating
+  negation of its PRIOR branches** as `condition[]` (see "Priority exclusions"
+  below). Without them `$apply` has no ordering: a guard that evaluates *unknown*
+  merely makes its own action not-applicable, and first-match-wins then runs the
+  next sibling — so an unconditional `otherwise` fires on an unanswered question
+  and the tree reaches a disposition it should have paused before.
 - A `then:` body (the colon form) is always closed by `end.` — a dashless,
   context-free closer; the trailing period keeps every CRL line ending in `.`
   (leaf) or `:` (opener). The inline single-action form
@@ -102,12 +108,19 @@ Syntax and rules:
   (`not "Excluded"`) or a compound with parentheses (`not ( "A" or "B" )`). It
   lowers *structurally*, not to a CQL boolean: De Morgan pushes every `not` down
   to the ref leaves, and each **negated literal** emits a per-atom
-  `not Coalesce(<ref>, false)` applicability condition — so a negated atom stays
-  a visible per-criterion `condition[]` like any other. Semantics are
-  **closed-world**: `not "X"` holds when `X` is *not established*. (`not` is the
-  emit-capable way to author a single-determination `first:` exclusion; the
-  per-action `unless` is a different, menu-member-only construct — see "Per-action
-  guards".)
+  `not <ref>` applicability condition — so a negated atom stays a visible
+  per-criterion `condition[]` like any other.
+  ⚠ Semantics in a BRANCH guard are **strong Kleene, not closed-world**
+  (#189): `not unknown = unknown`, and an unknown guard makes its arm
+  not-applicable so traversal halts and DTR asks the question. A negated branch
+  guard is deliberately NOT `Coalesce`-wrapped. (It used to be, and `$apply`
+  then approved a request whose contraindication question was never answered
+  while the CRE paused on the same case — a proven lane divergence.)
+  A determination that is **absent but derivable** still reads `false`
+  closed-world; only a determination that *nothing can compute* is unknown.
+  (`not` is the emit-capable way to author a single-determination `first:`
+  exclusion; the per-action `unless` is a different, menu-member-only construct
+  that DOES coalesce — see "Per-action guards".)
 - **A branch guard's STRUCTURE lowers to action shape, never collapsing to one
   opaque CQL boolean.** `and` becomes several ANDed applicability conditions on
   one action. An INLINE `or` expands to disjunctive-normal-form arms whose
@@ -152,6 +165,41 @@ sub-expression collapses it to a single leaf instead of expanding at the parent
 condition, so it is available only when the source genuinely has a shared,
 action-bearing sub-determination to delegate to (with its own dispositions), never
 a fabricated one.
+
+### Priority exclusions — how an ordered `first:` stays ordered in FHIR (#189)
+
+`$apply` has **no ordering primitive and no halt primitive.** A `PlanDefinition`
+action whose condition evaluates *unknown* is simply **not applicable**, and the
+engine then evaluates the next sibling. So an ordered `first:` is not ordered by
+anything the engine does — precedence has to be written into the conditions.
+
+Every branch of an ordered `first:` therefore carries, in addition to its own
+guard, one `condition[]` entry per **prior** branch holding that prior's
+**null-propagating negation**:
+
+```
+branch 1     G1
+branch 2     ¬G1 · G2
+branch 3     ¬G1 · ¬G2 · G3
+otherwise    ¬G1 · ¬G2 · ¬G3
+```
+
+`$apply` ANDs a `condition[]`, so these are separate entries, never one composed
+expression — which keeps the #224 invariant (a `text/cql-expression` only ever
+wraps `not <single-atom>`) and avoids a cross-product of arms.
+
+The negation is exact by shape: a positive prior `"X"` excludes as `not "X"`; a
+negated prior `not "X"` excludes as the positive `"X"`; an `or` prior becomes N
+separate negated conditions (De Morgan). None of them coalesce, and that is the
+point: an **unknown earlier guard poisons every later arm**, so no arm applies,
+traversal halts, and DTR asks the question instead of running on to a
+disposition. This is only emitted for `first:` — `all:` and `any:` branches are
+unordered and exclude nothing.
+
+⚠ Known gap: a prior whose guard is an `and` is skipped, because `¬(A and B)` is
+a disjunction and the #224 invariant requires disjunctions to lower to arms. Such
+a branch cannot yet exclude its successors; the fix is a named define per branch
+position, referenced as one `text/cql-identifier` condition.
 
 ## `criterion` — naming a reusable guard
 
@@ -526,15 +574,16 @@ this instead:** parenthesize to say what you mean —
 - when not "Meets Medical Necessity" then recommend activity "Deny".
 ```
 `not` is supported and lowers structurally: De Morgan pushes it to the ref
-leaves, and each negated literal emits a per-atom `not Coalesce(<ref>, false)`
-applicability condition (never a compound CQL boolean). A `criterion` ref is
-itself a leaf, so `not "C"` is ONE `not Coalesce("C", false)` condition — never
-De-Morganed into the criterion's body (which stays structural inside its define).
-That is the #236 negation advantage: inlining `not ( A and B )` would De Morgan
-into a 2-arm `not A or not B`, while a negated criterion ref stays one leaf.
-Semantics are closed-world — `not "X"` holds when `X` is *not established*. This is the
-emit-capable way to author a single-determination `first:` exclusion, which a
-menu-member-only per-action `unless` cannot express.
+leaves, and each negated literal emits a per-atom `not <ref>` applicability
+condition (never a compound CQL boolean). A `criterion` ref is itself a leaf, so
+`not "C"` is ONE `not "C"` condition — never De-Morganed into the criterion's
+body (which stays structural inside its define). That is the #236 negation
+advantage: inlining `not ( A and B )` would De Morgan into a 2-arm
+`not A or not B`, while a negated criterion ref stays one leaf.
+Semantics are strong Kleene, NOT closed-world (#189): `not unknown = unknown`,
+so a criterion over an unanswered question halts the arm rather than firing it.
+This is the emit-capable way to author a single-determination `first:` exclusion,
+which a menu-member-only per-action `unless` cannot express.
 
 ### ✓ use a `criterion` to factor a large `or` out of the parent DNF (#236)
 ```

@@ -318,18 +318,35 @@ fact "Diagnosis Finding":
 
 fact "Drug Therapy Failure":
 - date is "2026-01-01".
+- value is true.
 - defined by "Coverage Criteria Reference"."Failed Drug Therapy".
 
 fact "Physical Therapy Failure":
 - date is "2026-01-01".
+- value is true.
+- defined by "Coverage Criteria Reference"."Failed Physical Therapy".
+
+// #189 null/pause — "the patient did NOT fail therapy" is now something you STATE, not something you get by
+// omitting the fact. Omission means UNKNOWN (nothing established it and nothing can compute it), which makes
+// the gate pause and ask. An explicit \`value is false\` is the answer "no".
+fact "No Drug Therapy Failure":
+- date is "2026-01-01".
+- value is false.
+- defined by "Coverage Criteria Reference"."Failed Drug Therapy".
+
+fact "No Physical Therapy Failure":
+- date is "2026-01-01".
+- value is false.
 - defined by "Coverage Criteria Reference"."Failed Physical Therapy".
 
 fact "Viral Load Lab Result":
 - date is "2026-01-01".
+- value is true.
 - defined by "Coverage Criteria Reference"."Viral Load Below Threshold Lab Result".
 
 fact "Viral Suppression Chart Note":
 - date is "2026-01-01".
+- value is true.
 - defined by "Coverage Criteria Reference"."Viral Suppression Charted By Clinician".
 
 case "diagnosis + failed drug therapy + viral suppression (lab record) -> approve":
@@ -356,6 +373,8 @@ case "diagnosis + viral suppression but no conservative-therapy failure -> deny 
 - subject is "Sample Patient".
 - fact is "Diagnosis Finding".
 - fact is "Viral Load Lab Result".
+- fact is "No Drug Therapy Failure".
+- fact is "No Physical Therapy Failure".
 - result is "Coverage Determination" is "not-certify.Deny".
 
 case "no qualifying diagnosis -> deny (criterion-1 node otherwise)":
@@ -499,8 +518,16 @@ fact "Continuation Request Finding":
 - date is "2026-01-01".
 - defined by "Source Delegated Decision Reference"."Continuation Request".
 
+// #189 null/pause — the NEGATIVE is now STATED, not implied by omission. Omission means UNKNOWN
+// (nothing established it, nothing can compute it) and makes the gate pause and ask.
+fact "No Demonstrated Response":
+- date is "2026-01-01".
+- value is false.
+- defined by "Source Delegated Decision Reference"."Demonstrated Response".
+
 fact "Demonstrated Response Finding":
 - date is "2026-01-01".
+- value is true.
 - defined by "Source Delegated Decision Reference"."Demonstrated Response".
 
 fact "Clinically Indicated Finding":
@@ -516,6 +543,7 @@ case "continuation + demonstrated response -> approve via delegated sub":
 case "continuation, no response -> deny via delegated sub otherwise":
 - subject is "Sample Patient".
 - fact is "Continuation Request Finding".
+- fact is "No Demonstrated Response".
 - result is "Coverage Determination" is "not-certify.Deny".
 
 case "clinically indicated (no continuation) -> approve in parent":
@@ -629,8 +657,16 @@ fact "Indication X Finding":
 - date is "2026-01-01".
 - defined by "Disposition Arbitration Reference"."Has Indication X".
 
+// #189 null/pause — the NEGATIVE is now STATED, not implied by omission. Omission means UNKNOWN
+// (nothing established it, nothing can compute it) and makes the gate pause and ask.
+fact "No Failed Standard Therapy":
+- date is "2026-01-01".
+- value is false.
+- defined by "Disposition Arbitration Reference"."Failed Standard Therapy".
+
 fact "Failed Standard Therapy Finding":
 - date is "2026-01-01".
+- value is true.
 - defined by "Disposition Arbitration Reference"."Failed Standard Therapy".
 
 fact "Indication Y Finding":
@@ -639,6 +675,7 @@ fact "Indication Y Finding":
 
 fact "Severe Markers Finding":
 - date is "2026-01-01".
+- value is true.
 - defined by "Disposition Arbitration Reference"."Has Severe Markers".
 
 case "X pathway qualifies -> approve":
@@ -658,6 +695,7 @@ case "OVERLAP: both indications, X-pathway fails (no failed-standard) -> approve
 - fact is "Indication X Finding".
 - fact is "Indication Y Finding".
 - fact is "Severe Markers Finding".
+- fact is "No Failed Standard Therapy".
 - result is "Coverage Determination" is "certify.Approve".
 
 case "OVERLAP: both indications, Y-pathway fails (no severe markers) -> approve via X":
@@ -670,6 +708,7 @@ case "OVERLAP: both indications, Y-pathway fails (no severe markers) -> approve 
 case "within-indication: X present but pathway fails, no Y -> Deny":
 - subject is "Sample Patient".
 - fact is "Indication X Finding".
+- fact is "No Failed Standard Therapy".
 - result is "Coverage Determination" is "not-certify.Deny".
 
 case "off-indication: neither indication -> Deny EIU":

@@ -139,8 +139,33 @@ The rules:
   `most recent this`, a `definition is` derivation, or a `defined as`). A bare scalar `code is` with no
   reduction is **invalid** — the magic the emitter must never manufacture (the old `.asTruths()` hidden
   `exists(any true)`). *(In the shipped validate-only slice this is the `no-bare-scalar-code` **warning** — a
-  migration prompt; it becomes a hard error at the flip. A `code is` concept whose reduction is supplied by a
-  `value projection` posrep — e.g. patient age — is NOT bare and is exempt.)*
+  migration prompt; it becomes a hard error at the flip.)*
+
+  **Two shapes are EXEMPT, because their reduction is supplied by a REPRESENTATION rather than omitted:**
+
+  1. A `code is` concept whose reduction comes from a **`value projection` posrep** — e.g. patient age.
+  2. ⭐ A **PURE QUESTION** (#189 null/pause): `shape is Scalar` + `type is Observation` (or an omitted
+     `type is`, whose implicit standard is Observation) + `value type is boolean` + `code is`, with **no
+     derivation and no `source representation`**. Its `Observation.value[x]` **IS** the answer slot, and its
+     reduction is **newest-answer** — the same recency selection the age posrep uses, supplied by the answer
+     representation, not manufactured by the emitter. It reads three-state (`answeredValue()`:
+     true / false / **null**).
+
+  ⚠ The exemption is **load-bearing, not a convenience**. This rule's own migration advice for a boolean is
+  *"add `- definition is exists this.`"* — and following it on a pure question converts a determination that
+  **PAUSES** into a derivation that reads closed-world and can **never** pause: a silent flip from *ask the
+  user* to *deny*. It is also the ONLY shape a `when` branch guard can gate on, so outlawing it would outlaw
+  the canonical gate. The validator, the migration inventory oracle and the emitter all read ONE shared
+  predicate (`isPureQuestionConcept`) so they cannot drift on it.
+
+  ⚠ Conversely, a **non-Observation** boolean `code is` (e.g. `type is Condition`) is **not** exempt: there is
+  nowhere on that resource to store an answer, so it is not a question, and `exists this` is the right
+  reduction for it. That is the same distinction as the answerability note in §3 above.
+
+  This is also the answer to *"every set→scalar reduction is explicit in the CRL"* (§4, no magic): the
+  newest-answer read is **not** an undeclared reduction the emitter invented — it is the semantics of the
+  answer representation the `code is` declares, exactly as `exists(…)` is the semantics of a presence
+  representation. What §4 bans is a reduction with no declared source, and this one has one.
 - **A record-valued concept** (`shape is RecordSet`) ⟹ **no scalar reduction**; it **publishes its
   record set**. Other concepts reference it **by name** and derive from its **records**. (The explicit
   `shape is RecordSet` is what disambiguates a `CodeableConcept` *set* — e.g. a coded-Encounter refinement
@@ -252,9 +277,31 @@ its CQL is a pure function of its own definition.
 
 ### Closed-world
 
-Implicit absence = the empty set. A scalar over the empty set has no value; a **boolean** over the empty set
-is **false**. Explicit absence is an ordinary **absence code** (a record), not a positive event. There is no
-"unknown."
+Implicit absence = the empty set. A scalar over the empty set has no value; a **boolean DERIVED over evidence
+records** (`defined as exists ( … )`, a composition) over the empty set is **false**.
+
+**⚠ But a boolean determination that NOTHING CAN COMPUTE is `unknown`, not false.** A boolean concept with a
+local `code is` and **no** derivation and **no** source representation is a **QUESTION** — only a human can
+answer it — so until a local record is asserted its value is **unknown**, and a decision guarding on it
+**pauses and asks** rather than denying. A question, and therefore an answer, is **always a local code**.
+
+Its answer is an Observation carrying that local code with a `valueBoolean`: **`false` is `valueBoolean: false`**.
+There is **no "absence code"** — that idea was wrong and is removed. (Design of record
+`tmp/DESIGN-apply-null-pause.md`; executed evidence `tmp/NOTES-apply-null-behavior.md`, incl. the two reference
+PA IGs.)
+
+Note the type split this rests on: a `type is Condition` concept is an **evidence record** — there is nowhere on
+a Condition to STORE a boolean, so it can never carry an answer. The **question** over it is a separate
+`type is Observation` + `value type is boolean` + `code is` concept, whose `Observation.value[x]` IS the answer
+slot. **A guard consumes the determination, never the record.**
+
+⚠ That is a statement about ANSWERABILITY, not about legal concept shapes.
+**`type is Condition` + `value type is boolean` + `definition is exists this` is CANONICAL and must not be
+"fixed".** The two types name different things (charter §3): `type is` is the RECORD retrieved, `value type is`
+is the RESULT the derivation publishes — here, the boolean that `exists` computes. It is the shape of the
+worked FAP example above, and `docs/cql-to-crl-type-valuetype-rule.md:30` FORBIDS rewriting it to
+`Observation` + `boolean`. What such a concept cannot be is a **question**: it is a derivation, so it reads
+closed-world (absent record = `false`) and never pauses. Only a concept with a stored-boolean answer slot can.
 
 ---
 
@@ -264,7 +311,11 @@ is **false**. Explicit absence is an ordinary **absence code** (a record), not a
 - **CQL is context-free.** A concept's CQL is a pure function of its own definition — never of how it is
   consumed (guard vs measure population vs operand). There is no "QM vs decision" CQL fork.
 - **No magic.** The emitter never manufactures a value a concept did not declare. Every set→scalar reduction
-  is explicit in the CRL (per the value-type rule above).
+  is explicit in the CRL (per the value-type rule above) — where "explicit" means **it has a declared source**,
+  either a written reduction (`exists this` / `most recent this` / a `defined as`) or a REPRESENTATION whose
+  semantics supply it. The two representation-supplied reductions are the `value projection` posrep
+  (patient age) and the **pure question**'s newest-answer read (§3). Both are declared on the page; neither is
+  invented by the emitter. What this bans is a reduction with no declared source at all.
 - **⭐ A VALUE-READING boolean determination requires an explicit `value is` — a bare direct assertion is an
   AUTHOR-TIME ERROR, never a manufactured default.** A **value-reading** boolean concept is one whose emitted
   CQL own-arm READS `.value as FHIR.boolean` rather than presence — today the **member-existence interface**
@@ -274,14 +325,20 @@ is **false**. Explicit absence is an ordinary **absence code** (a record), not a
   author never stated* — exactly the magic the bullet above bans, and the need to defend it against
   re-litigation is the tell. The gate is **author-time**: the CEL **validator** rejects a bare / non-boolean
   direct assertion (with a matching **emitter** diagnostic, so a caller that skips validation still sees it) and
-  tells the author to write `value is true` / `value is false`. **At runtime the two lanes still AGREE without a
-  refusal:** a valueless value-reading record reads **false** in *both* `$apply` (`Last(where value is boolean)`
-  = null → false) and the CRE (0 own boolean values → false) → both compute the same verdict (closed-world
-  Deny). The CRE refuses loud ONLY where it genuinely cannot replicate `$apply` — conflicting `true`+`false`
+  tells the author to write `value is true` / `value is false`.
+  ⚠ **CORRECTED (#189 null/pause).** This bullet used to add: *"at runtime the two lanes still AGREE without a
+  refusal — a valueless value-reading record reads **false** in both, → closed-world Deny."* **That claim is
+  disproven, and the behaviour it described was the defect.** A valueless value-reading record now reads **null**
+  in *both* lanes — `$apply` via `answeredValue()` (deliberately NOT `Coalesce`d) and the CRE via its third
+  value — and both **PAUSE** rather than deny. The lanes still agree; they agree on *unknown*.
+  ⭐ **The author-time gate STANDS, and is strengthened by this, not weakened.** Under the old reading a bare
+  assertion silently became a Deny; under the correct one it silently becomes a *pause*, which is HARDER to
+  diagnose because the case simply produces no disposition at all. Rejecting it at authoring time is the only
+  place it is cheap. The CRE refuses loud ONLY where it genuinely cannot replicate `$apply` — conflicting `true`+`false`
   own assertions, whose newest-wins pick needs the emitted `(effective, id)` sort. A **presence-based
   (value-blind)** boolean concept (`definition is exists this`, a `defined as` over records) is untouched —
   bare = present = **true**, and an authored `value is` there is **ignored** (a warning: `value is false` on it
-  computes *true*; explicit absence is an absence code, not `value is false`). (disc 512/513; classification is
+  computes *true*). (disc 512/513; classification is
   the shared `isValueReadingBooleanConcept`.)
 - **⭐ No magic in the EVAL/TEST path either — matching is EXPLICIT MEMBERSHIP, both lanes, local AND remote.**
   This is the single biggest spin-cause in #189: "clever" shortcuts that *technically work* but are impossible to
@@ -296,11 +353,23 @@ is **false**. Explicit absence is an ordinary **absence code** (a record), not a
   of, and the concept computes over what is populated. There is no *selector* — the **code**, and which sets it is a
   member of, is the whole story. Local is not exempt: its check is trivially satisfied for the right code but
   **catches a wrong one** (an author error, or a hand-edited emitted file). See §3 "Matching is MEMBERSHIP".
-- **Null-safety by construction.** Every boolean-valued define the emitter produces is **total**: `exists(…)`
-  is total by construction; a nullable boolean derivation is totalized (`Coalesce(<predicate>, false)`) at its
-  own boundary — **per operand, before any `not`** (because `not Coalesce(A,false)` ≠ `Coalesce(not A,false)`
-  under closed-world), and never by Coalescing a nullable **non-boolean** operand (that would manufacture a
-  value). The backstop is an emit/test-time totality assertion, not a blanket terminal Coalesce.
+- **Null-safety WHERE A VALUE CAN BE COMPUTED — and a THIRD VALUE where it cannot.** ⚠ CORRECTED (#189
+  null/pause): this bullet used to require every boolean-valued define to be **total**, totalized **per operand,
+  before any `not`**. That blanket rule WAS the defect — it made an *unanswered question* indistinguishable from
+  an answered *"no"*, so the tree ran on to a disposition where it must stop and ask. The corrected model:
+  - A **derivation** stays closed-world and total: `exists(…)` is total by construction; a nullable boolean
+    derivation is totalized (`Coalesce(<predicate>, false)`) at its own boundary. Absent *evidence* is `false`,
+    because a derivation can always compute — `definition is exists this` never pauses.
+  - A **pure question** (a bare local `code is` + `value type is boolean`, with nothing that could compute it)
+    reads **three-state** and is deliberately NOT totalized: `answeredValue()` returns `true` / `false` /
+    **null**. `false` is a **stated value** (`valueBoolean: false`), never implied by omission.
+  - **Composition is strong Kleene**, and totality belongs at the **arm, never per operand**. A negated
+    *branch* guard is null-propagating (`not <ref>`); Coalescing it reads an unanswered question as "no".
+  - The one deliberate exception is the per-action `unless` / `only when` carrier, which stays **two-valued**
+    (`not Coalesce(<ref>, false)`) to match the CRE's two-valued action-guard evaluation. An action guard must
+    never pause.
+  - Never Coalesce a nullable **non-boolean** operand — that manufactures a value.
+  The backstop is an emit/test-time assertion, not a blanket terminal Coalesce.
 - **`canonicalBase` is required** — absent/empty is an error, no `urn:` fallback. The local CodeSystem is
   always `<canonicalBase>/CodeSystem/<domain>-local`.
 
@@ -390,10 +459,31 @@ This is the whole point of CRL: the author writes the declarative minimum and th
   is reviewable/diffable/versioned), and the deterministic emitter reads it. AI-on-source is auditable;
   AI-on-output is not.
 
-Currently the emit stops at coding+subject+recency — the completeness build is **deferred to T5/T6**. The full
-design (the three layers, the AI-edits-source rule, and the OPEN grammar question for the concept "slot") is
-captured in `docs/emit-189-casefeature-completeness.md` and tracked at **#290**. Do not re-derive it from
-memory — read that doc.
+**STATUS (#189 null/pause, 2026-08-27) — the SD half has LANDED, with one measured constraint on the
+"overridable" wording above.** The case-feature differential now reflects `REQUIRED_STRUCTURAL_ELEMENTS` (the
+same table the CEL writer's `applyStructuralDefaults` reads, so the two lanes cannot state different floors),
+each `default` element carrying its `pattern[x]`. That is what makes `$extract` supply it: **`$extract`
+materialises a profile's `pattern[x]` into the record it writes back** — which is also how the local `code`
+reaches the extracted resource, though the QuestionnaireResponse never mentions it. Before this, an answer
+extracted from the generated questionnaire had **no `status`** and was invalid against base R4 Observation.
+
+⚠ **A `pattern[x]` FIXES the value; it is not the "sensible default they can override" this section describes.**
+That is a mechanism limit, not a choice: the alternative — supplying the value via
+`sdc-questionnaire-definitionExtractValue` with a FHIRPath literal, exactly as `subject`/`effective` are
+supplied — was tried and **crashes** the cqf extract processor for a `code`-typed element
+(`DynamicModelResolver.setValue` NPEs; run recorded in `tmp/NOTES-apply-null-behavior.md` §9). So today these
+elements are **invariants of an answer record**, not answerable questions with defaults. Making them genuinely
+answerable-with-a-default is the T5/T6 completeness build (**#290**). Do not read the paragraph above as a
+description of what ships today.
+
+⚠ A **repeating** element (`category` 1..*) gets a **slice**, never a bare `pattern[x]`: in R4 a pattern on a
+repeating element constrains EVERY repetition, which would forbid a legitimate second category. `$extract`
+fills a sliced pattern too (verified). `min: 1` with no pattern is the one shape to avoid — it declares a floor
+nothing can fill, and every extracted answer then fails its own profile.
+
+The rest of the completeness build (the three layers, the AI-edits-source rule, and the OPEN grammar question
+for the concept "slot") is captured in `docs/emit-189-casefeature-completeness.md` and tracked at **#290**. Do
+not re-derive it from memory — read that doc.
 
 ---
 

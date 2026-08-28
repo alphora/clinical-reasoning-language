@@ -1326,6 +1326,14 @@ function buildInterfaceReexports(
               : "truth-set") as "total-boolean" | "truth-set",
           }
         : {}),
+      // #189 null/pause — a PURE QUESTION re-exports as the THREE-STATE `answeredValue()` read instead of the
+      // `asTruths().satisfied()` collapse, which folds "no answer record" and "answered false" into the same
+      // `false` and so denies where the tree must pause and ask. Decided HERE at synthesis because the
+      // Interface emitter's `conceptByName` is layer-isolated and cannot see the source concept's definition —
+      // the same reason `__interfaceReexportMode` is decided here.
+      ...(sourceLayer === "LocalPrimitives" && src?.__pureQuestion === true
+        ? { __pureQuestion: true as const }
+        : {}),
     };
     reexports.push(reexport);
   }

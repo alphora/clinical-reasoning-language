@@ -344,7 +344,19 @@ describe("#189 2d — caseFeatureDifferential (natural-resource, descriptor-driv
 
   it("a VALUELESS Condition (`exists this`) → Condition, code pattern, subject + recordedDate, NO value[x]", () => {
     const els = caseFeatureDifferential(caseFeatureProfileShape("Condition")!, CODING, SDURL);
-    expect(idsOf(els)).toEqual(["Condition", "Condition.code", "Condition.subject", "Condition.recordedDate"]);
+    // #189 assertion 6: the tail is the STRUCTURAL floor reflected from REQUIRED_STRUCTURAL_ELEMENTS — what the
+    // RESOURCE needs to be valid FHIR at all, so `$extract` materialises it into the answer record it writes back.
+    // `Condition.subject` is `wired` in the registry and already emitted above, so it is NOT duplicated here.
+    expect(idsOf(els)).toEqual([
+      "Condition",
+      "Condition.code",
+      "Condition.subject",
+      "Condition.recordedDate",
+      "Condition.category",
+      "Condition.category:health-concern",
+      "Condition.clinicalStatus",
+      "Condition.verificationStatus",
+    ]);
     // code element carries the local coding as a pattern, no value element anywhere.
     const codeEl = els.find((e) => e.id === "Condition.code")!;
     expect(codeEl.patternCodeableConcept).toEqual({ coding: [CODING] });
@@ -361,6 +373,9 @@ describe("#189 2d — caseFeatureDifferential (natural-resource, descriptor-driv
       "Observation.code",
       "Observation.subject",
       "Observation.effective[x]",
+      "Observation.status",
+      "Observation.category",
+      "Observation.category:survey",
     ]);
     expect(els.some((e) => String(e.id).includes("value"))).toBe(false);
   });
@@ -374,9 +389,48 @@ describe("#189 2d — caseFeatureDifferential (natural-resource, descriptor-driv
       "Observation.value[x]",
       "Observation.subject",
       "Observation.effective[x]",
+      "Observation.status",
+      "Observation.category",
+      "Observation.category:survey",
     ]);
     const valEl = els.find((e) => e.id === "Observation.value[x]")!;
     expect(valEl.type).toEqual([{ code: "boolean" }]);
+  });
+
+  // #189 assertion 6 (`$extract` round trip), harness-proven: a `pattern[x]` on the case-feature profile is what
+  // `$extract` materialises into the Observation it writes back from an answered QuestionnaireResponse. Without a
+  // `status` pattern the extracted answer came back with NO status and was INVALID against base R4 Observation,
+  // so answering the blocking question produced a record that could not be stored — a dead-end pause.
+  it("a `default` structural element carries its pattern so $extract materialises it", () => {
+    const profile = caseFeatureProfileShape("Observation", { valueElement: "value", datumValueType: "boolean" })!;
+    const els = caseFeatureDifferential(profile, CODING, SDURL);
+    const status = els.find((e) => e.id === "Observation.status")!;
+    expect(status).toMatchObject({ path: "Observation.status", min: 1, max: "1", patternCode: "final" });
+  });
+
+  // A REPEATING element (`category`, 1..*) gets a SLICE, never a bare `pattern[x]`: in R4 a pattern on a
+  // repeating element constrains EVERY repetition, which would make a legitimate second category invalid. The
+  // slice states "at least one matching" — and is still fillable by `$extract` (harness-verified).
+  it("a repeating `default` structural element is SLICED, not blanket-patterned", () => {
+    const els = caseFeatureDifferential(caseFeatureProfileShape("Observation")!, CODING, SDURL);
+    const head = els.find((e) => e.id === "Observation.category")!;
+    expect(head.max).toBe("*");
+    expect(head.patternCodeableConcept).toBeUndefined();
+    expect(head.slicing).toEqual({ discriminator: [{ type: "pattern", path: "$this" }], rules: "open" });
+    const slice = els.find((e) => e.id === "Observation.category:survey")!;
+    expect(slice).toMatchObject({ path: "Observation.category", sliceName: "survey", min: 1, max: "1" });
+    expect(slice.patternCodeableConcept).toEqual({
+      coding: [{ system: "http://terminology.hl7.org/CodeSystem/observation-category", code: "survey" }],
+    });
+  });
+
+  // ServiceRequest's `subject` is `wired` in the registry AND emitted above with its SDC extract wiring; the
+  // structural floor must not emit a second, extension-less copy of it.
+  it("a `wired` structural element is not duplicated by the floor", () => {
+    const els = caseFeatureDifferential(caseFeatureProfileShape("ServiceRequest")!, CODING, SDURL);
+    expect(idsOf(els).filter((id) => id === "ServiceRequest.subject")).toHaveLength(1);
+    expect(idsOf(els)).toContain("ServiceRequest.status");
+    expect(idsOf(els)).toContain("ServiceRequest.intent");
   });
 
   it("subject + recency carry the sdc-questionnaire-definitionExtractValue extension wired to %resource", () => {

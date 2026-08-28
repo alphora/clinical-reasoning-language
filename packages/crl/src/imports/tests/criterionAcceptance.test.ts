@@ -92,13 +92,13 @@ describe("#236 Step J — emit define-DAG linearity (no exponential blow-up)", (
       const c12 = defineBody(iface, "C12");
       expect((c12.match(/"C11"/g) ?? []).length).toBe(2);
       expect(c12).not.toContain('"Gate"'); // the leaf is reached only transitively, never inlined here
-      expect(c12).toMatch(/Coalesce\("C11", false\) and Coalesce\("C11", false\)/); // per-operand totalized
+      expect(c12).toMatch(/"C11" and "C11"/); // #189: bare leaves — a criterion define propagates null
       // Linear SIZE: the whole Interface library stays small (a 2^13-leaf expansion could not fit).
       expect(iface.length).toBeLessThan(4000);
     });
   });
 
-  it("a compound criterion body lowers structurally (per-operand Coalesce), referenced by identity", () => {
+  it("a compound criterion body lowers structurally (bare leaves), referenced by identity", () => {
     const crl = `# P
 library "P".
 concept "A":
@@ -130,11 +130,13 @@ activity "No":
       expect(r.success).toBe(true);
       const iface = r.cqlByLibrary.find((e) => e.libraryName === "PInterface")?.cql ?? "";
       const body = defineBody(iface, "Eligible");
-      // The criterion body is emitted ONCE as `Coalesce("A",false) and (Coalesce("B",false) or Coalesce("C",false))`
-      // — per-operand totalized leaves, the guard's own shape, no NNF/DNF materialization.
-      expect(body).toContain('Coalesce("A", false)');
-      expect(body).toContain('Coalesce("B", false)');
-      expect(body).toContain('Coalesce("C", false)');
+      // The criterion body is emitted ONCE as `"A" and ("B" or "C")` — the guard's own shape, no
+      // NNF/DNF materialization. #189: leaves are BARE, so an unknown leaf makes the criterion
+      // unknown and the guard referencing it pauses rather than falling through.
+      expect(body).toContain('"A"');
+      expect(body).toContain('"B"');
+      expect(body).toContain('"C"');
+      expect(body).not.toContain("Coalesce");
     });
   });
 });

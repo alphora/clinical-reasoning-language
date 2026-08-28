@@ -537,6 +537,14 @@ export interface Concept extends ASTNode {
    */
   __interfaceReexportMode?: "total-boolean" | "truth-set";
   /**
+   * SYNTHETIC-EMITTER-ONLY (#189 null/pause). Marks a PURE QUESTION concept (set at `lowerLocalCodes`, where the
+   * AUTHORED shape is still visible; the Interface re-export copies it) — a locally-coded boolean determination nothing can compute, hence UNKNOWN until answered.
+   * Its body emits the THREE-STATE `answeredValue()` read instead of the `asTruths().satisfied()` collapse,
+   * which folds "no answer record" and "answered false" into one `false`. Set in `buildInterfaceReexports`
+   * (the Interface emitter is layer-isolated and cannot see the source concept's definition).
+   */
+  __pureQuestion?: true;
+  /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). Marks the
    * INFERRED half of a both-representation (`code is` + `defined as`) concept that
    * `lowerLocalCodes` SPLIT into a LocalPrimitives retrieve twin + this Inferences twin.
