@@ -31,6 +31,7 @@ import {
 } from "../template-match/recencyProjectionOverride";
 import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
 
+import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import {
   resourceEmitRow,
   type CodingStrategy,
@@ -232,7 +233,7 @@ function computeLocalDatum(
 
   // Validate the (shape × reduction) cell FIRST — a returned descriptor's result type must not contradict its
   // reduction (charter §3 self-description; no manufacturing). Records then expose ONLY records (no datum).
-  if (concept.shape === "RecordSet") {
+  if (assumedShapePreMigration(concept.shape) === "RecordSet") {
     // A RecordSet publishes its record set; any reduction would collapse it to a scalar/record — incoherent.
     if (reduction) {
       return {
@@ -242,7 +243,7 @@ function computeLocalDatum(
     }
     return {};
   }
-  if (concept.shape === "Record") {
+  if (assumedShapePreMigration(concept.shape) === "Record") {
     // A Record selects ONE local record via `most recent this`; any other form is incoherent for a local arm.
     if (!reduction || reduction.kind !== "mostRecent" || reduction.target.type !== "ThisRecords") {
       return {
@@ -454,7 +455,7 @@ function notAgeLocalExact(
       },
     };
   }
-  const resultType = conceptResultType(concept.shape, concept.valueTypes, resourceType); // DEFAULTED resource (panel R2)
+  const resultType = conceptResultType(assumedShapePreMigration(concept.shape), concept.valueTypes, resourceType); // DEFAULTED resource (panel R2)
   if (!resultType) {
     return {
       status: "error",
@@ -562,7 +563,7 @@ function deriveOneSourceArm(
   if (rep.terminologyName === undefined) {
     return mk("source-binding-unsupported", `source representation on \`${resourceType}\` has no \`coded from\` — an uncoded source value read is out of B1 scope (the coding axis, §10)`);
   }
-  const resultType = conceptResultType(concept.shape, concept.valueTypes, resourceType);
+  const resultType = conceptResultType(assumedShapePreMigration(concept.shape), concept.valueTypes, resourceType);
   if (!resultType) {
     return mk("indeterminate-result-type", `concept declares ${concept.valueTypes.length} value types (needs exactly 1 for the source arm's result type)`);
   }
@@ -643,7 +644,7 @@ export function deriveEffectiveRepresentations(
     // Patient age is inherently a Scalar boolean. `resolveAgeConcept` checks the value type but NOT `shape` or a
     // deviating local `valueElement`, so guard both here rather than manufacturing a Scalar<boolean>/`value` datum
     // over a concept that declared otherwise (panel — no manufacturing).
-    if (concept.shape !== "Scalar") {
+    if (assumedShapePreMigration(concept.shape) !== "Scalar") {
       return {
         status: "error",
         error: {

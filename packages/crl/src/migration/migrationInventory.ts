@@ -18,6 +18,7 @@
 // warnings, and FAIL on a divergence the validator should have caught. The oracle is the completeness
 // floor; the validator is the authority we reconcile against.
 
+import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import * as path from "node:path";
 
@@ -239,7 +240,7 @@ function hasValueProjectionRep(concept: Concept): boolean {
  *  cannot drift on the one exemption whose absence silently deletes the pause. */
 export function isBareScalarCodeTarget(concept: Concept): boolean {
   return (
-    concept.shape === "Scalar" &&
+    assumedShapePreMigration(concept.shape) === "Scalar" &&
     concept.code !== undefined &&
     concept.definition === undefined &&
     !hasValueProjectionRep(concept) &&
@@ -755,7 +756,7 @@ function classifyNonTarget(concept: Concept): NonTargetEntry["reason"] | null {
   if (def?.type === "ReductionDefinition" || def?.type === "DefinitionIsDefinition") {
     return "explicit-reduction-or-derivation";
   }
-  if (concept.shape === "RecordSet") return "legal-recordset-publication"; // canonical base retrieve
+  if (assumedShapePreMigration(concept.shape) === "RecordSet") return "legal-recordset-publication"; // canonical base retrieve
   return "other";
 }
 

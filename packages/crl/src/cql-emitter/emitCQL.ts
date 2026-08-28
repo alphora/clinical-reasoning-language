@@ -113,6 +113,7 @@ import { resolveRecencyValueConcept, isPureQuestionConcept } from "../template-m
 
 import { lowerLocalCodes, preLowerAge } from "./lowerLocalCodes";
 import { crossRepRecencyMergeExpr } from "./crossRepRecencyMerge";
+import { assumedShapePreMigration } from "../grammar/conceptShapes";
 
 /**
  * #187 — the FHIRHelpers version the emitted CQL pins in
@@ -1314,7 +1315,7 @@ class Emitter {
     // (`.asTruths() union …`) → NOT a boolean. Checked before the definition switch because a recency twin's
     // definition does NOT emit via the catalog path.
     if (c.__bothRepMerge === "recency") {
-      return this.isBooleanScalarConcept(c) && c.shape === "Scalar"
+      return this.isBooleanScalarConcept(c) && assumedShapePreMigration(c.shape) === "Scalar"
         ? total("boundary-coalesce")
         : notBoolean("malformed recency twin (non-scalar-boolean declaration)");
     }
@@ -1331,11 +1332,11 @@ class Emitter {
         // A boolean `most recent this` is `Coalesce(FHIRHelpers.ToBoolean(<newest value read>), false)` ONLY
         // for a Scalar boolean; a `shape is Record` most-recent is a record SELECTION (non-boolean). Guard on
         // shape too, mirroring the coherence guard, not only the value type (disc 439 round-2 #2).
-        return this.isBooleanScalarConcept(c) && c.shape === "Scalar"
+        return this.isBooleanScalarConcept(c) && assumedShapePreMigration(c.shape) === "Scalar"
           ? total("boundary-coalesce")
           : notBoolean(
               "most recent (non-scalar/non-boolean value read)",
-              c.shape === "Record" && c.conceptType !== undefined
+              assumedShapePreMigration(c.shape) === "Record" && c.conceptType !== undefined
                 ? { shape: "Record", resourceType: c.conceptType }
                 : undefined,
             );
@@ -1879,7 +1880,7 @@ class Emitter {
             // non-Scalar shape, or a value type that is not exactly one `boolean`, contradicts that —
             // and the totality classifier (`booleanTotality.ts`) rejects the same, so admitting it here
             // would arm a Slice-C proof failure. Mirror the `this`-path guard in `lowerLocalCodes`.
-            if (c.shape !== "Scalar" || c.valueTypes.length !== 1 || c.valueTypes[0] !== "boolean") {
+            if (assumedShapePreMigration(c.shape) !== "Scalar" || c.valueTypes.length !== 1 || c.valueTypes[0] !== "boolean") {
               const vtClause =
                 c.valueTypes.length === 1
                   ? ` and \`value type is ${c.valueTypes[0]}\``
@@ -1909,7 +1910,7 @@ class Emitter {
           const { shape: operandShape, rendered: operandRef } = this.reductionOperand(r.target.ref);
           if (operandShape === "RecordSet") {
             const desc = c.__effectiveDescriptor as EffectiveRepresentationDescriptor | undefined;
-            if (c.shape === "Record") {
+            if (assumedShapePreMigration(c.shape) === "Record") {
               // B2b RECORD SELECT — `Last((<twin>) O sort by <recency>, id)`, the filter-free/read-free
               // spine (`emitSelectNewest` with no value filter). A Record's OPTIONAL `value type` (a datum
               // descriptor, design §1) is NOT read by the select, so it is deliberately NOT guarded here
@@ -1956,7 +1957,7 @@ class Emitter {
               desc.datumValueType !== "boolean" ||
               desc.valueElement === undefined ||
               desc.recency === undefined ||
-              c.shape !== "Scalar" ||
+              assumedShapePreMigration(c.shape) !== "Scalar" ||
               c.valueTypes.length !== 1 ||
               c.valueTypes[0] !== "boolean"
             ) {
@@ -2122,7 +2123,7 @@ class Emitter {
     // and `emitCQLFromAST` is a validator-free public entry, so assert here — the SAME `isScalarBoolean` invariant
     // the totality predicate + the discharge (`emittedDischargeAndType`) key on, so a malformed twin is ONE loud
     // emit error, never a predicate/emit/discharge drift.
-    if (!(c.shape === "Scalar" && c.valueTypes.length === 1 && c.valueTypes[0] === "boolean")) {
+    if (!(assumedShapePreMigration(c.shape) === "Scalar" && c.valueTypes.length === 1 && c.valueTypes[0] === "boolean")) {
       throw new Error(
         `internal invariant violated: recency both-rep twin "${c.name}" must declare a single \`boolean\` value ` +
           `type and \`Scalar\` cardinality (has shape=${c.shape ?? "(none)"}, value type(s)=` +
@@ -2392,7 +2393,7 @@ class Emitter {
         if (firstUnresolvedBareName === undefined) firstUnresolvedBareName = name;
         continue;
       }
-      const rt = conceptResultType(concept.shape, concept.valueTypes ?? [], concept.conceptType);
+      const rt = conceptResultType(assumedShapePreMigration(concept.shape), concept.valueTypes ?? [], concept.conceptType);
       const isScalarBoolean = rt !== undefined && rt.shape === "Scalar" && rt.valueType === "boolean";
       if (!isScalarBoolean && firstNonBooleanOperand === undefined) {
         // A known non-boolean result type OR an indeterminate one (rt === undefined) — both are result-type
@@ -2548,7 +2549,7 @@ class Emitter {
   private emitBooleanCompositionError(c: Concept, body: DefinedAsBooleanComposition): string {
     const loc = body.expression.location.start;
     const parentIsScalarBoolean =
-      c.shape === "Scalar" && (c.valueTypes?.length ?? 0) === 1 && c.valueTypes?.[0] === "boolean";
+      assumedShapePreMigration(c.shape) === "Scalar" && (c.valueTypes?.length ?? 0) === 1 && c.valueTypes?.[0] === "boolean";
     if (!parentIsScalarBoolean) {
       this.emitErrors.push({
         type: "Validation",
@@ -2703,7 +2704,7 @@ class Emitter {
         const resolver = this.totalityResolvers();
         const cls = this.classifyBooleanCompositionOperands(body.expression);
         const parentIsScalarBoolean =
-          c.shape === "Scalar" && (c.valueTypes?.length ?? 0) === 1 && c.valueTypes?.[0] === "boolean";
+          assumedShapePreMigration(c.shape) === "Scalar" && (c.valueTypes?.length ?? 0) === 1 && c.valueTypes?.[0] === "boolean";
         if (!cls.hasQualifiedOperand && parentIsScalarBoolean) {
           const loc = body.expression.location.start;
           if (cls.firstUnresolvedBareName !== undefined) {
@@ -2844,7 +2845,7 @@ class Emitter {
     // useSiteType validator documents this as a DEFERRED gap it does not yet catch, and `emitCQLFromAST` is
     // validator-free, so enforce it HERE rather than emit a scalar `exists(...)` under a record declaration.
     // Mirrors the reduction coherence guard (`ReductionShapeIncoherentError`).
-    if (c.shape !== "Scalar" || c.valueTypes.length !== 1 || c.valueTypes[0] !== "boolean") {
+    if (assumedShapePreMigration(c.shape) !== "Scalar" || c.valueTypes.length !== 1 || c.valueTypes[0] !== "boolean") {
       const vtClause =
         c.valueTypes.length === 1
           ? ` and \`value type is ${c.valueTypes[0]}\``

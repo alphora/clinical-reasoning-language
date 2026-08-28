@@ -15,6 +15,7 @@ import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
 import type { SourceContext } from "../imports/scopes";
 
 import type { ReductionShapeError, ReductionShapeRule, ValidationError } from "./validator";
+import { assumedShapePreMigration } from "../grammar/conceptShapes";
 
 // #189 grammar+validation slice — the reduction/shape COHERENCE layer. IMPL 1 shipped the
 // PERMISSIVE grammar+AST (the `- shape is …` clause, the `Reduction` discriminated union, the
@@ -140,8 +141,9 @@ export class ReductionShapeValidator {
     errors: ValidationError[],
   ): void {
     // `shape` is REQUIRED on the AST — the builder normalizes an omitted `shape is` to "Scalar"
-    // (ast/types.ts Concept.shape), so no `?? "Scalar"` coalesce is needed anywhere here.
-    const shape: ConceptShape = concept.shape;
+    // (ast/types.ts Concept.shape) — NO LONGER TRUE: an undeclared shape is `undefined`, and callers route
+    // through `assumedShapePreMigration` until the corpus declares one (RETIRE:189-shape-declared).
+    const shape: ConceptShape = assumedShapePreMigration(concept.shape);
     const def = concept.definition;
     const reduction: Reduction | undefined =
       def?.type === "ReductionDefinition" ? def.reduction : undefined;
@@ -172,7 +174,7 @@ export class ReductionShapeValidator {
           getRefLibrary(reduction.target.ref) ?? undefined,
           ctx,
         );
-        if (operand && operand.shape !== "RecordSet") {
+        if (operand && assumedShapePreMigration(operand.shape) !== "RecordSet") {
           this.warn(
             "recordset-operand-required",
             concept.name,
@@ -297,7 +299,7 @@ export class ReductionShapeValidator {
         getRefLibrary(narrativeOperand) ?? undefined,
         ctx,
       );
-      if (operand && operand.shape !== "RecordSet") {
+      if (operand && assumedShapePreMigration(operand.shape) !== "RecordSet") {
         this.warn(
           "recordset-operand-required",
           concept.name,

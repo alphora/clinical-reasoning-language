@@ -47,6 +47,7 @@
 // `unclassified`; `DischargeMetadata` is a discriminated union; the completeness backstop compares ALL
 // emitted define headers as a multiset (a bare `define "X":` header carries no result type).
 
+import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import type {
   CompositionExpression,
   Concept,
@@ -238,10 +239,10 @@ export function classifyBooleanTotality(
 ): BooleanTotalityObligation {
   // Shape decides FIRST (§2): a record/record-set publishes records — no boolean define, whatever the
   // definition form (a reduction on a RecordSet is incoherent and T1 rejects it on its own axis).
-  if (concept.shape === "RecordSet") {
+  if (assumedShapePreMigration(concept.shape) === "RecordSet") {
     return { kind: "not-applicable", nullable: false, reason: "`shape is RecordSet` publishes its record set (no boolean define)" };
   }
-  if (concept.shape === "Record") {
+  if (assumedShapePreMigration(concept.shape) === "Record") {
     return { kind: "not-applicable", nullable: false, reason: "`shape is Record` selects one record (no boolean read)" };
   }
 

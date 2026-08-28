@@ -45,6 +45,7 @@
  * deferred routing slice). See `librariesReferencedBy`.
  */
 
+import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import type {
   CRL,
   Concept,
@@ -366,8 +367,8 @@ export function buildConceptShapeMap(ast: CRL): Map<string, Concept["shape"]> {
   const shapes = new Map<string, Concept["shape"]>();
   for (const stmt of ast.statements) {
     if (stmt.type !== "Concept" || !stmt.name || stmt.__interfaceReexport) continue;
-    if (shapes.get(stmt.name) === "RecordSet" && stmt.shape !== "RecordSet") continue;
-    shapes.set(stmt.name, stmt.shape);
+    if (shapes.get(stmt.name) === "RecordSet" && assumedShapePreMigration(stmt.shape) !== "RecordSet") continue;
+    shapes.set(stmt.name, assumedShapePreMigration(stmt.shape));
   }
   return shapes;
 }
@@ -1255,7 +1256,7 @@ function buildInterfaceReexports(
     // determination stays `.satisfied()`.
     const srcIsReduction = src?.definition?.type === "ReductionDefinition";
     const srcIsScalarBoolean =
-      src?.shape === "Scalar" && src.valueTypes.length === 1 && src.valueTypes[0] === "boolean";
+      src !== undefined && assumedShapePreMigration(src.shape) === "Scalar" && src.valueTypes.length === 1 && src.valueTypes[0] === "boolean";
     // HARD ERROR (impl-panel round 1, both arms — critical B): a REDUCTION Inferences source that is NOT a
     // Scalar boolean (a `shape is Record` `most recent this`, or a non-boolean scalar reduction) has NO
     // valid boolean Interface collapse — `.satisfied()` on a record / non-boolean is a category error, and

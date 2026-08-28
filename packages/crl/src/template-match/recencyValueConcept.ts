@@ -19,6 +19,7 @@
 // a non-`mostRecent`/named-target reduction, a boolean or multi-value-type declaration — returns `not-recency-value`,
 // so the EXISTING E1 rejects (`e1-source-rep`) still fire on it. This resolver NARROWS; it never widens.
 
+import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import type { Concept, Representation } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import { resolveAgeConcept } from "./recencyProjectionOverride";
@@ -50,7 +51,7 @@ export function resolveRecencyValueConcept(concept: Concept): RecencyValueResolu
 
   // Publishes a Scalar NON-boolean value (a boolean value/interface concept is the `defined as exists` family, not
   // this recency-value merge; a Scalar boolean `most recent this` is the B2a cell).
-  if (concept.shape !== "Scalar") return no;
+  if (assumedShapePreMigration(concept.shape) !== "Scalar") return no;
   if (!(concept.valueTypes.length === 1 && concept.valueTypes[0] !== "boolean")) return no;
 
   // Exactly ONE `source representation`, `coded from` (a coded external value read), NOT a `value projection` (that is
@@ -96,7 +97,7 @@ export function isMemberExistenceInterface(
   if (!isRecencyValueReferent(getRefName(ref))) return false;
   // The interface's OWN arm must be a standard boolean Observation with the default value carrier (B), so the
   // hardcoded own-arm read is provably correct.
-  if (concept.shape !== "Scalar") return false;
+  if (assumedShapePreMigration(concept.shape) !== "Scalar") return false;
   if (!(concept.valueTypes.length === 1 && concept.valueTypes[0] === "boolean")) return false;
   if (concept.conceptType !== undefined && concept.conceptType !== "Observation") return false;
   if (concept.valueElement !== undefined) return false; // an authored non-default value carrier defers
@@ -162,7 +163,7 @@ export function isPureQuestionConcept(concept: Concept): boolean {
   // for an omitted `shape is`). Without this check a `shape is RecordSet` boolean Observation with a local
   // code was classified as a question and emitted `.answeredValue()` — a SCALAR selected from its records —
   // silently contradicting the cardinality the author declared. A record set is not an answer slot.
-  if (concept.shape !== "Scalar") return false;
+  if (assumedShapePreMigration(concept.shape) !== "Scalar") return false;
   // Only a resource with a stored boolean can carry an answer; a pure question is Observation by construction
   // (the implicit-standard local resource when `type is` is omitted — charter §3).
   if ((concept.conceptType ?? "Observation") !== "Observation") return false;

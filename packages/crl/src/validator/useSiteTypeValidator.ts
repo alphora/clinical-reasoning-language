@@ -34,6 +34,7 @@ import {
   type OperandConstraint,
 } from "../template-match/operandConstraints";
 
+import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import type {
   UseSiteOperandUntypedWarning,
   UseSiteTypeMismatchError,
@@ -225,7 +226,7 @@ export class UseSiteTypeValidator {
       // reductions / narrative `most recent`, not `defined as exists`). It lands with the flip / a
       // reductionShapeValidator follow-up; the concept still gets `shape-marker-not-emit-active` (2a) now,
       // so the flip is not cold. Non-demotable errors (design §2 exists/negation rows).
-      const resultChecksApply = concept.shape === "Scalar" && vts.length === 1 && vts[0] !== "boolean";
+      const resultChecksApply = assumedShapePreMigration(concept.shape) === "Scalar" && vts.length === 1 && vts[0] !== "boolean";
       if (resultChecksApply) {
         if (body.type === "DefinedAsExists") {
           errors.push(
@@ -256,7 +257,7 @@ export class UseSiteTypeValidator {
       // A top-level `sem-not` that already produced a Scalar RESULT error (2a) is not re-descended (matches
       // HEAD's early return); otherwise we descend so both (i) and (ii) see every leaf.
       if (body.type === "DefinedAsComposition") {
-        const parentResult = conceptResultType(concept.shape, vts, concept.conceptType);
+        const parentResult = conceptResultType(assumedShapePreMigration(concept.shape), vts, concept.conceptType);
         const parentValueType = vts.length === 1 ? vts[0] : undefined;
         const skipNegationResultError = resultChecksApply && topLevelIsSemNot(body.expression);
         if (!skipNegationResultError) {
@@ -291,7 +292,7 @@ export class UseSiteTypeValidator {
     // alias over a `RecordSet<Observation>` target, both disagree. BIDIRECTIONAL, still a hard error (a
     // bare alias has no bridge to migrate to — it is simply a wrong declaration).
     if (def?.type === "DefinedAsDefinition" && def.body.type === "DefinedAsBareRef") {
-      const parentResult = conceptResultType(concept.shape, concept.valueTypes ?? [], concept.conceptType);
+      const parentResult = conceptResultType(assumedShapePreMigration(concept.shape), concept.valueTypes ?? [], concept.conceptType);
       if (parentResult !== undefined) {
         const ref = def.body.ref;
         const targetResult = resolveConceptResultType(
@@ -346,9 +347,9 @@ export class UseSiteTypeValidator {
     // T2.1 — RESULT type MUST be a declared `Scalar<Boolean>`. A boolean composition intrinsically yields a
     // scalar boolean; enforce shape AND value type NOW (no `defined as exists`-style record-shape deferral —
     // that hole is pre-existing + migration-gated; a new zero-corpus family gets no second known-invalid cell).
-    if (concept.shape !== "Scalar") {
+    if (assumedShapePreMigration(concept.shape) !== "Scalar") {
       // A record shape is NEVER fully indeterminate (`resultType.ts`) — `conceptResultType` returns a value.
-      const rt = conceptResultType(concept.shape, vts, concept.conceptType);
+      const rt = conceptResultType(assumedShapePreMigration(concept.shape), vts, concept.conceptType);
       errors.push(
         booleanCompositionResult(
           "boolean-composition-result-nonscalar",
@@ -389,7 +390,7 @@ export class UseSiteTypeValidator {
             concept.name,
             getRefName(op.ref),
             renderResultType(rt),
-            rt.shape !== "Scalar",
+            assumedShapePreMigration(rt.shape) !== "Scalar",
             op.location,
             attribution,
           ),
@@ -723,7 +724,7 @@ export class UseSiteTypeValidator {
       // Record/RecordSet, threaded via the resolution) to an `exists` reduction rather than the generic
       // value-comparison guidance, which does not apply to a record stream.
       errors.push(guardMismatch(ownerName, getRefName(ref), res.valueType, res.shape, location, attribution));
-    } else if (res.shape !== "Scalar") {
+    } else if (assumedShapePreMigration(res.shape) !== "Scalar") {
       // #189 IMPL 2b (panel R2 Claude #2) — a boolean-DATUM operand with a non-Scalar SHAPE passes today's
       // value-type guard check, but at the flip it publishes records (not a boolean) and the guard hard-
       // errors. Emit the forward-looking WARNING now so the flip is not cold — the guard cell that LEADS
@@ -754,7 +755,7 @@ function buildTypeIndex(ast: CRL, sources?: SourceContext[]): TypeIndex {
       lib(key).concepts.set(stmt.name, {
         valueTypes: stmt.valueTypes ?? [],
         derived,
-        shape: stmt.shape,
+        shape: assumedShapePreMigration(stmt.shape),
         ...(stmt.conceptType ? { conceptType: stmt.conceptType } : {}),
       });
     } else if (stmt.type === "Parameter" && stmt.name) {

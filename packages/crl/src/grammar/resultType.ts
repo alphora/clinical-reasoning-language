@@ -6,6 +6,7 @@
 // must not own a language/model type (#189 T1, crl-emit panel R1 P7/P8). Relocated here from
 // `validator/useSiteTypeValidator.ts` (`resolveConceptResultType` stays there — it is scope-resolution-coupled).
 
+import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import type { ConceptShape } from "./conceptShapes";
 import type { ConceptType } from "./conceptTypes";
 import type { ConceptValueType } from "./conceptValueTypes";

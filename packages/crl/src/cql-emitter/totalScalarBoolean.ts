@@ -40,6 +40,7 @@
 // DIFFERENT phases: `emitCQL` at emit time (`this.conceptByName`, layer-isolated) and `layeredEmit`
 // (`buildInterfaceReexports`) at synthesis time (`sourceConceptByName`, pre-split). Both pass their own resolver.
 
+import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import { matchNarrative } from "../template-match";
 import { PATTERN_RETURN_SHAPE } from "./patternReturnShape";
 import type { Concept, ReferenceName, CompositionExpression, BranchCondition } from "../ast/types";
@@ -107,7 +108,7 @@ function isSingleBooleanValueType(c: Concept): boolean {
 /** A Scalar boolean = declared `shape is Scalar` + a single boolean value type (matches the reduction discharge
  *  gate `emitCQL.ts:1229` and the façade's `srcIsScalarBoolean`). */
 function isScalarBoolean(c: Concept): boolean {
-  return c.shape === "Scalar" && isSingleBooleanValueType(c);
+  return assumedShapePreMigration(c.shape) === "Scalar" && isSingleBooleanValueType(c);
 }
 
 /** Declared-boolean by the emitter's own `declaredShapeOfConcept` rule (`valueTypes.includes("boolean")`) — the
@@ -170,7 +171,7 @@ export function emitsScalarValue(
   if (visiting.has(concept.name)) return false; // cycle guard (an alias chain is bounded)
   // Only a Scalar, NON-boolean concept can publish a scalar value (a boolean is a total-scalar-boolean, not a
   // value; a Record/RecordSet publishes records). Cardinality/value-type are DECLARED (charter §3, authoritative).
-  if (concept.shape !== "Scalar") return false;
+  if (assumedShapePreMigration(concept.shape) !== "Scalar") return false;
   if (!(concept.valueTypes.length === 1 && concept.valueTypes[0] !== "boolean")) return false;
   const def = concept.definition;
   if (def === undefined) return false;

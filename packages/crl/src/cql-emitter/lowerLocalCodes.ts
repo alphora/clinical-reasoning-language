@@ -94,6 +94,7 @@
  * `TerminologySystem.name`) collapse the same domain along their own keys.
  */
 
+import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import type {
   AgeComputeFn,
   AgeRecencyOp,
@@ -744,7 +745,7 @@ export function lowerLocalCodes(
         // `Scalar × boolean` cell; absent/multiple/non-boolean is incoherent (an absent one is itself an
         // A.10 validator error). emitCQL runs no validator, so enforce it here rather than manufacture —
         // or arm a Slice-C proof failure by emitting a cell the classifier rejects (emit ⊄ classifier).
-        if (c.shape !== "Scalar" || c.valueTypes.length !== 1 || c.valueTypes[0] !== "boolean") {
+        if (assumedShapePreMigration(c.shape) !== "Scalar" || c.valueTypes.length !== 1 || c.valueTypes[0] !== "boolean") {
           const vtClause =
             c.valueTypes.length === 1
               ? ` and \`value type is ${c.valueTypes[0]}\``
@@ -773,7 +774,7 @@ export function lowerLocalCodes(
         //    read). It reads no value, so it must NOT declare a `value type` (the record resource is `type
         //    is`); it reuses the B2a select-newest spine with no value filter/read.
         // `shape is RecordSet` is incoherent: a set publishes its records, not a reduced/selected value.
-        if (c.shape === "RecordSet") {
+        if (assumedShapePreMigration(c.shape) === "RecordSet") {
           errors.push(
             mkError(
               "emit-reduction-shape-incoherent",
@@ -785,7 +786,7 @@ export function lowerLocalCodes(
           );
           continue;
         }
-        if (c.shape !== "Record") {
+        if (assumedShapePreMigration(c.shape) !== "Record") {
           // Scalar (B2a value read) → exactly one `value type` (the datum it reads). A `shape is Record`
           // select (B2b) gets NO value-type check: per the design of record, a Record's `value type` is
           // OPTIONAL and, when present, names the record's DATUM — which a bare record select never reads, so
@@ -955,7 +956,7 @@ export function lowerLocalCodes(
           );
           continue;
         }
-        if (c.shape === "Record") {
+        if (assumedShapePreMigration(c.shape) === "Record") {
           // B2b — a RECORD SELECT reads no value: the descriptor MUST carry NO datum (valueElement /
           // datumValueType undefined) and a recency sort, over ANY registry resource (the deriver already
           // fail-closed `unsupported-resource` for a non-registry / Period-recency resource, e.g. Encounter).
@@ -1310,7 +1311,7 @@ export function lowerLocalCodes(
     const codedFrom: CodedFromDefinition = {
       type: "CodedFromDefinition",
       terminologyName: c.name,
-      retrieveResourceType: c.shape === "Scalar" ? "Observation" : (c.conceptType ?? "Observation"),
+      retrieveResourceType: assumedShapePreMigration(c.shape) === "Scalar" ? "Observation" : (c.conceptType ?? "Observation"),
       location: loc,
     };
 

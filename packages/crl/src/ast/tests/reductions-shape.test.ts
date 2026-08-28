@@ -35,12 +35,19 @@ const ruleOf = (e: CRLError): string | undefined =>
 
 // ---------------------------------------------------------------- shape is
 describe("shape is — concept-level published-value cardinality", () => {
-  it("defaults an omitted `shape is` to Scalar (REQUIRED on the AST; never undefined)", () => {
+  it("leaves an omitted `shape is` UNDECLARED (`undefined`) — it does NOT default to Scalar", () => {
+    // #189, 2026-08-28. This test previously asserted the builder normalized an omitted `shape is` to
+    // "Scalar" "so no consumer re-interprets undefined". That normalization destroyed the difference
+    // between "the author declared Scalar" and "the author said nothing" — and the second is the fact the
+    // emitter needs in order to ASK instead of guess. With it erased, a case-feature `cpg-featureExpression`
+    // (which needs ONE record, and cannot get one from a Scalar) had no way to raise an author-time error,
+    // so the emitter SYNTHESIZED a records define instead — a reduction no author wrote (charter §4.0).
+    // ⚠ Do not reinstate the default. Undeclared is an author-time question, not a silent Scalar.
     const c = conceptNamed(
       `library "T".\nconcept "C":\n- value type is boolean.\n- code is \`c\`.\n`,
       "C",
     );
-    expect(c.shape).toBe("Scalar");
+    expect(c.shape).toBeUndefined();
   });
 
   it("captures an explicit Record / RecordSet shape", () => {

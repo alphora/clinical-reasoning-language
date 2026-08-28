@@ -36,6 +36,7 @@ import type { ResultType } from "../grammar/resultType";
 import { conceptResultType } from "../grammar/resultType";
 import { emitsTotalScalarBoolean, sameLayerResolver, uniformResolvers } from "../cql-emitter/totalScalarBoolean";
 import type { ReferenceResolver, ReferentResolution } from "../cql-emitter/totalScalarBoolean";
+import { assumedShapePreMigration } from "../grammar/conceptShapes";
 
 /** One source library's LOWERED concepts, keyed by its STABLE source identity (`sourceIdentity` — the registry
  *  `filePath` in production, NOT the display library name, which collides for `local-package-same-name`). */
@@ -169,7 +170,7 @@ export function buildDeclaredResultIndex(
         continue;
       }
       present.add(k);
-      const rt = conceptResultType(c.shape, c.valueTypes, c.conceptType);
+      const rt = conceptResultType(assumedShapePreMigration(c.shape), c.valueTypes, c.conceptType);
       if (rt === undefined) {
         indeterminate.add(k);
         continue;

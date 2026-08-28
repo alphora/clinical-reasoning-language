@@ -707,23 +707,28 @@ export class CRLAstBuilder
     return { conceptType, valueTypes };
   }
 
-  /** The concept's declared `shape is <Scalar|Record|RecordSet>.` (#189). REQUIRED on the AST:
-   *  an omitted `shape is` NORMALIZES to `"Scalar"`, so no consumer re-interprets `undefined`.
+  /** The concept's declared `shape is <Scalar|Record|RecordSet>.` (#189).
+   *
+   *  ⭐ Returns `undefined` when the author did NOT declare one. It previously normalized an
+   *  omitted `shape is` to `"Scalar"`; that erased "the author said nothing", which is the fact
+   *  the emitter needs in order to ASK instead of guess (see `Concept.shape` in `types.ts`).
+   *  Do not reinstate the default — an undeclared shape is an author-time question.
+   *
    *  disc-402 order-independence ⇒ the accessor is an ARRAY; take the FIRST occurrence (a
    *  duplicate is rejected by checkConceptBodyCardinality). The SHAPE_VALUE token was already
    *  allowlist-checked by the lexer, so its text is a valid `ConceptShape`. */
   private parseConceptShape(
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
-  ): ConceptShape {
+  ): ConceptShape | undefined {
     const shapeLine = bodyCtx.shapeLine?.()?.[0];
-    if (!shapeLine) return "Scalar";
+    if (!shapeLine) return undefined;
     try {
       const tok = shapeLine.SHAPE_VALUE();
       if (tok) return tok.text as ConceptShape;
     } catch {
-      // malformed shape line; lexer already reported — fall back to the default.
+      // malformed shape line; the lexer already reported it. Undeclared-as-far-as-we-can-tell.
     }
-    return "Scalar";
+    return undefined;
   }
 
   /** disc 402: the concept body is now ORDER-INDEPENDENT, so the grammar no longer caps the

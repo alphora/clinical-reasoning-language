@@ -463,13 +463,24 @@ export interface Concept extends ASTNode {
   valueTypes: ConceptValueType[];
   /**
    * The concept's declared PUBLISHED-value cardinality (`- shape is Scalar|Record|RecordSet.`,
-   * #189). REQUIRED on the AST: the builder NORMALIZES an omitted `shape is` to `"Scalar"`, so
-   * no consumer ever re-interprets `undefined`. Scalar ⇒ the concept publishes a single reduced
-   * value (a reduction is owed); Record ⇒ a single selected record; RecordSet ⇒ the set of
-   * records. In the grammar+validation slice this drives validation only; it does not yet change
-   * emit (the flip consults it later).
+   * #189). Scalar ⇒ the concept publishes a single reduced value (a reduction is owed);
+   * Record ⇒ a single selected record; RecordSet ⇒ the set of records.
+   *
+   * ⭐ `undefined` means THE AUTHOR DID NOT DECLARE ONE — it is NOT a synonym for `Scalar`.
+   *
+   * ⚠ This field used to be REQUIRED, with the builder normalizing an omitted `shape is` to
+   * `"Scalar"` "so no consumer re-interprets undefined". That normalization DESTROYED the
+   * distinction between "the author declared Scalar" and "the author said nothing", and the
+   * distinction is load-bearing: a case-feature `cpg-featureExpression` needs ONE record, a
+   * Scalar cannot be one, so the emitter SYNTHESIZED a records define to bridge the gap — a
+   * reduction no author wrote (charter §4.0: emit translates CRL, it does not invent CRL
+   * expression). The emitter could not raise the honest author-time error instead, because by
+   * then the fact it needed to report had already been normalized away.
+   *
+   * So consumers MUST distinguish the two. An undeclared shape is an author-time question
+   * ("which does this publish?"), never a silent default.
    */
-  shape: ConceptShape;
+  shape?: ConceptShape;
   // The concept's own local code (`- code is `…`.`). System = the package's
   // local domain (implicit). Present => locally assertable; absent => read-only.
   code?: string;
