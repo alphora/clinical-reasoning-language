@@ -390,13 +390,12 @@ function computeLocalDatum(
       // steering it to `Observation+boolean`. A "you need a boolean answer slot" diagnostic would push the
       // author the wrong way.
       //
-      // ⚠ REFACTOR:grounded (panel disc 517) — the gate is the SHARED `isPureQuestionConcept` predicate, not a
-      // locally re-derived condition. The local condition used to be `definition === undefined && boolean`,
-      // which is LOOSER than the predicate (no `representations` / `shape` check). A `code is` + boolean +
-      // SOURCE-REP concept therefore got an answerable boolean SD here while its Interface read stayed the
-      // presence collapse (`asTruths().satisfied()`, since `__pureQuestion` is false) — an SD advertising an
-      // answer slot whose stated `false` reads back as TRUE. The classifier and the emit cell must agree, or
-      // the artifact disagrees with itself.
+      // ⚠ REFACTOR:grounded — the gate MUST be the SHARED `isPureQuestionConcept` predicate, never a locally
+      // re-derived condition. A looser local test (e.g. `definition === undefined && boolean`, missing the
+      // `representations` / `shape` checks) lets a `code is` + boolean + SOURCE-REP concept get an answerable
+      // boolean SD here while its Interface read stays the presence collapse (`asTruths().satisfied()`, since
+      // `__pureQuestion` is false) — an SD advertising an answer slot whose stated `false` reads back as TRUE.
+      // The classifier and the emit cell must agree, or the artifact disagrees with itself.
       if (isPureQuestionConcept(concept)) {
         const readPath = authored ?? "value";
         if (readPath !== "value") {

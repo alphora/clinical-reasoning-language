@@ -22,6 +22,13 @@ Name the target model and where it lives (the charter/spec/design doc). Everythi
 code gets measured against THAT, not the other way round. If the code and the target model disagree,
 the default assumption is **the code is wrong** — that is literally why you are here.
 
+⚠ **But the authority can ITSELF be wrong**, and that is the more expensive failure, because it wears
+the target model's clothes. A charter clause can be stale, an operator escalation can be over-generalised,
+and your own gloss on one can inherit its authority. Symptom: a rule is cited to BLOCK a fix that was just
+agreed — often an all-caps escalation with a "read before touching X" marker. **That is the
+`stale-requirements` skill, not this one.** Invoke it the moment a rule seems to settle the matter.
+This skill assumes the target model is sound; that one is what you use when it is not.
+
 ## 2. Trust-mark everything you touch
 
 Every block you change gets a marker recording how much it can be trusted. **Unmarked = untouched =
@@ -39,6 +46,19 @@ behavior against the target model and it agrees. Stale doctrine comments that de
 if current are a primary trap: they are unmarked-wrong, and they actively mislead. Rewrite or mark them
 the moment you touch their file.
 
+**SCOPE — this is checkable, so it is not aspirational.** Every file in the blast radius that the refactor
+MODIFIES must carry a marker by the time its slice lands. That set is computable: the files the refactor's
+commits touched, minus the files carrying markers. `.claude/hooks/refactor-state.sh` reports the difference
+at session start. Measured once and it was **10 of 25** — meaning the taxonomy classified two-thirds of
+finished, reviewed work as presumed-wrong. A signal that noisy gets ignored, which costs more than not
+having it. If the backlog is large the honest fixes are to MARK them or to NARROW the blast radius — never
+to lower the bar.
+
+⚠ **TESTS COUNT, and they are the highest-value target.** A *passing* test asserting old doctrine is the
+most convincing stale copy in the repo: it looks like proof. Mark every test whose assertions you
+re-derived from the target model, and treat an unmarked test in the blast radius exactly like unmarked
+code — presumed-wrong, never citable as evidence that current behavior is intended.
+
 ## 3. Reviewers must be told the taxonomy — or they anchor too
 
 A reviewer reading unmarked stale code/comments/tests will hand you a confident, well-argued finding
@@ -51,13 +71,37 @@ harder. So in every review packet for refactor-in-progress code:
   symptom against the current code. A finding whose premise is "the current code says X" is evidence
   about the hack, not about the target.
 
-## 4. Expect wrong; expect to fix; don't be surprised
+## 4. Expect wrong — and route it, don't narrate it
 
 Mid-refactor, a failing test or an incoherent behavior is the *expected* state, not an alarming
 discovery. Do not spin up a crisis narrative ("the round-trip is broken!") over code you already know
-is being replaced. Note it, mark it, move to the target model.
+is being replaced.
 
-## 5. Done = everything grounded, nothing suspect (NOT "no markers")
+Route it instead — every such find lands in exactly one of three places, and "I noticed it" is not one:
+
+1. **Fix it now** if it is in this slice → mark `grounded`.
+2. **Mark it `REFACTOR:suspect`** if it is real but belongs to a later slice, WITH what it is waiting on.
+   This is the live to-do list; the state file's entry is where it becomes visible across sessions.
+3. **The rule is what is wrong**, not the code → `stale-requirements` (§1).
+
+An observation that gets narrated and then dropped is the failure this section exists to prevent.
+
+## 5. How this composes with `stale-requirements` — complementary, not overlapping
+
+They share a shape ("X is the patient, not the doctor") and split cleanly on what X is:
+
+| | `large-refactor` | `stale-requirements` |
+|---|---|---|
+| **the patient** | the CODE being changed | the RULES, including this skill's own target model |
+| **fires** | continuously, as a MODE, for the refactor's duration | at MOMENTS — a rule changes, or a rule blocks work |
+| **carried by** | `tmp/REFACTORS-IN-FORCE.md` + the in-code markers | invocation; the memory store's git history |
+| **hands reviewers** | the trust-mark taxonomy (which CODE is presumed-wrong) | the rule provenance (which RULES are the author's own claim) |
+
+The seam is §1 of this skill: it names an authority, and the sibling handles the case where that authority
+is the thing that is wrong. A refactor round frequently needs BOTH packets — reviewers must know which code
+is the patient AND which rules the change itself rewrote, or they will anchor on one or the other.
+
+## 6. Done = everything grounded, nothing suspect (NOT "no markers")
 
 The done-signal is the **presence of `REFACTOR:grounded` covering the whole blast radius**, plus the
 **absence of `REFACTOR:suspect`** and the absence of any **unmarked** block in scope. Concretely, the

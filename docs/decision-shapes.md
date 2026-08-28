@@ -113,9 +113,9 @@ Syntax and rules:
   ⚠ Semantics in a BRANCH guard are **strong Kleene, not closed-world**
   (#189): `not unknown = unknown`, and an unknown guard makes its arm
   not-applicable so traversal halts and DTR asks the question. A negated branch
-  guard is deliberately NOT `Coalesce`-wrapped. (It used to be, and `$apply`
-  then approved a request whose contraindication question was never answered
-  while the CRE paused on the same case — a proven lane divergence.)
+  guard is deliberately **NOT** `Coalesce`-wrapped: coalescing it makes `$apply`
+  approve a request whose contraindication question was never answered, while
+  the CRE pauses on the same case.
   A determination that is **absent but derivable** still reads `false`
   closed-world; only a determination that *nothing can compute* is unknown.
   (`not` is the emit-capable way to author a single-determination `first:`

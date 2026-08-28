@@ -850,11 +850,10 @@ function evalBranchCondition(
     return critTrace(inner.sat, inner.facts, inner.trace);
   }
   if (cond.type === "BranchConditionNot") {
-    // REFACTOR:grounded (#189 null/pause) — STRONG KLEENE negation: `not unknown = unknown`. This
-    // comment used to say "closed-world negation ... matches the emit-side `not Coalesce(<sat>, false)`
-    // two-valued semantics — NOT three-valued CQL null-logic". Both halves are now false: `kNot` is
-    // three-valued, and the emit side's BRANCH-guard carrier dropped its `Coalesce` to match (the ACTION
-    // guard carrier keeps it, and is evaluated two-valued by `evalGuard` — a different path).
+    // REFACTOR:grounded (#189 null/pause) — STRONG KLEENE negation: `not unknown = unknown`.
+    // ⚠ NOT closed-world, and NOT two-valued. The emit side's BRANCH-guard carrier is `not <ref>` with no
+    // `Coalesce`, matching this. (The ACTION-guard carrier DOES coalesce and is evaluated two-valued by
+    // `evalGuard` — a different path, deliberately: an action guard must never pause.)
     // A determination that is absent but DERIVABLE still reads `false` closed-world; only one that
     // nothing can compute is unknown, so `not X` on ordinary shapes is unchanged.
     // Facts of the operand ARE the evidence consulted, so they propagate (the reason it holds).

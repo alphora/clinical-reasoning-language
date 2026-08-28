@@ -4,15 +4,22 @@
 // that would otherwise form once `emitCQL` imports `DefineLedger`/`classifyBooleanTotality` from
 // `booleanTotality` while `booleanTotality` imported this table FROM `emitCQL`.
 //
-// CRLCommon library (v0.2.0+) returns the primitive list-shaped form for filter patterns. The boolean
-// realization is composed at the call site by wrapping with `exists(...)`. The author's `(type, valuetype)`
-// declaration drives whether the emitter wraps (boolean consumer) or calls directly (refinement consumer).
-// Per the principle [[patterns-are-semantic]] + [[defined-as-is-semantic-composition]] + catalog v0.6.0.
+// CRLCommon library (v0.2.0+) returns the primitive list-shaped form for filter patterns, so a pattern has
+// ONE natural output shape. This table records it.
 //
-// "list"     — function returns List<Resource>; emitter wraps with `exists(...)` for boolean consumers.
-// "boolean"  — function returns Boolean (inherently a predicate); refinement consumers get a FIXME comment.
-// "instance" — function returns Instance<Resource> (singleton — e.g. MostRecent/Last/Earliest/First); for
-//              refinement consumers the emitter lifts to a singleton-list via `{...}`.
+// RULE ([[patterns-are-semantic]]): a catalog signature never constrains what the author may DECLARE — the
+// emitter picks the pattern's REALIZATION FORM from the declared `(type, valuetype)`. But the emitter must
+// NEVER INSERT A REDUCTION (`exists`, a singleton lift `{ }`, a `Coalesce`) to bridge a shape the author
+// declared. A mismatch is an AUTHOR-TIME ERROR naming the fix ("declare the reduction"), not a bridge.
+//
+// ⚠ REFACTOR:suspect — the emitter DOES still bridge (`emitCQL.ts`, the declared-vs-patternShape block).
+// That code is the PATIENT, not the rule. It cannot be removed until reduction NESTING lands, because
+// without nesting an author has no way to SAY `exists ( <filter pattern> )`. Do not cite the current
+// behaviour as doctrine.
+//
+// "list"     — function returns List<Resource>.
+// "boolean"  — function returns Boolean (inherently a predicate).
+// "instance" — function returns Instance<Resource> (singleton — e.g. MostRecent/Last/Earliest/First).
 // "other"    — function returns Period/Quantity/Interval/DateTime; author's valuetype should match.
 //
 // The boolean-totality classifier reads this table to classify a catalog-pattern concept's totality

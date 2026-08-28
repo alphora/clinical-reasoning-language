@@ -3342,9 +3342,14 @@ class Emitter {
     // Generics-by-composition: CRLCommon functions return their PRIMITIVE
     // shape — list-shaped for filter patterns, boolean for inherently-boolean
     // patterns, other-shape for Period/Quantity/Instance/Interval patterns.
-    // The author's declared `(type, valuetype)` says what the consumer wants;
-    // the emitter composes via `exists(...)` wrapping when consumer asks for
-    // boolean and pattern returns a list. Per [[patterns-are-semantic]].
+    // ⚠ REFACTOR:suspect — THIS BLOCK IS THE PATIENT, not doctrine.
+    // The RULE ([[patterns-are-semantic]]): the emitter picks the pattern's REALIZATION FORM from the
+    // author's declared `(type, valuetype)` — a catalog signature never constrains what may be declared.
+    // It must NEVER INSERT A REDUCTION to bridge a shape. The `exists ...` / `exists { ... }` / `{ ... }`
+    // branches below do exactly that, and are slated to become author-time errors naming the fix
+    // ("declare the reduction"). They survive only until reduction NESTING lands — without nesting an
+    // author cannot SAY `exists ( <filter pattern> )`, so removing them first would strand every author.
+    // Do NOT cite these branches as evidence of intended behaviour.
     const call = this.emitPatternCall(matched);
     const declared = this.declaredShapeOfConcept(c);
     const patternShape: PatternReturnShape = PATTERN_RETURN_SHAPE[matched.pattern] ?? "list";

@@ -137,9 +137,9 @@ function structuralElements(id: string, path: string, value: DefaultValue): Arra
  *
  * WHY this is not cosmetic: `$extract` materialises a profile's `pattern[x]` into the resource it writes back
  * (harness-proven — the extracted Observation carries the local `code` even though the QuestionnaireResponse
- * never mentions it). Before this, an answer extracted from the generated questionnaire came back with NO
- * `status` and was INVALID against base R4 Observation — the answer round trip (design assertion 6, step 4)
- * failed validation. Emitting the pattern makes `$extract` fill it.
+ * never mentions it). Without the pattern, an answer extracted from the generated questionnaire carries NO
+ * `status` and is INVALID against base R4 Observation, so the answer round trip (design assertion 6, step 4)
+ * fails validation. Emitting the pattern is what makes `$extract` fill it.
  *
  * `wired` (subject) and the concept's own datum elements are emitted by the caller with their SDC extract
  * wiring, so anything colliding with an already-emitted path is skipped here — the caller owns those cells.

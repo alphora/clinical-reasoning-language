@@ -321,3 +321,104 @@ different `customerContext`, `send` refuses with `needs-operator-approval` and
 prints the command. Ask the operator in chat — **do not run the grant yourself.**
 
 <!-- vibe-mail-end -->
+
+
+# Project rules (CRL) — outside the provisioned blocks above
+
+## Rules are also the patient — invoke `stale-requirements`
+
+A charter clause, a memory, a doctrine comment, a kit rule, or an operator escalation can be **stale,
+over-generalized, or never have said what it is now being used to say**. Two failures follow, and both
+have happened here:
+
+- a stale requirement **vetoes a fix that was just agreed**, and
+- correcting it **leaves stale copies alive** elsewhere for the next round to trip on.
+
+**Invoke the `stale-requirements` skill at either of these two moments:**
+
+1. **A rule is about to CHANGE** — before editing any memory, charter clause, doctrine comment or kit rule.
+2. ⚠ **A rule is being used to BLOCK work** — the moment a reviewer (or you) cites a requirement as the
+   reason not to do something.
+
+Trigger 2 is the one that gets missed, and it is the more expensive. In that moment you are not thinking
+"I should invoke a skill" — you are thinking *"this violates a requirement, so I should stop."* That
+feeling IS the trigger. Reach for the skill precisely when a rule seems to settle the matter, especially
+when it is an all-caps escalation with a "read this before touching X" marker.
+
+The skill covers: separating QUOTED (the operator's words; only they retire them) from DERIVED (your gloss,
+overturnable on evidence); scope-narrowing being in-bounds while retirement is not; running behavioural
+claims instead of deferring to them; correcting in place with no history trail; sweeping every copy; and
+carrying the before-state into the review packet so your own corrections do not blind the review.
+
+The operator does not need to remember to ask for it. They may force it with `/stale-requirements`.
+
+## GATE — at session start AND after every compaction: read `tmp/REFACTORS-IN-FORCE.md`
+
+`large-refactor` is a **MODE, not an event.** Invoking it once at the start of a multi-session effort does
+not work: its discipline is per-edit, and it has to survive compactions and hand-offs. So it is carried as
+STATE, not as an instruction the operator repeats.
+
+If that file lists an ACTIVE refactor, **the `large-refactor` protocol is in force for its paths** — the
+code there is the PATIENT, unmarked code is presumed-wrong and may not be cited as authority, and any
+review packet touching those paths must hand reviewers the taxonomy.
+
+- Read it at session start and again after each compaction. It names the target model (the authority),
+  the blast radius, the done-gate, and the open `REFACTOR:suspect` list.
+- When you finish a slice, UPDATE it — the `suspect` list is the live to-do, and it is the only thing that
+  survives you.
+- ⚠ Never delete `REFACTOR:grounded` markers to "reach done". They are the evidence of completion.
+
+The operator does not say "use large-refactor". If the file says a refactor is active, it is active.
+
+## GATE — before work becomes DURABLE, decide whether it needed a panel at all
+
+Run this BEFORE committing, before encoding something as structure, before shipping. The two gates below
+cover HOW to run a round well; this one covers WHETHER to run one, which is the decision that has been
+wrong in BOTH directions here — rounds fired on mechanical work, and durable judgment calls committed with
+no round at all.
+
+Ask, explicitly, out loud in the response:
+
+1. Is this **non-trivial** AND **about to become durable**?
+2. Does it involve a **judgment call** in any of: concurrency/state, failure handling, public API shape,
+   data model, sequencing, dependency choices, test plan — or, in this project, **the concept model, the
+   emit contract, or a rule anyone else will read**?
+
+Both yes ⇒ a round is warranted. State the decision either way and say why. "I did not run a panel because
+X" is a fine answer; SILENCE is not, because silence is indistinguishable from forgetting.
+
+Skip freely for syntactic refactors, formatting, small bug fixes, and dependency bumps with no semantic
+change. Erring toward a round on a hard-to-reverse change is cheap; erring away from one is not.
+
+## GATE — before you send ANY review packet
+
+Run this list every time, without being asked. It is a gate on an ACTION, not a standing reminder: the
+things below are all written down elsewhere and have still been missed, because a rule held in general is
+not a rule checked at a step.
+
+1. **Invoke `stale-requirements`.** Rules the packet relies on, or that the change touches, get the
+   QUOTED/DERIVED split — and any rule you CORRECTED gets swept for copies first.
+2. **Generate the before-state** — `.claude/skills/stale-requirements/provenance.sh <base-ref> <out>
+   <rule-paths…>`. Name the base ref in the packet. Reviewers are read-only and cannot run git.
+3. **List what you DELETED**, and invite the finding: *"here is what I removed — tell me if any of it
+   actually covered this case."* Correcting every source before a review, without this, hands reviewers a
+   workspace that can only agree with you.
+4. **Carry the change itself** — reviewers cannot diff against `HEAD`. A file list is not a diff.
+5. **Both arms, same lens, byte-identical message, same turn.** A mismatched pair reads as coverage it
+   is not.
+6. **Hand over the `large-refactor` taxonomy** when the code under review is mid-refactor, or reviewers
+   will anchor on the hack being removed and return confident findings built on it.
+
+## GATE — when the reviews come back
+
+1. **Arm agreement is evidence about REASONING, never about facts.** Two arms agreeing that something is
+   true is not verification that it is true.
+2. **Verify every checkable claim by RUNNING it** — a cited `file:line`, an emitted artifact, a claimed
+   behaviour. A reviewer's citation is a claim to check, not a fact to import. This applies to your OWN
+   measurements: in this project, harness runs have overturned confident conclusions from both arms and
+   from the charter itself.
+3. **Every point gets accept / refine / reject, in writing.** Never silently dropped. A point declined on
+   provenance grounds (`stale-requirements` §8) needs its evidence written out like any other.
+4. **A finding survives deleting its citation, or it does not.** If it does, it is substantive — engage it
+   on the merits whatever doctrine it cites. If the citation WAS the argument and you wrote that text in
+   this change, it is circular. Ties go to the reviewer; you are the interested party.

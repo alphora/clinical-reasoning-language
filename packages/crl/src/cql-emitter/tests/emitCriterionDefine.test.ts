@@ -20,11 +20,13 @@ import {
 // Pins: every leaf rendered BARE; `not` over the bare leaf; minimal correct parenthesisation for
 // CQL precedence (`not` > `and` > `or`); concept vs criterion leaves routed to the qualifier by kind.
 //
-// ⚠ #189 null/pause REVERSED the totality pin. These used to assert `Coalesce(<leaf>, false)` on
-// every leaf, positives included. A criterion is a GUARD, and a guard is where a pause must be able
-// to happen: coalescing per operand made an unanswered question read `false`, so `$apply` ran on to
-// the next arm while the CRE paused on the same case. Totality now belongs at the reference site
-// (the per-action `unless` carrier), not in the define body.
+// REFACTOR:grounded (#189 null/pause) — these assertions were re-derived from the target model (strong
+// Kleene guards), NOT from the emitter. A PASSING test asserting old doctrine is the most convincing
+// stale copy in a refactor, so the mark matters more here than in source.
+// ⚠ Leaves are BARE — never `Coalesce(<leaf>, false)`. A criterion is a GUARD, and a guard is where a
+// pause must be able to happen: coalescing per operand makes an unanswered question read `false`, so
+// `$apply` runs on to the next arm while the CRE pauses on the same case. Totality belongs at the
+// reference site (the per-action `unless` carrier), not in the define body.
 
 const L = (line = 1): Location => ({ start: { line, column: 0 }, end: { line, column: 1 } });
 const ref = (name: string): BranchConditionRef => ({

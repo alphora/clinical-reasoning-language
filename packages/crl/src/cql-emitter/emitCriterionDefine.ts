@@ -10,16 +10,14 @@
 // `emitSemOr`): that path lowers `sem-*` over truth-sets / refinement lanes. A criterion body is a
 // plain boolean guard (`and`/`or`/`not` over concept + sub-criterion refs).
 //
-// REFACTOR:grounded (#189 null/pause) — a criterion body is STRONG KLEENE, not two-valued. Leaves are
-// rendered BARE. This reverses the pre-#189 rule ("every leaf totalized `Coalesce(<leaf>, false)` BEFORE
-// any `not`, because North Star §4 requires TWO-VALUED"): that rule was rewritten in the charter, because
-// coalescing per operand makes an UNANSWERED question indistinguishable from an answered "no".
+// REFACTOR:grounded (#189 null/pause) — a criterion body is STRONG KLEENE. Leaves are rendered BARE,
+// ⚠ NOT `Coalesce`-totalized per operand.
 //
-// A criterion is a GUARD, and a guard is where a pause has to be able to happen. With the leaves
-// coalesced, `criterion "Eligible": - when ( "Pure Question" ).` emitted
-// `define "Eligible": Coalesce("Pure Question", false)` — so `$apply` read an unanswered question as
-// `false` and ran on to the next arm, while the CRE evaluated the same criterion as UNKNOWN and paused.
-// A two-lane disagreement on an ordinary supported shape (panel finding, disc 517).
+// A criterion is a GUARD, and a guard is where a pause has to be able to happen. Coalesce the leaves and
+// `criterion "Eligible": - when ( "Pure Question" ).` becomes
+// `define "Eligible": Coalesce("Pure Question", false)` — `$apply` then reads an unanswered question as
+// `false` and runs on to the next arm while the CRE evaluates the same criterion as UNKNOWN and pauses.
+// A two-lane disagreement on an ordinary supported shape.
 //
 // Totality belongs at the ARM, not per operand. The REFERENCE SITE re-totalizes where two-valuedness is
 // genuinely required: the per-action `unless` carrier emits `not Coalesce(<ref>, false)` around whatever

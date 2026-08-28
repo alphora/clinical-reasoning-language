@@ -326,15 +326,11 @@ closed-world (absent record = `false`) and never pauses. Only a concept with a s
   re-litigation is the tell. The gate is **author-time**: the CEL **validator** rejects a bare / non-boolean
   direct assertion (with a matching **emitter** diagnostic, so a caller that skips validation still sees it) and
   tells the author to write `value is true` / `value is false`.
-  ⚠ **CORRECTED (#189 null/pause).** This bullet used to add: *"at runtime the two lanes still AGREE without a
-  refusal — a valueless value-reading record reads **false** in both, → closed-world Deny."* **That claim is
-  disproven, and the behaviour it described was the defect.** A valueless value-reading record now reads **null**
-  in *both* lanes — `$apply` via `answeredValue()` (deliberately NOT `Coalesce`d) and the CRE via its third
-  value — and both **PAUSE** rather than deny. The lanes still agree; they agree on *unknown*.
-  ⭐ **The author-time gate STANDS, and is strengthened by this, not weakened.** Under the old reading a bare
-  assertion silently became a Deny; under the correct one it silently becomes a *pause*, which is HARDER to
-  diagnose because the case simply produces no disposition at all. Rejecting it at authoring time is the only
-  place it is cheap. The CRE refuses loud ONLY where it genuinely cannot replicate `$apply` — conflicting `true`+`false`
+  ⚠ At runtime a valueless value-reading record reads **null** in *both* lanes — NOT `false`, and NOT a
+  closed-world Deny — and both **PAUSE**. The lanes agree; they agree on *unknown*. That is exactly why the
+  author-time gate matters: a bare assertion silently produces NO disposition at all, which is harder to
+  diagnose than a wrong one, and authoring time is the only place it is cheap to catch.
+  The CRE refuses loud ONLY where it genuinely cannot replicate `$apply` — conflicting `true`+`false`
   own assertions, whose newest-wins pick needs the emitted `(effective, id)` sort. A **presence-based
   (value-blind)** boolean concept (`definition is exists this`, a `defined as` over records) is untouched —
   bare = present = **true**, and an authored `value is` there is **ignored** (a warning: `value is false` on it
@@ -353,10 +349,10 @@ closed-world (absent record = `false`) and never pauses. Only a concept with a s
   of, and the concept computes over what is populated. There is no *selector* — the **code**, and which sets it is a
   member of, is the whole story. Local is not exempt: its check is trivially satisfied for the right code but
   **catches a wrong one** (an author error, or a hand-edited emitted file). See §3 "Matching is MEMBERSHIP".
-- **Null-safety WHERE A VALUE CAN BE COMPUTED — and a THIRD VALUE where it cannot.** ⚠ CORRECTED (#189
-  null/pause): this bullet used to require every boolean-valued define to be **total**, totalized **per operand,
-  before any `not`**. That blanket rule WAS the defect — it made an *unanswered question* indistinguishable from
-  an answered *"no"*, so the tree ran on to a disposition where it must stop and ask. The corrected model:
+- **Null-safety WHERE A VALUE CAN BE COMPUTED — and a THIRD VALUE where it cannot.**
+  ⚠ Totality is **NOT** per-operand, and **NOT** applied before a `not`. Blanket per-operand totalization makes
+  an *unanswered question* indistinguishable from an answered *"no"*, so the tree runs on to a disposition where
+  it must stop and ask. The model:
   - A **derivation** stays closed-world and total: `exists(…)` is total by construction; a nullable boolean
     derivation is totalized (`Coalesce(<predicate>, false)`) at its own boundary. Absent *evidence* is `false`,
     because a derivation can always compute — `definition is exists this` never pauses.

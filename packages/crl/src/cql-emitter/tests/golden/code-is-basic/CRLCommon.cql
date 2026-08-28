@@ -17,15 +17,27 @@ library CRLCommon version '0.2.0'
  *    take a `Quantity` parameter; temporal patterns take `Interval<DateTime>`
  *    or a `List<Encounter>` anchor where useful.
  *
- * 2. Return-shape strategy — generics-by-composition. Filter patterns return
- *    the PRIMITIVE list-shaped form (`List<Resource>` — the filtered list).
- *    The boolean realization is composed at the call site by wrapping with
- *    `exists(...)`. This honors the CRL principle that **patterns carry
- *    semantic intent, not a fixed return type**; the author's
- *    `(type, valuetype)` declaration drives whether the emitter wraps with
- *    `exists` (boolean) or uses the call directly (refinement). See
- *    [[defined-as-is-semantic-composition]] / [[patterns-are-semantic]]
- *    memory + the catalog v0.6.0 / v0.7.0 changelog.
+ * 2. Return-shape strategy — one NATURAL shape per pattern. Filter patterns
+ *    return the PRIMITIVE list-shaped form (`List<Resource>` — the filtered
+ *    list). This honors the CRL principle that **patterns carry semantic
+ *    intent, not a fixed return type**: a catalog signature never constrains
+ *    what an author may DECLARE, and the author's `(type, valuetype)` selects
+ *    which realization form the emitter emits.
+ *
+ *    REFACTOR:grounded (#189 null/pause) — this section was re-derived from
+ *    [[patterns-are-semantic]] AS CORRECTED, not from the emitter's current
+ *    behaviour. This file is a PRIME mis-attribution target: a reviewer reads
+ *    it as the catalog's rationale, so what it says about the emitter carries
+ *    weight it should not. Do not silently drop this mark.
+ *
+ *    ⚠ Selecting a realization form is NOT licence to synthesize one. The
+ *    emitter must never INSERT A REDUCTION (`exists`, a singleton lift `{ }`,
+ *    a `Coalesce`) to bridge a shape the author declared. A boolean over a
+ *    filter pattern is `definition is exists ( … )` — AUTHORED. A mismatch is
+ *    an author-time error naming the reduction, not an emitter bridge.
+ *    (The emitter still bridges today; that code is the patient, pending
+ *    reduction nesting. Do not read it as intent.)
+ *    See [[patterns-are-semantic]] + the catalog v0.6.0 / v0.7.0 changelog.
  *
  *    Some patterns are inherently boolean (Without, range classifiers like
  *    High/Low, value comparators like AtLeast/Between, count predicates
