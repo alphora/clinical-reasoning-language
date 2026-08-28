@@ -33,9 +33,23 @@ The proof must check a **transition**, not read an AST label:
    satisfied the obligation: e.g. `{ booleanEffect: "total", dischargedBy: "boundary-coalesce" }` /
    `{ dischargedBy: "intrinsic-exists" }`.
 3. **Proof phase — the CHECK.** The static emit/test-time proof verifies every boolean-valued define reaches
-   `booleanEffect: "total"` via a *discharge that matches its obligation*. A `requires-boundary` obligation with
-   no boundary-coalesce in the emitted expression is a proof FAILURE, not a pass. A future emitter regression
-   that drops a Coalesce is caught because the discharge no longer matches.
+   `booleanEffect: "total"` via a *discharge that matches its obligation* — **or is the classified three-state
+   question form.** A `requires-boundary` obligation with no boundary-coalesce in the emitted expression is a
+   proof FAILURE, not a pass. A future emitter regression that drops a Coalesce is caught because the discharge
+   no longer matches.
+
+   ⭐ **The one sanctioned partial: `question-three-state`.** A PURE QUESTION (`isPureQuestionConcept` —
+   Observation + `value type is boolean` + local `code is`, no derivation, no source rep) emits
+   `answeredValue()`, which returns true / false / **null** by design; a decision guarding on null PAUSES and
+   asks (charter §3/§4). It is proven by carrying the matching `{ booleanEffect: "three-state" }` discharge,
+   **never** by reaching `total` — and a question that comes back `total` is a proof FAILURE, because
+   totalizing it makes an unanswered question read as an answered "no".
+
+   ⚠ **Do not restate the old form of this rule** ("every emitted boolean define is total"). It was falsified
+   by the shipped pause fix and, cited as authority, repeatedly turned a small behavioural fix into an apparent
+   architecture problem. MEASURED (`tmp/NOTES-apply-null-behavior.md` §14, cqf-fhir-cr 4.7.0): a decision
+   pauses ONLY because these reads stay null. The exemption is kept narrow by the shared structural predicate,
+   so an ordinary nullable comparator can never claim it and skip its `Coalesce`.
 
 **Classifier↔lowering agreement obligation (load-bearing):** a test asserts that for every boolean-define form
 T5 actually emits, the emitted CQL matches the class the classifier assigns (checked against the emitted string /

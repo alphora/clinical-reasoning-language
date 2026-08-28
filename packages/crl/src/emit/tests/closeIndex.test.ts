@@ -207,17 +207,30 @@ describe("closeIndex — closure REPORT proof over a real closure", () => {
     expect(report.failures).toEqual([]);
   });
 
-  it("CLOSURE inventory pin: bare-scalar `code is` forms report as `rejected` (bucket 3, retired at 2e)", () => {
-    // code-is-decision has two bare Scalar boolean `code is` concepts (the `no-bare-scalar-code` pre-flip
-    // form). The classifier obligation is `rejected`; the closure REPORT surfaces them as hard failures — the
-    // pinned bucket-3 inventory that 2e retires. Pinning it here gives 2b.1's discharge + 2b.4's HARD gate a
-    // closure-level burn-down baseline (code review #1).
+  it("CLOSURE inventory pin: the two bare `code is` forms report DIFFERENTLY — a question owes a three-state read, a non-Observation boolean is rejected", () => {
+    // code-is-decision has two bare Scalar boolean `code is` concepts, and they are NOT the same form —
+    // pinning them to one reason was the stale doctrine this test used to carry (#189, 2026-08-28):
+    //
+    //   `Adult Patient`          Observation + boolean + `code is`  → a PURE QUESTION (charter §3). Its
+    //                            determination is answerable and its read is three-state; the LEGACY
+    //                            truth-set lane has not caught up, so it reports as OWING that read.
+    //   `Active Crohns Disease`  Condition + boolean + `code is`    → NOT a question (nowhere on a Condition
+    //                            to store an answer), so it stays a genuine bare-scalar `rejected`.
+    //
+    // Both still fail the closure REPORT, which keeps the 2e burn-down baseline — but the two reasons are
+    // different defects and must not be collapsed. ⚠ The previous single-reason pin asserted that the
+    // question shape was "invalid in boolean position", i.e. that the shipped PAUSE mechanism was slated for
+    // deletion. That is the invariant #189 corrected.
     const result = emitCQLImports(path.join(FIXTURES, "code-is-decision", "root.crl"));
     expect(result.success).toBe(true);
     const report = reportClosureTotality(policyLedgers(result));
     expect(report.status).toBe("failed");
     expect(report.failures.map((f) => f.name).sort()).toEqual(["Active Crohns Disease", "Adult Patient"]);
-    for (const f of report.failures) expect(f.reason).toContain("rejected form was emitted");
+    const reasonOf = (n: string) => report.failures.find((f) => f.name === n)!.reason;
+    expect(reasonOf("Adult Patient")).toContain("OWES a three-state read");
+    expect(reasonOf("Active Crohns Disease")).toContain("rejected form was emitted");
+    // NEVER the pause-killer: nothing here may report a question as TOTALIZED.
+    for (const f of report.failures) expect(f.reason).not.toContain("was TOTALIZED");
   });
 
   it("decision-when-reduction: the role→visibility mapping fires from real layered emit; routing applies the winner rule", () => {

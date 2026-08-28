@@ -109,7 +109,7 @@ import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import type { CRLError } from "../types/errors";
 import { ageComputeFnForUnit } from "../template-match/agePredicate";
 import { recencyOverrideById } from "../template-match/recencyProjectionOverride";
-import { resolveRecencyValueConcept } from "../template-match/recencyValueConcept";
+import { resolveRecencyValueConcept, isPureQuestionConcept } from "../template-match/recencyValueConcept";
 
 import { lowerLocalCodes, preLowerAge } from "./lowerLocalCodes";
 import { crossRepRecencyMergeExpr } from "./crossRepRecencyMerge";
@@ -1265,6 +1265,14 @@ class Emitter {
       discharge: { booleanEffect: "nullable", reason },
       result: { shape: "Scalar", valueType: "boolean" },
     });
+    // ⭐ #189 null/pause — the sanctioned three-state read of a PURE QUESTION. It IS a Boolean-typed define
+    // and it IS null when unanswered; enrolling it as `not-boolean` ("representations-only stub") described
+    // the pause mechanism as if no boolean were emitted at all. The ledger now records what actually ships.
+    const threeStateQuestion = (readBy: string): { resultType: string; discharge: DischargeMetadata; result: DefineResult } => ({
+      resultType: "Boolean",
+      discharge: { booleanEffect: "three-state", readBy },
+      result: { shape: "Scalar", valueType: "boolean" },
+    });
     // A RecordSet-emitting form's resource — MIRRORS the emit's own resolution (`emitCodedFrom`
     // `retrieveResourceType ?? conceptType ?? "Observation"`) so `result` reports the resource the retrieve
     // ACTUALLY emits: a synthetic source-impl `CodedFromDefinition` carries `retrieveResourceType`; a
@@ -1287,6 +1295,12 @@ class Emitter {
     // "interface"` to match the emit precondition (round-2 #2): a role-tagged concept in a non-interface lane
     // emits a legacy body, so it falls through to the definition switch (its ACTUAL form) below.
     if (role === "interface-facade" && this.caseFeature.kind === "interface") {
+      // ⭐ #189 null/pause — a PURE QUESTION re-exports as `.answeredValue()`, which is three-state BY DESIGN
+      // (true/false/null). Keyed on the SAME `__pureQuestion` marker the emit branch uses (≈:1798) so the
+      // ledger cannot drift from the text. Previously this fell through to `total("facade-satisfied")` — the
+      // ledger asserted the PAUSE read was TOTAL, which is the exact claim the charter and an executed
+      // `$apply` run (`tmp/NOTES-apply-null-behavior.md` §14) both refute.
+      if (c.__pureQuestion === true) return threeStateQuestion("answeredValue");
       const form = this.facadeForm(c);
       if (form === "recordsource") return notBoolean("ExternalPrimitives record re-export");
       if (form === "total-boolean") return total("facade-delegated"); // bare re-export — delegates to the reduction

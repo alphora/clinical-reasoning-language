@@ -212,9 +212,24 @@ describe("classifyBooleanTotality — catalog patterns & shapes", () => {
     ).toBe("not-applicable");
   });
 
-  it("bare Scalar `code is` (no reduction) → rejected", () => {
+  it("bare Scalar `code is` on an OBSERVATION boolean → question-three-state (a PURE QUESTION, not a reject)", () => {
+    // #189 null/pause, 2026-08-28. This test previously pinned `rejected` — i.e. that the shipped PAUSE
+    // mechanism was "invalid in boolean position" and staged for deletion at 2e. It is the opposite: an
+    // Observation + boolean + `code is` with no derivation and no source rep is the canonical ANSWERABLE
+    // shape (charter §3), the only shape a `when` branch guard can gate on, and its `answeredValue()` read
+    // is deliberately three-state. MEASURED: `$apply` pauses only because that read stays null
+    // (`tmp/NOTES-apply-null-behavior.md` §14).
     expect(
       classify(`library "T".\nconcept "B":\n- type is Observation.\n- value type is boolean.\n- code is \`b\`.\n`, "B").kind,
+    ).toBe("question-three-state");
+  });
+
+  it("bare Scalar `code is` on a NON-Observation boolean → still rejected (nowhere to store an answer)", () => {
+    // The boundary that keeps the exemption narrow (charter §3): a Condition has no boolean slot, so it can
+    // never carry an answer — it is not a question, and `exists this` is its correct reduction. If this ever
+    // flips to `question-three-state`, the exemption has widened into the bare-scalar hole it must not cover.
+    expect(
+      classify(`library "T".\nconcept "B":\n- type is Condition.\n- value type is boolean.\n- code is \`b\`.\n`, "B").kind,
     ).toBe("rejected");
   });
 

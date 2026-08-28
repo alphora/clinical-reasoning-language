@@ -2,8 +2,24 @@
 //
 // Design of record: `docs/emit-189-boolean-totality.md` (this module IS that spec's §1–5) and
 // `docs/emit-consistency-189-design.md` §3 rule 5, under the charter `docs/CRL-NORTH-STAR.md`
-// (null-safety by construction — every emitted boolean define is TOTAL: it evaluates to true/false,
-// never null, on any case). Emit-lane (the proof is emit/test-time; no validator consumes totality),
+// (null-safety by construction).
+//
+// ⭐ THE INVARIANT (REFACTOR:grounded — re-derived from the charter and an executed `$apply` run):
+//   EVERY emitted Boolean define is either PROVEN TOTAL, or is the CLASSIFIED THREE-STATE QUESTION FORM.
+//
+// ⚠ NOT "every boolean define is total". A PURE QUESTION (`isPureQuestionConcept`) emits `answeredValue()`,
+// which returns true / false / NULL by design, and a decision guarding on null PAUSES and asks. That is not a
+// gap to be closed — it is the mechanism, and totalizing it is how PAUSE dies. The negative is stated because
+// a reader who has seen a hundred closed-world CQL guards will otherwise re-derive the wrong rule from the
+// positive half alone; this module previously did exactly that and classified the question shape `rejected`.
+//
+// MEASURED (`tmp/NOTES-apply-null-behavior.md` §14, cqf-fhir-cr 4.7.0): a decision pauses ONLY because these
+// reads stay null. `cqf-applicabilityBehavior "any"` covers ORDERING only — the engine treats a null
+// condition as not-applicable and SKIPS TO THE NEXT SIBLING, so with an unconditional `otherwise` the same
+// null input DENIES. The synthesized `not <prior>` branch guards are therefore load-bearing safety, they stay,
+// and null-propagating boolean defines stay with them.
+//
+// Emit-lane (the proof is emit/test-time; no validator consumes totality),
 // mirroring T1's `emit/` → `template-match` import precedent.
 //
 // The proof checks a TRANSITION, not an AST label (§1):
@@ -12,7 +28,8 @@
 //      a claim about the §2/§7 lowering CONTRACT.
 //   2. Lowering phase — the DISCHARGE. T5 emit records how the emitted CQL satisfied the obligation
 //      (`{ booleanEffect: "total", dischargedBy }`), enrolled into the ledger alongside the emitted text.
-//   3. Proof phase — the CHECK. `proveWholeBoundaryTotality` verifies every boolean define reaches
+//   3. Proof phase — the CHECK. `proveWholeBoundaryTotality` verifies every boolean define is either the
+//      sanctioned `question-three-state` form, or reaches
 //      `booleanEffect: "total"` via a discharge that MATCHES its obligation AND its origin, that every
 //      composite's operands are themselves proven total (no vacuous cycles), and that the ledger covers
 //      every emitted boolean define header (no path emitted a define without enrolling).
@@ -43,6 +60,7 @@ import { resolveAgeConcept } from "../template-match/recencyProjectionOverride";
 import {
   resolveRecencyValueConcept,
   isMemberExistenceInterface,
+  isPureQuestionConcept,
 } from "../template-match/recencyValueConcept";
 import {
   PATTERN_RETURN_SHAPE,
@@ -94,6 +112,13 @@ export type BooleanTotalityObligation =
   // `defined as` composition / bare ref over a boolean parent — total iff EVERY resolved operand is total
   // (§2 rule 3, discharged architecturally at each operand's own boundary). Carries operands ONLY.
   | { kind: "composite"; operands: ReferenceName[]; cell: string }
+  // ⭐ #189 null/pause — a PURE QUESTION (`isPureQuestionConcept`): the ONE boolean form that is DELIBERATELY
+  // three-state. Nothing can compute it, so its emitted read (`answeredValue()`) returns true / false / NULL,
+  // and a decision guarding on null PAUSES and asks (charter §3/§4). This is a SANCTIONED partial, not a
+  // failure: it is proven by carrying the matching `three-state` discharge, never by reaching `total`.
+  // ⚠ Kept NARROW on purpose — only the shared structural predicate admits a concept here, so an ordinary
+  // nullable comparator can never claim the exemption and skip its `Coalesce`.
+  | { kind: "question-three-state"; form: string; cell: string }
   // Record / RecordSet / non-boolean scalar — produces no boolean define. `nullable` distinguishes a
   // nullable non-boolean scalar read (a later comparison must Coalesce the PREDICATE, not this value) from
   // a set/record result. Reading not-applicable as "consume anywhere" is the `Coalesce(X,0)` trap (§2).
@@ -414,6 +439,20 @@ export function classifyBooleanTotality(
     return { kind: "not-applicable", nullable: false, reason: "`coded from` is an external source arm (deferred, design §10)" };
   }
 
+  // ⭐ #189 null/pause — a PURE QUESTION is NOT a malformed bare scalar. It is the canonical answerable
+  // shape (charter §3), the ONLY shape a `when` branch guard can gate on, and its emitted read is
+  // deliberately three-state. Classifying it `rejected` said the shipped pause mechanism was invalid and
+  // staged it for deletion — which, at the REPORT→ENFORCE re-wire, would have deleted PAUSE itself.
+  // Measured 2026-08-28: `$apply` pauses ONLY because these reads stay null (`tmp/NOTES-apply-null-behavior.md`
+  // §14). REFACTOR:grounded — re-derived from the charter and an executed `$apply` run, not from adjacent code.
+  if (isPureQuestionConcept(concept)) {
+    return {
+      kind: "question-three-state",
+      form: "pure question (bare local `code is` boolean — newest-answer read)",
+      cell: "§3 pure question → `answeredValue()` true/false/null (NOT totalized)",
+    };
+  }
+
   // No definition. A boolean Scalar with nothing to reduce is malformed in boolean position (a bare Scalar
   // `code is` — §2 "no bare scalar code is"); a source-only concept (no code) is a deferred external arm.
   if (hasCode) {
@@ -476,6 +515,11 @@ export type DischargeKind =
  *  without inventing a boolean mechanism. */
 export type DischargeMetadata =
   | { booleanEffect: "total"; dischargedBy: DischargeKind }
+  // ⭐ #189 null/pause — the sanctioned three-state read of a PURE QUESTION. Distinct from `nullable`
+  // (an honest non-boolean/uncertified read) because THIS one is a Boolean-typed define that is null BY
+  // DESIGN and is PROVEN by that fact. It carries no `DischargeKind`: there is no totalizing mechanism to
+  // name, which is exactly the point.
+  | { booleanEffect: "three-state"; readBy: string }
   | { booleanEffect: "nullable"; reason: string }
   | { booleanEffect: "not-boolean" };
 
@@ -649,7 +693,8 @@ function isBooleanSubject(entry: EmittedDefineEntry): boolean {
 }
 
 // ===========================================================================
-// §1 step 3. The proof — every boolean define reaches `total` via a MATCHING discharge (fixed-point)
+// §1 step 3. The proof — every boolean define reaches `total` via a MATCHING discharge, OR is the
+// sanctioned three-state question form (fixed-point)
 // ===========================================================================
 
 export type ProofFailure = {
@@ -710,6 +755,11 @@ function dischargeKindMatchesObligation(ob: BooleanTotalityObligation, d: Discha
         d === "facade-satisfied" ||
         d === "member-existence-fold" // #189 Piece 1 — the value/interface three-leg fold, total by construction
       );
+    case "question-three-state":
+      // No total mechanism may discharge a question — it is proven by its `three-state` discharge, which
+      // carries no `DischargeKind` at all. A `total` discharge here means the emitter totalized a question
+      // (the pause-killer), so it must NOT match.
+      return false;
     case "requires-boundary":
       return d === "boundary-coalesce" || d === "age-recency-total";
     case "composite":
@@ -809,6 +859,25 @@ export function proveWholeBoundaryTotality(
     // An enrolled `rejected` obligation must never have been emitted (§3 — E1 forms fail by non-enrollment).
     if (e.obligation.kind === "rejected") {
       fail(e, `rejected form was emitted: ${e.obligation.reason}`);
+      continue;
+    }
+    // ⭐ #189 null/pause — the sanctioned three-state question. PROVEN by carrying the matching discharge,
+    // never by reaching `total`. Both directions are checked: a question that came back totalized is the
+    // pause-killer, and a three-state discharge on anything that is NOT a question is an unsanctioned partial.
+    if (e.obligation.kind === "question-three-state") {
+      if (e.discharge.booleanEffect === "total") {
+        // The pause-killer: emit totalized a question, so an unanswered question reads as an answered "no".
+        fail(e, "pure question was TOTALIZED — a question must stay three-state or an unanswered question denies instead of pausing");
+      } else if (e.discharge.booleanEffect !== "three-state") {
+        // Not a pause-killer — the legacy truth-set lane has not caught up: it emits a retrieve consumed by
+        // `.asTruths().satisfied()` (closed-world), so no three-state read exists for this question yet.
+        // This is the #189 burn-down signal, and it is NOT the same defect as totalizing one.
+        fail(e, `pure question OWES a three-state read but emit discharged \`${e.discharge.booleanEffect}\` (legacy truth-set lane — #189 burn-down)`);
+      }
+      continue;
+    }
+    if (e.discharge.booleanEffect === "three-state") {
+      fail(e, "non-question define enrolled a `three-state` discharge — only a pure question may be deliberately partial");
       continue;
     }
     if (!isBooleanSubject(e)) continue; // not-applicable/non-boolean defines are outside the boolean proof
