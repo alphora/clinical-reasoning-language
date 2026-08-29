@@ -141,10 +141,20 @@ export function isValueReadingBooleanConcept(concept: Concept, siblingConcepts: 
  * boolean lets a user answer true / false / leave-unanswered (design of record
  * `tmp/DESIGN-apply-null-pause.md` §3.1).
  *
- * Contrast the neighbouring shapes, none of which are questions:
- *   - `definition is exists this`  — a derivation over the concept's OWN records; absence is closed-world
- *     FALSE, so it never pauses (a "predicate dressed as a fact").
- *   - a `source representation`    — external data DEFAULTS the determination; absent evidence is FALSE.
+ * ⚠ THIS PREDICATE DETECTS THE DEGENERATE ONE-ARM CASE. It is NOT the test for "can this pause", and must
+ * never be used as one. Three-state-ness is a property of a determination's MERGE — a determination is
+ * UNKNOWN when NO arm establishes it — so a multi-arm determination pauses too, and the merge is what has to
+ * preserve that. This predicate answers the narrower question "is the answer slot the ONLY arm", because
+ * that is the case whose emitted read is exactly `answeredValue()`.
+ *
+ * The neighbouring shapes, and what an absent arm actually contributes:
+ *   - `definition is exists this`  — a derivation over the concept's OWN RECORDS. A retrieval always
+ *     computes, so absence here IS closed-world FALSE and it never pauses. ⚠ That holds because of what it
+ *     READS, not because it is a derivation: a derivation over a QUESTION inherits the question's unknown
+ *     (`"BMI" at least 30` over an unestablished BMI is UNKNOWN, charter §4).
+ *   - a `source representation`    — an external arm. ⚠ An absent source record contributes NOTHING to the
+ *     merge; it does not DEFAULT the determination to false. An untimestamped false cannot compete in a
+ *     merge, and totalizing it manufactures a stated answer out of an absence.
  *   - no `code is`                 — read-only/derived; a local code is the ONLY way to create an answer,
  *     and you can never ask a question about a representation (that is system-of-record clinical data).
  *
@@ -156,8 +166,11 @@ export function isValueReadingBooleanConcept(concept: Concept, siblingConcepts: 
  */
 export function isPureQuestionConcept(concept: Concept): boolean {
   if (concept.code === undefined) return false; // no local code → no answer slot
-  if (concept.definition !== undefined) return false; // a derivation computes it → closed-world
-  if ((concept.representations ?? []).length !== 0) return false; // a source rep defaults it → closed-world
+  // ⚠ These two exclusions make this the ONE-ARM detector. They are NOT a claim that a derivation or a
+  // posrep makes a determination closed-world — that claim is false (see the header), and reading them that
+  // way is what would deny an unestablished `Obese` instead of pausing on it.
+  if (concept.definition !== undefined) return false; // a second arm — the merge decides, not this predicate
+  if ((concept.representations ?? []).length !== 0) return false; // a second arm — likewise
   // REFACTOR:grounded (#189, panel finding disc 517) — CARDINALITY IS DECLARED, NOT INFERRED (charter §3).
   // A pure question publishes ONE answer, so it must declare `shape is Scalar` (the builder's normalization
   // for an omitted `shape is`). Without this check a `shape is RecordSet` boolean Observation with a local

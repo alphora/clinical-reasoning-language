@@ -16,13 +16,26 @@ current; see "Reconciliation" at the end.
 2026-08-29). It is the canonical target for the Obese/BMI chain, it is committed, and
 `packages/crl/src/tests/obesityTarget.test.ts` drives it across every lane.
 
-⭐ **A rule declaring the target's SHAPES rejected, out-of-scope, or to-be-migrated-away is STALE** — not "in
-tension with", stale, and to be corrected on sight. The shapes: a local `code is` alongside a derivation
-and/or `source representation` posreps, in both `shape is Record` and `shape is RecordSet` flavours.
+⭐⭐ **THE AUTHORITY ORDER IS: GOAL > CHARTER > CODE** (operator, 2026-08-29: *"the charter clause is not the
+authority. the authority is the goal."*).
 
-⚠ That is a scoped ruling, not a trump card. It retires rules about THOSE SHAPES. It does not exempt the
-target from ordinary validation, and it does not license retiring an operator requirement on the grounds
-that it inconveniences the target — only the operator retires those (`stale-requirements` §2).
+`large-refactor` establishes that the charter outranks mid-refactor CODE. This says what outranks the
+CHARTER: the goal does. This document is a derived articulation of what we are building; the target IS what
+we are building. So when a charter clause contradicts the goal, **the clause is corrected — you do not ask
+whether the clause permits the goal.** A clause is evidence about our past understanding, not a constraint
+on the thing it was written to serve.
+
+⚠ This does not make the charter optional, and it does not license "the goal is inconvenienced" as a reason
+to delete a rule. It settles which one MOVES when they genuinely conflict, and it removes the loop where a
+clause written to describe the target is then quoted back to block it.
+
+⭐ **So a rule contradicting the target is STALE** — not "in tension with", stale, and to be corrected on
+sight. That covers rules declaring its SHAPES rejected or out-of-scope (a local `code is` alongside a
+derivation and/or `source representation` posreps, in `shape is Record` and `shape is RecordSet`), AND rules
+whose SEMANTICS contradict the acceptance criterion.
+
+⚠ Still not a trump card over the OPERATOR. A rule the operator stated is retired only by the operator
+(`stale-requirements` §2). What this settles is charter-vs-goal, not operator-vs-goal.
 
 ⚠ **And the reason it was wrong is worth keeping**, because it is a mechanism and not a one-off mistake.
 Those rules were **deferral decisions dressed as rejections**. A slice could not yet lower a shape, so the
@@ -623,8 +636,12 @@ must precede removing the `exists` shape bridges.)
   an *unanswered question* indistinguishable from an answered *"no"*, so the tree runs on to a disposition where
   it must stop and ask. The model:
   - A **derivation** stays closed-world and total: `exists(…)` is total by construction; a nullable boolean
-    derivation is totalized (`Coalesce(<predicate>, false)`) at its own boundary. Absent *evidence* is `false`,
-    because a derivation can always compute — `definition is exists this` never pauses.
+    derivation OVER EVIDENCE is totalized (`Coalesce(<predicate>, false)`) at its own boundary. Absent
+    *evidence* is `false`, because a retrieval always computes — `definition is exists this` never pauses.
+    ⚠ A derivation over a QUESTION is NOT closed-world: it inherits the question's unknown. `"BMI" at least
+    30 'kg/m2'` over an unestablished BMI is UNKNOWN, not false — totalizing it manufactures a stated answer
+    from an absence and denies where the goal requires a pause. What determines the arm is what it reads,
+    never that it is a derivation.
   - A **pure question** (a bare local `code is` + `value type is boolean`, with nothing that could compute it)
     reads **three-state** and is deliberately NOT totalized: `answeredValue()` returns `true` / `false` /
     **null**. `false` is a **stated value** (`valueBoolean: false`), never implied by omission.
