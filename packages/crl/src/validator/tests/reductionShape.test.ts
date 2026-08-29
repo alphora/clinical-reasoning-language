@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, it, expect } from "vitest";
 
-import { buildCRL } from "../../index";
+import { buildCRL, validateCRL } from "../../index";
 import { validateCRLImports } from "../../imports/validate";
 import {
   Validator,
@@ -448,5 +448,53 @@ concept "C":
       expect(w[0].libraryName).toBe("T");
       expect(w[0].filePath?.endsWith("policy.crl")).toBe(true);
     });
+  });
+});
+
+describe("`most recent` must not MASK what it wraps (#189, 2026-08-29)", () => {
+  // THE BUG. `narrativeLeadsWithMostRecent` was a TEXT-PREFIX check — elements[0] === "most" &&
+  // elements[1] === "recent" — OR'd into the `shape is Record` single-yield gate. So ANY narrative whose
+  // first two words are "most recent" satisfied the Record contract without matching a catalog pattern at
+  // all, and the unmatched narrative underneath was never reported.
+  //
+  // It surfaced through the canonical target: `most recent body mass index of "Weight" and "Height"`
+  // validated CLEAN even though `body mass index` is in no catalog, while the left-to-right spelling of the
+  // same thing (`body mass index of ..., then most recent this`) correctly errored. Same two operations, so
+  // one spelling was lying.
+  //
+  // We do NOT try to detect "the author meant two operations". There is no need: the fix is to stop skipping
+  // the check. `most recent <named concept>` is a recognised single operation over an argument; anything
+  // else after "most recent" is narrative that must match a pattern like any other.
+  const RECORD = (def: string): string =>
+    'library "T".\nconcept "A":\n- shape is RecordSet.\n- type is Observation.\n' +
+    "- value type is Quantity.\n- code is `a`.\n" +
+    'concept "B":\n- shape is Record.\n- type is Observation.\n- value type is Quantity.\n- ' +
+    def +
+    "\n";
+
+  const errKinds = (src: string): string[] => {
+    const v = validateCRL(src, { soft: true }) as unknown as { errors?: { kind?: string }[] };
+    return (v.errors ?? []).map((e) => e.kind ?? "");
+  };
+
+  it("a NAMED operand is a single operation and stays clean", () => {
+    expect(errKinds(RECORD('definition is most recent "A".'))).toEqual([]);
+  });
+
+  it("nonsense after `most recent` is REPORTED, not swallowed", () => {
+    // The reduced case: if this passes, the prefix satisfies the Record contract over literally anything.
+    expect(errKinds(RECORD('definition is most recent flurble bloop of "A".'))).toEqual(["reduction-shape"]);
+  });
+
+  it("an uncatalogued calculation after `most recent` is REPORTED — the case from the canonical target", () => {
+    expect(errKinds(RECORD('definition is most recent body mass index of "A" and "A".'))).toEqual([
+      "reduction-shape",
+    ]);
+  });
+
+  it("the LEFT-TO-RIGHT spelling of the same thing reports it too — the two must agree", () => {
+    expect(errKinds(RECORD('definition is body mass index of "A" and "A", then most recent this.'))).toEqual([
+      "reduction-shape",
+    ]);
   });
 });

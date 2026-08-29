@@ -52,13 +52,19 @@ concept "Obese":
   - value projection is exists this.
 
 // QUESTION, not a condition (not boolean).
-// Arms: the calculation over Height and Weight, and recorded BMI observations.
+// Arms: the calculation over Height and Weight, recorded BMI observations, and
+// answers on the local code. ⚠ The reduction is `, then most recent this` —
+// LEFT TO RIGHT (compute, THEN select) and reducing over THIS concept's own
+// records, so all three arms merge. The prefix spelling `most recent body mass
+// index of …` composes the same two operations with the second written first,
+// and reduces only the calculation's output — silently dropping the recorded
+// and answered arms.
 concept "BMI":
 - shape is Record.
 - type is Observation.
 - value type is Quantity.
 - code is `bmi`.
-- definition is most recent body mass index of "Weight" and "Height".
+- definition is body mass index of "Weight" and "Height", then most recent this.
 - source representation:
   - type is Observation.
   - coded from "Clinical BMI VS".

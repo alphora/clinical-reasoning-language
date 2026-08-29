@@ -56,7 +56,7 @@ const OPTIONS: readonly AuthoringOption[] = [
     policy: path.join(FIXTURE, "policy.crl"),
     cases: path.join(FIXTURE, "cases.cel"),
     questions: ["Obese", "BMI", "Height", "Weight"],
-    validatesCleanToday: true,
+    validatesCleanToday: false,
   },
   {
     name: "RecordSet",
@@ -142,13 +142,17 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
         if (opt.validatesCleanToday) {
           expect(v.errors ?? []).toEqual([]);
         } else {
-          // ⚠ The Layered option reports `body mass index of …` as an UNMATCHED NARRATIVE — it resolves to no
-          // catalog pattern, so a `shape is Record` concept cannot be shown to yield one record. That is TRUE:
-          // arithmetic is not in the catalog (plan step 4, still open). MUST BECOME clean when it lands.
+          // ⚠ `body mass index of …` is an UNMATCHED NARRATIVE — it resolves to no catalog pattern, so a
+          // `shape is Record` concept cannot be shown to yield one record. That is TRUE: arithmetic is not in
+          // the catalog (plan step 4, still open). MUST BECOME clean when it lands.
           //
-          // ⭐ And the other two options do NOT report it only because they spell the reduction with a
-          // `most recent` PREFIX, which masks whatever it wraps — `most recent flurble bloop of "A"` validates
-          // clean (measured). So this option is the honest one, and the other two are clean partly by accident.
+          // ⭐ This used to be reported by the Layered option ALONE, and the difference was spelling, not
+          // correctness. `most recent body mass index of "Weight" and "Height"` composes TWO operations with
+          // the second written first — against the left-to-right rule — and the validator treats `most recent
+          // X` as one operation over an opaque argument, so it never looks inside. MEASURED: `most recent
+          // flurble bloop of "A"` validates CLEAN. The prefix spelling therefore violated left-to-right AND
+          // disabled the narrative check, which is ONE defect, not two. Written left-to-right, every option
+          // reports the gap honestly.
           expect((v.errors ?? []).map((e) => e.kind)).toEqual(["reduction-shape"]);
         }
         // The model is complete and legal TODAY. What is not complete is emit, and the warnings say so — each

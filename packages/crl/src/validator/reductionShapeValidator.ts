@@ -282,7 +282,7 @@ export class ReductionShapeValidator {
     // RETRIEVE, North Star §3 / design §2 `(none) × RecordSet → RecordSet<R>`; the old
     // `recordset-bare-code-incoherent` rule wrongly applied Scalar "code is = existence" intuition and
     // false-flagged the charter's own worked example — deleted, panel R3 gpt56 #1.)
-    if (shape === "RecordSet" && (reduction || narrativeLeadsWithMostRecent(def))) {
+    if (shape === "RecordSet" && (reduction || narrativeIsMostRecentNamedOperand(def))) {
       const how = reduction
         ? `a \`definition is ${verb(reduction)} …\` reduction`
         : "a narrative `most recent …` selection";
@@ -362,7 +362,7 @@ export class ReductionShapeValidator {
       // which is the magic this rule exists to prevent.
       const selectsRecord =
         (reduction !== undefined && reduction.kind === "mostRecent") ||
-        narrativeLeadsWithMostRecent(def) ||
+        narrativeIsMostRecentNamedOperand(def) ||
         definitionYieldsSingleValue(def);
       if (!selectsRecord) {
         // ⭐ NAME THE ACTUAL CAUSE. The old single message always said "does not select a single record"
@@ -554,15 +554,34 @@ function definitionYieldsSingleValue(def: ConceptDefinition | undefined): boolea
   return shape === "instance" || shape === "boolean" || shape === "other";
 }
 
-function narrativeLeadsWithMostRecent(def: ConceptDefinition | undefined): boolean {
+/**
+ * `most recent "X"` — the NAMED-operand selection, which is ONE operation over an argument and therefore
+ * genuinely yields a single record.
+ *
+ * ⚠ This used to test only that the narrative BEGAN with the words "most recent", and it was OR'd into the
+ * `shape is Record` single-yield gate — so any narrative starting with those two words satisfied the Record
+ * contract without matching a catalog pattern at all, and the unmatched narrative underneath went
+ * unreported. MEASURED: `definition is most recent flurble bloop of "A".` validated clean.
+ *
+ * The fix is not to infer what the author meant. `most recent <named concept>` is a recognised single
+ * operation; anything else following "most recent" is ordinary narrative and must match a pattern like any
+ * other, so it falls through to the unmatched-narrative diagnosis.
+ *
+ * ⚠ Note what this makes visible: `most recent <some calculation>` composes TWO operations with the second
+ * written FIRST, against the left-to-right reading rule. The left-to-right spelling is
+ * `<calculation>, then most recent this` — which additionally reduces over the concept's OWN records, so a
+ * both-representation concept merges its arms instead of reducing only the calculation's output.
+ */
+function narrativeIsMostRecentNamedOperand(def: ConceptDefinition | undefined): boolean {
   if (def?.type !== "DefinitionIsDefinition") return false;
   const els = def.body.elements;
   return (
-    els.length >= 2 &&
+    els.length === 3 &&
     els[0].type === "NWord" &&
     els[0].value === "most" &&
     els[1].type === "NWord" &&
-    els[1].value === "recent"
+    els[1].value === "recent" &&
+    els[2].type === "NConceptRef"
   );
 }
 
