@@ -1,0 +1,35 @@
+# The acceptance truth table for the canonical Obese/BMI target, as CRE cases.
+// ⚠ Two of these three FAIL today, and that is the point — see `tests/obesityTarget.test.ts`, which pins
+// each lane's current shortfall beside the value it must reach. `result is` states what the case MUST
+// produce; a `fail` here is the burn-down signal, never a case to re-author.
+library "ObesityCases".
+covers "Obesity Coverage (Record)".
+
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+fact "Obese Yes":
+- date is "2026-01-01".
+- value is true.
+- defined by "Obesity Coverage (Record)"."Obese".
+
+fact "Obese No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Obesity Coverage (Record)"."Obese".
+
+case "obese stated true -> approve":
+- subject is "Pat".
+- fact is "Obese Yes".
+- result is "Bariatric Surgery Coverage" is "Approve Bariatric Surgery".
+
+case "obese stated false -> deny":
+- subject is "Pat".
+- fact is "Obese No".
+- result is "Bariatric Surgery Coverage" is "Deny Bariatric Surgery".
+
+case "obese unanswered -> no recommendation":
+- subject is "Pat".
+- result is "Bariatric Surgery Coverage" is "Approve Bariatric Surgery".

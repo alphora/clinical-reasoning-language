@@ -1,0 +1,9 @@
+{
+  "name": "obesity",
+  "version": "1.0.0",
+  "private": true,
+  "description": "THE canonical target for the Obese/BMI chain (#189) — one policy, both lanes, driven by tests/obesityTarget.test.ts",
+  "crl": {
+    "canonicalBase": "http://example.org/obesity"
+  }
+}

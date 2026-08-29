@@ -1,0 +1,102 @@
+// ===========================================================================
+// ⭐ THE CANONICAL TARGET for the Obese/BMI chain (#189). One policy, one
+// truth, driven by `src/tests/obesityTarget.test.ts` across every lane.
+//
+// ⚠ It is the TARGET, not a description of what works: the model here is the
+// CORRECT one and the implementation catches up to it. Never reshape a concept
+// to make a lane pass — the test pins each lane's CURRENT shortfall with the
+// value it must reach, so closing one is a visible, deliberate edit.
+//
+// The acceptance criterion (operator, 2026-08-29):
+//
+//     Obese = true        -> Approve
+//     Obese = false       -> Deny
+//     Obese = unanswered  -> NO recommendation: pause and ask
+//
+// ⭐ The ONLY route to a Deny is a STATED false. If "unanswered" reaches a Deny
+// by any path, the chain is not done.
+//
+// RECORD version. A complete, runnable policy.
+//
+// Every concept carries a local `code is` AND `shape is Record`, so every one
+// is a QUESTION (= an answerable = a valid `cpg-featureExpression` target).
+// Four questions, and the user may answer at any level: assert obesity
+// directly, give a BMI, or give height and weight.
+//
+// Every concept here publishes ONE record, so every one owes a reduction that
+// merges its arms — the derived arm and the source-representation arm.
+// ===========================================================================
+library "Obesity Coverage (Record)".
+
+terminology "Obese VS":
+- valueset is `http://example.org/vitals/ValueSet/obese`.
+terminology "Clinical BMI VS":
+- valueset is `http://example.org/vitals/ValueSet/bmi`.
+terminology "Height VS":
+- valueset is `http://example.org/vitals/ValueSet/height`.
+terminology "Weight VS":
+- valueset is `http://example.org/vitals/ValueSet/weight`.
+
+// QUESTION + CONDITION (boolean-valued, so a `when` may gate on it).
+// Arms: the threshold over BMI, and existence of a coded Condition.
+// `most recent` selects the one record across both.
+concept "Obese":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `obese`.
+- definition is "BMI" at least 30 'kg/m2', then most recent this.
+- source representation:
+  - type is Condition.
+  - coded from "Obese VS".
+  - value projection is exists this.
+
+// QUESTION, not a condition (not boolean).
+// Arms: the calculation over Height and Weight, and recorded BMI observations.
+concept "BMI":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `bmi`.
+- definition is most recent body mass index of "Weight" and "Height".
+- source representation:
+  - type is Observation.
+  - coded from "Clinical BMI VS".
+
+// QUESTION, not a condition. A leaf — nothing derives it, so its arms are the
+// local answers and the recorded observations.
+concept "Height":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `height`.
+- definition is most recent this.
+- source representation:
+  - type is Observation.
+  - coded from "Height VS".
+
+// QUESTION, not a condition. A leaf, as Height.
+concept "Weight":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `weight`.
+- definition is most recent this.
+- source representation:
+  - type is Observation.
+  - coded from "Weight VS".
+
+activity "Approve Bariatric Surgery":
+- request CPGCommunicationRequest.
+- with `APPROVED`.
+
+activity "Deny Bariatric Surgery":
+- request CPGCommunicationRequest.
+- with `NOT APPROVED`.
+
+// Obesity is the coverage criterion. If it cannot be established from data,
+// the tree PAUSES and the questionnaire asks — that is the point of the chain.
+decision "Bariatric Surgery Coverage":
+first:
+- when "Obese" then recommend activity "Approve Bariatric Surgery".
+- otherwise then recommend activity "Deny Bariatric Surgery".
