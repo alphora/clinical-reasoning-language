@@ -413,7 +413,7 @@ decision "D":
 // ---- Surface 5 — criterion lane + closure boundary --------------------------
 
 describe("2a ledger — criterion enrollment + subject boundary", () => {
-  it("a `criterion` enrolls as an intrinsically-total axiom and proves", () => {
+  it("a `criterion` enrolls as a SANCTIONED THREE-STATE guard, not a total axiom", () => {
     const { entries } = emitLayered(`library "Crit".
 concept "A":
 - type is Condition.
@@ -426,12 +426,21 @@ activity "R":
 decision "D":
 - when "Guard" then recommend activity "R".
 `, "Crit");
-    const guard = entries.find((e) => e.name === "Guard" && e.origin === "criterion-axiom");
-    expect(guard?.discharge).toEqual({ booleanEffect: "total", dischargedBy: "axiom" });
+    // ⚠ 2026-08-29: this pinned `{ total, axiom }` / `criterion-axiom` — true before the Kleene flip, false
+    // after it. `criterionDefineLeafPolicy` renders leaves BARE so an UNKNOWN leaf makes the guard UNKNOWN,
+    // which is the whole reason a decision can PAUSE. A `total` certificate on a guard is the dishonest
+    // metadata the §1 proof exists to catch, so the proof was being fed the defect it screens for.
+    const guard = entries.find((e) => e.name === "Guard" && e.origin === "criterion-guard");
+    expect(guard?.discharge).toEqual({
+      booleanEffect: "three-state",
+      readBy: "strong-Kleene guard body (bare leaves)",
+    });
+    expect(guard?.obligation).toMatchObject({ kind: "sanctioned-three-state", family: "guard" });
     expect(guard?.resultType).toBe("Boolean");
-    // The criterion itself proves (its leaf `A` is a separate LocalPrimitives reject, but the criterion axiom is
-    // total by construction — per-leaf Coalesce).
-    expect(entries.some((e) => e.name === "Guard")).toBe(true);
+    // ⚠ And the enrolled TEXT, not only the metadata. The defect this replaces was metadata disagreeing
+    // with the lowering — the entry said `total` while the body was bare — so asserting the new claim
+    // without asserting the body would repeat the mistake in the other direction.
+    expect(guard?.cql).not.toContain("Coalesce");
   });
 
   it("the subject boundary is the POLICY library (CQLEmitter output); fixed catalog libraries are excluded", () => {

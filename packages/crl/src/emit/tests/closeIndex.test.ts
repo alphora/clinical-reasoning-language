@@ -212,8 +212,10 @@ describe("closeIndex — closure REPORT proof over a real closure", () => {
     // pinning them to one reason was the stale doctrine this test used to carry (#189, 2026-08-28):
     //
     //   `Adult Patient`          Observation + boolean + `code is`  → a PURE QUESTION (charter §3). Its
-    //                            determination is answerable and its read is three-state; the LEGACY
-    //                            truth-set lane has not caught up, so it reports as OWING that read.
+    //                            determination is answerable and its read IS three-state — on the Interface
+    //                            façade. What still reports is the LocalPrimitives RETRIEVE twin, which keeps
+    //                            the concept's name and so inherits its boolean obligation while emitting
+    //                            records: obligation ATTRIBUTION across lowered twins, not a missing read.
     //   `Active Crohns Disease`  Condition + boolean + `code is`    → NOT a question (nowhere on a Condition
     //                            to store an answer), so it stays a genuine bare-scalar `rejected`.
     //
@@ -227,10 +229,10 @@ describe("closeIndex — closure REPORT proof over a real closure", () => {
     expect(report.status).toBe("failed");
     expect(report.failures.map((f) => f.name).sort()).toEqual(["Active Crohns Disease", "Adult Patient"]);
     const reasonOf = (n: string) => report.failures.find((f) => f.name === n)!.reason;
-    expect(reasonOf("Adult Patient")).toContain("OWES a three-state read");
+    expect(reasonOf("Adult Patient")).toContain("attributed to its RETRIEVE twin");
     expect(reasonOf("Active Crohns Disease")).toContain("rejected form was emitted");
-    // NEVER the pause-killer: nothing here may report a question as TOTALIZED.
-    for (const f of report.failures) expect(f.reason).not.toContain("was TOTALIZED");
+    // NEVER the pause-killer: nothing here may report a question as totalized.
+    for (const f of report.failures) expect(f.reason).not.toContain("TOTALIZING discharge");
   });
 
   it("decision-when-reduction: the role→visibility mapping fires from real layered emit; routing applies the winner rule", () => {

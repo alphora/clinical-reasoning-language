@@ -89,7 +89,7 @@ describe("classifyBooleanTotality — reduction forms", () => {
     ).toBe("rejected");
   });
 
-  it("`most recent this` on a boolean Observation WITH a local `code is` → question-three-state (NOT totalized)", () => {
+  it("`most recent this` on a boolean Observation WITH a local `code is` → sanctioned-three-state QUESTION", () => {
     // #189 O1, 2026-08-29. This pinned `requires-boundary` — i.e. `Coalesce(<newest-answer read>, false)` —
     // which made this form DENY on an unanswered question while the bare `code is` form PAUSES. Identical
     // selection, one `Coalesce` apart, and nothing in the CRL distinguished them.
@@ -100,8 +100,8 @@ describe("classifyBooleanTotality — reduction forms", () => {
       classify(
         `library "T".\nconcept "M":\n- type is Observation.\n- value type is boolean.\n- code is \`m\`.\n- definition is most recent this.\n`,
         "M",
-      ).kind,
-    ).toBe("question-three-state");
+      ),
+    ).toMatchObject({ kind: "sanctioned-three-state", family: "question" });
   });
 
   it("`most recent this` on a boolean Observation with NO local `code is` → requires-boundary (evidence, not an answer)", () => {
@@ -234,7 +234,7 @@ describe("classifyBooleanTotality — catalog patterns & shapes", () => {
     ).toBe("not-applicable");
   });
 
-  it("bare Scalar `code is` on an OBSERVATION boolean → question-three-state (a PURE QUESTION, not a reject)", () => {
+  it("bare Scalar `code is` on an OBSERVATION boolean → sanctioned-three-state QUESTION (not a reject)", () => {
     // #189 null/pause, 2026-08-28. This test previously pinned `rejected` — i.e. that the shipped PAUSE
     // mechanism was "invalid in boolean position" and staged for deletion at 2e. It is the opposite: an
     // Observation + boolean + `code is` with no derivation and no source rep is the canonical ANSWERABLE
@@ -242,14 +242,14 @@ describe("classifyBooleanTotality — catalog patterns & shapes", () => {
     // is deliberately three-state. MEASURED: `$apply` pauses only because that read stays null
     // (`tmp/NOTES-apply-null-behavior.md` §14).
     expect(
-      classify(`library "T".\nconcept "B":\n- type is Observation.\n- value type is boolean.\n- code is \`b\`.\n`, "B").kind,
-    ).toBe("question-three-state");
+      classify(`library "T".\nconcept "B":\n- type is Observation.\n- value type is boolean.\n- code is \`b\`.\n`, "B"),
+    ).toMatchObject({ kind: "sanctioned-three-state", family: "question" });
   });
 
   it("bare Scalar `code is` on a NON-Observation boolean → still rejected (nowhere to store an answer)", () => {
     // The boundary that keeps the exemption narrow (charter §3): a Condition has no boolean slot, so it can
     // never carry an answer — it is not a question, and `exists this` is its correct reduction. If this ever
-    // flips to `question-three-state`, the exemption has widened into the bare-scalar hole it must not cover.
+    // flips to `sanctioned-three-state`, the exemption has widened into the bare-scalar hole it must not cover.
     expect(
       classify(`library "T".\nconcept "B":\n- type is Condition.\n- value type is boolean.\n- code is \`b\`.\n`, "B").kind,
     ).toBe("rejected");
@@ -403,7 +403,7 @@ describe("proveWholeBoundaryTotality", () => {
     expect(r.ok).toBe(false); // a caller must NOT ship an uncertified boolean define
   });
 
-  it("origin coupling: an authored form claiming `axiom` fails; a criterion-axiom origin passes (disc 429 #8/C7)", () => {
+  it("origin coupling: an authored form claiming `axiom` fails; a catalog-axiom origin passes (disc 429 #8/C7)", () => {
     const authoredClaimingAxiom = entry({
       name: "Fake",
       obligation: { kind: "intrinsically-total", form: "exists this", cell: "§2" },
@@ -412,13 +412,91 @@ describe("proveWholeBoundaryTotality", () => {
     });
     expect(proveWholeBoundaryTotality([authoredClaimingAxiom]).status).toBe("failed");
 
-    const criterion = entry({
-      name: "Crit",
-      obligation: { kind: "intrinsically-total", form: "criterion", cell: "§3" },
+    // ⚠ 2026-08-29: the criterion is NO LONGER an axiom, so `catalog-axiom` is the only origin that may
+    // claim the mechanism. A criterion claiming `axiom` is now a FAILURE, pinned in the sibling test below.
+    const catalog = entry({
+      name: "CFH",
+      obligation: { kind: "intrinsically-total", form: "catalog define", cell: "§3" },
       discharge: { booleanEffect: "total", dischargedBy: "axiom" },
-      origin: "criterion-axiom",
+      origin: "catalog-axiom",
     });
-    expect(proveWholeBoundaryTotality([criterion]).ok).toBe(true);
+    expect(proveWholeBoundaryTotality([catalog]).ok).toBe(true);
+  });
+
+  it("a GUARD define is a sanctioned three-state — and one claiming `total` is the pause-killer", () => {
+    // #189, 2026-08-29. A criterion define's leaves render BARE so an UNKNOWN leaf makes the guard UNKNOWN
+    // (charter §4: totality belongs at the arm, never per operand). It is proven by CARRYING the three-state
+    // discharge; a `total` one means emit totalized a guard, which reads an unanswered question as "no".
+    const guard = entry({
+      name: "Guard L1C0",
+      obligation: {
+        kind: "sanctioned-three-state",
+        family: "guard",
+        form: "criterion define (strong-Kleene guard body — bare leaves)",
+        cell: "§4",
+      },
+      discharge: { booleanEffect: "three-state", readBy: "strong-Kleene guard body (bare leaves)" },
+      origin: "criterion-guard",
+    });
+    expect(proveWholeBoundaryTotality([guard]).ok).toBe(true);
+
+    const totalized = entry({
+      ...guard,
+      discharge: { booleanEffect: "total", dischargedBy: "axiom" },
+      origin: "criterion-guard",
+    });
+    const r = proveWholeBoundaryTotality([totalized]);
+    expect(r.status).toBe("failed");
+    expect(r.failures[0]!.reason).toContain("guard define was emitted with a TOTALIZING discharge");
+  });
+
+  it("the sanctioned exemption is RE-DERIVED, not believed — family, origin and result type must agree", () => {
+    // ⚠ `family` reaches the ledger as a CLAIM on an entry. Without these couplings any entry could relabel
+    // itself `sanctioned-three-state` and skip its `Coalesce` — the exact widening the narrow rule guarded
+    // against, reintroduced by generalizing it. So the proof re-derives what the enrollment sites produce.
+    const guardish = {
+      obligation: { kind: "sanctioned-three-state" as const, family: "guard" as const, form: "f", cell: "§4" },
+      discharge: { booleanEffect: "three-state" as const, readBy: "bare" },
+    };
+    // An authored comparator relabelling itself a guard.
+    expect(proveWholeBoundaryTotality([entry({ name: "Fake", ...guardish, origin: "authored" })]).status, "authored-as-guard").toBe("failed");
+    // A guard relabelling itself a question (whose origin is `authored`).
+    expect(
+      proveWholeBoundaryTotality([
+        entry({
+          name: "Crossed",
+          obligation: { kind: "sanctioned-three-state", family: "question", form: "f", cell: "§3" },
+          discharge: { booleanEffect: "three-state", readBy: "bare" },
+          origin: "criterion-guard",
+        }),
+      ]).status,
+      "guard-as-question",
+    ).toBe("failed");
+    // A guard whose emitted body totalizes a leaf — metadata and lowering disagreeing, which IS the defect
+    // this whole change exists to stop the proof from swallowing.
+    const badBody = proveWholeBoundaryTotality([
+      entry({
+        name: "Guard L1C0",
+        ...guardish,
+        origin: "criterion-guard",
+        cql: `define "Guard L1C0":
+  Coalesce("Q", false)`,
+      }),
+    ]);
+    expect(badBody.status, "totalized-body").toBe("failed");
+    expect(badBody.failures[0]!.reason).toContain("metadata and the lowering disagree");
+  });
+
+  it("a three-state discharge WITHOUT a sanctioned obligation is an unsanctioned partial", () => {
+    // The boundary that keeps the exemption structural: an entry cannot claim a deliberate partial by
+    // asking for one. `family: "guard"` is reachable only from the criterion enrollment site.
+    const sneaky = entry({
+      name: "Sneaky",
+      obligation: { kind: "requires-boundary", form: "comparator", cell: "§2" },
+      discharge: { booleanEffect: "three-state", readBy: "please" },
+      origin: "authored",
+    });
+    expect(proveWholeBoundaryTotality([sneaky]).status).toBe("failed");
   });
 
   it("composite passes iff every operand resolves to a total boolean entry", () => {

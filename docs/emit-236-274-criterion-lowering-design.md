@@ -2,8 +2,10 @@
 
 **STATUS (2026-08-12): DESIGN COMPLETE + twice-reviewed** (crl-emit panel R1+R2, disc 417; both arms converged,
 all criticals verified against the code). Metrics **VERIFIED** against real artifacts (§1). **Fix = shape-2
-CQL-DEFINE DAG (§2)** — emit each criterion once as a named per-operand-totalized boolean CQL define, referenced
-by one `text/cql-identifier` condition. ⚠ The sub-PD / `definitionCanonical` shape (an earlier draft) was
+CQL-DEFINE DAG (§2)** — emit each criterion once as a named boolean CQL define, referenced by one
+`text/cql-identifier` condition. ⚠ That define is STRONG KLEENE, not per-operand-totalized: its leaves render
+BARE so an UNKNOWN leaf makes the guard UNKNOWN (charter §4 — totality belongs at the arm; a guard is where a
+pause has to be able to happen). ⚠ The sub-PD / `definitionCanonical` shape (an earlier draft) was
 **KILLED as a category error** (§1a) — do NOT resurrect it. **§3 = the resolved atomic BUILD CONTRACT (A–J).**
 **SHIPPED 2026-08-13** — the emit-side flip `7f9aaf1` (criterion inline-expansion retired; criteria lower once
 to named CQL defines, tree→DAG) + kit flip `649d0ea` (schemaVersion 1.25). Validated on the KE's real ~6.3M-line

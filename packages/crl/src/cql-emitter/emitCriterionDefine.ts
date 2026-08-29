@@ -20,8 +20,10 @@
 // A two-lane disagreement on an ordinary supported shape.
 //
 // Totality belongs at the ARM, not per operand. The REFERENCE SITE re-totalizes where two-valuedness is
-// genuinely required: the per-action `unless` carrier emits `not Coalesce(<ref>, false)` around whatever
-// this define produces, so an action guard over a criterion is still two-valued and still never pauses.
+// genuinely required: the per-action `unless` / `only when` carrier emits `not Coalesce(<ref>, false)`, so an
+// action guard never pauses. ⚠ That carrier names a CONCEPT, never a criterion — `referenceResolver` accepts
+// only `concept` in the action-guard slot — so it re-totalizes a concept's define, not this one. A criterion's
+// reference sites are branch guards, which is exactly where the pause has to be able to happen.
 //
 // The emitter takes a `qualify(name, kind)` callback rather than resolving library prefixes
 // itself: WHICH library a leaf's define lives in (Root / Interface / a concept re-export,

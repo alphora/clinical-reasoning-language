@@ -106,20 +106,34 @@ or `most recent this` is **rejected** for Period-recency reps (final-round Claud
 
 ## 3. Null-totality — whole-BOUNDARY invariant + a proof obligation
 
-Every boolean-valued define the emitter can produce is **total**. Rules:
+Every boolean-valued define the emitter can produce is either **total**, or a member of a CLOSED,
+structurally-admitted **three-state** family. Rules:
 
 1. Totalize each boolean-producing **leaf** at its own boundary: `exists`/`count` total by construction (do
-   NOT wrap — a needless Coalesce blunts the assertion in rule 5); every nullable boolean derivation is
-   `Coalesce(<boolean predicate>, false)`.
+   NOT wrap — a needless Coalesce blunts the assertion in rule 5); every nullable boolean DERIVATION is
+   `Coalesce(<boolean predicate>, false)`. A derivation can always compute, so absent evidence is `false`.
 2. **Only the boolean predicate is Coalesced** — never a nullable non-boolean operand (`Coalesce(X,0) >= N`
    manufactures a value; use `Coalesce(X >= N, false)`).
-3. **Per-operand-before-`not`** (`not Coalesce(A,false)` ≠ `Coalesce(not A,false)`). A terminal boundary
-   Coalesce is insufficient (wrong under negation) and harmful (masks a missed leaf as a plausible `false`).
+3. ⭐ **The three-state families, which are NOT totalized** (charter §4 — composition is strong Kleene and
+   totality belongs at the **arm, never per operand**):
+   - a **pure question** (`isPureQuestionConcept`) reads `answeredValue()` → true / false / **null**;
+   - a **guard define** — a `criterion`, authored or synthesized (`ast/guardDefines.ts`) — renders its
+     leaves BARE, so an UNKNOWN leaf makes the guard UNKNOWN.
+
+   A decision guarding on null PAUSES and asks. ⚠ Coalescing either reads an unanswered question as an
+   answered "no", so an unanswered question DENIES instead of pausing — MEASURED on `$apply`. Totality is
+   re-established at the REFERENCE SITE where two-valuedness is genuinely required: the per-action `unless` /
+   `only when` carrier emits `not Coalesce(<ref>, false)`, which is the one two-valued exception.
+
+   Each family is admitted STRUCTURALLY — a question only through `isPureQuestionConcept`, a guard only
+   through the criterion enrollment site — and the proof RE-DERIVES that from the entry's origin and result
+   type rather than believing the entry's own claim.
 4. Retrieve **`where`-predicates are null-decided** (status-absent = pass). On the local path this is largely
    moot — local uses absence codes, not status filters (§5).
 5. **Backstop = a static emit/test-time totality PROOF, not a runtime Coalesce.** Requires a **boolean-
    totality effect** in resolved-concept metadata + a lowering table classifying each form (intrinsically-
-   total / boundary-totalized / rejected). The current emitter has only return-*shape* metadata
+   total / boundary-totalized / sanctioned three-state / rejected). The current emitter has only
+   return-*shape* metadata
    (`PATTERN_RETURN_SHAPE`), not nullability — this is new metadata to add (final-round gpt56 #10). **Full
    buildable spec: `docs/emit-189-boolean-totality.md`** (the corrected classification, the two-phase
    obligation→discharge→proof model, whole-graph coverage, and the verification gaps). **Built AT the flip

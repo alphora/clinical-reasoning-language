@@ -38,18 +38,33 @@ The proof must check a **transition**, not read an AST label:
    proof FAILURE, not a pass. A future emitter regression that drops a Coalesce is caught because the discharge
    no longer matches.
 
-   ⭐ **The one sanctioned partial: `question-three-state`.** A PURE QUESTION (`isPureQuestionConcept` —
-   Observation + `value type is boolean` + local `code is`, no derivation, no source rep) emits
-   `answeredValue()`, which returns true / false / **null** by design; a decision guarding on null PAUSES and
-   asks (charter §3/§4). It is proven by carrying the matching `{ booleanEffect: "three-state" }` discharge,
-   **never** by reaching `total` — and a question that comes back `total` is a proof FAILURE, because
-   totalizing it makes an unanswered question read as an answered "no".
+   ⭐ **The sanctioned partials: `sanctioned-three-state`, in two families.** Each is proven by carrying the
+   matching `{ booleanEffect: "three-state" }` discharge, **never** by reaching `total` — one that comes back
+   `total` is a proof FAILURE, because totalizing it makes an unanswered question read as an answered "no".
+
+   - **`family: "question"`** — a PURE QUESTION (`isPureQuestionConcept` — Observation + `value type is
+     boolean` + local `code is`, no derivation, no source rep) emits `answeredValue()`, which returns true /
+     false / **null** by design.
+   - **`family: "guard"`** — a CRITERION define, authored or synthesized (`ast/guardDefines.ts`). Its leaves
+     render BARE (`emitCriterionDefine`) so an UNKNOWN leaf makes the guard UNKNOWN. Charter §4: *"Composition
+     is strong Kleene, and totality belongs at the arm, never per operand. A negated branch guard is
+     null-propagating."* Totality is re-established at the REFERENCE SITE — the per-action `unless` /
+     `only when` carrier emits `not Coalesce(<ref>, false)`, the charter's one two-valued exception.
+
+   A decision guarding on null PAUSES and asks (charter §3/§4).
+
+   ⚠ **The exemption is RE-DERIVED by the proof, never believed.** `family` reaches the ledger as a CLAIM on
+   an entry, so the proof checks that each family carries the origin only its own enrollment site produces
+   (`criterion-guard` / `authored`), that the entry is Boolean, and — for a guard — that its emitted body
+   carries no `Coalesce`. Without that, any entry could relabel itself and skip its totalization, which is
+   the widening the narrow single-family rule was guarding against.
 
    ⚠ **Do not restate the old form of this rule** ("every emitted boolean define is total"). It was falsified
    by the shipped pause fix and, cited as authority, repeatedly turned a small behavioural fix into an apparent
    architecture problem. MEASURED (`tmp/NOTES-apply-null-behavior.md` §14, cqf-fhir-cr 4.7.0): a decision
-   pauses ONLY because these reads stay null. The exemption is kept narrow by the shared structural predicate,
-   so an ordinary nullable comparator can never claim it and skip its `Coalesce`.
+   pauses ONLY because these reads stay null. The exemption stays narrow because each family is admitted by
+   its own structural gate and the proof re-derives that gate, so an ordinary nullable comparator can never
+   claim it and skip its `Coalesce`.
 
 **Classifier↔lowering agreement obligation (load-bearing):** a test asserts that for every boolean-define form
 T5 actually emits, the emitted CQL matches the class the classifier assigns (checked against the emitted string /
@@ -89,9 +104,10 @@ folded into "rejected" and exempted.
 model must state, per surface, how totality is established:
 
 - **Authored concept defines** — via the classifier (this doc).
-- **Criterion defines** (#236 — SHIPPED `7f9aaf1`; `cql-emitter/emitCQL.ts:955-976` gathers/renders via
-  `cql-emitter/emitCriterionDefine.ts`) — per-operand-totalized **by construction** in their own emitter;
-  the proof cites that as an axiom, does not re-derive.
+- **Criterion defines** (#236 — SHIPPED `7f9aaf1`; rendered via `cql-emitter/emitCriterionDefine.ts`) — a
+  STRONG-KLEENE guard, enrolled `sanctioned-three-state` / `family: "guard"`. ⚠ NOT an axiom and NOT
+  per-operand-totalized: a guard that reaches `total` is a proof FAILURE, because `$apply` pauses precisely
+  BECAUSE these defines return null.
 - **Interface façades** (`define "X": Inferred."X"`) — **delegated**: total iff the aliased define is total.
 - **Age-recency synthesized defines/helpers** — the §7 rewritten total-boolean boundary is the discharge.
 - **Guard-atom `not Coalesce(…, false)` carriers** (`fhir-emitter/decision.ts:659-674`, `guardApplicabilityCondition`) — ruled to STAY (§7), NOT generalized;

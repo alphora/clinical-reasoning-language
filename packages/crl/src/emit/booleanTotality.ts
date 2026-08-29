@@ -29,10 +29,21 @@
 //   2. Lowering phase — the DISCHARGE. T5 emit records how the emitted CQL satisfied the obligation
 //      (`{ booleanEffect: "total", dischargedBy }`), enrolled into the ledger alongside the emitted text.
 //   3. Proof phase — the CHECK. `proveWholeBoundaryTotality` verifies every boolean define is either the
-//      sanctioned `question-three-state` form, or reaches
+//      sanctioned `sanctioned-three-state` form (a pure question, or a guard define), or reaches
 //      `booleanEffect: "total"` via a discharge that MATCHES its obligation AND its origin, that every
 //      composite's operands are themselves proven total (no vacuous cycles), and that the ledger covers
 //      every emitted boolean define header (no path emitted a define without enrolling).
+//
+// ⚠ WHAT THIS PROOF CANNOT SEE. The charter's one two-valued exception — the per-action `unless` /
+// `only when` carrier — is an INLINE `text/cql-expression` in the emitted PlanDefinition
+// (`fhir-emitter/decision.ts`), never a CQL define, so it is outside this ledger's subject set entirely. Its
+// `not Coalesce(<ref>, false)` shape is pinned by the FHIR-lane tests and by the CRE's two-valued action-guard
+// evaluation, not here. A reader looking for where the exception is enforced will not find it in this module.
+//
+// Likewise a `sanctioned-three-state` GUARD entry carries no operand list, though the enrollment site has one
+// (the condition tree). So unlike a `composite`, the proof cannot trace guard→leaf and a guard referencing a
+// never-enrolled define is invisible to it. Report mode today; worth closing before the 2b gate makes this
+// load-bearing.
 //
 // STEP-1 SCOPE (build order §8.1): the AST-obligation phase + the ledger types/API + the proof are built
 // here and unit-tested standalone. The lowering DISCHARGE is produced by T5's reduction emit (§8.4); the
@@ -113,13 +124,23 @@ export type BooleanTotalityObligation =
   // `defined as` composition / bare ref over a boolean parent — total iff EVERY resolved operand is total
   // (§2 rule 3, discharged architecturally at each operand's own boundary). Carries operands ONLY.
   | { kind: "composite"; operands: ReferenceName[]; cell: string }
-  // ⭐ #189 null/pause — a PURE QUESTION (`isPureQuestionConcept`): the ONE boolean form that is DELIBERATELY
-  // three-state. Nothing can compute it, so its emitted read (`answeredValue()`) returns true / false / NULL,
-  // and a decision guarding on null PAUSES and asks (charter §3/§4). This is a SANCTIONED partial, not a
-  // failure: it is proven by carrying the matching `three-state` discharge, never by reaching `total`.
-  // ⚠ Kept NARROW on purpose — only the shared structural predicate admits a concept here, so an ordinary
-  // nullable comparator can never claim the exemption and skip its `Coalesce`.
-  | { kind: "question-three-state"; form: string; cell: string }
+  // ⭐ #189 null/pause — a boolean form that is DELIBERATELY three-state, and is proven by CARRYING the
+  // matching `three-state` discharge rather than by reaching `total`. The charter settles which forms these
+  // are: *"Composition is strong Kleene, and totality belongs at the arm, never per operand. A negated
+  // branch guard is null-propagating"* (§4). Two families, and the `family` tag says which:
+  //
+  //   - `"question"` — a PURE QUESTION (`isPureQuestionConcept`). Nothing can compute it, so its read
+  //     (`answeredValue()`) returns true / false / NULL and a decision guarding on it PAUSES and asks.
+  //   - `"guard"` — a CRITERION define, authored or synthesized (`ast/guardDefines.ts`). Its leaves render
+  //     BARE (`emitCriterionDefine`, REFACTOR:grounded) precisely so an UNKNOWN leaf makes the guard
+  //     UNKNOWN. A guard is where a pause has to be able to happen; Coalescing it reads an unanswered
+  //     question as "no". Totality is the REFERENCE SITE's job — the per-action `unless` carrier emits
+  //     `not Coalesce(<ref>, false)`, which is the charter's one two-valued exception.
+  //
+  // ⚠ Both families are admitted STRUCTURALLY, never by an entry asking for the exemption: a concept
+  // reaches `"question"` only through `isPureQuestionConcept`, and `"guard"` only through the criterion
+  // enrollment site. An ordinary nullable comparator can no more claim it than before.
+  | { kind: "sanctioned-three-state"; family: "question" | "guard"; form: string; cell: string }
   // Record / RecordSet / non-boolean scalar — produces no boolean define. `nullable` distinguishes a
   // nullable non-boolean scalar read (a later comparison must Coalesce the PREDICATE, not this value) from
   // a set/record result. Reading not-applicable as "consume anywhere" is the `Coalesce(X,0)` trap (§2).
@@ -378,7 +399,8 @@ export function classifyBooleanTotality(
         // the corpus is non-boolean), so this moves no existing emit.
         if (boolean && concept.code !== undefined) {
           return {
-            kind: "question-three-state",
+            kind: "sanctioned-three-state",
+            family: "question",
             form: "most recent this (newest-answer read of a question)",
             cell: "§3 question → three-state newest-answer read (NOT totalized)",
           };
@@ -466,7 +488,8 @@ export function classifyBooleanTotality(
   // §14). REFACTOR:grounded — re-derived from the charter and an executed `$apply` run, not from adjacent code.
   if (isPureQuestionConcept(concept)) {
     return {
-      kind: "question-three-state",
+      kind: "sanctioned-three-state",
+      family: "question",
       form: "pure question (bare local `code is` boolean — newest-answer read)",
       cell: "§3 pure question → `answeredValue()` true/false/null (NOT totalized)",
     };
@@ -502,8 +525,12 @@ export type DefineOrigin =
   | "authored" // an authored concept's define (classified by `classifyBooleanTotality`)
   | "interface-facade" // `define "X": Inferences."X"` — total iff the aliased define is total
   | "age-helper" // an age-recency synthesized define/helper — §5/§7 total-boolean boundary is the discharge
-  | "criterion-axiom" // a #236 criterion define — per-operand-totalized by construction (axiom)
-  | "catalog-axiom"; // CRLCommon/CaseFeatureCommon/FHIRHelpers library define (total by construction)
+  | "criterion-guard" // a #236 criterion define (authored or synthesized) — a STRONG-KLEENE guard, never an
+  //                       axiom: its leaves render bare so an UNKNOWN leaf makes the guard UNKNOWN
+  | "catalog-axiom"; // RESERVED — CRLCommon/CaseFeatureCommon/FHIRHelpers library define, total by
+  //                      construction. No production site writes it: the fixed catalog libraries are appended
+  //                      downstream (`imports/emit.ts`) and are not CQLEmitter output, so they never enroll.
+  //                      It is the only origin that may still claim the `axiom` discharge.
 
 /** The mechanism by which the emitted CQL made a boolean define total (§1 step 2). */
 export type DischargeKind =
@@ -774,10 +801,10 @@ function dischargeKindMatchesObligation(ob: BooleanTotalityObligation, d: Discha
         d === "facade-satisfied" ||
         d === "member-existence-fold" // #189 Piece 1 — the value/interface three-leg fold, total by construction
       );
-    case "question-three-state":
-      // No total mechanism may discharge a question — it is proven by its `three-state` discharge, which
-      // carries no `DischargeKind` at all. A `total` discharge here means the emitter totalized a question
-      // (the pause-killer), so it must NOT match.
+    case "sanctioned-three-state":
+      // No total mechanism may discharge a deliberately-partial form — it is proven by its `three-state`
+      // discharge, which carries no `DischargeKind` at all. A `total` discharge here means the emitter
+      // totalized a question or a guard (the pause-killer), so it must NOT match.
       return false;
     case "requires-boundary":
       return d === "boundary-coalesce" || d === "age-recency-total";
@@ -793,7 +820,7 @@ function dischargeKindMatchesObligation(ob: BooleanTotalityObligation, d: Discha
 function originMatchesDischarge(origin: DefineOrigin, d: DischargeKind): boolean {
   switch (d) {
     case "axiom":
-      return origin === "criterion-axiom" || origin === "catalog-axiom";
+      return origin === "catalog-axiom";
     case "facade-delegated":
     case "facade-satisfied":
       return origin === "interface-facade";
@@ -807,6 +834,12 @@ function originMatchesDischarge(origin: DefineOrigin, d: DischargeKind): boolean
     case "member-existence-fold":
       return origin === "authored";
   }
+}
+
+/** A CQL body with its quoted identifiers removed, so a scan for a call cannot be fooled by a DECLARATION
+ *  that merely contains the word (a concept legitimately named `"Coalesce Screen"`). */
+function stripQuotedIdentifiers(cql: string): string {
+  return cql.replace(/"[^"]*"/g, '""');
 }
 
 /** True iff the entry's discharge is `total`, its mechanism matches its obligation kind, AND its origin may
@@ -880,23 +913,66 @@ export function proveWholeBoundaryTotality(
       fail(e, `rejected form was emitted: ${e.obligation.reason}`);
       continue;
     }
-    // ⭐ #189 null/pause — the sanctioned three-state question. PROVEN by carrying the matching discharge,
-    // never by reaching `total`. Both directions are checked: a question that came back totalized is the
-    // pause-killer, and a three-state discharge on anything that is NOT a question is an unsanctioned partial.
-    if (e.obligation.kind === "question-three-state") {
+    // ⭐ #189 null/pause — a SANCTIONED three-state form (a pure question, or a guard define). PROVEN by
+    // carrying the matching discharge, never by reaching `total`. Both directions are checked: one that came
+    // back totalized is the pause-killer, and a three-state discharge on anything the classifier did NOT
+    // admit structurally is an unsanctioned partial.
+    if (e.obligation.kind === "sanctioned-three-state") {
+      const family = e.obligation.family;
+      const what = family === "guard" ? "guard define" : "pure question";
+      // ⚠ The exemption is admitted STRUCTURALLY, and the proof RE-DERIVES that rather than believing the
+      // entry. `family` reaches the ledger as a CLAIM on an `EmittedDefineEntry`; without these checks any
+      // entry could relabel itself and skip its `Coalesce`, which is the widening the narrow rule guarded
+      // against. So each family must also carry the origin only its own enrollment site can produce, and
+      // must actually be a Boolean define — a non-Boolean claiming the exemption is meaningless.
+      if (family === "guard" && e.origin !== "criterion-guard") {
+        fail(e, `\`family: "guard"\` requires the \`criterion-guard\` origin — origin was \`${e.origin}\``);
+        continue;
+      }
+      // A question is enrolled TWICE on the layered lane: by the concept itself (`authored`) and by its
+      // Interface re-export (`interface-facade`), which is the define a decision actually references. Both
+      // are keyed on the same `__pureQuestion` marker, so both are structural.
+      if (family === "question" && e.origin !== "authored" && e.origin !== "interface-facade") {
+        fail(e, `\`family: "question"\` requires the \`authored\` or \`interface-facade\` origin — origin was \`${e.origin}\``);
+        continue;
+      }
       if (e.discharge.booleanEffect === "total") {
-        // The pause-killer: emit totalized a question, so an unanswered question reads as an answered "no".
-        fail(e, "pure question was TOTALIZED — a question must stay three-state or an unanswered question denies instead of pausing");
+        // The pause-killer: emit gave it a totalizing discharge, so an unanswered question reads as an
+        // answered "no". (The prohibition is on MANUFACTURED totality at the boundary — a guard whose
+        // operands all happen to be total may evaluate totally, and that is not this.)
+        fail(e, `${what} was emitted with a TOTALIZING discharge — it must stay three-state, or an unanswered question denies instead of pausing`);
       } else if (e.discharge.booleanEffect !== "three-state") {
         // Not a pause-killer — the legacy truth-set lane has not caught up: it emits a retrieve consumed by
-        // `.asTruths().satisfied()` (closed-world), so no three-state read exists for this question yet.
+        // `.asTruths().satisfied()` (closed-world), so no three-state read exists for this form yet.
         // This is the #189 burn-down signal, and it is NOT the same defect as totalizing one.
-        fail(e, `pure question OWES a three-state read but emit discharged \`${e.discharge.booleanEffect}\` (legacy truth-set lane — #189 burn-down)`);
+        fail(
+          e,
+          e.discharge.booleanEffect === "not-boolean" && !isBooleanSubject(e)
+            ? // #189 burn-down — OBLIGATION ATTRIBUTION, not a missing read. A `code is` concept lowers into a
+              // LocalPrimitives RETRIEVE twin plus an Interface read, and the twin keeps the concept's NAME,
+              // so it inherits the concept's boolean obligation from the authored map while emitting records.
+              // The read itself is honest and on the façade. ⚠ Fixing it means deciding which twin owns a
+              // lowered concept's obligation, which is the whole local lane, not this form.
+              `${what}'s obligation is attributed to its RETRIEVE twin, which emits records (\`${e.resultType}\`) — ` +
+                `the three-state read lives on the Interface façade. Obligation attribution across lowered twins`
+            : `${what} OWES a three-state read but emit discharged \`${e.discharge.booleanEffect}\` (legacy truth-set lane — #189 burn-down)`,
+        );
+      } else if (!isBooleanSubject(e)) {
+        // The exemption is only meaningful for a BOOLEAN define. Checked here, AFTER the discharge, so the
+        // burn-down signal above keeps its own diagnosis: a question still on the legacy truth-set lane emits
+        // a List, and reporting that as "not Boolean" would name the symptom instead of the lane.
+        fail(e, `${what} carries a three-state discharge but its result type is \`${e.resultType}\`, not Boolean`);
+      } else if (family === "guard" && /\bCoalesce\s*\(/.test(stripQuotedIdentifiers(e.cql))) {
+        // ⚠ The DEFECT this replaces was metadata disagreeing with the emitted TEXT: the entry said `total`
+        // while the body was bare. Changing the hard-coded claim to `three-state` fixes the direction but not
+        // the trust, so the guard family is checked against its own CQL. A criterion body's leaves resolve to
+        // define identifiers, and nothing legitimate introduces a `Coalesce` — so one there IS the totalization.
+        fail(e, "guard define enrolled `three-state` but its emitted body totalizes a leaf (`Coalesce`) — the metadata and the lowering disagree");
       }
       continue;
     }
     if (e.discharge.booleanEffect === "three-state") {
-      fail(e, "non-question define enrolled a `three-state` discharge — only a pure question may be deliberately partial");
+      fail(e, "define enrolled a `three-state` discharge without a sanctioned-three-state obligation — only a pure question or a guard define may be deliberately partial");
       continue;
     }
     if (!isBooleanSubject(e)) continue; // not-applicable/non-boolean defines are outside the boolean proof

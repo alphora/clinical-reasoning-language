@@ -1167,7 +1167,20 @@ class Emitter {
       // so this changes no emitted or enrolled bytes for a real producer.)
       origin = "interface-facade";
       const form = this.facadeForm(c);
-      if (form === "recordsource") {
+      // ⭐ #189 — a PURE QUESTION's façade re-exports `.answeredValue()`, which is three-state BY DESIGN.
+      // Keyed on the SAME `__pureQuestion` marker the DISCHARGE side uses (`emittedDischargeAndType`), because
+      // the two disagreeing is exactly how this went wrong: the discharge said `three-state` while the
+      // obligation fell through to the `…satisfied()` arm below and said `intrinsically-total`, so EVERY
+      // façade of a question — the canonical `$apply` PAUSE path — enrolled a proof failure. MEASURED before
+      // fixing (`tmp/nullprobe/analysis/facadeledger-out.txt`).
+      if (c.__pureQuestion === true) {
+        obligation = {
+          kind: "sanctioned-three-state",
+          family: "question",
+          form: "interface façade of a pure question (`answeredValue()` re-export)",
+          cell: "§3 pure question → `answeredValue()` true/false/null (NOT totalized)",
+        };
+      } else if (form === "recordsource") {
         obligation = { kind: "not-applicable", nullable: false, reason: "ExternalPrimitives record re-export (no boolean define)" };
       } else if (form === "total-boolean") {
         // A bare re-export of a total Inferences reduction — total IFF the reduction is (delegated).
@@ -1236,23 +1249,23 @@ class Emitter {
   }
 
   /**
-   * ⚠ REFACTOR:suspect (#189, 2026-08-29) — THE OBLIGATION BELOW IS FALSE, and this comment is the marker.
+   * ⭐ REFACTOR:grounded (#189, 2026-08-29) — a criterion define is a SANCTIONED THREE-STATE GUARD, never a
+   * total boolean axiom.
    *
-   * It says a criterion define is per-leaf totalized, so it enrolls as an intrinsically-total boolean axiom.
-   * That was true before the Kleene flip. `criterionDefineLeafPolicy` now renders leaves BARE
-   * (`emitCriterionDefine`, REFACTOR:grounded) precisely so an UNKNOWN leaf makes the guard UNKNOWN — a
-   * criterion is a GUARD, and a guard is where a pause has to be able to happen. So the ledger currently
-   * carries `total` for a family of defines that are null by design, including the synthetic guard defines
-   * whose whole mechanism depends on returning null (MEASURED: `$apply` logs `returned null` for one).
+   * `criterionDefineLeafPolicy` renders leaves BARE (`emitCriterionDefine`) precisely so an UNKNOWN leaf
+   * makes the guard UNKNOWN: a criterion is a GUARD, and a guard is where a pause has to be able to happen.
+   * The charter settles it — *"Composition is strong Kleene, and totality belongs at the arm, never per
+   * operand. A negated branch guard is null-propagating"* (§4) — and its one two-valued exception is the
+   * per-action `unless` carrier, which re-totalizes at the REFERENCE SITE, not here.
    *
-   * ⚠ NOT corrected here, deliberately, because the honest classification is a DESIGN question this slice
-   * cannot answer by guessing: `three-state` is the arm for a Boolean-typed define that is null by design,
-   * and the proof gates it to a PURE QUESTION ("only a pure question may be deliberately partial",
-   * `booleanTotality`). A deliberately-partial GUARD is a second such family, and admitting it changes what
-   * the §1 proof asserts. Enrolling `nullable` instead would fail every criterion in the report — accurate,
-   * but it is the design call wearing a bug's clothes.
+   * ⚠ This enrolled `total`/`axiom` until 2026-08-29, which was a rule that outlived its construct: true
+   * before the Kleene flip, false after it, and the ledger went on certifying every criterion — including
+   * the synthetic guard defines whose entire mechanism is returning null (MEASURED: `$apply` logs
+   * `returned null` for one, and pauses because of it). A false `total` here is exactly the dishonest
+   * certificate the §1 proof exists to catch, so the proof was being fed the defect it screens for.
    *
-   * The ledger is REPORT mode today; this becomes load-bearing at the 2b gate, which is the deadline.
+   * The family tag is what keeps the exemption structural: `"guard"` is reachable ONLY from this site, so
+   * nothing else can claim a deliberate partial by asking for one.
    */
   private enrollCriterion(name: string, cql: string): void {
     this.ledger.appendDefine({
@@ -1260,12 +1273,13 @@ class Emitter {
       name,
       resultType: "Boolean",
       obligation: {
-        kind: "intrinsically-total",
-        form: "criterion (per-leaf Coalesce)", // REFACTOR:suspect — see the doc comment; leaves are BARE
-        cell: "§2 criterion → per-operand-total boolean define",
+        kind: "sanctioned-three-state",
+        family: "guard",
+        form: "criterion define (strong-Kleene guard body — bare leaves)",
+        cell: "§4 branch guard → null-propagating; totality belongs at the reference site",
       },
-      discharge: { booleanEffect: "total", dischargedBy: "axiom" },
-      origin: "criterion-axiom",
+      discharge: { booleanEffect: "three-state", readBy: "strong-Kleene guard body (bare leaves)" },
+      origin: "criterion-guard",
       cql,
       obligationSource: "manufactured",
       result: { shape: "Scalar", valueType: "boolean" },
