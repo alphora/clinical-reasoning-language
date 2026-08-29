@@ -23,9 +23,17 @@
 //                         records, which is not a dependency on another concept
 //   CodedFromDefinition   a terminology binding, not a concept edge
 //
-// ⚠ PURE and total: no library metadata, no resolution, no throwing. A caller resolves the returned names in
-// its own scope, so ONE edge function serves every consumer — the case-feature walk and the provenance
-// concept-shape tree, which are contractually required to agree and previously agreed by re-implementation.
+// ⚠ PURE: no library metadata, no resolution. A caller resolves the returned names in its own scope, so ONE
+// edge function serves every consumer — the case-feature walk and the provenance concept-shape tree, which
+// are contractually required to agree and previously agreed by re-implementation.
+//
+// ⚠ NOT total — it THROWS on one input, deliberately. A `defined as` boolean composition routes through
+// `flattenDefinedAsBody` → `branchConditionConceptRefsStrict`, which throws on an unclassified CRITERION ref
+// (`inferenceWalk.ts`): criterion refs are illegal at the `defined as` site, and swallowing one would turn an
+// author error into a silently-missing dependency edge — the exact failure this module exists to fix. Callers
+// share the case-feature walk's contract and let it propagate.
+//   (This header previously claimed "no throwing". That was wrong when written — caught in the O2 plan
+//    review, 2026-08-29 — and a caller that believed it would have been wrong about its own failure modes.)
 //
 // ⚠ EVERY union member is an EXPLICIT case, with no `default`. A `default: return []` is what made three of
 // the four definition forms indistinguishable from "no dependencies" in the first place; a future member
