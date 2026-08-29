@@ -89,10 +89,32 @@ describe("classifyBooleanTotality — reduction forms", () => {
     ).toBe("rejected");
   });
 
-  it("`most recent this` on a boolean Observation → requires-boundary", () => {
+  it("`most recent this` on a boolean Observation WITH a local `code is` → question-three-state (NOT totalized)", () => {
+    // #189 O1, 2026-08-29. This pinned `requires-boundary` — i.e. `Coalesce(<newest-answer read>, false)` —
+    // which made this form DENY on an unanswered question while the bare `code is` form PAUSES. Identical
+    // selection, one `Coalesce` apart, and nothing in the CRL distinguished them.
+    //
+    // The operator's acceptance criterion settles it: the ONLY route to a Deny is a STATED `false`;
+    // "unanswered" must not reach one by ANY path. So the `Coalesce` here is a defect, not a choice.
     expect(
       classify(
         `library "T".\nconcept "M":\n- type is Observation.\n- value type is boolean.\n- code is \`m\`.\n- definition is most recent this.\n`,
+        "M",
+      ).kind,
+    ).toBe("question-three-state");
+  });
+
+  it("`most recent this` on a boolean Observation with NO local `code is` → requires-boundary (evidence, not an answer)", () => {
+    // The boundary that keeps the exemption narrow: no local code ⇒ no answer slot ⇒ this is an ordinary
+    // nullable value read over EVIDENCE, and absent evidence is `false` (charter §4). Only an absent ANSWER
+    // is unknown. If this ever flips to three-state, the exemption has widened past questions.
+    expect(
+      classify(
+        // ⚠ `source representation` lines are TRAILING by grammar (CRLParser.g4:337) — a `definition is`
+        // after one is a parse error, not a semantic one.
+        `library "T".\nconcept "M":\n- type is Observation.\n- value type is boolean.\n` +
+          `- definition is most recent this.\n` +
+          `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is boolean.\n`,
         "M",
       ).kind,
     ).toBe("requires-boundary");

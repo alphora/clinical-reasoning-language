@@ -362,13 +362,31 @@ export function classifyBooleanTotality(
             reason: `\`most recent ${refDisplay(r.target.ref)}\` needs the cross-lib target-metadata index to resolve its value type (§4.5)`,
           };
         }
-        // `most recent this` on a Scalar boolean value carrier → nullable value read; the lowering owes
-        // `Coalesce(<value read of newest>, false)` (§2). Non-boolean scalar → nullable, not-applicable
-        // (a later comparison totalizes the predicate, not this value).
+        // ⭐ `most recent this` on a Scalar boolean with a local `code is` is THE NEWEST-ANSWER READ of a
+        // QUESTION — three-state, NEVER totalized (#189 O1, operator truth table 2026-08-29).
+        //
+        // It used to be `requires-boundary`, i.e. `Coalesce(<value read>, false)`. That made the SAME read
+        // deny where the bare form pauses: identical selection, one `Coalesce` apart. The operator's
+        // acceptance criterion settles it — **the only route to a Deny is a STATED `false`; "unanswered"
+        // must not reach one by ANY path** — so a `Coalesce` here is a defect, not a choice.
+        //
+        // ⚠ The `code is` is what makes it an answer read. WITHOUT a local code there is no answer slot, so
+        // a boolean `most recent this` is an ordinary nullable value read over evidence and still owes its
+        // boundary — absent EVIDENCE is false (charter §4), only an absent ANSWER is unknown.
+        //
+        // ⚠ Measured before changing it: ZERO corpus concepts sit on this cell (every `most recent this` in
+        // the corpus is non-boolean), so this moves no existing emit.
+        if (boolean && concept.code !== undefined) {
+          return {
+            kind: "question-three-state",
+            form: "most recent this (newest-answer read of a question)",
+            cell: "§3 question → three-state newest-answer read (NOT totalized)",
+          };
+        }
         return boolean
           ? {
               kind: "requires-boundary",
-              form: "most recent this (boolean value read)",
+              form: "most recent this (boolean value read over evidence — no local `code is`)",
               cell: "§2 `most recent this`, Scalar boolean → Coalesce(<value read>, false)",
             }
           : {

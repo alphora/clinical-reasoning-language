@@ -1031,27 +1031,38 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — #189 IMPL 2b: record-shaped r
     expect(mismatchWarnings(src, "composition-result-type-mismatch")).toHaveLength(0);
   });
 
-  it("WARNS on a boolean-DATUM record-shaped guard operand — RecordSet AND Record (forward-looking; panel R2 Claude #2 / gpt56 #4)", () => {
-    // The operand declares `value type is boolean`, so today's value-type guard check passes silently —
-    // but it is a record SHAPE, so at the flip it publishes records and the guard hard-errors. The
-    // forward-looking WARNING leads the flip (design §9 step 1); the guard does NOT hard-error in N.
-    for (const shape of ["RecordSet", "Record"]) {
-      const def =
-        shape === "Record"
-          ? `- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is \`o\`.\n- definition is most recent this.\n`
-          : `- shape is RecordSet.\n- type is Observation.\n- value type is boolean.\n- code is \`o\`.\n`;
-      const src =
-        `library "T".\n` +
-        `concept "Obs Flags":\n${def}` +
-        `activity "Do It":\n- request CPGCommunicationRequest.\n` +
-        `decision "D":\n- when "Obs Flags" then recommend activity "Do It".\n`;
-      expect(mismatches(src, "decision-guard-nonboolean"), shape).toHaveLength(0); // NOT the hard error
-      const warns = mismatchWarnings(src, "decision-guard-record-shaped");
-      expect(warns, shape).toHaveLength(1);
-      expect(warns[0].message).toMatch(new RegExp(`shape is ${shape}`));
-      expect(warns[0].message).toMatch(/defined as exists/);
-      expect(validateFull(src).isValid, shape).toBe(true);
-    }
+  const guardSrc = (def: string) =>
+    `library "T".\n` +
+    `concept "Obs Flags":\n${def}` +
+    `activity "Do It":\n- request CPGCommunicationRequest.\n` +
+    `decision "D":\n- when "Obs Flags" then recommend activity "Do It".\n`;
+
+  it("WARNS on a boolean-DATUM RecordSet guard operand — a SET is not a truth", () => {
+    // #189, 2026-08-28: NARROWED from "RecordSet AND Record". A set is not a truth however its datum is
+    // typed, so a guard over one genuinely owes a reduction. This half of the rule stands.
+    const src = guardSrc(`- shape is RecordSet.\n- type is Observation.\n- value type is boolean.\n- code is \`o\`.\n`);
+    expect(mismatches(src, "decision-guard-nonboolean")).toHaveLength(0); // NOT the hard error
+    const warns = mismatchWarnings(src, "decision-guard-record-shaped");
+    expect(warns).toHaveLength(1);
+    expect(warns[0].message).toMatch(/shape is RecordSet/);
+    expect(warns[0].message).toMatch(/defined as exists/);
+    expect(validateFull(src).isValid).toBe(true);
+  });
+
+  it("does NOT warn on a boolean-DATUM RECORD guard operand — it publishes one record and the guard reads its value", () => {
+    // ⭐ The canonical question-that-is-also-a-condition (`Obese`): `shape is Record` + `value type is
+    // boolean` + a local `code is`. The concept publishes ONE RECORD; that record carries A VALUE. The guard
+    // reads the value, the `cpg-featureExpression` targets the record — same concept, no split (charter §3).
+    //
+    // Warning here was actively harmful: it told the author to derive `defined as exists ( … )` from a
+    // concept that is ALREADY a truth — and `exists` is PRESENCE, which collapses answered-`false` into the
+    // same value as unanswered and so destroys PAUSE.
+    const src = guardSrc(
+      `- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is \`o\`.\n- definition is most recent this.\n`,
+    );
+    expect(mismatches(src, "decision-guard-nonboolean")).toHaveLength(0);
+    expect(mismatchWarnings(src, "decision-guard-record-shaped")).toHaveLength(0);
+    expect(validateFull(src).isValid).toBe(true);
   });
 
   it("teaches a RECORD-VALUED decision guard to reduce with `exists` (shape-aware message)", () => {

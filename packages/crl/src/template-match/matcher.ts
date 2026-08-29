@@ -96,7 +96,9 @@ function splitPipelineStages(els: NarrativeElement[]): NarrativeElement[][] | un
     // token so it cannot be swallowed by the greedy catch-all, and dropped here so a stage never sees it.
     // Bare `then` also delimits; the comma is not load-bearing, it just reads correctly.
     let stage = els.slice(from, cut);
-    while (stage.length > 0 && stage[stage.length - 1].type === "NWord" && stage[stage.length - 1].value === ",") {
+    for (;;) {
+      const last = stage[stage.length - 1];
+      if (last === undefined || last.type !== "NWord" || last.value !== ",") break;
       stage = stage.slice(0, -1);
     }
     if (stage.length === 0) return undefined; // leading / doubled / dangling `then`

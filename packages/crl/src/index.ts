@@ -476,16 +476,29 @@ export function buildCRL(input: string): ParseResult<CRL> {
     lexerErrorListener = parserSetup.lexerErrorListener;
     parserErrorListener = parserSetup.parserErrorListener;
     const tree = parserSetup.parser.crl();
+
+    // ⚠ CHECK THE PARSE BEFORE BUILDING. The builder used to visit the tree FIRST, so a syntax error left
+    // it walking a broken tree — it threw, and the catch below appended the raw ANTLR message as a
+    // diagnostic. An author who put a `definition is` after a `source representation:` (they are TRAILING by
+    // grammar) got BOTH lines:
+    //     Syntax error: mismatched input 'definition is' expecting 'source representation'
+    //     The specified node does not exist                     ← internal, reads as a TOOL failure
+    // The second is noise at best and misdirection at worst: it looks like the toolchain broke rather than
+    // like the CRL being wrong, and it is the line an author is most likely to report as a bug.
+    // A failed parse has nothing to build; return the syntax errors alone.
+    // ⚠ LEXICAL ERRORS FIRST — a bad token is the ROOT CAUSE and the parser error is its CONSEQUENCE.
+    // "Invalid activity type" tells an author what to fix; the `mismatched input` cascade it provokes does
+    // not. Both are returned so nothing is hidden, ordered cause-before-effect. (Previously these reached
+    // the author only via the catch block below, which happened to order them this way — relying on the
+    // builder THROWING to produce good diagnostics.)
+    const lexerErrors = lexerErrorListener.getErrors();
+    const parserErrors = parserErrorListener.getErrors();
+    if (lexerErrors.length > 0 || parserErrors.length > 0) {
+      return { success: false, errors: [...lexerErrors, ...parserErrors] };
+    }
+
     builder = new CRLAstBuilder();
     const ast = builder.visit(tree) as CRL;
-    const parserErrors = parserErrorListener.getErrors();
-    if (parserErrors.length > 0) {
-      return { success: false, errors: parserErrors };
-    }
-    const lexerErrors = lexerErrorListener.getErrors();
-    if (lexerErrors.length > 0) {
-      return { success: false, errors: lexerErrors };
-    }
     const builderErrors = builder.getErrors();
     if (builderErrors.length > 0) {
       return { success: false, errors: builderErrors };

@@ -724,11 +724,18 @@ export class UseSiteTypeValidator {
       // Record/RecordSet, threaded via the resolution) to an `exists` reduction rather than the generic
       // value-comparison guidance, which does not apply to a record stream.
       errors.push(guardMismatch(ownerName, getRefName(ref), res.valueType, res.shape, location, attribution));
-    } else if (assumedShapePreMigration(res.shape) !== "Scalar") {
-      // #189 IMPL 2b (panel R2 Claude #2) — a boolean-DATUM operand with a non-Scalar SHAPE passes today's
-      // value-type guard check, but at the flip it publishes records (not a boolean) and the guard hard-
-      // errors. Emit the forward-looking WARNING now so the flip is not cold — the guard cell that LEADS
-      // the flip, mirroring the composition/bare-ref result-type checks (design §9 step 1).
+    } else if (assumedShapePreMigration(res.shape) === "RecordSet") {
+      // ⚠ NARROWED to `RecordSet` (#189, 2026-08-28). This fired on any non-Scalar shape, on the premise
+      // that "at the flip it publishes records, not a truth, so the guard will hard-error". That premise is
+      // FALSE for `Record`: a `shape is Record` + `value type is boolean` concept publishes ONE record whose
+      // value IS a boolean — the guard reads the VALUE, the featureExpression targets the RECORD, same
+      // concept (charter §3). That shape is the canonical question-that-is-also-a-condition (`Obese`), so
+      // warning on it told the author to derive `defined as exists (…)` from a concept that is already a
+      // truth — and `exists` is presence, which would collapse answered-`false` into the same value as
+      // unanswered and destroy PAUSE.
+      //
+      // It stays correct for `RecordSet`: a SET is not a truth however its datum is typed, so a guard over
+      // one genuinely owes a reduction.
       errors.push(guardRecordShapedWarning(ownerName, getRefName(ref), res.shape, location, attribution));
     }
   }
@@ -1298,10 +1305,12 @@ function guardRecordShapedWarning(
     actual: `${shape}<…>`,
     message:
       `Decision/criterion "${ownerName}": a guard consumes a \`boolean\`, and its operand "${operandName}" ` +
-      `declares \`value type is boolean\` — but it is \`shape is ${shape}\`, so at the #189 flip it will ` +
-      `publish records, not a truth, and this guard will then hard-error. Derive a presence determination ` +
-      `now with \`defined as exists ( "${operandName}" )\` and guard on THAT. (Validate-only migration ` +
-      `warning — the current emit is unchanged in this version.)`,
+      `declares \`value type is boolean\` — but it is \`shape is ${shape}\`, so it publishes a SET of ` +
+      `records, not a truth, and this guard will hard-error at the #189 flip. Reduce it: derive a ` +
+      `determination from it (e.g. \`defined as exists ( "${operandName}" )\`, or a threshold) and guard ` +
+      `on THAT. (A \`shape is Record\` boolean operand is FINE — it publishes one record and the guard ` +
+      `reads its value; only a set needs reducing.) (Validate-only migration warning — the current emit ` +
+      `is unchanged in this version.)`,
     location: loc(location),
     severity: "warning",
     ...base(attribution),
