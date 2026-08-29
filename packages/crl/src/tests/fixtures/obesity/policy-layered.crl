@@ -89,9 +89,11 @@ concept "Greatest Weight":
 
 // ── LAYER 3 — the DERIVED DETERMINATIONS ───────────────────────────────────
 // Each has one value reached three ways — asserted, recorded, derived — and
-// `, then most recent this` reduces over the concept's OWN records, where the
-// asserted arm (`code is`) and the recorded arm (`source representation`) both
-// live. ⚠ Not layered ONLY because nothing needs a second reduction of them; if
+// `, then most recent this` reduces over the concept's OWN records, which hold
+// ALL THREE: the asserted arm (`code is`), the recorded arm (`source
+// representation`), and the derived candidate the stage before it produced.
+// ⚠ Naming only the first two reads the derivation as something OUTSIDE `this`,
+// which is exactly backwards — `, then` is what puts its result inside. ⚠ Not layered ONLY because nothing needs a second reduction of them; if
 // something did, they would layer like the histories.
 
 // Derived from the measurement selections; also recordable and assertable.

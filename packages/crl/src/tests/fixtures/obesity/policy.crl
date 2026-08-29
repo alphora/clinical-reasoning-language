@@ -38,8 +38,10 @@ terminology "Weight VS":
 - valueset is `http://example.org/vitals/ValueSet/weight`.
 
 // QUESTION + CONDITION (boolean-valued, so a `when` may gate on it).
-// Arms: the threshold over BMI, and existence of a coded Condition.
-// `most recent` selects the one record across both.
+// Arms: the threshold computed over BMI, existence of a coded Condition, and
+// answers on the local code. ⚠ THREE, not two — the local code is an arm like
+// any other, and the easiest to overlook because NO LINE OF THE DEFINITION
+// NAMES IT. `, then most recent this` selects the one record across all three.
 concept "Obese":
 - shape is Record.
 - type is Observation.
