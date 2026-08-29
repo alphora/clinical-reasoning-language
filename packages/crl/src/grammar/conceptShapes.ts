@@ -8,7 +8,8 @@ export const conceptShapes = conceptShapesJson as string[];
 // The AST-level literal union. Hand-kept in lock-step with the grammar's `validShapes` (and thus
 // conceptShapes.json): the three-value set is closed and load-bearing (it drives reduction
 // obligation and, at the flip, emit), so it is typed as literals rather than the widened `string`
-// the JSON import yields. `Scalar` is the default the builder normalizes an omitted `shape is` to.
+// the JSON import yields. ⚠ An omitted `shape is` is UNDECLARED (`undefined`), NOT `Scalar` — see
+// `assumedShapePreMigration` below and `Concept.shape` in `ast/types.ts`.
 export type ConceptShape = "Scalar" | "Record" | "RecordSet";
 
 /**

@@ -618,7 +618,14 @@ narrative
 narrativeElement
     : qualifiableReference                                                                       # NConceptRef
     | quantity                                                                                   # NQuantity
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | NARRATIVE_WORD | TIME_UNIT)  # NWord
+    // ⭐ THEN is admitted as a narrative word so a narrative can be a PIPELINE of stages:
+    //   `- definition is "BMI" at least 30 'kg/m2' then most recent this.`
+    // Reading order is evaluation order, and composition stops being combinatorial — stages are matched
+    // INDIVIDUALLY and chained, instead of one matcher per (comparator × reduction) pair (16 × 6 = 96 for
+    // two-stage alone, before three-stage).
+    // ⚠ SAFE against the decision `THEN`: `branchCondition` is concept refs + and/or/not + parens ONLY — it
+    // never contains a narrative, so a narrative can never greedily eat a branch's right edge.
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | THEN | COMMA | NARRATIVE_WORD | TIME_UNIT)  # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 

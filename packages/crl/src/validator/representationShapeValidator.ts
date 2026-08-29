@@ -8,6 +8,7 @@ import {
   type Location,
 } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
+import { matchNarrative } from "../template-match/matcher";
 
 import type { RepresentationShapeError, RepresentationShapeRule, ValidationError } from "./validator";
 
@@ -317,12 +318,36 @@ export class RepresentationShapeValidator {
       );
     }
 
-    // A.1 — posrep completeness. A source representation is ALWAYS fully explicit: `type` +
-    // `value element` + `value type`. `coded from` stays optional (Patient/birthDate has none).
+    // A.1 — posrep completeness, ARITY-AWARE (#189, 2026-08-28).
+    //
+    // ⭐ A source representation is `type is` + the arguments ITS PROJECTION declares (charter §3). It is NOT
+    // "always fully explicit": a VALUE-BLIND projection reads no element, so demanding one asks the author to
+    // describe something nothing consumes — and worse, to state something FALSE. To satisfy the old rule for
+    // `value projection is exists this.` over a Condition the author had to write
+    // `- value element is Condition.code.` + `- value type is boolean.`, asserting that `Condition.code`
+    // yields a boolean. It yields a CodeableConcept, and existence reads neither.
+    //
+    // ⚠ The rule is CORRECT for a value-READING projection and for a bare read: patient age genuinely reads
+    // `Patient.birthDate`, and dropping the element there would lose real information. Hence the split rather
+    // than a deletion.
+    //
+    // ⚠ An UNMATCHED projection narrative is NOT treated as value-blind — fail closed. Nothing can be said
+    // about a narrative that resolves to no pattern, so it still owes the explicit elements; otherwise free
+    // text would silently buy an exemption.
+    // ⭐ With the CANONICAL CARRIERS ruled (charter §3: Observation → `Observation.value`, Condition → `onset`),
+    // a bare value READ needs no declared element either — the projection, or the read itself, uses the
+    // resource's canonical carrier. So the author never names an element and can never name a WRONG one.
+    // A.1 reduces to: `type is` is required. (`coded from` is required iff the resource has a code-based
+    // retrieve — model info, NOT an authoring rule; that check is the next slice and is deliberately not
+    // faked here.)
+    //
+    // ⚠ `value element` / `value type` on a representation are RETIRED, not merely optional. They remain
+    // ACCEPTED so the un-migrated corpus keeps validating; the grammar drops them with the corpus migration.
+    // Do not re-add a requirement for them — requiring an element the projection already knows is what forced
+    // authors to state something false (`value element is Condition.code.` + `value type is boolean.` on an
+    // existence rep, asserting that element yields a boolean; it yields a CodeableConcept).
     const missing: string[] = [];
     if (!rep.conceptType) missing.push("type");
-    if (!rep.valueElement) missing.push("value element");
-    if (repValueTypes.length === 0) missing.push("value type");
     if (missing.length > 0) {
       errors.push(
         this.err(
@@ -513,3 +538,24 @@ function argHasConceptRef(arg: { type: string; disjuncts?: unknown[]; conjuncts?
   }
   return false;
 }
+
+/** True iff this representation carries a projection that reads NO value element.
+ *
+ *  ⭐ The arity question A.1 asks: does the projection need a `value element` (+ its type) supplied?
+ *  `exists this` does not — existence is over the records matching `type is` (+ `coded from`), never over a
+ *  value. `age today …` DOES (it reads `Patient.birthDate`), so it is not value-blind and A.1 still applies.
+ *
+ *  ⚠ FAIL CLOSED on an unmatched narrative (`known === false`): a projection that resolves to no pattern
+ *  cannot be shown to be value-blind, so it does not earn the exemption. Otherwise arbitrary free text would
+ *  buy its way out of the completeness rule. */
+function valueBlindProjection(rep: Representation): boolean {
+  const proj = rep.valueProjection;
+  if (proj === undefined) return false; // no projection = a bare value READ; it needs the element
+  const match = matchNarrative(proj.body);
+  if (match.known !== true) return false; // unmatched — nothing can be claimed about its arity
+  return VALUE_BLIND_PROJECTIONS.has(match.pattern);
+}
+
+/** Projections that read no value element. Kept as an explicit allowlist rather than inferred, so adding a
+ *  projector is a deliberate decision about its arity rather than an accident of its return shape. */
+const VALUE_BLIND_PROJECTIONS = new Set<string>(["Exists"]);

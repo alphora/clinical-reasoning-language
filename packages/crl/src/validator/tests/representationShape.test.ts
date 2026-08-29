@@ -35,18 +35,21 @@ function shapeErrors(src: string, rule?: RepresentationShapeRule): Representatio
 describe("RepresentationShapeValidator (Todo 2) — static shape rules", () => {
   // ---------------------------------------------------------------- A.1
   describe("A.1 incomplete-representation — a posrep is fully explicit", () => {
-    it("REJECTS a posrep missing value element + value type (old permissive form)", () => {
+    it("ACCEPTS a posrep that is `type is` + `coded from` — the CANONICAL form", () => {
+      // #189, 2026-08-28. This test previously asserted the OPPOSITE: that a posrep missing `value element`
+      // + `value type` is REJECTED ("a posrep is ALWAYS fully explicit"). That rule is retired.
+      //
+      // A representation is `type is` + the arguments its projection declares (charter §3). Requiring an
+      // element the projection already knows forced authors to state something FALSE — to satisfy the old
+      // rule for `value projection is exists this.` over a Condition you had to write
+      // `value element is Condition.code.` + `value type is boolean.`, asserting that element yields a
+      // boolean. It yields a CodeableConcept, and existence reads neither. With the canonical carriers ruled
+      // (Observation → `Observation.value`, Condition → `onset`) a bare read needs no declaration either.
       const src =
         `library "T".\nterminology "VS":\n- valueset is \`http://x/VS\`.\n` +
         `concept "Mammogram (ImagingStudy)":\n- value type is dateTime.\n` +
         `- source representation:\n  - type is ImagingStudy.\n  - coded from "VS".\n`;
-      const errs = shapeErrors(src, "incomplete-representation");
-      expect(errs).toHaveLength(1);
-      // Teaching: names the missing fields + the concrete expected shape.
-      expect(errs[0].message).toMatch(/value element/);
-      expect(errs[0].message).toMatch(/value type/);
-      expect(errs[0].message).toMatch(/value element is <Resource>\.<path>/);
-      expect(errs[0].conceptName).toBe("Mammogram (ImagingStudy)");
+      expect(shapeErrors(src, "incomplete-representation")).toHaveLength(0);
     });
 
     it("REJECTS a posrep missing type", () => {
@@ -335,8 +338,10 @@ describe("RepresentationShapeValidator (Todo 2) — static shape rules", () => {
 
     it("stays a hard ERROR under `soft: true` (structural, non-demotable)", () => {
       const src =
+        // A.1 vehicle: a posrep missing `type is` (still a violation; the value-element/value-type
+        // requirement was retired #189 2026-08-28, so it no longer produces one).
         `library "T".\nconcept "C":\n- value type is Quantity.\n` +
-        `- source representation:\n  - type is Observation.\n  - coded from "VS".\n`;
+        `- source representation:\n  - value element is Observation.value.\n  - value type is Quantity.\n  - coded from "VS".\n`;
       const built = buildCRL(src);
       if (!built.success || !built.result) throw new Error("build failed");
       const r = new Validator().validate(built.result, { soft: true });
@@ -353,8 +358,9 @@ describe("RepresentationShapeValidator (Todo 2) — static shape rules", () => {
       const crlPath = join(dir, "policy.crl");
       writeFileSync(
         crlPath,
+        // A.1 vehicle: missing `type is` (see the soft-mode test above).
         `library "T".\nconcept "C":\n- value type is Quantity.\n` +
-          `- source representation:\n  - type is Observation.\n  - coded from "VS".\n`,
+          `- source representation:\n  - value element is Observation.value.\n  - value type is Quantity.\n  - coded from "VS".\n`,
       );
       const result = validateCRLImports(crlPath);
       const errs = result.validationErrors.filter((e) => e.kind === "representation-shape");

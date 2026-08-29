@@ -45,7 +45,7 @@ emitted for external-coded facts.
 - One identity, a **declared value type** and a **declared cardinality** (operator decision D1 — cardinality
   is declared, **not inferred** from reduction-presence). The cardinality is a dedicated concept-level line,
   **`- shape is Scalar | Record | RecordSet.`** (grammar-shipped in the validation slice; `Scalar` is the
-  default the builder normalizes an omitted `shape is` to): a **Scalar** concept declares a singular value type
+  an omitted `shape is` is UNDECLARED, not `Scalar` — charter §3): a **Scalar** concept declares a singular value type
   (`boolean`/`Quantity`/…) and **must reduce**; a **RecordSet** concept **publishes its records** (consumed by
   name), its record resource coming from `type is`; a **Record** concept is a single selected record. The
   explicit `shape is RecordSet` disambiguates a `CodeableConcept` *set* (e.g. a coded-Encounter refinement
@@ -240,7 +240,7 @@ author-token drift lane).
 
 New surface: `definition is exists this` / `most recent this` / `count … at least N` / `this`; the **named**
 `definition is exists "X"`; the **cardinality declaration** `- shape is Scalar | Record | RecordSet.` (a
-dedicated concept-level line, `Scalar` the default — D1). `this` = an AST node for the concept's
+dedicated concept-level line; an omission is UNDECLARED, not `Scalar` — D1). `this` = an AST node for the concept's
 **representation records only** (no circularity); ref-walk / cycle / CRE / requalification specified.
 
 New validation (**WARNINGS / migration-prompts in version N**, per §9, **except the two non-demotable errors

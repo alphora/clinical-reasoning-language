@@ -16,6 +16,8 @@ import type { SourceContext } from "../imports/scopes";
 
 import type { ReductionShapeError, ReductionShapeRule, ValidationError } from "./validator";
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
+import { matchNarrative } from "../template-match/matcher";
+import { PATTERN_RETURN_SHAPE } from "../cql-emitter/patternReturnShape";
 
 // #189 grammar+validation slice — the reduction/shape COHERENCE layer. IMPL 1 shipped the
 // PERMISSIVE grammar+AST (the `- shape is …` clause, the `Reduction` discriminated union, the
@@ -120,6 +122,15 @@ export class ReductionShapeValidator {
     location: Location,
     attribution: Attribution,
     errors: ValidationError[],
+    // ⭐ Severity is per-RULE, and the split is "WIP" vs "FOREVER" (operator, 2026-08-28):
+    //   warning — the rule describes work not yet built (emit does not consult `shape` yet;
+    //             cross-representation dedup #257). Those finish before release, so they are not
+    //             authoring defects and must not fail a build today.
+    //   error   — the rule describes a permanent AUTHORING defect. `record-shape-invariant` is one:
+    //             declaring `shape is Record` and not authoring a definition that yields one record is
+    //             wrong now and wrong after every planned phase lands. Nothing on the roadmap makes it
+    //             valid, so shipping it as a warning invites authors to ignore it forever.
+    severity: "warning" | "error" = "warning",
   ): void {
     const e: ReductionShapeError = {
       kind: "reduction-shape",
@@ -127,7 +138,7 @@ export class ReductionShapeValidator {
       conceptName,
       message,
       location: { start: { ...location.start }, end: { ...location.end } },
-      severity: "warning",
+      severity,
       ...(attribution.libraryName ? { libraryName: attribution.libraryName } : {}),
       ...(attribution.filePath ? { filePath: attribution.filePath } : {}),
     };
@@ -330,19 +341,60 @@ export class ReductionShapeValidator {
     // step so the slice stays a clean coherence layer; the reachable path is recorded here so it is
     // not re-derived from scratch.
     if (shape === "Record") {
+      // ⭐ `- shape is Record.` is the CONTRACT (operator, 2026-08-28: *"shape is record is the contract.
+      // It shouldn't magically do anything. The author establishes shape is record and then they must
+      // author into that."*). This check asks whether the author DID author into it — i.e. whether the
+      // definition yields ONE record/value.
+      //
+      // ⚠ It previously accepted ONLY a `most recent` selection, which is a BUG: a threshold and a
+      // calculation each yield exactly one value too. `Obese`'s
+      // `definition is "BMI" at least 30 'kg/m2'` IS the thing that makes it a record — and the
+      // `Condition` source representation reduces by `exists(this)`, also one. Rejecting those forced the
+      // author to spend the single definition slot on `most recent this`, EVICTING the derivation — and
+      // the derivation is what links `Obese` → `BMI` → `Height`/`Weight` into one inference chain rather
+      // than four unrelated questions. (Measured: authoring both is a hard "declares more than one
+      // definition" error.)
+      //
+      // ⚠ What must still FAIL: a Record with NO definition, or one whose form yields a SET (a
+      // list-returning catalog pattern, a `defined as` set composition). There the author declared the
+      // contract and did not author into it. A local `code is` does NOT satisfy it on its own — that
+      // would make the reduction appear from a declaration the author wrote for a different purpose,
+      // which is the magic this rule exists to prevent.
       const selectsRecord =
-        (reduction !== undefined && reduction.kind === "mostRecent") || narrativeLeadsWithMostRecent(def);
+        (reduction !== undefined && reduction.kind === "mostRecent") ||
+        narrativeLeadsWithMostRecent(def) ||
+        definitionYieldsSingleValue(def);
       if (!selectsRecord) {
+        // ⭐ NAME THE ACTUAL CAUSE. The old single message always said "does not select a single record"
+        // and advised `most recent this` — which is WRONG ADVICE for the commonest case: an UNMATCHED
+        // NARRATIVE. There the definition is not a failed selection, it is text that resolves to no
+        // catalog pattern at all, so nothing can be said about what it yields; and taking the advice
+        // would evict the author's derivation from the single definition slot. Diagnose the cause the
+        // author actually has.
         this.warn(
           "record-shape-invariant",
           concept.name,
-          `Concept "${concept.name}" is \`shape is Record\` but does not select a single record. A ` +
-            `Record publishes ONE selected record — declare \`- definition is most recent this.\` (or ` +
-            `\`most recent "SomeRecordSet".\`) to select it, or change the shape (\`Scalar\` to reduce ` +
-            `to a value, \`RecordSet\` to publish the set).`,
+          def === undefined
+            ? `Concept "${concept.name}" declares \`- shape is Record.\` but has no definition, so nothing ` +
+              `says WHICH record it publishes. \`shape is Record\` is a contract; author into it — a ` +
+              `selection (\`- definition is most recent this.\`), a threshold, or a calculation. Or ` +
+              `change the shape (\`Scalar\` to publish a reduced value, \`RecordSet\` to publish the set).`
+            : def.type === "DefinitionIsDefinition" && !isMatchedCatalogPattern(def)
+              ? `Concept "${concept.name}" declares \`- shape is Record.\`, but its definition is ` +
+                `UNMATCHED NARRATIVE — it resolves to no catalog pattern, so it cannot be shown to yield a ` +
+                `single record. This is not a missing selection: adding \`most recent this\` would ` +
+                `overwrite the definition you wrote (a concept has exactly one). Either express the ` +
+                `derivation in a form the catalog matches, or add the missing pattern.`
+              : `Concept "${concept.name}" declares \`- shape is Record.\`, but its definition yields a SET, ` +
+                `not one record. Reduce it (a selection, threshold or calculation), or declare ` +
+                `\`- shape is RecordSet.\` to publish the set.`,
           loc,
           attribution,
           errors,
+          // FOREVER defect, not WIP: no planned phase makes an unfulfilled `shape is Record` contract
+          // valid, so it is an ERROR. Contrast the two `shape`-migration warnings and the #257 dedup
+          // warning beside it, which describe work that finishes before release.
+          "error",
         );
       }
     }
@@ -460,6 +512,48 @@ export class ReductionShapeValidator {
  * "does not select a record." Structural (leading `[NWord "most", NWord "recent"]`) — it does not
  * reach into the catalog matcher (which owns whether the tail resolves to a real record set).
  */
+/**
+ * True iff `def` is a definition whose RESULT is a single value/record rather than a set.
+ *
+ * ⭐ This is what "authoring into the `shape is Record` contract" means for the non-selection forms:
+ * a threshold (`"BMI" at least 30 'kg/m2'`), a calculation (`body mass index of "Weight" and "Height"`)
+ * and an existence reduction each produce exactly ONE value. Only a set-producing form leaves the
+ * contract unmet.
+ *
+ * Keyed off the SHARED catalog return-shape table so this cannot drift from the emitter's own view:
+ * `list` is the only set-producing shape; `instance` / `boolean` / `other` are single.
+ * A narrative whose pattern does not resolve is treated as NOT single — fail-closed, so an unknown
+ * form gets the author-time prompt rather than silent acceptance.
+ */
+/**
+ * True iff `def` is a narrative that resolves to a REAL catalog pattern.
+ *
+ * ⚠ `matchNarrative` does NOT return `undefined` for text it cannot match — it hands back the raw
+ * narrative source as the `pattern` name. So "did it match?" is "is the returned name a key of the
+ * shared return-shape table?", never a null check. Getting that wrong sent an unmatched calculation
+ * (`body mass index of "Weight" and "Height"`) down the "yields a SET" branch and printed the wrong
+ * cause at the author.
+ */
+function isMatchedCatalogPattern(def: ConceptDefinition | undefined): boolean {
+  if (def?.type !== "DefinitionIsDefinition") return false;
+  // `matchNarrative` carries the answer itself: its soft-compile fallback sets `known: false` and puts the
+  // RAW narrative source in `pattern`. So "did it match?" is `.known` — never a null check on `.pattern`,
+  // and no longer a proxy via `PATTERN_RETURN_SHAPE` membership (which would drift as the table changes).
+  return matchNarrative(def.body).known === true;
+}
+
+function definitionYieldsSingleValue(def: ConceptDefinition | undefined): boolean {
+  if (def === undefined) return false;
+  if (def.type === "ReductionDefinition") {
+    // `exists this` / `count this at least N` reduce a record set to ONE boolean.
+    return def.reduction.kind === "exists" || def.reduction.kind === "count" || def.reduction.kind === "mostRecent";
+  }
+  if (def.type !== "DefinitionIsDefinition") return false;
+  if (!isMatchedCatalogPattern(def)) return false; // unmatched narrative — nothing can be said about it
+  const shape = PATTERN_RETURN_SHAPE[matchNarrative(def.body).pattern];
+  return shape === "instance" || shape === "boolean" || shape === "other";
+}
+
 function narrativeLeadsWithMostRecent(def: ConceptDefinition | undefined): boolean {
   if (def?.type !== "DefinitionIsDefinition") return false;
   const els = def.body.elements;

@@ -118,6 +118,12 @@ NUMBER       : [0-9]+ ('.' [0-9]+)?;
 // Body excludes single-quote, CR, LF; `+` (not `*`) keeps empty `''` a lex error.
 SINGLE_QUOTED_STRING : '\'' ~['\r\n]+ '\'';
 
+// ⭐ Punctuation, so `, then` can delimit narrative pipeline stages (#189 G3).
+// ⚠ It MUST also be excluded from `DEFAULT_ErrorChar` (done below). That catch-all is greedy, so with `,`
+// still in its set it matched `'kg/m2',` — EIGHT characters, beating SINGLE_QUOTED_STRING's seven — and
+// ANTLR's longest-match rule handed back one InvalidToken. The comma silently poisoned the preceding unit.
+COMMA : ',';
+
 // Catch-all lowercase narrative word, including kebab-case (`record-of`, `not-virtual`).
 // Declared AFTER all specific lowercase keyword tokens (TIME_UNIT, AND, OR, NOT, WITH,
 // SEM_*, etc.) so those win on tie. Uppercase rejected — author must quote (`"BMI"`).
@@ -492,7 +498,7 @@ mode DEFAULT_MODE;
 
 // Catch-all error handling for unmatched characters in DEFAULT_MODE
 DEFAULT_ErrorChar
-    : ~[ \t\r\n.:()]+ {
+    : ~[ \t\r\n.:(),]+ {
         this.text = JSON.stringify({
             errorType: 'InvalidToken',
             value: this.text

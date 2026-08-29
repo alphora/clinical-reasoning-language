@@ -41,12 +41,69 @@ import type {
 /** Match a NarrativeClause to a single canonical pattern call. */
 export function matchNarrative(clause: NarrativeClause): CanonicalPatternCall {
   const els = clause.elements;
+
+  // ⭐ PIPELINE (#189 G3): `<stage> then <stage> then …`, authored LEFT TO RIGHT so reading order IS
+  // evaluation order. Each stage is matched INDIVIDUALLY against the ordinary vocabulary and the results are
+  // folded, so composition costs one matcher per stage rather than one per PAIR — 16 comparators × 6
+  // reductions would be 96 hand-written matchers for two-stage alone, before three-stage.
+  //
+  // Folding is left-associative: each later stage takes the accumulated call as its FIRST argument, which is
+  // what `this` denotes in a stage (`… then most recent this` → `MostRecent(<everything so far>)`). That
+  // yields OUTER-`MostRecent` — `most recent` reduces the concept's arms, it does not select from the named
+  // route in stage 1.
+  //
+  // ⚠ A pipeline whose stages do not ALL match is unknown as a whole. Reporting a partial chain would claim
+  // more than was understood, and half-matched logic that validates is the failure this work exists to remove.
+  const stages = splitPipelineStages(els);
+  if (stages !== undefined) {
+    const calls: CanonicalPatternCall[] = [];
+    for (const stage of stages) {
+      const match = matchStage(stage, clause.location);
+      if (match === null) return softCompileUnknown(clause);
+      calls.push(match);
+    }
+    return calls.reduce((acc, next) => ({
+      ...next,
+      args: [nestedArg(acc), ...next.args],
+    }));
+  }
+
+  const single = matchStage(els, clause.location);
+  return single ?? softCompileUnknown(clause);
+}
+
+function matchStage(els: NarrativeElement[], loc: Location): CanonicalPatternCall | null {
   for (const pattern of PATTERNS) {
-    const match = pattern(els, clause.location);
+    const match = pattern(els, loc);
     if (match !== null) return match;
   }
-  // Soft-compile fallback: unknown pattern. The text is the joined narrative.
-  return softCompileUnknown(clause);
+  return null;
+}
+
+/** Split a narrative on the top-level word `then`. Returns `undefined` when there is no `then` (an ordinary
+ *  single-stage narrative), and never returns an empty stage — a dangling or leading `then` yields
+ *  `undefined` so the clause falls through to the unknown-narrative path rather than matching a partial. */
+function splitPipelineStages(els: NarrativeElement[]): NarrativeElement[][] | undefined {
+  const cuts: number[] = [];
+  els.forEach((e, i) => {
+    if (e.type === "NWord" && e.value === "then") cuts.push(i);
+  });
+  if (cuts.length === 0) return undefined;
+  const stages: NarrativeElement[][] = [];
+  let from = 0;
+  for (const cut of [...cuts, els.length]) {
+    // The canonical delimiter is `, then` — the comma is PUNCTUATION, carried through the lexer as its own
+    // token so it cannot be swallowed by the greedy catch-all, and dropped here so a stage never sees it.
+    // Bare `then` also delimits; the comma is not load-bearing, it just reads correctly.
+    let stage = els.slice(from, cut);
+    while (stage.length > 0 && stage[stage.length - 1].type === "NWord" && stage[stage.length - 1].value === ",") {
+      stage = stage.slice(0, -1);
+    }
+    if (stage.length === 0) return undefined; // leading / doubled / dangling `then`
+    stages.push(stage);
+    from = cut + 1;
+  }
+  return stages;
 }
 
 function softCompileUnknown(clause: NarrativeClause): CanonicalPatternCall {
@@ -583,6 +640,41 @@ const lastBare: PatternMatcher = (els, loc) => {
   return makeCall("Last", [conceptRefArg(els[1])], loc);
 };
 
+/** `most recent this` as a PIPELINE STAGE → MostRecent() with no args.
+ *
+ *  `most recent this` already exists as a folded `definition is` REDUCTION, so it never reached the narrative
+ *  matcher before. Inside a pipeline it must, and it arrives with NO argument: `this` is the placeholder for
+ *  the value flowing in from the previous stage, which `matchNarrative` injects when it folds the chain. */
+const mostRecentThisStage: PatternMatcher = (els, loc) => {
+  if (els.length !== 3) return null;
+  if (!isWord(els[0], "most")) return null;
+  if (!isWord(els[1], "recent")) return null;
+  if (!isWord(els[2], "this")) return null;
+  return makeCall("MostRecent", [], loc);
+};
+
+/** ⭐ `exists this` → Exists(this) — the EXISTENCE PROJECTION (#189, 2026-08-28).
+ *
+ *  A value-blind projection: it reads NO element, so a representation carrying it supplies only `type is`
+ *  and (where the resource has a coded retrieve) `coded from`. That is what lets an existence rep stop
+ *  asserting a value element it never reads — the old rule forced
+ *  `value element is Condition.code.` + `value type is boolean.`, which claims that element yields a boolean.
+ *  It yields a CodeableConcept, and existence reads neither.
+ *
+ *  ⚠ OVERLOADED ON THE REPRESENTATION'S `type is` (charter §3): over a coded resource it is existence of
+ *  records matching `coded from`; over a supplied resource (Patient) it is existence of the resource itself.
+ *  The projection knows its own carrier, so the author never names an element and can never name a wrong one.
+ *
+ *  ⚠ `exists this` also exists as a `definition is` REDUCTION with its own grammar production. This is the
+ *  narrative spelling, for the PROJECTION arm — the construct was in the language but not on this arm.
+ *  ⚠ `exists(this)` (parenthesised) does NOT parse in a projection; only the bare form reaches here. */
+const existsThis: PatternMatcher = (els, loc) => {
+  if (els.length !== 2) return null;
+  if (!isWord(els[0], "exists")) return null;
+  if (!isWord(els[1], "this")) return null;
+  return makeCall("Exists", [], loc);
+};
+
 /** `calculated <X>` → Calculate(X) */
 const calculated: PatternMatcher = (els, loc) => {
   if (els.length !== 2) return null;
@@ -963,6 +1055,8 @@ const PATTERNS: PatternMatcher[] = [
   earliest,                        // 2
   first,                           // 2
   lastBare,                        // 2 (after lastOnDayOf / lastWithinBeforeStartOf)
+  mostRecentThisStage,             // 3 — `most recent this` as a pipeline stage
+  existsThis,                      // 2 — the existence PROJECTION (value-blind)
   calculated,                      // 2
   lowest,                          // 2
   highest,                         // 2

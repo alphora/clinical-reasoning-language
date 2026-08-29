@@ -88,6 +88,8 @@ export const PATTERN_RETURN_SHAPE: Record<string, PatternReturnShape> = {
   // NESTED inside a top-level comparator (`AtLeast`/`AtMost`/`Below` = "boolean"), never as
   // the top-level pattern, so it is never looked up here. If it ever were, the `?? "list"`
   // default would fail loudly (`exists CRLCommon.AgeInMonths()`), not miscompile.
+  // #189 — the existence projection. One boolean, always: existence is total by construction.
+  Exists: "boolean",
   Calculate: "other",
   Lowest: "other",
   Highest: "other",

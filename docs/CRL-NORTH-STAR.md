@@ -167,8 +167,20 @@ silently, never by consumption context. Two things are declared explicitly:
 - **The cardinality** — whether the concept publishes a **set of records** (`RecordSet`), a **single selected
   record** (`Record`), or a **single reduced value** (`Scalar`). This is declared, **not inferred** from whether
   a reduction happens to be present (that would drift back to a consumption-site rule). A concept declares it on
-  a dedicated concept-level line: **`- shape is Scalar | Record | RecordSet.`** — `Scalar` is the default the
-  builder normalizes an omitted `shape is` to; the record resource comes from `type is`, not from the value type.
+  a dedicated concept-level line: **`- shape is Scalar | Record | RecordSet.`** — the record resource comes from
+  `type is`, not from the value type.
+
+  ⚠ **An omitted `shape is` is UNDECLARED — it does NOT default to `Scalar`.** This sentence used to say the
+  builder normalized an omission to `Scalar`; that normalization erased the difference between *"the author
+  declared Scalar"* and *"the author said nothing"*, and the second is the fact the compiler needs in order to
+  ASK instead of guess. With it erased, a case-feature `cpg-featureExpression` (which needs ONE record, and
+  cannot get one from a Scalar) had no way to raise an author-time error, so the emitter SYNTHESIZED a records
+  define instead — a reduction no author wrote (§4.0). Removed in code 2026-08-28 (`c4ae00cb`).
+  ⚠ The negative is stated because a reader will otherwise re-derive the default from "cardinality is declared":
+  a declared axis with a silent fallback is not declared. Whether an undeclared shape becomes an author-time
+  ERROR is an open operator ruling (`tmp/PLAN-shape-declared.md`); until it is made, an omission is simply
+  undeclared, and consumers that structurally require a shape route through the one marked transitional
+  helper.
 
 The rules:
 
@@ -251,6 +263,134 @@ Note the two distinct types: the **representation datum** is a `Condition` recor
 no value element); the **published result** is `Scalar<Boolean>` produced by `exists`. `value type` names the
 result. The "value type must match a real element" rule applies only to a representation read as a value
 **without** a reduction — never to the output of `exists` / a threshold / an age calculation.
+
+### ⭐ A source representation is `type is` + optional `coded from`. NOTHING ELSE.
+
+**Operator, 2026-08-28.** Rule A.1 (`representationShapeValidator.ts`) requires every source representation to
+carry `type` + `value element` + `value type`. **That is a bug**, and the replacement is smaller than the rule
+it removes:
+
+> A source representation carries **`- type is <Resource>.`** and, when the resource has one,
+> **`- coded from "VS".`** — and nothing else. There is no `value element is` and no value type on a
+> representation.
+
+#### `coded from` is decided by MODEL INFO, not by the author and not by the projection
+
+It is required exactly when CQL has a **code-based retrieve** for that resource type. `Condition` has one
+(`[Condition: "VS"]`); `Patient` does not — you retrieve the patient, never patients-with-code-X. So the
+requirement is mechanically derivable from the target model.
+
+⚠ This is what finally removes the patient-age CARVE-OUT. Patient/birthDate has no `coded from` because
+**`Patient` has no coded retrieve**, not because age is special. One rule, no exception to remember.
+
+#### Projections are OVERLOADED ON `type is` and know their own elements
+
+A projection takes the representation's `type is` and knows which element(s) it needs from it: `exists this`
+over a `Condition` knows `Condition.code`; `age today …` over a `Patient` knows `Patient.birthDate`.
+
+⚠ **The author never names an element, so the author can never name a WRONG one.** That is the whole point.
+The old rule forced a FALSE statement into the source — to satisfy A.1 for an existence projection over a
+Condition the author had to write `- value element is Condition.code.` + `- value type is boolean.`, asserting
+that `Condition.code` yields a boolean. It does not; it yields a CodeableConcept, and existence reads no value
+at all.
+
+#### The layering: a projection is REP-LOCAL, `definition is` is CONCEPT-WIDE
+
+- A **projection** transforms ONE representation's datum into the concept's terms — its job is to make that
+  arm conform to what the concept declares.
+- **`definition is` is concept-wide.** It runs over arms that projections have already normalized, which is
+  why it needs no per-arm rules.
+
+**`most recent` follows the same overloading as everything else:** it takes the concept's `type is` and knows
+the recency element for it (an Observation's effective, a Condition's onset/recorded, …).
+
+✅ **This dissolves "what is the recency of a DERIVED value?"** — a question that looked like a blocking design
+unknown. There is no per-arm timestamp problem, because by the time `definition is` runs, every arm is already
+in the concept's type. Recency is a property of the concept's `type is`, not of where a value came from.
+
+#### ⭐ The CANONICAL carriers (RULED, operator 2026-08-28)
+
+Where a resource has several plausible elements, **the projection picks CANONICALLY.** There is no
+author-facing disambiguator, and **`value element is` does NOT survive on a representation.**
+
+| resource | canonical carrier | NOT |
+|---|---|---|
+| **Observation** | `Observation.value` | `Observation.component.value` |
+| **Condition** | `onset` | `recordedDate`, `assertedDate` |
+
+⚠ A resource whose canonical carrier has not been ruled is **UNMODELED** — fail closed and say so. Never guess
+a carrier, and never report an unmodeled element as "not a real element": `fhir-model/fhirValueModel.ts` keeps
+the three-way distinction for exactly this reason (a non-empty set = the element exists and admits these types;
+∅ = modeled and positively valueless; `undefined` = unmodeled, no knowledge).
+
+### ⭐⭐ QUESTIONS, ANSWERS AND featureExpression ARE THE SAME THING (operator, 2026-08-28)
+
+**Read this before touching case-features, DTR, `$populate` or `cpg-featureExpression`. It has been
+re-derived wrongly at least four times in one session, by me and by both review arms.**
+
+> **A question IS an answerable IS a valid featureExpression.** All three are one property:
+> **a local `code is` of `shape is Record`.**
+
+Three of the five model rules are therefore ONE rule, not three:
+
+- a **question** must be a local code of type **record**
+- an **answer** must be a local code of type **record**
+- a **featureExpression** must be a local code of type **record**
+
+The remaining two are separate and orthogonal:
+
+- a **`when`…`then` condition** must be a **boolean-valued** concept — which a question MAY also be, but need
+  not be, and a condition need not be a question;
+- there must be **at least one question that can unblock a condition** (liveness).
+
+#### ⚠ `shape is Record` and `value type is boolean` are NOT in tension
+
+A concept publishes **one record** (`shape is Record`) and that record carries **a value**
+(`value type is …`). The guard reads the **value**; the featureExpression targets the **record**. Same
+concept, one declaration each, no split and no second concept.
+
+⚠ Treating "publishes a record" and "publishes a boolean" as rival cardinalities is the wrong turn. There is
+no dual-cardinality problem to model, and **no binding is needed between a code-bearing concept and some
+separate projection** — the concept that carries the code IS the record IS the question IS the
+featureExpression target.
+
+#### The worked example (operator's, verbatim in substance)
+
+```crl
+concept "Obese":            // a QUESTION ("the patient is obese") AND a condition (boolean-valued)
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `obese`.          // ← the answer slot. This is what makes it a question.
+- definition is <BMI over the obesity threshold>.   // a derivation that DEFAULTS it
+- source representation:    // external data that also DEFAULTS it
+  - type is Condition.
+  - value type is boolean.
+  - coded from "Obese".
+
+concept "BMI":              // a QUESTION ("the patient's BMI is N") — NOT a condition (not boolean)
+- shape is Record.
+- type is Observation.
+- value type is integer.
+- code is `bmi`.
+- definition is <height and weight calculation>.
+- source representation: …
+
+concept "Height": …        concept "Weight": …     // likewise
+```
+
+**That is FOUR questions, because there are four local-coded records in the chain.** The user may answer at
+any level: assert obesity directly, or give a BMI, or give height and weight. Answering higher up satisfies
+the ones below; a source representation defaults any of them.
+
+#### ⭐ The engine walks the dependency / inference chain and emits a question for EVERY viable local-coded record on it
+
+That is a **FEATURE**, not an ambiguity. Consequences that have been gotten wrong:
+
+- **Do NOT "resolve" a single record projection**, and do NOT error when several exist. Several is the normal,
+  desirable case — each is its own question.
+- **Do NOT search for a separate Record concept to bind a case feature to.** There is nothing to bind.
+- The number of questions is a property of the authored chain, not something the emitter decides.
 
 ### ⭐ The value/interface both-rep convention (CANONICAL)
 

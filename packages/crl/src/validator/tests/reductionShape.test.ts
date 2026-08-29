@@ -27,6 +27,18 @@ function validateFull(src: string): ValidationResult {
 }
 
 /** Reduction-shape WARNINGS (they live on `.warnings`, never `.errors` — always warning-severity). */
+/** ⭐ #189 — `record-shape-invariant` is an ERROR, not a warning: an unfulfilled `shape is Record`
+ *  contract is a FOREVER authoring defect, unlike the WIP notices beside it (emit does not consult `shape`
+ *  yet; #257 cross-rep dedup) which describe work that finishes before release. */
+function redErrors(src: string, rule?: ReductionShapeRule, conceptName?: string): ReductionShapeError[] {
+  return validateFull(src).errors.filter(
+    (e): e is ReductionShapeError =>
+      e.kind === "reduction-shape" &&
+      (rule === undefined || e.rule === rule) &&
+      (conceptName === undefined || e.conceptName === conceptName),
+  );
+}
+
 function redWarnings(src: string, rule?: ReductionShapeRule, conceptName?: string): ReductionShapeError[] {
   return validateFull(src).warnings.filter(
     (e): e is ReductionShapeError =>
@@ -189,9 +201,26 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
 
   // ---------------------------------------------------------------- record-shape-invariant
   describe("record-shape-invariant — a Record selects one record via `most recent`", () => {
-    it("WARNS for `shape is Record` with no record-selecting reduction", () => {
+    it("ERRORS for `shape is Record` with NO definition at all", () => {
+      // #189, 2026-08-28: promoted from a warning. Declaring the contract and not authoring into it is a
+      // permanent authoring defect — no planned phase makes it valid — so it fails the build rather than
+      // being ignorable forever alongside the genuinely-WIP notices.
       const src = `library "T".\nconcept "C":\n- type is Condition.\n- shape is Record.\n- code is \`c\`.\n`;
-      expect(redWarnings(src, "record-shape-invariant", "C")).toHaveLength(1);
+      const errs = redErrors(src, "record-shape-invariant", "C");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toContain("has no definition");
+    });
+
+    it("ERRORS for `shape is Record` + UNMATCHED NARRATIVE, and names that as the cause", () => {
+      // The message must not say "does not select a single record" and advise `most recent this` here: the
+      // definition is not a failed selection, it is text matching no catalog pattern — and taking that
+      // advice would EVICT the derivation (a concept has exactly one definition).
+      const src =
+        `library "T".\nconcept "C":\n- type is Observation.\n- shape is Record.\n- code is \`c\`.\n` +
+        `- definition is body mass index of "Weight" and "Height".\n`;
+      const errs = redErrors(src, "record-shape-invariant", "C");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toContain("UNMATCHED NARRATIVE");
     });
 
     it("is CLEAN for `shape is Record` + `most recent this`", () => {
