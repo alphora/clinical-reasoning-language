@@ -18,12 +18,10 @@ import { emitFhirDefFromPath } from "../fhir-emitter/closureOrchestrator";
  *              a user may answer at any level — assert obesity, or a BMI, or a height and a weight.
  *   RecordSet  the histories are assertable but NOT answerable. ONE question, and the reduction happens at
  *              the top instead of at every level.
- *   Layered    ⭐ the expected CONVENTION, and the rule is NOT "layer everything": layer a MEASUREMENT,
- *              merge a DETERMINATION. You never add a "Height" — you add a height RECORD — so a measurement
- *              history carries the code and the Records above it are named selections (`Most Recent Weight`
- *              and `Greatest Weight` over ONE history is what the layer buys, and it is inexpressible on the
- *              other two). A determination has ONE value reached three ways — asserted, recorded, derived —
- *              which are arms of ONE concept, merged by `, then most recent this`.
+ *   Layered    ⭐ the expected CONVENTION. Layering NAMES REDUCTIONS: `Most Recent Weight` and `Greatest
+ *              Weight` both read ONE `Weight Records`, each stated once, neither restating its code or
+ *              posrep. ⚠ It says NOTHING about what may be answered — a local `code is` is the answer slot
+ *              at EVERY level, and a concept with a code AND a derivation simply has two arms.
  *
  * Different generated Questionnaires, same decision. So they owe the SAME truth table, and this file drives
  * all three through every lane — a lane that works for one authoring option and not the others is not done.
@@ -114,17 +112,21 @@ const OPTIONS: readonly AuthoringOption[] = [
     name: "Layered",
     policy: path.join(FIXTURE, "policy-layered.crl"),
     cases: path.join(FIXTURE, "cases-layered.cel"),
-    // ⭐ THE CONVENTION'S RULE, and it is not "layer everything": layer a MEASUREMENT, merge a
-    // DETERMINATION. A measurement is recorded repeatedly, so its history is the answer slot and the
-    // Records above it are named selections — `Most Recent Weight` and `Greatest Weight` over ONE history
-    // is what the layer buys. A determination has ONE value reached three ways (asserted, recorded,
-    // derived), and those are ARMS OF ONE CONCEPT that `, then most recent this` already merges.
+    // ⭐ LAYERING NAMES REDUCTIONS — `Most Recent Weight` and `Greatest Weight` over ONE `Weight Records`,
+    // each stated once. It says NOTHING about what may be answered.
     //
-    // ⚠ MEASURED: splitting a determination instead produced an answer slot nothing reads — an asserted
-    // obesity was accepted and IGNORED while the decision denied. That looked like a missing merge
-    // construct in the language; it was the split. Merged back, this option's CRE rows match the other
-    // two exactly, and its emit blocker becomes the SAME one, so all three now fail identically.
-    questions: ["BMI", "Obese"],
+    // ⚠ AN EARLIER VERSION OF THIS FILE CLAIMED IT DID: "a measurement history is the answer slot and the
+    // Records above it are selections, derived and never answered." That was invented, not derived. A local
+    // `code is` is the answer slot at every level, and whether a concept offers one is the AUTHOR's call.
+    // `Greatest Weight` carries a code here precisely so the mistake cannot be re-read off the file's shape
+    // — asserting "the greatest weight is 200" is a little odd, and asserting obesity (or a BMI, or a height
+    // and a weight) is entirely natural. Same mechanism, different naturalness.
+    //
+    // ⚠ ALSO MEASURED, and a separate error: SPLITTING a determination into a coded history plus an uncoded
+    // derivation produced an answer slot nothing reads — an asserted obesity accepted and IGNORED while the
+    // decision denied. That looked like a missing merge construct in the language; it was the split. Merged
+    // back, this option's CRE rows match the other two and its emit blocker becomes the same one.
+    questions: ["Greatest Weight", "BMI", "Obese"],
     validatesCleanToday: false,
     producesToday: PRODUCES_TODAY,
     emitBlocker: "emit-mixed-code-and-definition",

@@ -1,29 +1,32 @@
 // ===========================================================================
-// OBESITY — LAYERED. The CONVENTION: layer MEASUREMENTS, merge DETERMINATIONS.
+// OBESITY — LAYERED. Layering NAMES REDUCTIONS. It says nothing about answering.
 //
 // ⭐ ONE OF THREE LEGITIMATE AUTHORING OPTIONS (operator, 2026-08-29), and the
 // one we expect to establish as the convention. Assume an Obesity LIBRARY whose
 // every layer some other library consumes.
 //
-// ⭐ TWO KINDS OF CONCEPT, AND THEY LAYER DIFFERENTLY.
+// ⭐ WHAT LAYERING IS FOR: one history, several NAMED reductions over it, each
+// stated once and reusable by another library. `Most Recent Weight` and
+// `Greatest Weight` both read `Weight Records`, and neither restates its code or
+// its source representation. That reuse is the whole benefit.
 //
-// A MEASUREMENT is a thing you record repeatedly. You never add a "Height", you
-// add a HEIGHT RECORD — so the history carries the code and IS the answer slot,
-// and each Record above it is a NAMED SELECTION, derived and never answered.
-// That is what the layer buys: `Most Recent Weight` and `Greatest Weight` are
-// two selections over ONE history, and neither restates the code or the posrep.
+// ⭐ ANY CONCEPT MAY CARRY A `code is`, AND EVERY ONE THAT DOES IS ANSWERABLE.
+// A local code IS the answer slot — that is all it is, at every level. A concept
+// with a code AND a derivation simply has two arms, and answering is one more way
+// to establish it alongside computing it.
 //
-// A DETERMINATION is a thing you conclude. It has ONE value and several ways to
-// reach it — asserted, recorded externally, derived — and those are ARMS OF ONE
-// CONCEPT, not separate concepts. `code is` + `source representation` +
-// `definition is …, then most recent this` merges all three. Splitting them
-// instead produces an answer slot nothing reads: MEASURED, an asserted obesity
-// was accepted and ignored while the decision denied.
+// ⚠ There is NO rule that a history is answerable and a reduction is not. An
+// earlier version of this file said exactly that ("a selection is not a thing you
+// answer") and it was wrong. `Greatest Weight` below carries a code precisely to
+// keep that mistake from being re-derived from the file's shape: it reads a
+// little odd for a measurement — asserting "the greatest weight is 200" — and it
+// is entirely natural one layer up, where you may assert obesity, OR give a BMI,
+// OR give a height and a weight. Same mechanism, different naturalness. The
+// language does not legislate which; the AUTHOR chooses where to offer answers.
 //
-// ⚠ So the convention is NOT "layer everything". Layer a measurement, because a
-// history genuinely has several selections. Do not layer a determination: it has
-// one value, and separating its arms only removes the merge the language already
-// performs.
+// ⚠ And nothing here shares a code. Two ways to answer come from TWO CODED
+// CONCEPTS in one dependency chain, each with its own code, both surfaced when
+// the question walk follows that chain. Sharing a code is not needed for it.
 // ===========================================================================
 library "Obesity Coverage (Layered)".
 
@@ -36,9 +39,9 @@ terminology "Height VS":
 terminology "Weight VS":
 - valueset is `http://example.org/vitals/ValueSet/weight`.
 
-// ── MEASUREMENTS, layer 1 — the HISTORIES ──────────────────────────────────
-// The answer slots for the raw measurements. Answering means adding a record,
-// so an answer is in the history by construction.
+// ── LAYER 1 — the HISTORIES ────────────────────────────────────────────────
+// Coded, so answerable: answering adds a record, and the record is in the
+// history by construction.
 
 concept "Height Records":
 - shape is RecordSet.
@@ -58,9 +61,10 @@ concept "Weight Records":
   - type is Observation.
   - coded from "Weight VS".
 
-// ── MEASUREMENTS, layer 2 — the NAMED SELECTIONS ───────────────────────────
-// Each names ONE reduction of ONE history. Uncoded: a selection is not a thing
-// you answer. ⭐ Two selections over `Weight Records` is the point of the layer.
+// ── LAYER 2 — the NAMED REDUCTIONS ─────────────────────────────────────────
+// Each names ONE reduction of ONE history. ⭐ Two reductions over `Weight
+// Records` is the point of the layer. Whether one carries a code is the author's
+// call, not the layer's: `Greatest Weight` does, the other two do not.
 
 concept "Most Recent Height":
 - shape is Record.
@@ -74,17 +78,21 @@ concept "Most Recent Weight":
 - value type is Quantity.
 - definition is most recent "Weight Records".
 
+// ⭐ CODED ON PURPOSE. An aggregation is answerable like anything else — this is
+// the file's standing refutation of "a reduction is not a thing you answer".
 concept "Greatest Weight":
 - shape is Record.
 - type is Observation.
 - value type is Quantity.
+- code is `greatest-weight`.
 - definition is highest "Weight Records".
 
-// ── DETERMINATIONS — one concept, arms merged ──────────────────────────────
-// NOT layered. Each has one value reached three ways, and `, then most recent
-// this` reduces over the concept's OWN records — which is where the asserted
-// arm (`code is`) and the recorded arm (`source representation`) both live. So
-// the merge is the concept, and the concept is answerable.
+// ── LAYER 3 — the DERIVED DETERMINATIONS ───────────────────────────────────
+// Each has one value reached three ways — asserted, recorded, derived — and
+// `, then most recent this` reduces over the concept's OWN records, where the
+// asserted arm (`code is`) and the recorded arm (`source representation`) both
+// live. ⚠ Not layered ONLY because nothing needs a second reduction of them; if
+// something did, they would layer like the histories.
 
 // Derived from the measurement selections; also recordable and assertable.
 concept "BMI":
