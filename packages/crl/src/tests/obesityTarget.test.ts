@@ -18,10 +18,12 @@ import { emitFhirDefFromPath } from "../fhir-emitter/closureOrchestrator";
  *              a user may answer at any level — assert obesity, or a BMI, or a height and a weight.
  *   RecordSet  the histories are assertable but NOT answerable. ONE question, and the reduction happens at
  *              the top instead of at every level.
- *   Layered    ⭐ the expected CONVENTION: RecordSet -> Record -> calculated. Records reduce the named
- *              RecordSets; calculations use the Records. Each layer is expressed ONCE and referred to by the
- *              next — the local code and the posrep live on the history and are never restated. Assumes a
- *              library whose every layer some other library consumes.
+ *   Layered    ⭐ the expected CONVENTION: histories -> named selections -> derivations. You never add a
+ *              "Height", you add a height RECORD — so the history carries the code and IS the answer slot,
+ *              and every Record above it is a NAMED SELECTION, derived and never answered. `Most Recent
+ *              Weight` and `Greatest Weight` are two selections over ONE history: that reuse is what the
+ *              layer buys, and it is inexpressible on the other two, where one concept is both the slot and
+ *              an implicit most-recent selection.
  *
  * Different generated Questionnaires, same decision. So they owe the SAME truth table, and this file drives
  * all three through every lane — a lane that works for one authoring option and not the others is not done.
@@ -36,48 +38,6 @@ import { emitFhirDefFromPath } from "../fhir-emitter/closureOrchestrator";
  */
 
 const FIXTURE = path.resolve(__dirname, "fixtures/obesity");
-
-interface AuthoringOption {
-  readonly name: string;
-  readonly policy: string;
-  readonly cases: string;
-  /** The locally-coded, single-record concepts — i.e. the questions the Questionnaire will carry. */
-  readonly questions: readonly string[];
-  /**
-   * ⚠ Whether the policy validates with ZERO errors TODAY. The layered option does not, and the reason is a
-   * true statement about the language rather than a defect in the policy — see its own assertion below.
-   */
-  readonly validatesCleanToday: boolean;
-}
-
-const OPTIONS: readonly AuthoringOption[] = [
-  {
-    name: "Record",
-    policy: path.join(FIXTURE, "policy.crl"),
-    cases: path.join(FIXTURE, "cases.cel"),
-    questions: ["Obese", "BMI", "Height", "Weight"],
-    validatesCleanToday: false,
-  },
-  {
-    name: "RecordSet",
-    policy: path.join(FIXTURE, "policy-recordset.crl"),
-    cases: path.join(FIXTURE, "cases-recordset.cel"),
-    questions: ["Obese"],
-    validatesCleanToday: true,
-  },
-  {
-    // ⭐ THE CONVENTION: RecordSet -> Record -> calculated, each layer expressed ONCE and referred to by
-    // the next. Assumes an Obesity LIBRARY whose every layer some other library consumes.
-    name: "Layered",
-    policy: path.join(FIXTURE, "policy-layered.crl"),
-    cases: path.join(FIXTURE, "cases-layered.cel"),
-    // ⚠ MEASURED CONSEQUENCE of layering: the leaves stop being questions. The local code lives on the
-    // RecordSet (assertable, a history) and the reduction on an uncoded Record, so only the calculated
-    // layer is answerable. That is the trade the convention makes.
-    questions: ["BMI", "Obese"],
-    validatesCleanToday: false,
-  },
-];
 
 /**
  * The acceptance criterion (operator, 2026-08-29), which ALL THREE options owe:
@@ -111,6 +71,74 @@ const PRODUCES_TODAY: Record<string, readonly string[]> = {
   "obese stated false -> deny": ["Approve Bariatric Surgery"], // ⚠ must become ["Deny Bariatric Surgery"]
   "obese unanswered -> no recommendation": ["Deny Bariatric Surgery"], // ⚠ must become []
 };
+
+interface AuthoringOption {
+  readonly name: string;
+  readonly policy: string;
+  readonly cases: string;
+  /** The locally-coded, single-record concepts — i.e. the questions the Questionnaire will carry. */
+  readonly questions: readonly string[];
+  /**
+   * ⚠ Whether the policy validates with ZERO errors TODAY. The layered option does not, and the reason is a
+   * true statement about the language rather than a defect in the policy — see its own assertion below.
+   */
+  readonly validatesCleanToday: boolean;
+  /** What the CRE produces TODAY, per case. ⚠ The Layered option differs — see its entry. */
+  readonly producesToday: Record<string, readonly string[]>;
+  /** The emit error kind that blocks this option today. */
+  readonly emitBlocker: string;
+}
+
+const OPTIONS: readonly AuthoringOption[] = [
+  {
+    name: "Record",
+    policy: path.join(FIXTURE, "policy.crl"),
+    cases: path.join(FIXTURE, "cases.cel"),
+    questions: ["Obese", "BMI", "Height", "Weight"],
+    validatesCleanToday: false,
+    producesToday: PRODUCES_TODAY,
+    emitBlocker: "emit-mixed-code-and-definition",
+  },
+  {
+    name: "RecordSet",
+    policy: path.join(FIXTURE, "policy-recordset.crl"),
+    cases: path.join(FIXTURE, "cases-recordset.cel"),
+    questions: ["Obese"],
+    validatesCleanToday: true,
+    producesToday: PRODUCES_TODAY,
+    emitBlocker: "emit-mixed-code-and-definition",
+  },
+  {
+    // ⭐ THE CONVENTION: RecordSet -> Record -> calculated, each layer expressed ONCE and referred to by
+    // the next. Assumes an Obesity LIBRARY whose every layer some other library consumes.
+    name: "Layered",
+    policy: path.join(FIXTURE, "policy-layered.crl"),
+    cases: path.join(FIXTURE, "cases-layered.cel"),
+    // ⭐ ZERO, and that is the CONVENTION'S DEFINING PROPERTY, not a gap. You never add a "Height" — you add
+    // a height RECORD — so the answer slot is the history and every Record above it is a NAMED SELECTION,
+    // derived and never answered. Answer slots and selections are DISJOINT here; on the other two options
+    // one concept plays both roles, which is why neither can express a second selection (`Greatest Weight`)
+    // without reducing something already reduced.
+    questions: [],
+    validatesCleanToday: false,
+    // ⭐ ALL THREE ROWS DENY, including a STATED TRUE. Measured, and it is the convention's open gap made
+    // concrete: the answer lands on `Obese Records` (the history) while the decision guards on `Obese` (the
+    // derivation from BMI), and NOTHING merges the two arms. So under this convention today, ANSWERING THE
+    // QUESTION HAS NO EFFECT — the answer is written and ignored. On the coded-Record options that merge is
+    // what `, then most recent this` does over a concept's own records; a derivation has no records of its
+    // own, so it has no equivalent. MUST become the shared truth table.
+    producesToday: {
+      "obese stated true -> approve": ["Deny Bariatric Surgery"],
+      "obese stated false -> deny": ["Deny Bariatric Surgery"],
+      "obese unanswered -> no recommendation": ["Deny Bariatric Surgery"],
+    },
+    // ⚠ A DIFFERENT blocker: layering has no concept carrying both a code and a definition, so it never hits
+    // `emit-mixed-code-and-definition` at all. It hits the histories instead — a `source representation` with
+    // no top-level definition has no lowering, which before 2026-08-29 emitted a define whose body was a
+    // comment while reporting SUCCESS.
+    emitBlocker: "emit-representations-only-not-lowered",
+  },
+];
 
 describe("#189 canonical target — the Obese/BMI chain", () => {
   it("the three options expose DIFFERENT question sets — the property the Questionnaire is built from", () => {
@@ -171,7 +199,7 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
         for (const [name, mustProduce] of Object.entries(MUST_PRODUCE)) {
           const produced =
             (result.runs ?? []).find((r) => r.case === name)?.produced?.map((p) => p.recommendation) ?? [];
-          const today = PRODUCES_TODAY[name]!;
+          const today = opt.producesToday[name]!;
           // Assert TODAY's value so a regression is caught, and say what it must become. When a fix lands,
           // this line moves to `mustProduce` — a deliberate, visible edit.
           const why = opt.name + " / " + name + " — must become " + JSON.stringify(mustProduce);
@@ -198,8 +226,8 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
         // OTHER concepts (`Obese`, `BMI`). A leaf reducing over its OWN representations (`most recent this`)
         // is fine — that is the supported both-representation recency. So the real boundary is a local code
         // plus a CROSS-CONCEPT derivation, the ordinary shape of a question that can also be computed.
-        const mixed = (fhir.errors ?? []).filter((e) => e.kind === "emit-mixed-code-and-definition");
-        expect(mixed.length).toBeGreaterThan(0);
+        const blocking = (fhir.errors ?? []).filter((e) => e.kind === opt.emitBlocker);
+        expect(blocking.length, opt.name + " expected " + opt.emitBlocker).toBeGreaterThan(0);
       });
     });
   }

@@ -13,12 +13,12 @@ fact "Pat":
 fact "Obese Yes":
 - date is "2026-01-01".
 - value is true.
-- defined by "Obesity Coverage (Layered)"."Obese".
+- defined by "Obesity Coverage (Layered)"."Obese Records".
 
 fact "Obese No":
 - date is "2026-01-01".
 - value is false.
-- defined by "Obesity Coverage (Layered)"."Obese".
+- defined by "Obesity Coverage (Layered)"."Obese Records".
 
 case "obese stated true -> approve":
 - subject is "Pat".
