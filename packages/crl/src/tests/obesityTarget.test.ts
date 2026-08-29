@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
 import { buildCRL, validateCRL } from "../index";
+import { collectCodeIsConceptsInInferenceOrder } from "../fhir-emitter/caseFeatureCollection";
+import type { Concept } from "../ast/types";
 import { resolveCelImports } from "../cel/imports";
 import { runCel } from "../cre/run";
 import { emitCQLImports } from "../imports/emit";
@@ -74,8 +76,12 @@ interface AuthoringOption {
   readonly name: string;
   readonly policy: string;
   readonly cases: string;
-  /** The locally-coded, single-record concepts — i.e. the questions the Questionnaire will carry. */
-  readonly questions: readonly string[];
+  /**
+   * ⚠ The locally-coded concepts that ALSO publish one record — i.e. the valid `cpg-featureExpression`
+   * targets, whose read yields a single value. NOT "the questions": every coded concept is answerable
+   * whatever its shape (charter §3), and a coded history is answered by ADDING A RECORD.
+   */
+  readonly singleValuedTargets: readonly string[];
   /**
    * ⚠ Whether the policy validates with ZERO errors TODAY. The layered option does not, and the reason is a
    * true statement about the language rather than a defect in the policy — see its own assertion below.
@@ -85,6 +91,11 @@ interface AuthoringOption {
   readonly producesToday: Record<string, readonly string[]>;
   /** The emit error kind that blocks this option today. */
   readonly emitBlocker: string;
+  /**
+   * ⭐ The QUESTIONS a user is offered: every locally-coded concept reachable from the decision's guard by
+   * walking the DEPENDENCY path. This is goal item 2 — "the user can answer at any level".
+   */
+  readonly reachableQuestions: readonly string[];
 }
 
 const OPTIONS: readonly AuthoringOption[] = [
@@ -92,19 +103,21 @@ const OPTIONS: readonly AuthoringOption[] = [
     name: "Record",
     policy: path.join(FIXTURE, "policy.crl"),
     cases: path.join(FIXTURE, "cases.cel"),
-    questions: ["Obese", "BMI", "Height", "Weight"],
+    singleValuedTargets: ["Obese", "BMI", "Height", "Weight"],
     validatesCleanToday: false,
     producesToday: PRODUCES_TODAY,
     emitBlocker: "emit-mixed-code-and-definition",
+    reachableQuestions: ["Obese", "BMI", "Weight", "Height"],
   },
   {
     name: "RecordSet",
     policy: path.join(FIXTURE, "policy-recordset.crl"),
     cases: path.join(FIXTURE, "cases-recordset.cel"),
-    questions: ["Obese"],
+    singleValuedTargets: ["Obese"],
     validatesCleanToday: true,
     producesToday: PRODUCES_TODAY,
     emitBlocker: "emit-mixed-code-and-definition",
+    reachableQuestions: ["Obese", "BMI", "Weight", "Height"],
   },
   {
     // ⭐ THE CONVENTION: RecordSet -> Record -> calculated, each layer expressed ONCE and referred to by
@@ -126,18 +139,23 @@ const OPTIONS: readonly AuthoringOption[] = [
     // derivation produced an answer slot nothing reads — an asserted obesity accepted and IGNORED while the
     // decision denied. That looked like a missing merge construct in the language; it was the split. Merged
     // back, this option's CRE rows match the other two and its emit blocker becomes the same one.
-    questions: ["Greatest Weight", "BMI", "Obese"],
+    singleValuedTargets: ["Greatest Weight", "BMI", "Obese"],
     validatesCleanToday: false,
     producesToday: PRODUCES_TODAY,
     emitBlocker: "emit-mixed-code-and-definition",
+    // ⭐ Four, reached THROUGH the uncoded reductions: Obese -> BMI -> Most Recent Weight/Height ->
+    // Weight/Height Records. The intermediates carry no code so they offer no question, but the walk
+    // traverses them — which is what makes the layering invisible to a user answering the questionnaire.
+    reachableQuestions: ["Obese", "BMI", "Weight Records", "Height Records"],
   },
 ];
 
 describe("#189 canonical target — the Obese/BMI chain", () => {
-  it("the three options expose DIFFERENT question sets — the property the Questionnaire is built from", () => {
-    // A QUESTION is a locally-coded concept publishing ONE record: `code is` + `shape is Record`. That is what
-    // makes it an answerable, and a legal `cpg-featureExpression` target. So `shape is` is not decoration — it
-    // decides how many questions a user is asked.
+  it("the three options differ in which answerables publish ONE record (the featureExpression targets)", () => {
+    // ⚠ This measures `code is` + `shape is Record` — the valid `cpg-featureExpression` targets, whose read
+    // yields ONE value. It is NOT the question set: EVERY coded concept is answerable whatever its shape, and
+    // a coded history is answered by adding a record. The question set is the dependency walk, asserted
+    // separately below; conflating the two is what made an earlier version of this file assert both.
     //
     // ⚠ It is also a DISCRIMINATOR, and a suite declaring only one value of it cannot notice when the
     // discriminator is ignored — which is the open defect (step 6). And it selects a different emitter path:
@@ -149,10 +167,10 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
         result?: { statements: { type: string; name?: string; code?: unknown; shape?: string }[] };
       };
       expect(built.success, opt.name).toBe(true);
-      const questions = (built.result?.statements ?? [])
+      const singleValued = (built.result?.statements ?? [])
         .filter((st) => st.type === "Concept" && st.code !== undefined && st.shape === "Record")
         .map((st) => st.name ?? "");
-      expect(questions, opt.name).toEqual([...opt.questions]);
+      expect(singleValued, opt.name).toEqual([...opt.singleValuedTargets]);
     }
   });
 
@@ -224,4 +242,46 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
       });
     });
   }
+
+  it("⭐ ANSWER AT ANY LEVEL — the question walk follows the DEPENDENCY path (goal item 2)", () => {
+    // A local `code is` IS an answer slot, so the questions a user is offered are every coded concept
+    // reachable from the guard through the definitions. Two ways to answer come from TWO CODED CONCEPTS in
+    // one chain, each with its own code — no code-sharing mechanism is needed for it.
+    //
+    // ⚠ MEASURED BEFORE THE FIX: this reached ONE concept in every option, because the walk followed only
+    // `defined as` edges and the whole chain is `definition is` — goal item 2 silently absent, with no error
+    // anywhere.
+    //
+    // ⚠ WHAT THIS ASSERTS IS REACHABILITY, and only that. It is a unit call on the collector, so it does NOT
+    // prove an emitted questionnaire carries four items: the downstream consumers (`inputsByCondition`,
+    // `resolveCaseFeatureRecord`, the emitted `action.input` and the StructureDefinitions) are unreachable
+    // today because emit stops at `emit-mixed-code-and-definition`. Those get pinned when emit clears; saying
+    // "four questions are offered" before then would be a claim about output nothing has produced.
+    for (const opt of OPTIONS) {
+      const built = buildCRL(readFileSync(opt.policy, "utf8")) as unknown as {
+        result?: { library: { name: string }; statements: Concept[] };
+      };
+      const concepts = (built.result?.statements ?? []).filter(
+        (s) => (s as { type?: string }).type === "Concept",
+      );
+      const byName = new Map<string, Concept>();
+      const codeByConcept = new Map<string, string>();
+      for (const c of concepts) {
+        if (c.name) byName.set(c.name, c);
+        if (c.name && c.code !== undefined) codeByConcept.set(c.name, String(c.code));
+      }
+      const reached = collectCodeIsConceptsInInferenceOrder(
+        "Obese",
+        built.result?.library.name ?? "",
+        byName,
+        codeByConcept,
+      ).map((c) => c.name);
+      expect(reached, opt.name).toEqual([...opt.reachableQuestions]);
+    }
+    // ⚠ And the walk is the DECISION'S path, not "every coded concept": the Layered option codes
+    // `Greatest Weight` — a sibling reduction another library consumes — and it is correctly NOT offered
+    // here, because this decision never reads it.
+    const layered = OPTIONS.find((o) => o.name === "Layered")!;
+    expect(layered.reachableQuestions).not.toContain("Greatest Weight");
+  });
 });

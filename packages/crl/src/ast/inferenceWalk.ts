@@ -1,5 +1,5 @@
 /**
- * Neutral, single-authority pre-order walk over a concept's `defined as` inference graph.
+ * Neutral, single-authority pre-order walk over a concept's DEPENDENCY graph.
  *
  * This is the ONE traversal shared by the FHIR case-feature lane
  * (`fhir-emitter/caseFeatureCollection`) and the Medical-Validation concept-shape model
@@ -9,7 +9,9 @@
  *   - START at the root ref (normalized same-lib; a still-qualified root is skipped).
  *   - PRE-ORDER: a concept's OWN code fires `onEnter(name, code)` FIRST, then its operands recurse
  *     (a both-representation concept lists itself before its operands).
- *   - Operands are the `defined as` body refs, LEFT-TO-RIGHT (inline sem-or/and/not/group flattened —
+ *   - Operands are supplied by the CALLER (`operandsOf`), which both production callers take from the ONE
+ *     edge function `ast/conceptDependencies` — a `defined as` body's refs, a `definition is` narrative's
+ *     concept arguments, or a reduction's named target. LEFT-TO-RIGHT (inline sem-or/and/not/group flattened —
  *     the operators do not affect leaf order; both lanes collect refs positionally).
  *   - An intermediate concept with no code but a `defined as` is WALKED THROUGH (no leaf, operands recurse).
  *   - A cross-library operand (still qualified AFTER same-library normalization, e.g. `OtherLib."X"`) is

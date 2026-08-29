@@ -435,12 +435,19 @@ export function collectCaseFeatures(
   // Prefer the `DefinedAsDefinition`-bearing twin (the Inferences fold-in twin of a
   // both-rep concept is appended LAST by lowerLocalCodes, but select explicitly
   // rather than relying on last-wins).
+  // ⚠ Prefer the twin carrying the AUTHORED definition — any form, not just `defined as`. The dependency
+  // edge is now read from every definition form (`ast/conceptDependencies`), so a DefinedAs-only preference
+  // would let first-wins select the synthesized RETRIEVE twin for a `definition is` both-rep, yield no
+  // edges, and stop the walk at the first concept — reintroducing on the lowered path exactly the defect
+  // this edge widening fixes.
   const definedAsByName = new Map<string, Concept>();
   for (const stmt of lowered.ast.statements) {
     if (stmt.type !== "Concept" || !stmt.name) continue;
     const existing = definedAsByName.get(stmt.name);
-    const isDefinedAs = stmt.definition?.type === "DefinedAsDefinition";
-    if (existing === undefined || isDefinedAs) definedAsByName.set(stmt.name, stmt);
+    // The AUTHORED definition is anything except the synthesized retrieve (`CodedFromDefinition`, which
+    // `lowerLocalCodes` puts on the LocalPrimitives twin and which carries no concept edges).
+    const carriesAuthored = stmt.definition !== undefined && stmt.definition.type !== "CodedFromDefinition";
+    if (existing === undefined || carriesAuthored) definedAsByName.set(stmt.name, stmt);
   }
 
   // Collect every `when` condition ref across the source's decisions (any depth).

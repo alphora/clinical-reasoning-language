@@ -16,7 +16,8 @@
  *   - PURE: `leafEligibleByLib` is computed by the caller (the cockpit, via `leafEligibleConcepts`) and
  *     passed in, so this module keeps no `cql-emitter` dependency.
  */
-import { flattenDefinedAsBody, walkInferenceOrder } from "../ast/inferenceWalk";
+import { walkInferenceOrder } from "../ast/inferenceWalk";
+import { conceptRefsOfDefinition } from "../ast/conceptDependencies";
 import type { Concept } from "../ast/types";
 
 import { classifyConcept, type CrlConceptNode } from "./crlConceptLayer";
@@ -120,14 +121,12 @@ export function buildConceptShapeIndex(
       // A presence sentinel, NOT a real code value: only `code !== undefined` is consumed (`leafEligible`
       // below), and the gate compares nodeKeys/names, never the code. `leafEligible` = "lowers into localCodes".
       codeOf: (name) => (eligible.has(name) ? "•" : undefined),
-      operandsOf: (name) => {
-        const c = astByName.get(name);
-        // Byte-match the emitter's guard: only a `DefinedAsDefinition` contributes operands. A `definition is`
-        // both-rep (patient-age) therefore yields NO children (self only), exactly like the emitter.
-        return c?.definition?.type === "DefinedAsDefinition"
-          ? flattenDefinedAsBody(c.definition.body)
-          : [];
-      },
+      // ⚠ The SAME edge function the emitter uses (`ast/conceptDependencies`), not a byte-copy of it. This
+      // used to re-implement the `DefinedAsDefinition`-only guard, and when the emitter's walk widened to
+      // follow narrative and named-reduction edges this side did not — so the MV panes would have omitted
+      // inputs `$apply` surfaces, which is precisely the drift the equivalence contract above exists to stop.
+      // One function, two callers; a re-implementation that "byte-matches" only matches until it doesn't.
+      operandsOf: (name) => conceptRefsOfDefinition(astByName.get(name)?.definition),
       onEnter: (name, code) => {
         const cn = nodeByName.get(name);
         if (!cn) {

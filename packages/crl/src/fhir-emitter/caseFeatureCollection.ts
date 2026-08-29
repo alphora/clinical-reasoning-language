@@ -10,12 +10,16 @@
  *     (the condition closest to the Interface comes first — a both-representation
  *     concept that carries BOTH `code is` AND `defined as` lists its OWN code
  *     before its operands).
- *   - Then, if C is `defined as`, recurse its operands LEFT-TO-RIGHT (written
- *     order): a bare ref, or a parenthesized composition over `sem-or`/`sem-and`/
- *     `sem-not`. Each operand concept is visited the same way (pre-order).
- *   - An intermediate concept with NO `code is` (e.g. an `A And B` that only
- *     `defined as` two leaves) is WALKED THROUGH — it produces no entry but its
- *     own operands are still recursed.
+ *   - Then recurse WHATEVER C'S DEFINITION READS, LEFT-TO-RIGHT in written order
+ *     (`ast/conceptDependencies`): a `defined as` composition's operands, a
+ *     `definition is` narrative's concept arguments, or a reduction's NAMED
+ *     target. Each is visited the same way (pre-order).
+ *     ⚠ It followed `defined as` ONLY until 2026-08-29, so a `definition is`
+ *     chain stopped at C — MEASURED on the obesity target as ONE question where
+ *     four concepts carry codes. A dependency is whatever the definition READS.
+ *   - An intermediate concept with NO `code is` (e.g. an uncoded `Most Recent
+ *     Height`, or an `A And B` over two leaves) is WALKED THROUGH — it produces
+ *     no entry but its own operands are still recursed.
  *
  * So:
  *   - direct  (V1): C has `code is`, no `defined as` → [C].
@@ -35,7 +39,8 @@
  * case-features are unsupported in v0 (mirrors the decision/concept resolvers).
  */
 
-import { flattenDefinedAsBody, walkInferenceOrder } from "../ast/inferenceWalk";
+import { walkInferenceOrder } from "../ast/inferenceWalk";
+import { conceptRefsOfDefinition } from "../ast/conceptDependencies";
 import type { Concept, ReferenceName } from "../ast/types";
 
 /** One collected `code is` concept, in inference order. */
@@ -74,12 +79,12 @@ export function collectCodeIsConceptsInInferenceOrder(
   const ordered: CollectedCodeIsConcept[] = [];
   walkInferenceOrder(conditionRef, libraryName, {
     codeOf: (name) => codeByConcept.get(name),
-    operandsOf: (name) => {
-      const defined = definedAsByName.get(name);
-      return defined?.definition?.type === "DefinedAsDefinition"
-        ? flattenDefinedAsBody(defined.definition.body)
-        : [];
-    },
+    // ⚠ EVERY definition form is an edge, not just `defined as`. The walk followed composition operands
+    // only, so on a `definition is` chain it stopped at the first concept: MEASURED on the canonical target,
+    // starting at `Obese` it reached ONE question where FOUR concepts carry codes, and the questionnaire
+    // would have offered no way to answer with a height and a weight. A dependency is whatever the
+    // definition READS (`ast/conceptDependencies`).
+    operandsOf: (name) => conceptRefsOfDefinition(definedAsByName.get(name)?.definition),
     // PRE-ORDER: a both-rep concept's own code is pushed before its operands. The walk enters each
     // name once (cycle/diamond guards), so a leaf referenced twice yields ONE entry.
     onEnter: (name, code) => {

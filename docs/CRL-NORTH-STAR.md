@@ -367,8 +367,16 @@ the three-way distinction for exactly this reason (a non-empty set = the element
 **Read this before touching case-features, DTR, `$populate` or `cpg-featureExpression`. It has been
 re-derived wrongly at least four times in one session, by me and by both review arms.**
 
-> **A question IS an answerable IS a valid featureExpression.** All three are one property:
-> **a local `code is` of `shape is Record`.**
+> **A question IS an answerable.** One property: **a local `code is`.** That is the answer slot, and it is
+> the ONLY way to create an answer — at every level, whatever the concept's shape.
+
+⭐ A coded `shape is RecordSet` history IS answerable: you answer it by ADDING A RECORD, and its questionnaire
+item is naturally REPEATING. ⚠ Do not re-derive a `shape is Record` restriction from the fact that most
+answerables publish one value — that restriction denies a height history the ability to be answered, which is
+the commonest answer there is. `shape is` decides what a concept PUBLISHES, never whether it may be asked.
+
+⚠ Being a valid **`cpg-featureExpression` target** is the narrower, separate property — that read must yield
+ONE value, so it is `code is` + `shape is Record`. An answerable is not automatically one.
 
 Three of the five model rules are therefore ONE rule, not three:
 
