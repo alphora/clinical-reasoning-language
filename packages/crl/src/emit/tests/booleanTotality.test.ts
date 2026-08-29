@@ -159,22 +159,28 @@ describe("classifyBooleanTotality — defined-as forms", () => {
   });
 });
 
-describe("classifyBooleanTotality — E1 rejects (disc 429 C1) + age exception (C2)", () => {
-  it("`code is` + `defined as` (both-rep fold) → rejected (#257)", () => {
+describe("classifyBooleanTotality — the canonical `code is` + derivation/posrep shapes + age exception (C2)", () => {
+  it("`code is` + `defined as` (both-rep fold) → UNCLASSIFIED build debt, never `rejected`", () => {
     const o = classify(
       `library "T".\nconcept "D":\n- type is Observation.\n- value type is boolean.\n- code is \`d\`.\n- defined as "A".\n`,
       "D",
     );
-    expect(o.kind).toBe("rejected");
-    if (o.kind === "rejected") expect(o.reason).toContain("#257");
+    // Operator, 2026-08-29: the `fixtures/obesity` target is the goal, and everything contradicting it is
+    // stale. `rejected` means "must never be emitted" and fires a migration prompt telling the author to
+    // change their authoring — for a local `code is` alongside a derivation that would mean abandoning the
+    // canonical production model (charter §3). The honest classification is that the classifier cannot
+    // certify it YET: `unclassified`, which the proof enumerates and reports as INCOMPLETE.
+    expect(o.kind).toBe("unclassified");
+    if (o.kind === "unclassified") expect(o.reason).toContain("BUILD DEBT");
   });
 
-  it("`code is` + `source representation` (local + source multi-rep) → rejected (#257)", () => {
+  it("`code is` + `source representation` → UNCLASSIFIED build debt — this IS the canonical shape", () => {
     const o = classify(
       `library "T".\nconcept "D":\n- type is Observation.\n- value type is boolean.\n- code is \`d\`.\n- definition is exists this.\n- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is boolean.\n`,
       "D",
     );
-    expect(o.kind).toBe("rejected");
+    expect(o.kind).toBe("unclassified");
+    if (o.kind === "unclassified") expect(o.reason).toContain("canonical shape");
   });
 
   it("standalone patient-age posrep (no local code) → requires-boundary via resolveAgeConcept", () => {
@@ -382,7 +388,7 @@ describe("proveWholeBoundaryTotality", () => {
   it("FAILS an enrolled `rejected` obligation (E1 forms must fail by non-enrollment)", () => {
     const rejected = entry({
       name: "BothRep",
-      obligation: { kind: "rejected", code: "e1-defined-as", reason: "both-rep fold" },
+      obligation: { kind: "rejected", code: "bare-scalar", reason: "bare Scalar `code is`, no reduction" },
       discharge: { booleanEffect: "total", dischargedBy: "intrinsic-exists" },
     });
     const r = proveWholeBoundaryTotality([rejected]);

@@ -553,7 +553,7 @@ export function buildAuthoredObligations(ast: CRL): ReadonlyMap<string, BooleanT
   const map = new Map<string, BooleanTotalityObligation>();
   // #189 Piece 1 (disc 506) — the both-rep RECENCY-VALUE concept names, so a `defined as exists ("V")` interface's
   // obligation can be classified as the ACTIVE member-existence fold (total) when V is recency-value, rather than
-  // the deferred E1 reject. This classifier is per-concept and cannot resolve the referent alone; the whole-library
+  // the build-debt `unclassified` arm. This classifier is per-concept and cannot resolve the referent alone; the whole-library
   // scan here supplies it (the SAME `recencyValueNames` set `lowerLocalCodes` computes for the emit side).
   const recencyValueNames = new Set<string>();
   for (const s of ast.statements) {
@@ -1242,7 +1242,7 @@ class Emitter {
       result,
       visibility,
       // #189 2b.4a — a FORM-KEYED staging exemption from the HARD gate rides on the still-live REJECTED form
-      // (the pre-flip bare-scalar `code is`, set at the classifier). An E1 #257 reject leaves `staging` unset →
+      // (the pre-flip bare-scalar `code is`, set at the classifier). A non-staged reject leaves `staging` unset →
       // the gate blocks it. Families (a)/(c) live on the ungated single-library path, so no discharge-side marker.
       stagingExclusion: obligation.kind === "rejected" ? obligation.staging : undefined,
     });
@@ -1794,9 +1794,29 @@ class Emitter {
 
   private emitConcept(c: Concept): string {
     const header = `define ${cqlIdent(c.name)}:`;
+    // ⚠ A concept with no definition after lowering is REPRESENTATIONS-ONLY, and its lowering is unbuilt.
+    // This used to emit a comment as the define's entire body — a `define` with no expression, i.e. CQL that
+    // cannot translate — while the emitter reported SUCCESS. Silent success on invalid output is the worst
+    // of the three options: worse than failing, and worse than an honest placeholder, because it reads as
+    // "this works" to every consumer and to every progress report.
+    //
+    // Legal-but-unbuilt fails LOUDLY (charter §0a). The shape is canonical — do NOT re-author around it.
+    if (c.definition === undefined) {
+      this.emitErrors.push({
+        type: "Validation",
+        kind: "emit-representations-only-not-lowered",
+        line: c.location.start.line,
+        column: c.location.start.column,
+        message:
+          `Concept "${c.name}" is representations-only (a \`source representation\` with no top-level ` +
+          `definition) and its emit lowering is NOT YET BUILT. This is unbuilt work, not an illegal form — ` +
+          `the shape is canonical (charter §2/§3), so do not re-author the concept to avoid this. Emit ` +
+          `fails rather than producing a define with no body.`,
+      });
+    }
     const body = c.definition
       ? this.emitConceptBody(c, c.definition)
-      : "// TODO: representations-only concept (emit lowering deferred to how-round execution half)";
+      : `CRLCommon.UnmatchedNarrative('representations-only concept "${c.name}" — emit lowering not yet built')`;
     // #108: emit `meta is` annotations as a leading block comment on the
     // concept's `define`. CRL preserves them on Concept.meta but the
     // emitter was dropping them silently. `@logic-expression-text`,

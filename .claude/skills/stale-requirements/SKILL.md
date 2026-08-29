@@ -42,6 +42,15 @@ cannot tell which a clause is, treat it as DERIVED and go find the source.
 ⚠ Never cite a DERIVED clause to yourself as a blocker. If your reason for not doing the agreed thing
 traces to your own gloss, you have talked yourself out of the work with your own voice.
 
+⚠ **The most DERIVED rule of all is one you wrote yourself, recently.** It reads as settled because it is
+already in the code, in a committed doc, pinned by a passing test — and none of that is evidence, because
+you put it all there. A rule written for the case in hand is narrow BY CONSTRUCTION, so the first time a
+second case arrives it will look like a design constraint blocking the work. **Check the provenance before
+deferring to it** — `git log -S "<the rule's distinctive phrase>" -- <file>` takes seconds. If it names your
+own recent commit, the question is not "may I widen this?" but "what did the authority ABOVE it already
+decide?" (Real instance: a ledger rule three commits old, cited as a design call, while the charter above it
+had settled the general case all along.)
+
 ## 2. Scope-narrowing is IN bounds. Retirement is NOT.
 
 - **You (or a reviewer) MAY establish that a rule does not REACH the case at hand.** That is a factual

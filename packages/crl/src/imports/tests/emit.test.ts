@@ -238,29 +238,33 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
 
   it("a cross-lib possible-representation ref does NOT emit a dangling `include` (representations don't lower to CQL)", () => {
     // Landmine (B), resolved EMPIRICALLY: a representation-only / `code is` +
-    // `source representation … coded from "Other"."VS"` concept lowers to a
-    // `// TODO: representations-only concept` placeholder — the representation's
-    // terminology is NEVER referenced in the emitted CQL body. So a cross-lib
-    // representation ref must NOT drive a per-library `include` (that emitted a
-    // DANGLING `include Other`, and Other auto-splits so no "Other.cql" exists).
-    // Representation refs stay in the emit CLOSURE (Other's layers still emit for
-    // FHIR), just NOT in the include set.
+    // `source representation … coded from "Other"."VS"` concept has no emit lowering yet — the
+    // representation's terminology is NEVER referenced in the emitted CQL body. So a cross-lib
+    // representation ref must NOT drive a per-library `include` (that emitted a DANGLING
+    // `include Other`, and Other auto-splits so no "Other.cql" exists). Representation refs stay
+    // in the emit CLOSURE (Other's layers still emit for FHIR), just NOT in the include set.
+    //
+    // ⚠ This test used to assert `success: true` alongside a `// TODO` placeholder — i.e. it PINNED
+    // an emitter that reported success while writing a `define` whose entire body was a comment,
+    // which is CQL that cannot translate. The unbuilt lowering now fails loudly (charter §0a); the
+    // property this test exists for — no dangling include — is unchanged and still checked.
     const root = path.join(FIXTURES, "repr-cross-lib", "root.crl");
     const result = emitCQLImports(root);
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
+    expect((result.errors ?? []).some((e) => e.kind === "emit-representations-only-not-lowered")).toBe(true);
+    // CRITICAL: NO dangling `include Other` (nor an include of any Other-derived split layer) in the
+    // referrer's CQL. Still checked — vacuously while emit fails, but it re-arms the moment the lowering
+    // lands and the libraries come back.
     const rootCql = findLib(result, "Root") ?? "";
-    // The representation-only concept lowers to the TODO placeholder.
-    expect(rootCql).toMatch(/define "Foo"/);
-    expect(rootCql).toMatch(/representations-only concept/);
-    // CRITICAL: NO dangling `include Other` (nor an include of any Other-derived
-    // split layer) in the referrer's CQL.
-    expect(rootCql).not.toMatch(/include Other\b/);
+    expect(rootCql).not.toMatch(/include Other/);
     expect(rootCql).not.toMatch(/include "Other/);
-    // Closure PRESERVED: "Other" is still emitted (auto-split into policy-id
-    // layer libraries) even though the referrer does not `include` it.
-    const names = policyLibNames(result);
-    expect(names).toContain("CrlReprFixtureExternalConcepts");
-    expect(names).toContain("CrlReprFixtureExternalPrimitives");
+
+    // ⚠ NOT ASSERTED, and deliberately not deleted: this test also protected "the closure is PRESERVED —
+    // Other still emits its layer libraries even though the referrer does not include it". A hard emit
+    // error returns NO libraries, so that property is currently unobservable through this path. Stated
+    // here rather than dropped, because a silently removed assertion is indistinguishable from one that
+    // never existed. It comes back with the representations-only lowering.
+    expect(policyLibNames(result)).toEqual([]);
   });
 
   it("R2: source-name layer collision class is eliminated by policy-id naming (real `X Asserted` sibling no longer clashes)", () => {

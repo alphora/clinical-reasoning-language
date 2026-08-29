@@ -304,6 +304,12 @@ enforces + emits the new form, both lanes, together.
 
 ## 10. DEFERRED / RESUME — do not lose this
 
+⚠ **A deferral here is BUILD DEBT and is never recorded as a rejection** (charter §0a). Nothing in this
+section makes an authoring shape illegal. In particular a local `code is` alongside a derivation and/or
+`source representation` posreps is the CANONICAL production shape — the `fixtures/obesity` target is built
+entirely on it — so it classifies `unclassified` (cannot certify yet), never `rejected` (must never be
+emitted, fires an author migration prompt).
+
 Everything punted, with enough to pick up. **Captured here so the investment survives; file as tracker issues
 when picked up (memory is not backlog).**
 

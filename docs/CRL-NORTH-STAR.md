@@ -10,6 +10,32 @@ current; see "Reconciliation" at the end.
 
 ---
 
+## 0a. ⭐⭐ THE STAKE IN THE GROUND: `fixtures/obesity` is the goal
+
+**`packages/crl/src/tests/fixtures/obesity/` — both authoring options — IS the goal** (operator,
+2026-08-29). It is the canonical target for the Obese/BMI chain, it is committed, and
+`packages/crl/src/tests/obesityTarget.test.ts` drives it across every lane.
+
+⭐ **A rule declaring the target's SHAPES rejected, out-of-scope, or to-be-migrated-away is STALE** — not "in
+tension with", stale, and to be corrected on sight. The shapes: a local `code is` alongside a derivation
+and/or `source representation` posreps, in both `shape is Record` and `shape is RecordSet` flavours.
+
+⚠ That is a scoped ruling, not a trump card. It retires rules about THOSE SHAPES. It does not exempt the
+target from ordinary validation, and it does not license retiring an operator requirement on the grounds
+that it inconveniences the target — only the operator retires those (`stale-requirements` §2).
+
+⚠ **And the reason it was wrong is worth keeping**, because it is a mechanism and not a one-off mistake.
+Those rules were **deferral decisions dressed as rejections**. A slice could not yet lower a shape, so the
+shape was recorded as `rejected` — a status that fires an author-facing migration prompt. That silently
+converts *"we have not built this"* into *"you may not write this"*, and then the next round reads it as a
+language decision and re-derives the deferral. That is the spinning this stake was planted to stop.
+
+**So: build debt is recorded as build debt.** A form the emitter cannot yet certify classifies
+`unclassified` — enumerated, reported, incomplete, loud. `rejected` is reserved for a form that is genuinely
+invalid, and it is a claim about the LANGUAGE, never about the schedule.
+
+---
+
 ## 0. ⭐ The design priority: ease of use → CLARITY of use
 
 **This is a reading rule for the whole document — and for every rule anywhere in this project.**

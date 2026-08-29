@@ -1139,8 +1139,13 @@ export function lowerLocalCodes(
     //         definition).
     //     `code is` + `definition is age today` is RETIRED (the migration target is the
     //     age posrep) — the pre-lowering retirement scan owns that error, so it is skipped
-    //     here rather than double-reported. `code is` + `coded from` / any other
-    //     `definition is` stay hard errors (they don't fold into the truth-set lane).
+    //     here rather than double-reported.
+    //
+    // ⚠ BUILD DEBT, NOT A SCOPE DECISION (charter §0a). `code is` + any other `definition is` hard-errors
+    // below because the fold-in is UNBUILT for it, not because the shape is illegal — it is the canonical
+    // production shape, and the `fixtures/obesity` target is built on it, so this error is what stops that
+    // target emitting at all. Generalizing the `defined as` fold-in to cover `definition is` is the work.
+    // The error stays LOUD meanwhile: emitting nothing beats silently dropping the local-code source side.
     if (c.definition !== undefined && c.definition.type !== "DefinedAsDefinition") {
       if (c.definition.type === "DefinitionIsDefinition" && isAgeTodayPrefix(c.definition.body)) {
         continue; // retired `definition is age today` — owned by checkRetiredAgeDefinitions
@@ -1151,8 +1156,9 @@ export function lowerLocalCodes(
           `Concept "${c.name}" carries BOTH a local \`code is\` and a top-level ` +
             `definition (\`${c.definition.type}\`). Only \`code is\` + \`defined as\` ` +
             `or \`code is\` + an age \`source representation\` (both-representation) is ` +
-            `supported; \`code is\` + \`${c.definition.type}\` is out of scope — emit ` +
-            `nothing rather than silently drop the local-code source side.`,
+            `supported; \`code is\` + \`${c.definition.type}\` is NOT YET LOWERED — emit ` +
+            `nothing rather than silently drop the local-code source side. This is unbuilt work, not an ` +
+            `illegal form: do not re-author the concept to avoid it.`,
           loc,
         ),
       );
@@ -1187,9 +1193,9 @@ export function lowerLocalCodes(
           "emit-mixed-code-and-definition",
           `Concept "${c.name}" carries a local \`code is\`, a both-representation ` +
             `definition (\`${c.definition!.type}\`), AND a \`source representation\`. ` +
-            `The \`code is\` + definition + \`source representation\` 3-way is out of ` +
-            `scope this round — emit nothing rather than silently drop the local-code ` +
-            `source side.`,
+            `The \`code is\` + definition + \`source representation\` 3-way is NOT YET ` +
+            `LOWERED — emit nothing rather than silently drop the local-code source side. ` +
+            `This is unbuilt work, not an illegal form: do not re-author the concept to avoid it.`,
           loc,
         ),
       );

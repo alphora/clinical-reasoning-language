@@ -85,18 +85,18 @@ import {
 
 /**
  * A structured discriminant on the `rejected` arm (§4 reject seam). The T5 reject seam fires ONLY on the
- * MIGRATION cells — the bare-scalar `code is` (`bare-scalar`) and the three E1 both-rep forms (`e1-*`) — and
+ * MIGRATION cells — the bare-scalar `code is` (`bare-scalar`) — and
  * carries a #257/migration prompt. The remaining codes tag `rejected` verdicts that are ALREADY caught by
  * other validation (malformed value-type/age, non-boolean exists/count/composition, trivial threshold,
  * boolean-with-no-definition); the seam must NOT sweep them, so they get their own codes rather than sharing
  * a migration cell. A free-text `reason` still accompanies every code.
  */
 export type BooleanRejectCode =
-  // ── The four T5 reject-seam cells (fire the emit-boundary reject + migration prompt) ──
+  // ── The T5 reject-seam cell (fires the emit-boundary reject + migration prompt) ──
   | "bare-scalar" // bare Scalar `code is`, no reduction/shape — the `no-bare-scalar-code` flip form (retiring 2e)
-  | "e1-defined-as" // `code is` + `defined as` (both-rep fold) — #257
-  | "e1-coded-from" // `code is` + `coded from` (local + external source) — #257
-  | "e1-source-rep" // `code is` + `source representation` (local + source multi-rep) — #257
+  // ⚠ A `code is` alongside a derivation or `source representation` is NOT here. Those are the canonical
+  // production shape, so they classify `unclassified` (build debt the proof reports) — never `rejected`,
+  // which would tell an author to migrate off the model.
   // ── Pre-existing invalid forms (NOT swept by the seam; caught by other validation) ──
   | "malformed-age" // malformed patient-age concept
   | "malformed-value-type" // 0 or >1 value types in boolean position
@@ -146,15 +146,22 @@ export type BooleanTotalityObligation =
   // a set/record result. Reading not-applicable as "consume anywhere" is the `Coalesce(X,0)` trap (§2).
   | { kind: "not-applicable"; nullable: boolean; reason: string }
   // Malformed in boolean position (0 or >1 value types; bare Scalar `code is`; a non-boolean `exists`/`count`)
-  // OR an E1-deferred form the flip rejects with a #257 migration prompt (§4.7 both-rep fold; local+source
+  // A flip validation/emit error (§4.7 both-rep fold; local+source
   // multi-rep). A flip validation/emit error; MUST NOT reach the ledger. `staging` (2b.4a) FORM-KEYS the ONE
   // still-live reject the scoped gate reports-not-fails (the pre-flip bare-scalar `code is`, retiring 2e); an
-  // E1 #257 reject leaves it UNSET so the gate blocks it (the kind alone must not exempt — disc 454 gpt56 #1).
+  // A non-staged reject leaves it UNSET so the gate blocks it (the kind alone must not exempt — disc 454 gpt56 #1).
   | { kind: "rejected"; code: BooleanRejectCode; reason: string; staging?: StagingExclusion }
   // A boolean form the emitter may emit but the classifier cannot yet certify (unknown narrative; an
   // instance-shape catalog read whose value-vs-presence lowering is decided at T5, §4 gap 3; a known catalog
   // pattern absent from the return-shape table). ENUMERATED by the proof; renders the result INCOMPLETE (§2).
-  | { kind: "unclassified"; reason: string };
+  // `unlowered` marks the sub-case where NO sanctioned lowering exists for the shape yet. It is a claim about
+  // the EMITTER'S OWN STATE, never about the author's model, so it carries no author-facing surface — but a
+  // define enrolled for such a shape is PRODUCER DRIFT (a lowering emitted something the emitter does not
+  // know how to lower), and the proof hard-fails it. That tripwire is the half of the old `rejected`
+  // classification that was load-bearing; the half that told the author to migrate is what charter §0a
+  // retires. Losing the tripwire with it would have left these lanes trust-nothing everywhere else and
+  // trust-everything here.
+  | { kind: "unclassified"; reason: string; unlowered?: true };
 
 /** True iff the concept declares exactly one value type and it is `boolean`. */
 function isBooleanScalar(concept: Concept): boolean {
@@ -248,13 +255,13 @@ function classifyCatalogPattern(concept: Concept, body: NarrativeClause): Boolea
  * recorded separately by T5 and checked against this obligation by `proveWholeBoundaryTotality`.
  *
  * Dispatch order matters (disc 429): value type / shape is keyed FIRST, then age (the code+posrep exception),
- * then the E1 rejects (the code+source deferrals #257), then the definition form.
+ * then the code+source build-debt arms, then the definition form.
  */
 export function classifyBooleanTotality(
   concept: Concept,
   // #189 Piece 1 (disc 506) — OPTIONAL: reports whether a `defined as exists ("V")` referent name V is a both-rep
   // RECENCY-VALUE concept (only `buildAuthoredObligations` supplies it — it has the whole library; per-concept
-  // callers leave it undefined and keep the deferred E1 reject). Needed because the member-existence fold's
+  // callers leave it undefined and keep the build-debt arm). Needed because the member-existence fold's
   // totality depends on the REFERENT, which this per-concept classifier cannot otherwise resolve.
   memberExistenceReferent?: (referentName: string) => boolean,
 ): BooleanTotalityObligation {
@@ -283,7 +290,7 @@ export function classifyBooleanTotality(
   }
 
   // #189 Piece 1 (disc 506) — the both-rep RECENCY-VALUE merge (`code is` + `most recent this` + a `coded from`
-  // `source representation`, e.g. `Covered Device`) is EXEMPT from the E1 `e1-source-rep` reject below: it now
+  // `source representation`, e.g. `Covered Device`) is EXEMPT from the `unclassified` build-debt arm below: it now
   // EMITS (a `Scalar<value-type>`-or-null recency merge), and it is NON-boolean, so it is `not-applicable{nullable}`
   // in the boolean subject (the interface reads member-EXISTENCE over its records, not this value). Shape-exact via
   // the SHARED resolver (the concept's OWN shape — no referent resolution), so this narrowing cannot widen the
@@ -296,10 +303,16 @@ export function classifyBooleanTotality(
     };
   }
 
-  // E1 rejects (disc 429 C1) — a local `code is` PLUS a source arm (`defined as` both-rep fold; `coded from`;
-  // or `source representation` posreps) is DEFERRED to #257 and rejected at the flip with a migration prompt
-  // (§4.7). Without these cells the classifier could never produce `rejected` for an E1 form, leaving the
-  // proof's enrolled-rejected guard decorative. Age was already exempted above.
+  // A local `code is` PLUS a source arm (`defined as` both-rep fold; `coded from`;
+  // ⭐ A local `code is` alongside a derivation and/or `source representation` posreps is the CANONICAL
+  // production shape (charter §3; the `fixtures/obesity` target is built entirely on it, in both authoring
+  // options). What the classifier cannot yet do is CERTIFY its totality, so it says exactly that:
+  // `unclassified`, which the proof ENUMERATES and reports as INCOMPLETE.
+  //
+  // ⚠ NOT `rejected`. `rejected` means the form must never be emitted and fires a migration prompt telling
+  // the author to change their authoring — which for these shapes would tell them to abandon the canonical
+  // model. A deferral is build debt; recording it as a rejection turns "we have not built this" into "you
+  // may not write this", and that is how a scheduling decision quietly becomes a language decision.
   const hasCode = concept.code !== undefined;
   if (hasCode) {
     if (concept.definition?.type === "DefinedAsDefinition") {
@@ -309,7 +322,7 @@ export function classifyBooleanTotality(
       // unqualified ref + recency-value referent + own arm a Scalar<boolean> Observation), so the obligation activates
       // on EXACTLY the shapes emit activates on (no obligation↔emit drift). Existence is intrinsically total →
       // `intrinsically-total`, reconciling with the emitted `member-existence-fold` discharge. Every other `code is` +
-      // `defined as` (non-recency-value referent, composition, bare ref) stays the deferred E1 reject.
+      // `defined as` (non-recency-value referent, composition, bare ref) stays the build-debt `unclassified` arm.
       if (
         memberExistenceReferent !== undefined &&
         isMemberExistenceInterface(concept, memberExistenceReferent)
@@ -322,13 +335,32 @@ export function classifyBooleanTotality(
           cell: "§2 value/interface member-existence fold → own-newest or exists(LP) or exists(EP)",
         };
       }
-      return { kind: "rejected", code: "e1-defined-as", reason: "`code is` + `defined as` (both-rep fold) is deferred to #257 — rejected at the flip (§4.7)" };
+      return {
+        kind: "unclassified",
+        unlowered: true,
+        reason:
+          "`code is` + `defined as` (both-rep fold) — the classifier cannot certify its totality yet. " +
+          "BUILD DEBT, not an illegal form: the local code is the canonical production representation.",
+      };
     }
     if (concept.definition?.type === "CodedFromDefinition") {
-      return { kind: "rejected", code: "e1-coded-from", reason: "`code is` + `coded from` (local + external source) is deferred to #257 — rejected at the flip (§4.7)" };
+      return {
+        kind: "unclassified",
+        unlowered: true,
+        reason:
+          "`code is` + `coded from` (local + external source) — the classifier cannot certify its totality " +
+          "yet. BUILD DEBT, not an illegal form.",
+      };
     }
     if (concept.representations.length > 0) {
-      return { kind: "rejected", code: "e1-source-rep", reason: "`code is` + `source representation` (local + source multi-rep) is deferred to #257 — rejected at the flip (§4.7)" };
+      return {
+        kind: "unclassified",
+        unlowered: true,
+        reason:
+          "`code is` + `source representation` (local + source multi-rep) — the classifier cannot certify " +
+          "its totality yet. BUILD DEBT, not an illegal form: this IS the canonical shape (charter §3 — the " +
+          "local code is the production representation, a source representation is optional and additive).",
+      };
     }
   }
 
@@ -969,6 +1001,14 @@ export function proveWholeBoundaryTotality(
         // define identifiers, and nothing legitimate introduces a `Coalesce` — so one there IS the totalization.
         fail(e, "guard define enrolled `three-state` but its emitted body totalizes a leaf (`Coalesce`) — the metadata and the lowering disagree");
       }
+      continue;
+    }
+    // ⭐ THE ENROLLMENT TRIPWIRE. An `unlowered` obligation says the emitter has no sanctioned lowering for
+    // this shape — so a define enrolled for it means a lowering produced something anyway. Checked BEFORE the
+    // Boolean-subject skip, because the drift shows up on the non-Boolean lanes too (a truth-set `List`
+    // define, a representations-only stub), which a Boolean-only check would wave through.
+    if (e.obligation.kind === "unclassified" && e.obligation.unlowered === true) {
+      fail(e, `a define was emitted for a shape with NO sanctioned lowering — ${e.obligation.reason}`);
       continue;
     }
     if (e.discharge.booleanEffect === "three-state") {

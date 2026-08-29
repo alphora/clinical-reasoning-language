@@ -17,7 +17,7 @@
 //
 // SHAPE-EXACT (disc 506): anything off-shape — >1 posrep, a non-`coded from` posrep, a `value projection` (age) posrep,
 // a non-`mostRecent`/named-target reduction, a boolean or multi-value-type declaration — returns `not-recency-value`,
-// so the EXISTING E1 rejects (`e1-source-rep`) still fire on it. This resolver NARROWS; it never widens.
+// so the build-debt `unclassified` arm still covers it. This resolver NARROWS; it never widens.
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import type { Concept, Representation } from "../ast/types";
@@ -82,7 +82,7 @@ export function resolveRecencyValueConcept(concept: Concept): RecencyValueResolu
  * — a same-library (`getRefLibrary === null`, so a cross-lib `Other."V"` stays the deferred loud rejection, NOT a
  * silent local rebind) `Scalar<boolean>` at the DEFAULT Observation value carrier. That guarantees the emit's
  * `O.value as FHIR.boolean` / `(effective as FHIR.dateTime).value` own-arm read is correct — a `type is Condition` /
- * non-boolean / authored-non-standard-value-element interface is NOT this form and stays the deferred E1 reject
+ * non-boolean / authored-non-standard-value-element interface is NOT this form and stays the build-debt `unclassified` arm
  * (never a silently-untranslatable emit).
  */
 export function isMemberExistenceInterface(

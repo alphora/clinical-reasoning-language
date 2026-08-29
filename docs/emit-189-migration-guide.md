@@ -126,7 +126,17 @@ concept "Most Recent A1c":
 ```
 
 **State where every original representation goes.** The example keeps the local `code is` as the
-`RecordSet`'s single representation; **the `source representation` is dropped from the reduced set** —
+`RecordSet`'s single representation.
+
+⚠ **DO NOT drop the `source representation`, and do not split a concept in order to avoid one.** An earlier
+version of this case said the source representation is dropped from the reduced set. That instructed authors
+off the canonical model (charter §0a/§2: the local `code is` is the production representation and a source
+representation is optional and ADDITIVE), and its premise is also gone — the both-rep `most recent this` +
+`coded from` recency merge emits today.
+
+The one re-authoring that IS correct here is unrelated to emit maturity: a BOOLEAN concept carrying a
+non-boolean coded source rep must become the canonical value concept + boolean interface concept split
+(charter §3). That is a value-type-agreement rule. The value concept keeps BOTH arms.
 only the chosen set feeds `most recent this` until cross-representation dedup lands (#257). If you need
 the other representation too, model it as its own named `RecordSet` and decide, per concept, which set
 the reduction reads. Preserve local assertability where you had it (`code is` stays on the `RecordSet`).

@@ -457,10 +457,12 @@ decision "D":
 // ---- Surface 4 — authored census (the FULL flip-reject set 2e migrates) --
 
 describe("2a ledger — authored census (classifier over the RAW authored AST)", () => {
-  it("tallies the `rejected` authored forms (bare-scalar, both-rep) independent of emit", () => {
+  it("tallies `rejected` (bare-scalar) apart from `unclassified` build debt (both-rep), independent of emit", () => {
     const bareScalar = parse(BARE_SCALAR).statements.find((s) => s.type === "Concept" && s.name === "Flag");
     expect(classifyBooleanTotality(bareScalar as never).kind).toBe("rejected");
-    // A both-rep `code is` + `defined as` fold is an E1 reject.
+    // ⚠ A both-rep `code is` + `defined as` fold is NOT a reject — it is the canonical production shape
+    // whose totality the classifier cannot certify yet. `rejected` fires a migration prompt; using it here
+    // would tell an author to abandon the model (operator, 2026-08-29).
     const bothRep = parse(`library "T".
 concept "Src":
 - type is Condition.
@@ -472,6 +474,6 @@ concept "M":
 - code is \`m\`.
 - defined as ( "Src" ).
 `).statements.find((s) => s.type === "Concept" && s.name === "M");
-    expect(classifyBooleanTotality(bothRep as never).kind).toBe("rejected");
+    expect(classifyBooleanTotality(bothRep as never).kind).toBe("unclassified");
   });
 });
