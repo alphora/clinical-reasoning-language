@@ -41,9 +41,11 @@ terminology "Height VS":
 terminology "Weight VS":
 - valueset is `http://example.org/vitals/ValueSet/weight`.
 
-// THE question, and the condition. `most recent` is concept-level: it spans
-// BOTH arms — the threshold over the newest BMI, and existence of a coded
-// Condition — selecting the one record this concept publishes.
+// THE question, and the condition. `most recent` is concept-level: it spans ALL
+// THREE arms — the threshold computed over the newest BMI, existence of a coded
+// Condition, and the local `code is` channel where an answer lands — selecting
+// the one record this concept publishes. ⚠ The local code is an arm like any
+// other; it is easy to overlook because no line of the definition names it.
 concept "Obese":
 - shape is Record.
 - type is Observation.
