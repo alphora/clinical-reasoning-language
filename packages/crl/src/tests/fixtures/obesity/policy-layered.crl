@@ -1,27 +1,29 @@
 // ===========================================================================
-// OBESITY — LAYERED. The CONVENTION: histories -> named selections -> derivations.
+// OBESITY — LAYERED. The CONVENTION: layer MEASUREMENTS, merge DETERMINATIONS.
 //
 // ⭐ ONE OF THREE LEGITIMATE AUTHORING OPTIONS (operator, 2026-08-29), and the
 // one we expect to establish as the convention. Assume an Obesity LIBRARY whose
 // every layer some other library consumes.
 //
-// ⭐ THE RULE THAT SHAPES IT: you never add a "Height". You add a HEIGHT RECORD.
-// So the history is the ANSWER SLOT — the only place a local `code is` belongs —
-// and every Record above it is a NAMED SELECTION, derived and never answered.
-// The names say so: `Most Recent Height`, not `Height`.
+// ⭐ TWO KINDS OF CONCEPT, AND THEY LAYER DIFFERENTLY.
 //
-// That is what makes the layer earn its keep rather than being a restatement:
-// `Most Recent Weight` and `Greatest Weight` are two selections over ONE history,
-// and neither restates the code or the source representation.
+// A MEASUREMENT is a thing you record repeatedly. You never add a "Height", you
+// add a HEIGHT RECORD — so the history carries the code and IS the answer slot,
+// and each Record above it is a NAMED SELECTION, derived and never answered.
+// That is what the layer buys: `Most Recent Weight` and `Greatest Weight` are
+// two selections over ONE history, and neither restates the code or the posrep.
 //
-// ⚠ Contrast the other two options, which conflate the two roles on one concept:
-// a coded Record is simultaneously the answer slot AND a selection, and its
-// selection is implicitly "most recent" — so a SECOND selection (a greatest, an
-// earliest) has nowhere to attach without reducing something already reduced.
+// A DETERMINATION is a thing you conclude. It has ONE value and several ways to
+// reach it — asserted, recorded externally, derived — and those are ARMS OF ONE
+// CONCEPT, not separate concepts. `code is` + `source representation` +
+// `definition is …, then most recent this` merges all three. Splitting them
+// instead produces an answer slot nothing reads: MEASURED, an asserted obesity
+// was accepted and ignored while the decision denied.
 //
-// ⚠ OPEN, and this file is where it shows: a derivation and a recorded history
-// are two arms of one determination, and nothing here merges them. See `BMI`.
-// Deliberately left unresolved rather than papered over.
+// ⚠ So the convention is NOT "layer everything". Layer a measurement, because a
+// history genuinely has several selections. Do not layer a determination: it has
+// one value, and separating its arms only removes the merge the language already
+// performs.
 // ===========================================================================
 library "Obesity Coverage (Layered)".
 
@@ -34,10 +36,9 @@ terminology "Height VS":
 terminology "Weight VS":
 - valueset is `http://example.org/vitals/ValueSet/weight`.
 
-// ── LAYER 1 — the HISTORIES ────────────────────────────────────────────────
-// The ANSWER SLOTS. A local `code is` lives here and nowhere else: answering
-// means adding a record, so an answer is in the history by construction and the
-// history is never a partial account of itself.
+// ── MEASUREMENTS, layer 1 — the HISTORIES ──────────────────────────────────
+// The answer slots for the raw measurements. Answering means adding a record,
+// so an answer is in the history by construction.
 
 concept "Height Records":
 - shape is RecordSet.
@@ -57,30 +58,9 @@ concept "Weight Records":
   - type is Observation.
   - coded from "Weight VS".
 
-concept "BMI Records":
-- shape is RecordSet.
-- type is Observation.
-- value type is Quantity.
-- code is `bmi`.
-- source representation:
-  - type is Observation.
-  - coded from "Clinical BMI VS".
-
-concept "Obese Records":
-- shape is RecordSet.
-- type is Observation.
-- value type is boolean.
-- code is `obese`.
-- source representation:
-  - type is Condition.
-  - coded from "Obese VS".
-  - value projection is exists this.
-
-// ── LAYER 2 — the NAMED SELECTIONS ─────────────────────────────────────────
-// Records. Each names ONE reduction of ONE history. No code, no posrep: a
-// selection is not a thing you answer, and the datum was already described once
-// below. ⭐ `Most Recent Weight` and `Greatest Weight` are the point of the
-// layer — two selections, one history, nothing restated.
+// ── MEASUREMENTS, layer 2 — the NAMED SELECTIONS ───────────────────────────
+// Each names ONE reduction of ONE history. Uncoded: a selection is not a thing
+// you answer. ⭐ Two selections over `Weight Records` is the point of the layer.
 
 concept "Most Recent Height":
 - shape is Record.
@@ -100,35 +80,35 @@ concept "Greatest Weight":
 - value type is Quantity.
 - definition is highest "Weight Records".
 
-concept "Most Recent Recorded BMI":
-- shape is Record.
-- type is Observation.
-- value type is Quantity.
-- definition is most recent "BMI Records".
+// ── DETERMINATIONS — one concept, arms merged ──────────────────────────────
+// NOT layered. Each has one value reached three ways, and `, then most recent
+// this` reduces over the concept's OWN records — which is where the asserted
+// arm (`code is`) and the recorded arm (`source representation`) both live. So
+// the merge is the concept, and the concept is answerable.
 
-// ── LAYER 3 — the DERIVATIONS ──────────────────────────────────────────────
-// Computed from the selections. Uncoded, like the selections: a derivation is
-// not answered either — what a user answers is the history it competes with.
-
-// ⚠ THE OPEN ONE. This determination has TWO arms — the calculation below, and
-// the recorded/answered history reached through `Most Recent Recorded BMI` — and
-// nothing in the language merges them into one Record. On the coded-Record
-// options that merge is what `, then most recent this` does over a concept's OWN
-// records; a derivation with no records of its own has no equivalent. Left
-// unresolved on purpose: papering over it would hide the gap this file exposes.
+// Derived from the measurement selections; also recordable and assertable.
 concept "BMI":
 - shape is Record.
 - type is Observation.
 - value type is Quantity.
-- definition is body mass index of "Most Recent Weight" and "Most Recent Height".
+- code is `bmi`.
+- definition is body mass index of "Most Recent Weight" and "Most Recent Height", then most recent this.
+- source representation:
+  - type is Observation.
+  - coded from "Clinical BMI VS".
 
-// The same two-arm question as BMI: the threshold, versus what was asserted or
-// recorded in `Obese Records`.
+// The coverage criterion. Asserted by a clinician, recorded as a Condition, or
+// derived from BMI — whichever is newest wins.
 concept "Obese":
 - shape is Record.
 - type is Observation.
 - value type is boolean.
-- definition is "BMI" at least 30 'kg/m2'.
+- code is `obese`.
+- definition is "BMI" at least 30 'kg/m2', then most recent this.
+- source representation:
+  - type is Condition.
+  - coded from "Obese VS".
+  - value projection is exists this.
 
 activity "Approve Bariatric Surgery":
 - request CPGCommunicationRequest.

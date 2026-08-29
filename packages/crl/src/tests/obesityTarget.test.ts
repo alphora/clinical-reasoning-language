@@ -18,12 +18,12 @@ import { emitFhirDefFromPath } from "../fhir-emitter/closureOrchestrator";
  *              a user may answer at any level — assert obesity, or a BMI, or a height and a weight.
  *   RecordSet  the histories are assertable but NOT answerable. ONE question, and the reduction happens at
  *              the top instead of at every level.
- *   Layered    ⭐ the expected CONVENTION: histories -> named selections -> derivations. You never add a
- *              "Height", you add a height RECORD — so the history carries the code and IS the answer slot,
- *              and every Record above it is a NAMED SELECTION, derived and never answered. `Most Recent
- *              Weight` and `Greatest Weight` are two selections over ONE history: that reuse is what the
- *              layer buys, and it is inexpressible on the other two, where one concept is both the slot and
- *              an implicit most-recent selection.
+ *   Layered    ⭐ the expected CONVENTION, and the rule is NOT "layer everything": layer a MEASUREMENT,
+ *              merge a DETERMINATION. You never add a "Height" — you add a height RECORD — so a measurement
+ *              history carries the code and the Records above it are named selections (`Most Recent Weight`
+ *              and `Greatest Weight` over ONE history is what the layer buys, and it is inexpressible on the
+ *              other two). A determination has ONE value reached three ways — asserted, recorded, derived —
+ *              which are arms of ONE concept, merged by `, then most recent this`.
  *
  * Different generated Questionnaires, same decision. So they owe the SAME truth table, and this file drives
  * all three through every lane — a lane that works for one authoring option and not the others is not done.
@@ -114,29 +114,20 @@ const OPTIONS: readonly AuthoringOption[] = [
     name: "Layered",
     policy: path.join(FIXTURE, "policy-layered.crl"),
     cases: path.join(FIXTURE, "cases-layered.cel"),
-    // ⭐ ZERO, and that is the CONVENTION'S DEFINING PROPERTY, not a gap. You never add a "Height" — you add
-    // a height RECORD — so the answer slot is the history and every Record above it is a NAMED SELECTION,
-    // derived and never answered. Answer slots and selections are DISJOINT here; on the other two options
-    // one concept plays both roles, which is why neither can express a second selection (`Greatest Weight`)
-    // without reducing something already reduced.
-    questions: [],
+    // ⭐ THE CONVENTION'S RULE, and it is not "layer everything": layer a MEASUREMENT, merge a
+    // DETERMINATION. A measurement is recorded repeatedly, so its history is the answer slot and the
+    // Records above it are named selections — `Most Recent Weight` and `Greatest Weight` over ONE history
+    // is what the layer buys. A determination has ONE value reached three ways (asserted, recorded,
+    // derived), and those are ARMS OF ONE CONCEPT that `, then most recent this` already merges.
+    //
+    // ⚠ MEASURED: splitting a determination instead produced an answer slot nothing reads — an asserted
+    // obesity was accepted and IGNORED while the decision denied. That looked like a missing merge
+    // construct in the language; it was the split. Merged back, this option's CRE rows match the other
+    // two exactly, and its emit blocker becomes the SAME one, so all three now fail identically.
+    questions: ["BMI", "Obese"],
     validatesCleanToday: false,
-    // ⭐ ALL THREE ROWS DENY, including a STATED TRUE. Measured, and it is the convention's open gap made
-    // concrete: the answer lands on `Obese Records` (the history) while the decision guards on `Obese` (the
-    // derivation from BMI), and NOTHING merges the two arms. So under this convention today, ANSWERING THE
-    // QUESTION HAS NO EFFECT — the answer is written and ignored. On the coded-Record options that merge is
-    // what `, then most recent this` does over a concept's own records; a derivation has no records of its
-    // own, so it has no equivalent. MUST become the shared truth table.
-    producesToday: {
-      "obese stated true -> approve": ["Deny Bariatric Surgery"],
-      "obese stated false -> deny": ["Deny Bariatric Surgery"],
-      "obese unanswered -> no recommendation": ["Deny Bariatric Surgery"],
-    },
-    // ⚠ A DIFFERENT blocker: layering has no concept carrying both a code and a definition, so it never hits
-    // `emit-mixed-code-and-definition` at all. It hits the histories instead — a `source representation` with
-    // no top-level definition has no lowering, which before 2026-08-29 emitted a define whose body was a
-    // comment while reporting SUCCESS.
-    emitBlocker: "emit-representations-only-not-lowered",
+    producesToday: PRODUCES_TODAY,
+    emitBlocker: "emit-mixed-code-and-definition",
   },
 ];
 
