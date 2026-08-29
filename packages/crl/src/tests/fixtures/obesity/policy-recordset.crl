@@ -2,18 +2,28 @@
 // OBESITY — RECORDSET version. A complete, runnable policy.
 //
 // Height, Weight and BMI publish HISTORIES. They carry local codes, so they
-// are assertable — but `shape is RecordSet` means they are NOT questions.
-// Only `Obese` reduces to one record, so `Obese` is the single question, and
-// the reduction happens at the TOP rather than at every level.
+// are ANSWERABLE — you answer a history by ADDING A RECORD (charter §3). What
+// `shape is RecordSet` changes is not answerability but what the concept
+// PUBLISHES: a set, not one record. So the reduction happens at the TOP rather
+// than at every level.
 //
-// ⭐ ONE OF TWO LEGITIMATE AUTHORING OPTIONS (operator, 2026-08-29), alongside
-// `policy.crl`. Not a variant of it and not subordinate to it: both are
-// canonical, both owe the SAME truth table, and a lane that works for one and
-// not the other is not done. What differs is what the author exposes — four
-// questions answerable at any level, or one question with the reduction at the
-// top — so the two generate different Questionnaires from the same decision.
+// ⚠ AN EARLIER VERSION OF THIS HEADER SAID `shape is RecordSet` MEANS "NOT A
+// QUESTION", and that only `Obese` was a question. That was the retired
+// "measurements are a thing you don't answer" mistake — corrected in
+// `policy-layered.crl` and the charter and MISSED HERE (operator confirmed the
+// missed sweep, 2026-08-29). It also conflated two different things: reducing
+// to ONE RECORD (a `cpg-featureExpression` target) and being a QUESTION (a
+// local `code is`). `obesityTarget.test.ts` warns against exactly that
+// conflation, and already pins FOUR reachable questions for this option.
 //
-// ⚠ Keeping both is also what makes `shape is` testable. It is a DISCRIMINATOR,
+// ⭐ ONE OF THREE LEGITIMATE AUTHORING OPTIONS (operator, 2026-08-29), alongside
+// `policy.crl` and `policy-layered.crl`. Not a variant of them and not
+// subordinate: all are canonical, all owe the SAME truth table, and a lane that
+// works for one and not the others is not done. The SAME four concepts are
+// answerable in each. What differs is HOW you answer them — replace the one
+// record, or add to a history — and how many publish a single value.
+//
+// ⚠ Keeping all three is also what makes `shape is` testable. It is a DISCRIMINATOR,
 // and a suite declaring only one value of it cannot notice when the
 // discriminator is ignored — precisely the open defect (step 6, "emit honors
 // shape is"). It selects a different emitter path too: a reduction over a local
@@ -45,9 +55,9 @@ concept "Obese":
   - coded from "Obese VS".
   - value projection is exists this.
 
-// NOT a question — the local code makes it assertable, `shape is RecordSet`
-// makes it a set. Its records are the UNION of the computed values (over the
-// Height and Weight histories) and the recorded ones. A RecordSet publishes
+// ANSWERABLE like every coded concept — answered by ADDING a BMI record. Its
+// records are the UNION of the computed values (over the Height and Weight
+// histories), the recorded ones, and the answered ones. A RecordSet publishes
 // its set, so no reduction is owed.
 concept "BMI":
 - shape is RecordSet.
@@ -59,7 +69,7 @@ concept "BMI":
   - type is Observation.
   - coded from "Clinical BMI VS".
 
-// NOT a question — a history of measurements.
+// A history of measurements, and ANSWERABLE — you answer it by adding a height.
 concept "Height":
 - shape is RecordSet.
 - type is Observation.
@@ -69,7 +79,7 @@ concept "Height":
   - type is Observation.
   - coded from "Height VS".
 
-// NOT a question — a history of measurements.
+// A history of measurements, and ANSWERABLE — you answer it by adding a weight.
 concept "Weight":
 - shape is RecordSet.
 - type is Observation.
