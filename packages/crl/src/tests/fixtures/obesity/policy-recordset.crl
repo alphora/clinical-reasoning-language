@@ -1,0 +1,90 @@
+// ===========================================================================
+// OBESITY — RECORDSET version. A complete, runnable policy.
+//
+// Height, Weight and BMI publish HISTORIES. They carry local codes, so they
+// are assertable — but `shape is RecordSet` means they are NOT questions.
+// Only `Obese` reduces to one record, so `Obese` is the single question, and
+// the reduction happens at the TOP rather than at every level.
+//
+// ⚠ THE CONTRAST FIXTURE, and it is not optional. `shape is` is a
+// DISCRIMINATOR, and a suite that only ever declares one value of it cannot
+// notice when the discriminator is ignored. It also drives a different emitter
+// path: a reduction over a local `shape is RecordSet` OPERAND is gated
+// explicitly (`cql-emitter/emitCQL.ts`), so `BMI`'s operands here are
+// RecordSets where the Record version's are Records.
+//
+// The two are alternative MODELS of one chain, not variants of one model —
+// they generate different Questionnaires (four questions vs one). Which is
+// canonical for the goal is an open question; both must keep working.
+// ===========================================================================
+library "Obesity Coverage (RecordSet)".
+
+terminology "Obese VS":
+- valueset is `http://example.org/vitals/ValueSet/obese`.
+terminology "Clinical BMI VS":
+- valueset is `http://example.org/vitals/ValueSet/bmi`.
+terminology "Height VS":
+- valueset is `http://example.org/vitals/ValueSet/height`.
+terminology "Weight VS":
+- valueset is `http://example.org/vitals/ValueSet/weight`.
+
+// THE question, and the condition. `most recent` is concept-level: it spans
+// BOTH arms — the threshold over the newest BMI, and existence of a coded
+// Condition — selecting the one record this concept publishes.
+concept "Obese":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `obese`.
+- definition is "BMI" at least 30 'kg/m2', then most recent this.
+- source representation:
+  - type is Condition.
+  - coded from "Obese VS".
+  - value projection is exists this.
+
+// NOT a question — the local code makes it assertable, `shape is RecordSet`
+// makes it a set. Its records are the UNION of the computed values (over the
+// Height and Weight histories) and the recorded ones. A RecordSet publishes
+// its set, so no reduction is owed.
+concept "BMI":
+- shape is RecordSet.
+- type is Observation.
+- value type is Quantity.
+- code is `bmi`.
+- definition is body mass index of "Weight" and "Height".
+- source representation:
+  - type is Observation.
+  - coded from "Clinical BMI VS".
+
+// NOT a question — a history of measurements.
+concept "Height":
+- shape is RecordSet.
+- type is Observation.
+- value type is Quantity.
+- code is `height`.
+- source representation:
+  - type is Observation.
+  - coded from "Height VS".
+
+// NOT a question — a history of measurements.
+concept "Weight":
+- shape is RecordSet.
+- type is Observation.
+- value type is Quantity.
+- code is `weight`.
+- source representation:
+  - type is Observation.
+  - coded from "Weight VS".
+
+activity "Approve Bariatric Surgery":
+- request CPGCommunicationRequest.
+- with `APPROVED`.
+
+activity "Deny Bariatric Surgery":
+- request CPGCommunicationRequest.
+- with `NOT APPROVED`.
+
+decision "Bariatric Surgery Coverage":
+first:
+- when "Obese" then recommend activity "Approve Bariatric Surgery".
+- otherwise then recommend activity "Deny Bariatric Surgery".

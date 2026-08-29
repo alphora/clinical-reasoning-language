@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, it, expect } from "vitest";
 
-import { validateCRL } from "../index";
+import { buildCRL, validateCRL } from "../index";
 import { resolveCelImports } from "../cel/imports";
 import { runCel } from "../cre/run";
 import { emitCQLImports } from "../imports/emit";
@@ -29,6 +29,8 @@ import { emitFhirDefFromPath } from "../fhir-emitter/closureOrchestrator";
 
 const FIXTURE = path.resolve(__dirname, "fixtures/obesity");
 const POLICY = path.join(FIXTURE, "policy.crl");
+/** ⚠ The CONTRAST model — see `policy-recordset.crl`. Not a variant: a different question set. */
+const POLICY_RECORDSET = path.join(FIXTURE, "policy-recordset.crl");
 const CASES = path.join(FIXTURE, "cases.cel");
 
 /** The acceptance criterion, verbatim (operator, 2026-08-29). The ONLY route to a Deny is a STATED false. */
@@ -72,6 +74,37 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
     // false and the `otherwise` fires, so absence produces a DENY. That is the #189 defect itself, reaching
     // the target chain: a Deny that traces to an absence rather than to a stated answer.
     expect(producedFor(TRUTH_TABLE[2].case)).toEqual(["Deny Bariatric Surgery"]);
+  });
+
+  it("the two models declare DIFFERENT question sets — this is why both fixtures exist", () => {
+    // A QUESTION is a locally-coded concept that publishes ONE record: `code is` + `shape is Record`. That is
+    // what makes it an answerable, and a legal `cpg-featureExpression` target. So the shape declaration is not
+    // decoration — it decides how many questions the generated Questionnaire carries.
+    const questionsIn = (file: string): string[] => {
+      const built = buildCRL(readFileSync(file, "utf8")) as unknown as {
+        success: boolean;
+        result?: { statements: { type: string; name?: string; code?: unknown; shape?: string }[] };
+      };
+      expect(built.success).toBe(true);
+      return (built.result?.statements ?? [])
+        .filter((st) => st.type === "Concept" && st.code !== undefined && st.shape === "Record")
+        .map((st) => st.name ?? "");
+    };
+    // Answer at ANY level — assert obesity directly, or a BMI, or a height and a weight.
+    expect(questionsIn(POLICY)).toEqual(["Obese", "BMI", "Height", "Weight"]);
+    // ONE question; the histories are assertable but not answerable, and the reduction happens at the top.
+    expect(questionsIn(POLICY_RECORDSET)).toEqual(["Obese"]);
+
+    // ⚠ WHY THIS MATTERS BEYOND COVERAGE. `shape is` is a DISCRIMINATOR, and a suite that only ever declares
+    // one value of it cannot notice when the discriminator is ignored — which is exactly the open defect
+    // (step 6). It is also a different EMITTER PATH: a reduction over a local `shape is RecordSet` operand is
+    // gated explicitly (`cql-emitter/emitCQL.ts`), so `BMI`'s operands here are RecordSets where the Record
+    // model's are Records. Deleting this fixture as "nothing depends on it" was wrong; step 6 depends on it.
+  });
+
+  it("the CONTRAST model validates clean too — the target is not the only legal shape of this chain", () => {
+    const v = validateCRL(readFileSync(POLICY_RECORDSET, "utf8"), { soft: true });
+    expect(v.errors ?? []).toEqual([]);
   });
 
   it("EMIT — ⚠ BOTH LANES REFUSE the canonical shape today: `code is` + `definition is`", () => {
