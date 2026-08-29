@@ -12,16 +12,19 @@ import { emitFhirDefFromPath } from "../fhir-emitter/closureOrchestrator";
 /**
  * ⭐ THE CANONICAL TARGET for the Obese/BMI chain (#189) — `fixtures/obesity/`.
  *
- * ⭐ TWO AUTHORING OPTIONS, BOTH LEGITIMATE (operator, 2026-08-29). They are not candidates competing to be
- * the target, and neither is a variant of the other:
+ * ⭐ THREE AUTHORING OPTIONS, ALL LEGITIMATE (operator, 2026-08-29). None is a variant of another:
  *
  *   Record     every level is `code is` + `shape is Record`, so every level is a QUESTION. FOUR questions;
  *              a user may answer at any level — assert obesity, or a BMI, or a height and a weight.
  *   RecordSet  the histories are assertable but NOT answerable. ONE question, and the reduction happens at
  *              the top instead of at every level.
+ *   Layered    ⭐ the expected CONVENTION: RecordSet -> Record -> calculated. Records reduce the named
+ *              RecordSets; calculations use the Records. Each layer is expressed ONCE and referred to by the
+ *              next — the local code and the posrep live on the history and are never restated. Assumes a
+ *              library whose every layer some other library consumes.
  *
  * Different generated Questionnaires, same decision. So they owe the SAME truth table, and this file drives
- * both through every lane — a lane that works for one authoring option and not the other is not done.
+ * all three through every lane — a lane that works for one authoring option and not the others is not done.
  *
  * ⚠ THIS TEST PINS FAILURE ON PURPOSE. The policies are the CORRECT models; the implementation catches up to
  * them (`feedback_fixture-is-oracle-emit-catches-up`). Each lane asserts the value it MUST reach and, where
@@ -40,6 +43,11 @@ interface AuthoringOption {
   readonly cases: string;
   /** The locally-coded, single-record concepts — i.e. the questions the Questionnaire will carry. */
   readonly questions: readonly string[];
+  /**
+   * ⚠ Whether the policy validates with ZERO errors TODAY. The layered option does not, and the reason is a
+   * true statement about the language rather than a defect in the policy — see its own assertion below.
+   */
+  readonly validatesCleanToday: boolean;
 }
 
 const OPTIONS: readonly AuthoringOption[] = [
@@ -48,17 +56,31 @@ const OPTIONS: readonly AuthoringOption[] = [
     policy: path.join(FIXTURE, "policy.crl"),
     cases: path.join(FIXTURE, "cases.cel"),
     questions: ["Obese", "BMI", "Height", "Weight"],
+    validatesCleanToday: true,
   },
   {
     name: "RecordSet",
     policy: path.join(FIXTURE, "policy-recordset.crl"),
     cases: path.join(FIXTURE, "cases-recordset.cel"),
     questions: ["Obese"],
+    validatesCleanToday: true,
+  },
+  {
+    // ⭐ THE CONVENTION: RecordSet -> Record -> calculated, each layer expressed ONCE and referred to by
+    // the next. Assumes an Obesity LIBRARY whose every layer some other library consumes.
+    name: "Layered",
+    policy: path.join(FIXTURE, "policy-layered.crl"),
+    cases: path.join(FIXTURE, "cases-layered.cel"),
+    // ⚠ MEASURED CONSEQUENCE of layering: the leaves stop being questions. The local code lives on the
+    // RecordSet (assertable, a history) and the reduction on an uncoded Record, so only the calculated
+    // layer is answerable. That is the trade the convention makes.
+    questions: ["BMI", "Obese"],
+    validatesCleanToday: false,
   },
 ];
 
 /**
- * The acceptance criterion (operator, 2026-08-29), which BOTH options owe:
+ * The acceptance criterion (operator, 2026-08-29), which ALL THREE options owe:
  *
  *   Obese = true       -> Approve
  *   Obese = false      -> Deny
@@ -73,7 +95,7 @@ const MUST_PRODUCE: Record<string, readonly string[]> = {
 };
 
 /**
- * What the CRE produces TODAY. ⚠ Two of three rows are WRONG, identically under BOTH authoring options —
+ * What the CRE produces TODAY. ⚠ Two of three rows are WRONG, identically under EVERY authoring option —
  * which is itself the finding: the defect is in how a locally-coded concept is READ, not in either shape
  * model, so one fix closes both.
  *
@@ -91,7 +113,7 @@ const PRODUCES_TODAY: Record<string, readonly string[]> = {
 };
 
 describe("#189 canonical target — the Obese/BMI chain", () => {
-  it("the two options expose DIFFERENT question sets — the property the Questionnaire is built from", () => {
+  it("the three options expose DIFFERENT question sets — the property the Questionnaire is built from", () => {
     // A QUESTION is a locally-coded concept publishing ONE record: `code is` + `shape is Record`. That is what
     // makes it an answerable, and a legal `cpg-featureExpression` target. So `shape is` is not decoration — it
     // decides how many questions a user is asked.
@@ -115,9 +137,20 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
 
   for (const opt of OPTIONS) {
     describe(opt.name + " authoring option", () => {
-      it("VALIDATES clean; every warning maps to a named remaining step", () => {
+      it("VALIDATES; every warning maps to a named remaining step", () => {
         const v = validateCRL(readFileSync(opt.policy, "utf8"), { soft: true });
-        expect(v.errors ?? []).toEqual([]);
+        if (opt.validatesCleanToday) {
+          expect(v.errors ?? []).toEqual([]);
+        } else {
+          // ⚠ The Layered option reports `body mass index of …` as an UNMATCHED NARRATIVE — it resolves to no
+          // catalog pattern, so a `shape is Record` concept cannot be shown to yield one record. That is TRUE:
+          // arithmetic is not in the catalog (plan step 4, still open). MUST BECOME clean when it lands.
+          //
+          // ⭐ And the other two options do NOT report it only because they spell the reduction with a
+          // `most recent` PREFIX, which masks whatever it wraps — `most recent flurble bloop of "A"` validates
+          // clean (measured). So this option is the honest one, and the other two are clean partly by accident.
+          expect((v.errors ?? []).map((e) => e.kind)).toEqual(["reduction-shape"]);
+        }
         // The model is complete and legal TODAY. What is not complete is emit, and the warnings say so — each
         // is a step in `tmp/PLAN-obesity-apply.md`, not a defect in the policy:
         //   `shape is` declared but not consulted for the DECLARING concept -> step 6

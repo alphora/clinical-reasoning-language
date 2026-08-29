@@ -1,0 +1,111 @@
+// ===========================================================================
+// OBESITY — LAYERED version. The CONVENTION: RecordSet → Record → calculated.
+//
+// ⭐ ONE OF THREE LEGITIMATE AUTHORING OPTIONS (operator, 2026-08-29), and the
+// one we expect to establish as the convention. Assume this is an Obesity
+// LIBRARY consumed by other libraries, where every layer is used by something —
+// so every layer is public, and the shape is functionally the union of the
+// Record and RecordSet options.
+//
+// ⚠ It is NOT a straight union. The point of layering is that the lower layer
+// is expressed ONCE and the upper layers REFER to it, rather than each layer
+// restating the local `code is` and the `source representation`. Compare:
+//
+//   straight union   "Height" (Record) carries code + posrep + `most recent this`
+//                    "Height Records" (RecordSet) carries code + posrep AGAIN
+//   layered          "Height Records" carries code + posrep ONCE
+//                    "Height" reduces it BY NAME — no code, no posrep, no repeat
+//
+// ⚠ CONSEQUENCE, measured and deliberate: the leaves stop being QUESTIONS. A
+// question is a locally-coded concept publishing one record, and here the local
+// code lives on the RecordSet (assertable, a history) while the reduction lives
+// on an uncoded Record. So this option asks about `BMI` and `Obese` only.
+// That is the trade the layering makes, not an oversight — see the driver test.
+// ===========================================================================
+library "Obesity Coverage (Layered)".
+
+terminology "Obese VS":
+- valueset is `http://example.org/vitals/ValueSet/obese`.
+terminology "Clinical BMI VS":
+- valueset is `http://example.org/vitals/ValueSet/bmi`.
+terminology "Height VS":
+- valueset is `http://example.org/vitals/ValueSet/height`.
+terminology "Weight VS":
+- valueset is `http://example.org/vitals/ValueSet/weight`.
+
+// ── LAYER 1 — the HISTORIES ────────────────────────────────────────────────
+// RecordSets. They carry the local code and the source representation, so they
+// are assertable and they are the ONLY place that datum is described.
+
+concept "Height Records":
+- shape is RecordSet.
+- type is Observation.
+- value type is Quantity.
+- code is `height`.
+- source representation:
+  - type is Observation.
+  - coded from "Height VS".
+
+concept "Weight Records":
+- shape is RecordSet.
+- type is Observation.
+- value type is Quantity.
+- code is `weight`.
+- source representation:
+  - type is Observation.
+  - coded from "Weight VS".
+
+// ── LAYER 2 — the SELECTED values ──────────────────────────────────────────
+// Records reducing a NAMED history. No code, no posrep: the selection is the
+// only thing these add, and it is stated once for every consumer downstream.
+
+concept "Height":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- definition is most recent "Height Records".
+
+concept "Weight":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- definition is most recent "Weight Records".
+
+// ── LAYER 3 — CALCULATED ───────────────────────────────────────────────────
+// Computed from the Records above, and separately recordable in its own right:
+// the local code makes it assertable and answerable, the posrep admits externally
+// recorded BMIs, and the reduction merges the arms.
+
+concept "BMI":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `bmi`.
+- definition is body mass index of "Weight" and "Height", then most recent this.
+- source representation:
+  - type is Observation.
+  - coded from "Clinical BMI VS".
+
+concept "Obese":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `obese`.
+- definition is "BMI" at least 30 'kg/m2', then most recent this.
+- source representation:
+  - type is Condition.
+  - coded from "Obese VS".
+  - value projection is exists this.
+
+activity "Approve Bariatric Surgery":
+- request CPGCommunicationRequest.
+- with `APPROVED`.
+
+activity "Deny Bariatric Surgery":
+- request CPGCommunicationRequest.
+- with `NOT APPROVED`.
+
+decision "Bariatric Surgery Coverage":
+first:
+- when "Obese" then recommend activity "Approve Bariatric Surgery".
+- otherwise then recommend activity "Deny Bariatric Surgery".
