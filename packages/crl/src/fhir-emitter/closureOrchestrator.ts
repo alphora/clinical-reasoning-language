@@ -39,6 +39,7 @@ import type { Activity, BranchBlock, Concept, Decision, ReferenceName, Terminolo
 import { getRefLibrary, getRefName, isQualifiedRef, normalizeLocalRef } from "../ast/types";
 import { buildCriterionTable } from "../ast/criterionExpansion";
 import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex";
+import { guardDefineNameCollisions } from "../ast/guardDefines";
 import { resolveDispositionConfig } from "../dispositions";
 import { computeFhirEmitClosure } from "../imports/computeEmitClosure";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
@@ -1847,6 +1848,10 @@ export function emitFhirDefClosure(
     // builds). Threaded to the decision emit so a guard referencing a criterion is expanded
     // at `emitWhenBlock` entry (sole-ref collapse + the overflow diagnostic live there).
     const libCriterionTable = buildCriterionTable(lib.ast.statements);
+    // ⚠ #189 — the guard-define name check runs in THIS lane too, not only in the CQL lane where the
+    // duplicate `define` would materialize. A FHIR-only emit writes `not "<Lib>"."Guard L…C…"` just the
+    // same, and if an author declared that name the condition silently negates THEIR declaration.
+    errors.push(...guardDefineNameCollisions(lib.ast));
     for (const decision of hasDecisionLibraryTarget && !reductionCaseFeatureBlocked ? lib.decisions : []) {
       const decKey = qualifiedKey([lib.libraryName, decision.name]);
       if (classification.cycleMemberKeys.has(decKey)) continue;

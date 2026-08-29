@@ -134,10 +134,16 @@ export interface Decision extends ASTNode {
 // #224 ii: a named, reusable decision-guard sub-expression. `criterion "X": - when
 // ( <cond> ).` — the body is the SAME `BranchCondition` grammar as a `when` guard
 // (`and`/`or`/`not` over concept/criterion refs; #224 iii.3). A criterion is
-// AUTHORING-DRY: it inline-EXPANDS into the guard DNF and has NO FHIR mapping of
-// its own (the emitter emits nothing for it). A `when`/criterion-body ref to a
-// criterion is a distinct `BranchConditionCriterionRef` (below), replaced by this
-// `condition` at the criterion-expansion seam.
+// AUTHORING-DRY: it has no FHIR mapping of its own. It lowers to ONE boolean CQL
+// `define` (#236 — the tree→DAG collapse), which guards REFERENCE by name; the
+// inline expansion into the guard DNF is the case-feature/atom-closure reading of
+// it, not its emitted form. A `when`/criterion-body ref to a criterion is a
+// distinct `BranchConditionCriterionRef` (below), replaced by this `condition` at
+// the criterion-expansion seam.
+//
+// ⚠ The emitter also SYNTHESIZES criteria the author never wrote: a compound branch
+// guard whose negation cannot lower to conditions on one action is emitted as its
+// own criterion and excluded by name (`ast/guardDefines.ts`).
 export interface Criterion extends ASTNode {
   type: "Criterion";
   name: string;

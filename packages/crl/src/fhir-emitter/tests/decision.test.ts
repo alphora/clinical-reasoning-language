@@ -1124,8 +1124,11 @@ describe("decision — #224 iii.3 negated guard → per-literal FHIR emit", () =
     const { resource, errors, unmatched } = emitTop(d);
     expect(hardErrors(errors)).toEqual([]);
     expect(unmatched).toEqual([]);
-    // The `A and not B` PRIOR is an `and`, so `otherwise` is under-excluded — reported, not silent.
-    expect(exclusionWarnings(errors)).toHaveLength(1);
+    // ⭐ #189, 2026-08-29: the `and` prior is now EXPRESSIBLE via the named-define form, so there is no
+    // under-exclusion and no warning. This previously asserted a warning — i.e. that `otherwise` carried NO
+    // exclusion, which made it UNCONDITIONAL, and an unconditional `otherwise` DENIES on unknown. The test
+    // was pinning the pause-killer as expected behaviour.
+    expect(exclusionWarnings(errors)).toHaveLength(0);
     const children = acts(rootActions(resource)[0]); // [A∧¬B arm, otherwise]
     expect(children).toHaveLength(2);
     const arm = children[0]!;
@@ -1230,13 +1233,20 @@ describe("decision — #224 i.3 compound-guard structural emit", () => {
     const { resource, unmatched, errors } = emitTop(d);
     expect(unmatched).toEqual([]);
     expect(hardErrors(errors)).toEqual([]);
-    // The `A and B` PRIOR is an `and` — `otherwise` is under-excluded and the warning says so.
-    expect(exclusionWarnings(errors)).toHaveLength(1);
+    // ⭐ #189, 2026-08-29: no under-exclusion — the `and` prior is named and negated (see the sibling test).
+    expect(exclusionWarnings(errors)).toHaveLength(0);
     const children = acts(rootActions(resource)[0]); // under the first: switch wrapper
     expect(children).toHaveLength(2); // [A∧B arm, otherwise]
+    // The `when` guard STAYS DECOMPOSED — one condition per operand, so the MV cockpit can render and
+    // verdict each as a distinct node (`project_decision-no-opaque-boolean`). The named define is only for
+    // the DERIVED exclusion below, where the author wrote no guard at all.
     expect(condExprs(children[0]!)).toEqual(["A", "B"]);
     expect(children[0]!.definitionCanonical).toContain("lib-x-recommendation");
     expect(children[1]!.title).toBe("otherwise");
+    // ⭐ And `otherwise` now carries ONE exclusion naming the prior conjunction — not zero conditions.
+    const otherwiseConds = condExprs(children[1]!);
+    expect(otherwiseConds).toHaveLength(1);
+    expect(otherwiseConds[0]).toMatch(/^not .*Guard L\d+C\d+/);
   });
 
   it("`or` guard under `first:` → arms SPLICED as ordered siblings (no wrapper, otherwise not starved)", () => {

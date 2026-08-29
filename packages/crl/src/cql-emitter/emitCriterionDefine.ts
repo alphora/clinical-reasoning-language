@@ -55,9 +55,10 @@ interface Rendered {
  * structural (precedence, parenthesisation, `not`/`and`/`or`) is SHARED via `renderNode`, so a
  * criterion define and a `defined as` boolean composition CANNOT drift on shape (#189 Slice 0b,
  * plan banner gpt56-5/Claude-7):
- *   - criterion define (`criterionDefineLeafPolicy`): every leaf is defensively totalized
- *     `Coalesce(<ref>, false)` — a criterion re-export may be nullable — and a criterion ref is a
- *     legal define→define edge.
+ *   - criterion define (`criterionDefineLeafPolicy`): every leaf is rendered BARE, so UNKNOWN
+ *     propagates out of the define (a criterion is a GUARD, and a guard is where a pause has to be
+ *     able to happen — see the module header). A criterion ref is a legal define→define edge.
+ *     ⚠ Totality is the REFERENCE SITE's job, not this policy's.
  *   - boolean composition (`compositionLeafPolicy`, in `emitCQL`): a concept leaf is a BARE
  *     gate-proven ref (the emit pivot has ALREADY proven every operand a TOTAL scalar boolean via
  *     `emitsTotalScalarBoolean`; a `Coalesce` here would MASK that proof failure — charter §4
@@ -125,9 +126,9 @@ export function emitTotalBooleanExpr(
   return renderNode(cond, qualify, leaf).str;
 }
 
-/** The criterion define BODY — every concept/sub-criterion leaf `Coalesce`-totalized; criterion
- *  refs EXPECTED (define→define edges of the DAG). A thin wrapper over `emitTotalBooleanExpr` under
- *  the criterion-define policy (byte-invariant vs the pre-0b behavior). */
+/** The criterion define BODY — every concept/sub-criterion leaf rendered BARE (strong Kleene, so an
+ *  UNKNOWN leaf makes the guard UNKNOWN); criterion refs EXPECTED (define→define edges of the DAG). A
+ *  thin wrapper over `emitTotalBooleanExpr` under the criterion-define policy. */
 export function emitTotalBooleanGuard(cond: BranchCondition, qualify: QualifyLeaf): string {
   return emitTotalBooleanExpr(cond, qualify, criterionDefineLeafPolicy);
 }

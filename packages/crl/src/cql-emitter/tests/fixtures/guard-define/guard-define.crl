@@ -1,0 +1,57 @@
+# #189 — every compound branch-guard SHAPE whose negation cannot lower to conditions on one action.
+library "GuardDefine".
+
+concept "A":
+- type is Observation.
+- value type is boolean.
+- code is `a`.
+
+concept "B":
+- type is Observation.
+- value type is boolean.
+- code is `b`.
+
+concept "C":
+- type is Observation.
+- value type is boolean.
+- code is `c`.
+
+concept "Gate":
+- type is Observation.
+- value type is boolean.
+- code is `gate`.
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `APPROVED`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `NOT APPROVED`.
+
+// `and` prior — negates to a disjunction.
+decision "AndPrior":
+first:
+- when ( "A" and "B" ) then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
+
+// `not` over a COMPOUND — the dispatch has no direct arm for it, and ¬¬(A or B) is a disjunction again.
+decision "NotOrPrior":
+first:
+- when ( not ( "A" or "B" ) ) then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
+
+// MIXED `or` — one operand is not an atom, so a per-operand exclusion would be PARTIAL, not exact.
+decision "MixedOrPrior":
+first:
+- when ( "A" or ( "B" and "C" ) ) then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
+
+// NESTED — the prior needing a define is inside another branch's body, at depth.
+decision "NestedPrior":
+first:
+- when "Gate" then:
+  first:
+  - when ( "A" and "B" ) then recommend activity "Approve".
+  - otherwise then recommend activity "Deny".
+  end.
+- otherwise then recommend activity "Deny".

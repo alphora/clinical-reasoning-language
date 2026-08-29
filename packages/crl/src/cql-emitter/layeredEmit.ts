@@ -74,6 +74,7 @@ import {
   normalizeLocalRef,
 } from "../ast/types";
 import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex";
+import { guardDefineNameCollisions, synthesizeGuardCriteria } from "../ast/guardDefines";
 import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import { pascalCaseNameForId } from "../fhir-emitter/slug";
 
@@ -1102,7 +1103,7 @@ export function interfaceSurface(ast: CRL): { name: string; sourceLayer: Layer |
   const maps = buildNameLayerMaps(ast, FULL_PARTITION);
   // #236 — a guard atom may reference a `criterion`. The Interface re-export surface must
   // include the concepts a criterion body references (recursively), so the emitted criterion
-  // define's bare `Coalesce("Cov", false)` resolves to an Interface re-export rather than
+  // define's bare `"Cov"` leaf resolves to an Interface re-export rather than
   // dangling at `$apply`. Use the criterion INDEX (memoized, LINEAR) — NOT the materializing
   // expansion walk, which would overflow the atom cap on a doubling-DAG criterion and SILENTLY
   // DROP those re-exports (harmless before, but now that the CQL overflow gate is retired the
@@ -1405,8 +1406,20 @@ export function emitPartitioned(
     return { success: false, entries: [], errors: reexportResult.errors };
   }
   const reexports = reexportResult.reexports;
+  // ⭐ #189 — the SYNTHETIC GUARD CRITERIA join the re-exports on the working AST. A `Decision` classifies to
+  // NO layer (deliberately — the Interface layer re-exports its surface instead), so a guard define emitted
+  // from the decision statement would reach no library at all while the FHIR lane still wrote its `not
+  // <define>` reference: a DANGLING condition, which `$apply` treats as not-applicable and which reproduces
+  // the exact pause-killer the named-define form removes. Modelled as `Criterion`, they route to `Interface`
+  // through the existing `classifyStatementLayer` — the same library the FHIR lane qualifies against.
+  const guardCollisions = guardDefineNameCollisions(ast);
+  if (guardCollisions.length > 0) {
+    return { success: false, entries: [], errors: guardCollisions };
+  }
+  const guardCriteria = synthesizeGuardCriteria(ast);
+  const appended: Statement[] = [...reexports, ...guardCriteria];
   const workingAst: CRL =
-    reexports.length > 0 ? { ...ast, statements: [...ast.statements, ...reexports] } : ast;
+    appended.length > 0 ? { ...ast, statements: [...ast.statements, ...appended] } : ast;
 
   // The DISTINCT partition values actually present (order-independent).
   const present = new Set<Layer>();

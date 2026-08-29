@@ -97,6 +97,7 @@ import {
 } from "../ast/branchCondition";
 import { type CriterionTable } from "../ast/criterionExpansion";
 import { buildCriterionIndex, type CriterionIndex } from "../ast/criterionIndex";
+import { guardDefineName } from "../ast/guardDefines";
 import { cqlQuotedIdentifier } from "../cql-emitter/cqlStrings";
 import type { CRLError } from "../types/errors";
 import { libraryCanonicalUrl, libraryId } from "./library";
@@ -748,12 +749,14 @@ function priorityExclusionCondition(
  * Ordered `first:` ONLY — under `all:` / flat, order carries no priority and every applicable sibling
  * fires, so exclusions there would be a behavior change unrelated to this work.
  *
- * ⚠ INCOMPLETE, KNOWN — the `and` prior. ¬G is exact for an ATOM (a concept ref or a criterion ref), a
- * negated atom (¬¬G = G) and an `or` of atoms (De Morgan → a CONJUNCTION, i.e. N conditions, which `$apply`
- * ANDs). But an `and` prior negates to a DISJUNCTION (`¬A or ¬B`), which the #224 invariant requires lower
- * to ARMS and which is precisely the cross-product that would blow the 256-arm cap. Such a prior contributes
- * NO exclusion, so a later branch can still fire past an unknown atom in it (the V4 wrong-arm case). Needs
- * the named-define form; it is the next increment.
+ * ¬G is emitted DIRECTLY for an ATOM (a concept ref or a criterion ref), a negated atom (¬¬G = G) and an
+ * `or` of atoms (De Morgan → a CONJUNCTION, i.e. N conditions, which `$apply` ANDs).
+ *
+ * An `and` prior takes the NAMED-DEFINE form instead: its negation is a DISJUNCTION (`¬A or ¬B`), which the
+ * #224 invariant requires lower to ARMS and which is the cross-product that would blow the 256-arm cap — so
+ * the conjunction is NAMED (`guardDefines.ts`) and the NAME negated, giving one atom and one condition.
+ * ⚠ Not an optimisation: a prior that contributes NO exclusion leaves the later `otherwise` UNCONDITIONAL,
+ * and an unconditional arm DENIES on unknown (MEASURED). This is what makes the pause reachable.
  *
  * ⭐ REFACTOR:grounded (#189, panel disc 517) — EVERY inexpressible prior is now LOUD. A silent skip is not
  * a missing optimisation, it is a two-lane DIVERGENCE: the CRE `walkBranches` halts on `sat === null`
@@ -765,10 +768,16 @@ function priorityExclusionCondition(
  * lowers to a named boolean define, never its inline expansion), so ¬<criterion> is one condition, exactly
  * like ¬<concept>. Skipping it was the same defect one indirection away.
  *
- * A PARTIAL `or` is EMITTED rather than dropped: each ref conjunct of De Morgan's `¬A and ¬B and …` is a
- * conjunct of the EXACT exclusion, so emitting a subset can only UNDER-exclude, never over-exclude
+ * An `or` whose operands are all atoms is emitted directly, one negated condition per operand. If an operand
+ * fails to RESOLVE in this library the rest are still emitted: each conjunct of De Morgan's `¬A and ¬B and …`
+ * is a conjunct of the EXACT exclusion, so a subset can only UNDER-exclude, never over-exclude
  * (monotone-safe). Dropping all of them forfeits real protection for no gain — but the shortfall is still
  * reported, because an under-exclusion is exactly the divergence above.
+ *
+ * ⚠ A MIXED `or` (any operand that is not an atom) is NOT lowered this way. Its partial exclusion would be
+ * merely monotone-safe where the named-define form is EXACT, and monotone-safe is not good enough here: an
+ * under-excluded prior lets a later branch fire past an UNKNOWN operand, which is the wrong disposition the
+ * whole mechanism exists to prevent.
  */
 function priorityExclusions(
   priors: readonly { type: string }[],
@@ -796,8 +805,9 @@ function priorityExclusions(
       message:
         `Ordered \`first:\` priority exclusion is incomplete: ${why}. Later branches are UNDER-excluded, ` +
         `so \`$apply\` can reach a disposition past an UNKNOWN determination in that prior while the CRE ` +
-        `halts there (a two-lane divergence). Author the prior as a single guard reference or a named ` +
-        `\`criterion\` to make its exclusion expressible.`,
+        `halts there (a two-lane divergence). Every guard SHAPE is expressible — directly or through a ` +
+        `guard define — so this is a reference that does not resolve: check the name and the library it ` +
+        `is qualified from.`,
       line: g.location?.start.line,
       column: g.location?.start.column,
     });
@@ -811,9 +821,13 @@ function priorityExclusions(
     //   atom           -> ¬atom                     : one negated condition
     //   not atom       -> atom                      : one POSITIVE condition (¬¬G = G)
     //   (A or B or …)  -> ¬A and ¬B and …           : N negated conditions ($apply ANDs them)
-    //   (A and B)      -> ¬A or ¬B — a DISJUNCTION, which the #224 invariant requires lower to ARMS.
-    //                     Not expressible as conditions on ONE action; needs the named-define form.
-    // Anything this cannot express is REPORTED, never silently skipped — see the doc comment above.
+    //   EVERYTHING ELSE -> NAMED and negated: `not <define>`, one atom, one condition (`guardDefines.ts`).
+    //                     An `and` negates to ¬A or ¬B, a DISJUNCTION, which the #224 invariant requires
+    //                     lower to ARMS and which no set of conditions on ONE action can express ($apply
+    //                     ANDs them). A `not` over a compound and a MIXED `or` reach the same wall.
+    // ⚠ The four arms below are the EXACT complement of `needsGuardDefine` and must move together — a shape
+    // that neither lowers directly NOR gets a define emits no exclusion at all, and no exclusion means the
+    // later `otherwise` fires on unknown. There is deliberately no silent-skip arm.
     if (isAtom(g)) {
       const id = atomId(g);
       if (id !== null) conditions.push(priorityExclusionCondition(id, ctx.guardQualifierLibraryName));
@@ -827,7 +841,7 @@ function priorityExclusions(
           expression: { language: "text/cql-identifier", expression: id },
         });
       else inexpressible(g, "a prior negated branch guard whose reference does not resolve in this library");
-    } else if (g.type === "BranchConditionOr") {
+    } else if (g.type === "BranchConditionOr" && g.operands.every((o) => isAtom(o))) {
       let missing = 0;
       for (const o of g.operands) {
         const id = isAtom(o) ? atomId(o) : null;
@@ -837,15 +851,23 @@ function priorityExclusions(
       if (missing > 0)
         inexpressible(
           g,
-          `a prior \`or\` branch guard: ${missing} of ${g.operands.length} alternatives are not single ` +
-            `guard references, so its exclusion is only PARTIAL`,
+          `a prior \`or\` branch guard: ${missing} of ${g.operands.length} alternatives do not RESOLVE in ` +
+            `this library, so its exclusion is only PARTIAL`,
         );
     } else {
-      inexpressible(
-        g,
-        "a prior `and` branch guard — its negation is a DISJUNCTION, which cannot lower to conditions " +
-          "on one action (needs the named-define form)",
-      );
+      // ⭐ THE NAMED-DEFINE FORM (#189, 2026-08-29). Do not negate into a disjunction at all — NAME the
+      // conjunction and negate the NAME. `not <define>` is ONE atom, so it satisfies the #224 invariant and
+      // lowers to ONE condition instead of the 256-arm cross-product.
+      //
+      // ⚠ The name comes from the SHARED `guardDefineName`, the same function the CQL lane uses to EMIT the
+      // define. Two implementations that "should" agree would diverge into a dangling condition — which
+      // `$apply` treats as not-applicable, reproducing the exact pause-killer this replaces.
+      //
+      // The define renders its leaves BARE (criterion-body emitter, strong Kleene), so `not <define>` over
+      // an unknown operand is UNKNOWN — neither this arm nor the guarded one fires, and traversal halts.
+      // That is the whole point: before this, an `and` prior contributed NOTHING, the later `otherwise`
+      // emitted UNCONDITIONAL, and an unconditional arm DENIES on unknown (measured).
+      conditions.push(priorityExclusionCondition(guardDefineName(g), ctx.guardQualifierLibraryName));
     }
   }
   return conditions;

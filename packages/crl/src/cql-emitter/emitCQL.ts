@@ -104,6 +104,7 @@ import type {
 } from "../emit/effectiveRepresentation";
 import type { ReferenceName } from "../ast/types";
 import { emitCriterionDefine, emitTotalBooleanExpr } from "./emitCriterionDefine";
+import { guardDefineNameCollisions, synthesizeGuardCriteria } from "../ast/guardDefines";
 import type { QualifyLeaf, RenderLeafPolicy } from "./emitCriterionDefine";
 import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import type { CRLError } from "../types/errors";
@@ -600,6 +601,23 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
     if (preEmitErrors.length > 0) {
       return { success: false, errors: preEmitErrors };
     }
+    // ⭐ #189 — the SYNTHETIC GUARD CRITERIA for ordered-`first:` priority exclusions, appended as ordinary
+    // `Criterion` statements so `emitCriteria` emits them on the one criterion path (see `guardDefines.ts`
+    // for why an `and` prior needs a named define at all, and why it is modelled as a criterion).
+    //
+    // This entry is the PER-CRL lane, where the whole source is one library and the `Decision` is present.
+    // The LAYERED lane re-enters here with a per-layer AST that carries no `Decision`, so this is a no-op
+    // there — `emitPartitioned` appends the same synthetics to its working AST, from the SAME function, and
+    // `classifyStatementLayer` routes them into the Interface library the FHIR lane qualifies against.
+    const guardCollisions = guardDefineNameCollisions(lowered.ast);
+    if (guardCollisions.length > 0) {
+      return { success: false, errors: guardCollisions };
+    }
+    const guardCriteria = synthesizeGuardCriteria(lowered.ast);
+    const withGuards: CRL =
+      guardCriteria.length > 0
+        ? { ...lowered.ast, statements: [...lowered.ast.statements, ...guardCriteria] }
+        : lowered.ast;
     // #189 Slice C 2a — the AUTHORED (pre-lowering) obligations for ledger enrollment. Built from the RAW
     // `ast` (BEFORE `preLowerAge`/`lowerLocalCodes`, disc 439 #10) so a `public-determination` inherits its
     // authored obligation, not a re-classification of its lowered form (which loses `rejected`/E1). Built
@@ -609,7 +627,7 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
       options.authoredObligations !== undefined
         ? options
         : { ...options, authoredObligations: buildAuthoredObligations(ast) };
-    const emitter = new Emitter(lowered.ast, emitOptions);
+    const emitter = new Emitter(withGuards, emitOptions);
     const out = emitter.emit();
     const unmatched = emitter.getUnmatched();
     // Slice 4b D1 — emit-time diagnostics accumulated through the Emitter's
@@ -1069,12 +1087,15 @@ class Emitter {
   }
 
   /**
-   * #236 — emit each `criterion` as a per-operand-total boolean define. The body references
-   * co-resident defines BARE: concept re-exports + sibling criterion defines live in the SAME
-   * library (the `none` lane is one library; the layered Interface lane holds the decision's
-   * boolean surface + the criteria). Guard operands are boolean by validation
-   * (`checkGuardLiterals`), so `Coalesce(<leaf>, false)` is well-typed. No cross-library
-   * qualification is needed — everything a criterion references is beside it.
+   * #236 — emit each `criterion` as a boolean define. The body references co-resident defines BARE:
+   * concept re-exports + sibling criterion defines live in the SAME library (the `none` lane is one
+   * library; the layered Interface lane holds the decision's boolean surface + the criteria). No
+   * cross-library qualification is needed — everything a criterion references is beside it.
+   *
+   * ⚠ The define is STRONG KLEENE, not per-operand totalized: an UNKNOWN leaf makes the guard UNKNOWN
+   * (`emitCriterionDefine`). Totality belongs at the reference site. Also emits the SYNTHETIC guard
+   * criteria (`ast/guardDefines.ts`), which are ordinary criteria in every respect except that the
+   * author did not name them.
    */
   private emitCriteria(criteria: Criterion[]): string {
     return criteria
@@ -1214,8 +1235,25 @@ class Emitter {
     });
   }
 
-  /** #189 Slice C 2a — a `criterion` define is per-leaf totalized (`emitCriterionDefine`), so it is an
-   *  intrinsically-total boolean axiom by construction. */
+  /**
+   * ⚠ REFACTOR:suspect (#189, 2026-08-29) — THE OBLIGATION BELOW IS FALSE, and this comment is the marker.
+   *
+   * It says a criterion define is per-leaf totalized, so it enrolls as an intrinsically-total boolean axiom.
+   * That was true before the Kleene flip. `criterionDefineLeafPolicy` now renders leaves BARE
+   * (`emitCriterionDefine`, REFACTOR:grounded) precisely so an UNKNOWN leaf makes the guard UNKNOWN — a
+   * criterion is a GUARD, and a guard is where a pause has to be able to happen. So the ledger currently
+   * carries `total` for a family of defines that are null by design, including the synthetic guard defines
+   * whose whole mechanism depends on returning null (MEASURED: `$apply` logs `returned null` for one).
+   *
+   * ⚠ NOT corrected here, deliberately, because the honest classification is a DESIGN question this slice
+   * cannot answer by guessing: `three-state` is the arm for a Boolean-typed define that is null by design,
+   * and the proof gates it to a PURE QUESTION ("only a pure question may be deliberately partial",
+   * `booleanTotality`). A deliberately-partial GUARD is a second such family, and admitting it changes what
+   * the §1 proof asserts. Enrolling `nullable` instead would fail every criterion in the report — accurate,
+   * but it is the design call wearing a bug's clothes.
+   *
+   * The ledger is REPORT mode today; this becomes load-bearing at the 2b gate, which is the deadline.
+   */
   private enrollCriterion(name: string, cql: string): void {
     this.ledger.appendDefine({
       library: this.ledgerLibrary(),
@@ -1223,7 +1261,7 @@ class Emitter {
       resultType: "Boolean",
       obligation: {
         kind: "intrinsically-total",
-        form: "criterion (per-leaf Coalesce)",
+        form: "criterion (per-leaf Coalesce)", // REFACTOR:suspect — see the doc comment; leaves are BARE
         cell: "§2 criterion → per-operand-total boolean define",
       },
       discharge: { booleanEffect: "total", dischargedBy: "axiom" },
