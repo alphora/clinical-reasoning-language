@@ -6,16 +6,19 @@
 // Only `Obese` reduces to one record, so `Obese` is the single question, and
 // the reduction happens at the TOP rather than at every level.
 //
-// ⚠ THE CONTRAST FIXTURE, and it is not optional. `shape is` is a
-// DISCRIMINATOR, and a suite that only ever declares one value of it cannot
-// notice when the discriminator is ignored. It also drives a different emitter
-// path: a reduction over a local `shape is RecordSet` OPERAND is gated
-// explicitly (`cql-emitter/emitCQL.ts`), so `BMI`'s operands here are
-// RecordSets where the Record version's are Records.
+// ⭐ ONE OF TWO LEGITIMATE AUTHORING OPTIONS (operator, 2026-08-29), alongside
+// `policy.crl`. Not a variant of it and not subordinate to it: both are
+// canonical, both owe the SAME truth table, and a lane that works for one and
+// not the other is not done. What differs is what the author exposes — four
+// questions answerable at any level, or one question with the reduction at the
+// top — so the two generate different Questionnaires from the same decision.
 //
-// The two are alternative MODELS of one chain, not variants of one model —
-// they generate different Questionnaires (four questions vs one). Which is
-// canonical for the goal is an open question; both must keep working.
+// ⚠ Keeping both is also what makes `shape is` testable. It is a DISCRIMINATOR,
+// and a suite declaring only one value of it cannot notice when the
+// discriminator is ignored — precisely the open defect (step 6, "emit honors
+// shape is"). It selects a different emitter path too: a reduction over a local
+// `shape is RecordSet` OPERAND is gated explicitly (`cql-emitter/emitCQL.ts`),
+// so `BMI`'s operands here are RecordSets where the other option's are Records.
 // ===========================================================================
 library "Obesity Coverage (RecordSet)".
 
