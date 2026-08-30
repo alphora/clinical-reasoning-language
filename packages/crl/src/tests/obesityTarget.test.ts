@@ -89,6 +89,14 @@ interface AuthoringOption {
    * `body mass index of …` matched NO catalog pattern — arithmetic was not in the language. Adding the
    * `BodyMassIndex` pattern closed it, and THIS PIN IS HOW WE FOUND OUT: the driver failed with
    * `expected [] to deeply equal ["reduction-shape"]`, which is the pin doing its job in the good direction.
+   *
+   * ⚠⚠ VALIDATING CLEAN DOES NOT MEAN THE LOWERING IS RIGHT, and this option is the live proof. MEASURED
+   * (`tmp/nullprobe/analysis/pipelineShape-out.txt`): `body mass index of A and B, then most recent this`
+   * currently matches as `MostRecent(BodyMassIndex(A, B))` — it COLLAPSES INTO THE PREFIX SPELLING, which
+   * `policy.crl`'s own comment names as wrong ("reduces only the calculation's output — silently dropping
+   * the recorded and answered arms"), and it does not even translate ("Could not resolve call to operator
+   * MostRecent with signature (System.Quantity)"). So this flag says the VALIDATOR is satisfied, nothing
+   * more. What guards correctness is the EMIT assertion below plus an executed `$apply` run — never this.
    */
   readonly validatesCleanToday: boolean;
   /** What the CRE produces TODAY, per case. ⚠ The Layered option differs — see its entry. */
