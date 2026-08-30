@@ -406,6 +406,20 @@ export function codingJsonName(strategy: CodingStrategy): string {
   }
 }
 
+/** REFACTOR:grounded (#189 P1). The CQL lane's coding-element resolver — the THIRD spelling of one registry
+ *  field, kept here beside its siblings so the per-lane taxonomy has ONE home and cannot drift:
+ *
+ *    CQL literal / read : `medication: <CodeableConcept>`  ·  `(X.medication as FHIR.CodeableConcept)`   <- HERE
+ *    JSON instance write: `"medicationCodeableConcept"`                                 <- `codingJsonName`
+ *    SD element path    : the model path                                          <- `codingElementModelPath`
+ *
+ *  ⚠ A CQL resource literal names the CHOICE element itself, never the JSON variant spelling — reusing
+ *  `codingJsonName` here emits `medicationCodeableConcept:` into CQL, which does not translate. (Verified in
+ *  the CQL engine; caught by `recordConstructor`'s own test before it shipped.) */
+export function codingCqlElement(strategy: CodingStrategy): { element: string; array: boolean } {
+  return { element: strategy.field, array: strategy.kind === "codeable-concept-array" };
+}
+
 /** REFACTOR:grounded (#189 CEL-writer T2). The CEL instance lane's coding-PLACEMENT resolver: WHERE a resource's
  *  coding is written (the JSON name) and whether it is an ARRAY element — or `undefined` for a resource with no
  *  registry row (the CEL writer then keeps its pre-flip behavior / fails closed at T4). Coding placement is a
