@@ -179,7 +179,12 @@ describe("deriveEffectiveRepresentations — patient-age arms", () => {
 });
 
 describe("deriveEffectiveRepresentations — source arms, deferral, pure-derived", () => {
-  const SOURCE_REP = `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n`;
+  // #189 P2 — a source representation is `type is` + optional `coded from`, NOTHING ELSE. This fixture
+  // used to author `value element is Observation.value.` + `value type is Quantity.`; both are retired,
+  // and the GOAL is what retires them (`fixtures/obesity/` declares four source reps and not one carries
+  // either). The datum element and its value type are now DERIVED — from the registry and from the
+  // CONCEPT respectively — so a rep that authored them was pinning a rule the target disproves.
+  const SOURCE_REP = `- source representation:\n  - type is Observation.\n`;
 
   it("code is + non-age source rep → [local-exact] with a visible deferred source arm (§6)", () => {
     const out = deriveEffectiveRepresentations(
@@ -193,10 +198,17 @@ describe("deriveEffectiveRepresentations — source arms, deferral, pure-derived
     if (out.status !== "derived") return;
     expect(out.descriptors).toHaveLength(1);
     expect(out.descriptors[0].arm).toBe("local-exact");
-    // #189 B1 — the source arm is still visible (§6, never silently dropped), now with a TYPED reason: a `Quantity`
-    // source rep on a `boolean` concept is a rep-vs-concept value-type disagreement (charter §3).
+    // #189 B1 — the source arm is still VISIBLE (§6, never silently dropped), with a typed reason.
+    //
+    // ⚠ That reason CHANGED at P2, and the change is the point: this used to defer on a rep-vs-concept
+    // value-type disagreement — a check that cannot exist now a representation carries no value type. The
+    // live reason is the one that survives: no `coded from`, so there is no coding axis to bind (§10).
     expect(out.deferredArms).toEqual([
-      { kind: "source", reason: "value-type-not-admitted", detail: expect.stringContaining("disagrees") },
+      {
+        kind: "source",
+        reason: "source-binding-unsupported",
+        detail: expect.stringContaining("coded from"),
+      },
     ]);
   });
 

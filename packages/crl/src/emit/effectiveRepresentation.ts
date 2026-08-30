@@ -536,19 +536,44 @@ function deriveOneSourceArm(
         : `source resource \`${resourceType}\` is not in the emit registry`,
     );
   }
-  if (!rep.valueElement) {
-    return mk("value-element-unmappable", `source representation on \`${resourceType}\` has no \`value element is\` — a source datum needs an authored value read`);
+  // ⭐ THE SOURCE DATUM IS DERIVED FROM MODEL INFO, NOT AUTHORED (#189 P2).
+  //
+  // This arm used to require `rep.valueElement` and `rep.valueTypes` — Rule A.1's "a posrep must carry
+  // `type` + `value element` + `value type`". That rule is RETIRED, and the GOAL is what retires it:
+  // `fixtures/obesity/` declares FOUR source representations across three authoring options and NOT ONE
+  // authors a `value element is` or a value type — every one is `type is` + `coded from` (+ an optional
+  // `value projection is`). So a source arm that demands them can never resolve for the target, and the
+  // merge gets one descriptor where it needs `[local-exact, source]`. (`GOAL > CHARTER > CODE`, charter
+  // §0a; the charter's "a source representation is `type is` + optional `coded from`, NOTHING ELSE" agrees,
+  // but the goal is the reason.)
+  //
+  // ⚠ The requirement PREDATED its own retirement and survived the sweep: `493e0825` (2026-08-23) wrote it;
+  // `bd3b4668` (2026-08-28) retired it. Because the author can no longer supply the field, this arm was
+  // DEAD BY CONSTRUCTION — it could only ever defer.
+  //
+  // Derived instead, exactly parallel to the local arm:
+  //   · the READ PATH  — the resource's standard `value[x]` carrier (registry). A `valueless` row has no
+  //     value to read: its truth is EXISTENCE, which is the projection arm, not this one.
+  //   · the VALUE TYPE — the CONCEPT's, because a representation has none. A projection-free rep is read
+  //     AS the concept value (charter §3), so they were required to agree anyway; deriving makes the
+  //     agreement structural instead of a check that could fail.
+  if (concept.valueTypes.length !== 1) {
+    return mk("indeterminate-result-type", `concept declares ${concept.valueTypes.length} value types (needs exactly 1 for the source arm's datum)`);
   }
-  if (rep.valueTypes.length !== 1) {
-    return mk("indeterminate-result-type", `source representation declares ${rep.valueTypes.length} value types (needs exactly 1)`);
-  }
-  const declared = rep.valueTypes[0];
-  // A projection-free rep is read AS the concept value (charter §3) — the two value types must agree (no
-  // manufacturing). Only checked when the concept declares exactly one (a 0/2+ concept fails its own gate).
-  if (concept.valueTypes.length === 1 && concept.valueTypes[0] !== declared) {
-    return mk("value-type-not-admitted", `source rep value type \`${declared}\` disagrees with the concept value type \`${concept.valueTypes[0]}\` (a projection-free rep is read AS the concept value)`);
-  }
-  const readPath = relativePath(rep.valueElement.path, resourceType);
+  const declared = concept.valueTypes[0];
+  // ⭐ WHICH element carries the datum is a REGISTRY fact, and it differs by resource kind:
+  //
+  //   · a VALUE-BEARING resource (Observation) carries it in `value[x]` — the datum and the membership
+  //     coding are DIFFERENT elements (`Observation.value` vs `Observation.code`);
+  //   · a VALUELESS resource (ServiceRequest, Condition, MedicationRequest…) has no `value[x]`, so what it
+  //     asserts IS its coding element (`ServiceRequest.code`, `MedicationRequest.medication[x]`). Datum and
+  //     coding COINCIDE — which the descriptor's own comment already anticipated ("SEPARATE from
+  //     `valueElement` (datum), EVEN WHEN THEY COINCIDE").
+  //
+  // ⚠ An earlier revision of this derivation assumed `valueless` ⇒ no datum at all and REFUSED the arm.
+  // That REGRESSED a working policy — `dme101-030`'s `Covered Device` reads `ServiceRequest.code` as its
+  // value, which is precisely the coincident case. The authored `value element is` had been carrying it.
+  const readPath = row.valueless ? row.coding.field : "value";
   const admitted = valueReadValueTypes(resourceType, readPath);
   if (admitted === undefined) {
     return mk("value-read-unmodeled", `source value read ${resourceType}.${readPath} is not a modeled value-read element (§8)`);
