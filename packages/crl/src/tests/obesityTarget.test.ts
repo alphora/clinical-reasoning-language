@@ -83,8 +83,12 @@ interface AuthoringOption {
    */
   readonly singleValuedTargets: readonly string[];
   /**
-   * ⚠ Whether the policy validates with ZERO errors TODAY. The layered option does not, and the reason is a
-   * true statement about the language rather than a defect in the policy — see its own assertion below.
+   * ⚠ Whether the policy validates with ZERO errors TODAY.
+   *
+   * ⭐ ALL THREE now do (2026-08-30). It was `false` for the Record and Layered options because
+   * `body mass index of …` matched NO catalog pattern — arithmetic was not in the language. Adding the
+   * `BodyMassIndex` pattern closed it, and THIS PIN IS HOW WE FOUND OUT: the driver failed with
+   * `expected [] to deeply equal ["reduction-shape"]`, which is the pin doing its job in the good direction.
    */
   readonly validatesCleanToday: boolean;
   /** What the CRE produces TODAY, per case. ⚠ The Layered option differs — see its entry. */
@@ -104,7 +108,7 @@ const OPTIONS: readonly AuthoringOption[] = [
     policy: path.join(FIXTURE, "policy.crl"),
     cases: path.join(FIXTURE, "cases.cel"),
     singleValuedTargets: ["Obese", "BMI", "Height", "Weight"],
-    validatesCleanToday: false,
+    validatesCleanToday: true,
     producesToday: PRODUCES_TODAY,
     emitBlocker: "emit-mixed-code-and-definition",
     reachableQuestions: ["Obese", "BMI", "Weight", "Height"],
@@ -140,7 +144,7 @@ const OPTIONS: readonly AuthoringOption[] = [
     // decision denied. That looked like a missing merge construct in the language; it was the split. Merged
     // back, this option's CRE rows match the other two and its emit blocker becomes the same one.
     singleValuedTargets: ["Greatest Weight", "BMI", "Obese"],
-    validatesCleanToday: false,
+    validatesCleanToday: true,
     producesToday: PRODUCES_TODAY,
     emitBlocker: "emit-mixed-code-and-definition",
     // ⭐ Four, reached THROUGH the uncoded reductions: Obese -> BMI -> Most Recent Weight/Height ->

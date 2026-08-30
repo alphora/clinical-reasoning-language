@@ -91,6 +91,9 @@ export const PATTERN_RETURN_SHAPE: Record<string, PatternReturnShape> = {
   // #189 — the existence projection. One boolean, always: existence is total by construction.
   Exists: "boolean",
   Calculate: "other",
+  // #189 — a PRODUCER: computes a new Quantity (kg/m2) from two record operands. "other" because the value
+  // it yields is neither a member of its input nor a boolean — the concept declares what it publishes.
+  BodyMassIndex: "other",
   // ⭐ #189 — SELECTION patterns: they pick the record at one end of an ordering, exactly as
   // MostRecent/Earliest do over time. They returned a bare value until the catalog was corrected, which is
   // why a  concept could not publish the record its shape declares.

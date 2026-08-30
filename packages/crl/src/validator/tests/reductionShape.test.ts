@@ -215,9 +215,12 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
       // The message must not say "does not select a single record" and advise `most recent this` here: the
       // definition is not a failed selection, it is text matching no catalog pattern — and taking that
       // advice would EVICT the derivation (a concept has exactly one definition).
+      // ⚠ The example was `body mass index of …` until 2026-08-30, when that pattern was ADDED to the
+      // catalog — so it stopped being unmatched and this test began failing. The RULE is unchanged; only the
+      // EXAMPLE went stale. It needs a narrative that genuinely matches nothing, and must keep doing so.
       const src =
         `library "T".\nconcept "C":\n- type is Observation.\n- shape is Record.\n- code is \`c\`.\n` +
-        `- definition is body mass index of "Weight" and "Height".\n`;
+        `- definition is flurble bloop of "Weight" and "Height".\n`;
       const errs = redErrors(src, "record-shape-invariant", "C");
       expect(errs).toHaveLength(1);
       expect(errs[0].message).toContain("UNMATCHED NARRATIVE");
@@ -493,8 +496,19 @@ describe("`most recent` must not MASK what it wraps (#189, 2026-08-29)", () => {
   });
 
   it("the LEFT-TO-RIGHT spelling of the same thing reports it too — the two must agree", () => {
-    expect(errKinds(RECORD('definition is body mass index of "A" and "A", then most recent this.'))).toEqual([
+    expect(errKinds(RECORD('definition is flurble bloop of "A" and "A", then most recent this.'))).toEqual([
       "reduction-shape",
     ]);
+  });
+
+  // ⭐ The POSITIVE half, which the two masking tests above cannot show: a CATALOGUED calculation is CLEAN in
+  // BOTH spellings. This is the goal fixture's own form, and it pins that adding `body mass index` actually
+  // took — the two tests above used it as their "uncatalogued" example until 2026-08-30 precisely because it
+  // matched nothing, so this asserts the state that replaced it.
+  it("a CATALOGUED calculation validates clean, prefix and pipeline spellings alike", () => {
+    expect(errKinds(RECORD('definition is body mass index of "A" and "A".'))).toEqual([]);
+    expect(errKinds(RECORD('definition is body mass index of "A" and "A", then most recent this.'))).toEqual(
+      [],
+    );
   });
 });

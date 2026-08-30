@@ -570,6 +570,13 @@ define function "Highest"(X List<Observation>, scope Interval<DateTime>):
  *
  * `FHIRHelpers.ToQuantity` unwraps the FHIR datum to a System.Quantity so the comparison is like-for-like.
  *
+ * ⚠ THE SAME QUALIFICATION IS WHY `(System.Quantity, System.Quantity)` overloads exist beside the scalar
+ * ones: a COMPUTED value (`BodyMassIndex`, quantity arithmetic) is a System.Quantity, and the unqualified
+ * `(Quantity, Quantity)` pair is FHIR.Quantity, which never binds it. MEASURED: "Could not resolve call to
+ * operator AtLeast with signature (System.Quantity, System.Quantity)". The pre-existing
+ * `(Integer, System.Quantity)` overload is the same lesson already learned once — the age path returns an
+ * Integer, so it never needed the Quantity pair.
+ *
  * ⚠ THRESHOLDS ARE `System.Quantity`, SPELLED OUT. Under `using FHIR` an unqualified `Quantity` resolves to
  * FHIR.Quantity, while an emitted threshold literal (`100 'kg'`) is a System.Quantity — so an unqualified
  * parameter does NOT bind. MEASURED the hard way: the translator refused with "Could not resolve call to
@@ -593,6 +600,22 @@ define function "High"(rec Observation, threshold System.Quantity):
 define function "Low"(rec Observation, threshold System.Quantity):
   FHIRHelpers.ToQuantity(rec.value as Quantity) < threshold
 
+/*
+ * BodyMassIndex(weight, height) — #189, the goal fixture's calculation.
+ *
+ * BMI = mass / height², and CQL quantity arithmetic carries the units, so `kg / (m * m)` yields `kg/m2` and
+ * a threshold written `30 'kg/m2'` compares like-for-like. The AUTHOR is responsible for the operands'
+ * units being kg and m; nothing here converts, because a silent conversion is exactly the kind of invented
+ * semantics the charter forbids.
+ *
+ * ⚠ NULL-PROPAGATING, deliberately: either operand absent ⇒ null BMI ⇒ the determination over it stays
+ * UNKNOWN rather than becoming a stated `false`. That is what lets "no height and no weight" PAUSE instead
+ * of denying (charter §4).
+ */
+define function "BodyMassIndex"(weight Observation, height Observation):
+  FHIRHelpers.ToQuantity(weight.value as Quantity)
+    / (FHIRHelpers.ToQuantity(height.value as Quantity) * FHIRHelpers.ToQuantity(height.value as Quantity))
+
 /**
  * AtLeastN / Consecutive — INHERENTLY BOOLEAN count predicates.
  */
@@ -608,8 +631,12 @@ define function "Consecutive"(events List<Observation>, n Integer):
  */
 define function "High"(X Quantity, threshold Quantity):
   X > threshold
+define function "High"(X System.Quantity, threshold System.Quantity):
+  X > threshold
 
 define function "Low"(X Quantity, threshold Quantity):
+  X < threshold
+define function "Low"(X System.Quantity, threshold System.Quantity):
   X < threshold
 
 define function "Normal"(X Quantity, lo Quantity, hi Quantity):
@@ -637,6 +664,8 @@ define function "AtLeast"(value Integer, target Integer):
   value >= target
 define function "AtLeast"(value Integer, target System.Quantity):
   value >= target.value
+define function "AtLeast"(value System.Quantity, target System.Quantity):
+  value >= target
 define function "AtLeast"(values List<Observation>, target Quantity):
   exists (values) V where (V.value as Quantity) >= target
 define function "AtLeast"(values List<System.Quantity>, target System.Quantity):
@@ -648,6 +677,8 @@ define function "AtMost"(value Integer, target Integer):
   value <= target
 define function "AtMost"(value Integer, target System.Quantity):
   value <= target.value
+define function "AtMost"(value System.Quantity, target System.Quantity):
+  value <= target
 define function "AtMost"(values List<Observation>, target Quantity):
   exists (values) V where (V.value as Quantity) <= target
 define function "AtMost"(values List<System.Quantity>, target System.Quantity):
@@ -656,6 +687,8 @@ define function "AtMost"(values List<System.Quantity>, target System.Quantity):
 define function "Between"(value Quantity, lo Quantity, hi Quantity):
   value >= lo and value < hi
 define function "Between"(value Integer, lo Integer, hi Integer):
+  value >= lo and value < hi
+define function "Between"(value System.Quantity, lo System.Quantity, hi System.Quantity):
   value >= lo and value < hi
 define function "Between"(values List<Observation>, lo Quantity, hi Quantity):
   exists (values) V
@@ -666,6 +699,8 @@ define function "Between"(values List<System.Quantity>, lo System.Quantity, hi S
 define function "Exceeds"(value Quantity, target Quantity):
   value > target
 define function "Exceeds"(value Integer, target Integer):
+  value > target
+define function "Exceeds"(value System.Quantity, target System.Quantity):
   value > target
 define function "Exceeds"(values List<Observation>, target Quantity):
   exists (values) V where (V.value as Quantity) > target
@@ -678,6 +713,8 @@ define function "Below"(value Integer, target Integer):
   value < target
 define function "Below"(value Integer, target System.Quantity):
   value < target.value
+define function "Below"(value System.Quantity, target System.Quantity):
+  value < target
 define function "Below"(values List<Observation>, target Quantity):
   exists (values) V where (V.value as Quantity) < target
 define function "Below"(values List<System.Quantity>, target System.Quantity):

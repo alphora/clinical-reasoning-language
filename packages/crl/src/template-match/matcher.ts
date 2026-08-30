@@ -345,6 +345,26 @@ const componentOf: PatternMatcher = (els, loc) => {
   return makeCall("ComponentOf", [conceptRefArg(els[3]), conceptRefArg(els[0])], loc);
 };
 
+/**
+ * `body mass index of <Weight> and <Height>` → BodyMassIndex(weight, height) — #189.
+ *
+ * The goal fixture's calculation, and the first PRODUCER pattern in the catalog beyond `Calculate`: it
+ * computes a NEW value from its named operands rather than selecting or filtering an existing record.
+ * Narrative order is (weight, height) and so is the canonical call — the two are NOT interchangeable and a
+ * silent swap would invert the result, so keep them aligned.
+ */
+const bodyMassIndex: PatternMatcher = (els, loc) => {
+  if (els.length !== 7) return null;
+  if (!isWord(els[0], "body")) return null;
+  if (!isWord(els[1], "mass")) return null;
+  if (!isWord(els[2], "index")) return null;
+  if (!isWord(els[3], "of")) return null;
+  if (!isConceptRef(els[4])) return null;
+  if (!isWord(els[5], "and")) return null;
+  if (!isConceptRef(els[6])) return null;
+  return makeCall("BodyMassIndex", [conceptRefArg(els[4]), conceptRefArg(els[6])], loc);
+};
+
 /** `<X> active during <Y>` → Active(X, [during: Y]) */
 const activeDuring: PatternMatcher = (els, loc) => {
   if (els.length !== 4) return null;
@@ -1034,6 +1054,7 @@ const PATTERNS: PatternMatcher[] = [
   activeDuring,                    // 4 (post-catalog-v0.7: `<X> active during <Y>`)
   documentedAs,                    // 4
   justifiedBy,                     // 4
+  bodyMassIndex,                   // 7 (#189 — the goal fixture's calculation)
   componentOf,                     // 4
   atLeast,                         // 4
   atMost,                          // 4
