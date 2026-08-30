@@ -112,3 +112,25 @@ export const OBSERVATION_VALUE_X_EXCLUDED: readonly ConceptValueType[] = ["date"
  *  `RESOURCE_EMIT_REGISTRY` ∪ {Patient} in BOTH directions (a future stray row, e.g. `Encounter`, would silently
  *  widen the stated scope otherwise; disc 425). */
 export const MODELED_RESOURCE_TYPES: readonly string[] = Object.keys(FHIR_VALUE_READ_MODEL);
+
+/**
+ * The modeled value-read elements on `resourceType` that ADMIT `valueType`, in declaration order.
+ *
+ * ⭐ The carrier LOOKUP, inverted (#189 P2). Callers used to be handed an element path by the author
+ * (`value element is …`) and this module only checked it. With that construct retired, a caller has the
+ * concept's value type and needs the element — which is this function, and it is the ONLY sanctioned way to
+ * get one.
+ *
+ * ⚠ Returns `[]` for both "unmodeled resource" and "modeled, but nothing admits that type". Callers must
+ * FAIL CLOSED on an empty result rather than fall back to a default carrier: charter §3, RULED — *"a
+ * resource whose canonical carrier has not been ruled is UNMODELED … Never guess a carrier."* A result of
+ * length > 1 is likewise not a menu to pick from; it means no canonical carrier is ruled between them.
+ */
+export function valueReadElementsAdmitting(
+  resourceType: string,
+  valueType: ConceptValueType,
+): readonly string[] {
+  if (!Object.prototype.hasOwnProperty.call(FHIR_VALUE_READ_MODEL, resourceType)) return [];
+  const elements = FHIR_VALUE_READ_MODEL[resourceType];
+  return Object.keys(elements).filter((path) => elements[path].has(valueType));
+}

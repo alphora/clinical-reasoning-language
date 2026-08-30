@@ -21,7 +21,7 @@ import type { Concept, Representation, ReferenceName } from "../ast/types";
 import { hasLocalCode, hasSourceBinding } from "./conceptDatumSignals";
 import { localCodeSystemUrl } from "../fhir-emitter/slug";
 import { relativeElementPath } from "../fhir-model/elementPath";
-import { valueReadValueTypes } from "../fhir-model/fhirValueModel";
+import { valueReadElementsAdmitting, valueReadValueTypes } from "../fhir-model/fhirValueModel";
 import type { ConceptValueType } from "../grammar/conceptValueTypes";
 import type { ResultType } from "../grammar/resultType";
 import { conceptResultType } from "../grammar/resultType";
@@ -561,19 +561,38 @@ function deriveOneSourceArm(
     return mk("indeterminate-result-type", `concept declares ${concept.valueTypes.length} value types (needs exactly 1 for the source arm's datum)`);
   }
   const declared = concept.valueTypes[0];
-  // ⭐ WHICH element carries the datum is a REGISTRY fact, and it differs by resource kind:
+  // ⭐ WHICH element carries the datum comes from the FHIR VALUE MODEL — the existing authority — by asking
+  // which modeled element ADMITS the concept's declared value type.
   //
-  //   · a VALUE-BEARING resource (Observation) carries it in `value[x]` — the datum and the membership
-  //     coding are DIFFERENT elements (`Observation.value` vs `Observation.code`);
-  //   · a VALUELESS resource (ServiceRequest, Condition, MedicationRequest…) has no `value[x]`, so what it
-  //     asserts IS its coding element (`ServiceRequest.code`, `MedicationRequest.medication[x]`). Datum and
-  //     coding COINCIDE — which the descriptor's own comment already anticipated ("SEPARATE from
-  //     `valueElement` (datum), EVEN WHEN THEY COINCIDE").
+  // ⚠ NEVER GUESS A CARRIER (charter §3, RULED 2026-08-28): *"A resource whose canonical carrier has not
+  // been ruled is UNMODELED — fail closed and say so."* Two earlier revisions of this line guessed and were
+  // wrong in different ways: first `valueless ⇒ no datum` (which REGRESSED `dme101-030`'s `Covered Device`,
+  // a real `ServiceRequest.code` value-read), then `valueless ⇒ the coding element` — which happens to land
+  // on `ServiceRequest.code` but invents a carrier for every unruled resource, exactly what the charter
+  // forbids.
   //
-  // ⚠ An earlier revision of this derivation assumed `valueless` ⇒ no datum at all and REFUSED the arm.
-  // That REGRESSED a working policy — `dme101-030`'s `Covered Device` reads `ServiceRequest.code` as its
-  // value, which is precisely the coincident case. The authored `value element is` had been carrying it.
-  const readPath = row.valueless ? row.coding.field : "value";
+  // `FHIR_VALUE_READ_MODEL` already carries the three-way distinction this needs: a non-empty set = the
+  // element exists and admits these types; ∅ = modeled and POSITIVELY valueless; absent = unmodeled, no
+  // knowledge. So `Observation.value` admits Quantity, `ServiceRequest.code` admits CodeableConcept while
+  // its `value` is ∅, `Patient.birthDate` admits date, and Condition admits NOTHING — correctly, because a
+  // Condition's truth is EXISTENCE, not a value read.
+  //
+  // ⚠ AMBIGUITY FAILS CLOSED TOO. If two elements admitted the same type there would be no non-arbitrary
+  // choice, and picking one would be guessing by another name.
+  const admitting = valueReadElementsAdmitting(resourceType, declared);
+  if (admitting.length === 0) {
+    return mk(
+      "value-read-unmodeled",
+      `no modeled value-read element on \`${resourceType}\` admits \`${declared}\` — a carrier that has not been ruled is UNMODELED (charter §3); it is never guessed`,
+    );
+  }
+  if (admitting.length > 1) {
+    return mk(
+      "value-read-unmodeled",
+      `\`${resourceType}\` has ${admitting.length} modeled elements admitting \`${declared}\` (${admitting.join(", ")}) — no canonical carrier is ruled between them, and choosing one would be a guess`,
+    );
+  }
+  const readPath = admitting[0];
   const admitted = valueReadValueTypes(resourceType, readPath);
   if (admitted === undefined) {
     return mk("value-read-unmodeled", `source value read ${resourceType}.${readPath} is not a modeled value-read element (§8)`);
