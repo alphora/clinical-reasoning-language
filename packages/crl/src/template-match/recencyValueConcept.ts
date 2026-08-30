@@ -172,8 +172,10 @@ export function isPureQuestionConcept(concept: Concept): boolean {
   if (concept.definition !== undefined) return false; // a second arm — the merge decides, not this predicate
   if ((concept.representations ?? []).length !== 0) return false; // a second arm — likewise
   // REFACTOR:grounded (#189, panel finding disc 517) — CARDINALITY IS DECLARED, NOT INFERRED (charter §3).
-  // A pure question publishes ONE answer, so it must declare `shape is Scalar` (the builder's normalization
-  // for an omitted `shape is`). Without this check a `shape is RecordSet` boolean Observation with a local
+  // A pure question publishes ONE answer, so it must declare `shape is Scalar`. An OMITTED `shape is` is
+  // UNDECLARED, not `Scalar` (charter §3; the normalization was removed in `c4ae00cb`) — this read routes
+  // through the one marked transitional helper, which RETIREs with `189-shape-declared`.
+  // Without this check a `shape is RecordSet` boolean Observation with a local
   // code was classified as a question and emitted `.answeredValue()` — a SCALAR selected from its records —
   // silently contradicting the cardinality the author declared. A record set is not an answer slot.
   if (assumedShapePreMigration(concept.shape) !== "Scalar") return false;

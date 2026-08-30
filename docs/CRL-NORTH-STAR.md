@@ -296,9 +296,9 @@ concept "Most Recent Trial":               // single record → selection is exp
 One concept, one local code, many deriving references. There is no "two concepts sharing a code" problem
 (that would be `emit-duplicate-local-code`), and no dynamic "reduce at the use-site" rule: the base concept
 **declares** it is a record set, and each derivation names it and reaches its **records**. *(The cardinality
-marker is finalized as a dedicated concept-level line — `- shape is Scalar | Record | RecordSet.`, `Scalar` the
-default — grammar-shipped in the #189 validation slice; the ruling is that cardinality is declared, not
-inferred. `shape is Record | RecordSet` parses and validates today but is **validate-only** — emit activates
+marker is finalized as a dedicated concept-level line — `- shape is Scalar | Record | RecordSet.` —
+grammar-shipped in the #189 validation slice; the ruling is that cardinality is declared, not
+inferred, and an omission is UNDECLARED rather than `Scalar` (see above). `shape is Record | RecordSet` parses and validates today but is **validate-only** — emit activates
 at the flip.)*
 
 **Boolean determination from a valueless resource** (the #189 migration form): declare the concept's
