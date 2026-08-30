@@ -175,7 +175,7 @@ describe("resolveConstructor", () => {
       "value:FHIR.Quantity",
       "recorded:System.DateTime",
       "profile:System.String",
-      "evidence:List<FHIR.Resource>",
+      "evidence:List<FHIR.Reference>",
     ]);
   });
 

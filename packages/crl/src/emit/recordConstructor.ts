@@ -52,6 +52,15 @@ import {
   type StructuralRequiredElement,
 } from "./resourceEmitRegistry";
 
+/** ⚠ RE-EXPORTED so the RENDERER need not import the registry at all.
+ *
+ * `resourceEmitRegistry` has a sanctioned-importer boundary (`effectiveRepresentation.test.ts`) guarding
+ * against premature wiring, and the renderer is not a lane site — its contract is with
+ * `ConstructorSignature`, which already carries every registry fact it may use. Re-exporting the two
+ * types that contract exposes keeps the boundary intact AND makes the layering physical: the renderer
+ * CANNOT reach registry data, so it cannot re-query what `resolveConstructor` already validated. */
+export type { DefaultValue, StructuralRequiredElement } from "./resourceEmitRegistry";
+
 /** A runtime value the EMITTER must supply to a constructor — the registry's `wired` fulfillments. Today
  *  the only one is the case Patient reference; the union exists so a new binding is a compile error at
  *  every consumer rather than a silently-unfilled required element. */
@@ -187,6 +196,11 @@ export interface ConstructorSignature {
   contentKey: readonly string[];
   /** What the emitter must bind (empty unless the capability was `requires-context`). */
   bindings: readonly ConstructorBinding[];
+  /** ⚠ The required structural elements, CARRIED rather than re-queried (panel round 2). The renderer
+   *  must fill exactly the set `resolveConstructor` validated — re-querying lets the two drift, and the
+   *  `authored` refusal above is only meaningful if the renderer sees the same list it was checked
+   *  against. Every entry here is `default` or `wired`; `authored` cannot reach a resolved signature. */
+  requiredElements: readonly StructuralRequiredElement[];
 }
 
 /** One entry point. A refusal cannot be dropped by calling a different helper, and the diagnostic travels
@@ -313,7 +327,15 @@ export function constructorFunctionName(
   valueMode: ValueMode,
   valueType?: string,
 ): string {
-  const suffix = valueMode === "existence" ? "Existence" : (valueType ?? "");
+  // ⚠ Capitalize the value type: CRL primitive value types are lowercase (`boolean`, `integer`), which
+  // rendered `CRLConstructObservationboolean`. Emitted CQL is what goldens pin and reviewers read (design
+  // D1), so the seam is worth removing; the name stays deterministic either way.
+  const suffix =
+    valueMode === "existence"
+      ? "Existence"
+      : valueType === undefined
+        ? ""
+        : valueType[0].toUpperCase() + valueType.slice(1);
   return `${CONSTRUCTOR_NAME_PREFIX}${resourceType}${suffix}`;
 }
 
@@ -338,7 +360,8 @@ export function resolveConstructor(resourceType: string, valueType?: string): Co
   // Both are guaranteed by `cap` not being `impossible`; the emit boundary does not assume its own
   // preconditions.
   const row = resourceEmitRow(resourceType);
-  if (row === undefined) {
+  const required = requiredStructuralElements(resourceType);
+  if (row === undefined || required === undefined) {
     return { kind: "impossible", reason: "unsupported-resource", detail: `\`${resourceType}\` vanished` };
   }
 
@@ -372,9 +395,15 @@ export function resolveConstructor(resourceType: string, valueType?: string): Co
     cqlType: "System.String",
     conversion: { wrap: "FHIR.canonical" },
   });
-  // Evidence: bound to `derivedFrom` where the resource has one (design D5) — deterministic references to
-  // ids, unlike a contained Provenance stamped `Now()`. Always passed, because the id derives from it.
-  params.push({ name: "evidence", cqlType: "List<FHIR.Resource>" });
+  // Evidence: bound to `derivedFrom` where the resource has one (design D5) — deterministic references,
+  // unlike a contained Provenance stamped `Now()`. Always passed: identity is content-derived from it.
+  //
+  // ⚠ `List<FHIR.Reference>`, NOT `List<FHIR.Resource>` — MEASURED. A reference needs its `ResourceType/id`
+  // prefix, and inside the constructor the list is heterogeneous, so building one there would need a
+  // runtime type-dispatch chain — the exact construct that silently returned null in the design's §8
+  // probe. The CALLER knows each evidence operand's resource type at EMIT time, so it builds the
+  // references. Same reasoning that chose generation over a hand-maintained dispatch in D1.
+  params.push({ name: "evidence", cqlType: "List<FHIR.Reference>" });
 
   return {
     kind: "resolved",
@@ -396,6 +425,7 @@ export function resolveConstructor(resourceType: string, valueType?: string): Co
         "evidence",
       ],
       bindings,
+      requiredElements: required,
     },
   };
 }
