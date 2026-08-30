@@ -553,23 +553,29 @@ define function "Highest"(X List<Observation>, scope Interval<DateTime>):
  * what lets an unestablished determination stay UNKNOWN instead of becoming a stated `false`.
  * Charter §4: "what determines the arm is what it reads, never that it is a derivation."
  *
- * `FHIRHelpers.ToQuantity` unwraps the FHIR datum to a System.Quantity so the comparison is like-for-like
- * with the scalar overloads (same conversion the list overloads' `V.value as Quantity` relies on).
+ * `FHIRHelpers.ToQuantity` unwraps the FHIR datum to a System.Quantity so the comparison is like-for-like.
+ *
+ * ⚠ THRESHOLDS ARE `System.Quantity`, SPELLED OUT. Under `using FHIR` an unqualified `Quantity` resolves to
+ * FHIR.Quantity, while an emitted threshold literal (`100 'kg'`) is a System.Quantity — so an unqualified
+ * parameter does NOT bind. MEASURED the hard way: the translator refused with "Could not resolve call to
+ * operator AtLeast with signature (FHIR.Observation, System.Quantity)", the library failed to load, and the
+ * expression returned null — which looks EXACTLY like a legitimate pause. The `Integer, System.Quantity` and
+ * `List<System.Quantity>` overloads above spell it out for the same reason.
  */
-define function "AtLeast"(rec Observation, target Quantity):
+define function "AtLeast"(rec Observation, target System.Quantity):
   FHIRHelpers.ToQuantity(rec.value as Quantity) >= target
-define function "AtMost"(rec Observation, target Quantity):
+define function "AtMost"(rec Observation, target System.Quantity):
   FHIRHelpers.ToQuantity(rec.value as Quantity) <= target
-define function "Exceeds"(rec Observation, target Quantity):
+define function "Exceeds"(rec Observation, target System.Quantity):
   FHIRHelpers.ToQuantity(rec.value as Quantity) > target
-define function "Below"(rec Observation, target Quantity):
+define function "Below"(rec Observation, target System.Quantity):
   FHIRHelpers.ToQuantity(rec.value as Quantity) < target
-define function "Between"(rec Observation, lo Quantity, hi Quantity):
+define function "Between"(rec Observation, lo System.Quantity, hi System.Quantity):
   FHIRHelpers.ToQuantity(rec.value as Quantity) >= lo
     and FHIRHelpers.ToQuantity(rec.value as Quantity) < hi
-define function "High"(rec Observation, threshold Quantity):
+define function "High"(rec Observation, threshold System.Quantity):
   FHIRHelpers.ToQuantity(rec.value as Quantity) > threshold
-define function "Low"(rec Observation, threshold Quantity):
+define function "Low"(rec Observation, threshold System.Quantity):
   FHIRHelpers.ToQuantity(rec.value as Quantity) < threshold
 
 /**

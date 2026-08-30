@@ -41,6 +41,8 @@ import { valueSetUrl } from "../fhir-emitter/slug";
 import { cqlStringLiteral, cqlQuotedIdentifier } from "./cqlStrings";
 import { PATTERN_RETURN_SHAPE } from "./patternReturnShape";
 import type { PatternReturnShape } from "./patternReturnShape";
+import { questionReachableNames } from "../ast/questionReachability";
+import { conceptRefsOfDefinition } from "../ast/conceptDependencies";
 import {
   emitsBareReExportableScalarBoolean,
   emitsTotalScalarBoolean,
@@ -563,10 +565,22 @@ export function buildAuthoredObligations(ast: CRL): ReadonlyMap<string, BooleanT
     }
   }
   const isRecencyValueReferent = (name: string): boolean => recencyValueNames.has(name);
+  // ⭐ #189 O2 — the whole-library "can be UNANSWERED" set, computed on the AUTHORED AST because
+  // `lowerLocalCodes` erases the local `code is` that defines the property (MEASURED: a question and a piece
+  // of evidence emit byte-identical defines). A concept's DERIVATION reads a question when any operand it
+  // reads is in that set — which is what decides whether its comparator owes a boundary (charter §4).
+  const conceptStatements = ast.statements.filter(
+    (st): st is Concept => st.type === "Concept" && Boolean(st.name),
+  );
+  const answerable = questionReachableNames(conceptStatements);
+  const derivationReadsAQuestion = (c: Concept): boolean =>
+    conceptRefsOfDefinition(c.definition).some(
+      (ref) => getRefLibrary(ref) === null && answerable.has(getRefName(ref)),
+    );
   for (const s of ast.statements) {
     if (s.type !== "Concept" || !s.name) continue;
     try {
-      map.set(s.name, classifyBooleanTotality(s, isRecencyValueReferent));
+      map.set(s.name, classifyBooleanTotality(s, isRecencyValueReferent, derivationReadsAQuestion(s)));
     } catch (e) {
       map.set(s.name, {
         kind: "unclassified",
@@ -1501,6 +1515,13 @@ class Emitter {
         }
         const shape = PATTERN_RETURN_SHAPE[call.pattern];
         if (shape === "boolean") {
+          // ⭐ #189 O2 — lock-step with the emit above: a comparator over an ANSWERABLE operand emits BARE
+          // (no boundary), so it discharges THREE-STATE. Keyed on the same authored obligation the emit
+          // reads, which is what stops the metadata and the lowering disagreeing.
+          const authoredCmp = this.options.authoredObligations?.get(c.name);
+          if (authoredCmp?.kind === "sanctioned-three-state" && authoredCmp.family === "derivation") {
+            return threeStateRead("comparator over a question (three-state, no boundary)");
+          }
           // #189 Slice C 2b.1 — a boolean-DECLARED comparator now emits `Coalesce(<cmp>, false)` (total at its
           // boundary, `emitDefinitionIs`); a refinement-declared concept over a boolean pattern is the
           // ill-typed FIXME passthrough (`emitDefinitionIs` `:2522`), still a bare nullable boolean. Discharge
@@ -3559,6 +3580,15 @@ class Emitter {
       return `exists { ${call} }`;
     }
     if (declared === "boolean" && patternShape === "boolean") {
+      // ⭐ #189 O2 — the boundary is CONDITIONAL. Keyed on the concept's AUTHORED obligation, which
+      // `buildAuthoredObligations` already classified with whole-library question-reachability — so the emit
+      // and the obligation cannot drift (a drift here is exactly what `proveWholeBoundaryTotality` rejects).
+      // A derivation over an ANSWERABLE operand inherits its unknown and must NOT be totalized: charter §4,
+      // and the goal's acceptance criterion that the only route to a Deny is a STATED false.
+      const authored = this.options.authoredObligations?.get(c.name);
+      if (authored?.kind === "sanctioned-three-state" && authored.family === "derivation") {
+        return call;
+      }
       // #189 Slice C 2b.1 — TOTALIZE the boolean comparator at its own boundary. A catalog comparator
       // (`CRLCommon.AtLeast`/`Below`/…) is a NULLABLE boolean (its argument can be null — e.g. an absent
       // age), so a bare emit violates the charter's null-safety-by-construction (§4). `Coalesce(<cmp>, false)`

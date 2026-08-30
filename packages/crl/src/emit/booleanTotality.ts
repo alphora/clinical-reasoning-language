@@ -140,7 +140,7 @@ export type BooleanTotalityObligation =
   // ⚠ Both families are admitted STRUCTURALLY, never by an entry asking for the exemption: a concept
   // reaches `"question"` only through `isPureQuestionConcept`, and `"guard"` only through the criterion
   // enrollment site. An ordinary nullable comparator can no more claim it than before.
-  | { kind: "sanctioned-three-state"; family: "question" | "guard" | "merge"; form: string; cell: string }
+  | { kind: "sanctioned-three-state"; family: "question" | "guard" | "merge" | "derivation"; form: string; cell: string }
   // Record / RecordSet / non-boolean scalar — produces no boolean define. `nullable` distinguishes a
   // nullable non-boolean scalar read (a later comparison must Coalesce the PREDICATE, not this value) from
   // a set/record result. Reading not-applicable as "consume anywhere" is the `Coalesce(X,0)` trap (§2).
@@ -196,7 +196,11 @@ function collectCompositionRefs(expr: CompositionExpression, out: ReferenceName[
  *  to `unclassified` for a known pattern absent from `PATTERN_RETURN_SHAPE` (disc 429 #10) rather than
  *  mirroring the emitter's `?? "list"` guess — a boolean-shape pattern missing from the table would
  *  otherwise be `exists`-wrapped AND certified total (a semantic inversion). */
-function classifyCatalogPattern(concept: Concept, body: NarrativeClause): BooleanTotalityObligation {
+function classifyCatalogPattern(
+  concept: Concept,
+  body: NarrativeClause,
+  derivationReadsAQuestion?: boolean,
+): BooleanTotalityObligation {
   const call = matchNarrative(body);
   if (!call.known) {
     return {
@@ -232,8 +236,22 @@ function classifyCatalogPattern(concept: Concept, body: NarrativeClause): Boolea
       // On a non-boolean concept an instance read produces no boolean define.
       return { kind: "not-applicable", nullable: true, reason: `instance-shape catalog read \`${call.pattern}\` on a non-boolean concept` };
     case "boolean":
-      // Inherently-boolean comparators (High/Low/AtLeast/Between/…) lower to a NULLABLE CQL comparison — the
-      // lowering owes `Coalesce(<predicate>, false)` (never `Coalesce(operand, 0) >= N`, §2 rule 2).
+      // ⭐ #189 O2 — the boundary is CONDITIONAL ON WHAT THE OPERAND READS (charter §4: "what determines the
+      // arm is what it reads, never that it is a derivation").
+      //
+      //   · over EVIDENCE — absent evidence is `false`, because a retrieval always computes. The comparator
+      //     owes its boundary `Coalesce(<predicate>, false)` (never `Coalesce(operand, 0) >= N`, §2 rule 2).
+      //   · over a QUESTION — the derivation INHERITS the question's unknown. `"BMI" at least 30 'kg/m2'`
+      //     over an unestablished BMI is UNKNOWN, not false; totalizing it manufactures a stated answer from
+      //     an absence and DENIES where the goal requires a pause. Charter §4 names this exact example.
+      if (derivationReadsAQuestion === true) {
+        return {
+          kind: "sanctioned-three-state",
+          family: "derivation",
+          form: `catalog comparator \`${call.pattern}\` over an ANSWERABLE operand`,
+          cell: "§4 derivation over a QUESTION → inherits unknown (NOT totalized)",
+        };
+      }
       return {
         kind: "requires-boundary",
         form: `catalog comparator \`${call.pattern}\``,
@@ -264,6 +282,10 @@ export function classifyBooleanTotality(
   // callers leave it undefined and keep the build-debt arm). Needed because the member-existence fold's
   // totality depends on the REFERENT, which this per-concept classifier cannot otherwise resolve.
   memberExistenceReferent?: (referentName: string) => boolean,
+  // #189 O2 — OPTIONAL: does this concept's DERIVATION read something that can be UNANSWERED (a local
+  // `code is`, transitively)? Only a whole-library caller can answer it, exactly like `memberExistenceReferent`
+  // above; a per-concept caller leaves it undefined and keeps the unconditional boundary.
+  derivationReadsAQuestion?: boolean,
 ): BooleanTotalityObligation {
   // Shape decides FIRST (§2): a record/record-set publishes records — no boolean define, whatever the
   // definition form (a reduction on a RecordSet is incoherent and T1 rejects it on its own axis).
@@ -527,7 +549,7 @@ export function classifyBooleanTotality(
 
   // `definition is <narrative>` — a catalog-matchable predicate (concept-aware, disc 429 C3).
   if (def?.type === "DefinitionIsDefinition") {
-    return classifyCatalogPattern(concept, def.body);
+    return classifyCatalogPattern(concept, def.body, derivationReadsAQuestion);
   }
 
   // A pure hand-authored `coded from` (no local code) — an external source arm, deferred at the flip
@@ -976,7 +998,13 @@ export function proveWholeBoundaryTotality(
     if (e.obligation.kind === "sanctioned-three-state") {
       const family = e.obligation.family;
       const what =
-        family === "guard" ? "guard define" : family === "merge" ? "both-rep merge" : "pure question";
+        family === "guard"
+          ? "guard define"
+          : family === "merge"
+            ? "both-rep merge"
+            : family === "derivation"
+              ? "derivation over a question"
+              : "pure question";
       // ⚠ The exemption is admitted STRUCTURALLY, and the proof RE-DERIVES that rather than believing the
       // entry. `family` reaches the ledger as a CLAIM on an `EmittedDefineEntry`; without these checks any
       // entry could relabel itself and skip its `Coalesce`, which is the widening the narrow rule guarded
@@ -996,6 +1024,11 @@ export function proveWholeBoundaryTotality(
       // #189 O3 — a both-rep MERGE of an answerable determination. Same structural discipline as the other
       // two families: the origin is the one only its own enrollment site can produce (the merge twin is an
       // authored concept's define; the Interface re-export above it enrolls separately, as for a question).
+      // #189 O2 — a derivation over an answerable operand. Authored concept, or its Interface re-export.
+      if (family === "derivation" && e.origin !== "authored" && e.origin !== "interface-facade") {
+        fail(e, `\`family: "derivation"\` requires the \`authored\` or \`interface-facade\` origin — origin was \`${e.origin}\``);
+        continue;
+      }
       if (family === "merge" && e.origin !== "authored" && e.origin !== "interface-facade" && e.origin !== "age-helper") {
         fail(e, `\`family: "merge"\` requires the \`authored\`, \`interface-facade\` or \`age-helper\` origin — origin was \`${e.origin}\``);
         continue;
