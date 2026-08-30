@@ -28,6 +28,7 @@ import { getRefName, getRefLibrary } from "../ast/types";
 
 import { ageComputeFnForUnit } from "./agePredicate";
 import { splitPipeline } from "./pipeline";
+import type { PipelineMalformation, PipelineStage } from "./pipeline";
 import type {
   CanonicalArg,
   CanonicalPatternCall,
@@ -68,11 +69,14 @@ export function matchNarrative(clause: NarrativeClause): CanonicalPatternCall {
   //
   // ⚠ A pipeline whose stages do not ALL match is unknown as a whole. Reporting a partial chain would claim
   // more than was understood, and half-matched logic that validates is the failure this work exists to remove.
-  const stages = splitPipeline(els)?.map((stage) => stage.elements);
-  if (stages !== undefined) {
+  const split = splitPipeline(els);
+  if (split.kind === "malformed") return softCompileUnknown(clause);
+  if (split.kind === "pipeline") {
     const calls: CanonicalPatternCall[] = [];
-    for (const stage of stages) {
-      const match = matchStage(stage, clause.location);
+    for (const stage of split.stages) {
+      // ⭐ STAGE-LOCAL location, not `clause.location`. A call carrying the whole narrative's span makes
+      // every per-stage diagnostic point at the entire definition.
+      const match = matchStage(stage.elements, stage.location);
       if (match === null) return softCompileUnknown(clause);
       calls.push(match);
     }
@@ -84,6 +88,33 @@ export function matchNarrative(clause: NarrativeClause): CanonicalPatternCall {
 
   const single = matchStage(els, clause.location);
   return single ?? softCompileUnknown(clause);
+}
+
+/**
+ * Per-stage match results for ONE narrative — what the VALIDATOR needs and `matchNarrative` cannot express.
+ *
+ * ⚠ `matchNarrative` folds a pipeline into a single call and returns `known: false` for the WHOLE narrative
+ * when any stage fails. That is right for a consumer that needs one call, and useless for a diagnostic: it
+ * cannot say WHICH stage failed, so the author gets "this definition matched nothing" for a three-stage
+ * pipeline where one stage has a typo. This exposes the per-stage truth without duplicating the split.
+ */
+export type StageMatch = { stage: PipelineStage; call: CanonicalPatternCall | null };
+
+export type NarrativeStages =
+  | { kind: "not-a-pipeline" }
+  | { kind: "malformed"; problem: PipelineMalformation; location: Location }
+  | { kind: "pipeline"; stages: StageMatch[] };
+
+export function matchNarrativeStages(clause: NarrativeClause): NarrativeStages {
+  const split = splitPipeline(clause.elements);
+  if (split.kind !== "pipeline") return split;
+  return {
+    kind: "pipeline",
+    stages: split.stages.map((stage) => ({
+      stage,
+      call: matchStage(stage.elements, stage.location),
+    })),
+  };
 }
 
 function matchStage(els: NarrativeElement[], loc: Location): CanonicalPatternCall | null {
