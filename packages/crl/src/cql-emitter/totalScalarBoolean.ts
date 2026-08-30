@@ -132,18 +132,26 @@ function declaredBoolean(c: Concept): boolean {
  * calls would be unsound. It stores only FULLY-resolved subtree results; a cycle-guarded `false` is never cached (a
  * concept ON a cycle is genuinely non-total, so any result that transitively depended on it is still correct).
  */
+export type BooleanLaneMode =
+  /** Is the define provably TOTAL (never null)? Used by the ledger's proof and cross-library totality. */
+  | "total"
+  /** Is the define a SCALAR BOOLEAN (bare-usable in `not`/`and`/`or`, re-exportable bare)? May be three-state. */
+  | "scalarBoolean";
+
 export function emitsTotalScalarBoolean(
   concept: Concept | undefined,
   resolvers: Resolvers,
   visiting: ReadonlySet<string> = new Set(),
   memo: Map<string, boolean> = new Map(),
+  mode: BooleanLaneMode = "total",
 ): boolean {
   if (concept === undefined || concept.name === undefined) return false;
-  const cached = memo.get(concept.name);
+  const key = mode + " " + concept.name;
+  const cached = memo.get(key);
   if (cached !== undefined) return cached;
   if (visiting.has(concept.name)) return false; // cycle guard — a self/mutually-referential alias is not total
-  const result = computeTotality(concept, concept.name, resolvers, visiting, memo);
-  memo.set(concept.name, result);
+  const result = computeTotality(concept, concept.name, resolvers, visiting, memo, mode);
+  memo.set(key, result);
   return result;
 }
 
@@ -191,22 +199,62 @@ export function emitsScalarValue(
   return false;
 }
 
+/**
+ * ⭐ #189 O3 — is this concept's define a SCALAR BOOLEAN that may be re-exported BARE (`define X: Lib."X"`)?
+ *
+ * Distinct from `emitsTotalScalarBoolean`, which answers "is it provably TOTAL". The two used to be the same
+ * question because everything scalar-boolean was totalized at its own boundary; the three-state recency merge
+ * splits them:
+ *
+ *   | form                | total? | bare-re-exportable? |
+ *   |---------------------|--------|---------------------|
+ *   | boolean reduction   | yes    | yes                 |
+ *   | recency MERGE       | **no** | **yes**             |
+ *   | union merge (List)  | no     | no                  |
+ *
+ * Use THIS for façade-mode selection (bare vs `.asTruths().satisfied()`), and `emitsTotalScalarBoolean` for
+ * anything that needs a totality PROOF (composition operands, cross-library totality projection). Routing the
+ * façade by totality would collapse a three-state merge into a closed-world existence wrapper — the false it
+ * was just fixed not to manufacture.
+ */
+export function emitsBareReExportableScalarBoolean(
+  concept: Concept | undefined,
+  resolvers: Resolvers,
+  visiting: ReadonlySet<string> = new Set(),
+  memo: Map<string, boolean> = new Map(),
+): boolean {
+  return emitsTotalScalarBoolean(concept, resolvers, visiting, memo, "scalarBoolean");
+}
+
 function computeTotality(
   concept: Concept,
   name: string,
   resolvers: Resolvers,
   visiting: ReadonlySet<string>,
   memo: Map<string, boolean>,
+  mode: BooleanLaneMode,
 ): boolean {
-  // #189 Slice C 2b.3b.1 — a both-representation twin's totality is KINDED. A `"recency"` merge now emits a
-  // TOTAL boolean (`Coalesce(CFH.recencyAgeSelected(...), false)`, `emitCQL.emitRecencyMerge`), so it is total —
-  // gated on the twin declaring a SCALAR boolean (`isScalarBoolean`: `shape is Scalar` + a single `boolean` value
-  // type), NOT merely `declaredBoolean` (includes-boolean). Cardinality is authoritative (charter §3): a Record /
-  // RecordSet twin must publish records, never a manufactured scalar boolean (crl-emit code review 2b.3b.1i, both
-  // arms — the recency emit + discharge assert the SAME invariant, so a malformed twin is a loud emit error, not a
-  // predicate/emit drift). A `"union"` merge (and any future kind) still emits a truth-set List → NON-total; its
-  // record-half flip rides 2b.4/#257. Checked before the definition switch (mirrors `emittedDischargeAndType:1219`).
-  if (concept.__bothRepMerge === "recency") return isScalarBoolean(concept);
+  // ⭐ #189 O3 — a `"recency"` merge is NOT total. It emits a BARE `CFH.recencyAgeSelected(...)` with no outer
+  // `Coalesce` (`emitCQL.emitRecencyMerge`), because the concept carries a local `code is` and a determination
+  // NO arm establishes is UNKNOWN, not false. PROVEN by execution: with the `Coalesce` the same IG Denies an
+  // unanswered patient, without it the tree pauses and asks (worklist O3).
+  //
+  // ⚠ It used to `return isScalarBoolean(concept)` here — i.e. TOTAL — and that claim is what a boolean
+  // COMPOSITION over a merge would have relied on to admit it as a proven-total operand. Reporting it total
+  // now would be exactly the metadata/lowering disagreement the ledger's own text-check exists to catch.
+  //
+  // ⚠ BARE-RE-EXPORTABILITY IS A DIFFERENT QUESTION and has its own predicate below
+  // (`emitsBareReExportableScalarBoolean`). The Interface façade re-exports a merge BARE — that is what
+  // propagates the null — so the façade must not be routed by TOTALITY, or it collapses to
+  // `.asTruths().satisfied()` and re-manufactures the `false` one layer up.
+  //
+  // A `"union"` merge (and any future kind) still emits a truth-set List → NON-total; its record-half flip
+  // rides 2b.4/#257. Checked before the definition switch (mirrors `emittedDischargeAndType`).
+  // ⭐ #189 O3 — a `"recency"` merge is a SCALAR BOOLEAN but is NOT total: it emits a bare
+  // `CFH.recencyAgeSelected(...)` (no outer `Coalesce`), so an unanswered+uncomputable determination stays
+  // null and the tree PAUSES (proven by an executed `$apply` counterfactual — worklist O3).
+  // The two questions genuinely differ for this form, which is why the mode exists.
+  if (concept.__bothRepMerge === "recency") return mode === "scalarBoolean" && isScalarBoolean(concept);
   if (concept.__bothRepMerge !== undefined) return false;
   const def = concept.definition;
   if (def === undefined) return false;
@@ -237,7 +285,7 @@ function computeTotality(
         // A same-layer BARE alias → recurse the referent (validator ALLOWS alias chains, `A→B→R`); a QUALIFIED
         // (cross-library) alias → the LEGACY resolver's TERMINAL verdict (inert `false`). An alias is NOT a
         // boolean composition, so it never gains a cross-library totality proof — charter §4 no-magic (0c step 2).
-        return refIsTotal(body.ref, "legacy", resolvers, nextVisiting, memo);
+        return refIsTotal(body.ref, "legacy", resolvers, nextVisiting, memo, mode);
       }
       if (body.type === "DefinedAsComposition") {
         // #189 Slice C 2b.3b.1 — a boolean-declared `defined as` COMPOSITION is total IFF EVERY operand is total
@@ -245,7 +293,7 @@ function computeTotality(
         // admit marks `example-nested`'s `"A And B"` total while it emits truth-set → mixed RED; the recursion
         // keeps it non-total → all-non-total → byte-invariant). The pivot (`emitDefinedAs`) gates its boolean-lane
         // emit on this same predicate, so emit + discharge + façade agree by construction.
-        return compositionAllOperandsTotal(body.expression, resolvers, nextVisiting, memo);
+        return compositionAllOperandsTotal(body.expression, resolvers, nextVisiting, memo, mode);
       }
       if (body.type === "DefinedAsBooleanComposition") {
         // #189 Slice 0b — a `defined as` BOOLEAN composition (`("A" and "B")`, the neutral
@@ -259,7 +307,7 @@ function computeTotality(
         // keeps it OFF the bare-boolean lane and emits a LOUD error (no fabricated terminal `Coalesce`,
         // charter §4 no-magic). This REPLACES the T1 inert `return false`; `emit/booleanTotality.ts` (the
         // whole-boundary obligation machine) already classified it composite/delegated.
-        return branchCompositionAllOperandsTotal(body.expression, resolvers, nextVisiting, memo);
+        return branchCompositionAllOperandsTotal(body.expression, resolvers, nextVisiting, memo, mode);
       }
       // #270 — `defined as exists` is a TOTAL scalar boolean (existence is never null; `exists(...)` never
       // returns null), on EVERY lane. Since #270 the case-feature INFERRED lane lowers it to a bare scalar
@@ -293,10 +341,14 @@ function refIsTotal(
   resolvers: Resolvers,
   visiting: ReadonlySet<string>,
   memo: Map<string, boolean>,
+  mode: BooleanLaneMode = "total",
 ): boolean {
   const res = (family === "boolean" ? resolvers.family : resolvers.legacy)(ref);
+  // ⚠ A cross-library TERMINAL verdict answers TOTALITY only. In `scalarBoolean` mode a foreign total boolean
+  // is also bare-usable, so the verdict carries over; a foreign NON-total one cannot be distinguished from a
+  // foreign non-boolean here, so it stays `false` (conservative — the cross-lib three-state lane is O-UNIFIED).
   if (res.kind === "total") return res.total;
-  return emitsTotalScalarBoolean(res.concept, resolvers, visiting, memo);
+  return emitsTotalScalarBoolean(res.concept, resolvers, visiting, memo, mode);
 }
 
 /** #189 Slice 0c — is ONE boolean-composition operand a proven-total scalar boolean, under the SAME family-arm
@@ -316,18 +368,19 @@ function compositionAllOperandsTotal(
   resolvers: Resolvers,
   visiting: ReadonlySet<string>,
   memo: Map<string, boolean>,
+  mode: BooleanLaneMode = "total",
 ): boolean {
   switch (expr.type) {
     case "CompositionRef":
       // LEGACY arm — a sem-* composition operand never gains a cross-library totality proof (banner I: this is one
       // of the two legacy arms whose qualified verdict stays inert, keeping the golden corpus byte-invariant).
-      return refIsTotal(expr.ref, "legacy", resolvers, visiting, memo);
+      return refIsTotal(expr.ref, "legacy", resolvers, visiting, memo, mode);
     case "CompositionGroup":
     case "SemNotExpression":
-      return compositionAllOperandsTotal(expr.expression, resolvers, visiting, memo);
+      return compositionAllOperandsTotal(expr.expression, resolvers, visiting, memo, mode);
     case "SemAndExpression":
     case "SemOrExpression":
-      return expr.terms.every((t) => compositionAllOperandsTotal(t, resolvers, visiting, memo));
+      return expr.terms.every((t) => compositionAllOperandsTotal(t, resolvers, visiting, memo, mode));
   }
 }
 
@@ -344,10 +397,11 @@ function branchCompositionAllOperandsTotal(
   resolvers: Resolvers,
   visiting: ReadonlySet<string>,
   memo: Map<string, boolean>,
+  mode: BooleanLaneMode = "total",
 ): boolean {
   const refs = branchConditionConceptRefsStrict(expr, "totalScalarBoolean boolean-composition");
   // FAMILY arm — the ONLY arm 0c changes: a QUALIFIED (cross-library) operand consults the `family` resolver (the
   // `DeclaredResultIndex` lane-aware totality verdict), so a cross-lib boolean composition over a foreign total
   // boolean is provable. A bare operand still recurses same-layer through `emitsTotalScalarBoolean`.
-  return refs.every((r) => refIsTotal(r.ref, "boolean", resolvers, visiting, memo));
+  return refs.every((r) => refIsTotal(r.ref, "boolean", resolvers, visiting, memo, mode));
 }

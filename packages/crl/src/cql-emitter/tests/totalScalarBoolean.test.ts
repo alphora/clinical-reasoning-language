@@ -1,5 +1,10 @@
 import { buildCRL } from "../../index";
-import { emitsTotalScalarBoolean, sameLayerResolver, uniformResolvers } from "../totalScalarBoolean";
+import {
+  emitsBareReExportableScalarBoolean,
+  emitsTotalScalarBoolean,
+  sameLayerResolver,
+  uniformResolvers,
+} from "../totalScalarBoolean";
 import type { Resolvers, ReferenceResolver } from "../totalScalarBoolean";
 import type { CRL, Concept } from "../../ast/types";
 import { getRefLibrary } from "../../ast/types";
@@ -310,17 +315,30 @@ concept "Bare":
       ...over,
     }) as Concept;
 
-  it("a `\"recency\"` both-rep twin is TOTAL (Scalar boolean); a `\"union\"` twin is NOT", () => {
+  // ⭐ #189 O3 — a `"recency"` merge is a SCALAR BOOLEAN but NOT total. It emits a bare
+  // `CFH.recencyAgeSelected(...)` with no outer `Coalesce`, so an unanswered + uncomputable determination
+  // stays null and the tree PAUSES instead of Denying (proven by an executed `$apply` counterfactual —
+  // worklist O3). This pin previously asserted TOTAL, which is the claim a boolean composition would have
+  // used to admit the merge as a proven-total operand.
+  it("a `\"recency\"` both-rep twin is a SCALAR BOOLEAN but NOT total; a `\"union\"` twin is neither", () => {
     const empty = resolverFor(new Map<string, Concept>());
-    expect(emitsTotalScalarBoolean(mkConcept({ __bothRepMerge: "recency" }), empty)).toBe(true);
+    const recency = mkConcept({ __bothRepMerge: "recency" });
+    expect(emitsTotalScalarBoolean(recency, empty)).toBe(false); // three-state — the load-bearing assertion
+    expect(emitsBareReExportableScalarBoolean(recency, empty)).toBe(true); // bare-usable in `not`/`and`/`or`
     expect(emitsTotalScalarBoolean(mkConcept({ __bothRepMerge: "union" }), empty)).toBe(false);
+    expect(emitsBareReExportableScalarBoolean(mkConcept({ __bothRepMerge: "union" }), empty)).toBe(false);
   });
 
-  it("a `\"recency\"` twin with NON-scalar or NON-boolean declaration is NOT total (cardinality/coherence gate — lock-step with emitRecencyMerge's throw)", () => {
+  it("a `\"recency\"` twin with NON-scalar or NON-boolean declaration is neither total NOR bare-re-exportable (cardinality/coherence gate — lock-step with emitRecencyMerge's throw)", () => {
     const empty = resolverFor(new Map<string, Concept>());
-    expect(emitsTotalScalarBoolean(mkConcept({ __bothRepMerge: "recency", shape: "Record" }), empty)).toBe(false);
-    expect(emitsTotalScalarBoolean(mkConcept({ __bothRepMerge: "recency", valueTypes: ["boolean", "Quantity"] }), empty)).toBe(false);
-    expect(emitsTotalScalarBoolean(mkConcept({ __bothRepMerge: "recency", valueTypes: ["Quantity"] }), empty)).toBe(false);
+    for (const over of [
+      { __bothRepMerge: "recency" as const, shape: "Record" as const },
+      { __bothRepMerge: "recency" as const, valueTypes: ["boolean", "Quantity"] },
+      { __bothRepMerge: "recency" as const, valueTypes: ["Quantity"] },
+    ]) {
+      expect(emitsTotalScalarBoolean(mkConcept(over), empty)).toBe(false);
+      expect(emitsBareReExportableScalarBoolean(mkConcept(over), empty)).toBe(false);
+    }
   });
 });
 

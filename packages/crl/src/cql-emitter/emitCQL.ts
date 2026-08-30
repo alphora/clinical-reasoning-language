@@ -42,6 +42,7 @@ import { cqlStringLiteral, cqlQuotedIdentifier } from "./cqlStrings";
 import { PATTERN_RETURN_SHAPE } from "./patternReturnShape";
 import type { PatternReturnShape } from "./patternReturnShape";
 import {
+  emitsBareReExportableScalarBoolean,
   emitsTotalScalarBoolean,
   emitsScalarValue,
   sameLayerResolver,
@@ -2512,7 +2513,7 @@ class Emitter {
         firstNonBooleanOperand = name;
         firstNonBooleanResultType = rt;
       }
-      if (emitsTotalScalarBoolean(concept, resolver)) anyTotal = true;
+      if (emitsBareReExportableScalarBoolean(concept, resolver)) anyTotal = true;
       else if (firstNonTotalOperand === undefined) firstNonTotalOperand = name;
     }
     return {
@@ -2611,7 +2612,10 @@ class Emitter {
       return `/* FIXME: emit-boolean-composition-both-rep (${c.name}) */ CRLCommon.BooleanCompositionBothRep('${c.name}')`;
     }
     const resolver = this.totalityResolvers();
-    if (!emitsTotalScalarBoolean(c, resolver)) {
+    // #189 O3 — the LANE gate asks whether every operand is a SCALAR BOOLEAN, not whether each is TOTAL.
+    // Charter §4: composition is strong Kleene and "totality belongs at the arm, never per operand", so a
+    // three-state operand composes fine — `not(null)` is null, which is the pause propagating.
+    if (!emitsBareReExportableScalarBoolean(c, resolver)) {
       return this.emitBooleanCompositionError(c, body);
     }
     // The gate passed → every operand is a proven-total scalar boolean (a cross-library operand proven via the
@@ -2772,7 +2776,7 @@ class Emitter {
       // non-boolean-declared alias keeps the load-bearing guard + the `.asTruths()` path. Fold-in (a both-rep
       // concept, `__bothRepMerge` set) is orthogonal — the predicate already refuses it, and `foldIn === undefined`
       // keeps the flip out of the union path (whose weave is guarded next).
-      if (body.type === "DefinedAsBareRef" && foldIn === undefined && emitsTotalScalarBoolean(c, this.totalityResolvers())) {
+      if (body.type === "DefinedAsBareRef" && foldIn === undefined && emitsBareReExportableScalarBoolean(c, this.totalityResolvers())) {
         return cqlIdent(getRefName(body.ref));
       }
       // #189 Slice C 2b.2 (code review, Claude #3) — a both-rep UNION whose inferred bare-ref operand is a TOTAL
@@ -2783,7 +2787,7 @@ class Emitter {
         body.type === "DefinedAsBareRef" &&
         foldIn !== undefined &&
         getRefLibrary(body.ref) === null &&
-        emitsTotalScalarBoolean(this.conceptByName.get(getRefName(body.ref)), this.totalityResolvers())
+        emitsBareReExportableScalarBoolean(this.conceptByName.get(getRefName(body.ref)), this.totalityResolvers())
       ) {
         throw new ReductionInCompositionError(
           `Concept "${getRefName(body.ref)}" emits a TOTAL boolean and cannot be the inferred operand of a ` +
@@ -2852,8 +2856,8 @@ class Emitter {
             });
             return `/* FIXME: emit-composition-result-type-mismatch (${c.name}) */ CRLCommon.CompositionResultTypeMismatch('${c.name}')`;
           }
-          if (emitsTotalScalarBoolean(c, resolver)) {
-            return this.emitComposition(body.expression, "boolean"); // FLIP — parent Scalar<boolean> + EVERY operand total
+          if (emitsBareReExportableScalarBoolean(c, resolver)) {
+            return this.emitComposition(body.expression, "boolean"); // FLIP — parent Scalar<boolean> + every operand a scalar boolean
           }
           if (cls.anyTotal) {
             // MIXED totality: every operand is boolean-COMPATIBLE (mismatch above did not fire) but some are total,
@@ -2979,7 +2983,7 @@ class Emitter {
     // (`crossLibraryOf !== null`) — its shape is proven at the resolver seam (0c), not here.
     if (this.crossLibraryOf(body.ref) === null) {
       const operand = this.conceptByName.get(getRefName(body.ref));
-      if (operand && emitsTotalScalarBoolean(operand, this.totalityResolvers())) {
+      if (operand && emitsBareReExportableScalarBoolean(operand, this.totalityResolvers())) {
         throw new ReductionInCompositionError(
           `\`defined as exists ("${operand.name}")\` applies \`exists\` to "${operand.name}", which already ` +
             `emits a TOTAL scalar boolean — \`exists\` over a scalar boolean is ill-typed (and may silently ` +
@@ -3179,7 +3183,7 @@ class Emitter {
           if (
             this.caseFeature.kind !== "off" &&
             getRefLibrary(expr.ref) === null &&
-            emitsTotalScalarBoolean(this.conceptByName.get(getRefName(expr.ref)), this.totalityResolvers())
+            emitsBareReExportableScalarBoolean(this.conceptByName.get(getRefName(expr.ref)), this.totalityResolvers())
           ) {
             throw new ReductionInCompositionError(
               `Concept "${getRefName(expr.ref)}" emits a TOTAL scalar boolean and cannot be a truth-set operand in ` +

@@ -82,7 +82,11 @@ import type { CRLError } from "../types/errors";
 
 import { emitCQLFromAST } from "./emitCQL";
 import type { EmitResult, EmitOptions } from "./emitCQL";
-import { emitsTotalScalarBoolean, sameLayerResolver, uniformResolvers } from "./totalScalarBoolean";
+import {
+  emitsBareReExportableScalarBoolean,
+  sameLayerResolver,
+  uniformResolvers,
+} from "./totalScalarBoolean";
 import type { Resolvers } from "./totalScalarBoolean";
 import { makeTotalityFamilyResolver } from "../emit/declaredResultIndex";
 import type { CrossLibraryTotality } from "../emit/declaredResultIndex";
@@ -1290,7 +1294,10 @@ function buildInterfaceReexports(
     // SAME predicate — so the façade cannot `.satisfied()` a bare Boolean (an alias/comparator source) nor
     // bare-re-export a truth-set. The non-boolean-reduction HARD ERROR above still fires for a DIRECT reduction
     // guard; an alias to a non-boolean reduction is caught loud at emit (its referent trips the retained guard).
-    const srcEmitsTotalBoolean = emitsTotalScalarBoolean(src, srcTotalityResolvers);
+    // ⭐ #189 O3 — mode selection asks BARE-RE-EXPORTABILITY, not TOTALITY. A three-state recency merge is
+    // re-exportable bare (that is what propagates its null) but is NOT total; routing it by totality would
+    // send it to the `.asTruths().satisfied()` collapse and re-manufacture the `false` O3 removed.
+    const srcEmitsTotalBoolean = emitsBareReExportableScalarBoolean(src, srcTotalityResolvers);
     const targetLib = layerLibraryName(policyId, sourceLayer);
     const qualified: QualifiedReference = {
       type: "QualifiedReference",
