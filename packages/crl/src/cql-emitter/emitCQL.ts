@@ -3531,8 +3531,28 @@ class Emitter {
       return `// FIXME: ${matched.pattern} is inherently boolean; refinement consumer cannot use it as a list\n${call}`;
     }
     if (declared === "refinement" && patternShape === "instance") {
-      // Selection pattern returns a singleton resource; author declared
-      // refinement (list). Lift to a singleton-list via CQL list literal.
+      // ⭐ #189 — `shape is Record` PUBLISHES ONE RECORD, and a selection pattern already returns exactly
+      // that. Emit the call BARE: there is nothing to bridge.
+      //
+      // ⚠ This is the `{ call }` coercion, and it was NOT harmless. `declaredShapeOfConcept` collapses every
+      // non-boolean into "refinement", so a `shape is Record` concept was silently listified — MEASURED, a
+      // `shape is Record` selection emitted `{ CRLCommon.MostRecent("Weight Records") }`
+      // (`tmp/nullprobe/analysis/scalarOperand-out.txt`). Consequences that all trace here: `shape is` was
+      // not honored in emit at all; a comparator over such a concept bound the `List<Observation>` overload
+      // (`exists (…)`, TOTAL) instead of the null-propagating scalar one, which is why the O2 boundary is
+      // behaviourally dead; and `Greatest Weight` could not publish the record its shape declares.
+      //
+      // ⚠ SCOPE — this removes ONE bridge, not the block. `REFACTORS-IN-FORCE` says the coercion block
+      // "cannot be removed until reduction NESTING lands — without nesting an author cannot SAY
+      // `exists ( <filter pattern> )`". That rationale is REAL and reaches the `exists <call>` bridge above,
+      // which is untouched: strip that one and an author has no way to write what it inserts. It does NOT
+      // reach this bridge — here the pattern already yields the record, so removing the lift asks the author
+      // for nothing they have not already written (`- shape is Record.`). Scope narrowing, not retirement
+      // (`stale-requirements` §2); the blocker's own stated reason is what bounds it.
+      //
+      // RecordSet / Scalar keep the historical lift: declaring a SET (or a scalar VALUE) while reducing to
+      // one record is an incoherence the shape validator owns, not a bridge to re-decide here.
+      if (assumedShapePreMigration(c.shape) === "Record") return call;
       return `{ ${call} }`;
     }
     if (declared === "boolean" && patternShape === "instance") {

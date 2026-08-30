@@ -539,6 +539,39 @@ define function "Highest"(X List<Observation>, scope Interval<DateTime>):
     where (O.effective as Period) during scope
     return FHIRHelpers.ToQuantity(O.value as Quantity))
 
+/*
+ * ⭐ #189 — SINGLE-RECORD value comparators: `<Observation>` overloads.
+ *
+ * A `shape is Record` concept publishes ONE RECORD, and since the `{ call }` shape-coercion bridge was
+ * narrowed it emits that record BARE rather than as a singleton list. A comparator over it therefore arrives
+ * with an `Observation`, which matched NO overload before these — the emitted CQL did not translate.
+ *
+ * ⚠ THESE READ THE VALUE, AND THAT IS THE POINT. The `List<Observation>` overloads above are
+ * `exists (values) V where …` — PRESENCE semantics, total by construction, `false` on an empty list. That is
+ * correct for a record SET (does any record satisfy this?) and wrong for a record (what does THIS record
+ * say?). These are NULL-PROPAGATING: an absent record yields a null value yields a null comparison, which is
+ * what lets an unestablished determination stay UNKNOWN instead of becoming a stated `false`.
+ * Charter §4: "what determines the arm is what it reads, never that it is a derivation."
+ *
+ * `FHIRHelpers.ToQuantity` unwraps the FHIR datum to a System.Quantity so the comparison is like-for-like
+ * with the scalar overloads (same conversion the list overloads' `V.value as Quantity` relies on).
+ */
+define function "AtLeast"(rec Observation, target Quantity):
+  FHIRHelpers.ToQuantity(rec.value as Quantity) >= target
+define function "AtMost"(rec Observation, target Quantity):
+  FHIRHelpers.ToQuantity(rec.value as Quantity) <= target
+define function "Exceeds"(rec Observation, target Quantity):
+  FHIRHelpers.ToQuantity(rec.value as Quantity) > target
+define function "Below"(rec Observation, target Quantity):
+  FHIRHelpers.ToQuantity(rec.value as Quantity) < target
+define function "Between"(rec Observation, lo Quantity, hi Quantity):
+  FHIRHelpers.ToQuantity(rec.value as Quantity) >= lo
+    and FHIRHelpers.ToQuantity(rec.value as Quantity) < hi
+define function "High"(rec Observation, threshold Quantity):
+  FHIRHelpers.ToQuantity(rec.value as Quantity) > threshold
+define function "Low"(rec Observation, threshold Quantity):
+  FHIRHelpers.ToQuantity(rec.value as Quantity) < threshold
+
 /**
  * AtLeastN / Consecutive — INHERENTLY BOOLEAN count predicates.
  */
