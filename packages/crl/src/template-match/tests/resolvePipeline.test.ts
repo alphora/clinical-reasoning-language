@@ -218,11 +218,98 @@ describe("resolveConceptPipeline — the effect matrix", () => {
       "- code is `c`.",
       "- definition is exists this.",
     ]);
-    const argsOf = (r: PipelineResolution) =>
-      r.kind === "resolved" ? r.stages[0].call.args.map((a) => JSON.stringify({ t: a.type })) : ["INVALID"];
-    expect(argsOf(named)).toEqual([JSON.stringify({ t: "ConceptRefArg" })]);
-    expect(argsOf(bare)).toEqual([]);
-    expect(argsOf(named)).not.toEqual(argsOf(bare));
+    // ⚠ ASSERT THE IDENTITY, not the arg COUNT. A regression that kept an arg but dropped the concept name
+    // or the library qualifier would sail past a count/type check.
+    const arg = named.kind === "resolved" ? named.stages[0].call.args[0] : undefined;
+    expect(arg?.type).toBe("ConceptRefArg");
+    expect(arg && "value" in arg && arg.value).toBe("W");
+    expect(bare.kind === "resolved" && bare.stages[0].call.args).toEqual([]);
+  });
+
+  it("⭐ a QUALIFIED named target keeps its library", () => {
+    const r = resolve([
+      "- type is Condition.",
+      "- value type is boolean.",
+      "- code is `c`.",
+      '- definition is exists "Other"."W".',
+    ]);
+    const arg = r.kind === "resolved" ? r.stages[0].call.args[0] : undefined;
+    expect(arg && "value" in arg && arg.value).toBe("W");
+    expect(arg && "library" in arg && arg.library).toBe("Other");
+  });
+
+  it("⭐ a named target makes the occurrence read BOTH the flow and the operand", () => {
+    // ⚠ THE CHARTER, `docs/CRL-NORTH-STAR.md:208`: "A reduction over a NAMED set reduces `this` ∪ that set,
+    // so a coded concept's own assertions compete". Copying the catalog's binary `reads: "flow"` onto the
+    // occurrence would tell a lowering it consumes only the handed space — and the emitter's own
+    // `localUnionRef` path (emitCQL.ts:3654) exists precisely because it does not.
+    const named = resolve([
+      "- type is Condition.",
+      "- value type is boolean.",
+      "- code is `c`.",
+      '- definition is exists "W".',
+    ]);
+    const bare = resolve([
+      "- type is Condition.",
+      "- value type is boolean.",
+      "- code is `c`.",
+      "- definition is exists this.",
+    ]);
+    expect(named.kind === "resolved" && named.stages[0].reads).toBe("flow-and-operands");
+    expect(bare.kind === "resolved" && bare.stages[0].reads).toBe("flow");
+  });
+
+  it("⭐ a PRODUCER outputs `many` even from a one-record input — it ADDS", () => {
+    // ⚠⚠ THE CASE THAT PASSED CONFORMANCE ON A FALSE CLAIM. Producer output used to inherit the input's
+    // cardinality, so a selection followed by a producer stayed `one` and a `shape is Record` concept was
+    // blessed while publishing a 2-member space. Per the model at the head of `resolvePipeline.ts`, a
+    // producer "adds its candidate to what it was given": n+1 ≥ 2 even from one.
+    const r = resolve([
+      "- shape is Record.",
+      "- type is Observation.",
+      "- value type is boolean.",
+      "- code is `c`.",
+      "- definition is most recent this, then \"W\" at least 30 'kg/m2'.",
+    ]);
+    expect(diagnostics(r)).toEqual(["terminal-shape-mismatch"]);
+  });
+
+  it("⚠ a value stage whose CONCRETE result type disagrees is refused", () => {
+    // `returnShape: "other"` cannot tell `BodyMassIndex → Quantity` from a Period-returning pattern, so the
+    // old presence check let this resolve clean.
+    const r = resolve([
+      "- shape is Record.",
+      "- type is Observation.",
+      "- value type is date.",
+      "- code is `c`.",
+      '- definition is body mass index of "W" and "H", then most recent this.',
+    ]);
+    expect(diagnostics(r)).toEqual(["value-incompatible"]);
+  });
+
+  it("⚠ an UNDECLARED shape is asked for rather than guessed, on the arm that depends on it", () => {
+    // ⚠ `isRecordSpaced` routes through `assumedShapePreMigration` (undeclared → `Scalar`), so this would
+    // have been refused `value-stage-not-terminal` — an author-facing diagnostic naming a defect that is not
+    // the one present. RETIRE:189-shape-declared.
+    const r = resolve([
+      "- type is Observation.",
+      "- value type is boolean.",
+      "- code is `c`.",
+      "- definition is \"W\" at least 30 'kg/m2', then most recent this.",
+    ]);
+    expect(diagnostics(r)).toEqual(["shape-required-to-classify"]);
+  });
+
+  it("⚠ a `defined as` composition is NOT reported as having no program", () => {
+    // `no-program` says the source space is the whole answer. For a composition that is false — the
+    // composition IS the answer — and a consumer branching on it would silently drop the composition.
+    const r = resolve([
+      "- type is Observation.",
+      "- value type is boolean.",
+      "- code is `c`.",
+      '- defined as exists ("W").',
+    ]);
+    expect(r.kind).toBe("not-a-pipeline-program");
   });
 
   it("⚠ `count … at least N` is REFUSED, not lowered lossily", () => {

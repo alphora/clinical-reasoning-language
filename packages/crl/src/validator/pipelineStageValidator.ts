@@ -5,6 +5,7 @@ import {
   isProjectionOnly,
   isSelectionPattern,
   patternReturnShape,
+  renameForDefinitionSlot,
 } from "../template-match/patternCatalog";
 
 import type { PipelineStageError, PipelineStageRule, ValidationError } from "./validator";
@@ -100,11 +101,18 @@ export class PipelineStageValidator {
     // projection. Both can be authored as pipelines, and a stage rule covering only one would leave the
     // trap open in the other.
     if (concept.definition?.type === "DefinitionIsDefinition") {
-      this.checkNarrative(concept, concept.definition.body, "`definition is`", attribution, errors);
+      this.checkNarrative(concept, concept.definition.body, "`definition is`", "definition", attribution, errors);
     }
     for (const rep of concept.representations ?? []) {
       if (rep.valueProjection) {
-        this.checkNarrative(concept, rep.valueProjection.body, "`value projection is`", attribution, errors);
+        this.checkNarrative(
+          concept,
+          rep.valueProjection.body,
+          "`value projection is`",
+          "projection",
+          attribution,
+          errors,
+        );
       }
     }
   }
@@ -113,9 +121,17 @@ export class PipelineStageValidator {
     concept: Concept,
     body: Parameters<typeof matchNarrativeStages>[0],
     where: string,
+    slot: "definition" | "projection",
     attribution: Attribution,
     errors: ValidationError[],
   ): void {
+    // ⭐⭐ THE SLOT DECIDES WHAT THE WORDS MEAN, and this body serves BOTH slots. `matcher.ts` is slot-blind:
+    // it emits `Exists` for `exists this` wherever it appears. Without this rename the validator called
+    // `definition is most recent this, then exists this` a rep-local projection in a pipeline — while the
+    // resolver, which DOES rename, classified the same source clean. One commit, two readings, and the
+    // author-facing message even told them the computation "belongs in a concept-level `definition is`"
+    // while reporting on one. Both panel arms found it independently.
+    const patternIn = (p: string): string => (slot === "definition" ? renameForDefinitionSlot(p) : p);
     const result = matchNarrativeStages(body);
     if (result.kind === "not-a-pipeline") return;
 
@@ -163,7 +179,7 @@ export class PipelineStageValidator {
       // `value projection is exists this, then most recent this` validated completely clean. The later-stage
       // case was previously caught only by an ARITY proxy (the fold injects an operand into a zero-operand
       // contract), which by construction could never see stage 1.
-      if (isProjectionOnly(call.pattern)) {
+      if (isProjectionOnly(patternIn(call.pattern))) {
         errors.push(
           this.err(
             "pipeline-stage-projection-only",
@@ -178,7 +194,7 @@ export class PipelineStageValidator {
         );
         continue;
       }
-      if (!isClassified(call.pattern)) {
+      if (!isClassified(patternIn(call.pattern))) {
         // FAIL CLOSED. A matched-but-unclassified pattern is OUR gap, not the author's — say so, and do not
         // let it pass as "not a selection".
         errors.push(
@@ -208,8 +224,8 @@ export class PipelineStageValidator {
       const prev = result.stages[i - 1].call;
       const here = result.stages[i];
       if (prev === null || here.call === null) continue; // this pair is unjudgeable
-      if (!isClassified(prev.pattern) || !isClassified(here.call.pattern)) continue;
-      if (isSelectionPattern(prev.pattern) && isSelectionPattern(here.call.pattern)) {
+      if (!isClassified(patternIn(prev.pattern)) || !isClassified(patternIn(here.call.pattern))) continue;
+      if (isSelectionPattern(patternIn(prev.pattern)) && isSelectionPattern(patternIn(here.call.pattern))) {
         errors.push(
           this.err(
             "pipeline-selection-after-selection",

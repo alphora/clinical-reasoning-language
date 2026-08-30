@@ -127,6 +127,18 @@ export type PatternStage =
        */
       reads: "flow" | "operands";
       /**
+       * The CONCRETE value a VALUE-returning grounded pattern yields — one of the `conceptValueTypes`.
+       *
+       * ⚠⚠ REQUIRED ON A GROUNDED `boolean`/`other` PATTERN, because `returnShape` cannot do this job:
+       * `"other"` covers Period, Quantity, Interval and DateTime alike, so it cannot tell
+       * `BodyMassIndex → Quantity` from a Period-returning pattern. Without it the resolver could only ask
+       * "did the author declare SOME value type", which let a record concept declaring `value type is date`
+       * take a `BodyMassIndex` producer and resolve clean.
+       *
+       * ⚠ Meaningless on a `list`/`instance` pattern — those yield records, not values.
+       */
+      resultType?: string;
+      /**
        * For a LIST-returning pattern: does the output preserve the handed elements (a FILTER), or transform
        * them (a MAP)?
        *
@@ -185,11 +197,16 @@ const any = (returnShape: PatternReturnShape): PatternEntry => ({
 const groundedStage = (
   returnShape: PatternReturnShape,
   reads: "flow" | "operands",
-  preservesElements?: boolean,
+  opts: { resultType?: string; preservesElements?: boolean } = {},
 ): PatternEntry => ({
   returnShape,
   slot: "any",
-  stage: { grounded: true, reads, ...(preservesElements !== undefined ? { preservesElements } : {}) },
+  stage: {
+    grounded: true,
+    reads,
+    ...(opts.resultType !== undefined ? { resultType: opts.resultType } : {}),
+    ...(opts.preservesElements !== undefined ? { preservesElements: opts.preservesElements } : {}),
+  },
   realization: "crl-common",
 });
 
@@ -200,10 +217,14 @@ const groundedStage = (
  * reaching for it to add a native reduction would silently make that promise. There is exactly one native
  * pattern today (`ExistsOverSpace`); a second should be a deliberate act, not an inherited default.
  */
-const nativeStage = (returnShape: PatternReturnShape, reads: "flow" | "operands"): PatternEntry => ({
+const nativeStage = (
+  returnShape: PatternReturnShape,
+  reads: "flow" | "operands",
+  opts: { resultType?: string } = {},
+): PatternEntry => ({
   returnShape,
   slot: "any",
-  stage: { grounded: true, reads },
+  stage: { grounded: true, reads, ...(opts.resultType !== undefined ? { resultType: opts.resultType } : {}) },
   realization: "native",
 });
 
@@ -245,7 +266,13 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
   // ⭐ GROUNDED, and its signature is the load-bearing fact: `AtLeast(rec Observation, target Quantity)`
   // (:587) takes a SINGLETON record, NOT a list — so it reads NAMED operands and does not consume the space.
   // That is why it can be a PRODUCER: its result joins the space it was handed rather than replacing it.
-  AtLeast: groundedStage("boolean", "operands"),
+  // ⚠ THE GROUNDING PINS ONE OVERLOAD OF SEVEN. `CRLCommon.cql` defines `AtLeast` at :587 (`rec Observation,
+  // target Quantity` — a SINGLETON, hence `operands`) and again at :669 (`values List<Observation>` — a
+  // FLOW-consuming realization, and the one today's fold exploits). "Verified against its realization"
+  // glosses that the realization is an overload SET: this entry grounds the SINGLETON, and the List
+  // overloads are explicitly NOT the stage lowering. Lower a producer through :669 and the classification
+  // and the emitted call disagree.
+  AtLeast: groundedStage("boolean", "operands", { resultType: "boolean" }),
   AtMost: any("boolean"),
   Between: any("boolean"),
   Exceeds: any("boolean"),
@@ -278,13 +305,17 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
   // ⚠ NESTED-ONLY, and classified anyway. `StartOf` appears only inside `AgeAt(StartOf(X))` — but "never
   // looked up" is a claim about today's call sites, not an invariant, and a fail-closed table must not
   // depend on one.
-  StartOf: any("other"),
+  // ⚠ NATIVE, and the mechanical CRLCommon check FOUND this — it was marked `crl-common` and no
+  // `define function "StartOf"` exists. `emitCQL.ts` calls it out as a "synthetic pattern (not a catalog
+  // entry — they represent CQL keyword operators)" and emits `start of <arg>`. Third false `crl-common`
+  // claim caught by that test on its first run, after `Exists` and `Matches`.
+  StartOf: { returnShape: "other", slot: "any", stage: { grounded: false }, realization: "native" },
   Calculate: any("other"),
   // #189 — a PRODUCER: computes a new Quantity (kg/m2) from two record operands. "other" because the value
   // it yields is neither a member of its input nor a boolean — the concept declares what it publishes.
   // GROUNDED: `BodyMassIndex(weight Observation, height Observation)` (:615) — two singleton operands,
   // yielding a Quantity. Named operands, so PRODUCER.
-  BodyMassIndex: groundedStage("other", "operands"),
+  BodyMassIndex: groundedStage("other", "operands", { resultType: "Quantity" }),
   // No `AgeInMonths` entry BY DESIGN (#257 T2): the months compute fn only ever appears NESTED inside a
   // top-level comparator (`AtLeast`/`AtMost`/`Below`), never as the top-level pattern.
   // ⚠ An older note claimed a `?? "list"` default made a stray lookup "fail loudly". It did not — it produced
@@ -296,9 +327,12 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
   Exists: {
     returnShape: "boolean",
     slot: "projection-only",
-    // A projection is never a stage — D10 rejects it in a pipeline outright.
+    // A projection is never a stage — the stage rules reject it in a pipeline outright.
     stage: { grounded: false },
-    realization: "crl-common",
+    // ⚠ NATIVE. `CRLCommon.cql` has no `Exists` function — the emitter lowers this to a bare CQL
+    // `exists(...)` (`emitExistsBridge`). It was briefly marked `crl-common`, which the mechanical
+    // catalog-vs-CRLCommon check in `patternCatalog.test.ts` now makes impossible to state wrongly.
+    realization: "native",
     projection: {
       reads: "records",
       arity: 0,
@@ -314,7 +348,8 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
     returnShape: "boolean",
     slot: "projection-only",
     stage: { grounded: false },
-    realization: "crl-common",
+    // ⚠ NATIVE — `CRLCommon.cql` has no `Matches` function; membership lowers to a CQL retrieve/`in` test.
+    realization: "native",
     projection: {
       reads: "datum",
       arity: 0,
@@ -347,7 +382,7 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
   // the slot-keyed rename — see `DEFINITION_SLOT_RENAME` in `resolvePipeline.ts`. ⚠ `Matches` deliberately
   // does NOT get the same treatment: its comparand is the representation's own `coded from`, so it has no
   // concept-level counterpart and belongs nowhere but a projection.
-  ExistsOverSpace: nativeStage("boolean", "flow"),
+  ExistsOverSpace: nativeStage("boolean", "flow", { resultType: "boolean" }),
 };
 
 /** The catalog entry for `pattern`, or `undefined` if it is unclassified. */
@@ -415,6 +450,46 @@ export function isProjectionOnly(pattern: string): boolean {
 export function isSelectionPattern(pattern: string): boolean {
   return patternReturnShape(pattern) === "instance";
 }
+
+/**
+ * ⭐ THE SLOT-KEYED RENAME — the ONE table, for every reader of a narrative.
+ *
+ * `matcher.ts` is slot-blind: it emits `Exists` for the words `exists this` wherever they appear. But the
+ * two constructs those words spell are different operations (see the `ExistsOverSpace` entry), and the slot
+ * is what separates them. Any module that has matched a narrative and KNOWS it is a `definition is` must
+ * apply this before classifying.
+ *
+ * ⚠⚠ IT LIVES HERE BECAUSE IT WAS BRIEFLY IN ONE READER ONLY, AND THAT SHIPPED A CONTRADICTION: the resolver
+ * renamed and the validator did not, so `definition is most recent this, then exists this` resolved clean
+ * while the validator called it a rep-local projection in a pipeline — and told the author the computation
+ * "belongs in a concept-level `definition is`" while reporting on one. Both panel arms found it
+ * independently. A slot rule read in one place is a slot rule; read in two, it is a disagreement.
+ *
+ * ⚠ `Matches` is deliberately NOT in the table: its comparand is the representation's own `coded from`, so
+ * it has no concept-level counterpart and belongs nowhere but a projection.
+ */
+export function renameForDefinitionSlot(pattern: string): string {
+  return DEFINITION_SLOT_RENAME[pattern] ?? pattern;
+}
+
+const DEFINITION_SLOT_RENAME: Readonly<Record<string, string>> = { Exists: "ExistsOverSpace" };
+
+/**
+ * The `CRLCommon.cql` function a `crl-common` pattern actually calls.
+ *
+ * ⚠ `entry.pattern` is NOT always the callable name — `Last` lowers to `LastOf`, `First` to `FirstOf`. That
+ * mapping used to live only in `emitCQL.ts`, which meant the catalog could claim a `crl-common` realization
+ * for a name no CRLCommon function has, with nothing able to check it. `patternCatalog.test.ts` now does
+ * exactly that check, and it can only do so because the mapping is here.
+ */
+export function catalogFunctionName(pattern: string): string {
+  return CRL_COMMON_FUNCTION_NAME[pattern] ?? pattern;
+}
+
+const CRL_COMMON_FUNCTION_NAME: Readonly<Record<string, string>> = {
+  Last: "LastOf",
+  First: "FirstOf",
+};
 
 /** Every classified pattern name — for the totality audit. */
 export function classifiedPatterns(): readonly string[] {

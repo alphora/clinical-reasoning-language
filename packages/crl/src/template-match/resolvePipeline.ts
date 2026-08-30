@@ -79,6 +79,12 @@ export type StageShape =
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 /**
+ * What a stage OCCURRENCE consumes. The catalog's `reads` is the pattern's intrinsic contract and is binary;
+ * this is the occurrence, which a named operand can widen. See `ResolvedStage.reads`.
+ */
+export type StageReads = "flow" | "operands" | "flow-and-operands";
+
+/**
  * What a stage does to the space it was handed.
  *
  * ⭐ DERIVED from `(return shape × what the pattern reads × the concept's signature × terminal position)` —
@@ -103,14 +109,20 @@ export interface ResolvedStage {
   call: CanonicalPatternCall;
   effect: StageEffect;
   /**
-   * What the stage consumes — carried because `effect` alone does not determine the lowering.
+   * What this OCCURRENCE consumes — carried because `effect` alone does not determine the lowering.
    *
    * ⚠ `direct` covers two OPPOSITE realizations: a terminal `AtLeast` computes from NAMED operands, a
    * terminal `ExistsOverSpace` computes from the FLOW. A consumer that had to re-look-up the catalog to tell
-   * them apart would be a second reading of the fact this module exists to establish once. (Design R6: zero
-   * args cannot stand in for reads-the-flow.)
+   * them apart would be a second reading of the fact this module exists to establish once. Zero canonical
+   * args cannot stand in for "reads the flow".
+   *
+   * ⚠⚠ THREE-VALUED, AND THE THIRD VALUE IS THE CHARTER'S: *"A reduction over a NAMED set reduces `this` ∪
+   * that set, so a coded concept's own assertions compete"* (`docs/CRL-NORTH-STAR.md:208`). So
+   * `definition is exists "X"` on a concept that ALSO has `code is` reads BOTH — and copying the catalog's
+   * binary `reads: "flow"` onto the occurrence would tell a lowering it consumes only the handed space,
+   * which is how it would silently reduce one of the two arms and drop the other.
    */
-  reads: "flow" | "operands";
+  reads: StageReads;
   /** The space (or value) handed IN. Stage 0's input is the source space, S0. */
   inputShape: StageShape;
   /** What this stage hands ON — `Sᵢ` for a producer/filter, one member for a selection, a value for direct. */
@@ -154,7 +166,13 @@ export type PipelineDiagnostic =
    * ⚠ INTERNAL, and deliberately not silent. A structural reduction carries operands this slice cannot put
    * into a `CanonicalPatternCall` faithfully. Refusing beats building a lossy call — see `reductionAsCall`.
    */
-  | { kind: "reduction-unrepresentable"; location: Location; detail: string };
+  | { kind: "reduction-unrepresentable"; location: Location; detail: string }
+  /**
+   * ⚠ The classification DEPENDS on a shape the concept never declared, so the honest answer is "declare
+   * one", not a diagnosis derived from `assumedShapePreMigration`'s guess. RETIRE:189-shape-declared —
+   * delete this arm when `shape-not-declared` makes an undeclared shape a validator error upstream.
+   */
+  | { kind: "shape-required-to-classify"; index: number; location: Location; pattern: string };
 
 /**
  * The resolution of one concept's program.
@@ -167,8 +185,18 @@ export type PipelineDiagnostic =
  * (`requireReturnShape`) — that is an invariant violation, not something to hand a consumer.
  */
 export type PipelineResolution =
-  /** The concept has no `definition is` at all — its program is just the source space. */
+  /** The concept has no derivation at all — its program IS the source space. */
   | { kind: "no-program" }
+  /**
+   * The concept HAS a derivation, but not one this resolver models — `defined as (…)`, the boolean/`sem-*`
+   * composition family, which has its own machinery.
+   *
+   * ⚠⚠ A SEPARATE ARM BECAUSE `no-program` WOULD BE A LIE. It says the source space is the whole answer, and
+   * for a composition that is false — the composition IS the answer. A consumer branching on `no-program`
+   * (the P3 lowering, the CRE) would take the source space as final and silently drop the composition. That
+   * is the same "different and wrong claim" the `reduction-unrepresentable` arm exists to avoid.
+   */
+  | { kind: "not-a-pipeline-program"; definitionKind: string }
   | { kind: "resolved"; stages: ResolvedStage[]; publishes: StageShape }
   | { kind: "invalid"; diagnostics: PipelineDiagnostic[] };
 
@@ -230,7 +258,12 @@ export function resolveConceptPipeline(concept: Concept): PipelineResolution {
     return finish([{ elements: [], index: 0, location: concept.location }], [built.call], sig);
   }
 
-  if (def.type !== "DefinitionIsDefinition") return { kind: "no-program" };
+  // ⚠ `ConceptDefinition` is a FOUR-way union. `DefinedAsDefinition` and `CodedFromDefinition` are real
+  // derivations this resolver does not model — reporting them as `no-program` would tell a consumer the
+  // source space is the whole answer.
+  if (def.type !== "DefinitionIsDefinition") {
+    return { kind: "not-a-pipeline-program", definitionKind: def.type };
+  }
 
   // ── The NARRATIVE spelling: one stage, or n separated by `, then`. ────────────────────────────────────
   const staged = matchNarrativeStages(def.body);
@@ -301,6 +334,11 @@ function reductionAsCall(
       // for why the two cannot share a name.
       return { call: mk("ExistsOverSpace", targetArgs, location) };
     case "count":
+      // RETIRE:189-numberarg — delete this arm (and grow `CanonicalArg` a number member) when `AtLeastN` is
+      // grounded. ⚠ `count "Conservative Therapy Trial" at least 2` is the CHARTER'S OWN worked example
+      // ("Adequate Step Therapy", North Star §3), so this debt is on the critical path, not an edge case —
+      // and a refusal message is not a place to record a build item.
+      //
       // ⚠ REFUSED, NOT LOWERED LOSSILY. `CountReduction.atLeast` is a bare integer and `CanonicalArg` has no
       // number member; encoding it as a unitless `QuantityArg` would be a lie, and dropping it would repeat
       // the defect above. `AtLeastN` is ungrounded so nothing resolves today either way — but relying on a
@@ -393,7 +431,11 @@ function finish(
     // the catalog for exactly this and was read by NOBODY — so `returnShape === "list"` meant "filter"
     // unconditionally, and grounding a map like `ComponentOf` (the catalog's own worked counter-example,
     // `List<Quantity>` from Observations) would have recreated the collapse the field exists to prevent.
-    if (entry.returnShape === "list" && entry.stage.preservesElements === false) {
+    // ⚠ FAIL CLOSED ON `undefined` TOO, not just on `false`. The catalog says the flag is "required on a
+    // grounded list-returning pattern", but neither the type nor this check enforced it — so grounding
+    // `Within` or `SameDay` with `groundedStage("list", "flow")` and no third argument would classify as a
+    // FILTER with no decision ever made. That is the permissive default D9 removed, growing back.
+    if (entry.returnShape === "list" && entry.stage.preservesElements !== true) {
       diagnostics.push({
         kind: "stage-maps-not-filters",
         index: stage.index,
@@ -403,34 +445,56 @@ function finish(
       continue;
     }
 
-    const effect = deriveEffect(call.pattern, entry.returnShape, entry.stage.reads, sig, terminal);
+    const effect = deriveEffect(
+      call.pattern,
+      entry.returnShape,
+      entry.stage.reads,
+      entry.stage.resultType,
+      sig,
+      terminal,
+    );
     if (typeof effect !== "string") {
       diagnostics.push({ ...effect, index: stage.index, location: stage.location, pattern: call.pattern });
       continue;
     }
 
     const inputShape: StageShape = shape;
+    if (inputShape.kind !== "space") {
+      // ⚠ UNREACHABLE BY CONSTRUCTION — a `value` shape is only ever produced by a TERMINAL `direct` stage,
+      // and `value-stage-not-terminal` refuses a non-terminal one before it can hand anything on. It is a
+      // THROW rather than a silent `"many"` because manufacturing a fresh space for an impossible state is
+      // precisely the soft shape-repair this module exists to remove.
+      throw new Error(
+        `internal: stage ${stage.index + 1} (\`${call.pattern}\`) was handed a value, not a space; ` +
+          `\`value-stage-not-terminal\` should have refused the stage that produced it.`,
+      );
+    }
     const outputShape: StageShape =
       effect === "selection"
         ? { kind: "space", recordType: sig.recordType, cardinality: "one" }
         : effect === "direct"
           ? { kind: "value", valueType: sig.valueType ?? "unknown" }
-          : // ⭐ PRODUCER and FILTER hand on a SPACE, at the cardinality they were HANDED. Recording a
-            // producer's RAW value here is exactly the collapse this module removes — the next stage would
-            // appear to receive a scalar. ⚠ And re-asserting `"many"` would silently un-collapse a space a
-            // prior selection had reduced to one.
-            {
-              kind: "space",
-              recordType: sig.recordType,
-              cardinality: inputShape.kind === "space" ? inputShape.cardinality : "many",
-            };
+          : effect === "producer"
+            ? // ⭐ A PRODUCER ADDS. Per the model at the head of this file it "adds its candidate to what it
+              // was given", so handed a one-record space it hands on TWO — `many`, unconditionally.
+              //
+              // ⚠ THIS READ `inputShape.cardinality` AND THAT WAS WRONG in a way terminal conformance then
+              // blessed: `shape is Record.` + `most recent this, then "W" at least 30 'kg/m2'.` kept
+              // cardinality `one` through the producer and PASSED conformance as a Record while publishing a
+              // 2-member space. The asymmetry gives it away — the same terminal producer with a `many` input
+              // correctly failed. Recording a producer's RAW value would be the other collapse; neither is
+              // this.
+              { kind: "space", recordType: sig.recordType, cardinality: "many" }
+            : // A FILTER preserves elements, so it preserves cardinality: re-asserting `many` here would
+              // silently un-collapse a space a prior selection had reduced to one.
+              { kind: "space", recordType: sig.recordType, cardinality: inputShape.cardinality };
 
     resolved.push({
       index: stage.index,
       location: stage.location,
       call,
       effect,
-      reads: entry.stage.reads,
+      reads: occurrenceReads(entry.stage.reads, call),
       inputShape,
       outputShape,
       constructs: effect === "producer",
@@ -445,6 +509,17 @@ function finish(
   if (mismatch !== null) return { kind: "invalid", diagnostics: [mismatch] };
 
   return { kind: "resolved", stages: resolved, publishes: shape };
+}
+
+/**
+ * The occurrence's read set — the pattern's intrinsic contract, widened by what this call actually names.
+ *
+ * ⚠ A flow-reader carrying a named operand reads BOTH, per the charter: *"A reduction over a NAMED set
+ * reduces `this` ∪ that set"* (`docs/CRL-NORTH-STAR.md:208`). `definition is exists "X"` is that shape.
+ */
+function occurrenceReads(intrinsic: "flow" | "operands", call: CanonicalPatternCall): StageReads {
+  if (intrinsic === "operands") return "operands";
+  return call.args.length > 0 ? "flow-and-operands" : "flow";
 }
 
 /**
@@ -487,9 +562,14 @@ function deriveEffect(
   pattern: string,
   returnShape: string,
   reads: "flow" | "operands",
+  resultType: string | undefined,
   sig: ConceptSignature,
   terminal: boolean,
-): StageEffect | { kind: "value-incompatible"; detail: string } | { kind: "value-stage-not-terminal" } {
+):
+  | StageEffect
+  | { kind: "value-incompatible"; detail: string }
+  | { kind: "value-stage-not-terminal" }
+  | { kind: "shape-required-to-classify" } {
   // ⭐ THE SHARED READING. Not `returnShape === "instance"` re-typed here — the literal function the
   // validator also calls, which is what makes R7's "one truth" true rather than asserted.
   if (isSelectionPattern(pattern)) return "selection";
@@ -497,28 +577,45 @@ function deriveEffect(
 
   // A VALUE-computing stage — `boolean` or `other`. What it becomes depends on the concept, not the pattern.
   //
-  // ⚠ THIS WAS A PRESENCE CHECK (`sig.valueType !== undefined`) AND THAT IS NOT A TYPE CHECK: it let
-  // `shape is Scalar` + `value type is Quantity` + `exists this` resolve as a `direct` publication of a
-  // boolean into a Quantity. A boolean-returning pattern is checkable exactly, so check it.
+  // ⚠⚠ EXACT, AND IT WAS A PRESENCE CHECK (`sig.valueType !== undefined`). A presence check is not a type
+  // check: it let `shape is Scalar` + `value type is Quantity` + `exists this` publish a boolean as a
+  // Quantity, and — because `returnShape: "other"` covers Period, Quantity, Interval and DateTime alike — it
+  // let a record concept declaring `value type is date` take a `BodyMassIndex` producer and resolve clean.
+  // `resultType` on the grounded entry is what makes the comparison exact.
   //
-  // ⚠ `"other"` STAYS A PRESENCE CHECK, and I am saying so rather than implying more: the catalog records
-  // `"other"` for Period, Quantity, Interval and DateTime alike, so it cannot distinguish
-  // `BodyMassIndex → Quantity` from a Period-returning pattern. Tightening it needs a concrete result type
-  // per pattern, which is a catalog change, not a resolver one.
-  const matchesDatum =
-    returnShape === "boolean" ? sig.valueType === "boolean" : sig.valueType !== undefined;
+  // ⚠ FAIL CLOSED when a grounded value pattern declares none: that is a catalog gap, and treating it as
+  // "compatible with anything" is the permissive default this catalog exists without.
+  if (resultType === undefined) {
+    return {
+      kind: "value-incompatible",
+      detail:
+        `the pattern is grounded and value-returning but its catalog entry declares no \`resultType\`, ` +
+        `so the value it computes cannot be checked against what the concept declares`,
+    };
+  }
+  const matchesDatum = sig.valueType === resultType;
 
   // ⭐ PRODUCER presupposes a RECORD SPACE. "Joins the space as a constructed candidate" is meaningless in a
   // Scalar concept — and calling it a producer there would make its output a space and then fail terminal
   // conformance against `Scalar`: a spurious author-time error on a legal form.
+  // ⚠⚠ THE GUESS MUST NOT PRODUCE A MISDIAGNOSIS. `isRecordSpaced` routes through
+  // `assumedShapePreMigration`, so for an UNDECLARED concept it answers our transitional `Scalar` rather
+  // than the author's claim — and that answer only CHANGES the verdict on this arm. A concept carrying the
+  // goal's own `Obese` pipeline but no `shape is` would fall straight past it and be refused
+  // `value-stage-not-terminal`: an author-facing diagnostic naming a defect that is not the one present.
+  //
+  // ⚠ NARROW ON PURPOSE. A flow-reader lands on `direct` whether or not the concept is record-spaced, so
+  // guarding it too would refuse the 46 undeclared `definition is exists this` concepts this change exists
+  // to make resolve. The guess is only load-bearing for an OPERAND-reader.
+  if (reads === "operands" && sig.shape === undefined) return { kind: "shape-required-to-classify" };
+
   if (isRecordSpaced(sig) && reads === "operands") {
     if (!matchesDatum) {
       return {
         kind: "value-incompatible",
         detail:
-          returnShape === "boolean"
-            ? `the stage computes a boolean, but the concept declares \`value type is ${sig.valueType ?? "(none)"}\` for the candidate it would construct`
-            : `the stage computes a value but the concept declares no single value type for it to become`,
+          `the stage computes a \`${resultType}\`, but the concept declares ` +
+          `\`value type is ${sig.valueType ?? "(none)"}\` for the candidate it would construct`,
       };
     }
     return "producer";
@@ -535,7 +632,9 @@ function deriveEffect(
   if (!matchesDatum) {
     return {
       kind: "value-incompatible",
-      detail: `the stage computes a value but the concept declares no single value type to publish it as`,
+      detail:
+        `the stage computes a \`${resultType}\`, but the concept declares ` +
+        `\`value type is ${sig.valueType ?? "(none)"}\` as what it publishes`,
     };
   }
   return "direct";

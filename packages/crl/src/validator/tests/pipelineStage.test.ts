@@ -110,6 +110,19 @@ describe("pipeline stage rules — D10", () => {
     expect(found[0].message).toContain("cannot be stage 2");
   });
 
+  it("⭐⭐ a terminal `exists this` in a DEFINITION pipeline is clean — the slot decides", () => {
+    // ⚠⚠ THE CROSS-LANE CASE WHOSE ABSENCE SHIPPED A CONTRADICTION. `matcher.ts` is slot-blind: it emits
+    // `Exists` for `exists this` wherever it appears. The resolver renamed it to the concept-level
+    // `ExistsOverSpace` in a definition slot and classified this clean, while this validator did NOT and
+    // called it a rep-local projection in a pipeline — telling the author the computation "belongs in a
+    // concept-level `definition is`" while reporting on one. Both panel arms found it independently, in a
+    // commit where every test on each side passed.
+    //
+    // ⚠ Its PAIR is the projection-slot test above (`cannot be stage 2`), which must keep failing. Neither
+    // test alone proves the slot rule; only the two together do.
+    expect(stageErrors("definition is most recent this, then exists this.")).toEqual([]);
+  });
+
   it("the goal's own pipeline is CLEAN — the rules must not reject the target", () => {
     expect(stageErrors('definition is body mass index of "A" and "B", then most recent this.')).toEqual([]);
   });

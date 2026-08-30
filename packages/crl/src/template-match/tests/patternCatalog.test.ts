@@ -4,11 +4,13 @@ import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  catalogFunctionName,
   classifiedPatterns,
   isProjectionOnly,
   patternEntry,
   patternProjection,
   patternReturnShape,
+  renameForDefinitionSlot,
   requireReturnShape,
 } from "../patternCatalog";
 
@@ -119,6 +121,54 @@ describe("pattern catalog totality", () => {
     // The retrieve shape each requires — the contract a future emit author must not re-derive.
     expect(patternProjection("Exists")?.retrieve).toBe("terminology-filtered");
     expect(patternProjection("Matches")?.retrieve).toBe("unfiltered");
+  });
+
+  it("⭐⭐ every `crl-common` pattern names a function that EXISTS in CRLCommon.cql", () => {
+    // ⚠⚠ THIS CHECK IS THE POINT OF THE `realization` FIELD. Without it the field was a required claim that
+    // NOTHING read and that was FALSE on arrival for two entries: `Exists` and `Matches` were marked
+    // `crl-common`, and `CRLCommon.cql` defines neither — both lower to native CQL. That is exactly the
+    // `preservesElements` defect (a catalog field written, consumed by nobody) reproduced in the commit that
+    // fixed it. A field nothing reads cannot report its own falsehoods; this is what makes it read.
+    //
+    // ⚠ It also checks the NAME, not just the pattern: `Last` lowers to `LastOf` and `First` to `FirstOf`,
+    // so `entry.pattern` is not the callable. That mapping lives in the catalog for this reason.
+    const cql = readFileSync(
+      path.resolve(__dirname, "../../cql-emitter/catalog/CRLCommon.cql"),
+      "utf8",
+    );
+    const defined = new Set(
+      [...cql.matchAll(/^define function "([^"]+)"/gm)].map((m) => m[1]),
+    );
+    const missing = classifiedPatterns()
+      .filter((p) => patternEntry(p)!.realization === "crl-common")
+      .filter((p) => !defined.has(catalogFunctionName(p)));
+    expect(missing).toEqual([]);
+  });
+
+  it("⭐ the definition-slot rename covers `exists this` and NOTHING else", () => {
+    // The slot is what separates the concept-level existence reduction from the rep-local projection. Both
+    // are spelled `exists this` and the matcher is slot-blind, so every reader that KNOWS it is in a
+    // `definition is` must apply this — the resolver and the pipeline-stage validator both do.
+    expect(renameForDefinitionSlot("Exists")).toBe("ExistsOverSpace");
+    // ⚠ `Matches` must NOT be renamed: its comparand is the representation's own `coded from`, so it has no
+    // concept-level counterpart and belongs nowhere but a projection.
+    expect(renameForDefinitionSlot("Matches")).toBe("Matches");
+    expect(renameForDefinitionSlot("MostRecent")).toBe("MostRecent");
+  });
+
+  it("⭐ a grounded VALUE-returning pattern declares its concrete result type", () => {
+    // `returnShape: "other"` covers Period, Quantity, Interval and DateTime alike, so it cannot tell
+    // `BodyMassIndex → Quantity` from a Period-returning pattern. Without `resultType` the resolver could
+    // only ask "did the author declare SOME value type", which let a record concept declaring
+    // `value type is date` take a `BodyMassIndex` producer and resolve clean.
+    const ungrounded = classifiedPatterns()
+      .map((p) => [p, patternEntry(p)!] as const)
+      .filter(([, e]) => e.stage.grounded && (e.returnShape === "boolean" || e.returnShape === "other"))
+      .filter(([, e]) => (e.stage as { resultType?: string }).resultType === undefined)
+      .map(([p]) => p);
+    expect(ungrounded).toEqual([]);
+    expect((patternEntry("BodyMassIndex")!.stage as { resultType?: string }).resultType).toBe("Quantity");
+    expect((patternEntry("AtLeast")!.stage as { resultType?: string }).resultType).toBe("boolean");
   });
 
   it("a non-projection pattern carries no projection facts", () => {
