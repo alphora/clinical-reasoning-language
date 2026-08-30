@@ -486,7 +486,7 @@ function renderMetaBlock(meta: { text: string }[] | undefined): string {
 type CompositionShape = "boolean" | "refinement";
 
 // === Pattern return-shape classification ===
-// #189 P2 D9  the table now lives in `template-match/patternCatalog`, merged with the projection-scope
+// #189 P2 D9 — the table now lives in `template-match/patternCatalog`, merged with the projection-scope
 // facts so ONE module classifies the catalog. Reached through `patternReturnShape()` /
 // `requireReturnShape()`; the raw record is deliberately NOT re-exported, so no caller can reintroduce a
 // `?? default` lookup against it.
@@ -3576,7 +3576,7 @@ class Emitter {
         : undefined;
     const call = this.emitPatternCall(matched, localUnionRef);
     const declared = this.declaredShapeOfConcept(c);
-    // #189 P2 D9  FAIL CLOSED. This was `?? "list"`, which silently classified an unknown pattern as a
+    // #189 P2 D9 — FAIL CLOSED. This was `?? "list"`, which silently classified an unknown pattern as a
     // FILTER: a wrong classification that compiles, which is the soft-compile trap in miniature. Only
     // KNOWN patterns reach here (`emitDefinitionIs` returns the unmatched sentinel above), so a miss is a
     // catalog gap and must say so.

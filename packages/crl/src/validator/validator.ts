@@ -718,7 +718,7 @@ export class Validator {
     // misuse, >1 value type). Always an error (structural author mistake, never demoted) —
     // closes the check gap Todo 1's permissive grammar superset opened.
     errors.push(...this.representationShapeValidator.validate(ast, sources));
-    // #189 P2 D10  pipeline stage structure. ERRORS: an unmatched stage must never soft-compile.
+    // #189 P2 D10 — pipeline stage structure. ERRORS: an unmatched stage must never soft-compile.
     errors.push(...this.pipelineStageValidator.validate(ast, sources));
 
     // concept-model redesign Todo 2 rule B — use-site & result-shape type checking (pattern
