@@ -1180,6 +1180,16 @@ class Emitter {
           form: "interface façade of a pure question (`answeredValue()` re-export)",
           cell: "§3 pure question → `answeredValue()` true/false/null (NOT totalized)",
         };
+      } else if (c.__interfaceThreeStateMerge === true) {
+        // ⭐ #189 O3 — the façade of a THREE-STATE both-rep merge. Same shape as the question façade above and
+        // for the same reason: the re-export is bare (which propagates the null), so claiming `total` here
+        // would make the ledger disagree with what ships and fail the whole-boundary proof.
+        obligation = {
+          kind: "sanctioned-three-state",
+          family: "merge",
+          form: "interface façade of a both-rep recency merge (bare re-export of a three-state determination)",
+          cell: "§3 question → three-state cross-representation merge (NOT totalized)",
+        };
       } else if (form === "recordsource") {
         obligation = { kind: "not-applicable", nullable: false, reason: "ExternalPrimitives record re-export (no boolean define)" };
       } else if (form === "total-boolean") {
@@ -1318,10 +1328,13 @@ class Emitter {
       discharge: { booleanEffect: "nullable", reason },
       result: { shape: "Scalar", valueType: "boolean" },
     });
-    // ⭐ #189 null/pause — the sanctioned three-state read of a PURE QUESTION. It IS a Boolean-typed define
-    // and it IS null when unanswered; enrolling it as `not-boolean` ("representations-only stub") described
-    // the pause mechanism as if no boolean were emitted at all. The ledger now records what actually ships.
-    const threeStateQuestion = (readBy: string): { resultType: string; discharge: DischargeMetadata; result: DefineResult } => ({
+    // ⭐ #189 null/pause — a sanctioned THREE-STATE read. It IS a Boolean-typed define and it IS null when
+    // nothing establishes it; enrolling it as `not-boolean` ("representations-only stub") described the pause
+    // mechanism as if no boolean were emitted at all. The ledger now records what actually ships.
+    // ⚠ Serves TWO families: a pure QUESTION's newest-answer read, and (O3) a both-rep MERGE of an
+    // answerable determination. Named for the READ, not the family, so a third caller does not have to
+    // pretend to be a question to use it.
+    const threeStateRead = (readBy: string): { resultType: string; discharge: DischargeMetadata; result: DefineResult } => ({
       resultType: "Boolean",
       discharge: { booleanEffect: "three-state", readBy },
       result: { shape: "Scalar", valueType: "boolean" },
@@ -1353,7 +1366,10 @@ class Emitter {
       // ledger cannot drift from the text. Previously this fell through to `total("facade-satisfied")` — the
       // ledger asserted the PAUSE read was TOTAL, which is the exact claim the charter and an executed
       // `$apply` run (`tmp/NOTES-apply-null-behavior.md` §14) both refute.
-      if (c.__pureQuestion === true) return threeStateQuestion("answeredValue");
+      if (c.__pureQuestion === true) return threeStateRead("answeredValue");
+      // #189 O3 — lock-step with the obligation above: the façade of a three-state merge re-exports bare, so
+      // its discharge is three-state, not `facade-delegated` total.
+      if (c.__interfaceThreeStateMerge === true) return threeStateRead("bare re-export of a three-state merge");
       const form = this.facadeForm(c);
       if (form === "recordsource") return notBoolean("ExternalPrimitives record re-export");
       if (form === "total-boolean") return total("facade-delegated"); // bare re-export — delegates to the reduction
@@ -1367,8 +1383,12 @@ class Emitter {
     // (`.asTruths() union …`) → NOT a boolean. Checked before the definition switch because a recency twin's
     // definition does NOT emit via the catalog path.
     if (c.__bothRepMerge === "recency") {
+      // ⭐ #189 O3 — THREE-STATE, in lock-step with `emitRecencyMerge` dropping its outer `Coalesce`.
+      // A recency twin has a local `code is` by construction, so it is an ANSWERABLE determination and a
+      // merge no arm establishes is UNKNOWN, not false. It used to discharge `total("boundary-coalesce")`,
+      // which was the pause-killer the proof now rejects for this family.
       return this.isBooleanScalarConcept(c) && assumedShapePreMigration(c.shape) === "Scalar"
-        ? total("boundary-coalesce")
+        ? threeStateRead("recency-merge (three-state, no boundary)")
         : notBoolean("malformed recency twin (non-scalar-boolean declaration)");
     }
     if (c.__bothRepMerge === "recency-value") return notBoolean("both-rep recency-value scalar value merge");
@@ -2283,7 +2303,26 @@ class Emitter {
       `  ${newestLocal},\n` +
       `  ${computed}\n` +
       `)`;
-    return `Coalesce(\n${indent(selected)},\n  false\n)`;
+    // ⭐ #189 O3 — NO OUTER `Coalesce`. The merge stays THREE-STATE.
+    //
+    // This used to `return Coalesce(<selected>, false)`, and MEASURED
+    // (`tmp/nullprobe/analysis/layeredAge-out.txt`) that made the ONLY working both-representation merge in
+    // the emitter DENY on absence: unanswered locally AND no `birthDate` ⇒ `recencyAgeSelected` null ⇒
+    // `false` ⇒ the decision's `otherwise` fires. The concept carries a local `code is` (that is what makes
+    // this the RECENCY merge rather than the standalone one), so it is ANSWERABLE, and a determination no
+    // arm establishes is UNKNOWN — charter §4, and the operator's acceptance criterion that the only route
+    // to a Deny is a STATED `false`.
+    //
+    // ⚠ The null is LOAD-BEARING and must survive to the guard: the Interface layer above is a bare
+    // re-export (`define X: Inferences."X"`), a branch guard is deliberately null-propagating (that IS the
+    // pause), and an action-guard carrier totalizes at its OWN reference site. Totality belongs at the ARM.
+    // ⚠ Do NOT Coalesce `computed` before arbitration either — a null computed age must fall through to the
+    // local-source arm (`CaseFeatureCommon.cql`), which is why the inner arms stay bare too.
+    //
+    // The STANDALONE age concept (posrep only, no local `code is`) is a different cell and KEEPS its
+    // boundary: its one arm is `Patient.birthDate`, which is EVIDENCE, and absent evidence is `false`.
+    // `classifyBooleanTotality` splits the two on exactly that test, in lock-step with this emit.
+    return selected;
   }
 
   /**

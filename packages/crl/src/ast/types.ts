@@ -562,6 +562,18 @@ export interface Concept extends ASTNode {
    */
   __pureQuestion?: true;
   /**
+   * SYNTHETIC-EMITTER-ONLY (#189 O3). Marks an Interface re-export whose Inferences SOURCE is a
+   * both-representation RECENCY MERGE of an ANSWERABLE determination — i.e. a merge that is deliberately
+   * THREE-STATE (no outer `Coalesce`), because a determination NO arm establishes is UNKNOWN, not false.
+   *
+   * ⚠ The re-export EMITS the same bare `Inferences."X"` as a total-boolean façade — bare is what propagates
+   * the null — so this marker exists to correct the LEDGER, not the text: without it the façade enrolls
+   * `total("facade-delegated")` over a now-three-state operand and the whole-boundary proof fails with
+   * "composite is not provably total". Exactly the `__pureQuestion` pattern, for the merge family, and set at
+   * the same synthesis site for the same reason (the Interface emitter is layer-isolated).
+   */
+  __interfaceThreeStateMerge?: true;
+  /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). Marks the
    * INFERRED half of a both-representation (`code is` + `defined as`) concept that
    * `lowerLocalCodes` SPLIT into a LocalPrimitives retrieve twin + this Inferences twin.

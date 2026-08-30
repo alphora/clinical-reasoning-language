@@ -140,7 +140,7 @@ export type BooleanTotalityObligation =
   // ⚠ Both families are admitted STRUCTURALLY, never by an entry asking for the exemption: a concept
   // reaches `"question"` only through `isPureQuestionConcept`, and `"guard"` only through the criterion
   // enrollment site. An ordinary nullable comparator can no more claim it than before.
-  | { kind: "sanctioned-three-state"; family: "question" | "guard"; form: string; cell: string }
+  | { kind: "sanctioned-three-state"; family: "question" | "guard" | "merge"; form: string; cell: string }
   // Record / RecordSet / non-boolean scalar — produces no boolean define. `nullable` distinguishes a
   // nullable non-boolean scalar read (a later comparison must Coalesce the PREDICATE, not this value) from
   // a set/record result. Reading not-applicable as "consume anywhere" is the `Coalesce(X,0)` trap (§2).
@@ -281,11 +281,35 @@ export function classifyBooleanTotality(
   if (age.kind === "error") {
     return { kind: "rejected", code: "malformed-age", reason: `malformed patient-age concept: ${age.errorKind}: ${age.message}` };
   }
-  if (age.kind === "recency" || age.kind === "standalone") {
+  // ⭐ #189 O3 — the both-representation MERGE of a QUESTION is three-state, NEVER totalized.
+  //
+  // `recency` means the concept carries a local `code is` (the answer arm) beside the Patient arm — so it
+  // is ANSWERABLE, and when NO arm establishes it the determination is genuinely UNKNOWN. It used to be
+  // `requires-boundary`, and MEASURED (`tmp/nullprobe/analysis/layeredAge-out.txt`) the emit was
+  // `Coalesce(CFH.recencyAgeSelected(<newest local answer>, <computed age>), false)`: unanswered locally AND
+  // no `birthDate` ⇒ null ⇒ **false** ⇒ the `otherwise` fires ⇒ DENY. This was the ONLY working
+  // both-representation merge in the emitter, so it was also the thing a general merge would have been
+  // modelled on — it taught the wrong lesson (`large-refactor`: working code that predates the rule).
+  //
+  // Charter §4 settles it: *"what determines the arm is what it reads, never that it is a derivation"*, and
+  // the operator's acceptance criterion is that the ONLY route to a Deny is a STATED `false`.
+  //
+  // ⚠ `standalone` KEEPS its boundary. With no local `code is` there is no answer slot: the only arm is
+  // `Patient.birthDate`, which is EVIDENCE, and absent evidence is `false` (charter §4). Same split as O1's
+  // `most recent this` cell, and the same test — a local code is what makes it an answer read.
+  if (age.kind === "recency") {
+    return {
+      kind: "sanctioned-three-state",
+      family: "merge",
+      form: "patient age (recency) — both-rep merge of an ANSWERABLE determination",
+      cell: "§3 question → three-state cross-representation merge (NOT totalized)",
+    };
+  }
+  if (age.kind === "standalone") {
     return {
       kind: "requires-boundary",
-      form: `patient age (${age.kind})`,
-      cell: "§2/§5 patient-age recency → total-boolean rewrite",
+      form: "patient age (standalone — Patient arm only, no local `code is`)",
+      cell: "§2/§5 patient-age standalone → total-boolean rewrite (absent EVIDENCE is false)",
     };
   }
 
@@ -951,7 +975,8 @@ export function proveWholeBoundaryTotality(
     // admit structurally is an unsanctioned partial.
     if (e.obligation.kind === "sanctioned-three-state") {
       const family = e.obligation.family;
-      const what = family === "guard" ? "guard define" : "pure question";
+      const what =
+        family === "guard" ? "guard define" : family === "merge" ? "both-rep merge" : "pure question";
       // ⚠ The exemption is admitted STRUCTURALLY, and the proof RE-DERIVES that rather than believing the
       // entry. `family` reaches the ledger as a CLAIM on an `EmittedDefineEntry`; without these checks any
       // entry could relabel itself and skip its `Coalesce`, which is the widening the narrow rule guarded
@@ -966,6 +991,13 @@ export function proveWholeBoundaryTotality(
       // are keyed on the same `__pureQuestion` marker, so both are structural.
       if (family === "question" && e.origin !== "authored" && e.origin !== "interface-facade") {
         fail(e, `\`family: "question"\` requires the \`authored\` or \`interface-facade\` origin — origin was \`${e.origin}\``);
+        continue;
+      }
+      // #189 O3 — a both-rep MERGE of an answerable determination. Same structural discipline as the other
+      // two families: the origin is the one only its own enrollment site can produce (the merge twin is an
+      // authored concept's define; the Interface re-export above it enrolls separately, as for a question).
+      if (family === "merge" && e.origin !== "authored" && e.origin !== "interface-facade" && e.origin !== "age-helper") {
+        fail(e, `\`family: "merge"\` requires the \`authored\`, \`interface-facade\` or \`age-helper\` origin — origin was \`${e.origin}\``);
         continue;
       }
       if (e.discharge.booleanEffect === "total") {
@@ -994,12 +1026,15 @@ export function proveWholeBoundaryTotality(
         // burn-down signal above keeps its own diagnosis: a question still on the legacy truth-set lane emits
         // a List, and reporting that as "not Boolean" would name the symptom instead of the lane.
         fail(e, `${what} carries a three-state discharge but its result type is \`${e.resultType}\`, not Boolean`);
-      } else if (family === "guard" && /\bCoalesce\s*\(/.test(stripQuotedIdentifiers(e.cql))) {
+      } else if ((family === "guard" || family === "merge") && /\bCoalesce\s*\(/.test(stripQuotedIdentifiers(e.cql))) {
         // ⚠ The DEFECT this replaces was metadata disagreeing with the emitted TEXT: the entry said `total`
         // while the body was bare. Changing the hard-coded claim to `three-state` fixes the direction but not
-        // the trust, so the guard family is checked against its own CQL. A criterion body's leaves resolve to
-        // define identifiers, and nothing legitimate introduces a `Coalesce` — so one there IS the totalization.
-        fail(e, "guard define enrolled `three-state` but its emitted body totalizes a leaf (`Coalesce`) — the metadata and the lowering disagree");
+        // the trust, so these families are checked against their own CQL. A criterion body's leaves resolve to
+        // define identifiers, and a merge body is a `recencySelected` call over its arms — nothing legitimate
+        // introduces a `Coalesce` in either, so one there IS the totalization. (#189 O3 extended this from
+        // `guard` to `merge`: the merge cell's whole defect WAS an outer `Coalesce(<selected>, false)`, so the
+        // text check is what stops it coming back while the metadata still claims three-state.)
+        fail(e, `${what} enrolled \`three-state\` but its emitted body totalizes (\`Coalesce\`) — the metadata and the lowering disagree`);
       }
       continue;
     }

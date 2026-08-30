@@ -1336,6 +1336,16 @@ function buildInterfaceReexports(
       ...(sourceLayer === "LocalPrimitives" && src?.__pureQuestion === true
         ? { __pureQuestion: true as const }
         : {}),
+      // ⭐ #189 O3 — an Inferences source that is a both-rep RECENCY MERGE is deliberately THREE-STATE (no
+      // outer `Coalesce`), because a determination NO arm establishes is UNKNOWN. The re-export TEXT is
+      // unchanged — bare `Inferences."X"` is exactly what propagates the null — so this marker corrects the
+      // LEDGER only: without it the façade enrolls `total("facade-delegated")` over a three-state operand and
+      // the whole-boundary proof fails ("composite is not provably total"). MEASURED on dme101-030 before it
+      // was added. Decided HERE for the same reason `__pureQuestion` is: the Interface emitter is
+      // layer-isolated and cannot see the source concept's markers.
+      ...(sourceLayer === "Inferences" && src?.__bothRepMerge === "recency"
+        ? { __interfaceThreeStateMerge: true as const }
+        : {}),
     };
     reexports.push(reexport);
   }

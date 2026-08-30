@@ -925,9 +925,14 @@ concept "Age 18 Or Older":
       },
     });
     expect(r.success).toBe(true);
-    // #189 Slice C 2b.3b.1 — the recency merge is now a TOTAL boolean `Coalesce(CFH.recencyAgeSelected(...), false)`,
-    // NOT the retired `recencyAgeTruths` List lift.
-    expect(r.result).toContain("Coalesce(");
+    // ⭐ #189 O3 — the recency merge is THREE-STATE: a bare `CFH.recencyAgeSelected(...)` with NO outer
+    // `Coalesce`. It used to be `Coalesce(CFH.recencyAgeSelected(...), false)`, and MEASURED that made the
+    // only working both-representation merge DENY on absence — unanswered locally AND no `birthDate` ⇒ null
+    // ⇒ false ⇒ the decision's `otherwise` fires. The concept carries a local `code is`, so it is ANSWERABLE
+    // and a merge no arm establishes is UNKNOWN (charter §4; the only route to a Deny is a STATED false).
+    // ⚠ The `not.toContain("Coalesce(")` is the LOAD-BEARING assertion — this pin exists to stop the
+    // boundary coming back. (Still NOT the retired `recencyAgeTruths` List lift.)
+    expect(r.result).not.toContain("Coalesce(");
     expect(r.result).toContain("CFH.recencyAgeSelected(");
     expect(r.result).not.toContain("CFH.recencyAgeTruths(");
     expect(r.result).toContain('"T LocalPrimitives"."Age 18 Or Older"');
