@@ -9,7 +9,8 @@ import {
 } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
 import { matchNarrative } from "../template-match/matcher";
-import { isProjectionOnly, patternScope } from "../template-match/patternCatalog";
+import { isProjectionOnly, patternProjection } from "../template-match/patternCatalog";
+import { hasCodedRetrieve } from "../fhir-model/caseFeatureResources";
 
 import type { RepresentationShapeError, RepresentationShapeRule, ValidationError } from "./validator";
 
@@ -420,12 +421,21 @@ export class RepresentationShapeValidator {
     // the SHARED `patternScope` descriptor, never on a local re-derivation, so validate and lower cannot drift.
     if (rep.valueProjection) {
       const projected = matchNarrative(rep.valueProjection.body);
-      const scope = patternScope(projected.pattern);
-      // A.11 (terminology half) — a membership projection with NO set to test against. `matches this` and
-      // `exists this` both derive their meaning from the representation's `coded from`; without one,
-      // `- type is Patient.` + `- value projection is matches this.` validates clean today while naming
-      // nothing to match. Gate on the descriptor's `requiresTerminology`, not on the pattern name.
-      if (scope?.requiresTerminology && rep.terminologyName === undefined) {
+      const scope = patternProjection(projected.pattern);
+      // A.11 (terminology half) — a projection with NO set to test against.
+      //
+      // ⚠⚠ THE PATTERN DOES NOT DECIDE THIS ALONE, and an earlier version that thought it did REJECTED A
+      // LEGAL FORM: `Exists` was marked "always requires terminology", so `- type is Patient.` +
+      // `- value projection is exists this.` errored. The charter decides `coded from` by MODEL INFO — it is
+      // required exactly when the resource has a CODE-BASED RETRIEVE, and Patient has none (you retrieve the
+      // patient, never patients-with-code-X). So `always` is asked of the pattern, `when-coded-retrieve` is
+      // asked of the RESOURCE.
+      const resourceHasCodedRetrieve =
+        rep.conceptType !== undefined && hasCodedRetrieve(rep.conceptType);
+      const needsTerminology =
+        scope?.terminology === "always" ||
+        (scope?.terminology === "when-coded-retrieve" && resourceHasCodedRetrieve);
+      if (needsTerminology && rep.terminologyName === undefined) {
         errors.push(
           this.err(
             "projection-only-pattern-misplaced",
@@ -439,21 +449,12 @@ export class RepresentationShapeValidator {
           ),
         );
       }
-      if (scope && projected.args.length !== scope.arity) {
-        errors.push(
-          this.err(
-            "projection-only-pattern-misplaced",
-            concept.name,
-            `Concept "${concept.name}": \`${projected.pattern.toLowerCase()} this\` is a REP-LOCAL ` +
-              `projection over this representation's own datum and takes no operand, but here it is a ` +
-              `stage of a \`, then\` pipeline, which hands it the preceding stage's result. Author it as ` +
-              `the WHOLE \`value projection is …\`; a computation over other named declarations belongs in ` +
-              `a concept-level \`definition is\`.`,
-            rep.valueProjection.body.location,
-            attribution,
-          ),
-        );
-      }
+      // ⚠ THE ARITY CHECK THAT USED TO LIVE HERE IS GONE, and its removal is a fix rather than a loss. It
+      // caught "a projection-only pattern used as a pipeline stage" INDIRECTLY, by noticing that the fold had
+      // injected an operand into a zero-operand contract. That proxy could only ever see a LATER stage —
+      // stage 1 receives no injected operand, so `matches this, then most recent this` sailed through it
+      // (MEASURED: validated completely clean). `pipelineStageValidator` now checks EVERY stage's pattern
+      // directly, which is where the stages actually are; checking it in both places would double-report.
     }
 
     if (rep.valueProjection && narrativeHasConceptRef(rep.valueProjection.body.elements)) {

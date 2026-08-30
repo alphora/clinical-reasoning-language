@@ -333,7 +333,7 @@ export type RepresentationShapeRule =
   // representation to be local to: a concept-level `definition is`, or a stage of a `, then` pipeline (where
   // the fold PREPENDS the previous stage, handing a zero-operand pattern an operand). One global pattern
   // registry serves all three slots, so nothing structural prevents it — this rule does. See
-  // `template-match/patternScope.ts`.
+  // `template-match/patternCatalog.ts`.
   | "projection-only-pattern-misplaced"
   | "missing-value-type";
 
@@ -365,6 +365,7 @@ export type PipelineStageRule =
   | "pipeline-malformed"
   | "pipeline-stage-unmatched"
   | "pipeline-selection-after-selection"
+  | "pipeline-stage-projection-only"
   | "pipeline-stage-unclassified";
 
 export interface PipelineStageError extends ValidationErrorBase {

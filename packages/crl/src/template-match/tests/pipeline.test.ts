@@ -82,6 +82,17 @@ describe("splitPipeline", () => {
     expect(split.kind === "malformed" ? split.problem : null).toBe("dangling-then");
   });
 
+  it("⚠ all THREE malformations are distinguished — not just the dangling one", () => {
+    // Two of the three branches were unexercised, so their classification and their messages were unproven.
+    const problem = (definition: string): unknown => {
+      const split = splitPipeline(elementsOf(definition));
+      return split.kind === "malformed" ? split.problem : split.kind;
+    };
+    expect(problem("definition is then most recent this.")).toBe("leading-then");
+    expect(problem('definition is most recent "A", then, then most recent this.')).toBe("doubled-then");
+    expect(problem('definition is most recent "A", then.')).toBe("dangling-then");
+  });
+
   it("⭐ each stage carries its OWN span, so a per-stage diagnostic can point AT the stage", () => {
     // ⚠ Load-bearing for every stage diagnostic. `matchNarrative` used to pass `clause.location` to every
     // stage, so "stage 2 of 3 matched nothing" squiggled all three and left the author to guess which.

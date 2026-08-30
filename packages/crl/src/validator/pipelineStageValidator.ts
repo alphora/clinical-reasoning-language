@@ -1,7 +1,7 @@
 import type { CRL, Concept, Location } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
 import { matchNarrativeStages, narrativeText } from "../template-match/matcher";
-import { patternReturnShape } from "../template-match/patternCatalog";
+import { isProjectionOnly, patternReturnShape } from "../template-match/patternCatalog";
 
 import type { PipelineStageError, PipelineStageRule, ValidationError } from "./validator";
 
@@ -121,12 +121,9 @@ export class PipelineStageValidator {
     }
 
     // ⚠ Report EVERY unmatched stage, not just the first: a pipeline with two typos should not need two
-    // round-trips. And do not run the adjacency check across an unresolved stage — its kind is unknown, so
-    // any verdict about the pair would be invented.
-    let sawUnmatched = false;
+    // round-trips.
     for (const { stage, call } of result.stages) {
       if (call === null) {
-        sawUnmatched = true;
         errors.push(
           this.err(
             "pipeline-stage-unmatched",
@@ -135,6 +132,29 @@ export class PipelineStageValidator {
               `(\`${narrativeText(stage.elements)}\`) matches no known form. Each stage between \`then\` ` +
               `delimiters must be a complete operation on its own — a stage missing its operand ` +
               `(\`, then at least 30 'kg/m2'\`) is the common cause; name what it operates on, or \`this\`.`,
+            stage.location,
+            attribution,
+          ),
+        );
+        continue;
+      }
+      // ⭐ A PROJECTION-ONLY pattern used as a pipeline STAGE — in ANY position, including the first.
+      //
+      // ⚠ This lives here because only this validator sees the stages. `matchNarrative` FOLDS a pipeline into
+      // the terminal stage's pattern, so `definition is matches this, then most recent this` looks like
+      // `MostRecent` to any consumer reading the folded call — and MEASURED, both that and
+      // `value projection is exists this, then most recent this` validated completely clean. The later-stage
+      // case was previously caught only by an ARITY proxy (the fold injects an operand into a zero-operand
+      // contract), which by construction could never see stage 1.
+      if (isProjectionOnly(call.pattern)) {
+        errors.push(
+          this.err(
+            "pipeline-stage-projection-only",
+            concept.name,
+            `Concept "${concept.name}": \`${call.pattern.toLowerCase()} this\` is a REP-LOCAL projection ` +
+              `over ONE representation's own datum, so it is the WHOLE \`value projection is …\` or nothing ` +
+              `— it cannot be stage ${stage.index + 1} of a \`, then\` pipeline. A computation over other ` +
+              `named declarations belongs in a concept-level \`definition is\`.`,
             stage.location,
             attribution,
           ),
@@ -158,15 +178,21 @@ export class PipelineStageValidator {
         );
       }
     }
-    if (sawUnmatched) return;
-
     // SELECTION -> SELECTION. ⚠ SELECTION -> FILTER STAYS LEGAL: `highest this, then within last 6 months
     // this` and the reverse give different, both-meaningful answers. An earlier design forbade it by reading
     // a section HEADING ("a selection must be terminal") whose BODY retracted exactly that.
+    //
+    // ⚠ SKIP ONLY THE AFFECTED PAIR, never the whole pipeline. An earlier version returned globally as soon
+    // as ANY stage was unmatched, which suppressed independently-checkable violations elsewhere:
+    // `most recent "A", then most recent this, then wibble this` reported only the typo and stayed silent
+    // about the two selections in stages 1–2. A pair is unjudgeable only when one of ITS OWN stages is
+    // unresolved or unclassified — anything else is a verdict we can and should give.
     for (let i = 1; i < result.stages.length; i++) {
-      const prev = result.stages[i - 1].call!;
+      const prev = result.stages[i - 1].call;
       const here = result.stages[i];
-      if (isSelection(prev.pattern) && isSelection(here.call!.pattern)) {
+      if (prev === null || here.call === null) continue; // this pair is unjudgeable
+      if (!isClassified(prev.pattern) || !isClassified(here.call.pattern)) continue;
+      if (isSelection(prev.pattern) && isSelection(here.call.pattern)) {
         errors.push(
           this.err(
             "pipeline-selection-after-selection",

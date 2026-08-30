@@ -256,7 +256,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // referrer's CQL. Still checked — vacuously while emit fails, but it re-arms the moment the lowering
     // lands and the libraries come back.
     const rootCql = findLib(result, "Root") ?? "";
-    expect(rootCql).not.toMatch(/include Other/);
+    expect(rootCql).not.toMatch(/include Other/);
     expect(rootCql).not.toMatch(/include "Other/);
 
     // ⚠ NOT ASSERTED, and deliberately not deleted: this test also protected "the closure is PRESERVED —

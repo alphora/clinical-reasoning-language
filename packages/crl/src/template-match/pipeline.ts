@@ -18,9 +18,10 @@
 // re-splitting words independently — three implementations of one rule. This module is the single one.
 //
 // ⚠ SCOPE. This is the STRUCTURE only: where the stage boundaries are, and what each stage's element run
-// is. Stage KIND (producer / filter / selection / aggregate) is a CATALOG question and lands separately —
-// `bothrep` §13 measured the catalog's return-shape classification as unverified and defective
-// (`Highest`/`Lowest` misclassed as `other`), so a kind classifier built on it today would inherit that.
+// is. Stage KIND (producer / filter / selection / aggregate) is NOT stored anywhere — it is a property of an
+// OCCURRENCE, derived in the shared resolver from `(return shape × concept signature × terminal position)`
+// (design D9). `"BMI" at least 30` is a PRODUCER in `Obese` because of what that concept publishes and where
+// the stage sits, so no per-pattern table could hold the answer.
 
 import type { Location, NarrativeElement } from "../ast/types";
 
@@ -62,12 +63,15 @@ export type PipelineSplit =
   | { kind: "pipeline"; stages: PipelineStage[] };
 
 /**
- * Split a narrative's elements into pipeline stages, or `undefined` when it is not a pipeline.
+ * Split a narrative's elements into pipeline stages.
  *
- * `undefined` means "no `then` at all" — a single-stage narrative, which callers handle as an ordinary
- * narrative rather than as a one-stage pipeline. A MALFORMED pipeline (leading / doubled / dangling `then`)
- * also returns `undefined`: the narrative is then unmatchable as a whole, which is the honest outcome —
- * reporting a partial chain would claim more than was understood.
+ * `not-a-pipeline` means "no `then` at all" — a single-stage narrative, which callers handle as an ordinary
+ * narrative rather than as a one-stage pipeline. `malformed` means a `then` is present but the runs around it
+ * do not form stages; it carries WHICH mistake and WHERE, because the fix differs for each and a caller that
+ * cannot tell them apart reports a pipeline error as an ordinary unmatched narrative.
+ *
+ * ⚠ No stages are returned for a malformed pipeline: reporting a partial chain would claim more than was
+ * understood.
  *
  * The canonical delimiter is `, then`. The comma is PUNCTUATION, carried through the lexer as its own token
  * so the greedy catch-all cannot swallow it, and stripped here so a stage never sees it. Bare `then` also
@@ -118,7 +122,7 @@ function spanOf(run: NarrativeElement[]): Location {
 
 /** Whether a narrative is authored as a pipeline (has at least one `then` delimiter).
  *
- *  ⚠ TRUE even for a MALFORMED pipeline, where `splitPipeline` returns `undefined`. The two answer
+ *  ⚠ TRUE even for a MALFORMED pipeline, which `splitPipeline` reports as `malformed`. The two answer
  *  different questions — "did the author write a pipeline" vs "is it well-formed" — and collapsing them is
  *  how a malformed pipeline gets reported as an ordinary unmatched narrative instead of as the pipeline
  *  error it is. */

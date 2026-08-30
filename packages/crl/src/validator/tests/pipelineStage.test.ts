@@ -67,6 +67,49 @@ describe("pipeline stage rules — D10", () => {
     expect(found[0].message).toContain("already collapsed to one");
   });
 
+  it("⭐ an unmatched stage does NOT suppress an independently-checkable violation elsewhere", () => {
+    // ⚠ REGRESSION PIN. The first version returned globally as soon as ANY stage was unmatched, so this
+    // pipeline reported only the typo and stayed silent about stages 1-2 being two selections. A pair is
+    // unjudgeable only when one of ITS OWN stages is unresolved — not when some other stage is.
+    const found = stageErrors(
+      'definition is most recent "A", then most recent this, then wibble wobble this.',
+    );
+    const rules = found.map((f) => f.message ?? "");
+    expect(rules.some((m) => m.includes("matches no known form"))).toBe(true);
+    expect(rules.some((m) => m.includes("already collapsed to one"))).toBe(true);
+    expect(found).toHaveLength(2);
+  });
+
+  it("⭐ a PROJECTION-ONLY pattern as STAGE 1 of a pipeline is caught", () => {
+    // ⚠ REGRESSION PIN, and this one validated COMPLETELY CLEAN before. `matchNarrative` FOLDS a pipeline
+    // into the terminal stage's pattern, so this whole narrative looked like `MostRecent` to every consumer
+    // reading the folded call. The previous catch was an ARITY proxy — the fold injects an operand into a
+    // zero-operand contract — which by construction could never see stage 1, because stage 1 gets no
+    // injected operand.
+    const found = stageErrors("definition is matches this, then most recent this.", [
+      "- source representation:",
+      "  - type is ServiceRequest.",
+      '  - coded from "VS".',
+      "",
+    ].join("\n"));
+    expect(found).toHaveLength(1);
+    expect(found[0].message).toContain("cannot be stage 1");
+  });
+
+  it("a projection-only pattern as a LATER stage is caught ONCE, not twice", () => {
+    // The arity proxy in `representationShapeValidator` was removed when this rule landed; if it comes back,
+    // this fires twice.
+    const found = stageErrors("definition is most recent this.", [
+      "- source representation:",
+      "  - type is Condition.",
+      '  - coded from "VS".',
+      "  - value projection is most recent this, then exists this.",
+      "",
+    ].join("\n"));
+    expect(found).toHaveLength(1);
+    expect(found[0].message).toContain("cannot be stage 2");
+  });
+
   it("the goal's own pipeline is CLEAN — the rules must not reject the target", () => {
     expect(stageErrors('definition is body mass index of "A" and "B", then most recent this.')).toEqual([]);
   });
@@ -87,8 +130,13 @@ describe("pipeline stage rules — D10", () => {
         "",
       ].join("\n"),
     );
-    expect(found).toHaveLength(1);
-    expect(found[0].message).toContain("value projection");
+    // ⚠ TWO findings, both correct and independent: stage 1 (`exists this`) is a projection-only pattern
+    // used as a stage, and stage 2 (`wibble this`) matches nothing. Reporting both is the point — a pipeline
+    // with two distinct defects should not need two round-trips.
+    expect(found).toHaveLength(2);
+    expect(found.some((f) => (f.message ?? "").includes("cannot be stage 1"))).toBe(true);
+    expect(found.some((f) => (f.message ?? "").includes("matches no known form"))).toBe(true);
+    expect(found.every((f) => (f.message ?? "").includes("value projection"))).toBe(true);
   });
 });
 

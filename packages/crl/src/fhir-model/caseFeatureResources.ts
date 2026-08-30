@@ -31,3 +31,38 @@ export const CASE_FEATURE_EMITTABLE_TYPES: ReadonlySet<string> = new Set([
 export function isCaseFeatureEmittable(resourceType: string): boolean {
   return CASE_FEATURE_EMITTABLE_TYPES.has(resourceType);
 }
+
+/**
+ * The FHIR resource types that have a CODE-BASED RETRIEVE — i.e. where `[Resource: "VS"]` is meaningful.
+ *
+ * ⭐ This is the model fact behind the charter's rule that `coded from` "is decided by MODEL INFO, not by the
+ * author and not by the projection: it is required exactly when CQL has a code-based retrieve for that
+ * resource type." `Condition` has one; `Patient` does NOT — you retrieve the patient, never
+ * patients-with-code-X. That is also what removes the patient-age carve-out: `Patient/birthDate` has no
+ * `coded from` because Patient has no coded retrieve, not because age is special.
+ *
+ * ⚠ Lane-neutral BY NECESSITY. The same fact lives in `emit/resourceEmitRegistry` as each row's `coding`
+ * strategy, but the validate lane may not import that registry — the boundary is mechanically enforced
+ * (`emit/tests/effectiveRepresentation.test.ts`). This set is the validate-side authority, kept in lock-step
+ * with the registry's `coding` fields by the consistency test in `emit/tests/resourceEmitRegistry.test.ts`.
+ */
+export const CODED_RETRIEVE_TYPES: ReadonlySet<string> = new Set([
+  "Observation",
+  "Condition",
+  "Procedure",
+  "ServiceRequest",
+  "MedicationRequest",
+  "Encounter",
+]);
+
+/**
+ * Does `resourceType` support `[Resource: "VS"]`?
+ *
+ * ⚠ Used to decide whether a `value projection` needs a `coded from`. An earlier version asked the PATTERN
+ * instead and marked `exists this` as always requiring one — which REJECTED the legal
+ * `- type is Patient.` + `- value projection is exists this.`, because a per-pattern boolean cannot know
+ * what the resource supports.
+ */
+export function hasCodedRetrieve(resourceType: string): boolean {
+  return CODED_RETRIEVE_TYPES.has(resourceType);
+}
