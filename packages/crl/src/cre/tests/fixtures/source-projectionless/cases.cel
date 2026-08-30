@@ -1,0 +1,19 @@
+# The source arm supplies a member record that STATES false.
+library "PLC".
+covers "ProjLess".
+
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+fact "Denied Condition":
+- defined by "Condition".
+- code is "http://example.org/projless/CodeSystem/reference-vs-stub|denials".
+- date is "2026-01-01".
+- value is false.
+
+case "source states false -> deny":
+- subject is "Pat".
+- fact is "Denied Condition".
+- result is "D" is "Deny".

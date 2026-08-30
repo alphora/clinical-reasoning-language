@@ -298,10 +298,9 @@ interface ConceptEval {
  * ADDS a candidate per retrieved record (`source`). `definition is` is not an arm — it WORKS ON what these
  * two put here.
  */
-/** A CEL fact's `value is`, as the two independent questions a candidate needs. See `Ctx.candidates`. */
+/** A CEL fact's `value is`, as a candidate needs it. */
 interface FactValue {
   boolValue?: boolean;
-  hasValue: boolean;
 }
 
 export interface OwnCandidate {
@@ -310,8 +309,11 @@ export interface OwnCandidate {
   fact: string;
   /** The fact's `value is` when it is a boolean; absent for a bare fact or a non-boolean value. */
   boolValue?: boolean;
-  /** Whether the fact carries a `value is` AT ALL, of any type. See `Ctx.candidates`. */
-  hasValue: boolean;
+  /**
+   * For a SOURCE candidate: the matched pattern of the posrep's `value projection is`, or `undefined` when
+   * that posrep has none. It decides what the candidate's boolean IS — see `candidateValue`.
+   */
+  projection?: string;
 }
 
 interface Ctx {
@@ -339,10 +341,13 @@ interface Ctx {
    * `Obese` carries a Condition posrep, so the defect ACTIVATES the moment the value-reading classification
    * widens to pipeline concepts. Recorded now, while it is provably unreachable, rather than after.
    *
-   * ⚠ `hasValue` is value-PRESENCE of any type, not just boolean, and it is a different question from
-   * `boolValue !== undefined` (a non-boolean `value is` sets one and not the other). A producer computes from
-   * its operands' DATA, so an operand record carrying no value yields no candidate in `$apply` — reading
-   * record presence alone there would fabricate one.
+   * ⚠ A candidate's BOOLEAN is not uniformly its fact's `value is` — a source candidate is a PROJECTION
+   * OUTPUT. `candidateValue` is the one place that decides, and `projection` is what lets it.
+   *
+   * ⚠ There is deliberately NO value-presence field. An earlier draft carried one, described it as
+   * load-bearing for the emptiness proof, and never read it — the proof is conservative on candidate COUNT
+   * alone (a record without a usable datum blocks the proof and refuses, rather than fabricating a
+   * candidate). A field nothing reads cannot report its own falsehood; this comment is the honest version.
    */
   candidates: Map<Id, readonly OwnCandidate[]>;
   /** All concept definitions in the closure, by id, with their owning library. */
@@ -465,22 +470,46 @@ function provablyContributesNothing(id: Id, ctx: Ctx, seen: Set<Id>): boolean {
 
 /** Whether one resolved stage can be proved to add nothing to an EMPTY collection. */
 function stageAddsNothing(stage: ResolvedStage, lib: string, ctx: Ctx, seen: Set<Id>): boolean {
+  // ⚠⚠ A FLOW-READING `direct` PUBLISHES AN ESTABLISHED VALUE OVER AN EMPTY SPACE — it does NOT contribute
+  // nothing. `exists this` over no records is a closed-world `false` (charter: a records-read answers from an
+  // empty set), and it takes zero canonical args, so folding it in with the operand-readers below made
+  // `args.every(...)` VACUOUSLY TRUE and the proof ASSERTED emptiness of a non-empty publication. That is the
+  // one way this walk stopped being one-sided, and both review arms found it independently.
+  if (stage.reads !== "operands" && (stage.effect === "direct" || stage.effect === "producer")) return false;
+
   switch (stage.effect) {
     case "selection":
     case "filter":
-      // Nothing to select from, nothing to narrow.
-      return true;
+      // Nothing to select from, nothing to narrow — but a NAMED operand widens the space being reduced
+      // (charter: a reduction over a named set reduces `this` ∪ that set), so it must be proved empty too.
+      return namedOperandsEmpty(stage, lib, ctx, seen);
     case "producer":
     case "direct":
       // Constructs from NAMED operands. It adds nothing exactly when every operand it reads provably
       // contributes nothing — an operand with no candidate has no datum to compute from.
-      // ⚠ An operand we cannot resolve to a concept is NOT proved empty.
-      return stage.call.args.every((arg) => {
-        if (arg.type !== "ConceptRefArg") return true; // a literal operand adds no records of its own
-        const opId = idOf(arg.library ?? lib, arg.value);
-        return provablyContributesNothing(opId, ctx, seen);
-      });
+      return namedOperandsEmpty(stage, lib, ctx, seen);
   }
+}
+
+/**
+ * Whether every operand a stage names provably contributes nothing.
+ *
+ * ⚠ AN ARGUMENT THAT IS NOT A PLAIN LITERAL IS NOT PROVED EMPTY. A `NestedPatternArg` carries a whole
+ * computation (and usually a concept reference inside it); treating anything non-`ConceptRefArg` as "adds no
+ * records" would let the walk report emptiness without ever looking at it.
+ */
+function namedOperandsEmpty(stage: ResolvedStage, lib: string, ctx: Ctx, seen: Set<Id>): boolean {
+  return stage.call.args.every((arg) => {
+    switch (arg.type) {
+      case "ConceptRefArg":
+        return provablyContributesNothing(idOf(arg.library ?? lib, arg.value), ctx, seen);
+      case "QuantityArg":
+      case "EnumArg":
+        return true; // a literal contributes no records of its own
+      default:
+        return false; // nested / disjunction / conjunction — not inspected, so not proved
+    }
+  });
 }
 
 /**
@@ -551,32 +580,27 @@ function pipelineVerdict(entry: ConceptEntry, ctx: Ctx): Tri | undefined {
   if (stages.length === 1 && stages[0].call.pattern === "ExistsOverSpace") return undefined;
 
   // ── Every contributor we cannot compute must be PROVED to contribute nothing. ────────────────────────
+  //
+  // ⚠⚠ EVERY STAGE, INCLUDING A SELECTION. `most recent "X"` reduces `this` ∪ X (charter §3), and an earlier
+  // version checked named operands on producers ONLY — so a selection's named space was DROPPED and the
+  // verdict came from the own arm alone. On validator-clean input that is a silent wrong answer: X populated
+  // with the own arm empty read as a pause, and an own `true` beat a newer X record of `false`. The resolver
+  // already carries the fact (`reads: "flow-and-operands"` exists so a consumer cannot drop an arm); nothing
+  // was reading it.
   for (const stage of stages) {
-    if (stage.effect === "filter") {
-      // A filter reads record FIELDS (dates, statuses). Over a space we cannot prove empty it is undecidable.
-      if (!collectionProvablyEmptyBeforeStages(entry, ctx)) {
-        return refusePipeline(entry, ctx, `a \`${stage.call.pattern}\` filter stage needs record fields`);
-      }
-      continue;
+    const seen = new Set<Id>();
+    if (!namedOperandsEmpty(stage, entry.lib, ctx, seen)) {
+      return refusePipeline(
+        entry,
+        ctx,
+        `stage \`${stage.call.pattern}\` reduces or computes over a NAMED set this engine does not evaluate, ` +
+          `and that set is not provably absent in this case`,
+      );
     }
-    if (stage.effect === "producer" || stage.effect === "direct") {
-      const seen = new Set<Id>();
-      const operandsEmpty = stage.call.args.every((arg) => {
-        if (arg.type !== "ConceptRefArg") return true;
-        return provablyContributesNothing(idOf(arg.library ?? entry.lib, arg.value), ctx, seen);
-      });
-      if (!operandsEmpty) {
-        return refusePipeline(
-          entry,
-          ctx,
-          `stage \`${stage.call.pattern}\` computes from operand data this engine does not evaluate, and its ` +
-            `operands are not provably absent in this case`,
-        );
-      }
-      continue;
+    if (stage.effect === "filter" && (ctx.candidates.get(id)?.length ?? 0) > 0) {
+      // A filter reads record FIELDS (dates, statuses) of a space that is NOT empty here.
+      return refusePipeline(entry, ctx, `a \`${stage.call.pattern}\` filter stage needs record fields`);
     }
-    // A SELECTION needs recency ONLY when more than one candidate competes; that is decided below, on the
-    // collection, not here.
   }
 
   // ── The collection: what the two arms actually put there. ────────────────────────────────────────────
@@ -586,25 +610,55 @@ function pipelineVerdict(entry: ConceptEntry, ctx: Ctx): Tri | undefined {
     // ESTABLISHED false. This is the row the whole slice exists for: the gate pauses and asks.
     return null;
   }
-  const values = cands.map((c) => c.boolValue);
-  if (values.some((v) => v === undefined)) {
-    // A candidate record with no boolean value. `$apply` reads the newest record's value; a valueless record
-    // makes that read undecidable here without the emitted ordering.
-    return refusePipeline(entry, ctx, `a candidate record carries no boolean \`value is\``);
+
+  const values: (boolean | undefined | "unknown-projection")[] = cands.map((c) => candidateValue(c));
+  if (values.includes("unknown-projection")) {
+    return refusePipeline(
+      entry,
+      ctx,
+      `a source candidate comes from a posrep whose \`value projection is\` this engine does not interpret`,
+    );
   }
-  const first = values[0];
-  if (values.every((v) => v === first)) return first!; // order-independent: recency cannot change it
+  const known = values.filter((v): v is boolean => typeof v === "boolean");
+  if (known.length === 0) {
+    // ⭐ EVERY candidate is valueless, so WHICHEVER is newest the read is null — order-independent, no sort
+    // needed. The charter states the runtime contract directly: "a valueless value-reading record reads NULL
+    // in both lanes — NOT false … and both PAUSE." Refusing here would diverge from `$apply` on a verdict we
+    // can actually establish. ⚠ A MIX still refuses: there the newest genuinely decides.
+    return null;
+  }
+  if (known.length !== values.length) {
+    return refusePipeline(
+      entry,
+      ctx,
+      `some candidate records carry a boolean \`value is\` and some do not, so the newest record decides and ` +
+        `that needs the emitted date+id sort`,
+    );
+  }
+  const first = known[0];
+  if (known.every((v) => v === first)) return first; // order-independent: recency cannot change it
   return refusePipeline(
     entry,
     ctx,
-    `candidate records disagree (${values.join(", ")}) and picking the newest needs the emitted date+id sort`,
+    `candidate records disagree (${known.join(", ")}) and picking the newest needs the emitted date+id sort`,
   );
 }
 
-/** Whether the concept's collection is provably empty BEFORE its program runs — i.e. both arms contributed
- *  nothing. Used to decide whether an undecidable stage can be skipped as uninvoked. */
-function collectionProvablyEmptyBeforeStages(entry: ConceptEntry, ctx: Ctx): boolean {
-  return (ctx.candidates.get(idOf(entry.lib, entry.node.name))?.length ?? 0) === 0;
+/**
+ * ⭐ WHAT ONE CANDIDATE'S BOOLEAN ACTUALLY IS — and it is NOT uniformly the fact's `value is`.
+ *
+ *   · a LOCAL candidate is an answer on the concept's own code: its `value is` IS the value.
+ *   · a SOURCE candidate is a PROJECTION OUTPUT. `exists this` yields `true` for every record it is invoked
+ *     on; `matches this` yields `true` for a member (and only members reach the collection today).
+ *   · a SOURCE candidate from a posrep with NO projection is read as the concept's VALUE (charter §3), so its
+ *     `value is` is the value — the case an earlier version got wrong by assuming `true` for every source
+ *     member.
+ *   · any other projection is one this engine has not been taught; say so rather than guess.
+ */
+function candidateValue(c: OwnCandidate): boolean | undefined | "unknown-projection" {
+  if (c.arm === "local" || c.projection === undefined) return c.boolValue;
+  if (c.projection === "Exists" || c.projection === "Matches") return true;
+  return "unknown-projection";
 }
 
 function refusePipeline(entry: ConceptEntry, ctx: Ctx, why: string): Tri {
@@ -1493,19 +1547,27 @@ function buildLocalMembershipIndex(
 function buildSourceMembershipIndex(
   concepts: Map<Id, ConceptEntry>,
   graph: ResolvedCelGraph,
-): Map<string, Id[]> {
+): Map<string, SourceOwner[]> {
   const base = makeLocalDomainContext(graph).base;
   const registry = graph.crlRegistry;
-  const reverse = new Map<string, Id[]>();
+  const reverse = new Map<string, SourceOwner[]>();
   for (const [id, entry] of concepts) {
     for (const m of sourceMembersOfConcept(entry.node, base, registry)) {
       const key = memberKey(m.fhirType, m.system, m.code);
       const arr = reverse.get(key) ?? [];
-      arr.push(id);
+      // The PROJECTION travels with the owner: which posrep matched decides what the candidate's value IS,
+      // and the fact loop cannot re-derive that from the code alone.
+      arr.push({ id, ...(m.projection !== undefined ? { projection: m.projection } : {}) });
       reverse.set(key, arr);
     }
   }
   return reverse;
+}
+
+/** A concept whose SOURCE set contains a code, plus the projection of the posrep that put it there. */
+interface SourceOwner {
+  id: Id;
+  projection?: string;
 }
 
 function runCase(
@@ -1516,7 +1578,7 @@ function runCase(
   filePath: string,
   concepts: Map<Id, ConceptEntry>,
   localIndex: LocalMembershipIndex,
-  sourceIndex: Map<string, Id[]>,
+  sourceIndex: Map<string, SourceOwner[]>,
   resolveDecision: (callerLib: string, ref: ReferenceName) => ResolvedDecision | undefined,
   // #236 — per-library criterion tables for reference-and-evaluate (threaded onto Ctx; a criterion
   // guard resolves its body here at eval time instead of being inline-expanded up front).
@@ -1562,10 +1624,21 @@ function runCase(
   }
   const ownBoolValues = new Map<Id, boolean[]>();
   const candidates = new Map<Id, OwnCandidate[]>();
-  const populate = (id: Id, fn: string, arm: OwnCandidate["arm"], value: FactValue): void => {
+  const populate = (
+    id: Id,
+    fn: string,
+    arm: OwnCandidate["arm"],
+    value: FactValue,
+    projection?: string,
+  ): void => {
     const boolVal = value.boolValue;
     const cs = candidates.get(id) ?? [];
-    cs.push({ arm, fact: fn, ...(boolVal !== undefined ? { boolValue: boolVal } : {}), hasValue: value.hasValue });
+    cs.push({
+      arm,
+      fact: fn,
+      ...(boolVal !== undefined ? { boolValue: boolVal } : {}),
+      ...(projection !== undefined ? { projection } : {}),
+    });
     candidates.set(id, cs);
     directFacts.add(id);
     const arr = factsByConcept.get(id) ?? [];
@@ -1629,7 +1702,6 @@ function runCase(
     const valueField = fact.body.find((x): x is CELValueField => x.type === "CELValueField");
     const factValue: FactValue = {
       ...(typeof valueField?.value === "boolean" ? { boolValue: valueField.value } : {}),
-      hasValue: valueField !== undefined,
     };
 
     // D5(3) backstop: an `absent`/`negative` intent modifier on a LOCAL determination fact inverts its clinical
@@ -1680,21 +1752,17 @@ function runCase(
         if (scls.kind === "coded") {
           const owners = sourceIndex.get(memberKey(name, scls.parts.system ?? "", scls.parts.code));
           if (owners && owners.length > 0) {
-            // ⭐⭐ A SOURCE CANDIDATE'S VALUE COMES FROM ITS PROJECTION, NOT FROM THE FACT'S `value is`.
-            // The fact here is a retrieved SOURCE resource (a covered ServiceRequest, a coded Condition); the
-            // candidate it contributes is the projection's OUTPUT. `exists this` yields `true` for every
-            // record it is invoked on, and `matches this` yields `true` for a MEMBER — and reaching this
-            // branch at all IS membership (`sourceIndex` matched `(type, system, code)`, the same mechanical
-            // set the emitted ValueSet and CQL retrieve use).
+            // ⭐⭐ A SOURCE CANDIDATE'S VALUE COMES FROM ITS POSREP'S PROJECTION — carried on the owner,
+            // because the fact loop cannot re-derive it from the code.
             //
-            // ⚠ MEASURED: reading the fact's own `value is` here made `request is the covered service`
-            // refuse for "a candidate record carries no boolean `value is`" — a ServiceRequest carries no
-            // boolean, and it was never supposed to. The projection is what answers.
-            //
-            // ⚠ THE NON-MEMBER ROW IS STILL OPEN, and is NOT silently answered here: a non-member code does
-            // not reach this branch at all (it falls through to name-population), so `matches this`'s
-            // determinate `false` needs the UNFILTERED retrieve the fixture documents as owed.
-            for (const o of owners) populate(o, fn, "source", { boolValue: true, hasValue: true });
+            // ⚠⚠ AN EARLIER VERSION HARD-CODED `true` HERE AND THAT WAS A SILENT WRONG VERDICT. It is right
+            // for the two projections (`exists this` yields true per retrieved record; `matches this` yields
+            // true for a member, and reaching this branch IS membership) — but `sourceMembersOfConcept`
+            // indexes EVERY posrep carrying a `coded from`, projection or not, and a posrep with NO
+            // projection is read as the concept's VALUE (charter §3). So a member fact carrying
+            // `value is false` was contributing `true`, and a stated denial read as an approval — on a shape
+            // that had REFUSED LOUD before this slice. `candidateValue` now decides, per projection.
+            for (const o of owners) populate(o.id, fn, "source", factValue, o.projection);
             continue;
           }
         }

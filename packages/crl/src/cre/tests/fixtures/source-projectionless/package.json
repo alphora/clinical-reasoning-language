@@ -1,0 +1,9 @@
+{
+  "name": "source-projectionless",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CRE fixture — #189 P2: a BOOLEAN concept whose coded posrep has NO `value projection is`, so the source candidate's value is the record's own value (charter §3), not a fabricated `true`",
+  "crl": {
+    "canonicalBase": "http://example.org/projless"
+  }
+}

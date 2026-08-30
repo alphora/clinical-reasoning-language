@@ -12,6 +12,7 @@ import type {
   TerminologySystem,
   TerminologyValueset,
 } from "../ast/types";
+import { matchNarrative } from "../template-match/matcher";
 import { getRefName } from "../ast/types";
 import { referenceStubCoding } from "../fhir-emitter/valueSet";
 import type { Registry } from "../imports/types";
@@ -22,6 +23,16 @@ export interface SourceConceptMember {
   fhirType: string;
   system: string;
   code: string;
+  /**
+   * ⭐ The matched pattern of the OWNING posrep's `value projection is`, or `undefined` when it has none.
+   *
+   * ⚠⚠ LOAD-BEARING FOR THE CRE, and its absence caused a silent wrong verdict. A candidate's boolean is the
+   * PROJECTION's output — `exists this` yields `true` per retrieved record, `matches this` yields `true` for a
+   * member. But a posrep with NO projection is read as the concept's VALUE (charter §3), so a member fact
+   * carrying `value is false` must contribute `false`. Without this field the CRE assumed every source member
+   * contributed `true`, and a stated denial on a projection-less coded posrep read as an approval.
+   */
+  projection?: string;
 }
 
 /** Resolve a terminology by name across the registry (same lookup the CQL/emit lane uses). Bare same-library ref for
@@ -74,8 +85,14 @@ export function sourceMembersOfConcept(
     if (!rep.terminologyName || typeof rep.conceptType !== "string") continue;
     const term = resolveTerminology(getRefName(rep.terminologyName), registry);
     if (!term) continue;
+    const projection = rep.valueProjection ? matchNarrative(rep.valueProjection.body).pattern : undefined;
     for (const m of terminologyMembers(term, base)) {
-      members.push({ fhirType: rep.conceptType, system: m.system, code: m.code });
+      members.push({
+        fhirType: rep.conceptType,
+        system: m.system,
+        code: m.code,
+        ...(projection !== undefined ? { projection } : {}),
+      });
     }
   }
   return members;

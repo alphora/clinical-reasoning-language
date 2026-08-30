@@ -1,0 +1,32 @@
+# ⭐ A BOOLEAN concept with a PROJECTION-LESS coded posrep.
+library "ProjLess".
+
+// ⚠⚠ THIS SHAPE CAUGHT A SILENT WRONG VERDICT. The CRE briefly assumed EVERY source-set member contributed
+// `true` — right for `exists this` (true per retrieved record) and for `matches this` (true for a member), but
+// a posrep with NO `value projection is` is read as the concept's VALUE (charter §3). So a member record
+// carrying `value is false` was contributing `true`, and a stated denial read as an approval.
+
+terminology "Denials":
+- valueset is `http://example.org/projless/ValueSet/denials`.
+
+concept "Guard":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `g`.
+- definition is most recent this.
+- source representation:
+  - type is Condition.
+  - coded from "Denials".
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `ap`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `dn`.
+
+decision "D":
+first:
+- when "Guard" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
