@@ -195,7 +195,21 @@ currently permits is a **warning** (`composition-result-type-mismatch`) today th
 
 - selection (`most recent this`), threshold (`count "X" ... at least N`), aggregation, temporal
   (`within last …`), formula, and **`exists`** (concept → boolean).
-- `this` refers to the concept's **own representation records** (not its computed value → no circularity).
+- ⭐ **A definition is a PIPELINE.** Its stages are separated by `, then`, and **ONE STAGE'S OUTPUT IS THE
+  NEXT STAGE'S INPUT** — the stages do not share one set. Stage kinds differ in what they hand on: a
+  **producer** (a formula) passes its input through PLUS its computed candidate; a **filter** hands on a
+  subset; a **selection** hands on exactly one. So ORDER is load-bearing: `most recent this, then highest
+  this` is meaningless (stage 2 is handed a single record), while `within last 6 months this, then highest
+  this` is "the greatest of the recent ones".
+- ⭐ **`this` in a DEFINITION is the space as of the PREVIOUS stage.** At stage 0 that is the concept's own
+  source records — its local `code is` records ∪ each `source representation`'s records. At every later stage
+  it is EXACTLY the immediately preceding stage's output: never an earlier pre-filter space, and never the
+  stage's own output (which is what keeps `<derivation>, then most recent this` a pipeline and not a fixed
+  point). A reduction over a NAMED set reduces `this` ∪ that set, so a coded concept's own assertions compete
+  with the records it reduces.
+- ⚠ **`this` inside a `value projection` is a DIFFERENT binding and is always REP-LOCAL:** that
+  representation's own records, with the projection invoked once per retrieved datum. Zero records ⇒ nothing
+  to project ⇒ the arm contributes NOTHING (it does not contribute a closed-world `false`). See §4.
 
 ### ⭐ Value-type-driven reduction ("no bare `code is`" — stated correctly)
 

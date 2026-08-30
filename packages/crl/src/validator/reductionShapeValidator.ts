@@ -30,8 +30,10 @@ import { PATTERN_RETURN_SHAPE } from "../cql-emitter/patternReturnShape";
 // The load-bearing model (docs/CRL-NORTH-STAR.md): a concept is self-describing. Its declared
 // `shape` decides whether a reduction is owed — Scalar ⇒ publishes ONE reduced value (a reduction
 // is owed); Record ⇒ ONE selected record; RecordSet ⇒ the set of records. A reduction reduces a
-// RECORD SET (the concept's own representation records `this`, or a NAMED `shape is RecordSet`
-// concept) down to a scalar (`exists`/`count` ⇒ boolean) or a record (`most recent`).
+// RECORD SET down to a scalar (`exists`/`count` ⇒ boolean) or a record (`most recent`). That set is
+// `this` — the space as of the PREVIOUS pipeline stage (at stage 0: the concept's own local `code is`
+// records ∪ each `source representation`'s) — and/or a NAMED `shape is RecordSet` concept; a reduction
+// over a named set reduces `this` ∪ that set, so a coded concept's own assertions compete.
 //
 // Rules (all WARNINGS; see .vibe-tools/discussions/415 + the ReductionShapeRule doc in validator.ts):
 //   recordset-operand-required        — a named `exists`/`count`/`most recent` operand X that is not
@@ -207,9 +209,9 @@ export class ReductionShapeValidator {
           "reduction-this-no-representation",
           concept.name,
           `Concept "${concept.name}": \`definition is ${verb(reduction)} this\` reduces THIS ` +
-            `concept's own representation records, but it declares none (no \`code is\`, no ` +
-            `\`source representation\`). Add a representation, or reduce a named \`shape is RecordSet\` ` +
-            `concept instead of \`this\`.`,
+            `concept's own records, but it declares none (no \`code is\`, no \`source representation\`, ` +
+            `and no earlier pipeline stage to hand one on). Add a representation, or reduce a named ` +
+            `\`shape is RecordSet\` concept instead of \`this\`.`,
           loc,
           attribution,
           errors,

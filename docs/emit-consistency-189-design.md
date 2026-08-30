@@ -254,8 +254,11 @@ author-token drift lane).
 
 New surface: `definition is exists this` / `most recent this` / `count … at least N` / `this`; the **named**
 `definition is exists "X"`; the **cardinality declaration** `- shape is Scalar | Record | RecordSet.` (a
-dedicated concept-level line; an omission is UNDECLARED, not `Scalar` — D1). `this` = an AST node for the concept's
-**representation records only** (no circularity); ref-walk / cycle / CRE / requalification specified.
+dedicated concept-level line; an omission is UNDECLARED, not `Scalar` — D1). `this` = the space as of the
+PREVIOUS pipeline stage — at stage 0 the concept's own source records (local `code is` ∪ each `source
+representation`), thereafter the immediately preceding stage's output, never the stage's own (no circularity).
+⚠ `this` inside a `value projection` is a separate, always REP-LOCAL binding (charter §3). Ref-walk / cycle /
+CRE / requalification specified.
 
 New validation (**WARNINGS / migration-prompts in version N**, per §9, **except the two non-demotable errors
 noted**):
