@@ -3617,7 +3617,8 @@ class Emitter {
       // `buildAuthoredObligations` already classified with whole-library question-reachability — so the emit
       // and the obligation cannot drift (a drift here is exactly what `proveWholeBoundaryTotality` rejects).
       // A derivation over an ANSWERABLE operand inherits its unknown and must NOT be totalized: charter §4,
-      // and the goal's acceptance criterion that the only route to a Deny is a STATED false.
+      // and the acceptance criterion that a Deny requires an ESTABLISHED false — asserted, recorded, or
+      // computed (charter "VOCABULARY"). Absence is never established, so it must not totalize to `false`.
       const authored = this.options.authoredObligations?.get(c.name);
       if (authored?.kind === "sanctioned-three-state" && authored.family === "derivation") {
         return call;

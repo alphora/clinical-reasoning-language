@@ -20,7 +20,8 @@
 // ⚠ The breadth is also the SAFE direction, and that asymmetry is the argument (both review arms, round 1):
 //   · over-broad ⇒ we drop a `Coalesce` that was doing nothing (the operand was never null) — no behaviour change;
 //   · under-broad ⇒ an unanswered question becomes a stated `false` and the tree DENIES instead of pausing.
-// The goal's acceptance criterion is that the ONLY route to a Deny is a STATED false, so ties go to breadth.
+// The acceptance criterion is that a Deny requires an ESTABLISHED false (asserted, recorded, OR computed —
+// charter "VOCABULARY"); absence is never established. So ties go to breadth.
 //
 // ⚠ NOT `isPureQuestionConcept`. That is the ONE-ARM detector (a bare `code is` with nothing that could
 // compute it) and is explicitly NOT the test for "can this pause" — the goal's own `BMI` carries a code AND a

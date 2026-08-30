@@ -13,8 +13,15 @@
 //     Obese = false       -> Deny
 //     Obese = unanswered  -> NO recommendation: pause and ask
 //
-// ⭐ The ONLY route to a Deny is a STATED false. If "unanswered" reaches a Deny
-// by any path, the chain is not done.
+// ⭐ A Deny requires an ESTABLISHED false. If "unanswered" reaches a Deny by any
+// path, the chain is not done.
+//
+// ⚠ ESTABLISHED means ANY of the three arms produced the value — ASSERTION,
+// RECORD, or COMPUTATION (charter "VOCABULARY"). This line once read "a STATED
+// false", which was misread as "asserted by a human" and used to argue that a
+// computed false must not deny. It must: a height and a weight giving a BMI of
+// 25 makes `at least 30` a real `false`, and that DENIES, with nobody having
+// stated anything. What never denies is ABSENCE, which is not established.
 //
 // RECORD version. A complete, runnable policy.
 //

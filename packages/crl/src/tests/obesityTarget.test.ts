@@ -46,7 +46,9 @@ const FIXTURE = path.resolve(__dirname, "fixtures/obesity");
  *   Obese = false      -> Deny
  *   Obese = unanswered -> NO recommendation: pause and ask
  *
- * ⭐ The ONLY route to a Deny is a STATED false.
+ * ⭐ A Deny requires an ESTABLISHED false — asserted, recorded, OR computed (charter "VOCABULARY").
+ * Absence is never established. ⚠ "STATED" is NOT "asserted by a human": a computed false (a BMI of 25
+ * against `at least 30`) denies exactly as an asserted one does.
  */
 const MUST_PRODUCE: Record<string, readonly string[]> = {
   "obese stated true -> approve": ["Approve Bariatric Surgery"],

@@ -474,9 +474,45 @@ projection is read as the concept's value, so their value types must match). The
 value concept; the boolean lives on the interface. Trying to cram a coded source rep onto a boolean `exists`
 concept is the wrong turn this convention prevents.
 
-**Valueset membership ("is the value covered?") has no dedicated derivation.** Express it by scoping the value
-concept's rep with `coded from "VS"` and letting `exists` over it be the boolean: a non-member simply does not
-populate the value (closed-world → absent → false). The `coded from` filter *is* the membership test.
+**⭐⭐ Valueset membership is a PREDICATE over the value concept's datum, and it is THREE-STATE:**
+
+| datum | membership | reads |
+|---|---|---|
+| a code that **is** in the set | **true** | the predicate answered |
+| a code that is **NOT** in the set | ⭐ **false** | the predicate answered — a present non-member is a DETERMINATE no |
+| **no code at all** | **unknown** | there is nothing to test; the predicate has no subject |
+
+⚠ **A non-member is FALSE, never unknown**, and the reason is that the alternative is not implementable. To
+make a non-member read "unknown" you would have to enumerate the codes a set does NOT contain — which turns
+every value set into the whole code system with an in/out flag per member. **No clinical value set in
+existence is built that way**, and ours are not either (we do not take every local code and record whether it
+is in or out of every content set). A model that needs that construction fails on every real input.
+
+**So `unknown` is reserved for a NULL code — no datum to check.** That is the only state a human can resolve,
+and it is why this concept can pause.
+
+⚠ **Do NOT express membership by scoping the value concept's rep with `coded from "VS"` and taking `exists`
+over it.** That collapses the three states into two: a VS-scoped retrieve returns ∅ *both* for a present
+non-member *and* for no record at all, so a wrong-code request becomes indistinguishable from an absent one
+and the determinate `false` is lost. It is the "presence" anti-pattern the next paragraph forbids, reached by
+a different route.
+
+**⭐ A membership predicate is the SAME SHAPE as any other predicate over a datum**, differing only in the
+test: `"BMI" at least 30 'kg/m2'` compares a number, `"Requested Service" in "Covered VS"` tests a code
+against a set. Both read a value concept's datum; both are `true` / `false` / `unknown` on the same rule; both
+drive the same three decision paths (unknown → prompt · true → deeper into the tree · false → wider at the
+current level). There is no ServiceRequest special case and no membership special case.
+
+⚠ **Nothing here needs new language.** Membership is not a feature CRL is missing — it is the feature CQL
+exists for, and CRL already authors it: `coded from "VS"` emits a value-set retrieve
+(`[Condition: Concepts."Diagnosis of Hypertension"]` — shipped, in our own goldens), and that retrieve **is**
+`code in VS`. A single code goes in a one-code set and takes the same path; `FHIRHelpers.memberOf` is one
+further option, not a prerequisite.
+
+**What the three states need is a MODELLING discipline, not a keyword: keep "is there a datum" separate from
+"does it match".** One VS-scoped retrieve answers only the second, and its ∅ is ambiguous. The concept must be
+able to hold a code that does not match — then a present non-member reads `false` and only a missing datum
+reads `unknown`.
 
 **⭐ Matching is MEMBERSHIP — local codes and reference value sets alike; never "presence".** A concept's records
 are the resources whose code is a **member of the concept's value set**. That set is a single local code
@@ -513,6 +549,35 @@ Every concept has a declared result shape — `RecordSet` (a retrieve/union), `R
 recent`), or `Scalar` (a reduced value / `exists`). Set-algebra (`union`/`intersect`/`except`) is defined on
 `RecordSet`; a reduction moves `RecordSet → Record/Scalar`. The shape is **self-described by the concept**, so
 its CQL is a pure function of its own definition.
+
+### ⭐ VOCABULARY — established / unestablished, and the three ways to establish
+
+One word, used consistently, because the alternative has already caused a misread: an acceptance rule written
+as *"the only route to a Deny is a STATED false"* was read as *asserted-by-a-human* and used to argue that a
+COMPUTED false must not Deny. It must.
+
+> **ESTABLISHED** — some arm produced a value. **The three ways are ASSERTION, RECORD, and COMPUTATION** —
+> exactly the three data-collection arms (`code is` · `source representation` · `definition is`/`defined as`).
+> **UNESTABLISHED** — no arm produced one. That, and only that, reads **unknown**.
+
+So the acceptance rule, stated in these terms and true of every policy:
+
+> ⭐ **A Deny requires an ESTABLISHED false. Absence is never established.**
+
+A computed false is established: `"BMI" at least 30 'kg/m2'` over a BMI of 25 is a real `false` and denies,
+with nobody having stated anything. A non-member code is established: the datum exists and the test answered.
+An absent datum is not established, and pauses.
+
+**Which state an operand reads is decided by WHAT IT READS, never by what kind of construct it is:**
+
+| the construct reads… | absence means | so absence is |
+|---|---|---|
+| **RECORDS** — `exists this`, `exists ("V")`, `count this` | *no records exist*, which ANSWERS the question asked | **false** |
+| **A DATUM** — `at least 30`, `in "VS"`, `within last 6 months` | *nothing to test*, so the question has no subject | **unknown** |
+
+⚠ That is the whole distinction, and it is why `exists` never pauses while a predicate does. `exists` asks
+about the records themselves, and their absence is a complete answer. A predicate asks about a value, and no
+value leaves it unanswered.
 
 ### Closed-world
 
@@ -832,7 +897,9 @@ When you review CRL logic, emit, or representation design, measure it against **
   datum is a value splits into a both-rep VALUE concept + a BOOLEAN INTERFACE concept. Do **not** recommend
   conflating them (a coded `source representation` on a `boolean` concept is a validator error), and do **not**
   recommend reshaping the model to whatever emits today (source-only, dropped local override, downgraded boolean) —
-  the fixture is correct and the emit catches up. Coverage/membership is `coded from` + `exists`, not a value∈valueset derivation.
+  the fixture is correct and the emit catches up. Membership is a THREE-STATE predicate over the value concept's
+  datum (§3): a present non-member is `false`, and only a missing datum is `unknown` — so `coded from` + `exists`
+  alone is NOT the shape, because one VS-scoped retrieve returns ∅ for both and loses the determinate `false`.
 - QM artifacts are **provisional**; the capabilities they exercised (`sem-and`/`sem-not`) are not.
 
 ---
