@@ -3541,7 +3541,15 @@ class Emitter {
     // ("declare the reduction"). They survive only until reduction NESTING lands — without nesting an
     // author cannot SAY `exists ( <filter pattern> )`, so removing them first would strand every author.
     // Do NOT cite these branches as evidence of intended behaviour.
-    const call = this.emitPatternCall(matched);
+    // #189 — a locally-coded concept's own records join the set its reduction reduces (see the marker).
+    const localUnionRef =
+      c.__reductionLocalUnion !== undefined
+        ? cqlQualifiedRef(
+            this.caseFeature.kind === "inferred" ? this.caseFeature.localSourceLibrary : "",
+            c.__reductionLocalUnion,
+          )
+        : undefined;
+    const call = this.emitPatternCall(matched, localUnionRef);
     const declared = this.declaredShapeOfConcept(c);
     const patternShape: PatternReturnShape = PATTERN_RETURN_SHAPE[matched.pattern] ?? "list";
 
@@ -3603,7 +3611,7 @@ class Emitter {
     return call;
   }
 
-  private emitPatternCall(call: CanonicalPatternCall): string {
+  private emitPatternCall(call: CanonicalPatternCall, localUnionRef?: string): string {
     // Synthetic patterns (not catalog entries — they represent CQL keyword
     // operators) emit as CQL syntax instead of CRLCommon calls.
     if (call.pattern === "StartOf") {
@@ -3613,7 +3621,17 @@ class Emitter {
       return `end of ${this.emitArg(call.args[0])}`;
     }
     const fn = functionNameFor(call.pattern);
-    const args = call.args.map((a) => this.emitArg(a)).join(", ");
+    // ⭐ #189 — `localUnionRef` set ⟺ the concept carried a local `code is` beside this reduction, so the
+    // reduction applies to `this` ∪ its named set (operator, 2026-08-29). Only the FIRST argument is the set
+    // being reduced; a scope/threshold argument is untouched.
+    const args = call.args
+      .map((a, i) =>
+        i === 0 && localUnionRef !== undefined
+          ? `${localUnionRef}
+    union ${this.emitArg(a)}`
+          : this.emitArg(a),
+      )
+      .join(", ");
     return `CRLCommon.${fn}(${args})`;
   }
 

@@ -111,6 +111,9 @@ import type {
   Location,
 } from "../ast/types";
 import { EMIT_REDUCTION_NOT_ACTIVE_KIND } from "../ast/types";
+import { conceptRefsOfDefinition } from "../ast/conceptDependencies";
+import { matchNarrative } from "../template-match/matcher";
+import { PATTERN_RETURN_SHAPE } from "./patternReturnShape";
 import {
   deriveEffectiveRepresentations,
   type EffectiveRepresentationDescriptor,
@@ -1129,6 +1132,100 @@ export function lowerLocalCodes(
       delete retargetedReduction.code;
       loweredConcepts.push(retargetedReduction);
       continue;
+    }
+
+    // ⭐ (2-REDUCTION) #189 — `code is` + `definition is <selection> "<Named>"`, NO `source representation`.
+    //
+    // `Greatest Weight` — `code is greatest-weight` + `definition is highest "Weight Records"`,
+    // `shape is Record`. Two arms: the local answer slot and the derivation. The operator stated the
+    // semantics with a worked example (2026-08-29): the reduction reduces `this` ∪ the named set —
+    //
+    //     highest collection: 5 "weight records" ∪ 3 `greatest-weight` records
+    //     WR=2, WR=5, g-w=6 ←, WR=4, g-w=1, g-w=1, WR=5, WR=6 ←  ⇒  6
+    //
+    // ⭐ THE UNION IS THE POINT. Without it the derivation reads `weight`-coded records while the assertion
+    // carries `greatest-weight`, so the answer slot is written and NEVER READ —  the exact defect
+    // `obesityTarget.test.ts` already records as measured ("an answer slot nothing reads").
+    //
+    // TWO OUTPUTS (no EP twin — there is no posrep here):
+    //   (a) LP twin    — the same-name LOCAL records retrieve        (LocalPrimitives)
+    //   (b) Inferences — the PUBLIC determination: the reduction, over `this` ∪ the named set
+    //
+    // ⚠ SHAPE-EXACT: a SELECTION pattern (instance-returning: MostRecent/Last/Earliest/First/Highest/Lowest)
+    // over ONE named concept, `shape is Record`, no posrep, `type is` present. A selection COLLAPSES TO ONE,
+    // which is what `shape is Record` publishes — so no trailing reduction is owed and none is invented.
+    // Everything else falls through to the mixed error below and stays loud: a producer stage (a formula,
+    // a threshold) does not select, so a `shape is Record` concept carrying one owes a following reduction;
+    // a posrep makes it the 3-arm case; a non-Record shape declares something the stage does not produce.
+    if (
+      c.definition?.type === "DefinitionIsDefinition" &&
+      (c.representations ?? []).length === 0 &&
+      assumedShapePreMigration(c.shape) === "Record" &&
+      c.conceptType !== undefined
+    ) {
+      const matched = matchNarrative(c.definition.body);
+      const namedRefs = conceptRefsOfDefinition(c.definition);
+      const isSelection =
+        matched.known && PATTERN_RETURN_SHAPE[matched.pattern] === "instance" && namedRefs.length === 1;
+      if (isSelection) {
+        const priorForCode = codeValueToConcept.get(codeValue);
+        if (priorForCode !== undefined) {
+          errors.push(
+            mkError(
+              "emit-duplicate-local-code",
+              `Local code \`${codeValue}\` is declared by both "${priorForCode}" and "${c.name}". Each ` +
+                `local source code must be unique within the library.`,
+              loc,
+            ),
+          );
+          continue;
+        }
+        if (seenSyntheticNames.has(c.name) || existingTerminologyNames.has(c.name)) {
+          errors.push(
+            mkError(
+              "emit-local-code-terminology-collision",
+              `Lowering "${c.name}" would synthesize a terminology of that name, but it is already taken ` +
+                `in library "${ast.library.name}". Rename one so the synthesized local code does not collide.`,
+              loc,
+            ),
+          );
+          continue;
+        }
+        codeValueToConcept.set(codeValue, c.name);
+        seenSyntheticNames.add(c.name);
+        localCodes.push({ concept: c.name, code: codeValue, conceptType: c.conceptType });
+        syntheticTerminologies.push(
+          buildSyntheticTerminology(c.name, codeValue, localCodesystemName, urn, loc),
+        );
+
+        // (a) LP twin — the local records retrieve. `retrieveResourceType` SET ⟺ LocalPrimitives.
+        const lpTwin: Concept = {
+          ...c,
+          representations: [],
+          definition: {
+            type: "CodedFromDefinition",
+            terminologyName: c.name,
+            retrieveResourceType: c.conceptType,
+            location: loc,
+          },
+          __loweringRole: "source-impl",
+        };
+        delete lpTwin.code;
+        loweredConcepts.push(lpTwin);
+
+        // (b) Inferences twin — the PUBLIC determination. Keeps the AUTHORED narrative (so ref resolution,
+        //     requalification and the catalog match all run normally); the marker tells the emit to union
+        //     the LP records into the set being reduced.
+        const reductionTwin: Concept = {
+          ...c,
+          representations: [],
+          __reductionLocalUnion: c.name,
+          __loweringRole: "public-determination",
+        };
+        delete reductionTwin.code;
+        bothRepInferredTwins.push(reductionTwin);
+        continue;
+      }
     }
 
     // (2) MIXED `code` + top-level `definition`. BOTH-REPRESENTATION is SUPPORTED (the

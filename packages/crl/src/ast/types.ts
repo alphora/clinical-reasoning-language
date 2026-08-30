@@ -574,6 +574,17 @@ export interface Concept extends ASTNode {
    */
   __interfaceThreeStateMerge?: true;
   /**
+   * SYNTHETIC-EMITTER-ONLY (#189). On an Inferences twin whose concept carried a local `code is` AND a
+   * `definition is <selection> "<Named>"`: the name of its LocalPrimitives records twin, so the reduction is
+   * applied to `this` ∪ the named set rather than the named set alone.
+   *
+   * ⭐ That union IS the semantics, not an optimisation: "a reduction over a NAMED set also reduces the
+   * concept's OWN records" (operator, 2026-08-29) — which is what makes a coded concept's own assertions
+   * compete with the records it reduces. Without it, `Greatest Weight`'s answer slot would be written and
+   * never read.
+   */
+  __reductionLocalUnion?: string;
+  /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). Marks the
    * INFERRED half of a both-representation (`code is` + `defined as`) concept that
    * `lowerLocalCodes` SPLIT into a LocalPrimitives retrieve twin + this Inferences twin.
