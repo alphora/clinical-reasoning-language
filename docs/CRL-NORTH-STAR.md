@@ -517,16 +517,29 @@ current level). There is no ServiceRequest special case and no membership specia
   authored it: `coded from "VS"` emits a value-set retrieve (`[Condition: Concepts."Diagnosis of
   Hypertension"]`, in our own goldens), and that retrieve **is** `code in VS`. A single code goes in a
   one-code set and takes the same path.
-- ⚠ **Membership as a PREDICATE over an already-established DATUM has NO author surface.** Verified against
-  the complete matcher registry (60 matchers) plus the grammar and `CanonicalArg`: the predicate vocabulary is
-  `at least` · `at most` · `below` · `exceeds` · `between` · `low|high|normal|abnormal` · the temporal forms.
-  None applies a named terminology to a datum. So `"Requested Service" in "Covered VS"` above is the shape the
-  model REQUIRES; it is **not yet authorable**, and it parses today as unmatched narrative (both quoted
-  operands become concept references, with no way to mark the second as a terminology).
+- **Membership as a PREDICATE over a DATUM is the REP-LOCAL projection `matches this`.** It is the sibling of
+  `exists this`, in the same slot, and the set it tests against is the representation's own `coded from` —
+  the one place a terminology name lives, so nothing puts a value-set name into the concept namespace.
 
-⚠ Neither half may be dropped. "CRL cannot test code-in-valueset" is FALSE and absurd. "Nothing here needs
-new language" is ALSO false — the three-state ruling needs the datum predicate, because a retrieve answers
-*did it match*, never *was there a datum to match*.
+```crl
+- source representation:
+  - type is ServiceRequest.
+  - coded from "Covered VS".        // the set — ONE meaning, whatever the projection asks of it
+  - value projection is matches this.
+```
+
+⚠ **THE RETRIEVE SHAPE IS DECIDED BY THE PROJECTION, and this is the whole design.** `coded from` names the
+set; what is ASKED of it decides how the records are fetched:
+
+| projection | asks | retrieve | absence is |
+|---|---|---|---|
+| `exists this` | is there a record in the set? | **filtered** by the set | `false` — a records read; filtering and per-code testing are equivalent (`exists([SR: VS])` = `exists(SR where code in VS)`) |
+| `matches this` | does the record match the set? | ⚠ **UNFILTERED** — it must SEE non-members to judge them | *nothing contributed* — a datum read; unestablished, so it PAUSES |
+
+⚠⚠ Filter a `matches this` retrieve and a wrong-code record vanishes into the same empty set as no record at
+all — collapsing a determinate `false` into `unknown`, which is the exact defect the three-state ruling
+exists to prevent. The contract is carried in `template-match/patternScope.ts` so validation and lowering
+read ONE table rather than each re-deciding it.
 
 **⭐ Matching is MEMBERSHIP — local codes and reference value sets alike; never "presence".** A concept's records
 are the resources whose code is a **member of the concept's value set**. That set is a single local code

@@ -1,0 +1,80 @@
+// ===========================================================================
+// ⭐ THE CANONICAL TARGET for the ServiceRequest membership chain (#189).
+//
+// ⚠ It is the TARGET, not a description of what works. The model here is the
+// CORRECT one and the implementation catches up to it. Never reshape a concept
+// to make a lane pass.
+//
+// The acceptance criterion (operator, 2026-08-30):
+//
+//     an SR whose code IS in the value set          -> true  -> Approve
+//     an SR whose code is NOT in it, nothing newer  -> false -> Deny
+//     no SR at all, OR the SR carries no code       -> unanswered: pause and ask
+//
+// ⭐ THE WHOLE POINT: rows 2 and 3 are DIFFERENT. A request for some other
+// service is a determinate NO — we looked, and it is not covered. No request at
+// all is a question nobody has answered. Collapsing them is the defect this
+// fixture exists to prevent.
+//
+// ⭐ WHY `matches` AND NOT `exists`. Both are rep-local projections invoked once
+// per retrieved record, but they ask different questions, and the charter's rule
+// is that what a construct READS decides how it reads absence:
+//
+//   `exists this`   asks IS THERE A RECORD — a RECORDS read. Absence ANSWERS it,
+//                   so it is false, and it can NEVER pause. It also cannot tell
+//                   a wrong-code request from no request: both retrieve nothing.
+//   `matches … this` asks DOES THE RECORD SAY THIS — a DATUM read. A retrieved
+//                   record with another code is a real `false`; no record at all
+//                   leaves the arm contributing NOTHING, which is unestablished,
+//                   which pauses.
+//
+// ⚠ An earlier sketch of this policy paired `coded from` with `exists this`.
+// That is why it was wrong — not the `coded from`, which is required here
+// (charter §3: it is decided by MODEL INFO, and ServiceRequest HAS a code-based
+// retrieve). It was `exists`, which reads records and so cannot pause.
+//
+// ⭐ `coded from` names ONE set; what the PROJECTION asks of it decides the
+// retrieve shape. For `exists this`, filtering the retrieve and testing each
+// code are equivalent, so it stays the filtered retrieve it is today. For
+// `matches this` the retrieve must be UNFILTERED — the projection has to SEE
+// the non-member to call it false. Filter it and a wrong-code request vanishes
+// into the same empty set as no request, and row 2 collapses into row 3.
+//
+// ⚠ The value set holds ONE code here. That is a small set, not an absent check
+// (charter §3): membership is still evaluated, and the wrong-code row is what
+// proves it.
+// ===========================================================================
+library "Endoluminal Ablation Coverage".
+
+terminology "Endoluminal RFA VS":
+- valueset is `http://example.org/procedures/ValueSet/endoluminal-rfa`.
+
+// ONE question, three states. Its arms are the local `code is` (a clinician may
+// answer it directly) and the ServiceRequest the projection judges. `most recent
+// this` merges them, so a newer assertion overrides an older record and vice
+// versa.
+concept "Requested Service Is Endoluminal Radiofrequency Ablation":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `requested-service-is-endoluminal-rfa`.
+- definition is most recent this.
+- source representation:
+  - type is ServiceRequest.
+  - coded from "Endoluminal RFA VS".
+  - value projection is matches this.
+
+activity "Approve Endoluminal Ablation":
+- request CPGCommunicationRequest.
+- with `APPROVED`.
+
+activity "Deny Endoluminal Ablation":
+- request CPGCommunicationRequest.
+- with `NOT APPROVED`.
+
+// If coverage cannot be established from the data, the tree PAUSES and the
+// questionnaire asks — that is the point of the chain.
+decision "Endoluminal Ablation Coverage":
+first:
+- when "Requested Service Is Endoluminal Radiofrequency Ablation" then recommend activity "Approve Endoluminal Ablation".
+- otherwise then recommend activity "Deny Endoluminal Ablation".

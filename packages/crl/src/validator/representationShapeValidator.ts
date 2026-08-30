@@ -9,6 +9,7 @@ import {
 } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
 import { matchNarrative } from "../template-match/matcher";
+import { isProjectionOnly, patternScope } from "../template-match/patternScope";
 
 import type { RepresentationShapeError, RepresentationShapeRule, ValidationError } from "./validator";
 
@@ -246,6 +247,29 @@ export class RepresentationShapeValidator {
     // An ordinary narrative that merely contains the word (`"Weight" exists today`) leads with the ref,
     // not `exists`, so it is not flagged. Message no longer steers to `defined as exists` (existence is
     // now a `definition is` reduction).
+    // A.11 (definition half) — a PROJECTION-ONLY pattern in a concept-level `definition is`. One global
+    // pattern registry serves definitions, projections AND pipeline stages, so registering a rep-local
+    // projector silently makes `definition is matches this.` "known" (MEASURED). There is no representation
+    // for it to be local to there, so it means nothing; reject it at author time naming the fix rather than
+    // letting it soft-compile into emit.
+    if (concept.definition?.type === "DefinitionIsDefinition") {
+      const matched = matchNarrative(concept.definition.body);
+      if (isProjectionOnly(matched.pattern)) {
+        errors.push(
+          this.err(
+            "projection-only-pattern-misplaced",
+            concept.name,
+            `Concept "${concept.name}": \`${matched.pattern.toLowerCase()} this\` is a REP-LOCAL projection ` +
+              `— it reads ONE \`source representation:\`'s own datum, and a concept-level \`definition is\` ` +
+              `has no representation to be local to. Move it under the representation as ` +
+              `\`- value projection is ${matched.pattern.toLowerCase()} this.\`.`,
+            concept.definition.body.location,
+            attribution,
+          ),
+        );
+      }
+    }
+
     if (concept.definition?.type === "DefinitionIsDefinition") {
       const els = concept.definition.body.elements;
       const second = els[1]?.type;
@@ -390,6 +414,48 @@ export class RepresentationShapeValidator {
     // datum-local), so the message names both. (Since `value projection is` is its own keyword,
     // a MISPLACED concept-level `definition is` can no longer land here — that is a parse error —
     // so this rule's only job is the datum-local scope violation.)
+    // A.11 — a PROJECTION-ONLY pattern folded into a pipeline. `matchNarrative`'s pipeline fold prepends the
+    // previous stage as the next stage's first argument, so `… , then matches this` hands a pattern whose own
+    // contract is zero-operand a stage to read. MEASURED: `Matches` arrives with `args.length === 1`. Gate on
+    // the SHARED `patternScope` descriptor, never on a local re-derivation, so validate and lower cannot drift.
+    if (rep.valueProjection) {
+      const projected = matchNarrative(rep.valueProjection.body);
+      const scope = patternScope(projected.pattern);
+      // A.11 (terminology half) — a membership projection with NO set to test against. `matches this` and
+      // `exists this` both derive their meaning from the representation's `coded from`; without one,
+      // `- type is Patient.` + `- value projection is matches this.` validates clean today while naming
+      // nothing to match. Gate on the descriptor's `requiresTerminology`, not on the pattern name.
+      if (scope?.requiresTerminology && rep.terminologyName === undefined) {
+        errors.push(
+          this.err(
+            "projection-only-pattern-misplaced",
+            concept.name,
+            `Concept "${concept.name}": \`${projected.pattern.toLowerCase()} this\` tests this ` +
+              `representation's records against a value set, but the representation declares no ` +
+              `\`coded from\`. Add \`- coded from "<value set>".\` — the set is what the projection asks ` +
+              `about, so without it the projection has nothing to mean.`,
+            rep.valueProjection.body.location,
+            attribution,
+          ),
+        );
+      }
+      if (scope && projected.args.length !== scope.arity) {
+        errors.push(
+          this.err(
+            "projection-only-pattern-misplaced",
+            concept.name,
+            `Concept "${concept.name}": \`${projected.pattern.toLowerCase()} this\` is a REP-LOCAL ` +
+              `projection over this representation's own datum and takes no operand, but here it is a ` +
+              `stage of a \`, then\` pipeline, which hands it the preceding stage's result. Author it as ` +
+              `the WHOLE \`value projection is …\`; a computation over other named declarations belongs in ` +
+              `a concept-level \`definition is\`.`,
+            rep.valueProjection.body.location,
+            attribution,
+          ),
+        );
+      }
+    }
+
     if (rep.valueProjection && narrativeHasConceptRef(rep.valueProjection.body.elements)) {
       errors.push(
         this.err(

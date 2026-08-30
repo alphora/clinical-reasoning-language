@@ -327,6 +327,12 @@ export type RepresentationShapeRule =
   // not a use-site TYPE mismatch — it can fire with no value type declared). The both-rep fold is #257-deferred.
   | "boolean-composition-not-pure-derived"
   | "multiple-value-types"
+  // #189 SR — a REP-LOCAL projection form (`exists this`, `matches this`) used somewhere it has no
+  // representation to be local to: a concept-level `definition is`, or a stage of a `, then` pipeline (where
+  // the fold PREPENDS the previous stage, handing a zero-operand pattern an operand). One global pattern
+  // registry serves all three slots, so nothing structural prevents it — this rule does. See
+  // `template-match/patternScope.ts`.
+  | "projection-only-pattern-misplaced"
   | "missing-value-type";
 
 // concept-model redesign Todo 2 — a static representation-shape defect. One kind with a

@@ -1,0 +1,98 @@
+# The acceptance truth table for the canonical ServiceRequest membership target, as CRE cases.
+//
+// ⚠ The PAUSE rows FAIL today, and that is the point — see `tests/serviceRequestTarget.test.ts`, which pins
+// each lane's current shortfall beside the value it must reach. `result is` states what the case MUST
+// produce; a `fail` here is the burn-down signal, never a case to re-author.
+//
+// ⭐ THE ROWS THAT MATTER ARE 2 AND 3, AND THEY MUST DIFFER. A request for some other service is a
+// determinate NO — we looked at the request and it is not covered. No request at all is a question nobody
+// has answered. `exists this` cannot tell them apart (both retrieve nothing); `matches this` can, because it
+// reads the DATUM of a record that was actually retrieved.
+//
+// The stub code for a reference VS is `<canonicalBase>/CodeSystem/reference-vs-stub|<the VS canonical's last
+// path segment>` — the SAME mechanical stub the FHIR ValueSet and the CQL retrieve use, so both lanes agree
+// by construction. Here: canonicalBase `http://example.org/endoluminal-ablation`, VS `…/ValueSet/endoluminal-rfa`.
+library "EndoluminalAblationCases".
+covers "Endoluminal Ablation Coverage".
+
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+// ── The RECORDED arm — a ServiceRequest, judged by the projection ──────────────────────────────
+// A request carrying the covered code.
+fact "RFA Request":
+- code is "http://example.org/endoluminal-ablation/CodeSystem/reference-vs-stub|endoluminal-rfa".
+- date is "2026-01-01".
+- defined by "ServiceRequest".
+
+// A REAL request for something else. ⭐ The row that separates this model from an `exists` one: the record
+// exists and is retrievable, so the projection judges it and returns a determinate FALSE.
+fact "Other Service Request":
+- code is "http://example.org/endoluminal-ablation/CodeSystem/reference-vs-stub|some-other-procedure".
+- date is "2026-01-01".
+- defined by "ServiceRequest".
+
+// ── The ASSERTED arm — a clinician answers the question directly ───────────────────────────────
+fact "Answered Yes":
+- value is true.
+- date is "2026-02-01".
+- defined by "Endoluminal Ablation Coverage"."Requested Service Is Endoluminal Radiofrequency Ablation".
+
+fact "Answered No":
+- value is false.
+- date is "2026-02-01".
+- defined by "Endoluminal Ablation Coverage"."Requested Service Is Endoluminal Radiofrequency Ablation".
+
+// ── The truth table ────────────────────────────────────────────────────────────────────────────
+
+case "request is the covered service -> approve":
+- subject is "Pat".
+- fact is "RFA Request".
+- result is "Endoluminal Ablation Coverage" is "Approve Endoluminal Ablation".
+
+// ⭐ A DETERMINATE false: the request was read and it is not the covered service.
+case "request is a different service -> deny":
+- subject is "Pat".
+- fact is "Other Service Request".
+- result is "Endoluminal Ablation Coverage" is "Deny Endoluminal Ablation".
+
+// ⚠⚠ THE PAUSE ROWS ARE DELIBERATELY ABSENT FROM THIS FILE, AND THAT IS NOT AN OMISSION.
+//
+// CEL cannot say "no recommendation". `result is "<leaf>" is <branch | boolean>` is the whole surface
+// (`cel/ast/types.ts`: `CELResultValue = CELBooleanResult | CELBranchResult`), so every case MUST name a
+// branch. Writing the pause rows here would mean asserting a branch for a row whose correct answer is that
+// NO branch fires — i.e. authoring the exact collapse this fixture exists to prevent, inside the oracle
+// that is supposed to catch it.
+//
+// ⚠ That is not hypothetical: `fixtures/obesity/cases.cel` does exactly this today —
+//   `case "obese unanswered -> no recommendation": - result is … is "Approve Bariatric Surgery".`
+// — a case whose NAME says no recommendation and whose ASSERTION says Approve.
+//
+// So the pause rows live where they can be stated truthfully: `MUST_PRODUCE` in
+// `tests/serviceRequestTarget.test.ts` records them as `[]`, and `$apply` owns their execution. The two
+// pause rows this fixture owes are:
+//     no ServiceRequest at all              -> no recommendation
+//     a ServiceRequest carrying NO code     -> no recommendation
+// Adding a CEL pause form (`result is "D" pauses.`) is the language work that would let them come home.
+
+// ── The asserted arm, and its recency merge with the recorded one ──────────────────────────────
+
+case "answered yes, no request -> approve":
+- subject is "Pat".
+- fact is "Answered Yes".
+- result is "Endoluminal Ablation Coverage" is "Approve Endoluminal Ablation".
+
+case "answered no, no request -> deny":
+- subject is "Pat".
+- fact is "Answered No".
+- result is "Endoluminal Ablation Coverage" is "Deny Endoluminal Ablation".
+
+// ⭐ The merge: a NEWER assertion overrides an older record. The request says covered (2026-01-01); the
+// clinician says no (2026-02-01); `most recent this` selects the assertion.
+case "request covered but newer answer says no -> deny":
+- subject is "Pat".
+- fact is "RFA Request".
+- fact is "Answered No".
+- result is "Endoluminal Ablation Coverage" is "Deny Endoluminal Ablation".

@@ -682,6 +682,40 @@ const existsThis: PatternMatcher = (els, loc) => {
   return makeCall("Exists", [], loc);
 };
 
+/**
+ * `matches this` → Matches() — the MEMBERSHIP projection, sibling of `exists this` (#189 SR).
+ *
+ * ⭐ NO COMPARAND ARGUMENT. The set is the representation's own `coded from`, which is where every
+ * terminology reference in CRL already lives. Naming it again inside the narrative would put a terminology
+ * name in the CONCEPT namespace (both arrive as `NConceptRef`, so nothing structural separates them) and
+ * buy a second way to say one thing.
+ *
+ * ⭐ Both projections are REP-LOCAL, invoked once per retrieved datum, and that is what gives membership its
+ * three states with nothing special-cased (charter "VOCABULARY" + the membership section):
+ *
+ *   record retrieved, its code IS in the set   -> true
+ *   record retrieved, its code is NOT in it    -> FALSE   (a present non-member is a determinate no)
+ *   record retrieved but carrying NO code      -> null    (nothing to test)
+ *   NO record retrieved                        -> the arm contributes NOTHING -> unestablished -> pause
+ *
+ * ⚠⚠ THE RETRIEVE IS UNFILTERED, and this is the whole design. `coded from` names ONE set; what the
+ * projection ASKS of it decides the retrieve shape:
+ *
+ *   `exists this`  — "is there a record in the set?" A RECORDS read. Filtering the retrieve and testing
+ *                    each code are equivalent here (`exists([SR: VS])` = `exists(SR where code in VS)`), so
+ *                    this stays the filtered retrieve it is today, byte-identical.
+ *   `matches this` — "does the record match the set?" A DATUM read, so it MUST see the non-members. Filter
+ *                    the retrieve and a wrong-code record vanishes into the same empty set as no record at
+ *                    all, collapsing a determinate `false` into `unknown` — the exact defect the SR fixture
+ *                    exists to catch.
+ */
+const matchesThis: PatternMatcher = (els, loc) => {
+  if (els.length !== 2) return null;
+  if (!isWord(els[0], "matches")) return null;
+  if (!isWord(els[1], "this")) return null;
+  return makeCall("Matches", [], loc);
+};
+
 /** `calculated <X>` → Calculate(X) */
 const calculated: PatternMatcher = (els, loc) => {
   if (els.length !== 2) return null;
@@ -1064,6 +1098,7 @@ const PATTERNS: PatternMatcher[] = [
   first,                           // 2
   lastBare,                        // 2 (after lastOnDayOf / lastWithinBeforeStartOf)
   mostRecentThisStage,             // 3 — `most recent this` as a pipeline stage
+  matchesThis,                     // 2 — the MEMBERSHIP projection (value-READING; three-state)
   existsThis,                      // 2 — the existence PROJECTION (value-blind)
   calculated,                      // 2
   lowest,                          // 2

@@ -1,0 +1,9 @@
+{
+  "name": "service-request",
+  "version": "1.0.0",
+  "private": true,
+  "description": "THE canonical target for the ServiceRequest membership chain (#189) — `matches this` is a DATUM read, so a wrong-code request is a determinate false and no request at all pauses",
+  "crl": {
+    "canonicalBase": "http://example.org/endoluminal-ablation"
+  }
+}
