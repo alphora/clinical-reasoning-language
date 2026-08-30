@@ -17,7 +17,7 @@ import type { SourceContext } from "../imports/scopes";
 import type { ReductionShapeError, ReductionShapeRule, ValidationError } from "./validator";
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import { matchNarrative } from "../template-match/matcher";
-import { PATTERN_RETURN_SHAPE } from "../cql-emitter/patternReturnShape";
+import { patternReturnShape } from "../template-match/patternCatalog";
 
 // #189 grammar+validation slice — the reduction/shape COHERENCE layer. IMPL 1 shipped the
 // PERMISSIVE grammar+AST (the `- shape is …` clause, the `Reduction` discriminated union, the
@@ -552,7 +552,7 @@ function definitionYieldsSingleValue(def: ConceptDefinition | undefined): boolea
   }
   if (def.type !== "DefinitionIsDefinition") return false;
   if (!isMatchedCatalogPattern(def)) return false; // unmatched narrative — nothing can be said about it
-  const shape = PATTERN_RETURN_SHAPE[matchNarrative(def.body).pattern];
+  const shape = patternReturnShape(matchNarrative(def.body).pattern);
   return shape === "instance" || shape === "boolean" || shape === "other";
 }
 

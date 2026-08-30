@@ -1,7 +1,7 @@
 import type { CRL, Concept, Location } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
 import { matchNarrativeStages, narrativeText } from "../template-match/matcher";
-import { PATTERN_RETURN_SHAPE } from "../cql-emitter/patternReturnShape";
+import { patternReturnShape } from "../template-match/patternCatalog";
 
 import type { PipelineStageError, PipelineStageRule, ValidationError } from "./validator";
 
@@ -28,13 +28,13 @@ import type { PipelineStageError, PipelineStageRule, ValidationError } from "./v
 /** The patterns that COLLAPSE a space to one member. Context-free: a selection is a selection wherever it
  *  sits. Derived from the shared fact table, never re-listed — a second list would drift. */
 function isSelection(pattern: string): boolean {
-  return PATTERN_RETURN_SHAPE[pattern] === "instance";
+  return patternReturnShape(pattern) === "instance";
 }
 
 /** Whether the shared fact table knows this pattern at all. ⚠ FAIL CLOSED: an unknown pattern is a catalog
  *  gap, reported as such, never silently treated as "not a selection". */
 function isClassified(pattern: string): boolean {
-  return Object.prototype.hasOwnProperty.call(PATTERN_RETURN_SHAPE, pattern);
+  return patternReturnShape(pattern) !== undefined;
 }
 
 interface Attribution {

@@ -42,7 +42,7 @@
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import { matchNarrative } from "../template-match";
-import { PATTERN_RETURN_SHAPE } from "./patternReturnShape";
+import { patternReturnShape } from "../template-match/patternCatalog";
 import type { Concept, ReferenceName, CompositionExpression, BranchCondition } from "../ast/types";
 import { getRefName, getRefLibrary } from "../ast/types";
 import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
@@ -266,7 +266,7 @@ function computeTotality(
     case "DefinitionIsDefinition": {
       const call = matchNarrative(def.body);
       if (!call.known) return false; // unmatched narrative → compile-failing sentinel, never total
-      const shape = PATTERN_RETURN_SHAPE[call.pattern];
+      const shape = patternReturnShape(call.pattern);
       if (shape === "boolean") return declaredBoolean(concept); // comparator → `Coalesce(<cmp>, false)` total
       if (shape === "list") return isSingleBooleanValueType(concept); // list pattern → `exists <call>` total
       return false; // instance (presence, nullable) / other → NON-total

@@ -113,7 +113,7 @@ import type {
 import { EMIT_REDUCTION_NOT_ACTIVE_KIND } from "../ast/types";
 import { conceptRefsOfDefinition } from "../ast/conceptDependencies";
 import { matchNarrative } from "../template-match/matcher";
-import { PATTERN_RETURN_SHAPE } from "./patternReturnShape";
+import { patternReturnShape } from "../template-match/patternCatalog";
 import {
   deriveEffectiveRepresentations,
   type EffectiveRepresentationDescriptor,
@@ -1166,7 +1166,7 @@ export function lowerLocalCodes(
       const matched = matchNarrative(c.definition.body);
       const namedRefs = conceptRefsOfDefinition(c.definition);
       const isSelection =
-        matched.known && PATTERN_RETURN_SHAPE[matched.pattern] === "instance" && namedRefs.length === 1;
+        matched.known && patternReturnShape(matched.pattern) === "instance" && namedRefs.length === 1;
       if (isSelection) {
         const priorForCode = codeValueToConcept.get(codeValue);
         if (priorForCode !== undefined) {

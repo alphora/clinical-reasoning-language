@@ -9,7 +9,7 @@ import {
 } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
 import { matchNarrative } from "../template-match/matcher";
-import { isProjectionOnly, patternScope } from "../template-match/patternScope";
+import { isProjectionOnly, patternScope } from "../template-match/patternCatalog";
 
 import type { RepresentationShapeError, RepresentationShapeRule, ValidationError } from "./validator";
 

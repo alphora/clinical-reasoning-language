@@ -74,10 +74,7 @@ import {
   isMemberExistenceInterface,
   isPureQuestionConcept,
 } from "../template-match/recencyValueConcept";
-import {
-  PATTERN_RETURN_SHAPE,
-  type PatternReturnShape,
-} from "../cql-emitter/patternReturnShape";
+import { patternReturnShape, type PatternReturnShape } from "../template-match/patternCatalog";
 
 // ===========================================================================
 // §1–2. The obligation — what a boolean form OWES (a claim about the lowering contract)
@@ -193,7 +190,7 @@ function collectCompositionRefs(expr: CompositionExpression, out: ReferenceName[
  *  gap-3 value-vs-presence cell — the current catalog lowering emits `exists { <call> }` (PRESENCE), but a
  *  boolean concept means "the newest value is true"; certifying that intrinsically-total would ship
  *  presence-semantics as proven, so it is `unclassified` pending T5's §2 value-read decision. Fails CLOSED
- *  to `unclassified` for a known pattern absent from `PATTERN_RETURN_SHAPE` (disc 429 #10) rather than
+ *  to `unclassified` for a known pattern absent from the return-shape catalog (disc 429 #10) rather than
  *  mirroring the emitter's `?? "list"` guess — a boolean-shape pattern missing from the table would
  *  otherwise be `exists`-wrapped AND certified total (a semantic inversion). */
 function classifyCatalogPattern(
@@ -208,11 +205,11 @@ function classifyCatalogPattern(
       reason: `\`definition is\` narrative matched no catalog pattern (soft-compile "${call.pattern}") — cannot certify totality`,
     };
   }
-  const shape: PatternReturnShape | undefined = PATTERN_RETURN_SHAPE[call.pattern];
+  const shape: PatternReturnShape | undefined = patternReturnShape(call.pattern);
   if (shape === undefined) {
     return {
       kind: "unclassified",
-      reason: `catalog pattern \`${call.pattern}\` has no PATTERN_RETURN_SHAPE entry — cannot certify totality (fail-closed, disc 429 #10)`,
+      reason: `catalog pattern \`${call.pattern}\` has no return-shape catalog entry — cannot certify totality (fail-closed, disc 429 #10)`,
     };
   }
   const boolean = isBooleanScalar(concept);

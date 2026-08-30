@@ -39,8 +39,8 @@ import { matchNarrative } from "../template-match";
 // slug.ts imports only node:crypto), so the CQL `valueset '<url>'` byte-matches the FHIR `ValueSet.url`.
 import { valueSetUrl } from "../fhir-emitter/slug";
 import { cqlStringLiteral, cqlQuotedIdentifier } from "./cqlStrings";
-import { PATTERN_RETURN_SHAPE } from "./patternReturnShape";
-import type { PatternReturnShape } from "./patternReturnShape";
+import { patternReturnShape, requireReturnShape } from "../template-match/patternCatalog";
+import type { PatternReturnShape } from "../template-match/patternCatalog";
 import { questionReachableNames } from "../ast/questionReachability";
 import { conceptRefsOfDefinition } from "../ast/conceptDependencies";
 import {
@@ -486,10 +486,10 @@ function renderMetaBlock(meta: { text: string }[] | undefined): string {
 type CompositionShape = "boolean" | "refinement";
 
 // === Pattern return-shape classification ===
-// The table itself now lives in the leaf `./patternReturnShape` (extracted #189 Slice C 2a to break the
-// value-import cycle with `emit/booleanTotality`). Imported at the top for local use and re-exported here so
-// existing importers of `PATTERN_RETURN_SHAPE` / `PatternReturnShape` from `emitCQL` are unchanged.
-export { PATTERN_RETURN_SHAPE };
+// #189 P2 D9  the table now lives in `template-match/patternCatalog`, merged with the projection-scope
+// facts so ONE module classifies the catalog. Reached through `patternReturnShape()` /
+// `requireReturnShape()`; the raw record is deliberately NOT re-exported, so no caller can reintroduce a
+// `?? default` lookup against it.
 export type { PatternReturnShape };
 
 /**
@@ -1513,7 +1513,7 @@ class Emitter {
             ? nullableBool(`unmatched narrative "${call.pattern}" (fail-closed)`)
             : notBoolean("unmatched narrative");
         }
-        const shape = PATTERN_RETURN_SHAPE[call.pattern];
+        const shape = patternReturnShape(call.pattern);
         if (shape === "boolean") {
           // ⭐ #189 O2 — lock-step with the emit above: a comparator over an ANSWERABLE operand emits BARE
           // (no boundary), so it discharges THREE-STATE. Keyed on the same authored obligation the emit
@@ -3576,7 +3576,11 @@ class Emitter {
         : undefined;
     const call = this.emitPatternCall(matched, localUnionRef);
     const declared = this.declaredShapeOfConcept(c);
-    const patternShape: PatternReturnShape = PATTERN_RETURN_SHAPE[matched.pattern] ?? "list";
+    // #189 P2 D9  FAIL CLOSED. This was `?? "list"`, which silently classified an unknown pattern as a
+    // FILTER: a wrong classification that compiles, which is the soft-compile trap in miniature. Only
+    // KNOWN patterns reach here (`emitDefinitionIs` returns the unmatched sentinel above), so a miss is a
+    // catalog gap and must say so.
+    const patternShape: PatternReturnShape = requireReturnShape(matched.pattern, `concept "${c.name}"`);
 
     if (declared === "boolean" && patternShape === "list") {
       return `exists ${call}`;
