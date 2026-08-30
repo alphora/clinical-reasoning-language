@@ -131,9 +131,10 @@ describe("valueReadValueTypes — coherence pins", () => {
     // already restructures T1's consumers) may collapse to deriving `valueless` from here (emit importing a
     // lane-neutral leaf is the permitted direction). Not collapsed now — the cross-check is the inert-precursor
     // right-sized choice.
-    // Only case-feature datum rows (`caseFeature: true`) are value-read resources this model must cover; a
-    // CEL-writer-only row (`caseFeature: false`, e.g. Encounter — #189 CEL-writer T2) is never a case-feature
-    // value-read, so it is intentionally OUT of `fhirValueModel`'s scope.
+    // Only case-feature rows (`caseFeature: true`) are value-read resources this model must cover. ⚠ That is a
+    // scope statement about ESTABLISHED cells, not a category of resource — the flag defaults to `true` and
+    // `false` records that we have not established something yet (see `caseFeature`'s docstring). Encounter was
+    // the standing example of the `false` side and is now `true`; no live row is on the other side.
     for (const [resourceType, row] of Object.entries(RESOURCE_EMIT_REGISTRY)) {
       if (!row.caseFeature) continue;
       const s = valueReadValueTypes(resourceType, "value");
@@ -155,9 +156,12 @@ describe("valueReadValueTypes — coherence pins", () => {
 
   it("the model's keyset is EXACTLY the emit-registry resources ∪ {Patient} (model→registry, both directions)", () => {
     // Registry→model is pinned by the valueless↔∅ loop above (a new registry row forces a model row). This pins
-    // the OTHER direction: a stray model row (e.g. a future `Encounter`) would silently widen the stated scope.
-    // Scope = the CASE-FEATURE (value-read) registry rows ∪ {Patient}; CEL-writer-only rows (`caseFeature:
-    // false`, e.g. Encounter) are excluded — they carry no value-read element and are never a case-feature.
+    // the OTHER direction: a stray model row would silently widen the stated scope.
+    //
+    // Scope = the case-feature registry rows ∪ {Patient}. ⚠ The old note here read "CEL-writer-only rows are
+    // excluded — they carry no value-read element and are never a case-feature", using Encounter as the
+    // example. Both halves were false of Encounter: `type` IS its value-read element, and it IS a case feature.
+    // A CEL-written resource CAN be a case feature; it simply does not have to be.
     const expected = [
       ...Object.entries(RESOURCE_EMIT_REGISTRY)
         .filter(([, row]) => row.caseFeature)

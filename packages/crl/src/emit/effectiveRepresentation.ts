@@ -437,7 +437,8 @@ function notAgeLocalExact(
   const base = { concept: concept.name, owningLibrary: owningLibrary.libraryName };
   const resourceType = concept.conceptType ?? "Observation"; // implicit-standard local Observation (charter §3)
   // A′ gate (#189 CEL-writer T2): the descriptor deriver is a DEFINITION-lane consumer, so it honors only
-  // case-feature rows. A CEL-writer-only row (`caseFeature: false`, e.g. Encounter) is NOT a case-feature datum —
+  // case-feature rows. A row whose case-feature cells are not yet ESTABLISHED (`caseFeature: false`) derives no
+  // descriptor — a statement about us, not a category of resource (see the flag's docstring) —
   // it derives no descriptor, exactly as an unlisted resource does. (The CEL writer reaches Encounter via the
   // unrestricted `resourceCodingPlacement`, never this deriver.)
   const row = resourceEmitRow(resourceType);
@@ -450,7 +451,7 @@ function notAgeLocalExact(
         resourceType,
         field: "coding",
         detail: row
-          ? `resource type \`${resourceType}\` is a CEL-writer-only row (\`caseFeature: false\`) — not a case-feature datum; the definition lane derives no descriptor for it`
+          ? `resource type \`${resourceType}\` has \`caseFeature: false\` — its case-feature cells are not established yet, so the definition lane derives no descriptor. This is reversible: if nothing blocks it, the row should be \`true\``
           : `resource type \`${resourceType}\` is not in the emit registry`,
       },
     };
@@ -532,7 +533,7 @@ function deriveOneSourceArm(
     return mk(
       "unsupported-resource",
       row
-        ? `source resource \`${resourceType}\` is a CEL-writer-only row (\`caseFeature: false\`) — its value-read/recency cell is not proven (a B2/#257 decision)`
+        ? `source resource \`${resourceType}\` has \`caseFeature: false\` — its value-read/recency cell is not established yet (reversible; not a category impossibility)`
         : `source resource \`${resourceType}\` is not in the emit registry`,
     );
   }

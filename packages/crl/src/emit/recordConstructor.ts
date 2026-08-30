@@ -39,8 +39,11 @@
 // an Observation literal carrying a `Quantity`, a Condition existence literal, a heterogeneous
 // `List<FHIR.Resource>` bound to `derivedFrom`, a `System.String` assigned into `meta.profile`,
 // `MedicationRequest.medication[x]`, null parameters, and a context-derived subject reference.
-// NOT probed: a `codeable-concept-array` coding (`Encounter.type[]`) — which is moot here, because
-// Encounter is REFUSED below — and value variants other than `Quantity`.
+// ⭐ ALSO probed since: `Encounter.type[]` — a `codeable-concept-array` coding — and its NESTED
+// `period.start` recency, both of which construct, round-trip and sort.
+// ⚠ That probe was once skipped as "moot, because Encounter is REFUSED" — refused by the very flag being
+// questioned. A gap justified by the thing it is evidence about is circular; never file one that way.
+// STILL NOT probed: value variants other than `Quantity`.
 
 import { conceptValueTypes } from "../grammar/conceptValueTypes";
 import {
@@ -75,10 +78,11 @@ export type ConstructorImpossibility =
   // A row exists but no `REQUIRED_STRUCTURAL_ELEMENTS` entry does. Distinct from the above so a caller can
   // tell "unknown resource" from "known resource, unknown obligations".
   | { reason: "no-structural-schema"; detail: string }
-  // ⭐ The row is CEL-writer-only (`caseFeature: false`, e.g. Encounter). The definition lane must not
+  // ⭐ The row's case-feature cells are not established yet (`caseFeature: false`). The definition lane must not
   // profile an SD for it, so a constructed record would have no case-feature profile to instantiate.
   | { reason: "not-a-case-feature-datum"; detail: string }
-  // The recency stamp is a DOTTED path (`period.start`), which is not a top-level writable element.
+  // The recency stamp is EMPTY — there is no element to carry the propagated timestamp. ⚠ A DOTTED path is
+  // NOT a reason: a CQL literal constructs the nesting (only the JSON-write lane cannot spell it flat).
   | { reason: "recency-not-constructible"; detail: string }
   // The concept's value type is not a known CRL value type at all.
   | { reason: "value-type-unmappable"; detail: string }
@@ -231,7 +235,7 @@ export function capabilityFromRow(
   required: readonly StructuralRequiredElement[],
   valueType?: string,
 ): ConstructorCapability {
-  // ⭐ A CEL-writer-only row is not a case-feature datum, so the definition lane refuses to profile an SD
+  // ⭐ A row whose case-feature cells are not ESTABLISHED profiles no SD, so the definition lane refuses one
   // for it (`caseFeatureProfileShape` returns undefined). Constructing a record whose profile cannot exist
   // is incoherent, so refuse here rather than emitting one and discovering it downstream.
   if (!row.caseFeature) {
@@ -239,7 +243,7 @@ export function capabilityFromRow(
       kind: "impossible",
       reason: "not-a-case-feature-datum",
       detail:
-        `\`${resourceType}\` is a CEL-writer-only row (\`caseFeature: false\`) — the definition lane emits ` +
+        `\`${resourceType}\` has \`caseFeature: false\` (cells not established yet — reversible) — the definition lane emits ` +
         `no case-feature SD for it, so a constructed record would have no profile to instantiate.`,
     };
   }

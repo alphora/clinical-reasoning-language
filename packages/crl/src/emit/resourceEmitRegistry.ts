@@ -22,7 +22,7 @@
 // line refs drift). BLAST RADIUS the flip inherits, not discovers: `applyDateField`'s map covers 15 resource
 // types; a resource with NO registry row (MedicationStatement, DiagnosticReport, …) becomes a fail-closed
 // `unsupported-resource` at the definition lane and a `.code`-fallback → T4 case-atomic at the CEL lane.
-// Encounter, once among those, now has a CEL-writer-only (`caseFeature: false`) row (added T2).
+// Encounter, once among those, has a row (added T2) and is a CASE-FEATURE row as of 2026-08-30.
 //
 // SPELLING ≠ LEGALITY: a resolver spells a JSON name correctly for any variant; it does NOT assert the target
 // element admits that variant. `conceptValueTypes` is CRL-wide (includes `date`/`Attachment`), but e.g.
@@ -69,12 +69,21 @@ export interface ResourceEmitRow {
    *  resource. `false` for a value-bearing resource (Observation), whose boolean value element a value-reading
    *  reduction reads. Drives the descriptor's datum discrimination (design §2). */
   valueless: boolean;
-  /** REFACTOR:grounded (#189 CEL-writer, design panel disc 486 — A′). The row's CAPABILITY marker: which
-   *  consumers may honor it. `true` = a case-feature datum resource PROVEN so far, honored by the definition lane
-   *  (`caseFeatureProfileShape` / descriptor derivation, which profile an SD + `action.input`). `false` = a
-   *  resource the CEL writer emits but no case-feature has YET been proven to read (e.g. Encounter as an
-   *  ambient/QM-operand datum, added by the CEL-writer flip): the definition lane's case-feature gate skips it;
-   *  flipping `false`→`true` later is the intended one-line reversibility, NOT a category impossibility.
+  /** REFACTOR:grounded (#189 CEL-writer, design panel disc 486 — A′; REFRAMED by the operator 2026-08-30).
+   *
+   *  ⭐ **THE DEFAULT IS `true`. A CEL-WRITTEN RESOURCE *CAN* BE A CASE FEATURE — it just does not HAVE to be.**
+   *  Absent a demonstrated blocker, a resource the CEL writer emits SHOULD be a case-feature datum. `false` is
+   *  a statement about US, not about the resource: it records that some cell has not been established yet.
+   *
+   *  ⚠ This is NOT a taxonomy of "CEL-writer-only resources" versus "case-feature resources". Reading it that
+   *  way is what kept Encounter excluded long after both mechanics it was assumed to lack had been shown to
+   *  work — the flag was written during a period of getting the CEL lane to express what it needed, and the
+   *  exclusion outlived its reason. If setting `true` produces no blocker, set it. If it later produces one,
+   *  be equally willing to do whatever works.
+   *
+   *  `true` = the definition lane honors the row (`caseFeatureProfileShape` / descriptor derivation → an SD +
+   *  `action.input`). `false` = a cell is unestablished, the definition lane's gate skips it, and flipping is
+   *  a one-line change — never a category impossibility.
    *  SCOPE — this marker gates ONLY the DEFINITION lane (case-feature SD + `action.input` profiling via
    *  `caseFeatureProfileShape`, and the value-read model): those consumers honor a row only when `caseFeature`.
    *  It does NOT gate the CEL instance writer's coding-ELEMENT placement, which is RESOURCE-level (a fact emitting
@@ -89,7 +98,7 @@ export interface ResourceEmitRow {
 }
 
 /** The emit subset. Unlisted → fail-closed `unsupported-resource`. `codeable-concept-array` (Encounter.type)
- *  landed with the #189 CEL-writer flip (T2) — a CEL-writer-only (`caseFeature: false`) row. */
+ *  landed with the #189 CEL-writer flip (T2), on the Encounter row. */
 export const RESOURCE_EMIT_REGISTRY: Readonly<Record<string, ResourceEmitRow>> = {
   Observation: {
     coding: { kind: "codeable-concept", field: "code" },
@@ -123,11 +132,16 @@ export const RESOURCE_EMIT_REGISTRY: Readonly<Record<string, ResourceEmitRow>> =
   },
   // REFACTOR:grounded (#189 CEL-writer T2, disc 486 A′). A CEL-WRITER-ONLY row (`caseFeature: false`): the CEL
   // instance lane emits Encounters (ambient/QM-operand context, read by an external-lane `[Encounter: …]`
-  // retrieve on `type`), but no case-feature has `type is Encounter`, so the definition lane's case-feature gate
-  // skips this row. Coding is the `type[]` ARRAY (a visit code is `Encounter.type`, NOT `.code` — R4 Encounter
-  // has no `.code`). `recency` is the nested `period.start`; nested-Period recency is CONSUMED at T4
-  // (applyDateField-by-role) — it is NOT read by T2's coding path, and the T2 recency resolvers (which reject a
-  // dotted path) are never reached for Encounter (caseFeature-gated off the definition lane).
+  // retrieve on `type`) AND the definition lane profiles them as case features.
+  //
+  // Coding is the `type[]` ARRAY (a visit code is `Encounter.type`, NOT `.code` — R4 Encounter has no `.code`),
+  // and it is also the readable DATUM: what an Encounter asserts IS which visit it was.
+  //
+  // `recency` is the nested `period.start`. ⚠ Read the two lanes SEPARATELY — conflating them is what made
+  // this row look impossible: the INSTANCE-WRITE lane cannot spell a flat JSON name for it (there is no
+  // `period.startDateTime`), so `recencyStampJsonName` refuses it and `applyDateField` writes
+  // `period: { start: iso }` instead; the CQL lane simply CONSTRUCTS the nesting
+  // (`period: FHIR.Period { start: … }`) and sorts on `period.start.value`. Both measured.
   Encounter: {
     coding: { kind: "codeable-concept-array", field: "type" }, // Encounter.type[] — a visit code, NOT `.code`
     recency: { sortExpr: "period.start", cast: "none" }, // nested Period — CONSTRUCTED, see below
@@ -235,8 +249,8 @@ export const REQUIRED_STRUCTURAL_ELEMENTS: Readonly<Record<string, readonly Stru
     { element: "intent", fulfillment: { via: "default", value: { kind: "code", code: "order" } } },
     { element: "subject", fulfillment: { via: "wired", binding: "case-subject" } },
   ],
-  // Encounter is EMIT-FLOOR-ONLY (`caseFeature: false` — the CEL writer emits it as ambient context, but it is
-  // never a case-feature datum, so no SD; its required elements gate the emit floor, not the SD). R4 `status`
+  // Encounter's required elements gate BOTH the emit floor and its case-feature SD (it became a case-feature
+  // row 2026-08-30; the `EMIT-FLOOR-ONLY / never a case-feature datum` note here was that deferral). R4 `status`
   // (1..1) + `class` (1..1, a `Coding`) were emitted MISSING → invalid FHIR. `class` defaults to `OBSENC`
   // (observation encounter, v3-ActCode) per operator; `status` to `finished`.
   Encounter: [
@@ -555,8 +569,9 @@ export function caseFeatureProfileShape(
 ): CaseFeatureProfileShape | undefined {
   const row = resourceEmitRow(resourceType);
   if (row === undefined) return undefined;
-  // A′ gate (#189 CEL-writer T2, disc 486): a CEL-writer-only row (`caseFeature: false`, e.g. Encounter) is never
-  // a case-feature datum — the definition lane must NOT profile an SD for it, even though the CEL writer emits it.
+  // A′ gate (#189 CEL-writer T2, disc 486): a row whose case-feature cells are not yet established profiles no
+  // SD. ⚠ The gate is about what we have ESTABLISHED, not a category of resource — see `caseFeature`'s docstring.
+  // No live row is `false` today (Encounter, the last one, flipped 2026-08-30).
   if (!row.caseFeature) return undefined;
   // ⭐ THE CASE-FEATURE SD DERIVES FROM QI-CORE (operator, 2026-08-30), not from base FHIR.
   //

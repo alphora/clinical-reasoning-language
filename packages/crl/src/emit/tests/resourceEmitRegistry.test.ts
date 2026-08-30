@@ -26,9 +26,8 @@ import {
 // the fail-closed cells prove T2 refuses (never guesses) beyond its boundary and defers legality to T3.
 
 // The DEFINITION-lane / value-read matrices (recency-stamp write-names, SD-model) pin only `caseFeature: true`
-// rows: a CEL-writer-only row (`caseFeature: false`, e.g. Encounter — #189 CEL-writer T2) has no case-feature SD,
-// and its recency (nested Period) is a T4 concern. Its CEL-relevant surface — coding PLACEMENT — is pinned
-// separately (the `resourceCodingPlacement` block below).
+// rows — a row whose case-feature cells are not established profiles no SD. ⚠ No LIVE row is on that side any
+// more (Encounter, the last one, flipped 2026-08-30), so those matrices now cover the whole registry.
 const CASE_FEATURE_ROWS = Object.entries(RESOURCE_EMIT_REGISTRY)
   .filter(([, row]) => row.caseFeature)
   .map(([rt]) => rt)
@@ -70,8 +69,9 @@ describe("T2 write-name resolvers — resource-keyed matrix (the per-cell pin)",
   }
 
   it("every case-feature row resolves coding + recency stamp to a NON-error (totality over the definition subset)", () => {
-    // caseFeature rows only: a CEL-writer-only row (Encounter) has a nested-Period recency the T2 stamp resolver
-    // intentionally rejects until T4 — it is not part of this definition-lane totality.
+    // ⚠ A NESTED recency path has no flat JSON name by design — that is the instance-WRITE lane's contract,
+    // not a statement that the row is unsupported. `applyDateField` writes it (`Encounter -> period`), and the
+    // CQL lane constructs the nesting. The per-row branch below is what keeps those two facts apart.
     for (const [resourceType, row] of Object.entries(RESOURCE_EMIT_REGISTRY)) {
       if (!row.caseFeature) continue;
       expect(typeof codingJsonName(row.coding), resourceType).toBe("string");

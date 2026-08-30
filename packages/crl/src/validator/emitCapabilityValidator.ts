@@ -12,7 +12,8 @@ import { ValidationError } from "./validator";
 // WARNING, never an error (dispositions disc 494/495): the emit registry is a DELIBERATE SUBSET of capability,
 // so a hard error would turn "not yet emittable" (`type is Immunization`) into "invalid CRL" — breaching the
 // rule that the grammar (not the registry) defines the language. `conceptTypes` admits 33 resource types; the
-// registry backs 6 (5 case-feature + Encounter's CEL-writer-only row), so ~27 grammar-valid types trip this.
+// registry backs 6, ALL of them case-feature rows (Encounter joined 2026-08-30), so ~27 grammar-valid types
+// trip this.
 //
 // Gating MIRRORS the descriptor deriver's own gating (`effectiveRepresentation.ts`), so validate and emit cannot
 // drift on which concepts derive a case feature:
