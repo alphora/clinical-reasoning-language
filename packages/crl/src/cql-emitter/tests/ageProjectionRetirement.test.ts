@@ -172,11 +172,18 @@ describe("recency-projection override registry (the single source validate + emi
       resolveRecencyProjection(rep("age today at least 18 years", { conceptType: "Observation" }))
         .kind,
     ).toBe("wrong-carrier");
-    // Exact-`date` carrier: `["date","boolean"]` is NOT a match (a single entry can't carry it).
+    // ⭐ The rep's value TYPES no longer affect the carrier match (#189 P2). This used to require exactly
+    // `["date"]` and rejected `["date","boolean"]`. A representation declares no value type at all now —
+    // the projection knows its own carrier (`Patient.birthDate`, `date`), so there is nothing for the
+    // author to state and nothing that can disagree. What is still checked is `type is`, which the
+    // projection genuinely cannot supply (the Observation case above).
     expect(
       resolveRecencyProjection(rep("age today at least 18 years", { valueTypes: ["date", "boolean"] }))
         .kind,
-    ).toBe("wrong-carrier");
+    ).toBe("match");
+    expect(
+      resolveRecencyProjection(rep("age today at least 18 years", { valueTypes: [] })).kind,
+    ).toBe("match");
     // #257 T2 — a MONTHS projection matches, and its args carry computeFn AgeInMonths (read off the
     // matched call). A years projection carries AgeAt. An unsanctioned unit (days) still is not a match.
     const monthsRes = resolveRecencyProjection(rep("age today under 6 months"));

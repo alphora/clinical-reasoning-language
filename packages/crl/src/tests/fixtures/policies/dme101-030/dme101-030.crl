@@ -50,8 +50,6 @@ concept "Adult Eighteen Or Older":
 - code is `adult-18-or-older`.
 - source representation:
   - type is Patient.
-  - value element is Patient.birthDate.
-  - value type is date.
   - value projection is age today at least 18 years.
 
 // The requested device — the VALUE concept (North Star §3). A `CodeableConcept` datum, both-rep:
@@ -67,8 +65,6 @@ concept "Covered Device":
 - definition is most recent this.
 - source representation:
   - type is ServiceRequest.
-  - value element is ServiceRequest.code.
-  - value type is CodeableConcept.
   - coded from "Covered Devices".
 
 // The coverage determination — the BOOLEAN INTERFACE concept (North Star §3). It USES the value

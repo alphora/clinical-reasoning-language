@@ -15,8 +15,6 @@ concept "Covered Device":
 - definition is most recent this.
 - source representation:
   - type is ServiceRequest.
-  - value element is ServiceRequest.code.
-  - value type is CodeableConcept.
   - coded from "Covered Devices".
 
 concept "Covered Device Requested":

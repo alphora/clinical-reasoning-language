@@ -816,11 +816,21 @@ export interface Representation extends ASTNode {
   valueTypes: ConceptValueType[];
   terminologyName?: ReferenceName; // named coded-from
   /**
-   * The FHIR model-info property path of this rep's datum (`Observation.value`,
-   * `Patient.birthDate`, `ImagingStudy.started`). Path + its own location so Todo 2's
-   * validator anchors a "path X not on type Y" diagnostic at the `value element is` line.
-   * Present only when the posrep authored one (grammar-permissive; the validator requires
-   * it on a posrep). A single-segment path lexes and is rejected by Todo 2.
+   * ⚠ RETIRED on a representation. Accepted only until the corpus finishes migrating; the grammar drops it
+   * with the last fixture.
+   *
+   * This used to say "the validator requires it on a posrep" — Rule A.1, which is gone. A source
+   * representation carries `type is <Resource>.` and, when the resource has a coded retrieve,
+   * `coded from "<VS>".` — nothing else. The GOAL settles it: `fixtures/obesity/` declares four source
+   * representations across three authoring options and not one carries a value element or a value type.
+   *
+   * Which element carries the datum is MODEL INFO (`fhirValueModel.valueReadElementsAdmitting`), and its
+   * type is the CONCEPT's. Requiring the author to name it is what once forced them to state something
+   * FALSE — `value element is Condition.code.` + `value type is boolean.` on an existence rep, asserting
+   * that element yields a boolean when it yields a CodeableConcept.
+   *
+   * ⚠ Do NOT re-add a consumer. The last one (`effectiveRepresentation`'s source arm) made that arm dead by
+   * construction: it demanded a field the author could no longer supply, so it could only ever defer.
    */
   valueElement?: ValueElement;
   /**

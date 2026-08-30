@@ -17,8 +17,6 @@ concept "Adult Eighteen Or Older":
 - code is `adult-18-or-older`.
 - source representation:
   - type is Patient.
-  - value element is Patient.birthDate.
-  - value type is date.
   - value projection is age today at least 18 years.
 
 activity "Approve":

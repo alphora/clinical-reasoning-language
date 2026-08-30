@@ -1023,8 +1023,12 @@ describe("authoring-kit — getAuthoringKit", () => {
     // judge lenses (action-condition-count → opaque-inference-vs-named-transparent-define); every "each atom visible"
     // prose surface swept to distinguish inline vs named; `criterion-expansion-overflow`/criterion-atom bound retired.
     // CONTENT bump, NO payload-shape change. BOTH hashes move.
+    // #189 P2 — `value element is` / `value type` are RETIRED on a source representation. The two `form`
+    // strings taught them, so a KE agent reading the kit would author a construct the compiler no longer
+    // wants. That is a CORRECTNESS fix, not teaching, so it lands with the slice and re-pins at 1.25 with NO
+    // bump — the doctrine re-teach + schemaVersion bump stay BATCHED (`tmp/WORKLIST-kit-deltas.md`).
     expect(cpg.contentHash).toBe(
-      "840c0129eeaf90fb4d21a35e06830d1716ff9001cd7f5a439b50e189e87b4f66",
+      "acc263112865b1ed9932d0e431bb37b26f927356ac35d37488980508ce5262ff",
     );
     // #189 null/pause — the priorAuth payload embeds the reference `.cel` artifacts, which gained explicit
     // `value is true/false` facts (a NEGATIVE must now be STATED; omission means UNKNOWN and PAUSES). That is
@@ -1035,7 +1039,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     // ⚠ DO NOT RELEASE before the kit pass runs: a KE pinning 1.25 + the OLD priorAuth hash re-syncs on a
     //   hash change with no changelog entry explaining it.
     expect(priorAuth.contentHash).toBe(
-      "915edb9e694c04f2c3cd5136e2717dc0c9698e5f7fdde8ecbb64691858b9fe86",
+      "546fad888290f7373727924b6f15ca15b099f4ed98bda0ad473d71a8aea5e80c",
     );
   });
 
@@ -1078,7 +1082,13 @@ describe("authoring-kit — getAuthoringKit", () => {
     const src = REPRESENTATION_REFERENCE_CRL;
     expect(src).toContain('concept "Patient Under Six Months":');
     expect(src).toContain("value projection is age today under 6 months");
-    expect(src).toContain("value element is Patient.birthDate");
+    // ⚠ The exemplar no longer states the CARRIER — `value element is Patient.birthDate` is retired on a
+    // representation, and the projection knows its own carrier. Pin what the author actually writes: the
+    // Patient `type is` (the one fact the projection cannot supply) and the ABSENCE of the retired lines,
+    // so a regression that re-teaches them goes red here.
+    expect(src).toContain("- type is Patient.");
+    expect(src).not.toContain("value element is");
+    expect(src).not.toContain("- value type is date.");
     // STANDALONE = no local `code is` inside this concept's block (recency requires a `code is` arm).
     const block = src.slice(
       src.indexOf('concept "Patient Under Six Months":'),

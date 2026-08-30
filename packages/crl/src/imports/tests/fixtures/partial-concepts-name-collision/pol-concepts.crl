@@ -9,6 +9,4 @@ concept "Sibling Concept":
 - value type is boolean.
 - source representation:
   - type is Patient.
-  - value element is Patient.birthDate.
-  - value type is date.
   - value projection is age today at least 18 years.

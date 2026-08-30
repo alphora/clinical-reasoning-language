@@ -157,27 +157,26 @@ export function resolveRecencyProjection(rep: Representation): ProjectionResolut
     threshold: renderQuantityArg(qArg),
   };
 
-  // Carrier check against the sole override. A sanctioned age-today projection on the wrong
-  // resource / value element / value type is a recognized-but-misplaced projection — a distinct
-  // diagnostic from "no projection" so migration errors do not misleadingly claim none exists.
+  // Carrier check against the sole override. A sanctioned age-today projection on the wrong RESOURCE is a
+  // recognized-but-misplaced projection — a distinct diagnostic from "no projection" so migration errors do
+  // not misleadingly claim none exists.
+  //
+  // ⭐ THE CARRIER IS THE PROJECTION'S, NOT THE AUTHOR'S (#189 P2). This used to also demand
+  // `value element is Patient.birthDate.` + `value type is date.` on the rep, and its diagnostic told the
+  // author to add them — the retired Rule A.1, still enforced at the EMIT boundary, which is why migrating
+  // the corpus broke `dme101-030` before this line changed.
+  //
+  // The charter settles it: *"The projection knows its own carrier, so the author never names an element and
+  // can never name a wrong one."* `AGE_TODAY_OVER_BIRTHDATE` already carries `valueElementPath` and
+  // `repValueType`; every consumer reads them from the OVERRIDE. Requiring the author to restate them bought
+  // nothing and could only ever introduce a disagreement — which is the whole argument for deriving.
+  //
+  // ⚠ `type is` STAYS required. It is the one fact the projection cannot supply: `age today` over a
+  // ServiceRequest is a genuine authoring error, and silently assuming Patient would hide it.
   const override = AGE_TODAY_OVER_BIRTHDATE;
   const mismatches: string[] = [];
   if (rep.conceptType !== override.sourceType) {
     mismatches.push(`type is ${rep.conceptType ?? "(none)"} (expected ${override.sourceType})`);
-  }
-  if (rep.valueElement?.path !== override.valueElementPath) {
-    mismatches.push(
-      `value element is ${rep.valueElement?.path ?? "(none)"} (expected ${override.valueElementPath})`,
-    );
-  }
-  // Require EXACTLY one value type equal to the carrier's — a posrep with `["date", …]` must not
-  // resolve as a match on the strength of one entry (the general A.9 `multiple-value-types` catches
-  // it at author time, but the emit boundary does not run the Validator).
-  const repVts = rep.valueTypes ?? [];
-  if (repVts.length !== 1 || repVts[0] !== override.repValueType) {
-    mismatches.push(
-      `value type is ${repVts.join("/") || "(none)"} (expected exactly ${override.repValueType})`,
-    );
   }
   if (mismatches.length > 0) return { kind: "wrong-carrier", override, args, mismatches };
   return { kind: "match", override, args };
@@ -307,12 +306,15 @@ export function ageProjectionUnsupportedMessage(conceptName: string): string {
 /** A sanctioned age-today projection sitting on the wrong carrier (resource / element / type). */
 export function ageProjectionWrongCarrierMessage(conceptName: string, mismatches: string[]): string {
   const o = AGE_TODAY_OVER_BIRTHDATE;
+  // ⚠ This used to instruct the author to add `value element is Patient.birthDate.` +
+  // `value type is date.` — the retired Rule A.1, in a diagnostic an author is guaranteed to read. The
+  // projection knows its own carrier (`${o.valueElementPath}`); the author never names it.
   return (
     `Concept "${conceptName}": a \`value projection is age today …\` projects only over the ` +
     `Patient age carrier, but this representation does not match it (${mismatches.join("; ")}). ` +
-    `Model patient age as \`- type is ${o.sourceType}.\`, \`- value element is ` +
-    `${o.valueElementPath}.\`, \`- value type is ${o.repValueType}.\`, and the ` +
-    `\`- value projection is age today ….\`.`
+    `Model patient age as \`- type is ${o.sourceType}.\` plus the ` +
+    `\`- value projection is age today ….\` — the projection reads ${o.sourceType}.${o.valueElementPath} ` +
+    `itself, so the representation declares no value element and no value type.`
   );
 }
 

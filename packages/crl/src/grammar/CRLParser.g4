@@ -362,21 +362,28 @@ conceptBody
 //
 // A `source representation:` (posrep) is an anonymous SELF-DESCRIBING representation
 // of the same clinical concept from a NON-LOCAL (external) source shape. Per the
-// converged model (design of record §"Shape rules"; representation-model.md
-// refinement 5) a posrep is ALWAYS FULLY EXPLICIT — it does NOT inherit the enclosing
-// concept's fields. The grammar stays PERMISSIVE (fields optional so a partial posrep
-// still parses); Todo 2's validator REJECTS an incomplete posrep. (The concept's own
-// LOCAL representation is its `code is`, whose `type`/`value element` default to
-// Observation/`.value`; a posrep never defaults.) A posrep carries its own
-// `type` + `value element` + `value type`, an optional `coded from`, and an optional
-// `value projection is` PROJECTOR (rep-level: projects THIS rep's own datum to the
-// concept's value — its OWN term, distinct from the concept-level `definition is`
-// calculation over concepts; a bare `definition is` inside a rep is a parse error).
+// ⭐ A SOURCE REPRESENTATION IS `type is` + optional `coded from`. NOTHING ELSE.
 //
-//   - source representation: - type is ImagingStudy. - value element is ImagingStudy.started. - value type is dateTime. - coded from "Mammogram VS".
-// (The design-of-record's Patient/birthDate age posrep uses `value type is date`; the FHIR
-// `date` primitive is NOT yet in the value-type vocabulary — it lands with the value-type +
-// kit sync in Todo 4 alongside age-as-posrep, #257. Do not show it here until then.)
+// It does NOT inherit the enclosing concept's fields, and it does NOT declare a value
+// element or a value type. WHICH element carries the datum is MODEL INFO (the canonical
+// carrier per resource, `fhir-model/fhirValueModel.ts`); its TYPE is the CONCEPT's.
+//
+// ⚠ This comment used to say a posrep "carries its own `type` + `value element` + `value
+// type`" and showed a worked example doing so — Rule A.1, RETIRED. Requiring the author to
+// name the element is what forced writing something FALSE: to satisfy the old rule for
+// `value projection is exists this.` over a Condition you had to write
+// `- value element is Condition.code.` + `- value type is boolean.`, asserting that element
+// yields a boolean. It yields a CodeableConcept, and existence reads neither.
+//
+// A posrep may also carry a `value projection is` PROJECTOR (rep-level: projects THIS rep's
+// own datum to the concept's value — its OWN term, distinct from the concept-level
+// `definition is` over concepts; a bare `definition is` inside a rep is a parse error).
+//
+//   - source representation: - type is Observation. - coded from "Clinical BMI VS".
+//   - source representation: - type is Condition. - coded from "Obese VS". - value projection is exists this.
+//
+// ⚠ `valueElementLine` / `valueTypeLine` remain in `representationBody` ONLY until the
+// corpus finishes migrating. They are RETIRED, not optional — nothing consumes them.
 //
 sourceRepresentationLine
     : DASH SOURCE_REPRESENTATION COLON representationBody

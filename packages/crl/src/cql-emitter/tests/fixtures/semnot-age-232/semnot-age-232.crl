@@ -9,8 +9,6 @@ concept "Age 21 Or Older":
 - code is `age-21-or-older`.
 - source representation:
   - type is Patient.
-  - value element is Patient.birthDate.
-  - value type is date.
   - value projection is age today at least 21 years.
 
 concept "Under Age 21":

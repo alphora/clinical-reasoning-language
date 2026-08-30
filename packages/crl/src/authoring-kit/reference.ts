@@ -856,13 +856,9 @@ concept "Clinical Mammogram":
 - value type is dateTime.
 - source representation:
   - type is ImagingStudy.
-  - value element is ImagingStudy.started.
-  - value type is dateTime.
   - coded from "Mammogram VS".
 - source representation:
   - type is DiagnosticReport.
-  - value element is DiagnosticReport.effectiveDateTime.
-  - value type is dateTime.
   - coded from "Mammogram DiagnosticReport VS".
 
 // The billed study: Claim/EoB prove it was BILLED (deniable/reversible; no findings). A distinct
@@ -871,13 +867,9 @@ concept "Administrative Mammogram":
 - value type is dateTime.
 - source representation:
   - type is Claim.
-  - value element is Claim.item.servicedDate.
-  - value type is dateTime.
   - coded from "Mammogram Billing VS".
 - source representation:
   - type is ExplanationOfBenefit.
-  - value element is ExplanationOfBenefit.item.servicedDate.
-  - value type is dateTime.
   - coded from "Mammogram Billing VS".
 
 // ============ Mammogram — locally coded (\`code is\`) + value-preserving \`sem-or\` union ============
@@ -913,8 +905,6 @@ concept "Height":
 - code is \`height\`.
 - source representation:
   - type is Observation.
-  - value element is Observation.value.
-  - value type is Quantity.
   - coded from "Height VS".
 
 concept "Weight":
@@ -922,8 +912,6 @@ concept "Weight":
 - code is \`weight\`.
 - source representation:
   - type is Observation.
-  - value element is Observation.value.
-  - value type is Quantity.
   - coded from "Weight VS".
 
 concept "BMI":
@@ -932,8 +920,6 @@ concept "BMI":
 - definition is body mass index of "Weight" and "Height".
 - source representation:
   - type is Observation.
-  - value element is Observation.value.
-  - value type is Quantity.
   - coded from "Clinical BMI".
 
 concept "High BMI":
@@ -953,7 +939,5 @@ concept "Patient Under Six Months":
 - value type is boolean.
 - source representation:
   - type is Patient.
-  - value element is Patient.birthDate.
-  - value type is date.
   - value projection is age today under 6 months.
 `;

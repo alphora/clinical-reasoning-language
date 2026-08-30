@@ -353,11 +353,16 @@ export class RepresentationShapeValidator {
         this.err(
           "incomplete-representation",
           concept.name,
+          // ⚠ This message used to instruct the author to add `value element is` + `value type` — the
+          // RETIRED Rule A.1. The check above had already been narrowed to `type is`, so the diagnostic was
+          // teaching a construct the compiler no longer wants, in the one place an author is guaranteed to
+          // read it. The datum element and its value type are DERIVED (model info + the concept).
           `Concept "${concept.name}": a source representation is missing ` +
-            `${missing.map((m) => `\`${m}\``).join(" + ")}. A source representation is fully ` +
-            `explicit — it must carry \`type is <Resource>.\`, ` +
-            `\`value element is <Resource>.<path>.\`, and \`value type is <Type>.\` ` +
-            `(\`coded from\` is optional). It does NOT inherit the concept's fields.`,
+            `${missing.map((m) => `\`${m}\``).join(" + ")}. A source representation carries ` +
+            `\`type is <Resource>.\` and, when the resource has a coded retrieve, ` +
+            `\`coded from "<Value Set>".\` — and nothing else. It does NOT inherit the concept's fields, ` +
+            `and it does NOT declare a value element or a value type: which element carries the datum is ` +
+            `model info, and its type is the concept's.`,
           rep.location,
           attribution,
         ),

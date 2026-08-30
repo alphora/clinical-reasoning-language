@@ -11,8 +11,6 @@ concept "Age 18 Or Older":
 - code is `age-18-or-older`.
 - source representation:
   - type is Patient.
-  - value element is Patient.birthDate.
-  - value type is date.
   - value projection is age today at least 18 years.
 
 decision "Adult Eligibility Determination":
