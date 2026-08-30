@@ -10,6 +10,7 @@ import { DispositionValidator } from "./dispositionValidator";
 import { EmitCapabilityValidator } from "./emitCapabilityValidator";
 import { MetaTagValidator } from "./metaTagValidator";
 import { NameUniquenessValidator } from "./nameUniquenessValidator";
+import { PipelineStageValidator } from "./pipelineStageValidator";
 import { ReductionShapeValidator } from "./reductionShapeValidator";
 import { ReferenceResolver } from "./referenceResolver";
 import { RepresentationShapeValidator } from "./representationShapeValidator";
@@ -54,6 +55,7 @@ export type ValidationErrorKind =
   | "external-library-not-included"
   | "qualified-ref-unresolved"
   | "decision-shape"
+  | "pipeline-stage"
   | "reserved-library-name"
   // Configurable PA determinations (feature: configurable PA leaves). Only enforced when the project EXPLICITLY
   // configures `crl.dispositions.options` (the closed-set trigger); absent config = today's behavior.
@@ -345,6 +347,33 @@ export interface RepresentationShapeError extends ValidationErrorBase {
 }
 
 /**
+ * #189 P2 (design D10) — a defect in a `, then` PIPELINE's stage structure. ERRORS, deliberately:
+ * a pipeline is explicit author structure, and a stage that matches nothing must not soft-compile
+ * (plan §2.10 — the goal fixture once "validated clean while matching the wrong operation").
+ *
+ *   - "pipeline-malformed"                 — a `then` the runs around it cannot satisfy (leading /
+ *                                            doubled / dangling); the message names WHICH.
+ *   - "pipeline-stage-unmatched"           — a stage matches no known form. Names the 1-based stage, quotes
+ *                                            it, and points at the STAGE's own span, not the definition's.
+ *   - "pipeline-selection-after-selection"  — a selection over a space the previous stage already collapsed
+ *                                            to one record. ⚠ SELECTION → FILTER stays LEGAL.
+ *   - "pipeline-stage-unclassified"        — FAIL-CLOSED: a matched pattern with no return-shape catalog
+ *                                            entry, so its position cannot be checked. OUR gap, not the
+ *                                            author's, and it must never pass silently as "not a selection".
+ */
+export type PipelineStageRule =
+  | "pipeline-malformed"
+  | "pipeline-stage-unmatched"
+  | "pipeline-selection-after-selection"
+  | "pipeline-stage-unclassified";
+
+export interface PipelineStageError extends ValidationErrorBase {
+  kind: "pipeline-stage";
+  rule: PipelineStageRule;
+  conceptName: string;
+}
+
+/**
  * The specific rule a `use-site-type-mismatch` violates (concept-model redesign Todo 2 rule B).
  * One kind with a `rule` sub-discriminator (mirrors `representation-shape` / `decision-shape`);
  * lets consumers specialize without parsing message text.
@@ -542,6 +571,7 @@ export type ValidationError =
   | DispositionNonFinalLeafError
   | AgePredicateUnsupportedError
   | RepresentationShapeError
+  | PipelineStageError
   | UseSiteTypeMismatchError
   | UseSiteOperandUntypedWarning
   | ReductionShapeError
@@ -603,6 +633,7 @@ export class Validator {
   private readonly metaTagValidator: MetaTagValidator;
   private readonly agePredicateValidator: AgePredicateValidator;
   private readonly representationShapeValidator: RepresentationShapeValidator;
+  private readonly pipelineStageValidator: PipelineStageValidator;
   private readonly reductionShapeValidator: ReductionShapeValidator;
   private readonly useSiteTypeValidator: UseSiteTypeValidator;
   private readonly emitCapabilityValidator: EmitCapabilityValidator;
@@ -616,6 +647,7 @@ export class Validator {
     this.metaTagValidator = new MetaTagValidator();
     this.agePredicateValidator = new AgePredicateValidator();
     this.representationShapeValidator = new RepresentationShapeValidator();
+    this.pipelineStageValidator = new PipelineStageValidator();
     this.reductionShapeValidator = new ReductionShapeValidator();
     this.useSiteTypeValidator = new UseSiteTypeValidator();
     this.emitCapabilityValidator = new EmitCapabilityValidator();
@@ -686,6 +718,8 @@ export class Validator {
     // misuse, >1 value type). Always an error (structural author mistake, never demoted) —
     // closes the check gap Todo 1's permissive grammar superset opened.
     errors.push(...this.representationShapeValidator.validate(ast, sources));
+    // #189 P2 D10  pipeline stage structure. ERRORS: an unmatched stage must never soft-compile.
+    errors.push(...this.pipelineStageValidator.validate(ast, sources));
 
     // concept-model redesign Todo 2 rule B — use-site & result-shape type checking (pattern
     // operand constraints incl. refinement/anchor booleans and non-boolean composition/bare-ref

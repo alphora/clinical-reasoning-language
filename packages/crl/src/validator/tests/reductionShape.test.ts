@@ -495,8 +495,14 @@ describe("`most recent` must not MASK what it wraps (#189, 2026-08-29)", () => {
     ]);
   });
 
-  it("the LEFT-TO-RIGHT spelling of the same thing reports it too — the two must agree", () => {
+  it("the LEFT-TO-RIGHT spelling of the same thing reports it too — and now says MORE", () => {
+    // ⭐ Both spellings are still reported, which is what this test exists to pin. But since #189 P2 D10 the
+    // PIPELINE spelling reports TWICE, and the extra finding is an improvement rather than a divergence: a
+    // pipeline has stage structure to point at, so `pipeline-stage` names WHICH stage failed (`flurble bloop
+    // of "A" and "A"`, stage 1) and squiggles that stage alone, while `reduction-shape` still reports the
+    // whole definition's shape consequence. The prefix spelling has no stages, so it gets only the latter.
     expect(errKinds(RECORD('definition is flurble bloop of "A" and "A", then most recent this.'))).toEqual([
+      "pipeline-stage",
       "reduction-shape",
     ]);
   });

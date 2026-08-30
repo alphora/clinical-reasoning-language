@@ -137,6 +137,12 @@ function softCompileUnknown(clause: NarrativeClause): CanonicalPatternCall {
   };
 }
 
+/** An element run rendered back to readable narrative — for diagnostics that must QUOTE what the author
+ *  wrote. Shared so a stage error and the soft-compile placeholder cannot render the same words differently. */
+export function narrativeText(elements: readonly NarrativeElement[]): string {
+  return elements.map((e) => narrativeElementText(e)).join(" ");
+}
+
 function narrativeElementText(e: NarrativeElement): string {
   switch (e.type) {
     case "NConceptRef":
