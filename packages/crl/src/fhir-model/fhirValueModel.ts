@@ -86,7 +86,18 @@ const FHIR_VALUE_READ_MODEL: Readonly<
     // guarded in `computeLocalDatum`, not here — this model states the honest FHIR fact that SR.code admits CC.)
     code: new Set<ConceptValueType>(["CodeableConcept"]),
   },
-  MedicationRequest: { value: new Set<ConceptValueType>() }, // ∅
+  MedicationRequest: {
+    value: new Set<ConceptValueType>(), // ∅ — the standard `value` carrier is modeled-valueless
+    // #189 P2 — the SOURCE datum read: WHICH medication was requested. `medication[x]` is a CHOICE
+    // (`medicationCodeableConcept` | `medicationReference`), so it is exactly the "several plausible
+    // elements" case charter §3 reserves for an operator ruling rather than an inference from
+    // `ServiceRequest.code`'s shape.
+    // ⭐ RULED (operator, 2026-08-30): the carrier is `medicationCodeableConcept` — the coded half.
+    // Keyed by the ELEMENT path `medication` (as `value`/`code`/`birthDate` are), not the JSON variant
+    // spelling: a CQL read is `X.medication as FHIR.CodeableConcept`, while `medicationCodeableConcept`
+    // is the instance-writer's name for the same element (`codingJsonName`).
+    medication: new Set<ConceptValueType>(["CodeableConcept"]),
+  },
 };
 
 /** The admitted concept value-types for a resource's value-read element — see THE RETURN CONTRACT above. A
