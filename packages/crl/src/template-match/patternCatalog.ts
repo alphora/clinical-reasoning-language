@@ -94,10 +94,50 @@ export type RetrieveShape =
   /** `[Resource]` — the pattern must SEE non-members in order to judge them. */
   | "unfiltered";
 
+/**
+ * Whether a pattern may occupy a PIPELINE STAGE position, and what it does with the space handed to it.
+ *
+ * ⚠⚠ THE DEFAULT IS `{ grounded: false }`, AND THAT IS THE POINT. D9 made this catalog TOTAL over return
+ * shapes, which removed the old silent default — but it also meant nothing distinguished the handful of
+ * patterns whose STAGE behaviour has actually been verified from the ~40 that merely have a return shape. A
+ * resolver deriving effect from return shape alone would cheerfully classify `ComponentOf`, `InpatientStay`
+ * and `StartOf` as pipeline stages. This is the carrier that makes "fail closed" real rather than a wish.
+ *
+ * ⚠ `grounded: true` means VERIFIED AGAINST `CRLCommon.cql` — its signature, what it reads, and whether a
+ * list return preserves elements — not merely "it has a return shape".
+ */
+export type PatternStage =
+  /** Refused in a stage position. The default, and correct for anything unverified. */
+  | { grounded: false }
+  | {
+      grounded: true;
+      /**
+       * `flow`     — takes the handed space (a `List<Resource>`) as its argument. SELECTION / FILTER.
+       * `operands` — takes NAMED singleton operands only and computes a value from them; it does not consume
+       *              the space, so a PRODUCER adds its result to what it was given.
+       *
+       * ⚠ Zero canonical args cannot stand in for this: `most recent this` is `MostRecent` with zero args and
+       * reads the flow, while `exists this` / `matches this` also have zero args in their own slot.
+       */
+      reads: "flow" | "operands";
+      /**
+       * For a LIST-returning pattern: does the output preserve the handed elements (a FILTER), or transform
+       * them (a MAP)?
+       *
+       * ⚠ MEASURED that return shape alone cannot answer this: `ComponentOf` is `"list"` and returns
+       * `List<Quantity>` — it maps Observations to component quantities, preserving neither identity nor
+       * type — while `BaselineAndFollowUp` is `"list"` and genuinely filters. Required on a grounded
+       * list-returning pattern; meaningless otherwise.
+       */
+      preservesElements?: boolean;
+    };
+
 export interface PatternEntry {
   returnShape: PatternReturnShape;
   /** REQUIRED. Explicit on every pattern, so adding one forces a scope decision. */
   slot: PatternSlot;
+  /** REQUIRED. Absent grounding is a REFUSAL, never a permission — see `PatternStage`. */
+  stage: PatternStage;
   /** Projection facts — present only for `projection-only` patterns, where they are load-bearing. */
   projection?: {
     reads: PatternReads;
@@ -108,8 +148,30 @@ export interface PatternEntry {
   };
 }
 
-/** `slot: "any"` with a return shape — the ordinary catalog pattern. */
-const any = (returnShape: PatternReturnShape): PatternEntry => ({ returnShape, slot: "any" });
+/** `slot: "any"`, and NOT grounded as a pipeline stage — the ordinary catalog pattern.
+ *  ⚠ Grounding is opt-in and per-pattern: see `groundedStage` below and `PatternStage`. */
+const any = (returnShape: PatternReturnShape): PatternEntry => ({
+  returnShape,
+  slot: "any",
+  stage: { grounded: false },
+});
+
+/**
+ * `slot: "any"` AND verified as a pipeline stage against `CRLCommon.cql`.
+ *
+ * ⚠ Only the patterns the GOAL actually exercises are grounded so far — everything else is refused in a
+ * stage position rather than guessed. Grounding one means reading its realization, not assuming from its
+ * return shape.
+ */
+const groundedStage = (
+  returnShape: PatternReturnShape,
+  reads: "flow" | "operands",
+  preservesElements?: boolean,
+): PatternEntry => ({
+  returnShape,
+  slot: "any",
+  stage: { grounded: true, reads, ...(preservesElements !== undefined ? { preservesElements } : {}) },
+});
 
 const CATALOG: Readonly<Record<string, PatternEntry>> = {
   // ── List-returning filter patterns (primitive form per CRLCommon v0.2.0) ──────────────────────────
@@ -146,14 +208,18 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
   Low: any("boolean"),
   Normal: any("boolean"),
   Abnormal: any("boolean"),
-  AtLeast: any("boolean"),
+  // ⭐ GROUNDED, and its signature is the load-bearing fact: `AtLeast(rec Observation, target Quantity)`
+  // (:587) takes a SINGLETON record, NOT a list — so it reads NAMED operands and does not consume the space.
+  // That is why it can be a PRODUCER: its result joins the space it was handed rather than replacing it.
+  AtLeast: groundedStage("boolean", "operands"),
   AtMost: any("boolean"),
   Between: any("boolean"),
   Exceeds: any("boolean"),
   Below: any("boolean"),
 
   // ── Instance-returning SELECTION patterns (a singleton resource) ──────────────────────────────────
-  MostRecent: any("instance"),
+  // GROUNDED: `MostRecent(X List<Observation>): Last(X)` (CRLCommon.cql:434) — takes the handed space.
+  MostRecent: groundedStage("instance", "flow"),
   Last: any("instance"),
   LastOf: any("instance"),
   Earliest: any("instance"),
@@ -162,8 +228,10 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
   // ⭐ #189 — these pick the record at one end of an ordering, exactly as MostRecent/Earliest do over time.
   // They returned a bare value until the catalog was corrected, which is why a `shape is Record` concept
   // could not publish the record its shape declares.
-  Lowest: any("instance"),
-  Highest: any("instance"),
+  // GROUNDED: `Highest(X List<Observation>): Last((X) O sort by (value as Quantity).value)` (:550) — the
+  // handed space, ordered by value instead of by time. `Lowest` is its mirror.
+  Lowest: groundedStage("instance", "flow"),
+  Highest: groundedStage("instance", "flow"),
 
   // ── Other-shape patterns (Period, Quantity, Interval, DateTime) ───────────────────────────────────
   InpatientStay: any("other"),
@@ -180,7 +248,9 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
   Calculate: any("other"),
   // #189 — a PRODUCER: computes a new Quantity (kg/m2) from two record operands. "other" because the value
   // it yields is neither a member of its input nor a boolean — the concept declares what it publishes.
-  BodyMassIndex: any("other"),
+  // GROUNDED: `BodyMassIndex(weight Observation, height Observation)` (:615) — two singleton operands,
+  // yielding a Quantity. Named operands, so PRODUCER.
+  BodyMassIndex: groundedStage("other", "operands"),
   // No `AgeInMonths` entry BY DESIGN (#257 T2): the months compute fn only ever appears NESTED inside a
   // top-level comparator (`AtLeast`/`AtMost`/`Below`), never as the top-level pattern.
   // ⚠ An older note claimed a `?? "list"` default made a stray lookup "fail loudly". It did not — it produced
@@ -192,6 +262,8 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
   Exists: {
     returnShape: "boolean",
     slot: "projection-only",
+    // A projection is never a stage — D10 rejects it in a pipeline outright.
+    stage: { grounded: false },
     projection: {
       reads: "records",
       arity: 0,
@@ -206,6 +278,7 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
   Matches: {
     returnShape: "boolean",
     slot: "projection-only",
+    stage: { grounded: false },
     projection: {
       reads: "datum",
       arity: 0,
