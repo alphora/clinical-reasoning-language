@@ -1449,6 +1449,14 @@ export function lowerLocalCodes(
         } as DefinedAsDefinition,
         __bothRepMerge: "record-union",
         __bothRepFoldInLocalPrimitives: c.name,
+        // #189 P2 — the space, LISTED rather than derived from the fold-in name. Today exactly the two
+        // terms the derived form produced (byte-identical output, pinned by the goldens); the point is that
+        // `local ∪ n posreps ∪ n constructed candidates` is now expressible without changing the emitter
+        // again (design P2-D3).
+        __recordUnionTerms: [
+          { kind: "local-primitives", define: c.name },
+          { kind: "external-primitives", define: sourceName },
+        ],
         __loweringRole: "public-determination",
       };
       delete unionTwin.code;

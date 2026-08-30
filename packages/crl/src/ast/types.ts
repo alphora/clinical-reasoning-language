@@ -462,6 +462,23 @@ export interface ValueElement {
 //   (valuesets don't carry FHIR-type info).
 // - valueTypes (`value type is X.`) is OPTIONAL and 0..*; lazily required
 //   when something depends on it, then deduced from type's default.
+/**
+ * One term of a `record-union` twin's space (#189 P2). A term names WHICH emitted define supplies part of
+ * the concept's records, and WHICH LAYER it lives in — the layer decides the include qualifier, and
+ * getting it wrong emits a cross-family reference.
+ *
+ * `constructed` is P2's new arm: a producer stage's value, built into a record of the concept's `type is`
+ * by a generated constructor (design P1). It carries no define of its own — the expression is rendered at
+ * the union site — so it is identified by the stage that produced it.
+ */
+export type RecordUnionTerm =
+  /** A LocalPrimitives retrieve — the local `code is` arm. */
+  | { kind: "local-primitives"; define: string }
+  /** An ExternalPrimitives retrieve — a `source representation` whose `type is` MATCHES the concept's. */
+  | { kind: "external-primitives"; define: string }
+  /** A PRODUCER stage's constructed candidate, identified by its 0-based stage index. */
+  | { kind: "constructed"; stageIndex: number };
+
 export interface Concept extends ASTNode {
   type: "Concept";
   name: string;
@@ -596,6 +613,26 @@ export interface Concept extends ASTNode {
    * every other concept.
    */
   __bothRepFoldInLocalPrimitives?: string;
+  /**
+   * SYNTHETIC-EMITTER-ONLY (#189 P2). The ORDERED TERMS of a `record-union` twin's space.
+   *
+   * The union used to be implicit — exactly TWO terms whose define names the emitter DERIVED
+   * (`<foldIn>` and `<foldIn> Source`). That is fine while a concept has exactly a local arm and one
+   * posrep, and it cannot express the space P2 needs:
+   *
+   *   local `code is` retrieve  ∪  n posrep retrieves  ∪  n constructed candidates
+   *
+   * (design P2-D3's four-term taxonomy — a posrep whose `type is` differs from the concept's is
+   * PROJECTED into a constructed candidate, not unioned raw, or the space is type-incoherent).
+   *
+   * So the terms are LISTED rather than derived. Order is the authored order and is preserved; the union
+   * itself is commutative, but the emitted text is a golden and must be stable.
+   *
+   * ⚠ Set in LOCK-STEP with `__bothRepMerge === "record-union"`. The emitter throws on a marker without
+   * terms rather than falling back to the derived pair — a silent fallback would re-hide exactly the
+   * implicitness this replaces.
+   */
+  __recordUnionTerms?: readonly RecordUnionTerm[];
   /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). The
    * MERGE POLICY for a both-representation split (set on the Inferences twin

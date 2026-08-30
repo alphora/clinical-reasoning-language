@@ -2379,21 +2379,46 @@ class Emitter {
    * so two DIFFERENT resources describing one fact both survive — which is the honest reading of "the records
    * this concept publishes" until dedup is designed.
    */
+  /**
+   * The record-union twin's space — an ORDERED list of terms, `union`ed left to right.
+   *
+   * ⚠ #189 P2: the terms are now LISTED on the twin (`__recordUnionTerms`) rather than DERIVED from a
+   * fold-in name. The derived form could only ever express exactly two terms — a local retrieve and one
+   * `<name> Source` — and the space P2 needs is `local ∪ n posreps ∪ n constructed candidates`
+   * (design P2-D3). Emitted text is byte-identical for the two-term case; the goldens pin that.
+   *
+   * A `record-union` marker with no terms THROWS rather than falling back to the derived pair: a silent
+   * fallback would re-hide exactly the implicitness this replaces.
+   */
   private emitRecordUnion(c: Concept): string {
-    const foldIn = c.__bothRepFoldInLocalPrimitives;
-    if (foldIn === undefined) {
+    const terms = c.__recordUnionTerms;
+    if (terms === undefined || terms.length === 0) {
       throw new Error(
-        `internal invariant violated: record-union twin "${c.name}" is missing its LocalPrimitives fold-in ` +
-          `name — set in lock-step with the marker at lowering; a missing one is a compiler bug.`,
+        `internal invariant violated: record-union twin "${c.name}" carries no \`__recordUnionTerms\` — ` +
+          `set in lock-step with the marker at lowering; a missing list is a compiler bug.`,
       );
     }
     const localLib = this.caseFeature.kind === "inferred" ? this.caseFeature.localSourceLibrary : "";
     const sourceLib =
       this.caseFeature.kind === "inferred" ? (this.caseFeature.recordSourceLibrary ?? "") : "";
-    const lpRef = cqlQualifiedRef(localLib, foldIn);
-    const epRef = cqlQualifiedRef(sourceLib, `${foldIn} Source`);
-    return `${lpRef}
-  union ${epRef}`;
+
+    const rendered = terms.map((term) => {
+      switch (term.kind) {
+        case "local-primitives":
+          return cqlQualifiedRef(localLib, term.define);
+        case "external-primitives":
+          return cqlQualifiedRef(sourceLib, term.define);
+        case "constructed":
+          // RETIRE:189-p2-constructed — the producer arm lands with the pipeline un-collapse. Reaching
+          // here today means a term was listed before its emit exists, which is a compiler bug, not an
+          // author error: fail loud rather than emit a union that silently drops the derived arm.
+          throw new Error(
+            `internal invariant violated: record-union twin "${c.name}" lists a CONSTRUCTED term ` +
+              `(stage ${term.stageIndex}) but producer-stage emit has not landed yet (#189 P2).`,
+          );
+      }
+    });
+    return rendered.join("\n  union ");
   }
 
   private emitRecencyValueMerge(c: Concept): string {
