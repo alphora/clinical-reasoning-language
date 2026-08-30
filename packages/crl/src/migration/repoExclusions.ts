@@ -7,8 +7,11 @@
 import type { ExclusionRule } from "./migrationInventory";
 
 export const THIS_REPO_EXCLUSIONS: ExclusionRule[] = [
-  // -- Scratch / non-library ---------------------------------------------------------------------
-  { contains: "/docs/temp.crl", reason: "scratch doc snippet, not a content library" },
+  // ⚠ NO "scratch / non-library" FAMILY. `docs/temp.crl` was excluded here as a "scratch doc snippet",
+  // and the exclusion is what let it rot: it carried a `representation-shape` ERROR that the census was
+  // told not to look at. A carve-out for a file nobody is responsible for is how a landmine is kept, not
+  // how it is contained — so the file was fixed and the rule deleted. Every rule below names an
+  // INTENTIONAL error the fixture exists to produce; "we do not maintain this one" is not such a reason.
   // -- Import/registry resolution error fixtures --------------------------------------------------
   { contains: "/imports/tests/fixtures/registry-duplicate/", reason: "fixture: duplicate library-name registration (intentional error)" },
   { contains: "/imports/tests/fixtures/name-conflict/", reason: "fixture: cross-file name conflict (intentional error)" },

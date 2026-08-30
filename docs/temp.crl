@@ -49,6 +49,7 @@ first:
 
 concept "Any Qualifying Indication":
 - type is Condition.
+- value type is boolean.
 - defined as ( "Documented Fracture Nonunion" sem-or "Failed Conservative Therapy" ).
 
 decision "Coverage":

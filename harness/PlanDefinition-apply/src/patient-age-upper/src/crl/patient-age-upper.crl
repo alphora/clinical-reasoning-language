@@ -17,14 +17,18 @@ concept "Under Twenty One":
 - type is Observation.
 - value type is boolean.
 - code is `under-21`.
-- definition is age today under 21 years.
+- source representation:
+  - type is Patient.
+  - value projection is age today under 21 years.
 
 // both-rep INCLUSIVE at-most-21 (proves <= vs <: at age 21 this is TRUE, under-21 is FALSE)
 concept "At Most Twenty One":
 - type is Observation.
 - value type is boolean.
 - code is `at-most-21`.
-- definition is age today at most 21 years.
+- source representation:
+  - type is Patient.
+  - value projection is age today at most 21 years.
 
 decision "Pediatric Eligibility Determination":
 first:

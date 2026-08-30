@@ -1,13 +1,17 @@
 library "Neg Exclusion Policy".
 concept "Indication Leaf":
 - type is Observation.
+- value type is boolean.
 - code is `indication-leaf`.
 concept "Contra Leaf":
 - type is Observation.
+- value type is boolean.
 - code is `contra-leaf`.
 concept "Indication Present":
+- value type is boolean.
 - defined as ( "Indication Leaf" ).
 concept "Has Contraindication":
+- value type is boolean.
 - defined as ( "Contra Leaf" ).
 activity "Approve":
 - request CPGServiceRequest.
