@@ -491,11 +491,19 @@ is in or out of every content set). A model that needs that construction fails o
 **So `unknown` is reserved for a NULL code — no datum to check.** That is the only state a human can resolve,
 and it is why this concept can pause.
 
-⚠ **Do NOT express membership by scoping the value concept's rep with `coded from "VS"` and taking `exists`
-over it.** That collapses the three states into two: a VS-scoped retrieve returns ∅ *both* for a present
-non-member *and* for no record at all, so a wrong-code request becomes indistinguishable from an absent one
-and the determinate `false` is lost. It is the "presence" anti-pattern the next paragraph forbids, reached by
-a different route.
+⚠ **When the retrieved record CARRIES THE DATUM the predicate judges, its rep must NOT be scoped by that
+predicate's value set.** A VS-scoped retrieve returns ∅ both for a present non-member and for no record at
+all, so the wrong-code case becomes indistinguishable from the absent one and the determinate `false` is lost.
+Retrieve the record, *then* test its datum.
+
+⚠⚠ **This is NOT a ban on `coded from` + `exists`, which is the canonical shape of an EVIDENCE arm** — it is
+what `Obese`'s Condition arm does (`coded from "Obese VS"` + `value projection is exists this`), and that is
+correct. The two cases differ by what the non-member record MEANS:
+
+| the posrep's records are… | a non-member record | so VS-scoping is |
+|---|---|---|
+| **EVIDENCE FOR** the determination — a diagnosis that establishes obesity | IRRELEVANT (a diabetes Condition says nothing about obesity) — contributing nothing is right | **correct** |
+| **THE SUBJECT** the predicate judges — the requested service whose code IS the datum | the answer, in the negative (that IS what was requested, and it is not covered) | **destroys the datum** |
 
 **⭐ A membership predicate is the SAME SHAPE as any other predicate over a datum**, differing only in the
 test: `"BMI" at least 30 'kg/m2'` compares a number, `"Requested Service" in "Covered VS"` tests a code
@@ -503,16 +511,22 @@ against a set. Both read a value concept's datum; both are `true` / `false` / `u
 drive the same three decision paths (unknown → prompt · true → deeper into the tree · false → wider at the
 current level). There is no ServiceRequest special case and no membership special case.
 
-⚠ **Nothing here needs new language.** Membership is not a feature CRL is missing — it is the feature CQL
-exists for, and CRL already authors it: `coded from "VS"` emits a value-set retrieve
-(`[Condition: Concepts."Diagnosis of Hypertension"]` — shipped, in our own goldens), and that retrieve **is**
-`code in VS`. A single code goes in a one-code set and takes the same path; `FHIRHelpers.memberOf` is one
-further option, not a prerequisite.
+⚠ **BE PRECISE ABOUT THE LAYER — the two halves of this are BOTH true and are easy to state wrongly:**
 
-**What the three states need is a MODELLING discipline, not a keyword: keep "is there a datum" separate from
-"does it match".** One VS-scoped retrieve answers only the second, and its ∅ is ambiguous. The concept must be
-able to hold a code that does not match — then a present non-member reads `false` and only a missing datum
-reads `unknown`.
+- **Membership over RECORDS SHIPS, and is not a gap.** It is the feature CQL exists for, and CRL has always
+  authored it: `coded from "VS"` emits a value-set retrieve (`[Condition: Concepts."Diagnosis of
+  Hypertension"]`, in our own goldens), and that retrieve **is** `code in VS`. A single code goes in a
+  one-code set and takes the same path.
+- ⚠ **Membership as a PREDICATE over an already-established DATUM has NO author surface.** Verified against
+  the complete matcher registry (60 matchers) plus the grammar and `CanonicalArg`: the predicate vocabulary is
+  `at least` · `at most` · `below` · `exceeds` · `between` · `low|high|normal|abnormal` · the temporal forms.
+  None applies a named terminology to a datum. So `"Requested Service" in "Covered VS"` above is the shape the
+  model REQUIRES; it is **not yet authorable**, and it parses today as unmatched narrative (both quoted
+  operands become concept references, with no way to mark the second as a terminology).
+
+⚠ Neither half may be dropped. "CRL cannot test code-in-valueset" is FALSE and absurd. "Nothing here needs
+new language" is ALSO false — the three-state ruling needs the datum predicate, because a retrieve answers
+*did it match*, never *was there a datum to match*.
 
 **⭐ Matching is MEMBERSHIP — local codes and reference value sets alike; never "presence".** A concept's records
 are the resources whose code is a **member of the concept's value set**. That set is a single local code
