@@ -583,9 +583,23 @@ One word, used consistently, because the alternative has already caused a misrea
 as *"the only route to a Deny is a STATED false"* was read as *asserted-by-a-human* and used to argue that a
 COMPUTED false must not Deny. It must.
 
-> **ESTABLISHED** — some arm produced a value. **The three ways are ASSERTION, RECORD, and COMPUTATION** —
-> exactly the three data-collection arms (`code is` · `source representation` · `definition is`/`defined as`).
-> **UNESTABLISHED** — no arm produced one. That, and only that, reads **unknown**.
+> **ESTABLISHED** — a value was produced. **The three ways are ASSERTION, RECORD, and COMPUTATION.**
+> **UNESTABLISHED** — none of them produced one. That, and only that, reads **unknown**.
+
+⚠ **The three ways are NOT three peer "data-collection arms", and calling them that is what mis-models the
+whole shape.** The operator's statement (2026-08-30):
+
+> **TWO ARMS ADD TO A COLLECTION AND A THIRD ARM WORKS ON THAT COLLECTION STEPWISE (POTENTIALLY ADDING TO IT).**
+
+- **`code is`** ADDS its records to the concept's collection.
+- **Each `source representation`'s projection** runs PER RETRIEVED RECORD and ADDS a candidate for each.
+- ⭐ **`definition is` / `defined as` is NOT a third contributor — it WORKS ON that collection, STEPWISE.**
+  Each `, then` stage is handed what the stage before it produced; a PRODUCER stage adds its computed
+  candidate to what it was given; the last stage's reduction selects from the whole collection.
+
+⚠ So **"the merge" is not a mechanism to build** — it is the last stage operating on a collection the other
+two already filled. And **the source resource is never "the concept's record"**: the projection's OUTPUT is
+the candidate.
 
 So the acceptance rule, stated in these terms and true of every policy:
 
