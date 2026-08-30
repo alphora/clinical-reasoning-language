@@ -613,8 +613,21 @@ An absent datum is not established, and pauses.
 
 | the construct reads… | absence means | so absence is |
 |---|---|---|
-| **RECORDS** — `exists this`, `exists ("V")`, `count this` | *no records exist*, which ANSWERS the question asked | **false** |
-| **A DATUM** — `at least 30`, `in "VS"`, `within last 6 months` | *nothing to test*, so the question has no subject | **unknown** |
+| **RECORDS** — a DERIVATION like `defined as exists ("V")`, `count this` | *no records exist*, which ANSWERS the question asked | **false** |
+| **A DATUM** — `at least 30`, `within last 6 months` | *nothing to test*, so the question has no subject | **unknown** |
+
+⚠⚠ **A REP-LOCAL `value projection` is NEITHER ROW, and putting it in the first one kills the pause row.** A
+projection is invoked ONCE PER RETRIEVED RECORD, so **zero records ⇒ zero invocations ⇒ the arm contributes
+NOTHING** — not `false`. That is what leaves the concept unestablished, and it is the only reason an
+unanswered determination can pause at all.
+
+| projection | per retrieved record it can answer | zero records |
+|---|---|---|
+| `exists this` | ⭐ **`true` only** — there is no record to invoke it on that would answer `false`, so an existence arm can never record a negative | *nothing* |
+| `matches this` | `true` · **`false`** (a present non-member is a determinate no) · `null` (record with no datum) | *nothing* |
+
+⚠ `defined as exists ("V")` and `value projection is exists this` are different constructs in different
+slots and do NOT share absence behaviour. The first is closed-world `false`; the second contributes nothing.
 
 ⚠ That is the whole distinction, and it is why `exists` never pauses while a predicate does. `exists` asks
 about the records themselves, and their absence is a complete answer. A predicate asks about a value, and no

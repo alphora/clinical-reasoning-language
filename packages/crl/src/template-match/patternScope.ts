@@ -18,11 +18,29 @@
 // a pattern name. That is the whole point: the retrieve shape `matches this` requires is a semantic property
 // of the pattern, and a future emit author must not be able to re-derive it differently.
 
-/** What a pattern READS — which, per the charter's VOCABULARY section, decides how it reads ABSENCE. */
+/**
+ * What a pattern READS — which decides what it can PRODUCE per invocation.
+ *
+ * ⚠⚠ THIS IS NOT THE ABSENCE RULE, and conflating the two kills the pause row. Every pattern in this table
+ * is `projection-only`, and a projection is invoked ONCE PER RETRIEVED RECORD (charter §3). So for ALL of
+ * them, **zero records ⇒ zero invocations ⇒ the arm contributes NOTHING** — not `false`. That is what leaves
+ * the concept unestablished, and it is the only reason an unanswered determination can pause.
+ *
+ * The charter's "a records read means absence is `false`" is about the DERIVATION slot — `defined as
+ * exists ("V")` over an empty set is a closed-world `false`. A rep-local `exists this` is a different
+ * construct in a different slot and does NOT behave that way.
+ */
 export type PatternReads =
-  /** Records. Absence ANSWERS the question ("there are none"), so it is `false` and never pauses. */
+  /**
+   * The records themselves. Invoked per retrieved record, so it can only ever answer `true` — there is no
+   * record to invoke it on that would answer `false`. ⭐ A posrep projected by `exists this` therefore
+   * contributes `true` or NOTHING, never `false`: an existence arm cannot record a negative.
+   */
   | "records"
-  /** A datum. Absence leaves the question with no subject, so it is `unknown` and CAN pause. */
+  /**
+   * The retrieved record's datum. Invoked per retrieved record, and CAN answer `false` — a record whose
+   * code is not a member is a determinate no. A record carrying no datum answers `null`.
+   */
   | "datum";
 
 /** Which syntactic slot a pattern may occupy. */
