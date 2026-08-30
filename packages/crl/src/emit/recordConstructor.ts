@@ -366,7 +366,9 @@ export function resolveConstructor(resourceType: string, valueType?: string): Co
   }
 
   const valueMode: ValueMode = row.valueless ? "existence" : "value";
-  const bindings = cap.kind === "requires-context" ? cap.bindings : [];
+  // Every constructor needs the case subject (see the `subject` parameter below), whether or not the
+  // resource's FHIR cardinality makes it structurally required.
+  const bindings: readonly ConstructorBinding[] = ["case-subject"];
 
   // ⭐ No `slug` parameter. An earlier revision added one so a SHARED constructor could build a
   // per-concept id (design D1 dedups one function across concepts, so it cannot know its caller). Content
@@ -387,9 +389,14 @@ export function resolveConstructor(resourceType: string, valueType?: string): Co
     cqlType: "System.DateTime",
     conversion: { wrap: "FHIR.dateTime" },
   });
-  if (bindings.includes("case-subject")) {
-    params.push({ name: "subject", cqlType: "FHIR.Reference" });
-  }
+  // ⭐ ALWAYS a subject — not gated on the registry's `wired` list.
+  //
+  // MEASURED (design §11): the registry marks `Observation.subject` 0..1, so it is not a STRUCTURAL
+  // requirement and the wired list omits it — yet the CEL writer emits `subject` on every Observation, and
+  // `caseFeatureProfileShape` carries `subjectElementPath: "subject"` for EVERY resource. The case-feature
+  // contract is stricter than FHIR cardinality, and a constructed record with no subject is unattributable
+  // to a patient. Gating on `wired` produced exactly that for Observation.
+  params.push({ name: "subject", cqlType: "FHIR.Reference" });
   params.push({
     name: "profile",
     cqlType: "System.String",

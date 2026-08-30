@@ -101,7 +101,10 @@ describe("constructorCapability — refusals", () => {
 });
 
 describe("constructorCapability — bindings", () => {
-  it("Observation needs NO wired binding, and the registry agrees", () => {
+  it("⭐ Observation has no WIRED requirement — yet its constructor still takes a subject", () => {
+    // The capability reports the registry's structural obligations, and Observation has none that are
+    // `wired`. The SIGNATURE nonetheless carries `subject`, because the case-feature contract requires it
+    // independently (design §11a). These two facts must not be collapsed into one.
     expect(
       (requiredStructuralElements("Observation") ?? []).some((r) => r.fulfillment.via === "wired"),
     ).toBe(false);
@@ -169,11 +172,14 @@ describe("resolveConstructor", () => {
     expect(sig.recency).toEqual(RESOURCE_EMIT_REGISTRY.Observation.recency);
     expect(sig.recency.cast).toBe("dateTime");
     expect(sig.evidenceElement).toBe("derivedFrom");
-    expect(sig.bindings).toEqual([]);
+    // ⭐ `case-subject` even though `Observation.subject` is 0..1 and NOT structurally required — the
+    // case-feature contract is stricter than FHIR cardinality (parity finding, design §11a).
+    expect(sig.bindings).toEqual(["case-subject"]);
     expect(sig.params.map((p) => `${p.name}:${p.cqlType}`)).toEqual([
       "code:FHIR.CodeableConcept",
       "value:FHIR.Quantity",
       "recorded:System.DateTime",
+      "subject:FHIR.Reference",
       "profile:System.String",
       "evidence:List<FHIR.Reference>",
     ]);

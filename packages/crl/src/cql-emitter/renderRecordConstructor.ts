@@ -105,8 +105,10 @@ export function renderRecordConstructor(sig: ConstructorSignature): string {
   const params = sig.params.map((p) => `  ${p.name} ${p.cqlType}`).join(",\n");
 
   // `wired` bindings resolve to the parameter of the same name (D3a puts one in the signature per binding).
-  const bindingParam: Record<string, string> = {};
-  if (sig.bindings.includes("case-subject")) bindingParam["case-subject"] = "subject";
+  const bindingParam: Record<string, string> = { "case-subject": "subject" };
+  // Whether or not the resource's FHIR cardinality makes `subject` structurally required, the case-feature
+  // contract does — so it is written even when the registry's required-element list does not mention it.
+  const subjectIsStructural = sig.requiredElements.some((r) => r.element === "subject");
 
   const body: string[] = [];
 
@@ -117,6 +119,8 @@ export function renderRecordConstructor(sig: ConstructorSignature): string {
     const rendered = requiredElementCql(sig.resourceType, required, bindingParam);
     if (rendered !== undefined) body.push(rendered);
   }
+
+  if (!subjectIsStructural) body.push(`subject: subject`);
 
   // The concept's coding, at the resource's own element — NOT a universal `.code` (design D3b).
   body.push(
