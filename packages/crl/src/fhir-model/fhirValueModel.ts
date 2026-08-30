@@ -77,8 +77,27 @@ const FHIR_VALUE_READ_MODEL: Readonly<
 > = {
   Observation: { value: new Set(OBSERVATION_VALUE_X) },
   Patient: { birthDate: new Set<ConceptValueType>(["date"]) }, // the uncoded age arm's value-read
-  Condition: { value: new Set<ConceptValueType>() }, // ∅ — modeled, valueless (presence via `exists`)
-  Procedure: { value: new Set<ConceptValueType>() }, // ∅
+  Condition: {
+    value: new Set<ConceptValueType>(), // ∅ — no `Condition.value[x]`; presence is read via `exists`
+    // ⭐ RULED (operator, 2026-08-30). TWO readable elements, and they do NOT compete: the lookup selects by
+    // the CONCEPT's value type, and these admit disjoint types, so there is never a choice to make.
+    //   · `onset` — WHEN the condition started. Charter §3's carrier table already ruled this element for
+    //     Condition (NOT `recordedDate`/`assertedDate`); the value model simply never carried it, so a
+    //     dateTime read on a Condition failed closed despite having been ruled. This closes that gap.
+    //     ⚠ `dateTime` ONLY, not `date` — R4's `onset[x]` is `dateTime|Age|Period|Range|string` with NO
+    //     `onsetDate`, exactly as `Observation.value[x]` has no `valueDate` (see
+    //     `OBSERVATION_VALUE_X_EXCLUDED`). Same fact, same exclusion.
+    onset: new Set<ConceptValueType>(["dateTime"]),
+    //   · `code` — WHICH condition, as a code. Symmetric with `ServiceRequest.code`.
+    //     ⚠ This does NOT make existence obsolete: a boolean Condition concept still reads `exists`, because
+    //     `boolean` is admitted by neither element. The two coexist because they answer different questions.
+    code: new Set<ConceptValueType>(["CodeableConcept"]),
+  },
+  Procedure: {
+    value: new Set<ConceptValueType>(), // ∅ — no `Procedure.value[x]`
+    // ⭐ RULED (operator, 2026-08-30): WHICH procedure, as a code. Symmetric with `ServiceRequest.code`.
+    code: new Set<ConceptValueType>(["CodeableConcept"]),
+  },
   ServiceRequest: {
     value: new Set<ConceptValueType>(), // ∅ — the standard `value` carrier is modeled-valueless
     // #189 B1 — the SOURCE datum read: `ServiceRequest.code` (which covered device was requested) is a genuine

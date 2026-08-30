@@ -9,6 +9,7 @@ import { AGE_TODAY_OVER_BIRTHDATE } from "../../template-match/recencyProjection
 import { relativeElementPath } from "../elementPath";
 import {
   valueReadValueTypes,
+  valueReadElementsAdmitting,
   OBSERVATION_VALUE_X_EXCLUDED,
   MODELED_RESOURCE_TYPES,
 } from "../fhirValueModel";
@@ -201,5 +202,67 @@ describe("T3a wiring boundary — allowlisted importers of fhirValueModel", () =
     const dir = join(__dirname, ".."); // packages/crl/src/fhir-model
     expect(existsSync(join(dir, "index.ts"))).toBe(false);
     expect(existsSync(join(dir, "index.tsx"))).toBe(false);
+  });
+});
+
+describe("#189 P2 — the SOURCE carrier lookup (`valueReadElementsAdmitting`)", () => {
+  /**
+   * ⭐ The whole carrier table, pinned per (resource, value type).
+   *
+   * With `value element is` retired on a representation, a source arm no longer receives its element from
+   * the author — it LOOKS ONE UP by asking which modeled element admits the concept's value type. So this
+   * table IS the contract: adding a resource, or a readable element on one, must be a VISIBLE edit here,
+   * because charter §3 rules that an unruled carrier is UNMODELED and is never guessed.
+   */
+  it("pins the complete readable-carrier set", () => {
+    const table: Record<string, string[]> = {};
+    for (const resourceType of [...Object.keys(RESOURCE_EMIT_REGISTRY), "Patient"]) {
+      const hits: string[] = [];
+      for (const valueType of conceptValueTypes) {
+        const admitting = valueReadElementsAdmitting(resourceType, valueType);
+        if (admitting.length > 0) hits.push(`${valueType}->${admitting.join("|")}`);
+      }
+      table[resourceType] = hits;
+    }
+    expect(table).toEqual({
+      // every R4 `Observation.value[x]` variant lands on the one carrier
+      Observation: conceptValueTypes
+        .filter((t) => !OBSERVATION_VALUE_X_EXCLUDED.includes(t))
+        .map((t) => `${t}->value`),
+      // ⭐ TWO readable elements, admitting DISJOINT types — they answer different questions
+      // ("which condition" vs "when did it start"), so the lookup never has a choice to make.
+      Condition: ["CodeableConcept->code", "dateTime->onset"],
+      Procedure: ["CodeableConcept->code"],
+      ServiceRequest: ["CodeableConcept->code"],
+      MedicationRequest: ["CodeableConcept->medication"],
+      // ⚠ Encounter is `caseFeature: false` — refused BEFORE any carrier lookup, so having none is right.
+      Encounter: [],
+      Patient: ["date->birthDate"],
+    });
+  });
+
+  it("⚠ `date` is NOT admitted anywhere a dateTime carrier exists — R4 has no `valueDate`/`onsetDate`", () => {
+    // The same FHIR fact that excludes `date` from `Observation.value[x]` excludes it from
+    // `Condition.onset[x]` (`dateTime|Age|Period|Range|string`). `Patient.birthDate` is a genuine `date`
+    // element, which is why it is the one place `date` resolves.
+    expect(OBSERVATION_VALUE_X_EXCLUDED).toContain("date");
+    expect(valueReadElementsAdmitting("Observation", "date")).toEqual([]);
+    expect(valueReadElementsAdmitting("Condition", "date")).toEqual([]);
+    expect(valueReadElementsAdmitting("Condition", "dateTime")).toEqual(["onset"]);
+    expect(valueReadElementsAdmitting("Patient", "date")).toEqual(["birthDate"]);
+  });
+
+  it("⚠ a boolean concept resolves NO carrier on a valueless resource — its truth is EXISTENCE", () => {
+    // Ruling `code`/`onset` readable does NOT make existence obsolete: `boolean` is admitted by neither, so
+    // a boolean Condition/Procedure concept still reads `exists`. That is the whole corpus today.
+    for (const rt of ["Condition", "Procedure", "ServiceRequest", "MedicationRequest"]) {
+      expect(valueReadElementsAdmitting(rt, "boolean"), rt).toEqual([]);
+    }
+    expect(valueReadElementsAdmitting("Observation", "boolean")).toEqual(["value"]);
+  });
+
+  it("fails closed on an unmodeled resource rather than defaulting to a carrier", () => {
+    expect(valueReadElementsAdmitting("Flurble", "CodeableConcept")).toEqual([]);
+    expect(valueReadElementsAdmitting("ImagingStudy", "dateTime")).toEqual([]);
   });
 });
