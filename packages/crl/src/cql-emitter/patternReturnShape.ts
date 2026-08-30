@@ -91,6 +91,9 @@ export const PATTERN_RETURN_SHAPE: Record<string, PatternReturnShape> = {
   // #189 — the existence projection. One boolean, always: existence is total by construction.
   Exists: "boolean",
   Calculate: "other",
-  Lowest: "other",
-  Highest: "other",
+  // ⭐ #189 — SELECTION patterns: they pick the record at one end of an ordering, exactly as
+  // MostRecent/Earliest do over time. They returned a bare value until the catalog was corrected, which is
+  // why a  concept could not publish the record its shape declares.
+  Lowest: "instance",
+  Highest: "instance",
 };

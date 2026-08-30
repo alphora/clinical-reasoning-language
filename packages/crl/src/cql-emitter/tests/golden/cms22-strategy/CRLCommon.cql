@@ -525,19 +525,34 @@ define function "Calculate"(X Quantity):
 /**
  * Lowest / Highest — return Quantity (the min/max value). Stay as-is.
  */
+/*
+ * ⭐ #189 — Lowest / Highest SELECT A RECORD, not a bare value.
+ *
+ * These returned `Min`/`Max` OVER THE VALUES, so a `shape is Record` concept — `Greatest Weight`,
+ * `definition is highest "Weight Records"` — could not publish the record its shape declares, and the
+ * operator challenged exactly that: "it seems like it should publish an Observation as currently defined."
+ * They now sort by the datum and take the end, which is the same SELECTION `MostRecent`/`Earliest` perform
+ * over a different ordering — and it makes them consistent with those (`PATTERN_RETURN_SHAPE: "instance"`).
+ *
+ * ⚠ Sort ascending, then `Last` (max) / `First` (min): CQL has no `Max`-by-key over a list of resources.
+ * ⚠ Safe to change: `highest`/`lowest` appear ONLY in the goal fixture and NO golden emits
+ * `CRLCommon.Highest`/`Lowest`, so nothing existing moves. (Verified by grep before changing.)
+ * ⚠ A `shape is Scalar` consumer wanting the VALUE is a different realization of the same pattern and is
+ * NOT built — it would need the value read, and no concept declares it today.
+ */
 define function "Lowest"(X List<Observation>):
-  Min((X) O return FHIRHelpers.ToQuantity(O.value as Quantity))
+  First((X) O sort by (value as Quantity).value)
 define function "Lowest"(X List<Observation>, scope Interval<DateTime>):
-  Min((X) O
+  First((X) O
     where (O.effective as Period) during scope
-    return FHIRHelpers.ToQuantity(O.value as Quantity))
+    sort by (value as Quantity).value)
 
 define function "Highest"(X List<Observation>):
-  Max((X) O return FHIRHelpers.ToQuantity(O.value as Quantity))
+  Last((X) O sort by (value as Quantity).value)
 define function "Highest"(X List<Observation>, scope Interval<DateTime>):
-  Max((X) O
+  Last((X) O
     where (O.effective as Period) during scope
-    return FHIRHelpers.ToQuantity(O.value as Quantity))
+    sort by (value as Quantity).value)
 
 /*
  * ⭐ #189 — SINGLE-RECORD value comparators: `<Observation>` overloads.
