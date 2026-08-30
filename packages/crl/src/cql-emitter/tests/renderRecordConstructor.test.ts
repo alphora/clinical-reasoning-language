@@ -116,7 +116,17 @@ describe("renderRecordConstructor", () => {
       if (r.kind !== "resolved") continue;
       const cql = renderRecordConstructor(r.signature);
       expect(cql, rt).not.toContain("Now()");
-      expect(cql, rt).toContain(`${r.signature.recency.sortExpr}: FHIR.dateTime { value: recorded }`);
+      // ⚠ A NESTED recency path constructs its wrappers rather than naming a flat element. This assertion
+      // used to demand the flat spelling for every row — and passed only because Encounter, the one row with
+      // a dotted path, was refused upstream. A test that cannot reach its own case proves nothing.
+      const segments = r.signature.recency.sortExpr.split(".");
+      if (segments.length === 1) {
+        expect(cql, rt).toContain(`${segments[0]}: FHIR.dateTime { value: recorded }`);
+      } else {
+        expect(cql, rt).toContain(`${segments[0]}: FHIR.`);
+        expect(cql, rt).toContain(`${segments[segments.length - 1]}: FHIR.dateTime { value: recorded }`);
+        expect(cql, rt).not.toContain(`${r.signature.recency.sortExpr}:`);
+      }
     }
   });
 

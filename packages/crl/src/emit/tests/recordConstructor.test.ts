@@ -38,11 +38,20 @@ describe("constructorCapability — refusals", () => {
     expect(refusalOf(constructorCapability("Flurble", "Quantity"))).toBe("unsupported-resource");
   });
 
-  it("⭐ refuses a CEL-writer-only row, and the registry says Encounter is one", () => {
-    // The registry marks Encounter `caseFeature: false`, and the definition lane refuses to profile an SD
-    // for it. A constructed record with no case-feature profile to instantiate is incoherent.
-    expect(RESOURCE_EMIT_REGISTRY.Encounter.caseFeature).toBe(false);
-    expect(refusalOf(constructorCapability("Encounter"))).toBe("not-a-case-feature-datum");
+  it("⚠ the CEL-writer-only refusal is now UNREACHABLE from the live registry — exercised synthetically", () => {
+    // Encounter was the only `caseFeature: false` row and it FLIPPED (operator, 2026-08-30), so no live row
+    // reaches this branch. It stays because the flag stays: a future CEL-writer-only row must still be
+    // refused, and a refusal whose diagnostic never executes is asserted rather than tested.
+    expect(
+      Object.values(RESOURCE_EMIT_REGISTRY).every((row) => row.caseFeature),
+      "no live row is caseFeature:false",
+    ).toBe(true);
+    const cap = capabilityFromRow(
+      "Encounter",
+      { ...RESOURCE_EMIT_REGISTRY.Encounter, caseFeature: false },
+      requiredStructuralElements("Encounter") ?? [],
+    );
+    expect(refusalOf(cap)).toBe("not-a-case-feature-datum");
   });
 
   it("⭐ SPELLING ≠ LEGALITY — refuses a value variant the resource does not admit", () => {
@@ -158,8 +167,10 @@ describe("⭐ the WHOLE registry, classified — every row, with its reason", ()
       Procedure: "requires-context",
       ServiceRequest: "requires-context",
       MedicationRequest: "requires-context",
-      // ⭐ CEL-writer-only. Refused BEFORE its dotted `period.start` recency is even reached.
-      Encounter: "impossible:not-a-case-feature-datum",
+      // ⭐ Encounter is a case-feature row now, and its nested recency constructs. `constructible` (not
+      // `requires-context`) because its required elements — status + class — are both `default`; it has no
+      // `wired` subject requirement, though the SIGNATURE still carries a subject like every other.
+      Encounter: "constructible",
     });
   });
 
@@ -280,11 +291,11 @@ describe("resolveConstructor", () => {
   });
 
   it("a refusal travels WITH its reason — it cannot be dropped by taking a different helper", () => {
-    const r = resolveConstructor("Encounter");
+    const r = resolveConstructor("Flurble");
     expect(r.kind).toBe("impossible");
     if (r.kind === "impossible") {
-      expect(r.reason).toBe("not-a-case-feature-datum");
-      expect(r.detail).toContain("caseFeature");
+      expect(r.reason).toBe("unsupported-resource");
+      expect(r.detail).toContain("RESOURCE_EMIT_REGISTRY");
     }
   });
 

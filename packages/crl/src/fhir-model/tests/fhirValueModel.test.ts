@@ -96,8 +96,10 @@ describe("valueReadValueTypes — ∅ (modeled valueless) vs `undefined` (unmode
   });
 
   it("an unmodeled RESOURCE → undefined (no knowledge; never asserts `absent`)", () => {
-    expect(valueReadValueTypes("Encounter", "value")).toBeUndefined();
+    // ⚠ Encounter used to be an example of an UNMODELED resource. It is modeled now (its `type` is a
+    // readable visit code), so the examples must be genuinely unmodeled ones.
     expect(valueReadValueTypes("Immunization", "value")).toBeUndefined();
+    expect(valueReadValueTypes("DiagnosticReport", "value")).toBeUndefined();
   });
 
   it("an unmodeled ELEMENT on a modeled resource → undefined (real R4 element, just not value-read knowledge)", () => {
@@ -235,8 +237,8 @@ describe("#189 P2 — the SOURCE carrier lookup (`valueReadElementsAdmitting`)",
       Procedure: ["CodeableConcept->code"],
       ServiceRequest: ["CodeableConcept->code"],
       MedicationRequest: ["CodeableConcept->medication"],
-      // ⚠ Encounter is `caseFeature: false` — refused BEFORE any carrier lookup, so having none is right.
-      Encounter: [],
+        // ⭐ Encounter is a case-feature row now; `type` is its readable visit code.
+      Encounter: ["CodeableConcept->type"],
       Patient: ["date->birthDate"],
     });
   });

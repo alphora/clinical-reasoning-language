@@ -44,6 +44,9 @@ describe("T2 write-name resolvers — resource-keyed matrix (the per-cell pin)",
     Procedure: { coding: "code", stamp: "performedDateTime" },
     ServiceRequest: { coding: "code", stamp: "authoredOn" },
     MedicationRequest: { coding: "medicationCodeableConcept", stamp: "authoredOn" },
+    // ⚠ Encounter has NO flat stamp — its `period.start` is nested and is written by `applyDateField`
+    // (`period -> { start: iso }`), not by the flat-name resolver. Pinned as an ERROR below, not here.
+    Encounter: { coding: "type", stamp: "" },
   };
 
   it("EXPECTED covers exactly the registry rows — a new row cannot ship without a pinned name pair", () => {
@@ -54,12 +57,15 @@ describe("T2 write-name resolvers — resource-keyed matrix (the per-cell pin)",
   });
 
   for (const [resourceType, expected] of Object.entries(EXPECTED)) {
-    it(`${resourceType} → coding \`${expected.coding}\`, recency stamp \`${expected.stamp}\``, () => {
+    it(`${resourceType} → coding \`${expected.coding}\`, recency stamp \`${expected.stamp || "(nested)"}\``, () => {
       const row = RESOURCE_EMIT_REGISTRY[resourceType];
       expect(row, `${resourceType} must be a registry row`).toBeDefined();
       expect(codingJsonName(row.coding)).toBe(expected.coding);
       const stamp = recencyStampJsonName(row.recency);
-      expect(stamp, JSON.stringify(stamp)).toEqual({ jsonName: expected.stamp });
+      // An EMPTY pinned stamp means the row's recency is NESTED, so it has no flat JSON name by design and
+      // the resolver returns a typed error — `applyDateField` writes it (`Encounter -> period`).
+      if (expected.stamp === "") expect(stamp, JSON.stringify(stamp)).toHaveProperty("errorKind");
+      else expect(stamp, JSON.stringify(stamp)).toEqual({ jsonName: expected.stamp });
     });
   }
 
@@ -69,7 +75,16 @@ describe("T2 write-name resolvers — resource-keyed matrix (the per-cell pin)",
     for (const [resourceType, row] of Object.entries(RESOURCE_EMIT_REGISTRY)) {
       if (!row.caseFeature) continue;
       expect(typeof codingJsonName(row.coding), resourceType).toBe("string");
-      expect(recencyStampJsonName(row.recency), resourceType).toHaveProperty("jsonName");
+      // ⚠ A recency stamp resolves to a FLAT JSON name only for a flat path. A NESTED one
+      // (`Encounter.period.start`) is deliberately OUT of this resolver's contract — it cannot be spelled as
+      // one key — and is written by `applyDateField` instead (`Encounter -> period`, `{ start: iso }`). The
+      // resolver returns a typed ERROR rather than undefined, so a future consumer fails closed.
+      const stamp = recencyStampJsonName(row.recency);
+      if (row.recency.sortExpr.includes(".")) {
+        expect(stamp, resourceType).toHaveProperty("errorKind");
+      } else {
+        expect(stamp, resourceType).toHaveProperty("jsonName");
+      }
     }
   });
 });
@@ -122,12 +137,20 @@ describe("#189 2d — caseFeatureProfileShape (SD-model spelling, the THIRD spel
   // The SD-element model spelling per row — distinct from BOTH the JSON write name (`effectiveDateTime`) and the
   // CQL read (`effective`). A choice element keeps its `[x]`; a plain element is itself. Keyed by resourceType so
   // a row mutation fails the pin (same discipline as the T2 matrix above).
+  // ⭐ The SD derives from QI-CORE, not base FHIR (operator, 2026-08-30). The CEL instance lane already
+  // stamped `qicoreBaseProfile(...)` on the records it writes, so a base-FHIR SD meant the two lanes
+  // disagreed about the base a case-feature record conforms to. Deriving from QI-Core also makes `subject`
+  // a requirement OF THE BASE rather than something the D6 parity diff had to discover.
   const EXPECTED_MODEL: Record<string, { coding: string; recency: string; base: string }> = {
-    Observation: { coding: "code", recency: "effective[x]", base: "http://hl7.org/fhir/StructureDefinition/Observation" },
-    Condition: { coding: "code", recency: "recordedDate", base: "http://hl7.org/fhir/StructureDefinition/Condition" },
-    Procedure: { coding: "code", recency: "performed[x]", base: "http://hl7.org/fhir/StructureDefinition/Procedure" },
-    ServiceRequest: { coding: "code", recency: "authoredOn", base: "http://hl7.org/fhir/StructureDefinition/ServiceRequest" },
-    MedicationRequest: { coding: "medication[x]", recency: "authoredOn", base: "http://hl7.org/fhir/StructureDefinition/MedicationRequest" },
+    Observation: { coding: "code", recency: "effective[x]", base: "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-simple-observation" },
+    Condition: { coding: "code", recency: "recordedDate", base: "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-condition-problems-health-concerns" },
+    Procedure: { coding: "code", recency: "performed[x]", base: "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-procedure" },
+    ServiceRequest: { coding: "code", recency: "authoredOn", base: "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-servicerequest" },
+    MedicationRequest: { coding: "medication[x]", recency: "authoredOn", base: "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-medicationrequest" },
+    // ⭐ Encounter joined the case-feature rows (operator, 2026-08-30). Its coding is the `type[]` ARRAY and
+    // its recency is the NESTED `period.start` — both measured to construct and round-trip in CQL. The dotted
+    // recency is unspellable as a flat JSON name, which is the instance-WRITE lane's problem, not the SD's.
+    Encounter: { coding: "type", recency: "period.start", base: "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-encounter" },
   };
 
   it("EXPECTED_MODEL covers exactly the registry rows (a new row cannot ship without its SD-model pin)", () => {
@@ -145,6 +168,16 @@ describe("#189 2d — caseFeatureProfileShape (SD-model spelling, the THIRD spel
     });
   }
 
+  it("⚠ the SD base MATCHES what the CEL instance lane stamps — one base, both lanes", () => {
+    // The inconsistency this closes: the writer stamped QI-Core on instances while the SD derived from base
+    // FHIR. Asserting them EQUAL is what keeps them from drifting apart again.
+    for (const resourceType of CASE_FEATURE_ROWS) {
+      expect(caseFeatureProfileShape(resourceType)!.baseDefinition, resourceType).toBe(
+        qicoreBaseProfile(resourceType),
+      );
+    }
+  });
+
   it("valueless-existence (no value datum) → NO value element", () => {
     const shape = caseFeatureProfileShape("Condition");
     expect(shape!.value).toBeUndefined();
@@ -161,7 +194,9 @@ describe("#189 2d — caseFeatureProfileShape (SD-model spelling, the THIRD spel
   });
 
   it("fail-closed: an unlisted resource → undefined (caller emits unsupported-casefeature-resource)", () => {
-    expect(caseFeatureProfileShape("Encounter")).toBeUndefined();
+    // ⚠ Encounter used to be the example here. It is now a case-feature row, so the example had to become a
+    // genuinely unlisted resource — using a DEFERRED row to demonstrate "unlisted" conflated two things.
+    expect(caseFeatureProfileShape("Immunization")).toBeUndefined();
     expect(caseFeatureProfileShape("DiagnosticReport", { valueElement: "value", datumValueType: "boolean" })).toBeUndefined();
   });
 });
@@ -257,10 +292,10 @@ describe("#189 CEL-writer T2 — coding PLACEMENT + the Encounter (caseFeature:f
     expect(codingJsonName({ kind: "codeable-concept-array", field: "type" })).toBe("type");
   });
 
-  it("the Encounter row is CEL-writer-only: caseFeature:false, type[] coding, valueless", () => {
+  it("the Encounter row is a CASE-FEATURE row: caseFeature:true, type[] coding, valueless", () => {
     const enc = RESOURCE_EMIT_REGISTRY.Encounter;
     expect(enc).toBeDefined();
-    expect(enc.caseFeature).toBe(false);
+    expect(enc.caseFeature).toBe(true);
     expect(enc.coding).toEqual({ kind: "codeable-concept-array", field: "type" });
     expect(enc.valueless).toBe(true);
   });
@@ -275,11 +310,19 @@ describe("#189 CEL-writer T2 — coding PLACEMENT + the Encounter (caseFeature:f
     );
   });
 
-  it("A′ gate: caseFeatureProfileShape returns undefined for a caseFeature:false row (Encounter)", () => {
-    // Encounter is emitted by the CEL writer but is NEVER a case-feature datum — the definition lane must not
-    // profile an SD for it, even though it has a registry row.
-    expect(caseFeatureProfileShape("Encounter")).toBeUndefined();
-    // a caseFeature:true row still profiles.
+  it("A′ gate: caseFeatureProfileShape returns undefined for any caseFeature:false row", () => {
+    // ⭐ Encounter was the ONLY `caseFeature: false` row, and it flipped to `true` (operator, 2026-08-30) —
+    // its exclusion was an empirical deferral ("no case-feature has `type is Encounter`"), not a category
+    // rule, and both mechanics it was assumed to lack were measured to work.
+    //
+    // So the GATE is still pinned, but generically: whatever rows are `caseFeature: false` profile no SD, and
+    // every `true` row does. Pinning it against one named resource is what let the gate and the reason for
+    // the gate drift apart.
+    for (const [resourceType, row] of Object.entries(RESOURCE_EMIT_REGISTRY)) {
+      const shape = caseFeatureProfileShape(resourceType);
+      if (row.caseFeature) expect(shape, `${resourceType} profiles`).toBeDefined();
+      else expect(shape, `${resourceType} does NOT profile`).toBeUndefined();
+    }
     expect(caseFeatureProfileShape("Condition")).toBeDefined();
   });
 
@@ -438,10 +481,12 @@ describe("case-feature-emittable set ↔ registry caseFeature flags (lane-neutra
     expect([...CASE_FEATURE_EMITTABLE_TYPES].sort()).toEqual([...registryCaseFeatureTypes].sort());
   });
 
-  it("Encounter (caseFeature: false) is a registry row but NOT in the neutral set", () => {
-    expect(RESOURCE_EMIT_REGISTRY.Encounter).toBeDefined();
-    expect(RESOURCE_EMIT_REGISTRY.Encounter.caseFeature).toBe(false);
-    expect(CASE_FEATURE_EMITTABLE_TYPES.has("Encounter")).toBe(false);
+  it("⭐ Encounter is in BOTH the registry and the neutral set — the flip moved them together", () => {
+    // The two representations exist because an enforced import boundary stops them sharing code, so a flag
+    // flip that moved only one would put validate and emit into silent disagreement. That is the whole
+    // reason this bridge test exists.
+    expect(RESOURCE_EMIT_REGISTRY.Encounter.caseFeature).toBe(true);
+    expect(CASE_FEATURE_EMITTABLE_TYPES.has("Encounter")).toBe(true);
   });
 });
 

@@ -66,14 +66,31 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     expect(r.recordsDefineId).toBe("Screen Positive Records");
   });
 
-  it("Encounter (no registry row) → unsupported-resource (NOT re-hacked to Observation)", () => {
+  it("⭐ Encounter resolves to a RECORD — it is a case-feature row now", () => {
+    // ⚠ This case was titled "Encounter (no registry row)", which was never true: Encounter always HAD a row,
+    // it was `caseFeature: false` — a CEL-writer-only ambient datum. That flag FLIPPED (operator,
+    // 2026-08-30) after both mechanics it was assumed to lack (`type[]` array coding, nested `period.start`
+    // recency) were MEASURED to construct and round-trip in CQL.
     const r = resolve(
       `concept "Enc":\n- type is Encounter.\n- value type is boolean.\n- code is \`enc\`.\n- definition is exists this.\n`,
       "Enc",
     );
+    expect(r.kind).toBe("record");
+    if (r.kind !== "record") return;
+    expect(r.descriptor.resourceType).toBe("Encounter");
+    expect(r.recordsDefineId).toBe("Enc Records");
+  });
+
+  it("a resource with NO registry row → unsupported-resource (NOT re-hacked to Observation)", () => {
+    // The point the Encounter case used to carry, now made by a genuinely unlisted resource: an unmodeled
+    // type fails closed rather than being coerced into an Observation, which is the hack #189 removes.
+    const r = resolve(
+      `concept "G":\n- type is Goal.\n- value type is boolean.\n- code is \`g\`.\n- definition is exists this.\n`,
+      "G",
+    );
     expect(r.kind).toBe("unsupported-resource");
     if (r.kind !== "unsupported-resource") return;
-    expect(r.resourceType).toBe("Encounter");
+    expect(r.resourceType).toBe("Goal");
   });
 
   it("bare-scalar `code is` (no reduction — the legacy/pre-migration form) → not-a-record (must be re-authored)", () => {

@@ -44,7 +44,7 @@
   "kind": "resource",
   "abstract": false,
   "type": "MedicationRequest",
-  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/MedicationRequest",
+  "baseDefinition": "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-medicationrequest",
   "derivation": "constraint",
   "differential": {
     "element": [

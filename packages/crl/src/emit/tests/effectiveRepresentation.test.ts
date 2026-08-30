@@ -320,9 +320,14 @@ describe("deriveEffectiveRepresentations — source arms, deferral, pure-derived
 });
 
 describe("deriveEffectiveRepresentations — fail-closed errors", () => {
-  it("a CEL-writer-only row (Encounter, caseFeature:false) → error{unsupported-resource} — the A′ deriver gate", () => {
-    // The deriver is a DEFINITION-lane consumer: Encounter HAS a registry row (the CEL writer emits it) but
-    // `caseFeature: false`, so it derives no case-feature descriptor. Distinct branch from a no-row resource.
+  it("⭐ Encounter now DERIVES — the A′ gate no longer excludes it", () => {
+    // Encounter was the standing example of a CEL-writer-only row the definition lane refused. That flag
+    // FLIPPED (operator, 2026-08-30): it was an empirical deferral ("no case-feature has `type is
+    // Encounter`"), and both mechanics it was assumed to lack — `type[]` array coding and nested
+    // `period.start` recency — were MEASURED to construct and round-trip.
+    //
+    // The A′ GATE is still live and still tested (`resourceEmitRegistry.test.ts`: every `caseFeature: false`
+    // row profiles no SD). What changed is that no LIVE row sits on the false side.
     const out = deriveEffectiveRepresentations(
       concept(
         `library "T".\nconcept "Enc":\n- type is Encounter.\n- value type is boolean.\n- code is \`enc\`.\n- definition is exists this.\n`,
@@ -330,10 +335,10 @@ describe("deriveEffectiveRepresentations — fail-closed errors", () => {
       ),
       OWNING,
     );
-    expect(out.status).toBe("error");
-    if (out.status === "error") {
-      expect(out.error.kind).toBe("unsupported-resource");
-      expect(out.error.detail).toContain("CEL-writer-only");
+    expect(out.status).toBe("derived");
+    if (out.status === "derived") {
+      expect(out.descriptors.map((d) => d.arm)).toEqual(["local-exact"]);
+      expect(out.descriptors[0].resourceType).toBe("Encounter");
     }
   });
 

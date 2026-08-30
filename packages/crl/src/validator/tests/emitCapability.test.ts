@@ -47,11 +47,24 @@ describe("EmitCapabilityValidator (#189 disc 495 Q6) — emit-capability WARNING
     }
   });
 
-  it("warns on Encounter — a CEL-writer-only row (caseFeature:false) is not a case-feature datum", () => {
+  it("⭐ does NOT warn on Encounter — it is a case-feature datum now", () => {
+    // Encounter was the standing example of a CEL-writer-only row the VALIDATE lane warned about. The flag
+    // flipped (operator, 2026-08-30), and the lane-neutral set moved WITH it — which is the whole point of
+    // the bridge test: validate and emit must not disagree about what is emittable.
     expect(
       emitCapWarnings(
         `library "T".\nconcept "Visit":\n- type is Encounter.\n- value type is boolean.\n- code is \`visit\`.\n`,
         "Visit",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("still warns on a type that backs NO case-feature datum", () => {
+    // The warning itself is live and must stay reachable — an unlisted resource is what exercises it now.
+    expect(
+      emitCapWarnings(
+        `library "T".\nconcept "Aim":\n- type is Goal.\n- value type is boolean.\n- code is \`aim\`.\n`,
+        "Aim",
       ),
     ).toHaveLength(1);
   });

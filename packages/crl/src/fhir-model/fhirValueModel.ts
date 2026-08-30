@@ -105,6 +105,14 @@ const FHIR_VALUE_READ_MODEL: Readonly<
     // guarded in `computeLocalDatum`, not here — this model states the honest FHIR fact that SR.code admits CC.)
     code: new Set<ConceptValueType>(["CodeableConcept"]),
   },
+  Encounter: {
+    value: new Set<ConceptValueType>(), // ∅ — no `Encounter.value[x]`
+    // ⭐ RULED (operator, 2026-08-30): WHICH visit, as a code. `Encounter.type` — R4 Encounter has NO
+    // `.code`, so `type` is both the retrieve coding and the datum, the same coincidence
+    // `ServiceRequest.code` has. It is a REPEATING element (`type[]`), which the coding side already models
+    // as `codeable-concept-array`; a value READ takes the coded visit type.
+    type: new Set<ConceptValueType>(["CodeableConcept"]),
+  },
   MedicationRequest: {
     value: new Set<ConceptValueType>(), // ∅ — the standard `value` carrier is modeled-valueless
     // #189 P2 — the SOURCE datum read: WHICH medication was requested. `medication[x]` is a CHOICE

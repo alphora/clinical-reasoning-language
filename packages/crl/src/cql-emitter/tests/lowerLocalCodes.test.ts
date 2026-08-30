@@ -548,10 +548,20 @@ concept "C":
     expect(
       kinds("- type is Observation.\n- code is `c`.\n- definition is most recent this."),
     ).toContain("emit-reduction-shape-incoherent");
-    // Unsupported resource (Encounter is not a registry row) → `unsupported-resource` (no exists-this prompt).
+    // ⭐ Encounter now fails for the RIGHT reason. The comment here used to say "Encounter is not a registry
+    // row", which was never true — it always had a row, with `caseFeature: false`. So a boolean `most recent
+    // this` on it reported `unsupported-resource`, blaming the resource for what is really a value-read
+    // problem. With the flag flipped it reports `value-read-valueless`: Encounter HAS no value element, so a
+    // value-reading reduction is the wrong construct and the diagnostic says to author `exists this`.
     const enc = run("- type is Encounter.\n- value type is boolean.\n- code is `c`.\n- definition is most recent this.");
-    expect(enc.errors.map((e) => e.kind)).toContain("unsupported-resource");
-    expect(enc.errors.every((e) => !/exists this/.test(e.message ?? ""))).toBe(true);
+    expect(enc.errors.map((e) => e.kind)).toContain("value-read-valueless");
+    expect(enc.errors.some((e) => /exists this/.test(e.message ?? ""))).toBe(true);
+
+    // A genuinely unlisted resource still reports `unsupported-resource`, with NO exists-this prompt —
+    // nothing is known about it, so suggesting a reduction would be a guess.
+    const goal = run("- type is Goal.\n- value type is boolean.\n- code is `g`.\n- definition is most recent this.");
+    expect(goal.errors.map((e) => e.kind)).toContain("unsupported-resource");
+    expect(goal.errors.every((e) => !/exists this/.test(e.message ?? ""))).toBe(true);
   });
 
   it("#189 Slice B2a — a rejected `most recent this` leaves NO dedup residue for a later valid concept reusing the name/code shape", () => {

@@ -130,9 +130,21 @@ export const RESOURCE_EMIT_REGISTRY: Readonly<Record<string, ResourceEmitRow>> =
   // dotted path) are never reached for Encounter (caseFeature-gated off the definition lane).
   Encounter: {
     coding: { kind: "codeable-concept-array", field: "type" }, // Encounter.type[] — a visit code, NOT `.code`
-    recency: { sortExpr: "period.start", cast: "none" }, // nested Period; consumed at T4, not by T2 coding
+    recency: { sortExpr: "period.start", cast: "none" }, // nested Period — CONSTRUCTED, see below
     valueless: true,
-    caseFeature: false,
+    // ⭐ FLIPPED to `true` (operator, 2026-08-30: "we should be able to create an Encounter CF"). This row
+    // was CEL-writer-only on the stated grounds that "no case-feature has `type is Encounter`" — an
+    // EMPIRICAL claim about the corpus, which the same comment called "the intended one-line reversibility,
+    // NOT a category impossibility". It was a deferral, and deferral is a technique, not law.
+    //
+    // The two mechanics it was assumed to lack were MEASURED to work (design §12): the `type[]` ARRAY coding
+    // round-trips as `type: { code }`, and the nested `period.start` recency CONSTRUCTS as
+    // `period: FHIR.Period { start: … }` — and sorts on `period.start.value`.
+    //
+    // ⚠ The dotted path is still unspellable as a FLAT JSON name, so `recencyStampJsonName` rightly refuses
+    // it. That is the instance-WRITE lane, a different question from constructing the nesting in CQL;
+    // conflating the two is what made this row look categorically impossible.
+    caseFeature: true,
   },
 };
 
@@ -546,9 +558,26 @@ export function caseFeatureProfileShape(
   // A′ gate (#189 CEL-writer T2, disc 486): a CEL-writer-only row (`caseFeature: false`, e.g. Encounter) is never
   // a case-feature datum — the definition lane must NOT profile an SD for it, even though the CEL writer emits it.
   if (!row.caseFeature) return undefined;
+  // ⭐ THE CASE-FEATURE SD DERIVES FROM QI-CORE (operator, 2026-08-30), not from base FHIR.
+  //
+  // This used to hardcode `http://hl7.org/fhir/StructureDefinition/<Resource>` while the CEL INSTANCE lane
+  // stamped `qicoreBaseProfile(...)` on the records it writes (`cel/emitter/emitFhir.ts`). So a written
+  // instance claimed QI-Core conformance against a case-feature SD derived from base FHIR — the two lanes
+  // disagreeing about the base, which is the same class of lane-inconsistency the D6 parity invariant
+  // exists to catch (it caught the `subject` half; this is the other half).
+  //
+  // ⭐ It also makes an obligation STRUCTURAL that was previously discovered by accident: QI-Core requires
+  // `subject` on a Condition, so a case-feature record without one is non-conformant BY THE BASE. That was
+  // found this morning by diffing the two lanes and fixed from `subjectElementPath`; deriving from QI-Core
+  // is why it should never have needed finding.
+  //
+  // ⚠ FAILS CLOSED on an unmapped resource rather than falling back to base FHIR: a silent fallback would
+  // reintroduce exactly the split this removes. Every `caseFeature: true` row is mapped today.
+  const base = qicoreBaseProfile(resourceType);
+  if (base === undefined) return undefined;
   return {
     resourceType,
-    baseDefinition: `http://hl7.org/fhir/StructureDefinition/${resourceType}`,
+    baseDefinition: base,
     codingElementPath: codingElementModelPath(row.coding),
     recencyElementPath: recencyElementModelPath(row.recency),
     subjectElementPath: "subject",

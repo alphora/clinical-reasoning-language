@@ -44,7 +44,7 @@
   "kind": "resource",
   "abstract": false,
   "type": "Observation",
-  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Observation",
+  "baseDefinition": "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-simple-observation",
   "derivation": "constraint",
   "differential": {
     "element": [
