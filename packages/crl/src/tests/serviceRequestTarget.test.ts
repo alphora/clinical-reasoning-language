@@ -55,11 +55,15 @@ const MUST_PRODUCE: Record<string, readonly string[]> = {
  * branch. A pause row's correct answer is that NO branch fires, so writing it in CEL means asserting the
  * collapse the fixture exists to catch.
  *
- * ⚠ `fixtures/obesity/cases.cel` DOES assert it — `case "obese unanswered -> no recommendation"` carries
- * `result is … is "Approve Bariatric Surgery"`. Name and assertion contradict each other. That is a
- * pre-existing defect in a ratified oracle, NOT copied here.
+ * ⚠ THE BOUNDARY IS PERMANENT, NOT A GAP. CEL is Case EXAMPLE Language: a case exemplifies what a decision
+ * DOES, and an absence cannot be exemplified. There is no pause form and there will not be one — pause
+ * testing is what THIS file is for.
  *
- * These rows are recorded here and owned by `$apply` until CEL gains a pause form.
+ * ⚠ `fixtures/obesity/cases.cel` carries the same consequence — `case "obese unanswered -> no
+ * recommendation"` asserts `"Approve Bariatric Surgery"`, so its name and its assertion disagree. That is a
+ * known effect of the boundary and the OPERATOR'S CALL, not a defect to go fix.
+ *
+ * These rows are recorded here; `$apply` owns their execution.
  */
 const OWED_PAUSE_ROWS: readonly string[] = [
   "no ServiceRequest at all -> no recommendation",

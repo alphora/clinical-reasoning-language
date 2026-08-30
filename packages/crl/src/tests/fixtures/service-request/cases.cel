@@ -70,12 +70,15 @@ case "request is a different service -> deny":
 //   `case "obese unanswered -> no recommendation": - result is … is "Approve Bariatric Surgery".`
 // — a case whose NAME says no recommendation and whose ASSERTION says Approve.
 //
+// ⚠ THIS IS A PERMANENT BOUNDARY, NOT A GAP TO CLOSE. CEL is Case EXAMPLE Language: a case exemplifies what
+// a decision DOES, and you cannot exemplify an absence. There is no pause form and there will not be one —
+// pause testing is what our tests are for.
+//
 // So the pause rows live where they can be stated truthfully: `MUST_PRODUCE` in
-// `tests/serviceRequestTarget.test.ts` records them as `[]`, and `$apply` owns their execution. The two
+// `tests/serviceRequestTarget.test.ts` records them as `[]`, and `$apply` owns their EXECUTION. The two
 // pause rows this fixture owes are:
 //     no ServiceRequest at all              -> no recommendation
 //     a ServiceRequest carrying NO code     -> no recommendation
-// Adding a CEL pause form (`result is "D" pauses.`) is the language work that would let them come home.
 
 // ── The asserted arm, and its recency merge with the recorded one ──────────────────────────────
 
