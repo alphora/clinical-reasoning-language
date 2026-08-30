@@ -145,12 +145,38 @@ describe("ServiceRequest membership target — fixtures/service-request", () => 
     expect(runFixture().map((r) => r.case).sort()).toEqual(Object.keys(MUST_PRODUCE).sort());
   });
 
-  it("⚠ TODAY the CRE cannot evaluate the merge, so every run is a LOUD error (not a wrong answer)", () => {
-    // The CRE refuses `most recent this` rather than fabricating a presence-based answer. That refusal is
-    // CORRECT behaviour for a gap; what must change is the gap, not the refusal.
+  it("⭐ the CRE now EVALUATES this family — the blanket refusal is gone, and what it produces is pinned", () => {
+    // ⚠ WAS: "every run is a LOUD error", pinned as correct-behaviour-for-a-gap. The gap closed. The CRE
+    // keys the refusal on the RESOLVED PROGRAM now, so `most recent this` is decided from the candidate
+    // collection whenever the case makes it decidable (zero candidates → unknown; agreeing candidates →
+    // that value; disagreement or an uncomputable contributor → a refusal that still says so loudly).
+    //
+    // ⚠ PIN WHAT IS PRODUCED, per case — a blanket `[]` would be satisfied by a regression back to refusal,
+    // since a refusal DISCARDS `produced`.
     const runs = runFixture();
-    expect(runs.map((r) => r.status)).toEqual(runs.map(() => "error"));
-    for (const r of runs) expect(r.produced ?? []).toEqual([]); // ⚠ must become MUST_PRODUCE[r.case]
+    const byCase = Object.fromEntries(
+      runs.map((r) => [r.case!, { status: r.status, produced: (r.produced ?? []).map((p) => p.recommendation) }]),
+    );
+    // ⚠ EXPLICIT, NOT A SNAPSHOT. A snapshot would record all five rows as equally "current", hiding which
+    // ones MEET `MUST_PRODUCE` and which are still owed — and an oracle fixture that cannot tell progress
+    // from regression is worthless. Each row says which it is.
+    expect(byCase).toEqual({
+      // ⭐ THREE ROWS NOW MEET THE CRITERION.
+      "answered yes, no request -> approve": { status: "pass", produced: [APPROVE] },
+      "answered no, no request -> deny": { status: "pass", produced: [DENY] },
+      "request is the covered service -> approve": { status: "pass", produced: [APPROVE] },
+
+      // ⚠ OWED — an HONEST refusal, not a wrong answer. A covered request (source arm -> true) and a newer
+      // local answer of false are two DISAGREEING candidates, and picking the newest needs the emitted
+      // date+id sort the CRE deliberately does not replicate. ⚠ must become `{ pass, [DENY] }`.
+      "request covered but newer answer says no -> deny": { status: "error", produced: [] },
+
+      // ⚠ OWED — THE DEFECT THIS FIXTURE EXISTS TO CATCH, unchanged by this slice. The `coded from` retrieve
+      // is FILTERED, so a non-member ServiceRequest never reaches the concept and leaves the same empty
+      // evidence as no request at all. `matches this` needs the UNFILTERED retrieve to judge it.
+      // ⚠ must become `{ pass, [DENY] }`.
+      "request is a different service -> deny": { status: "fail", produced: [] },
+    });
   });
 
   it("the ServiceRequest lane is ALIVE — a covered request DOES reach the concept", () => {
@@ -180,10 +206,12 @@ describe("ServiceRequest membership target — fixtures/service-request", () => 
     //     expect(wrongCode).toEqual({ satisfied: false, facts: ["Other Service Request"] });
   });
 
-  it("⚠ a STATED false is presence-satisfied today — the same defect the obesity target carries", () => {
+  it("⭐ a STATED false now reads FALSE — the defect the obesity target carried is gone here too", () => {
+    // ⚠ WAS `satisfied: true` (⚠ must become false). The guard used to read PRESENCE — the fact exists, so
+    // the concept read true REGARDLESS of its `value is false`, and a stated denial approved. The CRE now
+    // evaluates this family off the CANDIDATE COLLECTION and reads the candidate's boolean value.
     const runs = runFixture();
     const answeredNo = guardTrace(runs.find((r) => r.case!.includes("answered no"))!);
-    // The fact exists, so the guard reads satisfied REGARDLESS of its `value is false`.
-    expect(answeredNo).toEqual({ satisfied: true, facts: ["Answered No"] }); // ⚠ must become satisfied: false
+    expect(answeredNo).toEqual({ satisfied: false, facts: ["Answered No"] });
   });
 });

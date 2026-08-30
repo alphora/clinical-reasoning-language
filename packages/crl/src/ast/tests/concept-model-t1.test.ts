@@ -415,7 +415,15 @@ case "some":
     const [run] = runCel(graph).runs;
     expect(run).toBeDefined();
     expect(run.status).toBe("error");
-    expect(run.diagnostics.some((d) => /count.*reduction.*is not evaluated/i.test(d))).toBe(true);
+    // ⚠ WORDING MOVED (#189 P2, 2026-08-30) and the behaviour did NOT: the refusal is now keyed on the
+    // RESOLVED PROGRAM rather than the AST node kind, so it reads `count`'s reason off the resolver
+    // (`reduction-unrepresentable` — the threshold has no canonical arg yet) instead of restating the node
+    // kind. Still an error, still never a fabricated presence answer, and it now catches the NARRATIVE
+    // spelling too, which the node-kind test walked straight past.
+    expect(run.diagnostics.some((d) => /reduction concept .* is not evaluated by run_decision/i.test(d))).toBe(
+      true,
+    );
+    expect(run.diagnostics.some((d) => /count/i.test(d))).toBe(true);
   });
 
   it("run_decision — a SATISFIED `defined as exists` guard (a record present) → true → Approve (#270 Slice 0a-cre positive twin)", () => {

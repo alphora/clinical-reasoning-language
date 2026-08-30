@@ -56,24 +56,6 @@ const MUST_PRODUCE: Record<string, readonly string[]> = {
   "obese unanswered -> no recommendation": [],
 };
 
-/**
- * What the CRE produces TODAY. ⚠ Two of three rows are WRONG, identically under EVERY authoring option —
- * which is itself the finding: the defect is in how a locally-coded concept is READ, not in either shape
- * model, so one fix closes both.
- *
- *   stated FALSE  the CRE PRESENCE-satisfies the assertion — the fact exists, so `Obese` reads true whatever
- *                 its value — and APPROVES. A stated false denied is the only legitimate route to a Deny, so
- *                 this is the row that matters most. (Same shape as the Option C fix for `defined as exists`
- *                 interfaces, disc 512; these concepts are `code is` + `definition is`, a different arm.)
- *   UNANSWERED    absence reads closed-world false, so the `otherwise` fires and produces a DENY. That is the
- *                 #189 defect itself, reaching the target chain: a Deny tracing to an absence, not an answer.
- */
-const PRODUCES_TODAY: Record<string, readonly string[]> = {
-  "obese stated true -> approve": ["Approve Bariatric Surgery"], // already correct
-  "obese stated false -> deny": ["Approve Bariatric Surgery"], // ⚠ must become ["Deny Bariatric Surgery"]
-  "obese unanswered -> no recommendation": ["Deny Bariatric Surgery"], // ⚠ must become []
-};
-
 interface AuthoringOption {
   readonly name: string;
   readonly policy: string;
@@ -102,7 +84,6 @@ interface AuthoringOption {
    */
   readonly validatesCleanToday: boolean;
   /** What the CRE produces TODAY, per case. ⚠ The Layered option differs — see its entry. */
-  readonly producesToday: Record<string, readonly string[]>;
   /** The emit error kind that blocks this option today. */
   readonly emitBlocker: string;
   /**
@@ -119,7 +100,6 @@ const OPTIONS: readonly AuthoringOption[] = [
     cases: path.join(FIXTURE, "cases.cel"),
     singleValuedTargets: ["Obese", "BMI", "Height", "Weight"],
     validatesCleanToday: true,
-    producesToday: PRODUCES_TODAY,
     emitBlocker: "emit-mixed-code-and-definition",
     reachableQuestions: ["Obese", "BMI", "Weight", "Height"],
   },
@@ -129,7 +109,6 @@ const OPTIONS: readonly AuthoringOption[] = [
     cases: path.join(FIXTURE, "cases-recordset.cel"),
     singleValuedTargets: ["Obese"],
     validatesCleanToday: true,
-    producesToday: PRODUCES_TODAY,
     emitBlocker: "emit-mixed-code-and-definition",
     reachableQuestions: ["Obese", "BMI", "Weight", "Height"],
   },
@@ -155,7 +134,6 @@ const OPTIONS: readonly AuthoringOption[] = [
     // back, this option's CRE rows match the other two and its emit blocker becomes the same one.
     singleValuedTargets: ["Greatest Weight", "BMI", "Obese"],
     validatesCleanToday: true,
-    producesToday: PRODUCES_TODAY,
     emitBlocker: "emit-mixed-code-and-definition",
     // ⭐ Four, reached THROUGH the uncoded reductions: Obese -> BMI -> Most Recent Weight/Height ->
     // Weight/Height Records. The intermediates carry no code so they offer no question, but the walk
@@ -215,20 +193,37 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
         expect([...new Set((v.warnings ?? []).map((w) => w.kind))]).toEqual(["reduction-shape"]);
       });
 
-      it("CRE — the truth table. ⚠ TWO ROWS FAIL; the expectation is the TARGET, not the behaviour", () => {
+      it("⭐ CRE — the truth table. ALL THREE ROWS now meet the acceptance criterion", () => {
+        // ⭐⭐ THE ROWS MOVED TO `MUST_PRODUCE` (2026-08-30, #189 P2). They were pinned to a wrong
+        // a wrong status-quo pin because the CRE presence-satisfied a locally-coded concept — a stated FALSE read
+        // true (the fact exists) and APPROVED, and an unanswered one read closed-world false and DENIED.
+        // Both are gone: the CRE now evaluates the pipeline family off the CANDIDATE COLLECTION rather than
+        // OR-ing a presence arm with a composition arm.
         const result = runCel(resolveCelImports(opt.cases)) as unknown as {
           success: boolean;
-          runs?: { case: string; produced?: { recommendation: string }[] }[];
+          runs?: {
+            case: string;
+            status?: string;
+            produced?: { recommendation: string }[];
+            diagnostics?: string[];
+          }[];
         };
         expect(result.success).toBe(true);
         for (const [name, mustProduce] of Object.entries(MUST_PRODUCE)) {
-          const produced =
-            (result.runs ?? []).find((r) => r.case === name)?.produced?.map((p) => p.recommendation) ?? [];
-          const today = opt.producesToday[name]!;
-          // Assert TODAY's value so a regression is caught, and say what it must become. When a fix lands,
-          // this line moves to `mustProduce` — a deliberate, visible edit.
-          const why = opt.name + " / " + name + " — must become " + JSON.stringify(mustProduce);
-          expect(produced, why).toEqual([...today]);
+          const run = (result.runs ?? []).find((r) => r.case === name);
+          const produced = run?.produced?.map((p) => p.recommendation) ?? [];
+          const why = opt.name + " / " + name;
+          expect(produced, why).toEqual([...mustProduce]);
+
+          // ⚠⚠ PIN `status`, NOT ONLY `produced`. A refusal DISCARDS `produced` and returns `[]`
+          // (`cre/run.ts`, the `runtimeError` arm), so an engine that gave up would be BYTE-IDENTICAL to the
+          // pause on the unanswered row — the one row `[]` is legitimately correct for. Without this the
+          // acceptance marker could be "reached" by regressing.
+          expect(run?.status, why + " — must not be an engine refusal").not.toBe("error");
+          expect(
+            (run?.diagnostics ?? []).filter((d) => d.includes("not evaluated by run_decision")),
+            why + " — no refusal diagnostic",
+          ).toEqual([]);
         }
       });
 

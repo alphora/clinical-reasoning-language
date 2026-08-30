@@ -98,6 +98,8 @@ import type {
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import { classifyCanonicalToken } from "../cel/canonicalToken";
 import { isValueReadingBooleanConcept, isPureQuestionConcept } from "../template-match/recencyValueConcept";
+import { resolveConceptPipeline } from "../template-match/resolvePipeline";
+import type { ResolvedStage } from "../template-match/resolvePipeline";
 import { isResourcelessDerived } from "../emit/conceptDatumSignals";
 import {
   makeLocalDomainContext,
@@ -289,6 +291,29 @@ interface ConceptEval {
   composition?: CompositionTrace;
 }
 
+/**
+ * One record contributed to a concept's collection by ONE arm.
+ *
+ * Per the operator's model: `code is` ADDS its records (`local`); each `source representation`'s projection
+ * ADDS a candidate per retrieved record (`source`). `definition is` is not an arm — it WORKS ON what these
+ * two put here.
+ */
+/** A CEL fact's `value is`, as the two independent questions a candidate needs. See `Ctx.candidates`. */
+interface FactValue {
+  boolValue?: boolean;
+  hasValue: boolean;
+}
+
+export interface OwnCandidate {
+  arm: "local" | "source";
+  /** The CEL fact that supplied it. */
+  fact: string;
+  /** The fact's `value is` when it is a boolean; absent for a bare fact or a non-boolean value. */
+  boolValue?: boolean;
+  /** Whether the fact carries a `value is` AT ALL, of any type. See `Ctx.candidates`. */
+  hasValue: boolean;
+}
+
 interface Ctx {
   /** Concepts directly satisfied by a case fact (`defined by`). */
   directFacts: Set<Id>;
@@ -304,6 +329,22 @@ interface Ctx {
    *  (no own record), all-agree → that value; CONFLICTING true+false → refuse loud (the collision posture — the
    *  newest-wins pick would need the emitted date+id sort the CRE deliberately does not replicate). */
   ownBoolValues: Map<Id, boolean[]>;
+  /**
+   * ⭐ #189 P2 — every record a CEL fact contributed to a concept's collection, WITH THE ARM THAT PUT IT THERE.
+   *
+   * ⚠⚠ ARM PROVENANCE IS NOT COSMETIC. `populate` was arm-BLIND, so a `source representation` fact's boolean
+   * `value is` landed in `ownBoolValues` indistinguishably from the concept's OWN answer. That is inert only
+   * because `isMemberExistenceInterface` excludes rep-carrying concepts for exactly this reason
+   * (`recencyValueConcept.ts:104-109`) — so no value-reading concept has a source arm TODAY. The canonical
+   * `Obese` carries a Condition posrep, so the defect ACTIVATES the moment the value-reading classification
+   * widens to pipeline concepts. Recorded now, while it is provably unreachable, rather than after.
+   *
+   * ⚠ `hasValue` is value-PRESENCE of any type, not just boolean, and it is a different question from
+   * `boolValue !== undefined` (a non-boolean `value is` sets one and not the other). A producer computes from
+   * its operands' DATA, so an operand record carrying no value yields no candidate in `$apply` — reading
+   * record presence alone there would fabricate one.
+   */
+  candidates: Map<Id, readonly OwnCandidate[]>;
   /** All concept definitions in the closure, by id, with their owning library. */
   concepts: Map<Id, ConceptEntry>;
   // NOTE: the covered-library identity + file moved off Ctx in the #172 frame migration — the library is now `rootLib`
@@ -365,6 +406,216 @@ interface Frame {
   currentFilePath: string;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+// #189 P2 — THE PIPELINE FAMILY: a one-sided emptiness PROOF, and the collection algebra it enables
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+//
+// REFACTOR:grounded — re-derived from the operator's collection model and the charter, not from the code it
+// replaces. The code it replaces keyed on an AST NODE KIND (`def.type === "ReductionDefinition"`), so the
+// narrative spelling of the same operation walked past the refusal and presence-evaluated: MEASURED at 13
+// in-tree concepts, 9 of them the goal's own fixtures. Do not read the node-kind arms below as intent.
+//
+// ⚠⚠ WHY THIS IS NOT A RECORD-EXISTENCE EVALUATOR, AND MUST NOT BECOME ONE. A general
+// "does this concept's pipeline produce at least one record" query cannot be answered from presence:
+// `BodyMassIndex(W, H)` needs usable DATA, not records named W and H; a filter can take a non-empty space
+// and return empty; a source projection's candidate is its projection OUTPUT, not the retrieved resource.
+// Answering it anyway would be the partial/completeness model the CRE is forbidden to grow
+// (`feedback_cre-is-mechanical-not-runtime`).
+//
+// ⭐ THE IN-BOUNDS QUESTION IS ONE-SIDED: *can we PROVE this contributor cannot be invoked at all?* Zero
+// invocations contribute NOTHING (charter §3), so a contributor proved empty may be skipped and one that
+// cannot be proved empty is REFUSED. It never claims a record exists and never claims completeness — the
+// only new answer is "provably nothing", read off the case's own facts.
+//
+// ⚠ AND IT NEEDS VALUE-PRESENCE, NOT RECORD-PRESENCE. A Weight record carrying no `value is` yields no BMI
+// candidate under `$apply` (the CQL computes from values; null in, no candidate out). Proving emptiness from
+// record presence alone would fabricate a candidate that `$apply` never produces — the same family of
+// fabrication this whole slice removes.
+
+/** Whether a concept can be PROVED to contribute no candidate at all in this case. One-sided: `false` means
+ *  "not proved", never "contributes something". */
+function provablyContributesNothing(id: Id, ctx: Ctx, seen: Set<Id>): boolean {
+  // ⚠ ITS OWN CYCLE GUARD. `ctx.stack` belongs to `evalConcept`'s recursion; sharing it would make an
+  // emptiness walk look like a determination cycle and vice versa. A cycle here cannot be proved empty.
+  if (seen.has(id)) return false;
+  seen.add(id);
+  try {
+    // Any fact put a record in the collection — local or source arm alike.
+    if ((ctx.candidates.get(id)?.length ?? 0) > 0) return false;
+
+    const entry = ctx.concepts.get(id);
+    if (entry === undefined) return false; // unknown concept: prove nothing
+
+    const program = resolveConceptPipeline(entry.node);
+    // No derivation, or one this resolver does not model: the arms are all that could have filled the
+    // collection, and they are empty.
+    if (program.kind === "no-program") return true;
+    // ⚠ `not-a-pipeline-program` is a `defined as` composition or a `coded from` — a real derivation with its
+    // own machinery. NOT provable here, and calling it empty would be exactly the "different and wrong claim"
+    // its own resolver arm exists to avoid.
+    if (program.kind !== "resolved") return false;
+
+    // A stage can only ADD to an empty collection by CONSTRUCTING a candidate — i.e. a producer, and only if
+    // its named operands yield data. Selections and filters over an empty space stay empty.
+    return program.stages.every((stage) => stageAddsNothing(stage, entry.lib, ctx, seen));
+  } finally {
+    seen.delete(id);
+  }
+}
+
+/** Whether one resolved stage can be proved to add nothing to an EMPTY collection. */
+function stageAddsNothing(stage: ResolvedStage, lib: string, ctx: Ctx, seen: Set<Id>): boolean {
+  switch (stage.effect) {
+    case "selection":
+    case "filter":
+      // Nothing to select from, nothing to narrow.
+      return true;
+    case "producer":
+    case "direct":
+      // Constructs from NAMED operands. It adds nothing exactly when every operand it reads provably
+      // contributes nothing — an operand with no candidate has no datum to compute from.
+      // ⚠ An operand we cannot resolve to a concept is NOT proved empty.
+      return stage.call.args.every((arg) => {
+        if (arg.type !== "ConceptRefArg") return true; // a literal operand adds no records of its own
+        const opId = idOf(arg.library ?? lib, arg.value);
+        return provablyContributesNothing(opId, ctx, seen);
+      });
+  }
+}
+
+/**
+ * ⭐ THE COLLECTION ALGEBRA for a concept whose `definition is` resolves to a pipeline program.
+ *
+ * Returns the determination, or `undefined` when this concept is not in the family (the caller keeps its
+ * existing arms). ⚠ It may set `ctx.runtimeError` — a refusal is a verdict about OUR ability, not the case's.
+ *
+ * ⭐ THE MODEL IT IMPLEMENTS (operator): two arms ADD to a collection; `definition is` WORKS ON it. So the
+ * determination is read off the COLLECTION, not OR'd across arms:
+ *
+ *   · zero candidates, nothing incomputable  -> `null`  (UNKNOWN — nothing established it; the gate pauses)
+ *   · candidates that all AGREE              -> that value (order-independent, so recency cannot change it)
+ *   · candidates that DISAGREE               -> refuse (newest-wins needs the emitted date+id sort)
+ *   · any contributor we cannot prove empty  -> refuse (it might contribute, and we cannot say what)
+ *
+ * ⚠ The agree/disagree posture is not new: `evalConcept`'s value-reading arm already refuses a decisive
+ * conflict for exactly this reason. This generalizes it from one arm to the whole collection.
+ */
+function pipelineVerdict(entry: ConceptEntry, ctx: Ctx): Tri | undefined {
+  const id = idOf(entry.lib, entry.node.name);
+  const program = resolveConceptPipeline(entry.node);
+
+  // ⚠ SCOPE FIRST, and the order matters. Only a BOOLEAN determination is a guard question — a `when` operand
+  // must be boolean — so a Quantity/CodeableConcept concept with a program (`Height`, `BMI`) is an OPERAND,
+  // read through `provablyContributesNothing` and never asked for a truth value. Refusing THOSE would turn
+  // our own catalog gaps into failed runs for concepts nothing was going to ask a verdict of.
+  if (!(entry.node.valueTypes?.length === 1 && entry.node.valueTypes[0] === "boolean")) return undefined;
+
+  if (program.kind === "invalid") {
+    // ⚠ REASON-SPECIFIC, never one behaviour. `invalid` mixes author errors (which the validator should have
+    // rejected upstream) with OUR build debt — `stage-ungrounded` (a pattern whose stage behaviour is not
+    // verified), `reduction-unrepresentable` (`count`'s threshold has no canonical arg yet),
+    // `shape-required-to-classify`. None may presence-evaluate, because presence-evaluating a program we
+    // cannot read IS fabrication — but they are different messages, and collapsing them would report our gap
+    // as the author's mistake.
+    // Carry the resolver's own DETAIL, not just the diagnostic kind — for `count` it names the construct and
+    // the missing piece, which is what a reader needs and what a kind alone throws away.
+    const why = program.diagnostics
+      .map((d) => ("detail" in d ? `${d.kind}: ${d.detail}` : d.kind))
+      .join("; ");
+    ctx.runtimeError = true;
+    ctx.diagnostics.push(
+      `\`definition is\` reduction concept ${labelOf(entry.lib, entry.node.name)} is not evaluated by ` +
+        `run_decision — its program cannot be classified (${why}), so it would need record-level evaluation ` +
+        `the engine's presence model does not provide; run marked error rather than fabricate a ` +
+        `presence-based answer.`,
+    );
+    return false;
+  }
+  if (program.kind !== "resolved") return undefined; // no program, or a `defined as`/`coded from` family
+
+  // ── A LONE CONCEPT-LEVEL EXISTENCE REDUCTION stays exactly where it was. ─────────────────────────────
+  //
+  // Over `this` it is SOUND as presence: the concept's own records ARE the space it reduces, and absence is
+  // a closed-world established false (charter — a records-read answers from an empty set).
+  //
+  // ⚠ Over a NAMED target it is NOT this family's business either, and routing it here was a REGRESSION I
+  // caught in the suite: the collection algebra reads THIS concept's candidates, while `exists "X"` asks
+  // about X's — so a case asserting X's records refused instead of answering. It keeps the existing
+  // `refTrace` arm.
+  //
+  // ⚠⚠ THAT ARM IS KNOWN-UNSOUND IN A DIFFERENT WAY, and this slice does NOT fix it: `refTrace` yields the
+  // target's DETERMINATION, not "has at least one record", so a RecordSet target holding a computed
+  // candidate with no direct fact can read false. Named-existence soundness is its own change with its own
+  // blast radius; it is NOT made worse here, and it is recorded rather than silently inherited.
+  const stages = program.stages;
+  if (stages.length === 1 && stages[0].call.pattern === "ExistsOverSpace") return undefined;
+
+  // ── Every contributor we cannot compute must be PROVED to contribute nothing. ────────────────────────
+  for (const stage of stages) {
+    if (stage.effect === "filter") {
+      // A filter reads record FIELDS (dates, statuses). Over a space we cannot prove empty it is undecidable.
+      if (!collectionProvablyEmptyBeforeStages(entry, ctx)) {
+        return refusePipeline(entry, ctx, `a \`${stage.call.pattern}\` filter stage needs record fields`);
+      }
+      continue;
+    }
+    if (stage.effect === "producer" || stage.effect === "direct") {
+      const seen = new Set<Id>();
+      const operandsEmpty = stage.call.args.every((arg) => {
+        if (arg.type !== "ConceptRefArg") return true;
+        return provablyContributesNothing(idOf(arg.library ?? entry.lib, arg.value), ctx, seen);
+      });
+      if (!operandsEmpty) {
+        return refusePipeline(
+          entry,
+          ctx,
+          `stage \`${stage.call.pattern}\` computes from operand data this engine does not evaluate, and its ` +
+            `operands are not provably absent in this case`,
+        );
+      }
+      continue;
+    }
+    // A SELECTION needs recency ONLY when more than one candidate competes; that is decided below, on the
+    // collection, not here.
+  }
+
+  // ── The collection: what the two arms actually put there. ────────────────────────────────────────────
+  const cands = ctx.candidates.get(id) ?? [];
+  if (cands.length === 0) {
+    // ⭐ NOTHING ESTABLISHED IT. Not `false` — absence is never established, and a Deny requires an
+    // ESTABLISHED false. This is the row the whole slice exists for: the gate pauses and asks.
+    return null;
+  }
+  const values = cands.map((c) => c.boolValue);
+  if (values.some((v) => v === undefined)) {
+    // A candidate record with no boolean value. `$apply` reads the newest record's value; a valueless record
+    // makes that read undecidable here without the emitted ordering.
+    return refusePipeline(entry, ctx, `a candidate record carries no boolean \`value is\``);
+  }
+  const first = values[0];
+  if (values.every((v) => v === first)) return first!; // order-independent: recency cannot change it
+  return refusePipeline(
+    entry,
+    ctx,
+    `candidate records disagree (${values.join(", ")}) and picking the newest needs the emitted date+id sort`,
+  );
+}
+
+/** Whether the concept's collection is provably empty BEFORE its program runs — i.e. both arms contributed
+ *  nothing. Used to decide whether an undecidable stage can be skipped as uninvoked. */
+function collectionProvablyEmptyBeforeStages(entry: ConceptEntry, ctx: Ctx): boolean {
+  return (ctx.candidates.get(idOf(entry.lib, entry.node.name))?.length ?? 0) === 0;
+}
+
+function refusePipeline(entry: ConceptEntry, ctx: Ctx, why: string): Tri {
+  ctx.runtimeError = true;
+  ctx.diagnostics.push(
+    `concept ${labelOf(entry.lib, entry.node.name)} is not evaluated by run_decision — ${why}; run marked ` +
+      `error rather than fabricate a presence-based answer.`,
+  );
+  return false;
+}
+
 /**
  * Satisfaction of a concept by id: directly asserted (a fact `defined by` it) OR
  * its `defined as` composition evaluates true. Memoized per case; cycle-guarded
@@ -415,10 +666,31 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
   const runtimeErrorBefore = ctx.runtimeError;
   let composition: CompositionTrace | undefined;
   let composed = false;
+  /** Set by the pipeline-family arm's guard so the body reads the verdict it already computed. */
+  let pipelineEval: Tri | undefined;
   const def = entry?.node.definition;
   if (def && def.type === "DefinedAsDefinition") {
     composition = walkDefinedAs(def.body, entry!.lib, ctx);
     composed = composition.satisfied;
+  } else if (entry !== undefined && (pipelineEval = pipelineVerdict(entry, ctx)) !== undefined) {
+    // ⭐⭐ THE PIPELINE FAMILY — keyed on the RESOLVED PROGRAM, not on an AST node kind.
+    //
+    // ⚠⚠ THE NODE KIND WAS THE BUG. The refusal below used to test `def.type === "ReductionDefinition"`, so
+    // the NARRATIVE spelling of the same operation walked past it and presence-evaluated — silently false.
+    // MEASURED at 13 in-tree concepts, 9 of them the goal's own fixtures including `policy.crl::Obese`.
+    //
+    // ⚠ It also does NOT go through `kOr([direct, composed])` below, and that is the point. `kOr` is right for
+    // the `defined as exists` family because its emitted CQL literally IS an `or`. This family's emitted
+    // target is newest-over-union — a SELECTION over a collection — and OR approximates it in neither
+    // direction: an empty own arm would read `false` and Deny (the very defect), while mapping empty to
+    // `null` inside `kOr` would swallow an established false from another arm.
+    ctx.stack.delete(id);
+    // ⚠ ONE CALL. `pipelineVerdict` REFUSES by side effect (it sets `ctx.runtimeError` and pushes a
+    // diagnostic), so calling it once to test the arm and again to read the answer would double-report every
+    // refusal and, worse, make the arm's guard condition itself mutate the run.
+    const pipelineResult: ConceptEval = { sat: pipelineEval! };
+    if (!ctx.runtimeError && ctx.cycleHits === cyclesBefore) ctx.cache.set(id, pipelineResult);
+    return pipelineResult;
   } else if (def && def.type === "ReductionDefinition") {
     const red = def.reduction;
     if (red.kind === "exists" && red.target.type === "ReductionConceptRef") {
@@ -1289,7 +1561,12 @@ function runCase(
     if (isPureQuestionConcept(e.node)) pureQuestionIds.add(cid);
   }
   const ownBoolValues = new Map<Id, boolean[]>();
-  const populate = (id: Id, fn: string, boolVal?: boolean): void => {
+  const candidates = new Map<Id, OwnCandidate[]>();
+  const populate = (id: Id, fn: string, arm: OwnCandidate["arm"], value: FactValue): void => {
+    const boolVal = value.boolValue;
+    const cs = candidates.get(id) ?? [];
+    cs.push({ arm, fact: fn, ...(boolVal !== undefined ? { boolValue: boolVal } : {}), hasValue: value.hasValue });
+    candidates.set(id, cs);
     directFacts.add(id);
     const arr = factsByConcept.get(id) ?? [];
     arr.push(fn);
@@ -1299,7 +1576,10 @@ function runCase(
     // false (0 own values), exactly as `$apply`'s `Last(where O.value is FHIR.boolean)` = null → false, so both lanes
     // AGREE (Deny). It is an AUTHORING error, gated LOUD by the validator (+ emitter diagnostic) at author time — NOT a
     // runtime refusal here (that would diverge from `$apply`'s verdict). Surface a non-fatal debuggability diagnostic.
-    if (valueReadingIds.has(id)) {
+    // ⚠ THE OWN ARM IS THE **LOCAL** ARM. A source representation's fact is a candidate in the collection, not
+    // the concept's own answer, so its boolean must never be read as one. Inert today (no value-reading concept
+    // has a posrep), and fixed here so it stays right when the classification widens — see `Ctx.candidates`.
+    if (valueReadingIds.has(id) && arm === "local") {
       if (boolVal !== undefined) {
         const vs = ownBoolValues.get(id) ?? [];
         vs.push(boolVal);
@@ -1347,7 +1627,10 @@ function runCase(
     // #189 Piece 3 (Option C, disc 512) — the fact's boolean `value is`, if any (non-boolean → undefined). A
     // value-reading concept's own-arm reads this; a fact carrying it is recorded per populated concept in `populate`.
     const valueField = fact.body.find((x): x is CELValueField => x.type === "CELValueField");
-    const boolVal = typeof valueField?.value === "boolean" ? valueField.value : undefined;
+    const factValue: FactValue = {
+      ...(typeof valueField?.value === "boolean" ? { boolValue: valueField.value } : {}),
+      hasValue: valueField !== undefined,
+    };
 
     // D5(3) backstop: an `absent`/`negative` intent modifier on a LOCAL determination fact inverts its clinical
     // meaning, but membership sees only the code → the concept would compute PRESENT (the opposite). Refuse loud
@@ -1397,12 +1680,26 @@ function runCase(
         if (scls.kind === "coded") {
           const owners = sourceIndex.get(memberKey(name, scls.parts.system ?? "", scls.parts.code));
           if (owners && owners.length > 0) {
-            for (const o of owners) populate(o, fn, boolVal);
+            // ⭐⭐ A SOURCE CANDIDATE'S VALUE COMES FROM ITS PROJECTION, NOT FROM THE FACT'S `value is`.
+            // The fact here is a retrieved SOURCE resource (a covered ServiceRequest, a coded Condition); the
+            // candidate it contributes is the projection's OUTPUT. `exists this` yields `true` for every
+            // record it is invoked on, and `matches this` yields `true` for a MEMBER — and reaching this
+            // branch at all IS membership (`sourceIndex` matched `(type, system, code)`, the same mechanical
+            // set the emitted ValueSet and CQL retrieve use).
+            //
+            // ⚠ MEASURED: reading the fact's own `value is` here made `request is the covered service`
+            // refuse for "a candidate record carries no boolean `value is`" — a ServiceRequest carries no
+            // boolean, and it was never supposed to. The projection is what answers.
+            //
+            // ⚠ THE NON-MEMBER ROW IS STILL OPEN, and is NOT silently answered here: a non-member code does
+            // not reach this branch at all (it falls through to name-population), so `matches this`'s
+            // determinate `false` needs the UNFILTERED retrieve the fixture documents as owed.
+            for (const o of owners) populate(o, fn, "source", { boolValue: true, hasValue: true });
             continue;
           }
         }
       }
-      populate(namedId, fn, boolVal);
+      populate(namedId, fn, "source", factValue);
       continue;
     }
 
@@ -1421,7 +1718,7 @@ function runCase(
     }
     // BARE local fact (derivable base) — the DEGENERATE case: a member of the named concept by construction.
     if (!codeField) {
-      populate(namedId, fn, boolVal);
+      populate(namedId, fn, "local", factValue);
       continue;
     }
     // AUTHORED code on a LOCAL fact = the membership/data input (code-driven, compartment-global lookup below).
@@ -1451,7 +1748,7 @@ function runCase(
     }
     const ownerId = localIndex.reverse.get(key);
     if (ownerId) {
-      populate(ownerId, fn, boolVal);
+      populate(ownerId, fn, "local", factValue);
     } else {
       diagnostics.push(
         `fact "${fn}" code \`${cls.parts.system}|${cls.parts.code}\` is not a member of any local concept set ` +
@@ -1509,6 +1806,7 @@ function runCase(
     valueReadingIds,
     pureQuestionIds,
     ownBoolValues,
+    candidates,
     concepts,
     cache: new Map(),
     stack: new Set(),
