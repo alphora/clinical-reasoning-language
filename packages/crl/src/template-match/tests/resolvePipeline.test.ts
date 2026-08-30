@@ -290,7 +290,8 @@ describe("resolveConceptPipeline — the effect matrix", () => {
   it("⚠ an UNDECLARED shape is asked for rather than guessed, on the arm that depends on it", () => {
     // ⚠ `isRecordSpaced` routes through `assumedShapePreMigration` (undeclared → `Scalar`), so this would
     // have been refused `value-stage-not-terminal` — an author-facing diagnostic naming a defect that is not
-    // the one present. RETIRE:189-shape-declared.
+    // the one present. RETIRE:189-shape-declared — this case becomes a plain classification once
+    // `shape-not-declared` makes an undeclared shape a validator error upstream.
     const r = resolve([
       "- type is Observation.",
       "- value type is boolean.",
