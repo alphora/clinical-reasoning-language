@@ -1,7 +1,11 @@
 import type { CRL, Concept, Location } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
 import { matchNarrativeStages, narrativeText } from "../template-match/matcher";
-import { isProjectionOnly, patternReturnShape } from "../template-match/patternCatalog";
+import {
+  isProjectionOnly,
+  isSelectionPattern,
+  patternReturnShape,
+} from "../template-match/patternCatalog";
 
 import type { PipelineStageError, PipelineStageRule, ValidationError } from "./validator";
 
@@ -25,11 +29,24 @@ import type { PipelineStageError, PipelineStageRule, ValidationError } from "./v
 // one classification that IS context-free (picking one member of a space is that whatever the concept
 // publishes), so it can be decided here without the resolver.
 
-/** The patterns that COLLAPSE a space to one member. Context-free: a selection is a selection wherever it
- *  sits. Derived from the shared fact table, never re-listed — a second list would drift. */
-function isSelection(pattern: string): boolean {
-  return patternReturnShape(pattern) === "instance";
-}
+// REFACTOR:grounded — the selection rule here is re-derived from the target model, not from adjacent code:
+// it now CALLS the catalog's `isSelectionPattern` rather than restating `returnShape === "instance"`, and the
+// decision NOT to adopt the resolver's scope was measured against the corpus rather than assumed.
+//
+// ⭐ THE SWITCH (design R7). This file used to carry its own
+// `isSelection(patternReturnShape(p) === "instance")` — the same rule the resolver derives, read a second
+// time. It now CALLS the shared `isSelectionPattern`, so there is one reading and not two that agree by
+// coincidence.
+//
+// ⚠ WHY THIS AND NOT `resolveConceptPipeline`. Delegating wholesale was MEASURED and rejected: the
+// resolver's scope is every concept PROGRAM while this validator's is `, then` pipelines, so adopting it
+// would have turned 185 of 219 in-tree programs into hard author errors — the resolver is fail-closed for a
+// consumer that must not EXECUTE an unverified program, which is not this validator's obligation. R7 asks
+// only for the duplicated selection derivation to go, and that is what went.
+//
+// ⚠ AND `deriveEffect` COULD NOT SERVE: it is reached only past the resolver's `stage.grounded` gate, while
+// five in-tree selection patterns (`Last`, `LastOf`, `Earliest`, `First`, `FirstOf`) are ungrounded. Calling
+// it here would have silently stopped `pipeline-selection-after-selection` firing for all five.
 
 /** Whether the shared fact table knows this pattern at all. ⚠ FAIL CLOSED: an unknown pattern is a catalog
  *  gap, reported as such, never silently treated as "not a selection". */
@@ -192,7 +209,7 @@ export class PipelineStageValidator {
       const here = result.stages[i];
       if (prev === null || here.call === null) continue; // this pair is unjudgeable
       if (!isClassified(prev.pattern) || !isClassified(here.call.pattern)) continue;
-      if (isSelection(prev.pattern) && isSelection(here.call.pattern)) {
+      if (isSelectionPattern(prev.pattern) && isSelectionPattern(here.call.pattern)) {
         errors.push(
           this.err(
             "pipeline-selection-after-selection",

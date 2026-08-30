@@ -112,8 +112,8 @@ describe("resolveConceptPipeline — the effect matrix", () => {
     ]);
     expect(effects(r)).toEqual(["producer", "selection"]);
     const [producer, selection] = r.kind === "resolved" ? r.stages : [];
-    expect(producer.outputShape).toEqual({ kind: "space", recordType: "Observation" });
-    expect(selection.inputShape).toEqual({ kind: "space", recordType: "Observation" });
+    expect(producer.outputShape).toEqual({ kind: "space", recordType: "Observation", cardinality: "many" });
+    expect(selection.inputShape).toEqual({ kind: "space", recordType: "Observation", cardinality: "many" });
     expect(producer.constructs).toBe(true);
     expect(selection.constructs).toBe(false);
   });
@@ -143,6 +143,136 @@ describe("resolveConceptPipeline — the effect matrix", () => {
       '  - coded from "VS".',
     ]);
     expect(diagnostics(r)).toContain("stage-projection-only");
+  });
+
+  it("⭐ the CONCEPT-LEVEL `exists this` resolves — it is NOT the rep-local projection", () => {
+    // ⚠⚠ THE CASE THE MODULE SHIPPED WRONG. `reductionAsCall` mapped a structural `exists` reduction to the
+    // catalog's `Exists` entry, which is the REP-LOCAL projection (`slot: "projection-only"`), so this — the
+    // CANONICAL `type is Condition` + `value type is boolean` + `exists this` — was refused as "a rep-local
+    // projection cannot be a pipeline stage". MEASURED at 55 in-tree concepts. No test reached it because
+    // none of these tests exercised a structural reduction other than `most recent`.
+    const r = resolve([
+      "- type is Condition.",
+      "- value type is boolean.",
+      "- code is `c`.",
+      "- definition is exists this.",
+    ]);
+    expect(effects(r)).toEqual(["direct"]);
+    expect(r.kind === "resolved" && r.stages[0].call.pattern).toBe("ExistsOverSpace");
+    // ⭐ It reads the FLOW, not named operands — the fact that distinguishes its lowering from a terminal
+    // `AtLeast`, which is also `direct`.
+    expect(r.kind === "resolved" && r.stages[0].reads).toBe("flow");
+  });
+
+  it("⭐ BOTH SPELLINGS of concept-level `exists this` resolve identically", () => {
+    // ⚠ The matcher is slot-blind: it emits `Exists` for the words `exists this` wherever they appear. If
+    // the rename lived only in `reductionAsCall`, the structural spelling would resolve while a terminal
+    // `, then exists this` stage refused — the same two-spellings drift, moved rather than removed.
+    const structural = resolve([
+      "- type is Condition.",
+      "- value type is boolean.",
+      "- code is `c`.",
+      "- definition is exists this.",
+    ]);
+    const staged = resolve([
+      "- type is Condition.",
+      "- value type is boolean.",
+      "- code is `c`.",
+      "- definition is most recent this, then exists this.",
+    ]);
+    expect(effects(structural)).toEqual(["direct"]);
+    expect(effects(staged)).toEqual(["selection", "direct"]);
+    const patterns = staged.kind === "resolved" ? staged.stages.map((s) => s.call.pattern) : [];
+    expect(patterns).toEqual(["MostRecent", "ExistsOverSpace"]);
+  });
+
+  it("⚠ `matches this` is NOT renamed into the definition slot", () => {
+    // Its comparand is the representation's own `coded from`, so it has no concept-level counterpart. The
+    // rename table is deliberately one entry, not "projections become their concept-level twin".
+    const r = resolve([
+      "- type is Observation.",
+      "- value type is boolean.",
+      "- code is `c`.",
+      "- definition is matches this.",
+      "- source representation:",
+      "  - type is ServiceRequest.",
+      '  - coded from "VS".',
+    ]);
+    expect(diagnostics(r)).toContain("stage-projection-only");
+  });
+
+  it("⭐ a NAMED reduction target reaches the call — it is not silently dropped", () => {
+    // ⚠⚠ `ReductionTarget` is `ThisRecords | ReductionConceptRef`, and `reductionAsCall` returned
+    // `args: []` UNCONDITIONALLY — so `exists "W"` resolved byte-identically to `exists this`, reducing a
+    // different space with no diagnostic. Latent only because every named-target form was refused upstream;
+    // it goes live the moment concept-level existence resolves, which is this same change.
+    const named = resolve([
+      "- type is Condition.",
+      "- value type is boolean.",
+      "- code is `c`.",
+      '- definition is exists "W".',
+    ]);
+    const bare = resolve([
+      "- type is Condition.",
+      "- value type is boolean.",
+      "- code is `c`.",
+      "- definition is exists this.",
+    ]);
+    const argsOf = (r: PipelineResolution) =>
+      r.kind === "resolved" ? r.stages[0].call.args.map((a) => JSON.stringify({ t: a.type })) : ["INVALID"];
+    expect(argsOf(named)).toEqual([JSON.stringify({ t: "ConceptRefArg" })]);
+    expect(argsOf(bare)).toEqual([]);
+    expect(argsOf(named)).not.toEqual(argsOf(bare));
+  });
+
+  it("⚠ `count … at least N` is REFUSED, not lowered lossily", () => {
+    // `CountReduction.atLeast` is a bare integer and `CanonicalArg` has no number member. Encoding it as a
+    // unitless QuantityArg would be a lie; dropping it repeats the silent-drop defect above. `AtLeastN` is
+    // ungrounded today so nothing resolves either way — but relying on the DOWNSTREAM refusal is the
+    // coupling that breaks the day someone grounds it.
+    const r = resolve([
+      "- type is Condition.",
+      "- value type is boolean.",
+      '- definition is count "W" at least 2.',
+    ]);
+    expect(diagnostics(r)).toEqual(["reduction-unrepresentable"]);
+  });
+
+  it("⭐ TERMINAL CONFORMANCE — a Record concept may not publish a boolean", () => {
+    // ⚠ Owed by design R9 and absent: this resolved CLEAN while publishing a value the concept's declared
+    // shape contradicts. The producer arm's own comment already spoke of "failing terminal conformance
+    // against Scalar" as though the check existed.
+    const r = resolve([
+      "- shape is Record.",
+      "- type is Condition.",
+      "- value type is boolean.",
+      "- code is `c`.",
+      "- definition is exists this.",
+    ]);
+    expect(diagnostics(r)).toEqual(["terminal-shape-mismatch"]);
+  });
+
+  it("⭐ TERMINAL CONFORMANCE — a Scalar concept may not publish a space", () => {
+    const r = resolve([
+      "- shape is Scalar.",
+      "- type is Observation.",
+      "- value type is Quantity.",
+      "- code is `c`.",
+      "- definition is most recent this.",
+    ]);
+    expect(diagnostics(r)).toEqual(["terminal-shape-mismatch"]);
+  });
+
+  it("⚠ a boolean stage in a non-boolean concept is REFUSED — presence is not a type check", () => {
+    // `matchesDatum` was `sig.valueType !== undefined`, which let a boolean-returning stage publish itself
+    // as a Quantity.
+    const r = resolve([
+      "- shape is Scalar.",
+      "- type is Observation.",
+      "- value type is Quantity.",
+      "- definition is exists this.",
+    ]);
+    expect(diagnostics(r)).toEqual(["value-incompatible"]);
   });
 
   it("a concept with no `definition is` has no program", () => {

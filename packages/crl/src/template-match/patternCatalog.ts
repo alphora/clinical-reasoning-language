@@ -16,6 +16,9 @@
 // (the derivation, written badly) — and deriving it is what dissolves the long-standing contradiction over
 // whether `AtLeast` is a producer or an aggregate. Both observations were right on different axes.
 //
+// REFACTOR:grounded — the catalog's own entries are re-derived from the target model. ⚠ The `REFACTOR:suspect`
+// below refers to `emitCQL.ts`, NOT to this file; do not read it as a mark on the catalog.
+//
 // RULE ([[patterns-are-semantic]]): a catalog signature never constrains what the author may DECLARE — the
 // emitter picks the pattern's REALIZATION FORM from the declared `(type, valuetype)`. But the emitter must
 // NEVER INSERT A REDUCTION (`exists`, a singleton lift `{ }`, a `Coalesce`) to bridge a shape the author
@@ -103,8 +106,11 @@ export type RetrieveShape =
  * resolver deriving effect from return shape alone would cheerfully classify `ComponentOf`, `InpatientStay`
  * and `StartOf` as pipeline stages. This is the carrier that makes "fail closed" real rather than a wish.
  *
- * ⚠ `grounded: true` means VERIFIED AGAINST `CRLCommon.cql` — its signature, what it reads, and whether a
- * list return preserves elements — not merely "it has a return shape".
+ * ⚠ `grounded: true` means VERIFIED AGAINST ITS REALIZATION — signature, what it reads, and whether a list
+ * return preserves elements — not merely "it has a return shape". For a `realization: "crl-common"` pattern
+ * that realization is the function in `CRLCommon.cql`; for a `"native"` one it is the CQL operator it lowers
+ * to. Saying "verified against `CRLCommon.cql`" would leave a native reduction with nothing to verify
+ * against, and the next grounding would copy a precedent the definition does not cover.
  */
 export type PatternStage =
   /** Refused in a stage position. The default, and correct for anything unverified. */
@@ -132,12 +138,24 @@ export type PatternStage =
       preservesElements?: boolean;
     };
 
+/**
+ * How a pattern becomes target code.
+ *
+ * ⚠ REQUIRED, because `grounded` is a claim about a REALIZATION and the two realizations are verified
+ * against different artifacts. Every pattern here but one is a call into `CRLCommon.cql`; a `"native"` one
+ * lowers to a CQL operator and has no CRLCommon function at all. Without this field a consumer reasonably
+ * assumes `entry.pattern` names a callable `CRLCommon` function — and for a native reduction it does not.
+ */
+export type PatternRealization = "crl-common" | "native";
+
 export interface PatternEntry {
   returnShape: PatternReturnShape;
   /** REQUIRED. Explicit on every pattern, so adding one forces a scope decision. */
   slot: PatternSlot;
   /** REQUIRED. Absent grounding is a REFUSAL, never a permission — see `PatternStage`. */
   stage: PatternStage;
+  /** REQUIRED. See `PatternRealization` — a catalog NAME is not always a callable function name. */
+  realization: PatternRealization;
   /** Projection facts — present only for `projection-only` patterns, where they are load-bearing. */
   projection?: {
     reads: PatternReads;
@@ -154,6 +172,7 @@ const any = (returnShape: PatternReturnShape): PatternEntry => ({
   returnShape,
   slot: "any",
   stage: { grounded: false },
+  realization: "crl-common",
 });
 
 /**
@@ -171,6 +190,21 @@ const groundedStage = (
   returnShape,
   slot: "any",
   stage: { grounded: true, reads, ...(preservesElements !== undefined ? { preservesElements } : {}) },
+  realization: "crl-common",
+});
+
+/**
+ * A grounded stage that lowers to a CQL OPERATOR rather than a `CRLCommon` function.
+ *
+ * ⚠ The separate constructor is the point: `groundedStage` promises a CRLCommon realization, and a caller
+ * reaching for it to add a native reduction would silently make that promise. There is exactly one native
+ * pattern today (`ExistsOverSpace`); a second should be a deliberate act, not an inherited default.
+ */
+const nativeStage = (returnShape: PatternReturnShape, reads: "flow" | "operands"): PatternEntry => ({
+  returnShape,
+  slot: "any",
+  stage: { grounded: true, reads },
+  realization: "native",
 });
 
 const CATALOG: Readonly<Record<string, PatternEntry>> = {
@@ -264,6 +298,7 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
     slot: "projection-only",
     // A projection is never a stage — D10 rejects it in a pipeline outright.
     stage: { grounded: false },
+    realization: "crl-common",
     projection: {
       reads: "records",
       arity: 0,
@@ -279,6 +314,7 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
     returnShape: "boolean",
     slot: "projection-only",
     stage: { grounded: false },
+    realization: "crl-common",
     projection: {
       reads: "datum",
       arity: 0,
@@ -289,6 +325,29 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
       retrieve: "unfiltered",
     },
   },
+
+  // ── THE CONCEPT-LEVEL EXISTENCE REDUCTION ─────────────────────────────────────────────────────────
+  //
+  // ⭐⭐ NOT A SPELLING OF `Exists` ABOVE, AND CONFLATING THE TWO WAS A LIVE DEFECT. Both are written
+  // `exists this`, and that is where the resemblance ends:
+  //
+  //   · `Exists` is REP-LOCAL: it sits in ONE representation's `value projection is`, is invoked once per
+  //     retrieved record, and therefore answers `true` or NOTHING — an existence arm cannot record a
+  //     negative, which is what lets a determination pause.
+  //   · `ExistsOverSpace` is CONCEPT-LEVEL: it is the third arm working on the collection the other two
+  //     filled, so it reduces a space that is already there and absence is a CLOSED-WORLD `false`. It
+  //     never pauses.
+  //
+  // Routing the structural `definition is exists this` through `Exists` refused 55 in-tree concepts as
+  // "a rep-local projection cannot be a pipeline stage" — including the canonical
+  // `type is Condition` + `value type is boolean` + `exists this`. MEASURED, not reasoned.
+  //
+  // ⚠ The SLOT is what separates them, and the matcher cannot see it: `matcher.ts` emits `Exists` for the
+  // words `exists this` wherever they appear. The resolver, which only ever reads a `definition is`, does
+  // the slot-keyed rename — see `DEFINITION_SLOT_RENAME` in `resolvePipeline.ts`. ⚠ `Matches` deliberately
+  // does NOT get the same treatment: its comparand is the representation's own `coded from`, so it has no
+  // concept-level counterpart and belongs nowhere but a projection.
+  ExistsOverSpace: nativeStage("boolean", "flow"),
 };
 
 /** The catalog entry for `pattern`, or `undefined` if it is unclassified. */
@@ -338,6 +397,23 @@ export function patternProjection(pattern: string): NonNullable<PatternEntry["pr
 /** Whether `pattern` is legal ONLY as a standalone rep-level `value projection is`. */
 export function isProjectionOnly(pattern: string): boolean {
   return patternEntry(pattern)?.slot === "projection-only";
+}
+
+/**
+ * ⭐ THE ONE READING OF "is this a selection" — the single context-free axis of stage effect.
+ *
+ * ⚠⚠ THIS FUNCTION IS THE SWITCH (design R7). `pipelineStageValidator` and `resolvePipeline.deriveEffect`
+ * used to derive it separately from `returnShape === "instance"`; both now CALL this. A re-derived twin in
+ * either caller is two readings again, just co-located.
+ *
+ * ⚠ IT MUST NOT REQUIRE GROUNDING, and that is not an oversight. The resolver refuses an ungrounded pattern
+ * before it ever derives an effect, but the VALIDATOR must still answer this for the five ungrounded
+ * instance-returning patterns in the catalog (`Last`, `LastOf`, `Earliest`, `First`, `FirstOf`) — otherwise
+ * `pipeline-selection-after-selection` silently stops firing for all of them. Selection is context-free
+ * BECAUSE it is: picking one member of a space is that whatever the concept publishes and whoever asks.
+ */
+export function isSelectionPattern(pattern: string): boolean {
+  return patternReturnShape(pattern) === "instance";
 }
 
 /** Every classified pattern name — for the totality audit. */
