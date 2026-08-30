@@ -244,15 +244,20 @@ export function capabilityFromRow(
     };
   }
 
-  // A dotted recency path is not a top-level writable stamp; the registry's write-lane resolvers reject it
-  // for the same reason, and a naive consumer would spell an invalid nested element.
-  if (row.recency.sortExpr.length === 0 || row.recency.sortExpr.includes(".")) {
+  // ⚠ An EMPTY recency path is unconstructible — there is no element to stamp.
+  //
+  // ⚠⚠ A DOTTED path is NOT. An earlier revision refused those too, reasoning from
+  // `recencyStampJsonName`'s dotted-path rejection — but that guard is about SPELLING A FLAT JSON NAME
+  // (`period.startDateTime` is unspellable), which is the instance-WRITE lane. A CQL literal CONSTRUCTS the
+  // nesting instead: `period: FHIR.Period { start: FHIR.dateTime { value: recorded } }`. MEASURED — it
+  // builds, reads back, and SORTS on `period.start.value` (design §12).
+  //
+  // Conflating the two lanes is what made `Encounter` look categorically unconstructible when it is not.
+  if (row.recency.sortExpr.length === 0) {
     return {
       kind: "impossible",
       reason: "recency-not-constructible",
-      detail:
-        `\`${resourceType}\` has a dotted/empty recency path (\`${row.recency.sortExpr}\`), which is not a ` +
-        `top-level writable stamp — a constructed record could not carry its propagated timestamp.`,
+      detail: `\`${resourceType}\` has an empty recency path — a constructed record has no element to carry its propagated timestamp`,
     };
   }
 

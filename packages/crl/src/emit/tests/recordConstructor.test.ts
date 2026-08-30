@@ -78,16 +78,32 @@ describe("constructorCapability — refusals", () => {
     if (cap.kind === "impossible") expect(cap.detail).toContain("occurrence[x]");
   });
 
-  it("⭐ EXERCISES the dotted-recency refusal — Encounter's real row, minus the caseFeature gate", () => {
-    // Encounter's `period.start` is the live instance of a dotted recency path, but the caseFeature gate
-    // refuses it first. Flip that one field so the SECOND guard is the one under test.
+  it("⭐ a DOTTED recency path IS constructible — Encounter's real row, minus the caseFeature gate", () => {
+    // ⚠ An earlier revision REFUSED dotted paths, reasoning from `recencyStampJsonName`'s rejection of
+    // them. That guard is about spelling a flat JSON name (`period.startDateTime` is unspellable) — the
+    // instance-WRITE lane. A CQL literal CONSTRUCTS the nesting instead, and it was MEASURED to build, read
+    // back, and sort on `period.start.value`. Conflating the two lanes made Encounter look categorically
+    // unconstructible when it is only DEFERRED (`caseFeature: false`).
+    expect(RESOURCE_EMIT_REGISTRY.Encounter.recency.sortExpr).toBe("period.start");
     const cap = capabilityFromRow(
       "Encounter",
       { ...RESOURCE_EMIT_REGISTRY.Encounter, caseFeature: true },
       requiredStructuralElements("Encounter") ?? [],
     );
+    expect(cap.kind).not.toBe("impossible");
+  });
+
+  it("an EMPTY recency path is still unconstructible — there is no element to stamp", () => {
+    const cap = capabilityFromRow(
+      "Encounter",
+      {
+        ...RESOURCE_EMIT_REGISTRY.Encounter,
+        caseFeature: true,
+        recency: { ...RESOURCE_EMIT_REGISTRY.Encounter.recency, sortExpr: "" },
+      },
+      requiredStructuralElements("Encounter") ?? [],
+    );
     expect(refusalOf(cap)).toBe("recency-not-constructible");
-    if (cap.kind === "impossible") expect(cap.detail).toContain("period.start");
   });
 
   it("⚠ no registry row today is `authored` — the tripwire that says when the branch goes live", () => {

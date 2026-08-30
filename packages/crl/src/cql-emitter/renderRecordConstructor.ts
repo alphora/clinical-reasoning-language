@@ -45,6 +45,23 @@ export function boundCodeCqlType(resourceType: string, element: string): string 
   return `FHIR.${resourceType}${upperFirst(element)}`;
 }
 
+/**
+ * Assign `valueExpr` at `path`, constructing any intermediate nesting.
+ *
+ * A flat path is `element: <value>`. A dotted one cannot be — CQL has no element literally named
+ * `period.start` — so the wrappers are built innermost-out, capitalizing each intermediate segment to name
+ * its type (`period` → `FHIR.Period`), which is the FHIR convention for a datatype-valued element.
+ */
+function nestedAssignment(path: string, valueExpr: string): string {
+  const segments = path.split(".");
+  let acc = valueExpr;
+  for (let i = segments.length - 1; i > 0; i -= 1) {
+    const parent = segments[i - 1];
+    acc = `FHIR.${upperFirst(parent)} { ${segments[i]}: ${acc} }`;
+  }
+  return `${segments[0]}: ${acc}`;
+}
+
 /** A `FHIR.Coding { … }` literal. `display` is omitted when absent rather than emitted null. */
 function coding(system: string, code: string, display?: string): string {
   const parts = [`system: FHIR.uri { value: ${q(system)} }`, `code: FHIR.code { value: ${q(code)} }`];
@@ -129,10 +146,18 @@ export function renderRecordConstructor(sig: ConstructorSignature): string {
       : `${sig.codingElement.element}: code`,
   );
 
-  // The PROPAGATED recency stamp. Both a choice element (`effective`) and a plain one (`recordedDate`)
-  // take a `FHIR.dateTime` literal in a CQL resource construction; the `cast` distinction on the registry
-  // row governs the READ side.
-  body.push(`${sig.recency.sortExpr}: FHIR.dateTime { value: recorded }`);
+  // The PROPAGATED recency stamp. A choice element (`effective`) and a plain one (`recordedDate`) both take
+  // a `FHIR.dateTime` literal in a CQL construction; the `cast` on the registry row governs the READ side.
+  //
+  // ⚠ A DOTTED path (`Encounter.period.start`) is NOT a flat element name — emitting `period.start: …`
+  // would declare an element literally called "period.start". CQL has no such element, so the nesting is
+  // CONSTRUCTED instead, innermost-out: `period: FHIR.Period { start: FHIR.dateTime { … } }`.
+  //
+  // The intermediate type is derived by capitalizing the segment, which is the FHIR convention for a
+  // BackboneElement/datatype-valued element (`period` → `Period`). MEASURED for Encounter — it builds,
+  // reads back, and sorts on `period.start.value` (design §12). A deeper or irregular path would need the
+  // model to name its types; there is exactly one dotted recency path in the registry today.
+  body.push(nestedAssignment(sig.recency.sortExpr, `FHIR.dateTime { value: recorded }`));
 
   if (sig.valueElement !== undefined) body.push(`${sig.valueElement}: value`);
 
