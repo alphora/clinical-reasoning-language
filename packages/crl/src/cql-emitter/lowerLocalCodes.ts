@@ -101,6 +101,7 @@ import type {
   CRL,
   Concept,
   CodedFromDefinition,
+  DefinedAsDefinition,
   DefinitionIsDefinition,
   Reduction,
   ReductionConceptRef,
@@ -1199,6 +1200,162 @@ export function lowerLocalCodes(
           loc,
         ),
       );
+      continue;
+    }
+
+    // ⭐ (3b-UNION) #189 — `code is` + ONE simple `source representation`, NO definition, `shape is RecordSet`.
+    //
+    // The charter states the semantics outright (§3): *"a concept unions the records from all its
+    // representations"*. MEASURED before building: NEITHER arm emitted — a posrep-bearing concept failed
+    // `emit-representations-only-not-lowered` in BOTH the direct and the layered lane, WITH or WITHOUT a local
+    // code (`tmp/nullprobe/analysis/posrepOnly-out.txt`, `layeredUnion-out.txt`). So this is not "merge two
+    // working arms"; the SOURCE arm had no lowering at all.
+    //
+    // THREE OUTPUTS, mirroring the recency-value split above (keep them in lock-step):
+    //   (a) LP twin      — the same-name LOCAL records retrieve            (LocalPrimitives)
+    //   (b) EP source    — `"<X> Source"`, the external retrieve           (ExternalPrimitives)
+    //   (c) Inferences   — the same-name PUBLIC determination: `( "X" sem-or "X Source" )` = the UNION
+    //
+    // `sem-or` IS union (charter §3 set algebra), so (c) invents no operation — it states the charter's rule
+    // in the language's own terms, which is what keeps this out of §4.0's "emitter magic".
+    //
+    // ⚠ SHAPE-EXACT and narrow BY DESIGN. Anything off-shape falls through to the skip below and keeps its
+    // loud error: >1 posrep, a posrep with a `value projection` (the age lane) or a `value element` /
+    // type-crossing `value type` (the general #257 posrep), a non-RecordSet shape (which would owe a stated
+    // reduction — charter §3 cardinality), or a missing `type is` on either side.
+    const unionReps = c.representations ?? [];
+    const unionRep = unionReps.length === 1 ? unionReps[0] : undefined;
+    if (
+      c.definition === undefined &&
+      unionRep !== undefined &&
+      assumedShapePreMigration(c.shape) === "RecordSet" &&
+      c.conceptType !== undefined &&
+      unionRep.conceptType !== undefined &&
+      unionRep.terminologyName !== undefined &&
+      unionRep.valueProjection === undefined &&
+      unionRep.valueElement === undefined &&
+      (unionRep.valueTypes.length === 0 ||
+        (unionRep.valueTypes.length === c.valueTypes.length &&
+          unionRep.valueTypes.every((v, i) => v === c.valueTypes[i])))
+    ) {
+      const localResource = c.conceptType;
+      const sourceName = `${c.name} Source`;
+      // Dedup / collision — the FOURTH copy of the (5)-(7) mirror. Keep in lock-step (DRY note above).
+      const priorForCode = codeValueToConcept.get(codeValue);
+      if (priorForCode !== undefined) {
+        errors.push(
+          mkError(
+            "emit-duplicate-local-code",
+            `Local code \`${codeValue}\` is declared by both "${priorForCode}" and "${c.name}". Each ` +
+              `local source code must be unique within the library.`,
+            loc,
+          ),
+        );
+        continue;
+      }
+      if (seenSyntheticNames.has(c.name) || existingTerminologyNames.has(c.name)) {
+        errors.push(
+          mkError(
+            "emit-local-code-terminology-collision",
+            `Lowering both-rep union concept "${c.name}" would synthesize a terminology of the same name, ` +
+              `but that name is already taken in library "${ast.library.name}". Rename one so the ` +
+              `synthesized local code does not collide.`,
+            loc,
+          ),
+        );
+        continue;
+      }
+      if (topLevelIdentifierNames.has(sourceName)) {
+        errors.push(
+          mkError(
+            "emit-records-twin-name-collision",
+            `Lowering both-rep union concept "${c.name}" synthesizes an external source concept ` +
+              `"${sourceName}", but a top-level identifier of that name already exists in library ` +
+              `"${ast.library.name}". Rename "${c.name}" (or the conflicting declaration).`,
+            loc,
+          ),
+        );
+        continue;
+      }
+
+      codeValueToConcept.set(codeValue, c.name);
+      seenSyntheticNames.add(c.name);
+      topLevelIdentifierNames.add(sourceName);
+      localCodes.push({ concept: c.name, code: codeValue, conceptType: localResource });
+      syntheticTerminologies.push(
+        buildSyntheticTerminology(c.name, codeValue, localCodesystemName, urn, loc),
+      );
+
+      // (a) LP twin — the LOCAL records retrieve. `retrieveResourceType` SET ⟺ LocalPrimitives.
+      const lpTwin: Concept = {
+        ...c,
+        representations: [],
+        definition: {
+          type: "CodedFromDefinition",
+          terminologyName: c.name,
+          retrieveResourceType: localResource,
+          location: loc,
+        },
+        __loweringRole: "source-impl",
+      };
+      delete lpTwin.code;
+      loweredConcepts.push(lpTwin);
+
+      // (b) EP source twin — the EXTERNAL retrieve. `retrieveResourceType` UNDEFINED ⟺ ExternalPrimitives.
+      const epSource: Concept = {
+        ...c,
+        name: sourceName,
+        shape: "RecordSet",
+        valueTypes: [],
+        representations: [],
+        conceptType: unionRep.conceptType,
+        definition: {
+          type: "CodedFromDefinition",
+          terminologyName: unionRep.terminologyName,
+          retrieveResourceType: undefined,
+          location: loc,
+        },
+        __loweringRole: "source-impl",
+      };
+      delete epSource.code;
+      delete epSource.meta; // a compiler-internal retrieve — do NOT republish the author's meta/evidence
+      delete epSource.evidence;
+      externalSourceTwins.push(epSource);
+
+      // (c) Inferences twin — the PUBLIC determination, and the only one the author's name resolves to.
+      //
+      // ⚠ MARKER-DRIVEN, not composition-driven. Routing this through `defined as ( "X" sem-or "X Source" )`
+      // was tried and MEASURED: it lands in the TRUTH-SET lane and hard-errors
+      // `emit-mixed-source-inference-unsupported`, because `.asTruths()` lifts LocalPrimitives records into a
+      // BOOLEAN truth-set and an ExternalPrimitives record-list cannot join one. That lane is right for a
+      // boolean determination and wrong for a record-valued one: a `RecordSet<Quantity>` has no truth-set.
+      // The retargeted body below is therefore NEVER rendered (the `record-union` emit reads the marker); it
+      // exists only to classify the twin as Inferences and to survive `requalifyDefinition`.
+      const unionTwin: Concept = {
+        ...c,
+        representations: [],
+        definition: {
+          type: "DefinedAsDefinition",
+          body: {
+            type: "DefinedAsComposition",
+            expression: {
+              type: "SemOrExpression",
+              terms: [
+                { type: "CompositionRef", ref: c.name, location: loc },
+                { type: "CompositionRef", ref: sourceName, location: loc },
+              ],
+              location: loc,
+            },
+            location: loc,
+          },
+          location: loc,
+        } as DefinedAsDefinition,
+        __bothRepMerge: "record-union",
+        __bothRepFoldInLocalPrimitives: c.name,
+        __loweringRole: "public-determination",
+      };
+      delete unionTwin.code;
+      bothRepInferredTwins.push(unionTwin);
       continue;
     }
 

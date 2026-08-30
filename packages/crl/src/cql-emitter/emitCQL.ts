@@ -1913,6 +1913,16 @@ class Emitter {
     // select between the newest local record's value and the newest source record's value. Marker-driven (the
     // retargeted reduction body is NEVER rendered). NOT a truth-set boolean (unlike the age `"recency"` merge) —
     // a plain scalar value define, so it is dispatched here regardless of the case-feature lane.
+    // ⭐ #189 — the both-representation RECORD UNION (`code is` + ONE simple `coded from` `source
+    // representation`, `shape is RecordSet`, no definition). Charter §3: "a concept unions the records from
+    // all its representations". Marker-driven (the retargeted `sem-or` body is NEVER rendered) and dispatched
+    // regardless of the case-feature lane, exactly like `recency-value`: a record-valued concept has no
+    // truth-set, so routing it through the `defined as` composition lane would hard-error
+    // `emit-mixed-source-inference-unsupported` (MEASURED — an ExternalPrimitives record-list cannot join a
+    // `.asTruths()` truth-set, and rightly so; that lane is for BOOLEAN determinations).
+    if (c.__bothRepMerge === "record-union") {
+      return this.emitRecordUnion(c);
+    }
     if (c.__bothRepMerge === "recency-value") {
       return this.emitRecencyValueMerge(c);
     }
@@ -2335,6 +2345,36 @@ class Emitter {
    * `__recencyValueDescriptors` (derived at lowering) + the LP/EP retrieve names. The tie-break policy lives in the
    * ONE shared `CaseFeatureCommon.recencyLocalWins` (via `crossRepRecencyMergeExpr`), so age and this cannot drift.
    */
+  /**
+   * #189 — the both-representation RECORD UNION: `<local records> union <source records>`.
+   *
+   * The two arms are the twins `lowerLocalCodes` synthesized beside this one — a LocalPrimitives retrieve
+   * over the synthetic local code, and an ExternalPrimitives `"<X> Source"` retrieve over the posrep's
+   * terminology. This define is the PUBLIC determination the author's name resolves to.
+   *
+   * ⚠ Deliberately NOT deduped. Charter §3 states the union; whether the same clinical fact arriving on both
+   * arms should collapse to one record is the OPEN dedup question (design §9), and silently choosing
+   * `distinct` here would answer it by accident. CQL `union` is set-semantics over identical elements only,
+   * so two DIFFERENT resources describing one fact both survive — which is the honest reading of "the records
+   * this concept publishes" until dedup is designed.
+   */
+  private emitRecordUnion(c: Concept): string {
+    const foldIn = c.__bothRepFoldInLocalPrimitives;
+    if (foldIn === undefined) {
+      throw new Error(
+        `internal invariant violated: record-union twin "${c.name}" is missing its LocalPrimitives fold-in ` +
+          `name — set in lock-step with the marker at lowering; a missing one is a compiler bug.`,
+      );
+    }
+    const localLib = this.caseFeature.kind === "inferred" ? this.caseFeature.localSourceLibrary : "";
+    const sourceLib =
+      this.caseFeature.kind === "inferred" ? (this.caseFeature.recordSourceLibrary ?? "") : "";
+    const lpRef = cqlQualifiedRef(localLib, foldIn);
+    const epRef = cqlQualifiedRef(sourceLib, `${foldIn} Source`);
+    return `${lpRef}
+  union ${epRef}`;
+  }
+
   private emitRecencyValueMerge(c: Concept): string {
     const foldIn = c.__bothRepFoldInLocalPrimitives;
     const marker = c.__recencyValueDescriptors as

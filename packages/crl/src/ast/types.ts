@@ -606,7 +606,14 @@ export interface Concept extends ASTNode {
    *     over the LP/EP retrieves, not this merge. Descriptors on `__recencyValueDescriptors`.
    * Absent on non-both-rep concepts.
    */
-  __bothRepMerge?: "union" | "recency" | "recency-value";
+  /**
+   * `"record-union"` (#189) — a `code is` + ONE simple `coded from` `source representation`, `shape is
+   * RecordSet`, NO definition. The Inferences twin publishes the UNION of the local records and the source
+   * records (charter §3: "a concept unions the records from all its representations"). Distinct from
+   * `"union"`, which is the BOOLEAN truth-set fold (`.asTruths() union …`); a record-valued concept has no
+   * truth-set, so it emits a plain `union` of the two retrieves.
+   */
+  __bothRepMerge?: "union" | "recency" | "recency-value" | "record-union";
   /**
    * SYNTHETIC-EMITTER-ONLY. For a `"recency"` both-rep Inferences twin, the
    * threshold of the `age today <cmp> <Q>` computed arm, as an already-emitted CQL
