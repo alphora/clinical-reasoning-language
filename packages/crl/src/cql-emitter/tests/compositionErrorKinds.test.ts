@@ -85,7 +85,7 @@ concept "CCComp":
 - defined as ( "CC1" sem-or "CC2" ).`;
 
 describe("#189 Slice C 2b.3b.1ii — boolean composition pivot error kinds (same-layer)", () => {
-  it("MIXED totality (total recency + non-total truth-set) → success:false, emit-composition-totality-mixed + sentinel, NOT the stale ReductionInCompositionError", () => {
+  it("MIXED three-state (recency merge + a composition over questions) → ADMITTED to the boolean lane, strong Kleene", () => {
     const { success, kinds, inferred } = emit(`library "P".
 
 ${AGE_RECENCY}
@@ -99,10 +99,21 @@ concept "Gate":
 
 ${DECISION}
 `);
-    expect(success).toBe(false);
-    expect(kinds).toContain("emit-composition-totality-mixed");
-    expect(kinds).not.toContain("emit-reduction-in-composition"); // the honest kind replaces the stale guard
-    expect(inferred).toContain("CRLCommon.CompositionTotalityMixed"); // compile-failing sentinel in the emitted CQL
+    // ⭐ #189 T5 step 2b — this cell FLIPPED, and the flip is the point of the slice. Both operands are
+    // THREE-STATE booleans: `"Age 21 Or Older"` is a both-rep recency merge (three-state since O3 dropped its
+    // outer `Coalesce`) and `"TS"` is a composition over two PURE QUESTIONS, each of which now publishes a
+    // three-state determination instead of a truth-set List. So there is no longer a totality MIXTURE to
+    // report — there are two nullable booleans, which is exactly what the boolean lane must accept.
+    //
+    // The charter settles the direction: composition is strong Kleene, and totality belongs at the ARM, never
+    // per operand. Refusing here (or coalescing either operand) would deny a patient whose age is unknown AND
+    // whose questions are unanswered, where the tree must pause and ask.
+    expect(success).toBe(true);
+    expect(kinds).toEqual([]);
+    // BARE leaves — no `Coalesce`, no truth-set weave, no compile-failing sentinel.
+    expect(inferred).toMatch(/define "Gate":\s*\n\s*"Age 21 Or Older"\s*\n?\s*or "TS"/);
+    expect(inferred).not.toContain("CRLCommon.CompositionTotalityMixed");
+    expect(inferred).not.toContain("asTruths()");
   });
 
   it("boolean parent over a KNOWN non-boolean (Scalar<CodeableConcept>) operand → emit-composition-result-type-mismatch + type-realign remedy (NOT `exists`)", () => {

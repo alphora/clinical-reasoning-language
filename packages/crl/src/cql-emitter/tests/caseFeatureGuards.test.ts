@@ -109,7 +109,13 @@ concept "Mixed":
     const result = emitPartitioned(lowered.ast, "Mix", "Mix", FULL_PARTITION);
     expect(result.success).toBe(false);
     const allKinds = result.entries.flatMap((e) => e.result.errors?.map((x) => x.kind) ?? []);
-    expect(allKinds).toContain("emit-mixed-source-inference-unsupported");
+    // ⚠ #189 T5 step 2b changed WHICH loud kind fires here, not whether one does. `"Local Leaf"` is a PURE
+    // QUESTION, so it now publishes a three-state BOOLEAN determination rather than a truth-set List — and a
+    // boolean woven into a refinement-lane composition is refused one guard EARLIER, by
+    // `emit-reduction-in-composition`. The invariant this test exists for is unchanged: a local/external
+    // `defined as` mixture NEVER emits ill-typed CQL under success:true. Both guards live in the region step 7
+    // deletes wholesale, so the ordering is not worth re-plumbing here.
+    expect(allKinds).toContain("emit-reduction-in-composition");
   });
 });
 

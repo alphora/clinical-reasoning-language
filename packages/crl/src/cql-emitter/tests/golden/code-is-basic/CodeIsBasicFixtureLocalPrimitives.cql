@@ -8,8 +8,8 @@ include CodeIsBasicFixtureLocalConcepts
 
 context Patient
 
-define "Adult Patient":
+define "Adult Patient Records":
   [Observation: CodeIsBasicFixtureLocalConcepts."Adult Patient"]
 
-define "Active Crohns Disease":
-  [Observation: CodeIsBasicFixtureLocalConcepts."Active Crohns Disease"]
+define "Active Crohns Disease Records":
+  [Condition: CodeIsBasicFixtureLocalConcepts."Active Crohns Disease"]

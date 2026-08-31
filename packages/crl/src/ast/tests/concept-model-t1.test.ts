@@ -289,10 +289,17 @@ concept "B":
 
 describe("increment-1 lowering guard", () => {
   it("emit_cql LOWERS an exists concept to a boolean `exists (<X>)` (#265; was a guarded structured error pre-#265)", () => {
+    // ⚠ #189 T5 step 2b — "Present" declares `shape is RecordSet`, so it is a RECORD PUBLISHER and `exists`
+    // over it is well-typed. It must NOT be a bare Scalar boolean `code is`: that is a PURE QUESTION, whose
+    // determination is now a three-state BOOLEAN, and `exists` over a boolean is ill-typed (it can silently
+    // invert via singleton promotion). The emitter refuses that LOUDLY and tells the author to reference the
+    // question directly (`defined as "Present"`), which is both what they meant and what preserves the pause.
+    // This test is about `defined as exists ( "X" )` LOWERING at all (#265), so give it a record set.
     const ast = parseInput(`library "T".
 concept "Present":
 - type is Observation.
 - value type is boolean.
+- shape is RecordSet.
 - code is \`present\`.
 concept "Has Present":
 - value type is boolean.

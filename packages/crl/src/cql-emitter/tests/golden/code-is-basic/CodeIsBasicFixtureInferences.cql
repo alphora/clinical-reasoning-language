@@ -9,6 +9,11 @@ include CodeIsBasicFixtureLocalPrimitives
 
 context Patient
 
+define "Adult Patient":
+  CodeIsBasicFixtureLocalPrimitives."Adult Patient Records".answeredValue()
+
+define "Active Crohns Disease":
+  exists (CodeIsBasicFixtureLocalPrimitives."Active Crohns Disease Records")
+
 define "Adult With Crohns":
-  CodeIsBasicFixtureLocalPrimitives."Adult Patient".asTruths()
-    intersect CodeIsBasicFixtureLocalPrimitives."Active Crohns Disease".asTruths()
+  "Adult Patient" and "Active Crohns Disease"

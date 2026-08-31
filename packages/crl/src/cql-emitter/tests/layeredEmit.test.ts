@@ -557,18 +557,23 @@ decision "Cover":
     const localSource = layerLibraryName("example-semand", "LocalPrimitives");
     const inferred = layerLibraryName("example-semand", "Inferences");
 
-    // Inferences body qualifies LocalPrimitives truth-sets → `LocalPrimitives."A".asTruths()`;
-    // its header MUST `include <LocalPrimitives>` (byte-identical, unquoted).
+    // #189 T5 step 2b — "A" and "B" are PURE QUESTIONS, so each now publishes an Inferences determination
+    // reading its LocalPrimitives answer records three-state (`"<X> Records".answeredValue()`), and the parent
+    // composes those BOOLEANS rather than weaving truth-set Lists. The cascade invariant is unchanged and is
+    // what this test is actually about: the Inferences body qualifies LocalPrimitives, so its header MUST
+    // `include <LocalPrimitives>` (byte-identical, unquoted).
     const inf = layer(r, "Inferences")!;
-    expect(inf.result.result).toContain(`${localSource}."A".asTruths()`);
-    expect(inf.result.result).toContain(`${localSource}."B".asTruths()`);
+    expect(inf.result.result).toContain(`${localSource}."A Records".answeredValue()`);
+    expect(inf.result.result).toContain(`${localSource}."B Records".answeredValue()`);
     expect(inf.result.result).toContain(`include ${localSource}`);
     expect(inf.crossLibraryIncludes).toContain(localSource);
 
-    // Interface re-exports the Inferences determination → `Inferences."A And B".satisfied()`;
-    // its header MUST `include <Inferences>`.
+    // Interface re-exports the Inferences determination. BARE, not `.satisfied()`: the parent composes two
+    // three-state questions, so its result is three-state, and `.satisfied()` (an `exists` wrapper) would
+    // collapse the unknown back to `false` — the pause→deny flip.
     const iface = layer(r, "Interface")!;
-    expect(iface.result.result).toContain(`${inferred}."A And B".satisfied()`);
+    expect(iface.result.result).toContain(`${inferred}."A And B"`);
+    expect(iface.result.result).not.toContain(`${inferred}."A And B".satisfied()`);
     expect(iface.result.result).toContain(`include ${inferred}`);
     expect(iface.crossLibraryIncludes).toContain(inferred);
 
@@ -728,10 +733,18 @@ decision "Cover":
     const lowered = lowerLocalCodes(a);
     expect(lowered.errors).toEqual([]);
     const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
-    expect(r.success).toBe(false);
-    // The Inferences layer (which emits "Combo") carries the loud, filterable diagnostic.
+    // ⭐ #189 T5 step 2b LIFTED THIS DEFERRAL — the comment above predicted it ("a boundary-2 change"). "R" is
+    // a TOTAL boolean (`exists this`) and "S" is a PURE QUESTION, which now publishes a THREE-STATE boolean
+    // determination instead of a bare retrieve. Both operands are booleans, so the pivot routes "Combo" to the
+    // BOOLEAN lane and the mixture is well-typed. This is the §4a case 2b exists to admit: composition is
+    // strong Kleene, so an unanswered "S" makes "Combo" unknown (the guard pauses) rather than false.
+    expect(r.success).toBe(true);
     const inferred = r.entries.find((e) => e.layer === "Inferences");
-    expect(inferred?.result.errors?.some((e) => e.kind === "emit-reduction-in-composition")).toBe(true);
+    expect(inferred?.result.errors ?? []).toEqual([]);
+    // BARE leaves — no `Coalesce`, no `exists` wrapper. Totality belongs at the branch guard, never per operand.
+    expect(inferred?.result.result).toMatch(/define "Combo":\s*\n\s*"R"\s*\n?\s*or "S"/);
+    expect(inferred?.result.result).not.toContain("asTruths()");
+    expect(inferred?.result.result).not.toContain("Coalesce");
   });
 
   it("#189 2b.2 — a BARE-REF alias `defined as \"R\"` to a reduction FLIPS: the reduction's total boolean re-exports DIRECTLY", () => {
@@ -811,9 +824,14 @@ decision "Cover":
     const lowered = lowerLocalCodes(a);
     expect(lowered.errors).toEqual([]);
     const r = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
-    expect(r.success).toBe(false);
+    // ⭐ #189 T5 step 2b LIFTED THIS DEFERRAL (the title's "composition-over-totals is 2b.3" is now done). "D"
+    // is a total-boolean alias to a reduction and "S" is a PURE QUESTION publishing a three-state boolean, so
+    // "E" composes two BOOLEANS in the boolean lane rather than weaving a Boolean into a truth-set List.
+    expect(r.success).toBe(true);
     const inferred = r.entries.find((e) => e.layer === "Inferences");
-    expect(inferred?.result.errors?.some((e) => e.kind === "emit-reduction-in-composition")).toBe(true);
+    expect(inferred?.result.errors ?? []).toEqual([]);
+    expect(inferred?.result.result).toMatch(/define "E":\s*\n\s*"D"\s*\n?\s*or "S"/);
+    expect(inferred?.result.result).not.toContain("asTruths()");
   });
 
   it("#189 2b.2 — a boolean COMPARATOR used as a decision guard re-exports its façade BARE (total-boolean), not `.satisfied()` (2b.1 hand-off)", () => {

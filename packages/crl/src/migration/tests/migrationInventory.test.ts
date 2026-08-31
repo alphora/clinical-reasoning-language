@@ -240,7 +240,7 @@ describe("reconcile diff — oracle vs authoritative validator (pure)", () => {
 describe("runInventory — integration over real fixture sub-roots", () => {
   const NONE: ExclusionRule[] = [];
 
-  it("code-is-basic: closed-set holds, reconciles, flags the bare leaves not the defined-as", () => {
+  it("code-is-basic: closed-set holds, reconciles, and has NOTHING left to migrate", () => {
     const rep = runInventory({ root: fixture("cql-emitter/tests/fixtures/code-is-basic"), exclusions: NONE });
     expect(rep.counts.included + rep.counts.excluded + rep.counts.buildFailed).toBe(rep.counts.discovered);
     expect(rep.reconcile.ok).toBe(true);
@@ -251,9 +251,14 @@ describe("runInventory — integration over real fixture sub-roots", () => {
     // destroy the pause. "Active Crohns Disease" is `type is Condition`: nowhere to store a boolean, so it
     // is not a question and IS still a migration target.
     expect(names).not.toContain("Adult Patient");
-    expect(names).toContain("Active Crohns Disease");
+    // #189 T5 step 2b MIGRATED this fixture: "Active Crohns Disease" now carries `definition is exists this`,
+    // the canonical spelling for a `type is Condition` boolean (the value type names the RESULT of the
+    // `exists`), so it is a derivation rather than a bare leaf and is off the worklist. The inventory going
+    // EMPTY here is the migration landing, not coverage being lost — the inventory's own machinery is
+    // exercised by the unit cases above and by the other fixture roots below.
+    expect(names).not.toContain("Active Crohns Disease");
     expect(names).not.toContain("Adult With Crohns");
-    expect(rep.targets.every((t) => t.migrationClass === "boolean-presence")).toBe(true);
+    expect(rep.targets).toEqual([]);
   });
 
   it("patient-age: the age posrep concept is a value-projection-exempt NON-target", () => {

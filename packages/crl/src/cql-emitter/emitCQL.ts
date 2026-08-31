@@ -1466,6 +1466,21 @@ class Emitter {
           if (emitsTotalScalarBoolean(c, this.totalityResolvers())) {
             return total("composite-delegated");
           }
+          // ⚠⚠ REFACTOR:suspect — #189 T5 step 2b, MEASURED HOLE, do not read this arm as intent.
+          //
+          // Since 2b the emit PIVOT routes on `emitsBareReExportableScalarBoolean` (is every operand a scalar
+          // BOOLEAN), not on totality — so a composition over a three-state operand now emits a strong-Kleene
+          // BOOLEAN (`"Adult Patient" and "Active Crohns Disease"`), not a truth-set List. This arm still
+          // reports `non-Boolean(truth-set defined-as (List))` for it, which is FALSE, and the consequence is
+          // worse than a wrong label: `isBooleanSubject` keys on `resultType`, so these defines drop OUT of the
+          // boolean proof entirely and design §3's "every boolean define is total or a member of a CLOSED
+          // sanctioned three-state family" goes UNENFORCED for exactly the family 2b introduces. The proof
+          // still reports `proven` — vacuously. MEASURED via the test-mode ledger on `code-is-basic`
+          // ("Adult With Crohns") and `semnot-232` (all five compositions).
+          //
+          // The fix is the plan's MACHINE (3): classify a Kleene composition `sanctioned-three-state`
+          // (a new `family: "composition"`) with a matching `threeStateRead` discharge, and teach the prover to
+          // accept a proven-three-state operand. Until then this hole is RECORDED, not papered over.
           return notBoolean("truth-set defined-as (List)");
         }
         // LEGACY lane (`caseFeature` off — cms/none): the emitted shape depends on the body + value type
@@ -1487,6 +1502,10 @@ class Emitter {
         // certify a total it cannot emit — the `declaredShapeOfConcept` check below (a value-type test, not
         // a totality proof) would wrongly do so.
         if (body.type === "DefinedAsBooleanComposition") {
+          // ⚠⚠ REFACTOR:suspect — the LEGACY-lane half of the same measured hole as the case-feature arm above.
+          // The `notBoolean` reason ("emit error") was true before 2b, when a non-total operand could not be
+          // composed at all. It is now false for a THREE-STATE operand: the pivot admits it and emits a Kleene
+          // Boolean. See the arm above for the measurement and for machine (3), the fix.
           return emitsTotalScalarBoolean(c, this.totalityResolvers())
             ? total("composite-delegated")
             : notBoolean("boolean composition with a non-total operand (emit error)");
@@ -1603,7 +1622,15 @@ class Emitter {
     // RISK: verify on a real CQL engine downstream; if fluent method-style resolution
     // across an `include` does NOT hold, the model + goldens must switch to qualified
     // `CFH.asTruths(...)` calls.
-    if (this.caseFeature.kind !== "off") {
+    // ⭐ #189 null/pause T5 step 2b — a PURE QUESTION's determination emits `"X Records".answeredValue()`,
+    // which is also a CaseFeatureCommon fluent, and a question is NOT decision-bearing by construction — so it
+    // reaches the DIRECT (unlayered) path where the case-feature lane is "off". Without this the emitted CQL
+    // calls a fluent from a library the header never includes, and it cannot translate. MEASURED: a one-question
+    // library emitted `"Present Records".answeredValue()` under a header carrying only FHIRHelpers + CRLCommon.
+    const emitsQuestionRead = this.ast.statements.some(
+      (s) => s.type === "Concept" && s.__pureQuestionRead === true && !this.skipNames.has(s.name),
+    );
+    if (this.caseFeature.kind !== "off" || emitsQuestionRead) {
       lines.push("include CaseFeatureCommon called CFH");
     }
     // Cross-library includes for per-CRL emit: every other CRL library this
@@ -1836,6 +1863,11 @@ class Emitter {
 
   private emitConcept(c: Concept): string {
     const header = `define ${cqlIdent(c.name)}:`;
+    // ⭐ #189 null/pause T5 step 2b — the PURE QUESTION's Inferences twin. Dispatched HERE, ahead of the
+    // representations-only guard below, because the twin deliberately carries no `definition`: the read is a
+    // compiler-synthesized lowering, not an authored form. Without this the compiler would report a define it
+    // built itself as unbuilt work.
+    const questionRead = c.__pureQuestionRead === true ? this.emitPureQuestionRead(c) : undefined;
     // ⚠ A concept with no definition after lowering is REPRESENTATIONS-ONLY, and its lowering is unbuilt.
     // This used to emit a comment as the define's entire body — a `define` with no expression, i.e. CQL that
     // cannot translate — while the emitter reported SUCCESS. Silent success on invalid output is the worst
@@ -1843,7 +1875,7 @@ class Emitter {
     // "this works" to every consumer and to every progress report.
     //
     // Legal-but-unbuilt fails LOUDLY (charter §0a). The shape is canonical — do NOT re-author around it.
-    if (c.definition === undefined) {
+    if (c.definition === undefined && questionRead === undefined) {
       this.emitErrors.push({
         type: "Validation",
         kind: "emit-representations-only-not-lowered",
@@ -1856,9 +1888,11 @@ class Emitter {
           `fails rather than producing a define with no body.`,
       });
     }
-    const body = c.definition
-      ? this.emitConceptBody(c, c.definition)
-      : `CRLCommon.UnmatchedNarrative('representations-only concept "${c.name}" — emit lowering not yet built')`;
+    const body =
+      questionRead ??
+      (c.definition
+        ? this.emitConceptBody(c, c.definition)
+        : `CRLCommon.UnmatchedNarrative('representations-only concept "${c.name}" — emit lowering not yet built')`);
     // #108: emit `meta is` annotations as a leading block comment on the
     // concept's `define`. CRL preserves them on Concept.meta but the
     // emitter was dropping them silently. `@logic-expression-text`,
@@ -1892,6 +1926,56 @@ class Emitter {
     return cql;
   }
 
+  /**
+   * ⭐ #189 null/pause T5 step 2b — the PURE QUESTION's THREE-STATE read.
+   *
+   *   newest answer record valued true   -> true
+   *   newest answer record valued false  -> false
+   *   NO answer record at all            -> null   (UNKNOWN — the guard pauses and the question is asked)
+   *
+   * The whole point is the third row. `asTruths().satisfied()` — the collapse this slice retires — maps both
+   * "no record" and "answered false" onto `false`, so a decision DENIES where it must PAUSE. `answeredValue()`
+   * (CaseFeatureCommon) keeps them apart, and is deliberately NOT `Coalesce`d: totality belongs at the ARM,
+   * never per operand (charter §4 / design of record §3.1/§3.3).
+   *
+   * Emitted on the INFERENCES twin so every consumer — a `defined as` composition, the Interface facade, a
+   * criterion — reads the SAME define. Before 2b this read existed only on the facade, so a composition could
+   * not reach it (`LAYER_ORDER` forbids Inferences -> Interface) and fell through to the collapse.
+   */
+  private emitPureQuestionRead(c: Concept): string {
+    const def = c.definition;
+    // INTERNAL-INVARIANT: the marker and the bare ref to the records twin are set TOGETHER when the
+    // determination is synthesized (`lowerLocalCodes`). A marked determination that cannot name the records it
+    // reads is a compiler bug, not a defaultable case — fail loudly rather than fabricate a target.
+    if (def?.type !== "DefinedAsDefinition" || def.body.type !== "DefinedAsBareRef") {
+      throw new Error(
+        `internal invariant violated: pure-question determination "${c.name}" carries __pureQuestionRead but ` +
+          `its definition is ${def?.type ?? "(none)"}, not a \`defined as\` bare ref to its records twin. The ` +
+          `marker and the ref are set in lock-step in lowerLocalCodes; a determination missing either is a ` +
+          `compiler bug.`,
+      );
+    }
+    // INTERNAL-INVARIANT: `answeredValue()` returns a Boolean, so a marked determination that declares anything
+    // else would publish a shape its author never wrote (charter §3 cardinality is authoritative / §4 no-magic).
+    // `lowerLocalCodes` only sets the marker via `isPureQuestionConcept`, which enforces both — but
+    // `emitCQLFromAST` is a validator-free public entry, so assert rather than emit a Boolean under a
+    // Record/RecordSet or non-boolean declaration.
+    if (!(assumedShapePreMigration(c.shape) === "Scalar" && c.valueTypes.length === 1 && c.valueTypes[0] === "boolean")) {
+      throw new Error(
+        `internal invariant violated: pure-question determination "${c.name}" carries __pureQuestionRead but ` +
+          `declares shape=${c.shape ?? "(none)"}, value type(s)=` +
+          `${c.valueTypes.length > 0 ? c.valueTypes.join(", ") : "(none)"}. The three-state read emits a Scalar ` +
+          `boolean; any other declaration would manufacture a shape the concept did not declare.`,
+      );
+    }
+    // The SAME qualification the bare-ref alias arm of `emitDefinedAsBody` uses, so the records twin resolves
+    // identically whether it is same-library (direct emit) or cross-layer (the LocalPrimitives layer).
+    const ref = def.body.ref;
+    const crossLib = this.crossLibraryOf(ref);
+    const target = crossLib !== null ? cqlQualifiedRef(crossLib, getRefName(ref)) : cqlIdent(getRefName(ref));
+    return `${target}.answeredValue()`;
+  }
+
   private emitConceptBody(c: Concept, def: ConceptDefinition): string {
     // Case-feature INTERFACE re-export: collapse the re-exported source-layer
     // truth-set to a boolean for the decision/action-guard surface.
@@ -1923,9 +2007,7 @@ class Emitter {
           // never per operand (design of record §3.1/§3.3). Marker set at synthesis (`buildInterfaceReexports`)
           // because this emitter is layer-isolated. REFACTOR:grounded — derived from the design of record and
           // the reference IGs' case-feature read, not from the adjacent truth-set lane.
-          return c.__pureQuestion === true
-            ? `${qref}.answeredValue()`
-            : `${qref}.asTruths().satisfied()`;
+          return `${qref}.asTruths().satisfied()`;
         // ExternalPrimitives (and any other) → fall through to the legacy re-export.
       }
     }
@@ -2772,7 +2854,16 @@ class Emitter {
     // now mis-blames a proven-total foreign operand in a mixed `foreign-total and local-non-total` composition
     // (disc 466, both arms). A qualified offender that is STILL non-total gets an accurate note (its foreign define
     // is non-total, or it is unresolvable in this library's scope — never a promise of a proof that just failed).
-    const nonTotal = refs.find((r) => !branchCompositionOperandTotal(r.ref, resolvers));
+    // ⭐ #189 null/pause T5 step 2b — SEARCH IN THE GATE'S MODE (`scalarBoolean`), not in `total`.
+    //
+    // The gate above asks `emitsBareReExportableScalarBoolean` — is every operand a scalar BOOLEAN — because
+    // composition is strong Kleene and totality belongs at the arm, never per operand. Searching in `total`
+    // mode asked a DIFFERENT question, so in `defined as ( "Q" and "SomeRecordSet" )` the gate failed on the
+    // RecordSet while the search named the QUESTION — which is scalar-boolean but (rightly) never total.
+    // The message then told the author to totalize a question, and adding `exists this` to a question converts
+    // "ask the user" into "deny": the exact pause→deny flip this slice exists to remove, delivered by the
+    // diagnostic meant to help. Same mode ⇒ the named operand is always one that actually failed the gate.
+    const nonTotal = refs.find((r) => !branchCompositionOperandTotal(r.ref, resolvers, "scalarBoolean"));
     const offender = nonTotal !== undefined ? getRefName(nonTotal.ref) : "(unknown)";
     const crossLibNote =
       nonTotal !== undefined && getRefLibrary(nonTotal.ref) !== null
@@ -2783,11 +2874,18 @@ class Emitter {
       kind: "emit-boolean-composition-operand-not-total",
       line: loc.line,
       column: loc.column,
+      // ⚠ #189 null/pause T5 step 2b — this message must NEVER advise totalizing an operand. A three-state
+      // operand is WELCOME here (composition is strong Kleene; `not(null)` is null, which is the pause
+      // propagating), so the defect is never "this operand can be null" — it is "this operand is not a scalar
+      // boolean at all". Advising `exists this` on a question would turn a pause into a denial.
       message:
-        `Concept "${c.name}" is a boolean \`defined as\` composition but operand "${offender}"${crossLibNote} does ` +
-        `not emit a TOTAL scalar boolean. Every operand must be a proven-total boolean (a reduction \`exists\`/` +
-        `\`count\`, a boolean comparator, a \`defined as exists\`, or a boolean composition/alias over such). A ` +
-        `boolean composition never fabricates totality (no terminal \`Coalesce\` — charter §4); make it total.`,
+        `Concept "${c.name}" is a boolean \`defined as\` composition (\`and\`/\`or\`/\`not\`) but operand ` +
+        `"${offender}"${crossLibNote} does not emit a scalar BOOLEAN. Every operand must publish one boolean — a ` +
+        `reduction \`exists\`/\`count\`, a boolean comparator, a \`defined as exists\`, a locally-coded boolean ` +
+        `question, or a composition/alias over such. An operand that publishes RECORDS composes with \`sem-and\`/` +
+        `\`sem-or\` instead, on the record lane. ⚠ Do NOT make the operand "total" to satisfy this: an operand ` +
+        `that is UNKNOWN until answered is legitimate here and its unknown must propagate (charter §4 — totality ` +
+        `belongs at the arm, never per operand). Totalizing a question turns a pause into a denial.`,
     });
     return `/* FIXME: emit-boolean-composition-operand-not-total (${c.name} -> ${offender}) */ CRLCommon.BooleanCompositionOperandNotTotal('${c.name}')`;
   }
@@ -3271,12 +3369,19 @@ class Emitter {
             getRefLibrary(expr.ref) === null &&
             emitsBareReExportableScalarBoolean(this.conceptByName.get(getRefName(expr.ref)), this.totalityResolvers())
           ) {
+            // ⚠ #189 null/pause T5 step 2b — this message must NOT say "total", and must NOT advise totalizing.
+            // Since 2b it fires for a PURE QUESTION too: a question's determination IS a scalar Boolean, but a
+            // THREE-STATE one. Telling an author to make it total is the exact pause→deny flip #189 removes —
+            // adding `exists this` to a question converts "ask the user" into "deny". Name the type mismatch and
+            // point at the LANE, never at the operand.
             throw new ReductionInCompositionError(
-              `Concept "${getRefName(expr.ref)}" emits a TOTAL scalar boolean and cannot be a truth-set operand in ` +
-                `a REFINEMENT-lane \`defined as\` composition (a total boolean union/intersect/except a truth-set ` +
+              `Concept "${getRefName(expr.ref)}" emits a scalar BOOLEAN and cannot be a truth-set operand in ` +
+                `a REFINEMENT-lane \`defined as\` composition (a boolean union/intersect/except a truth-set ` +
                 `List is ill-typed). To compose booleans, declare the PARENT concept \`- value type is boolean.\` so ` +
-                `the composition flips to the boolean (\`and\`/\`or\`/\`not\`) lane (#189 2b.3b.1). Weaving a total ` +
-                `boolean into a truth-set (refinement) List is the record-half case, deferred to a later #189 boundary.`,
+                `the composition flips to the boolean (\`and\`/\`or\`/\`not\`) lane, which is strong Kleene and ` +
+                `propagates an unanswered operand as unknown. Do NOT totalize the operand to satisfy this — if it ` +
+                `is a question, totalizing it turns a pause into a denial. Weaving a boolean into a truth-set ` +
+                `(refinement) List is the record-half case, deferred to a later #189 boundary.`,
               typeof expr.ref === "string" ? undefined : expr.ref.location,
             );
           }

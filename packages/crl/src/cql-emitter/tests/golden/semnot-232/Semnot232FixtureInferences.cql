@@ -9,21 +9,27 @@ include Semnot232FixtureLocalPrimitives
 
 context Patient
 
+define "Alpha":
+  Semnot232FixtureLocalPrimitives."Alpha Records".answeredValue()
+
+define "Beta":
+  Semnot232FixtureLocalPrimitives."Beta Records".answeredValue()
+
 define "Not Alpha":
-  ({ true } except (Semnot232FixtureLocalPrimitives."Alpha".asTruths()))
+  not ("Alpha")
 
 define "Beta Or Not Alpha":
-  Semnot232FixtureLocalPrimitives."Beta".asTruths()
-    union ({ true } except (Semnot232FixtureLocalPrimitives."Alpha".asTruths()))
+  "Beta"
+    or not ("Alpha")
 
 define "Neither Alpha Nor Beta":
-  ({ true } except (Semnot232FixtureLocalPrimitives."Alpha".asTruths()))
-    intersect ({ true } except (Semnot232FixtureLocalPrimitives."Beta".asTruths()))
+  not ("Alpha")
+    and not ("Beta")
 
 define "Beta And Not Alpha":
-  Semnot232FixtureLocalPrimitives."Beta".asTruths()
-    except Semnot232FixtureLocalPrimitives."Alpha".asTruths()
+  "Beta"
+    and not ("Alpha")
 
 define "Beta And Grouped Not Alpha":
-  Semnot232FixtureLocalPrimitives."Beta".asTruths()
-    except Semnot232FixtureLocalPrimitives."Alpha".asTruths()
+  "Beta"
+    and (not ("Alpha"))

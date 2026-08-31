@@ -579,6 +579,39 @@ export interface Concept extends ASTNode {
    */
   __pureQuestion?: true;
   /**
+   * SYNTHETIC-EMITTER-ONLY (#189 null/pause, T5 step 2b). Marks the INFERENCES TWIN of a pure question — the
+   * define that carries its THREE-STATE read (`<LocalPrimitives twin>.answeredValue()`).
+   *
+   * REFACTOR:grounded — re-derived from the charter ("composition is strong Kleene, and totality belongs at
+   * the arm, never per operand") and from RUNNING the emitter on both the layered and the direct paths, not
+   * from the adjacent truth-set lane.
+   *
+   * ⭐ WHY THE TWIN EXISTS AT ALL. A pure question has no `definition is`/`defined as`, so before 2b it emitted
+   * only a LocalPrimitives RETRIEVE, and the three-state read lived exclusively on the Interface façade. A
+   * `defined as` COMPOSITION is an Inference, and `LAYER_ORDER` forbids Inferences referencing Interface — so
+   * a composition over a question resolved its leaf to the retrieve (a `List<FHIR.Observation>`, not a
+   * Boolean) and could only be lowered by the truth-set collapse this slice deletes. Giving the question a
+   * first-class Inferences define makes the qualifier resolve the leaf to a Boolean with NO change to the
+   * composition renderer (`compositionLeafPolicy.concept` is `(qualified) => qualified`), and the Interface
+   * facade then re-exports that define BARE — one read, one place, every consumer.
+   *
+   * ⭐ THE INVARIANT, and it is load-bearing: a `__pureQuestionRead` concept ALWAYS carries a
+   * `DefinedAsDefinition` whose body is a `DefinedAsBareRef` naming its records twin. The marker and that ref
+   * are set together in `lowerLocalCodes`, and `emitPureQuestionRead` throws if they disagree. The ref is real
+   * rather than a compiler-private field precisely so the shared cross-layer/cross-library requalification
+   * applies to it unchanged — the marker changes only how the ref is RENDERED (`.answeredValue()` appended
+   * instead of a bare alias).
+   *
+   * ⚠ It must also declare `Scalar` + a single `boolean` value type — `answeredValue()` returns a Boolean, so
+   * a differently-declared concept would publish a shape its author never wrote (charter §3/§4, no magic).
+   * `lowerLocalCodes` only ever sets the marker via `isPureQuestionConcept`, which enforces both; the emit
+   * asserts it again because `emitCQLFromAST` is a validator-free public entry.
+   *
+   * Its LocalPrimitives half carries `__loweringRole: "records-impl"` and this determination carries
+   * `"public-determination"` — the same split `code is` + `definition is exists this` already uses.
+   */
+  __pureQuestionRead?: true;
+  /**
    * SYNTHETIC-EMITTER-ONLY (#189 O3). Marks an Interface re-export whose Inferences SOURCE is a
    * both-representation RECENCY MERGE of an ANSWERABLE determination — i.e. a merge that is deliberately
    * THREE-STATE (no outer `Coalesce`), because a determination NO arm establishes is UNKNOWN, not false.

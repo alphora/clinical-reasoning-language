@@ -442,6 +442,14 @@ export function lowerLocalCodes(
     // `c` is reassigned once an age `source representation` is CONSUMED (stripped) below,
     // so the downstream `code is` lowering sees a representation-free concept.
     let c: Concept = stmt;
+    // ⭐ #189 null/pause — classify the PURE QUESTION off the AUTHORED statement, HERE, before anything
+    // rebinds `c`. The (AGE) block below strips a consumed Patient-age posrep (`c = { ...c, representations:
+    // [] }`), which leaves a concept that LOOKS like a bare `code is` boolean — so classifying later reads an
+    // age recency merge, a TWO-ARM determination, as a one-arm question. MEASURED: that mis-marking was
+    // already latent on every age recency twin's LocalPrimitives half before step 2b (harmless only because
+    // an `source-impl` role short-circuits every consumer of the marker); 2b made it live by giving a
+    // question an Inferences twin, and nine `lowerLocalCodes` recency tests failed at once.
+    const isPureQuestion = isPureQuestionConcept(stmt);
     const codeValue = c.code as string;
     const loc = c.location;
 
@@ -1625,9 +1633,89 @@ export function lowerLocalCodes(
       // lowering, `definition` is the retrieve, so the predicate can no longer tell a pure question (nothing
       // can compute it → UNKNOWN until answered) from a derived determination (closed-world false). The
       // Interface re-export copies this marker and emits the three-state `answeredValue()` read.
-      ...(isPureQuestionConcept(c) ? { __pureQuestion: true as const } : {}),
+      ...(isPureQuestion ? { __pureQuestion: true as const } : {}),
     };
     delete lowered.code;
+
+    // ⭐⭐ #189 null/pause T5 step 2b — a PURE QUESTION splits into a RECORDS TWIN + a DETERMINATION, exactly
+    // as `code is` + `definition is exists this` already does. The two differ only in the READ, which is the
+    // whole semantic point:
+    //
+    //     `code is` + `exists this`  ->  define "X": exists ("X Records")            <- closed-world false
+    //     a PURE QUESTION            ->  define "X": "X Records".answeredValue()     <- true / false / NULL
+    //
+    // WHY A SPLIT AT ALL. Before 2b a question emitted only the RETRIEVE under its own name, so a
+    // `defined as` composition over it resolved its leaf to a `List<FHIR.Observation>` and could only be
+    // lowered by the truth-set collapse this slice deletes — the collapse that makes an UNANSWERED question
+    // read `false` and a decision DENY where it must PAUSE. A first-class determination define fixes that with
+    // NO change to the composition renderer (`compositionLeafPolicy.concept` is `(qualified) => qualified`),
+    // and the Interface facade re-exports the same define bare, so every consumer reads ONE definition of
+    // "answered".
+    //
+    // ⚠ WHY THE RECORDS-TWIN MECHANISM AND NOT THE BOTH-REP SAME-NAME TWIN (measured, not assumed). The
+    // both-rep split gives BOTH halves the authored name and relies on the layered split to separate them.
+    // A question does not REQUIRE a decision (it is the canonical `when`-guard shape, but a library may declare
+    // questions and no decision at all), so it routes the DIRECT (unlayered) path too —
+    // where same-name halves collide into a duplicate `define "X"` and the emit is refused
+    // (`emit-both-rep-requires-case-feature-lane`; MEASURED on a bare one-question library). Distinct names
+    // work on BOTH paths with ONE mechanism.
+    if (isPureQuestion) {
+      const questionTwinName = recordsTwinDefineName(c.name);
+      if (topLevelIdentifierNames.has(questionTwinName)) {
+        errors.push(
+          mkError(
+            "emit-records-twin-name-collision",
+            `Lowering the pure-question concept "${c.name}" synthesizes a records-twin concept ` +
+              `"${questionTwinName}", but a top-level identifier of that name already exists in library ` +
+              `"${ast.library.name}". Rename "${c.name}" (or the conflicting declaration) so the ` +
+              `synthesized "${questionTwinName}" is unique.`,
+            loc,
+          ),
+        );
+        continue;
+      }
+      topLevelIdentifierNames.add(questionTwinName);
+      // The RECORDS TWIN "X Records" — the answer records themselves. A question is `type is Observation` by
+      // construction (`isPureQuestionConcept`), so the forced-Observation retrieve `codedFrom` already names
+      // the natural resource. Carries NO scalar value type: it publishes RECORDS, and a RecordSet's value type
+      // would describe a datum a bare retrieve does not project (mirrors the reduction records twin).
+      const questionRecordsTwin: Concept = {
+        ...lowered,
+        name: questionTwinName,
+        shape: "RecordSet",
+        valueTypes: [],
+        __loweringRole: "records-impl",
+      };
+      // The twin is a compiler-internal retrieve, not an authored concept — the author's `meta is` / evidence
+      // and the question marker stay on the public determination "X".
+      delete questionRecordsTwin.meta;
+      delete questionRecordsTwin.evidence;
+      delete questionRecordsTwin.__pureQuestion;
+      recordsTwins.push(questionRecordsTwin);
+
+      // The DETERMINATION "X" — a bare ref to the twin, RENDERED as the three-state read. The ref is real (it
+      // is what the read applies to), so cross-layer/cross-library requalification comes for free from the
+      // shared `DefinedAsBareRef` machinery; `__pureQuestionRead` changes only how it is rendered.
+      const questionDetermination: Concept = {
+        ...c,
+        definition: {
+          type: "DefinedAsDefinition",
+          body: {
+            type: "DefinedAsBareRef",
+            ref: questionTwinName,
+            location: loc,
+          },
+          location: loc,
+        },
+        __pureQuestion: true as const,
+        __pureQuestionRead: true as const,
+        __loweringRole: "public-determination",
+      };
+      delete questionDetermination.code;
+      loweredConcepts.push(questionDetermination);
+      continue;
+    }
+
     loweredConcepts.push(lowered);
 
     // BOTH-REPRESENTATION: also synthesize the INFERRED twin carrying the original

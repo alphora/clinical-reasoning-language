@@ -8,8 +8,8 @@ include Semnot232FixtureLocalConcepts
 
 context Patient
 
-define "Alpha":
+define "Alpha Records":
   [Observation: Semnot232FixtureLocalConcepts."Alpha"]
 
-define "Beta":
+define "Beta Records":
   [Observation: Semnot232FixtureLocalConcepts."Beta"]

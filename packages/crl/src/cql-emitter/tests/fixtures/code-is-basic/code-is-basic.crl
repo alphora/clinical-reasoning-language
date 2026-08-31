@@ -16,24 +16,41 @@ library "Code Is Basic".
 
 // ============ Locally-coded leaves (`code is`) ============
 
+// A PURE QUESTION: a local `code is` boolean with NO derivation and no source representation, so nothing
+// can compute it and it is UNKNOWN until a human answers it. It lowers to an "<X> Records" retrieve plus a
+// three-state determination (`.answeredValue()` — true / false / null), and the null is what makes a guard
+// over it PAUSE and ask rather than deny.
 concept "Adult Patient":
 - type is Observation.
 - value type is boolean.
+- shape is Scalar.
 - code is `adult-18-or-older`.
 
+// NOT a question: `exists this` is a derivation over the concept's OWN records, so absence is closed-world
+// FALSE and it never pauses. `type is Condition` + `value type is boolean` + `exists this` is the canonical
+// spelling — the value type names the RESULT of the `exists`, and this is never re-spelled as an Observation.
 concept "Active Crohns Disease":
 - type is Condition.
 - value type is boolean.
+- shape is Scalar.
 - code is `active-crohns-disease`.
+- definition is exists this.
 
 // ============ Inferred (defined as over the coded leaves) ============
 
+// TWO SEPARATE BOOLEAN FACTS, so this is boolean `and` — not `sem-and`. The bright line: `sem-*` composes
+// RECORDS across one concept's representations; `and`/`or`/`not` compose BOOLEANS. Composition is strong
+// Kleene, so an unanswered "Adult Patient" makes this null (pause) rather than false (deny) — totality
+// belongs at the branch guard, never per operand.
+//
+// No `type is`: a purely derived composition is EPHEMERAL — it is CQL only and writes no resource, so it has
+// no natural resource to name and gets no case-feature StructureDefinition.
 concept "Adult With Crohns":
-- type is Observation.
 - value type is boolean.
+- shape is Scalar.
 - defined as
 (
    "Adult Patient"
-   sem-and
+   and
    "Active Crohns Disease"
 ).

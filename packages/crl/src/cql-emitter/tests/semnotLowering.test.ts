@@ -36,45 +36,73 @@ const inferredCql = (result: any): string =>
     .map((l: any) => l.cql)
     .join("\n");
 
-describe("#232 — sem-not lowering (truth-set lane)", () => {
+/**
+ * ⭐ #189 T5 step 2b — THIS WHOLE BLOCK FLIPPED LANES, and the flip is a defect fix, not a re-pin.
+ *
+ * `semnot-232`'s leaves ("Alpha", "Beta") are PURE QUESTIONS: locally-coded booleans with no derivation and no
+ * source representation, so nothing can compute them and they are UNKNOWN until a human answers. Step 2b gives
+ * each a three-state determination (`"<X> Records".answeredValue()` — true / false / null), which makes every
+ * composition over them a composition over BOOLEANS, so the pivot routes them to the boolean lane.
+ *
+ * ⚠ WHY THE OLD PINS WERE THE BUG. In the truth-set lane an UNANSWERED question has an empty truth-set, so
+ * `({ true } except (Alpha))` evaluated to `{ true }` — i.e. `sem-not <unanswered question>` was TRUE. A tree
+ * guarded on it took the branch on the strength of a question nobody had answered. The boolean lane gives
+ * `not (null) = null`, so the guard pauses and the question is asked. That is the #189 null/pause defect, and
+ * these four cases were pinning it.
+ *
+ * The sibling `semnot-age-232` block below flipped the same way for the same reason at #189 2b.3b.1 (a recency
+ * twin instead of a question), so this is one behaviour reaching its second family, not a new rule.
+ *
+ * ⚠ COVERAGE CONSEQUENCE, RECORDED RATHER THAN PAPERED OVER: `semnot-232` was the last in-tree fixture
+ * reaching the truth-set unit-universe complement (`{ true } except (X)`). That lowering is now unexercised.
+ * It is NOT re-covered with a contrived fixture: the complement universe only exists for a truth-set of
+ * booleans (a `sem-not` over a `coded from` record list already LOUD-REFUSES, `emit-unlowerable-negation`),
+ * and that lane is what T5 step 5 deletes wholesale. Authoring a fixture to keep it green would sanction a
+ * shape the language no longer produces.
+ */
+describe("#232 — sem-not lowering (pure-question leaves → boolean lane)", () => {
   const result: any = emitCQLImports(FIX("semnot-232"));
 
   it("emits the closure without errors", () => {
     expect(result.success).toBe(true);
   });
 
-  it("lowers a STANDALONE no-base sem-not to the unit-universe complement", () => {
+  it("each question leaf publishes its THREE-STATE determination, un-Coalesced", () => {
     const cql = inferredCql(result);
-    expect(cql).toMatch(
-      /define "Not Alpha":\s*\n\s*\(\{ true \} except \(Semnot232FixtureLocalPrimitives\."Alpha"\.asTruths\(\)\)\)/,
-    );
-    // The old silent-inversion signature must be gone.
+    expect(cql).toMatch(/define "Alpha":\s*\n\s*Semnot232FixtureLocalPrimitives\."Alpha Records"\.answeredValue\(\)/);
+    expect(cql).toMatch(/define "Beta":\s*\n\s*Semnot232FixtureLocalPrimitives\."Beta Records"\.answeredValue\(\)/);
+    // Totality belongs at the branch guard, never per operand — a `Coalesce` here forecloses the pause.
+    expect(cql).not.toContain("Coalesce");
+  });
+
+  it("lowers a STANDALONE no-base sem-not to boolean `not` — null-propagating, not the `{ true }` complement", () => {
+    const cql = inferredCql(result);
+    expect(cql).toMatch(/define "Not Alpha":\s*\n\s*not \("Alpha"\)/);
+    // The unit-universe complement asserted TRUE for an unanswered question. It must not come back.
+    expect(cql).not.toContain("{ true }");
+    // The original #232 silent-inversion signature must also still be gone.
     expect(cql).not.toContain("FIXME");
   });
 
-  it("PARENTHESISES the complement as a sem-or term (union/except share precedence, left-assoc)", () => {
-    // `B union ({ true } except (A))` must NOT degrade to `(B union { true }) except A`.
+  it("a sem-or term lowers to `or not`, and precedence still cannot degrade", () => {
     const cql = inferredCql(result);
-    expect(cql).toMatch(
-      /define "Beta Or Not Alpha":[\s\S]*?\.asTruths\(\)\s*\n\s*union \(\{ true \} except \(Semnot232FixtureLocalPrimitives\."Alpha"\.asTruths\(\)\)\)/,
-    );
+    expect(cql).toMatch(/define "Beta Or Not Alpha":\s*\n\s*"Beta"\s*\n\s*or not \("Alpha"\)/);
   });
 
-  it("lowers an ALL-NEGATIVE sem-and to an intersect of complements (was `{}` — always empty)", () => {
+  it("an ALL-NEGATIVE sem-and lowers to `not X and not Y` (was `{}` — always empty, then `{ true }` — always true)", () => {
     const cql = inferredCql(result);
-    expect(cql).toMatch(
-      /define "Neither Alpha Nor Beta":\s*\n\s*\(\{ true \} except \([\s\S]*?"Alpha"\.asTruths\(\)\)\)\s*\n\s*intersect \(\{ true \} except \([\s\S]*?"Beta"\.asTruths\(\)\)\)/,
-    );
+    expect(cql).toMatch(/define "Neither Alpha Nor Beta":\s*\n\s*not \("Alpha"\)\s*\n\s*and not \("Beta"\)/);
   });
 
-  it("leaves a POSITIVE-ANCHORED sem-and on `except` (unchanged), grouped or not", () => {
+  it("a POSITIVE-ANCHORED sem-and lowers to `and not` — the boolean counterpart of `except`, grouped or not", () => {
     const cql = inferredCql(result);
-    // Both the ungrouped `Beta sem-and sem-not Alpha` and the grouped
-    // `Beta sem-and (sem-not Alpha)` produce the identical `Beta except Alpha`.
+    // Set `B except A` (elements of B not in A) is boolean `B and not A`. Both the ungrouped
+    // `Beta sem-and sem-not Alpha` and the grouped `Beta sem-and (sem-not Alpha)` mean the same thing.
     const bodies = cql.match(/define "Beta And (Grouped )?Not Alpha":\s*\n\s*([\s\S]*?)(?=\ndefine |\s*$)/g) ?? [];
     expect(bodies.length).toBe(2);
     for (const b of bodies) {
-      expect(b).toContain('except Semnot232FixtureLocalPrimitives."Alpha".asTruths()');
+      expect(b).toMatch(/"Beta"\s*\n\s*and \(?not \("Alpha"\)/);
+      expect(b).not.toContain("asTruths()");
       expect(b).not.toContain("{ true }");
     }
   });

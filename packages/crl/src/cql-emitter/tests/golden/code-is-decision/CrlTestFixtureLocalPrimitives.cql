@@ -8,8 +8,8 @@ include CrlTestFixtureLocalConcepts
 
 context Patient
 
-define "Adult Patient":
-  [Observation: CrlTestFixtureLocalConcepts."Adult Patient"]
-
 define "Active Crohns Disease":
   [Observation: CrlTestFixtureLocalConcepts."Active Crohns Disease"]
+
+define "Adult Patient Records":
+  [Observation: CrlTestFixtureLocalConcepts."Adult Patient"]

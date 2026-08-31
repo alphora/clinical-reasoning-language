@@ -122,8 +122,10 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     // The answer slot — this is what becomes the answerable `Observation.value[x]` boolean questionnaire item.
     expect(r.descriptor.valueElement).toBe("value");
     expect(r.descriptor.datumValueType).toBe("boolean");
-    // No `ThisRecords` reduction → no `"<X> Records"` twin; the featureExpression targets the concept itself.
-    expect(r.recordsDefineId).toBe("Can Use Equipment At Home");
+    // T5 step 2b — a question now lowers exactly like `code is` + `definition is exists this`: the answer
+    // RECORDS are published as `"<X> Records"` in LocalPrimitives and `"<X>"` is the three-state determination
+    // in Inferences. The featureExpression must target the records define, or it dangles (Inv 2(d)).
+    expect(r.recordsDefineId).toBe("Can Use Equipment At Home Records");
   });
 
   // ⚠ BOUNDARY, NOT A TARGET. Pins today's edge of the cell so it cannot move by accident. Non-boolean

@@ -88,6 +88,7 @@ import {
   uniformResolvers,
 } from "./totalScalarBoolean";
 import type { Resolvers } from "./totalScalarBoolean";
+import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
 import { makeTotalityFamilyResolver } from "../emit/declaredResultIndex";
 import type { CrossLibraryTotality } from "../emit/declaredResultIndex";
 
@@ -1255,6 +1256,37 @@ function buildInterfaceReexports(
       continue;
     }
     const src = sourceConceptByName.get(name);
+    // ⭐ #189 null/pause T5 step 2b — REFACTOR:grounded. A `__pureQuestion` source on the LocalPrimitives arm is
+    // UNREACHABLE from the compiler (the lowering renames a question's retrieve to `"<X> Records"`, so the bare
+    // name only ever resolves to Inferences), but `emitCQLFromAST`/`emitPartitioned` are validator-free public
+    // entries a caller can feed a hand-built AST. Left alone that shape emits `.asTruths().satisfied()` — the
+    // collapse that denies an unanswered question — while the ledger below enrols it `sanctioned-three-state`.
+    // A metadata/text disagreement about the PAUSE is the one thing this slice exists to remove, so refuse it
+    // LOUD rather than ship it (charter §0a: legal-but-unbuilt fails loudly; a silent wrong verdict never).
+    // ⚠ TWO shapes reach here, and the SECOND is the likelier one. `__pureQuestion` catches a marked concept
+    // that somehow kept the LocalPrimitives name; `isPureQuestionConcept` catches an UN-LOWERED question — a raw
+    // parse handed straight to the exported `emitLayered`/`emitPartitioned`, which never ran the lowering, so the
+    // name still resolves to LocalPrimitives and carries no marker at all. That one is not exotic, and left alone
+    // it silently collapses the question under `success: true`.
+    if (
+      sourceLayer === "LocalPrimitives" &&
+      (src?.__pureQuestion === true || (src !== undefined && isPureQuestionConcept(src)))
+    ) {
+      errors.push({
+        type: "Validation",
+        kind: "emit-question-facade-not-lowered",
+        message:
+          `decision references pure-question concept "${name}", whose Interface facade would re-export from ` +
+          `LocalPrimitives. A pure question is lowered to a \`"${name} Records"\` retrieve plus a three-state ` +
+          `determination \`"${name}"\` in Inferences, so its facade must source from Inferences and re-export ` +
+          `BARE. Re-exporting from LocalPrimitives would emit the \`asTruths().satisfied()\` collapse, which ` +
+          `folds "no answer record" and "answered false" into one \`false\` and denies where the tree must ` +
+          `PAUSE and ask. Emit this policy through \`lowerLocalCodes\` (the normal path) rather than handing ` +
+          `\`emitCQLFromAST\` an un-lowered question.`,
+        ...(src?.location ? { line: src.location.start.line, column: src.location.start.column } : {}),
+      });
+      continue;
+    }
     // #189 Slice-C boundary 1 — TOTALITY mode for an Inferences re-export. A REDUCTION that publishes a
     // Scalar boolean (`exists`/`Count`/a `Coalesce`-guarded `most recent`) is a TOTAL boolean, so the
     // façade re-exports it BARE (a plain CQL Boolean has no `.satisfied()`); a `defined as` truth-set
@@ -1340,7 +1372,24 @@ function buildInterfaceReexports(
       // `false` and so denies where the tree must pause and ask. Decided HERE at synthesis because the
       // Interface emitter's `conceptByName` is layer-isolated and cannot see the source concept's definition —
       // the same reason `__interfaceReexportMode` is decided here.
-      ...(sourceLayer === "LocalPrimitives" && src?.__pureQuestion === true
+      // ⭐ #189 null/pause — REFACTOR:grounded. A PURE QUESTION's facade must NOT collapse. `asTruths().satisfied()` folds "no
+      // answer record" and "answered false" into the same `false`, so an unanswered question is
+      // indistinguishable from a "no" and the decision DENIES where it must PAUSE and ask.
+      //
+      // T5 step 2b moved the READ from here to a first-class Inferences twin (`__pureQuestionRead`), so a
+      // question now re-exports from `Inferences` BARE — bare is what propagates the null — rather than
+      // applying `.answeredValue()` at the facade. Bare-ness comes from `emitsBareReExportableScalarBoolean`
+      // above (which admits the twin); this marker corrects the LEDGER, exactly as `__interfaceThreeStateMerge`
+      // does for the merge family, so the facade enrolls `sanctioned-three-state` and not a false `total`.
+      //
+      // ⚠ There is NO LocalPrimitives arm for a question any more, and there must not be one. `lowerLocalCodes`
+      // publishes a question's records under `"<X> Records"` and its determination under `"<X>"`, so the NAME
+      // `"<X>"` resolves to Inferences unconditionally — LocalPrimitives holds no concept by that name at all.
+      // A `__pureQuestion` concept arriving here on the LocalPrimitives arm therefore did NOT come from the
+      // lowering, and its facade would emit the `.asTruths().satisfied()` collapse while this marker enrolled it
+      // as `sanctioned-three-state` — metadata claiming a pause over text that denies. The
+      // `emit-question-facade-not-lowered` guard above refuses that outright rather than shipping it.
+      ...(sourceLayer === "Inferences" && src?.__pureQuestionRead === true
         ? { __pureQuestion: true as const }
         : {}),
       // ⭐ #189 O3 — an Inferences source that is a both-rep RECENCY MERGE is deliberately THREE-STATE (no

@@ -18,7 +18,7 @@
 import type { Concept } from "../ast/types";
 import { recordsTwinDefineName } from "../cql-emitter/lowerLocalCodes";
 import { deriveEffectiveRepresentations } from "../emit/effectiveRepresentation";
-import { resolveRecencyValueConcept } from "../template-match/recencyValueConcept";
+import { resolveRecencyValueConcept, isPureQuestionConcept } from "../template-match/recencyValueConcept";
 import type {
   EffectiveRepresentationDescriptor,
   OwningLibraryMetadata,
@@ -103,8 +103,15 @@ export function resolveCaseFeatureRecord(
     // same-name convention, exactly the case the comment above names). So target the concept name, not the twin
     // (targeting `"<X> Records"` DANGLES — the Inv-2(d) integrity check catches it).
     const isRecencyValueBothRep = resolveRecencyValueConcept(concept).kind === "recency-value";
+    // ⭐ #189 null/pause T5 step 2b — a PURE QUESTION now splits the same way a `ThisRecords` reduction does:
+    // `lowerLocalCodes` publishes its answer records as `"<X> Records"` in LocalPrimitives and its THREE-STATE
+    // determination (`"<X> Records".answeredValue()`) as `"<X>"` in Inferences. So the `cpg-featureExpression`
+    // must target the TWIN. It has no `ReductionDefinition` — a question is a bare `code is` — so the reduction
+    // test above cannot see it. MEASURED: without this every question's SD dangled (Inv 2(d) caught all four in
+    // the `guard-define` fixture), because `"<X>"` in LocalPrimitives no longer exists.
+    const isQuestion = isPureQuestionConcept(concept);
     const hasRecordsTwin =
-      reduction !== undefined && reduction.target.type === "ThisRecords" && !isRecencyValueBothRep;
+      isQuestion || (reduction !== undefined && reduction.target.type === "ThisRecords" && !isRecencyValueBothRep);
     return {
       kind: "record",
       descriptor: local,

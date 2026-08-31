@@ -322,8 +322,12 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
 
+    // #189 T5 step 2b — an INFERENCES layer is now present: a pure question publishes its three-state
+    // determination there (`"<X> Records".answeredValue()`), so a library whose only derivations were questions
+    // is no longer Inferences-free.
     const names = policyLibNames(result);
     expect(names).toEqual([
+      "CrlTestFixtureInferences",
       "CrlTestFixtureInterface",
       "CrlTestFixtureLocalConcepts",
       "CrlTestFixtureLocalPrimitives",
@@ -526,9 +530,11 @@ decision "Triage":
     // policyId === "Pol" (passed explicitly; a direct caller uses the source name).
     const plan = computeSplitPlan(lowered.ast, "Pol", "Pol", lowered.localCodes.length);
     expect(plan.kind).toBe("interface");
+    // #189 T5 step 2b — see above: a question's determination lands in Inferences, so the plan emits it.
     expect(plan.emittedLibraryNames).toEqual([
       "PolLocalConcepts",
       "PolLocalPrimitives",
+      "PolInferences",
       "PolInterface",
     ]);
     expect(plan.partition).toBeDefined();

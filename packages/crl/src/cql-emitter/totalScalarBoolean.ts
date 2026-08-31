@@ -256,6 +256,21 @@ function computeTotality(
   // The two questions genuinely differ for this form, which is why the mode exists.
   if (concept.__bothRepMerge === "recency") return mode === "scalarBoolean" && isScalarBoolean(concept);
   if (concept.__bothRepMerge !== undefined) return false;
+  // ⭐ #189 null/pause T5 step 2b — REFACTOR:grounded. The PURE QUESTION's Inferences twin splits the two
+  // questions the SAME way the recency merge does, for the same reason:
+  //
+  //   BARE-RE-EXPORTABLE? yes. It emits `<LocalPrimitives half>.answeredValue()` — already a Scalar Boolean,
+  //     with no `.satisfied()` method — and re-exporting it bare is exactly what carries its null to the guard.
+  //   TOTAL?              no.  A question nothing has answered is UNKNOWN. Claiming total here is the
+  //     pause→deny flip: a boolean composition would admit it as a proven-total operand and the guard would
+  //     read a manufactured `false` instead of pausing to ask.
+  //
+  // ⚠ Checked BEFORE the definition switch below. The twin's definition is a synthesized bare ref to its
+  // records twin (see `__pureQuestionRead` in `ast/types.ts`), so without this arm it would fall into the
+  // `DefinedAsDefinition` alias case and recurse into a RecordSet retrieve — reporting NON-boolean for a define
+  // that emits a Boolean. Keyed on `__pureQuestionRead` (the determination that emits the read), never on
+  // `__pureQuestion` (which the Interface facade also carries).
+  if (concept.__pureQuestionRead === true) return mode === "scalarBoolean" && isScalarBoolean(concept);
   const def = concept.definition;
   if (def === undefined) return false;
   switch (def.type) {
@@ -356,8 +371,12 @@ function refIsTotal(
  *  emit FAILURE path (`emitBooleanCompositionError`) names the genuinely non-total operand — NOT any qualified ref
  *  (0c makes a qualified operand provable, so the 0b "qualified ⇒ offender" rule mis-blames a proven-total foreign
  *  operand; disc 466 both arms). Fresh `visiting`/`memo`: a single-operand check is its own call tree. */
-export function branchCompositionOperandTotal(ref: ReferenceName, resolvers: Resolvers): boolean {
-  return refIsTotal(ref, "boolean", resolvers, new Set(), new Map());
+export function branchCompositionOperandTotal(
+  ref: ReferenceName,
+  resolvers: Resolvers,
+  mode: BooleanLaneMode = "total",
+): boolean {
+  return refIsTotal(ref, "boolean", resolvers, new Set(), new Map(), mode);
 }
 
 /** Every operand of a boolean `defined as` composition is total — the composition-flip gate (§4.1/§4.2). Walks the
