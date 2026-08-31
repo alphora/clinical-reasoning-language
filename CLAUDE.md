@@ -370,6 +370,25 @@ review packet touching those paths must hand reviewers the taxonomy.
 
 The operator does not say "use large-refactor". If the file says a refactor is active, it is active.
 
+## ⛔ NEVER WRITE A HANDOFF OR A NEW PLAN — update `tmp/REFACTORS-IN-FORCE.md`
+
+MEASURED 2026-08-31: `tmp/` held **65 HANDOFF files, 51 of them claiming to be THE resume point**, plus 48
+PLANs and 28 files saying "NEXT" — 264 markdown files in a **gitignored** directory nothing prunes. So no
+review, no PR and no cleanup pass could ever catch it.
+
+The cost was not tidiness. A fresh plan got written for work that already had a converged design doc and two
+panel rounds, because there was no single place to look. And the sprawl PRESERVED a wrong framing — "all that
+is left is the emit" — across sessions, so every prerequisite arrived looking like a surprise and produced
+yet another handoff saying "actually NEXT is X".
+
+- **The single source of truth for what to do next is `tmp/REFACTORS-IN-FORCE.md` §"THE ONE NEXT STEP".**
+  Update that section. Do not create `HANDOFF-*.md`. Do not create `PLAN-*.md`.
+- A slice that genuinely needs its own design gets ONE `DESIGN-*.md`, **linked from that section**.
+- `.claude/hooks/refactor-state.sh` flags at session start if handoffs reappear or a second file starts
+  claiming NEXT. **A second answer to "what next" is worse than none.**
+- ⚠ Before writing ANY plan: `ls tmp/DESIGN-*.md` and grep it for the subject. Reading a state file's
+  summary is NOT the same as following its pointers — that is the specific error that produced plan #49.
+
 ## GATE — before work becomes DURABLE, decide whether it needed a panel at all
 
 Run this BEFORE committing, before encoding something as structure, before shipping. The two gates below
