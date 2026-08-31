@@ -782,6 +782,19 @@ export interface Concept extends ASTNode {
   __recencyMergePublishes?: "value" | "record";
   __recencyValueDescriptors?: unknown;
   /**
+   * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). ⭐ #189 — the PRODUCER stages of a
+   * both-representation merge, RESOLVED at lowering into everything the emit needs to construct each
+   * candidate (`emit/producerCandidate.ts` `ProducerCandidateSpec[]`).
+   *
+   * ⚠ CARRIED BECAUSE THE AUTHORED PIPELINE DOES NOT SURVIVE LOWERING: the merge twin replaces `definition`
+   * with a synthetic `most recent <self>`, so a `<producer>, then most recent this` concept would otherwise
+   * reach the emitter with no trace of its producer and silently union only its two retrieve arms.
+   *
+   * Set in lock-step with the `constructed` entries in `__recordUnionTerms` — the terms say WHAT is in the
+   * space, these say HOW each constructed member is built.
+   */
+  __recencyProducerSpecs?: unknown;
+  /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). #189 Slice C boundary 2 (2a) — the
    * LOWERING ROLE of a concept the lowering passes produced/retargeted, so the totality-ledger enrollment
    * (`emitConcept`) picks its obligation SOURCE without marker-sniffing (disc 439 crit #1/#2):

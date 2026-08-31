@@ -109,11 +109,17 @@ const OPTIONS: readonly AuthoringOption[] = [
     cases: path.join(FIXTURE, "cases.cel"),
     singleValuedTargets: ["Obese", "BMI", "Height", "Weight"],
     validatesCleanToday: true,
-    // ⭐ MOVED 2026-08-31 from `emit-mixed-code-and-definition`. BOTH `Obese` and `BMI` now classify as the
-    // both-representation merge and refuse on the PRODUCER stage instead. `Obese` was held out by a single
-    // blanket `value projection` exclusion in `resolveRecencyValueConcept` whose own comment gave AGE as its
-    // reason, while the `resolveAgeConcept` check beside it already covered age.
-    emitBlocker: "emit-reduction-not-active",
+    // ⭐⭐ MOVED AGAIN 2026-08-31 — the PRODUCER STAGE NOW LOWERS, so `BMI` no longer refuses at all. Its
+    // constructed candidate is EXECUTION-VERIFIED against the real cqf engine (`tmp/nullprobe/bmiexec/`):
+    // 90 kg / (1.7 m)^2 emits a candidate valued `31100 'g.m-2'` stamped MAY — the `Max` of Weight-May and
+    // Height-Feb, per §5b — carrying the case-feature profile url, and a threshold over it constructs a
+    // second candidate `true` at that same stamp.
+    //
+    // What blocks Record/Layered now is ONLY `Obese`'s source arm: a `type is Condition` posrep with
+    // `value projection is exists this`, which `deriveOneSourceArm` still defers `out-of-scope`, so the merge
+    // gets one descriptor where it needs `[local-exact, source]`. That is the NEXT slice, and the last one
+    // between here and an end-to-end emit of these two options.
+    emitBlocker: "emit-most-recent-derivation",
     reachableQuestions: ["Obese", "BMI", "Weight", "Height"],
   },
   {
@@ -151,8 +157,8 @@ const OPTIONS: readonly AuthoringOption[] = [
     // back, this option's CRE rows match the other two and its emit blocker becomes the same one.
     singleValuedTargets: ["Greatest Weight", "BMI", "Obese"],
     validatesCleanToday: true,
-    // ⭐ MOVED 2026-08-31 — see the Record option. Same two concepts, same narrower refusal.
-    emitBlocker: "emit-reduction-not-active",
+    // ⭐⭐ MOVED AGAIN 2026-08-31 — see the Record option. Same producer landing, same remaining blocker.
+    emitBlocker: "emit-most-recent-derivation",
     // ⭐ Four, reached THROUGH the uncoded reductions: Obese -> BMI -> Most Recent Weight/Height ->
     // Weight/Height Records. The intermediates carry no code so they offer no question, but the walk
     // traverses them — which is what makes the layering invisible to a user answering the questionnaire.

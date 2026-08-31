@@ -119,7 +119,9 @@ import {
   type EffectiveRepresentationDescriptor,
   type OwningLibraryMetadata,
 } from "../emit/effectiveRepresentation";
-import { localCodeSystemSlug, localCodeSystemUrl } from "../fhir-emitter/slug";
+import { caseFeatureUrlFromPolicyId, localCodeSystemSlug, localCodeSystemUrl } from "../fhir-emitter/slug";
+import { resolveProducerCandidates } from "../emit/producerCandidate";
+import type { ProducerCandidateSpec } from "../emit/producerCandidate";
 import { isAgeTodayPrefix } from "../template-match/agePredicate";
 import {
   resolveRecencyValueConcept,
@@ -170,6 +172,17 @@ export interface LowerLocalCodesOptions {
    * so those callers (which have no FHIR lane to diverge from) are unaffected.
    */
   localDomainId?: string;
+  /**
+   * ⭐ #189 — the POLICY ID (`metadata.name`), used to compose a PRODUCER stage's constructed candidate
+   * `meta.profile` — the case-feature StructureDefinition url — through the shared `slug.ts` authority the
+   * FHIR lane also calls. Distinct from `localDomainId`, which is `localDomainIdFor(...)` output and
+   * diverges for sibling libraries.
+   *
+   * ⚠ Absent for direct/test callers. A concept that actually NEEDS it (one with a producer stage) then
+   * REFUSES with a structured error rather than stamping an `unnamed` canonical that silently disagrees
+   * with the FHIR lane. Concepts without a producer are unaffected.
+   */
+  policyId?: string;
 }
 
 /**
@@ -392,6 +405,17 @@ export function lowerLocalCodes(
   // belongs to the source policy, not the layer.
   const urn = localCodeSystemUrl(canonicalBase, opts.localDomainId ?? ast.library.name);
 
+  // ⭐ #189 — the AUTHORED concepts by name, for producer-operand resolution. Built from the INPUT ast, so it
+  // is the author's library view, not a half-lowered one: an operand is resolved against what the author
+  // declared (its `shape is` / `type is`), never against a twin this pass happens to have synthesized first.
+  const conceptsByName = new Map<string, Concept>();
+  for (const st of ast.statements) {
+    if ((st as { type?: string }).type === "Concept") {
+      const cc = st as Concept;
+      if (cc.name) conceptsByName.set(cc.name, cc);
+    }
+  }
+
   // Slice 4b — the ONE shared domain `codesystem` DECLARATION name. R1/case-feature:
   // derived from the POLICY ID (`opts.localDomainId`, the package.json `name`) so the
   // human-readable decl name keys off the SAME identity as the local-domain URL slug
@@ -517,35 +541,6 @@ export function lowerLocalCodes(
     // throw; `buildNameLayerMaps` Inferences-wins for same-name).
     const rv = resolveRecencyValueConcept(c);
     if (rv.kind === "recency-value") {
-      // ⚠⚠ #189 — A PRODUCER STAGE IS NOT LOWERED YET, AND IT MUST NOT BE SILENTLY DROPPED.
-      //
-      // The classifier admits `<producer>, then most recent this` because the SHAPE is this merge: the arms
-      // add to a collection and the terminal selection works on it. But the merge EMIT below only unions the
-      // two retrieve arms — it does not yet construct and add the producer's candidate. MEASURED on the goal's
-      // `BMI`: it emitted `Last((LocalPrimitives."BMI" union ExternalPrimitives."BMI Source") …)` with
-      // `body mass index of "Weight" and "Height"` NOWHERE IN THE OUTPUT, under `success: true`.
-      //
-      // A whole derived arm vanishing from a successful emit is the worst failure mode this refactor has:
-      // every consumer reads it as "this works". Charter §0a — legal-but-unbuilt fails LOUDLY. The verified
-      // target for the missing piece is `tmp/NOTES-bmi-producer-target-verified.md`; this error deletes with
-      // it.
-      if (rv.producerStages.length > 0) {
-        const names = rv.producerStages.map((st) => `\`${st.call.pattern}\``).join(", ");
-        errors.push(
-          mkError(
-            EMIT_REDUCTION_NOT_ACTIVE_KIND,
-            `Concept "${c.name}" is a both-representation merge whose pipeline runs ${rv.producerStages.length} ` +
-              `PRODUCER stage(s) (${names}) before its terminal selection. The two representation arms lower ` +
-              `today, but a producer's computed value must be CONSTRUCTED into a candidate of the concept's ` +
-              `\`type is\` and added to the space before the selection runs, and that construction is NOT YET ` +
-              `WIRED. Emitting the arms alone would silently drop the derivation — so this fails rather than ` +
-              `shipping a determination that ignores its own definition. This is unbuilt work, not an illegal ` +
-              `form: do not re-author the concept to avoid it.`,
-            c.definition?.location ?? loc,
-          ),
-        );
-        continue;
-      }
       const localResource = c.conceptType ?? "Observation"; // implicit-standard local Observation (charter §3)
       // Dedup / collision — the THIRD copy of the (5)-(7)+(A2) mirror (DRY note above; keep lock-step).
       const priorForCode = codeValueToConcept.get(codeValue);
@@ -712,6 +707,39 @@ export function lowerLocalCodes(
         kind: "mostRecent",
         target: { type: "ReductionConceptRef", ref: c.name, location: loc } as ReductionConceptRef,
       };
+      // ⭐⭐ #189 — THE PRODUCER STAGES, RESOLVED HERE AND CARRIED ON THE TWIN.
+      //
+      // ⚠ THE AUTHORED PIPELINE DOES NOT SURVIVE THIS LOWERING. The twin below replaces `c.definition` with a
+      // synthetic `most recent <self>` reduction (it exists only to classify Inferences and to survive
+      // `requalifyDefinition`), so a `<producer>, then most recent this` concept arrives at the emitter with
+      // NO trace of its producer. An emitter that iterated the definition would find nothing and union the
+      // two retrieve arms alone — which is exactly the silent-drop this slice exists to make impossible.
+      // (Panel round 1, gpt-5.6 arm: the plan's render-time iteration was over a list that is not there.)
+      //
+      // So resolution happens WHERE THE FACTS ARE — lowering has the whole-library view an operand lookup
+      // needs — and the twin carries the finished specs. `resolveProducerCandidates` refuses (typed, with an
+      // author-facing message) for every shape it does not cover, so a partial spec can never reach emit.
+      let producerSpecs: readonly ProducerCandidateSpec[] = [];
+      if (rv.producerStages.length > 0) {
+        const resolved = resolveProducerCandidates({
+          concept: c,
+          producerStages: rv.producerStages,
+          siblingsByName: conceptsByName,
+          code: { system: urn, code: codeValue },
+          // ⚠ COMPOSED BY THE SHARED AUTHORITY (`fhir-emitter/slug.ts`), which the FHIR lane's
+          // `caseFeatureCanonicalUrl` now delegates to. The constructed candidate's `meta.profile` and the
+          // emitted case-feature StructureDefinition url are ONE composition, so they cannot drift.
+          profile: opts.policyId
+            ? caseFeatureUrlFromPolicyId(canonicalBase, opts.policyId, c.name)
+            : "",
+        });
+        if (resolved.kind === "refused") {
+          errors.push(mkError(resolved.refusal.kind, resolved.refusal.message, c.definition?.location ?? loc));
+          continue;
+        }
+        producerSpecs = resolved.specs;
+      }
+
       const mergeTwin: Concept = {
         ...c,
         representations: [],
@@ -722,6 +750,16 @@ export function lowerLocalCodes(
         // `Scalar` → the newest record's value; `Record` → the newest record over the union of the arms.
         __recencyMergePublishes: rv.publishes,
         __recencyValueDescriptors: { local: localDesc, source: sourceDesc },
+        // ⭐ #189 — THE SPACE, LISTED rather than derived, on the SAME channel the record-union twin uses
+        // (design P2-D3). Both twins now describe their space as a term list and both render it through ONE
+        // function, so "what is in this concept's space" has a single reader. Listing it is also what makes
+        // `local ∪ n posreps ∪ n constructed candidates` expressible without touching the emitter again.
+        __recordUnionTerms: [
+          { kind: "local-primitives" as const, define: c.name },
+          { kind: "external-primitives" as const, define: sourceName },
+          ...producerSpecs.map((spec) => ({ kind: "constructed" as const, stageIndex: spec.stageIndex })),
+        ],
+        __recencyProducerSpecs: producerSpecs,
         __loweringRole: "public-determination",
       };
       delete mergeTwin.code;

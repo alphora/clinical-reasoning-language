@@ -40,6 +40,18 @@ import { matchNarrative } from "../template-match";
 import { valueSetUrl } from "../fhir-emitter/slug";
 import { cqlStringLiteral, cqlQuotedIdentifier } from "./cqlStrings";
 import { patternReturnShape, requireReturnShape } from "../template-match/patternCatalog";
+import {
+  componentStampCql,
+  derivedStampCql,
+  fhirBooleanFromSystemBoolean,
+  fhirQuantityFromSystemQuantity,
+  renderConstructorCall,
+} from "./renderConstructorCall";
+import type { ProducerCandidateSpec } from "../emit/producerCandidate";
+import { renderRecordConstructor } from "./renderRecordConstructor";
+import { CONSTRUCTOR_NAME_PREFIX, isConstructorName } from "../emit/recordConstructor";
+import type { ConstructorSignature } from "../emit/recordConstructor";
+import type { RecordUnionTerm } from "../ast/types";
 import type { PatternReturnShape } from "../template-match/patternCatalog";
 import { questionReachableNames } from "../ast/questionReachability";
 import { conceptRefsOfDefinition } from "../ast/conceptDependencies";
@@ -611,6 +623,10 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
     const lowered = lowerLocalCodes(pre.ast, {
       canonicalBase: options.canonicalBase,
       localDomainId: options.localDomainId,
+      // ⭐ #189 — the policy id a PRODUCER stage needs to compose its constructed candidate's
+      // `meta.profile` through the shared `slug.ts` authority. Absent for direct callers; a concept that
+      // needs it refuses loudly rather than stamping an `unnamed` canonical.
+      policyId: options.policyId,
     });
     const preEmitErrors = [...pre.errors, ...lowered.errors];
     if (preEmitErrors.length > 0) {
@@ -1080,6 +1096,14 @@ class Emitter {
     if (parameters) sections.push(parameters);
 
     sections.push(this.emitContext());
+
+    // ⭐⭐ #189 — THE GENERATED RECORD CONSTRUCTORS, emitted BEFORE the defines that call them.
+    //
+    // One function per distinct signature per library (design D1/D2 — construction is library-local, and
+    // content addressing removes any per-concept parameter, so two concepts constructing the same resource
+    // and value type share ONE function). Deduped by `functionName`.
+    const constructors = this.emitGeneratedConstructors();
+    if (constructors) sections.push(constructors);
 
     const concepts = this.ast.statements
       .filter((s): s is Concept => s.type === "Concept" && !!s.name)
@@ -2484,23 +2508,128 @@ class Emitter {
     const sourceLib =
       this.caseFeature.kind === "inferred" ? (this.caseFeature.recordSourceLibrary ?? "") : "";
 
+    return this.renderSpaceTerms(c, terms, localLib, sourceLib);
+  }
+
+  /**
+   * ⭐ #189 — emit the generated record constructors this library's producer stages call.
+   *
+   * ⚠ THE COLLISION CHECK IS LOAD-BEARING, not hygiene. `recordConstructor.ts` records that it VERIFIED the
+   * collision is reachable: `concept "CRLConstructObservationQuantity"` parses and keeps that name, because
+   * CRL concept names are quoted strings and no lexical rule excludes the prefix. Design D1 is "detect
+   * before emission, never rely on a translator error", so an authored define in the reserved namespace
+   * throws HERE rather than silently shadowing (or being shadowed by) a generated function.
+   */
+  private emitGeneratedConstructors(): string | null {
+    const byName = new Map<string, ConstructorSignature>();
+    for (const st of this.ast.statements) {
+      if (st.type !== "Concept") continue;
+      const specs = ((st as Concept).__recencyProducerSpecs ?? []) as readonly ProducerCandidateSpec[];
+      for (const spec of specs) byName.set(spec.signature.functionName, spec.signature);
+    }
+    if (byName.size === 0) return null;
+
+    for (const st of this.ast.statements) {
+      const name = (st as { name?: string }).name;
+      if (name !== undefined && isConstructorName(name)) {
+        throw new Error(
+          `declaration "${name}" is in the RESERVED generated-constructor namespace ` +
+            `(\`${CONSTRUCTOR_NAME_PREFIX}\`...), which this library also needs for a producer stage's ` +
+            `record construction. Rename the declaration.`,
+        );
+      }
+    }
+
+    return [...byName.keys()]
+      .sort()
+      .map((n) => renderRecordConstructor(byName.get(n)!))
+      .join("\n\n");
+  }
+
+  /**
+   * ⭐⭐ #189 — THE ONE READER OF "WHAT IS IN A CONCEPT'S SPACE".
+   *
+   * Both both-representation twins describe their space as a `__recordUnionTerms` list and both render it
+   * here: the RECORD-UNION twin (the records target) and the RECENCY-VALUE merge's record branch. That is
+   * deliberate. Two renderers would be two answers to one question, free to disagree about whether a derived
+   * candidate is in the space — and a `cpg-featureExpression` records read that disagreed with the published
+   * determination is exactly the cross-lane drift this refactor exists to remove. (Panel round 1, Claude arm
+   * #5: the first draft patched the merge directly and left this channel dead.)
+   *
+   * The operator's model is then literally the emitted text: each term ADDS to the collection, and the
+   * `definition is` stage WORKS ON the result.
+   */
+  private renderSpaceTerms(
+    c: Concept,
+    terms: readonly RecordUnionTerm[],
+    localLib: string,
+    sourceLib: string,
+  ): string {
+    const specs = (c.__recencyProducerSpecs ?? []) as readonly ProducerCandidateSpec[];
     const rendered = terms.map((term) => {
       switch (term.kind) {
         case "local-primitives":
           return cqlQualifiedRef(localLib, term.define);
         case "external-primitives":
           return cqlQualifiedRef(sourceLib, term.define);
-        case "constructed":
-          // RETIRE:189-p2-constructed — the producer arm lands with the pipeline un-collapse. Reaching
-          // here today means a term was listed before its emit exists, which is a compiler bug, not an
-          // author error: fail loud rather than emit a union that silently drops the derived arm.
-          throw new Error(
-            `internal invariant violated: record-union twin "${c.name}" lists a CONSTRUCTED term ` +
-              `(stage ${term.stageIndex}) but producer-stage emit has not landed yet (#189 P2).`,
-          );
+        case "constructed": {
+          const spec = specs.find((sp) => sp.stageIndex === term.stageIndex);
+          if (spec === undefined) {
+            // Set in lock-step at lowering, so a missing spec is a compiler bug, not an author error. Fail
+            // loud rather than emit a union that silently drops the derived arm.
+            throw new Error(
+              `internal invariant violated: both-rep twin "${c.name}" lists a CONSTRUCTED term ` +
+                `(stage ${term.stageIndex}) with no matching producer spec — the two are set together at ` +
+                `lowering.`,
+            );
+          }
+          return `(${this.renderConstructedCandidate(spec)})`;
+        }
       }
     });
     return rendered.join("\n  union ");
+  }
+
+  /**
+   * Render ONE producer stage's constructed candidate as a singleton list that is EMPTY when nothing was
+   * produced — so it unions into the space with no special case for "the producer produced nothing", which
+   * is the state that leaves the determination UNKNOWN and lets the tree PAUSE.
+   *
+   * Everything here was resolved at lowering (`emit/producerCandidate.ts`); this only turns it into text.
+   * The one thing it does NOT take from the spec is how to render a reference — `emitArg` does that, so
+   * reference qualification has exactly ONE implementation.
+   */
+  private renderConstructedCandidate(spec: ProducerCandidateSpec): string {
+    const computed = this.emitPatternCall(spec.call);
+    let valueExpr: string;
+    switch (spec.valueWrap) {
+      case "quantity":
+        valueExpr = fhirQuantityFromSystemQuantity(`(${computed})`);
+        break;
+      case "boolean":
+        valueExpr = fhirBooleanFromSystemBoolean(`(${computed})`);
+        break;
+      case "none":
+        // `existence` mode: the constructor's second parameter is a RAW `System.Boolean` guard, not a FHIR
+        // value, so it takes no wrapper (design D0b).
+        valueExpr = `(${computed})`;
+        break;
+    }
+    // §5b — the candidate's stamp is the NEWEST of the components that DETERMINE its value, read off each
+    // operand through ITS OWN registry row. Literal operands (a threshold) carry no stamp and are absent.
+    const stampExpr = derivedStampCql(
+      spec.operandStamps.map((st) =>
+        componentStampCql(`(${this.emitArg(spec.call.args[st.argIndex])})`, st.sortExpr, st.cast),
+      ),
+    );
+    return renderConstructorCall({
+      functionName: spec.signature.functionName,
+      code: spec.code,
+      valueExpr,
+      stampExpr,
+      subjectExpr: `FHIR.Reference { reference: FHIR.string { value: 'Patient/' + Patient.id } }`,
+      profile: spec.profile,
+    });
   }
 
   private emitRecencyValueMerge(c: Concept): string {
@@ -2550,7 +2679,17 @@ class Emitter {
     // operator ruled the cell unrealistic ("nothing is ever going to come in on two arms at the same instant")
     // and low priority. It is recorded in `DESIGN-bothrep-derivation-merge.md` §5c, NOT silently dropped.
     if (c.__recencyMergePublishes === "record") {
-      return this.emitSelectNewest(`${lpRef} union ${epRef}`, local, undefined);
+      // ⭐ #189 — THE SPACE COMES FROM THE TERM LIST, not from the two refs above. `local ∪ posrep ∪ n
+      // constructed candidates` is ONE list with ONE renderer (`renderSpaceTerms`), so the records twin and
+      // the published determination cannot disagree about what is in the space. A twin with no terms is a
+      // lowering bug rather than an author error, but the two-arm form is kept as an EXPLICIT fallback so a
+      // hand-built AST (a public entry) still emits the derived pair it always did.
+      const terms = c.__recordUnionTerms;
+      const space =
+        terms !== undefined && terms.length > 0
+          ? this.renderSpaceTerms(c, terms, localLib, sourceLib)
+          : `${lpRef} union ${epRef}`;
+      return this.emitSelectNewest(space, local, undefined);
     }
 
     // A recency timestamp read (`System.DateTime`) off a record expression (`base` = `(<newest>).`) or the bare

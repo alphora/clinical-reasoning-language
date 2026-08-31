@@ -390,6 +390,38 @@ export function valueSetUrl(canonicalBase: string, policyId: string, terminology
 }
 
 /**
+ * ⭐ #189 — the CASE-FEATURE StructureDefinition `id`, from the policy id + concept name.
+ *
+ * The SINGLE composition BOTH emit lanes use, on the `valueSetIdFromPolicyId` precedent directly above and for
+ * the same reason: the FHIR lane emits this id as the case-feature SD's `id`/`url`, and the CQL lane stamps
+ * that url into a CONSTRUCTED candidate's `meta.profile`. Two derivations would be free to drift; one cannot.
+ * `fhir-emitter/structureDefinition.ts` `caseFeatureId` delegates here, so every existing id is byte-identical.
+ *
+ * ⚠ `uniqueCapSlug` (not the bare-capping `slugify`) because case-feature concept names are the LONGEST
+ * declaration names in the corpus, and it is a PURE function of the name — which is what makes the independent
+ * call sites byte-equal rather than merely usually-equal. `rawSlug` (UNcapped) is fed deliberately: `slugify`
+ * would truncate the discriminating tail before the hash could see it.
+ */
+export function caseFeatureIdFromPolicyId(policyId: string, conceptName: string): string {
+  return uniqueCapSlug(`${policyIdBase({ name: policyId })}-${rawSlug(conceptName)}`);
+}
+
+/**
+ * ⭐ #189 — the case-feature StructureDefinition canonical url, `<canonicalBase>/StructureDefinition/<id>`.
+ *
+ * ⚠ Deliberately does NOT normalize a trailing slash on `canonicalBase`, matching `valueSetUrl` above and the
+ * historical `caseFeatureCanonicalUrl` composition verbatim. A lane that normalized would stop byte-matching
+ * the one that does not, which is the whole failure this shared function exists to prevent.
+ */
+export function caseFeatureUrlFromPolicyId(
+  canonicalBase: string,
+  policyId: string,
+  conceptName: string,
+): string {
+  return `${canonicalBase}/StructureDefinition/${caseFeatureIdFromPolicyId(policyId, conceptName)}`;
+}
+
+/**
  * #198 — Option B per-library local-domain / layered-identity BASE.
  *
  * The local CodeSystem url (`<policyId>-local`) AND the base/layered Library

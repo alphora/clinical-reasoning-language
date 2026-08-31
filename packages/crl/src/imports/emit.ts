@@ -493,7 +493,16 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     authoredObligationsByPath.set(entry.filePath, buildAuthoredObligations(entry.ast));
     const preAge = preLowerAge(entry.ast);
     if (preAge.errors.length > 0) lowerErrors.push(...preAge.errors);
-    const lowered = lowerLocalCodes(preAge.ast, { canonicalBase, localDomainId: entryLocalDomainId });
+    // ⭐ #189 — `policyId` threaded for a PRODUCER stage's candidate `meta.profile` (shared `slug.ts`
+    // composition, same value the FHIR lane passes).
+    const lowered = lowerLocalCodes(preAge.ast, {
+      canonicalBase,
+      localDomainId: entryLocalDomainId,
+      // ⚠ `localDomainId` at THIS scope is the package.json policy id (`readPolicyId`), the same value the
+      // FHIR lane passes as `metadata.name`; the PER-ENTRY `entryLocalDomainId` is the disambiguated
+      // sibling base and is a different thing.
+      policyId: localDomainId,
+    });
     if (lowered.errors.length > 0) lowerErrors.push(...lowered.errors);
     // `didLower` = did `lowerLocalCodes` synthesize a local codesystem (the `code is` lowering) —
     // computed against the pre-transformed ast, so a standalone-only library (no `code is`) does not

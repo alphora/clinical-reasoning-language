@@ -45,7 +45,14 @@ import type { CaseFeatureProfileShape, DefaultValue } from "../emit/resourceEmit
 
 import { localCodeSystemUrl } from "./slug";
 import { libraryCanonicalUrl } from "./library";
-import { pascalCaseName, policyIdBase, rawSlug, uniqueCapSlug } from "./slug";
+import {
+  caseFeatureIdFromPolicyId,
+  caseFeatureUrlFromPolicyId,
+  pascalCaseName,
+  policyIdBase,
+  rawSlug,
+  uniqueCapSlug,
+} from "./slug";
 import {
   cpgCaseFeatureExtensions,
   isPublishablePlus,
@@ -267,12 +274,18 @@ export function caseFeatureId(metadata: CpgMetadata, conceptName: string): strin
   // #237/T1 — component-wise `rawSlug` (was whole-composite `rawSlug(`${base}-${name}`)`,
   // which collapses an empty-strip concept name's `"unnamed"` to a bare `policyIdBase`
   // = the Library id base, a latent collision). Per-part keeps one composition rule.
-  return uniqueCapSlug(`${policyIdBase(metadata)}-${rawSlug(conceptName)}`);
+  //
+  // ⭐ #189 — DELEGATES to `slug.ts`, which is now the single composition BOTH lanes call: the CQL lane
+  // stamps this url into a constructed candidate's `meta.profile` and has only a policy id, not a
+  // `CpgMetadata`. Byte-identical to the prior inline form for every existing id (same `uniqueCapSlug` over
+  // the same `policyIdBase`/`rawSlug` parts) — the `valueSetId` precedent, for the same reason.
+  return caseFeatureIdFromPolicyId(metadata.name, conceptName);
 }
 
-/** The case-feature StructureDefinition canonical url for an interface concept. */
+/** The case-feature StructureDefinition canonical url for an interface concept. ⭐ #189 — one composition,
+ *  shared with the CQL lane via `slug.ts`; see `caseFeatureId`. */
 export function caseFeatureCanonicalUrl(metadata: CpgMetadata, conceptName: string): string {
-  return `${metadata.canonicalBase}/StructureDefinition/${caseFeatureId(metadata, conceptName)}`;
+  return caseFeatureUrlFromPolicyId(metadata.canonicalBase, metadata.name, conceptName);
 }
 
 /**

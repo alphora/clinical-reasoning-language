@@ -51,10 +51,16 @@ describe("#189 — the both-rep RECORD merge (`shape is Record` + `code is` + po
     expect(success).toBe(true);
   });
 
+  // ⚠ `\s*` around `union` rather than a literal space: the merge's space is now rendered by the
+  // SHARED `renderSpaceTerms`, which joins terms with a newline exactly as the record-union twin
+  // always did. That is the POINT of one renderer — a two-arm merge and an n-arm one are the same
+  // code path, so the separator cannot be one thing here and another there. Nothing about the
+  // SEMANTICS moved; pinning the old single-line spacing would only pin which function happened to
+  // build the string.
   it("⭐ emits the two arms UNIONED into one collection, with the stage selecting over it", () => {
     const { cql } = emit();
     expect(cql).toMatch(
-      /define "Height":\s*\n\s*Last\(\s*\n\s*\(\S*LocalPrimitives\."Height" union \S*ExternalPrimitives\."Height Source"\) O\s*\n\s*sort by \(effective as FHIR\.dateTime\)\.value, id\s*\n\s*\)/,
+      /define "Height":\s*\n\s*Last\(\s*\n\s*\(\S*LocalPrimitives\."Height"\s*\n?\s*union \S*ExternalPrimitives\."Height Source"\) O\s*\n\s*sort by \(effective as FHIR\.dateTime\)\.value, id\s*\n\s*\)/,
     );
   });
 

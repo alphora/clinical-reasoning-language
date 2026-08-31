@@ -1275,6 +1275,10 @@ export function emitFhirDefClosure(
     const lowered = lowerLocalCodes(preAge.ast, {
       canonicalBase: metadata.canonicalBase,
       localDomainId: entryLocalDomainId,
+      // ⭐ #189 — the policy id a PRODUCER stage needs for its candidate's `meta.profile`. Threaded on BOTH
+      // lanes: a lane that omitted it would refuse concepts the other lane emits, which is precisely the
+      // divergence this refactor removes.
+      policyId: metadata.name,
     });
     if (preAge.errors.length > 0 || lowered.errors.length > 0) {
       errors.push(...preAge.errors, ...lowered.errors);
