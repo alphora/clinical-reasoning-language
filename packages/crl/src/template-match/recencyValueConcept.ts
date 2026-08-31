@@ -23,6 +23,8 @@ import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import type { Concept, Representation } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import { resolveAgeConcept } from "./recencyProjectionOverride";
+import { resolveConceptPipeline } from "./resolvePipeline";
+import type { ResolvedStage } from "./resolvePipeline";
 
 export type RecencyValueResolution =
   | {
@@ -40,6 +42,20 @@ export type RecencyValueResolution =
        * thing this file exists to prevent (validate and emit read ONE authority).
        */
       publishes: "value" | "record";
+      /**
+       * ⭐ #189 — the PRODUCER stages this concept's pipeline runs BEFORE its terminal selection, in order.
+       *
+       * The operator's model: *"TWO ARMS ADD TO A COLLECTION AND A THIRD ARM WORKS ON THAT COLLECTION
+       * STEPWISE (POTENTIALLY ADDING TO IT)."* The two arms are the local `code is` records and the source
+       * representation's; each producer stage ADDS one constructed candidate to that space; the terminal
+       * selection then WORKS ON the result. EMPTY for a bare `most recent this` — the two arms alone.
+       *
+       * ⚠ Taken from the SHARED `resolveConceptPipeline`, which `cre/run.ts` already consumes. That is the
+       * point: the two lanes read ONE authority for what a concept's stages are, so they cannot drift on it.
+       * Re-deriving stage structure here would be a second reading of the fact that module exists to
+       * establish once.
+       */
+      producerStages: readonly ResolvedStage[];
     }
   | { kind: "not-recency-value" };
 
@@ -54,11 +70,26 @@ export function resolveRecencyValueConcept(concept: Concept): RecencyValueResolu
   // A local `code is` is required (the local arm of the both-rep pair).
   if (concept.code === undefined) return no;
 
-  // `definition is most recent this` — a `mostRecent` reduction over the concept's OWN records (`ThisRecords`).
-  const def = concept.definition;
-  if (def === undefined || def.type !== "ReductionDefinition") return no;
-  const red = def.reduction;
-  if (red.kind !== "mostRecent" || red.target.type !== "ThisRecords") return no;
+  // ⭐ #189 — THE PROGRAM, from the SHARED resolver (D6: one authority, both lanes). Admits BOTH shapes the
+  // goal uses, because they differ only in whether anything runs before the selection:
+  //
+  //   `most recent this`                                  -> [selection]            (Height, Weight)
+  //   `body mass index of "W" and "H", then most recent this` -> [producer, selection]  (BMI)
+  //   `"BMI" at least 30 'kg/m2', then most recent this`      -> [producer, selection]  (Obese)
+  //
+  // The REQUIREMENT is only that the pipeline ENDS in a selection over the space: that is what makes the
+  // concept publish ONE candidate chosen from the arms, which is what this merge is. Everything before it
+  // must be a PRODUCER — a stage that computes from named operands and ADDS a constructed candidate. A
+  // `filter` or a `direct` stage is a different lowering and stays out until it has one.
+  //
+  // ⚠ Deliberately NOT re-derived from the AST here. `resolveConceptPipeline` is what `cre/run.ts` reads, so
+  // keying on it is what stops the CRE and the emit disagreeing about a concept's stages.
+  const program = resolveConceptPipeline(concept);
+  if (program.kind !== "resolved" || program.stages.length === 0) return no;
+  const terminal = program.stages[program.stages.length - 1];
+  if (terminal.effect !== "selection") return no;
+  const producerStages = program.stages.slice(0, -1);
+  if (!producerStages.every((st) => st.effect === "producer")) return no;
 
   // ⭐ #189 — REFACTOR:grounded. `Scalar` publishes the newest record's VALUE; `Record` publishes the newest
   // RECORD. Re-derived from the GOAL (charter §0a: GOAL > CHARTER > CODE) and execution-verified against the
@@ -89,7 +120,7 @@ export function resolveRecencyValueConcept(concept: Concept): RecencyValueResolu
   // a `value projection` rep is already excluded above, but this keeps the two resolvers from ever disagreeing).
   if (resolveAgeConcept(concept).kind !== "not-age") return no;
 
-  return { kind: "recency-value", sourceRep: rep, publishes };
+  return { kind: "recency-value", sourceRep: rep, publishes, producerStages };
 }
 
 /**

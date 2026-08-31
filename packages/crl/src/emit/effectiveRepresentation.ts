@@ -32,6 +32,7 @@ import {
 import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
+import { resolveConceptPipeline } from "../template-match/resolvePipeline";
 import {
   resourceEmitRow,
   type CodingStrategy,
@@ -244,11 +245,31 @@ function computeLocalDatum(
     return {};
   }
   if (assumedShapePreMigration(concept.shape) === "Record") {
-    // A Record selects ONE local record via `most recent this`; any other form is incoherent for a local arm.
-    if (!reduction || reduction.kind !== "mostRecent" || reduction.target.type !== "ThisRecords") {
+    // ⭐ #189 — a Record publishes ONE record, SELECTED from its arms. What matters is that the concept's
+    // program ENDS IN A SELECTION; how many stages run before it does not change that this arm contributes
+    // records and reads no datum. Both goal spellings are the same cell:
+    //
+    //   `most recent this`                                      -> [selection]
+    //   `body mass index of "W" and "H", then most recent this`  -> [producer, selection]
+    //
+    // ⚠ Asked of the SHARED `resolveConceptPipeline` (which `cre/run.ts` also consumes), NOT re-derived from
+    // the AST. The old test poked at `ReductionDefinition` directly, so a PIPELINE — whose node is a
+    // `DefinitionIsDefinition` — read as "no reduction at all" and every producer-bearing goal concept was
+    // refused here. Keying on the resolver is also what stops this authority and the CRE disagreeing about
+    // what a concept's stages are.
+    const program = resolveConceptPipeline(concept);
+    const endsInSelection =
+      program.kind === "resolved" &&
+      program.stages.length > 0 &&
+      program.stages[program.stages.length - 1].effect === "selection";
+    if (!endsInSelection) {
+      const shape =
+        program.kind === "resolved"
+          ? `a program of ${program.stages.length} stage(s) ending in \`${program.stages[program.stages.length - 1]?.effect ?? "nothing"}\``
+          : `a \`${program.kind}\` program`;
       return {
         errorKind: "unsupported-reduction-form",
-        detail: `\`shape is Record\` selects one local record via \`most recent this\` — this concept's reduction is not that cell`,
+        detail: `\`shape is Record\` publishes ONE record selected from its arms, so its program must END IN A SELECTION (\`most recent this\`, alone or after producer stages) — this concept has ${shape}`,
       };
     }
     return {}; // record selection reads no value — no datum
