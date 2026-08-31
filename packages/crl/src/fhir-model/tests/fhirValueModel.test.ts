@@ -187,10 +187,18 @@ describe("T3a wiring boundary — allowlisted importers of fhirValueModel", () =
     // ambiguous) and must consult the SAME authority or the two can disagree about what a resource carries.
     //
     // ⚠ THE ALTERNATIVE WAS CONSIDERED AND REJECTED, and a panel arm argued for it: thread the carrier
-    // through the descriptor instead. That would make a Record descriptor carry datum metadata it
-    // deliberately does NOT carry — the record SELECTION reads no value, and the emit asserts exactly that
-    // (`desc.valueElement === undefined`). Weakening a clear invariant to avoid naming a consumer is the
-    // worse trade. This boundary exists to keep the consumers FEW and DELIBERATE, not zero.
+    // through the descriptor's EXISTING read fields instead. That would make a Record descriptor carry datum
+    // metadata it deliberately does NOT carry — the record SELECTION reads no value, and the emit asserts
+    // exactly that (`desc.valueElement === undefined`). Weakening a clear invariant to avoid naming a
+    // consumer is the worse trade. This boundary exists to keep the consumers FEW and DELIBERATE, not zero.
+    //
+    // ⚠⚠ WHAT THIS RULE DOES *NOT* SAY, because I nearly misread it that way myself (disc 528): it is not a
+    // claim that a Record concept HAS no datum carrier. It says the READ FIELDS must not be overloaded to
+    // express one. Charter §3 is explicit that the record CARRIES a value — the case-feature SD needs that
+    // carrier to emit an answerable `value[x]`, and its absence is a MEASURED dead end (four questions
+    // offered, none answerable). A SEPARATE field, or a shared resolver both lanes call, satisfies this rule
+    // completely. Overloading `valueElement` does not: the B2b guard throws on it and the CEL writer's B4
+    // dispatch silently reroutes on `datumValueType`.
     const ALLOW = new Set([
       "emit/effectiveRepresentation.ts",
       "emit/recordBooleanGuard.ts",
