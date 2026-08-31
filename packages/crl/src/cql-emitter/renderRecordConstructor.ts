@@ -169,10 +169,29 @@ export function renderRecordConstructor(sig: ConstructorSignature): string {
     body.push(`${sig.evidenceElement}: evidence`);
   }
 
-  const guard =
+  // ⭐⭐ #189 — THE GUARD COVERS THE RECENCY STAMP TOO, and that is not defensive tidiness: without it the
+  // ENGINE THROWS. MEASURED against the cqf CQL engine (`tmp/nullprobe/nulldrop/`): a constructor called with a
+  // non-null value and a NULL `recorded` dies with
+  //
+  //     null cannot be cast to non-null type org.opencds.cqf.cql.engine.runtime.DateTime
+  //
+  // because the body builds `FHIR.dateTime { value: recorded }` unconditionally. A null timestamp does not
+  // degrade to a null candidate — it kills the whole evaluation, taking every other define with it.
+  //
+  // It is REACHABLE: a derived candidate's stamp is the NEWEST OF ITS COMPONENTS (design §5b), so a component
+  // whose recency element is absent (dirty source data) propagates null into `recorded`. Evaluation time is
+  // FORBIDDEN as a fallback (§5b — an invented timestamp lets a stale calculation outrank a fresh assertion),
+  // so the only honest outcome is the one the value already gets: NO CANDIDATE. A candidate that cannot say
+  // when it was claimed cannot be recency-ordered against the other arms, and guessing its place is exactly
+  // the manufactured answer this design bans.
+  //
+  // ⚠ This is a guard on ABSENCE, never on a value: it drops a candidate whose stamp is unknown, and it must
+  // never drop one whose stamp is merely old.
+  const valueGuard =
     sig.valueMode === "value"
-      ? `if ${sig.guardParam} is null then`
-      : `if ${sig.guardParam} is not true then`;
+      ? `${sig.guardParam} is null`
+      : `${sig.guardParam} is not true`;
+  const guard = `if ${valueGuard} or recorded is null then`;
 
   return [
     `define function ${sig.functionName}(`,

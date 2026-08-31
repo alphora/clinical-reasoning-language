@@ -68,7 +68,12 @@ describe("renderRecordConstructor", () => {
         "  profile System.String,",
         "  evidence List<FHIR.Reference>",
         "):",
-        "  if value is null then",
+        // ⚠ THE GUARD COVERS `recorded` TOO. MEASURED: with a non-null value and a NULL stamp the ENGINE THROWS
+        // (`null cannot be cast to non-null type DateTime`) building `FHIR.dateTime { value: recorded }` — a null
+        // timestamp kills the whole evaluation rather than yielding a null candidate. Reachable via §5b (a derived
+        // stamp is the newest of its components, and a component may have none). Evaluation time is forbidden as a
+        // fallback, so an un-datable candidate correctly contributes NOTHING.
+        "  if value is null or recorded is null then",
         "    null as FHIR.Observation",
         "  else",
         "    FHIR.Observation {",
@@ -89,7 +94,8 @@ describe("renderRecordConstructor", () => {
     const cql = render("Condition");
     // `is not true` — so `false` AND null both yield no candidate. `is null` would let a computed false
     // through as a Condition, which is the thing a Condition cannot represent.
-    expect(cql).toContain("if established is not true then");
+    // `is not true` — so `false` AND null both yield no candidate; plus the recency guard (see the contract test).
+    expect(cql).toContain("if established is not true or recorded is null then");
     expect(cql).toContain("null as FHIR.Condition");
     expect(cql).not.toContain("value: value");
     // R4 Condition has no `derivedFrom` — nothing is written, though `evidence` is still received.
