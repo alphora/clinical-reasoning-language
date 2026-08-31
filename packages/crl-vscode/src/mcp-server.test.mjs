@@ -184,10 +184,10 @@ check("authoring_kit unknown useCase → isError listing valid useCases", async 
     assert.match(r.content[0].text, /Unknown authoring useCase|cpg|prior-auth/);
   });
 
-// #189 DEFERRED (expected-fail): dme101-030's both-rep age concept can't be evaluated by the CRE yet (the age
-// `value projection` posrep → status error), so success/passCount=3 does not hold. Same root cause as
-// `cre/tests/run.test.ts`'s `it.fails` (#189 CRE age-posrep catch-up). `.fails` self-tracks (flags when fixed).
-check.fails("run_decision via path → dme101-030.cel: 3 cases pass the result-is oracle", async () => {
+// #189 — UN-MARKED. dme101-030's both-rep age concept was un-evaluable by the CRE (the age `value projection`
+// posrep drove the run to status error), so success/passCount=3 did not hold. The CRE now evaluates it and
+// `.fails` flagged GREEN, which is what it is for.
+check("run_decision via path → dme101-030.cel: 3 cases pass the result-is oracle", async () => {
     const dme101Cel = resolve(here, "../../crl/src/tests/fixtures/policies/dme101-030/dme101-030.cel");
     const r = await client.callTool({ name: "run_decision", arguments: { path: dme101Cel } });
     assert.ok(!r.isError, "should not be a tool error");
@@ -205,7 +205,7 @@ check("run_decision without path → isError", async () => {
 
 // #189 DEFERRED (expected-fail): same CRE age-posrep limitation as above — `out.success` (all cases pass) is
 // false for dme101-030's both-rep age concept. `.fails` self-tracks (flags GREEN→un-mark when the CRE catches up).
-check.fails("render_scenario via path → dme101-030.cel: view-model envelope through the bundled server", async () => {
+check("render_scenario via path → dme101-030.cel: view-model envelope through the bundled server", async () => {
     const dme101Cel = resolve(here, "../../crl/src/tests/fixtures/policies/dme101-030/dme101-030.cel");
     const r = await client.callTool({ name: "render_scenario", arguments: { path: dme101Cel } });
     assert.ok(!r.isError, "should not be a tool error");

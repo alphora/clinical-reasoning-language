@@ -54,10 +54,25 @@ afterAll(() => {
 
 // Write a CRL+CEL project to a temp dir and resolve it ONCE — returns the shared graph + the NAMED scenario (a wrong
 // case name fails loudly rather than silently testing scenarios[0]).
+// #271 — a local `code is` has no derivable code set without a canonical base, and the CRE REFUSES to
+// fabricate a verdict rather than guess one. A temp fixture project is a real project, so it declares one
+// like any other — and its CEL facts must then cite the codesystem that base DERIVES
+// (`<canonicalBase>/CodeSystem/<package name>-local`), not an arbitrary system string. Before this, the
+// facts named `http://example.org` etc., which matched nothing; the tests passed only because they import
+// the BUILT `packages/crl/dist`, which predated the requirement.
+const LOCAL_BASE = "http://example.org/crl/parity-fixture";
+/** The local codesystem `LOCAL_BASE` derives — every fixture fact's `code is` must cite it. */
+const LOCAL_CS = `${LOCAL_BASE}/CodeSystem/parity-fixture-local`;
+
 function project(files, celName, caseName) {
   const root = mkdtempSync(join(tmpdir(), "parity-"));
   tmpRoots.push(root);
-  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "parity-fixture", version: "1.0.0", private: true }));
+  writeFileSync(join(root, "package.json"), JSON.stringify({
+      name: "parity-fixture",
+      version: "1.0.0",
+      private: true,
+      crl: { canonicalBase: LOCAL_BASE },
+    }));
   for (const [name, contents] of Object.entries(files)) {
     const full = join(root, name);
     mkdirSync(dirname(full), { recursive: true });
@@ -153,7 +168,7 @@ first:
 - when ${guard} then recommend activity "Approve".
 - otherwise then recommend activity "Deny".`;
 const factOf = (n) => `fact "f${n}":
-- code is "http://example.org|${n.toLowerCase()}".
+- code is "${LOCAL_CS}|${n.toLowerCase()}".
 - date is "2026-01-01".
 - defined by "${n}".`;
 // `- result is "G" is "<result>"` BINDS the case to decision "G" (so `sv.decision`/`rootLib` resolve + the compound is

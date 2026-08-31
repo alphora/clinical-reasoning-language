@@ -60,6 +60,11 @@ export default defineConfig({
           // `forks` (v4 default): child-process isolation. The integration suites (mcp-server, provision, stableServer)
           // spawn built servers + child processes and do real fs work; a per-file fork keeps that fully isolated per suite.
           pool: "forks",
+          // ⚠ FORCE THE BUILD FIRST. These suites import the BUILT `packages/crl/dist` and spawn the esbuild
+          // bundles, so without this they silently test whatever was compiled last. MEASURED: 66 tests in this
+          // project were broken by `99f70207` while the full-suite run stayed GREEN against a stale `dist`.
+          // Scoped to this project — `--project crl` runs TypeScript sources and needs no build.
+          globalSetup: [resolve(base, "packages/crl-vscode/test/vitestGlobalSetup.mjs")],
           // T3: the full crl-vscode suite. `src/**/*.test.mjs` are the migrated node-harness suites; the T1 proof stays; the
           // oracle golden gate lives outside src/ and is listed explicitly (its filename matches neither glob).
           include: ["src/**/*.test.mjs", "test/vitest/**/*.vitest.test.ts", "test/oracle/check.mjs"],

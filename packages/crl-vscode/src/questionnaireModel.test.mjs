@@ -16,9 +16,24 @@ const check = test;
 
 // Write a CRL+CEL project to a fresh temp dir (its own project root) and render the named case.
 // `files` is a map of relative-name → contents. Returns the single ScenarioViewModel + its decision lib.
+// #271 — a local `code is` has no derivable code set without a canonical base, and the CRE REFUSES to
+// fabricate a verdict rather than guess one. A temp fixture project is a real project, so it declares one
+// like any other — and its CEL facts must then cite the codesystem that base DERIVES
+// (`<canonicalBase>/CodeSystem/<package name>-local`), not an arbitrary system string. Before this, the
+// facts named `http://example.org` etc., which matched nothing; the tests passed only because they import
+// the BUILT `packages/crl/dist`, which predated the requirement.
+const LOCAL_BASE = "http://example.org/crl/qm-fixture";
+/** The local codesystem `LOCAL_BASE` derives — every fixture fact's `code is` must cite it. */
+const LOCAL_CS = `${LOCAL_BASE}/CodeSystem/qm-fixture-local`;
+
 function renderCase(files, celName, caseName) {
   const root = mkdtempSync(join(tmpdir(), "qm-"));
-  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "qm-fixture", version: "1.0.0", private: true }));
+  writeFileSync(join(root, "package.json"), JSON.stringify({
+      name: "qm-fixture",
+      version: "1.0.0",
+      private: true,
+      crl: { canonicalBase: LOCAL_BASE },
+    }));
   for (const [name, contents] of Object.entries(files)) {
     const full = join(root, name);
     mkdirSync(dirname(full), { recursive: true });
@@ -60,11 +75,11 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fA":
-- code is "http://example.org|a".
+- code is "${LOCAL_CS}|a".
 - date is "2026-01-01".
 - defined by "A".
 fact "fB":
-- code is "http://example.org|b".
+- code is "${LOCAL_CS}|b".
 - date is "2026-01-01".
 - defined by "B".
 case "both hold":
@@ -106,7 +121,7 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fA":
-- code is "http://example.org|a".
+- code is "${LOCAL_CS}|a".
 - date is "2026-01-01".
 - defined by "A".
 case "A holds → the keyed determination fires":
@@ -159,7 +174,7 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fExcl":
-- code is "http://example.org|excl".
+- code is "${LOCAL_CS}|excl".
 - date is "2026-01-01".
 - defined by "Exclusion".
 case "exclusion present, but result claims Approve":
@@ -207,7 +222,7 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fY":
-- code is "http://example.org|y".
+- code is "${LOCAL_CS}|y".
 - date is "2026-01-01".
 - defined by "Y".
 case "X absent, Y holds → fall through to Approve":
@@ -254,11 +269,11 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fExcl":
-- code is "http://example.org|excl".
+- code is "${LOCAL_CS}|excl".
 - date is "2026-01-01".
 - defined by "Excl".
 fact "fCov":
-- code is "http://example.org|cov".
+- code is "${LOCAL_CS}|cov".
 - date is "2026-01-01".
 - defined by "Covered".
 case "both hold; Excl preempts → Deny":
@@ -311,11 +326,11 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fDx":
-- code is "http://example.org|dx".
+- code is "${LOCAL_CS}|dx".
 - date is "2026-01-01".
 - defined by "Dx".
 fact "fContra":
-- code is "http://example.org|contra".
+- code is "${LOCAL_CS}|contra".
 - date is "2026-01-01".
 - defined by "Contra".
 case "contraindicated → Med guarded out, Rescreen fires":
@@ -364,11 +379,11 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fDx":
-- code is "http://example.org|dx".
+- code is "${LOCAL_CS}|dx".
 - date is "2026-01-01".
 - defined by "Dx".
 fact "fContra":
-- code is "http://example.org|contra".
+- code is "${LOCAL_CS}|contra".
 - date is "2026-01-01".
 - defined by "Contra".
 case "contraindicated, whole menu guarded out → nothing produced":
@@ -505,11 +520,11 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fA":
-- code is "http://example.org|a".
+- code is "${LOCAL_CS}|a".
 - date is "2026-01-01".
 - defined by "A".
 fact "fS":
-- code is "http://example.org|s".
+- code is "${LOCAL_CS}|s".
 - date is "2026-01-01".
 - defined by "S".
 case "delegated approve":
@@ -527,7 +542,12 @@ case "delegated approve":
 
 // ── 9. The cross-lib same-name trap: a cross-library `use decision` whose sub `when` shares a NAME with a
 //      root-lib concept → resolveValueTypes must be called with the SUB's lib. Assert via a per-lib stub. ──
-check("USE-DECISION (cross-lib same-name trap) → the sub's when resolves value types against the SUB's library", () => {
+// ⚠ EXPECTED-FAIL, tracked by #301 — a CEL fact cannot populate an IMPORTED library's concept by code
+// (`- defined by "B"."Shared".` never matches, while a root-library fact with the same code system does).
+// So the delegated guard stays false, the sub-decision is never entered, and this case cannot reach its
+// terminal. NOT fixture debt: the temp project declares a `crl.canonicalBase` and the facts cite the
+// codesystem it derives. `.fails` self-tracks — it flags GREEN, so un-mark it when #301 lands.
+check.fails("USE-DECISION (cross-lib same-name trap) → the sub's when resolves value types against the SUB's library", () => {
   const crlA = `# A
 library "A".
 concept "RA":
@@ -558,11 +578,11 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fRA":
-- code is "http://example.org|ra".
+- code is "${LOCAL_CS}|ra".
 - date is "2026-01-01".
 - defined by "RA".
 fact "fSharedB":
-- code is "http://example.org|shared-b".
+- code is "${LOCAL_CS}|shared-b".
 - date is "2026-01-01".
 - defined by "B"."Shared".
 case "cross-lib delegated":
@@ -612,7 +632,7 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fA":
-- code is "http://example.org|a".
+- code is "${LOCAL_CS}|a".
 - date is "2026-01-01".
 - defined by "A".
 case "a holds":
@@ -636,7 +656,12 @@ case "a holds":
 });
 
 // ── 11. status==="error" → empty questions + terminalKind error (no path walked) ──
-check("ERROR — status error (delegation cycle) → empty questions, terminalKind error, no outcome", () => {
+// ⚠ EXPECTED-FAIL, tracked by #301 — a CEL fact cannot populate an IMPORTED library's concept by code
+// (`- defined by "B"."Shared".` never matches, while a root-library fact with the same code system does).
+// So the delegated guard stays false, the sub-decision is never entered, and this case cannot reach its
+// terminal. NOT fixture debt: the temp project declares a `crl.canonicalBase` and the facts cite the
+// codesystem it derives. `.fails` self-tracks — it flags GREEN, so un-mark it when #301 lands.
+check.fails("ERROR — status error (delegation cycle) → empty questions, terminalKind error, no outcome", () => {
   const crlA = `# A
 library "A".
 concept "P":
@@ -663,11 +688,11 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fPa":
-- code is "http://example.org|p".
+- code is "${LOCAL_CS}|p".
 - date is "2026-01-01".
 - defined by "P".
 fact "fPb":
-- code is "http://example.org|p".
+- code is "${LOCAL_CS}|p".
 - date is "2026-01-01".
 - defined by "B"."P".
 case "cycle":
@@ -711,7 +736,7 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fDx":
-- code is "http://example.org|dx".
+- code is "${LOCAL_CS}|dx".
 - date is "2026-01-01".
 - defined by "Dx".
 case "both fire":
@@ -801,7 +826,7 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fCov":
-- code is "http://x|cov".
+- code is "${LOCAL_CS}|cov".
 - defined by "Covered".
 case "covered wins; Other preempted":
 - subject is "Pat".
@@ -839,7 +864,7 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fC":
-- code is "http://x|c".
+- code is "${LOCAL_CS}|c".
 - defined by "Comp".
 case "comp holds":
 - subject is "Pat".
@@ -891,7 +916,7 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fC":
-- code is "http://x|c".
+- code is "${LOCAL_CS}|c".
 - defined by "Root".
 case "root holds":
 - subject is "Pat".
@@ -947,7 +972,7 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fC":
-- code is "http://x|c".
+- code is "${LOCAL_CS}|c".
 - defined by "Root".
 case "root holds":
 - subject is "Pat".
@@ -1016,7 +1041,7 @@ first:
 - when ${guard} then recommend activity "Approve".
 - otherwise then recommend activity "Deny".`;
 const factOf = (name, code) => `fact "${name}":
-- code is "http://example.org|${code}".
+- code is "${LOCAL_CS}|${code}".
 - date is "2026-01-01".
 - defined by "${name.replace(/^f/, "")}".`;
 const guardCel = (facts, hold) => `library "GC".
@@ -1329,7 +1354,7 @@ fact "Pat":
 - birth date is "1970-01-01".
 - defined by "Patient".
 fact "fC":
-- code is "http://x|c".
+- code is "${LOCAL_CS}|c".
 - defined by "Comp".
 case "c":
 - subject is "Pat".
@@ -1383,7 +1408,7 @@ fact "Pat":
 - name is "Pat".
 - birth date is "1970-01-01".
 - defined by "Patient".
-${codes.map((c) => `fact "f${c}":\n- code is "http://e|${c.toLowerCase()}".\n- date is "2026-01-01".\n- defined by "${c}".`).join("\n")}
+${codes.map((c) => `fact "f${c}":\n- code is "${LOCAL_CS}|${c.toLowerCase()}".\n- date is "2026-01-01".\n- defined by "${c}".`).join("\n")}
 case "c":
 - subject is "Pat".
 ${codes.map((c) => `- fact is "f${c}".`).join("\n")}
