@@ -71,16 +71,46 @@ describe("#189 — rendering a producer stage's constructed candidate", () => {
     expect(cql).toMatch(/^if "BMI Computed" is null then null as FHIR\.Quantity/);
   });
 
-  it("wraps a boolean producer's result without a guard — a null boolean stays null", () => {
-    // The constructor's own `value is null` guard drops it, so no candidate. Nothing to pre-empt here.
-    expect(fhirBooleanFromSystemBoolean('"Obese Computed"')).toBe('FHIR.boolean { value: "Obese Computed" }');
+  it("⚠ GUARDS the boolean too — a CQL instance with a null property is NOT a null instance", () => {
+    // ⚠ THIS TEST REPLACES ONE THAT PINNED THE OPPOSITE. The bare `FHIR.boolean { value: X }` shipped under
+    // the comment "a null System.Boolean stays null — the constructor drops it", and the test asserted that
+    // exact string. Both were ASSERTED; neither was run. EXECUTED (`tmp/nullprobe/boolguard/`):
+    //
+    //     FHIR.boolean { value: null } is null           ->  FALSE
+    //     (FHIR.boolean { value: null }).value is null   ->  true
+    //     <the guarded form> is null                     ->  true
+    //
+    // So the constructor's `value is null` guard never fired, and a candidate with a null `valueBoolean` and
+    // a REAL stamp was built. It is the NEWEST in the space, so it beats an older established `false` and
+    // turns an owed DENY into a pause.
+    const cql = fhirBooleanFromSystemBoolean('"Obese Computed"');
+    expect(cql).toBe(
+      'if "Obese Computed" is null then null as FHIR.boolean\n' +
+        '  else FHIR.boolean { value: "Obese Computed" }',
+    );
   });
 
   describe("§5b — a derived candidate's stamp is the NEWEST of the components that determine its value", () => {
     it("a FORMULA over several operands takes the MAX of their stamps", () => {
       // Executed: Weight @May, Height @Feb -> the candidate is stamped MAY. The operator's reasoning is that
       // a recalculation triggered by a newer input is a NEW claim, made as of that input.
-      expect(derivedStampCql(['"W Stamp"', '"H Stamp"'])).toBe('Max({ "W Stamp", "H Stamp" })');
+      expect(derivedStampCql(['"W Stamp"', '"H Stamp"'])).toContain('Max({ "W Stamp", "H Stamp" })');
+    });
+
+    it("⚠⚠ ANY null component yields a NULL stamp — `Max` alone would silently ignore it", () => {
+      // ⚠ THIS TEST REPLACES A BARE `Max({ … })` PIN. EXECUTED (`tmp/nullprobe/maxnull/`): CQL's aggregate
+      // `Max` IGNORES nulls — `Max({ @2026-05-01, null })` returns `2026-05-01`, null only when ALL are.
+      // Leaning on that default stamps a formula whose Height has a value but no `effective` with the
+      // WEIGHT'S date alone, giving a partially-undated claim a confident place in the recency order. The
+      // guarded form was executed in the same probe and returns null.
+      //
+      // Partially-unknown is unknown: any null component ⇒ null stamp ⇒ the constructor's `recorded is null`
+      // guard drops the candidate. The asserted and recorded arms are untouched, so this does not over-pause.
+      const cql = derivedStampCql(['"W Stamp"', '"H Stamp"']);
+      expect(cql).toBe(
+        'if "W Stamp" is null or "H Stamp" is null then null as System.DateTime\n' +
+          '  else Max({ "W Stamp", "H Stamp" })',
+      );
     });
 
     it("a THRESHOLD over ONE operand takes THAT operand's stamp — no Max wrapper", () => {

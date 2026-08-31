@@ -68,9 +68,33 @@ export function fhirQuantityFromSystemQuantity(systemQuantityExpr: string): stri
   );
 }
 
-/** The boolean counterpart. A null System.Boolean stays null — the constructor drops it, so no candidate. */
+/**
+ * ⚠⚠ THE BOOLEAN COUNTERPART NEEDS THE SAME GUARD, AND FOR A REASON THAT IS NOT OBVIOUS. An earlier version
+ * of this function emitted the bare `FHIR.boolean { value: X }` under the comment *"a null System.Boolean
+ * stays null — the constructor drops it, so no candidate"*. That was ASSERTED, and it is FALSE.
+ *
+ * MEASURED against the cqf CQL engine (`tmp/nullprobe/boolguard/`): a CQL instance selector with a null
+ * property is a NON-NULL INSTANCE.
+ *
+ *     FHIR.boolean { value: null } is null   ->  FALSE
+ *     (FHIR.boolean { value: null }).value is null  ->  true
+ *
+ * So the constructor's `value is null` guard NEVER FIRES on it and a candidate IS built — carrying a null
+ * `valueBoolean` and a REAL recency stamp.
+ *
+ * ⚠ THAT CANDIDATE WINS. The reachable case is a BMI record that EXISTS but carries no value: `AtLeast`
+ * returns null while the stamp is the record's own `effective`, so the valueless candidate is the NEWEST in
+ * the space, beats an older ESTABLISHED `false`, and turns an owed DENY into a pause. Charter "VOCABULARY" —
+ * absence is never established, so a non-claim must never compete in the merge.
+ *
+ * The guarded form is verified null (`Guarded Is Null = true`, same probe).
+ */
 export function fhirBooleanFromSystemBoolean(systemBooleanExpr: string): string {
-  return `FHIR.boolean { value: ${systemBooleanExpr} }`;
+  return (
+    `if ${systemBooleanExpr} is null then null as FHIR.boolean
+` +
+    `  else FHIR.boolean { value: ${systemBooleanExpr} }`
+  );
 }
 
 /** The concept's own local code as a `FHIR.CodeableConcept` literal — what the candidate is coded as. */
@@ -122,7 +146,28 @@ export function renderConstructorCall(inputs: ConstructorCallInputs): string {
 export function derivedStampCql(componentStampExprs: readonly string[]): string {
   if (componentStampExprs.length === 0) return "null as System.DateTime";
   if (componentStampExprs.length === 1) return componentStampExprs[0];
-  return `Max({ ${componentStampExprs.join(", ")} })`;
+  // ⚠⚠ THE NULL CHECK IS EXPLICIT BECAUSE `Max` WOULD OTHERWISE DECIDE THIS SILENTLY, AND WRONGLY.
+  //
+  // MEASURED against the cqf CQL engine (`tmp/nullprobe/maxnull/`): CQL's aggregate `Max` IGNORES null list
+  // elements. `Max({ @2026-05-01, null })` returns `2026-05-01` — it is null only when EVERY element is.
+  //
+  // An earlier version emitted the bare `Max({ … })` and leaned on that default. It is the wrong rule here:
+  // a formula whose Height has a value but NO `effective` would be stamped by the WEIGHT ALONE, giving a
+  // partially-undated claim a confident place in the recency order. That is the same manufactured stamp the
+  // no-`Now()` rule below bans, arriving by a different route — and `renderRecordConstructor`'s own guard
+  // doctrine already states the rule for the fully-unknown case: *"a candidate that cannot say when it was
+  // claimed cannot be recency-ordered against the other arms, and guessing its place is exactly the
+  // manufactured answer this design bans."* Partially-unknown is unknown.
+  //
+  // So the rule is ALL-OR-NOTHING: any null component ⇒ a null stamp ⇒ the constructor's `recorded is null`
+  // guard fires ⇒ NO candidate. This does not over-pause — the concept's asserted and recorded arms are
+  // untouched and still compete.
+  const anyNull = componentStampExprs.map((e) => `${e} is null`).join(" or ");
+  return (
+    `if ${anyNull} then null as System.DateTime
+` +
+    `  else Max({ ${componentStampExprs.join(", ")} })`
+  );
 }
 
 /** A component's recency stamp, read off a selected record. `cast` mirrors the resource registry's row: a
