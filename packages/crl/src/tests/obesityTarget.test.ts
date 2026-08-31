@@ -307,6 +307,38 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
         expect(obese).toContain("LocalPrimitives");
         expect(obese).toContain("return CRLConstructObservationBoolean(");
         expect(obese).toContain("CRLCommon.AtLeast(");
+
+        // ⭐⭐ GOAL ITEM 2, IN THE EMITTED ARTIFACT. The `ANSWER AT ANY LEVEL` test below asserts
+        // REACHABILITY only — a unit call on the collector — because emit used to stop short of producing
+        // anything. It does not now: the decision's action carries one `action.input` per answerable concept
+        // in the dependency chain, each pointing at its OWN case-feature StructureDefinition, and every one
+        // of those SDs is emitted. ⚠ Both halves matter: an input naming an SD that is not emitted is a
+        // dangling profile, which is exactly the regression a producer edge leaving the dependency graph
+        // caused once (`86ff56eb`).
+        const fhirRes = (fhir as unknown as { resources?: { resource?: Record<string, unknown> }[] }).resources ?? [];
+        const sdUrls = new Set(
+          fhirRes
+            .map((r) => r.resource ?? (r as unknown as Record<string, unknown>))
+            .filter((x) => x.resourceType === "StructureDefinition")
+            .map((x) => String(x.url)),
+        );
+        const pd = fhirRes
+          .map((r) => r.resource ?? (r as unknown as Record<string, unknown>))
+          .find((x) => x.resourceType === "PlanDefinition" && String(x.id).endsWith("bariatric-surgery-coverage"));
+        expect(pd, opt.name + " — the decision PlanDefinition").toBeDefined();
+        const guardAction = ((pd as { action?: { action?: unknown[] }[] }).action ?? [])[0]?.action?.[0] as {
+          condition?: { expression?: { expression?: string } }[];
+          input?: { profile?: string[] }[];
+        };
+        // the guard is the `when` condition, by identifier — null-propagating, never totalized
+        expect(guardAction?.condition?.[0]?.expression?.expression).toBe("Obese");
+        const inputProfiles = (guardAction?.input ?? []).flatMap((i) => i.profile ?? []);
+        expect(inputProfiles.length, opt.name + " — one input per answerable concept").toBe(
+          opt.reachableQuestions.length,
+        );
+        for (const p of inputProfiles) {
+          expect(sdUrls.has(p), opt.name + " — input profile " + p + " must be an EMITTED SD").toBe(true);
+        }
       });
     });
   }
