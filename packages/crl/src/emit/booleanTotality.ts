@@ -579,7 +579,8 @@ export function classifyBooleanTotality(
       code: "bare-scalar",
       reason: "bare Scalar `code is` with no reduction — invalid in boolean position (§2)",
       // 2b.4a — the pre-flip `no-bare-scalar-code` form; the scoped gate REPORTS it (does not fail) until 2e
-      // flips it. Form-keyed here so an E1 #257 reject (which leaves `staging` unset) still blocks.
+      // flips it. Form-keyed here so an E1 #257 form (which leaves `staging` unset) still blocks.
+      // ⚠ NOT a reject — E1 classifies `unclassified`; see the E1 note at the `hasCode` gate.
       staging: { code: "legacy-bare-scalar", retiresAt: "2e (bare-scalar reduction retirement)" },
     };
   }

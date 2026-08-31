@@ -199,6 +199,75 @@ describe("#189 T5-CQL step 1 — truth-set retirement inventory", () => {
       }
       out.push("");
     }
+    // ⚠⚠ THE INLINE CORPUS. Plan §2 says "every fixture + inline test CRL", and an earlier cut of this probe
+    // walked `git ls-files` ONLY — so "seven concepts across five files" was the tracked-`.crl` count, not
+    // the seam's blast radius. Both review arms caught it, and one named a concrete miss
+    // (`caseFeatureRecord.test.ts` "Legacy" — Condition + boolean + code, no reduction). Inline CRL lives in
+    // template literals inside test files; extract each `library "..."`-rooted block and classify it too.
+    const inlineRows: Row[] = [];
+    const testFiles = execSync("git ls-files", { cwd: REPO, encoding: "utf8", maxBuffer: 1 << 28 })
+      .split(String.fromCharCode(10))
+      .map((x) => x.trim())
+      .filter((x) => x.endsWith(".test.ts"));
+    for (const f of testFiles) {
+      const src = readFileSync(path.join(REPO, f), "utf8");
+      // A backtick block containing a `library "..."` line — the shape every inline CRL fixture uses.
+      // ⚠ The delimiter is built rather than written: a backtick inside a regex literal in a .ts file trips
+      // the transform. `BT` is that character.
+      const BT = String.fromCharCode(96);
+      const BS = String.fromCharCode(92);
+      // ⚠⚠ THE CHARACTER CLASS MUST TOLERATE AN ESCAPED BACKTICK, and two earlier cuts did not — each found
+      // ZERO inline concepts while the review had NAMED one (`caseFeatureRecord.test.ts` "Legacy"). Inline
+      // CRL routinely contains `\`code\`` , so a naive `[^BT]*` stops at the first escaped backtick and the
+      // block never closes. A probe that cannot reach the case a reviewer handed it is decorative.
+      const body = "(?:[^" + BT + BS + BS + "]|" + BS + BS + ".)*";
+      const blockRe = new RegExp(BT + "(" + body + ")" + BT, "g");
+      for (const m of src.matchAll(blockRe)) {
+        if (!/concept\s+"/.test(m[1])) continue;
+        const raw = m[1]
+          .split(BS + BT)
+          .join(BT)
+          // Inline snippets are written with ESCAPED newlines inside a single-line literal.
+          .split(BS + "n")
+          .join(String.fromCharCode(10))
+          .replace(/\$\{[^}]*\}/g, "X");
+        const snippet = /library\s+"/.test(raw)
+          ? raw
+          : 'library "Inline".' + String.fromCharCode(10) + raw;
+        let built: { result?: CRL };
+        try {
+          built = buildCRL(snippet) as never;
+        } catch {
+          continue;
+        }
+        if (!built.result) continue;
+        for (const c of built.result.statements as Concept[]) {
+          if (c.type !== "Concept") continue;
+          const hit = classify(c);
+          if (!hit) continue;
+          let verdict: string;
+          try {
+            const v = classifyBooleanTotality(c) as { kind: string; code?: string };
+            verdict = v.kind + (v.code ? `/${v.code}` : "");
+          } catch (e) {
+            verdict = `THREW ${String(e).slice(0, 40)}`;
+          }
+          inlineRows.push({ file: f, concept: c.name, cell: hit.cell, detail: `${hit.detail} → **${verdict}**` });
+        }
+      }
+    }
+    const inlineRejects = inlineRows.filter((r) => r.detail.includes("rejected/"));
+    out.push(
+      "## ⚠ INLINE test CRL (plan §2's other half)",
+      "",
+      `${inlineRows.length} in-scope concepts in inline snippets across ${new Set(inlineRows.map((r) => r.file)).size} test files.`,
+      `**${inlineRejects.length} of them classify \`rejected\`** — these fire the step-4 seam too, and are NOT`,
+      "in the tracked-`.crl` count.",
+      "",
+      ...inlineRejects.map((r) => `- \`${r.file}\` :: **${r.concept}** — ${r.detail}`),
+      "",
+    );
+
     if (unparsed.length > 0) {
       out.push("## Unparsed (excluded from the counts)", "", ...unparsed.map((f) => `- \`${f}\``), "");
     }
