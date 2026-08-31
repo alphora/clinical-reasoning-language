@@ -355,7 +355,23 @@ at all.
   why it needs no per-arm rules.
 
 **`most recent` follows the same overloading as everything else:** it takes the concept's `type is` and knows
-the recency element for it (an Observation's effective, a Condition's onset/recorded, …).
+the recency element for it (an Observation's `effective`, a Condition's `recordedDate`, …).
+
+⚠ **RECENCY AND THE VALUE CARRIER ARE DIFFERENT AXES, and conflating them has already cost a round.** The
+table below is the **value carrier** — which element holds a projected DATUM. The **recency** element is a
+separate per-resource fact and its single authority is `emit/resourceEmitRegistry.ts`
+(`RESOURCE_EMIT_REGISTRY[<Resource>].recency`). For a Condition those give DIFFERENT elements on purpose:
+the value carrier is `onset` (when the condition began — a clinical fact you might read AS a value) and the
+recency is `recordedDate` (when the claim was made — what the merge sorts by). A review round read this
+parenthetical's old "onset/recorded" as a ruling about recency, found `recordedDate` in the design of record,
+and reported a contradiction that did not exist.
+
+⭐ WHY RECENCY IS THE CLAIM DATE, so it is not re-derived: the merge arbitrates between CLAIMS. A local
+answer is dated by `effective`, which the DTR extraction populates from `QuestionnaireResponse.authored` —
+when the answer was given. A derived candidate is stamped "when was this claim made" (§5b). All three arms
+must be on that one axis, or the sort compares a claim date against a clinical-history date. Concretely:
+a Condition a clinician records TODAY with an onset of 1995 is the most recent ASSERTION anyone has made,
+and must not lose to a 2020 answer.
 
 ✅ **This dissolves "what is the recency of a DERIVED value?"** — a question that looked like a blocking design
 unknown. There is no per-arm timestamp problem, because by the time `definition is` runs, every arm is already
