@@ -603,10 +603,21 @@ define function "Low"(rec Observation, threshold System.Quantity):
 /*
  * BodyMassIndex(weight, height) — #189, the goal fixture's calculation.
  *
- * BMI = mass / height², and CQL quantity arithmetic carries the units, so `kg / (m * m)` yields `kg/m2` and
- * a threshold written `30 'kg/m2'` compares like-for-like. The AUTHOR is responsible for the operands'
- * units being kg and m; nothing here converts, because a silent conversion is exactly the kind of invented
- * semantics the charter forbids.
+ * BMI = mass / height², and CQL quantity arithmetic carries the units. The AUTHOR is responsible for the
+ * operands' units being kg and m; nothing here converts, because a silent conversion is exactly the kind of
+ * invented semantics the charter forbids.
+ *
+ * ⚠ THE RESULT UNIT IS NOT `kg/m2`. MEASURED against the cqf CQL engine: 90 'kg' / (1.7 'm' * 1.7 'm')
+ * evaluates to `31100 'g.m-2'` — the engine normalises the mass unit and prints the exponent form. An earlier
+ * version of this comment claimed the arithmetic "yields `kg/m2` and a threshold written `30 'kg/m2'` compares
+ * like-for-like". The CONCLUSION holds but the REASON did not: it is the COMPARISON that normalises, not the
+ * arithmetic. Verified both ways, so the threshold is not accidentally satisfied:
+ *
+ *     20000 'g.m-2' >= 30 'kg/m2'  ->  false      (20 < 30)
+ *     40000 'g.m-2' >= 30 'kg/m2'  ->  true       (40 > 30)
+ *
+ * So `"BMI" at least 30 'kg/m2'` is correct over this result. What is NOT safe is assuming the unit STRING is
+ * `kg/m2` — anything that displays, round-trips or string-matches this value sees `g.m-2`.
  *
  * ⚠ NULL-PROPAGATING, deliberately: either operand absent ⇒ null BMI ⇒ the determination over it stays
  * UNKNOWN rather than becoming a stated `false`. That is what lets "no height and no weight" PAUSE instead
