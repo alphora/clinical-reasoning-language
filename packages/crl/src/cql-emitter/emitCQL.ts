@@ -2530,6 +2530,29 @@ class Emitter {
     const lpRef = cqlQualifiedRef(localLib, foldIn);
     const epRef = cqlQualifiedRef(sourceLib, sourceName);
 
+    // ⭐⭐ #189 — a `shape is Record` merge publishes the newest RECORD, so it selects over the UNION of the arms
+    // and stops. It does NOT go through the value-merge below.
+    //
+    // WHY THE UNION IS THE WHOLE MECHANISM HERE: both arms retrieve the concept's OWN `type is` resource (the
+    // local `code is` records and the `coded from` source records are both `[Observation: …]`), so the union is
+    // HOMOGENEOUS and needs no candidate construction. The operator's model — two arms ADD to a collection and
+    // the `definition is` stage WORKS ON it — is then literally the emitted expression: `union` adds, `Last(…)`
+    // is the stage.
+    //
+    // ⚠ THE VALUE MERGE BELOW CANNOT SERVE THIS CASE, and would emit untranslatable CQL if it tried. A
+    // record-shaped `local-exact` descriptor carries NO `valueElement`/`datumValueType` (there is no value to
+    // read — the record IS the result), so the value path interpolates them as `undefined` and emits
+    // `where O.undefined is FHIR.undefined` under `success: true`. MEASURED on the goal's `Height` before this
+    // branch existed. A silent untranslatable emit is worse than a refusal, so the branch is taken FIRST.
+    //
+    // ⚠ ARM RANK IS NOT IN THIS SORT KEY, deliberately and with the operator's ruling. On an equal `effective`
+    // the order is ASSERTED > RECORDED > INFERRED, but `sort by <effective>, id` cannot express it and the
+    // operator ruled the cell unrealistic ("nothing is ever going to come in on two arms at the same instant")
+    // and low priority. It is recorded in `DESIGN-bothrep-derivation-merge.md` §5c, NOT silently dropped.
+    if (c.__recencyMergePublishes === "record") {
+      return this.emitSelectNewest(`${lpRef} union ${epRef}`, local, undefined);
+    }
+
     // A recency timestamp read (`System.DateTime`) off a record expression (`base` = `(<newest>).`) or the bare
     // element (`base` = "" for the in-query `sort by`). `dateTime` casts the polymorphic `effective[x]` choice.
     const ts = (rec: RecencyAccess, base: string): string =>

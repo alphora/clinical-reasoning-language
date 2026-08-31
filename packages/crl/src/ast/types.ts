@@ -769,6 +769,17 @@ export interface Concept extends ASTNode {
    * (`effectiveRepresentation` imports FROM `ast/types`); the emit read site casts. Absent unless
    * `__bothRepMerge === "recency-value"`.
    */
+  /**
+   * SYNTHETIC-EMITTER-ONLY (#189). What a both-representation recency MERGE twin publishes — the concept's
+   * DECLARED `shape is`, carried onto the twin so the emit does not re-derive it:
+   *   `"value"`  — `shape is Scalar`: the newest record's VALUE (a `Scalar<T>` or null).
+   *   `"record"` — `shape is Record`: the newest RECORD, selected over the UNION of the arms.
+   * ⚠ The two emit DIFFERENT expressions, and a record-shaped descriptor carries NO `valueElement`, so a twin
+   * that lost this marker would emit `where O.undefined is FHIR.undefined` — untranslatable CQL under
+   * `success: true`. Set in lock-step with `__recencyValueDescriptors` at lowering;
+   * `resolveRecencyValueConcept().publishes` is the single authority for it.
+   */
+  __recencyMergePublishes?: "value" | "record";
   __recencyValueDescriptors?: unknown;
   /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). #189 Slice C boundary 2 (2a) — the

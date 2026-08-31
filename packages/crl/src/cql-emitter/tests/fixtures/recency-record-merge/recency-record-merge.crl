@@ -1,0 +1,20 @@
+# #189 — the both-representation RECORD merge: two arms ADD to a collection, `definition is` WORKS ON it.
+//
+// This is the GOAL's leaf shape, extracted verbatim from `tests/fixtures/obesity/policy.crl`'s `Height`:
+// a local `code is` (the answer arm) + one `coded from` source representation (the recorded arm) + a
+// `definition is most recent this` stage that selects across BOTH. `shape is Record`, so the concept
+// publishes the newest RECORD — not its value.
+library "RRM".
+
+terminology "Height VS":
+- valueset is `http://example.org/vitals/ValueSet/height`.
+
+concept "Height":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `height`.
+- definition is most recent this.
+- source representation:
+  - type is Observation.
+  - coded from "Height VS".

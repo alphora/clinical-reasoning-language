@@ -246,6 +246,22 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
         // OTHER concepts (`Obese`, `BMI`). A leaf reducing over its OWN representations (`most recent this`)
         // is fine — that is the supported both-representation recency. So the real boundary is a local code
         // plus a CROSS-CONCEPT derivation, the ordinary shape of a question that can also be computed.
+        //
+        // ⭐ PROGRESS, 2026-08-31 — the LEAVES NOW LOWER. `Height`/`Weight` (`shape is Record` + `code is` +
+        // `most recent this` + one `coded from` posrep) used to add `emit-reduction-not-active` to this list;
+        // they no longer error at all. Their merge emits the two arms unioned into one collection with the
+        // `definition is` stage selecting over it:
+        //
+        //     define "Height":
+        //       Last( (LocalPrimitives."Height" union ExternalPrimitives."Height Source") O
+        //               sort by (effective as FHIR.dateTime).value, id )
+        //
+        // EXECUTION-VERIFIED against the real CQL engine, not an emit diff: with a local answer (Jan) and a
+        // source record (Jun), `Arm Count=2` and the newest across BOTH arms wins
+        // (`tmp/nullprobe/hw-verify/`). ⚠ The library still emits NOTHING because `Obese`/`BMI` — the concepts
+        // with a PRODUCER stage — still refuse, and one refusal fails the whole closure. So this assertion is
+        // unchanged and correct; what shrank is WHY, and the remaining blocker is now exactly the producer
+        // stage, not the leaves.
         const blocking = (fhir.errors ?? []).filter((e) => e.kind === opt.emitBlocker);
         expect(blocking.length, opt.name + " expected " + opt.emitBlocker).toBeGreaterThan(0);
       });

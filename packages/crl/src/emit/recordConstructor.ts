@@ -195,7 +195,7 @@ export interface ConstructorSignature {
    *  and collides silently. So no `id` is emitted, and dedup compares these fields directly.
    *
    *  ⚠ NOT a `provenance` field: two arms whose content is identical publish the same value, so the
-   *  ASSERTED > DERIVED > RECORDED tie-break (design §5c) is indifferent between them. Arm identity stays
+   *  ASSERTED > RECORDED > INFERRED tie-break (design §5c) is indifferent between them. Arm identity stays
    *  POSITIONAL (design D9). */
   contentKey: readonly string[];
   /** What the emitter must bind (empty unless the capability was `requires-context`). */

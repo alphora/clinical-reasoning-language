@@ -693,6 +693,9 @@ export function lowerLocalCodes(
           definition: { type: "ReductionDefinition", reduction: mergeReduction, location: loc },
           __bothRepMerge: "recency-value",
           __bothRepFoldInLocalPrimitives: c.name, // LP self-fold include (collectLayerIncludes)
+          // ⭐ #189 — WHAT THIS MERGE PUBLISHES, from the ONE resolver, set in lock-step with the descriptors.
+          // `Scalar` → the newest record's value; `Record` → the newest record over the union of the arms.
+          __recencyMergePublishes: rv.publishes,
           __recencyValueDescriptors: { local: localDesc, source: sourceDesc },
           __loweringRole: "public-determination",
         };

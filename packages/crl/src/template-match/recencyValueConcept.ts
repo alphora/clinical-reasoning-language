@@ -29,6 +29,17 @@ export type RecencyValueResolution =
       kind: "recency-value";
       /** The single `coded from` source posrep — its `terminologyName` scopes the source membership retrieve. */
       sourceRep: Representation;
+      /**
+       * ⭐ #189 — WHAT THE MERGE PUBLISHES, and it is the concept's DECLARED `shape is`, never inferred.
+       *
+       *   `"value"`  — `shape is Scalar`: the merge publishes the newest RECORD'S VALUE (a `Scalar<T>` or null).
+       *   `"record"` — `shape is Record`: the merge publishes the newest RECORD itself.
+       *
+       * Both select the same way over the same union of arms; they differ ONLY in what the selected candidate
+       * is read down to. Splitting them into two resolvers would let the two selections drift, which is the
+       * thing this file exists to prevent (validate and emit read ONE authority).
+       */
+      publishes: "value" | "record";
     }
   | { kind: "not-recency-value" };
 
@@ -49,10 +60,22 @@ export function resolveRecencyValueConcept(concept: Concept): RecencyValueResolu
   const red = def.reduction;
   if (red.kind !== "mostRecent" || red.target.type !== "ThisRecords") return no;
 
-  // Publishes a Scalar NON-boolean value (a boolean value/interface concept is the `defined as exists` family, not
-  // this recency-value merge; a Scalar boolean `most recent this` is the B2a cell).
-  if (assumedShapePreMigration(concept.shape) !== "Scalar") return no;
-  if (!(concept.valueTypes.length === 1 && concept.valueTypes[0] !== "boolean")) return no;
+  // ⭐ #189 — REFACTOR:grounded. `Scalar` publishes the newest record's VALUE; `Record` publishes the newest
+  // RECORD. Re-derived from the GOAL (charter §0a: GOAL > CHARTER > CODE) and execution-verified against the
+  // real CQL engine, not from the adjacent Scalar-only code. Both are this
+  // form. The `Record` arm is what the GOAL's `Height`/`Weight` are (`shape is Record` + `code is` + `most recent
+  // this` + one `coded from` posrep), and excluding it was the single line that kept the goal from emitting —
+  // MEASURED: every other condition here already passed for them.
+  //
+  // ⚠ `RecordSet` is NOT admitted: a merge that selects ONE candidate cannot publish a set, and inferring a
+  // cardinality the author did not declare is the magic charter §3/§4 bans. It stays the build-debt arm.
+  const declaredShape = assumedShapePreMigration(concept.shape);
+  if (declaredShape !== "Scalar" && declaredShape !== "Record") return no;
+  const publishes = declaredShape === "Scalar" ? ("value" as const) : ("record" as const);
+  // A Scalar publishes a value, so it must DECLARE exactly one non-boolean value type (a Scalar boolean `most
+  // recent this` is the B2a cell; a boolean value/interface concept is the `defined as exists` family). A Record
+  // publishes the record, and its `value type` is an OPTIONAL datum description — it constrains nothing here.
+  if (publishes === "value" && !(concept.valueTypes.length === 1 && concept.valueTypes[0] !== "boolean")) return no;
 
   // Exactly ONE `source representation`, `coded from` (a coded external value read), NOT a `value projection` (that is
   // the patient-age recency lane, owned by `resolveAgeConcept`).
@@ -66,7 +89,7 @@ export function resolveRecencyValueConcept(concept: Concept): RecencyValueResolu
   // a `value projection` rep is already excluded above, but this keeps the two resolvers from ever disagreeing).
   if (resolveAgeConcept(concept).kind !== "not-age") return no;
 
-  return { kind: "recency-value", sourceRep: rep };
+  return { kind: "recency-value", sourceRep: rep, publishes };
 }
 
 /**
