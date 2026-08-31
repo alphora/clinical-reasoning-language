@@ -77,9 +77,20 @@ export type ProducerCandidateResolution =
   | { kind: "resolved"; specs: readonly ProducerCandidateSpec[] }
   | { kind: "refused"; refusal: ProducerCandidateRefusal };
 
-/** The refusal kind every producer-candidate rejection carries — one FILTERABLE kind, per the emit-error
- *  convention, with the specifics in the message. */
-export const PRODUCER_CANDIDATE_REFUSED_KIND = "emit-reduction-not-active";
+/**
+ * ⭐ TWO KINDS, because a KIND IS A CLAIM and consumers filter on it (`obesityTarget.test.ts`'s blocker
+ * ratchet does exactly that).
+ *
+ * `emit-reduction-not-active` carries a specific promise, stated by the sentinel this slice replaced: *"this
+ * is unbuilt work, not an illegal form: do not re-author the concept to avoid it."* That is right for a
+ * flow-reading producer or a RecordSet operand — real shapes whose lowering does not exist yet.
+ *
+ * ⚠ It is exactly WRONG for a typo'd operand name, where re-authoring is the entire fix. Charter §0a's
+ * lesson is that blurring "the language cannot express this" with "the schedule has not reached this" is the
+ * documented spin mechanism; an author told not to re-author their typo is stuck.
+ */
+export const PRODUCER_BUILD_DEBT_KIND = "emit-reduction-not-active";
+export const PRODUCER_AUTHOR_ERROR_KIND = "emit-mixed-code-and-definition";
 
 export interface ProducerCandidateInputs {
   /** The concept whose merge the candidates join. */
@@ -93,6 +104,8 @@ export interface ProducerCandidateInputs {
   /** The case-feature SD canonical url, ALREADY COMPOSED by the shared authority (`slug.ts`). ⚠ Passed in,
    *  never derived here — the two lanes must read one composition, and this module is not it. */
   profile: string;
+  /** The concept's OWN library name, so a qualifier naming it reads as LOCAL rather than cross-library. */
+  owningLibraryName: string;
 }
 
 /** A stage arg that names a concept, with its position. Literals (`30 'kg/m2'`) are not operands for
@@ -106,6 +119,21 @@ function conceptRefArgs(call: CanonicalPatternCall): { argIndex: number; arg: Ca
 }
 
 /**
+ * ⚠⚠ THE STAMPED COMPONENTS MUST BE THE COMPONENTS THAT DETERMINE THE VALUE, and a walk that silently skips
+ * an argument kind breaks that equality without saying so.
+ *
+ * `CanonicalArg` is a six-way union. `NestedPatternArg`, `DisjunctionArg` and `ConjunctionArg` all CARRY
+ * concept references, and `emitArg` renders a nested pattern by recursing — so if a grounded producer ever
+ * binds one, its VALUE would include those refs while its STAMP excluded them. A candidate stamped by a
+ * strict subset of its determinants takes a confident recency place it has not earned: the same defect class
+ * the `Max`-ignores-nulls fix removed, arriving through the argument model instead of the null model.
+ *
+ * Today's grounded producers bind only concept refs and literals. This makes the day that changes a LOUD
+ * failure rather than a quiet mis-stamp — the same standard applied to a flow-reading producer.
+ */
+const SIMPLE_ARG_TYPES = new Set(["ConceptRefArg", "QuantityArg", "EnumArg"]);
+
+/**
  * Resolve every producer stage into a candidate spec, or refuse with one author-facing message.
  *
  * ⚠ TOTAL and REFUSING: every shape this does not cover returns `refused`, never a partial spec. A partial
@@ -113,15 +141,21 @@ function conceptRefArgs(call: CanonicalPatternCall): { argIndex: number; arg: Ca
  * slice exists to make impossible.
  */
 export function resolveProducerCandidates(inputs: ProducerCandidateInputs): ProducerCandidateResolution {
-  const { concept, producerStages, siblingsByName, code, profile } = inputs;
+  const { concept, producerStages, siblingsByName, code, profile, owningLibraryName } = inputs;
+  /** Unbuilt lowering — the form is legal and the author must NOT work around it. */
   const refuse = (message: string): ProducerCandidateResolution => ({
     kind: "refused",
-    refusal: { kind: PRODUCER_CANDIDATE_REFUSED_KIND, message },
+    refusal: { kind: PRODUCER_BUILD_DEBT_KIND, message },
+  });
+  /** The author must change something — a name that resolves to nothing, a missing declaration. */
+  const refuseAuthor = (message: string): ProducerCandidateResolution => ({
+    kind: "refused",
+    refusal: { kind: PRODUCER_AUTHOR_ERROR_KIND, message },
   });
 
   const resourceType = concept.conceptType;
   if (resourceType === undefined) {
-    return refuse(
+    return refuseAuthor(
       `Concept "${concept.name}" runs a producer stage but declares no \`type is\` resource, so there is no ` +
         `record for its computed value to be constructed into. Declare the resource the determination is.`,
     );
@@ -189,10 +223,24 @@ export function resolveProducerCandidates(inputs: ProducerCandidateInputs): Prod
     // Observation, height Observation)`, `AtLeast(rec Observation, target System.Quantity)`). An operand
     // that publishes something else binds a DIFFERENT overload or none at all — and `componentStampCql`'s
     // record read needs the same guarantee. So the shape is checked here, before any text is rendered.
+    const complexArg = stage.call.args.find((a) => !SIMPLE_ARG_TYPES.has(a.type));
+    if (complexArg !== undefined) {
+      return refuse(
+        `Concept "${concept.name}": producer stage ${stage.index} (\`${stage.call.pattern}\`) takes a ` +
+          `\`${complexArg.type}\` argument. Which of its nested concept references DETERMINE the computed ` +
+          `value — and so must contribute to its §5b recency stamp — is not established, and stamping a ` +
+          `candidate from a subset of its determinants would give it a recency place it has not earned.`,
+      );
+    }
+
     const operandStamps: OperandStamp[] = [];
     for (const { argIndex, arg } of conceptRefArgs(stage.call)) {
       if (arg.type !== "ConceptRefArg") continue; // narrowing; `conceptRefArgs` filters
-      if (arg.library !== undefined && arg.library !== null) {
+      // ⚠ A qualifier naming THIS library is LOCAL. `"Current Library"."Weight"` is an ordinary same-library
+      // reference that CRL normalizes elsewhere (`normalizeLocalRef`), and rejecting it as cross-library would
+      // refuse a legal authoring the rest of the language accepts. Only a qualifier that survives
+      // normalization is foreign.
+      if (arg.library !== undefined && arg.library !== null && arg.library !== owningLibraryName) {
         return refuse(
           `Concept "${concept.name}": producer stage ${stage.index} reads the cross-library operand ` +
             `\`${arg.library}."${arg.value}"\`. Resolving another library's record shape and recency element ` +
@@ -201,7 +249,7 @@ export function resolveProducerCandidates(inputs: ProducerCandidateInputs): Prod
       }
       const operand = siblingsByName.get(arg.value);
       if (operand === undefined) {
-        return refuse(
+        return refuseAuthor(
           `Concept "${concept.name}": producer stage ${stage.index} names the operand "${arg.value}", which ` +
             `is not a concept in this library.`,
         );
@@ -217,7 +265,7 @@ export function resolveProducerCandidates(inputs: ProducerCandidateInputs): Prod
       }
       const operandResource = operand.conceptType;
       if (operandResource === undefined) {
-        return refuse(
+        return refuseAuthor(
           `Concept "${concept.name}": producer stage ${stage.index} reads operand "${arg.value}", which ` +
             `declares no \`type is\` resource, so its recency element is unknown.`,
         );
@@ -229,6 +277,25 @@ export function resolveProducerCandidates(inputs: ProducerCandidateInputs): Prod
             `(\`${operandResource}\`), whose recency element is not established in the emit registry. §5b ` +
             `stamps a derived candidate from its components' timestamps, so an operand without one cannot ` +
             `contribute.`,
+        );
+      }
+      // ⚠⚠ THE GROUNDED OVERLOAD IS TYPED, so "publishes a Record" is not enough. `CRLCommon` grounds
+      // `BodyMassIndex(weight Observation, height Observation)` and `AtLeast(rec Observation, target
+      // System.Quantity)` — both read `rec.value as Quantity` off an OBSERVATION. Two `Condition` operands
+      // would pass a shape-only check and then have NO CQL overload (a translator failure, which design D1
+      // forbids); an Observation whose declared datum is `string` would pass, translate, and quietly return
+      // null through the `as Quantity` cast — turning an ESTABLISHED computation into a pause, which is worse.
+      //
+      // Checked against the catalog's own realization types rather than a list invented here, so a new
+      // grounded overload widens this by widening the catalog.
+      const operandDatum = operand.valueTypes.length === 1 ? operand.valueTypes[0] : undefined;
+      if (operandResource !== "Observation" || operandDatum !== "Quantity") {
+        return refuse(
+          `Concept "${concept.name}": producer stage ${stage.index} reads operand "${arg.value}" ` +
+            `(\`type is ${operandResource}\`, \`value type is ${operandDatum ?? "(none/multiple)"}\`). The ` +
+            `grounded realization of \`${stage.call.pattern}\` reads a Quantity value off an Observation; no ` +
+            `overload covers this operand, so the emitted CQL would either fail to translate or read null ` +
+            `through a failed cast and silently drop the candidate.`,
         );
       }
       // ⚠ THE OPERAND'S OWN ROW, never the enclosing concept's. An all-Observation fixture makes the wrong

@@ -8,9 +8,13 @@
 //   1. `lowerLocalCodes` — the (2-pre) reduction gate branches the 3-output split here instead of erroring;
 //   2. `classifyBooleanTotality` — runs on the AUTHORED (pre-lowering) concept, where the `__bothRepMerge` marker is
 //      invisible, so it must recognize the AUTHORED shape to reclassify the merge `not-applicable{nullable}`;
-//   3. `deriveEffectiveRepresentations` (effectiveRepresentation.ts) — already classifies this as `[local-exact,
-//      source]`; this resolver's predicate MIRRORS that both-rep branch so the value producer and the shape gate cannot
-//      disagree.
+//   3. `deriveEffectiveRepresentations` (effectiveRepresentation.ts) — classifies the arms as `[local-exact,
+//      source]`. ⚠ The two DELIBERATELY disagree on one axis: this resolver admits a non-age `value projection`
+//      posrep (which is what lets the goal's `Obese` classify) while `deriveOneSourceArm` still defers it
+//      `out-of-scope`. That disagreement is the SAFETY MECHANISM, not a drift — classifying a shape is not
+//      building its arm, and the loud `emit-most-recent-derivation` is what keeps the unbuilt arm from
+//      shipping silently. An earlier version of this line claimed the two "cannot disagree"; that is no
+//      longer the design.
 // This is the `resolveAgeConcept` precedent (recencyProjectionOverride.ts:204 — "the SAME source the author-time
 // validator consults, so validate and emit cannot drift"). PURELY STRUCTURAL: no owning-library metadata, so a pure
 // AST consumer (the totality classifier) can call it.

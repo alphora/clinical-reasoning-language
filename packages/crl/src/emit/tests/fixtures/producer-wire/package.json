@@ -1,0 +1,7 @@
+{
+  "name": "producerwire",
+  "version": "1.0.0",
+  "private": true,
+  "description": "#189 — the committed integration pin for a PRODUCER stage's constructed candidate. Both value modes: a Quantity formula (BMI) and a boolean threshold (Obese).",
+  "crl": { "canonicalBase": "http://example.org/producerwire" }
+}

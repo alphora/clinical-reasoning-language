@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 
+import * as path from "node:path";
+import { readFileSync } from "node:fs";
+
 import { emitCQL } from "../../cql-emitter/emitCQL";
+import { emitCQLImports } from "../../imports/emit";
 import { buildCRL } from "../../index";
 import { resolveRecencyValueConcept } from "../../template-match/recencyValueConcept";
 import type { Concept } from "../../ast/types";
@@ -18,6 +22,12 @@ import { conceptRefsOfConcept, conceptRefsOfDefinition } from "../../ast/concept
  */
 
 const BASE = { canonicalBase: "http://example.org/crl/pc", localDomainId: "pc", policyId: "pc" };
+
+/** The committed integration fixture — the goal's producer shape, both value modes. */
+const FIXTURE_POLICY = path.resolve(__dirname, "fixtures/producer-wire/policy.crl");
+
+const emitLane = (): { success: boolean; cqlByLibrary?: { cql?: string }[] } =>
+  emitCQLImports(FIXTURE_POLICY) as unknown as { success: boolean; cqlByLibrary?: { cql?: string }[] };
 
 const HEADER = `library "PC".
 
@@ -66,11 +76,50 @@ const msgOf = (r: { errors?: { message?: string }[] }, needle: string): string =
 describe("#189 — a producer stage's constructed candidate", () => {
   const good = HEADER + leaf("Height", "height", "H VS") + leaf("Weight", "weight", "W VS") + bmi;
 
-  it("⭐ the producer no longer refuses — its candidate reaches the emitted space", () => {
-    // The `emit-reduction-not-active` sentinel that stood here is GONE for this shape. What replaces it is a
-    // constructed candidate unioned into the merge's space, so the derivation can never be silently dropped.
-    const r = emit(good);
-    expect(kindsOf(r)).not.toContain("emit-reduction-not-active");
+  it("⭐ the producer's candidate REACHES THE EMITTED SPACE — constructor defined, called, unioned in", () => {
+    // ⚠ THIS ASSERTED ONLY THAT ONE ERROR KIND WAS ABSENT, which a panel arm correctly called a non-test: a
+    // regression to a DIFFERENT error — or back to silently omitting the producer while reporting success —
+    // passed it. The integration evidence lived only under `tmp/`: gitignored, prunable, invisible to CI,
+    // which is the "handoff instead of a fixture" failure this repo keeps paying for. It is a FIXTURE now.
+    //
+    // ⚠ Through `emitCQLImports`, not `emitCQL`: a both-representation merge is only valid in the layered
+    // case-feature lane, and a direct emit collides the two twins into a duplicate define.
+    const r = emitLane();
+    expect(r.success).toBe(true);
+    const cql = (r.cqlByLibrary ?? []).map((l) => l.cql ?? "").join(String.fromCharCode(10));
+    // 1. the constructor FUNCTION is defined — it had NO production caller at all before this slice
+    expect(cql).toContain("define function CRLConstructObservationQuantity(");
+    // 2. and its boolean sibling, so both value modes are covered
+    expect(cql).toContain("define function CRLConstructObservationBoolean(");
+    // 3. the producer's computation is IN the emitted text. Its silent ABSENCE under `success: true` is the
+    //    exact failure this slice exists to make impossible — measured once on this very shape.
+    expect(cql).toContain("CRLCommon.BodyMassIndex(");
+    expect(cql).toContain("CRLCommon.AtLeast(");
+    // 4. §5b — all-or-nothing, and a `Max` only where there is more than one determinant
+    expect(cql).toContain("then null as System.DateTime");
+    expect(cql).toContain("Max({");
+    // 5. the candidate is a THIRD arm of the space the terminal selection reads, beside local and source
+    const bmi = cql.slice(cql.indexOf('define "BMI":'));
+    expect(bmi).toContain("LocalPrimitives");
+    expect(bmi).toContain("ExternalPrimitives");
+    expect(bmi).toContain("CRLConstructObservationQuantity(");
+    expect(bmi).toContain("where C is not null");
+    // 6. and it is stamped with the case-feature profile url the FHIR lane emits (parity, not a lookalike)
+    expect(bmi).toContain("'http://example.org/producerwire/StructureDefinition/producerwire-bmi'");
+  });
+
+  it("⚠ REFUSES a member-existence interface over a PRODUCER-BEARING referent", () => {
+    // MEASURED as a silent WRONG ANSWER, not a missing feature: the fold's arms read the retrieves directly,
+    // so `exists ("Obese")` evaluated FALSE on data where `Obese` is a constructed `true` — two defines in
+    // one library publishing contradictory determinations under `success: true`. ⚠ THIS SLICE made it
+    // reachable (before, such a referent hard-failed and no CQL shipped), so it is this slice's to refuse.
+    const src = readFileSync(FIXTURE_POLICY, "utf8").replace(
+      'defined as exists ("Weight")',
+      'defined as exists ("Obese")',
+    );
+    const r = emit(src, { libraryName: "BMI Wire" });
+    expect(r.success).toBe(false);
+    expect(msgOf(r, "member-existence interface")).toContain("would publish");
   });
 
   it("⚠ REFUSES when no policy id is available, rather than stamping a profile the FHIR lane never emits", () => {

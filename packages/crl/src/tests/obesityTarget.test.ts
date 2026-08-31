@@ -128,10 +128,17 @@ const OPTIONS: readonly AuthoringOption[] = [
     cases: path.join(FIXTURE, "cases-recordset.cel"),
     singleValuedTargets: ["Obese"],
     validatesCleanToday: true,
-    // ⚠ UNCHANGED KIND, DIFFERENT CONCEPT. `Obese` moved to `emit-reduction-not-active` with the other two
-    // options; what still raises this here is `BMI`, whose `shape is RecordSet` publishes a SET and so is
-    // not the select-one merge at all. That is the declared build-debt arm (cardinality is DECLARED, never
-    // inferred — charter §3), not the same blocker the others had.
+    // ⚠ UNCHANGED KIND, DIFFERENT CONCEPT — and MEASURED, after a panel arm caught the earlier claim here
+    // being false. `Obese` raises `emit-most-recent-derivation` in ALL THREE options (its Condition posrep
+    // with `value projection is exists this` is identical across them, and descriptor derivation runs and
+    // `continue`s BEFORE producer resolution is reached). What raises THIS kind is `BMI`, whose
+    // `shape is RecordSet` reduces two HISTORIES.
+    //
+    // ⚠ That refusal is right for now but its KIND is wrong, and this slice is what made it wrong: the same
+    // `code is` + definition mix now LOWERS for the Record option, so "NOT YET LOWERED" is no longer a true
+    // statement about the form. The real blocker is that pairing two histories has no defined semantics —
+    // which weight with which height. Re-kinding it is owed (panel round 1 item 5, round 2 item 10) and
+    // needs the pairing question answered, not a relabel.
     emitBlocker: "emit-mixed-code-and-definition",
     reachableQuestions: ["Obese", "BMI", "Weight", "Height"],
   },
@@ -268,11 +275,12 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
         expect(fhir.success).toBe(false);
         // ⚠ MEASURED, and narrower than any message here says. The boundary is NOT "a local code plus a
         // cross-concept derivation" — that framing was true when this pin was `emit-mixed-code-and-definition`
-        // for every option, and it is not true now. Both `Obese` and `BMI` classify as the both-representation
-        // merge; what they refuse on is the PRODUCER STAGE their pipeline runs before its terminal selection
-        // (`resolveConceptPipeline`: `AtLeast` and `BodyMassIndex` respectively). So the remaining boundary is
-        // exactly ONE mechanism — construct a producer's computed value into a candidate of the concept's
-        // `type is` and add it to the space — and it is the same mechanism for both concepts.
+        // for every option, and it stopped being true once the both-rep merge learned to lower that shape.
+        // It is not "the producer stage" either: the producer LOWERS now, and `BMI` no longer refuses at all.
+        //
+        // What remains is `Obese`'s SOURCE ARM — a `type is Condition` posrep carrying `value projection is
+        // exists this`, which `deriveOneSourceArm` defers `out-of-scope`, so the merge gets one descriptor
+        // where it needs `[local-exact, source]`.
         //
         // ⭐ PROGRESS, 2026-08-31 — the LEAVES NOW LOWER. `Height`/`Weight` (`shape is Record` + `code is` +
         // `most recent this` + one `coded from` posrep) used to add `emit-reduction-not-active` to this list;

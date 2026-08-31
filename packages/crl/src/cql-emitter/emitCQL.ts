@@ -2684,12 +2684,34 @@ class Emitter {
       // the published determination cannot disagree about what is in the space. A twin with no terms is a
       // lowering bug rather than an author error, but the two-arm form is kept as an EXPLICIT fallback so a
       // hand-built AST (a public entry) still emits the derived pair it always did.
+      // ⚠ NO SILENT FALLBACK. An earlier revision fell back to `lpRef union epRef` when terms were absent,
+      // twenty lines below `emitRecordUnion` THROWING for the identical state with the comment "a silent
+      // fallback would re-hide exactly the implicitness this replaces" — two answers to one question in one
+      // file, which is the drift `renderSpaceTerms` exists to remove. Worse, the lock-step invariant was
+      // enforced in ONE direction: a constructed term with no spec threw, while SPECS WITH NO TERMS silently
+      // emitted two arms and dropped every producer. That is precisely the failure this slice removes.
       const terms = c.__recordUnionTerms;
-      const space =
-        terms !== undefined && terms.length > 0
-          ? this.renderSpaceTerms(c, terms, localLib, sourceLib)
-          : `${lpRef} union ${epRef}`;
-      return this.emitSelectNewest(space, local, undefined);
+      if (terms === undefined || terms.length === 0) {
+        throw new Error(
+          `internal invariant violated: recency-value merge twin "${c.name}" carries no ` +
+            `\`__recordUnionTerms\` — set in lock-step with the descriptors at lowering; a missing list is a ` +
+            `compiler bug (or an ill-formed hand-built AST).`,
+        );
+      }
+      return this.emitSelectNewest(this.renderSpaceTerms(c, terms, localLib, sourceLib), local, undefined);
+    }
+
+    // ⚠ THE VALUE BRANCH READS NEITHER TERMS NOR SPECS, so a constructed candidate reaching it would be
+    // SILENTLY DROPPED. It is unreachable today — `deriveEffect` grants `producer` only to a record-spaced
+    // concept, so `producerStages.length > 0` implies `publishes === "record"` — but that invariant lives two
+    // modules away and a hand-built AST is a public entry. Same standard `producerCandidate.ts` applies to a
+    // flow-reading producer: make the day it becomes reachable a LOUD failure, not a quiet divergence.
+    if (((c.__recencyProducerSpecs ?? []) as readonly unknown[]).length > 0) {
+      throw new Error(
+        `internal invariant violated: recency-value merge twin "${c.name}" publishes a VALUE but carries ` +
+          `producer specs. A constructed candidate joins a RECORD space; the value merge has nowhere to put ` +
+          `it and would drop the derivation silently.`,
+      );
     }
 
     // A recency timestamp read (`System.DateTime`) off a record expression (`base` = `(<newest>).`) or the bare

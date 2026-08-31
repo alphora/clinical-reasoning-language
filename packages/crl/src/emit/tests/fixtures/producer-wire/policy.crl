@@ -1,0 +1,75 @@
+// #189 — the committed integration pin for a PRODUCER stage's constructed candidate.
+//
+// ⭐ BOTH VALUE MODES: `BMI` is a Quantity FORMULA over two operands (so its §5b stamp is a `Max`), `Obese`
+// is a boolean THRESHOLD over one (so its stamp is that operand's). Both are `code is` + a `definition is`
+// pipeline + a `coded from` posrep — the goal's shape.
+//
+// ⚠ THE DECISION DELIBERATELY GUARDS ON A NON-PRODUCER CONCEPT. A member-existence interface over a
+// producer-bearing referent is REFUSED (`lowerLocalCodes`): its arms read the retrieves directly, so it would
+// publish `false` while the referent's merge publishes the computed value. The emitter applies NO
+// reachability filtering, so `BMI` and `Obese` still emit in full — which is what this fixture pins.
+library "BMI Wire".
+
+terminology "Clinical Obese VS":
+- valueset is `http://example.org/vitals/ValueSet/obese`.
+terminology "Clinical BMI VS":
+- valueset is `http://example.org/vitals/ValueSet/bmi`.
+terminology "Height VS":
+- valueset is `http://example.org/vitals/ValueSet/height`.
+terminology "Weight VS":
+- valueset is `http://example.org/vitals/ValueSet/weight`.
+
+concept "Height":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `height`.
+- definition is most recent this.
+- source representation:
+  - type is Observation.
+  - coded from "Height VS".
+
+concept "Weight":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `weight`.
+- definition is most recent this.
+- source representation:
+  - type is Observation.
+  - coded from "Weight VS".
+
+concept "BMI":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `bmi`.
+- definition is body mass index of "Weight" and "Height", then most recent this.
+- source representation:
+  - type is Observation.
+  - coded from "Clinical BMI VS".
+
+concept "Obese":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `obese`.
+- definition is "BMI" at least 30 'kg/m2', then most recent this.
+- source representation:
+  - type is Observation.
+  - coded from "Clinical Obese VS".
+
+concept "Has Weight":
+- shape is Scalar.
+- type is Observation.
+- value type is boolean.
+- code is `has-weight`.
+- defined as exists ("Weight").
+
+activity "A":
+- request CPGCommunicationRequest.
+- with `APPROVED`.
+
+decision "D":
+first:
+- when "Has Weight" then recommend activity "A".

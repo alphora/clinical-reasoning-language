@@ -110,7 +110,8 @@ import type {
   TerminologyBodyLine,
   Location,
 } from "../ast/types";
-import { EMIT_REDUCTION_NOT_ACTIVE_KIND } from "../ast/types";
+import { EMIT_REDUCTION_NOT_ACTIVE_KIND, getRefName } from "../ast/types";
+import type { ReferenceName } from "../ast/types";
 import { conceptRefsOfDefinition } from "../ast/conceptDependencies";
 import { matchNarrative } from "../template-match/matcher";
 import { patternReturnShape } from "../template-match/patternCatalog";
@@ -371,9 +372,16 @@ export function lowerLocalCodes(
   // both-rep → the interface emits a TOTAL member-existence boolean) from the deferred truth-set union. A pre-pass
   // because concept order is arbitrary (a value concept may be declared AFTER the interface that references it).
   const recencyValueNames = new Set<string>();
+  // ⭐⭐ #189 — the recency-value concepts that also run a PRODUCER stage. A member-existence fold over one of
+  // these is REFUSED below; see the refusal for why it cannot merely be classified.
+  const producerBearingNames = new Set<string>();
   for (const stmt of ast.statements) {
-    if (stmt.type === "Concept" && resolveRecencyValueConcept(stmt).kind === "recency-value") {
-      recencyValueNames.add(stmt.name);
+    if (stmt.type === "Concept") {
+      const rv = resolveRecencyValueConcept(stmt);
+      if (rv.kind === "recency-value") {
+        recencyValueNames.add(stmt.name);
+        if (rv.producerStages.length > 0) producerBearingNames.add(stmt.name);
+      }
     }
   }
 
@@ -726,6 +734,7 @@ export function lowerLocalCodes(
           producerStages: rv.producerStages,
           siblingsByName: conceptsByName,
           code: { system: urn, code: codeValue },
+          owningLibraryName: ast.library.name,
           // ⚠ COMPOSED BY THE SHARED AUTHORITY (`fhir-emitter/slug.ts`), which the FHIR lane's
           // `caseFeatureCanonicalUrl` now delegates to. The constructed candidate's `meta.profile` and the
           // emitted case-feature StructureDefinition url are ONE composition, so they cannot drift.
@@ -1821,6 +1830,40 @@ export function lowerLocalCodes(
       // disc 507 A/B — shape-EXACT on BOTH the referent AND the interface's own arm (unqualified ref, recency-value
       // referent, Scalar<boolean> Observation at the default value carrier), via the SHARED predicate every site uses.
       const isMemberExistenceFold = isMemberExistenceInterface(c, (name) => recencyValueNames.has(name));
+      // ⭐⭐ #189 — REFUSE a member-existence fold over a PRODUCER-BEARING referent. MEASURED, and it is a
+      // silent WRONG ANSWER, not a missing feature: the fold's arms read the LocalPrimitives / ExternalPrimitives
+      // RETRIEVES directly (`exists(...)`), while a producer's candidate exists only in the merge. So
+      // `define "Is Obese"` evaluated FALSE on data where `Obese` is a constructed `true`
+      // (`tmp/NOTES-producer-wiring-executed.md`) — two defines in one library publishing contradictory
+      // determinations, under `success: true`.
+      //
+      // ⚠ THIS SLICE IS WHAT MADE IT REACHABLE, so it is this slice's to close. Before producers lowered, such
+      // a referent hard-failed and no CQL shipped; classifying it as recency-value now lets the interface emit.
+      // Both panel arms called it a release blocker rather than backlog, and they were right — charter §0a,
+      // legal-but-unbuilt fails LOUDLY.
+      //
+      // The symmetric precedent is the projection posrep: broadening the CLASSIFIER is safe only when an
+      // independent downstream refusal covers the arm that was not built. The projection got one
+      // (`deriveOneSourceArm`); this lane had none. This is it, and it retires when the fold reads the space.
+      if (isMemberExistenceFold) {
+        const referent = getRefName((c.definition as DefinedAsDefinition & { body: { ref: ReferenceName } }).body.ref);
+        if (producerBearingNames.has(referent)) {
+          errors.push(
+            mkError(
+              EMIT_REDUCTION_NOT_ACTIVE_KIND,
+              `Concept "${c.name}" is a member-existence interface over "${referent}", which computes a ` +
+                `candidate from a \`definition is\` PRODUCER stage. The interface's arms test the local and ` +
+                `source RETRIEVES directly, but a computed candidate exists only in "${referent}"'s merge — so ` +
+                `this interface would publish \`false\` while "${referent}" beside it publishes the computed ` +
+                `value. Reading the merged space from an interface is NOT YET WIRED; emitting a determination ` +
+                `that contradicts its own referent is worse than refusing. This is unbuilt work, not an ` +
+                `illegal form: do not re-author the concept to avoid it.`,
+              c.definition?.location ?? loc,
+            ),
+          );
+          continue;
+        }
+      }
       const inferredTwin: Concept = {
         ...c,
         definition: bothRepDefinedAs,
