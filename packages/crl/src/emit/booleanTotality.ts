@@ -51,8 +51,8 @@
 // through `DefineLedger.appendDefine` lands as producers are enrolled (§8.4/§8.5). Until then this module is
 // INERT (imported by nothing in prod). NOT independently committable — lands atomically at T7 (design §9).
 //
-// Revised per crl-emit panel disc 429 (both arms): E1 forms now classify `rejected` (the enrolled-rejected
-// proof guard was decorative otherwise); age routes through `resolveAgeConcept` (not narrative coincidence);
+// Revised per crl-emit panel disc 429 (both arms): age routes through `resolveAgeConcept` (not narrative
+// coincidence);
 // composite proof is a fixed-point (cycles no longer pass vacuously); the subject set is result-type-only
 // (discharge metadata cannot exempt a Boolean define); the `?? "list"` catalog default fails CLOSED to
 // `unclassified`; `DischargeMetadata` is a discriminated union; the completeness backstop compares ALL
@@ -550,7 +550,8 @@ export function classifyBooleanTotality(
   }
 
   // A pure hand-authored `coded from` (no local code) — an external source arm, deferred at the flip
-  // (design §10); no LOCAL boolean define in v1. (code + coded-from was rejected above as an E1 form.)
+  // (design §10); no LOCAL boolean define in v1. (code + coded-from classifies `unclassified`
+  // above — build debt the proof reports, NOT a rejection; see the E1 note at the `hasCode` gate.)
   if (def?.type === "CodedFromDefinition") {
     return { kind: "not-applicable", nullable: false, reason: "`coded from` is an external source arm (deferred, design §10)" };
   }
@@ -983,7 +984,7 @@ export function proveWholeBoundaryTotality(
   };
 
   for (const e of entries) {
-    // An enrolled `rejected` obligation must never have been emitted (§3 — E1 forms fail by non-enrollment).
+    // An enrolled `rejected` obligation must never have been emitted (§3).
     if (e.obligation.kind === "rejected") {
       fail(e, `rejected form was emitted: ${e.obligation.reason}`);
       continue;

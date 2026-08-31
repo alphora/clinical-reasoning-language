@@ -7,6 +7,7 @@ import { describe, it } from "vitest";
 import type { CRL, Concept } from "../../ast/types";
 import { assumedShapePreMigration } from "../../grammar/conceptShapes";
 import { buildCRL } from "../../index";
+import { classifyBooleanTotality } from "../../emit/booleanTotality";
 
 /**
  * #189 T5-CQL BUILD-ORDER STEP 1 — the whole-fixture probe + migration inventory
@@ -96,7 +97,17 @@ describe("#189 T5-CQL step 1 — truth-set retirement inventory", () => {
       for (const c of built.result.statements as Concept[]) {
         if (c.type !== "Concept") continue;
         const hit = classify(c);
-        if (hit) rows.push({ file: f, concept: c.name, cell: hit.cell, detail: hit.detail });
+        if (!hit) continue;
+        // ⭐ RUN the classifier, do not read its comments: the module carries TWO doctrine comments that
+        // disagree about what an E1 form classifies as. The verdict is the fact.
+        let verdict: string;
+        try {
+          const v = classifyBooleanTotality(c) as { kind: string; code?: string };
+          verdict = v.kind + (v.code ? `/${v.code}` : "");
+        } catch (e) {
+          verdict = `THREW ${String(e).slice(0, 40)}`;
+        }
+        rows.push({ file: f, concept: c.name, cell: hit.cell, detail: `${hit.detail} → **${verdict}**` });
       }
     }
 
