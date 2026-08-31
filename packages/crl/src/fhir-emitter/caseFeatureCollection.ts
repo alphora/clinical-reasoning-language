@@ -40,7 +40,7 @@
  */
 
 import { walkInferenceOrder } from "../ast/inferenceWalk";
-import { conceptRefsOfDefinition } from "../ast/conceptDependencies";
+import { conceptRefsOfConcept } from "../ast/conceptDependencies";
 import type { Concept, ReferenceName } from "../ast/types";
 
 /** One collected `code is` concept, in inference order. */
@@ -84,7 +84,10 @@ export function collectCodeIsConceptsInInferenceOrder(
     // starting at `Obese` it reached ONE question where FOUR concepts carry codes, and the questionnaire
     // would have offered no way to answer with a height and a weight. A dependency is whatever the
     // definition READS (`ast/conceptDependencies`).
-    operandsOf: (name) => conceptRefsOfDefinition(definedAsByName.get(name)?.definition),
+    // ⭐ #189 — the WHOLE concept's edges, definition AND lowered producer stages. A merge twin's definition
+    // is a synthetic `most recent <self>`, so a producer's operands are invisible to a definition-only walk —
+    // which silently truncated this walk the moment producers started lowering.
+    operandsOf: (name) => conceptRefsOfConcept(definedAsByName.get(name)),
     // PRE-ORDER: a both-rep concept's own code is pushed before its operands. The walk enters each
     // name once (cycle/diamond guards), so a leaf referenced twice yields ONE entry.
     onEnter: (name, code) => {

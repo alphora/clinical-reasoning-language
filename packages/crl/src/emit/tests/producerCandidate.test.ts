@@ -4,6 +4,8 @@ import { emitCQL } from "../../cql-emitter/emitCQL";
 import { buildCRL } from "../../index";
 import { resolveRecencyValueConcept } from "../../template-match/recencyValueConcept";
 import type { Concept } from "../../ast/types";
+import { lowerLocalCodes } from "../../cql-emitter/lowerLocalCodes";
+import { conceptRefsOfConcept, conceptRefsOfDefinition } from "../../ast/conceptDependencies";
 
 /**
  * ⭐ #189 — the PRODUCER stage's constructed candidate, and the refusals that guard it.
@@ -129,5 +131,44 @@ concept "Obese":
     const r = emit(src, { libraryName: "PJ" });
     expect(r.success).toBe(false);
     expect(kindsOf(r)).toContain("emit-most-recent-derivation");
+  });
+});
+
+describe("#189 — a producer edge is a DEPENDENCY edge", () => {
+  // ⚠⚠ THE REGRESSION THIS PINS WAS REAL AND SHIPPED FOR ONE COMMIT. When producer stages started lowering,
+  // their operands moved from `definition` onto `__recencyProducerSpecs` — and every walk that asked
+  // `conceptRefsOfDefinition` stopped seeing them. The merge twin's definition is a synthetic
+  // `most recent <self>`, so `Obese` reported only its own name and the case-feature walk halted there:
+  // 2 of 5 reachable concepts got a StructureDefinition, and a constructed `BMI` candidate carried a
+  // `meta.profile` canonical that resolved to NOTHING.
+  //
+  // ⚠ Nothing was wrong with `Weight`/`Height`. They were unreachable through an edge that had gone
+  // invisible — which is why "these concepts are fine on their own" is not evidence that a walk reaches them.
+  //
+  // THE RULE: moving an edge off `definition` does not move it out of the graph.
+  it("survives lowering — the case-feature walk still reaches THROUGH a producer", () => {
+    const src = HEADER + leaf("Height", "height", "H VS") + leaf("Weight", "weight", "W VS") + bmi + `
+concept "Big":
+- shape is Scalar.
+- type is Observation.
+- value type is boolean.
+- code is \`big\`.
+- defined as exists ("BMI").
+`;
+    const built = buildCRL(src) as unknown as { result?: { statements: Concept[] } };
+    const lowered = lowerLocalCodes(built.result as never, {
+      canonicalBase: "http://example.org/crl/pc",
+      localDomainId: "pc",
+      policyId: "pc",
+    }) as unknown as { ast: { statements: Concept[] } };
+
+    const merge = lowered.ast.statements.find(
+      (s) => s.name === "BMI" && (s as Concept).__loweringRole === "public-determination",
+    ) as Concept;
+
+    // The definition alone reports only the synthetic self-reference...
+    expect(conceptRefsOfDefinition(merge.definition).map(String)).toEqual(["BMI"]);
+    // ...while the WHOLE concept still names the operands the derivation actually depends on.
+    expect(conceptRefsOfConcept(merge).map(String).sort()).toEqual(["BMI", "Height", "Weight"]);
   });
 });

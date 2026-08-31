@@ -81,6 +81,45 @@ function narrativeElementRefs(el: NarrativeElement): ReferenceName[] {
  * The concepts a DEFINITION reads, in source order. Pure, total, and duplicate-preserving — a caller that
  * needs uniqueness dedups in its own traversal (the case-feature walk already enters each name once).
  */
+/**
+ * ⭐⭐ #189 — THE DEPENDENCY EDGES OF A WHOLE CONCEPT, definition AND lowered producer stages.
+ *
+ * ⚠⚠ USE THIS, NOT `conceptRefsOfDefinition`, ANYWHERE THE WALK RUNS OVER A LOWERED AST.
+ *
+ * A both-representation merge twin's `definition` is a SYNTHETIC `most recent <self>` — the authored
+ * pipeline does not survive lowering. So a concept whose real dependency is a PRODUCER stage
+ * (`body mass index of "Weight" and "Height", then most recent this`) reports only its own name from the
+ * definition, and its operands live on `__recencyProducerSpecs`.
+ *
+ * ⚠ MEASURED, and it was a REGRESSION the moment producers started lowering: the case-feature walk over the
+ * lowered ast stopped at `Obese` because the `Obese -> BMI -> Weight/Height` edges were all producer edges.
+ * Only 2 of 5 reachable concepts got a StructureDefinition, so a constructed candidate carried a
+ * `meta.profile` canonical resolving to nothing. Nothing was wrong with `Weight`/`Height`; they were simply
+ * unreachable through an edge that had become invisible.
+ *
+ * The rule this encodes: MOVING AN EDGE OFF `definition` DOES NOT MOVE IT OUT OF THE GRAPH. One dependency
+ * graph, both storage locations.
+ */
+export function conceptRefsOfConcept(concept: Concept | undefined): ReferenceName[] {
+  if (concept === undefined) return [];
+  const refs = [...conceptRefsOfDefinition(concept.definition)];
+  const specs = (concept.__recencyProducerSpecs ?? []) as readonly {
+    call?: { args?: readonly unknown[] };
+  }[];
+  for (const spec of specs) {
+    for (const arg of spec.call?.args ?? []) {
+      const a = arg as { type?: string; value?: string; library?: string | null };
+      // ⚠ A cross-library operand is REFUSED upstream (`emit/producerCandidate.ts`), so a spec that exists
+      // carries same-library refs only. Push the bare name — the same form a `defined as` operand takes —
+      // rather than inventing a qualified-reference node the walk's consumers would have to special-case.
+      if (a?.type === "ConceptRefArg" && typeof a.value === "string" && !a.library) {
+        refs.push(a.value as ReferenceName);
+      }
+    }
+  }
+  return refs;
+}
+
 export function conceptRefsOfDefinition(def: ConceptDefinition | undefined): ReferenceName[] {
   if (def === undefined) return [];
   switch (def.type) {
