@@ -46,6 +46,7 @@
  */
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
+import { isRecordBooleanGuardSource, resolveRecordBooleanGuardCarrier } from "../emit/recordBooleanGuard";
 import type {
   CRL,
   Concept,
@@ -1304,17 +1305,38 @@ function buildInterfaceReexports(
     // mirroring the F3 not-source-typed guard above, rather than emit ill-typed CQL. Only a Scalar-boolean
     // reduction re-exports as a total boolean; a non-boolean *Scalar* most-recent is already loud at emit
     // (the B2a value-read guard throws), so this specifically closes the Record / non-boolean-scalar hole.
-    if (sourceLayer === "Inferences" && srcIsReduction && !srcIsScalarBoolean) {
+    // ⭐⭐ #189 — THE RECORD-BOOLEAN GUARD. A `shape is Record` + `value type is boolean` merge publishes ONE
+    // RECORD WHOSE VALUE IS A BOOLEAN, so it has a third façade form the rule below never considered: not
+    // `.satisfied()` (a category error on a record, correctly refused) and not a bare re-export (which would
+    // publish a record as a boolean), but a VALUE READ — three-state `true` / `false` / `null`.
+    //
+    // ⭐ THE CHARTER RULES IT (§3, "`shape is Record` and `value type is boolean` are NOT in tension"): *"The
+    // guard reads the VALUE; the featureExpression targets the RECORD. Same concept."* That is the goal's
+    // `Obese`, the canonical question-that-is-also-a-condition, in all three authoring options.
+    //
+    // ⚠ AND IT RESTORES EMITTER/VALIDATOR COHERENCE, which is independent of the goal. `useSiteTypeValidator`
+    // was narrowed on 2026-08-28 to warn only on `RecordSet`, with the reasoning quoted above — so a
+    // Record-boolean guard validates CLEAN today while this emitter hard-errors it. The refusal below
+    // (2026-08-17) simply predates that ruling.
+    //
+    // ⚠ THE GATE IS CARRIER-PROVEN, NOT "Record + boolean" — see `isRecordBooleanGuardSource`. A
+    // `type is Condition` + boolean Record classifies and lowers, and reading `.value` off it would be the
+    // same category error by the carrier axis. The hard error below stays for everything this does not admit.
+    const isRecordBooleanGuard = sourceLayer === "Inferences" && srcIsReduction && isRecordBooleanGuardSource(src);
+    if (!isRecordBooleanGuard && sourceLayer === "Inferences" && srcIsReduction && !srcIsScalarBoolean) {
       errors.push({
         type: "Validation",
         kind: "emit-reduction-nonboolean-interface",
         message:
           `decision references reduction concept "${name}", which publishes a ${src?.shape ?? "?"} ` +
           `(value type ${src && src.valueTypes.length > 0 ? src.valueTypes.join(", ") : "(none)"}) rather ` +
-          `than a Scalar boolean. A non-boolean reduction has no valid boolean Interface collapse ` +
-          `(\`.satisfied()\` on a record / non-boolean is a category error), so it cannot be a decision ` +
-          `guard surface. Only a Scalar-boolean reduction (exists / count / boolean most-recent) re-exports ` +
-          `as a total boolean.`,
+          `than a boolean this layer can read. A Scalar-boolean reduction re-exports BARE; a ` +
+          `\`shape is Record\` + \`value type is boolean\` merge whose resource has a PROVEN boolean carrier ` +
+          `re-exports as a VALUE READ (the guard reads the value, the featureExpression targets the record — ` +
+          `charter §3). This concept is neither: \`.satisfied()\` on it is a category error and a bare ` +
+          `re-export would publish a non-boolean as a decision guard surface. If the shape looks right, the ` +
+          `missing piece is the carrier — a resource with no modeled boolean value element (a Condition's ` +
+          `truth is EXISTENCE, not a value) cannot be value-read, and an unruled carrier is never guessed.`,
         ...(src?.location ? { line: src.location.start.line, column: src.location.start.column } : {}),
       });
       continue;
@@ -1362,9 +1384,18 @@ function buildInterfaceReexports(
       // re-exports BARE, a truth-set determination collapses with `.satisfied()`.
       ...(sourceLayer === "Inferences"
         ? {
-            __interfaceReexportMode: (srcEmitsTotalBoolean
-              ? "total-boolean"
-              : "truth-set") as "total-boolean" | "truth-set",
+            // ⭐ #189 — THREE modes now. A RECORD-BOOLEAN guard reads the selected record's value
+            // (three-state); a total-boolean reduction re-exports BARE; a truth-set collapses.
+            __interfaceReexportMode: (isRecordBooleanGuard
+              ? "record-boolean-value"
+              : srcEmitsTotalBoolean
+                ? "total-boolean"
+                : "truth-set") as "total-boolean" | "truth-set" | "record-boolean-value",
+            // The PROVEN carrier, resolved at synthesis because the Interface emitter's `conceptByName` is
+            // layer-isolated and cannot see the source concept — the same reason the mode is decided here.
+            ...(isRecordBooleanGuard
+              ? { __recordBooleanCarrier: resolveRecordBooleanGuardCarrier(src) ?? undefined }
+              : {}),
           }
         : {}),
       // #189 null/pause — a PURE QUESTION re-exports as the THREE-STATE `answeredValue()` read instead of the

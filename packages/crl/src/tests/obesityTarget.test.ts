@@ -95,6 +95,8 @@ interface AuthoringOption {
    * thing. Moving the other way is a regression.
    */
   readonly emitBlocker: string;
+  /** ⭐ Does this option EMIT end-to-end today? Record and Layered do; RecordSet is declared build debt. */
+  readonly emitsToday: boolean;
   /**
    * ⭐ The QUESTIONS a user is offered: every locally-coded concept reachable from the decision's guard by
    * walking the DEPENDENCY path. This is goal item 2 — "the user can answer at any level".
@@ -122,6 +124,7 @@ const OPTIONS: readonly AuthoringOption[] = [
     // three-state read (`.value as FHIR.boolean` — true / false / null), which is exactly the null/pause
     // determination this whole issue is about.
     emitBlocker: "emit-reduction-nonboolean-interface",
+    emitsToday: true,
     reachableQuestions: ["Obese", "BMI", "Weight", "Height"],
   },
   {
@@ -142,6 +145,7 @@ const OPTIONS: readonly AuthoringOption[] = [
     // which weight with which height. Re-kinding it is owed (panel round 1 item 5, round 2 item 10) and
     // needs the pairing question answered, not a relabel.
     emitBlocker: "emit-mixed-code-and-definition",
+    emitsToday: false,
     reachableQuestions: ["Obese", "BMI", "Weight", "Height"],
   },
   {
@@ -169,6 +173,7 @@ const OPTIONS: readonly AuthoringOption[] = [
     // ⭐⭐⭐ MOVED AGAIN 2026-08-31 — see the Record option. Same landing, same remaining blocker: the guard
     // surface, not the data model.
     emitBlocker: "emit-reduction-nonboolean-interface",
+    emitsToday: true,
     // ⭐ Four, reached THROUGH the uncoded reductions: Obese -> BMI -> Most Recent Weight/Height ->
     // Weight/Height Records. The intermediates carry no code so they offer no question, but the walk
     // traverses them — which is what makes the layering invisible to a user answering the questionnaire.
@@ -261,54 +266,47 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
         }
       });
 
-      it("EMIT — ⚠ BOTH LANES REFUSE the canonical shape today", () => {
-        // The charter makes a local `code is` the canonical production representation and a derivation over it
-        // ordinary (`project_local-domain-is-canonical`, North Star §3). These concepts are exactly that — a
-        // question that can also be computed. Emit rejects the combination.
+      it("⭐⭐ EMIT — BOTH LANES", () => {
+        // ⚠⚠ THIS TEST ASSERTED FAILURE FROM THE DAY IT WAS WRITTEN, and that was correct: the policies are
+        // the CORRECT models and the implementation catches up to them. The Record and Layered options now
+        // emit — so the assertion INVERTS rather than relaxes, and a regression to any refusal fails here.
         //
-        // ⚠ MUST BECOME `success: true` with no `emit-mixed-code-and-definition`. Until then the chain cannot
-        // reach `$apply` at all, which makes this — not `shape is` — the FIRST blocker on the path.
-        const cql = emitCQLImports(opt.policy) as unknown as { success: boolean; cqlByLibrary?: unknown[] };
-        expect(cql.success).toBe(false);
-        expect(cql.cqlByLibrary ?? []).toHaveLength(0);
-
+        // What it took, in order, each measured rather than assumed: the merge learning to lower `code is` +
+        // a `definition is` pipeline; the PRODUCER stage constructing its computed value into a candidate;
+        // the heterogeneous PROJECTION arm turning each source Condition into one; and finally the GUARD
+        // SURFACE — a `shape is Record` + `value type is boolean` façade reading the selected record's value
+        // three-state instead of being refused as uncollapsible.
+        const cql = emitCQLImports(opt.policy) as unknown as {
+          success: boolean;
+          cqlByLibrary?: { cql?: string }[];
+        };
+        expect(cql.success, opt.name + " — CQL lane").toBe(opt.emitsToday);
         const fhir = emitFhirDefFromPath(opt.policy, {
           date: new Date("2026-01-01T00:00:00.000Z"),
         }) as unknown as { success: boolean; errors?: { kind?: string }[] };
-        expect(fhir.success).toBe(false);
-        // ⚠ MEASURED, and narrower than any message here says. The boundary is NOT "a local code plus a
-        // cross-concept derivation" — that framing was true when this pin was `emit-mixed-code-and-definition`
-        // for every option, and it stopped being true once the both-rep merge learned to lower that shape.
-        // It is not "the producer stage" either: the producer LOWERS now, and `BMI` no longer refuses at all.
-        //
-        // What remains is `Obese`'s SOURCE ARM — a `type is Condition` posrep carrying `value projection is
-        // exists this`, which `deriveOneSourceArm` defers `out-of-scope`, so the merge gets one descriptor
-        // where it needs `[local-exact, source]`.
-        //
-        // ⭐ PROGRESS, 2026-08-31 — the LEAVES NOW LOWER. `Height`/`Weight` (`shape is Record` + `code is` +
-        // `most recent this` + one `coded from` posrep) used to add `emit-reduction-not-active` to this list;
-        // they no longer error at all. Their merge emits the two arms unioned into one collection with the
-        // `definition is` stage selecting over it:
-        //
-        //     define "Height":
-        //       Last( (LocalPrimitives."Height" union ExternalPrimitives."Height Source") O
-        //               sort by (effective as FHIR.dateTime).value, id )
-        //
-        // EXECUTION-VERIFIED against the real CQL engine, not an emit diff: with a local answer (Jan) and a
-        // source record (Jun), `Arm Count=2` and the newest across BOTH arms wins
-        // (`tmp/nullprobe/hw-verify/`). ⚠ The library still emits NOTHING because `Obese`/`BMI` — the concepts
-        // with a PRODUCER stage — still refuse, and one refusal fails the whole closure. So this assertion is
-        // unchanged and correct; what shrank is WHY, and the remaining blocker is now exactly the producer
-        // stage, not the leaves.
-        //
-        // ⭐ PROGRESS, 2026-08-31 (second) — `Obese` JOINED THEM. It reported the outer
-        // `emit-mixed-code-and-definition` in all three options until a blanket `value projection` exclusion
-        // was narrowed to the age lane it was actually written for. Its `type is Condition` + `value
-        // projection is exists this` posrep is still refused DOWNSTREAM by `deriveOneSourceArm`
-        // (`emit-most-recent-derivation`, probed at `tmp/nullprobe/projgate/`) — so the projection arm is
-        // real remaining work — but the concept is no longer misreported as an unlowered shape.
-        const blocking = (fhir.errors ?? []).filter((e) => e.kind === opt.emitBlocker);
-        expect(blocking.length, opt.name + " expected " + opt.emitBlocker).toBeGreaterThan(0);
+        expect(fhir.success, opt.name + " — FHIR lane").toBe(opt.emitsToday);
+
+        if (!opt.emitsToday) {
+          // ⚠ The remaining option is RecordSet, and its blocker is DECLARED BUILD DEBT, not a shape rule:
+          // `BMI` reduces two HISTORIES and how to pair them (which weight with which height) has no defined
+          // semantics. Pinned so it cannot quietly become something else.
+          const blocking = (fhir.errors ?? []).filter((e) => e.kind === opt.emitBlocker);
+          expect(blocking.length, opt.name + " expected " + opt.emitBlocker).toBeGreaterThan(0);
+          return;
+        }
+
+        // ⭐ The guard surface reads the selected record's VALUE, three-state — `null` when no arm
+        // established the determination, which is what makes the tree PAUSE rather than deny.
+        const all = (cql.cqlByLibrary ?? []).map((l) => l.cql ?? "").join(String.fromCharCode(10));
+        expect(all).toContain("FHIRHelpers.ToBoolean(");
+        // ⚠ NO `Coalesce` around the guard read: totality belongs at the ARM, never per operand. A
+        // `Coalesce(…, false)` here would fold "no candidate" into `false` and deny exactly where it pauses.
+        expect(all).not.toMatch(/Coalesce\(\s*\(?[A-Za-z]*Inferences\."Obese"/);
+        // ⭐ and all three arms reach the space: local answers, the projected Conditions, the computed candidate
+        const obese = all.slice(all.indexOf('define "Obese":'));
+        expect(obese).toContain("LocalPrimitives");
+        expect(obese).toContain("return CRLConstructObservationBoolean(");
+        expect(obese).toContain("CRLCommon.AtLeast(");
       });
     });
   }

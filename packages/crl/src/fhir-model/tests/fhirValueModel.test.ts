@@ -181,7 +181,21 @@ describe("T3a wiring boundary — allowlisted importers of fhirValueModel", () =
     // flag anything else outside src/fhir-model/.
     const srcRoot = join(__dirname, "..", ".."); // packages/crl/src
     const IMPORT_RE = /from\s+["'][^"']*\/fhirValueModel["']/;
-    const ALLOW = new Set(["emit/effectiveRepresentation.ts", "migration/migrationInventory.ts"]);
+    // ⭐ #189 — a THIRD consumer, added deliberately: `emit/recordBooleanGuard.ts` proves the boolean
+    // CARRIER on a `shape is Record` + `value type is boolean` guard source, which is the same category of
+    // question the T1 deriver asks (resolve a carrier from the model, fail closed when it is unmodeled or
+    // ambiguous) and must consult the SAME authority or the two can disagree about what a resource carries.
+    //
+    // ⚠ THE ALTERNATIVE WAS CONSIDERED AND REJECTED, and a panel arm argued for it: thread the carrier
+    // through the descriptor instead. That would make a Record descriptor carry datum metadata it
+    // deliberately does NOT carry — the record SELECTION reads no value, and the emit asserts exactly that
+    // (`desc.valueElement === undefined`). Weakening a clear invariant to avoid naming a consumer is the
+    // worse trade. This boundary exists to keep the consumers FEW and DELIBERATE, not zero.
+    const ALLOW = new Set([
+      "emit/effectiveRepresentation.ts",
+      "emit/recordBooleanGuard.ts",
+      "migration/migrationInventory.ts",
+    ]);
     const offenders: string[] = [];
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {

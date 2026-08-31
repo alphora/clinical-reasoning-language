@@ -1174,9 +1174,16 @@ class Emitter {
    *  discharge AGREE (disc 439 code review, gpt56 #1): `"recordsource"` = a plain record re-export (no boolean
    *  define); `"total-boolean"` = a BARE re-export of a total Inferences reduction (delegates its totality);
    *  `"satisfied"` = `…satisfied()` = `exists(truths)`, intrinsically total by its OWN existence wrapper. */
-  private facadeForm(c: Concept): "recordsource" | "total-boolean" | "satisfied" {
+  private facadeForm(c: Concept): "recordsource" | "total-boolean" | "record-boolean-value" | "satisfied" {
     if (c.__interfaceSourceLayer === "ExternalPrimitives") return "recordsource";
     if (c.__interfaceSourceLayer === "Inferences" && c.__interfaceReexportMode === "total-boolean") return "total-boolean";
+    // ⚠⚠ THIS ELSE-BRANCH IS THE DANGEROUS ONE, and a panel arm flagged it as the single worst silent-miss
+    // in this change: a mode this function does not know about falls through to `"satisfied"`, which emits
+    // `.satisfied()` on a RECORD *and* enrolls a `total` certificate — ill-typed text under a dishonest
+    // proof, at `success: true`. So the record-boolean mode is named here explicitly.
+    if (c.__interfaceSourceLayer === "Inferences" && c.__interfaceReexportMode === "record-boolean-value") {
+      return "record-boolean-value";
+    }
     return "satisfied"; // Inferences `.satisfied()` or LocalPrimitives `.asTruths().satisfied()`
   }
 
@@ -1233,6 +1240,19 @@ class Emitter {
           family: "merge",
           form: "interface façade of a both-rep recency merge (bare re-export of a three-state determination)",
           cell: "§3 question → three-state cross-representation merge (NOT totalized)",
+        };
+      } else if (form === "record-boolean-value") {
+        // ⭐⭐ #189 — the façade of a RECORD-BOOLEAN GUARD. It reads the selected record's boolean carrier
+        // (`FHIRHelpers.ToBoolean(… as FHIR.boolean)`), which is three-state by construction: no candidate
+        // selected ⇒ `null`. Same family as the merge façade above and for the SAME reason — claiming `total`
+        // here would make the ledger disagree with what ships and fail the whole-boundary proof. ⚠ The
+        // certificate and the emitted text are decided from ONE marker (`__interfaceReexportMode`), so a mode
+        // that renders a value read cannot enroll as anything else.
+        obligation = {
+          kind: "sanctioned-three-state",
+          family: "merge",
+          form: "interface façade of a Record-shaped boolean merge (value read of the selected record)",
+          cell: "§3 guard reads the VALUE / featureExpression targets the RECORD (NOT totalized)",
         };
       } else if (form === "recordsource") {
         obligation = { kind: "not-applicable", nullable: false, reason: "ExternalPrimitives record re-export (no boolean define)" };
@@ -1417,6 +1437,10 @@ class Emitter {
       const form = this.facadeForm(c);
       if (form === "recordsource") return notBoolean("ExternalPrimitives record re-export");
       if (form === "total-boolean") return total("facade-delegated"); // bare re-export — delegates to the reduction
+      // ⭐ #189 — a value read off the selected record is THREE-STATE, never total: an unselected record
+      // yields `null`, which is precisely the PAUSE this issue exists to deliver. Certifying it `total` would
+      // be the dishonest-certificate failure the enrollment above names.
+      if (form === "record-boolean-value") return threeStateRead("record-boolean guard (value read of the selected record)");
       return total("facade-satisfied"); // `…satisfied()` = `exists(truths)` — intrinsically total
     }
     // #189 Slice C 2b.3b.1 — a both-representation twin's discharge is KINDED, lock-step with the emit flip + the
@@ -2027,6 +2051,27 @@ class Emitter {
           // `defined as` truth-set determination stays `.satisfied()`. The mode is decided at synthesis
           // (`buildInterfaceReexports`) because this per-layer emitter's `conceptByName` is layer-isolated
           // and cannot see the source concept's definition.
+          // ⭐⭐ #189 — THE RECORD-BOOLEAN GUARD reads the selected record's VALUE. Three-state by
+          // construction: `true` / `false` / `null` when no candidate was selected — and the null is what
+          // makes the tree PAUSE rather than deny. `FHIRHelpers.ToBoolean` is the established conversion in
+          // this codebase (not a hand-rolled `.value` chain), and the CARRIER comes from the proven
+          // resolution at synthesis, never a literal `.value` — a `type is Condition` boolean Record has no
+          // boolean element at all, and reading one would be the same category error `.satisfied()` is.
+          //
+          // ⚠ DELIBERATELY NOT `Coalesce`d. Totality belongs at the ARM, never per operand; a `Coalesce` here
+          // would fold "no candidate" into `false` and deny exactly where the design pauses.
+          if (c.__interfaceReexportMode === "record-boolean-value") {
+            const carrier = c.__recordBooleanCarrier;
+            if (carrier === undefined) {
+              // Set in lock-step with the mode at synthesis; a missing carrier is a compiler bug, and
+              // falling through would emit `.satisfied()` on a record under a three-state certificate.
+              throw new Error(
+                `internal invariant violated: interface façade "${c.name}" is mode \`record-boolean-value\` ` +
+                  `with no \`__recordBooleanCarrier\` — the two are set together at synthesis.`,
+              );
+            }
+            return `FHIRHelpers.ToBoolean((${qref}).${carrier} as FHIR.boolean)`;
+          }
           return c.__interfaceReexportMode === "total-boolean" ? qref : `${qref}.satisfied()`;
         case "LocalPrimitives":
           // #189 null/pause — a PURE QUESTION reads THREE-STATE. `asTruths().satisfied()` folds "no answer

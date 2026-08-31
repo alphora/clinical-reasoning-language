@@ -569,7 +569,15 @@ export interface Concept extends ASTNode {
    * Only meaningful when `__interfaceSourceLayer === "Inferences"`. Absent on every
    * other concept.
    */
-  __interfaceReexportMode?: "total-boolean" | "truth-set";
+  __interfaceReexportMode?: "total-boolean" | "truth-set" | "record-boolean-value";
+  /**
+   * SYNTHETIC-EMITTER-ONLY. ⭐ #189 — the PROVEN boolean carrier a `record-boolean-value` façade reads
+   * (`emit/recordBooleanGuard.ts`), resolved at synthesis and set in lock-step with that mode.
+   *
+   * ⚠ Carried rather than re-derived: the Interface emitter's `conceptByName` is layer-isolated and cannot
+   * see the source concept, which is the same reason the mode itself is decided at synthesis.
+   */
+  __recordBooleanCarrier?: string;
   /**
    * SYNTHETIC-EMITTER-ONLY (#189 null/pause). Marks a PURE QUESTION concept (set at `lowerLocalCodes`, where the
    * AUTHORED shape is still visible; the Interface re-export copies it) — a locally-coded boolean determination nothing can compute, hence UNKNOWN until answered.
