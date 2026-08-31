@@ -84,7 +84,16 @@ interface AuthoringOption {
    */
   readonly validatesCleanToday: boolean;
   /** What the CRE produces TODAY, per case. ⚠ The Layered option differs — see its entry. */
-  /** The emit error kind that blocks this option today. */
+  /**
+   * The emit error kind that blocks this option today.
+   *
+   * ⚠ THIS PIN IS A RATCHET, NOT A CONSTANT — it records WHICH refusal is currently first, and it moves as
+   * blockers clear. `emit-mixed-code-and-definition` ("`code is` + a definition is NOT LOWERED") is the
+   * OUTER one; `emit-reduction-not-active` ("the merge lowers, but this concept runs a PRODUCER stage the
+   * construction is not wired for") is strictly INSIDE it. So a move from the former to the latter is
+   * PROGRESS: the concept now classifies as the both-representation merge and fails on a narrower, truer
+   * thing. Moving the other way is a regression.
+   */
   readonly emitBlocker: string;
   /**
    * ⭐ The QUESTIONS a user is offered: every locally-coded concept reachable from the decision's guard by
@@ -100,7 +109,11 @@ const OPTIONS: readonly AuthoringOption[] = [
     cases: path.join(FIXTURE, "cases.cel"),
     singleValuedTargets: ["Obese", "BMI", "Height", "Weight"],
     validatesCleanToday: true,
-    emitBlocker: "emit-mixed-code-and-definition",
+    // ⭐ MOVED 2026-08-31 from `emit-mixed-code-and-definition`. BOTH `Obese` and `BMI` now classify as the
+    // both-representation merge and refuse on the PRODUCER stage instead. `Obese` was held out by a single
+    // blanket `value projection` exclusion in `resolveRecencyValueConcept` whose own comment gave AGE as its
+    // reason, while the `resolveAgeConcept` check beside it already covered age.
+    emitBlocker: "emit-reduction-not-active",
     reachableQuestions: ["Obese", "BMI", "Weight", "Height"],
   },
   {
@@ -109,6 +122,10 @@ const OPTIONS: readonly AuthoringOption[] = [
     cases: path.join(FIXTURE, "cases-recordset.cel"),
     singleValuedTargets: ["Obese"],
     validatesCleanToday: true,
+    // ⚠ UNCHANGED KIND, DIFFERENT CONCEPT. `Obese` moved to `emit-reduction-not-active` with the other two
+    // options; what still raises this here is `BMI`, whose `shape is RecordSet` publishes a SET and so is
+    // not the select-one merge at all. That is the declared build-debt arm (cardinality is DECLARED, never
+    // inferred — charter §3), not the same blocker the others had.
     emitBlocker: "emit-mixed-code-and-definition",
     reachableQuestions: ["Obese", "BMI", "Weight", "Height"],
   },
@@ -134,7 +151,8 @@ const OPTIONS: readonly AuthoringOption[] = [
     // back, this option's CRE rows match the other two and its emit blocker becomes the same one.
     singleValuedTargets: ["Greatest Weight", "BMI", "Obese"],
     validatesCleanToday: true,
-    emitBlocker: "emit-mixed-code-and-definition",
+    // ⭐ MOVED 2026-08-31 — see the Record option. Same two concepts, same narrower refusal.
+    emitBlocker: "emit-reduction-not-active",
     // ⭐ Four, reached THROUGH the uncoded reductions: Obese -> BMI -> Most Recent Weight/Height ->
     // Weight/Height Records. The intermediates carry no code so they offer no question, but the walk
     // traverses them — which is what makes the layering invisible to a user answering the questionnaire.
@@ -242,10 +260,13 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
           date: new Date("2026-01-01T00:00:00.000Z"),
         }) as unknown as { success: boolean; errors?: { kind?: string }[] };
         expect(fhir.success).toBe(false);
-        // ⚠ MEASURED, and narrower than the message says: the refused concepts are the ones deriving from
-        // OTHER concepts (`Obese`, `BMI`). A leaf reducing over its OWN representations (`most recent this`)
-        // is fine — that is the supported both-representation recency. So the real boundary is a local code
-        // plus a CROSS-CONCEPT derivation, the ordinary shape of a question that can also be computed.
+        // ⚠ MEASURED, and narrower than any message here says. The boundary is NOT "a local code plus a
+        // cross-concept derivation" — that framing was true when this pin was `emit-mixed-code-and-definition`
+        // for every option, and it is not true now. Both `Obese` and `BMI` classify as the both-representation
+        // merge; what they refuse on is the PRODUCER STAGE their pipeline runs before its terminal selection
+        // (`resolveConceptPipeline`: `AtLeast` and `BodyMassIndex` respectively). So the remaining boundary is
+        // exactly ONE mechanism — construct a producer's computed value into a candidate of the concept's
+        // `type is` and add it to the space — and it is the same mechanism for both concepts.
         //
         // ⭐ PROGRESS, 2026-08-31 — the LEAVES NOW LOWER. `Height`/`Weight` (`shape is Record` + `code is` +
         // `most recent this` + one `coded from` posrep) used to add `emit-reduction-not-active` to this list;
@@ -262,6 +283,13 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
         // with a PRODUCER stage — still refuse, and one refusal fails the whole closure. So this assertion is
         // unchanged and correct; what shrank is WHY, and the remaining blocker is now exactly the producer
         // stage, not the leaves.
+        //
+        // ⭐ PROGRESS, 2026-08-31 (second) — `Obese` JOINED THEM. It reported the outer
+        // `emit-mixed-code-and-definition` in all three options until a blanket `value projection` exclusion
+        // was narrowed to the age lane it was actually written for. Its `type is Condition` + `value
+        // projection is exists this` posrep is still refused DOWNSTREAM by `deriveOneSourceArm`
+        // (`emit-most-recent-derivation`, probed at `tmp/nullprobe/projgate/`) — so the projection arm is
+        // real remaining work — but the concept is no longer misreported as an unlowered shape.
         const blocking = (fhir.errors ?? []).filter((e) => e.kind === opt.emitBlocker);
         expect(blocking.length, opt.name + " expected " + opt.emitBlocker).toBeGreaterThan(0);
       });

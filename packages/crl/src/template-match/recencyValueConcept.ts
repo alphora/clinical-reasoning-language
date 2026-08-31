@@ -15,9 +15,10 @@
 // validator consults, so validate and emit cannot drift"). PURELY STRUCTURAL: no owning-library metadata, so a pure
 // AST consumer (the totality classifier) can call it.
 //
-// SHAPE-EXACT (disc 506): anything off-shape — >1 posrep, a non-`coded from` posrep, a `value projection` (age) posrep,
-// a non-`mostRecent`/named-target reduction, a boolean or multi-value-type declaration — returns `not-recency-value`,
-// so the build-debt `unclassified` arm still covers it. This resolver NARROWS; it never widens.
+// SHAPE-EXACT (disc 506): anything off-shape — >1 posrep, a non-`coded from` posrep, an AGE concept (per
+// `resolveAgeConcept`, which owns that lane whole), a pipeline not ending in a selection, a boolean or
+// multi-value-type Scalar declaration — returns `not-recency-value`, so the build-debt `unclassified` arm still
+// covers it. This resolver NARROWS; it never widens.
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import type { Concept, Representation } from "../ast/types";
@@ -108,16 +109,29 @@ export function resolveRecencyValueConcept(concept: Concept): RecencyValueResolu
   // publishes the record, and its `value type` is an OPTIONAL datum description — it constrains nothing here.
   if (publishes === "value" && !(concept.valueTypes.length === 1 && concept.valueTypes[0] !== "boolean")) return no;
 
-  // Exactly ONE `source representation`, `coded from` (a coded external value read), NOT a `value projection` (that is
-  // the patient-age recency lane, owned by `resolveAgeConcept`).
+  // Exactly ONE `source representation`, `coded from` (a coded external value read).
   const reps = concept.representations ?? [];
   if (reps.length !== 1) return no;
   const rep = reps[0];
-  if (rep.valueProjection !== undefined) return no; // age/recency lane
   if (rep.terminologyName === undefined) return no; // must be `coded from`
 
-  // Age is the shared classification authority — never claim recency-value for something age owns (defense in depth;
-  // a `value projection` rep is already excluded above, but this keeps the two resolvers from ever disagreeing).
+  // ⭐ #189 — REFACTOR:grounded. AGE IS THE EXCLUSION, NOT `value projection`. `resolveAgeConcept` is the shared classification
+  // authority for the age lane, and it is the WHOLE gate: it reports non-`not-age` for a sanctioned age
+  // projection AND for every age-SHAPED mis-authoring, so nothing age owns can reach this arm.
+  //
+  // ⚠ This line used to be preceded by a blanket `if (rep.valueProjection !== undefined) return no`, whose
+  // own comment gave AGE as its reason while this check already covered it. The blanket form rejected EVERY
+  // projection, and MEASURED that single line was what kept the goal's `Obese` (`type is Condition` +
+  // `coded from "Obese VS"` + `value projection is exists this`) out of this merge in all three authoring
+  // options — it reported `emit-mixed-code-and-definition` ("`code is` + a definition is not lowered"), a
+  // claim that stopped being true when the merge learned to lower exactly that.
+  //
+  // ⚠ Narrowing it opens NO silent-drop path, and that was PROBED rather than argued
+  // (`tmp/nullprobe/projgate/`): a projection posrep is INDEPENDENTLY refused downstream by
+  // `deriveOneSourceArm` (`emit/effectiveRepresentation.ts`), which defers it `out-of-scope` so the merge
+  // gets one descriptor where it needs `[local-exact, source]` and fails LOUDLY with
+  // `emit-most-recent-derivation`. Classifying the shape here and building its arm there are separate steps;
+  // this one only stops the error message from lying about which.
   if (resolveAgeConcept(concept).kind !== "not-age") return no;
 
   return { kind: "recency-value", sourceRep: rep, publishes, producerStages };
