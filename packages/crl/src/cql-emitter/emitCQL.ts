@@ -47,8 +47,13 @@ import {
   fhirQuantityFromSystemQuantity,
   renderConstructorCall,
 } from "./renderConstructorCall";
-import type { ProducerCandidateSpec } from "../emit/producerCandidate";
+import type { ProducerCandidateSpec, ProjectedSourceSpec } from "../emit/producerCandidate";
 import { renderRecordConstructor } from "./renderRecordConstructor";
+import { renderProjectedSourceArm } from "./renderConstructorCall";
+
+/** ⭐ #189 — the case subject, resolved ONCE at the call site so the constructors stay context-free and one
+ *  generated function serves every concept (design D3a). */
+const SUBJECT_REFERENCE_CQL = `FHIR.Reference { reference: FHIR.string { value: 'Patient/' + Patient.id } }`;
 import { CONSTRUCTOR_NAME_PREFIX, isConstructorName } from "../emit/recordConstructor";
 import type { ConstructorSignature } from "../emit/recordConstructor";
 import type { RecordUnionTerm } from "../ast/types";
@@ -2570,8 +2575,36 @@ class Emitter {
       switch (term.kind) {
         case "local-primitives":
           return cqlQualifiedRef(localLib, term.define);
-        case "external-primitives":
-          return cqlQualifiedRef(sourceLib, term.define);
+        case "external-primitives": {
+          const epRef = cqlQualifiedRef(sourceLib, term.define);
+          // ⭐ #189 — A PROJECTED SOURCE ARM IS STILL THE SOURCE TERM, transformed. The retrieve stays what it
+          // is (`[Condition: "Obese VS"]` — the honest source records); the projection turns EACH record into
+          // a candidate of the CONCEPT's `type is` right here, at the space-assembly site, beside the
+          // producer's candidate. That keeps the ExternalPrimitives twin truthful about what it retrieves and
+          // keeps every transformation of the space in one place.
+          const src = (c.__recencyValueDescriptors as { source?: { arm?: string } } | undefined)?.source;
+          if (src?.arm !== "source-projected") return epRef;
+          const spec = c.__projectedSourceSpec as ProjectedSourceSpec | undefined;
+          if (spec === undefined) {
+            throw new Error(
+              `internal invariant violated: both-rep twin "${c.name}" has a PROJECTED source arm but no ` +
+                `\`__projectedSourceSpec\` — the two are set together at lowering.`,
+            );
+          }
+          // ⚠⚠ THE PARENTHESES ARE LOAD-BEARING, AND THIS WAS CAUGHT BY EXECUTION, not review. A CQL query
+          // source binds LOOSER than `union`, so `A union (B) C return f(C)` parses as `(A union B) C` — the
+          // alias captures the WHOLE union and the projection is applied to the local answers as well. The
+          // engine reported `Could not resolve call to operator Union with signature (FHIR.Observation,
+          // list<FHIR.Observation>)`. Wrapping makes the query one term of the union, which is what it is.
+          return `(${renderProjectedSourceArm({
+            sourceRef: epRef,
+            functionName: spec.functionName,
+            code: spec.code,
+            recency: spec.recency,
+            subjectExpr: SUBJECT_REFERENCE_CQL,
+            profile: spec.profile,
+          })})`;
+        }
         case "constructed": {
           const spec = specs.find((sp) => sp.stageIndex === term.stageIndex);
           if (spec === undefined) {
@@ -2627,7 +2660,7 @@ class Emitter {
       code: spec.code,
       valueExpr,
       stampExpr,
-      subjectExpr: `FHIR.Reference { reference: FHIR.string { value: 'Patient/' + Patient.id } }`,
+      subjectExpr: SUBJECT_REFERENCE_CQL,
       profile: spec.profile,
     });
   }
@@ -2641,7 +2674,7 @@ class Emitter {
       foldIn === undefined ||
       marker === undefined ||
       marker.local?.arm !== "local-exact" ||
-      marker.source?.arm !== "source"
+      (marker.source?.arm !== "source" && marker.source?.arm !== "source-projected")
     ) {
       throw new Error(
         `internal invariant violated: recency-value merge twin "${c.name}" is missing its fold-in name or its ` +
@@ -2699,6 +2732,17 @@ class Emitter {
         );
       }
       return this.emitSelectNewest(this.renderSpaceTerms(c, terms, localLib, sourceLib), local, undefined);
+    }
+
+    // ⚠ A PROJECTED SOURCE ARM HAS NO VALUE ELEMENT, and cannot: its source resource is one whose truth is
+    // EXISTENCE (a Condition has no modeled value carrier at all). It contributes CONSTRUCTED RECORDS, so it
+    // belongs to the record branch. The value merge would read `source.valueElement` off it — the compiler
+    // catches that today, and this keeps it caught if the descriptor ever grows the field for another reason.
+    if (source.arm === "source-projected") {
+      throw new Error(
+        `internal invariant violated: recency-value merge twin "${c.name}" publishes a VALUE but its source ` +
+          `arm is a PROJECTION, which contributes constructed records rather than a value to read.`,
+      );
     }
 
     // ⚠ THE VALUE BRANCH READS NEITHER TERMS NOR SPECS, so a constructed candidate reaching it would be

@@ -121,8 +121,8 @@ import {
   type OwningLibraryMetadata,
 } from "../emit/effectiveRepresentation";
 import { caseFeatureUrlFromPolicyId, localCodeSystemSlug, localCodeSystemUrl } from "../fhir-emitter/slug";
-import { resolveProducerCandidates } from "../emit/producerCandidate";
-import type { ProducerCandidateSpec } from "../emit/producerCandidate";
+import { resolveProducerCandidates, resolveProjectedSource } from "../emit/producerCandidate";
+import type { ProducerCandidateSpec, ProjectedSourceSpec } from "../emit/producerCandidate";
 import { isAgeTodayPrefix } from "../template-match/agePredicate";
 import {
   resolveRecencyValueConcept,
@@ -619,7 +619,9 @@ export function lowerLocalCodes(
           : undefined;
       const sourceDesc =
         outcome.status === "derived"
-          ? outcome.descriptors.find((d) => d.arm === "source")
+          // ⭐ #189 — either source arm. `source` reads a VALUE off the record; `source-projected` builds a
+          // candidate PER RECORD from a `value projection`. Both are the merge's second arm.
+          ? outcome.descriptors.find((d) => d.arm === "source" || d.arm === "source-projected")
           : undefined;
       if (
         outcome.status !== "derived" ||
@@ -749,6 +751,23 @@ export function lowerLocalCodes(
         producerSpecs = resolved.specs;
       }
 
+      // ⭐ #189 — the PROJECTED source arm's spec, resolved beside the producers' and set in lock-step with
+      // the `source-projected` descriptor.
+      let projectedSourceSpec: ProjectedSourceSpec | undefined;
+      if (sourceDesc.arm === "source-projected") {
+        const proj = resolveProjectedSource({
+          concept: c,
+          sourceResourceType: sourceDesc.resourceType,
+          code: { system: urn, code: codeValue },
+          profile: opts.policyId ? caseFeatureUrlFromPolicyId(canonicalBase, opts.policyId, c.name) : "",
+        });
+        if (proj.kind === "refused") {
+          errors.push(mkError(proj.refusal.kind, proj.refusal.message, c.definition?.location ?? loc));
+          continue;
+        }
+        projectedSourceSpec = proj.spec;
+      }
+
       const mergeTwin: Concept = {
         ...c,
         representations: [],
@@ -769,6 +788,7 @@ export function lowerLocalCodes(
           ...producerSpecs.map((spec) => ({ kind: "constructed" as const, stageIndex: spec.stageIndex })),
         ],
         __recencyProducerSpecs: producerSpecs,
+        __projectedSourceSpec: projectedSourceSpec,
         __loweringRole: "public-determination",
       };
       delete mergeTwin.code;

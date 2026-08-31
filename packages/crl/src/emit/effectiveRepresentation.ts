@@ -17,7 +17,7 @@
 // rather than reading raw `concept.valueTypes` (which skips the coding-element-conflation guard). The `source` arm
 // stays INERT (F/#257); only the `local-exact` value datum is read, and only for a `role: "local"` CC concept.
 
-import type { Concept, Representation, ReferenceName } from "../ast/types";
+import type { Concept, Representation, ReferenceName, ValueProjection } from "../ast/types";
 import { hasLocalCode, hasSourceBinding } from "./conceptDatumSignals";
 import { localCodeSystemUrl } from "../fhir-emitter/slug";
 import { relativeElementPath } from "../fhir-model/elementPath";
@@ -97,6 +97,35 @@ export type EffectiveRepresentationDescriptor =
       resultType: ResultType;
       recency: RecencyAccess;
       owningLibrary: OwningLibraryMetadata;
+    }
+  | {
+      /**
+       * ⭐ #189 — a `source representation` whose `value projection` transforms EACH source record into a
+       * CANDIDATE of the concept's own `type is`. The goal's `Obese`: `type is Condition` +
+       * `coded from "Obese VS"` + `value projection is exists this`, on an `type is Observation` concept.
+       *
+       * ⚠ THIS ARM DOES NO VALUE READ, which is why it is a separate arm rather than a flag on `source`.
+       * A Condition has no value element — `FHIR_VALUE_READ_MODEL` says so positively, and the value-read
+       * derivation correctly fails closed on it. Its truth is EXISTENCE, and the projection is what turns
+       * that existence into a value the merge can rank.
+       *
+       * ⚠ REP-LOCAL AND PER RECORD (executed, `tmp/NOTES-obese-target-verified.md`): each retrieved record
+       * contributes ONE candidate carrying `true`. Zero records ⇒ zero candidates ⇒ the projection
+       * contributes NOTHING — it can never produce a `false`. That is what lets an unestablished
+       * determination PAUSE instead of denying.
+       *
+       * `recency` is the SOURCE resource's row (`Condition.recordedDate`), because the candidate is dated by
+       * the record it was projected from.
+       */
+      arm: "source-projected";
+      resourceType: string;
+      coding: CodingStrategy;
+      terminologyRef: ReferenceName;
+      resultType: ResultType;
+      recency: RecencyAccess;
+      owningLibrary: OwningLibraryMetadata;
+      /** The sanctioned projection. Only `exists` today; anything else defers rather than guessing. */
+      projection: "exists";
     };
 
 /** The reason a source arm was DEFERRED (not derived to a `source` descriptor): a genuine `DerivationErrorKind`,
@@ -528,6 +557,23 @@ function notAgeLocalExact(
   };
 }
 
+/**
+ * ⭐ #189 — is this projection exactly `exists this`?
+ *
+ * ⚠ SHAPE-EXACT, deliberately. A projection says what a source record CONTRIBUTES, and getting that wrong
+ * silently writes a value the author never stated. `exists this` is the one whose per-record construction is
+ * established and EXECUTED (`tmp/NOTES-obese-target-verified.md`); age projections belong to
+ * `resolveAgeConcept`; everything else DEFERS. Fail-closed on an unruled shape is the same rule this file
+ * already applies to value carriers.
+ */
+function isExistsThisProjection(projection: ValueProjection): boolean {
+  const els = projection.body?.elements ?? [];
+  if (els.length !== 2) return false;
+  const word = (el: (typeof els)[number]): string =>
+    el.type === "NWord" ? el.value.toLowerCase() : "";
+  return word(els[0]) === "exists" && word(els[1]) === "this";
+}
+
 /** Derive ONE `source representation:` posrep's arm — a `source` descriptor (a coded external value-read) or a
  *  TYPED deferred arm. #189 B1: fail closed on every rep shape the coded-value-read arm does not cover, never
  *  silently dropping a rep (§6). Keeps the LOCAL and SOURCE value-reads INDEPENDENT (the source datum is the rep's
@@ -540,10 +586,56 @@ function deriveOneSourceArm(
   const mk = (reason: SourceDeferralReason, detail: string): { deferred: DeferredArm } => ({
     deferred: { kind: "source", reason, detail },
   });
-  // A projection source rep (patient-age `value projection`) is the age/recency lane (`uncoded`), not this
-  // coded-value-read arm.
+  // ⭐ #189 — A `value projection` IS AN ARM, it is just not the value-READ arm.
+  //
+  // The age projection stays out (its own lane owns it, `resolveAgeConcept`). An `exists this` projection
+  // derives a `source-projected` descriptor: each source record becomes ONE candidate of the concept's
+  // `type is`, carrying `true`. Anything else DEFERS rather than guessing what the projection means — the
+  // charter's rule for unruled shapes, and the same reason this file refuses to guess a value carrier.
   if (rep.valueProjection) {
-    return mk("out-of-scope", `source representation carries a \`value projection\` (age/recency lane), not a \`coded from\` value read`);
+    if (!isExistsThisProjection(rep.valueProjection)) {
+      return mk(
+        "out-of-scope",
+        `source representation carries a \`value projection\` that is not \`exists this\` — the age lane owns ` +
+          `age projections, and no other projection's per-record construction is established`,
+      );
+    }
+    const resourceType = rep.conceptType;
+    if (!resourceType) return mk("unsupported-resource", `projection source representation has no \`type is\` resource`);
+    const row = resourceEmitRow(resourceType);
+    if (!row || !row.caseFeature || row.recency === undefined) {
+      return mk(
+        "unsupported-resource",
+        `projection source resource \`${resourceType}\` has no established recency element, so a candidate ` +
+          `projected from it could not be recency-ranked against the other arms`,
+      );
+    }
+    if (rep.terminologyName === undefined) {
+      return mk("source-binding-unsupported", `projection source representation has no \`coded from\` membership binding`);
+    }
+    const resultType = conceptResultType(assumedShapePreMigration(concept.shape), concept.valueTypes, resourceType);
+    if (!resultType) {
+      return mk("indeterminate-result-type", `concept declares ${concept.valueTypes.length} value types (needs exactly 1)`);
+    }
+    if (concept.valueTypes.length !== 1 || concept.valueTypes[0] !== "boolean") {
+      return mk(
+        "indeterminate-result-type",
+        `an \`exists this\` projection contributes a BOOLEAN candidate, but the concept declares ` +
+          `\`value type is ${concept.valueTypes.join("/") || "(none)"}\``,
+      );
+    }
+    return {
+      descriptor: {
+        arm: "source-projected",
+        resourceType,
+        coding: row.coding,
+        terminologyRef: rep.terminologyName,
+        resultType,
+        recency: row.recency,
+        owningLibrary: owningLibMeta,
+        projection: "exists",
+      },
+    };
   }
   const resourceType = rep.conceptType;
   if (!resourceType) return mk("unsupported-resource", `source representation has no \`type is\` resource`);

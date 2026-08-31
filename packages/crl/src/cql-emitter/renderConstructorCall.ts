@@ -130,6 +130,53 @@ export function renderConstructorCall(inputs: ConstructorCallInputs): string {
 }
 
 /**
+ * ⭐ #189 — a PROJECTED source arm: every source record becomes ONE candidate of the concept's own `type is`.
+ *
+ * ⚠ THE `return` IS PER RECORD, AND THAT IS THE SEMANTICS, not a rendering detail. Zero source records means
+ * zero invocations means NO candidate — so an `exists this` projection can only ever contribute `true`, and
+ * can never contribute a `false`. That single property is the difference between an unestablished
+ * determination PAUSING and it denying (executed, `tmp/NOTES-obese-target-verified.md`).
+ *
+ * ⚠ The candidate is stamped from the SOURCE record it was projected from (`C.recordedDate` for a Condition),
+ * read through the source resource's own registry row — so it competes on recency with the local answers on
+ * equal terms. The heterogeneity disappears at this point: the Condition never appears in the space AS a
+ * Condition, only as the candidate the projection built from it.
+ *
+ * ⚠ NO `where C is not null` HERE, unlike the producer call. The value is the literal `true`, so the
+ * constructor's value guard cannot fire; only a null STAMP can drop a record, and the constructor's own
+ * `recorded is null` guard handles that — a source record with no date yields a null candidate that the
+ * `union` drops. Adding a filter would suggest the value could be absent, which it cannot.
+ */
+export function renderProjectedSourceArm(inputs: {
+  /** The source retrieve to project over (`ExternalPrimitives."Obese Source"`). */
+  sourceRef: string;
+  /** The generated constructor's name, from `resolveConstructor`. */
+  functionName: string;
+  /** The concept's own local code — the candidate is coded as the CONCEPT, never as the source record. */
+  code: CandidateCode;
+  /** The SOURCE resource's recency element and cast, from its own registry row. */
+  recency: { sortExpr: string; cast: "dateTime" | "none" };
+  subjectExpr: string;
+  profile: string;
+}): string {
+  const stamp = componentStampCql("C", inputs.recency.sortExpr, inputs.recency.cast);
+  const args = [
+    candidateCodeCql(inputs.code),
+    `FHIR.boolean { value: true }`,
+    stamp,
+    inputs.subjectExpr,
+    q(inputs.profile),
+    "{}",
+  ];
+  return (
+    `(${inputs.sourceRef}) C\n` +
+    `    return ${inputs.functionName}(\n` +
+    `      ${args.join(",\n      ")}\n` +
+    `    )`
+  );
+}
+
+/**
  * §5b — a DERIVED candidate's stamp is the NEWEST OF THE COMPONENTS THAT DETERMINE ITS VALUE.
  *
  * The operator's reasoning, which is the one to keep: *"in a calculation, one argument updating changes the

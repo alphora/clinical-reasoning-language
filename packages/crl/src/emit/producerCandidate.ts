@@ -68,6 +68,73 @@ export interface ProducerCandidateSpec {
   operandStamps: readonly OperandStamp[];
 }
 
+/**
+ * ⭐ #189 — what the emit needs to project ONE source representation into candidates.
+ *
+ * The sibling of `ProducerCandidateSpec`, resolved at the same place for the same reason: the constructor
+ * and the SOURCE resource's recency row are facts about the concept and the registry, and lowering is where
+ * they are known. The renderer only turns them into text.
+ */
+export interface ProjectedSourceSpec {
+  functionName: string;
+  code: { system: string; code: string };
+  profile: string;
+  /** The SOURCE resource's recency element — the candidate is dated by the record it was projected from. */
+  recency: { sortExpr: string; cast: "dateTime" | "none" };
+}
+
+/**
+ * Resolve a PROJECTED source arm, or refuse. Mirrors `resolveProducerCandidates`: the concept's own code and
+ * profile, the constructor for its `type is`, and the recency row of the SOURCE resource (never the
+ * concept's — the candidate carries the source record's date).
+ */
+export function resolveProjectedSource(inputs: {
+  concept: Concept;
+  sourceResourceType: string;
+  code: { system: string; code: string };
+  profile: string;
+}): { kind: "resolved"; spec: ProjectedSourceSpec } | { kind: "refused"; refusal: ProducerCandidateRefusal } {
+  const { concept, sourceResourceType, code, profile } = inputs;
+  const refuse = (message: string) => ({ kind: "refused" as const, refusal: { kind: PRODUCER_BUILD_DEBT_KIND, message } });
+
+  const resourceType = concept.conceptType;
+  if (resourceType === undefined) {
+    return refuse(
+      `Concept "${concept.name}" projects a source representation but declares no \`type is\` resource, so ` +
+        `there is nothing to construct each source record into.`,
+    );
+  }
+  if (profile.trim() === "") {
+    return refuse(
+      `Concept "${concept.name}" projects a source representation, whose candidates must be stamped with the ` +
+        `case-feature StructureDefinition url the FHIR lane emits — but no policy id was supplied.`,
+    );
+  }
+  const ctor = resolveConstructor(resourceType, "boolean");
+  if (ctor.kind !== "resolved") {
+    return refuse(
+      `Concept "${concept.name}": an \`exists this\` projection constructs a boolean \`${resourceType}\` ` +
+        `candidate per source record, and that constructor cannot be built (${ctor.reason}: ${ctor.detail}).`,
+    );
+  }
+  const row = resourceEmitRow(sourceResourceType);
+  if (row === undefined || row.recency === undefined) {
+    return refuse(
+      `Concept "${concept.name}": the projection's source resource \`${sourceResourceType}\` has no ` +
+        `established recency element, so its candidates could not be ranked against the other arms.`,
+    );
+  }
+  return {
+    kind: "resolved",
+    spec: {
+      functionName: ctor.signature.functionName,
+      code,
+      profile,
+      recency: { sortExpr: row.recency.sortExpr, cast: row.recency.cast },
+    },
+  };
+}
+
 export interface ProducerCandidateRefusal {
   kind: string;
   message: string;

@@ -173,13 +173,24 @@ concept "Obese":
     expect(resolveRecencyValueConcept(obese).kind).toBe("recency-value");
   });
 
-  it("⚠ but still REFUSES it downstream — classifying a shape is not building its arm", () => {
-    // `deriveOneSourceArm` defers a projection posrep `out-of-scope`, so the merge gets one descriptor where
-    // it needs `[local-exact, source]` and fails loudly. If this ever passes without the projection arm being
-    // BUILT, a projection has been silently dropped — which is the failure this whole slice exists to prevent.
+  it("⭐ and now BUILDS its arm — each source record becomes ONE candidate carrying `true`", () => {
+    // ⚠ THIS TEST PINNED THE OPPOSITE UNTIL THE ARM LANDED: `deriveOneSourceArm` deferred a projection posrep
+    // `out-of-scope`, the merge got one descriptor where it needs `[local-exact, source]`, and it failed
+    // loudly — which was CORRECT while the arm was unbuilt. The refusal was never the goal; it was the
+    // honest state of a classified-but-unbuilt shape. Now it is built, and the pin flips.
+    //
+    // ⚠ REP-LOCAL AND PER RECORD, and that is the semantics: zero source records ⇒ zero invocations ⇒ NO
+    // candidate. An `exists this` projection can only ever contribute `true`, never `false`, which is what
+    // lets an unestablished determination PAUSE rather than deny. EXECUTED across the acceptance matrix in
+    // `tmp/NOTES-obese-projection-executed.md`.
     const r = emit(src, { libraryName: "PJ" });
-    expect(r.success).toBe(false);
-    expect(kindsOf(r)).toContain("emit-most-recent-derivation");
+    expect(kindsOf(r)).not.toContain("emit-most-recent-derivation");
+    const cql = (r as unknown as { result?: string }).result ?? "";
+    // The retrieve stays the honest SOURCE records; the projection transforms each into a candidate.
+    expect(cql).toContain("return CRLConstructObservationBoolean(");
+    expect(cql).toContain("FHIR.boolean { value: true }");
+    // stamped by the record it was projected FROM, through the SOURCE resource's own registry row
+    expect(cql).toContain("(C).recordedDate.value");
   });
 });
 

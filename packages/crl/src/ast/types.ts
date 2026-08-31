@@ -795,6 +795,12 @@ export interface Concept extends ASTNode {
    */
   __recencyProducerSpecs?: unknown;
   /**
+   * SYNTHETIC-EMITTER-ONLY. ⭐ #189 — the PROJECTED source arm's construction spec
+   * (`emit/producerCandidate.ts` `ProjectedSourceSpec`), set in lock-step with a `source-projected`
+   * descriptor. Present only when the concept's `source representation` carries a `value projection`.
+   */
+  __projectedSourceSpec?: unknown;
+  /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). #189 Slice C boundary 2 (2a) — the
    * LOWERING ROLE of a concept the lowering passes produced/retargeted, so the totality-ledger enrollment
    * (`emitConcept`) picks its obligation SOURCE without marker-sniffing (disc 439 crit #1/#2):

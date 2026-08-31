@@ -109,17 +109,19 @@ const OPTIONS: readonly AuthoringOption[] = [
     cases: path.join(FIXTURE, "cases.cel"),
     singleValuedTargets: ["Obese", "BMI", "Height", "Weight"],
     validatesCleanToday: true,
-    // ⭐⭐ MOVED AGAIN 2026-08-31 — the PRODUCER STAGE NOW LOWERS, so `BMI` no longer refuses at all. Its
-    // constructed candidate is EXECUTION-VERIFIED against the real cqf engine (`tmp/nullprobe/bmiexec/`):
-    // 90 kg / (1.7 m)^2 emits a candidate valued `31100 'g.m-2'` stamped MAY — the `Max` of Weight-May and
-    // Height-Feb, per §5b — carrying the case-feature profile url, and a threshold over it constructs a
-    // second candidate `true` at that same stamp.
+    // ⭐⭐⭐ MOVED AGAIN 2026-08-31 — THE PRODUCER STAGE AND THE PROJECTION ARM BOTH LOWER NOW. Every
+    // representation blocker on this option is gone; `BMI` and `Obese` emit their full three-arm merges,
+    // EXECUTION-VERIFIED against the real cqf engine across the acceptance matrix
+    // (`tmp/NOTES-obese-projection-executed.md`): a Condition alone establishes `true` at ITS OWN date, a
+    // computed `false` from a newer BMI beats it (DENY), and NOTHING AT ALL yields `null` — the PAUSE row.
     //
-    // What blocks Record/Layered now is ONLY `Obese`'s source arm: a `type is Condition` posrep with
-    // `value projection is exists this`, which `deriveOneSourceArm` still defers `out-of-scope`, so the merge
-    // gets one descriptor where it needs `[local-exact, source]`. That is the NEXT slice, and the last one
-    // between here and an end-to-end emit of these two options.
-    emitBlocker: "emit-most-recent-derivation",
+    // ⚠ WHAT BLOCKS THE OPTION NOW IS THE GUARD SURFACE, not the data model. `Obese` is `shape is Record` +
+    // `value type is boolean` and IS the decision's `when` condition, and the Interface layer refuses to
+    // collapse a Record-shaped reduction to a boolean. That refusal predates this work and is the LAST
+    // blocker between here and an end-to-end emit: a Record publishing a boolean has a perfectly good
+    // three-state read (`.value as FHIR.boolean` — true / false / null), which is exactly the null/pause
+    // determination this whole issue is about.
+    emitBlocker: "emit-reduction-nonboolean-interface",
     reachableQuestions: ["Obese", "BMI", "Weight", "Height"],
   },
   {
@@ -164,8 +166,9 @@ const OPTIONS: readonly AuthoringOption[] = [
     // back, this option's CRE rows match the other two and its emit blocker becomes the same one.
     singleValuedTargets: ["Greatest Weight", "BMI", "Obese"],
     validatesCleanToday: true,
-    // ⭐⭐ MOVED AGAIN 2026-08-31 — see the Record option. Same producer landing, same remaining blocker.
-    emitBlocker: "emit-most-recent-derivation",
+    // ⭐⭐⭐ MOVED AGAIN 2026-08-31 — see the Record option. Same landing, same remaining blocker: the guard
+    // surface, not the data model.
+    emitBlocker: "emit-reduction-nonboolean-interface",
     // ⭐ Four, reached THROUGH the uncoded reductions: Obese -> BMI -> Most Recent Weight/Height ->
     // Weight/Height Records. The intermediates carry no code so they offer no question, but the walk
     // traverses them — which is what makes the layering invisible to a user answering the questionnaire.
