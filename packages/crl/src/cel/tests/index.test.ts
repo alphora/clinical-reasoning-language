@@ -2,7 +2,7 @@ import { readFileSync } from "fs";
 import * as path from "path";
 
 import { buildCEL, tokenizeCEL, parseCEL } from "../index";
-import type { CEL, CELCase, CELFact, CELFactRefField, CELDefinedByField } from "../ast/types";
+import type { CEL, CELCase, CELFact, CELFactRefField, CELDefinedByField, CELValue } from "../ast/types";
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 
@@ -279,33 +279,38 @@ describe("CEL #189 S1 — `value is true` / `value is false` (first-class boolea
   const boolSrc = (v: string) =>
     ['library "T".', 'fact "Determination":', `- value is ${v}.`, '- defined by "Some Concept".'].join("\n");
 
-  test("`value is true` builds a boolean CELValueField (value === true)", () => {
-    const r = buildCEL(boolSrc("true"));
+  const valueOf = (src: string): CELValue => {
+    const r = buildCEL(src);
     expect(r.success).toBe(true);
     const fact = (r.result as CEL).statements.find((s): s is CELFact => s.type === "CELFact");
-    const vf = fact!.body.find((b) => b.type === "CELValueField") as { value: unknown } | undefined;
-    expect(vf?.value).toBe(true);
-    expect(typeof vf?.value).toBe("boolean");
+    const vf = fact!.body.find((b) => b.type === "CELValueField") as { value: CELValue } | undefined;
+    return vf!.value;
+  };
+
+  test("`value is true` builds a boolean CELValue", () => {
+    expect(valueOf(boolSrc("true"))).toEqual({ kind: "boolean", value: true });
   });
 
-  test("`value is false` builds a boolean CELValueField (value === false — distinct from absent)", () => {
-    const r = buildCEL(boolSrc("false"));
-    expect(r.success).toBe(true);
-    const fact = (r.result as CEL).statements.find((s): s is CELFact => s.type === "CELFact");
-    const vf = fact!.body.find((b) => b.type === "CELValueField") as { value: unknown } | undefined;
-    expect(vf?.value).toBe(false);
-    expect(typeof vf?.value).toBe("boolean");
+  test("`value is false` builds a boolean CELValue (distinct from absent)", () => {
+    expect(valueOf(boolSrc("false"))).toEqual({ kind: "boolean", value: false });
   });
 
-  test("`value is 42` still builds a numeric value (no regression), `value is \"text\"` a string", () => {
-    const num = buildCEL(boolSrc("42"));
-    expect(num.success).toBe(true);
-    const numFact = (num.result as CEL).statements.find((s): s is CELFact => s.type === "CELFact");
-    expect((numFact!.body.find((b) => b.type === "CELValueField") as { value: unknown }).value).toBe(42);
-    const str = buildCEL(boolSrc('"documented"'));
-    expect(str.success).toBe(true);
-    const strFact = (str.result as CEL).statements.find((s): s is CELFact => s.type === "CELFact");
-    expect((strFact!.body.find((b) => b.type === "CELValueField") as { value: unknown }).value).toBe("documented");
+  test("`value is 42` builds a bare NUMBER, `value is \"text\"` a string", () => {
+    // ⭐ A bare number is `kind: "number"`, NOT `"quantity"`. The AST records what was WRITTEN; whether a
+    // unitless number is legal (an integer/decimal target) or an error (a Quantity target) is the
+    // validator's call, from the target's declared value type. Inferring `quantity` here would be the guess
+    // the value-type table exists to prevent.
+    expect(valueOf(boolSrc("42"))).toEqual({ kind: "number", value: 42 });
+    expect(valueOf(boolSrc('"documented"'))).toEqual({ kind: "string", value: "documented" });
+  });
+
+  test("⭐ `value is 90 'kg'` builds a QUANTITY carrying its unit", () => {
+    // ⚠⚠ The unit is not decoration. `FHIRHelpers.ToQuantity` coalesces `Coalesce(code, unit, '1')`, so a
+    // FHIR Quantity written without one is DIMENSIONLESS and NULL against every real unit — measured, and
+    // shipped in seven goldens before CEL could express this.
+    expect(valueOf(boolSrc("90 'kg'"))).toEqual({ kind: "quantity", value: 90, unit: "kg" });
+    expect(valueOf(boolSrc("1.7 'm'"))).toEqual({ kind: "quantity", value: 1.7, unit: "m" });
+    expect(valueOf(boolSrc("118 'mm[Hg]'"))).toEqual({ kind: "quantity", value: 118, unit: "mm[Hg]" });
   });
 });
 

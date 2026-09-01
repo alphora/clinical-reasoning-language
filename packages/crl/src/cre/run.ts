@@ -1700,8 +1700,13 @@ function runCase(
     // #189 Piece 3 (Option C, disc 512) — the fact's boolean `value is`, if any (non-boolean → undefined). A
     // value-reading concept's own-arm reads this; a fact carrying it is recorded per populated concept in `populate`.
     const valueField = fact.body.find((x): x is CELValueField => x.type === "CELValueField");
+    // ⚠ Switched on the DISCRIMINANT, not `typeof`. `typeof valueField?.value === "boolean"` compiles
+    // against the union — it narrows to `never` and reads as always-false — so this silently stopped
+    // recording every boolean fact value while `tsc` stayed green. Caught by 25 failing CRE tests, which is
+    // a far better outcome than the writer's version of the same mistake (which nothing would have caught
+    // but the goldens).
     const factValue: FactValue = {
-      ...(typeof valueField?.value === "boolean" ? { boolValue: valueField.value } : {}),
+      ...(valueField?.value.kind === "boolean" ? { boolValue: valueField.value.value } : {}),
     };
 
     // D5(3) backstop: an `absent`/`negative` intent modifier on a LOCAL determination fact inverts its clinical

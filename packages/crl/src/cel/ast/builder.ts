@@ -58,6 +58,7 @@ import type {
   CELBirthDateField,
   CELCodeField,
   CELDateField,
+  CELValue,
   CELValueField,
   CELStageField,
   CELDefinedByField,
@@ -293,27 +294,30 @@ export class CELAstBuilder
     if (numTok) {
       // ⭐ `value is 90 'kg'.` — the unit rides with the number. The grammar makes it optional; the
       // validator decides whether it was REQUIRED (a Quantity target) or FORBIDDEN (an integer/decimal one).
+      // ⚠ A unitless number builds `kind: "number"`, NOT `"quantity"`. The AST records what was WRITTEN;
+      // only the validator — which resolves the target's declared value type — decides what it means.
       const unitTok = ctx.SINGLE_QUOTED_STRING();
-      const unit = unitTok ? unitTok.text.slice(1, -1) : undefined;
-      return {
-        type: "CELValueField",
-        value: Number(numTok.text),
-        ...(unit !== undefined ? { unit } : {}),
-        location: getLocation(ctx),
-      };
+      const value: CELValue = unitTok
+        ? { kind: "quantity", value: Number(numTok.text), unit: unitTok.text.slice(1, -1) }
+        : { kind: "number", value: Number(numTok.text) };
+      return { type: "CELValueField", value, location: getLocation(ctx) };
     }
     const sl = ctx.stringLiteral();
     if (sl) {
-      return { type: "CELValueField", value: unquote(sl.text), location: getLocation(ctx) };
+      return {
+        type: "CELValueField",
+        value: { kind: "string", value: unquote(sl.text) },
+        location: getLocation(ctx),
+      };
     }
     // #189 S1 — `value is true` / `value is false` (the TRUE/FALSE keyword tokens, shared with
     // `result is`). A boolean value carries the concept's determination for a `value type is boolean`
     // local `code is` leaf; the emitter lowers it to `Observation.valueBoolean`.
     if (ctx.TRUE()) {
-      return { type: "CELValueField", value: true, location: getLocation(ctx) };
+      return { type: "CELValueField", value: { kind: "boolean", value: true }, location: getLocation(ctx) };
     }
     if (ctx.FALSE()) {
-      return { type: "CELValueField", value: false, location: getLocation(ctx) };
+      return { type: "CELValueField", value: { kind: "boolean", value: false }, location: getLocation(ctx) };
     }
     throw new Error(`Empty valueField at ${getLocation(ctx).start.line}`);
   };

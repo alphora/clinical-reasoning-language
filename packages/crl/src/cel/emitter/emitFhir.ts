@@ -47,8 +47,10 @@ import type {
   CELAtClause,
   CELCrossResourceField,
   CrossResourceRelation,
+  CELValue,
   CELValueField,
 } from "../ast/types";
+import { celValueScalar } from "../ast/types";
 
 import type {
   EmitResult,
@@ -586,23 +588,39 @@ function writeCodedLocalValue(
   return "written";
 }
 
+/**
+ * The flat view of a fact's body.
+ *
+ * ⚠⚠ NAMED FIELDS, NOT A `Record<string, …>` INDEX SIGNATURE, and that is the whole point. As a Record this
+ * lookup let a consumer read `body.unit` and get `undefined` with `tsc` green — which is exactly how the
+ * writer emitted dimensionless quantities while the validator demanded units. It ALSO would have let
+ * `typeof body.value === "number"` quietly fall through to `valueString` once `value` became a union,
+ * stringifying an object. Named fields make both of those compile errors instead of behaviours.
+ */
+interface FlatFactBody {
+  name?: string;
+  birthDate?: string;
+  code?: string;
+  date?: string;
+  stage?: string;
+  /** ⭐ The WHOLE value, never a flattened scalar — a consumer must switch on `kind`. */
+  value?: CELValue;
+}
+
 /** Read body fields from a fact into a flat lookup. */
-function readFactBody(fact: CELFact): Record<string, string | number | boolean> {
-  const out: Record<string, string | number | boolean> = {};
+function readFactBody(fact: CELFact): FlatFactBody {
+  const out: FlatFactBody = {};
   for (const b of fact.body) {
     if (b.type === "CELNameField") out.name = b.value;
     else if (b.type === "CELBirthDateField") out.birthDate = b.value;
     else if (b.type === "CELCodeField") out.code = b.value;
     else if (b.type === "CELDateField") out.date = b.value;
-    // ⚠ THE UNIT TRAVELS WITH THE VALUE. Dropping it here is silent: this lookup is a `Record<string, …>`
-    // index signature, so a consumer reading `body.unit` type-checks fine and simply gets `undefined` —
-    // which is exactly how the writer emitted a dimensionless Quantity while the validator was demanding a
-    // unit. (Both panel arms predicted this class when they asked for a discriminated `CELValue` union
-    // instead of an optional field; it then happened here, silently, with `tsc` green. Disc 529 §5.)
-    else if (b.type === "CELValueField") {
-      out.value = b.value;
-      if (b.unit !== undefined) out.unit = b.unit;
-    }
+    // ⚠ THE WHOLE `CELValue` TRAVELS, never a flattened scalar. This lookup used to hold primitives, and
+    // the unit fell off here — silently, because a `Record<string, …>` index signature lets a consumer read
+    // `body.unit` and simply get `undefined`. `tsc` was green while the validator demanded units and the
+    // writer emitted dimensionless quantities. The union is carried whole so a consumer must switch on
+    // `kind` and cannot lose half the value by omission.
+    else if (b.type === "CELValueField") out.value = b.value;
     else if (b.type === "CELStageField") out.stage = b.value;
     // CELDefinedByField intentionally not flattened — caller has the field.
   }
@@ -840,7 +858,7 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
     const siblings = lib ? lib.ast.statements.filter((s): s is Concept => s.type === "Concept") : [];
     if (isValueReadingBooleanConcept(targetConcept, siblings)) {
       const vf = fact.body.find((b): b is CELValueField => b.type === "CELValueField");
-      if (!vf || typeof vf.value !== "boolean") {
+      if (!vf || vf.value.kind !== "boolean") {
         ctx.diagnostics.push({
           kind: "value-reading-assertion-needs-boolean",
           severity: "error",
@@ -983,7 +1001,9 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   // corpus facts (no `.cel` authors a CodeableConcept `value is`), so this path is emit-byte-inert.
   let codedValueWritten = false;
   if (body.value !== undefined && derived.role === "local") {
-    const written = writeCodedLocalValue(ctx, derived, factName, body.value, resourceBody);
+    // ⚠ The SCALAR, deliberately: this arm writes a CodeableConcept parsed from a `system|code` STRING, so
+    // it wants the authored text, not the value node. Passing the node stringified it into a parse failure.
+    const written = writeCodedLocalValue(ctx, derived, factName, celValueScalar(body.value), resourceBody);
     if (written === "error") return undefined; // diagnostic pushed; skip the fact (never a partial/wrong datum)
     codedValueWritten = written === "written";
   }
@@ -996,25 +1016,39 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   // the F correctness slice (design §10 obligation); B4 adds only the descriptor-gated CodeableConcept path above
   // and leaves this switch byte-identical.
   if (!codedValueWritten && body.value !== undefined && fhirType === "Observation") {
-    if (typeof body.value === "boolean") {
-      resourceBody.valueBoolean = body.value;
-    } else if (typeof body.value === "number") {
-      // ⭐⭐ A QUANTITY CARRIES ITS UNIT, and a unitless one is DIMENSIONLESS, not undecided.
-      // `FHIRHelpers.ToQuantity` coalesces `Coalesce(code, unit, '1')`, so `{value: 118}` becomes
-      // `System.Quantity{unit:'1'}` and is NULL against every real unit — measured on the cqf engine, and
-      // shipped in seven goldens before the validator required a unit. Writing the unit here is what makes
-      // that requirement mean anything; without it the validator demands a unit and the writer throws it
-      // away, which LOOKS fixed and is not.
-      //
-      // ⚠ SHAPE MATCHED TO THE CONSTRUCTOR LANE ON PURPOSE. `fhirQuantityFromSystemQuantity` builds
-      // `{value, unit}` from a CQL System.Quantity, and FHIRHelpers accepts a null `system` — so both lanes
-      // evaluate identically. Emitting `system`/`code` HERE ONLY would make a CEL-written record and a
-      // producer-constructed one differ in shape while agreeing in value: the cross-lane drift this refactor
-      // exists to remove. If the payload gains `system`+`code`, BOTH lanes gain it together (disc 529 §3).
-      resourceBody.valueQuantity =
-        body.unit !== undefined ? { value: body.value, unit: body.unit } : { value: body.value };
-    } else {
-      resourceBody.valueString = String(body.value);
+    // ⚠ EXHAUSTIVE SWITCH ON `kind`, NOT `typeof`. A `typeof body.value === "number"` test still COMPILES
+    // against a union — it narrows to `never` and assigns silently — so the previous shape would have
+    // stringified a value object into `valueString` with `tsc` green. Switching on the discriminant is what
+    // makes a new value kind a compile error instead of a wrong resource.
+    const v = body.value;
+    switch (v.kind) {
+      case "boolean":
+        resourceBody.valueBoolean = v.value;
+        break;
+      case "quantity":
+        // ⭐⭐ A QUANTITY CARRIES ITS UNIT, and a unitless one is DIMENSIONLESS, not undecided.
+        // `FHIRHelpers.ToQuantity` coalesces `Coalesce(code, unit, '1')`, so `{value: 118}` becomes
+        // `System.Quantity{unit:'1'}` and is NULL against every real unit — measured on the cqf engine, and
+        // shipped in seven goldens before the validator required a unit.
+        //
+        // ⚠ SHAPE MATCHED TO THE CONSTRUCTOR LANE ON PURPOSE. `fhirQuantityFromSystemQuantity` builds
+        // `{value, unit}` from a CQL System.Quantity, and FHIRHelpers accepts a null `system` — so both
+        // lanes evaluate identically. Emitting `system`/`code` HERE ONLY would make a CEL-written record and
+        // a producer-constructed one differ in shape while agreeing in value: the cross-lane drift this
+        // refactor exists to remove. If the payload gains them, BOTH lanes gain them together (disc 529 §3).
+        resourceBody.valueQuantity = { value: v.value, unit: v.unit };
+        break;
+      case "number":
+        // A bare number reaching the writer means the validator admitted it — i.e. an integer/decimal
+        // target, where a unit is FORBIDDEN. ⚠ It still lands on `valueQuantity`, which is the OLD-WORLD
+        // mis-spelling this switch is marked `REFACTOR:suspect` for (`integer` -> `valueQuantity`); routing
+        // it to the descriptor's carrier is the F correctness slice, not this one. Left byte-identical
+        // deliberately, and called out so it is not mistaken for a decision.
+        resourceBody.valueQuantity = { value: v.value };
+        break;
+      case "string":
+        resourceBody.valueString = v.value;
+        break;
     }
   }
 

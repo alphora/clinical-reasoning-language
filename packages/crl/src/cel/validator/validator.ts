@@ -23,6 +23,7 @@ import type {
   CELInclude,
   CELValueField,
 } from "../ast/types";
+import { celValueScalar } from "../ast/types";
 import type { Concept } from "../../ast/types";
 import { isValueReadingBooleanConcept } from "../../template-match/recencyValueConcept";
 import { buildDefinedByCandidates } from "../definedByResolve";
@@ -586,7 +587,11 @@ function validateNumericValueRules(
   fp: string,
 ): void {
   const valueField = f.body.find((b): b is CELValueField => b.type === "CELValueField");
-  if (!valueField || typeof valueField.value !== "number") return;
+  if (!valueField) return;
+  const v = valueField.value;
+  // ⭐ `"number"` = written bare; `"quantity"` = written with a unit. Both are numeric literals, and which
+  // one is LEGAL depends on the target's declared value type — that is what this table decides.
+  if (v.kind !== "number" && v.kind !== "quantity") return;
   const db = f.body.find((b): b is CELDefinedByField => b.type === "CELDefinedByField");
   if (!db || !isQualifiedRef(db.ref)) return; // a bare-type fact declares no datum contract to check against
   const reg = graph.crlRegistry;
@@ -605,20 +610,20 @@ function validateNumericValueRules(
   const where = `"${libName}"."${declName}"`;
 
   if (declared === "Quantity") {
-    if (valueField.unit === undefined) {
+    if (v.kind === "number") {
       errors.push(
         err(
           "quantity-value-missing-unit",
-          `Fact "${f.name}" states \`value is ${valueField.value}\` for ${where}, which declares ` +
+          `Fact "${f.name}" states \`value is ${v.value}\` for ${where}, which declares ` +
             `\`value type is Quantity\` — a quantity REQUIRES a unit. Without one the emitted ` +
             `\`valueQuantity\` is DIMENSIONLESS (FHIRHelpers reads a missing unit as \`'1'\`), so every ` +
             `comparison against a real unit evaluates to NULL and the fact silently establishes nothing. ` +
-            `Write it as \`value is ${valueField.value} '<ucum>'.\` (e.g. \`'kg'\`, \`'m'\`, \`'mm[Hg]'\`).`,
+            `Write it as \`value is ${v.value} '<ucum>'.\` (e.g. \`'kg'\`, \`'m'\`, \`'mm[Hg]'\`).`,
           valueField.location,
           fp,
         ),
       );
-    } else if (valueField.unit.trim() === "") {
+    } else if (v.unit.trim() === "") {
       errors.push(
         err(
           "quantity-value-empty-unit",
@@ -633,11 +638,11 @@ function validateNumericValueRules(
   }
 
   if (declared === "integer" || declared === "decimal") {
-    if (valueField.unit !== undefined) {
+    if (v.kind === "quantity") {
       errors.push(
         err(
           "dimensionless-value-with-unit",
-          `Fact "${f.name}" states \`value is ${valueField.value} '${valueField.unit}'\` for ${where}, which ` +
+          `Fact "${f.name}" states \`value is ${v.value} '${v.unit}'\` for ${where}, which ` +
             `declares \`value type is ${declared}\` — a dimensionless datum takes NO unit. Declare the ` +
             `concept \`value type is Quantity\` if the datum really is a measured quantity.`,
           valueField.location,
@@ -652,7 +657,7 @@ function validateNumericValueRules(
   errors.push(
     err(
       "value-type-mismatch",
-      `Fact "${f.name}" states a NUMBER (\`value is ${valueField.value}\`) for ${where}, which declares ` +
+      `Fact "${f.name}" states a NUMBER (\`value is ${v.value}\`) for ${where}, which declares ` +
         `\`value type is ${declared}\`. A number cannot be that datum. Either state a literal of the ` +
         `declared type, or point the fact at the concept whose datum this actually is.`,
       valueField.location,
@@ -729,12 +734,15 @@ function validateBooleanValueRules(
           fp,
         ),
       );
-    } else if (typeof valueField.value !== "boolean") {
+      // ⚠ `valueField.value.kind`, NOT `typeof`. Against the union a `typeof … !== "boolean"` test is
+      // ALWAYS TRUE, so this rejected every correctly-authored `value is true`/`false` — caught by the
+      // authoring-kit reference artifacts, which is exactly what those references are for.
+    } else if (valueField.value.kind !== "boolean") {
       errors.push(
         err(
           "value-reading-assertion-needs-boolean",
           `Fact "${f.name}" asserts value-reading boolean concept "${libName}"."${declName}" with a non-boolean ` +
-            `\`value is ${JSON.stringify(valueField.value)}\`; it must be \`value is true\` or \`value is false\` (a ` +
+            `\`value is ${JSON.stringify(celValueScalar(valueField.value))}\`; it must be \`value is true\` or \`value is false\` (a ` +
             `non-boolean value lands off the \`FHIR.boolean\` own-arm read and is dropped).`,
           valueField.location,
           fp,
@@ -749,7 +757,7 @@ function validateBooleanValueRules(
     warnings.push(
       warn(
         "value-ignored-on-presence-concept",
-        `Fact "${f.name}" authors \`value is ${JSON.stringify(valueField.value)}\` on presence-based boolean concept ` +
+        `Fact "${f.name}" authors \`value is ${JSON.stringify(celValueScalar(valueField.value))}\` on presence-based boolean concept ` +
           `"${libName}"."${declName}", whose determination is computed by EXISTENCE — the value is ignored (both ` +
           `lanes compute it true when the record is present, regardless of the value). To assert it false, omit the ` +
           `fact (closed-world absence); explicit absence is an absence code, not \`value is false\`.`,

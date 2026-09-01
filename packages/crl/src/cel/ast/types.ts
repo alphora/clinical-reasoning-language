@@ -125,30 +125,45 @@ export interface CELDateField {
   location: Location;
 }
 
+/**
+ * ⭐⭐ A FACT'S STATED VALUE, as a DISCRIMINATED UNION — so a consumer cannot silently drop part of it.
+ *
+ * ⚠⚠ THIS SHAPE WAS EARNED, NOT CHOSEN ON PRINCIPLE. It first shipped as `value: number | string | boolean`
+ * plus an optional `unit?: string`, and within that same change `readFactBody` — which flattens a fact into
+ * a `Record<string, …>` — dropped the unit on the floor. `tsc` stayed green, the validator required units,
+ * and the writer emitted dimensionless quantities anyway: it LOOKED fixed. Only the goldens failing to move
+ * caught it. Both panel arms predicted exactly that class and asked for this union (disc 529 §5); the
+ * optional field was the cheaper shape and it cost more.
+ *
+ * ⚠ A UNITLESS NUMBER IS `"number"`, NOT `"quantity"` — the AST records what was WRITTEN, and only the
+ * validator (which resolves the fact's target and its declared value type) decides what it MEANS. Inferring
+ * `quantity` here would be the guess the value-type table exists to prevent, and a unitless FHIR Quantity is
+ * DIMENSIONLESS (`FHIRHelpers` reads a missing unit as `'1'`), not an under-specified one.
+ */
+export type CELValue =
+  /** A bare number. Its meaning — integer, decimal, or an ERROR against a Quantity target — is the
+   *  validator's call, from the target's declared value type. */
+  | { kind: "number"; value: number }
+  /** A number WITH a UCUM unit (`value is 90 'kg'`) — self-describing as a quantity. The unit string is
+   *  author-owned and checked only for presence; validating it against a lexicon is the membership-proving
+   *  trap this project refuses everywhere else. */
+  | { kind: "quantity"; value: number; unit: string }
+  | { kind: "boolean"; value: boolean }
+  | { kind: "string"; value: string };
+
+/** The scalar behind a `CELValue`, for the sites that genuinely only need it (a diagnostic message, a
+ *  presence test). ⚠ Use it DELIBERATELY: it discards the unit, which is the drop this union exists to make
+ *  impossible by accident. Anything writing a datum must switch on `kind` instead. */
+export function celValueScalar(v: CELValue): number | string | boolean {
+  return v.value;
+}
+
 export interface CELValueField {
   type: "CELValueField";
   // #189 S1 — a boolean value (`value is true` / `value is false`) is first-class: a
   // `value type is boolean` local `code is` concept authors its determination directly, and the
-  // emitter lowers it to `Observation.valueBoolean`. `number`/`string` remain for Quantity/text values.
-  value: number | string | boolean;
-  /**
-   * ⭐ The UCUM unit on a numeric value — `value is 90 'kg'.` Absent for every non-numeric literal, and for
-   * a number whose target is an integer/decimal datum (where a unit is FORBIDDEN, not merely optional).
-   *
-   * ⚠⚠ A UNITLESS NUMBER IS NOT "A QUANTITY WITHOUT A UNIT" — IT IS A DIMENSIONLESS ONE. `FHIRHelpers.ToQuantity`
-   * coalesces `Coalesce(code, unit, '1')`, so a FHIR Quantity with no unit becomes `System.Quantity{unit:'1'}`
-   * and EVERY comparison against a real unit is NULL. Measured on the cqf engine, and shipped in seven
-   * goldens before this existed. That is why the validator REQUIRES this for a Quantity target rather than
-   * treating it as decoration.
-   *
-   * ⚠ Held as a plain optional field rather than a discriminated `CELValue` union. Both panel arms asked for
-   * the union so that a consumer ignoring the unit becomes a COMPILE error, and the concern is right — that
-   * is precisely how one lane writes a unit and another drops it. The enforcement here is instead at the two
-   * places that can actually drop it: the validator's value-type table and the writer's numeric cells, both
-   * of which now read the RESOLVED datum contract. The union remains OWED, recorded in disc 529 §5, and is
-   * the more robust answer for the next consumer nobody has written yet.
-   */
-  unit?: string;
+  // emitter lowers it to `Observation.valueBoolean`.
+  value: CELValue;
   location: Location;
 }
 
