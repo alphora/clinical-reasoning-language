@@ -49,10 +49,16 @@ import {
   fhirQuantityFromSystemQuantity,
   renderBoundaryTransform,
   renderConstructorCall,
+  renderValueReadSourceArm,
 } from "./renderConstructorCall";
 import { boundarySelectedDefineName } from "./lowerLocalCodes";
 import { renderBoundaryIdentityCheck } from "../emit/producerCandidate";
-import type { BoundaryTransformSpec, ProducerCandidateSpec, ProjectedSourceSpec } from "../emit/producerCandidate";
+import type {
+  BoundaryTransformSpec,
+  ProducerCandidateSpec,
+  ProjectedSourceSpec,
+  ValueReadSourceSpec,
+} from "../emit/producerCandidate";
 import { renderRecordConstructor } from "./renderRecordConstructor";
 import { renderProjectedSourceArm } from "./renderConstructorCall";
 
@@ -2723,6 +2729,15 @@ class Emitter {
       // boundary transform CALLS. That is a library that fails to translate, not a wrong answer.
       const boundary = (st as Concept).__boundaryTransformSpec as BoundaryTransformSpec | undefined;
       if (boundary !== undefined) byName.set(boundary.signature.functionName, boundary.signature);
+      // ⭐⭐ #189 — AND SO DOES A CONSTRUCTED HETEROGENEOUS SOURCE ARM — same dangling-emit class.
+      //
+      // A concept whose posrep is a DIFFERENT resource type (`type is Observation` + a `type is ServiceRequest`
+      // representation carrying `value element is`) constructs one candidate per source record, and that arm
+      // can be the library's ONLY constructor demand: such a concept need have no producer, and it is
+      // statically excluded from the boundary transform because it already conforms BY CONSTRUCTION. Gathering
+      // only the other two emits a call to a function nothing defines — a library that fails to TRANSLATE.
+      const valueRead = (st as Concept).__valueReadSourceSpec as ValueReadSourceSpec | undefined;
+      if (valueRead !== undefined) byName.set(valueRead.signature.functionName, valueRead.signature);
     }
     // ⚠ Reached when the library has neither a producer nor a boundary transform — nothing to define.
     if (byName.size === 0) return null;
@@ -2800,6 +2815,40 @@ class Emitter {
           // `patternCodeableConcept` — but that is a SPECIFIC CASE WE CANNOT RELY ON, and it is not why this
           // line is correct. REFACTOR:grounded
           const src = (c.__recencyValueDescriptors as { source?: { arm?: string } } | undefined)?.source;
+          // ⭐⭐ A HETEROGENEOUS ARM IS CONSTRUCTED, NOT UNIONED. Its records are not the concept's `type is`,
+          // so unioning them raw puts a shape in the collection that the selection cannot read — MEASURED,
+          // the merge's own conforming filter (`where O.value is …`) removes them again, emit reports
+          // success, and the concept publishes null with no diagnostic.
+          //
+          // ⚠ This is the SAME obligation the projection arm discharges, for a different reason: a
+          // projection converts a source whose truth is EXISTENCE, this converts one carrying a DATUM the
+          // concept wants (`ServiceRequest.code` read as "what service was requested").
+          const vrSpec = c.__valueReadSourceSpec as ValueReadSourceSpec | undefined;
+          if (vrSpec !== undefined) {
+            // ⭐⭐ WRAPPED, and the reason is the RETURN clause, not the alias.
+            //
+            // A CQL query source must be fully parenthesized, so `A union (B) S where ...` does bind S to
+            // `(B)` alone — VERIFIED by execution (a local record beside a source one won on recency and kept
+            // its own `id`, so it was never swallowed into the query). The sibling comment below attributes the
+            // measured failure to the alias capturing the whole union; that mechanism is wrong.
+            //
+            // ⚠ What IS greedy is `returnClause`, which takes a full `expression` — so `return F(S) union <next>`
+            // swallows the following term into the return, which is exactly the measured
+            // `Union(FHIR.Observation, list<FHIR.Observation>)` signature. This arm is safe ONLY while it is the
+            // final term; a concept combining a heterogeneous posrep with a producer stage puts a constructed
+            // term after it and reproduces that failure under emit-success. Two characters buy immunity.
+            return `(${renderValueReadSourceArm({
+              sourceRef: epRef,
+              functionName: vrSpec.signature.functionName,
+              code: vrSpec.code,
+              read: vrSpec.read,
+              recency: vrSpec.recency,
+              subjectExpr: SUBJECT_REFERENCE_CQL,
+              profile: vrSpec.profile,
+            })})`;
+          }
+          // ⚠ A SAME-TYPE arm is returned RAW, and that is correct — it is already the concept's shape, so
+          // the collection is homogeneous and nothing needs constructing (charter §3's shape-sufficiency).
           if (src?.arm !== "source-projected") return epRef;
           const spec = c.__projectedSourceSpec as ProjectedSourceSpec | undefined;
           if (spec === undefined) {
@@ -3681,7 +3730,24 @@ class Emitter {
     const ownArm = `FHIRHelpers.ToBoolean((${ownNewest}).value as FHIR.boolean) is true`;
     // (ii)/(iii) member records of the referent V.
     const localMember = `exists (${cqlQualifiedRef(localLib, referentName)})`;
-    const sourceMember = `exists (${cqlQualifiedRef(sourceLib, `${referentName} Source`)})`;
+    // ⭐⭐ LEG (iii) CARRIES THE REFERENT'S OWN DATUM FILTER, or it CONTRADICTS the referent.
+    //
+    // ⚠ MEASURED (panel round 10, gpt arm #3), and it is a self-contradiction inside ONE library. When V's
+    // source arm is CONSTRUCTED, V drops any source record carrying no datum — that is V's pause semantics.
+    // A raw `exists (EP."V Source")` here answers from the RETRIEVE instead, so for a carrier whose coding and
+    // datum are DIFFERENT elements the two disagree: a `Condition` in the value set with a `recordedDate` but
+    // no `onset` makes V publish null while this leg says a member exists. Same library, opposite answers
+    // about the same concept — the cross-lane drift this refactor exists to remove.
+    //
+    // ⚠ It does NOT arise where coding and datum COINCIDE (`ServiceRequest.code`, `Encounter.type`), because
+    // the VS-filtered retrieve already implies the datum. That coincidence is why the probe missed it.
+    const referent = this.conceptByName.get(referentName);
+    const referentRead = (referent?.__valueReadSourceSpec as ValueReadSourceSpec | undefined)?.read.element;
+    const sourceRef = cqlQualifiedRef(sourceLib, `${referentName} Source`);
+    const sourceMember =
+      referentRead === undefined
+        ? `exists (${sourceRef})`
+        : `exists ((${sourceRef}) S where S.${referentRead} is not null)`;
     return `${ownArm}\n    or ${localMember}\n    or ${sourceMember}`;
   }
 

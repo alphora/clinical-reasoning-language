@@ -301,3 +301,54 @@ export function renderBoundaryTransform(inputs: {
     `  else ${constructedExpr}`
   );
 }
+
+
+/**
+ * ⭐⭐ #189 — a HETEROGENEOUS source arm: every source record becomes ONE record of the concept's own
+ * `type is`, carrying the source's DATUM as its value.
+ *
+ * The sibling of `renderProjectedSourceArm`. That one handles a source whose truth is EXISTENCE (a Condition,
+ * contributing a literal `true`); this one handles a source carrying a real datum the concept wants —
+ * `ServiceRequest.code` read as "what service was requested".
+ *
+ * ⚠⚠ WITHOUT IT THE ARM IS SILENTLY DROPPED, MEASURED. A heterogeneous arm unioned RAW is removed again by
+ * the merge's own conforming filter (`where O.value is FHIR.CodeableConcept` on a ServiceRequest), so emit
+ * reports success, the retrieve returns the record, and the concept publishes null.
+ *
+ * ⚠ `where S.<element> is not null` IS THE SEMANTICS, not a tidy-up. A source record carrying no datum
+ * cannot be read as the concept's value — there is nothing to read — so it contributes NOTHING and the
+ * determination stays unestablished, which PAUSES. Letting it through would build a null-valued candidate
+ * with a real stamp, which would win the recency race and bury an older answered value.
+ *
+ * ⚠ The candidate is dated by the SOURCE record, because it IS that record's claim.
+ */
+export function renderValueReadSourceArm(inputs: {
+  /** The source retrieve to read over (`ExternalPrimitives."X Source"`). */
+  sourceRef: string;
+  functionName: string;
+  /** The concept's own local code — the record is coded as the CONCEPT, never as the source. */
+  code: CandidateCode;
+  /** WHERE on the source record the datum lives, and the FHIR type to read it as. */
+  read: { element: string; fhirType: string };
+  /** The SOURCE resource's recency element and cast, from its own registry row. */
+  recency: { sortExpr: string; cast: "dateTime" | "none" };
+  subjectExpr: string;
+  profile: string;
+}): string {
+  const stamp = componentStampCql("S", inputs.recency.sortExpr, inputs.recency.cast);
+  const args = [
+    candidateCodeCql(inputs.code),
+    `(S.${inputs.read.element} as ${inputs.read.fhirType})`,
+    stamp,
+    inputs.subjectExpr,
+    q(inputs.profile),
+    "{}",
+  ];
+  return (
+    `(${inputs.sourceRef}) S\n` +
+    `    where S.${inputs.read.element} is not null\n` +
+    `    return ${inputs.functionName}(\n` +
+    `      ${args.join(",\n      ")}\n` +
+    `    )`
+  );
+}

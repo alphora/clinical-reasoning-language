@@ -488,36 +488,6 @@ export function resolveBoundaryTransform(inputs: {
         `strategy nor its recency element is known.`,
     );
   }
-  // ⭐⭐ A HETEROGENEOUS UNPROJECTED SOURCE ARM IS REFUSED HERE, LOUDLY — because today it is SILENTLY
-  // DROPPED, which is worse than anything a refusal costs.
-  //
-  // ⚠ MEASURED (`Observation` concept + an unprojected `type is ServiceRequest` posrep): the emit SUCCEEDS,
-  // the source retrieve returns the record (`source arm count = 1`), and the published concept is `null` —
-  // the union's `where O.value is …` filter drops it, because a ServiceRequest has no `value`. The author
-  // declared a source representation, the record was found, and it contributed NOTHING with no diagnostic.
-  //
-  // ⚠⚠ THE SHAPE IS AUTHORED AND LEGAL — do NOT read this as rejecting the CRL form. There are 12
-  // heterogeneous posreps in the tree, and `dme101-030`'s `Covered Device` (Observation concept +
-  // ServiceRequest posrep) RUNS today — in the SCALAR lane, which is untouched by this. What is missing is
-  // the Record lane's lowering: a heterogeneous arm needs PROJECTING into the concept's own type before it
-  // joins the space (charter §3's homogeneity invariant), exactly as `Obese`'s Condition arm is. Until that
-  // lowering exists this is typed BUILD DEBT (§0a), not an author error.
-  const sourceType = concept.representations?.find((r) => r.conceptType !== undefined)?.conceptType;
-  if (sourceType !== undefined && sourceType !== resourceType) {
-    return refuse(
-      `Concept "${concept.name}" publishes a \`${resourceType}\` record but its \`source representation\` is ` +
-        `\`${sourceType}\`, and that arm carries no \`value projection\` to bring it into the concept's own ` +
-        `type. A heterogeneous arm cannot join the concept's collection unprojected — the selection reads ` +
-        `\`${resourceType}\`'s value and recency elements, which a \`${sourceType}\` does not carry, so the ` +
-        `source records would be silently dropped. Add a \`value projection\` to that representation.`,
-    );
-  }
-  if (row.recency === undefined) {
-    return refuse(
-      `Concept "${concept.name}": \`${resourceType}\` has no established recency element, so a replaced ` +
-        `record could not carry the date of the record it replaced.`,
-    );
-  }
   const ctor = resolveConstructor(resourceType, carrier?.valueType);
   if (ctor.kind !== "resolved") {
     return refuse(
@@ -566,4 +536,128 @@ export function renderBoundaryIdentityCheck(
   codeRef: string,
 ): string {
   return renderCodingIdentityCheck(spec.coding, alias, codeRef);
+}
+
+
+/**
+ * ⭐⭐ #189 — what the emit needs to CONSTRUCT a heterogeneous source arm into the concept's own record.
+ *
+ * The fourth sibling of the producer / projection / boundary specs, and it exists for the same reason as the
+ * PROJECTION spec: a source record that is not the concept's `type is` cannot join the collection as itself.
+ * The projection arm handles a source whose truth is EXISTENCE (a Condition); this one handles a source that
+ * carries a real DATUM the concept wants — `ServiceRequest.code` read as "what service was requested".
+ *
+ * ⚠⚠ WITHOUT THIS THE ARM IS SILENTLY DROPPED, MEASURED. A heterogeneous arm was previously unioned RAW,
+ * and the merge's own conforming filter removed it again:
+ *
+ *     Last( (LocalPrimitives."X" union ExternalPrimitives."X Source") O
+ *           where O.value is FHIR.CodeableConcept       -- a ServiceRequest has no `.value`
+ *           sort by (effective as FHIR.dateTime).value, id )   -- nor `.effective`
+ *
+ * Emit reported success, the retrieve returned the record (`source arm count = 1`), and the concept
+ * published `null`. The author declared a representation, the record was found, and it contributed nothing
+ * with no diagnostic — the worst failure mode this project recognises.
+ *
+ * ⚠ The candidate is dated by the SOURCE record (`ServiceRequest.authoredOn`), never by the concept's own
+ * recency row, because it IS that record's claim — same rule as the projection arm.
+ */
+export interface ValueReadSourceSpec {
+  /** Carried WHOLE: the emitter must both CALL and DEFINE the constructor (see `BoundaryTransformSpec`). */
+  signature: ConstructorSignature;
+  /** The concept's own local code — what the constructed record is coded as. */
+  code: { system: string; code: string };
+  /** The case-feature profile url stamped into `meta.profile`. */
+  profile: string;
+  /** WHERE on the SOURCE record the datum lives, and the FHIR type to read it as. */
+  read: { element: string; fhirType: string };
+  /** The SOURCE resource's recency row — the candidate carries the date of the record it was built from. */
+  recency: { sortExpr: string; cast: "dateTime" | "none" };
+}
+
+/**
+ * Resolve a HETEROGENEOUS source arm's construction, or refuse.
+ *
+ * ⚠ The caller decides WHETHER this is needed (the source resource differs from the concept's); this answers
+ * "given that it is, can it be built?".
+ */
+export function resolveValueReadSource(inputs: {
+  concept: Concept;
+  /** The derived `source` descriptor — its `valueElement`/`datumValueType` are the read, already resolved
+   *  from the FHIR value model, never guessed here. */
+  source: {
+    resourceType: string;
+    valueElement: string;
+    datumValueType: string;
+    /** Does the read return a LIST? Resolved from the value model by the deriver — never re-derived here
+     *  (`fhir-model` has an import allowlist, and a second reading of a model fact is how lanes drift). */
+    readRepeats: boolean;
+    recency: { sortExpr: string; cast: "dateTime" | "none" };
+  };
+  code: { system: string; code: string };
+  profile: string;
+}): { kind: "resolved"; spec: ValueReadSourceSpec } | { kind: "refused"; refusal: ProducerCandidateRefusal } {
+  const { concept, source, code, profile } = inputs;
+  const refuse = (message: string) => ({ kind: "refused" as const, refusal: { kind: PRODUCER_BUILD_DEBT_KIND, message } });
+
+  const resourceType = concept.conceptType;
+  if (resourceType === undefined) {
+    return refuse(
+      `Concept "${concept.name}" reads a heterogeneous \`${source.resourceType}\` source representation but ` +
+        `declares no \`type is\` resource, so there is nothing to construct each source record into.`,
+    );
+  }
+  if (profile.trim() === "") {
+    return refuse(
+      `Concept "${concept.name}" constructs candidates from a \`${source.resourceType}\` source ` +
+        `representation, and each must be stamped with the case-feature StructureDefinition url the FHIR ` +
+        `lane emits — but no policy id was supplied.`,
+    );
+  }
+  // ⭐⭐ A REPEATING READ IS REFUSED — the emitter may not choose the reduction.
+  //
+  // ⚠ MEASURED (panel round 10, BOTH arms independently): without this, `Encounter.type` rendered
+  // `(S.type as FHIR.CodeableConcept)` on a `CodeableConcept[]`, emit reported SUCCESS, and the library failed
+  // to TRANSLATE. Worse than the cast, `S.type is not null` is VACUOUSLY TRUE on an empty list, so the
+  // datum-presence filter is dead for these carriers and a record with no type would contribute a candidate —
+  // denying where it must pause.
+  //
+  // ⚠⚠ THIS IS TYPED BUILD DEBT, NOT AN AUTHOR ERROR (§0a). The CRL form is legal; what is missing is a
+  // RULED reduction (first / each / the member matching the value set), which is an operator decision, not an
+  // inference the emitter is entitled to make (`patterns-are-semantic`). The refusal this construction replaced
+  // covered this shape, so accepting it here would ship a strict regression against what was deleted.
+  if (source.readRepeats) {
+    return refuse(
+      `Concept "${concept.name}" reads \`${source.resourceType}.${source.valueElement}\`, which REPEATS, and ` +
+        `no reduction has been ruled for it — first, last, each, or the member matching the value set are ` +
+        `all defensible and CRL has chosen none, so the emitter must not choose one either. Read a ` +
+        `non-repeating element, or have the reduction ruled.`,
+    );
+  }
+  const ctor = resolveConstructor(resourceType, source.datumValueType);
+  if (ctor.kind !== "resolved") {
+    return refuse(
+      `Concept "${concept.name}": each \`${source.resourceType}\` record must become a \`${resourceType}\` ` +
+        `carrying \`value type is ${source.datumValueType}\`, and that constructor cannot be built ` +
+        `(${ctor.reason}: ${ctor.detail}).`,
+    );
+  }
+  const valueParam = ctor.signature.params.find((prm) => prm.name === "value");
+  if (valueParam === undefined) {
+    return refuse(
+      `Concept "${concept.name}": the \`${resourceType}\` constructor for ` +
+        `\`${source.datumValueType}\` takes no value parameter, so a source DATUM has nowhere to land.`,
+    );
+  }
+  return {
+    kind: "resolved",
+    spec: {
+      signature: ctor.signature,
+      code,
+      profile,
+      // ⚠ The FHIR type comes off the RESOLVED SIGNATURE, not re-derived — the read and the constructor's
+      // parameter must be the same type (same rule as `resolveBoundaryTransform`).
+      read: { element: source.valueElement, fhirType: valueParam.cqlType },
+      recency: source.recency,
+    },
+  };
 }

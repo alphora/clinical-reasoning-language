@@ -21,7 +21,7 @@ import type { Concept, Representation, ReferenceName, ValueProjection } from "..
 import { hasLocalCode, hasSourceBinding } from "./conceptDatumSignals";
 import { localCodeSystemUrl } from "../fhir-emitter/slug";
 import { relativeElementPath } from "../fhir-model/elementPath";
-import { valueReadElementsAdmitting, valueReadValueTypes } from "../fhir-model/fhirValueModel";
+import { isRepeatingValueRead, valueReadElementsAdmitting, valueReadValueTypes } from "../fhir-model/fhirValueModel";
 import { resolveRecordDatumCarrier } from "./recordBooleanGuard";
 import type { ConceptValueType } from "../grammar/conceptValueTypes";
 import type { ResultType } from "../grammar/resultType";
@@ -115,6 +115,10 @@ export type EffectiveRepresentationDescriptor =
       coding: CodingStrategy;
       valueElement: string;
       datumValueType: ConceptValueType;
+      /** Does the value READ return a LIST (e.g. `Encounter.type`)? Carried WITH the read so the constructing
+       *  arm can refuse a reduction nobody has ruled, without importing the value model itself (§4.1 allowlist)
+       *  — a model fact read in two places is a model fact free to drift. */
+      readRepeats: boolean;
       terminologyRef: ReferenceName;
       resultType: ResultType;
       recency: RecencyAccess;
@@ -268,7 +272,7 @@ function ageLocalExactDescriptor(
   };
 }
 
-type Datum = { valueElement?: string; datumValueType?: ConceptValueType };
+type Datum = { valueElement?: string; datumValueType?: ConceptValueType; readRepeats?: boolean };
 type DatumResult = Datum | { errorKind: DerivationErrorKind; detail: string };
 
 /** The datum (value element + datum type) of a NOT-AGE local-exact arm, keyed on shape × reduction (kind AND
@@ -405,7 +409,15 @@ function computeLocalDatum(
           detail: `\`most recent this\` on ${resourceType}.${readPath} admits {${[...admitted].join(", ")}}, but the concept declares value type \`${declared}\``,
         };
       }
-      return { valueElement: readPath, datumValueType: declared };
+      return {
+        valueElement: readPath,
+        datumValueType: declared,
+        // ⭐ The MULTIPLICITY travels WITH the read, resolved once here beside it. A repeating read has
+        // no ruled reduction, so the constructing arm must refuse rather than pick one — but that arm
+        // may not import the value model (§4.1 allowlist), and re-deriving a model fact in a second
+        // place is how the two readings drift apart.
+        readRepeats: isRepeatingValueRead(resourceType, readPath),
+      };
     }
     default:
       // #189 Piece 1 — a `code is` + `defined as exists ("X")` BOOLEAN INTERFACE concept (charter §3
@@ -766,6 +778,7 @@ function deriveOneSourceArm(
       coding: row.coding, // membership coding axis — SEPARATE from `valueElement` (datum), even when they coincide
       valueElement: readPath,
       datumValueType: declared,
+      readRepeats: isRepeatingValueRead(resourceType, readPath),
       terminologyRef: rep.terminologyName, // PRESERVE qualified identity (URL/membership = B5)
       resultType,
       recency: row.recency,

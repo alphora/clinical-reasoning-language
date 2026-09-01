@@ -149,6 +149,30 @@ export const OBSERVATION_VALUE_X_EXCLUDED: readonly ConceptValueType[] = ["date"
 /** The resource types this model knows about — exported so a test can pin the model's keyset against
  *  `RESOURCE_EMIT_REGISTRY` ∪ {Patient} in BOTH directions (a future stray row, e.g. `Encounter`, would silently
  *  widen the stated scope otherwise; disc 425). */
+/**
+ * ⭐⭐ REPEATING value-read elements — `"<ResourceType>.<element>"`.
+ *
+ * ⚠⚠ A REPEATING READ HAS NO REDUCTION UNTIL AN AUTHOR NAMES ONE. `Encounter.type` is `type[]`: first,
+ * last, each, or the one matching the value set are all defensible, and CRL has ruled none of them. The
+ * emitter may NOT pick — a catalog signature never licenses a synthesized reduction (`patterns-are-semantic`).
+ *
+ * ⚠ MEASURED (panel round 10, BOTH arms): with no such fact, `resolveValueReadSource` rendered
+ * `(S.type as FHIR.CodeableConcept)` on a list. Emit reported `success: true` and the library then FAILED TO
+ * TRANSLATE — "Expression of type 'List of CodeableConcept' cannot be cast as a value of type
+ * 'CodeableConcept'". The multiplicity lived only in a PROSE comment on the model below, so nothing could
+ * gate on it. It is a structured fact here for exactly that reason.
+ *
+ * ⚠ It belongs beside the value READ model and is NOT derived from the coding strategy
+ * (`codeable-concept-array`). Coding and datum are different elements on most carriers — conflating them is
+ * what produced the interface/candidate disagreement the same round found on `Condition`.
+ */
+export const REPEATING_VALUE_READS: ReadonlySet<string> = new Set<string>(["Encounter.type"]);
+
+/** Does this value read return a LIST? See `REPEATING_VALUE_READS`. */
+export function isRepeatingValueRead(resourceType: string, element: string): boolean {
+  return REPEATING_VALUE_READS.has(`${resourceType}.${element}`);
+}
+
 export const MODELED_RESOURCE_TYPES: readonly string[] = Object.keys(FHIR_VALUE_READ_MODEL);
 
 /**

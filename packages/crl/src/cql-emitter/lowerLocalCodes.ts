@@ -121,8 +121,13 @@ import {
   type OwningLibraryMetadata,
 } from "../emit/effectiveRepresentation";
 import { caseFeatureUrlFromPolicyId, localCodeSystemSlug, localCodeSystemUrl } from "../fhir-emitter/slug";
-import { resolveBoundaryTransform, resolveProducerCandidates, resolveProjectedSource } from "../emit/producerCandidate";
-import type { BoundaryTransformSpec } from "../emit/producerCandidate";
+import {
+  resolveBoundaryTransform,
+  resolveProducerCandidates,
+  resolveProjectedSource,
+  resolveValueReadSource,
+} from "../emit/producerCandidate";
+import type { BoundaryTransformSpec, ValueReadSourceSpec } from "../emit/producerCandidate";
 import type { ProducerCandidateSpec, ProjectedSourceSpec } from "../emit/producerCandidate";
 import { isAgeTodayPrefix } from "../template-match/agePredicate";
 import {
@@ -769,6 +774,40 @@ export function lowerLocalCodes(
         projectedSourceSpec = proj.spec;
       }
 
+      // ⭐⭐ #189 — a HETEROGENEOUS source arm must be CONSTRUCTED into the concept's own type, or it is
+      // silently dropped: MEASURED, the raw union is removed again by the merge's own conforming filter
+      // (`where O.value is …` on a ServiceRequest), emit reports success and the concept publishes null.
+      let valueReadSourceSpec: ValueReadSourceSpec | undefined;
+      // ⚠⚠ GATED ON `rv.publishes === "record"`, exactly as the refusal this replaced was. The VALUE lane
+      // reads `source.valueElement` raw and never consults this spec, so firing here would attach a spec no
+      // renderer reads — emitting a constructor nothing calls — and, on the refusal path, would turn a
+      // scalar-lane emit that SUCCEEDS today into an error. That lane is genuinely untouched by this change,
+      // and this gate is what makes that claim true (panel round 10, Claude arm #2: it was NOT true when the
+      // packet asserted it).
+      if (
+        rv.publishes === "record" &&
+        sourceDesc.arm === "source" &&
+        sourceDesc.resourceType !== localDesc.resourceType
+      ) {
+        const vr = resolveValueReadSource({
+          concept: c,
+          source: {
+            resourceType: sourceDesc.resourceType,
+            valueElement: sourceDesc.valueElement,
+            datumValueType: sourceDesc.datumValueType,
+            readRepeats: sourceDesc.readRepeats === true,
+            recency: { sortExpr: sourceDesc.recency.sortExpr, cast: sourceDesc.recency.cast },
+          },
+          code: { system: urn, code: codeValue },
+          profile: opts.policyId ? caseFeatureUrlFromPolicyId(canonicalBase, opts.policyId, c.name) : "",
+        });
+        if (vr.kind === "refused") {
+          errors.push(mkError(vr.refusal.kind, vr.refusal.message, c.definition?.location ?? loc));
+          continue;
+        }
+        valueReadSourceSpec = vr.spec;
+      }
+
       // ⭐⭐ #189 — THE BOUNDARY TRANSFORM's spec, and the STATIC GATE that decides whether one is needed.
       //
       // Charter §3 (operator, 2026-09-01): *"a consumer has to see a CF"*, scoped — *"it only applies to
@@ -795,7 +834,12 @@ export function lowerLocalCodes(
       // its own projected-ness), or a projected rep beside an unprojected one would silently disable the
       // transform for both.
       let boundaryTransformSpec: BoundaryTransformSpec | undefined;
-      if (rv.publishes === "record" && sourceDesc.arm !== "source-projected") {
+      // ⚠ A CONSTRUCTED arm conforms BY CONSTRUCTION — the constructor writes the concept's local code and
+      // case-feature profile — so neither a PROJECTED arm nor a HETEROGENEOUS one needs the boundary
+      // transform. Only a same-type raw arm can put a non-conforming record in the space.
+      const sourceIsConstructed =
+        sourceDesc.arm === "source-projected" || valueReadSourceSpec !== undefined;
+      if (rv.publishes === "record" && !sourceIsConstructed) {
         const bt = resolveBoundaryTransform({
           concept: c,
           code: { system: urn, code: codeValue },
@@ -852,6 +896,7 @@ export function lowerLocalCodes(
         ],
         __recencyProducerSpecs: producerSpecs,
         __projectedSourceSpec: projectedSourceSpec,
+        __valueReadSourceSpec: valueReadSourceSpec,
         __boundaryTransformSpec: boundaryTransformSpec,
         __loweringRole: "public-determination",
       };

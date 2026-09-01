@@ -819,6 +819,15 @@ export interface Concept extends ASTNode {
    */
   __boundaryTransformSpec?: unknown;
   /**
+   * SYNTHETIC-EMITTER-ONLY. ⭐⭐ #189 — the HETEROGENEOUS source arm's construction spec
+   * (`emit/producerCandidate.ts` `ValueReadSourceSpec`): how to turn each source record of a DIFFERENT
+   * resource type into a record of the concept's own, carrying the source's datum as its value.
+   *
+   * ⚠ Set only when the source resource differs from the concept's. A same-type arm unions directly — it
+   * is already the right shape — and a `value projection` arm takes `__projectedSourceSpec` instead.
+   */
+  __valueReadSourceSpec?: unknown;
+  /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). #189 Slice C boundary 2 (2a) — the
    * LOWERING ROLE of a concept the lowering passes produced/retargeted, so the totality-ledger enrollment
    * (`emitConcept`) picks its obligation SOURCE without marker-sniffing (disc 439 crit #1/#2):

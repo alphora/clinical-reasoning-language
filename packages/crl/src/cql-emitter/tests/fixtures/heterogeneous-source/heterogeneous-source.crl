@@ -1,0 +1,35 @@
+# A HETEROGENEOUS source arm: an Observation concept whose representation is a DIFFERENT resource type.
+library "Heterogeneous Source".
+
+terminology "Covered Services VS":
+- valueset is `http://example.org/heterogeneous-source/ValueSet/covered-services`.
+
+concept "Requested Service":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is `requested-service`.
+- definition is most recent this.
+- source representation:
+  - type is ServiceRequest.
+  - coded from "Covered Services VS".
+
+concept "Service Was Requested":
+- shape is Scalar.
+- type is Observation.
+- value type is boolean.
+- code is `service-was-requested`.
+- defined as exists ("Requested Service").
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `APPROVED`.
+
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `NOT APPROVED`.
+
+decision "Requested Service Decision":
+first:
+- when "Service Was Requested" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
