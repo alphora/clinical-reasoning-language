@@ -240,6 +240,24 @@ currently permits is a **warning** (`composition-result-type-mismatch`) today th
   its boundary is a case-feature record — the concept's own `type is`, carrying the concept's LOCAL code.
   That is the rule, and it does not depend on which consumer is asking.
 
+  ⭐⭐ **SCOPE, RULED (operator, 2026-09-01): "It only applies to concepts that have a `code is`."** A case
+  feature IS a local identity, so a concept with no local `code is` has none to publish and is not a
+  case-feature boundary at all. Such a concept is EPHEMERAL by §4 — it gets no StructureDefinition, it is
+  not answerable (local `code is` is the only way to create an answer), and it exists only as
+  target-language computation. It publishes a SHAPE-conformant record, and that is the whole contract.
+
+  ⚠ A real shape, not a loophole: the goal's own Layered option declares `Most Recent Height` and `Most
+  Recent Weight` as `shape is Record` with NO code, deliberately, while its sibling `Greatest Weight`
+  carries one. Whether a reduction is answerable is the AUTHOR'S call.
+
+  ⚠⚠ AND THIS IS WHERE THE THREE LEGS STOP BEING SYMMETRIC — worth seeing plainly rather than
+  rediscovering it later as a bug. A PRODUCER stamps the CF as a side effect of CONSTRUCTING: it writes the
+  concept's local code and case-feature profile into the candidate it builds. A PROJECTION stamps because
+  constructing that candidate is its entire purpose. A **SELECTION CONSTRUCTS NOTHING** — it picks a record
+  that already exists — so it stamps nothing, and a selection over a space holding an unprojected source
+  record republishes that record RAW. That asymmetry is the whole reason a boundary transform exists. For
+  an UNCODED concept it cannot apply, because there is no identity to stamp with.
+
   ⚠ **The questionnaire path happens to survive a raw record, and that is a SPECIFIC CASE WE CANNOT RELY
   ON.** Measured: with a raw externally-coded source record winning the selection, `$populate` pre-filled the
   question and `$extract` still produced a LOCAL-coded Observation — because `$extract` RE-DERIVES identity

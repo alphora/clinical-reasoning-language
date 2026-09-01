@@ -2280,6 +2280,8 @@ class Emitter {
    *
    * The identity obligation — *a consumer has to see a CASE FEATURE* (charter §3, operator 2026-09-01) —
    * is discharged at the concept BOUNDARY, on the ONE record this returns, not on the n records it sorted.
+   * ⚠ And it is scoped: *"it only applies to concepts that have a `code is`"* (same ruling). An UNCODED
+   * concept has no local identity to publish, so there is nothing to stamp and no obligation to discharge.
    *
    * ⚠⚠ SO IF THIS FUNCTION EVER NEEDS THE CONCEPT'S IDENTITY — a sort, filter or tie-break that reads the
    * local code rather than the shape — **carve out that case; do not project the space to satisfy it.**
@@ -2649,7 +2651,9 @@ class Emitter {
           // keeps every transformation of the space in one place.
           // ⚠⚠ RETURNING THE RAW RECORD IS CORRECT *HERE*, IN THE COLLECTION — and NOT at the boundary.
           //
-          // RULED (operator, 2026-09-01): **a consumer has to see a CASE FEATURE.** But that obligation is
+          // RULED (operator, 2026-09-01): **a consumer has to see a CASE FEATURE** — scoped, by the same
+          // ruling, to concepts that HAVE a local `code is` (an uncoded concept has no identity to
+          // publish). But that obligation is
           // the concept's BOUNDARY's, not this union's: comparison, recency ordering and value reads need
           // only the SHAPE, so the collection may hold the raw record and pay nothing per member. The
           // local-code projection belongs where the concept PUBLISHES — one record for a `shape is Record`

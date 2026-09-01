@@ -17,12 +17,26 @@ import type { RecordSetUnboundedWarning, ValidationError } from "./validator";
 // never read as "RecordSet is discouraged". It says one thing only: *you did not bound this set, and the
 // cost of that lands at the concept boundary.*
 //
-// ⭐ WHY THE COST IS REAL, not speculative. Charter §3: a consumer has to see a CASE FEATURE, and that
-// transform happens at the concept BOUNDARY. For a `shape is Record` concept the boundary is ONE record, so
-// it is one construction. For a `shape is RecordSet` concept the boundary is the WHOLE SET — n
-// constructions, on every evaluation. **And no placement of the transform changes that**: the boundary IS
-// the collection, so moving work earlier or later cannot shrink n. The only lever is a restriction that
-// makes the set smaller, which is precisely what this rule notices is missing.
+// ⭐ WHY THE COST IS REAL, not speculative — and it has TWO tiers, which matters because only one of them
+// applies to every warned concept.
+//
+//   · ALWAYS: the set is retrieved and carried through every downstream stage at its full history length.
+//     This is the operator's actual claim (*"a history only record set is a performance smell"*) and it
+//     needs no case-feature machinery to be true.
+//   · ADDITIONALLY, FOR A CONCEPT WITH A LOCAL `code is`: charter §3 puts the case-feature transform at the
+//     concept BOUNDARY. For `shape is Record` that is ONE construction; for a RecordSet the boundary IS the
+//     whole set, so it is n constructions on every evaluation — and **no placement of the transform changes
+//     that**, because there is nothing between the union and the boundary to shrink it.
+//
+// ⚠⚠ THE SECOND TIER DOES NOT APPLY TO AN UNCODED CONCEPT, and stating it as though it did would be a
+// stale rule waiting to ambush a later round. MEASURED: 14 of the 32 in-tree hits have NO local `code is`
+// (`Medical Reasons` is `coded from` a value set and nothing else). Charter §3's scope ruling is explicit
+// — *"it only applies to concepts that have a `code is`"* — because a case feature IS a local identity and
+// an uncoded concept has none to publish.
+//
+// The warning still fires for both, because tier one is reason enough. The MESSAGE must not claim tier two.
+// Either way the only lever is a restriction that makes the set smaller, which is what this notices is
+// missing.
 //
 // ⚠ SCOPE — deliberately narrow, three ways, because a warning that cries wolf gets muted and then the real
 // ones are invisible too:
@@ -77,17 +91,21 @@ export class RecordSetBoundValidator {
 
     if (this.restricts(concept)) return;
 
+    // ⚠ Tier two of the cost only exists where there is a case-feature identity to construct — see the
+    // header. `concept.code` is the local `code is`; absent means uncoded.
+    const hasLocalCode = concept.code !== undefined;
+
     const warning: RecordSetUnboundedWarning = {
       kind: "recordset-unbounded",
       conceptName: concept.name,
       message:
         `Concept "${concept.name}" declares \`shape is RecordSet\` but its program never restricts the ` +
-        `set, so it publishes the patient's WHOLE history for this code. That is legal, and sometimes ` +
-        `exactly what you mean — but every consumer of this concept pays for each record in it, because ` +
-        `the case-feature transform happens at the concept boundary and the boundary here is the entire ` +
-        `set. If you meant a bounded window, add a restriction (\`, then within last 6 months this\`); if ` +
-        `you meant one record, declare \`shape is Record\` and select one (\`definition is most recent ` +
-        `this\`).`,
+        `set, so it publishes the patient's WHOLE matching history. That is legal, and sometimes ` +
+        `exactly what you mean — but the full history is then retrieved and carried through every ` +
+        `downstream stage${hasLocalCode ? ", and because this concept has a local \`code is\` each record " +
+          "in the set is also transformed into a case feature at the concept boundary" : ""}. If you ` +
+        `meant a bounded window, add a restriction (\`, then within last 6 months this\`); if you meant ` +
+        `one record, declare \`shape is Record\` and select one (\`definition is most recent this\`).`,
       location: concept.location,
       severity: "warning",
       ...(attribution.libraryName ? { libraryName: attribution.libraryName } : {}),

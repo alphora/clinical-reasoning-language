@@ -14,11 +14,12 @@ import { Validator, type ValidationResult } from "../validator";
  * all three authoring options canonical. So `isValid` MUST stay true and the finding MUST land in
  * `warnings`. A future refactor that "tightens" this into an error would make the goal fixture invalid.
  *
- * ⭐ WHY THE COST IS REAL: the case-feature transform happens at the concept BOUNDARY (charter §3, *a
- * consumer has to see a CF*). For `shape is Record` the boundary is ONE record; for `shape is RecordSet`
- * the boundary is the WHOLE set, so it is n constructions — and no placement of the transform changes
- * that, because the boundary IS the collection. A restriction is the only lever, which is what this
- * notices is missing.
+ * ⭐ WHY THE COST IS REAL, in two tiers. ALWAYS: the full history is retrieved and carried through every
+ * downstream stage — the operator's actual claim, true of any unbounded set. ADDITIONALLY FOR A CODED
+ * CONCEPT: the case-feature transform happens at the concept BOUNDARY (charter §3), which for a RecordSet
+ * is the WHOLE set, so it is n constructions — and no placement changes that, because the boundary IS the
+ * collection. ⚠ Tier two is scoped — *"it only applies to concepts that have a `code is`"* — and the
+ * message must not claim it for an uncoded concept. A restriction is the only lever either way.
  */
 
 const HEAD = ['# P', 'library "L".', 'terminology "W VS":', "- valueset is `http://example.org/v/ValueSet/w`."];
@@ -71,6 +72,37 @@ describe("#189 — recordset-unbounded", () => {
       ['concept "Weight":', "- shape is Record.", "- type is Observation.", "- value type is Quantity.", "- code is `weight`."].join("\n"),
     );
     expect(kinds(r, "warnings")).not.toContain("recordset-unbounded");
+  });
+
+  it("⭐⭐ the MESSAGE states the case-feature cost only for a CODED concept", () => {
+    // ⚠⚠ THE REASON MATTERS AS MUCH AS THE FINDING. Charter §3 (operator, 2026-09-01): the boundary
+    // case-feature transform *"only applies to concepts that have a `code is`"* — a case feature IS a local
+    // identity, and an uncoded concept has none to publish. MEASURED: 14 of the 32 in-tree hits are UNCODED
+    // (`Medical Reasons` is `coded from` a value set and nothing else), so a message that claimed n
+    // constructions for all of them would be a stale rule shipped in an author-facing string.
+    //
+    // The warning still fires for both — an unbounded history is retrieved and carried at full length
+    // regardless, which is the operator's actual claim and reason enough on its own.
+    const coded = validate(
+      ['concept "Coded Hx":', "- shape is RecordSet.", "- type is Observation.", "- value type is Quantity.", "- code is `weight`."].join("\n"),
+    );
+    const uncoded = validate(
+      [
+        'concept "Uncoded Hx":',
+        "- shape is RecordSet.",
+        "- type is Observation.",
+        "- value type is Quantity.",
+        "- source representation:",
+        "  - type is Observation.",
+        '  - coded from "W VS".',
+      ].join("\n"),
+    );
+    const msg = (r: ValidationResult): string =>
+      r.warnings.filter((w) => w.kind === "recordset-unbounded").map((w) => w.message).join(" ");
+
+    expect(msg(coded)).toContain("case feature");
+    expect(msg(uncoded)).toMatch(/retrieved and carried/);
+    expect(msg(uncoded)).not.toContain("case feature");
   });
 
   it("⚠ an OMITTED shape is an open question, not a RecordSet — it must not warn", () => {
