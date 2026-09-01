@@ -22,6 +22,7 @@ import { hasLocalCode, hasSourceBinding } from "./conceptDatumSignals";
 import { localCodeSystemUrl } from "../fhir-emitter/slug";
 import { relativeElementPath } from "../fhir-model/elementPath";
 import { valueReadElementsAdmitting, valueReadValueTypes } from "../fhir-model/fhirValueModel";
+import { resolveRecordDatumCarrier } from "./recordBooleanGuard";
 import type { ConceptValueType } from "../grammar/conceptValueTypes";
 import type { ResultType } from "../grammar/resultType";
 import { conceptResultType } from "../grammar/resultType";
@@ -71,6 +72,27 @@ export type EffectiveRepresentationDescriptor =
       owningLibrary: OwningLibraryMetadata;
       valueElement?: string;
       datumValueType?: ConceptValueType;
+      /**
+       * ⭐⭐ #189 — THE ANSWER CARRIER: the element this concept's record CARRIES ITS VALUE IN, for a
+       * concept that publishes a RECORD and therefore reads no value on this arm.
+       *
+       * ⚠⚠ A SEPARATE FIELD, AND DELIBERATELY NOT `valueElement`. Two claims were being conflated:
+       * *"the selection does not read the datum"* (TRUE, and asserted by the B2b record-select guard) and
+       * *"the descriptor does not know the datum"* (FALSE — charter §3 says the record CARRIES a value).
+       * Overloading the read fields to express the second breaks the first in two measured ways: the B2b
+       * guard THROWS on `valueElement !== undefined`, and the CEL writer's B4 dispatch silently claims the
+       * write path on `datumValueType === "CodeableConcept"`. So the read fields keep their meaning exactly
+       * and this one carries the new fact. (Panel round 4, both arms; ledger disc 528.)
+       *
+       * ⭐ WHY IT EXISTS: without it the case-feature StructureDefinition emits no `value[x]`, and the
+       * generated Questionnaire item is a GROUP WITH NO CHILDREN — MEASURED on the goal, four questions
+       * offered and none answerable. The pause is a dead end until a user can answer.
+       *
+       * ⚠ Resolved by the SHARED `resolveRecordDatumCarrier`, which the Interface guard also calls — the
+       * guard READS the value at this element and the SD tells the user to WRITE it here, so they must come
+       * from one authority. Absent when the model rules no carrier (fail closed: no `value[x]`, never a guess).
+       */
+      answerCarrier?: { element: string; valueType: ConceptValueType };
     }
   | {
       arm: "uncoded";
@@ -540,6 +562,13 @@ function notAgeLocalExact(
       },
     };
   }
+  // ⭐ #189 — resolved from the SHARED authority the Interface guard also calls, so the element a guard READS
+  // and the element an SD tells a user to WRITE cannot be resolved two different ways.
+  const carrierElement = resolveRecordDatumCarrier(concept);
+  const answerCarrier =
+    carrierElement !== null && concept.valueTypes.length === 1
+      ? { element: carrierElement, valueType: concept.valueTypes[0] }
+      : undefined;
   return {
     status: "derived",
     descriptor: {
@@ -553,6 +582,11 @@ function notAgeLocalExact(
       owningLibrary,
       ...(datum.valueElement !== undefined ? { valueElement: datum.valueElement } : {}),
       ...(datum.datumValueType !== undefined ? { datumValueType: datum.datumValueType } : {}),
+      // ⭐⭐ #189 — the ANSWER CARRIER, for a concept that publishes a RECORD. Beside the read fields, never
+      // instead of them: the selection reads no value (and the B2b guard asserts exactly that), but the
+      // RECORD still carries one, and the case-feature SD needs it to emit an answerable `value[x]`. Absent
+      // for every other shape — a Scalar's carrier IS its read path, already above.
+      ...(answerCarrier !== undefined ? { answerCarrier } : {}),
     },
   };
 }

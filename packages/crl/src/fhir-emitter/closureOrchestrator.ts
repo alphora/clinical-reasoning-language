@@ -1949,10 +1949,45 @@ export function emitFhirDefClosure(
           continue;
         }
         const record = resolution;
-        const valueDatum =
+        // ⭐⭐ #189 — THE ANSWER SLOT. Two sources, and the second is why four questions were offered with
+        // nothing to answer:
+        //   · a value-READING concept (Scalar) already carries its carrier in the read fields;
+        //   · a RECORD-publishing concept reads no value on this arm, but its RECORD STILL CARRIES ONE —
+        //     `answerCarrier`, from the shared resolver the Interface guard also calls.
+        //
+        // ⚠ MEASURED before this existed: the SD emitted no `value[x]`, so `$apply` generated four
+        // Questionnaire items that were GROUPS WITH ZERO CHILDREN. The tree paused correctly, asked four
+        // questions, and none of them could be answered — the pause was a DEAD END.
+        const readDatum =
           record.descriptor.valueElement !== undefined && record.descriptor.datumValueType !== undefined
             ? { valueElement: record.descriptor.valueElement, datumValueType: record.descriptor.datumValueType }
             : undefined;
+        const answerCarrier =
+          record.descriptor.arm === "local-exact" ? record.descriptor.answerCarrier : undefined;
+        const valueDatum =
+          readDatum ??
+          (answerCarrier !== undefined
+            ? { valueElement: answerCarrier.element, datumValueType: answerCarrier.valueType }
+            : undefined);
+
+        // ⚠⚠ NO DIAGNOSTIC HERE YET, AND THE FIRST ATTEMPT AT ONE WAS INSTRUCTIVE. Round 4 asked for a loud
+        // author-facing warning when a locally-coded concept declares a value type its resource cannot carry
+        // — because that concept IS the measured dead end (a question offered with nothing to answer),
+        // arriving one concept at a time.
+        //
+        // ⚠ I built it keyed on "declares a value type + no carrier" and it fired on 22 tests, because that
+        // predicate is WRONG: a `code is` + `defined as exists` boolean (`Adult Patient`, `Cov`) declares
+        // `value type is boolean` and its record is VALUELESS BY DESIGN — its truth is the record's PRESENCE,
+        // not a stored value. That is the legal valueless class the B2b panel explicitly protected, and
+        // warning on it is the deferral-dressed-as-rejection §0a bans. Worse, `CRLError` carries no severity,
+        // so "a warning" pushed into `errors` FAILS THE CLOSURE — a deriver error by another name, which is
+        // precisely what round 4 said fail-closed must NOT mean.
+        //
+        // The honest scope needs a predicate this lane does not have yet: "the answer is a STORED VALUE"
+        // (Record-publishing, value-reading) vs "the answer is the RECORD'S PRESENCE" (existence-derived,
+        // answered through the coding/binding form — NOTES §3.2, explicitly out of scope this slice). Until
+        // that predicate exists, an unanswerable case feature is SILENT here and recorded as build debt on
+        // the state file, rather than shipping a warning that cries on correct content.
         const cfResult = emitCaseFeatureStructureDefinition(
           name,
           code,

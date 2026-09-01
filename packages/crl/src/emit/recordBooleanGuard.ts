@@ -30,25 +30,61 @@
 import type { Concept } from "../ast/types";
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import { valueReadElementsAdmitting } from "../fhir-model/fhirValueModel";
+import { resourceEmitRow } from "./resourceEmitRegistry";
 
-/** The proven boolean carrier on a Record-shaped boolean concept, or `null` if there is none. */
-export function resolveRecordBooleanGuardCarrier(concept: Concept | undefined): string | null {
+/**
+ * ⭐⭐ The proven DATUM CARRIER on a Record-publishing concept — the element that record carries its value in,
+ * or `null` when the model does not rule one.
+ *
+ * TWO consumers, ONE authority, and that is the whole point: the Interface guard READS the value at this
+ * element, and the case-feature StructureDefinition tells a user to WRITE it there. Two independent
+ * resolutions agreeing only by discipline is the drift this refactor exists to remove.
+ *
+ * ⚠⚠ THE CODING-ELEMENT EXCLUSION IS LOAD-BEARING, and its absence was safe only by accident. Until this
+ * function took a `valueType`, nothing reached the trap because NO coding element admits `boolean`. Ask for
+ * `CodeableConcept` and `valueReadElementsAdmitting` returns exactly ONE element for Condition, Procedure,
+ * ServiceRequest, Encounter and MedicationRequest — **the resource's identity coding**, which the
+ * case-feature differential already `patternCodeableConcept`-fixes to the concept's own local code. Without
+ * this guard, "exactly one admitting element" would pass and emit a profile whose ANSWER SLOT IS ITS FIXED
+ * IDENTITY: a question whose only legal answer is its own name. `computeLocalDatum` has carried the same
+ * exclusion since disc 497; this is that rule, on the other lane. (Panel round 4, both arms.)
+ */
+export function resolveRecordDatumCarrier(concept: Concept | undefined): string | null {
   if (concept === undefined) return null;
   if (assumedShapePreMigration(concept.shape) !== "Record") return null;
-  if (!(concept.valueTypes.length === 1 && concept.valueTypes[0] === "boolean")) return null;
+  if (concept.valueTypes.length !== 1) return null;
+  const valueType = concept.valueTypes[0];
   const resourceType = concept.conceptType;
   if (resourceType === undefined) return null;
-  // ⚠ An AUTHORED `value element is` override wins — it is the author naming the carrier explicitly, which is
-  // stronger evidence than the model's default and is already honoured elsewhere. It is still only accepted
-  // when the model AGREES the element admits a boolean, so an override cannot invent a carrier either.
-  const admitting = valueReadElementsAdmitting(resourceType, "boolean");
+  const row = resourceEmitRow(resourceType);
+  if (row === undefined) return null;
+
+  const admissible = (path: string): boolean => {
+    // ⚠ NEVER the coding element — see the header.
+    if (row.coding !== undefined && path === row.coding.field) return false;
+    return valueReadElementsAdmitting(resourceType, valueType).includes(path);
+  };
+
+  // ⚠ An AUTHORED `value element is` override wins — the author naming the carrier explicitly is stronger
+  // evidence than the model's default. It is still only accepted when the model AGREES the element admits
+  // this value type, so an override can no more invent a carrier than a guess can.
   if (concept.valueElement !== undefined) {
     const authored = concept.valueElement.path;
-    return admitting.includes(authored) ? authored : null;
+    return admissible(authored) ? authored : null;
   }
-  // Exactly one, or fail closed. Zero = the resource has no boolean carrier (a Condition's truth is
-  // EXISTENCE, not a value). More than one = no canonical carrier is ruled between them.
+  // Exactly one, or fail closed. Zero = the resource has no carrier for this type (a Condition's truth is
+  // EXISTENCE, not a value). More than one = no canonical carrier is ruled between them, and choosing would
+  // be guessing by another name (charter §3).
+  const admitting = valueReadElementsAdmitting(resourceType, valueType).filter(admissible);
   return admitting.length === 1 ? admitting[0] : null;
+}
+
+/** The boolean case, for the Interface guard. Delegates so the guard's read element and the SD's answer slot
+ *  can never be resolved two different ways. */
+export function resolveRecordBooleanGuardCarrier(concept: Concept | undefined): string | null {
+  if (concept === undefined) return null;
+  if (!(concept.valueTypes.length === 1 && concept.valueTypes[0] === "boolean")) return null;
+  return resolveRecordDatumCarrier(concept);
 }
 
 /**

@@ -7,6 +7,7 @@ import { emitCQL } from "../../cql-emitter/emitCQL";
 import { emitCQLImports } from "../../imports/emit";
 import { buildCRL } from "../../index";
 import { resolveRecencyValueConcept } from "../../template-match/recencyValueConcept";
+import { resolveRecordDatumCarrier } from "../recordBooleanGuard";
 import type { Concept } from "../../ast/types";
 import { lowerLocalCodes } from "../../cql-emitter/lowerLocalCodes";
 import { conceptRefsOfConcept, conceptRefsOfDefinition } from "../../ast/conceptDependencies";
@@ -230,5 +231,71 @@ concept "Big":
     expect(conceptRefsOfDefinition(merge.definition).map(String)).toEqual(["BMI"]);
     // ...while the WHOLE concept still names the operands the derivation actually depends on.
     expect(conceptRefsOfConcept(merge).map(String).sort()).toEqual(["BMI", "Height", "Weight"]);
+  });
+});
+
+describe("#189 — the ANSWER CARRIER: a Record's case feature must be answerable", () => {
+  // ⚠⚠ MEASURED BEFORE THIS EXISTED: `$apply` on the goal generated four Questionnaire items and EVERY ONE
+  // was a group with ZERO CHILDREN. The tree paused correctly, asked four questions, and none of them could
+  // be answered — the pause was a DEAD END. Chain: descriptor `valueElement=undefined` -> `valueDatum:
+  // undefined` -> the SD emits no `value[x]` -> nothing to build an answerable item from.
+  //
+  // ⭐ EXECUTED AFTER (`tmp/NOTES-goal-answerable-executed.md`): the four items gain BOOLEAN / QUANTITY
+  // children, `$extract` writes a local-coded Observation carrying the answer, and re-applying DENIES. The
+  // pause is a GATE, not a dead end.
+  it("⭐ resolves the carrier a Record's value lives in, per declared value type", () => {
+    const built = buildCRL(HEADER + leaf("Weight", "weight", "W VS")) as unknown as {
+      result?: { statements: Concept[] };
+    };
+    const weight = (built.result?.statements ?? []).find((s) => s.name === "Weight") as Concept;
+    expect(resolveRecordDatumCarrier(weight)).toBe("value");
+  });
+
+  it("⚠⚠ NEVER the resource's IDENTITY CODING — a question whose only legal answer is its own name", () => {
+    // Safe by accident until this generalized: no coding element admits `boolean`. Ask for CodeableConcept
+    // and `valueReadElementsAdmitting` returns exactly ONE element for Condition/Procedure/ServiceRequest —
+    // the identity coding, which the case-feature differential already `patternCodeableConcept`-fixes to the
+    // concept's local code. "Exactly one admitting element" would have passed. (Panel round 4, both arms.)
+    const src = `library "CC".
+
+terminology "V":
+- valueset is \`http://example.org/v\`.
+
+concept "Coded Thing":
+- shape is Record.
+- type is ServiceRequest.
+- value type is CodeableConcept.
+- code is \`ct\`.
+- definition is most recent this.
+- source representation:
+  - type is ServiceRequest.
+  - coded from "V".
+`;
+    const built = buildCRL(src) as unknown as { result?: { statements: Concept[] } };
+    const c = (built.result?.statements ?? []).find((s) => s.name === "Coded Thing") as Concept;
+    expect(resolveRecordDatumCarrier(c)).toBeNull();
+  });
+
+  it("⚠ fail-closed on a resource with no carrier for the declared type — no guess, no `value[x]`", () => {
+    // A Condition's truth is EXISTENCE, not a value; it has no boolean element at all. Charter §3: an
+    // unruled carrier is UNMODELED and is never guessed.
+    const src = `library "CD".
+
+terminology "V":
+- valueset is \`http://example.org/v\`.
+
+concept "Cond Bool":
+- shape is Record.
+- type is Condition.
+- value type is boolean.
+- code is \`cb\`.
+- definition is most recent this.
+- source representation:
+  - type is Condition.
+  - coded from "V".
+`;
+    const built = buildCRL(src) as unknown as { result?: { statements: Concept[] } };
+    const c = (built.result?.statements ?? []).find((s) => s.name === "Cond Bool") as Concept;
+    expect(resolveRecordDatumCarrier(c)).toBeNull();
   });
 });
