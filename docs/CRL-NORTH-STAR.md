@@ -236,46 +236,30 @@ currently permits is a **warning** (`composition-result-type-mismatch`) today th
   VOCABULARY says the same from the other end: *"the source resource is never 'the concept's record': the
   projection's OUTPUT is the candidate."*
 
-  ⚠⚠ **OPEN — NOT YET DETERMINED (operator, 2026-09-01):** when a source record is **already the correct
-  shape**, may the RAW record be used, or must a case-feature record be created even then?
+  ⭐⭐ **SETTLED BY MEASUREMENT (2026-09-01): THE SAME SHAPE IS SUFFICIENT.** An unprojected `source
+  representation` contributes its RAW record, and that is correct.
 
-  ⚠ The emitter uses the raw record today, and that is a DELIBERATE CHOICE under a stated premise — *"the
-  unprojected was left raw based on the assumption that the same shape was sufficient"* — not an oversight.
-  So what is under review is the PREMISE, not a defect: treat the code as the current answer to this
-  question, and change it only when the premise is ruled on.
+  EXECUTED end to end with a raw, EXTERNAL-coded source record winning the selection, its case feature's
+  `cpg-featureExpression` pointed at the published merge:
 
-  ⭐ **AND THE REMEDY IS ALREADY NAMED, so it is not re-designed if the premise falls:** *"if that is proven
-  a bad assumption then there needs to be a DEFAULT, INTERNAL projection that transforms unprojected to
-  local-code records."* ⚠ **Internal** — the emitter supplies it; it is NOT a form the author writes, so the
-  CRL surface does not change either way. An unprojected rep would then contribute exactly what an explicit
-  projection does: a case-feature record carrying the concept's local code.
-
-  ⭐⭐ **WHAT COULD REQUIRE THE CONCEPT AND NOT MERELY ITS SHAPE — measured, three things, and they are all
-  IDENTITY CLAIMS rather than evaluation:**
-
-  | requires the local CODE | evidence |
+  | step | result |
   |---|---|
-  | the local leg's RETRIEVE | `[Observation: <LocalConcepts>."BMI"]` — code-filtered. Anything that re-derives the concept's records BY CODE finds only local-coded ones. |
-  | the case-feature PROFILE | `Observation.code` is `patternCodeableConcept`-fixed to the concept's local coding |
-  | `$extract` | it materializes the code FROM that pattern — the QuestionnaireResponse never mentions it |
+  | `$populate` | the question PRE-FILLED with the source value, no outcome errors |
+  | submit unchanged → `$extract` | `Observation code=bmi` in the **LOCAL** codesystem, `value {35, 'kg/m2'}` |
 
-  ⚠ **EVALUATION needs none of them.** The merge selected by name-union, the guard reads `.value`, the
-  recency sort reads the recency element. So "the same shape" IS sufficient for every operation that
-  COMPARES records, and insufficient only where the concept's IDENTITY is asserted.
+  ⭐ **WHY it works, and the reason is the general rule:** IDENTITY IS SUPPLIED BY THE CASE-FEATURE PROFILE
+  AT EXTRACTION — `$extract` materializes the code from the SD's `patternCodeableConcept`, and the
+  QuestionnaireResponse never mentions it. So a record in the collection is never the thing that CLAIMS the
+  concept's identity; it only has to be comparable. Shape is what comparison needs, and shape is what the
+  charter requires.
 
-  ⭐ **That distinction is also the COST answer**, and it matters: transforming every record of a RecordSet
-  would be expensive, while identity is claimed at ONE record — the selection's output, the thing a
-  featureExpression points at. So the transformation belongs at the IDENTITY BOUNDARY, not at the union. For
-  a `shape is Record` concept that is one record per concept, not n. (For a `shape is RecordSet` case feature
-  the boundary is the whole published set — which is the separate open cardinality question below, and the
-  place where the cost concern really bites.)
+  ⚠ So there is NO default internal projection and NO per-record transformation — and therefore none of the
+  cost that one would carry on a large record set. The transformation that was contemplated for the identity
+  boundary turns out to be unnecessary because the boundary already stamps identity itself.
 
-  The evidence that bears on it: a case-feature StructureDefinition pattern-fixes the concept's LOCAL code
-  (`patternCodeableConcept`), so a raw record of the right TYPE still carries the EXTERNAL code — meaning
-  "correct shape" has to be settled as **type alone** or **type AND coding** before the answer follows. It
-  may also differ by consumer: EVALUATION only needs the value (the merge has already selected the record),
-  while POPULATION and extraction stamp the profile and so need the local coding. Do not assume either
-  branch; it decides whether `cpg-featureExpression` can point at the published merge.
+  ⚠ One consequence to know rather than discover: extraction re-stamps `effective` from the
+  QuestionnaireResponse's `authored`, so submitting a pre-filled value makes it a fresh local claim. That is
+  the promotion question (see §5b and the recency rules), not a defect in this arrangement.
 
   At every later stage `this` is EXACTLY the immediately preceding stage's output: never an earlier pre-filter space, and never the
   stage's own output (which is what keeps `<derivation>, then most recent this` a pipeline and not a fixed

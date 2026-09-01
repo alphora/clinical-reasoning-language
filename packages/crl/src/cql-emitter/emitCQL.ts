@@ -2631,30 +2631,24 @@ class Emitter {
           // a candidate of the CONCEPT's `type is` right here, at the space-assembly site, beside the
           // producer's candidate. That keeps the ExternalPrimitives twin truthful about what it retrieves and
           // keeps every transformation of the space in one place.
-          // ⚠⚠ THIS IS A DELIBERATE CHOICE UNDER A STATED PREMISE — not an oversight, and not a bug to
-          // "fix" on the strength of the charter alone. Operator, 2026-09-01: *"the unprojected was left raw
-          // based on the assumption that the same shape was sufficient."*
+          // ⭐⭐ RETURNING THE RAW RECORD IS CORRECT, and that was PROVEN rather than argued.
           //
           // A projection's SOLE PURPOSE is to bring a record that is NOT the concept's shape INTO it
-          // (charter §3, three legs). This rep's records ARE the concept's `type is` already, so under that
-          // premise there is nothing to transform. What is under review is the PREMISE — whether "the same
-          // shape" means TYPE alone or TYPE AND CODING — not this line's correctness given it.
+          // (charter §3, three legs). This rep's records ARE the concept's `type is` already, so there is
+          // nothing to transform — which is why the unprojected arm was left raw in the first place.
           //
-          // ⚠ What is measured: the case-feature SD pattern-fixes the concept's LOCAL code, so a raw record
-          // of the right TYPE still carries the EXTERNAL one. So "already the correct shape" has to be
-          // settled as type ALONE or type AND coding — and it may differ by consumer, since EVALUATION only
-          // needs the value while POPULATION stamps the profile. That determination decides whether
-          // `cpg-featureExpression` can point at this space.
+          // ⚠ THE DOUBT WAS REAL AND WORTH TESTING: a raw record carries the EXTERNAL code while the
+          // case-feature profile pattern-fixes the LOCAL one, so "the same shape" might have had to mean
+          // TYPE AND CODING. EXECUTED end to end — a raw external-coded source record WINNING the selection,
+          // with the feature expression pointed at this merge: the question PRE-FILLED with its value, and
+          // `$extract` produced an Observation carrying the LOCAL code and that value.
           //
-          // ⚠ THE BRANCH ITSELF IS THE WRONG SHAPE, not just this arm. If EVERY source rep projects — and
-          // it does; that is what a projection is FOR — then the question is never "is it projected?" but
-          // "WHICH projection?": identity, `exists this`, or age. `source-projected` reads as an exception
-          // when it is the general case with one spelling filled in.
-          //
-          // ⚠ NOT FIXED HERE because the identity projection needs the per-rep carrier/type conversion
-          // matrix, and the arm below only knows how to build a BOOLEAN from `exists this`. Next build
-          // slice (disc 530).
-          // REFACTOR:suspect
+          // ⭐ WHY, and it is the general rule: IDENTITY IS SUPPLIED BY THE PROFILE AT EXTRACTION. `$extract`
+          // materializes the code from `patternCodeableConcept`; the QuestionnaireResponse never mentions
+          // it. So a record in this collection is never the thing that CLAIMS the concept's identity — it
+          // only has to be COMPARABLE, and shape is what comparison needs. Hence no internal projection, and
+          // none of the per-record cost one would carry over a large record set.
+          // REFACTOR:grounded
           const src = (c.__recencyValueDescriptors as { source?: { arm?: string } } | undefined)?.source;
           if (src?.arm !== "source-projected") return epRef;
           const spec = c.__projectedSourceSpec as ProjectedSourceSpec | undefined;
