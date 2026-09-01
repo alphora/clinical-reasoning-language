@@ -264,6 +264,31 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
             why + " — no refusal diagnostic",
           ).toEqual([]);
         }
+
+        // ⭐⭐ THE COMPUTED ARM — the row this table was missing, and it is the capability the producer and
+        // projection build shipped. `computed obese -> approve` states NOTHING about Obese: it must be
+        // DERIVED from Weight and Height. `$apply` DOES compute it (executed end-to-end,
+        // `tmp/NOTES-goal-answerable-executed.md`); the CRE does not, and this pins the honest gap.
+        //
+        // ⭐ THE CRE REFUSES LOUDLY, which is the charter-acceptable state and the whole reason this
+        // assertion is worth having: *"stage `AtLeast` reduces or computes over a NAMED set this engine
+        // does not evaluate ... run marked error rather than fabricate a presence-based answer."* A loud
+        // refusal is build debt; a SILENT two-valued answer would be the proven defect class — the two
+        // lanes disagreeing while both look fine. This pin is what keeps the refusal from quietly becoming
+        // a fabrication.
+        //
+        // ⚠ MUST BECOME `status: pass` with `["Approve Bariatric Surgery"]`. TWO shortfalls gate it, and
+        // neither is in this lane: the CRE must learn the producer stage, AND CEL must be able to state a
+        // UNIT (its grammar takes `NUMBER | string | true | false`, and the writer emits `valueQuantity:
+        // { value }` with no unit — so `value is 90` is 90 of NOTHING, and a unitless Quantity against
+        // `30 'kg/m2'` is null on the real engine, MEASURED).
+        const computed = (result.runs ?? []).find((r) => r.case === "computed obese -> approve");
+        expect(computed, opt.name + " — the computed-arm case must be present").toBeDefined();
+        expect(computed?.status, opt.name + " — CRE producer arm (pinned shortfall)").toBe("error");
+        expect(
+          (computed?.diagnostics ?? []).some((d) => d.includes("not evaluated by run_decision")),
+          opt.name + " — the refusal must stay LOUD, never a fabricated answer",
+        ).toBe(true);
       });
 
       it("⭐⭐ EMIT — BOTH LANES", () => {

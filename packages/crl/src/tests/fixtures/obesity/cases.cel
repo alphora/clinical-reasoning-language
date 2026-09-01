@@ -33,3 +33,36 @@ case "obese stated false -> deny":
 case "obese unanswered -> no recommendation":
 - subject is "Pat".
 - result is "Bariatric Surgery Coverage" is "Approve Bariatric Surgery".
+
+// ⭐⭐ THE COMPUTED ARM — the capability the whole producer/projection build shipped, and the row this
+// table was missing. NOTHING is asserted about Obese: it must be DERIVED, from `body mass index of` over
+// Weight and Height, then compared `at least 30 'kg/m2'`. 90 / 1.7^2 = 31.1 -> Approve.
+//
+// ⚠ TWO INDEPENDENT SHORTFALLS KEEP THIS FROM PASSING TODAY, and both are HONEST rather than silent —
+// pinned in `obesityTarget.test.ts` beside the value this case must reach:
+//
+//   1. The CRE REFUSES this shape loudly (`status: error`): "stage `AtLeast` reduces or computes over a
+//      NAMED set this engine does not evaluate ... run marked error rather than fabricate a presence-based
+//      answer." That is the charter-acceptable state — a loud refusal, never a two-valued divergence from
+//      `$apply`, which DOES compute this arm (executed: `tmp/NOTES-goal-answerable-executed.md`).
+//   2. ⚠ CEL CANNOT STATE A UNIT. The grammar takes `NUMBER | string | true | false` and the writer emits
+//      `valueQuantity: { value }` with no unit/system/code — so `value is 90` is 90 of NOTHING. MEASURED
+//      against the real engine: a unitless Quantity compared with `30 'kg/m2'` is NULL, so even a CRE that
+//      computed this arm could not be given the operands to compute it from.
+//
+// The facts below are therefore the CORRECT model of the case, not a workaround; the lanes catch up to it.
+fact "Weight 90":
+- date is "2026-05-01".
+- value is 90.
+- defined by "Obesity Coverage (Record)"."Weight".
+
+fact "Height 1.7":
+- date is "2026-02-01".
+- value is 1.7.
+- defined by "Obesity Coverage (Record)"."Height".
+
+case "computed obese -> approve":
+- subject is "Pat".
+- fact is "Weight 90".
+- fact is "Height 1.7".
+- result is "Bariatric Surgery Coverage" is "Approve Bariatric Surgery".
