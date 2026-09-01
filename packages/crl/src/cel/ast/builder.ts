@@ -291,7 +291,16 @@ export class CELAstBuilder
   visitValueField = (ctx: ValueFieldContext): CELValueField => {
     const numTok = ctx.NUMBER();
     if (numTok) {
-      return { type: "CELValueField", value: Number(numTok.text), location: getLocation(ctx) };
+      // ⭐ `value is 90 'kg'.` — the unit rides with the number. The grammar makes it optional; the
+      // validator decides whether it was REQUIRED (a Quantity target) or FORBIDDEN (an integer/decimal one).
+      const unitTok = ctx.SINGLE_QUOTED_STRING();
+      const unit = unitTok ? unitTok.text.slice(1, -1) : undefined;
+      return {
+        type: "CELValueField",
+        value: Number(numTok.text),
+        ...(unit !== undefined ? { unit } : {}),
+        location: getLocation(ctx),
+      };
     }
     const sl = ctx.stringLiteral();
     if (sl) {

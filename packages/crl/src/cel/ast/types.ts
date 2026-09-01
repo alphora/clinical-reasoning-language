@@ -131,6 +131,24 @@ export interface CELValueField {
   // `value type is boolean` local `code is` concept authors its determination directly, and the
   // emitter lowers it to `Observation.valueBoolean`. `number`/`string` remain for Quantity/text values.
   value: number | string | boolean;
+  /**
+   * ⭐ The UCUM unit on a numeric value — `value is 90 'kg'.` Absent for every non-numeric literal, and for
+   * a number whose target is an integer/decimal datum (where a unit is FORBIDDEN, not merely optional).
+   *
+   * ⚠⚠ A UNITLESS NUMBER IS NOT "A QUANTITY WITHOUT A UNIT" — IT IS A DIMENSIONLESS ONE. `FHIRHelpers.ToQuantity`
+   * coalesces `Coalesce(code, unit, '1')`, so a FHIR Quantity with no unit becomes `System.Quantity{unit:'1'}`
+   * and EVERY comparison against a real unit is NULL. Measured on the cqf engine, and shipped in seven
+   * goldens before this existed. That is why the validator REQUIRES this for a Quantity target rather than
+   * treating it as decoration.
+   *
+   * ⚠ Held as a plain optional field rather than a discriminated `CELValue` union. Both panel arms asked for
+   * the union so that a consumer ignoring the unit becomes a COMPILE error, and the concern is right — that
+   * is precisely how one lane writes a unit and another drops it. The enforcement here is instead at the two
+   * places that can actually drop it: the validator's value-type table and the writer's numeric cells, both
+   * of which now read the RESOLVED datum contract. The union remains OWED, recorded in disc 529 §5, and is
+   * the more robust answer for the next consumer nobody has written yet.
+   */
+  unit?: string;
   location: Location;
 }
 

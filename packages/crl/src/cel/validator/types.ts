@@ -52,6 +52,13 @@ export type CELValidationErrorKind =
   // apparent intent), the authoring trap Option C's "false denies" rule teaches into existence. WARNING (not an error):
   // the fact still populates correctly by presence; explicit absence is an absence CODE (a record), not `value is false`.
   | "value-ignored-on-presence-concept"
+  // ⭐ The NUMERIC cell of the value-type x literal-shape table (disc 529). A unitless number is a
+  // DIMENSIONLESS quantity, not an undecided one — FHIRHelpers reads a missing unit as `'1'`, so it is
+  // null against every real unit. Shipped in seven goldens before these existed.
+  | "quantity-value-missing-unit"
+  | "quantity-value-empty-unit"
+  | "dimensionless-value-with-unit"
+  | "value-type-mismatch"
   // #189 Piece 2 (disc 508 / impl-review gpt56 #4) — a fact naming a LOCAL concept authors a MALFORMED canonical
   // `code is` token (empty code, or a pipe with an empty system/code). The emitter skips it (invalid FHIR); the
   // validator flags it lane-neutrally as an ERROR (a KE author validating without emitting still sees it).

@@ -18,7 +18,8 @@
     ]
   },
   "valueQuantity": {
-    "value": 24.1
+    "value": 24.1,
+    "unit": "kg/m2"
   },
   "effectiveDateTime": "2026-07-15",
   "status": "final",

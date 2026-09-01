@@ -77,6 +77,16 @@ QUOTED_STRING       : '"' (~["\\\r\n])* '"';
 // (see src/cel/ast/types.ts for the contract).
 BACKTICK_STRING     : '`' ( ~[`\\] | '\\' . )* '`';
 
+// SINGLE_QUOTED_STRING — the UCUM unit on a quantity value, matching CRL's token byte-for-byte
+// (`CRLLexer.g4:119`). ⭐ CRL's `quantity : NUMBER (SINGLE_QUOTED_STRING | TIME_UNIT)` REQUIRES a unit; CEL
+// could not express one at all, so `value is 90` wrote a FHIR Quantity with no unit — which FHIRHelpers
+// coalesces to `'1'`, DIMENSIONLESS, making every comparison against a real unit NULL. Measured, and shipped
+// in seven goldens.
+//
+// ⚠ Placed AFTER the other string tokens and before HEADER, mirroring CRL's ordering. CEL has no
+// NARRATIVE_WORD, so the maximal-munch hazard CRL documents at its own token does not arise here.
+SINGLE_QUOTED_STRING : '\'' ~['\r\n]+ '\'';
+
 // HEADER — matches CRL exactly (no trailing-newline match; WS consumes the newline).
 HEADER              : '#' ~[\r\n]* ;
 

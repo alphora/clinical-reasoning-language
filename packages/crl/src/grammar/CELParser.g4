@@ -77,7 +77,15 @@ nameField         : NAME_IS stringLiteral ;
 birthDateField    : BIRTH_DATE_IS stringLiteral ;
 codeField         : CODE_IS stringLiteral ;
 dateField         : DATE_IS stringLiteral ;
-valueField        : VALUE_IS (NUMBER | stringLiteral | TRUE | FALSE) ;
+// ⭐ `value is 90 'kg'.` — the unit is GRAMMATICALLY OPTIONAL and SEMANTICALLY REQUIRED for a
+// Quantity-valued target. Grammar-permissive / validator-strict is this language's established division (the
+// boolean `value is` rules work the same way): a grammar that needed the concept's declared value type to
+// parse would be context-sensitive and unlike everything else in CEL.
+//
+// The rule the validator enforces is a value-type x literal-shape TABLE, not a unit rule on its own —
+// a unit is REQUIRED for a Quantity target and FORBIDDEN for an integer/decimal one, because a dimensionless
+// integer is a first-class shape (charter §3's own worked example declares `value type is integer`).
+valueField        : VALUE_IS (NUMBER SINGLE_QUOTED_STRING? | stringLiteral | TRUE | FALSE) ;
 stageField        : STAGE_IS STAGE_VALUE ;
 definedByField    : DEFINED_BY reference ;
 

@@ -36,7 +36,7 @@ fact "Wellness Visit":
 fact "Documented High BMI":
 - code is "http://loinc.org|39156-5".
 - date is "2026-01-15".
-- value is 32.4.
+- value is 32.4 'kg/m2'.
 - defined by "cms69-strategy"."BMI as an Observation".
 
 fact "Overweight Diagnosis":

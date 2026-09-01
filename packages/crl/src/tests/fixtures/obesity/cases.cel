@@ -53,12 +53,12 @@ case "obese unanswered -> no recommendation":
 // The facts below are therefore the CORRECT model of the case, not a workaround; the lanes catch up to it.
 fact "Weight 90":
 - date is "2026-05-01".
-- value is 90.
+- value is 90 'kg'.
 - defined by "Obesity Coverage (Record)"."Weight".
 
 fact "Height 1.7":
 - date is "2026-02-01".
-- value is 1.7.
+- value is 1.7 'm'.
 - defined by "Obesity Coverage (Record)"."Height".
 
 case "computed obese -> approve":

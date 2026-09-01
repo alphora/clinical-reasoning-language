@@ -18,7 +18,8 @@
     ]
   },
   "valueQuantity": {
-    "value": 118
+    "value": 118,
+    "unit": "mm[Hg]"
   },
   "effectiveDateTime": "2026-03-10",
   "status": "final",

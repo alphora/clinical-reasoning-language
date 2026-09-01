@@ -27,7 +27,7 @@ fact "Baseline Wellness Visit":
 fact "High Baseline BMI":
 - code is "http://loinc.org|39156-5".
 - date is "2026-01-15".
-- value is 32.4.
+- value is 32.4 'kg/m2'.
 - defined by "cms69-ExternalPrimitives"."BMI Observations".
 
 fact "Weight Assessment Referral Order":
@@ -39,7 +39,7 @@ fact "Weight Assessment Referral Order":
 fact "Follow-up Normal BMI":
 - code is "http://loinc.org|39156-5".
 - date is "2026-07-15".
-- value is 24.1.
+- value is 24.1 'kg/m2'.
 - defined by "cms69-ExternalPrimitives"."BMI Observations".
 
 

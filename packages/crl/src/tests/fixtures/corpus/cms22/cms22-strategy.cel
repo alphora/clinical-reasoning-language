@@ -46,13 +46,13 @@ fact "Hypertensive BP Reading":
 fact "Hypertensive Systolic":
 - code is "http://loinc.org|8480-6".
 - date is "2026-04-12".
-- value is 152.
+- value is 152 'mm[Hg]'.
 - defined by "cms22-strategy"."Standalone Systolic BP Observations".
 
 fact "Hypertensive Diastolic":
 - code is "http://loinc.org|8462-4".
 - date is "2026-04-12".
-- value is 96.
+- value is 96 'mm[Hg]'.
 - defined by "cms22-strategy"."Standalone Diastolic BP Observations".
 
 

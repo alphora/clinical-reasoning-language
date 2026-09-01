@@ -594,7 +594,15 @@ function readFactBody(fact: CELFact): Record<string, string | number | boolean> 
     else if (b.type === "CELBirthDateField") out.birthDate = b.value;
     else if (b.type === "CELCodeField") out.code = b.value;
     else if (b.type === "CELDateField") out.date = b.value;
-    else if (b.type === "CELValueField") out.value = b.value;
+    // ⚠ THE UNIT TRAVELS WITH THE VALUE. Dropping it here is silent: this lookup is a `Record<string, …>`
+    // index signature, so a consumer reading `body.unit` type-checks fine and simply gets `undefined` —
+    // which is exactly how the writer emitted a dimensionless Quantity while the validator was demanding a
+    // unit. (Both panel arms predicted this class when they asked for a discriminated `CELValue` union
+    // instead of an optional field; it then happened here, silently, with `tsc` green. Disc 529 §5.)
+    else if (b.type === "CELValueField") {
+      out.value = b.value;
+      if (b.unit !== undefined) out.unit = b.unit;
+    }
     else if (b.type === "CELStageField") out.stage = b.value;
     // CELDefinedByField intentionally not flattened — caller has the field.
   }
@@ -991,7 +999,20 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
     if (typeof body.value === "boolean") {
       resourceBody.valueBoolean = body.value;
     } else if (typeof body.value === "number") {
-      resourceBody.valueQuantity = { value: body.value };
+      // ⭐⭐ A QUANTITY CARRIES ITS UNIT, and a unitless one is DIMENSIONLESS, not undecided.
+      // `FHIRHelpers.ToQuantity` coalesces `Coalesce(code, unit, '1')`, so `{value: 118}` becomes
+      // `System.Quantity{unit:'1'}` and is NULL against every real unit — measured on the cqf engine, and
+      // shipped in seven goldens before the validator required a unit. Writing the unit here is what makes
+      // that requirement mean anything; without it the validator demands a unit and the writer throws it
+      // away, which LOOKS fixed and is not.
+      //
+      // ⚠ SHAPE MATCHED TO THE CONSTRUCTOR LANE ON PURPOSE. `fhirQuantityFromSystemQuantity` builds
+      // `{value, unit}` from a CQL System.Quantity, and FHIRHelpers accepts a null `system` — so both lanes
+      // evaluate identically. Emitting `system`/`code` HERE ONLY would make a CEL-written record and a
+      // producer-constructed one differ in shape while agreeing in value: the cross-lane drift this refactor
+      // exists to remove. If the payload gains `system`+`code`, BOTH lanes gain it together (disc 529 §3).
+      resourceBody.valueQuantity =
+        body.unit !== undefined ? { value: body.value, unit: body.unit } : { value: body.value };
     } else {
       resourceBody.valueString = String(body.value);
     }

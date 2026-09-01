@@ -236,6 +236,7 @@ export function validateCEL(
     validateFactCodeMembership(f, graph, domainCtx, errors, warnings, fp);
     validateSourceFactMembership(f, sourceMemberKeys, sourceTypes, warnings, fp);
     validateBooleanValueRules(f, graph, domainCtx, errors, warnings, fp);
+    validateNumericValueRules(f, graph, errors, fp);
   }
 
   // 7. Case bodies.
@@ -549,6 +550,115 @@ function validateFactCodeMembership(
       ),
     );
   }
+}
+
+/**
+ * ⭐⭐ The NUMERIC cell of the value-type x literal-shape table (disc 529, both arms).
+ *
+ * ⚠⚠ A UNITLESS NUMBER IS A DIMENSIONLESS ONE, NOT AN UNDECIDED ONE. `FHIRHelpers.ToQuantity` coalesces
+ * `Coalesce(code, unit, '1')`, so a FHIR Quantity written with no unit becomes `System.Quantity{unit:'1'}`
+ * and EVERY comparison against a real unit is NULL — measured on the cqf engine, and shipped in SEVEN
+ * goldens before this rule existed. A fact reading `value is 90` that executes as null in every comparison
+ * is the charter's canonical invisible intent-vs-execution gap (§0), which is why this is an ERROR and not
+ * a warning.
+ *
+ * The table this implements, by the TARGET's declared value type:
+ *
+ *   Quantity          number + REQUIRED unit      (`value is 90 'kg'`)
+ *   integer/decimal   number, unit FORBIDDEN      (a dimensionless integer is a first-class shape — the
+ *                                                  charter's own worked example declares `value type is
+ *                                                  integer`, so forcing `'1'` on it would be noise)
+ *   anything else     a number is a MISMATCH      (this is the cms22 cell: `value is 118` stated for a
+ *                                                  `value type is CodeableConcept` concept, which validated
+ *                                                  and emitted silently before this)
+ *
+ * ⚠ ROLE-AGNOSTIC BY DESIGN. Most numeric facts in the corpus are REMOTE (`coded from`), and the legacy
+ * value writer already writes remote numeric values — the goldens prove it. Gating this to local facts (as
+ * the CodeableConcept cell is, for its own D2-deferral reason) would leave the corpus shipping the null.
+ *
+ * ⚠ THE UNIT STRING IS AUTHOR-OWNED AND NOT CHECKED AGAINST A UCUM LEXICON — only non-emptiness. Proving
+ * membership in a code system is the trap this project refuses everywhere else; it is no more ours here.
+ */
+function validateNumericValueRules(
+  f: CELFact,
+  graph: ResolvedCelGraph,
+  errors: CELValidationError[],
+  fp: string,
+): void {
+  const valueField = f.body.find((b): b is CELValueField => b.type === "CELValueField");
+  if (!valueField || typeof valueField.value !== "number") return;
+  const db = f.body.find((b): b is CELDefinedByField => b.type === "CELDefinedByField");
+  if (!db || !isQualifiedRef(db.ref)) return; // a bare-type fact declares no datum contract to check against
+  const reg = graph.crlRegistry;
+  if (!reg) return;
+  const libName = getRefLibrary(db.ref);
+  const declName = getRefName(db.ref);
+  const lib = reg.byNameLocal.get(libName ?? "") ?? reg.byNamePackage.get(libName ?? "");
+  if (!lib) return; // unresolved library — `validateDefinedBy` owns that diagnostic
+  const target = buildDefinedByCandidates(lib.ast.statements).get(declName);
+  if (!target || target.type !== "Concept") return;
+
+  // ⚠ Exactly ONE declared value type, or there is no contract to check. A multi-value-type concept is a
+  // different (unbuilt) cell and must not be guessed at here.
+  if (target.valueTypes.length !== 1) return;
+  const declared = target.valueTypes[0];
+  const where = `"${libName}"."${declName}"`;
+
+  if (declared === "Quantity") {
+    if (valueField.unit === undefined) {
+      errors.push(
+        err(
+          "quantity-value-missing-unit",
+          `Fact "${f.name}" states \`value is ${valueField.value}\` for ${where}, which declares ` +
+            `\`value type is Quantity\` — a quantity REQUIRES a unit. Without one the emitted ` +
+            `\`valueQuantity\` is DIMENSIONLESS (FHIRHelpers reads a missing unit as \`'1'\`), so every ` +
+            `comparison against a real unit evaluates to NULL and the fact silently establishes nothing. ` +
+            `Write it as \`value is ${valueField.value} '<ucum>'.\` (e.g. \`'kg'\`, \`'m'\`, \`'mm[Hg]'\`).`,
+          valueField.location,
+          fp,
+        ),
+      );
+    } else if (valueField.unit.trim() === "") {
+      errors.push(
+        err(
+          "quantity-value-empty-unit",
+          `Fact "${f.name}" states an EMPTY unit for ${where}. A unit is author-owned and unchecked against ` +
+            `any lexicon, but it must be a unit.`,
+          valueField.location,
+          fp,
+        ),
+      );
+    }
+    return;
+  }
+
+  if (declared === "integer" || declared === "decimal") {
+    if (valueField.unit !== undefined) {
+      errors.push(
+        err(
+          "dimensionless-value-with-unit",
+          `Fact "${f.name}" states \`value is ${valueField.value} '${valueField.unit}'\` for ${where}, which ` +
+            `declares \`value type is ${declared}\` — a dimensionless datum takes NO unit. Declare the ` +
+            `concept \`value type is Quantity\` if the datum really is a measured quantity.`,
+          valueField.location,
+          fp,
+        ),
+      );
+    }
+    return;
+  }
+
+  // Any other declared type: a number is simply the wrong literal shape.
+  errors.push(
+    err(
+      "value-type-mismatch",
+      `Fact "${f.name}" states a NUMBER (\`value is ${valueField.value}\`) for ${where}, which declares ` +
+        `\`value type is ${declared}\`. A number cannot be that datum. Either state a literal of the ` +
+        `declared type, or point the fact at the concept whose datum this actually is.`,
+      valueField.location,
+      fp,
+    ),
+  );
 }
 
 /** #189 Piece 3 (Option C, disc 512) — the VALUE-READING boolean assertion rules. A fact that directly asserts (by

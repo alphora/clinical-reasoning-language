@@ -31,14 +31,14 @@ fact "Normal BP Panel":
 fact "Normal Systolic Component":
 - code is "http://loinc.org|8480-6".
 - date is "2026-03-10".
-- value is 118.
-- defined by "cms22-ExternalPrimitives"."Systolic Blood Pressure Code".
+- value is 118 'mm[Hg]'.
+- defined by "cms22-ExternalPrimitives"."Standalone Systolic BP Observations".
 
 fact "Normal Diastolic Component":
 - code is "http://loinc.org|8462-4".
 - date is "2026-03-10".
-- value is 76.
-- defined by "cms22-ExternalPrimitives"."Diastolic Blood Pressure Code".
+- value is 76 'mm[Hg]'.
+- defined by "cms22-ExternalPrimitives"."Standalone Diastolic BP Observations".
 
 
 // ============ Cases ============
