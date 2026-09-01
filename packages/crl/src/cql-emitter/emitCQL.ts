@@ -2631,7 +2631,8 @@ class Emitter {
           // a candidate of the CONCEPT's `type is` right here, at the space-assembly site, beside the
           // producer's candidate. That keeps the ExternalPrimitives twin truthful about what it retrieves and
           // keeps every transformation of the space in one place.
-          // ⭐⭐ RETURNING THE RAW RECORD IS CORRECT, and that was PROVEN rather than argued.
+          // ⭐ RETURNING THE RAW RECORD IS CORRECT FOR EVERY CONSUMER THAT EXISTS TODAY — measured, not
+          // argued, but scoped: see the boundary caveat at the end of this comment.
           //
           // A projection's SOLE PURPOSE is to bring a record that is NOT the concept's shape INTO it
           // (charter §3, three legs). This rep's records ARE the concept's `type is` already, so there is
@@ -2643,12 +2644,21 @@ class Emitter {
           // with the feature expression pointed at this merge: the question PRE-FILLED with its value, and
           // `$extract` produced an Observation carrying the LOCAL code and that value.
           //
-          // ⭐ WHY, and it is the general rule: IDENTITY IS SUPPLIED BY THE PROFILE AT EXTRACTION. `$extract`
-          // materializes the code from `patternCodeableConcept`; the QuestionnaireResponse never mentions
-          // it. So a record in this collection is never the thing that CLAIMS the concept's identity — it
-          // only has to be COMPARABLE, and shape is what comparison needs. Hence no internal projection, and
-          // none of the per-record cost one would carry over a large record set.
-          // REFACTOR:grounded
+          // WHY it works there: `$extract` RE-DERIVES identity from `patternCodeableConcept` and the
+          // QuestionnaireResponse carries only the VALUE. ⚠ A consumer that re-stamps identity cannot tell
+          // you whether identity mattered — so that result does NOT generalise on its own.
+          //
+          // ⚠ What DOES generalise, measured: every other consumer of a published record reads `.value` or
+          // the recency element and nothing else — the Interface guard, another concept's producer operands
+          // (`BodyMassIndex("Weight","Height")` reads `.value as Quantity`), the §5b stamp read. So shape
+          // suffices for the consumers that EXIST.
+          //
+          // ⚠⚠ OPEN, and not disposed of by any of the above: a concept's published record IS its case
+          // feature by this model's claim, so publishing an externally-coded resource means "the concept's
+          // record" and "a case-feature instance" are not the same thing. That leak is invisible until
+          // something treats the published record AS the case feature — validating it against the SD,
+          // persisting it, referencing it, or matching it by code. Charter §3 carries the open concern.
+          // REFACTOR:suspect
           const src = (c.__recencyValueDescriptors as { source?: { arm?: string } } | undefined)?.source;
           if (src?.arm !== "source-projected") return epRef;
           const spec = c.__projectedSourceSpec as ProjectedSourceSpec | undefined;

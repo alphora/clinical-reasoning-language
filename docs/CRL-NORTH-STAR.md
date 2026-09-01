@@ -236,8 +236,8 @@ currently permits is a **warning** (`composition-result-type-mismatch`) today th
   VOCABULARY says the same from the other end: *"the source resource is never 'the concept's record': the
   projection's OUTPUT is the candidate."*
 
-  ⭐⭐ **SETTLED BY MEASUREMENT (2026-09-01): THE SAME SHAPE IS SUFFICIENT.** An unprojected `source
-  representation` contributes its RAW record, and that is correct.
+  ⭐ **MEASURED (2026-09-01): SHAPE IS SUFFICIENT FOR THE QUESTIONNAIRE CONSUMER.** An unprojected `source
+  representation` contributes its RAW record, and for that consumer it works.
 
   EXECUTED end to end with a raw, EXTERNAL-coded source record winning the selection, its case feature's
   `cpg-featureExpression` pointed at the published merge:
@@ -247,15 +247,23 @@ currently permits is a **warning** (`composition-result-type-mismatch`) today th
   | `$populate` | the question PRE-FILLED with the source value, no outcome errors |
   | submit unchanged → `$extract` | `Observation code=bmi` in the **LOCAL** codesystem, `value {35, 'kg/m2'}` |
 
-  ⭐ **WHY it works, and the reason is the general rule:** IDENTITY IS SUPPLIED BY THE CASE-FEATURE PROFILE
-  AT EXTRACTION — `$extract` materializes the code from the SD's `patternCodeableConcept`, and the
-  QuestionnaireResponse never mentions it. So a record in the collection is never the thing that CLAIMS the
-  concept's identity; it only has to be comparable. Shape is what comparison needs, and shape is what the
-  charter requires.
+  ⚠⚠ **BUT THAT PROVES ONE CONSUMER, NOT A GENERAL RULE — and the questionnaire is a SPECIAL one.** It works
+  because `$extract` RE-DERIVES identity from the SD's `patternCodeableConcept`; the QuestionnaireResponse
+  carries only the VALUE. A consumer that re-stamps identity cannot tell you whether identity mattered.
 
-  ⚠ So there is NO default internal projection and NO per-record transformation — and therefore none of the
-  cost that one would carry on a large record set. The transformation that was contemplated for the identity
-  boundary turns out to be unnecessary because the boundary already stamps identity itself.
+  **What is actually measured about the OTHER consumers of a concept's published record:** every one of them
+  today reads `.value` or the recency element and nothing else — the Interface guard
+  (`ToBoolean(<Inferences>."X".value …)`), another concept's producer operands (`BodyMassIndex("Weight",
+  "Height")` reads `.value as Quantity`), the §5b stamp read (`("Weight").effective`). So shape suffices
+  **for the consumers that exist**.
+
+  ⚠⚠ **THE OPEN CONCERN IS THE CONCEPT'S OWN BOUNDARY, and it is not disposed of by the above.** A concept's
+  published record IS its case feature by this model's own claim. If what it publishes can be an
+  externally-coded resource, then "the concept's record" and "a case-feature instance of that concept" are
+  not the same thing, and the difference is invisible until something treats the published record AS the case
+  feature — validating it against the SD, persisting it, referencing it, or matching it by code. **A case
+  feature leaking a different representation is a defect in the boundary even while no current consumer
+  trips on it.** Do not read the questionnaire result as settling this.
 
   ⚠ One consequence to know rather than discover: extraction re-stamps `effective` from the
   QuestionnaireResponse's `authored`, so submitting a pre-filled value makes it a fresh local claim. That is
