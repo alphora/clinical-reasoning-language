@@ -41,13 +41,18 @@ import { valueSetUrl } from "../fhir-emitter/slug";
 import { cqlStringLiteral, cqlQuotedIdentifier } from "./cqlStrings";
 import { patternReturnShape, requireReturnShape } from "../template-match/patternCatalog";
 import {
+  candidateCodeCql,
   componentStampCql,
+  constructorCallExpr,
   derivedStampCql,
   fhirBooleanFromSystemBoolean,
   fhirQuantityFromSystemQuantity,
+  renderBoundaryTransform,
   renderConstructorCall,
 } from "./renderConstructorCall";
-import type { ProducerCandidateSpec, ProjectedSourceSpec } from "../emit/producerCandidate";
+import { boundarySelectedDefineName } from "./lowerLocalCodes";
+import { renderBoundaryIdentityCheck } from "../emit/producerCandidate";
+import type { BoundaryTransformSpec, ProducerCandidateSpec, ProjectedSourceSpec } from "../emit/producerCandidate";
 import { renderRecordConstructor } from "./renderRecordConstructor";
 import { renderProjectedSourceArm } from "./renderConstructorCall";
 
@@ -1972,6 +1977,51 @@ class Emitter {
         }
       }
     }
+    // ⭐⭐ #189 — THE BOUNDARY TRANSFORM. When lowering resolved a spec, this concept's space can publish a
+    // record that is NOT its case feature (an unprojected source arm), so "<X>" normalises rather than
+    // publishing the raw winner, and the raw select moves to a helper define.
+    //
+    // ⚠ THE TRANSFORM IS ON THE CONCEPT'S OWN DEFINE because the ruling is consumer-independent (charter
+    // §3: "it does not depend on which consumer is asking"). Putting it on the helper and pointing only the
+    // `cpg-featureExpression` at it would show the questionnaire a case feature while every other CQL
+    // consumer read the raw record — and would LOOK correct, because the questionnaire is the surface the
+    // defect was reported on.
+    //
+    // ⚠ PRESENCE OF THE SPEC IS THE GATE, decided at lowering. Nothing is emitted for a concept whose space
+    // conforms by construction (`Obese`, whose Condition arm is projected) — a check with a provably dead
+    // else-branch is noise a reader must then re-verify.
+    const boundary = c.__boundaryTransformSpec as BoundaryTransformSpec | undefined;
+    if (boundary !== undefined) {
+      const selectedRef = cqlIdent(boundarySelectedDefineName(c.name));
+      // ⭐ ONE code expression for BOTH the check and the construct. Probed: an inline `FHIR.CodeableConcept`
+      // compares correctly with `~` on every coding cell, so no `code` declaration and no terminology
+      // include are needed, and the two uses cannot drift (`tmp/NOTES-kernel-spellings-executed.md`).
+      const codeLit = candidateCodeCql(boundary.code);
+      const constructed = constructorCallExpr({
+        functionName: boundary.signature.functionName,
+        code: boundary.code,
+        // ⚠ A VALUELESS concept's constructor takes `established`, not `value` — its truth is the record's
+        // PRESENCE, so the replacement asserts existence rather than copying a datum that does not exist.
+        valueExpr:
+          boundary.carrier === undefined
+            ? "true"
+            : `(${selectedRef}.${boundary.carrier.element} as ${boundary.carrier.fhirType})`,
+        // ⚠ STAMPED FROM THE RECORD IT REPLACES, never invented. A null stamp DROPS the candidate via the
+        // constructor's own guard — consistent with the projected leg (disc 532 Q3).
+        stampExpr: componentStampCql(selectedRef, boundary.recency.sortExpr, boundary.recency.cast),
+        subjectExpr: `FHIR.Reference { reference: FHIR.string { value: 'Patient/' + Patient.id } }`,
+        profile: boundary.profile,
+      });
+      const transformed = renderBoundaryTransform({
+        selectedRef,
+        identityCheck: renderBoundaryIdentityCheck(boundary, selectedRef, codeLit),
+        constructedExpr: constructed,
+      });
+      const helper = `define ${selectedRef}:\n${indent(body, 1)}`;
+      const cqlPair = `${helper}\n\n${metaBlock}${header}\n${indent(transformed, 1)}`;
+      this.enrollConcept(c, cqlPair);
+      return cqlPair;
+    }
     const cql = `${metaBlock}${header}\n${indent(body, 1)}`;
     // #189 Slice C 2a — DUAL-WRITE: enroll the emitted define into the totality ledger (report-mode side
     // record). The returned string is UNCHANGED — output stays the section assembly, byte-identical.
@@ -2199,6 +2249,21 @@ class Emitter {
               // undated `Last` returns the highest-`id` record — deterministic, unreachable on the canonical
               // lane (T2: CEL writes the dateTime variant), inheriting the disc-433-reviewed shared-primitive
               // behavior (for a Record the failure mode is "wrong record published", cf. B2a's "wrong truth").
+              //
+              // ⚠⚠ THE BOUNDARY THEN DROPS WHAT THIS SELECT PERMITS, AND THE TWO ARE ONE RULE, not a
+              // contradiction — read them together or file a bug that is not there. This select is
+              // permissive because RANKING must not invent an order; the boundary transform is strict
+              // because PUBLISHING a case feature requires a date (its `meta.profile` promises a
+              // recency-bearing record, and the constructor's `recorded is null` guard yields nothing).
+              // So an all-undated space selects a record here and publishes NULL at the boundary — the
+              // determination is unestablished, the guard pauses, and the question gets asked. LOUD.
+              //
+              // ⭐ That is CONSISTENT with the leg that already shipped: `renderConstructorCall`'s projected
+              // arm has always dropped an undated source record ("a source record with no date yields a
+              // null candidate that the `union` drops"). Passing the raw record through at the boundary
+              // instead would make the SAME undated record behave differently depending on whether its rep
+              // happens to carry a projection (disc 532 Q3 — the arms disagreed; this was settled by
+              // reading both call sites, not by argument).
               // FULL CONTRACT GUARD (a hand-built AST via `emitCQLFromAST` is a public entry): a Record select
               // carries NO datum and — because B2b admits ANY registry resource (no Observation pin) — the
               // descriptor's resource must match the concept, or a mismatched descriptor would emit the wrong
@@ -2598,7 +2663,16 @@ class Emitter {
       if (st.type !== "Concept") continue;
       const specs = ((st as Concept).__recencyProducerSpecs ?? []) as readonly ProducerCandidateSpec[];
       for (const spec of specs) byName.set(spec.signature.functionName, spec.signature);
+      // ⭐⭐ #189 — A BOUNDARY TRANSFORM DEMANDS A CONSTRUCTOR TOO, AND MAY BE ITS ONLY DEMAND.
+      //
+      // ⚠ Gathering from producer specs ALONE was a dangling-emit waiting to happen (gpt-5.6 arm, disc 532):
+      // a source-only unprojected leaf — the goal's `Height`/`Weight`, whose whole program is `code is` +
+      // `coded from` — has NO producer and NO projection, so nothing here would have defined the function the
+      // boundary transform CALLS. That is a library that fails to translate, not a wrong answer.
+      const boundary = (st as Concept).__boundaryTransformSpec as BoundaryTransformSpec | undefined;
+      if (boundary !== undefined) byName.set(boundary.signature.functionName, boundary.signature);
     }
+    // ⚠ Reached when the library has neither a producer nor a boundary transform — nothing to define.
     if (byName.size === 0) return null;
 
     for (const st of this.ast.statements) {

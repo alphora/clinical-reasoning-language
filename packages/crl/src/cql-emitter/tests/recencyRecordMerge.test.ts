@@ -64,10 +64,34 @@ describe("#189 — the both-rep RECORD merge (`shape is Record` + `code is` + po
   // (`answerCarrier`). ⚠ Scoped to a DECLARED carrier: an `exists this` concept's SD has no
   // `value[x]` at all (its answer IS presence), so no filter is emitted there.
   it("⭐ emits the two arms UNIONED into one collection, with the stage selecting over it", () => {
+    // ⚠⚠ THE SELECT MOVED TO THE HELPER DEFINE, and that is the #189 BOUNDARY TRANSFORM, not drift. This
+    // fixture is `code is` + an UNPROJECTED posrep, so its space CAN publish a record that is not the
+    // concept's case feature — the bare source retrieve. Charter §3 (operator, 2026-09-01): *"a consumer has
+    // to see a CF"*, and consumer-independently, so the concept's OWN define normalises and the raw select
+    // moves to `"<X> Selected"`.
+    //
+    // The union and the stage are UNCHANGED — the operator's *"two arms add to a collection and a third arm
+    // works on that collection"* still reads literally here; it just reads on the helper.
     const { cql } = emit();
     expect(cql).toMatch(
-      /define "Height":\s*\n\s*Last\(\s*\n\s*\(\S*LocalPrimitives\."Height"\s*\n?\s*union \S*ExternalPrimitives\."Height Source"\) O\s*\n\s*where O\.value is FHIR\.Quantity\s*\n\s*sort by \(effective as FHIR\.dateTime\)\.value, id\s*\n\s*\)/,
+      /define "Height Selected":\s*\n\s*Last\(\s*\n\s*\(\S*LocalPrimitives\."Height"\s*\n?\s*union \S*ExternalPrimitives\."Height Source"\) O\s*\n\s*where O\.value is FHIR\.Quantity\s*\n\s*sort by \(effective as FHIR\.dateTime\)\.value, id\s*\n\s*\)/,
     );
+  });
+
+  it("⭐⭐ the concept's OWN define carries the boundary transform — check, then replace", () => {
+    // ⚠ THE TRANSFORM IS HERE, not on the helper. Had it sat on a side define that only the
+    // `cpg-featureExpression` targeted, the questionnaire would see a case feature while every other CQL
+    // consumer — a cross-library ref, the Interface re-export, a downstream reduction — read the raw record.
+    // Both panel arms caught that inversion (disc 532 Q5).
+    //
+    // EXECUTED (`tmp/NOTES-boundary-transform-executed.md`): an EXTERNAL winner comes back CONSTRUCTED
+    // (`id` null, local code, case-feature profile, and the SOURCE record's stamp and value preserved); a
+    // LOCAL winner is returned untouched WITH its `id`.
+    const { cql } = emit();
+    expect(cql).toMatch(/define "Height":\s*\n\s*if "Height Selected" is null then null/);
+    expect(cql).toMatch(/else if "Height Selected"\.code ~ FHIR\.CodeableConcept/);
+    expect(cql).toMatch(/then "Height Selected"/);
+    expect(cql).toMatch(/else CRLConstructObservationQuantity\(/);
   });
 
   it("publishes each arm as its own retrieve — local by CODE, source by VALUE SET", () => {

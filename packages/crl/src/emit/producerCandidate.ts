@@ -28,7 +28,7 @@ import type { ResolvedStage } from "../template-match/resolvePipeline";
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import { resolveConstructor } from "./recordConstructor";
 import type { ConstructorSignature } from "./recordConstructor";
-import { resourceEmitRow } from "./resourceEmitRegistry";
+import { renderCodingIdentityCheck, resourceEmitRow } from "./resourceEmitRegistry";
 import type { CodingStrategy } from "./resourceEmitRegistry";
 
 /** One operand's recency stamp source, resolved from the OPERAND CONCEPT'S registry row. */
@@ -475,9 +475,10 @@ export function resolveBoundaryTransform(inputs: {
   }
   if (profile.trim() === "") {
     return refuse(
-      `Concept "${concept.name}" publishes a record that must be normalised to its case feature, whose ` +
-        `\`meta.profile\` must byte-equal the StructureDefinition url the FHIR lane emits — but no policy id ` +
-        `was supplied, and re-deriving that url in the CQL lane is the cross-lane drift this refuses.`,
+      `Concept "${concept.name}" publishes a record that must be normalised to its case feature, and the ` +
+        `replacement must be stamped with the case-feature StructureDefinition url the FHIR lane emits — ` +
+        `but no policy id was supplied. Re-deriving that url in the CQL lane is the cross-lane drift this ` +
+        `refuses; the two lanes stamp ONE composition or they disagree about what the record is.`,
     );
   }
   const row = resourceEmitRow(resourceType);
@@ -519,4 +520,26 @@ export function resolveBoundaryTransform(inputs: {
       recency: { sortExpr: row.recency.sortExpr, cast: row.recency.cast },
     },
   };
+}
+
+
+/**
+ * ⭐ Render "is this record already our case feature?" for a resolved boundary spec.
+ *
+ * ⚠⚠ THIS THIN WRAPPER EXISTS TO RESPECT AN IMPORT BOUNDARY, and the boundary is right. A test pins that
+ * `resourceEmitRegistry` is imported ONLY by its own home plus `fhir-emitter/structureDefinition` and
+ * `cel/emitter/emitFhir` — every other production importer is the premature-wiring hazard it guards. Wiring
+ * `emitCQL` straight into the registry to reach `renderCodingIdentityCheck` would have widened that
+ * allowlist for a convenience.
+ *
+ * ⭐ And the indirection is the better shape anyway: the emitter asks the SPEC how to check identity, rather
+ * than re-deriving the strategy from a resource type it would have to look up itself. Same reason the spec
+ * carries the constructor signature whole.
+ */
+export function renderBoundaryIdentityCheck(
+  spec: BoundaryTransformSpec,
+  alias: string,
+  codeRef: string,
+): string {
+  return renderCodingIdentityCheck(spec.coding, alias, codeRef);
 }

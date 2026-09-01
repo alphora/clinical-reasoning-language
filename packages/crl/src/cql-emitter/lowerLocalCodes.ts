@@ -121,7 +121,8 @@ import {
   type OwningLibraryMetadata,
 } from "../emit/effectiveRepresentation";
 import { caseFeatureUrlFromPolicyId, localCodeSystemSlug, localCodeSystemUrl } from "../fhir-emitter/slug";
-import { resolveProducerCandidates, resolveProjectedSource } from "../emit/producerCandidate";
+import { resolveBoundaryTransform, resolveProducerCandidates, resolveProjectedSource } from "../emit/producerCandidate";
+import type { BoundaryTransformSpec } from "../emit/producerCandidate";
 import type { ProducerCandidateSpec, ProjectedSourceSpec } from "../emit/producerCandidate";
 import { isAgeTodayPrefix } from "../template-match/agePredicate";
 import {
@@ -768,6 +769,63 @@ export function lowerLocalCodes(
         projectedSourceSpec = proj.spec;
       }
 
+      // ⭐⭐ #189 — THE BOUNDARY TRANSFORM's spec, and the STATIC GATE that decides whether one is needed.
+      //
+      // Charter §3 (operator, 2026-09-01): *"a consumer has to see a CF"*, scoped — *"it only applies to
+      // concepts that have a `code is`."* This branch is code-bearing by construction, so the remaining
+      // question is whether this concept's space can ever publish a NON-conforming record.
+      //
+      // ⭐ IT CAN, IFF AN UNPROJECTED `external-primitives` TERM IS IN THE SPACE. Enumerate what can be there:
+      // local-primitives conform (the local retrieve IS the local code), producer candidates conform (the
+      // constructor writes the local code and the case-feature profile), and a PROJECTED source arm conforms
+      // (the projection constructs a local-coded candidate). Only the bare source retrieve does not. That is
+      // the SAME predicate `renderSpaceTerms` already tests to decide whether to project the arm.
+      //
+      // ⚠ Emitting the transform where the else-branch is provably dead is not free: it is noise a reader
+      // must then re-verify is dead, and it would churn goldens with no behaviour change (disc 532, both
+      // arms). `Obese` is exactly that case — its Condition arm is projected, so it needs NO transform.
+      //
+      // ⚠⚠ GATED ON `rv.publishes`, NOT ON `concept.shape`. A VALUE-publishing merge's `"<X>"` is a Quantity
+      // or a boolean, and wrapping a scalar in a record transform is the type-incoherence the FHIR lane
+      // refuses on the other side. Shape and `publishes` are resolved together but answer different
+      // questions; the one that matters here is what the define actually holds.
+      //
+      // ⚠ SINGLE-SOURCE TODAY. `sourceDesc` is the one source arm, so its `arm` IS the per-term fact. When
+      // #257 lands multi-rep this must read the TERM LIST instead (each `external-primitives` term carrying
+      // its own projected-ness), or a projected rep beside an unprojected one would silently disable the
+      // transform for both.
+      let boundaryTransformSpec: BoundaryTransformSpec | undefined;
+      if (rv.publishes === "record" && sourceDesc.arm !== "source-projected") {
+        const bt = resolveBoundaryTransform({
+          concept: c,
+          code: { system: urn, code: codeValue },
+          profile: opts.policyId ? caseFeatureUrlFromPolicyId(canonicalBase, opts.policyId, c.name) : "",
+          carrier: localDesc.answerCarrier,
+        });
+        if (bt.kind === "refused") {
+          errors.push(mkError(bt.refusal.kind, bt.refusal.message, c.definition?.location ?? loc));
+          continue;
+        }
+        // ⚠ The helper emits its own top-level `define`, so guard its name exactly as `"<X> Source"` and the
+        // records twin are guarded. A collision here would emit a duplicate top-level identifier — invalid
+        // CQL — and the author can only fix it by renaming their declaration, so say so.
+        const selectedName = boundarySelectedDefineName(c.name);
+        if (topLevelIdentifierNames.has(selectedName)) {
+          errors.push(
+            mkError(
+              "emit-generated-name-collision",
+              `The synthesized boundary helper define "${selectedName}" collides with an existing top-level ` +
+                `identifier of the same name in library "${ast.library.name}". CQL defines share one ` +
+                `top-level identifier namespace, so this would emit a duplicate identifier (invalid CQL). ` +
+                `Rename the conflicting declaration.`,
+              loc,
+            ),
+          );
+          continue;
+        }
+        boundaryTransformSpec = bt.spec;
+      }
+
       const mergeTwin: Concept = {
         ...c,
         representations: [],
@@ -789,6 +847,7 @@ export function lowerLocalCodes(
         ],
         __recencyProducerSpecs: producerSpecs,
         __projectedSourceSpec: projectedSourceSpec,
+        __boundaryTransformSpec: boundaryTransformSpec,
         __loweringRole: "public-determination",
       };
       delete mergeTwin.code;
@@ -2140,4 +2199,21 @@ export function leafEligibleConcepts(ast: CRL): Set<string> {
  */
 export function recordsTwinDefineName(conceptName: string): string {
   return `${conceptName} Records`;
+}
+
+/**
+ * ⭐ #189 — the BOUNDARY helper's define name: the PRE-transform raw select, which the concept's own define
+ * then normalises into its case feature.
+ *
+ * ⚠⚠ THE HELPER HOLDS THE RAW SELECT AND `"<X>"` HOLDS THE TRANSFORM — never the other way round. If the
+ * transform sat here and only the `cpg-featureExpression` targeted it, every OTHER CQL consumer (a
+ * cross-library reference, the Interface re-export, a downstream reduction) would still read the raw record,
+ * and the ruling is consumer-independent (charter §3). Both panel arms caught that inversion (disc 532 Q5).
+ *
+ * ⚠ This is the FOURTH generated top-level name after `"<X> Records"`, `"<X> Source"` and the
+ * `CRLConstruct*` functions, and like them it shares CQL's top-level identifier namespace — so it is
+ * preflighted against `topLevelIdentifierNames` at synthesis rather than colliding at translate time.
+ */
+export function boundarySelectedDefineName(conceptName: string): string {
+  return `${conceptName} Selected`;
 }

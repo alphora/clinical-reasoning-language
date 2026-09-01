@@ -809,6 +809,16 @@ export interface Concept extends ASTNode {
    */
   __projectedSourceSpec?: unknown;
   /**
+   * SYNTHETIC-EMITTER-ONLY. ⭐⭐ #189 — the BOUNDARY TRANSFORM's spec (`emit/producerCandidate.ts`
+   * `BoundaryTransformSpec`): how to normalise this concept's PUBLISHED record into its case feature.
+   *
+   * ⚠ PRESENCE IS THE GATE. It is set ONLY when the concept publishes a RECORD and its space holds an
+   * UNPROJECTED `external-primitives` term — the one arm that can put a non-conforming record in the space.
+   * Everything else (the local retrieve, producer candidates, a projected source arm) conforms BY
+   * CONSTRUCTION, so a transform there would emit a check whose else-branch is provably dead.
+   */
+  __boundaryTransformSpec?: unknown;
+  /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). #189 Slice C boundary 2 (2a) — the
    * LOWERING ROLE of a concept the lowering passes produced/retargeted, so the totality-ledger enrollment
    * (`emitConcept`) picks its obligation SOURCE without marker-sniffing (disc 439 crit #1/#2):
