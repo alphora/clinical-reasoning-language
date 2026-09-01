@@ -212,12 +212,20 @@ currently permits is a **warning** (`composition-result-type-mismatch`) today th
      projection's SOLE PURPOSE: to bring records that are NOT the concept's shape INTO it, creating a new
      case-feature record where one is needed, so that evaluation is HOMOGENEOUS.** `value projection is
      exists this` is one spelling of it (a Condition's existence becoming a boolean Observation).
-  3. **The derived leg (a `definition is` PRODUCER)** — contributes a CONSTRUCTED candidate, built to the
-     concept's shape by the same reasoning.
+  3. **The derived leg (a `definition is` PRODUCER)** — contributes a CONSTRUCTED candidate, and is under
+     the SAME rule: it is built to the concept's shape, for the same reason.
 
-  The terminal selection then compares like with like, which is the whole point — VOCABULARY says the same
-  from the other end: *"the source resource is never 'the concept's record': the projection's OUTPUT is the
-  candidate."*
+  ⭐⭐ **THE HOMOGENEITY INVARIANT — AT EVERY STAGE, NOT JUST STAGE 0.** At each stage of the pattern
+  operations the set in hand must be records that are **either at least the same shape, or case-features**
+  (which of those, see the open determination below). That is what makes the three legs contribute to ONE
+  homogeneous collection that the CONCEPT-LEVEL operations can work on — and it is preserved by every stage
+  kind, not just established at the start: a **producer** passes its input through PLUS a candidate built to
+  that shape, a **filter** hands on a subset, a **selection** hands on one member. A stage that widened the
+  set to mixed shapes would leave the next operation comparing unlike things, which is the failure the whole
+  arrangement exists to prevent.
+
+  VOCABULARY says the same from the other end: *"the source resource is never 'the concept's record': the
+  projection's OUTPUT is the candidate."*
 
   ⚠⚠ **OPEN — NOT YET DETERMINED (operator, 2026-09-01):** when a source record is **already the correct
   shape**, may the RAW record be used, or must a case-feature record be created even then? The evidence that
