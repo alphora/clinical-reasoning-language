@@ -29,6 +29,7 @@ import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import { resolveConstructor } from "./recordConstructor";
 import type { ConstructorSignature } from "./recordConstructor";
 import { resourceEmitRow } from "./resourceEmitRegistry";
+import type { CodingStrategy } from "./resourceEmitRegistry";
 
 /** One operand's recency stamp source, resolved from the OPERAND CONCEPT'S registry row. */
 export interface OperandStamp {
@@ -397,4 +398,125 @@ export function resolveProducerCandidates(inputs: ProducerCandidateInputs): Prod
   }
 
   return { kind: "resolved", specs };
+}
+
+
+/**
+ * ⭐⭐ #189 — what the emit needs to normalise a concept's PUBLISHED record into its case feature.
+ *
+ * The third sibling of `ProducerCandidateSpec` / `ProjectedSourceSpec`, resolved in the same place for the
+ * same reason: the concept's code, its case-feature profile url, its constructor and its coding strategy are
+ * facts about the concept and the registry, and LOWERING is where they are known. The renderer only turns
+ * them into text.
+ *
+ * ⚠⚠ THE PROFILE IS WHY THIS IS RESOLVED HERE AND NOT AT RENDER TIME. The constructed record's
+ * `meta.profile` MUST byte-equal the case-feature StructureDefinition url the FHIR lane emits, or the two
+ * lanes disagree about what the record IS. That url is built from `CpgMetadata`, which the CQL emit site
+ * does not have — re-deriving it there would be a second reading of a cross-lane identity, which is exactly
+ * how the two lanes drift. Lowering already threads `policyId` for the producer arms; this rides the same
+ * channel.
+ */
+export interface BoundaryTransformSpec {
+  /**
+   * The constructor, WHOLE — not just its `functionName`. The emitter must both CALL it and DEFINE it, and
+   * a boundary-demanded constructor may be the ONLY demand for it: a source-only unprojected leaf has no
+   * producer and no projection, so gathering constructors from producer specs alone would emit a call to a
+   * function that was never defined.
+   */
+  signature: ConstructorSignature;
+  /** The concept's own local code — what a replaced record is coded as. */
+  code: { system: string; code: string };
+  /** The case-feature profile url stamped into `meta.profile`. */
+  profile: string;
+  /** How to ask "is this record already our case feature?" — rendered by `renderCodingIdentityCheck`. */
+  coding: CodingStrategy;
+  /**
+   * Where the published record carries its datum, and the FHIR type to read it as. `undefined` for a
+   * VALUELESS concept (its truth is the record's presence), which takes the constructor's existence mode.
+   */
+  carrier: { element: string; fhirType: string } | undefined;
+  /**
+   * The concept's OWN recency row — a replaced record is dated by the record it replaced, so the stamp is
+   * read off the selected winner, never invented.
+   *
+   * ⚠ NULL-RECENCY IS A DROP, DELIBERATELY (disc 532 Q3, both arms + measurement). The constructor's own
+   * `recorded is null` guard yields no candidate, so a winner that cannot say when it was established
+   * publishes NOTHING rather than a raw non-conforming record. That is CONSISTENT with the projected leg,
+   * which has shipped this behaviour since `renderConstructorCall` ("a source record with no date yields a
+   * null candidate that the `union` drops") — passing the raw record through here would make the same
+   * undated record behave differently depending on whether its rep happens to carry a projection.
+   */
+  recency: { sortExpr: string; cast: "dateTime" | "none" };
+}
+
+/**
+ * Resolve a concept's BOUNDARY transform, or refuse.
+ *
+ * ⚠ This does NOT decide WHETHER the transform is needed — that is the caller's static gate (only a space
+ * that can hold an unprojected `external-primitives` term can publish a non-conforming record). This answers
+ * "given that it is needed, can it be built?".
+ */
+export function resolveBoundaryTransform(inputs: {
+  concept: Concept;
+  code: { system: string; code: string };
+  profile: string;
+  /** The published record's datum carrier, from the effective-representation descriptor. */
+  carrier: { element: string; valueType: string } | undefined;
+}): { kind: "resolved"; spec: BoundaryTransformSpec } | { kind: "refused"; refusal: ProducerCandidateRefusal } {
+  const { concept, code, profile, carrier } = inputs;
+  const refuse = (message: string) => ({ kind: "refused" as const, refusal: { kind: PRODUCER_BUILD_DEBT_KIND, message } });
+
+  const resourceType = concept.conceptType;
+  if (resourceType === undefined) {
+    return refuse(
+      `Concept "${concept.name}" publishes a record that must be normalised to its case feature, but ` +
+        `declares no \`type is\` resource, so there is nothing to construct it into.`,
+    );
+  }
+  if (profile.trim() === "") {
+    return refuse(
+      `Concept "${concept.name}" publishes a record that must be normalised to its case feature, whose ` +
+        `\`meta.profile\` must byte-equal the StructureDefinition url the FHIR lane emits — but no policy id ` +
+        `was supplied, and re-deriving that url in the CQL lane is the cross-lane drift this refuses.`,
+    );
+  }
+  const row = resourceEmitRow(resourceType);
+  if (row === undefined) {
+    return refuse(
+      `Concept "${concept.name}": \`${resourceType}\` has no emit-registry row, so neither its coding ` +
+        `strategy nor its recency element is known.`,
+    );
+  }
+  if (row.recency === undefined) {
+    return refuse(
+      `Concept "${concept.name}": \`${resourceType}\` has no established recency element, so a replaced ` +
+        `record could not carry the date of the record it replaced.`,
+    );
+  }
+  const ctor = resolveConstructor(resourceType, carrier?.valueType);
+  if (ctor.kind !== "resolved") {
+    return refuse(
+      `Concept "${concept.name}": the boundary transform constructs a \`${resourceType}\` carrying the ` +
+        `concept's local code, and that constructor cannot be built (${ctor.reason}: ${ctor.detail}).`,
+    );
+  }
+  return {
+    kind: "resolved",
+    spec: {
+      signature: ctor.signature,
+      code,
+      profile,
+      coding: row.coding,
+      // ⚠ THE FHIR TYPE IS READ OFF THE RESOLVED SIGNATURE, not re-derived from the value type. The carrier
+      // read (`X.value as FHIR.Quantity`) and the constructor's `value` parameter must be the SAME type, and
+      // deriving them separately is how an emitted function and the call to it come to disagree — the exact
+      // reason this file already carries the signature WHOLE rather than just its name.
+      carrier: (() => {
+        if (carrier === undefined) return undefined;
+        const param = ctor.signature.params.find((prm) => prm.name === "value");
+        return param === undefined ? undefined : { element: carrier.element, fhirType: param.cqlType };
+      })(),
+      recency: { sortExpr: row.recency.sortExpr, cast: row.recency.cast },
+    },
+  };
 }
