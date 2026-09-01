@@ -467,10 +467,23 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
         const fe = ((r as { extension?: { url?: string; valueExpression?: { reference?: string } }[] }).extension ?? []).find(
           (e) => (e.url ?? "").includes("cpg-featureExpression"),
         );
+        const isRecordSetHistory = String(r.id).endsWith("-records");
+        if (isRecordSetHistory) {
+          // ⭐⭐ A `shape is RecordSet` CASE FEATURE HAS NO `cpg-featureExpression` — the ABSENCE is the
+          // design, not a gap. RULED (operator, 2026-09-01): *"'answerable' … the literal interpretation
+          // applies — it's meant to allow the question to be ASKED. IOW, it should always behave like an
+          // empty Record."* Answering a coded concept APPENDS a record, so a set has nothing to confirm.
+          //
+          // ⚠ MEASURED that this is also what makes it WORK: a population context over a history yields
+          // MULTIPLE values into a non-repeating group and `$populate` DELETES the item from the response.
+          // With none, the item is present and blank at ANY cardinality and `POPULATE [ERROR]` count is 0
+          // (`tmp/NOTES-repeats-fix-probed.md`), while `definitionExtract` still writes the answer.
+          expect(fe, `${opt.name} — ${r.id} must NOT pre-fill a set`).toBeUndefined();
+          continue;
+        }
         expect(fe, `${opt.name} — ${r.id} has no featureExpression`).toBeDefined();
         const layer = String(fe?.valueExpression?.reference ?? "").split("/").pop() ?? "";
-        const isRecordSetHistory = String(r.id).endsWith("-records");
-        expect(layer, `${opt.name} — ${r.id}`).toMatch(isRecordSetHistory ? /LocalPrimitives$/ : /Inferences$/);
+        expect(layer, `${opt.name} — ${r.id}`).toMatch(/Inferences$/);
       }
 
       const unanswerable = sds

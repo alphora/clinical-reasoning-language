@@ -265,9 +265,24 @@ export interface CpgFeatureExpression {
  *
  * Returns a heterogeneous array (valueCode entries + one valueExpression entry).
  */
+/**
+ * ⚠⚠ `featureExpression` is OPTIONAL, and its ABSENCE is meaningful — it is how a `shape is RecordSet`
+ * case feature says "ask this question, but do not pre-fill it".
+ *
+ * RULED (operator, 2026-09-01): *"'a `shape is RecordSet` is answerable' — the literal interpretation
+ * applies. It's meant to allow the question to be ASKED. IOW, it should always behave like an empty
+ * Record."* Answering a coded concept APPENDS a record, so there is nothing to confirm: asking which of five
+ * historical records the clinician is ratifying is meaningless — they are adding a sixth.
+ *
+ * ⭐ MEASURED that this is also what makes the question WORK. A featureExpression over a history yields
+ * MULTIPLE values into a non-repeating group, and `$populate` responds by DELETING the item from the
+ * response — a group with nothing in it and no way to answer. With no population context the question is
+ * generated, present and blank at ANY cardinality, and `sdc-questionnaire-definitionExtract` still writes
+ * the answered record (`tmp/NOTES-repeats-fix-probed.md`).
+ */
 export function cpgCaseFeatureExtensions(
   level: Capability,
-  featureExpression: CpgFeatureExpression,
+  featureExpression: CpgFeatureExpression | undefined,
 ): Array<Record<string, unknown>> {
   const codes = capabilitiesUpTo(level).filter((c) => c !== "executable");
   const ext: Array<Record<string, unknown>> = codes.map((c) => ({
@@ -275,14 +290,16 @@ export function cpgCaseFeatureExtensions(
     valueCode: c,
   }));
   ext.push({ url: CPG_KNOWLEDGE_REPRESENTATION_EXT, valueCode: "structured" });
-  ext.push({
-    url: CPG_FEATURE_EXPRESSION_EXT,
-    valueExpression: {
-      language: featureExpression.language,
-      expression: featureExpression.expression,
-      reference: featureExpression.reference,
-    },
-  });
+  if (featureExpression !== undefined) {
+    ext.push({
+      url: CPG_FEATURE_EXPRESSION_EXT,
+      valueExpression: {
+        language: featureExpression.language,
+        expression: featureExpression.expression,
+        reference: featureExpression.reference,
+      },
+    });
+  }
   return ext;
 }
 

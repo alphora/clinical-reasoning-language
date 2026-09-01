@@ -337,7 +337,7 @@ export function emitCaseFeatureStructureDefinition(
   // LocalPrimitives at the call site — a pair split across parameters is a pair nobody maintains together
   // (disc 532, both arms). The caller resolves the semantic LAYER against the manifest; this function never
   // re-derives it.
-  target: ResolvedFeatureExpressionTarget,
+  target: ResolvedFeatureExpressionTarget | undefined,
   // Present iff the concept READS a value (a value-bearing Observation determination); a valueless-existence
   // concept passes `undefined` → no `value[x]` element (the boolean is `exists`, computed in CQL).
   valueDatum: { valueElement: string; datumValueType: string } | undefined,
@@ -349,7 +349,7 @@ export function emitCaseFeatureStructureDefinition(
   // CodeSystem url (not the primary's), matching the code the CQL lane lowered.
   localDomainId: string = metadata.name,
 ): { resource: EmittedResource | null; errors: CRLError[] } {
-  if (target.librarySuffix === "") {
+  if (target !== undefined && target.librarySuffix === "") {
     throw new Error(
       `internal invariant violated: emitCaseFeatureStructureDefinition for "${conceptName}" was ` +
         `called with an empty \`target.librarySuffix\` (layer define "${target.define}"). The ` +
@@ -403,7 +403,8 @@ export function emitCaseFeatureStructureDefinition(
   // lives); its `expression` is the caller-supplied `recordsDefineId` (a `text/cql-identifier`) — the
   // `"<X> Records"` twin for a reduction, or the concept name for a RecordSet / both-rep retrieve. NOT the
   // ephemeral boolean `"<X>"` (a natural-resource SD bound to a Boolean expr is type-incoherent — charter §4).
-  const featureExpressionCanonical = libraryCanonicalUrl(metadata, target.librarySuffix);
+  const featureExpressionCanonical =
+    target === undefined ? undefined : libraryCanonicalUrl(metadata, target.librarySuffix);
 
   // #189 2d: the differential is built from the concept's NATURAL resource (charter §4) via
   // `caseFeatureProfileShape` + `caseFeatureDifferential`. `undefined` = the resource is not in the emit
@@ -426,13 +427,20 @@ export function emitCaseFeatureStructureDefinition(
     // no run-time forms), knowledgeRepresentationLevel `structured`, and the
     // featureExpression pointing at the LocalPrimitives library's CQL identifier (the
     // bare `code is` define).
-    extension: cpgCaseFeatureExtensions(level, {
-      language: "text/cql-identifier",
-      // #189 2d — target the RECORDS twin define (`"<X> Records"` = the natural-resource retrieve), NOT the
-      // ephemeral boolean `"<X>"` (a Condition SD bound to a Boolean expr is type-incoherent — charter §4).
-      expression: target.define,
-      reference: featureExpressionCanonical,
-    }),
+    // ⚠ `undefined` → NO `cpg-featureExpression` is emitted, which is how a `shape is RecordSet` case
+    // feature says "ask this question, do not pre-fill it" (see `cpgCaseFeatureExtensions`).
+    extension: cpgCaseFeatureExtensions(
+      level,
+      target === undefined || featureExpressionCanonical === undefined
+        ? undefined
+        : {
+            language: "text/cql-identifier",
+            // #189 — the define that publishes what the concept DECLARES it publishes, never the ephemeral
+            // boolean `"<X>"` (a Condition SD bound to a Boolean expr is type-incoherent — charter §4).
+            expression: target.define,
+            reference: featureExpressionCanonical,
+          },
+    ),
     url,
     version: metadata.version,
     name,

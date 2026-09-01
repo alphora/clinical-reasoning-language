@@ -79,7 +79,14 @@ export type FeatureExpressionTarget = {
 export type CaseFeatureRecord = {
   kind: "record";
   descriptor: LocalExactDescriptor;
-  target: FeatureExpressionTarget;
+  /**
+   * Where the `cpg-featureExpression` points — or `undefined` for NO featureExpression at all.
+   *
+   * ⚠⚠ ABSENCE IS MEANINGFUL, not a gap. A `shape is RecordSet` case feature publishes a SET, and a set is
+   * not a value to CONFIRM — answering a coded concept APPENDS a record. RULED (operator, 2026-09-01):
+   * *"'answerable' … the literal interpretation applies … it should always behave like an empty Record."*
+   */
+  target?: FeatureExpressionTarget;
 };
 
 export type CaseFeatureRecordResolution = CaseFeatureRecord | CaseFeatureRecordSkip;
@@ -173,6 +180,29 @@ export function resolveCaseFeatureRecord(
     // uses, so the two lanes cannot disagree about what a concept publishes.
     const rv = resolveRecencyValueConcept(concept);
     const publishesRecord = !isQuestion && rv.kind === "recency-value" && rv.publishes === "record";
+
+    // ⭐⭐ A `shape is RecordSet` CASE FEATURE GETS NO `cpg-featureExpression` — the question is ASKED and
+    // always BLANK.
+    //
+    // RULED (operator, 2026-09-01): *"I think you misinterpreted 'a `shape is RecordSet` is answerable'.
+    // The literal interpretation applies — it's meant to allow the question to be ASKED. IOW, it should
+    // always behave like an empty Record."* Answering a coded concept APPENDS a record (local `code is` is
+    // the only way to create an answer), so there is nothing to confirm: asking which of five historical
+    // records a clinician is ratifying is meaningless — they are adding a sixth.
+    //
+    // ⭐ MEASURED that this is ALSO what makes the question work at all. Pointing a featureExpression at a
+    // history yields MULTIPLE values into a non-repeating group and `$populate` DELETES the item from the
+    // response — the clinician gets a group with nothing in it. With no population context the item is
+    // present and blank at ANY cardinality, `POPULATE [ERROR]` count is 0, and
+    // `sdc-questionnaire-definitionExtract` still writes the answered record
+    // (`tmp/NOTES-repeats-fix-probed.md`).
+    //
+    // ⚠ So the earlier `repeats` hunt is WITHDRAWN. Nothing needs to repeat, because nothing should
+    // pre-fill. Do NOT re-derive a population context for a set.
+    // ⚠ EXPLICITLY declared only — an OMITTED `shape is` is an open author-time question, not a set.
+    if (!isQuestion && concept.shape === "RecordSet") {
+      return { kind: "record", descriptor: local };
+    }
     if (publishesRecord) {
       return {
         kind: "record",

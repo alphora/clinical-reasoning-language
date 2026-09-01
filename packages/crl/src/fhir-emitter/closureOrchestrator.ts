@@ -2012,10 +2012,14 @@ export function emitFhirDefClosure(
           // ⚠ NO `?? ""` FALLBACK ANY MORE. That spelling leaned on the emitter's empty-suffix throw as a
           // backstop, i.e. it turned "the manifest entry is missing" into a generic internal-invariant throw
           // one call deeper. Refuse HERE, naming the layer and the concept.
-          resolveFeatureExpressionTarget(record.target, name, {
-            "local-primitives": localSourceReferenceSuffix,
-            inferences: inferencesReferenceSuffix,
-          }),
+          // ⚠ `undefined` target → NO `cpg-featureExpression`. That is the `shape is RecordSet` case: the
+          // question is asked and always blank (see `caseFeatureRecord.ts`), so there is nothing to resolve.
+          record.target === undefined
+            ? undefined
+            : resolveFeatureExpressionTarget(record.target, name, {
+                "local-primitives": localSourceReferenceSuffix,
+                inferences: inferencesReferenceSuffix,
+              }),
           valueDatum,
           // #198 — the sibling's disambiguated local domain, so the case-feature
           // `patternCodeableConcept.coding.system` matches THIS library's CodeSystem.
