@@ -421,4 +421,35 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
     const layered = OPTIONS.find((o) => o.name === "Layered")!;
     expect(layered.reachableQuestions).not.toContain("Greatest Weight");
   });
+
+  it("⭐⭐ every reachable question's case-feature SD is ANSWERABLE — the carrier is per RECORD, not per cardinality", () => {
+    // ⚠⚠ THIS ROW EXISTS BECAUSE ITS ABSENCE LET A REGRESSION SHIP. `resolveRecordDatumCarrier` gated on
+    // `shape === "Record"`, so the Layered option's `Weight Records` / `Height Records` (both
+    // `shape is RecordSet`) emitted case-feature SDs with NO `value[x]` — TWO OF FOUR QUESTIONS IN THE
+    // EXPECTED-CONVENTION OPTION COULD NOT BE ANSWERED. The whole suite stayed green, because
+    // `reachableQuestions` above pins WHICH concepts are offered as questions and nothing pinned whether
+    // the resulting profile could hold an answer.
+    //
+    // ⚠ Disc 530's panel had warned in advance: *"RecordSet must not be silently excluded — Record-first
+    // is fine as SEQUENCING, but it is BUILD DEBT, never 'answerable = Record'."* Charter §3 says a coded
+    // `shape is RecordSet` history IS answerable. Cardinality changes the enclosing questionnaire GROUP,
+    // not the resource's value PATH.
+    for (const opt of OPTIONS) {
+      if (!opt.emitsToday) continue;
+      const fhir = emitFhirDefFromPath(opt.policy, { date: new Date("2026-01-01T00:00:00.000Z") }) as unknown as {
+        resources?: { resource?: { resourceType?: string; id?: string; differential?: { element?: { path?: string; min?: number }[] } } }[];
+      };
+      const sds = (fhir.resources ?? [])
+        .map((w) => w.resource)
+        .filter((r): r is NonNullable<typeof r> => r?.resourceType === "StructureDefinition");
+
+      // One case-feature SD per reachable question — no more, no fewer.
+      expect(sds.map((r) => r.id).sort(), opt.name + " — SD count").toHaveLength(opt.reachableQuestions.length);
+
+      const unanswerable = sds
+        .filter((r) => !(r.differential?.element ?? []).some((e) => /\.value(\[x\]|[A-Z])/.test(e.path ?? "") && e.min === 1))
+        .map((r) => r.id);
+      expect(unanswerable, opt.name + " — SDs with no answerable value[x]").toEqual([]);
+    }
+  });
 });

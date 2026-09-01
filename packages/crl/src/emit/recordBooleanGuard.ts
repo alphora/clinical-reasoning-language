@@ -33,7 +33,7 @@ import { valueReadElementsAdmitting } from "../fhir-model/fhirValueModel";
 import { resourceEmitRow } from "./resourceEmitRegistry";
 
 /**
- * ⭐⭐ The proven DATUM CARRIER on a Record-publishing concept — the element that record carries its value in,
+ * ⭐⭐ The proven DATUM CARRIER on a RECORD-BEARING concept — the element that record carries its value in,
  * or `null` when the model does not rule one.
  *
  * TWO consumers, ONE authority, and that is the whole point: the Interface guard READS the value at this
@@ -51,7 +51,23 @@ import { resourceEmitRow } from "./resourceEmitRegistry";
  */
 export function resolveRecordDatumCarrier(concept: Concept | undefined): string | null {
   if (concept === undefined) return null;
-  if (assumedShapePreMigration(concept.shape) !== "Record") return null;
+  // ⭐⭐ THE CARRIER IS A PROPERTY OF A RECORD, NOT OF PUBLISHED CARDINALITY — and gating it on `Record`
+  // alone was a REGRESSION I introduced, measured on the goal: the Layered option's `Weight Records` and
+  // `Height Records` are `shape is RecordSet`, so their case-feature SDs emitted with NO `value[x]` and
+  // TWO OF FOUR QUESTIONS IN THE EXPECTED-CONVENTION OPTION COULD NOT BE ANSWERED.
+  //
+  // ⚠ Charter §3 is explicit that a coded `shape is RecordSet` history IS answerable, and disc 530's panel
+  // had warned in advance: *"RecordSet must not be silently excluded — Record-first is fine as SEQUENCING,
+  // but it is BUILD DEBT, never 'answerable = Record'."* I accepted that and then shipped exactly that gate.
+  //
+  // Cardinality changes the enclosing questionnaire GROUP, not the resource's value PATH. Whether a concept
+  // publishes one record or many says nothing about where each of those records keeps its datum.
+  //
+  // ⚠ SCALAR STAYS OUT, and that is not the same omission: a Scalar concept publishes a VALUE, not a
+  // record, so it has no record of its own to carry one. (Its records-twin seam is a separate question —
+  // disc 531 ledger, the three-shape constraint.)
+  const shape = assumedShapePreMigration(concept.shape);
+  if (shape !== "Record" && shape !== "RecordSet") return null;
   if (concept.valueTypes.length !== 1) return null;
   const valueType = concept.valueTypes[0];
   const resourceType = concept.conceptType;
