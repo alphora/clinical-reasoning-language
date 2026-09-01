@@ -2279,9 +2279,13 @@ class Emitter {
       desc.recency.cast === "dateTime"
         ? `(${desc.recency.sortExpr} as FHIR.dateTime).value`
         : `${desc.recency.sortExpr}.value`;
+    // ⭐ #189 — the conforming filter reads the carrier from EITHER source. A value-READING concept
+    // has it on `valueElement`; a RECORD-publishing one reads no value on this arm but its record still
+    // CARRIES one, on `answerCarrier`. Same element either way — ONE authority resolved it.
+    const filterElement = desc.valueElement ?? desc.answerCarrier?.element;
     const whereClause =
-      valueTypeFilter !== undefined && desc.valueElement !== undefined
-        ? `\n      where O.${desc.valueElement} is ${valueTypeFilter}`
+      valueTypeFilter !== undefined && filterElement !== undefined
+        ? `\n      where O.${filterElement} is ${valueTypeFilter}`
         : "";
     // `twinRef` is the ALREADY-RENDERED operand expression (bare `"X Records"` on the `none` path, or a
     // cross-layer `<S>-LocalPrimitives."X Records"` qualified ref on the layered path — Slice-C boundary 1),
@@ -2768,6 +2772,26 @@ class Emitter {
       // file, which is the drift `renderSpaceTerms` exists to remove. Worse, the lock-step invariant was
       // enforced in ONE direction: a constructed term with no spec threw, while SPECS WITH NO TERMS silently
       // emitted two arms and dropped every producer. That is precisely the failure this slice removes.
+      // ⭐⭐ #189 — A VALUELESS RECORD MUST NEVER WIN THE SELECTION (operator, 2026-08-31: *"there should
+      // never be valueless observations at all"*).
+      //
+      // The VALUE merge has always filtered non-conforming rows — *"a newer non-conforming row must not mask
+      // an older conforming one"* (disc 506). The RECORD branch had no such filter, because the descriptor
+      // did not know the record's carrier. It does now (`answerCarrier`), so the same rule applies: a record
+      // whose declared carrier holds nothing is not a candidate for "the newest establishment of this
+      // determination", however recent it is. Our own case-feature profile says `value[x] min=1`, so such a
+      // record does not conform to what we tell a user to write.
+      //
+      // ⚠ SCOPED TO A DECLARED CARRIER, and that scope IS the rule. An `exists this` concept's SD carries NO
+      // `value[x]` at all — its answer is the record's PRESENCE — so `answerCarrier` is absent and no filter
+      // is emitted. Filtering there would drop every legitimate existence record.
+      //
+      // ⚠ DEFENCE-IN-DEPTH, not a fix for a defect we ship: nothing in our emit produces a valueless record
+      // (measured — the four I first blamed on the emit were my own harness submitting an UNPRUNED
+      // QuestionnaireResponse). It defends the invariant against ANY writer, which is what makes it worth
+      // having: this space holds records from `$extract`, from source systems, and from us.
+      const conformingFilter =
+        local.answerCarrier !== undefined ? `FHIR.${local.answerCarrier.valueType}` : undefined;
       const terms = c.__recordUnionTerms;
       if (terms === undefined || terms.length === 0) {
         throw new Error(
@@ -2776,7 +2800,7 @@ class Emitter {
             `compiler bug (or an ill-formed hand-built AST).`,
         );
       }
-      return this.emitSelectNewest(this.renderSpaceTerms(c, terms, localLib, sourceLib), local, undefined);
+      return this.emitSelectNewest(this.renderSpaceTerms(c, terms, localLib, sourceLib), local, conformingFilter);
     }
 
     // ⚠ A PROJECTED SOURCE ARM HAS NO VALUE ELEMENT, and cannot: its source resource is one whose truth is

@@ -57,10 +57,16 @@ describe("#189 — the both-rep RECORD merge (`shape is Record` + `code is` + po
   // code path, so the separator cannot be one thing here and another there. Nothing about the
   // SEMANTICS moved; pinning the old single-line spacing would only pin which function happened to
   // build the string.
+  // ⭐⭐ AND FILTERS NON-CONFORMING ROWS. A valueless record must never win the selection
+  // (operator, 2026-08-31: "there should never be valueless observations at all"). The VALUE merge
+  // always did this — "a newer non-conforming row must not mask an older conforming one" (disc 506)
+  // — and the RECORD branch could not until the descriptor learned the record's carrier
+  // (`answerCarrier`). ⚠ Scoped to a DECLARED carrier: an `exists this` concept's SD has no
+  // `value[x]` at all (its answer IS presence), so no filter is emitted there.
   it("⭐ emits the two arms UNIONED into one collection, with the stage selecting over it", () => {
     const { cql } = emit();
     expect(cql).toMatch(
-      /define "Height":\s*\n\s*Last\(\s*\n\s*\(\S*LocalPrimitives\."Height"\s*\n?\s*union \S*ExternalPrimitives\."Height Source"\) O\s*\n\s*sort by \(effective as FHIR\.dateTime\)\.value, id\s*\n\s*\)/,
+      /define "Height":\s*\n\s*Last\(\s*\n\s*\(\S*LocalPrimitives\."Height"\s*\n?\s*union \S*ExternalPrimitives\."Height Source"\) O\s*\n\s*where O\.value is FHIR\.Quantity\s*\n\s*sort by \(effective as FHIR\.dateTime\)\.value, id\s*\n\s*\)/,
     );
   });
 
