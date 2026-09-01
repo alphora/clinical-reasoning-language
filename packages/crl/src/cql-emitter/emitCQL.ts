@@ -2631,11 +2631,14 @@ class Emitter {
           // a candidate of the CONCEPT's `type is` right here, at the space-assembly site, beside the
           // producer's candidate. That keeps the ExternalPrimitives twin truthful about what it retrieves and
           // keeps every transformation of the space in one place.
-          // ⚠⚠ THIS RETURN IS UNDER AN OPEN DETERMINATION — do not "fix" it on the strength of the charter
-          // alone. A projection's SOLE PURPOSE is to bring a record that is NOT the concept's shape INTO it
-          // (charter §3, three legs). This rep's records ARE the concept's `type is` already, so whether the
-          // RAW record may be used, or a case-feature record must be created even then, is EXPLICITLY
-          // undetermined (operator, 2026-09-01).
+          // ⚠⚠ THIS IS A DELIBERATE CHOICE UNDER A STATED PREMISE — not an oversight, and not a bug to
+          // "fix" on the strength of the charter alone. Operator, 2026-09-01: *"the unprojected was left raw
+          // based on the assumption that the same shape was sufficient."*
+          //
+          // A projection's SOLE PURPOSE is to bring a record that is NOT the concept's shape INTO it
+          // (charter §3, three legs). This rep's records ARE the concept's `type is` already, so under that
+          // premise there is nothing to transform. What is under review is the PREMISE — whether "the same
+          // shape" means TYPE alone or TYPE AND CODING — not this line's correctness given it.
           //
           // ⚠ What is measured: the case-feature SD pattern-fixes the concept's LOCAL code, so a raw record
           // of the right TYPE still carries the EXTERNAL one. So "already the correct shape" has to be

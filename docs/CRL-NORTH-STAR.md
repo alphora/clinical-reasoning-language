@@ -219,17 +219,58 @@ currently permits is a **warning** (`composition-result-type-mismatch`) today th
   operations the set in hand must be records that are **either at least the same shape, or case-features**
   (which of those, see the open determination below). That is what makes the three legs contribute to ONE
   homogeneous collection that the CONCEPT-LEVEL operations can work on — and it is preserved by every stage
-  kind, not just established at the start: a **producer** passes its input through PLUS a candidate built to
-  that shape, a **filter** hands on a subset, a **selection** hands on one member. A stage that widened the
-  set to mixed shapes would leave the next operation comparing unlike things, which is the failure the whole
-  arrangement exists to prevent.
+  kind, not just established at the start.
+
+  ⭐ **A PRODUCER ADDS; IT DOES NOT RUN AGAINST THE COLLECTION.** It reads its own NAMED OPERANDS, computes,
+  and contributes ONE conformant candidate to the set — the set flows past it untouched. That is why a
+  producer can be a mid-pipeline stage at all. **Collection-wide operations are the other kinds**: a
+  **selection** runs across the whole set and hands on one member; a **filter** runs across it and hands on a
+  subset. A stage that widened the set to mixed shapes would leave those operations comparing unlike things,
+  which is the failure the whole arrangement exists to prevent.
+
+  ⚠ The producer's "reads its operands, never the flow" half is ENFORCED, not merely intended:
+  `emit/producerCandidate.ts` refuses a producer whose stage `reads` anything but `operands`, because a
+  flow-reading producer would consume the space it was handed and its result could not simply rejoin that
+  space.
 
   VOCABULARY says the same from the other end: *"the source resource is never 'the concept's record': the
   projection's OUTPUT is the candidate."*
 
   ⚠⚠ **OPEN — NOT YET DETERMINED (operator, 2026-09-01):** when a source record is **already the correct
-  shape**, may the RAW record be used, or must a case-feature record be created even then? The evidence that
-  bears on it: a case-feature StructureDefinition pattern-fixes the concept's LOCAL code
+  shape**, may the RAW record be used, or must a case-feature record be created even then?
+
+  ⚠ The emitter uses the raw record today, and that is a DELIBERATE CHOICE under a stated premise — *"the
+  unprojected was left raw based on the assumption that the same shape was sufficient"* — not an oversight.
+  So what is under review is the PREMISE, not a defect: treat the code as the current answer to this
+  question, and change it only when the premise is ruled on.
+
+  ⭐ **AND THE REMEDY IS ALREADY NAMED, so it is not re-designed if the premise falls:** *"if that is proven
+  a bad assumption then there needs to be a DEFAULT, INTERNAL projection that transforms unprojected to
+  local-code records."* ⚠ **Internal** — the emitter supplies it; it is NOT a form the author writes, so the
+  CRL surface does not change either way. An unprojected rep would then contribute exactly what an explicit
+  projection does: a case-feature record carrying the concept's local code.
+
+  ⭐⭐ **WHAT COULD REQUIRE THE CONCEPT AND NOT MERELY ITS SHAPE — measured, three things, and they are all
+  IDENTITY CLAIMS rather than evaluation:**
+
+  | requires the local CODE | evidence |
+  |---|---|
+  | the local leg's RETRIEVE | `[Observation: <LocalConcepts>."BMI"]` — code-filtered. Anything that re-derives the concept's records BY CODE finds only local-coded ones. |
+  | the case-feature PROFILE | `Observation.code` is `patternCodeableConcept`-fixed to the concept's local coding |
+  | `$extract` | it materializes the code FROM that pattern — the QuestionnaireResponse never mentions it |
+
+  ⚠ **EVALUATION needs none of them.** The merge selected by name-union, the guard reads `.value`, the
+  recency sort reads the recency element. So "the same shape" IS sufficient for every operation that
+  COMPARES records, and insufficient only where the concept's IDENTITY is asserted.
+
+  ⭐ **That distinction is also the COST answer**, and it matters: transforming every record of a RecordSet
+  would be expensive, while identity is claimed at ONE record — the selection's output, the thing a
+  featureExpression points at. So the transformation belongs at the IDENTITY BOUNDARY, not at the union. For
+  a `shape is Record` concept that is one record per concept, not n. (For a `shape is RecordSet` case feature
+  the boundary is the whole published set — which is the separate open cardinality question below, and the
+  place where the cost concern really bites.)
+
+  The evidence that bears on it: a case-feature StructureDefinition pattern-fixes the concept's LOCAL code
   (`patternCodeableConcept`), so a raw record of the right TYPE still carries the EXTERNAL code — meaning
   "correct shape" has to be settled as **type alone** or **type AND coding** before the answer follows. It
   may also differ by consumer: EVALUATION only needs the value (the merge has already selected the record),
