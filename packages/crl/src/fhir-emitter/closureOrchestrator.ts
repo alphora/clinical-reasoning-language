@@ -1606,6 +1606,15 @@ export function emitFhirDefClosure(
     const localSourceReferenceSuffix = localSourceEntry
       ? identityForEntry(localSourceEntry)
       : undefined;
+    // ⭐ #189 T4 — the INFERENCES layer's identity, resolved the same way, because a `shape is Record`
+    // case feature's `cpg-featureExpression` now targets the concept's PUBLISHED define (the merge,
+    // normalised to the case feature by the boundary transform) rather than the answered-records retrieve.
+    //
+    // ⚠ `undefined` when the policy emits no Inferences layer. That is NOT silently tolerated:
+    // `resolveFeatureExpressionTarget` throws, naming the concept, the define and the layer — an absent
+    // identity would build a ROOT-pointing canonical, i.e. a silently dangling featureExpression.
+    const inferencesEntry = entryByLayer("Inferences");
+    const inferencesReferenceSuffix = inferencesEntry ? identityForEntry(inferencesEntry) : undefined;
 
     // (3) ActivityDefinitions
     const actResult = emitActivityDefinitionsForLibrary(
@@ -2003,7 +2012,10 @@ export function emitFhirDefClosure(
           // ⚠ NO `?? ""` FALLBACK ANY MORE. That spelling leaned on the emitter's empty-suffix throw as a
           // backstop, i.e. it turned "the manifest entry is missing" into a generic internal-invariant throw
           // one call deeper. Refuse HERE, naming the layer and the concept.
-          resolveFeatureExpressionTarget(record.target, name, { "local-primitives": localSourceReferenceSuffix }),
+          resolveFeatureExpressionTarget(record.target, name, {
+            "local-primitives": localSourceReferenceSuffix,
+            inferences: inferencesReferenceSuffix,
+          }),
           valueDatum,
           // #198 — the sibling's disambiguated local domain, so the case-feature
           // `patternCodeableConcept.coding.system` matches THIS library's CodeSystem.

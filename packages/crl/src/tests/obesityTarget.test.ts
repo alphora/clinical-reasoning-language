@@ -446,6 +446,33 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
       // One case-feature SD per reachable question — no more, no fewer.
       expect(sds.map((r) => r.id).sort(), opt.name + " — SD count").toHaveLength(opt.reachableQuestions.length);
 
+      // ⭐⭐ #189 T4 — WHERE EACH QUESTION READS ITS ANSWER. Pinned because the retarget changed EVERY
+      // featureExpression in both options and the whole suite stayed green: nothing pinned the target, which
+      // is the same gap that let the RecordSet carrier regression ship.
+      //
+      // THE RULE (disc 532): the featureExpression targets the define that publishes what the concept
+      // DECLARES it publishes. So a `shape is Record` case feature reads the INFERENCES merge — local ∪
+      // source ∪ constructed candidates, normalised to the case feature — while a `shape is RecordSet`
+      // history keeps its LocalPrimitives list target.
+      //
+      // ⚠ MEASURED, both halves (`tmp/NOTES-populate-constructed-resource-executed.md`): a retargeted
+      // question pre-fills from a CQL-CONSTRUCTED, id-less candidate; an un-retargeted one stays blank
+      // though the tree computed it TRUE and acted on it. That was the whole defect
+      // (`.vibe-tools/discussions/530`), and `$apply` now returns `1.1 : Obese => boolean:true`.
+      //
+      // ⚠ RecordSet stays put DELIBERATELY — probe 2 measured that its question cannot populate at ≥2
+      // records whatever the target publishes (the generated group is not marked `repeats`), so retargeting
+      // would move a broken question from one wrong answer to another.
+      for (const r of sds) {
+        const fe = ((r as { extension?: { url?: string; valueExpression?: { reference?: string } }[] }).extension ?? []).find(
+          (e) => (e.url ?? "").includes("cpg-featureExpression"),
+        );
+        expect(fe, `${opt.name} — ${r.id} has no featureExpression`).toBeDefined();
+        const layer = String(fe?.valueExpression?.reference ?? "").split("/").pop() ?? "";
+        const isRecordSetHistory = String(r.id).endsWith("-records");
+        expect(layer, `${opt.name} — ${r.id}`).toMatch(isRecordSetHistory ? /LocalPrimitives$/ : /Inferences$/);
+      }
+
       const unanswerable = sds
         .filter((r) => !(r.differential?.element ?? []).some((e) => /\.value(\[x\]|[A-Z])/.test(e.path ?? "") && e.min === 1))
         .map((r) => r.id);

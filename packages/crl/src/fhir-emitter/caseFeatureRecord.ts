@@ -145,17 +145,49 @@ export function resolveCaseFeatureRecord(
     const isQuestion = isPureQuestionConcept(concept);
     const hasRecordsTwin =
       isQuestion || (reduction !== undefined && reduction.target.type === "ThisRecords" && !isRecencyValueBothRep);
+    // ⭐⭐ #189 T4 — THE RULE (disc 532, both arms): **the featureExpression targets the define that
+    // publishes what the concept DECLARES it publishes.** One rule from self-description, not two
+    // conventions keyed on library.
+    //
+    // ⚠⚠ THE MEASURED DEFECT THIS CLOSES: LocalPrimitives holds ANSWERED RECORDS ONLY, so a computed or
+    // sourced value never pre-filled its own question — ONE `$apply` response computed `Obese`, ACTED on it,
+    // and asked the clinician to supply it, blank. A `shape is Record` concept publishes its selected record
+    // from the Inferences merge (local ∪ source ∪ constructed candidates, normalised to the case feature by
+    // the boundary transform), so THAT is where the question must read.
+    //
+    // ⚠ EXECUTED both halves, with an internal control in one run
+    // (`tmp/NOTES-populate-constructed-resource-executed.md`): a retargeted BMI pre-filled from a
+    // CQL-CONSTRUCTED, id-less candidate, while an un-retargeted `Obese` stayed blank though the tree had
+    // computed it TRUE. Necessary AND sufficient.
+    //
+    // ⚠⚠ RECORD-PUBLISHING CONCEPTS ONLY, and the two exclusions are not oversights:
+    //   · a `shape is RecordSet` publisher keeps its LIST target — MEASURED (probe 2,
+    //     `tmp/NOTES-repeating-group-populate-executed.md`), its question cannot populate at ≥2 records
+    //     whatever the target publishes, because the generated group is not marked `repeats`. Retargeting it
+    //     would move a broken question from one wrong answer to another.
+    //   · a PURE QUESTION keeps its answer-records twin — its Inferences define is a three-state BOOLEAN
+    //     (`"<X> Records".answeredValue()`), and pointing a record-typed featureExpression at a boolean is
+    //     the type-incoherence the SD emitter refuses on the other side.
+    //
+    // ⚠ GATED ON `publishes`, NOT on `concept.shape` alone — through the SAME shared resolver the CQL lane
+    // uses, so the two lanes cannot disagree about what a concept publishes.
+    const rv = resolveRecencyValueConcept(concept);
+    const publishesRecord = !isQuestion && rv.kind === "recency-value" && rv.publishes === "record";
+    if (publishesRecord) {
+      return {
+        kind: "record",
+        descriptor: local,
+        target: { layer: "inferences", define: concept.name, resultKind: "record" },
+      };
+    }
     return {
       kind: "record",
       descriptor: local,
       target: {
-        // T1 is a PURE REFACTOR: every target stays exactly where it was. The `inferences` layer exists in
-        // the type but is not produced yet — T4 introduces it, per disc 532's build order.
         layer: "local-primitives",
         define: hasRecordsTwin ? recordsTwinDefineName(concept.name) : concept.name,
-        // ⚠ EVERY current target is a RETRIEVE define, so every one is a LIST — both the `"<X> Records"`
-        // twin and the same-name publish. That is not an oversight being recorded; it IS the measured
-        // latent defect (probe 2), now visible in the type instead of implicit in the emit.
+        // ⚠ A RETRIEVE define, so a LIST — both the `"<X> Records"` twin and the same-name publish. Not an
+        // oversight being recorded; it IS the measured latent defect (probe 2), visible in the type.
         resultKind: "record-list",
       },
     };
