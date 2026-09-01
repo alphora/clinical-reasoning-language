@@ -638,8 +638,10 @@ set; what is ASKED of it decides how the records are fetched:
 
 ⚠⚠ Filter a `matches this` retrieve and a wrong-code record vanishes into the same empty set as no record at
 all — collapsing a determinate `false` into `unknown`, which is the exact defect the three-state ruling
-exists to prevent. The contract is carried in `template-match/patternScope.ts` so validation and lowering
-read ONE table rather than each re-deciding it.
+exists to prevent. The contract is carried in the pattern catalog’s `projection.retrieve` field
+(`template-match/patternCatalog.ts`) so validation and lowering read ONE table rather than each re-deciding
+it. ⚠ As of 2026-09-01 that field has NO consumer outside its own test — the catalog states the contract and
+nothing enforces it yet, so `matches this` does not emit. Wiring lowering to READ it is the open work.
 
 **⭐ Matching is MEMBERSHIP — local codes and reference value sets alike; never "presence".** A concept's records
 are the resources whose code is a **member of the concept's value set**. That set is a single local code
