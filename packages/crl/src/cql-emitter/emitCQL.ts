@@ -1367,6 +1367,34 @@ class Emitter {
   }
 
   /**
+   * ⭐ #189 — enroll the BOUNDARY HELPER as its own ledger entry.
+   *
+   * The helper is role-equivalent to a lowered implementation twin: a non-boolean RECORD define with no
+   * boolean obligation and nothing to discharge. It exists only so the concept's own define can normalise
+   * what it selected, and no consumer outside this library should read it.
+   */
+  private enrollBoundaryHelper(name: string, cql: string, resourceType: string): void {
+    this.ledger.appendDefine({
+      library: this.ledgerLibrary(),
+      name,
+      resultType: `non-Boolean(${resourceType})`,
+      obligation: {
+        kind: "not-applicable",
+        nullable: false,
+        reason: "#189 boundary helper — the PRE-transform raw select (no boolean define)",
+      },
+      // ⚠ `not-boolean`, not a three-state: the helper publishes a RECORD. It can be null (an empty space),
+      // but that is record absence, not an unknown truth — the null arm of the transform reads it as such.
+      discharge: { booleanEffect: "not-boolean" },
+      origin: "authored",
+      cql,
+      obligationSource: "manufactured",
+      result: { shape: "Record", resourceType },
+      visibility: "impl",
+    });
+  }
+
+  /**
    * #189 Slice C 2a — the DISCHARGE + result type of a concept's emitted `define`, from its EMITTED form.
    * `resultType === "Boolean"` is the proof's subject gate; a non-boolean form returns a `non-Boolean(...)`
    * token (skipped by the proof). FAIL-CLOSED (disc 439 #5): a form whose boolean-ness is not locally
@@ -2018,9 +2046,21 @@ class Emitter {
         constructedExpr: constructed,
       });
       const helper = `define ${selectedRef}:\n${indent(body, 1)}`;
-      const cqlPair = `${helper}\n\n${metaBlock}${header}\n${indent(transformed, 1)}`;
-      this.enrollConcept(c, cqlPair);
-      return cqlPair;
+      const own = `${metaBlock}${header}\n${indent(transformed, 1)}`;
+      // ⚠⚠ TWO DEFINES, TWO LEDGER ENTRIES — never the concatenated pair under one name.
+      //
+      // The ledger's contract is ONE ENTRY PER EMITTED DEFINE (`appendStatement` refuses top-level defines
+      // precisely to enforce it). Enrolling the pair under the concept's name SATISFIED `appendDefine`'s
+      // check — it only asks that the entry's name is AMONG the declared headers — while leaving
+      // `"<X> Selected"` a top-level define with NO entry. MEASURED: `extractEmittedDefineHeaders` reports
+      // `BMI Selected` / `Height Selected` / `Weight Selected` as defines, so the completeness proof counts
+      // them uncovered. Behaviour-neutral while the proof runs in report mode; a hard gate would reject a
+      // valid library, and two readers of the contract would disagree about the invariant.
+      //
+      // The returned TEXT is still the pair — only the ENROLLMENT is split.
+      this.enrollBoundaryHelper(boundarySelectedDefineName(c.name), helper, c.conceptType ?? "Resource");
+      this.enrollConcept(c, own);
+      return `${helper}\n\n${own}`;
     }
     const cql = `${metaBlock}${header}\n${indent(body, 1)}`;
     // #189 Slice C 2a — DUAL-WRITE: enroll the emitted define into the totality ledger (report-mode side
@@ -2250,13 +2290,25 @@ class Emitter {
               // lane (T2: CEL writes the dateTime variant), inheriting the disc-433-reviewed shared-primitive
               // behavior (for a Record the failure mode is "wrong record published", cf. B2a's "wrong truth").
               //
-              // ⚠⚠ THE BOUNDARY THEN DROPS WHAT THIS SELECT PERMITS, AND THE TWO ARE ONE RULE, not a
-              // contradiction — read them together or file a bug that is not there. This select is
-              // permissive because RANKING must not invent an order; the boundary transform is strict
-              // because PUBLISHING a case feature requires a date (its `meta.profile` promises a
-              // recency-bearing record, and the constructor's `recorded is null` guard yields nothing).
-              // So an all-undated space selects a record here and publishes NULL at the boundary — the
-              // determination is unestablished, the guard pauses, and the question gets asked. LOUD.
+              // ⚠⚠ WHAT THE BOUNDARY DOES WITH AN UNDATED WINNER IS CONDITIONAL, and an earlier version of
+              // this comment overstated it. THE ACTUAL RULE: **a CONSTRUCTED record requires a stamp; a
+              // CONFORMING winner is never constructed.** So:
+              //
+              //   · undated winner that already carries the local code  -> PUBLISHED AS-IS, undated. The
+              //     identity check passes, the preserve branch returns it, and the constructor's
+              //     `recorded is null` guard is never reached.
+              //   · undated winner that must be replaced                 -> the constructor yields null, so
+              //     the concept publishes NOTHING; the determination is unestablished and the guard pauses.
+              //   · a concept with NO transform (a projected arm, e.g. `Obese`) -> always publishes its
+              //     winner, dated or not.
+              //
+              // ⚠ MEASURED, because the first version of this comment claimed the strong form and was wrong:
+              // one undated LOCAL-coded weight record publishes `id=wlocal, value=88, stamp=null` — a
+              // record, not null (`tmp/NOTES-boundary-transform-executed.md`).
+              //
+              // The two sites are still ONE rule: ranking must not invent an order, so the select is
+              // permissive; CONSTRUCTING a case feature requires a date, so the constructor refuses. They
+              // only interact when replacement is actually needed.
               //
               // ⭐ That is CONSISTENT with the leg that already shipped: `renderConstructorCall`'s projected
               // arm has always dropped an undated source record ("a source record with no date yields a

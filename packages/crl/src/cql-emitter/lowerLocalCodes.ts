@@ -823,6 +823,11 @@ export function lowerLocalCodes(
           );
           continue;
         }
+        // ⚠ RESERVE IT, exactly as `sourceName` / `recordsTwinName` / the question twin do. Omitting this
+        // was latent rather than live (no other generated family can spell `"<X> Selected"`, and authored
+        // names are pre-seeded above) — but the asymmetry is precisely the hole the NEXT generated-name
+        // family falls into.
+        topLevelIdentifierNames.add(selectedName);
         boundaryTransformSpec = bt.spec;
       }
 

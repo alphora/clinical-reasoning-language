@@ -115,7 +115,12 @@ describe("#189 — the both-rep RECORD merge (`shape is Record` + `code is` + po
     // must publish the RECORD; collapsing it to a value here would silently change what the concept publishes
     // from what its author declared (charter §3 — cardinality is authoritative).
     const { cql } = emit();
-    const merge = /define "Height":\s*\n\s*Last\([\s\S]*?\n\s*\)/.exec(cql)?.[0] ?? "";
+    const merge = /define "Height Selected":\s*\n\s*Last\([\s\S]*?\n\s*\)/.exec(cql)?.[0] ?? "";
+    // ⚠⚠ ASSERT THE EXTRACTION FIRST. When the select moved to the helper (the #189 boundary transform) this
+    // regex still said `define "Height":`, so it matched NOTHING, `merge` was `""`, and the assertion below
+    // passed no matter what the emitter produced. MEASURED after the fact: extraction length 0. A guard that
+    // cannot fail is worse than no guard — it reads as coverage.
+    expect(merge, "the select block must be found, or the assertion below is vacuous").not.toBe("");
     expect(merge).not.toContain(".value as FHIR.");
     // And no per-operand totalisation anywhere on the merge path — totality belongs at the arm.
     expect(cql).not.toContain("Coalesce");

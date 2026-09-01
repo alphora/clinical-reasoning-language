@@ -176,6 +176,16 @@ function runEmit(args: EmitArgs) {
     libraryName: args.libraryName,
     canonicalBase,
     localDomainId,
+    // ⭐ #189 — THE POLICY ID, which this handler already read two lines up. `policyId` and
+    // `localDomainId` are SEPARATE options, and passing only the latter left `policyId` undefined here.
+    //
+    // ⚠ That matters from the boundary transform onward: a `shape is Record` concept with an unprojected
+    // `source representation` must stamp its replacement record with the case-feature StructureDefinition
+    // url, which is composed from the policy id — so without it the emit REFUSES (correctly; a guessed
+    // profile would make the two lanes disagree about what the record IS). MEASURED: `emit_cql` on the
+    // goal's own `policy.crl` refused `Height` and `Weight`, which emitted fine before, purely because the
+    // value was read here and then not passed on.
+    policyId: localDomainId,
   });
   return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 }

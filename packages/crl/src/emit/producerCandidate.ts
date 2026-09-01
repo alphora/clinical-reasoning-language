@@ -488,6 +488,30 @@ export function resolveBoundaryTransform(inputs: {
         `strategy nor its recency element is known.`,
     );
   }
+  // ⭐⭐ A HETEROGENEOUS UNPROJECTED SOURCE ARM IS REFUSED HERE, LOUDLY — because today it is SILENTLY
+  // DROPPED, which is worse than anything a refusal costs.
+  //
+  // ⚠ MEASURED (`Observation` concept + an unprojected `type is ServiceRequest` posrep): the emit SUCCEEDS,
+  // the source retrieve returns the record (`source arm count = 1`), and the published concept is `null` —
+  // the union's `where O.value is …` filter drops it, because a ServiceRequest has no `value`. The author
+  // declared a source representation, the record was found, and it contributed NOTHING with no diagnostic.
+  //
+  // ⚠⚠ THE SHAPE IS AUTHORED AND LEGAL — do NOT read this as rejecting the CRL form. There are 12
+  // heterogeneous posreps in the tree, and `dme101-030`'s `Covered Device` (Observation concept +
+  // ServiceRequest posrep) RUNS today — in the SCALAR lane, which is untouched by this. What is missing is
+  // the Record lane's lowering: a heterogeneous arm needs PROJECTING into the concept's own type before it
+  // joins the space (charter §3's homogeneity invariant), exactly as `Obese`'s Condition arm is. Until that
+  // lowering exists this is typed BUILD DEBT (§0a), not an author error.
+  const sourceType = concept.representations?.find((r) => r.conceptType !== undefined)?.conceptType;
+  if (sourceType !== undefined && sourceType !== resourceType) {
+    return refuse(
+      `Concept "${concept.name}" publishes a \`${resourceType}\` record but its \`source representation\` is ` +
+        `\`${sourceType}\`, and that arm carries no \`value projection\` to bring it into the concept's own ` +
+        `type. A heterogeneous arm cannot join the concept's collection unprojected — the selection reads ` +
+        `\`${resourceType}\`'s value and recency elements, which a \`${sourceType}\` does not carry, so the ` +
+        `source records would be silently dropped. Add a \`value projection\` to that representation.`,
+    );
+  }
   if (row.recency === undefined) {
     return refuse(
       `Concept "${concept.name}": \`${resourceType}\` has no established recency element, so a replaced ` +

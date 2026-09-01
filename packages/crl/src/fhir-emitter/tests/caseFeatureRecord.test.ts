@@ -37,6 +37,11 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     expect(r.descriptor.resourceType).toBe("Condition");
     expect(r.descriptor.valueElement).toBeUndefined(); // valueless — no value[x], truth is `exists`
     expect(r.target.define).toBe("Qualifying Diagnosis Records");
+    // ⚠ PIN THE MULTIPLICITY, not just the name. `resultKind` records the CQL type of the target define,
+    // and "every current target is a record-list" was a COMMENT-ONLY claim until this line — which is
+    // exactly the shape probe 2 measured failing at ≥2 records. T4 is what introduces a `record` target.
+    expect(r.target.resultKind).toBe("record-list");
+    expect(r.target.layer).toBe("local-primitives");
   });
 
   it("MedicationRequest + exists this → a valueless record (NOT forced to Observation — the hack is gone)", () => {

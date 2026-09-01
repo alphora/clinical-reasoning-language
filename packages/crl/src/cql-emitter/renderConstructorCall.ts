@@ -265,9 +265,24 @@ export function componentStampCql(recordExpr: string, sortExpr: string, cast: "d
  * non-conforming one is replaced by a constructed record that carries the local code and PRESERVES the
  * source record's stamp.
  *
- * ⚠ NULL-RECENCY IS A DROP (disc 532 Q3). The stamp is read off the winner; when it is null the
- * constructor's own guard yields nothing, so an establishment that cannot say WHEN publishes nothing rather
- * than a raw non-conforming record. Consistent with the projected leg, which has always behaved this way.
+ * ⚠ NULL-RECENCY IS A DROP (disc 532 Q3) — CONDITIONALLY. The stamp is read off the winner; when it is null
+ * the constructor's own guard yields nothing. But that guard is only reached on the REPLACE branch: a winner
+ * that already carries the local code is PRESERVED undated. MEASURED, both rows, in
+ * `tmp/NOTES-boundary-transform-executed.md`.
+ *
+ * ⚠⚠ TWO KNOWN GAPS, FILED RATHER THAN SILENTLY DECIDED (disc 533, both arms):
+ *
+ *   1. **`evidence` is `{}`** — the replacement carries NO back-reference to the record it replaced, even
+ *      though that record HAS an `id` and is in scope. The Observation value-mode signature already declares
+ *      `evidenceElement: "derivedFrom"`, so the slot exists and the expression is one line. It is NOT done
+ *      here because `derivedFrom` exists only on that one cell: a general answer needs a per-resource
+ *      registry decision, and inventing one per call site is how the lanes drift. The projected arm passes
+ *      `{}` for the same reason. ⚠ Read this as OPEN, not as decided-forever.
+ *   2. **`meta.profile` is asymmetric** — a CONSTRUCTED replacement carries the case-feature profile; a
+ *      PRESERVED winner does not, because stamping a retrieved record would mean reconstructing it and
+ *      discarding its `id`. So profile PRESENCE means "constructed", and conformance is established by the
+ *      CODE (`patternCodeableConcept`), never by the profile. Any consumer testing `meta.profile` to decide
+ *      whether a record is a case feature is asking the wrong question.
  */
 export function renderBoundaryTransform(inputs: {
   /** The rendered reference to the helper define holding the raw select (e.g. `"Weight Selected"`). */
