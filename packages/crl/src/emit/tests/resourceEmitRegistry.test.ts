@@ -19,6 +19,8 @@ import {
   resourceCodingPlacement,
   QICORE_BASE_PROFILE,
   qicoreBaseProfile,
+  renderCodingIdentityCheck,
+  resourceEmitRow,
 } from "../resourceEmitRegistry";
 
 // T2 — the JSON-write-name resolvers. These derive the serialized-JSON write name from a T1 read row via the
@@ -508,6 +510,52 @@ describe("QICORE_BASE_PROFILE — base QI-Core profile per stamped resource type
     for (const url of Object.values(QICORE_BASE_PROFILE)) {
       expect(url).toMatch(/^http:\/\/hl7\.org\/fhir\/us\/qicore\/StructureDefinition\/qicore-/);
       expect(url, "wire canonical is unversioned (no |version)").not.toContain("|");
+    }
+  });
+});
+
+
+describe("#189 — renderCodingIdentityCheck: the boundary transform's identity check, per coding strategy", () => {
+  // ⭐⭐ EVERY EXPECTATION HERE WAS EXECUTED on the cqf engine before being written down
+  // (`tmp/NOTES-kernel-spellings-executed.md`) — one external-coded and one local-coded record per cell.
+  //
+  // ⚠⚠ THE REASON THIS TEST EXISTS: I measured the `codeable-concept` cell ALONE and generalised it into a
+  // universal `<alias>.code ~ <code>` kernel. That is wrong for two of the five `caseFeature: true`
+  // resources. It fails at COMPILE time rather than silently — "Could not resolve call to operator
+  // Equivalent with signature (list<FHIR.CodeableConcept>, System.Code)" — but a compile failure of the
+  // whole emitted library is still a shipped defect.
+  //
+  // ⚠ `codingCqlElement` CANNOT serve this: it flattens to `{ element, array }`, collapsing
+  // `codeable-concept` and `choice-codeable-concept` into the same shape — and the choice is precisely the
+  // cell that needs the `as` cast.
+
+  it("codeable-concept (Observation/Condition/Procedure/ServiceRequest) — a direct `~`", () => {
+    expect(renderCodingIdentityCheck({ kind: "codeable-concept", field: "code" }, "O", '"Local"')).toBe(
+      'O.code ~ "Local"',
+    );
+  });
+
+  it("⭐ choice-codeable-concept (MedicationRequest.medication[x]) — REQUIRES the `as` cast", () => {
+    expect(
+      renderCodingIdentityCheck({ kind: "choice-codeable-concept", field: "medication" }, "M", '"Local"'),
+    ).toBe('(M.medication as FHIR.CodeableConcept) ~ "Local"');
+  });
+
+  it("⭐ codeable-concept-array (Encounter.type[]) — REQUIRES `exists`, not `~` on the list", () => {
+    expect(renderCodingIdentityCheck({ kind: "codeable-concept-array", field: "type" }, "E", '"Local"')).toBe(
+      'exists (E.type CFC where CFC ~ "Local")',
+    );
+  });
+
+  it("⚠ every `caseFeature: true` resource resolves to a spelling — no silent gap", () => {
+    // The registry is the authority on which resources the case-feature lane admits. If a row is added or
+    // its `caseFeature` flipped (Encounter WAS flipped, 2026-08-30), this fails until the cell is measured.
+    for (const rt of ["Observation", "Condition", "Procedure", "ServiceRequest", "MedicationRequest", "Encounter"]) {
+      const row = resourceEmitRow(rt);
+      expect(row, rt).toBeDefined();
+      const rendered = renderCodingIdentityCheck(row!.coding, "X", '"L"');
+      expect(rendered, rt).toContain('"L"');
+      expect(rendered.length, rt).toBeGreaterThan(0);
     }
   });
 });

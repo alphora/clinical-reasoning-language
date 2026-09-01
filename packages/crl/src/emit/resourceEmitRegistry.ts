@@ -446,6 +446,40 @@ export function codingCqlElement(strategy: CodingStrategy): { element: string; a
   return { element: strategy.field, array: strategy.kind === "codeable-concept-array" };
 }
 
+/**
+ * ⭐⭐ REFACTOR:grounded (#189 boundary transform). RENDER THE IDENTITY CHECK — "is this record OUR case
+ * feature?" — for a resource's coding strategy. `alias` is a bound record expression; `codeRef` is the
+ * emitted CQL name of the concept's local `code` declaration.
+ *
+ * ⚠⚠ THIS EXISTS BECAUSE `codingCqlElement` CANNOT DO IT, and the difference is not cosmetic. That resolver
+ * flattens `CodingStrategy` to `{ element, array }` — which collapses `codeable-concept` and
+ * `choice-codeable-concept` into the same shape, and the CHOICE is exactly the cell that needs an `as` cast.
+ * A caller reading `{ element: "medication", array: false }` would emit `X.medication ~ <code>` and be wrong.
+ *
+ * ⭐ EVERY SPELLING BELOW WAS EXECUTED on the cqf engine — `tmp/NOTES-kernel-spellings-executed.md`, one
+ * external-coded and one local-coded record per cell. ⚠ I previously measured ONLY the `codeable-concept`
+ * cell and generalised it into a universal `.code ~`; that is wrong for two of the five case-feature
+ * resources, and it FAILS AT COMPILE TIME rather than silently ("Could not resolve call to operator
+ * Equivalent with signature (list<FHIR.CodeableConcept>, System.Code)").
+ *
+ * ⚠ `~` IS CONTAINMENT, not set-equality — a record carrying the local code ALONGSIDE its original external
+ * code passes, on both the scalar and array cells. That is what `patternCodeableConcept` requires, and it is
+ * why the check is sound: the local codesystem is synthetic and ours, and BOTH axes (system and code)
+ * discriminate.
+ */
+export function renderCodingIdentityCheck(strategy: CodingStrategy, alias: string, codeRef: string): string {
+  switch (strategy.kind) {
+    case "codeable-concept":
+      return `${alias}.${strategy.field} ~ ${codeRef}`;
+    case "choice-codeable-concept":
+      // A choice element can hold a Reference instead (`medicationReference`); the cast yields null there,
+      // and `null ~ code` is null — correctly NOT a match, never a crash.
+      return `(${alias}.${strategy.field} as FHIR.CodeableConcept) ~ ${codeRef}`;
+    case "codeable-concept-array":
+      return `exists (${alias}.${strategy.field} CFC where CFC ~ ${codeRef})`;
+  }
+}
+
 /** REFACTOR:grounded (#189 CEL-writer T2). The CEL instance lane's coding-PLACEMENT resolver: WHERE a resource's
  *  coding is written (the JSON name) and whether it is an ARRAY element — or `undefined` for a resource with no
  *  registry row (the CEL writer then keeps its pre-flip behavior / fails closed at T4). Coding placement is a
