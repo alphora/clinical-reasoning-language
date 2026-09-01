@@ -202,8 +202,22 @@ currently permits is a **warning** (`composition-result-type-mismatch`) today th
   this` is meaningless (stage 2 is handed a single record), while `within last 6 months this, then highest
   this` is "the greatest of the recent ones".
 - ⭐ **`this` in a DEFINITION is the space as of the PREVIOUS stage.** At stage 0 that is the concept's own
-  source records — its local `code is` records ∪ each `source representation`'s records. At every later stage
-  it is EXACTLY the immediately preceding stage's output: never an earlier pre-filter space, and never the
+  source records — its local `code is` records ∪ **each `source representation`'s CANDIDATES**.
+
+  ⭐⭐ **THAT IS WHAT A PROJECTION IS FOR: it transforms the raw external record into a LOCAL-CODE
+  REPRESENTATION so that evaluation is HOMOGENEOUS.** Every source representation projects. `value projection
+  is exists this` is simply an EXPLICIT one; a rep written without it has an IDENTITY projection (it is "read
+  AS the concept value" — the value/interface convention below). So the space never holds a raw external
+  resource: every member is a record of the concept's own `type is` carrying the concept's local code,
+  whatever it was projected from, and the terminal selection compares like with like. VOCABULARY states the
+  same rule from the other end — *"the source resource is never 'the concept's record': the projection's
+  OUTPUT is the candidate."*
+
+  ⚠ This is also why a selected member conforms to the concept's case-feature profile: homogeneity is not a
+  convenience, it is what makes the merge, the guard's value read, and the questionnaire's population all
+  talk about the same thing.
+
+  At every later stage `this` is EXACTLY the immediately preceding stage's output: never an earlier pre-filter space, and never the
   stage's own output (which is what keeps `<derivation>, then most recent this` a pipeline and not a fixed
   point). A reduction over a NAMED set reduces `this` ∪ that set, so a coded concept's own assertions compete
   with the records it reduces.

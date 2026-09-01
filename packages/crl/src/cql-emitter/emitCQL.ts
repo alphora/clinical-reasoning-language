@@ -2631,6 +2631,22 @@ class Emitter {
           // a candidate of the CONCEPT's `type is` right here, at the space-assembly site, beside the
           // producer's candidate. That keeps the ExternalPrimitives twin truthful about what it retrieves and
           // keeps every transformation of the space in one place.
+          // ⚠⚠ THIS RETURN IS NOW KNOWN-WRONG, and it is recorded rather than silently left. An UNPROJECTED
+          // source rep contributes an IDENTITY-PROJECTION CANDIDATE, not its raw external resource —
+          // operator ruling 2026-09-01, and charter §3 stage-0 now says so explicitly ("each `source
+          // representation`'s CANDIDATES … not the raw external resources"). Returning `epRef` unions in a
+          // record carrying the EXTERNAL code, so a selected source winner does not conform to the concept's
+          // case-feature profile, which is why `cpg-featureExpression` cannot point at this space yet.
+          //
+          // ⚠ THE BRANCH ITSELF IS THE WRONG SHAPE, not just this arm. If EVERY source rep projects — and
+          // it does; that is what a projection is FOR — then the question is never "is it projected?" but
+          // "WHICH projection?": identity, `exists this`, or age. `source-projected` reads as an exception
+          // when it is the general case with one spelling filled in.
+          //
+          // ⚠ NOT FIXED HERE because the identity projection needs the per-rep carrier/type conversion
+          // matrix, and the arm below only knows how to build a BOOLEAN from `exists this`. Next build
+          // slice (disc 530).
+          // REFACTOR:suspect
           const src = (c.__recencyValueDescriptors as { source?: { arm?: string } } | undefined)?.source;
           if (src?.arm !== "source-projected") return epRef;
           const spec = c.__projectedSourceSpec as ProjectedSourceSpec | undefined;

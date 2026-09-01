@@ -32,7 +32,8 @@ import { patternReturnShape } from "../template-match/patternCatalog";
 // is owed); Record ⇒ ONE selected record; RecordSet ⇒ the set of records. A reduction reduces a
 // RECORD SET down to a scalar (`exists`/`count` ⇒ boolean) or a record (`most recent`). That set is
 // `this` — the space as of the PREVIOUS pipeline stage (at stage 0: the concept's own local `code is`
-// records ∪ each `source representation`'s) — and/or a NAMED `shape is RecordSet` concept; a reduction
+// records ∪ each `source representation`'s CANDIDATES, never its raw external resources — charter §3) —
+// and/or a NAMED `shape is RecordSet` concept; a reduction
 // over a named set reduces `this` ∪ that set, so a coded concept's own assertions compete.
 //
 // Rules (all WARNINGS; see .vibe-tools/discussions/415 + the ReductionShapeRule doc in validator.ts):
