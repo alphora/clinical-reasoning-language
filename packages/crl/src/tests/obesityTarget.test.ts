@@ -225,11 +225,23 @@ describe("#189 canonical target — the Obese/BMI chain", () => {
           // reports the gap honestly.
           expect((v.errors ?? []).map((e) => e.kind)).toEqual(["reduction-shape"]);
         }
-        // The model is complete and legal TODAY. What is not complete is emit, and the warnings say so — each
-        // is a step in `tmp/PLAN-obesity-apply.md`, not a defect in the policy:
+        // The model is complete and legal TODAY. What is not complete is emit, and the warnings say so —
+        // `reduction-shape` is a step in `tmp/PLAN-obesity-apply.md`, not a defect in the policy:
         //   `shape is` declared but not consulted for the DECLARING concept -> step 6
         //   cross-representation recency merge                              -> #257
-        expect([...new Set((v.warnings ?? []).map((w) => w.kind))]).toEqual(["reduction-shape"]);
+        //
+        // ⭐⭐ `recordset-unbounded` IS NOT A REMAINING STEP — IT IS A PROPERTY OF THESE TWO OPTIONS, AND
+        // THE GOAL IS THE ORACLE THAT SAYS SO. The RecordSet option's `Weight`/`Height`/`BMI` and the
+        // Layered option's `Weight Records`/`Height Records` publish the patient's WHOLE coded history on
+        // purpose. The warning is CORRECT and must keep firing: charter §3 puts the case-feature transform
+        // at the concept BOUNDARY, and for a RecordSet the boundary is the entire set, so the cost is real.
+        //
+        // ⚠⚠ WHAT THIS ROW ACTUALLY PINS IS THE SEVERITY. These fixtures are the canonical authoring
+        // options and they stay VALID — so if anyone ever "tightens" `recordset-unbounded` into an error,
+        // the goal itself becomes invalid and this test says so. Do NOT silence it by bounding the
+        // fixtures: that would delete the very shape the option exists to demonstrate.
+        const expectedWarnings = opt.name === "Record" ? ["reduction-shape"] : ["recordset-unbounded", "reduction-shape"];
+        expect([...new Set((v.warnings ?? []).map((w) => w.kind))].sort()).toEqual(expectedWarnings.sort());
       });
 
       it("⭐ CRE — the truth table. ALL THREE ROWS now meet the acceptance criterion", () => {

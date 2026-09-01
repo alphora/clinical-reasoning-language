@@ -2270,6 +2270,22 @@ class Emitter {
    * so a newer mistyped/valueless row can't mask an older conforming one ("newest CONFORMING record wins" —
    * disc 433 crit).
    */
+  /**
+   * ⭐ THE SELECTION — and the clearest place the SHAPE-IS-SUFFICIENT invariant is spent.
+   *
+   * Everything this reads off a space member is SHAPE: the recency element to sort by, `id` to break ties,
+   * and the carrier element to type-filter. **None of it needs the member to carry the concept's own local
+   * code**, which is exactly why a raw source record may sit in the collection un-projected
+   * (`renderSpaceTerms`, the `external-primitives` arm) and cost nothing per member.
+   *
+   * The identity obligation — *a consumer has to see a CASE FEATURE* (charter §3, operator 2026-09-01) —
+   * is discharged at the concept BOUNDARY, on the ONE record this returns, not on the n records it sorted.
+   *
+   * ⚠⚠ SO IF THIS FUNCTION EVER NEEDS THE CONCEPT'S IDENTITY — a sort, filter or tie-break that reads the
+   * local code rather than the shape — **carve out that case; do not project the space to satisfy it.**
+   * Projecting here is a one-line change that moves the cost from 1 to n, on every evaluation, with no
+   * failing test to announce it. See the foot-gun note at the `external-primitives` arm.
+   */
   private emitSelectNewest(
     twinRef: string,
     desc: EffectiveRepresentationDescriptor & { arm: "local-exact" },
@@ -2641,6 +2657,14 @@ class Emitter {
           //
           // ⚠ Do NOT "fix" this line by projecting every member: that is the expensive shape (n transforms
           // over a history) and it buys nothing the boundary does not already give.
+          //
+          // ⚠⚠ IF YOU FIND A CASE WHERE SHAPE IS *NOT* SUFFICIENT INSIDE THE COLLECTION — some later stage
+          // that needs the concept's IDENTITY and not merely its shape — **carve that case out; do not
+          // remove the invariant.** Removing it is a one-line change that silently makes every RecordSet
+          // concept pay a construction per member, on every evaluation, forever: a giant performance foot
+          // gun with no failing test to announce it. A carve-out is bounded and reviewable; a removal is
+          // neither. If a carve-out genuinely cannot express the case, that is an operator-level decision
+          // about the model, not a local fix.
           //
           // ⚠ The questionnaire path survives a raw record — measured, `$extract` re-derives identity from
           // `patternCodeableConcept` — but that is a SPECIFIC CASE WE CANNOT RELY ON, and it is not why this

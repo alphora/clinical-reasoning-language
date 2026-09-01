@@ -11,6 +11,7 @@ import { EmitCapabilityValidator } from "./emitCapabilityValidator";
 import { MetaTagValidator } from "./metaTagValidator";
 import { NameUniquenessValidator } from "./nameUniquenessValidator";
 import { PipelineStageValidator } from "./pipelineStageValidator";
+import { RecordSetBoundValidator } from "./recordSetBoundValidator";
 import { ReductionShapeValidator } from "./reductionShapeValidator";
 import { ReferenceResolver } from "./referenceResolver";
 import { RepresentationShapeValidator } from "./representationShapeValidator";
@@ -109,7 +110,12 @@ export type ValidationErrorKind =
   // (`unsupported-casefeature-resource`); this surfaces it EARLIER at validate time. Intrinsic
   // WARNING, NEVER an error: the emit registry is a deliberate SUBSET of capability, so a hard error
   // would turn "not yet emittable" into "invalid CRL" (grammar defines the language, not the registry).
-  | "unsupported-casefeature-resource";
+  | "unsupported-casefeature-resource"
+  // #189 — a `shape is RecordSet` concept whose program never restricts the set, so it publishes the
+  // patient's whole history. Intrinsic WARNING, NEVER an error: the shape is LEGAL and the Layered
+  // authoring option uses it deliberately. It flags COST, not incorrectness — the case-feature transform
+  // lands at the concept boundary, and for a RecordSet the boundary is the entire set.
+  | "recordset-unbounded";
 
 /**
  * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
@@ -555,6 +561,18 @@ export interface EmitCapabilityWarning extends ValidationErrorBase {
   resourceType: string;
 }
 
+/**
+ * ⭐ #189 — a `shape is RecordSet` concept whose program never restricts the set.
+ *
+ * ⚠ INTRINSICALLY a warning, never demotable-from-error: an unbounded coded history is LEGAL (the Layered
+ * authoring option publishes one deliberately) and charter §3 keeps all three authoring options canonical.
+ * See `recordSetBoundValidator.ts` for why the cost is real and why the scope is drawn where it is.
+ */
+export interface RecordSetUnboundedWarning extends ValidationErrorBase {
+  kind: "recordset-unbounded";
+  conceptName: string;
+}
+
 export type ValidationError =
   | EmptyNameError
   | DuplicateNameError
@@ -577,6 +595,7 @@ export type ValidationError =
   | UseSiteOperandUntypedWarning
   | ReductionShapeError
   | EmitCapabilityWarning
+  | RecordSetUnboundedWarning
   | MetaDiagnostic;
 
 export interface ValidationResult {
@@ -635,6 +654,7 @@ export class Validator {
   private readonly agePredicateValidator: AgePredicateValidator;
   private readonly representationShapeValidator: RepresentationShapeValidator;
   private readonly pipelineStageValidator: PipelineStageValidator;
+  private readonly recordSetBoundValidator: RecordSetBoundValidator;
   private readonly reductionShapeValidator: ReductionShapeValidator;
   private readonly useSiteTypeValidator: UseSiteTypeValidator;
   private readonly emitCapabilityValidator: EmitCapabilityValidator;
@@ -649,6 +669,7 @@ export class Validator {
     this.agePredicateValidator = new AgePredicateValidator();
     this.representationShapeValidator = new RepresentationShapeValidator();
     this.pipelineStageValidator = new PipelineStageValidator();
+    this.recordSetBoundValidator = new RecordSetBoundValidator();
     this.reductionShapeValidator = new ReductionShapeValidator();
     this.useSiteTypeValidator = new UseSiteTypeValidator();
     this.emitCapabilityValidator = new EmitCapabilityValidator();
@@ -721,6 +742,10 @@ export class Validator {
     errors.push(...this.representationShapeValidator.validate(ast, sources));
     // #189 P2 D10 — pipeline stage structure. ERRORS: an unmatched stage must never soft-compile.
     errors.push(...this.pipelineStageValidator.validate(ast, sources));
+    // #189 — an unbounded `shape is RecordSet` history. ⚠ Pushed straight to `warnings`, NOT through
+    // `pushSplit`: this finding is intrinsically advisory (the shape is legal — see the validator's header),
+    // so it must never flip `isValid`, and there is nothing for `soft` mode to demote.
+    warnings.push(...this.recordSetBoundValidator.validate(ast, sources));
 
     // concept-model redesign Todo 2 rule B — use-site & result-shape type checking (pattern
     // operand constraints incl. refinement/anchor booleans and non-boolean composition/bare-ref
