@@ -6,6 +6,7 @@ import {
   derivedStampCql,
   fhirBooleanFromSystemBoolean,
   fhirQuantityFromSystemQuantity,
+  renderBoundaryTransform,
   renderConstructorCall,
 } from "../renderConstructorCall";
 
@@ -132,5 +133,50 @@ describe("#189 — rendering a producer stage's constructed candidate", () => {
       );
       expect(componentStampCql('"Cond"', "recordedDate", "none")).toBe('("Cond").recordedDate.value');
     });
+  });
+});
+
+describe("#189 — renderBoundaryTransform: check-then-replace at the concept boundary", () => {
+  // ⭐⭐ THE SHAPE HERE WAS EXECUTED, BOTH BRANCHES (`tmp/NOTES-kernel-spellings-executed.md`) — the
+  // `if/then/else` type-unifies a RETRIEVED resource with a CONSTRUCTED one, which this project's history
+  // says never to assume ("obvious" CQL spellings have failed here repeatedly: union precedence,
+  // `ToQuantity` direction, `FHIR.boolean { value: null } is null = false`).
+  //
+  //   winner already carries the local code -> preserved WITH its `id`
+  //   winner is externally coded            -> replaced; constructed record carries the local code
+  //                                            and PRESERVES the source record's stamp
+
+  const rendered = renderBoundaryTransform({
+    selectedRef: '"Weight Selected"',
+    identityCheck: '"Weight Selected".code ~ "Local Weight"',
+    constructedExpr: "CRLConstructObservationQuantity(...)",
+  });
+
+  it("⚠ the NULL arm comes FIRST — the identity check against null is NULL, not false", () => {
+    // Without it the `else` would construct from a record that is not there: `null.code ~ X` is null, which
+    // is not true, so control would fall through to the construct branch on an empty space.
+    expect(rendered.startsWith('if "Weight Selected" is null then null')).toBe(true);
+  });
+
+  it("⭐ PRESERVES a conforming winner rather than reconstructing it", () => {
+    // A record already carrying the local code is a PERSISTED resource with an `id`. Always-reconstruct
+    // would discard that identity on every evaluation to avoid a check measured to be one operator.
+    expect(rendered).toContain('then "Weight Selected"');
+  });
+
+  it("replaces a non-conforming winner with the constructed record", () => {
+    expect(rendered).toContain("else CRLConstructObservationQuantity(...)");
+  });
+
+  it("⚠ the identity check is INJECTED, never built here — it is descriptor-driven per coding strategy", () => {
+    // `renderCodingIdentityCheck` owns the spelling; a hardcoded `.code` here would fail to COMPILE on
+    // Encounter's `type[]` and would need an `as` cast on MedicationRequest's `medication[x]`.
+    const arr = renderBoundaryTransform({
+      selectedRef: '"Enc Selected"',
+      identityCheck: 'exists ("Enc Selected".type CFC where CFC ~ "Local Visit")',
+      constructedExpr: "CRLConstructEncounter(...)",
+    });
+    expect(arr).toContain('exists ("Enc Selected".type CFC where CFC ~ "Local Visit")');
+    expect(arr).not.toContain(".code ~");
   });
 });

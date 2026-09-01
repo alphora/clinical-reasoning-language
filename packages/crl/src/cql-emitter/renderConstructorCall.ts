@@ -106,6 +106,26 @@ export function candidateCodeCql(code: CandidateCode): string {
 }
 
 /**
+ * The BARE constructor call — ONE reading of the argument order, for every caller.
+ *
+ * ⚠ Extracted because the BOUNDARY transform needs a SINGLE resource expression while the arms need a LIST
+ * (`renderConstructorCall` below wraps this one). Rendering the argument list in two places is how a call
+ * and the function it calls come to disagree — the same reason `ProducerCandidateSpec` carries the
+ * constructor signature WHOLE rather than just its name.
+ */
+export function constructorCallExpr(inputs: ConstructorCallInputs): string {
+  const args = [
+    candidateCodeCql(inputs.code),
+    inputs.valueExpr,
+    inputs.stampExpr,
+    inputs.subjectExpr,
+    q(inputs.profile),
+    inputs.evidenceExpr ?? "{}",
+  ];
+  return `${inputs.functionName}(\n    ${args.join(",\n    ")}\n  )`;
+}
+
+/**
  * ⭐ The producer's candidate, as a LIST that is empty when nothing was produced.
  *
  * ⚠ THE `where C is not null` IS LOAD-BEARING AND WAS PROBED, not assumed. P2-D1 flagged the null-drop as
@@ -116,17 +136,13 @@ export function candidateCodeCql(code: CandidateCode): string {
  *
  * The result is a list precisely so it can be `union`ed into the space with no special case for "the producer
  * produced nothing" — which is the state that makes the determination UNKNOWN and the guard PAUSE.
+ *
+ * ⚠ The BOUNDARY transform deliberately does NOT use this form: it publishes ONE record, not a list, so it
+ * calls `constructorCallExpr` directly. The null-drop still happens — via the constructor's own
+ * `recorded is null` guard — it just has no list to be empty.
  */
 export function renderConstructorCall(inputs: ConstructorCallInputs): string {
-  const args = [
-    candidateCodeCql(inputs.code),
-    inputs.valueExpr,
-    inputs.stampExpr,
-    inputs.subjectExpr,
-    q(inputs.profile),
-    inputs.evidenceExpr ?? "{}",
-  ];
-  return `({ ${inputs.functionName}(\n    ${args.join(",\n    ")}\n  ) }) C\n    where C is not null`;
+  return `({ ${constructorCallExpr(inputs)} }) C\n    where C is not null`;
 }
 
 /**
@@ -223,4 +239,50 @@ export function componentStampCql(recordExpr: string, sortExpr: string, cast: "d
   return cast === "dateTime"
     ? `((${recordExpr}).${sortExpr} as FHIR.dateTime).value`
     : `(${recordExpr}).${sortExpr}.value`;
+}
+
+/**
+ * ⭐⭐ #189 — THE BOUNDARY TRANSFORM. Run the concept's pipeline, ask whether the published record already IS
+ * the case feature, and construct one only if it is not.
+ *
+ * Operator, 2026-09-01: *"we should be able to run everything for a concept and then check if the result is
+ * our CF then replace the result with our CF if not."* — and, scoping it: *"it only applies to concepts that
+ * have a `code is`."*
+ *
+ * ⚠⚠ THE TRANSFORM GOES ON THE CONCEPT'S OWN DEFINE, AND THE HELPER HOLDS THE RAW SELECT — never the other
+ * way round. Both panel arms caught this independently (disc 532 Q5): if the transform sat on a side define
+ * that only the `cpg-featureExpression` targeted, every CQL consumer — a cross-library reference, the
+ * Interface re-export, a downstream reduction — would still read the raw record. The ruling is
+ * consumer-independent (charter §3: *"it does not depend on which consumer is asking"*), so the concept's
+ * published define is where it must land.
+ *
+ * ⚠ CHECK-THEN-REPLACE, not always-reconstruct. A record that already carries the local code is a PERSISTED
+ * resource with an `id`; reconstructing it would discard that identity on every evaluation to avoid a check
+ * measured to be a single operator.
+ *
+ * ⭐ EXECUTED, both branches (`tmp/NOTES-kernel-spellings-executed.md`): the `if/then/else` type-unifies a
+ * RETRIEVED resource with a CONSTRUCTED one; the conforming winner is preserved WITH its `id`; the
+ * non-conforming one is replaced by a constructed record that carries the local code and PRESERVES the
+ * source record's stamp.
+ *
+ * ⚠ NULL-RECENCY IS A DROP (disc 532 Q3). The stamp is read off the winner; when it is null the
+ * constructor's own guard yields nothing, so an establishment that cannot say WHEN publishes nothing rather
+ * than a raw non-conforming record. Consistent with the projected leg, which has always behaved this way.
+ */
+export function renderBoundaryTransform(inputs: {
+  /** The rendered reference to the helper define holding the raw select (e.g. `"Weight Selected"`). */
+  selectedRef: string;
+  /** The identity check over `selectedRef`, from `renderCodingIdentityCheck` — descriptor-driven. */
+  identityCheck: string;
+  /** The constructor call producing the replacement record. */
+  constructedExpr: string;
+}): string {
+  const { selectedRef, identityCheck, constructedExpr } = inputs;
+  // ⚠ The null arm is FIRST and explicit. Without it the identity check runs against null — which is null,
+  // not false, so the `else` would construct from a record that is not there.
+  return (
+    `if ${selectedRef} is null then null\n` +
+    `  else if ${identityCheck} then ${selectedRef}\n` +
+    `  else ${constructedExpr}`
+  );
 }
