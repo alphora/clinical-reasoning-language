@@ -294,33 +294,50 @@ export function caseFeatureCanonicalUrl(metadata: CpgMetadata, conceptName: stri
  * The caller (closureOrchestrator) collects the eligible concept (a `code is`
  * concept reachable from a decision `when` condition) and supplies the resolved
  * `code` (from `lowerLocalCodes().localCodes`) + the descriptor-derived
- * `resourceType` / `recordsDefineId` / `valueDatum`.
+ * `resourceType` / `target` / `valueDatum`.
  *
- * `featureExpressionLibrarySuffix` is the #186 unified IDENTITY `S` of the
- * LocalPrimitives library (the opaque hyphen-free PascalCase name, e.g.
- * `ExampleSemandLocalsource`) — where the concept's `code is` define lives — used
- * to build the `cpg-featureExpression.reference` canonical
- * (`libraryCanonicalUrl(metadata, S)`). The truth-set lane points the
- * featureExpression at the LocalPrimitives Library (NOT the Interface re-export), so
- * the case-feature submission resolves the bare `code is` boolean retrieve.
- * REQUIRED + non-empty: the caller only invokes this once it has confirmed the
- * LocalPrimitives Library is in the manifest. An empty identity would build a
- * ROOT-pointing reference (a silent dangling/wrong target) — fail fast instead.
+ * `target.librarySuffix` is the #186 unified IDENTITY `S` of the library the featureExpression define lives
+ * in (the opaque hyphen-free PascalCase name, e.g. `ExampleSemandLocalsource`), used to build the
+ * `cpg-featureExpression.reference` canonical (`libraryCanonicalUrl(metadata, S)`). It points at the
+ * LIBRARY, never the Interface re-export.
+ *
+ * ⚠ REQUIRED + non-empty: the caller resolves the layer against the manifest and only invokes this once it
+ * has confirmed the entry. An empty identity would build a ROOT-pointing reference — a silent dangling
+ * target — so this fails fast instead.
  */
+/**
+ * A `FeatureExpressionTarget` with its LAYER already resolved to a library identity.
+ *
+ * ⚠ The resolution belongs to the caller because only it holds the manifest — and it must FAIL LOUD when the
+ * requested layer has no entry, never fall back to an empty identity (which would build a ROOT-pointing
+ * canonical: a silent dangling target).
+ */
+export type ResolvedFeatureExpressionTarget = {
+  /** The #186 unified IDENTITY `S` of the library the define lives in. */
+  librarySuffix: string;
+  /** The bare CQL define identifier. */
+  define: string;
+  /** The CQL type of that define — see `FeatureExpressionTarget.resultKind`. */
+  resultKind: "record" | "record-list";
+};
+
 export function emitCaseFeatureStructureDefinition(
   conceptName: string,
   code: string,
   metadata: CpgMetadata,
   opts: EmitOptions,
-  featureExpressionLibrarySuffix: string,
   // #189 2d — the concept's NATURAL FHIR resource (Condition, MedicationRequest, …) from its
   // effective-representation descriptor. The SD `type`/`baseDefinition`/differential follow it (charter §4);
   // the forced-`Observation` profile was the hack. `undefined` from `caseFeatureProfileShape` → the resource is
   // not in the emit registry → a structured `unsupported-casefeature-resource` (never a silent Observation fallback).
   resourceType: string,
-  // The records-twin define the `cpg-featureExpression` targets (`"<X> Records"` in the LocalPrimitives library) —
-  // the natural-resource retrieve, NOT the ephemeral boolean `"<X>"` (charter §4; panel disc 481/482).
-  recordsDefineId: string,
+  // ⭐ WHERE THE `cpg-featureExpression` POINTS — the RESOLVED target: a library identity plus the bare
+  // define, kept as ONE object. ⚠⚠ It used to arrive as TWO independent arguments (a define name here, the
+  // library identity in `featureExpressionLibrarySuffix`), which is how the library came to be hard-wired to
+  // LocalPrimitives at the call site — a pair split across parameters is a pair nobody maintains together
+  // (disc 532, both arms). The caller resolves the semantic LAYER against the manifest; this function never
+  // re-derives it.
+  target: ResolvedFeatureExpressionTarget,
   // Present iff the concept READS a value (a value-bearing Observation determination); a valueless-existence
   // concept passes `undefined` → no `value[x]` element (the boolean is `exists`, computed in CQL).
   valueDatum: { valueElement: string; datumValueType: string } | undefined,
@@ -332,13 +349,12 @@ export function emitCaseFeatureStructureDefinition(
   // CodeSystem url (not the primary's), matching the code the CQL lane lowered.
   localDomainId: string = metadata.name,
 ): { resource: EmittedResource | null; errors: CRLError[] } {
-  if (featureExpressionLibrarySuffix === "") {
+  if (target.librarySuffix === "") {
     throw new Error(
       `internal invariant violated: emitCaseFeatureStructureDefinition for "${conceptName}" was ` +
-        `called with an empty featureExpressionLibrarySuffix. The case-feature featureExpression ` +
-        `reference must resolve to the policy's LocalPrimitives Library (where the \`code is\` define ` +
-        `lives); the caller must confirm a \`localsource\` manifest entry before emitting any ` +
-        `case-feature profile.`,
+        `called with an empty \`target.librarySuffix\` (layer define "${target.define}"). The ` +
+        `case-feature featureExpression reference must resolve to a real Library canonical; the caller ` +
+        `must confirm the manifest entry for the requested layer before emitting any case-feature profile.`,
     );
   }
   const errors: CRLError[] = [];
@@ -387,7 +403,7 @@ export function emitCaseFeatureStructureDefinition(
   // lives); its `expression` is the caller-supplied `recordsDefineId` (a `text/cql-identifier`) — the
   // `"<X> Records"` twin for a reduction, or the concept name for a RecordSet / both-rep retrieve. NOT the
   // ephemeral boolean `"<X>"` (a natural-resource SD bound to a Boolean expr is type-incoherent — charter §4).
-  const featureExpressionCanonical = libraryCanonicalUrl(metadata, featureExpressionLibrarySuffix);
+  const featureExpressionCanonical = libraryCanonicalUrl(metadata, target.librarySuffix);
 
   // #189 2d: the differential is built from the concept's NATURAL resource (charter §4) via
   // `caseFeatureProfileShape` + `caseFeatureDifferential`. `undefined` = the resource is not in the emit
@@ -414,7 +430,7 @@ export function emitCaseFeatureStructureDefinition(
       language: "text/cql-identifier",
       // #189 2d — target the RECORDS twin define (`"<X> Records"` = the natural-resource retrieve), NOT the
       // ephemeral boolean `"<X>"` (a Condition SD bound to a Boolean expr is type-incoherent — charter §4).
-      expression: recordsDefineId,
+      expression: target.define,
       reference: featureExpressionCanonical,
     }),
     url,

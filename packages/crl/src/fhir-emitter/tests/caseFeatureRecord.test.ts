@@ -36,7 +36,7 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     if (r.kind !== "record") return;
     expect(r.descriptor.resourceType).toBe("Condition");
     expect(r.descriptor.valueElement).toBeUndefined(); // valueless — no value[x], truth is `exists`
-    expect(r.recordsDefineId).toBe("Qualifying Diagnosis Records");
+    expect(r.target.define).toBe("Qualifying Diagnosis Records");
   });
 
   it("MedicationRequest + exists this → a valueless record (NOT forced to Observation — the hack is gone)", () => {
@@ -48,7 +48,7 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     if (r.kind !== "record") return;
     expect(r.descriptor.resourceType).toBe("MedicationRequest");
     expect(r.descriptor.valueElement).toBeUndefined();
-    expect(r.recordsDefineId).toBe("Active Rx Records");
+    expect(r.target.define).toBe("Active Rx Records");
   });
 
   it("Observation + boolean + exists this → a valueless record (exists is PRESENCE; the Observation's value is orthogonal and NOT read)", () => {
@@ -63,7 +63,7 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     // `value=false` Observation still exists → true). There is no "value-filtered exists" — no value datum,
     // so the SD carries no `value[x]`. A value READ is `most recent this`, a different reduction.
     expect(r.descriptor.valueElement).toBeUndefined();
-    expect(r.recordsDefineId).toBe("Screen Positive Records");
+    expect(r.target.define).toBe("Screen Positive Records");
   });
 
   it("⭐ Encounter resolves to a RECORD — it is a case-feature row now", () => {
@@ -78,7 +78,7 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     expect(r.kind).toBe("record");
     if (r.kind !== "record") return;
     expect(r.descriptor.resourceType).toBe("Encounter");
-    expect(r.recordsDefineId).toBe("Enc Records");
+    expect(r.target.define).toBe("Enc Records");
   });
 
   it("a resource with NO registry row → unsupported-resource (NOT re-hacked to Observation)", () => {
@@ -125,7 +125,7 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     // T5 step 2b — a question now lowers exactly like `code is` + `definition is exists this`: the answer
     // RECORDS are published as `"<X> Records"` in LocalPrimitives and `"<X>"` is the three-state determination
     // in Inferences. The featureExpression must target the records define, or it dangles (Inv 2(d)).
-    expect(r.recordsDefineId).toBe("Can Use Equipment At Home Records");
+    expect(r.target.define).toBe("Can Use Equipment At Home Records");
   });
 
   // ⚠ BOUNDARY, NOT A TARGET. Pins today's edge of the cell so it cannot move by accident. Non-boolean

@@ -166,11 +166,15 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
       "adult-18-or-older",
       METADATA,
       FIXED,
-      "CasefeatureFixtureLocalPrimitives",
-      // #189 2d — natural resource (valueless Condition existence), the records-twin
-      // featureExpression target, and no value datum (the boolean is `exists` in CQL).
+      // #189 2d — natural resource (valueless Condition existence); no value datum (the boolean is
+      // `exists` in CQL). The featureExpression target is now ONE resolved object (library identity +
+      // define + the define's CQL type), not a define name plus a separate library argument.
       "Condition",
-      "Adult Patient Records",
+      {
+        librarySuffix: "CasefeatureFixtureLocalPrimitives",
+        define: "Adult Patient Records",
+        resultKind: "record-list",
+      },
       undefined,
     );
     expect(errors).toEqual([]);
@@ -198,12 +202,11 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
         "adult-18-or-older",
         METADATA,
         FIXED,
-        "",
         "Condition",
-        "Adult Patient Records",
+        { librarySuffix: "", define: "Adult Patient Records", resultKind: "record-list" },
         undefined,
       ),
-    ).toThrow(/empty featureExpressionLibrarySuffix/);
+    ).toThrow(/empty `target\.librarySuffix`/);
   });
 
   // F1 (impl-review) — defensive missing-code guard. Unreachable from the
@@ -217,9 +220,12 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
       "",
       METADATA,
       FIXED,
-      "CasefeatureFixtureLocalPrimitives",
       "Condition",
-      "Adult Patient Records",
+      {
+        librarySuffix: "CasefeatureFixtureLocalPrimitives",
+        define: "Adult Patient Records",
+        resultKind: "record-list",
+      },
       undefined,
     );
     expect(resource).toBeNull();

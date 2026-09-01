@@ -63,7 +63,7 @@ import {
   type CollectedCodeIsConcept,
 } from "./caseFeatureCollection";
 import { caseFeatureCanonicalUrl, emitCaseFeatureStructureDefinition } from "./structureDefinition";
-import { resolveCaseFeatureRecord, type CaseFeatureRecordResolution } from "./caseFeatureRecord";
+import { resolveCaseFeatureRecord, type CaseFeatureRecordResolution, resolveFeatureExpressionTarget } from "./caseFeatureRecord";
 import { emitLocalCodeSystem } from "./codeSystem";
 import {
   emitDecisionPlanDefinition,
@@ -1993,13 +1993,17 @@ export function emitFhirDefClosure(
           code,
           metadata,
           resolvedOpts,
-          // Non-undefined here (the gate requires a LocalPrimitives entry); the `?? ""`
-          // preserves the emitter's own empty-suffix throw-guard as a backstop.
-          localSourceReferenceSuffix ?? "",
-          // #189 2d — the concept's NATURAL resource + records-twin define (from the descriptor); the SD `type`
-          // and `cpg-featureExpression` follow them, replacing the forced-Observation hack.
+          // #189 2d — the concept's NATURAL resource (from the descriptor); the SD `type` follows it,
+          // replacing the forced-Observation hack.
           record.descriptor.resourceType,
-          record.recordsDefineId,
+          // ⭐ RESOLVE THE LAYER ROLE HERE — this is the only place that holds the manifest, and the pair
+          // travels on as ONE object from here down (disc 532: a pair split across parameters is a pair
+          // nobody maintains together, which is how the library came to be hard-wired).
+          //
+          // ⚠ NO `?? ""` FALLBACK ANY MORE. That spelling leaned on the emitter's empty-suffix throw as a
+          // backstop, i.e. it turned "the manifest entry is missing" into a generic internal-invariant throw
+          // one call deeper. Refuse HERE, naming the layer and the concept.
+          resolveFeatureExpressionTarget(record.target, name, { "local-primitives": localSourceReferenceSuffix }),
           valueDatum,
           // #198 — the sibling's disambiguated local domain, so the case-feature
           // `patternCodeableConcept.coding.system` matches THIS library's CodeSystem.

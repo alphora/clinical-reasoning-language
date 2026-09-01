@@ -16,6 +16,7 @@
 // or a `shape is RecordSet` publisher).
 
 import type { Concept } from "../ast/types";
+import type { ResolvedFeatureExpressionTarget } from "./structureDefinition";
 import { recordsTwinDefineName } from "../cql-emitter/lowerLocalCodes";
 import { deriveEffectiveRepresentations } from "../emit/effectiveRepresentation";
 import { resolveRecencyValueConcept, isPureQuestionConcept } from "../template-match/recencyValueConcept";
@@ -40,13 +41,45 @@ export type CaseFeatureRecordSkip =
   // …) — the concept is not (yet) a valid case-feature; carry the deriver's own diagnostic kind + detail.
   | { kind: "not-a-record"; derivationKind: string; detail: string };
 
-/** A gatherable case-feature record: its natural-resource descriptor + the records-define the featureExpression
- *  targets. `recordsDefineId` is a bare CQL define identifier in the concept's OWNING LocalPrimitives library. */
+/**
+ * ⭐⭐ WHERE A CASE FEATURE'S `cpg-featureExpression` POINTS — a (layer, define, resultKind) TRIPLE.
+ *
+ * ⚠⚠ THIS REPLACED A BARE `recordsDefineId: string`, WHICH BAKED IN TWO THINGS AT ONCE. It named a define
+ * AND silently assumed the LocalPrimitives layer (the library identity travelled as a separate argument,
+ * hard-wired by the caller). Disc 531/532, both arms: that is the seam that makes the merge un-targetable,
+ * which is why a computed or sourced value can never pre-fill its own question.
+ */
+export type FeatureExpressionTarget = {
+  /**
+   * The LAYER the define lives in, as a ROLE — resolved to a library identity by the caller, which is the
+   * only place that knows the manifest. `local-primitives` = answered records only; `inferences` = the
+   * merged space (local ∪ source ∪ constructed candidates).
+   */
+  layer: "local-primitives" | "inferences";
+  /** The bare CQL define identifier (`text/cql-identifier`). SINGLE SOURCE for a twin: `recordsTwinDefineName`. */
+  define: string;
+  /**
+   * ⭐ The CQL TYPE OF THE TARGET DEFINE — NOT the concept's declared `shape is`, and the two genuinely
+   * diverge: a pure question's `"<X> Records"` twin is a LIST define serving a SCALAR concept.
+   *
+   * ⚠⚠ MEASURED WHY THIS MATTERS (`tmp/NOTES-repeating-group-populate-executed.md`): a `record-list`
+   * target populates fine with ONE member and, at TWO, the item VANISHES from the QuestionnaireResponse
+   * with `POPULATE [ERROR] … multiple values for a non repeating group`. So today EVERY featureExpression
+   * target is a `record-list`, and that is exactly the latent defect.
+   *
+   * ⚠ It is NOT a refusal. A many-target is emitted today (a `shape is RecordSet` publisher targets its own
+   * set define) and charter §3 says a coded RecordSet history IS answerable — the missing `repeats` on the
+   * generated group is filed BUILD DEBT. A type that could not express it would convert "not built yet"
+   * into "not allowed", which is the §0a deferral-dressed-as-rejection.
+   */
+  resultKind: "record" | "record-list";
+};
+
+/** A gatherable case-feature record: its natural-resource descriptor + where its featureExpression points. */
 export type CaseFeatureRecord = {
   kind: "record";
   descriptor: LocalExactDescriptor;
-  /** the `"<X> Records"` twin define name (SINGLE SOURCE: `recordsTwinDefineName`). */
-  recordsDefineId: string;
+  target: FeatureExpressionTarget;
 };
 
 export type CaseFeatureRecordResolution = CaseFeatureRecord | CaseFeatureRecordSkip;
@@ -115,7 +148,16 @@ export function resolveCaseFeatureRecord(
     return {
       kind: "record",
       descriptor: local,
-      recordsDefineId: hasRecordsTwin ? recordsTwinDefineName(concept.name) : concept.name,
+      target: {
+        // T1 is a PURE REFACTOR: every target stays exactly where it was. The `inferences` layer exists in
+        // the type but is not produced yet — T4 introduces it, per disc 532's build order.
+        layer: "local-primitives",
+        define: hasRecordsTwin ? recordsTwinDefineName(concept.name) : concept.name,
+        // ⚠ EVERY current target is a RETRIEVE define, so every one is a LIST — both the `"<X> Records"`
+        // twin and the same-name publish. That is not an oversight being recorded; it IS the measured
+        // latent defect (probe 2), now visible in the type instead of implicit in the emit.
+        resultKind: "record-list",
+      },
     };
   }
   const uncoded = outcome.descriptors.find((d) => d.arm === "uncoded");
@@ -128,4 +170,34 @@ export function resolveCaseFeatureRecord(
     derivationKind: "no-local-arm",
     detail: `concept "${concept.name}" derived no local-exact or uncoded arm (deferred-only)`,
   };
+}
+
+
+/**
+ * ⭐ Resolve a `FeatureExpressionTarget`'s LAYER ROLE to a real library identity.
+ *
+ * ⚠⚠ FAILS LOUD, BY DESIGN, AND THIS IS THE POINT OF THE FUNCTION. The previous spelling passed
+ * `localSourceReferenceSuffix ?? ""` and relied on the emitter's empty-suffix throw one call deeper — so a
+ * MISSING MANIFEST ENTRY surfaced as a generic internal-invariant message naming neither the layer nor why
+ * it was wanted. An empty identity builds a ROOT-pointing canonical, which is a silently dangling
+ * featureExpression: it resolves at neither translator-load nor emit (Inv 2(c)/2(d)).
+ *
+ * The map is passed in rather than read here because only the orchestrator holds the manifest — this stays
+ * pure over (target, identities).
+ */
+export function resolveFeatureExpressionTarget(
+  target: FeatureExpressionTarget,
+  conceptName: string,
+  identities: Partial<Record<FeatureExpressionTarget["layer"], string | undefined>>,
+): ResolvedFeatureExpressionTarget {
+  const librarySuffix = identities[target.layer];
+  if (librarySuffix === undefined || librarySuffix === "") {
+    throw new Error(
+      `internal invariant violated: case-feature "${conceptName}" targets its \`cpg-featureExpression\` at ` +
+        `define "${target.define}" in the "${target.layer}" layer, but that layer has no library identity in ` +
+        `the manifest. The caller must confirm the layer's Library is emitted BEFORE resolving a target — ` +
+        `an absent identity would build a root-pointing canonical, i.e. a silently dangling featureExpression.`,
+    );
+  }
+  return { librarySuffix, define: target.define, resultKind: target.resultKind };
 }
