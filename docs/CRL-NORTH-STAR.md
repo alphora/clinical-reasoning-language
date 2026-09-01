@@ -204,18 +204,29 @@ currently permits is a **warning** (`composition-result-type-mismatch`) today th
 - ⭐ **`this` in a DEFINITION is the space as of the PREVIOUS stage.** At stage 0 that is the concept's own
   source records — its local `code is` records ∪ **each `source representation`'s CANDIDATES**.
 
-  ⭐⭐ **THAT IS WHAT A PROJECTION IS FOR: it transforms the raw external record into a LOCAL-CODE
-  REPRESENTATION so that evaluation is HOMOGENEOUS.** Every source representation projects. `value projection
-  is exists this` is simply an EXPLICIT one; a rep written without it has an IDENTITY projection (it is "read
-  AS the concept value" — the value/interface convention below). So the space never holds a raw external
-  resource: every member is a record of the concept's own `type is` carrying the concept's local code,
-  whatever it was projected from, and the terminal selection compares like with like. VOCABULARY states the
-  same rule from the other end — *"the source resource is never 'the concept's record': the projection's
-  OUTPUT is the candidate."*
+  ⭐⭐ **THREE LEGS FILL THAT COLLECTION, and they differ only in how a record GETS there.**
 
-  ⚠ This is also why a selected member conforms to the concept's case-feature profile: homogeneity is not a
-  convenience, it is what makes the merge, the guard's value read, and the questionnaire's population all
-  talk about the same thing.
+  1. **The local `code is` leg (ASSERTED)** — contributes NATIVELY. Its records are already case-feature
+     shaped, because the concept's own code is what makes them.
+  2. **The record leg (`source representation`)** — contributes THROUGH A PROJECTION. ⭐ **That is a
+     projection's SOLE PURPOSE: to bring records that are NOT the concept's shape INTO it, creating a new
+     case-feature record where one is needed, so that evaluation is HOMOGENEOUS.** `value projection is
+     exists this` is one spelling of it (a Condition's existence becoming a boolean Observation).
+  3. **The derived leg (a `definition is` PRODUCER)** — contributes a CONSTRUCTED candidate, built to the
+     concept's shape by the same reasoning.
+
+  The terminal selection then compares like with like, which is the whole point — VOCABULARY says the same
+  from the other end: *"the source resource is never 'the concept's record': the projection's OUTPUT is the
+  candidate."*
+
+  ⚠⚠ **OPEN — NOT YET DETERMINED (operator, 2026-09-01):** when a source record is **already the correct
+  shape**, may the RAW record be used, or must a case-feature record be created even then? The evidence that
+  bears on it: a case-feature StructureDefinition pattern-fixes the concept's LOCAL code
+  (`patternCodeableConcept`), so a raw record of the right TYPE still carries the EXTERNAL code — meaning
+  "correct shape" has to be settled as **type alone** or **type AND coding** before the answer follows. It
+  may also differ by consumer: EVALUATION only needs the value (the merge has already selected the record),
+  while POPULATION and extraction stamp the profile and so need the local coding. Do not assume either
+  branch; it decides whether `cpg-featureExpression` can point at the published merge.
 
   At every later stage `this` is EXACTLY the immediately preceding stage's output: never an earlier pre-filter space, and never the
   stage's own output (which is what keeps `<derivation>, then most recent this` a pipeline and not a fixed

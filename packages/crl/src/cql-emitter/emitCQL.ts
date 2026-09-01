@@ -2631,12 +2631,17 @@ class Emitter {
           // a candidate of the CONCEPT's `type is` right here, at the space-assembly site, beside the
           // producer's candidate. That keeps the ExternalPrimitives twin truthful about what it retrieves and
           // keeps every transformation of the space in one place.
-          // ⚠⚠ THIS RETURN IS NOW KNOWN-WRONG, and it is recorded rather than silently left. An UNPROJECTED
-          // source rep contributes an IDENTITY-PROJECTION CANDIDATE, not its raw external resource —
-          // operator ruling 2026-09-01, and charter §3 stage-0 now says so explicitly ("each `source
-          // representation`'s CANDIDATES … not the raw external resources"). Returning `epRef` unions in a
-          // record carrying the EXTERNAL code, so a selected source winner does not conform to the concept's
-          // case-feature profile, which is why `cpg-featureExpression` cannot point at this space yet.
+          // ⚠⚠ THIS RETURN IS UNDER AN OPEN DETERMINATION — do not "fix" it on the strength of the charter
+          // alone. A projection's SOLE PURPOSE is to bring a record that is NOT the concept's shape INTO it
+          // (charter §3, three legs). This rep's records ARE the concept's `type is` already, so whether the
+          // RAW record may be used, or a case-feature record must be created even then, is EXPLICITLY
+          // undetermined (operator, 2026-09-01).
+          //
+          // ⚠ What is measured: the case-feature SD pattern-fixes the concept's LOCAL code, so a raw record
+          // of the right TYPE still carries the EXTERNAL one. So "already the correct shape" has to be
+          // settled as type ALONE or type AND coding — and it may differ by consumer, since EVALUATION only
+          // needs the value while POPULATION stamps the profile. That determination decides whether
+          // `cpg-featureExpression` can point at this space.
           //
           // ⚠ THE BRANCH ITSELF IS THE WRONG SHAPE, not just this arm. If EVERY source rep projects — and
           // it does; that is what a projection is FOR — then the question is never "is it projected?" but
