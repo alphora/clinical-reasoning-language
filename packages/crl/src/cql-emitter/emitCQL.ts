@@ -2631,34 +2631,20 @@ class Emitter {
           // a candidate of the CONCEPT's `type is` right here, at the space-assembly site, beside the
           // producer's candidate. That keeps the ExternalPrimitives twin truthful about what it retrieves and
           // keeps every transformation of the space in one place.
-          // ⭐ RETURNING THE RAW RECORD IS CORRECT FOR EVERY CONSUMER THAT EXISTS TODAY — measured, not
-          // argued, but scoped: see the boundary caveat at the end of this comment.
+          // ⚠⚠ RETURNING THE RAW RECORD IS CORRECT *HERE*, IN THE COLLECTION — and NOT at the boundary.
           //
-          // A projection's SOLE PURPOSE is to bring a record that is NOT the concept's shape INTO it
-          // (charter §3, three legs). This rep's records ARE the concept's `type is` already, so there is
-          // nothing to transform — which is why the unprojected arm was left raw in the first place.
+          // RULED (operator, 2026-09-01): **a consumer has to see a CASE FEATURE.** But that obligation is
+          // the concept's BOUNDARY's, not this union's: comparison, recency ordering and value reads need
+          // only the SHAPE, so the collection may hold the raw record and pay nothing per member. The
+          // local-code projection belongs where the concept PUBLISHES — one record for a `shape is Record`
+          // concept, bounded by construction.
           //
-          // ⚠ THE DOUBT WAS REAL AND WORTH TESTING: a raw record carries the EXTERNAL code while the
-          // case-feature profile pattern-fixes the LOCAL one, so "the same shape" might have had to mean
-          // TYPE AND CODING. EXECUTED end to end — a raw external-coded source record WINNING the selection,
-          // with the feature expression pointed at this merge: the question PRE-FILLED with its value, and
-          // `$extract` produced an Observation carrying the LOCAL code and that value.
+          // ⚠ Do NOT "fix" this line by projecting every member: that is the expensive shape (n transforms
+          // over a history) and it buys nothing the boundary does not already give.
           //
-          // WHY it works there: `$extract` RE-DERIVES identity from `patternCodeableConcept` and the
-          // QuestionnaireResponse carries only the VALUE. ⚠ A consumer that re-stamps identity cannot tell
-          // you whether identity mattered — so that result does NOT generalise on its own.
-          //
-          // ⚠ What DOES generalise, measured: every other consumer of a published record reads `.value` or
-          // the recency element and nothing else — the Interface guard, another concept's producer operands
-          // (`BodyMassIndex("Weight","Height")` reads `.value as Quantity`), the §5b stamp read. So shape
-          // suffices for the consumers that EXIST.
-          //
-          // ⚠⚠ OPEN, and not disposed of by any of the above: a concept's published record IS its case
-          // feature by this model's claim, so publishing an externally-coded resource means "the concept's
-          // record" and "a case-feature instance" are not the same thing. That leak is invisible until
-          // something treats the published record AS the case feature — validating it against the SD,
-          // persisting it, referencing it, or matching it by code. Charter §3 carries the open concern.
-          // REFACTOR:suspect
+          // ⚠ The questionnaire path survives a raw record — measured, `$extract` re-derives identity from
+          // `patternCodeableConcept` — but that is a SPECIFIC CASE WE CANNOT RELY ON, and it is not why this
+          // line is correct. REFACTOR:grounded
           const src = (c.__recencyValueDescriptors as { source?: { arm?: string } } | undefined)?.source;
           if (src?.arm !== "source-projected") return epRef;
           const spec = c.__projectedSourceSpec as ProjectedSourceSpec | undefined;

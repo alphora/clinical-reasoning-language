@@ -236,38 +236,38 @@ currently permits is a **warning** (`composition-result-type-mismatch`) today th
   VOCABULARY says the same from the other end: *"the source resource is never 'the concept's record': the
   projection's OUTPUT is the candidate."*
 
-  ⭐ **MEASURED (2026-09-01): SHAPE IS SUFFICIENT FOR THE QUESTIONNAIRE CONSUMER.** An unprojected `source
-  representation` contributes its RAW record, and for that consumer it works.
+  ⭐⭐ **RULED (operator, 2026-09-01): A CONSUMER HAS TO SEE A CASE FEATURE.** What a concept publishes at
+  its boundary is a case-feature record — the concept's own `type is`, carrying the concept's LOCAL code.
+  That is the rule, and it does not depend on which consumer is asking.
 
-  EXECUTED end to end with a raw, EXTERNAL-coded source record winning the selection, its case feature's
-  `cpg-featureExpression` pointed at the published merge:
+  ⚠ **The questionnaire path happens to survive a raw record, and that is a SPECIFIC CASE WE CANNOT RELY
+  ON.** Measured: with a raw externally-coded source record winning the selection, `$populate` pre-filled the
+  question and `$extract` still produced a LOCAL-coded Observation — because `$extract` RE-DERIVES identity
+  from `patternCodeableConcept` and the QuestionnaireResponse carries only the value. A consumer that
+  re-stamps identity cannot tell you whether identity mattered. Do not generalise from it.
 
-  | step | result |
-  |---|---|
-  | `$populate` | the question PRE-FILLED with the source value, no outcome errors |
-  | submit unchanged → `$extract` | `Observation code=bmi` in the **LOCAL** codesystem, `value {35, 'kg/m2'}` |
+  ⭐ **WHERE THE TRANSFORM HAPPENS: AT THE BOUNDARY, NOT AT THE UNION.** The collection may hold whatever
+  satisfies the shape — comparison, recency ordering and value reads need nothing more — and the local-code
+  projection is applied where the concept PUBLISHES. For a `shape is Record` concept that is exactly ONE
+  record, so the transform is bounded by construction. (A direct questionnaire use case requires a Record
+  rather than a RecordSet anyway, so it is always a single transform there.)
 
-  ⚠⚠ **BUT THAT PROVES ONE CONSUMER, NOT A GENERAL RULE — and the questionnaire is a SPECIAL one.** It works
-  because `$extract` RE-DERIVES identity from the SD's `patternCodeableConcept`; the QuestionnaireResponse
-  carries only the VALUE. A consumer that re-stamps identity cannot tell you whether identity mattered.
+  ⭐⭐ **THE COST IS IN GETTING THERE — WHICH IS WHY AN AUTHOR SHOULD REDUCE TO A RECORD AS EARLY AS
+  POSSIBLE.** The boundary transform is one record; what can hurt is carrying a large history a long way
+  through the pipeline before reducing it. `within last 6 months this, then most recent this` narrows before
+  the work; an unfiltered history carried to the end does not. Cost here is AUTHORED, not imposed — the
+  language gives the author both the opportunity and the responsibility to manage the size of the set they
+  hand on.
 
-  **What is actually measured about the OTHER consumers of a concept's published record:** every one of them
-  today reads `.value` or the recency element and nothing else — the Interface guard
-  (`ToBoolean(<Inferences>."X".value …)`), another concept's producer operands (`BodyMassIndex("Weight",
-  "Height")` reads `.value as Quantity`), the §5b stamp read (`("Weight").effective`). So shape suffices
-  **for the consumers that exist**.
+  ⭐ **THE CONVENTION THAT FOLLOWS: reduce to a `shape is Record` as early as the model allows, and use
+  `shape is RecordSet` ONLY WHERE IT IS REQUIRED** — i.e. where the SET itself is what the concept publishes
+  or what a later stage genuinely reduces over. The layered style is the natural home for this: name the
+  history once, reduce it once, and let everything above consume the Record.
 
-  ⚠⚠ **THE OPEN CONCERN IS THE CONCEPT'S OWN BOUNDARY, and it is not disposed of by the above.** A concept's
-  published record IS its case feature by this model's own claim. If what it publishes can be an
-  externally-coded resource, then "the concept's record" and "a case-feature instance of that concept" are
-  not the same thing, and the difference is invisible until something treats the published record AS the case
-  feature — validating it against the SD, persisting it, referencing it, or matching it by code. **A case
-  feature leaking a different representation is a defect in the boundary even while no current consumer
-  trips on it.** Do not read the questionnaire result as settling this.
-
-  ⚠ One consequence to know rather than discover: extraction re-stamps `effective` from the
-  QuestionnaireResponse's `authored`, so submitting a pre-filled value makes it a fresh local claim. That is
-  the promotion question (see §5b and the recency rules), not a defect in this arrangement.
+  ⚠ **THIS IS A PRACTICE, NOT A LEGALITY RULE, and the distinction is load-bearing.** All three authoring
+  options remain canonical — a coded `shape is RecordSet` history IS answerable and IS a valid model, and a
+  lane that works for one option and not the others is not done. This says which shape to REACH FOR when the
+  model leaves you a choice; it never says a RecordSet is wrong where the set is the point.
 
   At every later stage `this` is EXACTLY the immediately preceding stage's output: never an earlier pre-filter space, and never the
   stage's own output (which is what keeps `<derivation>, then most recent this` a pipeline and not a fixed
