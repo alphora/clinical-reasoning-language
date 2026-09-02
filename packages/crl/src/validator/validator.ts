@@ -119,6 +119,12 @@ export type ValidationErrorKind =
   // lands at the concept boundary, and for a RecordSet the boundary is the entire set.
   | "recordset-unbounded"
   | "answer-options-missing"
+  // ⭐ #189 inline `value from:` options.
+  | "answer-options-missing-display"
+  | "answer-options-duplicate-code"
+  | "answer-options-missing-marker"
+  | "answer-options-none-qualifying"
+  | "answer-options-all-qualifying"
   | "answer-options-unanswerable"
   | "answer-options-not-coded"
   | "membership-scope-equals-comparand"
@@ -596,7 +602,16 @@ export interface MembershipScopeFinding extends ValidationErrorBase {
 }
 
 export interface AnswerOptionsFinding extends ValidationErrorBase {
-  kind: "answer-options-missing" | "answer-options-unanswerable" | "answer-options-not-coded";
+  kind:
+    | "answer-options-missing"
+    | "answer-options-unanswerable"
+    | "answer-options-not-coded"
+    // ⭐ #189 inline `value from:` options.
+    | "answer-options-missing-display"
+    | "answer-options-duplicate-code"
+    | "answer-options-missing-marker"
+    | "answer-options-none-qualifying"
+    | "answer-options-all-qualifying";
   conceptName: string;
 }
 

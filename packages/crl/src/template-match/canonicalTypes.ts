@@ -38,6 +38,7 @@ export interface CanonicalPatternCall {
 export type CanonicalArg =
   | ConceptRefArg
   | TerminologyRefArg
+  | SubsetRefArg
   | QuantityArg
   | EnumArg
   | DisjunctionArg
@@ -74,6 +75,28 @@ export interface TerminologyRefArg {
   value: string;
   /** Library qualifier from the source `"Lib"."VS"` form; absent for bare refs. */
   library?: string;
+  location: Location;
+}
+
+/**
+ * ⭐⭐ A SUBSET of the SUBJECT's own inline answer options — `"X" in qualifying` (#189).
+ *
+ * ⚠⚠ IT IS NOT A `TerminologyRefArg`, AND REUSING ONE WOULD BE A REAL DEFECT. A terminology ref resolves
+ * in the TERMINOLOGY namespace; `qualifying` resolves against THE SUBJECT CONCEPT'S OWN declaration. Passing
+ * it as a terminology would send the resolver looking for a value set named "qualifying", and two different
+ * subjects each with a `qualifying` subset would be indistinguishable — the same namespace confusion that
+ * made `TerminologyRefArg` a separate type from `ConceptRefArg` in the first place.
+ *
+ * ⚠ THE COMPARAND'S REAL IDENTITY IS `(owning concept, subset name)`. Only the NAME is carried here because
+ * the owning concept is the membership call's FIRST arg — the subject. Resolution therefore happens against
+ * `args[0]`, never against a global table. Do not "helpfully" add a library or terminology field.
+ *
+ * ⚠ Like `TerminologyRefArg`, this never stamps a producer candidate: only the DATUM operand does.
+ */
+export interface SubsetRefArg {
+  type: "SubsetRefArg";
+  /** The subset's name. Today always `"qualifying"` — the only spelling the grammar enables. */
+  value: string;
   location: Location;
 }
 

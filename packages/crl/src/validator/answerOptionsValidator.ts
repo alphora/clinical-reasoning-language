@@ -1,4 +1,5 @@
 import type { CRL, Concept } from "../ast/types";
+import { findPatternCalls } from "../template-match/referenceRoles";
 import type { SourceContext } from "../imports/scopes";
 
 import type { AnswerOptionsFinding, ValidationError } from "./validator";
@@ -37,15 +38,41 @@ import type { AnswerOptionsFinding, ValidationError } from "./validator";
 export class AnswerOptionsValidator {
   public validate(ast: CRL, sources?: SourceContext[]): ValidationError[] {
     const out: ValidationError[] = [];
+    const concepts: Concept[] = sources
+      ? sources.flatMap(({ stmt }) => (stmt.type === "Concept" ? [stmt] : []))
+      : ast.statements.flatMap((stmt) => (stmt.type === "Concept" ? [stmt as Concept] : []));
+
+    // ⭐⭐ WHICH CONCEPTS ARE THE SUBJECT OF AN `in qualifying` PREDICATE — computed ONCE, because the
+    // marker requirement is a property of USE, not of the declaration (operator ruling, 2026-09-02).
+    //
+    // ⚠ THE WALK IS RECURSIVE, VIA `findPatternCalls`, AND THAT IS NOT OPTIONAL. `matchNarrative` FOLDS a
+    // pipeline into a `NestedPatternArg`, so a reader that only inspects top-level args misses a membership
+    // buried in a stage. That exact bug appeared in THREE separate readers earlier in #189, which is why the
+    // shared authority exists. Do not hand-roll this walk.
+    const predicatedOn = new Set<string>();
+    for (const c of concepts) {
+      if (c.definition?.type !== "DefinitionIsDefinition") continue;
+      for (const call of findPatternCalls(c.definition.body, "Membership")) {
+        if (!call.args.some((a) => a.type === "SubsetRefArg")) continue;
+        const subj = call.args.find((a) => a.type === "ConceptRefArg");
+        if (subj && "value" in subj) predicatedOn.add(String(subj.value));
+      }
+    }
+
     if (sources) {
       for (const { stmt, scope } of sources) {
         if (stmt.type === "Concept") {
-          this.checkConcept(stmt, { libraryName: scope.currentLibrary, filePath: scope.filePath }, out);
+          this.checkConcept(
+            stmt,
+            { libraryName: scope.currentLibrary, filePath: scope.filePath },
+            out,
+            predicatedOn,
+          );
         }
       }
     } else {
       for (const stmt of ast.statements) {
-        if (stmt.type === "Concept") this.checkConcept(stmt as Concept, {}, out);
+        if (stmt.type === "Concept") this.checkConcept(stmt as Concept, {}, out, predicatedOn);
       }
     }
     return out;
@@ -55,6 +82,8 @@ export class AnswerOptionsValidator {
     concept: Concept,
     attribution: { libraryName?: string; filePath?: string },
     out: ValidationError[],
+    /** Concepts that ARE the subject of an `in qualifying` predicate — see `validate`. */
+    predicatedOn: ReadonlySet<string>,
   ): void {
     // ⚠ EXACTLY ONE value type, and it must be the coded one. `includes(...)` was too loose: a multi-typed
     // concept has no single answer carrier (`answerCarrier` requires one), so the absence warning would tell
@@ -99,6 +128,98 @@ export class AnswerOptionsValidator {
           ...attrib,
         } as AnswerOptionsFinding);
       }
+      // ⭐⭐ #189 — INLINE OPTIONS. Everything below applies ONLY to the inline form; a terminology
+      // reference has its own declaration with its own rules.
+      if (concept.valueFrom.kind === "inline") {
+        const options = concept.valueFrom.options;
+
+        // A display is what a CLINICIAN READS in the generated questionnaire. The grammar cannot require it
+        // (an option line is shared with the marker-less form), and it must NEVER be derived by title-casing
+        // the code — that manufactures clinician-facing text the author never wrote.
+        for (const o of options) {
+          if (o.display.trim() !== "") continue;
+          out.push({
+            kind: "answer-options-missing-display",
+            conceptName: concept.name,
+            message:
+              `Option \`${o.code}\` on concept "${concept.name}" has an empty \`display\`. The display is the ` +
+              `text a clinician reads when picking this answer; it cannot be derived from the code without ` +
+              `inventing wording the author never wrote. Give it one.`,
+            location: o.location,
+            severity: "error",
+            ...attrib,
+          } as AnswerOptionsFinding);
+        }
+
+        // Two options with one code are two rows of the SAME answer: whichever the emitter wrote last would
+        // silently define the other's display and marker.
+        const seen = new Map<string, number>();
+        for (const o of options) seen.set(o.code, (seen.get(o.code) ?? 0) + 1);
+        for (const [code, n] of seen) {
+          if (n < 2) continue;
+          out.push({
+            kind: "answer-options-duplicate-code",
+            conceptName: concept.name,
+            message:
+              `Concept "${concept.name}" declares option \`${code}\` ${n} times. One code is one answer; ` +
+              `duplicates would collapse into a single option whose display and marker depend on line order.`,
+            location: concept.valueFrom.location,
+            severity: "error",
+            ...attrib,
+          } as AnswerOptionsFinding);
+        }
+
+        // ⭐⭐ THE MARKER IS REQUIRED IFF THE CONCEPT IS PREDICATED ON (operator ruling, 2026-09-02).
+        // `predicatedOn` is computed once in `validate` — see the recursion note there.
+        if (predicatedOn.has(concept.name)) {
+          // A silent default would let a KE add an option, have a patient answer it honestly, and get a
+          // determinate `false -> deny` — the UNRECOVERABLE class, since a pause is recoverable but a
+          // spurious `false` looks like a decision. Adding an option must not compile until it is classified.
+          for (const o of options) {
+            if (o.qualifying !== undefined) continue;
+            out.push({
+              kind: "answer-options-missing-marker",
+              conceptName: concept.name,
+              message:
+                `Option \`${o.code}\` on concept "${concept.name}" has no \`qualifying\` / \`not qualifying\` ` +
+                `marker, and this concept IS the subject of an \`in qualifying\` predicate — so every option ` +
+                `must say what it does. An unmarked option would silently count as NOT qualifying, turning an ` +
+                `honest answer into a determinate denial. Mark it.`,
+              location: o.location,
+              severity: "error",
+              ...attrib,
+            } as AnswerOptionsFinding);
+          }
+
+          const marked = options.filter((o) => o.qualifying !== undefined);
+          if (marked.length > 0 && marked.every((o) => o.qualifying === false)) {
+            out.push({
+              kind: "answer-options-none-qualifying",
+              conceptName: concept.name,
+              message:
+                `No option on concept "${concept.name}" is \`qualifying\`, so \`in qualifying\` can never be ` +
+                `true and the qualifying value set is empty. Either the markers are inverted or the predicate ` +
+                `is dead.`,
+              location: concept.valueFrom.location,
+              severity: "error",
+              ...attrib,
+            } as AnswerOptionsFinding);
+          } else if (marked.length > 1 && marked.every((o) => o.qualifying === true)) {
+            out.push({
+              kind: "answer-options-all-qualifying",
+              conceptName: concept.name,
+              message:
+                `Every option on concept "${concept.name}" is \`qualifying\`, so \`in qualifying\` is false ` +
+                `only for a code that was never offered. If a user should be able to answer in a way that ` +
+                `does NOT qualify — a "none of the listed" option — the set is missing it.`,
+              location: concept.valueFrom.location,
+              severity: "warning",
+              ...attrib,
+            } as AnswerOptionsFinding);
+          }
+        }
+      }
+
       return;
     }
 

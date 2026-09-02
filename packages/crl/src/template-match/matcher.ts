@@ -758,6 +758,37 @@ const conceptInTerminology: PatternMatcher = (els, loc) => {
 };
 
 
+/**
+ * ⭐⭐ `"<X>" in qualifying` → Membership(X, qualifying-subset-of-X) — #189 inline answer options.
+ *
+ * The sibling of `conceptInTerminology`, and the two are told apart by whether the comparand is QUOTED:
+ *
+ *     "X" in "Covered Services"     → 3 els, els[2] is a CONCEPT REF   → terminology membership
+ *     "X" in qualifying             → 3 els, els[2] is a WORD          → subset membership
+ *
+ * ⚠ QUANTIFIER: THIS FORM IS `one` — the subject must publish ONE datum, which is why the existing
+ * non-Record refusal in `membershipScopeValidator` still applies unchanged. Multi-select is backlogged by
+ * operator ruling and will arrive as ADDITIONAL patterns (`any value of "X" in …`, `every value of "X" in
+ * …`), never by re-interpreting this one against the subject's shape. Re-interpreting would make the same
+ * written narrative mean different things depending on a declaration elsewhere, which is precisely the
+ * intent↔execution gap the charter's §0 exists to prevent.
+ *
+ * ⚠ The future `in subset "<name>"` form is FOUR elements, so it cannot be confused with either of the
+ * above — that disambiguation is why the subset spelling carries the `subset` keyword rather than reusing a
+ * bare quoted name, which would collide with terminology membership.
+ */
+const conceptInQualifying: PatternMatcher = (els, loc) => {
+  if (els.length !== 3) return null;
+  if (!isConceptRef(els[0])) return null;
+  if (!isWord(els[1], "in")) return null;
+  if (!isWord(els[2], "qualifying")) return null;
+  return makeCall(
+    "Membership",
+    [conceptRefArg(els[0]), { type: "SubsetRefArg", value: "qualifying", location: els[2].location }],
+    loc,
+  );
+};
+
 /** `calculated <X>` → Calculate(X) */
 const calculated: PatternMatcher = (els, loc) => {
   if (els.length !== 2) return null;
@@ -1141,6 +1172,7 @@ const PATTERNS: PatternMatcher[] = [
   lastBare,                        // 2 (after lastOnDayOf / lastWithinBeforeStartOf)
   mostRecentThisStage,             // 3 — `most recent this` as a pipeline stage
   conceptInTerminology,            // 3 — `"X" in "VS"`, the CONCEPT-LEVEL membership predicate
+  conceptInQualifying,             // 3 — `"X" in qualifying`, the INLINE-OPTIONS subset predicate (#189)
   existsThis,                      // 2 — the existence PROJECTION (value-blind)
   calculated,                      // 2
   lowest,                          // 2

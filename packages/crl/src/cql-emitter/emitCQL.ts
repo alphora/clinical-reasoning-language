@@ -4372,6 +4372,17 @@ class Emitter {
         }
         return cqlIdent(arg.value);
       }
+      case "SubsetRefArg": {
+        // ⚠⚠ SENTINEL — REPLACE WITH THE GENERATED QUALIFYING VALUESET'S CQL DECLARATION IDENTIFIER.
+        // `"X" in qualifying` parses and builds, but the per-concept CodeSystem and its ValueSets are not
+        // emitted yet, so there is no declaration to render. THROWING is the only honest option: returning
+        // a plausible identifier would emit CQL that translates against nothing, and returning the subset
+        // name would silently bind to whatever authored terminology happened to share it.
+        throw new Error(
+          `inline \`value from:\` options do not emit yet: cannot render the "${arg.value}" subset of an ` +
+            `answer-option set that has no generated ValueSet. (#189, emit-inline-value-from-not-active)`,
+        );
+      }
       case "TerminologyRefArg": {
         // ⭐ A value-set operand renders as the CQL `valueset` DECLARATION IDENTIFIER, never as a define name.
         // ⚠ It resolves in the TERMINOLOGY namespace, which is why it is not a `ConceptRefArg`: rendering it
