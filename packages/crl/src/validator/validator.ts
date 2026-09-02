@@ -11,6 +11,7 @@ import { EmitCapabilityValidator } from "./emitCapabilityValidator";
 import { MetaTagValidator } from "./metaTagValidator";
 import { NameUniquenessValidator } from "./nameUniquenessValidator";
 import { PipelineStageValidator } from "./pipelineStageValidator";
+import { ConceptSubstanceValidator } from "./conceptSubstanceValidator";
 import { RecordSetBoundValidator } from "./recordSetBoundValidator";
 import { AnswerOptionsValidator } from "./answerOptionsValidator";
 import { MembershipScopeValidator } from "./membershipScopeValidator";
@@ -118,6 +119,7 @@ export type ValidationErrorKind =
   // authoring option uses it deliberately. It flags COST, not incorrectness — the case-feature transform
   // lands at the concept boundary, and for a RecordSet the boundary is the entire set.
   | "recordset-unbounded"
+  | "concept-no-substance"
   | "answer-options-missing"
   // ⭐ #189 inline `value from:` options.
   | "answer-options-missing-display"
@@ -601,6 +603,17 @@ export interface MembershipScopeFinding extends ValidationErrorBase {
   conceptName: string;
 }
 
+/**
+ * ⭐ A concept that declares no local `code is`, no definition and no representation — inert.
+ *
+ * ⚠ This rule USED TO THROW IN THE AST BUILDER. It moved here because an `AstError` aborts the build and
+ * suppresses every other diagnostic on the file. See `conceptSubstanceValidator.ts`.
+ */
+export interface ConceptSubstanceFinding extends ValidationErrorBase {
+  kind: "concept-no-substance";
+  conceptName: string;
+}
+
 export interface AnswerOptionsFinding extends ValidationErrorBase {
   kind:
     | "answer-options-missing"
@@ -640,6 +653,7 @@ export type ValidationError =
   | RecordSetUnboundedWarning
   | AnswerOptionsFinding
   | MembershipScopeFinding
+  | ConceptSubstanceFinding
   | MetaDiagnostic;
 
 export interface ValidationResult {
@@ -698,6 +712,7 @@ export class Validator {
   private readonly agePredicateValidator: AgePredicateValidator;
   private readonly representationShapeValidator: RepresentationShapeValidator;
   private readonly pipelineStageValidator: PipelineStageValidator;
+  private readonly conceptSubstanceValidator: ConceptSubstanceValidator;
   private readonly recordSetBoundValidator: RecordSetBoundValidator;
   private readonly answerOptionsValidator: AnswerOptionsValidator;
   private readonly membershipScopeValidator: MembershipScopeValidator;
@@ -715,6 +730,7 @@ export class Validator {
     this.agePredicateValidator = new AgePredicateValidator();
     this.representationShapeValidator = new RepresentationShapeValidator();
     this.pipelineStageValidator = new PipelineStageValidator();
+    this.conceptSubstanceValidator = new ConceptSubstanceValidator();
     this.recordSetBoundValidator = new RecordSetBoundValidator();
     this.answerOptionsValidator = new AnswerOptionsValidator();
     this.membershipScopeValidator = new MembershipScopeValidator();
@@ -793,6 +809,7 @@ export class Validator {
     // #189 — an unbounded `shape is RecordSet` history. ⚠ Pushed straight to `warnings`, NOT through
     // `pushSplit`: this finding is intrinsically advisory (the shape is legal — see the validator's header),
     // so it must never flip `isValid`, and there is nothing for `soft` mode to demote.
+    errors.push(...this.conceptSubstanceValidator.validate(ast, sources));
     warnings.push(...this.recordSetBoundValidator.validate(ast, sources));
     // ⭐ #189 gap 2 — a coded question's ANSWER OPTIONS. Routed through `pushSplit` because this validator
     // emits BOTH severities by intrinsic kind: `value from` on an unanswerable or non-coded concept is an

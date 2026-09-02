@@ -1,4 +1,9 @@
-# intentionally broken: missing concept body keyword
+# intentionally broken: a GENUINE SYNTAX error (missing `:` after the concept name, missing `.` terminators).
+#
+# ⚠ It used to be a concept with only `- type is Observation.`, which parses fine and was rejected by the
+# SEMANTIC "a concept must carry some substance" rule while that rule still threw inside the AST builder.
+# When that rule moved to `conceptSubstanceValidator`, this file stopped being a parse failure at all and
+# these tests lost their subject. A test about PARSE failures needs a parse failure.
 library "Test-source-path-parse-failure".
-concept "X":
-- type is Observation.
+concept "X"
+- type is Observation

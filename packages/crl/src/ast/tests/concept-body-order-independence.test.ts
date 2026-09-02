@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { emitCQL } from "../../cql-emitter/emitCQL";
-import { buildCRL } from "../../index";
+import { buildCRL, validateCRL } from "../../index";
 import type { CRLError } from "../../types/errors";
 import { Concept } from "../types";
 
@@ -246,9 +246,23 @@ describe("concept-body cardinality is builder-enforced and fail-closed (disc 402
 });
 
 describe("boundaries preserved (disc 402)", () => {
-  it("an empty concept body still fails the 'must have some producer' build error", () => {
-    const r = buildCRL(`library "T".\nconcept "C":`);
-    expect(r.success).toBe(false);
+  it("an empty concept body is still REJECTED — by the validator now, not by the builder", () => {
+    // ⚠ THE BOUNDARY MOVED, IT DID NOT DISAPPEAR. "A concept must carry some substance" used to THROW in
+    // the AST builder; it now lives in `conceptSubstanceValidator` (operator instruction, 2026-09-02),
+    // because an `AstError` aborts the build and suppresses every OTHER diagnostic on the file — MEASURED:
+    // this very source now also reports the missing `value type`, which the build abort had been hiding.
+    //
+    // Asserting `buildCRL(...).success === false` here would re-pin the OLD location and quietly forbid
+    // the move, so this pins BOTH halves: it builds, and validation rejects it.
+    const built = buildCRL(`library "T".
+concept "C":`);
+    expect(built.success, "an inert concept must still BUILD — the rule is semantic, not syntactic").toBe(true);
+
+    const v = validateCRL(`library "T".
+concept "C":`, { soft: true }) as unknown as {
+      errors?: { kind: string }[];
+    };
+    expect((v.errors ?? []).map((e) => e.kind)).toContain("concept-no-substance");
   });
 
   // The NON-shared line kinds have no `representationBody` slot, so writing one after a posrep is a

@@ -1181,19 +1181,11 @@ export class CRLAstBuilder
     this.checkConceptBodyCardinality(bodyCtx, name);
     const definition = this.parseConceptDefinition(bodyCtx, ctx);
     const representations = this.parseRepresentations(bodyCtx);
-    // A concept must carry SOME real body. An EMPTY `code is ``.` is not a real
-    // body (it leaves the concept un-assertable), so a concept whose only body
-    // is an empty code still fails this check — but the empty `code` value is
-    // PRESERVED on the AST below (when the line is present) so the CQL emit's
-    // `lowerLocalCodes` can surface an explicit empty-code diagnostic for the
-    // mixed case (empty code + a real definition).
-    if (!definition && representations.length === 0 && !code) {
-      this.reportError("AstError", ctx, {
-        message:
-          "ConceptStatement must have a local code, coded from, defined as, definition is, or at least one possible representation",
-      });
-      return null as unknown as Concept;
-    }
+    // ⚠⚠ THE "A CONCEPT MUST CARRY SOME SUBSTANCE" CHECK USED TO LIVE HERE AND THREW. It now lives in
+    // `validator/conceptSubstanceValidator.ts` (operator instruction, 2026-09-02): an `AstError` ABORTS the
+    // build, so a file with an inert concept reported ONE diagnostic and every other validator was skipped.
+    // MEASURED — a fixture meant to exercise `answer-options-unanswerable` reported only `AstError` and none
+    // of the answer-options findings. Building is the wrong place for a semantic rule; do not move it back.
     return {
       type: "Concept",
       name,

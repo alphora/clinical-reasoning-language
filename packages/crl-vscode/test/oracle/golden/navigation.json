@@ -43,11 +43,41 @@
   },
   {
     "label": "def-on-qualifier",
-    "result": null
+    "result": {
+      "kind": "location",
+      "uri": {
+        "fsPath": "$TMP/sib.crl"
+      },
+      "range": {
+        "start": {
+          "line": 1,
+          "character": 9
+        },
+        "end": {
+          "line": 1,
+          "character": 12
+        }
+      }
+    }
   },
   {
     "label": "def-on-qualified-name",
-    "result": null
+    "result": {
+      "kind": "location",
+      "uri": {
+        "fsPath": "$TMP/sib.crl"
+      },
+      "range": {
+        "start": {
+          "line": 3,
+          "character": 9
+        },
+        "end": {
+          "line": 3,
+          "character": 20
+        }
+      }
+    }
   },
   {
     "label": "refs-BMI-withDecl",
@@ -346,6 +376,28 @@
     "result": [
       {
         "kind": "symbolInformation",
+        "name": "Sib Concept",
+        "symbolKind": 12,
+        "containerName": "Sib",
+        "location": {
+          "kind": "location",
+          "uri": {
+            "fsPath": "$TMP/sib.crl"
+          },
+          "range": {
+            "start": {
+              "line": 3,
+              "character": 9
+            },
+            "end": {
+              "line": 3,
+              "character": 20
+            }
+          }
+        }
+      },
+      {
+        "kind": "symbolInformation",
         "name": "BMI Valueset",
         "symbolKind": 13,
         "containerName": "Root",
@@ -513,6 +565,22 @@
       "edits": [
         {
           "uri": {
+            "fsPath": "$TMP/sib.crl"
+          },
+          "range": {
+            "start": {
+              "line": 3,
+              "character": 9
+            },
+            "end": {
+              "line": 3,
+              "character": 20
+            }
+          },
+          "newText": "Sib Concept 2"
+        },
+        {
+          "uri": {
             "fsPath": "$TMP/root.crl"
           },
           "range": {
@@ -548,6 +616,24 @@
   },
   {
     "label": "doclinks",
-    "result": []
+    "result": [
+      {
+        "kind": "documentLink",
+        "range": {
+          "start": {
+            "line": 2,
+            "character": 8
+          },
+          "end": {
+            "line": 2,
+            "character": 13
+          }
+        },
+        "target": {
+          "fsPath": "$TMP/sib.crl"
+        },
+        "tooltip": "Open library \"Sib\""
+      }
+    ]
   }
 ]
