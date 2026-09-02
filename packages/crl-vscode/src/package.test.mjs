@@ -230,7 +230,7 @@ check("contributes.languages.configuration paths resolve to real files", () => {
   }
 });
 
-// Coral branding assets (#B.1 follow-on): the container icon SVG + the `$(coral)` icon-font woff must exist on disk so a
+// Coral branding assets (#B.1 follow-on): the container icon SVG + the `$(crl-coral)` icon-font woff must exist on disk so a
 // missing/mis-referenced asset can't ship a broken icon.
 check("Coral assets: the crlCockpit container icon + the coral icon font resolve to real files", () => {
   const container = (c.viewsContainers?.activitybar ?? []).find((x) => x.id === "crlCockpit");
@@ -241,10 +241,27 @@ check("Coral assets: the crlCockpit container icon + the coral icon font resolve
   const assist = (c.viewsContainers?.activitybar ?? []).find((x) => x.id === "crlAssist");
   assert.equal(assist?.icon, "media/coral-assist-activitybar.svg", "crlAssist uses the distinct Coral+ SVG (not $(sparkle))");
   assert.match(readFileSync(join(here, "..", assist.icon), "utf8"), /<svg/, "the CRL Assist icon is a real SVG");
-  const coralIcon = c.icons?.coral;
+  const coralIcon = c.icons?.["crl-coral"];
   assert.ok(coralIcon && coralIcon.default?.fontCharacter === "\\E900", "the coral icon font is contributed at U+E900");
   const woff = readFileSync(join(here, "..", coralIcon.default.fontPath.replace(/^\.\//, "")));
   assert.ok(woff.length > 0, "the coral-icons.woff exists and is non-empty");
+});
+
+// ⚠ VS Code REJECTS a single-segment icon id at EXTENSION REGISTRATION, not at build or package time:
+//   "'configuration.icons' keys represent the icon id and can only contain letter, digits and minuses.
+//    They need to consist of at least two segments in the form component-iconname."
+// The contribution is then DROPPED, so `$(<id>)` renders as nothing and the status bar silently loses its
+// glyph. `vsce package` does not catch it and no test did either — it was reported from a running editor.
+check("every contributed icon id is `component-iconname` (VS Code drops single-segment ids)", () => {
+  const ids = Object.keys(c.icons ?? {});
+  assert.ok(ids.length > 0, "there is at least one contributed icon to check");
+  for (const id of ids) {
+    assert.match(
+      id,
+      /^[a-z0-9]+(-[a-z0-9]+)+$/,
+      `icon id "${id}" must be lowercase letters/digits/minuses in at least two segments`,
+    );
+  }
 });
 
 check("the marketplace extension icon is a real PNG (not the default placeholder)", () => {

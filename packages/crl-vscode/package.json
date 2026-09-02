@@ -27,7 +27,7 @@
   },
   "contributes": {
     "icons": {
-      "coral": {
+      "crl-coral": {
         "description": "Coral",
         "default": {
           "fontPath": "./media/coral-icons.woff",

@@ -34,11 +34,11 @@ const PLACEHOLDER = "Ask the CRL agent anything about Clinical Reasoning Languag
 export function registerAgentChat(context: vscode.ExtensionContext): void {
   const chat = new AgentChat(context);
   // An always-visible reopener: once "CRL Assist" is docked in a side bar, its icon lives in THAT bar's strip and vanishes
-  // when the bar is hidden — so a status-bar item (the `$(coral)` brand glyph from the contributed icon font) gives a
+  // when the bar is hidden — so a status-bar item (the `$(crl-coral)` brand glyph from the contributed icon font) gives a
   // one-click way to reveal it from anywhere. Also bound to Ctrl+Alt+A (see package.json keybindings).
   const statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusItem.name = "CRL Assist";
-  statusItem.text = "$(coral) CRL Assist";
+  statusItem.text = "$(crl-coral) CRL Assist";
   statusItem.tooltip = "Open CRL Assist  (Ctrl+Alt+A)";
   statusItem.command = "crl.agent.chat";
   statusItem.show();
