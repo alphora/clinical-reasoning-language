@@ -212,11 +212,28 @@ export function emitValueSet(
   // `$apply` terminology provider evaluates membership from the expansion directly rather than falling back to
   // `compose` (which it WARNS "may produce incorrect results" — probe-verified 2026-08-24). A reference
   // (`{valueSet:[url]}`) include is not enumerated → contributes nothing → a pure-reference VS emits no expansion.
+  //
+  // ⭐⭐ THE EXPANSION MIRRORS THE COMPOSE, `display` INCLUDED — AND THAT IS THE DROPDOWN.
+  // (#189 precursor B. Both panel arms ruled this in scope and non-optional, 2026-09-02.)
+  //
+  // The chain is: a case-feature StructureDefinition BINDS this value set → the questionnaire generator
+  // expands that binding into `Questionnaire.item.answerOption` → a clinician reads those labels. And the
+  // `$apply` terminology provider evaluates from the EXPANSION, not the compose. So a display carried only
+  // on the CodeSystem may never reach the questionnaire, and the answer list renders as RAW SLUGS — which
+  // would defeat the entire point of requiring authored displays on inline answer options.
+  //
+  // ⚠ INERT TODAY, DELIBERATELY. `buildCompose` emits `{ code }` with no display, because an AUTHORED
+  // instantiated terminology has no display grammar — and it must STAY that way: do NOT invent a display
+  // there by title-casing a slug, which manufactures clinician-facing text the author never wrote. This
+  // copies a display only when one EXISTS, so byte output is unchanged until inline `value from` options
+  // (which do carry authored displays) start supplying them.
   const expansionContains = compose.include.flatMap((inc) => {
     const system = (inc as { system?: string }).system;
-    const concepts = (inc as { concept?: Array<{ code: string }> }).concept;
+    const concepts = (inc as { concept?: Array<{ code: string; display?: string }> }).concept;
     if (system === undefined || concepts === undefined) return [];
-    return concepts.map((c) => ({ system, code: c.code }));
+    // Conditional spread, not `display: c.display` — an explicit `undefined` key would change the emitted
+    // JSON shape for every existing value set and break every golden for no behavioural gain.
+    return concepts.map((c) => ({ system, code: c.code, ...(c.display === undefined ? {} : { display: c.display }) }));
   });
 
   const resource: Record<string, unknown> = {
