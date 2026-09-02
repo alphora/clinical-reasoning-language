@@ -617,7 +617,11 @@ current level). There is no ServiceRequest special case and no membership specia
   authored it: `coded from "VS"` emits a value-set retrieve (`[Condition: Concepts."Diagnosis of
   Hypertension"]`, in our own goldens), and that retrieve **is** `code in VS`. A single code goes in a
   one-code set and takes the same path.
-- **Membership as a PREDICATE over a DATUM is the REP-LOCAL projection `matches this`.** It is the sibling of
+- **Membership as a PREDICATE over a DATUM is a CONCEPT-LEVEL test** (`definition is "X" in "VS"`), against a
+  set DIFFERENT from the one scoping the retrieve — see the ruled model below. ⚠ The rep-local spelling
+  described in the rest of this bullet (`value projection is matches this`) is RETIRED (operator,
+  2026-09-02) and is deleted by #189 gap 3; its REASONING survives the respelling, its MECHANISM does not:
+  It is the sibling of
   `exists this`, in the same slot, and the set it tests against is that representation's own `coded from`.
   A membership predicate never names its own set — it asks about the set the representation already
   declares, so the RETRIEVE and the TEST cannot disagree about which codes are in play.
@@ -765,7 +769,8 @@ unanswered determination can pause at all.
 | projection | per retrieved record it can answer | zero records |
 |---|---|---|
 | `exists this` | ⭐ **`true` only** — there is no record to invoke it on that would answer `false`, so an existence arm can never record a negative | *nothing* |
-| `matches this` | `true` · **`false`** (a present non-member is a determinate no) · `null` (record with no datum) | *nothing* |
+| `matches this` ⚠ RETIRED spelling — the STATES are the live rule, now carried by the concept-level
+predicate | `true` · **`false`** (a present non-member is a determinate no) · `null` (record with no datum) | *nothing* |
 
 ⚠ `defined as exists ("V")` and `value projection is exists this` are different constructs in different
 slots and do NOT share absence behaviour. The first is closed-world `false`; the second contributes nothing.

@@ -179,7 +179,9 @@ describe("ServiceRequest membership target — fixtures/service-request", () => 
 
       // ⚠ OWED — THE DEFECT THIS FIXTURE EXISTS TO CATCH, unchanged by this slice. The `coded from` retrieve
       // is FILTERED, so a non-member ServiceRequest never reaches the concept and leaves the same empty
-      // evidence as no request at all. `matches this` needs the UNFILTERED retrieve to judge it.
+      // evidence as no request at all. ⚠ The FIX is not an unfiltered retrieve (that reading is RETIRED —
+      // operator 2026-09-02): it is that the retrieve is scoped by the REQUESTABLE set while the predicate
+      // tests the COVERED set, so a wrong-code request is retrieved and then judged.
       // ⚠ must become `{ pass, [DENY] }`.
       "request is a different service -> deny": { status: "fail", produced: [] },
     });
@@ -206,8 +208,9 @@ describe("ServiceRequest membership target — fixtures/service-request", () => 
     // leaves exactly the empty evidence that "no request at all" would.
     expect(wrongCode).toEqual({ satisfied: false, facts: [] });
 
-    // ⭐ WHAT MUST BECOME TRUE: with `matches this` the retrieve is UNFILTERED, so the wrong-code request IS
-    // retrieved and the projection judges it — a determinate `false` CARRYING the fact that produced it.
+    // ⭐ WHAT MUST BECOME TRUE: the retrieve is scoped by the REQUESTABLE set, so a wrong-code request for a
+    // requestable service IS retrieved; the concept-level predicate then tests it against the COVERED set and
+    // returns a determinate `false` CARRYING the fact that produced it.
     // When that lands this test fails HERE, which is the signal, and the expectation becomes:
     //     expect(wrongCode).toEqual({ satisfied: false, facts: ["Other Service Request"] });
   });

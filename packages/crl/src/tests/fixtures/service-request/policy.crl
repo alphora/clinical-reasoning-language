@@ -73,12 +73,12 @@
 // (charter §3: it is decided by MODEL INFO, and ServiceRequest HAS a code-based
 // retrieve). It was `exists`, which reads records and so cannot pause.
 //
-// ⭐ `coded from` names ONE set; what the PROJECTION asks of it decides the
-// retrieve shape. For `exists this`, filtering the retrieve and testing each
-// code are equivalent, so it stays the filtered retrieve it is today. For
-// `matches this` the retrieve must be UNFILTERED — the projection has to SEE
-// the non-member to call it false. Filter it and a wrong-code request vanishes
-// into the same empty set as no request, and row 2 collapses into row 3.
+// ⭐ `coded from` names the REQUESTABLE set — what this concept is about — and
+// the retrieve stays SCOPED by it for every projection. The wrong-code request
+// reaches the concept because it IS a requestable service; it is then judged
+// against the COVERED set, which is a DIFFERENT terminology. That difference is
+// what makes a determinate `false` reachable, and it is why one set cannot do
+// both jobs (see the rejected alternatives above).
 //
 // ⚠ The value set holds ONE code here. That is a small set, not an absent check
 // (charter §3): membership is still evaluated, and the wrong-code row is what
