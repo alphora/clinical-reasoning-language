@@ -65,6 +65,8 @@ import {
 import { caseFeatureCanonicalUrl, emitCaseFeatureStructureDefinition } from "./structureDefinition";
 import { resolveCaseFeatureRecord, type CaseFeatureRecordResolution, resolveFeatureExpressionTarget } from "./caseFeatureRecord";
 import { emitLocalCodeSystem, emitReferenceStubCodeSystem } from "./codeSystem";
+import { emitInlineAnswerResources, inlineAnswerSet } from "./inlineAnswerSet";
+import type { InlineAnswerSet } from "./inlineAnswerSet";
 import {
   emitDecisionPlanDefinition,
   type ActivityResolver,
@@ -1169,6 +1171,11 @@ export function emitFhirDefClosure(
   const localCodePaths = new Set(
     expandedClosure.filter((e) => astHasConceptLocalCode(e.ast)).map((e) => e.filePath),
   );
+  // ⭐⭐ #189 — ONE descriptor per inline-options concept, built ONCE and read by BOTH the resource emit
+  // and the StructureDefinition binding. Deriving it twice would let the emitted ValueSet url and the url
+  // the binding points at drift apart — silently, since nothing validates binding targets today.
+  const inlineSetByConcept = new Map<string, InlineAnswerSet>();
+
   const localDomainResolver = createLocalDomainResolver({
     primarySeedPaths,
     localCodePaths,
@@ -1214,29 +1221,19 @@ export function emitFhirDefClosure(
 
   // Per-library emit (1-4) + per-decision emit with closure-aware resolvers.
   for (const lib of libraries) {
-    // ⚠⚠ SENTINEL — REMOVE WITH THE INLINE-OPTIONS EMIT, AND NOT BEFORE.
-    //
-    // The grammar and AST accept `value from:` inline options ahead of the emit that materializes their
-    // per-concept CodeSystem and ValueSets. Without this the concept would emit with NO answer options and
-    // NO binding — a silent-wrong package, the exact defect class this slice exists to remove.
-    //
-    // ⚠ IT LIVES HERE, over EVERY concept in the closure, and NOT in the case-feature branch where it was
-    // first written. MEASURED: a case feature requires a concept reachable from a decision, so a sentinel
-    // there missed an inline-options concept entirely and emit reported only an unrelated error. That is the
-    // same "guard that cannot fire" failure as the membership subject-shape check earlier in #189 — a guard
-    // in a conditional path reads as protection it does not provide. Verify a guard FIRES, do not assume it.
+    // ⭐⭐ #189 — INLINE ANSWER OPTIONS materialize the concept's OWN vocabulary: one CodeSystem plus the
+    // all-options and qualifying ValueSets. See `inlineAnswerSet.ts` for why the CodeSystem is per-CONCEPT
+    // and why `lowerLocalCodes` is untouched.
     for (const st of lib.ast.statements) {
-      if (st.type !== "Concept" || st.valueFrom?.kind !== "inline") continue;
-      errors.push({
-        type: "Validation",
-        kind: "emit-inline-value-from-not-active",
-        message:
-          `Concept "${st.name}" declares inline \`value from:\` options, which do not emit yet. The ` +
-          `per-concept CodeSystem and its ValueSets are not built, so emitting would ship a question with ` +
-          `no answer options. Use \`value from "<terminology>"\` until the inline form activates.`,
-        line: st.valueFrom.location?.start.line,
-        column: st.valueFrom.location?.start.column,
-      } as CRLError);
+      if (st.type !== "Concept") continue;
+      const domainId = localDomainResolver.domainIdFor({
+        filePath: lib.filePath,
+        name: lib.libraryName,
+      }) as string;
+      const set = inlineAnswerSet(st, domainId, metadata.canonicalBase);
+      if (!set) continue;
+      inlineSetByConcept.set(st.name, set);
+      resources.push(...emitInlineAnswerResources(set, metadata, resolvedOpts));
     }
 
     // Build per-source-library resolvers.
@@ -2017,7 +2014,13 @@ export function emitFhirDefClosure(
         // silently, since nothing validates binding targets today.
         let answerOptions: { valueSetUrl: string } | undefined;
         const vfConcept = conceptByNameForGate.get(name);
-        if (vfConcept?.valueFrom?.kind === "terminology") {
+        // ⚠ The INLINE form binds the ALL-OPTIONS set, never the qualifying one: the binding IS the
+        // dropdown, and offering only the qualifying answers would make "none of the listed" unpickable —
+        // which is precisely the answer that lets a user reach a determinate `false` in one step.
+        const inlineSet = inlineSetByConcept.get(name);
+        if (inlineSet) {
+          answerOptions = { valueSetUrl: inlineSet.allOptions.url };
+        } else if (vfConcept?.valueFrom?.kind === "terminology") {
           // ⚠ NORMALIZE FIRST. A ref qualified with THIS library's own name (`value from "L"."Opts"` inside
           // library L) is LOCAL, and every other terminology consumer normalizes before deciding — the
           // sibling resolver does it on the line it resolves. Testing `isQualifiedRef` raw refused a form that

@@ -347,6 +347,8 @@ export interface EmittedResource {
     // domain. Distinct from `LocalCodeSystem` because the two have opposite ship postures: the local domain
     // is production vocabulary, the stub is `experimental` and is replaced at packaging.
     | "ReferenceStubCodeSystem"
+    // ⭐ A concept's OWN answer vocabulary + its two ValueSets, from an inline `value from:` block.
+    | "InlineAnswerOptions"
     | "CaseFeature";
   sourceName?: string;
   location?: Location;
