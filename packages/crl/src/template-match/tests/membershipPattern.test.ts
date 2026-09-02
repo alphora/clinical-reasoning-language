@@ -179,6 +179,43 @@ describe("#189 gap 3 T2 — membership validation", () => {
     expect(r.isValid).toBe(true);
   });
 
+  it("⭐⭐ the warning fires on the FOLDED form too — three readers have now made this mistake", () => {
+    // ⚠ `matchNarrative` folds a pipeline, so `"X" in "VS", then most recent this` — the charter's own
+    // spelling — matches as `MostRecent(NestedPatternArg(Membership(…)))`. A consumer that inspects only the
+    // TOP-LEVEL pattern name silently stops seeing the construct. That bug shipped in the reference resolver
+    // and the layered emitter (fixed via `narrativeReferenceRoles`), and then survived in THIS validator.
+    const built = buildCRL(
+      [
+        "# P",
+        'library "L".',
+        "",
+        'terminology "Covered Services":',
+        "- system is `http://www.ama-assn.org/go/cpt`.",
+        "- code is `37718`.",
+        "",
+        'concept "Requested Service":',
+        "- shape is Record.",
+        "- type is Observation.",
+        "- value type is CodeableConcept.",
+        "- code is `requested-service`.",
+        "- definition is most recent this.",
+        "- source representation:",
+        "  - type is ServiceRequest.",
+        '  - coded from "Covered Services".',
+        "",
+        'concept "Requested Service Is Covered":',
+        "- shape is Record.",
+        "- type is Observation.",
+        "- value type is boolean.",
+        "- code is `requested-service-is-covered`.",
+        '- definition is "Requested Service" in "Covered Services", then most recent this.',
+      ].join("\n"),
+    );
+    expect(built.success).toBe(true);
+    const r = new Validator().validate(built.result!);
+    expect(r.warnings.map((e) => e.kind)).toContain("membership-scope-equals-comparand");
+  });
+
   it("⭐ differing sets are clean — the warning must not fire on the correct shape", () => {
     const built = build("CodeableConcept", "Requestable Services");
     const r = new Validator().validate(built.result!);

@@ -1,7 +1,7 @@
 import type { CRL, Concept, DefinitionIsDefinition } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
-import { matchNarrative } from "../template-match/matcher";
+import { findPatternCalls } from "../template-match/referenceRoles";
 
 import type { MembershipScopeFinding, ValidationError } from "./validator";
 
@@ -61,13 +61,18 @@ export class MembershipScopeValidator {
   ): void {
     const def = concept.definition;
     if (!def || def.type !== "DefinitionIsDefinition") return;
-    const matched = matchNarrative((def as DefinitionIsDefinition).body) as unknown as
-      | { pattern: string; known: boolean; args: { type: string; value: string; library?: string }[] }
-      | null;
-    if (!matched || matched.known !== true || matched.pattern !== "Membership") return;
+    // ⚠⚠ FIND THE CALL AT ANY DEPTH, not just at the top. `matchNarrative` folds a pipeline, so
+    // `"X" in "VS", then most recent this` — the charter's own spelling — matches as
+    // `MostRecent(NestedPatternArg(Membership(…)))`. Inspecting only `matched.pattern` made BOTH warnings
+    // below stop firing on that form. Third reader to make this mistake; hence the shared helper.
+    const calls = findPatternCalls((def as DefinitionIsDefinition).body, "Membership") as unknown as readonly {
+      args: { type: string; value: string; library?: string }[];
+    }[];
+    if (calls.length === 0) return;
+    const args = calls[0].args;
 
-    const subjectArg = matched.args.find((a) => a.type === "ConceptRefArg");
-    const setArg = matched.args.find((a) => a.type === "TerminologyRefArg");
+    const subjectArg = args.find((a) => a.type === "ConceptRefArg");
+    const setArg = args.find((a) => a.type === "TerminologyRefArg");
     if (!subjectArg || !setArg) return;
 
     // ⚠⚠ A CROSS-LIBRARY SUBJECT CANNOT BE PROVED ANSWERABLE HERE, AND THE FAILURE IS SILENT.

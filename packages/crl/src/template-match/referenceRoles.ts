@@ -78,3 +78,38 @@ export function narrativeReferenceRoles(body: NarrativeClause): ReadonlyMap<stri
   walkCall(matched, out);
   return out;
 }
+
+/**
+ * ⭐ Every call of `pattern` anywhere in a narrative — at the top level OR nested inside a folded pipeline.
+ *
+ * ⚠ Same reason `narrativeReferenceRoles` recurses: `matchNarrative` folds `"X" in "VS", then most recent
+ * this` into `MostRecent(NestedPatternArg(Membership(…)))`, so a consumer that inspects only the TOP-LEVEL
+ * pattern name silently stops seeing the construct in the charter's own spelling. That mistake has now been
+ * made in THREE readers; this exists so there is no fourth.
+ */
+export function findPatternCalls(body: NarrativeClause, pattern: string): readonly CanonicalPatternCall[] {
+  const out: CanonicalPatternCall[] = [];
+  const matched = matchNarrative(body);
+  if (matched?.known !== true) return out;
+  const visitCall = (call: CanonicalPatternCall): void => {
+    if (call.pattern === pattern) out.push(call);
+    for (const arg of call.args) visitArg(arg);
+  };
+  const visitArg = (arg: CanonicalArg): void => {
+    switch (arg.type) {
+      case "NestedPatternArg":
+        visitCall(arg.pattern);
+        return;
+      case "DisjunctionArg":
+        for (const d of arg.disjuncts) visitArg(d);
+        return;
+      case "ConjunctionArg":
+        for (const c of arg.conjuncts) visitArg(c);
+        return;
+      default:
+        return;
+    }
+  };
+  visitCall(matched);
+  return out;
+}
