@@ -28,6 +28,18 @@ VALUE_PROJECTION_IS : 'value projection is';
 // Diverges from `value type is` / `value element is` / `value projection is` at char 6 ('f'), so there is
 // no prefix conflict. No mode: a terminology reference is lexed in DEFAULT exactly as `coded from`'s is.
 VALUE_FROM          : 'value from';
+// ⭐⭐ #189 INLINE ANSWER OPTIONS — the two keywords an inline `value from:` option line needs.
+//
+// ⚠ BOTH ARE ADMITTED AS NARRATIVE WORDS (`narrativeElement`'s NWord alternation). That is REQUIRED, not
+// tidiness: the membership predicate is NARRATIVE (`- definition is "Patient Complaint" in qualifying.`), so
+// a `QUALIFYING` token that could not appear in a narrative would make the predicate unparseable — the
+// keyword would eat its own use site. Any keyword added here must be added there in the same edit.
+//
+// ⚠ THERE IS DELIBERATELY NO `NOT_QUALIFYING` TOKEN. The negative marker composes the EXISTING `NOT` with
+// `QUALIFYING` (`optionMarker`). A `'not qualifying'` literal would win ANTLR's longest match over `NOT`
+// wherever those two words met in narrative, silently changing how an unrelated sentence tokenizes.
+DISPLAY_IS          : 'display is';
+QUALIFYING          : 'qualifying';
 PARAM_TYPE_IS       : 'param type is' -> mode(PARAMETER_TYPE_MODE);
 EVIDENCE_IS         : 'evidence is';
 META_IS             : 'meta is';

@@ -1214,6 +1214,31 @@ export function emitFhirDefClosure(
 
   // Per-library emit (1-4) + per-decision emit with closure-aware resolvers.
   for (const lib of libraries) {
+    // ⚠⚠ SENTINEL — REMOVE WITH THE INLINE-OPTIONS EMIT, AND NOT BEFORE.
+    //
+    // The grammar and AST accept `value from:` inline options ahead of the emit that materializes their
+    // per-concept CodeSystem and ValueSets. Without this the concept would emit with NO answer options and
+    // NO binding — a silent-wrong package, the exact defect class this slice exists to remove.
+    //
+    // ⚠ IT LIVES HERE, over EVERY concept in the closure, and NOT in the case-feature branch where it was
+    // first written. MEASURED: a case feature requires a concept reachable from a decision, so a sentinel
+    // there missed an inline-options concept entirely and emit reported only an unrelated error. That is the
+    // same "guard that cannot fire" failure as the membership subject-shape check earlier in #189 — a guard
+    // in a conditional path reads as protection it does not provide. Verify a guard FIRES, do not assume it.
+    for (const st of lib.ast.statements) {
+      if (st.type !== "Concept" || st.valueFrom?.kind !== "inline") continue;
+      errors.push({
+        type: "Validation",
+        kind: "emit-inline-value-from-not-active",
+        message:
+          `Concept "${st.name}" declares inline \`value from:\` options, which do not emit yet. The ` +
+          `per-concept CodeSystem and its ValueSets are not built, so emitting would ship a question with ` +
+          `no answer options. Use \`value from "<terminology>"\` until the inline form activates.`,
+        line: st.valueFrom.location?.start.line,
+        column: st.valueFrom.location?.start.column,
+      } as CRLError);
+    }
+
     // Build per-source-library resolvers.
     const sourceLibResolvers = makeResolversForSourceLibrary(
       lib.libraryName,
@@ -1992,7 +2017,7 @@ export function emitFhirDefClosure(
         // silently, since nothing validates binding targets today.
         let answerOptions: { valueSetUrl: string } | undefined;
         const vfConcept = conceptByNameForGate.get(name);
-        if (vfConcept?.valueFrom !== undefined) {
+        if (vfConcept?.valueFrom?.kind === "terminology") {
           // ⚠ NORMALIZE FIRST. A ref qualified with THIS library's own name (`value from "L"."Opts"` inside
           // library L) is LOCAL, and every other terminology consumer normalizes before deciding — the
           // sibling resolver does it on the line it resolves. Testing `isQualifiedRef` raw refused a form that

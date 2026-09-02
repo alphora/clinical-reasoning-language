@@ -479,6 +479,50 @@ export type RecordUnionTerm =
   /** A PRODUCER stage's constructed candidate, identified by its 0-based stage index. */
   | { kind: "constructed"; stageIndex: number };
 
+/**
+ * ⭐⭐ ONE OFFERED ANSWER of an INLINE `value from:` block (#189).
+ *
+ * The concept OWNS these codes — they live in that concept's own CodeSystem, not the artifact-local one
+ * (which holds concept IDENTITIES). Two different vocabularies with two different jobs; see
+ * `codeSystem.ts::emitReferenceStubCodeSystem` for why identity-bearing and option-bearing systems must not
+ * be unified.
+ */
+export interface InlineAnswerOption {
+  /** The option's code, scoped by the concept's own CodeSystem — so it may be short. */
+  code: string;
+  /**
+   * The text a clinician READS in the generated questionnaire.
+   *
+   * ⚠ REQUIRED by the validator, and NEVER derived from the code by title-casing: that would manufacture
+   * clinician-facing text the author never wrote. The grammar cannot require it (an option line is shared
+   * with the unmarked form), so the check lives in the validator.
+   */
+  display: string;
+  /**
+   * What this option does to the determination. `true` = `qualifying`, `false` = `not qualifying`,
+   * `undefined` = UNMARKED.
+   *
+   * ⚠ UNMARKED IS NOT "does not qualify" — it is genuinely absent, and the distinction is load-bearing.
+   * The validator REQUIRES a marker exactly when the concept is the subject of an `in qualifying` predicate
+   * (operator ruling, 2026-09-02): a silent default would let a KE add an option, have a patient answer it
+   * honestly, and get a determinate `false -> deny` — the unrecoverable class, since a pause is recoverable
+   * but a spurious `false` looks like a decision. A plain dropdown that feeds no predicate needs no markers.
+   */
+  qualifying?: boolean;
+  location: Location;
+}
+
+/**
+ * The concept's OFFERED answer values — either a named terminology or inline options.
+ *
+ * ⚠ A DISCRIMINATED UNION on purpose. The two forms emit differently (a terminology reference resolves to
+ * an authored ValueSet; inline options MINT a CodeSystem plus their ValueSets), so a shape where both fields
+ * are optional would let a consumer read the wrong one and fail at emit rather than at the type.
+ */
+export type ValueFrom =
+  | { kind: "terminology"; terminologyName: ReferenceName; location: Location }
+  | { kind: "inline"; options: InlineAnswerOption[]; location: Location };
+
 export interface Concept extends ASTNode {
   type: "Concept";
   name: string;
@@ -535,7 +579,7 @@ export interface Concept extends ASTNode {
    * source candidates, producers, the CRE) and is filed as its own slice. MEASURED: the generated dropdown is
    * byte-identical at every binding strength, so strength buys nothing here.
    */
-  valueFrom?: { terminologyName: ReferenceName; location: Location };
+  valueFrom?: ValueFrom;
   // Optional: a concept may be representations-only (no top-level definition).
   definition?: ConceptDefinition;
   // `possible representation:` entries (ADR 0001 §3). May be empty.

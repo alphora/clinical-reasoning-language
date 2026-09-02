@@ -230,7 +230,10 @@ export class ReferenceResolver {
     // definition switch below because it is a concept FIELD, not a definition — a concept may carry one with
     // no definition at all (a pure coded question). Missing this walk would let a qualified answer set dangle:
     // it would validate, then fail to resolve at emit.
-    if (concept.valueFrom) {
+    // ⚠ Only the TERMINOLOGY form names a reference. Inline options declare their codes in place, so there
+    // is nothing to resolve — their checks (required display, marker, duplicate codes) are the answer-options
+    // validator's job, not the reference resolver's.
+    if (concept.valueFrom?.kind === "terminology") {
       this.checkRef(
         concept.valueFrom.terminologyName,
         TERMINOLOGY_REF_KINDS,

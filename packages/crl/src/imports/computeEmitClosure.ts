@@ -314,7 +314,10 @@ function visitConceptRepresentationRefs(concept: Concept, visit: (ref: Reference
   // caught by review, not by a failing test, because the phantom include does not reproduce in every library
   // arrangement. Closure membership and per-library `include`s are DIFFERENT concerns; this ref needs the
   // former (so the ValueSet is emitted and the binding resolves) and must not have the latter.
-  if (concept.valueFrom) visit(concept.valueFrom.terminologyName);
+  // ⚠ INLINE options pull NOTHING into the closure: the concept OWNS its CodeSystem and ValueSets, so they
+  // are emitted beside it rather than resolved from another declaration. Only the terminology form names an
+  // external thing that must be dragged in.
+  if (concept.valueFrom?.kind === "terminology") visit(concept.valueFrom.terminologyName);
 }
 
 function visitComposition(expr: CompositionExpression, visit: (ref: ReferenceName) => void): void {

@@ -135,7 +135,15 @@ import {
   Representation,
   MetaEntry,
 } from "./types";
-import type { CRL, LibraryDeclaration, Include, ReferenceName, QualifiedReference } from "./types";
+import type {
+  CRL,
+  LibraryDeclaration,
+  Include,
+  ReferenceName,
+  QualifiedReference,
+  ValueFrom,
+  InlineAnswerOption,
+} from "./types";
 
 function getLocation(ctx: ParserRuleContext): Location {
   const start = ctx.start;
@@ -962,7 +970,7 @@ export class CRLAstBuilder
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
     name: string,
     ctx: import("../grammar/generated/antlr/CRLParser").ConceptStatementContext,
-  ): { terminologyName: ReferenceName; location: Location } | undefined {
+  ): ValueFrom | undefined {
     const lines = bodyCtx.valueFromLine?.() ?? [];
     if (lines.length === 0) return undefined;
     if (lines.length > 1) {
@@ -973,6 +981,32 @@ export class CRLAstBuilder
       });
       return undefined;
     }
+    const location = getLocation(lines[0]);
+
+    // ⭐⭐ #189 — INLINE OPTIONS. The concept declares its offered answers here, and OWNS their codes.
+    const optionLines = lines[0].inlineOptionLine?.() ?? [];
+    if (optionLines.length > 0) {
+      const options: InlineAnswerOption[] = [];
+      for (const ol of optionLines) {
+        const strs = ol.backtickString?.() ?? [];
+        // The grammar pins both: `- \`code\` display is \`text\`[, marker].` Defensive only.
+        if (strs.length < 2) continue;
+        const marker = ol.optionMarker?.();
+        // ⚠ UNMARKED stays `undefined`, never coerced to false — see `InlineAnswerOption.qualifying`. The
+        // validator decides whether absence is legal, because only IT can see whether the concept is the
+        // subject of an `in qualifying` predicate.
+        const qualifying =
+          marker === undefined ? undefined : !/^not/i.test(marker.text.replace(/\s+/g, ""));
+        options.push({
+          code: strs[0].text.slice(1, -1),
+          display: strs[1].text.slice(1, -1),
+          ...(qualifying === undefined ? {} : { qualifying }),
+          location: getLocation(ol),
+        });
+      }
+      return { kind: "inline", options, location };
+    }
+
     const termRefCtx = lines[0].terminologyReference?.();
     if (!termRefCtx) {
       this.reportError("AstError", ctx, {
@@ -980,7 +1014,7 @@ export class CRLAstBuilder
       });
       return undefined;
     }
-    return { terminologyName: refFromRefContext(termRefCtx), location: getLocation(lines[0]) };
+    return { kind: "terminology", terminologyName: refFromRefContext(termRefCtx), location };
   }
 
   // The concept's own local code (`- code is `…`.`); the system is the package's
