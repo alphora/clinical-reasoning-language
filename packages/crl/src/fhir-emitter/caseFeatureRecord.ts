@@ -203,7 +203,32 @@ export function resolveCaseFeatureRecord(
     if (!isQuestion && concept.shape === "RecordSet") {
       return { kind: "record", descriptor: local };
     }
-    if (publishesRecord) {
+    // ⭐⭐ #189 — A LOCAL-ONLY `shape is Record` CONCEPT PUBLISHES ONE RECORD TOO, AND WAS NOT POINTED AT IT.
+    //
+    // `publishesRecord` above resolves through `resolveRecencyValueConcept`, which classifies only a
+    // BOTH-REP recency MERGE. A locally-answered coded question — `code is` + `definition is most recent
+    // this`, no `source representation` — is not that, so it fell through to the `record-list` fallback
+    // below and pointed its population context at the RAW RECORDS twin.
+    //
+    // ⚠⚠ MEASURED via `$apply`: with the question answered TWICE — which is precisely what
+    // `most recent this` EXISTS to arbitrate — the context yielded two Observations into a non-repeating
+    // group and `$populate` ERRORED ("Population context expression resulted in multiple values for a non
+    // repeating group"). The DECISION was still correct; the clinician-facing item broke. So a re-answered
+    // question, the most ordinary thing a user does, had no working population channel.
+    //
+    // ⚠ THIS IS NOT THE CASE THE `repeats` HUNT WITHDREW. That one is `shape is RecordSet`, which correctly
+    // gets NO population context at all because answering APPENDS a record and there is nothing to confirm.
+    // This concept declares ONE record and already HAS a one-record define; it simply was not aimed at it.
+    //
+    // ⚠ SHAPE **AND** THE REDUCTION, never shape alone — the declaration says one record, the reduction
+    // says which one. `hasRecordsTwin` above already established the reduction selects over `ThisRecords`.
+    const publishesSelectedRecord =
+      !isQuestion &&
+      concept.shape === "Record" &&
+      reduction !== undefined &&
+      reduction.target.type === "ThisRecords";
+
+    if (publishesRecord || publishesSelectedRecord) {
       return {
         kind: "record",
         descriptor: local,
