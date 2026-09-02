@@ -37,6 +37,7 @@ export interface CanonicalPatternCall {
 
 export type CanonicalArg =
   | ConceptRefArg
+  | TerminologyRefArg
   | QuantityArg
   | EnumArg
   | DisjunctionArg
@@ -52,6 +53,26 @@ export interface ConceptRefArg {
    * the narrative ref was qualified; absent for bare refs (which resolve
    * in the owning library at emit time).
    */
+  library?: string;
+  location: Location;
+}
+
+/**
+ * ⭐⭐ A named TERMINOLOGY reference — a value set, NOT a concept.
+ *
+ * ⚠⚠ IT IS A SEPARATE ARG TYPE ON PURPOSE, and passing one as a `ConceptRefArg` would be a real defect,
+ * not a cosmetic one: every consumer of `ConceptRefArg` treats it as a concept that must resolve in
+ * `siblingsByName` AND as a determinant CONTRIBUTING A RECENCY STAMP to a producer candidate
+ * (`emit/producerCandidate.ts`). A value set has neither an identity in that map nor a date. The
+ * membership predicate (`"X" in "VS"`) is the first pattern whose operands live in DIFFERENT namespaces,
+ * so the distinction has to be in the type rather than in each consumer's head.
+ *
+ * ⚠ Only the DATUM operand stamps the candidate; a `TerminologyRefArg` never enters `operandStamps`.
+ */
+export interface TerminologyRefArg {
+  type: "TerminologyRefArg";
+  value: string;
+  /** Library qualifier from the source `"Lib"."VS"` form; absent for bare refs. */
   library?: string;
   location: Location;
 }

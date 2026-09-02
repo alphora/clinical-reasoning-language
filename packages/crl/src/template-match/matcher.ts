@@ -33,6 +33,7 @@ import type {
   CanonicalArg,
   CanonicalPatternCall,
   ConceptRefArg,
+  TerminologyRefArg,
   QuantityArg,
   EnumArg,
   DisjunctionArg,
@@ -231,6 +232,24 @@ function nestedArg(pattern: CanonicalPatternCall): NestedPatternArg {
 
 function isWord(e: NarrativeElement | undefined, ...allowed: string[]): boolean {
   return !!e && e.type === "NWord" && (allowed.length === 0 || allowed.includes(e.value));
+}
+
+/**
+ * ⭐ A quoted narrative name built as a TERMINOLOGY reference rather than a concept one.
+ *
+ * ⚠ The narrative parser cannot tell them apart — both are `NConceptRef`, because a quoted name is a
+ * quoted name. The ROLE comes from the PATTERN's shape: in `"X" in "VS"` the second operand is the set
+ * by position. That is exactly why the distinction has to be made HERE and carried in the arg type; a
+ * consumer downstream has no way to recover it.
+ */
+function terminologyRefArg(e: NConceptRef): TerminologyRefArg {
+  const library = getRefLibrary(e.value);
+  return {
+    type: "TerminologyRefArg",
+    value: getRefName(e.value),
+    ...(library !== null ? { library } : {}),
+    location: e.location,
+  };
 }
 
 function isConceptRef(e: NarrativeElement | undefined): e is NConceptRef {
@@ -754,6 +773,25 @@ const existsThis: PatternMatcher = (els, loc) => {
  *                    all, collapsing a determinate `false` into `unknown` — the exact defect the SR fixture
  *                    exists to catch.
  */
+/**
+ * ⭐⭐ `"<X>" in "<VS>"` → Membership(X, VS) — the CONCEPT-LEVEL membership predicate.
+ *
+ * The form the charter writes (§3, beside `"BMI" at least 30 'kg/m2'`). It asks whether the value a
+ * NAMED CONCEPT publishes is a member of a set the predicate names ITSELF — which is what distinguishes
+ * it from the retired `matches this`, whose comparand was forced to be the representation's own
+ * `coded from` and therefore could never differ from the retrieve scope.
+ *
+ * ⚠ The two operands are in DIFFERENT namespaces (concept, then terminology) and are told apart by
+ * POSITION. See `terminologyRefArg`.
+ */
+const conceptInTerminology: PatternMatcher = (els, loc) => {
+  if (els.length !== 3) return null;
+  if (!isConceptRef(els[0])) return null;
+  if (!isWord(els[1], "in")) return null;
+  if (!isConceptRef(els[2])) return null;
+  return makeCall("Membership", [conceptRefArg(els[0]), terminologyRefArg(els[2])], loc);
+};
+
 const matchesThis: PatternMatcher = (els, loc) => {
   if (els.length !== 2) return null;
   if (!isWord(els[0], "matches")) return null;
@@ -1143,6 +1181,7 @@ const PATTERNS: PatternMatcher[] = [
   first,                           // 2
   lastBare,                        // 2 (after lastOnDayOf / lastWithinBeforeStartOf)
   mostRecentThisStage,             // 3 — `most recent this` as a pipeline stage
+  conceptInTerminology,            // 3 — `"X" in "VS"`, the CONCEPT-LEVEL membership predicate
   matchesThis,                     // 2 — the MEMBERSHIP projection (value-READING; three-state)
   existsThis,                      // 2 — the existence PROJECTION (value-blind)
   calculated,                      // 2

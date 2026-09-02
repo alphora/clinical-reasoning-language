@@ -568,7 +568,9 @@ export class UseSiteTypeValidator {
           this.applyShape(c, constraint, call, conceptName, ctx, attribution, warnedUntyped, errors);
         }
         return;
-      // NestedPatternArg / QuantityArg / EnumArg: no-op here (see method + checkCall comments).
+      // NestedPatternArg / QuantityArg / EnumArg / TerminologyRefArg: no-op here (see method + checkCall
+      // comments). ⚠ A terminology operand carries no VALUE TYPE to check — it names a SET, and whether
+      // the concept beside it is coded is the membership pattern's own validation, not a use-site shape.
     }
   }
 

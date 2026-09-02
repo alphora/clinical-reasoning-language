@@ -4318,6 +4318,15 @@ class Emitter {
         }
         return cqlIdent(arg.value);
       }
+      case "TerminologyRefArg": {
+        // ⭐ A value-set operand renders as the CQL `valueset` DECLARATION IDENTIFIER, never as a define name.
+        // ⚠ It resolves in the TERMINOLOGY namespace, which is why it is not a `ConceptRefArg`: rendering it
+        // through the concept path would emit a reference to a define that does not exist.
+        if (arg.library && arg.library !== this.options.libraryName) {
+          return cqlQualifiedRef(this.renderLib(arg.library), arg.value);
+        }
+        return cqlIdent(this.terminologyEmitName.get(arg.value) ?? arg.value);
+      }
       case "QuantityArg":
         return arg.unit ? `${arg.value} ${cqlString(arg.unit)}` : `${arg.value}`;
       case "EnumArg":

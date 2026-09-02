@@ -19,6 +19,7 @@ import type {
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
 import { branchConditionRefs, branchConditionConceptRefsStrict } from "../ast/branchCondition";
+import { matchNarrative } from "../template-match/matcher";
 import type { LibraryScope, SourceContext } from "../imports/scopes";
 import { lookupKnownLibrary } from "../imports/scopes";
 
@@ -35,6 +36,10 @@ type AcceptableKinds = readonly [RefKind, ...RefKind[]];
 
 /** Concept-accepting slot — also accepts parameter for narrative refs. */
 const NARRATIVE_REF_KINDS: AcceptableKinds = ["concept", "parameter"] as const;
+
+/** A location made comparable — two refs are the SAME ref iff they occupy the same span. */
+const spanKey = (l: { start: { line: number; column: number }; end: { line: number; column: number } }): string =>
+  `${l.start.line}:${l.start.column}-${l.end.line}:${l.end.column}`;
 /** Concept-only slot — `defined as` bare ref, composition refs, `when "C"`. */
 const CONCEPT_REF_KINDS: AcceptableKinds = ["concept"] as const;
 /** Terminology-only slot — `coded from`, activity `with`. */
@@ -321,7 +326,29 @@ export class ReferenceResolver {
   }
 
   private walkNarrative(clause: NarrativeClause, ctx: WalkContext, errors: ValidationError[]): void {
+    // ⭐⭐ A NARRATIVE REF'S NAMESPACE DEPENDS ON THE PATTERN IT LANDS IN.
+    //
+    // Every quoted name parses as an `NConceptRef` — the narrative parser cannot tell a concept from a
+    // terminology, because a quoted name is a quoted name. Most patterns take only concepts, so checking every
+    // ref against the CONCEPT namespace was right until `"X" in "VS"` arrived: its comparand is a value set,
+    // and resolving it as a concept reports "no concept declared with this name" for a perfectly good
+    // terminology.
+    //
+    // So MATCH FIRST, then route by the arg the matcher produced. ⚠ Routed by LOCATION, not by name: a
+    // concept and a terminology may legally share a name, and a name-keyed lookup would send one ref to the
+    // wrong namespace with no diagnostic. An unmatched narrative keeps the old behaviour exactly.
+    const matched = matchNarrative(clause);
+    const terminologySpans = new Set<string>();
+    if (matched?.known === true) {
+      for (const arg of matched.args) {
+        if (arg.type === "TerminologyRefArg") terminologySpans.add(spanKey(arg.location));
+      }
+    }
     for (const el of clause.elements) {
+      if (el.type === "NConceptRef" && terminologySpans.has(spanKey(el.location))) {
+        this.checkRef(el.value, TERMINOLOGY_REF_KINDS, el.location, ctx, errors, null);
+        continue;
+      }
       this.walkNarrativeElement(el, ctx, errors);
     }
   }

@@ -364,6 +364,31 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
     },
   },
 
+  // ── THE CONCEPT-LEVEL MEMBERSHIP PREDICATE ─────────────────────────────────────────────
+  //
+  // ⭐⭐ `"<concept>" in "<terminology>"` — the form the charter itself writes (§3, beside
+  // `"BMI" at least 30 'kg/m2'`). It REPLACES the rep-local `matches this` projection, which the operator
+  // retired (2026-09-02) because it was created to do exactly this job.
+  //
+  // ⚠ NOT `groundedStage`, which promises a `crl-common` realization: `CRLCommon.cql` has no membership
+  // function and never will — membership lowers to a NATIVE CQL `in` against a `valueset` declaration.
+  //
+  // ⚠⚠ ITS TWO OPERANDS LIVE IN DIFFERENT NAMESPACES, which no other pattern has: the datum is a
+  // CONCEPT, the comparand is a TERMINOLOGY. That is why `TerminologyRefArg` exists — passing the set as
+  // a `ConceptRefArg` would make `resolveProducerCandidates` demand a recency stamp from a value set.
+  // Only the DATUM operand stamps the constructed candidate.
+  //
+  // ⚠ THREE-STATE, and the third state is not free: CQL `in` returns FALSE for a null operand and for a
+  // present-but-empty `CodeableConcept` (both MEASURED). The lowering guards; the totality classification
+  // is occurrence-sensitive (over a QUESTION it inherits unknown, over EVIDENCE it is boundary-totalized)
+  // and is NOT decided by this table.
+  Membership: {
+    returnShape: "boolean",
+    slot: "any",
+    stage: { grounded: true, reads: "operands", resultType: "boolean" },
+    realization: "native",
+  },
+
   // ── THE CONCEPT-LEVEL EXISTENCE REDUCTION ─────────────────────────────────────────────────────────
   //
   // ⭐⭐ NOT A SPELLING OF `Exists` ABOVE, AND CONFLATING THE TWO WAS A LIVE DEFECT. Both are written

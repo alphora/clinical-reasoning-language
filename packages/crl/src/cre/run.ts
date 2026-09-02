@@ -505,6 +505,11 @@ function namedOperandsEmpty(stage: ResolvedStage, lib: string, ctx: Ctx, seen: S
         return provablyContributesNothing(idOf(arg.library ?? lib, arg.value), ctx, seen);
       case "QuantityArg":
       case "EnumArg":
+      // ⭐ A TERMINOLOGY operand is a literal SET, not a record source — it contributes no records of its own,
+      // exactly as a quantity does. ⚠ Leaving it to the `default` arm below would answer "not proved empty",
+      // which is conservative in the WRONG direction here: it would make the CRE refuse a membership stage
+      // whose only non-concept operand is a value set.
+      case "TerminologyRefArg":
         return true; // a literal contributes no records of its own
       default:
         return false; // nested / disjunction / conjunction — not inspected, so not proved
