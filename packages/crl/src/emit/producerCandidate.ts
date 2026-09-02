@@ -77,6 +77,18 @@ export interface ProducerCandidateSpec {
  * they are known. The renderer only turns them into text.
  */
 export interface ProjectedSourceSpec {
+  /**
+   * ⭐⭐ THE RESOLVED CONSTRUCTOR SIGNATURE, CARRIED WHOLE — the same rule `ProducerCandidateSpec` states
+   * above, and this spec used to break it by carrying only `functionName`.
+   *
+   * ⚠ MEASURED: the emitter must both CALL the constructor and DEFINE it, and
+   * `emitGeneratedConstructors` gathers definitions by walking the spec kinds that carry a `signature`. With
+   * only a name here, a concept whose ONLY constructor demand is a projected source arm emitted a CALL that
+   * nothing defined — `Could not resolve call to operator CRLConstructObservationBoolean` — and the whole
+   * library failed to TRANSLATE while emit reported success. Found by running `$apply` on `tmp/bleph` after
+   * a content change removed the other concepts that had been defining it incidentally.
+   */
+  signature: ConstructorSignature;
   functionName: string;
   code: { system: string; code: string };
   profile: string;
@@ -128,6 +140,7 @@ export function resolveProjectedSource(inputs: {
   return {
     kind: "resolved",
     spec: {
+      signature: ctor.signature,
       functionName: ctor.signature.functionName,
       code,
       profile,

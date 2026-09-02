@@ -2787,6 +2787,18 @@ class Emitter {
       // only the other two emits a call to a function nothing defines — a library that fails to TRANSLATE.
       const valueRead = (st as Concept).__valueReadSourceSpec as ValueReadSourceSpec | undefined;
       if (valueRead !== undefined) byName.set(valueRead.signature.functionName, valueRead.signature);
+      // ⭐⭐ #189 — AND SO DOES A PROJECTED SOURCE ARM. THE FOURTH DEMAND, AND THE THIRD TIME THIS EXACT
+      // CLASS HAS BITTEN, so the pattern is worth stating: EVERY spec kind that renders a constructor CALL
+      // must be gathered here, or the library fails to TRANSLATE while emit reports success.
+      //
+      // ⚠ MEASURED on `tmp/bleph` via `$apply`: `Could not resolve call to operator
+      // CRLConstructObservationBoolean`. It was INVISIBLE until a content change removed the other concepts
+      // whose specs had been defining that function incidentally — the caller had never carried its own
+      // demand, and free-rode for as long as a neighbour happened to declare it. A dangling constructor is
+      // therefore not a property of the CALLING concept alone; it depends on its company, which is exactly
+      // why gathering must be exhaustive rather than representative.
+      const projected = (st as Concept).__projectedSourceSpec as ProjectedSourceSpec | undefined;
+      if (projected !== undefined) byName.set(projected.signature.functionName, projected.signature);
     }
     // ⚠ Reached when the library has neither a producer nor a boundary transform — nothing to define.
     if (byName.size === 0) return null;
