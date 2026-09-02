@@ -633,26 +633,54 @@ current level). There is no ServiceRequest special case and no membership specia
   representation at all still has one.
 
 ```crl
+terminology "Requestable Services":   // the REQUESTABLE universe — what this concept is ABOUT
+- system is `http://www.ama-assn.org/go/cpt`.
+- code is `37718`.                    // endoluminal RFA
+- code is `37722`.                    // fem-pop bypass
+
+terminology "Covered Services":       // what this policy PAYS FOR — the predicate's comparand
+- system is `http://www.ama-assn.org/go/cpt`.
+- code is `37718`.
+
+concept "Requested Service":
+- value from "Requestable Services".        // what a USER may pick
 - source representation:
   - type is ServiceRequest.
-  - coded from "Covered VS".        // the set — ONE meaning, whatever the projection asks of it
-  - value projection is matches this.
+  - coded from "Requestable Services".      // the RETRIEVE SCOPE
+
+concept "Requested Service Is Covered":
+- definition is "Requested Service" in "Covered Services", then most recent this.
 ```
 
-⚠ **THE RETRIEVE SHAPE IS DECIDED BY THE PROJECTION, and this is the whole design.** `coded from` names the
-set; what is ASKED of it decides how the records are fetched:
+⚠⚠ **`coded from` STATES WHAT THE CONCEPT IS ABOUT. It is not an optimization, and it is not the
+predicate's set.** RULED (operator, 2026-09-02) after the alternatives were worked through and rejected;
+both failure modes below are why, and neither is recoverable by tuning.
 
-| projection | asks | retrieve | absence is |
-|---|---|---|---|
-| `exists this` | is there a record in the set? | **filtered** by the set | `false` — a records read; filtering and per-code testing are equivalent (`exists([SR: VS])` = `exists(SR where code in VS)`) |
-| `matches this` | does the record match the set? | ⚠ **UNFILTERED** — it must SEE non-members to judge them | *nothing contributed* — a datum read; unestablished, so it PAUSES |
+| the three roles | named by | says |
+|---|---|---|
+| RETRIEVE SCOPE | `coded from` on the posrep | which records are candidate answers to this question |
+| PREDICATE COMPARAND | the membership test's set | which of those answers counts as yes |
+| OFFERED ANSWERS | `value from` on the concept | which codes a user may pick |
 
-⚠⚠ Filter a `matches this` retrieve and a wrong-code record vanishes into the same empty set as no record at
-all — collapsing a determinate `false` into `unknown`, which is the exact defect the three-state ruling
-exists to prevent. The contract is carried in the pattern catalog’s `projection.retrieve` field
-(`template-match/patternCatalog.ts`) so validation and lowering read ONE table rather than each re-deciding
-it. ⚠ As of 2026-09-01 that field has NO consumer outside its own test — the catalog states the contract and
-nothing enforces it yet, so `matches this` does not emit. Wiring lowering to READ it is the open work.
+⚠ **The retrieve scope and the predicate comparand MUST be different sets.** Filter the retrieve by set X
+and test membership in X, and every record that reaches the predicate is a member **by identity** — the
+predicate can never return `false`, and the determinate-no row disappears. This is not a filtering accident
+to tune; it is a tautology.
+
+⚠ **The retrieve must NOT be unfiltered either.** Dropping `coded from` is what makes `most recent this`
+meaningless: EVERY record of that resource type competes, so a routine lab order dated later than the
+service request under adjudication wins the recency race and produces a confident WRONG denial. A retrieve
+scoped by nothing ranks by nothing. (A pause is recoverable — someone gets asked. A spurious `false` is not;
+it looks like a decision.)
+
+⭐ **So a record OUTSIDE the retrieve scope is not a missed `false` — it is not an instance of the concept.**
+A colonoscopy request under a blepharoplasty policy is not "not covered"; the policy was never asked about
+it, and the determination correctly stays unestablished. When an acceptance criterion says *"a code NOT in
+the value set is a determinate no"*, the set it means is the PREDICATE's, never the retrieve's.
+
+⚠ The three states come from the DATUM, not from the retrieve shape: a retrieved record whose code is in
+the predicate's set is `true`; one whose code is not is `false`; a record carrying no code, or no record at
+all, contributes nothing and the determination is unestablished, which PAUSES.
 
 **⭐ Matching is MEMBERSHIP — local codes and reference value sets alike; never "presence".** A concept's records
 are the resources whose code is a **member of the concept's value set**. That set is a single local code

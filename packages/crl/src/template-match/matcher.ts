@@ -735,7 +735,15 @@ const existsThis: PatternMatcher = (els, loc) => {
  *   record retrieved but carrying NO code      -> null    (nothing to test)
  *   NO record retrieved                        -> the arm contributes NOTHING -> unestablished -> pause
  *
- * ⚠⚠ THE RETRIEVE IS UNFILTERED, and this is the whole design. `coded from` names ONE set; what the
+ * ⚠⚠ RETIRED (operator, 2026-09-02) — DO NOT CITE THE PARAGRAPH BELOW AS THE DESIGN. The unfiltered
+ * retrieve is not the model: `coded from` STAYS and states what the concept is ABOUT, which is what makes
+ * `most recent this` meaningful — drop it and every record of that type competes, so an unrelated newer
+ * order wins the recency race and denies. Membership is a CONCEPT-LEVEL predicate against a DIFFERENT
+ * (narrower) set; the retrieve scope and the predicate comparand are two sets doing two jobs. See
+ * `docs/CRL-NORTH-STAR.md` §3 and `fixtures/service-request/policy.crl`. This projection and the text
+ * below are deleted by #189 gap 3.
+ *
+ * ⚠ THE RETRIEVE IS UNFILTERED, and this WAS the design. `coded from` names ONE set; what the
  * projection ASKS of it decides the retrieve shape:
  *
  *   `exists this`  — "is there a record in the set?" A RECORDS read. Filtering the retrieve and testing

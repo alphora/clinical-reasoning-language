@@ -16,6 +16,46 @@
 // all is a question nobody has answered. Collapsing them is the defect this
 // fixture exists to prevent.
 //
+// ⭐⭐ WHAT "NOT IN THE VALUE SET" MEANS IN ROW 2 — RULED (operator, 2026-09-02),
+// because it was misread once and cost a planning round.
+//
+// "it" is the COVERED set, NOT the retrieve set. Row 2 says: *we adjudicate this
+// kind of request, and this particular one is not covered.*
+//
+// A ServiceRequest for something this policy was never asked about — a
+// colonoscopy, under a blepharoplasty policy — is NOT a missed row 2. It is not
+// an instance of the concept at all, so it never reaches the predicate and the
+// determination stays unestablished. Denying it would be a WRONG answer wearing
+// a confident face; pausing says "this policy has nothing to say here", which is
+// the truth.
+//
+// ⚠ THEREFORE `coded from` IS NOT AN OPTIMIZATION. It states what the concept is
+// ABOUT — which requests are candidate answers to this question — and that is
+// what makes `most recent this` MEANINGFUL. Drop it and every ServiceRequest in
+// the record competes: a routine lab order dated later than the RFA request wins
+// the recency race and denies the RFA. A retrieve scoped by nothing ranks by
+// nothing.
+//
+// ⚠ So the two sets do DIFFERENT jobs and must both exist: `coded from` names
+// the REQUESTABLE universe (what this concept is about), the predicate names the
+// COVERED set (what this policy pays for).
+//
+// ⚠⚠ THE TWO ALTERNATIVES WERE WORKED THROUGH AND REJECTED. Recorded so they
+// are not re-proposed — both failures are structural, not tunable:
+//
+//   (1) NO `coded from` — an unfiltered retrieve.
+//       Every ServiceRequest in the record competes. A routine lab order dated
+//       later than the request under adjudication wins the recency race and
+//       DENIES it. A retrieve scoped by nothing ranks by nothing. This trades a
+//       recoverable pause for a confident WRONG answer, which is worse in kind.
+//
+//   (2) ONE set doing both jobs — `coded from` and the predicate name the same
+//       terminology.
+//       Every record that survives a filter for set X is a member of X, so the
+//       predicate can never return false. Row 2 disappears BY IDENTITY. The
+//       source path still discriminates only if the sets differ; with one set the
+//       chain behaves like a bare `exists` wearing two concepts.
+//
 // ⭐ WHY `matches` AND NOT `exists`. Both are rep-local projections invoked once
 // per retrieved record, but they ask different questions, and the charter's rule
 // is that what a construct READS decides how it reads absence:

@@ -16,6 +16,12 @@ import { runCel } from "../cre/run";
  *
  *   an SR whose code IS in the value set         -> true  -> Approve
  *   an SR whose code is NOT in it, nothing newer -> false -> Deny
+ *
+ * ⭐⭐ "it" is the COVERED set, NOT the retrieve set (RULED, operator 2026-09-02). Row 2 says *we
+ * adjudicate this kind of request, and this one is not covered.* A ServiceRequest this policy was never
+ * asked about — a colonoscopy under a blepharoplasty policy — is not an instance of the concept at all,
+ * so it correctly PAUSES rather than denying. See the fixture header for why that makes `coded from`
+ * load-bearing rather than an optimization.
  *   no SR at all, OR the SR carries no code      -> unanswered: pause and ask
  *
  * ⭐ ROWS 2 AND 3 MUST DIFFER, and that is the entire reason this fixture exists. A request for another

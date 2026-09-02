@@ -355,8 +355,11 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
       arity: 0,
       // The set IS the comparand — without one there is nothing to match against, on any resource.
       terminology: "always",
-      // ⚠ It MUST see non-members: filter the retrieve and a wrong-code record vanishes into the same empty
-      // set as no record at all, collapsing a determinate `false` into `unknown`.
+      // ⚠⚠ RETIRED (operator, 2026-09-02) — this field states the OLD model and has no consumer. The
+      // unfiltered retrieve is not the design: `coded from` stays and scopes what the concept is ABOUT,
+      // membership becomes a CONCEPT-LEVEL predicate against a DIFFERENT set, and the collapse it feared is
+      // avoided by the two sets differing rather than by removing the filter. Deleted with this whole entry
+      // by #189 gap 3. See `docs/CRL-NORTH-STAR.md` §3.
       retrieve: "unfiltered",
     },
   },
