@@ -13,6 +13,7 @@ import { NameUniquenessValidator } from "./nameUniquenessValidator";
 import { PipelineStageValidator } from "./pipelineStageValidator";
 import { RecordSetBoundValidator } from "./recordSetBoundValidator";
 import { AnswerOptionsValidator } from "./answerOptionsValidator";
+import { MembershipScopeValidator } from "./membershipScopeValidator";
 import { ReductionShapeValidator } from "./reductionShapeValidator";
 import { ReferenceResolver } from "./referenceResolver";
 import { RepresentationShapeValidator } from "./representationShapeValidator";
@@ -119,7 +120,8 @@ export type ValidationErrorKind =
   | "recordset-unbounded"
   | "answer-options-missing"
   | "answer-options-unanswerable"
-  | "answer-options-not-coded";
+  | "answer-options-not-coded"
+  | "membership-scope-equals-comparand";
 
 /**
  * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
@@ -579,6 +581,13 @@ export interface RecordSetUnboundedWarning extends ValidationErrorBase {
 
 /** ⭐ #189 gap 2 — findings about a coded question's ANSWER OPTIONS (`value from`). The `missing` kind is a
  *  WARNING today and becomes an error at the flip (operator ruling, 2026-09-01); the other two are errors. */
+/** ⭐ #189 gap 3 — the retrieve scope and the membership comparand naming the SAME terminology, which makes
+ *  a determinate `false` unreachable from source data. A WARNING: a local answer arm keeps it reachable. */
+export interface MembershipScopeFinding extends ValidationErrorBase {
+  kind: "membership-scope-equals-comparand";
+  conceptName: string;
+}
+
 export interface AnswerOptionsFinding extends ValidationErrorBase {
   kind: "answer-options-missing" | "answer-options-unanswerable" | "answer-options-not-coded";
   conceptName: string;
@@ -608,6 +617,7 @@ export type ValidationError =
   | EmitCapabilityWarning
   | RecordSetUnboundedWarning
   | AnswerOptionsFinding
+  | MembershipScopeFinding
   | MetaDiagnostic;
 
 export interface ValidationResult {
@@ -668,6 +678,7 @@ export class Validator {
   private readonly pipelineStageValidator: PipelineStageValidator;
   private readonly recordSetBoundValidator: RecordSetBoundValidator;
   private readonly answerOptionsValidator: AnswerOptionsValidator;
+  private readonly membershipScopeValidator: MembershipScopeValidator;
   private readonly reductionShapeValidator: ReductionShapeValidator;
   private readonly useSiteTypeValidator: UseSiteTypeValidator;
   private readonly emitCapabilityValidator: EmitCapabilityValidator;
@@ -684,6 +695,7 @@ export class Validator {
     this.pipelineStageValidator = new PipelineStageValidator();
     this.recordSetBoundValidator = new RecordSetBoundValidator();
     this.answerOptionsValidator = new AnswerOptionsValidator();
+    this.membershipScopeValidator = new MembershipScopeValidator();
     this.reductionShapeValidator = new ReductionShapeValidator();
     this.useSiteTypeValidator = new UseSiteTypeValidator();
     this.emitCapabilityValidator = new EmitCapabilityValidator();
@@ -765,6 +777,10 @@ export class Validator {
     // ERROR (the line can never do anything), while a coded question MISSING one is a WARNING today and
     // becomes an error at the flip — 9 in-tree concepts must migrate first (operator ruling, 2026-09-01).
     pushSplit(this.answerOptionsValidator.validate(ast, sources));
+    // ⭐ #189 gap 3 — scope-equals-comparand. Intrinsically a WARNING (see the validator header): the
+    // collapse is a tautology for the SOURCE arm only, so erroring would reject a concept whose local
+    // answer arm still reaches a determinate `false`.
+    pushSplit(this.membershipScopeValidator.validate(ast, sources));
 
     // concept-model redesign Todo 2 rule B — use-site & result-shape type checking (pattern
     // operand constraints incl. refinement/anchor booleans and non-boolean composition/bare-ref

@@ -105,3 +105,78 @@ describe("#189 gap 3 — the Membership pattern", () => {
     expect(r.errors.map((e) => e.kind)).toContain("unresolved-reference");
   });
 });
+
+describe("#189 gap 3 T2 — membership validation", () => {
+  const build = (operandValueType: string, scopeSet: string | null) =>
+    buildCRL(
+      [
+        "# P",
+        'library "L".',
+        "",
+        'terminology "Requestable Services":',
+        "- system is `http://www.ama-assn.org/go/cpt`.",
+        "- code is `37718`.",
+        "- code is `37722`.",
+        "",
+        'terminology "Covered Services":',
+        "- system is `http://www.ama-assn.org/go/cpt`.",
+        "- code is `37718`.",
+        "",
+        'concept "Requested Service":',
+        "- shape is Record.",
+        "- type is Observation.",
+        `- value type is ${operandValueType}.`,
+        "- code is `requested-service`.",
+        "- definition is most recent this.",
+        ...(scopeSet
+          ? ["- source representation:", "  - type is ServiceRequest.", `  - coded from "${scopeSet}".`]
+          : []),
+        "",
+        'concept "Requested Service Is Covered":',
+        "- shape is Record.",
+        "- type is Observation.",
+        "- value type is boolean.",
+        "- code is `requested-service-is-covered`.",
+        '- definition is "Requested Service" in "Covered Services".',
+      ].join("\n"),
+    );
+
+  it("⭐ the tested value must be CODED — a membership test reads a code", () => {
+    for (const vt of ["Quantity", "boolean"]) {
+      const built = build(vt, "Requestable Services");
+      expect(built.success).toBe(true);
+      const r = new Validator().validate(built.result!);
+      expect(r.errors.map((e) => e.kind), `value type ${vt} must be rejected`).toContain(
+        "use-site-type-mismatch",
+      );
+    }
+    const ok = build("CodeableConcept", "Requestable Services");
+    const r = new Validator().validate(ok.result!);
+    expect(r.errors.map((e) => e.kind)).not.toContain("use-site-type-mismatch");
+  });
+
+  it("⭐⭐ scope == comparand WARNS — the determinate NO is unreachable from source data", () => {
+    // Every record surviving a filter for set X is a member of X, so the predicate can only answer yes or
+    // nothing. This is the identity collapse the two-terminology model exists to prevent.
+    const built = build("CodeableConcept", "Covered Services");
+    const r = new Validator().validate(built.result!);
+    expect(r.warnings.map((e) => e.kind)).toContain("membership-scope-equals-comparand");
+    // ⚠ A WARNING, NOT AN ERROR, and the reason is load-bearing: the collapse is a tautology for the SOURCE
+    // arm only. A local `code is` answer never passes through the retrieve, so a concept answered directly
+    // can still produce a `false`. Erroring would reject an authoring that works.
+    expect(r.errors.map((e) => e.kind)).not.toContain("membership-scope-equals-comparand");
+    expect(r.isValid).toBe(true);
+  });
+
+  it("⭐ differing sets are clean — the warning must not fire on the correct shape", () => {
+    const built = build("CodeableConcept", "Requestable Services");
+    const r = new Validator().validate(built.result!);
+    expect(r.warnings.map((e) => e.kind)).not.toContain("membership-scope-equals-comparand");
+  });
+
+  it("⚠ an operand with NO representation cannot collapse — stays silent", () => {
+    const built = build("CodeableConcept", null);
+    const r = new Validator().validate(built.result!);
+    expect(r.warnings.map((e) => e.kind)).not.toContain("membership-scope-equals-comparand");
+  });
+});

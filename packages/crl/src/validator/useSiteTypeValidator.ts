@@ -990,6 +990,12 @@ function operandMismatchTail(
       );
     case "value-comparison":
       return `A value-comparison pattern compares a magnitude, so its operand must be \`${vt}\`-valued.`;
+    case "membership":
+      return (
+        `A membership test asks whether a CODE is in a value set, so its subject must be \`${vt}\`-valued. ` +
+        `A concept with no code to test cannot be a member of anything — if you meant "is there a record", ` +
+        `that is an existence question, not a membership one.`
+      );
     case "refinement":
       // The redesign's shape split: a concept consumed at BOTH a refinement/anchor position AND a
       // boolean guard has NO single valid declaration (disc 403 [imp] #5). Point at the split

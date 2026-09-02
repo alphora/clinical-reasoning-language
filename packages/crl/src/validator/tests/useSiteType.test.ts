@@ -740,6 +740,10 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — registry self-validation", ()
   // real concept-operand slot — so a matcher arg-order change can't silently disable a check
   // (disc 397 gpt56 #5).
   const REP_PHRASE: Record<string, string> = {
+    // ⭐ #189 gap 3 — the concept-level membership predicate. Arg 0 is the tested CONCEPT; arg 1 is a
+    // `TerminologyRefArg` (the value SET) and carries no constraint, so the slot assertion below never
+    // reaches it.
+    Membership: '"X" in "VS"',
     MostRecent: 'most recent "X"',
     Last: 'last "X"',
     Earliest: 'earliest "X"',
@@ -836,7 +840,12 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — registry self-validation", ()
         const expected =
           c.family === "value-comparison"
             ? { rel: "is", valueType: "Quantity" }
-            : { rel: "not-derived", valueType: "boolean" }; // time-selection AND refinement
+            : // ⭐ #189 gap 3 — membership tests a CODE, so its subject must BE a CodeableConcept. Same `is`
+              // rel as value-comparison, different value type, and a DIFFERENT family because the diagnostic
+              // differs ("compares a magnitude" would be nonsense for a set test).
+              c.family === "membership"
+              ? { rel: "is", valueType: "CodeableConcept" }
+              : { rel: "not-derived", valueType: "boolean" }; // time-selection AND refinement
         expect(
           { rel: c.shape.rel, valueType: c.shape.valueType },
           `${pattern} arg[${c.position}]: family ${c.family} must pair with ${expected.rel} ${expected.valueType}`,

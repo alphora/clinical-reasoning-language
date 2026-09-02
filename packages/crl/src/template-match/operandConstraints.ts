@@ -46,7 +46,7 @@ export type OperandShape =
  * the shape's `rel` — selects the message. `refinement` additionally stays SILENT on an untyped
  * operand (those positions are ubiquitous; A.10 owns the untyped case).
  */
-export type OperandFamily = "time-selection" | "value-comparison" | "refinement";
+export type OperandFamily = "time-selection" | "value-comparison" | "refinement" | "membership";
 
 export interface OperandConstraint {
   /** 0-based index into `CanonicalPatternCall.args` (the matcher emits the concept operand first). */
@@ -60,6 +60,10 @@ export interface OperandConstraint {
 
 const NOT_DERIVED_BOOLEAN: OperandShape = { rel: "not-derived", valueType: "boolean" };
 const IS_QUANTITY: OperandShape = { rel: "is", valueType: "Quantity" };
+// ⭐ Membership tests whether a CODE is in a set, so its subject must carry a code. Same `rel: "is"`
+// shape as value-comparison, different FAMILY — the family selects the diagnostic, and "compares a
+// magnitude" would be nonsense here.
+const IS_CODEABLE_CONCEPT: OperandShape = { rel: "is", valueType: "CodeableConcept" };
 
 // Time-selection — selects an instance by timestamp. A DERIVED BOOLEAN has no instance stream
 // (refinement 1's actual bug: `most recent "Mammogram"` over a `defined as exists` boolean). Any
@@ -118,6 +122,12 @@ export const OPERAND_CONSTRAINTS: Readonly<Record<string, readonly OperandConstr
   Last: timeSelection,
   Earliest: timeSelection,
   First: timeSelection,
+  // ⭐ Membership — the TESTED value (arg 0). ⚠ Arg 1 is the value SET and carries NO constraint here: it
+  // is a `TerminologyRefArg`, not a concept, so it has no value type to check. (`useSiteTypeValidator`
+  // no-ops on that arg type; whether the set exists is the reference resolver's job.)
+  Membership: [
+    { position: 0, shape: IS_CODEABLE_CONCEPT, family: "membership", role: "the tested value" },
+  ],
   // Value-comparison (compared value — arg 0).
   AtLeast: valueComparison,
   AtMost: valueComparison,
@@ -162,6 +172,8 @@ export function operandExpectation(constraint: OperandConstraint): string {
   switch (constraint.family) {
     case "value-comparison":
       return `\`${constraint.shape.valueType}\`-valued`;
+    case "membership":
+      return `\`${constraint.shape.valueType}\`-valued (a membership test reads a CODE)`;
     case "time-selection":
       return `not a derived \`${constraint.shape.valueType}\` (a computed value has no event date to select over)`;
     case "refinement":
