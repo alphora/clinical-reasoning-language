@@ -144,6 +144,38 @@ export class MembershipScopeValidator {
     const subject = byName.get(subjectArg.value);
     if (!subject) return; // an unresolved operand is already a reference error
 
+    // ⚠⚠ THE SUBJECT MUST PUBLISH ONE RECORD, AND THIS REFUSAL REPLACES A MEASURED SILENT-WRONG EMIT.
+    //
+    // The lowering reads `<subject>.value as FHIR.CodeableConcept`. That is right for a concept publishing a
+    // RECORD. For `shape is RecordSet` the subject is a LIST, so `.value` is a list too and the cast is a
+    // list-to-singleton — MEASURED: emit reports SUCCESS and the library fails to TRANSLATE with
+    // "Expression of type 'List of choice<…>' cannot be cast as a value of type 'CodeableConcept'". Exactly
+    // the class of the `Encounter.type` repeating-read defect, and the panel predicted this cell before it
+    // was reachable.
+    //
+    // ⚠ `shape is Scalar` publishes the VALUE, not a record, so the lowering would read `.value` off a
+    // value. That cell is BUILDABLE (drop the `.value` step) but is not built, so it refuses too rather than
+    // emitting something nobody has run. Typed BUILD DEBT (§0a), not an author error — the message says so.
+    const shape = subject.shape;
+    if (shape !== undefined && shape !== "Record") {
+      out.push({
+        kind: "membership-subject-shape-unsupported",
+        conceptName: concept.name,
+        message:
+          `Concept "${concept.name}" tests membership over "${subjectArg.value}", which declares ` +
+          `\`shape is ${shape}\`. Membership reads the ONE value its subject publishes, and only ` +
+          `\`shape is Record\` publishes one: a \`RecordSet\` publishes a LIST (there is no ruled reduction ` +
+          `for which record's value to test), and a \`Scalar\` publishes the value itself (readable, but that ` +
+          `lowering is not built). Give the subject \`shape is Record\` and a reduction such as ` +
+          `\`definition is most recent this\`.`,
+        location: concept.location,
+        severity: "error",
+        ...(attribution.libraryName ? { libraryName: attribution.libraryName } : {}),
+        ...(attribution.filePath ? { filePath: attribution.filePath } : {}),
+      } as MembershipScopeFinding);
+      return;
+    }
+
     for (const rep of subject.representations ?? []) {
       if (!rep.terminologyName) continue;
       // ⚠ Compare the QUALIFIER too. Two libraries may each declare a terminology of the same name, and a

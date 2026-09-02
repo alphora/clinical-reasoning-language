@@ -123,7 +123,8 @@ export type ValidationErrorKind =
   | "answer-options-not-coded"
   | "membership-scope-equals-comparand"
   | "membership-cross-library-subject"
-  | "membership-predicate-not-assertable";
+  | "membership-predicate-not-assertable"
+  | "membership-subject-shape-unsupported";
 
 /**
  * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
@@ -589,7 +590,8 @@ export interface MembershipScopeFinding extends ValidationErrorBase {
   kind:
     | "membership-scope-equals-comparand"
     | "membership-cross-library-subject"
-    | "membership-predicate-not-assertable";
+    | "membership-predicate-not-assertable"
+  | "membership-subject-shape-unsupported";
   conceptName: string;
 }
 

@@ -4306,6 +4306,16 @@ class Emitter {
    * make the answer depend on machinery they cannot see.
    */
   private emitMembership(call: CanonicalPatternCall): string {
+    // ⚠⚠ THE SUBJECT MUST PUBLISH ONE RECORD, AND THIS LANE CANNOT CHECK IT — the VALIDATOR does
+    // (`membership-subject-shape-unsupported`). Recorded here because the gap is real: for a
+    // `shape is RecordSet` subject the read below is a LIST and the cast is list-to-singleton, so emit
+    // reports SUCCESS and the library fails to TRANSLATE ("Expression of type 'List of choice<…>' cannot be
+    // cast as a value of type 'CodeableConcept'") — MEASURED, and the same class as gap 1's repeating-read.
+    //
+    // ⚠ A guard was written here and REMOVED because it could not fire: `conceptByName` holds only THIS
+    // layer's statements (see its declaration), and the subject lives in another layer. A check that cannot
+    // fire is worse than none — it reads as protection. Closing this properly needs the subject's shape
+    // carried down from lowering as a marker, where the whole AST is visible.
     const subject = this.emitArg(call.args[0]);
     const set = this.emitArg(call.args[1]);
     const datum = `(${subject}.value as FHIR.CodeableConcept)`;
