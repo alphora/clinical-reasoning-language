@@ -64,7 +64,7 @@ import {
 } from "./caseFeatureCollection";
 import { caseFeatureCanonicalUrl, emitCaseFeatureStructureDefinition } from "./structureDefinition";
 import { resolveCaseFeatureRecord, type CaseFeatureRecordResolution, resolveFeatureExpressionTarget } from "./caseFeatureRecord";
-import { emitLocalCodeSystem } from "./codeSystem";
+import { emitLocalCodeSystem, emitReferenceStubCodeSystem } from "./codeSystem";
 import {
   emitDecisionPlanDefinition,
   type ActivityResolver,
@@ -2108,6 +2108,36 @@ export function emitFhirDefClosure(
     if (typeof catUrl === "string" && emittedUrlsSoFar.has(catUrl)) continue;
     if (typeof catUrl === "string") emittedUrlsSoFar.add(catUrl);
     resources.push(catResource);
+  }
+
+  // ⭐⭐ #189 PRECURSOR A — DECLARE THE REFERENCE-VS STUB CODES. A pure reference terminology
+  // (`valueset is <url>`) emits a membership STUB whose compose carries one synthetic code under a shared
+  // `reference-vs-stub` system; until now NOTHING emitted that CodeSystem, so every stub ValueSet pointed at
+  // a system no resource declared. MEASURED on `tmp/bleph`: 2 of 14 codes declared by no emitted CodeSystem.
+  //
+  // ⚠ COLLECTED FROM THE EMITTED VALUESETS, NOT RE-DERIVED FROM THE AST. `referenceStubCoding` is the one
+  // authority for a stub `{system, code}`; reading back what was actually emitted sits DOWNSTREAM of it, so
+  // this cannot drift from the ValueSets it describes. A second walk over the terminology AST could.
+  //
+  // ⚠ THE STUB VALUESET'S OWN ID/URL ARE UNTOUCHED, and that is load-bearing: a reference VS canonical is
+  // CUSTOMER-FACING — a deployment binds that id and customizes the INSTANCE at it (adding or removing codes
+  // for its environment), and production swaps the real value set in at the SAME canonical. This pass only
+  // declares the synthetic code living INSIDE the stub body; it never re-points an identifier.
+  const stubSystem = `${metadata.canonicalBase}/CodeSystem/reference-vs-stub`;
+  const stubCodes = new Set<string>();
+  for (const r of resources) {
+    if (r.resourceType !== "ValueSet") continue;
+    const includes = (r.resource as { compose?: { include?: Array<{ system?: string; concept?: Array<{ code?: string }> }> } })
+      .compose?.include;
+    for (const inc of includes ?? []) {
+      if (inc.system !== stubSystem) continue;
+      for (const c of inc.concept ?? []) if (typeof c.code === "string") stubCodes.add(c.code);
+    }
+  }
+  if (stubCodes.size > 0) {
+    const stubCs = emitReferenceStubCodeSystem([...stubCodes], metadata, resolvedOpts);
+    errors.push(...stubCs.errors);
+    if (stubCs.resource) resources.push(stubCs.resource);
   }
 
   // Closure invariants — locked sequence per plan v3.2 (+ slice 4 Inv 0).

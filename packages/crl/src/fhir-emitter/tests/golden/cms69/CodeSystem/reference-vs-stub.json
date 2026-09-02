@@ -1,0 +1,61 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "reference-vs-stub",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/CodeSystem/reference-vs-stub",
+  "version": "1.0.0",
+  "name": "ReferenceVsStub",
+  "title": "CMS69 BMI Screening demonstration corpus",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "Smile Digital Health",
+  "description": "CMS69 BMI Screening demonstration corpus",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "2.16.840.1.113762.1.4.1047.502"
+    },
+    {
+      "code": "2.16.840.1.113883.3.526.3.1007"
+    },
+    {
+      "code": "2.16.840.1.113883.3.526.3.1561"
+    },
+    {
+      "code": "2.16.840.1.113883.3.526.3.1563"
+    },
+    {
+      "code": "2.16.840.1.113883.3.526.3.1582"
+    },
+    {
+      "code": "2.16.840.1.113883.3.600.1.1527"
+    },
+    {
+      "code": "2.16.840.1.113883.3.600.1.1528"
+    },
+    {
+      "code": "2.16.840.1.113883.3.600.1.1623"
+    }
+  ]
+}

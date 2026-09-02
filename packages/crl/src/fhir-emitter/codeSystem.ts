@@ -198,6 +198,107 @@ export function emitLocalCodeSystem(
   };
 }
 
+/**
+ * ⭐⭐ #189 PRECURSOR A — THE ONE `reference-vs-stub` CodeSystem for a closure.
+ *
+ * A PURE reference terminology (`valueset is <url>`) emits a membership STUB carrying one synthetic code
+ * under a shared `<canonicalBase>/CodeSystem/reference-vs-stub` system (`valueSet.ts::referenceStubCoding`).
+ * Until now NOTHING emitted that CodeSystem, so every stub ValueSet referenced a system no resource declared.
+ *
+ * ⚠ MEASURED on `tmp/bleph` (2026-09-02): 2 of 14 dangling codes were these. Two review arms missed it
+ * across two rounds; a `dangle.ts` sweep over the emitted package found it.
+ *
+ * ⚠ THE CODES ARE COLLECTED FROM THE EMITTED VALUESETS, NOT RE-DERIVED. `referenceStubCoding` is the single
+ * authority for a stub `{system, code}`, and reading back what the ValueSets actually emitted puts this
+ * DOWNSTREAM of that authority rather than beside it — a second predicate over the terminology AST could
+ * drift from what was emitted, which is the exact failure mode the local-CodeSystem lane guards against.
+ *
+ * ⚠ `experimental: true`, NOT the package metadata — mirroring the stub ValueSet convention
+ * (`valueSet.ts`: a real value set is `experimental=false` with real content; packaging swaps the real
+ * content in at the same url and drops the stub). This is scaffolding that MUST NOT SHIP. It is the exact
+ * opposite of a concept-level answer-option CodeSystem, which is production vocabulary — do not unify them.
+ *
+ * ⚠ NO `display`. A stub code is a value set canonical's last path segment, not a clinical term; a display
+ * would be manufactured content. FHIR makes `concept.display` optional, so omission is legal and honest.
+ *
+ * ⭐⭐ THE TWO IDENTIFIER INVARIANTS — ESSENTIAL, AND THEY POINT OPPOSITE WAYS. (Operator, 2026-09-02,
+ * stated as essential and protected here by request. Conflating them was an actual error in design review,
+ * caught by the operator, so the contrast is written out rather than assumed.)
+ *
+ *   1. A CUSTOMER-FACING CANONICAL MUST NEVER MOVE. A REFERENCE value set's url/id is bound by a deployment:
+ *      production swaps the real value set in AT THE SAME CANONICAL, and a customer customizes the INSTANCE
+ *      there — adding or removing codes for their environment. Wrong content is fixed by changing the
+ *      instance's CODES, never by re-pointing the identifier. See `valueSet.ts::resolveReferenceStub`, which
+ *      is where that id is decided and where the full rule lives.
+ *
+ *   2. A GENERATED RESOURCE THAT SHIPS WITH THE ARTIFACT MAY HAVE ITS ID MOVE, AND THAT IS NOT A BREAKAGE.
+ *      Nothing external pins it. If a concept's `code is` changes, the artifact's next version simply
+ *      carries a new and corrected ValueSet/CodeSystem beside the content that uses it — terminology and
+ *      content ship together, so they cannot disagree. ⚠ DO NOT "protect" these by freezing derived ids or
+ *      by declaring a shipped `code is` immutable; an earlier draft did exactly that, over-applying rule 1,
+ *      and it would forbid ordinary authoring for no gain.
+ *
+ * ⚠ THIS resource is rule 1's neighbour but is itself rule 2: it is OUR scaffolding, `experimental`, and it
+ * is what DECLARES the synthetic code sitting inside a stub body. It never touches the stub ValueSet's
+ * customer-facing id. Keep those two facts apart when editing either.
+ *
+ * ⚠ And do NOT unify this with a per-concept answer-option CodeSystem. Same resource type, OPPOSITE ship
+ * postures: answer options are production vocabulary carrying package metadata; this is scaffolding meant to
+ * be superseded. Unifying them would either ship the stub or misfile the vocabulary.
+ */
+export function emitReferenceStubCodeSystem(
+  stubCodes: ReadonlyArray<string>,
+  metadata: CpgMetadata,
+  opts: EmitOptions = {},
+): { resource: EmittedResource | null; errors: CRLError[] } {
+  const errors: CRLError[] = [];
+  if (stubCodes.length === 0) return { resource: null, errors };
+
+  const id = "reference-vs-stub";
+  const url = `${metadata.canonicalBase}/CodeSystem/${id}`;
+  const level = opts.capability ?? "publishable";
+  const publishable = isPublishablePlus(level);
+  const title = metadata.title || metadata.name;
+  const description =
+    metadata.description ||
+    "Synthetic per-value-set stub codes for REFERENCE value sets. Authoring/test scaffolding — replaced when real value set content is swapped in at the same canonical.";
+
+  const resource: Record<string, unknown> = {
+    resourceType: "CodeSystem",
+    id,
+    meta: { profile: crmiCapabilityProfiles("codesystem", level) },
+    extension: knowledgeExtensions(level),
+    url,
+    version: metadata.version,
+    name: pascalCaseName("reference vs stub"),
+    title,
+    status: metadata.status,
+    // ⚠ Scaffolding, so ALWAYS experimental — never `metadata.experimental`. See the header.
+    experimental: true,
+    ...(publishable ? { date: (opts.clock ?? defaultClock)().toISOString() } : {}),
+    publisher: metadata.publisher,
+    description,
+    caseSensitive: true,
+    content: "complete",
+    concept: [...stubCodes].sort().map((code) => ({ code })),
+  };
+
+  if (metadata.contact.length > 0) resource.contact = metadata.contact;
+  if (metadata.jurisdiction.length > 0) resource.jurisdiction = metadata.jurisdiction;
+  if (metadata.useContext.length > 0) resource.useContext = metadata.useContext;
+
+  return {
+    resource: {
+      resourceType: "CodeSystem",
+      relativePath: `CodeSystem/${id}.json`,
+      resource,
+      sourceKind: "ReferenceStubCodeSystem",
+      sourceName: metadata.name,
+    },
+    errors,
+  };
+}
+
 function defaultClock(): Date {
   return new Date();
 }

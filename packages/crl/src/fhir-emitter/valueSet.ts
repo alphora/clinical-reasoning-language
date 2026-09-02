@@ -82,6 +82,26 @@ export function referenceStubCoding(
  * ⚠ Extracted because `url`, `id`, `compose` and `experimental` are a COUPLED TUPLE: they must all describe
  * the same decision. Computing the predicate in two places let `url` diverge from the rest if either moved
  * (Claude arm, code review r13) — which is the drift class `emittedValueSetUrl` itself exists to prevent.
+ *
+ * ⭐⭐ INVARIANT — A REFERENCE VALUE SET'S CANONICAL IS CUSTOMER-FACING AND MUST NEVER MOVE.
+ * (Operator, 2026-09-02, stated as essential and protected here by request.)
+ *
+ * The stub emits at the DECLARED canonical VERBATIM — `url` = the authored `valueset is <url>`, `id` = its
+ * last path segment. That is not a formatting choice, it is the whole deployment model:
+ *
+ *   • A DEPLOYMENT BINDS THAT ID. At runtime the real value set is swapped in AT THE SAME CANONICAL, and
+ *     the emitted CQL `valueset` declaration — which already binds that url — keeps resolving unchanged.
+ *   • A CUSTOMER CUSTOMIZES THE INSTANCE AT THAT ID, adding or removing codes for their environment. That
+ *     only works if the identifier is the fixed point and the CONTENT is what varies.
+ *
+ * ⚠⚠ SO: WRONG CONTENT IS FIXED BY CHANGING THE INSTANCE'S CODES — NEVER BY RE-POINTING THE IDENTIFIER.
+ * Do not mint a per-terminology canonical, do not derive the id from anything local, do not "tidy" it into
+ * our own namespace. Any of those breaks the swap AND breaks customer customization, and the failure is
+ * silent: membership simply stops matching. This was floated once and rejected outright.
+ *
+ * ⚠ The synthetic code inside the stub body is a DIFFERENT thing and is ours — see
+ * `codeSystem.ts::emitReferenceStubCodeSystem`, which declares it and carries the contrasting invariant for
+ * resources that SHIP WITH THE ARTIFACT rather than being bound by a deployment.
  */
 function resolveReferenceStub(
   terminology: Terminology,

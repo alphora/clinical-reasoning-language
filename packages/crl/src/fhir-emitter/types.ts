@@ -336,7 +336,18 @@ export interface EmittedResource {
    * sourceKind = "Recommendation" and sourceName = the activity's CRL name
    * (NOT a synthesized "<name> Recommendation" string).
    */
-  sourceKind?: "Terminology" | "Library" | "Activity" | "Recommendation" | "Decision" | "LocalCodeSystem" | "CaseFeature";
+  sourceKind?:
+    | "Terminology"
+    | "Library"
+    | "Activity"
+    | "Recommendation"
+    | "Decision"
+    | "LocalCodeSystem"
+    // ⚠ The ONE shared `reference-vs-stub` CodeSystem for a closure — scaffolding, not a library's local
+    // domain. Distinct from `LocalCodeSystem` because the two have opposite ship postures: the local domain
+    // is production vocabulary, the stub is `experimental` and is replaced at packaging.
+    | "ReferenceStubCodeSystem"
+    | "CaseFeature";
   sourceName?: string;
   location?: Location;
 }
