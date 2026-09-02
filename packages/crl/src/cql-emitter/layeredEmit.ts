@@ -75,6 +75,7 @@ import {
   normalizeLocalRef,
 } from "../ast/types";
 import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex";
+import { matchNarrative } from "../template-match/matcher";
 import { guardDefineNameCollisions, synthesizeGuardCriteria } from "../ast/guardDefines";
 import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import { pascalCaseNameForId } from "../fhir-emitter/slug";
@@ -493,6 +494,36 @@ function visitCompositionRefs(
   }
 }
 
+/**
+ * ⭐⭐ WHICH NARRATIVE REFS NAME A TERMINOLOGY RATHER THAN A CONCEPT.
+ *
+ * Every quoted name in a narrative is an `NConceptRef` — the parser cannot tell the namespaces apart.
+ * For every pattern but one that is harmless, because the operands ARE concepts. `Membership`
+ * (`"X" in "VS"`) is the exception: its comparand is a value set, which lives in the Concepts LAYER, so
+ * requalifying it as a concept leaves it BARE and the emitted library fails to translate with
+ * "Could not resolve identifier" — MEASURED on the `$apply` harness, with emit reporting success.
+ *
+ * ⚠ Keyed by SPAN, not by name: a concept and a terminology may legally share a name (the layer maps
+ * are deliberately separate for exactly that reason), so a name-keyed set would misroute silently.
+ */
+function terminologyRefSpans(body: NarrativeClause): ReadonlySet<string> {
+  const out = new Set<string>();
+  const matched = matchNarrative(body);
+  if (matched?.known !== true) return out;
+  for (const arg of matched.args) {
+    if (arg.type === "TerminologyRefArg") out.add(spanKey(arg.location));
+  }
+  return out;
+}
+
+/** A location made comparable — two refs are the SAME ref iff they occupy the same span. */
+function spanKey(l: {
+  start: { line: number; column: number };
+  end: { line: number; column: number };
+}): string {
+  return `${l.start.line}:${l.start.column}-${l.end.line}:${l.end.column}`;
+}
+
 /** Visit every `ReferenceName` in a narrative arg-value. */
 function visitArgValueRefs(arg: ArgValue, visit: (ref: ReferenceName) => void): void {
   switch (arg.type) {
@@ -757,10 +788,14 @@ function requalifyNarrativeElement(
   lib: string,
   policyId: string,
   partition: Partition,
+  terminologySpans: ReadonlySet<string>,
 ): NarrativeElement {
   switch (el.type) {
-    case "NConceptRef":
-      return { ...el, value: requalifyRef(el.value, "concept", currentLayer, maps, lib, policyId, partition) };
+    case "NConceptRef": {
+      // ⭐ The SLOT depends on the pattern this ref lands in — see `terminologyRefSpans`.
+      const slot: RefSlot = terminologySpans.has(spanKey(el.location)) ? "terminology" : "concept";
+      return { ...el, value: requalifyRef(el.value, slot, currentLayer, maps, lib, policyId, partition) };
+    }
     case "NDisjunction":
       return {
         ...el,
@@ -785,10 +820,11 @@ function requalifyNarrative(
   policyId: string,
   partition: Partition,
 ): NarrativeClause {
+  const terminologySpans = terminologyRefSpans(body);
   return {
     ...body,
     elements: body.elements.map((el) =>
-      requalifyNarrativeElement(el, currentLayer, maps, lib, policyId, partition),
+      requalifyNarrativeElement(el, currentLayer, maps, lib, policyId, partition, terminologySpans),
     ),
   };
 }

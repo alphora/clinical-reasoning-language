@@ -1,8 +1,13 @@
+import * as path from "node:path";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+
 import { describe, it, expect } from "vitest";
 
 import { buildCRL } from "../../index";
 import { Validator } from "../../validator/validator";
 import { matchNarrative } from "../matcher";
+import { emitCQLImports } from "../../imports/emit";
 import type { Concept, DefinitionIsDefinition } from "../../ast/types";
 
 /**
@@ -178,5 +183,93 @@ describe("#189 gap 3 T2 — membership validation", () => {
     const built = build("CodeableConcept", null);
     const r = new Validator().validate(built.result!);
     expect(r.warnings.map((e) => e.kind)).not.toContain("membership-scope-equals-comparand");
+  });
+});
+
+describe("#189 gap 3 T3 — the lowering", () => {
+  const emitFor = (): string => {
+    const dir = mkdtempSync(path.join(tmpdir(), "crl-membership-"));
+    try {
+      writeFileSync(
+        path.join(dir, "package.json"),
+        JSON.stringify({ name: "mt", version: "1.0.0", private: true, crl: { canonicalBase: "http://example.org/mt" } }),
+      );
+      const file = path.join(dir, "p.crl");
+      writeFileSync(
+        file,
+        [
+          "# membership",
+          'library "Mt".',
+          "",
+          'terminology "Requestable Services":',
+          "- system is `http://www.ama-assn.org/go/cpt`.",
+          "- code is `37718`.",
+          "- code is `37722`.",
+          "",
+          'terminology "Covered Services":',
+          "- system is `http://www.ama-assn.org/go/cpt`.",
+          "- code is `37718`.",
+          "",
+          'concept "Requested Service":',
+          "- shape is Record.",
+          "- type is Observation.",
+          "- value type is CodeableConcept.",
+          "- code is `requested-service`.",
+          "- definition is most recent this.",
+          "- source representation:",
+          "  - type is ServiceRequest.",
+          '  - coded from "Requestable Services".',
+          "",
+          'concept "Requested Service Is Covered":',
+          "- shape is Scalar.",
+          "- type is Observation.",
+          "- value type is boolean.",
+          '- definition is "Requested Service" in "Covered Services".',
+          "",
+          'activity "Approve":',
+          "- request CPGCommunicationRequest.",
+          "- with `APPROVED`.",
+          "",
+          'decision "D":',
+          "first:",
+          '- when "Requested Service Is Covered" then recommend activity "Approve".',
+        ].join("\n"),
+        "utf-8",
+      );
+      const r = emitCQLImports(file) as { success: boolean; errors?: unknown[]; cqlByLibrary?: { libraryName: string; cql: string }[] };
+      expect(r.success, JSON.stringify(r.errors ?? [])).toBe(true);
+      const lib = (r.cqlByLibrary ?? []).find((l) => l.libraryName.endsWith("Inferences"));
+      expect(lib, "no Inferences library emitted").toBeDefined();
+      return lib!.cql;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  it("⭐⭐ guards NULL and EMPTY before testing membership — both MEASURED to read `false` otherwise", () => {
+    const cql = emitFor();
+    // ⚠ CQL `in` returns a determinate FALSE for a null operand AND for a present-but-empty
+    // `{coding: {}}` — both measured on the engine. Lowered naively, "nobody has said which service was
+    // requested" would DENY rather than PAUSE, collapsing the unanswered row into the not-covered row — the
+    // exact defect the goal fixture exists to prevent.
+    expect(cql).toMatch(/is null or not exists \(.*\.coding\) then null/);
+  });
+
+  it("⭐ converts with `ToConcept` — a raw CodeableConcept is not a valid `in` operand", () => {
+    expect(emitFor()).toContain("FHIRHelpers.ToConcept(");
+  });
+
+  it("⭐⭐ QUALIFIES the value set to its declaring layer", () => {
+    // ⚠ MEASURED on the `$apply` harness: emit reported SUCCESS and the library failed to TRANSLATE with
+    // "Could not resolve identifier Covered Services in the current library". Terminologies live in the
+    // Concepts layer; the predicate emits in Inferences. The narrative requalifier hardcoded the CONCEPT slot
+    // for every quoted name, so the set was left bare. Same class as the dangling constructor in gap 1.
+    expect(emitFor()).toMatch(/in [A-Za-z]+ExternalConcepts\."Covered Services"/);
+  });
+
+  it("⭐ reads the SUBJECT's published value, not its representations", () => {
+    // The subject is a concept that has ALREADY reduced (`most recent this`), so membership tests the ONE
+    // value it publishes. Reaching through to its posrep would ignore the author's own reduction.
+    expect(emitFor()).toContain('("Requested Service".value as FHIR.CodeableConcept)');
   });
 });

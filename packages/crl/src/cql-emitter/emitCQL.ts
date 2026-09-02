@@ -4277,6 +4277,45 @@ class Emitter {
     return call;
   }
 
+  /**
+   * ⭐⭐ `"<concept>" in "<terminology>"` — THREE-STATE membership over the subject's published datum.
+   *
+   * ⚠⚠ THE GUARD IS NOT DEFENSIVE STYLE. MEASURED on the engine, and every row of this cost a probe:
+   *
+   *   | expression                                   | CQL returns |
+   *   |----------------------------------------------|-------------|
+   *   | `ToConcept(<member CC>) in "VS"`              | true        |
+   *   | `ToConcept(<nonmember CC>) in "VS"`           | false       |
+   *   | multi-coding where ONE coding is a member     | true        |
+   *   | **`{coding: {}}` — present but EMPTY**        | **false**   |
+   *   | **`null` CodeableConcept**                    | **false**   |
+   *
+   * So `in` reads a MISSING datum as a determinate NO. Lowered naively, "nobody has said which service was
+   * requested" would DENY instead of PAUSE — collapsing the unanswered row into the not-covered row, which is
+   * the precise defect the goal fixture exists to prevent. The `if … then null` restores the third state.
+   *
+   * ⚠ EMPTINESS, not just null: a `CodeableConcept` with an empty `coding[]` is PRESENT (so it survives a
+   * `is not null` filter, including the one gap 1's constructed source arm applies) and still carries no code
+   * to test. It must pause for the same reason no record does.
+   *
+   * ⚠ `FHIRHelpers.ToConcept(…)` is REQUIRED — a raw FHIR `CodeableConcept` is not a valid `in` operand; the
+   * conversion to a System `Concept` is what gives the any-coding-matches semantics measured above.
+   *
+   * ⚠ The subject is a CONCEPT that has ALREADY REDUCED, so this reads the ONE value it publishes. It does
+   * NOT reach through to the subject's representations — that would ignore the author's own reduction and
+   * make the answer depend on machinery they cannot see.
+   */
+  private emitMembership(call: CanonicalPatternCall): string {
+    const subject = this.emitArg(call.args[0]);
+    const set = this.emitArg(call.args[1]);
+    const datum = `(${subject}.value as FHIR.CodeableConcept)`;
+    return (
+      `if ${datum} is null or not exists (${datum}.coding) then null
+` +
+      `    else FHIRHelpers.ToConcept(${datum}) in ${set}`
+    );
+  }
+
   private emitPatternCall(call: CanonicalPatternCall, localUnionRef?: string): string {
     // Synthetic patterns (not catalog entries — they represent CQL keyword
     // operators) emit as CQL syntax instead of CRLCommon calls.
@@ -4285,6 +4324,11 @@ class Emitter {
     }
     if (call.pattern === "EndOf") {
       return `end of ${this.emitArg(call.args[0])}`;
+    }
+    // ⭐⭐ #189 gap 3 — MEMBERSHIP. Native, like the two above: it emits CQL syntax, not a `CRLCommon` call
+    // (there is no membership function and there will not be one — the operator is `in`).
+    if (call.pattern === "Membership") {
+      return this.emitMembership(call);
     }
     const fn = functionNameFor(call.pattern);
     // ⭐ #189 — `localUnionRef` set ⟺ the concept carried a local `code is` beside this reduction, so the
