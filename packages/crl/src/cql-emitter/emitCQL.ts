@@ -1138,16 +1138,24 @@ class Emitter {
       .filter((t) => !this.skipNames.has(t.name));
     if (terminologies.length > 0) {
       sections.push(this.emitTerminologies(terminologies));
-      // ⭐⭐ #189 — the qualifying value set behind every `"X" in qualifying` THIS LAYER emits.
-      //
-      // ⚠ DECLARED IN THE LAYER THAT USES IT, not in the one that owns the concept. The subject is normally
-      // a local primitive while the predicate is an inference, so the two are in DIFFERENT libraries; two
-      // libraries each declaring the same canonical is ordinary CQL, and it avoids a cross-layer qualifier
-      // that would have to be kept in step by hand. Both declarations come from ONE descriptor
-      // (`inlineAnswerSetsByName`), so they cannot disagree about the url.
-      const inlineDecls = this.emitInlineAnswerValuesets();
-      if (inlineDecls.length > 0) sections.push(inlineDecls);
     }
+
+    // ⭐⭐ #189 — the qualifying value set behind every `"X" in qualifying` THIS LAYER emits.
+    //
+    // ⚠ DECLARED IN THE LAYER THAT USES IT, not in the one that owns the concept. The subject is normally a
+    // local primitive while the predicate is an inference, so the two are in DIFFERENT libraries; two
+    // libraries each declaring the same canonical is ordinary CQL, and it avoids a cross-layer qualifier kept
+    // in step by hand. Both declarations come from ONE descriptor, so they cannot disagree about the url.
+    //
+    // ⚠⚠ IT IS DELIBERATELY **OUTSIDE** THE `terminologies.length > 0` BLOCK, and that is not a style
+    // choice. It was written INSIDE it and MEASURED broken: the Inferences layer declares no terminologies of
+    // its own, so the block never ran and the layer emitted
+    // `… in "np-patient-complaint-answer-options-qualifying"` with NO declaration for it — emit reported
+    // SUCCESS and the library would fail to TRANSLATE ("Could not resolve identifier"). The predicate's layer
+    // is precisely the one LEAST likely to have authored terminologies, so the enclosing condition was
+    // anti-correlated with the need. Do not fold this back in.
+    const inlineDecls = this.emitInlineAnswerValuesets();
+    if (inlineDecls.length > 0) sections.push(inlineDecls);
 
     const parameters = this.emitParameters();
     if (parameters) sections.push(parameters);
