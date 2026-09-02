@@ -542,7 +542,28 @@ function writeCodedLocalValue(
   // Only the CodeableConcept local datum is B4's. Every other shape is NOT-APPLICABLE → the legacy switch handles
   // it byte-unchanged (the inertness contract: the existing numeric `value is` facts derive a Quantity/integer
   // datum → land here → fall through, verified by the full-corpus diff).
-  if (!localArm || localArm.arm !== "local-exact" || localArm.datumValueType !== "CodeableConcept") {
+  //
+  // ⭐⭐ A RECORD-SHAPED QUESTION CARRIES ITS ANSWER ON `answerCarrier`, NOT ON THE READ PATH, and testing
+  // only `datumValueType` MISSED EVERY CODED QUESTION IN THE CORPUS.
+  //
+  // For a Record concept the READ fields (`valueElement` / `datumValueType`) are deliberately UNDEFINED —
+  // `effectiveRepresentation.ts` says so in as many words: the selection reads no value, but the RECORD still
+  // carries one, and that carrier is what the case-feature SD emits as the answerable `value[x]`. This writer
+  // WRITES that same answer, so it must resolve the same carrier the SD does.
+  //
+  // ⚠ MEASURED, and it was PRE-EXISTING rather than introduced here: bleph AND the canonical ServiceRequest
+  // fixture both emitted `valueString: "http://www.ama-assn.org/go/cpt|37718"` instead of a
+  // `valueCodeableConcept`. The CRE passes those rows because it reads the `.cel` directly, so the defect was
+  // invisible to every test — it only appears when the emitted FHIR is inspected or executed. The call site's
+  // note that this path "fires for ZERO corpus facts" was true when written and has been false since the first
+  // coded question was authored.
+  const carrier =
+    localArm?.arm === "local-exact" && localArm.datumValueType === "CodeableConcept"
+      ? { element: localArm.valueElement, valueType: localArm.datumValueType }
+      : localArm?.arm === "local-exact" && localArm.answerCarrier?.valueType === "CodeableConcept"
+        ? localArm.answerCarrier
+        : undefined;
+  if (!localArm || localArm.arm !== "local-exact" || carrier === undefined) {
     return "not-applicable";
   }
 
@@ -560,7 +581,7 @@ function writeCodedLocalValue(
     return "error";
   };
 
-  if (!localArm.valueElement) {
+  if (!carrier.element) {
     return mkErr(
       `local concept "${concept.name}" declares a CodeableConcept value type but its representation reads no value element; cannot place the authored \`value is\``,
     );
@@ -582,7 +603,7 @@ function writeCodedLocalValue(
       : undefined,
   );
   if ("error" in parsed) return mkErr(`fact "${factName}": ${parsed.error}`);
-  const jn = valueJsonName(localArm.valueElement, "CodeableConcept");
+  const jn = valueJsonName(carrier.element, "CodeableConcept");
   if ("errorKind" in jn) return mkErr(`fact "${factName}": ${jn.detail}`);
 
   resourceBody[jn.jsonName] = codeableConceptFromParts(parsed.parts);
