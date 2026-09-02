@@ -2,7 +2,7 @@
 library "ProjLess".
 
 // ⚠⚠ THIS SHAPE CAUGHT A SILENT WRONG VERDICT. The CRE briefly assumed EVERY source-set member contributed
-// `true` — right for `exists this` (true per retrieved record) and for `matches this` (true for a member), but
+// `true` — right for `exists this` (true per retrieved record), but
 // a posrep with NO `value projection is` is read as the concept's VALUE (charter §3). So a member record
 // carrying `value is false` was contributing `true`, and a stated denial read as an approval.
 

@@ -131,19 +131,16 @@ describe("resolveConceptPipeline — the effect matrix", () => {
     expect(diagnostics(r)).toContain("stage-ungrounded");
   });
 
-  it("⚠ a rep-local PROJECTION as a stage is refused", () => {
-    const r = resolve([
-      "- shape is Record.",
-      "- type is Observation.",
-      "- value type is boolean.",
-      "- code is `c`.",
-      "- definition is matches this, then most recent this.",
-      "- source representation:",
-      "  - type is ServiceRequest.",
-      '  - coded from "VS".',
-    ]);
-    expect(diagnostics(r)).toContain("stage-projection-only");
-  });
+  // ⚠⚠ RETIRED WITH `matches this`, AND THE RULE IT TESTED IS NOW UNREACHABLE — not merely untested.
+  //
+  // It pinned "a rep-local projection cannot be a pipeline stage" using `matches this`. With that construct
+  // gone, `Exists` is the ONLY `slot: "projection-only"` pattern left, and `exists this` in a `definition is`
+  // is SLOT-RENAMED to `ExistsOverSpace` — so no narrative can reach `stage-projection-only` through a
+  // definition any more. Substituting `exists this` here does not preserve the test; it silently tests the
+  // rename instead (measured: it reports `value-stage-not-terminal`, a different rule).
+  //
+  // The DIAGNOSTIC is deliberately kept (see `pipelineStageValidator`) because the rule is general and the
+  // next projection-only pattern would otherwise land with no guard. Whoever adds one restores this test.
 
   it("⭐ the CONCEPT-LEVEL `exists this` resolves — it is NOT the rep-local projection", () => {
     // ⚠⚠ THE CASE THE MODULE SHIPPED WRONG. `reductionAsCall` mapped a structural `exists` reduction to the
@@ -186,20 +183,6 @@ describe("resolveConceptPipeline — the effect matrix", () => {
     expect(patterns).toEqual(["MostRecent", "ExistsOverSpace"]);
   });
 
-  it("⚠ `matches this` is NOT renamed into the definition slot", () => {
-    // Its comparand is the representation's own `coded from`, so it has no concept-level counterpart. The
-    // rename table is deliberately one entry, not "projections become their concept-level twin".
-    const r = resolve([
-      "- type is Observation.",
-      "- value type is boolean.",
-      "- code is `c`.",
-      "- definition is matches this.",
-      "- source representation:",
-      "  - type is ServiceRequest.",
-      '  - coded from "VS".',
-    ]);
-    expect(diagnostics(r)).toContain("stage-projection-only");
-  });
 
   it("⭐ a NAMED reduction target reaches the call — it is not silently dropped", () => {
     // ⚠⚠ `ReductionTarget` is `ThisRecords | ReductionConceptRef`, and `reductionAsCall` returned

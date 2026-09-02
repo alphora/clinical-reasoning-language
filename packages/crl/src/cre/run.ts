@@ -683,7 +683,8 @@ function pipelineVerdict(entry: ConceptEntry, ctx: Ctx): Tri | undefined {
  *
  *   · a LOCAL candidate is an answer on the concept's own code: its `value is` IS the value.
  *   · a SOURCE candidate is a PROJECTION OUTPUT. `exists this` yields `true` for every record it is invoked
- *     on; `matches this` yields `true` for a member (and only members reach the collection today).
+ *     on. (`matches this` was the sibling projection and is RETIRED — membership moved to a concept-level
+ *     predicate, which the CRE evaluates separately.)
  *   · a SOURCE candidate from a posrep with NO projection is read as the concept's VALUE (charter §3), so its
  *     `value is` is the value — the case an earlier version got wrong by assuming `true` for every source
  *     member.
@@ -691,7 +692,7 @@ function pipelineVerdict(entry: ConceptEntry, ctx: Ctx): Tri | undefined {
  */
 function candidateValue(c: OwnCandidate): boolean | undefined | "unknown-projection" {
   if (c.arm === "local" || c.projection === undefined) return c.boolValue;
-  if (c.projection === "Exists" || c.projection === "Matches") return true;
+  if (c.projection === "Exists") return true;
   return "unknown-projection";
 }
 
@@ -1883,7 +1884,7 @@ function runCase(
             // because the fact loop cannot re-derive it from the code.
             //
             // ⚠⚠ AN EARLIER VERSION HARD-CODED `true` HERE AND THAT WAS A SILENT WRONG VERDICT. It is right
-            // for the two projections (`exists this` yields true per retrieved record; `matches this` yields
+            // for the surviving projection (`exists this` yields true per retrieved record; the retired
             // true for a member, and reaching this branch IS membership) — but `sourceMembersOfConcept`
             // indexes EVERY posrep carrying a `coded from`, projection or not, and a posrep with NO
             // projection is read as the concept's VALUE (charter §3). So a member fact carrying

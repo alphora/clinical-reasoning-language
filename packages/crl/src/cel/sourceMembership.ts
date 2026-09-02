@@ -27,7 +27,8 @@ export interface SourceConceptMember {
    * ⭐ The matched pattern of the OWNING posrep's `value projection is`, or `undefined` when it has none.
    *
    * ⚠⚠ LOAD-BEARING FOR THE CRE, and its absence caused a silent wrong verdict. A candidate's boolean is the
-   * PROJECTION's output — `exists this` yields `true` per retrieved record, `matches this` yields `true` for a
+   * PROJECTION's output — `exists this` yields `true` per retrieved record. (`matches this` was the other
+   * projection and is RETIRED: membership is now a CONCEPT-LEVEL predicate naming its own set.) For a
    * member. But a posrep with NO projection is read as the concept's VALUE (charter §3), so a member fact
    * carrying `value is false` must contribute `false`. Without this field the CRE assumed every source member
    * contributed `true`, and a stated denial on a projection-less coded posrep read as an approval.

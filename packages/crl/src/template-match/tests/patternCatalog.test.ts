@@ -99,28 +99,25 @@ describe("pattern catalog totality", () => {
     for (const p of classifiedPatterns()) {
       expect(patternEntry(p)!.slot, `pattern ${p}`).toBeDefined();
     }
-    expect(isProjectionOnly("Matches")).toBe(true);
     expect(isProjectionOnly("Exists")).toBe(true);
     expect(isProjectionOnly("MostRecent")).toBe(false);
   });
 
-  it("⭐ `matches this` and `exists this` differ on READS and on TERMINOLOGY need", () => {
+  it("⭐ `exists this` READS RECORDS, and needs terminology only when the RESOURCE has a coded retrieve", () => {
+    // ⚠⚠ THIS TEST USED TO BE A CONTRAST with `matches this`, which is RETIRED (operator, 2026-09-02) —
+    // membership is now a CONCEPT-LEVEL predicate naming its own set. What survives the retirement is the
+    // half about `exists`, and it survives because it is a REGRESSION PIN, not a description.
+    //
     // `reads` decides what a projection can produce WHEN INVOKED: an existence arm can never record a
-    // negative, a membership arm can. Zero records contributes NOTHING for both — that is arm
-    // participation, not this axis, and conflating them kills the pause row.
+    // negative. Zero records contributes NOTHING — that is arm participation, not this axis, and conflating
+    // them kills the pause row.
     expect(patternProjection("Exists")?.reads).toBe("records");
-    expect(patternProjection("Matches")?.reads).toBe("datum");
 
-    // ⚠ REGRESSION PIN. `Exists` was once marked "always requires terminology", which REJECTED the legal
+    // ⚠ THE PIN. `Exists` was once marked "always requires terminology", which REJECTED the legal
     // `- type is Patient.` + `- value projection is exists this.` — Patient has no code-based retrieve, so
-    // the charter does not require a `coded from` there. The RESOURCE decides for `exists`; the SET is the
-    // comparand for `matches`.
+    // the charter does not require a `coded from` there. The RESOURCE decides.
     expect(patternProjection("Exists")?.terminology).toBe("when-coded-retrieve");
-    expect(patternProjection("Matches")?.terminology).toBe("always");
-
-    // The retrieve shape each requires — the contract a future emit author must not re-derive.
     expect(patternProjection("Exists")?.retrieve).toBe("terminology-filtered");
-    expect(patternProjection("Matches")?.retrieve).toBe("unfiltered");
   });
 
   it("⭐⭐ every `crl-common` pattern names a function that EXISTS in CRLCommon.cql", () => {

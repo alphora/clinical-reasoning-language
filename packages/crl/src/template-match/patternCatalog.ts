@@ -66,12 +66,7 @@ export type PatternReads =
    * record to invoke it on that would answer `false`. ⭐ A posrep projected by `exists this` therefore
    * contributes `true` or NOTHING, never `false`: an existence arm cannot record a negative.
    */
-  | "records"
-  /**
-   * The retrieved record's datum. Invoked per retrieved record, and CAN answer `false` — a record whose code
-   * is not a member is a determinate no. A record carrying no datum answers `null`.
-   */
-  | "datum";
+  | "records";
 
 /**
  * Whether the pattern needs the representation's `coded from` set.
@@ -123,7 +118,7 @@ export type PatternStage =
        *              the space, so a PRODUCER adds its result to what it was given.
        *
        * ⚠ Zero canonical args cannot stand in for this: `most recent this` is `MostRecent` with zero args and
-       * reads the flow, while `exists this` / `matches this` also have zero args in their own slot.
+       * reads the flow, while `exists this` also has zero args in its own slot.
        */
       reads: "flow" | "operands";
       /**
@@ -342,25 +337,6 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
       // Filtering the retrieve and testing each code are EQUIVALENT for an existence question
       // (`exists([SR: VS])` = `exists(SR where code in VS)`), so this keeps the filtered retrieve.
       retrieve: "terminology-filtered",
-    },
-  },
-  Matches: {
-    returnShape: "boolean",
-    slot: "projection-only",
-    stage: { grounded: false },
-    // ⚠ NATIVE — `CRLCommon.cql` has no `Matches` function; membership lowers to a CQL retrieve/`in` test.
-    realization: "native",
-    projection: {
-      reads: "datum",
-      arity: 0,
-      // The set IS the comparand — without one there is nothing to match against, on any resource.
-      terminology: "always",
-      // ⚠⚠ RETIRED (operator, 2026-09-02) — this field states the OLD model and has no consumer. The
-      // unfiltered retrieve is not the design: `coded from` stays and scopes what the concept is ABOUT,
-      // membership becomes a CONCEPT-LEVEL predicate against a DIFFERENT set, and the collapse it feared is
-      // avoided by the two sets differing rather than by removing the filter. Deleted with this whole entry
-      // by #189 gap 3. See `docs/CRL-NORTH-STAR.md` §3.
-      retrieve: "unfiltered",
     },
   },
 

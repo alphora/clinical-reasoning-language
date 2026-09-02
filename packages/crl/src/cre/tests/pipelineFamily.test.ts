@@ -306,7 +306,7 @@ describe("CRE — a PROJECTION-LESS coded posrep reads the record's own value", 
   it("⚠⚠ a source member STATING false denies — it is not a fabricated `true`", () => {
     // ⚠ THE SILENT WRONG VERDICT THE CODE REVIEW CAUGHT, and the reason it needed its own fixture: the
     // in-tree source-membership fixtures are all non-boolean, so a MUTATION restoring the bug
-    // (`arm === "source"` ⇒ `true`) passed the entire suite. `exists this` and `matches this` DO yield `true`
+    // (`arm === "source"` ⇒ `true`) passed the entire suite. `exists this` DOES yield `true`
     // per retrieved record — but a posrep with NO `value projection is` is read as the concept's VALUE
     // (charter §3), so this record's `value is false` is the candidate.
     const cases = path.resolve(__dirname, "fixtures/source-projectionless/cases.cel");

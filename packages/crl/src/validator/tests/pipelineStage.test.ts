@@ -80,21 +80,10 @@ describe("pipeline stage rules — D10", () => {
     expect(found).toHaveLength(2);
   });
 
-  it("⭐ a PROJECTION-ONLY pattern as STAGE 1 of a pipeline is caught", () => {
-    // ⚠ REGRESSION PIN, and this one validated COMPLETELY CLEAN before. `matchNarrative` FOLDS a pipeline
-    // into the terminal stage's pattern, so this whole narrative looked like `MostRecent` to every consumer
-    // reading the folded call. The previous catch was an ARITY proxy — the fold injects an operand into a
-    // zero-operand contract — which by construction could never see stage 1, because stage 1 gets no
-    // injected operand.
-    const found = stageErrors("definition is matches this, then most recent this.", [
-      "- source representation:",
-      "  - type is ServiceRequest.",
-      '  - coded from "VS".',
-      "",
-    ].join("\n"));
-    expect(found).toHaveLength(1);
-    expect(found[0].message).toContain("cannot be stage 1");
-  });
+  // ⚠⚠ RETIRED WITH `matches this`. It pinned "a projection-only pattern cannot be stage 1", and `Matches`
+  // was the only pattern that could reach it: `Exists` is the other projection-only entry, and `exists this`
+  // in a `definition is` is SLOT-RENAMED to `ExistsOverSpace`, so it never presents as a projection there.
+  // The diagnostic is KEPT for the next projection-only pattern; whoever adds one restores this test.
 
   it("a projection-only pattern as a LATER stage is caught ONCE, not twice", () => {
     // The arity proxy in `representationShapeValidator` was removed when this rule landed; if it comes back,
