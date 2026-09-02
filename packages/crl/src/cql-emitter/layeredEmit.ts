@@ -46,6 +46,8 @@
  */
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
+import { buildInlineAnswerSetMap } from "../fhir-emitter/inlineAnswerSet";
+import type { InlineAnswerSet } from "../fhir-emitter/inlineAnswerSet";
 import { isRecordBooleanGuardSource, resolveRecordBooleanGuardCarrier } from "../emit/recordBooleanGuard";
 import type {
   CRL,
@@ -1495,6 +1497,15 @@ export function emitPartitioned(
   // to every layer emitter below. INERT until the layered reduction emit consumes it
   // (build steps 2–4); today no layer routes a reduction, so it changes no output.
   const conceptShapesByName = buildConceptShapeMap(ast);
+  // ⭐ #189 — same construction, same reason: the predicate's layer cannot see the subject's declaration.
+  // ⚠ PREFER WHAT THE CALLER THREADED. `lowerLocalCodes` CLEARS `Concept.code`, and these ids key on it,
+  // so rebuilding here — from an ast that is already lowered on the orchestrated path — yields an EMPTY map
+  // and every `in qualifying` fails to resolve. The orchestrator builds it from the RAW entry ast
+  // (`imports/emit.ts`), exactly as it does the authored totality obligations, and for the same reason.
+  // The local build is the fallback for a direct caller whose ast is still authored.
+  const inlineAnswerSetsByName =
+    baseOptions.inlineAnswerSetsByName ??
+    buildInlineAnswerSetMap(ast, baseOptions.localDomainId ?? policyId, baseOptions.canonicalBase ?? "");
   // R2 — synthesize the Interface re-exports (FULL split only). They are appended
   // to a WORKING AST so the existing classify/sweep/emit loop materializes the
   // `Interface` layer with no special casing. `buildNameLayerMaps` already
@@ -1585,6 +1596,7 @@ export function emitPartitioned(
       libraryName,
       crossLibraryIncludes,
       conceptShapesByName,
+      inlineAnswerSetsByName,
       // #189 Slice 0c — augment the source-bound totality service with THIS source's rendered-layer names, so the
       // per-layer pivot/discharge classify a cross-layer operand as same-source (not misread as cross-library).
       ...(baseOptions.crossLibraryTotality !== undefined

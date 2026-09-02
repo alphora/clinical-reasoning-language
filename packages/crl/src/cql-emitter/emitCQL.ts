@@ -38,6 +38,9 @@ import { matchNarrative } from "../template-match";
 // #189 functional-VS slice — the SHARED ValueSet-url composition (leaf util; no cql→fhir-emitter cycle since
 // slug.ts imports only node:crypto), so the CQL `valueset '<url>'` byte-matches the FHIR `ValueSet.url`.
 import { valueSetUrl } from "../fhir-emitter/slug";
+import { buildInlineAnswerSetMap } from "../fhir-emitter/inlineAnswerSet";
+import type { InlineAnswerSet } from "../fhir-emitter/inlineAnswerSet";
+import { findPatternCalls } from "../template-match/referenceRoles";
 import { cqlStringLiteral, cqlQuotedIdentifier } from "./cqlStrings";
 import { patternReturnShape, requireReturnShape } from "../template-match/patternCatalog";
 import {
@@ -294,6 +297,16 @@ export interface EmitOptions {
    * reductions compose.
    */
   conceptShapesByName?: ReadonlyMap<string, Concept["shape"]>;
+  /**
+   * ⭐⭐ #189 — `concept name → inline answer set`, built ONCE pre-split (`buildInlineAnswerSetMap`) and
+   * threaded to every layer emitter.
+   *
+   * ⚠ REQUIRED for the cross-layer case, which is the NORMAL one: a concept declaring inline options is a
+   * local primitive, while the `"X" in qualifying` predicate over it is an inference — different layers, so
+   * this layer's own `conceptByName` cannot see the subject. Same construction and same reason as
+   * `conceptShapesByName` above.
+   */
+  inlineAnswerSetsByName?: ReadonlyMap<string, InlineAnswerSet>;
   /**
    * #189 Slice C boundary 2 (2a) — the AUTHORED (pre-lowering) boolean-totality obligation per concept name,
    * for the totality-ledger enrollment (`emitConcept`). Built by the caller from the RAW authored AST (BEFORE
@@ -621,6 +634,24 @@ export function buildAuthoredObligations(ast: CRL): ReadonlyMap<string, BooleanT
 
 export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult {
   try {
+    // ⭐⭐ #189 — the inline answer-option descriptors, captured HERE because this is the last point the ast
+    // is still AUTHORED. `lowerLocalCodes` below CLEARS `Concept.code`, and these ids key on it, so any
+    // later build yields an EMPTY map and every `in qualifying` fails to resolve — MEASURED on the probe.
+    //
+    // ⚠ A CALLER-SUPPLIED map WINS. The orchestrated path builds it from the RAW entry ast before this
+    // function ever sees a lowered one (`imports/emit.ts`), exactly as it does the authored totality
+    // obligations; this self-build is the fallback for a direct caller.
+    const options_ = options.inlineAnswerSetsByName
+      ? options
+      : {
+          ...options,
+          inlineAnswerSetsByName: buildInlineAnswerSetMap(
+            ast,
+            options.localDomainId ?? options.policyId ?? "",
+            options.canonicalBase ?? "",
+          ),
+        };
+    options = options_;
     // Slice 3 — lower concept-level `code is` local source codes into synthetic
     // Terminology + CodedFromDefinition BEFORE any indexing/classification, so
     // the rest of this emitter handles them as ordinary asserted concepts. The
@@ -932,6 +963,7 @@ class Emitter {
       // `conceptByName` already holds every concept. INERT until the layered
       // reduction emit consumes it (build steps 2–4).
       conceptShapesByName: options.conceptShapesByName ?? new Map<string, Concept["shape"]>(),
+      inlineAnswerSetsByName: options.inlineAnswerSetsByName ?? new Map<string, InlineAnswerSet>(),
       // #189 Slice C boundary 2 (2a) — authored (pre-lowering) obligations per concept name for ledger
       // enrollment. Empty when the caller supplied none; `emitCQLFromAST` builds a real map from its raw
       // input before construction and passes it here (direct none-lane callers) — see EmitOptions doc.
@@ -1106,6 +1138,15 @@ class Emitter {
       .filter((t) => !this.skipNames.has(t.name));
     if (terminologies.length > 0) {
       sections.push(this.emitTerminologies(terminologies));
+      // ⭐⭐ #189 — the qualifying value set behind every `"X" in qualifying` THIS LAYER emits.
+      //
+      // ⚠ DECLARED IN THE LAYER THAT USES IT, not in the one that owns the concept. The subject is normally
+      // a local primitive while the predicate is an inference, so the two are in DIFFERENT libraries; two
+      // libraries each declaring the same canonical is ordinary CQL, and it avoids a cross-layer qualifier
+      // that would have to be kept in step by hand. Both declarations come from ONE descriptor
+      // (`inlineAnswerSetsByName`), so they cannot disagree about the url.
+      const inlineDecls = this.emitInlineAnswerValuesets();
+      if (inlineDecls.length > 0) sections.push(inlineDecls);
     }
 
     const parameters = this.emitParameters();
@@ -4305,6 +4346,43 @@ class Emitter {
    * NOT reach through to the subject's representations — that would ignore the author's own reduction and
    * make the answer depend on machinery they cannot see.
    */
+  /**
+   * The `valueset` declarations for every inline-options subset this layer's predicates bind.
+   *
+   * ⚠ THE WALK IS RECURSIVE, via `findPatternCalls`. `matchNarrative` FOLDS a pipeline into a
+   * `NestedPatternArg`, so a scan of top-level args misses a membership buried in a stage — a bug that
+   * appeared in THREE separate readers earlier in #189 before the shared authority existed.
+   */
+  private emitInlineAnswerValuesets(): string {
+    const sets = new Map<string, InlineAnswerSet>();
+    for (const stmt of this.ast.statements) {
+      if (stmt.type !== "Concept" || stmt.definition?.type !== "DefinitionIsDefinition") continue;
+      for (const call of findPatternCalls(stmt.definition.body, "Membership")) {
+        if (!call.args.some((a: CanonicalArg) => a.type === "SubsetRefArg")) continue;
+        const subj = call.args.find((a: CanonicalArg) => a.type === "ConceptRefArg");
+        if (!subj || !("value" in subj)) continue;
+        const set = this.options.inlineAnswerSetsByName?.get(String(subj.value));
+        if (set) sets.set(set.qualifying.id, set);
+      }
+    }
+    return [...sets.values()]
+      .map((set) => `valueset ${cqlIdent(set.qualifying.id)}: ${cqlString(set.qualifying.url)}`)
+      .join(String.fromCharCode(10));
+  }
+
+  /** Resolve a subset comparand against its SUBJECT and render the layer-local `valueset` identifier. */
+  private renderSubsetComparand(subjArg: CanonicalArg | undefined, subsetName: string): string {
+    const name = subjArg?.type === "ConceptRefArg" ? subjArg.value : undefined;
+    const set = name === undefined ? undefined : this.options.inlineAnswerSetsByName?.get(name);
+    if (!set) {
+      throw new Error(
+        `\`in ${subsetName}\` names a subset of "${name ?? "?"}", but that concept declares no inline ` +
+          `\`value from:\` options, so there is no set to test against. (#189)`,
+      );
+    }
+    return cqlIdent(set.qualifying.id);
+  }
+
   private emitMembership(call: CanonicalPatternCall): string {
     // ⚠⚠ THE SUBJECT MUST PUBLISH ONE RECORD, AND THIS LANE CANNOT CHECK IT — the VALIDATOR does
     // (`membership-subject-shape-unsupported`). Recorded here because the gap is real: for a
@@ -4312,12 +4390,31 @@ class Emitter {
     // reports SUCCESS and the library fails to TRANSLATE ("Expression of type 'List of choice<…>' cannot be
     // cast as a value of type 'CodeableConcept'") — MEASURED, and the same class as gap 1's repeating-read.
     //
-    // ⚠ A guard was written here and REMOVED because it could not fire: `conceptByName` holds only THIS
-    // layer's statements (see its declaration), and the subject lives in another layer. A check that cannot
-    // fire is worse than none — it reads as protection. Closing this properly needs the subject's shape
-    // carried down from lowering as a marker, where the whole AST is visible.
+    // ⭐ THE GUARD NOW FIRES. It was written here once and REMOVED because `conceptByName` holds only THIS
+    // layer's statements and the subject lives in another — a check that cannot fire is worse than none.
+    // The note left behind said it needed "the subject's shape carried down where the whole AST is visible";
+    // `conceptShapesByName` IS that map (built pre-split, threaded to every layer), so the missing piece was
+    // already on the options object.
+    const subjArg = call.args[0];
+    if (subjArg?.type === "ConceptRefArg") {
+      const shape = this.options.conceptShapesByName?.get(subjArg.value);
+      if (shape !== undefined && shape !== "Record") {
+        throw new Error(
+          `membership subject "${subjArg.value}" publishes \`shape is ${shape}\`, but this lowering reads ` +
+            `ONE record's value. For a RecordSet that read is a LIST and the cast fails at TRANSLATION while ` +
+            `emit reports success. (#189 membership-subject-shape-unsupported)`,
+        );
+      }
+    }
+
     const subject = this.emitArg(call.args[0]);
-    const set = this.emitArg(call.args[1]);
+    const setArg = call.args[1];
+    // ⚠ A SUBSET comparand resolves against the SUBJECT, never against a global terminology table — two
+    // different subjects may each declare a `qualifying` subset, and they are different sets.
+    const set =
+      setArg?.type === "SubsetRefArg"
+        ? this.renderSubsetComparand(subjArg, setArg.value)
+        : this.emitArg(setArg);
     const datum = `(${subject}.value as FHIR.CodeableConcept)`;
     return (
       `if ${datum} is null or not exists (${datum}.coding) then null

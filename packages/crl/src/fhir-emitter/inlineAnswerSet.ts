@@ -1,4 +1,4 @@
-import type { Concept, InlineAnswerOption } from "../ast/types";
+import type { CRL, Concept, InlineAnswerOption } from "../ast/types";
 
 import { pascalCaseName, rawSlug, uniqueCapSlugForSuffix } from "./slug";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
@@ -101,6 +101,32 @@ export function inlineAnswerSet(
  */
 export function qualifyingOptions(set: InlineAnswerSet): readonly InlineAnswerOption[] {
   return set.options.filter((o) => o.qualifying === true);
+}
+
+/**
+ * ⭐⭐ #189 — the pre-split `concept name → inline answer set` map (`EmitOptions.inlineAnswerSetsByName`).
+ *
+ * Built ONCE where every concept is visible, exactly like `buildConceptShapeMap` above and for the same
+ * reason: the concept that DECLARES inline options and the concept that PREDICATES on it
+ * (`"X" in qualifying`) generally land in DIFFERENT emitted layers, so the predicate's layer emitter cannot
+ * see the subject in its own `conceptByName`.
+ *
+ * ⚠ It carries the SAME descriptor the FHIR lane emits from (`fhir-emitter/inlineAnswerSet.ts`), so the CQL
+ * `valueset '<url>'` and the emitted `ValueSet.url` cannot drift — the anti-drift contract every other
+ * terminology already obeys.
+ */
+export function buildInlineAnswerSetMap(
+  ast: CRL,
+  localDomainId: string,
+  canonicalBase: string,
+): Map<string, InlineAnswerSet> {
+  const out = new Map<string, InlineAnswerSet>();
+  for (const stmt of ast.statements) {
+    if (stmt.type !== "Concept" || !stmt.name) continue;
+    const set = inlineAnswerSet(stmt, localDomainId, canonicalBase);
+    if (set) out.set(stmt.name, set);
+  }
+  return out;
 }
 
 function defaultClock(): Date {

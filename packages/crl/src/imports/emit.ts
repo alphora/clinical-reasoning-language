@@ -10,6 +10,8 @@ import type {
 } from "../ast/types";
 import { getRefLibrary, isQualifiedRef } from "../ast/types";
 import { emitCQLFromAST, infoForParameterStatement, buildAuthoredObligations } from "../cql-emitter/emitCQL";
+import { buildInlineAnswerSetMap } from "../fhir-emitter/inlineAnswerSet";
+import type { InlineAnswerSet } from "../fhir-emitter/inlineAnswerSet";
 import type { AstParameterInfo } from "../cql-emitter/emitCQL";
 import type { BooleanTotalityObligation, EmittedDefineEntry } from "../emit/booleanTotality";
 import { buildDeclaredResultIndex } from "../emit/declaredResultIndex";
@@ -479,6 +481,11 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   // authored `rejected`/E1 obligations cannot be recovered. Threaded into every emit call so production
   // enrollment is HONEST-by-construction (not a test-only inventory).
   const authoredObligationsByPath = new Map<string, ReadonlyMap<string, BooleanTotalityObligation>>();
+  // ⭐⭐ #189 — the inline answer-option descriptors, built from the RAW `entry.ast` for the SAME reason as
+  // the obligations above: `lowerLocalCodes` CLEARS `Concept.code`, and these ids are keyed on it. Building
+  // this from the lowered closure yields an EMPTY map and every `in qualifying` then fails to resolve —
+  // MEASURED on the probe before this was moved. Keyed by filePath, threaded into every emit call.
+  const inlineAnswerSetsByPath = new Map<string, ReadonlyMap<string, InlineAnswerSet>>();
   const emitClosure = rawEmitClosure.map((entry) => {
     // #198 — per-entry local domain (primary keeps the bare policy id; siblings
     // are disambiguated). Threaded into the lowering so the synthetic `codesystem
@@ -491,6 +498,10 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     // spuriously register a local-domain for collision tracking.
     // #189 Slice C 2a — classify authored obligations from the RAW `entry.ast` (still un-lowered here).
     authoredObligationsByPath.set(entry.filePath, buildAuthoredObligations(entry.ast));
+    inlineAnswerSetsByPath.set(
+      entry.filePath,
+      buildInlineAnswerSetMap(entry.ast, entryLocalDomainId ?? localDomainId ?? "", canonicalBase ?? ""),
+    );
     const preAge = preLowerAge(entry.ast);
     if (preAge.errors.length > 0) lowerErrors.push(...preAge.errors);
     // ⭐ #189 — `policyId` threaded for a PRODUCER stage's candidate `meta.profile` (shared `slug.ts`
@@ -905,6 +916,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
         // #189 Slice C 2a — authored obligations from the RAW ast (this entry's input was lowered above, so
         // `emitCQLFromAST`'s self-build would classify lowered forms; pass the raw-derived map instead).
         authoredObligations: authoredObligationsByPath.get(entry.filePath),
+        inlineAnswerSetsByName: inlineAnswerSetsByPath.get(entry.filePath),
         // #227 — a layered library may FOREIGN-ref a name-keeping-root (`none`)
         // sibling; render that `include`/qualified-ref through `S` so it matches the
         // renamed target's header. Layered sibling names aren't in the map (identity).
