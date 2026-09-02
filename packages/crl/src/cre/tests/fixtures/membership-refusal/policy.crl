@@ -1,0 +1,41 @@
+# The concept-level membership predicate — the CRE cannot evaluate it YET, and must say so.
+library "MembershipRefusal".
+
+terminology "Requestable Services":
+- system is `http://www.ama-assn.org/go/cpt`.
+- code is `37718`.
+- code is `37722`.
+
+terminology "Covered Services":
+- system is `http://www.ama-assn.org/go/cpt`.
+- code is `37718`.
+
+concept "Requested Service":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- value from "Requestable Services".
+- code is `requested-service`.
+- definition is most recent this.
+- source representation:
+  - type is ServiceRequest.
+  - coded from "Requestable Services".
+
+concept "Requested Service Is Covered":
+- shape is Scalar.
+- type is Observation.
+- value type is boolean.
+- definition is "Requested Service" in "Covered Services".
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `APPROVED`.
+
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `NOT APPROVED`.
+
+decision "Membership Refusal Decision":
+first:
+- when "Requested Service Is Covered" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".

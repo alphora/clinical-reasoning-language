@@ -1,0 +1,20 @@
+# These cases are EXPECTED to error today.
+// ⚠ The CRE cannot evaluate a concept-level membership predicate yet (T5). What this fixture pins is that
+// it says so LOUDLY, by name, rather than producing a branch it never computed.
+library "MembershipRefusalCases".
+covers "MembershipRefusal".
+
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+fact "RFA Request":
+- code is "http://www.ama-assn.org/go/cpt|37718".
+- date is "2026-01-01".
+- defined by "ServiceRequest".
+
+case "covered service -> approve":
+- subject is "Pat".
+- fact is "RFA Request".
+- result is "Membership Refusal Decision" is "Approve".
