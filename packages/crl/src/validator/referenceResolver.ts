@@ -19,7 +19,7 @@ import type {
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
 import { branchConditionRefs, branchConditionConceptRefsStrict } from "../ast/branchCondition";
-import { matchNarrative } from "../template-match/matcher";
+import { narrativeReferenceRoles, spanKey } from "../template-match/referenceRoles";
 import type { LibraryScope, SourceContext } from "../imports/scopes";
 import { lookupKnownLibrary } from "../imports/scopes";
 
@@ -36,13 +36,9 @@ type AcceptableKinds = readonly [RefKind, ...RefKind[]];
 
 /** Concept-accepting slot — also accepts parameter for narrative refs. */
 const NARRATIVE_REF_KINDS: AcceptableKinds = ["concept", "parameter"] as const;
-
-/** A location made comparable — two refs are the SAME ref iff they occupy the same span. */
-const spanKey = (l: { start: { line: number; column: number }; end: { line: number; column: number } }): string =>
-  `${l.start.line}:${l.start.column}-${l.end.line}:${l.end.column}`;
 /** Concept-only slot — `defined as` bare ref, composition refs, `when "C"`. */
 const CONCEPT_REF_KINDS: AcceptableKinds = ["concept"] as const;
-/** Terminology-only slot — `coded from`, activity `with`. */
+/** Terminology-only slot — `coded from`, activity `with`, and a membership comparand. */
 const TERMINOLOGY_REF_KINDS: AcceptableKinds = ["terminology"] as const;
 /** Decision-only slot — `use decision`. */
 const DECISION_REF_KINDS: AcceptableKinds = ["decision"] as const;
@@ -337,15 +333,12 @@ export class ReferenceResolver {
     // So MATCH FIRST, then route by the arg the matcher produced. ⚠ Routed by LOCATION, not by name: a
     // concept and a terminology may legally share a name, and a name-keyed lookup would send one ref to the
     // wrong namespace with no diagnostic. An unmatched narrative keeps the old behaviour exactly.
-    const matched = matchNarrative(clause);
-    const terminologySpans = new Set<string>();
-    if (matched?.known === true) {
-      for (const arg of matched.args) {
-        if (arg.type === "TerminologyRefArg") terminologySpans.add(spanKey(arg.location));
-      }
-    }
+    // ⚠ ONE authority, and it RECURSES — see `narrativeReferenceRoles`. A shallow top-level scan shipped
+    // here and missed the folded pipeline form (`"X" in "VS", then most recent this`), which is the
+    // charter's own spelling: the matcher wraps the earlier call in a `NestedPatternArg`.
+    const roles = narrativeReferenceRoles(clause);
     for (const el of clause.elements) {
-      if (el.type === "NConceptRef" && terminologySpans.has(spanKey(el.location))) {
+      if (el.type === "NConceptRef" && roles.get(spanKey(el.location)) === "terminology") {
         this.checkRef(el.value, TERMINOLOGY_REF_KINDS, el.location, ctx, errors, null);
         continue;
       }

@@ -93,13 +93,19 @@ describe("#189 gap 3 — the Membership pattern", () => {
     expect(r.errors.map((e) => e.kind)).toContain("unresolved-reference");
   });
 
-  it("⭐ the reduction may follow it, so the predicate can MERGE with a local answer", () => {
-    // `, then most recent this` is what makes membership a PRODUCER whose candidate competes with a
-    // clinician's direct answer on recency — the goal's "newer answer says no" row.
-    const { concept } = predicate(
+  it("⭐⭐ the FOLDED pipeline form resolves its terminology too — it is the charter's own spelling", () => {
+    // ⚠⚠ THIS TEST USED TO ASSERT ONLY `concept.definition` IS DEFINED, and it passed while the form was
+    // BROKEN — a vacuous assertion, caught by review. `matchNarrative` FOLDS a pipeline by wrapping the
+    // earlier call in a `NestedPatternArg`, so `"X" in "VS", then most recent this` matches as
+    // `MostRecent(NestedPatternArg(Membership(…)))`. A scan of the TOP-LEVEL args never sees the
+    // terminology, so the comparand was checked against the CONCEPT namespace and reported unresolved.
+    const { validator, built } = predicate(
       'definition is "Requested Service" in "Covered Services", then most recent this.',
     );
-    expect(concept.definition).toBeDefined();
+    const r = validator.validate(built.result!);
+    expect(r.errors.map((e) => e.kind), "the folded form must resolve its comparand").not.toContain(
+      "unresolved-reference",
+    );
   });
 
   it("⚠ an unmatched narrative is untouched — the resolver's namespace routing is pattern-scoped", () => {
