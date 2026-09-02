@@ -516,6 +516,26 @@ export interface Concept extends ASTNode {
    * without a `code is`/`type` parses here and is rejected by Todo 2.
    */
   valueElement?: ValueElement;
+  /**
+   * ⭐⭐ The concept's ANSWER OPTION SET (`- value from "VS".`) — the coded values a user is OFFERED for
+   * this question. Emits the case-feature SD's `value[x].binding`, which the questionnaire generator expands
+   * into inline `answerOption` codings.
+   *
+   * ⚠ CONCEPT-LEVEL, NOT rep-local, and that is the whole point: 5 of the 9 affected concepts have NO
+   * representation at all to hang it on, and post-multi-rep a rep-local spelling could not say which
+   * representation's set wins.
+   *
+   * ⚠⚠ A DIFFERENT AXIS FROM `coded from`, which scopes the RETRIEVE. Naming the same set for both is
+   * legal but usually wrong — it filters non-members out of the retrieve, so a record carrying an unoffered
+   * code vanishes into the same empty set as no record, collapsing a determinate `false` into `unknown`.
+   *
+   * ⚠ OFFERED, not ADMISSIBLE. This does NOT constrain what the concept may hold: an `ElementDefinition`
+   * binding governs FHIR conformance, never evaluation, so a value outside the set still reaches CQL. A
+   * genuine admissibility constraint would have to gate every value-producing leg (local, CEL, $extract,
+   * source candidates, producers, the CRE) and is filed as its own slice. MEASURED: the generated dropdown is
+   * byte-identical at every binding strength, so strength buys nothing here.
+   */
+  valueFrom?: { terminologyName: ReferenceName; location: Location };
   // Optional: a concept may be representations-only (no top-level definition).
   definition?: ConceptDefinition;
   // `possible representation:` entries (ADR 0001 §3). May be empty.

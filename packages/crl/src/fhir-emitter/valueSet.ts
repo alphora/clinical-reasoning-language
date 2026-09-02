@@ -64,6 +64,54 @@ export function referenceStubCoding(
 }
 
 /**
+ * ⭐⭐ THE ONE AUTHORITY for "what canonical does this terminology EMIT at". Two answers, and the split is
+ * not cosmetic:
+ *   · a PURE reference (`valueset is <url>`) with an id-legal tail emits its STUB at the DECLARED canonical,
+ *     so the resource resolves at the url the CQL `valueset` decl already binds;
+ *   · everything else (instantiated, mixed, or a URN with no stubbable tail) emits at our SLUG url.
+ *
+ * ⚠ EXPORTED because the SD `value[x].binding` must name the SAME url this emits at, and re-deriving it at
+ * the binding site would be a second reading free to drift. A panel round asserted "bind the declared
+ * canonical" as settled and it was WRONG for instantiated value sets — which are precisely the ones that
+ * yield a real dropdown, since a reference stub expands to a single synthetic option.
+ */
+/**
+ * ⭐ THE ONE PLACE that decides whether a terminology emits as a reference STUB, and what that stub is.
+ * `null` ⇒ not a stubbable pure reference (instantiated, mixed, or a canonical with no FHIR-id-legal tail).
+ *
+ * ⚠ Extracted because `url`, `id`, `compose` and `experimental` are a COUPLED TUPLE: they must all describe
+ * the same decision. Computing the predicate in two places let `url` diverge from the rest if either moved
+ * (Claude arm, code review r13) — which is the drift class `emittedValueSetUrl` itself exists to prevent.
+ */
+function resolveReferenceStub(
+  terminology: Terminology,
+  canonicalBase: string,
+): { url: string; id: string; compose: { include: Array<Record<string, unknown>> } } | null {
+  const refLines = terminology.body.filter((l): l is TerminologyValueset => l.type === "TerminologyValueset");
+  const isPureReference =
+    refLines.length === 1 && terminology.body.every((l) => l.type === "TerminologyValueset");
+  if (!isPureReference) return null;
+  const declaredUrl = refLines[0].valuesetName;
+  const coding = referenceStubCoding(declaredUrl, canonicalBase);
+  if (!coding) return null;
+  return {
+    url: declaredUrl,
+    id: coding.code,
+    compose: { include: [{ system: coding.system, concept: [{ code: coding.code }] }] },
+  };
+}
+
+export function emittedValueSetUrl(
+  terminology: Terminology,
+  canonicalBase: string,
+  policyId: string,
+): string {
+  const stub = resolveReferenceStub(terminology, canonicalBase);
+  if (stub) return stub.url;
+  return valueSetUrl(canonicalBase, policyId, terminology.name);
+}
+
+/**
  * Emit one cpg-shareableValueSet from a single CRL Terminology.
  *
  * Returns `{resource, errors, unmatched}`. `resource` is null when a hard
@@ -111,26 +159,9 @@ export function emitValueSet(
   // CONVENTION: one per-VS code (the id) under a dedicated `reference-vs-stub` CodeSystem + expansion +
   // `experimental=true` (a REAL value set is `experimental=false` with real content; packaging swaps the real
   // content in at the same url at package/runtime and drops the experimental stub).
-  const refLines = terminology.body.filter((l): l is TerminologyValueset => l.type === "TerminologyValueset");
-  const isPureReference =
-    refLines.length === 1 && terminology.body.every((l) => l.type === "TerminologyValueset");
-  let referenceStub: { url: string; id: string; compose: { include: Array<Record<string, unknown>> } } | null = null;
-  if (isPureReference) {
-    const declaredUrl = refLines[0].valuesetName;
-    // The stub model applies ONLY to a canonical whose last path segment is a legal FHIR id (an http(s) canonical
-    // like `.../ValueSet/<oid>` or `.../ValueSet/<slug>`). A URN / placeholder (`urn:example:placeholder`) has no
-    // FHIR-id-legal tail → `referenceStubCoding` returns null → fall back to the pre-existing pointer emission (our
-    // slug id/url), unchanged — it is not a resolvable reference the stub could stand in for. The derivation is the
-    // shared `referenceStubCoding` (single authority), byte-identical to the prior inline form.
-    const coding = referenceStubCoding(declaredUrl, metadata.canonicalBase);
-    if (coding) {
-      referenceStub = {
-        url: declaredUrl,
-        id: coding.code,
-        compose: { include: [{ system: coding.system, concept: [{ code: coding.code }] }] },
-      };
-    }
-  }
+  // ⚠ ONE decision, one place — see `resolveReferenceStub`. `url`/`id`/`compose`/`experimental` are a coupled
+  // tuple and must not be derived from two readings of the same predicate.
+  const referenceStub = resolveReferenceStub(terminology, metadata.canonicalBase);
 
   // #237/T1 — one exported id helper, collision-safe via `uniqueCapSlug` over the component-wise `rawSlug`
   // composite (for an INSTANTIATED VS the `url` derives from `id`, so id↔url stay byte-equal). A reference stub
@@ -153,7 +184,7 @@ export function emitValueSet(
 
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
-  const url = referenceStub ? referenceStub.url : valueSetUrl(metadata.canonicalBase, metadata.name, terminology.name);
+  const url = emittedValueSetUrl(terminology, metadata.canonicalBase, metadata.name);
 
   const compose = referenceStub ? referenceStub.compose : buildCompose(terminology.body, terminology, unmatched);
 

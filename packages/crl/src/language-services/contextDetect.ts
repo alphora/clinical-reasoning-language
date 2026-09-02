@@ -45,6 +45,11 @@ export function detectExpectedKind(linePrefix: string): ExpectedRefKind {
   // `coded from` — terminology only. Also matches `coded from "Lib"."`.
   if (/\bcoded\s+from\s+(?:"[^"]*"\s*\.\s*)?$/.test(beforeQuote)) return "terminology";
 
+  // `value from` — terminology only (a concept's ANSWER OPTIONS). Also matches `value from "Lib"."`.
+  // ⚠ Without this the slot falls through to "any" and completion offers concepts/decisions/activities where
+  // only a terminology can go — the same wrong-namespace suggestion the `coded from` rule above prevents.
+  if (/\bvalue\s+from\s+(?:"[^"]*"\s*\.\s*)?$/.test(beforeQuote)) return "terminology";
+
   // `with` inside an activity body. `- with "T"` slot.
   if (/^\s*-\s*with\s+(?:"[^"]*"\s*\.\s*)?$/.test(beforeQuote)) return "terminology";
 

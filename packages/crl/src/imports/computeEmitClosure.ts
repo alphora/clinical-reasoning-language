@@ -304,6 +304,17 @@ function visitConceptRepresentationRefs(concept: Concept, visit: (ref: Reference
   for (const rep of concept.representations ?? []) {
     if (rep.terminologyName) visit(rep.terminologyName);
   }
+  // ⭐⭐ `value from "VS"` BELONGS HERE, WITH THE OTHER CLOSURE-ONLY TERMINOLOGY REFS — not in
+  // `visitConceptDefinitionRefs`. Its set is consumed by the case-feature SD's `value[x].binding`, which is a
+  // FHIR artifact; the emitted CQL never references it. The include-collecting walker's own doc block records
+  // what walking a non-lowering ref there COSTS (measured 2026-07-04): a DANGLING `include <Other>` in the
+  // referrer, with no matching `.cql` once the target auto-splits.
+  //
+  // ⚠ The first cut of this slice put it in the definition walker, which is exactly that mistake — and it was
+  // caught by review, not by a failing test, because the phantom include does not reproduce in every library
+  // arrangement. Closure membership and per-library `include`s are DIFFERENT concerns; this ref needs the
+  // former (so the ValueSet is emitted and the binding resolves) and must not have the latter.
+  if (concept.valueFrom) visit(concept.valueFrom.terminologyName);
 }
 
 function visitComposition(expr: CompositionExpression, visit: (ref: ReferenceName) => void): void {

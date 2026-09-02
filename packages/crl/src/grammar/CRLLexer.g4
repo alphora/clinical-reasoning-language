@@ -19,6 +19,15 @@ VALUE_ELEMENT_IS    : 'value element is' -> mode(VALUE_ELEMENT_MODE);
 // narrative that follows is lexed in DEFAULT_MODE exactly like `definition is`. Diverges from
 // `value type is` / `value element is` at char 6 ('p'), so no prefix conflict.
 VALUE_PROJECTION_IS : 'value projection is';
+// `value from` names the concept's ANSWER OPTION SET — the coded values a user is OFFERED for this
+// question. CONCEPT-LEVEL, because the answer slot is the concept's, not a representation's: 5 of the 9
+// affected concepts have NO representation at all to hang it on.
+// ⚠ NOT the same axis as `coded from`, which is REP-LOCAL and names which external records REPRESENT the
+// concept (the retrieve scope). They coincide on some carriers and must be free to diverge — a smoking
+// status concept's `coded from` names WHICH observation, while its answers are never/former/current.
+// Diverges from `value type is` / `value element is` / `value projection is` at char 6 ('f'), so there is
+// no prefix conflict. No mode: a terminology reference is lexed in DEFAULT exactly as `coded from`'s is.
+VALUE_FROM          : 'value from';
 PARAM_TYPE_IS       : 'param type is' -> mode(PARAMETER_TYPE_MODE);
 EVIDENCE_IS         : 'evidence is';
 META_IS             : 'meta is';

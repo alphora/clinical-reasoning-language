@@ -350,6 +350,7 @@ conceptBody
       | evidenceLine
       | codeIsLine
       | codedFromLine
+      | valueFromLine
       | definedAsBody
       | definitionIsBody
       )*
@@ -478,6 +479,20 @@ evidenceLine
 // (ADR 0001 §2). Used as a read-only base and inside possible representations.
 codedFromLine
     : DASH CODED_FROM terminologyReference DOT
+    ;
+
+// `value from` names the ANSWER OPTION SET for a coded question — the values a user is OFFERED.
+// CONCEPT-LEVEL ONLY: deliberately NOT an alternative in `representationBody`. The answer slot belongs to
+// the concept (a concept with zero representations still has one), and post-multi-rep a rep-local spelling
+// would be underdetermined — which representation's set would win?
+//
+// ⚠ A DIFFERENT AXIS FROM `coded from`, not a synonym. `coded from` scopes the RETRIEVE (which external
+// records represent this concept); `value from` names the OFFERED VALUES. Authoring them as the same set
+// is legal but usually wrong: it filters non-members out of the retrieve, so a record carrying an
+// unoffered code vanishes into the same empty set as no record at all — collapsing a determinate `false`
+// into `unknown` (`fixtures/service-request/policy.crl` exists to catch exactly that).
+valueFromLine
+    : DASH VALUE_FROM terminologyReference DOT
     ;
 
 // `code is` declares the concept's OWN local code. The system is the package's

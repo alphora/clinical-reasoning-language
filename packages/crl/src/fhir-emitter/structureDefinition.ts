@@ -180,6 +180,8 @@ export function caseFeatureDifferential(
   profile: CaseFeatureProfileShape,
   coding: { system: string; code: string; display: string },
   sdUrl: string,
+  // ⭐ The RESOLVED answer-option canonical, or `undefined` for no binding. See the call site's parameter doc.
+  answerOptions?: { valueSetUrl: string },
 ): Array<Record<string, unknown>> {
   const rt = profile.resourceType;
   const codingIsChoice = profile.codingElementPath.endsWith("[x]");
@@ -214,6 +216,19 @@ export function caseFeatureDifferential(
       max: "1",
       mustSupport: true,
       type: [{ code: profile.value.typeCode }],
+      // ⭐⭐ THE ANSWER OPTIONS. MEASURED on the real `$apply` path: with no binding the generated item carries
+      // NO options; with one it carries an inline `answerOption` coding per member, expanded from the emitted
+      // ValueSet. So this binding IS the dropdown — there is no separate `answerValueSet` we emit.
+      //
+      // ⚠ STRENGTH IS `extensible`, and it is a SEMANTIC choice, not a hedge. `value from` names what a user is
+      // OFFERED, not what the concept may HOLD: an `ElementDefinition` binding governs FHIR conformance and
+      // never evaluation, so an out-of-set value still reaches CQL either way. Claiming `required` would assert
+      // an admissibility CRL does not enforce, and would make a source-derived candidate carrying an unoffered
+      // code violate the very profile it is stamped with. MEASURED: the generated dropdown is byte-identical at
+      // every strength, so `required` would buy nothing it could not also break.
+      ...(answerOptions
+        ? { binding: { strength: "extensible", valueSet: answerOptions.valueSetUrl } }
+        : {}),
     });
   }
   elements.push({
@@ -341,6 +356,14 @@ export function emitCaseFeatureStructureDefinition(
   // Present iff the concept READS a value (a value-bearing Observation determination); a valueless-existence
   // concept passes `undefined` → no `value[x]` element (the boolean is `exists`, computed in CQL).
   valueDatum: { valueElement: string; datumValueType: string } | undefined,
+  // ⭐⭐ The concept's ANSWER OPTION SET, already RESOLVED to the canonical its ValueSet emits at
+  // (`emittedValueSetUrl` — the one authority). Present iff the concept authored `value from` AND there is a
+  // `value[x]` answer slot to bind. `undefined` ⇒ no binding, exactly as today.
+  //
+  // ⚠ RESOLVED here, never re-derived: a reference VS emits at its DECLARED canonical while an instantiated
+  // one emits at our SLUG url, so a binding that guessed "the declared canonical" would dangle for every
+  // instantiated set — which are the only ones that produce a real multi-option dropdown.
+  answerOptions: { valueSetUrl: string } | undefined,
   // #198 (Option B) — the per-library local-domain BASE whose CodeSystem this
   // case-feature's code lives in. Defaults to the policy id (`metadata.name`) —
   // byte-identical to pre-#198 for a PRIMARY library. A SIBLING `code is` library
@@ -419,6 +442,28 @@ export function emitCaseFeatureStructureDefinition(
     return { resource: null, errors };
   }
 
+  // ⚠⚠ AN AUTHORED `value from` WITH NO SLOT TO BIND IS DIAGNOSED HERE, and HERE is the point: this is the
+  // one place that knows whether a `value[x]` element will exist, because it is the place that decides. The
+  // registry admits the element only for a datum at the STANDARD `value` carrier, so a concept whose resource
+  // carries its identity ON its coding element — or whose truth is the record's PRESENCE — has no answer slot.
+  // Without this the authored line would emit NOTHING and the author would never learn why the dropdown is
+  // empty, which `written == executed` forbids.
+  //
+  // ⚠ An earlier cut predicted this UPSTREAM in the orchestrator with a weaker test; two predicates for one
+  // fact are free to drift, and the import boundary that forbade it was right (gpt-5.6 arm, code review r13).
+  if (answerOptions !== undefined && caseFeatureProfile.value === undefined) {
+    errors.push({
+      type: "Validation",
+      kind: "emit-value-from-no-answer-slot",
+      message:
+        `Case-feature concept "${conceptName}" declares \`value from\`, but its \`${resourceType}\` profile ` +
+        `has no \`value[x]\` answer slot for the options to bind to, so the generated question would offer ` +
+        `none. Answer options need a stored value to be chosen INTO; a concept whose truth is the record's ` +
+        `presence is answered by the record existing, not by picking a code.`,
+    });
+    return { resource: null, errors };
+  }
+
   const resource: Record<string, unknown> = {
     resourceType: "StructureDefinition",
     id,
@@ -456,7 +501,12 @@ export function emitCaseFeatureStructureDefinition(
     baseDefinition: caseFeatureProfile.baseDefinition,
     derivation: "constraint",
     differential: {
-      element: caseFeatureDifferential(caseFeatureProfile, { system, code, display: conceptName }, url),
+      element: caseFeatureDifferential(
+        caseFeatureProfile,
+        { system, code, display: conceptName },
+        url,
+        answerOptions,
+      ),
     },
   };
 

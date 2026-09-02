@@ -951,6 +951,38 @@ export class CRLAstBuilder
     };
   }
 
+  /**
+   * ⭐ `- value from "VS".` — the concept's ANSWER OPTION SET.
+   *
+   * ⚠ SINGULAR, and a repeat is an ERROR rather than a silent first-or-last win. Two `value from` lines
+   * are two different claims about what the user may be offered; picking one quietly would make the emitted
+   * dropdown depend on line order, which no author could see (`written == executed`).
+   */
+  private parseValueFrom(
+    bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
+    name: string,
+    ctx: import("../grammar/generated/antlr/CRLParser").ConceptStatementContext,
+  ): { terminologyName: ReferenceName; location: Location } | undefined {
+    const lines = bodyCtx.valueFromLine?.() ?? [];
+    if (lines.length === 0) return undefined;
+    if (lines.length > 1) {
+      this.reportError("AstError", ctx, {
+        message:
+          `Concept "${name}" declares ${lines.length} \`value from\` lines. A concept has ONE answer ` +
+          `option set; two would make the emitted question depend on line order.`,
+      });
+      return undefined;
+    }
+    const termRefCtx = lines[0].terminologyReference?.();
+    if (!termRefCtx) {
+      this.reportError("AstError", ctx, {
+        message: "ConceptStatement: missing terminologyReference in valueFromLine",
+      });
+      return undefined;
+    }
+    return { terminologyName: refFromRefContext(termRefCtx), location: getLocation(lines[0]) };
+  }
+
   // The concept's own local code (`- code is `…`.`); the system is the package's
   // local domain (implicit). Present => the concept is locally assertable.
   //
@@ -1111,6 +1143,7 @@ export class CRLAstBuilder
     // implicit-standard `.value`). Grammar-permissive; the validator enforces pairing.
     const valueElement = this.parseValueElement(bodyCtx.valueElementLine?.()?.[0]);
     const shape = this.parseConceptShape(bodyCtx);
+    const valueFrom = this.parseValueFrom(bodyCtx, name, ctx);
     this.checkConceptBodyCardinality(bodyCtx, name);
     const definition = this.parseConceptDefinition(bodyCtx, ctx);
     const representations = this.parseRepresentations(bodyCtx);
@@ -1135,6 +1168,7 @@ export class CRLAstBuilder
       shape,
       ...(code !== undefined ? { code } : {}),
       ...(valueElement ? { valueElement } : {}),
+      ...(valueFrom ? { valueFrom } : {}),
       ...(meta.length > 0 ? { meta } : {}),
       ...(evidence ? { evidence } : {}),
       ...(definition ? { definition } : {}),

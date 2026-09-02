@@ -12,6 +12,7 @@ import { MetaTagValidator } from "./metaTagValidator";
 import { NameUniquenessValidator } from "./nameUniquenessValidator";
 import { PipelineStageValidator } from "./pipelineStageValidator";
 import { RecordSetBoundValidator } from "./recordSetBoundValidator";
+import { AnswerOptionsValidator } from "./answerOptionsValidator";
 import { ReductionShapeValidator } from "./reductionShapeValidator";
 import { ReferenceResolver } from "./referenceResolver";
 import { RepresentationShapeValidator } from "./representationShapeValidator";
@@ -115,7 +116,10 @@ export type ValidationErrorKind =
   // patient's whole history. Intrinsic WARNING, NEVER an error: the shape is LEGAL and the Layered
   // authoring option uses it deliberately. It flags COST, not incorrectness — the case-feature transform
   // lands at the concept boundary, and for a RecordSet the boundary is the entire set.
-  | "recordset-unbounded";
+  | "recordset-unbounded"
+  | "answer-options-missing"
+  | "answer-options-unanswerable"
+  | "answer-options-not-coded";
 
 /**
  * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
@@ -573,6 +577,13 @@ export interface RecordSetUnboundedWarning extends ValidationErrorBase {
   conceptName: string;
 }
 
+/** ⭐ #189 gap 2 — findings about a coded question's ANSWER OPTIONS (`value from`). The `missing` kind is a
+ *  WARNING today and becomes an error at the flip (operator ruling, 2026-09-01); the other two are errors. */
+export interface AnswerOptionsFinding extends ValidationErrorBase {
+  kind: "answer-options-missing" | "answer-options-unanswerable" | "answer-options-not-coded";
+  conceptName: string;
+}
+
 export type ValidationError =
   | EmptyNameError
   | DuplicateNameError
@@ -596,6 +607,7 @@ export type ValidationError =
   | ReductionShapeError
   | EmitCapabilityWarning
   | RecordSetUnboundedWarning
+  | AnswerOptionsFinding
   | MetaDiagnostic;
 
 export interface ValidationResult {
@@ -655,6 +667,7 @@ export class Validator {
   private readonly representationShapeValidator: RepresentationShapeValidator;
   private readonly pipelineStageValidator: PipelineStageValidator;
   private readonly recordSetBoundValidator: RecordSetBoundValidator;
+  private readonly answerOptionsValidator: AnswerOptionsValidator;
   private readonly reductionShapeValidator: ReductionShapeValidator;
   private readonly useSiteTypeValidator: UseSiteTypeValidator;
   private readonly emitCapabilityValidator: EmitCapabilityValidator;
@@ -670,6 +683,7 @@ export class Validator {
     this.representationShapeValidator = new RepresentationShapeValidator();
     this.pipelineStageValidator = new PipelineStageValidator();
     this.recordSetBoundValidator = new RecordSetBoundValidator();
+    this.answerOptionsValidator = new AnswerOptionsValidator();
     this.reductionShapeValidator = new ReductionShapeValidator();
     this.useSiteTypeValidator = new UseSiteTypeValidator();
     this.emitCapabilityValidator = new EmitCapabilityValidator();
@@ -746,6 +760,11 @@ export class Validator {
     // `pushSplit`: this finding is intrinsically advisory (the shape is legal — see the validator's header),
     // so it must never flip `isValid`, and there is nothing for `soft` mode to demote.
     warnings.push(...this.recordSetBoundValidator.validate(ast, sources));
+    // ⭐ #189 gap 2 — a coded question's ANSWER OPTIONS. Routed through `pushSplit` because this validator
+    // emits BOTH severities by intrinsic kind: `value from` on an unanswerable or non-coded concept is an
+    // ERROR (the line can never do anything), while a coded question MISSING one is a WARNING today and
+    // becomes an error at the flip — 9 in-tree concepts must migrate first (operator ruling, 2026-09-01).
+    pushSplit(this.answerOptionsValidator.validate(ast, sources));
 
     // concept-model redesign Todo 2 rule B — use-site & result-shape type checking (pattern
     // operand constraints incl. refinement/anchor booleans and non-boolean composition/bare-ref

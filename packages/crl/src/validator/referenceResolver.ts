@@ -225,6 +225,20 @@ export class ReferenceResolver {
   // ------------------------ concept body walk ---------------------------
 
   private walkConcept(concept: Concept, ctx: WalkContext, errors: ValidationError[]): void {
+    // ⭐ `value from "VS"` is a TERMINOLOGY REFERENCE like any other, and it is walked HERE rather than in the
+    // definition switch below because it is a concept FIELD, not a definition — a concept may carry one with
+    // no definition at all (a pure coded question). Missing this walk would let a qualified answer set dangle:
+    // it would validate, then fail to resolve at emit.
+    if (concept.valueFrom) {
+      this.checkRef(
+        concept.valueFrom.terminologyName,
+        TERMINOLOGY_REF_KINDS,
+        concept.valueFrom.location,
+        ctx,
+        errors,
+        null,
+      );
+    }
     const def = concept.definition;
     if (def) {
       switch (def.type) {

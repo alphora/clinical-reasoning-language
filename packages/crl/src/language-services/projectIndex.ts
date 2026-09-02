@@ -579,9 +579,16 @@ function walkStatementRefs(
     case "Concept": {
       const c = stmt as {
         definition?: unknown;
+        valueFrom?: { terminologyName: unknown; location: Loc };
         representations?: { valueProjection?: { body?: { elements?: unknown[] } } }[];
       };
       walkConceptBody(c.definition, owningLib, owningOrigin, filePath, source, ns, out);
+      // ⭐ `value from "VS"` — a terminology reference on the CONCEPT, not in its definition, so it needs its
+      // own index entry. Unindexed it would go stale on a rename of the terminology it names, exactly as an
+      // unindexed projection ref would (the same defect a prior round caught there).
+      if (c.valueFrom) {
+        addRef(c.valueFrom.terminologyName, "terminology", owningLib, filePath, source, c.valueFrom.location, out);
+      }
       // A representation's `value projection is` PROJECTOR carries concept refs (in the
       // shape-defect case). Index them for find-refs / go-to-definition / rename — a RESOLVED
       // projection ref left unindexed would go stale on a rename of its target (gpt56 impl review

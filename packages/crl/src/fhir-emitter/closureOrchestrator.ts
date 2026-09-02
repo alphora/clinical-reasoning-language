@@ -78,7 +78,7 @@ import { resolveEmitClock } from "./reproDate";
 import { emitRecommendationDefinitionsForLibrary } from "./recommendation";
 import { CPG_FEATURE_EXPRESSION_EXT, isFhirDefError } from "./types";
 import type { CpgMetadata, EmitOptions, EmittedResource, UnmatchedReference } from "./types";
-import { emitValueSetsForLibrary } from "./valueSet";
+import { emitValueSetsForLibrary, emittedValueSetUrl } from "./valueSet";
 
 /**
  * D2 (slice-4c review gpt55 [important] / Claude [critical]) — the CQL-lane hard
@@ -1979,6 +1979,58 @@ export function emitFhirDefClosure(
             ? { valueElement: answerCarrier.element, datumValueType: answerCarrier.valueType }
             : undefined);
 
+        // ⭐⭐ RESOLVE `value from` TO THE CANONICAL ITS VALUESET ACTUALLY EMITS AT.
+        //
+        // ⚠ Routed through `emittedValueSetUrl` — the same authority `emitValueSet` uses — because the answer
+        // depends on the terminology's KIND: a pure reference emits at its DECLARED canonical, everything else
+        // at our slug url. A binding that assumed either one would dangle for the other half of the corpus.
+        //
+        // ⚠ A QUALIFIED (cross-library) `value from` is REFUSED, not guessed. The existing terminology resolver
+        // already draws that boundary ("cross-library terminology unsupported in v0") and returns a CQL
+        // identifier rather than a canonical, so there is no cross-library canonical to resolve yet. Emitting a
+        // locally-reconstructed url instead would produce a binding that resolves to nothing in the package —
+        // silently, since nothing validates binding targets today.
+        let answerOptions: { valueSetUrl: string } | undefined;
+        const vfConcept = conceptByNameForGate.get(name);
+        if (vfConcept?.valueFrom !== undefined) {
+          // ⚠ NORMALIZE FIRST. A ref qualified with THIS library's own name (`value from "L"."Opts"` inside
+          // library L) is LOCAL, and every other terminology consumer normalizes before deciding — the
+          // sibling resolver does it on the line it resolves. Testing `isQualifiedRef` raw refused a form that
+          // validates clean and that `coded from` accepts, i.e. validate-clean then emit-refuse on the same
+          // spelling. MEASURED before the fix (Claude arm, code review r13).
+          const vfRef = normalizeLocalRef(vfConcept.valueFrom.terminologyName, lib.libraryName);
+          if (isQualifiedRef(vfRef)) {
+            errors.push({
+              type: "Validation",
+              kind: "emit-value-from-cross-library",
+              message:
+                `Concept "${name}" names a cross-library answer option set in \`value from\`. ` +
+                `Resolving a terminology canonical across libraries is not supported yet, and a locally ` +
+                `reconstructed url would bind to nothing in the package. Declare it in this library.`,
+              line: vfConcept.valueFrom.location?.start.line,
+              column: vfConcept.valueFrom.location?.start.column,
+            } as CRLError);
+          } else {
+            const vfName = getRefName(vfRef);
+            const term = lib.ast.statements.find(
+              (st): st is Terminology => st.type === "Terminology" && st.name === vfName,
+            );
+            // An unresolvable name is already a validator error; emit stays silent rather than double-reporting.
+            if (term !== undefined) {
+              // ⚠ WHETHER THERE IS AN ANSWER SLOT TO BIND IS NOT DECIDED HERE, and deliberately so. The
+              // registry admits a `value[x]` element only for a datum at the STANDARD `value` carrier, and
+              // `resourceEmitRegistry` may only be imported by the sanctioned lane sites (the SD emitter is
+              // one; this orchestrator is not). A first cut predicted the answer here with a WEAKER local
+              // test (`valueDatum === undefined`), which would have let a non-standard carrier drop the
+              // authored line SILENTLY — two predicates free to drift, which is the defect rather than the
+              // guard against it. The SD emitter diagnoses it where the element is actually decided.
+              answerOptions = {
+                valueSetUrl: emittedValueSetUrl(term, metadata.canonicalBase, metadata.name),
+              };
+            }
+          }
+        }
+
         // ⚠⚠ NO DIAGNOSTIC HERE YET, AND THE FIRST ATTEMPT AT ONE WAS INSTRUCTIVE. Round 4 asked for a loud
         // author-facing warning when a locally-coded concept declares a value type its resource cannot carry
         // — because that concept IS the measured dead end (a question offered with nothing to answer),
@@ -2021,6 +2073,7 @@ export function emitFhirDefClosure(
                 inferences: inferencesReferenceSuffix,
               }),
           valueDatum,
+          answerOptions,
           // #198 — the sibling's disambiguated local domain, so the case-feature
           // `patternCodeableConcept.coding.system` matches THIS library's CodeSystem.
           entryLocalDomainId,

@@ -618,8 +618,19 @@ current level). There is no ServiceRequest special case and no membership specia
   Hypertension"]`, in our own goldens), and that retrieve **is** `code in VS`. A single code goes in a
   one-code set and takes the same path.
 - **Membership as a PREDICATE over a DATUM is the REP-LOCAL projection `matches this`.** It is the sibling of
-  `exists this`, in the same slot, and the set it tests against is the representation's own `coded from` —
-  the one place a terminology name lives, so nothing puts a value-set name into the concept namespace.
+  `exists this`, in the same slot, and the set it tests against is that representation's own `coded from`.
+  A membership predicate never names its own set — it asks about the set the representation already
+  declares, so the RETRIEVE and the TEST cannot disagree about which codes are in play.
+
+  ⚠ **`coded from` is not the only place a terminology name may appear on a concept.** A coded question
+  declares its ANSWER OPTIONS with a concept-level `value from "VS"` — the codes a user is OFFERED. That is
+  a DIFFERENT AXIS from `coded from`, which scopes the RETRIEVE (which external records represent this
+  concept), and the two must be free to diverge: a smoking-status concept's `coded from` names WHICH
+  observation, while its answers are never-smoked / former / current. Authoring them as the same set is
+  legal but usually wrong — it filters non-members out of the retrieve, so a record carrying an unoffered
+  code vanishes into the same empty set as no record at all, collapsing a determinate `false` into
+  `unknown`. The answer set lives on the CONCEPT because the answer slot does: a concept with no
+  representation at all still has one.
 
 ```crl
 - source representation:
