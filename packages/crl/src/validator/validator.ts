@@ -131,8 +131,13 @@ export type ValidationErrorKind =
   | "answer-options-not-coded"
   | "membership-scope-equals-comparand"
   | "membership-cross-library-subject"
+  | "membership-subset-cross-library"
+  | "membership-subset-subject-has-no-options"
   | "membership-predicate-not-assertable"
-  | "membership-subject-shape-unsupported";
+  | "membership-subject-shape-unsupported"
+  // ⭐ #189 inline-options subset comparand (`"X" in qualifying`).
+  | "membership-subset-cross-library"
+  | "membership-subset-subject-has-no-options";
 
 /**
  * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
@@ -599,7 +604,12 @@ export interface MembershipScopeFinding extends ValidationErrorBase {
     | "membership-scope-equals-comparand"
     | "membership-cross-library-subject"
     | "membership-predicate-not-assertable"
-  | "membership-subject-shape-unsupported";
+    | "membership-subject-shape-unsupported"
+    // ⭐ #189 — the inline-options subset comparand (`"X" in qualifying`). Both are ERRORS: a subset names
+    // part of the SUBJECT'S OWN declaration, so neither a foreign subject nor a subject without inline
+    // options has anything to resolve against.
+    | "membership-subset-cross-library"
+    | "membership-subset-subject-has-no-options";
   conceptName: string;
 }
 

@@ -108,7 +108,10 @@ export class MembershipScopeValidator {
 
     const subjectArg = args.find((a) => a.type === "ConceptRefArg");
     const setArg = args.find((a) => a.type === "TerminologyRefArg");
-    if (!subjectArg || !setArg) return;
+    // ⭐ #189 — the INLINE-OPTIONS subset comparand (`"X" in qualifying`). It shares the subject checks
+    // below (the shape rule is identical), and differs only where the two forms genuinely differ.
+    const subsetArg = args.find((a) => a.type === "SubsetRefArg");
+    if (!subjectArg || (!setArg && !subsetArg)) return;
 
     // ⚠⚠ A CROSS-LIBRARY SUBJECT CANNOT BE PROVED ANSWERABLE HERE, AND THE FAILURE IS SILENT.
     //
@@ -123,6 +126,35 @@ export class MembershipScopeValidator {
     // cannot tell the two apart from here. Refusing would reject correct authoring; saying nothing would let
     // a pause disappear with no diagnostic. (Not reachable today — a separate pre-existing gate refuses
     // qualified refs into an auto-splitting library — so this is a tripwire for when that lifts.)
+    // ⭐⭐ FOR THE SUBSET FORM THIS IS AN ERROR, NOT A WARNING, and the asymmetry is principled rather than
+    // stricter-for-its-own-sake. The warning below is hedged because a foreign subject that really IS
+    // evidence-only SHOULD be totalized, and this validator cannot tell the two apart. That ambiguity CANNOT
+    // ARISE here: `in qualifying` resolves against the SUBJECT'S OWN inline `value from:` declaration, so its
+    // subject is an answerable question BY CONSTRUCTION. A foreign one would be silently totalized and DENY
+    // an unanswered question instead of pausing — the unrecoverable class, with no compensating legitimate
+    // reading to protect.
+    //
+    // ⚠ It also cannot be resolved: the comparand's identity is (owning concept, subset name), and nothing
+    // resolves a foreign concept's option list here. Emitting anyway would bind to nothing.
+    if (subjectArg.library !== undefined && subsetArg) {
+      out.push({
+        kind: "membership-subset-cross-library",
+        conceptName: concept.name,
+        message:
+          `Concept "${concept.name}" tests \`in ${subsetArg.value}\` against a subject in another library ` +
+          `("${subjectArg.library}"."${subjectArg.value}"). A subset names part of the SUBJECT'S OWN ` +
+          `\`value from:\` declaration, which cannot be resolved across libraries — and a cross-library ` +
+          `subject cannot be proved answerable, so its unknown would be totalized to \`false\` and an ` +
+          `unanswered question would DENY instead of pausing. Declare the predicate in the same library as ` +
+          `its subject.`,
+        location: concept.location,
+        severity: "error",
+        ...(attribution.libraryName ? { libraryName: attribution.libraryName } : {}),
+        ...(attribution.filePath ? { filePath: attribution.filePath } : {}),
+      } as MembershipScopeFinding);
+      return;
+    }
+
     if (subjectArg.library !== undefined) {
       out.push({
         kind: "membership-cross-library-subject",
@@ -143,6 +175,26 @@ export class MembershipScopeValidator {
 
     const subject = byName.get(subjectArg.value);
     if (!subject) return; // an unresolved operand is already a reference error
+
+    // ⚠ `in qualifying` names a subset of the SUBJECT'S declared options. Without an inline `value from:`
+    // there is no set to test against, and the CQL lowering has nothing to render — it throws at emit. An
+    // author-time error names the actual fix instead.
+    if (subsetArg && subject.valueFrom?.kind !== "inline") {
+      out.push({
+        kind: "membership-subset-subject-has-no-options",
+        conceptName: concept.name,
+        message:
+          `Concept "${concept.name}" tests \`in ${subsetArg.value}\`, but "${subjectArg.value}" declares no ` +
+          `inline \`value from:\` options, so there is no subset to test against. Give the subject an inline ` +
+          `\`value from:\` block whose options carry \`qualifying\` / \`not qualifying\` markers, or test ` +
+          `against a named terminology instead (\`in "<terminology>"\`).`,
+        location: concept.location,
+        severity: "error",
+        ...(attribution.libraryName ? { libraryName: attribution.libraryName } : {}),
+        ...(attribution.filePath ? { filePath: attribution.filePath } : {}),
+      } as MembershipScopeFinding);
+      return;
+    }
 
     // ⚠⚠ THE SUBJECT MUST PUBLISH ONE RECORD, AND THIS REFUSAL REPLACES A MEASURED SILENT-WRONG EMIT.
     //
@@ -175,6 +227,11 @@ export class MembershipScopeValidator {
       } as MembershipScopeFinding);
       return;
     }
+
+    // ⚠ The scope-vs-comparand rule below is TERMINOLOGY-ONLY: it compares the predicate's set against the
+    // subject's `coded from` retrieve scope. A subset comparand has no such set — it names part of the
+    // subject's own options — so the comparison is meaningless here, not merely inapplicable.
+    if (!setArg) return;
 
     for (const rep of subject.representations ?? []) {
       if (!rep.terminologyName) continue;

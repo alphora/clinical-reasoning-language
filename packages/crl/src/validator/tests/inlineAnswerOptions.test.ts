@@ -104,6 +104,54 @@ describe("#189 inline answer options — the validator", () => {
     expect(f[0].severity).toBe("warning");
   });
 
+  it("⭐ refuses `in qualifying` when the SUBJECT declares no inline options", () => {
+    // The lowering has nothing to render and throws at emit; an author-time error names the fix instead.
+    const src = `library "T".
+
+terminology "Ext":
+- system is \`http://example.org/s\`.
+- code is \`a\`.
+
+concept "Q":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is \`q\`.
+- value from "Ext".
+- definition is most recent this.
+
+concept "D":
+- shape is Scalar.
+- value type is boolean.
+- definition is "Q" in qualifying.
+`;
+    const kinds = (validateCRL(src, { soft: true }) as unknown as { errors?: { kind: string }[] }).errors ?? [];
+    expect(kinds.map((e) => e.kind)).toContain("membership-subset-subject-has-no-options");
+  });
+
+  it("⭐ refuses `in qualifying` over a subject that does not publish ONE record", () => {
+    // Shared with terminology membership: the lowering reads `<subject>.value`, which for a RecordSet is a
+    // LIST and fails at TRANSLATION while emit reports success. The subset form must not bypass that.
+    const src = `library "T".
+
+concept "Q":
+- shape is RecordSet.
+- type is Observation.
+- value type is CodeableConcept.
+- code is \`q\`.
+- value from:
+  - \`a\` display is \`A\`, qualifying.
+  - \`b\` display is \`B\`, not qualifying.
+
+concept "D":
+- shape is Scalar.
+- value type is boolean.
+- definition is "Q" in qualifying.
+`;
+    const kinds = (validateCRL(src, { soft: true }) as unknown as { errors?: { kind: string }[] }).errors ?? [];
+    expect(kinds.map((e) => e.kind)).toContain("membership-subject-shape-unsupported");
+  });
+
   it("carries the pre-existing `value from` rules across to the inline form", () => {
     // ⚠ These two are NOT inline-specific and must keep applying: options on a concept nobody can answer,
     // or one whose value is not coded, are meaningless in either spelling.
