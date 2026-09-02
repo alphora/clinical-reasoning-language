@@ -104,16 +104,23 @@ describe("ServiceRequest membership target — fixtures/service-request", () => 
     expect((v.warnings ?? []).map((w) => w.kind)).toEqual(["reduction-shape"]);
   });
 
-  it("`matches this` RESOLVES to the Matches pattern — it is not soft-compiled narrative", () => {
-    // ⚠ Load-bearing. A projection that fails to match still PARSES and still validates; it silently becomes
+  it("the membership predicate RESOLVES — it is not soft-compiled narrative", () => {
+    // ⚠ Load-bearing. A narrative that fails to match still PARSES and still validates; it silently becomes
     // unmatched narrative. Without this assertion the fixture would look authored while meaning nothing.
+    //
+    // ⚠⚠ The rep-local `value projection is matches this` this used to pin is RETIRED (operator, 2026-09-02):
+    // its comparand was forced to be the representation's own `coded from`, so the set it tested could never
+    // differ from the set scoping the retrieve — and when those coincide every retrieved record is a member
+    // BY IDENTITY and the determinate `false` is unreachable. The concept-level form names its own set.
     const built = buildCRL(readFileSync(POLICY, "utf8")) as unknown as { result?: CRL };
-    const concept = (built.result!.statements as Concept[]).find((s) => s.type === "Concept")!;
-    const projection = concept.representations[0].valueProjection!;
-    const matched = matchNarrative(projection.body);
-    expect(matched.pattern).toBe("Matches");
+    const predicate = (built.result!.statements as Concept[]).find(
+      (s) => s.type === "Concept" && s.name === "Requested Service Is Covered",
+    )!;
+    const matched = matchNarrative((predicate.definition as { body: NarrativeClause }).body);
     expect(matched.known).toBe(true);
-    expect(matched.args).toEqual([]); // the set is the rep's `coded from`, never a narrative operand
+    expect(matched.pattern).toBe("Membership");
+    // ⭐ TWO operands in DIFFERENT namespaces — the subject concept and the value SET it is tested against.
+    expect(matched.args.map((a) => a.type)).toEqual(["ConceptRefArg", "TerminologyRefArg"]);
   });
 
   it("the SIBLING `exists this` still resolves — `matchesThis` is registered ahead of it", () => {
@@ -167,23 +174,26 @@ describe("ServiceRequest membership target — fixtures/service-request", () => 
     // ones MEET `MUST_PRODUCE` and which are still owed — and an oracle fixture that cannot tell progress
     // from regression is worthless. Each row says which it is.
     expect(byCase).toEqual({
-      // ⭐ THREE ROWS NOW MEET THE CRITERION.
+      // ⭐⭐ ALL FIVE ROWS NOW MEET THE CRITERION. Every one of these was owed at some point in #189, and the
+      // last two closed in gap 3.
       "answered yes, no request -> approve": { status: "pass", produced: [APPROVE] },
       "answered no, no request -> deny": { status: "pass", produced: [DENY] },
       "request is the covered service -> approve": { status: "pass", produced: [APPROVE] },
 
-      // ⚠ OWED — an HONEST refusal, not a wrong answer. A covered request (source arm -> true) and a newer
-      // local answer of false are two DISAGREEING candidates, and picking the newest needs the emitted
-      // date+id sort the CRE deliberately does not replicate. ⚠ must become `{ pass, [DENY] }`.
-      "request covered but newer answer says no -> deny": { status: "error", produced: [] },
+      // ⭐ CLOSED by T5b's date-only ordering. It was pinned `error` because "picking the newest needs the
+      // emitted date+id sort the CRE deliberately does not replicate" — a rule written for the
+      // boolean-conflict case and inherited as "the CRE can never pick newest". The `id` is needed only for
+      // TIES; CEL facts carry `date is` on the page, and a strictly-ordered date comparison is as MECHANICAL
+      // as the membership check itself. An exact-date disagreement still refuses.
+      "request covered but newer answer says no -> deny": { status: "pass", produced: [DENY] },
 
-      // ⚠ OWED — THE DEFECT THIS FIXTURE EXISTS TO CATCH, unchanged by this slice. The `coded from` retrieve
-      // is FILTERED, so a non-member ServiceRequest never reaches the concept and leaves the same empty
-      // evidence as no request at all. ⚠ The FIX is not an unfiltered retrieve (that reading is RETIRED —
-      // operator 2026-09-02): it is that the retrieve is scoped by the REQUESTABLE set while the predicate
-      // tests the COVERED set, so a wrong-code request is retrieved and then judged.
-      // ⚠ must become `{ pass, [DENY] }`.
-      "request is a different service -> deny": { status: "fail", produced: [] },
+      // ⭐⭐ THE ROW THIS FIXTURE EXISTS FOR, and the last to close. A request for a DIFFERENT requestable
+      // service is retrieved (it is in the requestable universe, which is what `coded from` scopes), and the
+      // concept-level predicate then judges its code against the COVERED set — a determinate false.
+      //
+      // ⚠ It differs from "no request at all", which stays unestablished and PAUSES. Rows 2 and 3 differing
+      // is the entire point; they were indistinguishable under every earlier shape.
+      "request is a different service -> deny": { status: "pass", produced: [DENY] },
     });
   });
 
@@ -203,16 +213,15 @@ describe("ServiceRequest membership target — fixtures/service-request", () => 
     const runs = runFixture();
     const wrongCode = guardTrace(runs.find((r) => r.case!.includes("different service"))!);
 
-    // MEASURED, not predicted, and meaningful only because the test above proves the lane is live: the
-    // `coded from` retrieve is FILTERED today, so a non-member ServiceRequest never reaches the concept and
-    // leaves exactly the empty evidence that "no request at all" would.
-    expect(wrongCode).toEqual({ satisfied: false, facts: [] });
-
-    // ⭐ WHAT MUST BECOME TRUE: the retrieve is scoped by the REQUESTABLE set, so a wrong-code request for a
-    // requestable service IS retrieved; the concept-level predicate then tests it against the COVERED set and
+    // ⭐⭐ CLOSED. The retrieve is scoped by the REQUESTABLE set, so a wrong-code request for a requestable
+    // service IS retrieved; the concept-level predicate then judges its code against the COVERED set and
     // returns a determinate `false` CARRYING the fact that produced it.
-    // When that lands this test fails HERE, which is the signal, and the expectation becomes:
-    //     expect(wrongCode).toEqual({ satisfied: false, facts: ["Other Service Request"] });
+    //
+    // ⚠ The FACT is the load-bearing half, and it is why this is not just `satisfied: false`. The predicate
+    // is EPHEMERAL — it has no facts of its own — so a naive implementation reports the right verdict with
+    // empty evidence, and "we looked and it is not covered" becomes indistinguishable in the trace from
+    // "nobody has said". The winning SUBJECT fact is attributed to it deliberately.
+    expect(wrongCode).toEqual({ satisfied: false, facts: ["Other Service Request"] });
   });
 
   it("⭐ a STATED false now reads FALSE — the defect the obesity target carried is gone here too", () => {
@@ -221,6 +230,9 @@ describe("ServiceRequest membership target — fixtures/service-request", () => 
     // evaluates this family off the CANDIDATE COLLECTION and reads the candidate's boolean value.
     const runs = runFixture();
     const answeredNo = guardTrace(runs.find((r) => r.case!.includes("answered no"))!);
-    expect(answeredNo).toEqual({ satisfied: false, facts: ["Answered No"] });
+    // ⚠ The fact is now the SUBJECT answer ("which service was requested"), not an assertion of the
+    // coverage conclusion — the predicate is not directly assertable, so answering a different SERVICE is
+    // how a clinician states a denial.
+    expect(answeredNo).toEqual({ satisfied: false, facts: ["Answered Other Service"] });
   });
 });

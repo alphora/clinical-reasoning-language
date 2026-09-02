@@ -1,10 +1,6 @@
 // ===========================================================================
 // ⭐ THE CANONICAL TARGET for the ServiceRequest membership chain (#189).
 //
-// ⚠ It is the TARGET, not a description of what works. The model here is the
-// CORRECT one and the implementation catches up to it. Never reshape a concept
-// to make a lane pass.
-//
 // The acceptance criterion (operator, 2026-08-30):
 //
 //     an SR whose code IS in the value set          -> true  -> Approve
@@ -12,9 +8,9 @@
 //     no SR at all, OR the SR carries no code       -> unanswered: pause and ask
 //
 // ⭐ THE WHOLE POINT: rows 2 and 3 are DIFFERENT. A request for some other
-// service is a determinate NO — we looked, and it is not covered. No request at
-// all is a question nobody has answered. Collapsing them is the defect this
-// fixture exists to prevent.
+// service is a determinate NO — the request was read and it is not covered. No
+// request at all is a question nobody has answered. Collapsing them is the
+// defect this fixture exists to prevent.
 //
 // ⭐⭐ WHAT "NOT IN THE VALUE SET" MEANS IN ROW 2 — RULED (operator, 2026-09-02),
 // because it was misread once and cost a planning round.
@@ -26,83 +22,79 @@
 // colonoscopy, under a blepharoplasty policy — is NOT a missed row 2. It is not
 // an instance of the concept at all, so it never reaches the predicate and the
 // determination stays unestablished. Denying it would be a WRONG answer wearing
-// a confident face; pausing says "this policy has nothing to say here", which is
-// the truth.
+// a confident face; pausing says "this policy has nothing to say here".
 //
 // ⚠ THEREFORE `coded from` IS NOT AN OPTIMIZATION. It states what the concept is
-// ABOUT — which requests are candidate answers to this question — and that is
-// what makes `most recent this` MEANINGFUL. Drop it and every ServiceRequest in
-// the record competes: a routine lab order dated later than the RFA request wins
-// the recency race and denies the RFA. A retrieve scoped by nothing ranks by
-// nothing.
+// ABOUT — which requests are candidate answers — and that is what makes
+// `most recent this` MEANINGFUL. Drop it and every ServiceRequest in the record
+// competes: a routine lab order dated later than the RFA request wins the
+// recency race and denies the RFA. A retrieve scoped by nothing ranks by nothing.
 //
-// ⚠ So the two sets do DIFFERENT jobs and must both exist: `coded from` names
-// the REQUESTABLE universe (what this concept is about), the predicate names the
-// COVERED set (what this policy pays for).
+// ⚠⚠ THE TWO ALTERNATIVES WERE WORKED THROUGH AND REJECTED. Recorded so they are
+// not re-proposed — both failures are structural, not tunable:
 //
-// ⚠⚠ THE TWO ALTERNATIVES WERE WORKED THROUGH AND REJECTED. Recorded so they
-// are not re-proposed — both failures are structural, not tunable:
-//
-//   (1) NO `coded from` — an unfiltered retrieve.
-//       Every ServiceRequest in the record competes. A routine lab order dated
-//       later than the request under adjudication wins the recency race and
-//       DENIES it. A retrieve scoped by nothing ranks by nothing. This trades a
+//   (1) NO `coded from` — an unfiltered retrieve. Every ServiceRequest competes;
+//       a later unrelated order wins recency and DENIES. This trades a
 //       recoverable pause for a confident WRONG answer, which is worse in kind.
 //
-//   (2) ONE set doing both jobs — `coded from` and the predicate name the same
-//       terminology.
-//       Every record that survives a filter for set X is a member of X, so the
-//       predicate can never return false. Row 2 disappears BY IDENTITY. The
-//       source path still discriminates only if the sets differ; with one set the
-//       chain behaves like a bare `exists` wearing two concepts.
+//   (2) ONE set doing both jobs. Every record surviving a filter for set X is a
+//       member of X, so the predicate can never return false. Row 2 disappears
+//       BY IDENTITY.
 //
-// ⭐ WHY `matches` AND NOT `exists`. Both are rep-local projections invoked once
-// per retrieved record, but they ask different questions, and the charter's rule
-// is that what a construct READS decides how it reads absence:
+// ⭐⭐ THE SHAPE: A CODED SUBJECT + AN EPHEMERAL PREDICATE.
 //
-//   `exists this`   asks IS THERE A RECORD — a RECORDS read. Absence ANSWERS it,
-//                   so it is false, and it can NEVER pause. It also cannot tell
-//                   a wrong-code request from no request: both retrieve nothing.
-//   `matches … this` asks DOES THE RECORD SAY THIS — a DATUM read. A retrieved
-//                   record with another code is a real `false`; no record at all
-//                   leaves the arm contributing NOTHING, which is unestablished,
-//                   which pauses.
+// The question a human is asked is WHICH SERVICE was requested — a coded
+// dropdown whose options are the requestable universe. Coverage is then COMPUTED
+// from that answer, not asked separately.
 //
-// ⚠ An earlier sketch of this policy paired `coded from` with `exists this`.
-// That is why it was wrong — not the `coded from`, which is required here
-// (charter §3: it is decided by MODEL INFO, and ServiceRequest HAS a code-based
-// retrieve). It was `exists`, which reads records and so cannot pause.
+// ⚠ The predicate is NOT directly assertable, and a `code is` beside it is a
+// validator ERROR (charter §3 exception, operator 2026-09-02). Coverage is a
+// FUNCTION of the requested service, not an independent clinical fact: a local
+// answer would be a second source of truth for something derived, and the
+// recency merge would arbitrate between an ANSWER and its own COMPUTATION.
+// Overriding the conclusion is expressed by answering the SUBJECT differently.
 //
-// ⭐ `coded from` names the REQUESTABLE set — what this concept is about — and
-// the retrieve stays SCOPED by it for every projection. The wrong-code request
-// reaches the concept because it IS a requestable service; it is then judged
-// against the COVERED set, which is a DIFFERENT terminology. That difference is
-// what makes a determinate `false` reachable, and it is why one set cannot do
-// both jobs (see the rejected alternatives above).
-//
-// ⚠ The value set holds ONE code here. That is a small set, not an absent check
-// (charter §3): membership is still evaluated, and the wrong-code row is what
-// proves it.
+// ⚠ BOTH terminologies are INSTANTIATED, and that is required rather than
+// stylistic: membership is MECHANICAL (against the emitted set, never a resolved
+// expansion), so two PURE REFERENCE sets each emit a DIFFERENT single-code stub
+// and no datum could ever be in both — the approve row would vanish by identity,
+// the mirror of failure (2) above.
 // ===========================================================================
 library "Endoluminal Ablation Coverage".
 
-terminology "Endoluminal RFA VS":
-- valueset is `http://example.org/procedures/ValueSet/endoluminal-rfa`.
+// What a user may be asked to pick, and what this concept is ABOUT.
+terminology "Requestable Services":
+- system is `http://www.ama-assn.org/go/cpt`.
+// `37718` is endoluminal RFA (the covered one); `37722` is a fem-pop bypass — requestable, NOT covered.
+- code is `37718`.
+- code is `37722`.
 
-// ONE question, three states. Its arms are the local `code is` (a clinician may
-// answer it directly) and the ServiceRequest the projection judges. `most recent
-// this` merges them, so a newer assertion overrides an older record and vice
-// versa.
-concept "Requested Service Is Endoluminal Radiofrequency Ablation":
+// What this policy pays for. ⚠ A DIFFERENT set: see failure (2) above.
+terminology "Covered Services":
+- system is `http://www.ama-assn.org/go/cpt`.
+- code is `37718`.
+
+// THE QUESTION. Its arms are the local `code is` (a clinician answers the
+// dropdown directly) and the ServiceRequest the policy reads. `most recent this`
+// merges them, so a newer assertion overrides an older record and vice versa.
+concept "Requested Service":
 - shape is Record.
 - type is Observation.
-- value type is boolean.
-- code is `requested-service-is-endoluminal-rfa`.
+- value type is CodeableConcept.
+- value from "Requestable Services".
+- code is `requested-service`.
 - definition is most recent this.
 - source representation:
   - type is ServiceRequest.
-  - coded from "Endoluminal RFA VS".
-  - value projection is matches this.
+  - coded from "Requestable Services".
+
+// THE DETERMINATION — computed, never asserted. Three states: the requested
+// service is covered / is not covered / has not been established at all.
+concept "Requested Service Is Covered":
+- shape is Scalar.
+- type is Observation.
+- value type is boolean.
+- definition is "Requested Service" in "Covered Services".
 
 activity "Approve Endoluminal Ablation":
 - request CPGCommunicationRequest.
@@ -113,8 +105,8 @@ activity "Deny Endoluminal Ablation":
 - with `NOT APPROVED`.
 
 // If coverage cannot be established from the data, the tree PAUSES and the
-// questionnaire asks — that is the point of the chain.
+// questionnaire asks which service was requested — that is the point of the chain.
 decision "Endoluminal Ablation Coverage":
 first:
-- when "Requested Service Is Endoluminal Radiofrequency Ablation" then recommend activity "Approve Endoluminal Ablation".
+- when "Requested Service Is Covered" then recommend activity "Approve Endoluminal Ablation".
 - otherwise then recommend activity "Deny Endoluminal Ablation".
