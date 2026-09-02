@@ -97,7 +97,8 @@ import type {
   CELValueField,
 } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
-import { classifyCanonicalToken, parseCheckedCanonicalToken } from "../cel/canonicalToken";
+import { classifyCanonicalToken, parseCodedValueToken } from "../cel/canonicalToken";
+import { inlineAnswerSet } from "../fhir-emitter/inlineAnswerSet";
 import { isValueReadingBooleanConcept, isPureQuestionConcept } from "../template-match/recencyValueConcept";
 import { resolveConceptPipeline } from "../template-match/resolvePipeline";
 import type { ResolvedStage } from "../template-match/resolvePipeline";
@@ -275,6 +276,15 @@ interface ConceptEntry {
  *  `canonicalBase`) — a local fact then fails the run LOUD rather than fabricating a member/non-member verdict. */
 interface LocalMembershipIndex {
   forward: Map<Id, LocalConceptMember>;
+  /**
+   * ⭐⭐ #189 — per-concept INLINE ANSWER OPTIONS, so a CEL fact may write a BARE option code and have its
+   * system resolved from the concept's own answer CodeSystem.
+   *
+   * ⚠ Built here rather than at the fact site because this is where the local-domain context already lives.
+   * Without it the CRE would need the minted system typed by hand in the `.cel`, and a typo would silently
+   * make the value a NON-MEMBER — a confident deny in the lane whose job is catching confident denies.
+   */
+  answerSets: Map<Id, { system: string; codes: ReadonlySet<string> }>;
   reverse: Map<string, Id>;
   /** `(fhirType, system, code)` keys claimed by ≥2 DISTINCT concepts. `concepts` is built from the whole registry
    *  (broader than the emitted closure `emit-duplicate-local-code` guards), so an unrelated same-domain/type/code
@@ -388,6 +398,9 @@ interface Ctx {
    *  `resolveDecision` is. `undefined` ⇒ unresolved, which the caller must REFUSE rather than read as
    *  an empty set (empty would mean "not a member" — a determinate wrong answer). */
   terminologyMembers: (lib: string, name: string) => readonly { system: string; code: string }[] | undefined;
+  /** ⭐ #189 — a concept's inline answer-option system + codes, keyed by concept id. Same descriptor the FHIR
+   *  lane emits from, so the two lanes cannot disagree about who is a member of `qualifying`. */
+  answerSets: Map<Id, { system: string; codes: ReadonlySet<string> }>;
   /** #236 — per-library criterion tables (`name → Criterion`), for reference-and-evaluate: a
    *  criterion guard resolves its body HERE instead of being inline-expanded up front. Keyed by library. */
   criterionTables: Map<string, CriterionTable>;
@@ -720,12 +733,33 @@ function evaluateMembership(stage: ResolvedStage, entry: ConceptEntry, ctx: Ctx)
   const args = stage.call.args;
   const subjectArg = args.find((a) => a.type === "ConceptRefArg");
   const setArg = args.find((a) => a.type === "TerminologyRefArg");
-  if (!subjectArg || !setArg) return "not-evaluated";
+  // ⭐⭐ #189 — an INLINE-OPTIONS subset comparand (`"X" in qualifying`).
+  const subsetArg = args.find((a) => a.type === "SubsetRefArg");
+  if (!subjectArg || (!setArg && !subsetArg)) return "not-evaluated";
   // ⚠ Cross-library operands are not resolved here — a same-named terminology in another library would bind
   // wrongly. Refuse by falling through rather than guessing which one the lowering picked.
-  if (subjectArg.library !== undefined || setArg.library !== undefined) return "not-evaluated";
+  if (subjectArg.library !== undefined || setArg?.library !== undefined) return "not-evaluated";
 
-  const members = ctx.terminologyMembers(entry.lib, setArg.value);
+  let members: readonly { system: string; code: string }[] | undefined;
+  if (subsetArg) {
+    // ⚠ THE SUBSET RESOLVES AGAINST THE SUBJECT, never a global table — two different concepts may each
+    // declare a `qualifying` subset and they are DIFFERENT sets. The member set is the subject's options
+    // marked `qualifying`, read from the SAME descriptor the FHIR lane emits its ValueSet from, so the two
+    // lanes cannot disagree about who is a member.
+    //
+    // ⚠ `qualifying === true` ONLY. An UNMARKED option is not a member: absence is not "no". The validator
+    // requires a marker exactly when a concept is predicated on, so an unmarked option reaching here means
+    // validation was skipped — and counting it either way would manufacture a verdict nobody authored.
+    const subjEntry = ctx.concepts.get(idOf(entry.lib, subjectArg.value));
+    const opts = subjEntry?.node.valueFrom?.kind === "inline" ? subjEntry.node.valueFrom.options : undefined;
+    const answerSet = ctx.answerSets.get(idOf(entry.lib, subjectArg.value));
+    if (opts === undefined || answerSet === undefined) return "not-evaluated";
+    members = opts
+      .filter((o) => o.qualifying === true)
+      .map((o) => ({ system: answerSet.system, code: o.code }));
+  } else {
+    members = ctx.terminologyMembers(entry.lib, setArg!.value);
+  }
   if (members === undefined) return "not-evaluated"; // unresolved comparand — the validator already says so
 
   const subjectId = idOf(entry.lib, subjectArg.value);
@@ -1618,7 +1652,20 @@ function buildLocalMembershipIndex(
   const forward = new Map<Id, LocalConceptMember>();
   const reverse = new Map<string, Id>();
   const collisions = new Set<string>();
+  const answerSets = new Map<Id, { system: string; codes: ReadonlySet<string> }>();
   for (const [id, entry] of concepts) {
+    // ⚠ The domain id comes from the SAME resolver the emitted CodeSystem url uses, so the CRE and the FHIR
+    // lane cannot disagree about which system a bare option code resolves to.
+    const domainId = ctx.resolver?.domainIdFor({ filePath: entry.filePath, name: entry.entryName });
+    if (ctx.base !== undefined && domainId !== undefined) {
+      const set = inlineAnswerSet(entry.node, domainId, ctx.base);
+      if (set) {
+        answerSets.set(id, {
+          system: set.codeSystem.url,
+          codes: new Set(set.options.map((o: { code: string }) => o.code)),
+        });
+      }
+    }
     const res = localMemberOfConcept(
       entry.node,
       { filePath: entry.filePath, entryName: entry.entryName, fallbackLib: entry.fallbackLib },
@@ -1634,7 +1681,7 @@ function buildLocalMembershipIndex(
     if (prior !== undefined && prior !== id) collisions.add(key); // two DISTINCT concepts claim one set → ambiguous
     else reverse.set(key, id);
   }
-  return { forward, reverse, collisions, hasProject: graph.projectRoot !== undefined };
+  return { forward, reverse, answerSets, collisions, hasProject: graph.projectRoot !== undefined };
 }
 
 /** #189 Piece 3 — the SOURCE-membership reverse index: `(fhirType, system, code)` → the concept id(s) whose source
@@ -1822,7 +1869,9 @@ function runCase(
     // UNKNOWN (pause) while a mis-parsed datum would be a determinate non-member — turning bad authoring into
     // a confident denial. The writer already errors loudly on the same token, so the author is told there.
     const codedFromValue =
-      valueField?.value.kind === "string" ? parseCheckedCanonicalToken(valueField.value.value) : undefined;
+      valueField?.value.kind === "string"
+        ? parseCodedValueToken(valueField.value.value, localIndex.answerSets.get(namedId))
+        : undefined;
     const dateField = fact.body.find((x): x is CELDateField => x.type === "CELDateField");
     const factValue: FactValue = {
       ...(valueField?.value.kind === "boolean" ? { boolValue: valueField.value.value } : {}),
@@ -2013,6 +2062,8 @@ function runCase(
     // ⭐ #189 gap 3 — closed over the graph, exactly as `resolveDecision` is, so the membership predicate reads
     // the SAME mechanical set the FHIR ValueSet and the CQL retrieve use.
     terminologyMembers,
+    // ⭐ #189 — from the SAME index the local-code membership uses, so both lanes read one descriptor.
+    answerSets: localIndex.answerSets,
     valueReadingIds,
     pureQuestionIds,
     ownBoolValues,

@@ -24,10 +24,11 @@ import {
 } from "../../emit/effectiveRepresentation";
 import { readCanonicalBase, readPolicyId } from "../../fhir-emitter/metadata";
 import { createLocalDomainResolver, deriveLocalConceptCoding } from "../../fhir-emitter/localDomain";
+import { inlineAnswerSet } from "../../fhir-emitter/inlineAnswerSet";
 import {
   parseCanonicalToken,
   classifyCanonicalToken,
-  parseCheckedCanonicalToken,
+  parseCodedValueToken,
   type CodeParts,
 } from "../canonicalToken";
 import { localCodePathsOf } from "../localMembership";
@@ -569,7 +570,17 @@ function writeCodedLocalValue(
       `local concept "${concept.name}" declares a CodeableConcept value type, so its \`value is\` must be a \`<system>|<code>\` token, not ${typeof rawValue === "number" ? "a number" : "a boolean"}`,
     );
   }
-  const parsed = parseCheckedCanonicalToken(rawValue);
+  // ⭐⭐ #189 — a BARE inline-option code resolves its system from the `defined by` concept's own answer
+  // CodeSystem. Without this the concept-level system — a MINTED url in no authored source — would have to
+  // be typed by hand here, and a typo would silently make the value a NON-MEMBER: a confident deny in the
+  // lane whose job is catching confident denies. Both review arms raised this independently as [critical].
+  const answerSet = inlineAnswerSet(concept, meta.meta.localDomainId, meta.meta.canonicalBase);
+  const parsed = parseCodedValueToken(
+    rawValue,
+    answerSet
+      ? { system: answerSet.codeSystem.url, codes: new Set(answerSet.options.map((o: { code: string }) => o.code)) }
+      : undefined,
+  );
   if ("error" in parsed) return mkErr(`fact "${factName}": ${parsed.error}`);
   const jn = valueJsonName(localArm.valueElement, "CodeableConcept");
   if ("errorKind" in jn) return mkErr(`fact "${factName}": ${jn.detail}`);
