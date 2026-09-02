@@ -679,6 +679,51 @@ both failure modes below are why, and neither is recoverable by tuning.
 | PREDICATE COMPARAND | the membership test's set | which of those answers counts as yes |
 | OFFERED ANSWERS | `value from` on the concept | which codes a user may pick |
 
+### The LOCAL-ONLY form: inline options, and a subset as the comparand
+
+When the options are the artifact's OWN codes rather than an external code set, the question declares them
+inline and the predicate names a SUBSET of that same declaration — so a code is written ONCE:
+
+```crl
+concept "Patient Complaint":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is `patient-complaint`.
+- definition is most recent this.
+- value from:
+  - `chronic-blepharitis` display is `Chronic blepharitis`, qualifying.
+  - `none-of-listed`       display is `None of the listed complaints`, not qualifying.
+
+concept "Qualifying Patient Complaint Documented":
+- shape is Scalar.
+- value type is boolean.
+- definition is "Patient Complaint" in qualifying.
+```
+
+The codes live in the CONCEPT'S OWN CodeSystem, minted from its `code is`. **No system URL is authored
+anywhere** — including in CEL, where a fact may carry a bare option code and resolve its system from the
+`defined by` concept.
+
+⚠ **The two roles are still distinct, and that is why this form is safe.** The offered set and the
+comparand are two views of ONE declaration — all options versus the `qualifying` ones — so they cannot be
+made identical by accident, and the tautology above is unreachable BY CONSTRUCTION rather than by author
+care. That is the whole reason to prefer it when the codes are ours.
+
+⚠ **ALWAYS OFFER A "NONE OF THE LISTED …" OPTION**, marked `not qualifying`. Without it a denial costs one
+answer per option, because an unanswered disjunct leaves the criterion UNKNOWN and the tree pauses. With it,
+one honest answer reaches a determinate `false`. The word "listed" is load-bearing: a patient may genuinely
+have the finding without having a LISTED one, and the answer must not make them claim otherwise.
+
+⚠ The marker is REQUIRED exactly when the concept is the subject of an `in qualifying` predicate, so adding
+an option cannot compile until the author says what it does. A dropdown that feeds no predicate needs none.
+
+⚠ Membership stays OFFERED, not ADMISSIBLE (below): a present code that was never offered is a determinate
+NON-member, not an error. CEL states one with the explicit `<system>|<code>` form.
+
+⚠ Use the named-terminology form instead when the options are an EXTERNAL code set (CPT, ICD-10), or when
+two predicates need DIFFERENT qualifying subsets of one question — one marker names one subset.
+
 ⚠ **The retrieve scope and the predicate comparand MUST be different sets.** Filter the retrieve by set X
 and test membership in X, and every record that reaches the predicate is a member **by identity** — the
 predicate can never return `false`, and the determinate-no row disappears. This is not a filtering accident

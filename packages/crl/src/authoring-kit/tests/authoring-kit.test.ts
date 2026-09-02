@@ -417,7 +417,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.25");
+    expect(kit.schemaVersion).toBe("1.26");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -1028,7 +1028,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     // wants. That is a CORRECTNESS fix, not teaching, so it lands with the slice and re-pins at 1.25 with NO
     // bump — the doctrine re-teach + schemaVersion bump stay BATCHED (`tmp/WORKLIST-kit-deltas.md`).
     expect(cpg.contentHash).toBe(
-      "acc263112865b1ed9932d0e431bb37b26f927356ac35d37488980508ce5262ff",
+      "f2b195659eb0501fbd889e962e2578f2009621bd1e063e703ef502844545c483",
     );
     // #189 null/pause — the priorAuth payload embeds the reference `.cel` artifacts, which gained explicit
     // `value is true/false` facts (a NEGATIVE must now be STATED; omission means UNKNOWN and PAUSES). That is
@@ -1036,10 +1036,11 @@ describe("authoring-kit — getAuthoringKit", () => {
     // while the schemaVersion bump + doctrine re-teach are BATCHED to one final kit pass
     // (`tmp/WORKLIST-kit-deltas.md`, operator 2026-08-27). Hence a re-pin at 1.25 with NO bump.
     // ⚠ The cpg hash is UNCHANGED — that payload does not embed the reference artifacts.
-    // ⚠ DO NOT RELEASE before the kit pass runs: a KE pinning 1.25 + the OLD priorAuth hash re-syncs on a
-    //   hash change with no changelog entry explaining it.
+    // ⚠ THE KIT PASS RAN (schemaVersion 1.25 → 1.26, #189 inline answer options). BOTH hashes re-pin, and the
+    //   changelog entry that explains the re-sync is the `inline-answer-options` rule itself. A KE pinning
+    //   1.25 re-syncs and gets the teaching for the new construct in the same step.
     expect(priorAuth.contentHash).toBe(
-      "546fad888290f7373727924b6f15ca15b099f4ed98bda0ad473d71a8aea5e80c",
+      "aaec7180fdd9600ace2129a9abb03542f96131c7a00833b665268ef0ad0c27b9",
     );
   });
 

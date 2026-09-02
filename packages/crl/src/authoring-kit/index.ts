@@ -298,7 +298,7 @@ export type {
 //   decision-shapes.md` folded into the same transaction (it was cited by the flipped rules' `ref` fields).
 //   CONTENT bump; NO payload-shape change. BOTH useCase hashes re-pin.
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.25";
+const SCHEMA_VERSION = "1.26";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -484,6 +484,97 @@ const RULES: KitRule[] = [
       },
       {
         text: "`defined as exists ( \"Concept\" )` LANE MATRIX (capability status, NOT a usable Stage-1 form yet): parses+validates ✓; standard CQL emit ✓ (#265, `exists (<Concept>)`); run_decision ✗ (status:error, #270) — cannot pass the kit verify-loop today; #269 (reject a boolean operand → silently-always-true) unbuilt, so its operand must be an instance-bearing non-boolean concept by author care. The run_decision-passing boolean determination form is a plain `code is` boolean concept.",
+        force: "default",
+      },
+    ],
+  },
+  {
+    id: "inline-answer-options",
+    edge: "cpg",
+    category: "concept-model",
+    rule:
+      "A CODED QUESTION DECLARES ITS OWN ANSWER OPTIONS INLINE, and the predicate that reads them names a " +
+      "SUBSET of that same declaration \u2014 so the codes are written ONCE, on the question they belong to. " +
+      "`- value from:` takes option lines of the form \`<code>\` display is \`<text a clinician reads>\`, " +
+      "<marker>. The marker is `qualifying` or `not qualifying`. A separate boolean concept then tests " +
+      "`definition is \"<question>\" in qualifying.` \u2014 no terminology, no system URL, no second list. " +
+      "THE OPTION CODES LIVE IN THE CONCEPT'S OWN CodeSystem, minted from its `code is`; an author never " +
+      "writes a system anywhere, including in CEL, where a fact may carry a BARE option code " +
+      "(`- value is \"chronic-blepharitis\".`) and its system is resolved from the `defined by` concept. " +
+      "THE MARKER IS REQUIRED EXACTLY WHEN the concept is the subject of an `in qualifying` predicate \u2014 a " +
+      "plain dropdown that feeds no predicate needs none, and forcing one would classify options as " +
+      "qualifying-for-nothing. ALWAYS OFFER A \"NONE OF THE LISTED \u2026\" OPTION, marked `not qualifying`: it " +
+      "is what lets an honest user reach a DETERMINATE false in ONE answer instead of leaving the criterion " +
+      "unknown, and the word \"listed\" is load-bearing \u2014 a patient may genuinely have the finding without " +
+      "having a LISTED one. Membership stays OFFERED, NOT ADMISSIBLE: a present code that was never offered " +
+      "is a determinate NON-member (false), not an error, and CEL states one with the explicit " +
+      "\`<system>|<code>\` form. THE SUBJECT MUST PUBLISH ONE RECORD (`shape is Record` + a reduction such " +
+      "as `definition is most recent this`); a `RecordSet` subject is REFUSED (multi-select is not built). " +
+      "A cross-library subject is REFUSED: a subset names part of the subject's OWN declaration and cannot " +
+      "be resolved across libraries, and a foreign subject's unknown would be totalized to false \u2014 denying " +
+      "an unanswered question instead of pausing. USE THE NAMED-TERMINOLOGY FORM " +
+      "(`value from \"<terminology>\"`) INSTEAD when the options are an EXTERNAL code set (CPT, ICD-10) or " +
+      "when two predicates need DIFFERENT qualifying subsets of one question.",
+    why:
+      "Declaring the options twice \u2014 once as an offered set and again as the qualifying set \u2014 is the " +
+      "CONFIDENT-DENY hazard in its purest form: a KE adds an option, forgets to mirror it, and an honest " +
+      "answer computes false and DENIES. A pause is recoverable; a spurious false looks like a decision. " +
+      "One list with a required marker makes that mistake fail to compile instead of failing a patient.",
+    ref: "src/validator/answerOptionsValidator.ts; src/validator/membershipScopeValidator.ts; src/fhir-emitter/inlineAnswerSet.ts; #189",
+    clauses: [
+      {
+        text:
+          "Options are declared INLINE on the question: `- value from:` then one line per option \u2014 " +
+          "\`<code>\` display is \`<text>\`, qualifying|not qualifying. The predicate is a separate boolean " +
+          "concept: `definition is \"<question>\" in qualifying.`",
+        force: "default",
+      },
+      {
+        text:
+          "A `display` is REQUIRED on every inline option (`answer-options-missing-display`). It is the text " +
+          "a clinician reads; it is never derived from the code.",
+        force: "validator-enforced",
+      },
+      {
+        text:
+          "The `qualifying` / `not qualifying` marker is REQUIRED on every option of a concept that IS the " +
+          "subject of an `in qualifying` predicate (`answer-options-missing-marker`), and is not required " +
+          "otherwise. Adding an option therefore cannot compile until you say what it does.",
+        force: "validator-enforced",
+      },
+      {
+        text:
+          "Offer a \"none of the listed \u2026\" option marked `not qualifying`. Without it a denial costs one " +
+          "answer per option instead of one answer total, because an unanswered disjunct leaves the " +
+          "criterion UNKNOWN. If EVERY option qualifies the validator warns (`answer-options-all-qualifying`); " +
+          "if NONE does it errors (`answer-options-none-qualifying`).",
+        force: "validator-enforced",
+      },
+      {
+        text:
+          "The subject must publish ONE record: `shape is Record` plus a reduction (`definition is most " +
+          "recent this`). A `RecordSet` subject is refused (`membership-subject-shape-unsupported`) \u2014 " +
+          "multi-select is not built.",
+        force: "validator-enforced",
+      },
+      {
+        text:
+          "A cross-library subject is refused (`membership-subset-cross-library`), as is a subject with no " +
+          "inline options (`membership-subset-subject-has-no-options`).",
+        force: "validator-enforced",
+      },
+      {
+        text:
+          "In CEL, a fact on such a concept carries a BARE option code (`- value is \"<code>\".`); the system " +
+          "is resolved from the concept. The explicit \`<system>|<code>\` form remains legal and is how you " +
+          "author a deliberate NON-member (an unoffered or external code), which evaluates to a determinate " +
+          "false, not an error.",
+        force: "default",
+      },
+      {
+        text:
+          "Use `value from \"<terminology>\"` instead when the options are an EXTERNAL code set, or when two " +
+          "predicates need different qualifying subsets of one question.",
         force: "default",
       },
     ],
