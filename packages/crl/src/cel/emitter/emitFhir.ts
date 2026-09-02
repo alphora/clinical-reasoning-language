@@ -238,6 +238,38 @@ function deriveFhirType(
   if (!isQualifiedRef(ref)) {
     const name = getRefName(ref);
     if (CONCEPT_TYPE_SET.has(name)) return { fhirType: name, role: "bare-type" };
+    // ⭐⭐ AN UNQUALIFIED NAME MAY ALSO BE A CONCEPT IN THE **COVERED** LIBRARY, and until now it silently
+    // was not: this branch handled only bare FHIR TYPE names and returned `undefined` for everything else,
+    // so `- defined by "Performed For Cosmetic Purposes".` emitted NO RESOURCE AT ALL.
+    //
+    // ⚠ MEASURED via `$apply` on `tmp/bleph`: every boolean fact written in the natural unqualified form
+    // produced only a `could not derive a FHIR resource type` WARNING, so the case data was missing those
+    // answers entirely. The CRE passes such rows — it reads the `.cel` directly and never consults this
+    // writer — so the two lanes DISAGREED: the CRE certified, `$apply` paused for want of an answer nobody
+    // had written. A warning, not an error, is why it stayed quiet.
+    //
+    // ⚠ The canonical ServiceRequest fixture never hit it: its unqualified `defined by`s name bare TYPES
+    // (`"Patient"`, `"ServiceRequest"`) and its concept refs are QUALIFIED. So no test could see it either.
+    //
+    // Resolution is against the `covers` target — the same library the validator resolves an unqualified
+    // `defined by` against — never a search across the registry, which could bind a same-named concept in
+    // an unrelated library.
+    const covered = graph.coversTarget;
+    if (covered) {
+      for (const st of covered.ast.statements) {
+        if (st.type !== "Concept" || st.name !== name) continue;
+        const ct = st.conceptType;
+        if (!ct || !CONCEPT_TYPE_SET.has(ct)) return undefined;
+        return {
+          fhirType: ct,
+          kind: "Concept",
+          role: classifyConceptRole(st),
+          concept: st,
+          ...(typeof covered.name === "string" ? { owningLibrary: covered.name } : {}),
+          owningEntry: covered,
+        };
+      }
+    }
     return undefined;
   }
 
