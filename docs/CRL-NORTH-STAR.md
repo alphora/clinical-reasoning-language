@@ -568,6 +568,17 @@ them into one.
   ("Value")`, a threshold (`definition is "Value" at least N …`), a temporal window, etc. **This is the concept
   the decision reads.** It is directly assertable via its own local `code is`.
 
+  ⚠⚠ **EXCEPTION — A MEMBERSHIP PREDICATE IS *NOT* DIRECTLY ASSERTABLE** (operator, 2026-09-02), and the
+  validator ERRORS on a `code is` beside one. `"X" in "VS"` asks whether a value the author already models is
+  in a set: it is a FUNCTION of that value, not an independent clinical fact anyone observes. A local answer
+  would be a second source of truth for something definitionally derived, and the recency merge would then
+  arbitrate between an ANSWER and its own COMPUTATION as if they were peer observations.
+
+  ⭐ The answerable thing is the INPUT. The SUBJECT carries `code is` + `value from`, so the question a user
+  is asked is *which service was requested* — strictly more informative than a yes/no about coverage, and the
+  only one a person is actually in a position to answer. Overriding the conclusion is expressed by answering
+  the subject differently, which the recency merge already arbitrates.
+
 **Why the split is mandatory, not stylistic:** a `boolean` concept **cannot** carry a `CodeableConcept` (or
 other non-boolean) `source representation` — the validator rejects it (`use-site-type-mismatch`: a rep with no
 projection is read as the concept's value, so their value types must match). The datum's type lives on the

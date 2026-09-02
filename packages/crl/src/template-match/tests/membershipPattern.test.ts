@@ -45,10 +45,12 @@ function predicate(definition: string): { concept: Concept; validator: Validator
     [
       ...HEAD,
       'concept "Requested Service Is Covered":',
-      "- shape is Record.",
+      // ⚠ EPHEMERAL — no `code is`. A membership predicate is NOT directly assertable (operator ruling,
+      // 2026-09-02; charter §3 exception), and the validator now ERRORS on a coded one. The earlier version of
+      // this helper authored the coded shape, which made these fixtures teach an illegal form.
+      "- shape is Scalar.",
       "- type is Observation.",
       "- value type is boolean.",
-      "- code is `requested-service-is-covered`.",
       `- ${definition}`,
     ].join("\n"),
   );
@@ -144,10 +146,12 @@ describe("#189 gap 3 T2 — membership validation", () => {
           : []),
         "",
         'concept "Requested Service Is Covered":',
-        "- shape is Record.",
+        // ⚠ EPHEMERAL. A coded membership predicate is an ERROR (operator ruling, 2026-09-02), and that error
+        // SHORT-CIRCUITS the advisory findings below — so a fixture carrying `code is` would silently stop
+        // exercising the very warnings these tests exist to check.
+        "- shape is Scalar.",
         "- type is Observation.",
         "- value type is boolean.",
-        "- code is `requested-service-is-covered`.",
         '- definition is "Requested Service" in "Covered Services".',
       ].join("\n"),
     );
@@ -204,10 +208,9 @@ describe("#189 gap 3 T2 — membership validation", () => {
         '  - coded from "Covered Services".',
         "",
         'concept "Requested Service Is Covered":',
-        "- shape is Record.",
+        "- shape is Scalar.",
         "- type is Observation.",
         "- value type is boolean.",
-        "- code is `requested-service-is-covered`.",
         '- definition is "Requested Service" in "Covered Services", then most recent this.',
       ].join("\n"),
     );
@@ -314,5 +317,84 @@ describe("#189 gap 3 T3 — the lowering", () => {
     // The subject is a concept that has ALREADY reduced (`most recent this`), so membership tests the ONE
     // value it publishes. Reaching through to its posrep would ignore the author's own reduction.
     expect(emitFor()).toContain('("Requested Service".value as FHIR.CodeableConcept)');
+  });
+});
+
+describe("#189 gap 3 — a membership predicate is NOT directly assertable", () => {
+  // ⭐⭐ RULED (operator, 2026-09-02) as an explicit EXCEPTION to charter §3's "a boolean interface is
+  // directly assertable via its own local `code is`".
+  //
+  // Coverage is a FUNCTION of the tested value, not an independent clinical fact. A local answer would be a
+  // second source of truth for something definitionally derived, and the recency merge would arbitrate
+  // between an ANSWER and its own COMPUTATION as though they were peer observations of the same thing. The
+  // answerable thing is the INPUT — the subject carries `code is` + `value from`, so the user is asked WHICH
+  // SERVICE was requested, which is both more informative and the only question a person can answer.
+  const build = (predLines: string[]) =>
+    buildCRL(
+      [
+        "# P",
+        'library "L".',
+        "",
+        'terminology "Requestable Services":',
+        "- system is `http://www.ama-assn.org/go/cpt`.",
+        "- code is `37718`.",
+        "- code is `37722`.",
+        "",
+        'terminology "Covered Services":',
+        "- system is `http://www.ama-assn.org/go/cpt`.",
+        "- code is `37718`.",
+        "",
+        'concept "Requested Service":',
+        "- shape is Record.",
+        "- type is Observation.",
+        "- value type is CodeableConcept.",
+        "- code is `requested-service`.",
+        "- definition is most recent this.",
+        "- source representation:",
+        "  - type is ServiceRequest.",
+        '  - coded from "Requestable Services".',
+        "",
+        'concept "Requested Service Is Covered":',
+        ...predLines,
+      ].join("\n"),
+    );
+
+  it("⭐ the EPHEMERAL shape is clean — it is the only legal one", () => {
+    const built = build([
+      "- shape is Scalar.",
+      "- type is Observation.",
+      "- value type is boolean.",
+      '- definition is "Requested Service" in "Covered Services".',
+    ]);
+    const r = new Validator().validate(built.result!);
+    expect(r.errors.map((e) => e.kind)).not.toContain("membership-predicate-not-assertable");
+    expect(r.isValid).toBe(true);
+  });
+
+  it("⭐⭐ a `code is` beside a membership predicate is an ERROR", () => {
+    const built = build([
+      "- shape is Record.",
+      "- type is Observation.",
+      "- value type is boolean.",
+      "- code is `requested-service-is-covered`.",
+      '- definition is "Requested Service" in "Covered Services".',
+    ]);
+    const r = new Validator().validate(built.result!);
+    expect(r.errors.map((e) => e.kind)).toContain("membership-predicate-not-assertable");
+    // ⚠ An ERROR, not a warning — unlike the two scope findings. There is no authoring for which a coded
+    // membership predicate is correct, so nothing correct is blocked.
+    expect(r.isValid).toBe(false);
+  });
+
+  it("⭐ and on the FOLDED form too — the rule cannot be evaded by adding a reduction", () => {
+    const built = build([
+      "- shape is Record.",
+      "- type is Observation.",
+      "- value type is boolean.",
+      "- code is `requested-service-is-covered`.",
+      '- definition is "Requested Service" in "Covered Services", then most recent this.',
+    ]);
+    const r = new Validator().validate(built.result!);
+    expect(r.errors.map((e) => e.kind)).toContain("membership-predicate-not-assertable");
   });
 });

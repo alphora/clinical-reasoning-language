@@ -71,6 +71,41 @@ export class MembershipScopeValidator {
     if (calls.length === 0) return;
     const args = calls[0].args;
 
+    // ⭐⭐ A MEMBERSHIP PREDICATE IS NOT DIRECTLY ASSERTABLE — RULED (operator, 2026-09-02), and it is an
+    // explicit EXCEPTION to charter §3's "a boolean interface is directly assertable via its own local
+    // `code is`".
+    //
+    // The reason is what the predicate MEANS. Coverage is a FUNCTION of which service was requested; it is
+    // not an independent clinical fact anyone observes. Giving it a `code is` would create a second source of
+    // truth for something definitionally derived — a clinician could assert "covered" while the datum says
+    // otherwise, and the recency merge would then arbitrate between an ANSWER and its own COMPUTATION as
+    // though they were peer observations of the same thing.
+    //
+    // ⚠ The answerable thing is the INPUT, not the conclusion: the subject carries `code is` + `value from`,
+    // so the question a user is asked is "which service was requested" — strictly more informative than a
+    // yes/no about coverage, and the only one a person can actually answer.
+    //
+    // ⚠ An ERROR, not a warning (contrast the two findings below): there is no authoring for which a coded
+    // membership predicate is correct, so nothing is wrongly blocked.
+    if (concept.code !== undefined) {
+      out.push({
+        kind: "membership-predicate-not-assertable",
+        conceptName: concept.name,
+        message:
+          `Concept "${concept.name}" derives its value from a membership test and also declares ` +
+          `\`code is\`, which would make it directly assertable. Coverage is a FUNCTION of the tested ` +
+          `value, not an independent fact: a local answer here would be a second source of truth for ` +
+          `something computed, and the recency merge would arbitrate between an answer and its own ` +
+          `computation. Remove \`code is\` — the question to ask is the SUBJECT ` +
+          `("${subjectArgName(args)}"), which carries the answer slot and its options.`,
+        location: concept.location,
+        severity: "error",
+        ...(attribution.libraryName ? { libraryName: attribution.libraryName } : {}),
+        ...(attribution.filePath ? { filePath: attribution.filePath } : {}),
+      } as MembershipScopeFinding);
+      return;
+    }
+
     const subjectArg = args.find((a) => a.type === "ConceptRefArg");
     const setArg = args.find((a) => a.type === "TerminologyRefArg");
     if (!subjectArg || !setArg) return;
@@ -136,4 +171,9 @@ export class MembershipScopeValidator {
       return;
     }
   }
+}
+
+/** The membership subject's name, for the teaching diagnostic. */
+function subjectArgName(args: readonly { type: string; value: string }[]): string {
+  return args.find((a) => a.type === "ConceptRefArg")?.value ?? "the tested concept";
 }

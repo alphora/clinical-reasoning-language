@@ -122,7 +122,8 @@ export type ValidationErrorKind =
   | "answer-options-unanswerable"
   | "answer-options-not-coded"
   | "membership-scope-equals-comparand"
-  | "membership-cross-library-subject";
+  | "membership-cross-library-subject"
+  | "membership-predicate-not-assertable";
 
 /**
  * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
@@ -585,7 +586,10 @@ export interface RecordSetUnboundedWarning extends ValidationErrorBase {
 /** ⭐ #189 gap 3 — the retrieve scope and the membership comparand naming the SAME terminology, which makes
  *  a determinate `false` unreachable from source data. A WARNING: a local answer arm keeps it reachable. */
 export interface MembershipScopeFinding extends ValidationErrorBase {
-  kind: "membership-scope-equals-comparand" | "membership-cross-library-subject";
+  kind:
+    | "membership-scope-equals-comparand"
+    | "membership-cross-library-subject"
+    | "membership-predicate-not-assertable";
   conceptName: string;
 }
 
