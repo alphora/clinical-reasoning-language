@@ -27,6 +27,7 @@ import { createLocalDomainResolver, deriveLocalConceptCoding } from "../../fhir-
 import {
   parseCanonicalToken,
   classifyCanonicalToken,
+  parseCheckedCanonicalToken,
   type CodeParts,
 } from "../canonicalToken";
 import { localCodePathsOf } from "../localMembership";
@@ -377,17 +378,6 @@ function resolveAtClause(at: CELAtClause, anchors: AnchorMap): string | undefine
 // identity `code is`), a DATUM must carry `<system>|<code>` in full: a system-less Coding can never match the B5
 // membership read (`coded from "VS"` filters on system+code), so a malformed token fails CLOSED here rather than
 // emitting a value B5 cannot validate. Requires exactly one pipe with non-empty system and code.
-function parseCheckedCanonicalToken(raw: string): { parts: CodeParts } | { error: string } {
-  const segs = raw.split("|");
-  if (segs.length !== 2) {
-    return { error: `a CodeableConcept \`value is\` requires exactly \`<system>|<code>\` (got \`${raw}\`)` };
-  }
-  const [system, code] = segs;
-  if (system.trim() === "" || code.trim() === "") {
-    return { error: `a CodeableConcept \`value is\` requires a non-empty system and code (got \`${raw}\`)` };
-  }
-  return { parts: { system, code } };
-}
 
 function codeableConceptFromParts(cp: CodeParts): Record<string, unknown> {
   return {

@@ -97,3 +97,26 @@ export function sourceMembersOfConcept(
   }
   return members;
 }
+
+/**
+ * ⭐⭐ THE MECHANICAL MEMBER SET OF A NAMED TERMINOLOGY — lane-neutral, so a consumer outside this module
+ * cannot end up with a second derivation.
+ *
+ * The CRE's concept-level membership predicate (`"X" in "VS"`) needs exactly the set this module already
+ * derives for SOURCE membership, and `terminologyMembers` was module-private. Duplicating it would have been
+ * two readings of the emitted set — the drift this file exists to prevent by mirroring `valueSet.ts`.
+ *
+ * ⚠ MECHANICAL: a pure reference VS contributes its single STUB coding, never a resolved expansion. Returns
+ * `undefined` when the name does not resolve, so a caller can refuse rather than treat unresolved as empty
+ * (which would read as "not a member" — a determinate wrong answer).
+ */
+export function terminologyMembersByName(
+  name: string,
+  base: string | undefined,
+  registry: Registry | undefined,
+): { system: string; code: string }[] | undefined {
+  if (!base || !registry) return undefined;
+  const term = resolveTerminology(name, registry);
+  if (!term) return undefined;
+  return terminologyMembers(term, base);
+}

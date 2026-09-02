@@ -49,3 +49,32 @@ export function classifyCanonicalToken(raw: string): CanonicalTokenClass {
   }
   return { kind: "coded", parts: { system, code } };
 }
+
+/**
+ * ⭐⭐ THE STRICT parse for a CODED `value is` — `<system>|<code>`, both non-empty, no tolerance.
+ *
+ * ⚠ DELIBERATELY NOT `classifyCanonicalToken` above. That one is for a fact's IDENTITY (`code is`), where a
+ * pipe-less token is a legal LOCAL code and defaulting the system is correct. A coded VALUE has no such
+ * shorthand: a datum carrying no system cannot be mechanically compared against an emitted value set, so a
+ * systemless token here is an author error rather than a defaulting case.
+ *
+ * ⚠⚠ SHARED, because TWO LANES MUST AGREE BY CONSTRUCTION about what a coded answer says. The CEL FHIR
+ * writer parses `value is` with this to build `valueCodeableConcept`; the CRE parses the same field with it
+ * to evaluate membership. Two hand-mirrored copies would be two chances to disagree on the system axis —
+ * exactly the drift `sourceMembership.ts` avoids by mirroring `valueSet.ts` rather than restating it.
+ *
+ * ⚠ A panel round proposed mirroring `classifyCanonicalToken` here instead; reading the writer settled it
+ * (`emitFhir.ts` uses THIS for the value and that one for the identity). Mirroring the wrong authority would
+ * have made a systemless answer silently comparable.
+ */
+export function parseCheckedCanonicalToken(raw: string): { parts: CodeParts } | { error: string } {
+  const segs = raw.split("|");
+  if (segs.length !== 2) {
+    return { error: `a CodeableConcept \`value is\` requires exactly \`<system>|<code>\` (got \`${raw}\`)` };
+  }
+  const [system, code] = segs;
+  if (system.trim() === "" || code.trim() === "") {
+    return { error: `a CodeableConcept \`value is\` requires a non-empty system and code (got \`${raw}\`)` };
+  }
+  return { parts: { system, code } };
+}

@@ -1,6 +1,7 @@
-# These cases are EXPECTED to error today.
-// ⚠ The CRE cannot evaluate a concept-level membership predicate yet (T5). What this fixture pins is that
-// it says so LOUDLY, by name, rather than producing a branch it never computed.
+# The CRE's membership evaluation, and the cell it still refuses.
+// ⭐ Rows 1–2 EVALUATE (T5b): newest-wins by date, then mechanical membership against the emitted set.
+// ⚠ Row 3 is the cell that is still REFUSED — two candidates on the SAME DATE disagreeing, where the emitted
+// `id` sort would decide and the CRE deliberately does not replicate it. It must refuse, never guess.
 library "MembershipRefusalCases".
 covers "MembershipRefusal".
 
@@ -14,7 +15,32 @@ fact "RFA Request":
 - date is "2026-01-01".
 - defined by "ServiceRequest".
 
+fact "Other Request":
+- code is "http://www.ama-assn.org/go/cpt|37722".
+- date is "2026-01-01".
+- defined by "ServiceRequest".
+
+// A clinician answers the SUBJECT — which service was requested — LATER than the request above.
+fact "Answered Other":
+- value is "http://www.ama-assn.org/go/cpt|37722".
+- date is "2026-02-01".
+- defined by "MembershipRefusal"."Requested Service".
+
 case "covered service -> approve":
 - subject is "Pat".
 - fact is "RFA Request".
+- result is "Membership Refusal Decision" is "Approve".
+
+// ⭐ NEWEST WINS: an older covered request, overridden by a newer answer naming a non-covered service.
+case "newer answer overrides an older covered request -> deny":
+- subject is "Pat".
+- fact is "RFA Request".
+- fact is "Answered Other".
+- result is "Membership Refusal Decision" is "Deny".
+
+// ⚠ THE REFUSED CELL: same date, disagreeing codes. The tie-break is the emitted record id.
+case "same-date disagreement -> refused":
+- subject is "Pat".
+- fact is "RFA Request".
+- fact is "Other Request".
 - result is "Membership Refusal Decision" is "Approve".

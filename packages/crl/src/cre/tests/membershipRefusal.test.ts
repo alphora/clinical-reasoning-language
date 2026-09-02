@@ -6,43 +6,57 @@ import { resolveCelImports } from "../../cel/imports";
 import { runCel } from "../run";
 
 /**
- * ⭐⭐ #189 gap 3 — THE CRE MUST REFUSE A MEMBERSHIP PREDICATE LOUDLY, NEVER PRODUCE A BRANCH.
+ * ⭐⭐ #189 gap 3 T5b — THE CRE EVALUATES MEMBERSHIP, and refuses exactly one cell.
  *
- * The CRE cannot evaluate `"X" in "VS"` yet: `FactValue` carries only `boolValue`, so it has no way to hold
- * the coded datum the predicate reads, and `conceptTruth` comes back EMPTY. That is T5's work.
+ * ⚠ THIS FILE USED TO PIN A BLANKET REFUSAL (T5a). It was INVERTED rather than deleted when the evaluation
+ * landed, because a fixture that only ever says "not yet" stops being evidence the moment it goes stale —
+ * and its one case (a covered request) was precisely a cell T5b now decides. A panel round predicted this
+ * exact migration; without it the slice would have landed with a red pinned test and an ad-hoc edit.
  *
- * ⚠⚠ WHAT THIS PINS IS THE FAILURE MODE, NOT THE GAP. An engine that cannot evaluate something has two
- * options, and only one is safe: refuse by name, or guess. Guessing here would mean emitting a
- * recommendation from a determination it never computed — a wrong answer wearing the CRE's authority, in the
- * lane whose whole job is to check the other lane. The refusal is generic machinery that already existed;
- * this test exists so a later change cannot quietly turn it into silence.
+ * ⭐ NEWEST WINS, BY DATE (operator, 2026-09-02). Before this the CRE read a fact date NOWHERE — `date is`
+ * reached only the FHIR writer — so disagreement could only be REFUSED, which is why the goal's
+ * "request covered but newer answer says no" row was pinned permanently owed. A strictly-ordered date
+ * comparison is as MECHANICAL as the membership check itself: no runtime, no resolution.
  *
- * ⚠ When T5 lands, this test does not get deleted — it gets INVERTED to assert the produced branch. A fixture
- * that only ever said "not yet" would stop being evidence the moment it became stale.
+ * ⚠ The emitted `id` tie-break is deliberately NOT replicated, so an exact-date disagreement still refuses.
+ * That is the last cell, and it is pinned below — picking by insertion order there would be a fabricated
+ * verdict in the lane whose whole job is checking the other one.
  */
 const CASES = path.resolve(__dirname, "fixtures/membership-refusal/cases.cel");
 
-describe("#189 gap 3 — the CRE refuses membership by name", () => {
-  it("⭐⭐ errors rather than producing a branch, and names the concept AND the stage", () => {
-    const res = runCel(resolveCelImports(CASES) as never) as unknown as {
-      runs?: { status?: string; produced?: string[]; diagnostics?: (string | { message?: string })[] }[];
-    };
-    const runs = res.runs ?? [];
-    expect(runs.length, "the fixture must actually run").toBeGreaterThan(0);
+type Run = { case?: string; status?: string; produced?: { recommendation?: string }[]; diagnostics?: (string | { message?: string })[] };
 
-    for (const r of runs) {
-      expect(r.status, "an unevaluatable determination must ERROR").toBe("error");
-      // ⚠ THE LOAD-BEARING ASSERTION. `produced: []` is what separates "refused" from "guessed".
-      expect(r.produced ?? [], "the CRE must not produce a branch it did not compute").toEqual([]);
-      const msg = (r.diagnostics ?? [])
-        .map((d) => (typeof d === "string" ? d : (d.message ?? "")))
-        .join(" | ");
-      expect(msg, "the refusal must name the concept").toContain("Requested Service Is Covered");
-      expect(msg, "the refusal must name the stage that defeated it").toContain("Membership");
-      // ⭐ The engine says WHY it refused rather than just that it did — "rather than fabricate" is the
-      // discipline this test protects. A refusal that stopped explaining itself would still pass the
-      // assertions above while becoming much harder to act on.
-      expect(msg).toContain("rather than fabricate");
-    }
+const runs = (): Run[] => (runCel(resolveCelImports(CASES) as never) as unknown as { runs?: Run[] }).runs ?? [];
+const byCase = (name: string): Run => {
+  const r = runs().find((x) => x.case === name);
+  expect(r, `case "${name}" did not run`).toBeDefined();
+  return r!;
+};
+
+describe("#189 gap 3 T5b — the CRE evaluates membership", () => {
+  it("⭐ a covered request APPROVES — mechanical membership against the emitted set", () => {
+    const r = byCase("covered service -> approve");
+    expect(r.status).toBe("pass");
+    expect((r.produced ?? []).map((p) => p.recommendation)).toEqual(["Approve"]);
+  });
+
+  it("⭐⭐ a NEWER answer overrides an OLDER covered request — the row that was pinned permanently owed", () => {
+    // This is the goal's "request covered but newer answer says no -> deny" shape. It was `error` because
+    // "picking the newest needs the emitted date+id sort the CRE deliberately does not replicate" — a rule
+    // written for the boolean-conflict case and inherited as "the CRE can never pick newest". The `id` is
+    // only needed for TIES; CEL facts carry `date is` on the page.
+    const r = byCase("newer answer overrides an older covered request -> deny");
+    expect(r.status).toBe("pass");
+    expect((r.produced ?? []).map((p) => p.recommendation)).toEqual(["Deny"]);
+  });
+
+  it("⭐⭐ SAME-DATE disagreement still REFUSES — it must never guess", () => {
+    // The one cell left. `produced: []` is the load-bearing assertion: it separates "refused" from "guessed".
+    // Picking by insertion order here would be a wrong answer wearing the CRE's authority.
+    const r = byCase("same-date disagreement -> refused");
+    expect(r.status).toBe("error");
+    expect(r.produced ?? [], "the CRE must not produce a branch it did not compute").toEqual([]);
+    const msg = (r.diagnostics ?? []).map((d) => (typeof d === "string" ? d : (d.message ?? ""))).join(" | ");
+    expect(msg, "the refusal must say the tie-break is the emitted record id").toContain("emitted record id");
   });
 });

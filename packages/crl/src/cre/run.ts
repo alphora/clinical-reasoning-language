@@ -90,13 +90,14 @@ import { buildCriterionTablesForGraph } from "./criterionTables";
 import type {
   CELCase,
   CELCodeField,
+  CELDateField,
   CELDefinedByField,
   CELFact,
   CELResultField,
   CELValueField,
 } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
-import { classifyCanonicalToken } from "../cel/canonicalToken";
+import { classifyCanonicalToken, parseCheckedCanonicalToken } from "../cel/canonicalToken";
 import { isValueReadingBooleanConcept, isPureQuestionConcept } from "../template-match/recencyValueConcept";
 import { resolveConceptPipeline } from "../template-match/resolvePipeline";
 import type { ResolvedStage } from "../template-match/resolvePipeline";
@@ -107,7 +108,7 @@ import {
   memberKey,
   type LocalConceptMember,
 } from "../cel/localMembership";
-import { sourceMembersOfConcept } from "../cel/sourceMembership";
+import { sourceMembersOfConcept, terminologyMembersByName } from "../cel/sourceMembership";
 import type { LsLocation } from "../language-services/contracts";
 import { toZeroBasedRange } from "../language-services/contracts";
 // childId + idOf/nameOf are single-sourced in ast/ (natural layer direction); re-exported here for existing consumers
@@ -301,6 +302,13 @@ interface ConceptEval {
 /** A CEL fact's `value is`, as a candidate needs it. */
 interface FactValue {
   boolValue?: boolean;
+  /** ⭐ #189 gap 3 — a CODED `value is`, parsed by the SHARED `parseCheckedCanonicalToken` (the same one the
+   *  CEL FHIR writer uses to build `valueCodeableConcept`), so the two lanes cannot disagree about what a
+   *  coded answer says. Absent for a non-coded or malformed value. */
+  codedValue?: { system: string; code: string };
+  /** ⭐ The fact's `date is`. ⚠ Until now the CRE read a fact date NOWHERE — `date is` reached only the FHIR
+   *  writer — so there was nothing to order candidates by and disagreement could only be refused. */
+  date?: string;
 }
 
 export interface OwnCandidate {
@@ -309,6 +317,12 @@ export interface OwnCandidate {
   fact: string;
   /** The fact's `value is` when it is a boolean; absent for a bare fact or a non-boolean value. */
   boolValue?: boolean;
+  /** ⭐ #189 gap 3 — the candidate's CODED datum: a local fact's coded `value is`, or a SOURCE fact's own
+   *  code (a ServiceRequest's `code is` IS the service code, which is exactly what gap 1's constructed
+   *  candidate carries as its VALUE — so both lanes read the same datum by construction). */
+  codedValue?: { system: string; code: string };
+  /** ⭐ #189 gap 3 — the candidate's claim date, for newest-wins selection. */
+  date?: string;
   /**
    * For a SOURCE candidate: the matched pattern of the posrep's `value projection is`, or `undefined` when
    * that posrep has none. It decides what the candidate's boolean IS — see `candidateValue`.
@@ -370,6 +384,10 @@ interface Ctx {
    *  cross-library qualified ref resolves its sub in its own library. (The root-decision lookup in `runCase` reads its
    *  own `decisions` map BEFORE Ctx is built, so no per-library decision map is stored on Ctx.) */
   resolveDecision: (callerLib: string, ref: ReferenceName) => ResolvedDecision | undefined;
+  /** ⭐ #189 gap 3 — the MECHANICAL member set of a named terminology, closed over the graph exactly as
+   *  `resolveDecision` is. `undefined` ⇒ unresolved, which the caller must REFUSE rather than read as
+   *  an empty set (empty would mean "not a member" — a determinate wrong answer). */
+  terminologyMembers: (lib: string, name: string) => readonly { system: string; code: string }[] | undefined;
   /** #236 — per-library criterion tables (`name → Criterion`), for reference-and-evaluate: a
    *  criterion guard resolves its body HERE instead of being inline-expanded up front. Keyed by library. */
   criterionTables: Map<string, CriterionTable>;
@@ -593,6 +611,17 @@ function pipelineVerdict(entry: ConceptEntry, ctx: Ctx): Tri | undefined {
   // already carries the fact (`reads: "flow-and-operands"` exists so a consumer cannot drop an arm); nothing
   // was reading it.
   for (const stage of stages) {
+    // ⭐⭐ #189 gap 3 — MEMBERSHIP IS EVALUATED, not refused. It must be intercepted BEFORE the named-operand
+    // guard below: its subject is deliberately NOT provably empty (that is the whole point — there is a datum
+    // to read), so the generic arm would refuse every membership case before reaching it.
+    if (stage.call.pattern === "Membership") {
+      const verdict = evaluateMembership(stage, entry, ctx);
+      if (verdict !== "not-evaluated") return verdict;
+      // `not-evaluated` ⇒ fall through to the generic refusal, which names the stage. A cell this evaluator
+      // does not cover must still REFUSE rather than reach the own-collection read below — the predicate is
+      // ephemeral, so its own candidate list is always empty and the `[] → null` arm would silently turn an
+      // unevaluated membership into a pause.
+    }
     const seen = new Set<Id>();
     if (!namedOperandsEmpty(stage, entry.lib, ctx, seen)) {
       return refusePipeline(
@@ -664,6 +693,70 @@ function candidateValue(c: OwnCandidate): boolean | undefined | "unknown-project
   if (c.arm === "local" || c.projection === undefined) return c.boolValue;
   if (c.projection === "Exists" || c.projection === "Matches") return true;
   return "unknown-projection";
+}
+
+/**
+ * ⭐⭐ #189 gap 3 — EVALUATE `"<subject>" in "<terminology>"` in the CRE.
+ *
+ * Returns a `Tri` when it can decide, or `"not-evaluated"` to fall through to the generic refusal. It must
+ * never return a verdict it did not compute: this lane's whole job is to check the other one.
+ *
+ * ⭐ NEWEST WINS, BY DATE (operator, 2026-09-02). The CRE previously read a fact date NOWHERE and could only
+ * accept order-independent agreement or refuse — which left the goal's "request covered but newer answer says
+ * no" row permanently owed. A strictly-ordered date comparison is as MECHANICAL as the membership check
+ * itself (no runtime, no resolution), so it is in bounds; the emitted `id` tie-break is NOT replicated, so an
+ * exact date TIE between disagreeing candidates still refuses rather than picking by insertion order.
+ *
+ * ⚠⚠ THE WINNER'S DATUM DECIDES, not "is there a coded datum anywhere". An older coded candidate beside a
+ * newer valueless one is UNKNOWN — because `$apply` selects the newest record and reads its null value. A
+ * naive "use whatever code we have" would approve where the emitted lane pauses.
+ *
+ * ⚠ Membership is MECHANICAL — against the EMITTED member set only, never a real value-set expansion. A pure
+ * reference VS contributes its single stub coding and nothing else. If a case's datum is a real code and the
+ * comparand is a reference VS, "not a member" is the honest answer, not "go look it up".
+ */
+function evaluateMembership(stage: ResolvedStage, entry: ConceptEntry, ctx: Ctx): Tri | "not-evaluated" {
+  const args = stage.call.args;
+  const subjectArg = args.find((a) => a.type === "ConceptRefArg");
+  const setArg = args.find((a) => a.type === "TerminologyRefArg");
+  if (!subjectArg || !setArg) return "not-evaluated";
+  // ⚠ Cross-library operands are not resolved here — a same-named terminology in another library would bind
+  // wrongly. Refuse by falling through rather than guessing which one the lowering picked.
+  if (subjectArg.library !== undefined || setArg.library !== undefined) return "not-evaluated";
+
+  const members = ctx.terminologyMembers(entry.lib, setArg.value);
+  if (members === undefined) return "not-evaluated"; // unresolved comparand — the validator already says so
+
+  const subjectId = idOf(entry.lib, subjectArg.value);
+  const cands = ctx.candidates.get(subjectId) ?? [];
+  if (cands.length === 0) return null; // nothing asserted, nothing retrieved → unknown → PAUSE
+
+  // Newest wins. ⚠ An undated candidate cannot be ordered against a dated one, so a mix refuses rather than
+  // treating "no date" as oldest — a silent assumption that would decide real cases.
+  if (cands.some((c) => c.date === undefined) && cands.length > 1) {
+    return refusePipeline(entry, ctx, `subject "${subjectArg.value}" has candidates with and without dates, so newest-wins cannot be ordered`);
+  }
+  const newest = cands.reduce((a, b) => ((b.date ?? "") > (a.date ?? "") ? b : a));
+  const tied = cands.filter((c) => (c.date ?? "") === (newest.date ?? ""));
+  if (tied.length > 1) {
+    const distinct = new Set(tied.map((c) => (c.codedValue ? `${c.codedValue.system}|${c.codedValue.code}` : "")));
+    if (distinct.size > 1) {
+      // ⚠ Exactly the cell the emitted `id` sort would decide and we deliberately do not replicate.
+      return refusePipeline(entry, ctx, `subject "${subjectArg.value}" has disagreeing candidates on the same date, and the tie-break is the emitted record id`);
+    }
+  }
+
+  const datum = newest.codedValue;
+  if (datum === undefined) return null; // the winner carries no code to test → unknown → PAUSE
+
+  const hit = members.some((m) => m.system === datum.system && m.code === datum.code);
+  // ⭐ EVIDENCE. The predicate is EPHEMERAL, so it has no facts of its own — the guard trace reads
+  // `factsByConcept` for the PREDICATE's id and would show nothing. Attribute the winning SUBJECT fact, so a
+  // determinate verdict carries the record that produced it (the goal pins exactly this on its wrong-code row).
+  const id = idOf(entry.lib, entry.node.name);
+  const facts = ctx.factsByConcept.get(id) ?? [];
+  if (!facts.includes(newest.fact)) ctx.factsByConcept.set(id, [...facts, newest.fact]);
+  return hit;
 }
 
 function refusePipeline(entry: ConceptEntry, ctx: Ctx, why: string): Tri {
@@ -1588,6 +1681,9 @@ function runCase(
   // #236 — per-library criterion tables for reference-and-evaluate (threaded onto Ctx; a criterion
   // guard resolves its body here at eval time instead of being inline-expanded up front).
   criterionTables: Map<string, CriterionTable>,
+  // ⭐ #189 gap 3 — the mechanical member set of a named terminology, threaded exactly as `resolveDecision`
+  // is (this function has no graph of its own).
+  terminologyMembers: (lib: string, name: string) => readonly { system: string; code: string }[] | undefined,
 ): CaseRun {
   const diagnostics: string[] = [];
   let subjectFact: string | undefined;
@@ -1642,6 +1738,11 @@ function runCase(
       arm,
       fact: fn,
       ...(boolVal !== undefined ? { boolValue: boolVal } : {}),
+      // ⭐ #189 gap 3 — the coded datum and the claim date ride the candidate now. Both were previously
+      // computed and DROPPED: the code was used to find the owning concept and discarded, and `date is` was
+      // never read here at all.
+      ...(value.codedValue !== undefined ? { codedValue: value.codedValue } : {}),
+      ...(value.date !== undefined ? { date: value.date } : {}),
       ...(projection !== undefined ? { projection } : {}),
     });
     candidates.set(id, cs);
@@ -1710,8 +1811,24 @@ function runCase(
     // recording every boolean fact value while `tsc` stayed green. Caught by 25 failing CRE tests, which is
     // a far better outcome than the writer's version of the same mistake (which nothing would have caught
     // but the goldens).
+    // ⭐ #189 gap 3 — a CODED `value is` and the fact's `date is` now survive onto the candidate.
+    //
+    // ⚠ The coded value is parsed by the SHARED `parseCheckedCanonicalToken` — the SAME function the CEL FHIR
+    // writer uses to build `valueCodeableConcept`. Mirroring it by hand here would be two chances to disagree
+    // about what a coded answer says, on the system axis where a mismatch is silent.
+    //
+    // ⚠⚠ A MALFORMED token yields NO coded value, never a wrong one. That matters because "no datum" is
+    // UNKNOWN (pause) while a mis-parsed datum would be a determinate non-member — turning bad authoring into
+    // a confident denial. The writer already errors loudly on the same token, so the author is told there.
+    const codedFromValue =
+      valueField?.value.kind === "string" ? parseCheckedCanonicalToken(valueField.value.value) : undefined;
+    const dateField = fact.body.find((x): x is CELDateField => x.type === "CELDateField");
     const factValue: FactValue = {
       ...(valueField?.value.kind === "boolean" ? { boolValue: valueField.value.value } : {}),
+      ...(codedFromValue !== undefined && "parts" in codedFromValue
+        ? { codedValue: { system: codedFromValue.parts.system ?? "", code: codedFromValue.parts.code } }
+        : {}),
+      ...(dateField !== undefined ? { date: dateField.value } : {}),
     };
 
     // D5(3) backstop: an `absent`/`negative` intent modifier on a LOCAL determination fact inverts its clinical
@@ -1772,7 +1889,18 @@ function runCase(
             // projection is read as the concept's VALUE (charter §3). So a member fact carrying
             // `value is false` was contributing `true`, and a stated denial read as an approval — on a shape
             // that had REFUSED LOUD before this slice. `candidateValue` now decides, per projection.
-            for (const o of owners) populate(o.id, fn, "source", factValue, o.projection);
+            // ⭐⭐ #189 gap 3 — THE SOURCE CANDIDATE'S CODED DATUM IS THE FACT'S OWN CODE.
+            //
+            // For a resource whose retrieve coding IS its datum (`ServiceRequest.code` — which service was
+            // requested), the code that made this fact a member is ALSO the value a membership predicate
+            // reads. That is not a coincidence to exploit: it is the same coincidence gap 1's construction
+            // relies on, where the emitted candidate carries `S.code` as its VALUE. Both lanes therefore read
+            // the same datum BY CONSTRUCTION rather than by two derivations agreeing.
+            const sourceValue: FactValue = {
+              ...factValue,
+              codedValue: { system: scls.parts.system ?? "", code: scls.parts.code },
+            };
+            for (const o of owners) populate(o.id, fn, "source", sourceValue, o.projection);
             continue;
           }
         }
@@ -1881,6 +2009,9 @@ function runCase(
   const ctx: Ctx = {
     directFacts,
     factsByConcept,
+    // ⭐ #189 gap 3 — closed over the graph, exactly as `resolveDecision` is, so the membership predicate reads
+    // the SAME mechanical set the FHIR ValueSet and the CQL retrieve use.
+    terminologyMembers,
     valueReadingIds,
     pureQuestionIds,
     ownBoolValues,
@@ -2035,6 +2166,8 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
           sourceIndex,
           resolveDecision,
           criterionTablesByLib,
+          // ⭐ #189 gap 3 — the SAME mechanical set the FHIR ValueSet and the CQL retrieve use.
+          (_lib, name) => terminologyMembersByName(name, makeLocalDomainContext(graph).base, graph.crlRegistry),
         ),
       );
   }
