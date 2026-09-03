@@ -90,9 +90,13 @@ concept "Requested Service":
 
 // THE DETERMINATION — computed, never asserted. Three states: the requested
 // service is covered / is not covered / has not been established at all.
+// ⚠ NO `type is`, DELIBERATELY. This concept is an EPHEMERAL derivation: it publishes a computed boolean,
+// emits no resource, and gets no case-feature StructureDefinition. Declaring `type is Observation` here
+// would advertise a representation it does not have — and this file is the CANONICAL exemplar, so an author
+// copying it would carry that mistake into their own artifact. (It DID declare one until #189 item 5; the
+// charter and kit teach the no-`type is` form, and the exemplar has to agree with them.)
 concept "Requested Service Is Covered":
 - shape is Scalar.
-- type is Observation.
 - value type is boolean.
 - definition is "Requested Service" in "Covered Services".
 

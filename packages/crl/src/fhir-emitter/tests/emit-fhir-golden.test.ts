@@ -31,6 +31,16 @@ const UPDATE = process.env.UPDATE_GOLDEN === "1";
 const CORPORA: Record<string, string> = {
   cms22: "cms22/cms22-strategy.crl",
   cms69: "cms69/cms69-strategy.crl",
+  // ⭐⭐ #189 item 6 — THE NAMED-TERMINOLOGY `value from "<terminology>"` FORM, pinned BYTE-FOR-BYTE.
+  //
+  // ⚠ It was NOT pinned before, and the absence was easy to mistake for coverage: the inline-options work
+  // reported "0 golden changes" as evidence the old form was untouched, but NO golden exercised
+  // `value from` AT ALL — they could not have moved. Only two CRL files in the tree use the form, and this
+  // is the canonical one.
+  //
+  // ⚠ Reached by a relative escape rather than by MOVING the fixture: it is the #189 canonical target and
+  // several behavioural tests reference it at this path.
+  "service-request": "../service-request/policy.crl",
 };
 
 // Hermetic, reproducible emit: pass an explicit `date` override (highest

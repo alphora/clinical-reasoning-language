@@ -1,0 +1,75 @@
+{
+  "resourceType": "PlanDefinition",
+  "id": "service-request-approve-endoluminal-ablation-recommendation",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://example.org/endoluminal-ablation/PlanDefinition/service-request-approve-endoluminal-ablation-recommendation",
+  "version": "1.0.0",
+  "name": "EndoluminalAblationCoverageApproveEndoluminalAblationRecommendation",
+  "title": "Approve Endoluminal Ablation",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Approve Endoluminal Ablation",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/plan-definition-type",
+        "code": "eca-rule"
+      }
+    ]
+  },
+  "library": [
+    "http://example.org/endoluminal-ablation/Library/ServiceRequestInterface"
+  ],
+  "action": [
+    {
+      "title": "Approve Endoluminal Ablation",
+      "description": "Approve Endoluminal Ablation",
+      "code": [
+        {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+              "code": "guideline-based-care"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/action-type",
+            "code": "create"
+          }
+        ]
+      },
+      "groupingBehavior": "logical-group",
+      "definitionCanonical": "http://example.org/endoluminal-ablation/ActivityDefinition/service-request-approve-endoluminal-ablation"
+    }
+  ]
+}
