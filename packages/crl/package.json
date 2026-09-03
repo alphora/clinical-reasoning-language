@@ -53,7 +53,7 @@
     "access": "public"
   },
   "scripts": {
-    "lint": "eslint 'src/**/*.ts' --quiet",
+    "lint": "eslint \"src/**/*.ts\" --quiet",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write 'src/**/*.ts'",
     "test": "vitest run --root ../.. --project crl --no-file-parallelism",
