@@ -21,7 +21,15 @@ export interface EmittedCase {
    * one hashed segment. Compose a path from them and it will compile, run, and silently match nothing.
    */
   compartmentDir: string;
-  /** Slugified case name — IDENTITY, not a path segment (see `compartmentDir`). */
+  /**
+   * ⭐ THE AUTHORED case name, verbatim. The JOIN KEY back to the CEL suite.
+   *
+   * ⚠ Join on THIS, never on `caseSlug`: two authored names can slug identically ("Case A!" and
+   * "Case A?" both give `case-a`), so a slug join can silently bind one case's facts to another's
+   * results. `caseSlug` is lossy by construction and exists for display and id composition.
+   */
+  caseName: string;
+  /** Slugified case name — lossy; NOT a join key and NOT a path segment (see `compartmentDir`). */
   caseSlug: string;
   /** Slugified library name — IDENTITY, not a path segment (see `compartmentDir`). */
   librarySlug: string;

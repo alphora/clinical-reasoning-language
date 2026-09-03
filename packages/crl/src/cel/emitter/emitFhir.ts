@@ -1384,6 +1384,7 @@ function emitCase(ctx: EmitContext): EmittedCase | undefined {
     // The ONE addressable location for this case. `ctx.patientCompartmentId` is set in `emitCase`
     // before any resource is emitted, so every resource's `outputPath` sits under exactly this.
     compartmentDir: `patient/${ctx.patientCompartmentId}`,
+    caseName: ctx.c.name,
     caseSlug: ctx.caseSlug,
     librarySlug: ctx.librarySlug,
     resources,

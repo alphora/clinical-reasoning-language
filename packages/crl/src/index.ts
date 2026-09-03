@@ -277,6 +277,8 @@ export {
   compartmentIdOf,
 } from "./results/useCases";
 export type { ResultUseCase } from "./results/useCases";
+export { buildProducerInputs, casesMissingFromEmit } from "./results/caseInput";
+export type { ProducerCaseInput, CaseInputDiagnostic } from "./results/caseInput";
 export {
   producerManifestName,
   resolveCaseArtifacts,
