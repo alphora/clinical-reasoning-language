@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { buildCRL } from "../../index";
+import { emitCQL } from "../emitCQL";
 import { buildInlineAnswerSetMap } from "../../fhir-emitter/inlineAnswerSet";
 import { emitPartitioned, FULL_PARTITION } from "../layeredEmit";
 import { lowerLocalCodes } from "../lowerLocalCodes";
@@ -90,6 +91,43 @@ describe("#189 inline answer options — CQL lowering across the layer split", (
     const { res } = emit();
     const all = res.entries.map((e) => String(e.result.result ?? "")).join("\n");
     expect(all).toMatch(/is null or not exists \(.*\.coding\) then null/);
+  });
+
+  it("⚠⚠ a generated `valueset` name that collides with an AUTHORED declaration is an ERROR", () => {
+    // MEASURED before this check: two `valueset` decls with the SAME CQL identifier and DIFFERENT urls, under
+    // `success: true`. The library then fails to translate, or binds whichever the engine picks.
+    //
+    // ⚠ The FHIR side is covered elsewhere and was verified separately: an id clash between a generated
+    // ValueSet and an authored one is already a hard `closure-resource-url-collision` from the closure
+    // invariants. THIS is the half those invariants cannot see — a CQL identifier is not a resource url.
+    const src = `library "Cp2".
+
+terminology "cp2-q-answer-options-qualifying":
+- system is \`http://example.org/x\`.
+- code is \`z\`.
+
+concept "Q":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is \`q\`.
+- definition is most recent this.
+- value from:
+  - \`a\` display is \`A\`, qualifying.
+  - \`b\` display is \`B\`, not qualifying.
+
+concept "D":
+- shape is Scalar.
+- value type is boolean.
+- definition is "Q" in qualifying.
+`;
+    const r = emitCQL(src, {
+      canonicalBase: "http://example.org/cp2",
+      localDomainId: "cp2",
+      policyId: "cp2",
+    }) as unknown as { success: boolean; errors?: { kind?: string }[] };
+    expect(r.success, "a colliding identifier must not emit clean").toBe(false);
+    expect((r.errors ?? []).map((e) => e.kind)).toContain("emit-inline-answer-valueset-name-collision");
   });
 
   it("⚠ the comparand is the QUALIFYING set, not the all-options set", () => {

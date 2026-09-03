@@ -4385,6 +4385,34 @@ class Emitter {
         if (set) sets.set(set.qualifying.id, set);
       }
     }
+    // ⚠⚠ A GENERATED DECLARATION SHARES CQL'S TOP-LEVEL IDENTIFIER NAMESPACE with every authored one, and
+    // a clash is SILENT: MEASURED, an authored `terminology "<policy>-<code>-answer-options-qualifying"`
+    // produced TWO `valueset` decls with the SAME identifier and DIFFERENT urls, under `success: true`.
+    // The library then fails to translate, or binds to whichever the engine picks.
+    //
+    // ⚠ The FHIR side is already covered by the closure's url/path invariants (VERIFIED: an id clash there
+    // is a hard `closure-resource-url-collision`). This is the half those invariants cannot see, because a
+    // CQL identifier is not a resource url.
+    const taken = new Map<string, string>();
+    for (const st of this.ast.statements) {
+      const n = (st as { name?: string }).name;
+      if (typeof n === "string" && n !== "") taken.set(n, st.type);
+    }
+    for (const set of sets.values()) {
+      const clash = taken.get(set.qualifying.id);
+      if (clash === undefined) continue;
+      this.emitErrors.push({
+        type: "Validation",
+        kind: "emit-inline-answer-valueset-name-collision",
+        message:
+          `The generated \`valueset\` declaration for "${set.ownerConcept}"'s qualifying options is named ` +
+          `\`${set.qualifying.id}\`, which collides with an authored ${clash} of the same name in this ` +
+          `library. Both would emit a top-level CQL identifier, and the library would bind one of them ` +
+          `arbitrarily. Rename the authored declaration, or change the concept's \`code is\` (the generated ` +
+          `name derives from it).`,
+      });
+    }
+
     return [...sets.values()]
       .map((set) => `valueset ${cqlIdent(set.qualifying.id)}: ${cqlString(set.qualifying.url)}`)
       .join(String.fromCharCode(10));
