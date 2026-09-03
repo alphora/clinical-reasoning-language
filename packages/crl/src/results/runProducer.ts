@@ -81,10 +81,22 @@ export function classify(
   stderr: string,
   timedOut: boolean,
   exitCode: number | null,
+  outputReadable = true,
 ): { state: ProducerCaseState; reason?: string } {
   if (timedOut) return { state: "timeout", reason: "per-case wall timeout" };
   if (exitCode !== 0) {
     return { state: "failed", reason: `driver exited ${exitCode ?? "signal"}` };
+  }
+  // ⚠ UNREADABLE OUTPUT IS A FAILURE, NOT AN EMPTY RESULT. An earlier cut turned an unparseable stdout
+  // into `{}` and then classified it `no-questionnaire` — recording "the policy asked nothing" for a run
+  // whose output we could not read at all. Those are opposite facts.
+  if (!outputReadable) {
+    return { state: "failed", reason: "driver produced no readable JSON on stdout" };
+  }
+  // ⚠ An engine can exit 0 having reported errors in its OperationOutcome. Treating a clean exit as
+  // proof of a clean run is what made the very first apply against our layout look successful.
+  if (/ERROR|encountered exception/i.test(stderr) && !results.questionnaire) {
+    return { state: "failed", reason: "engine reported an error and produced no questionnaire" };
   }
   // ⚠ The known `repeats` debt: ANY re-answered question (`most recent this` recency) trips this while
   // the disposition stays correct. Folding it into `failed` makes every recency case read as broken,
@@ -121,7 +133,7 @@ export function runOneCase(ctx: RunContext, c: RunOneCase): ProducerCaseEntry {
 
   const params = parseDriverStdout(stdout);
   const results = params ? extractResults(params) : {};
-  const { state, reason } = classify(results, stderr, timedOut, proc.status);
+  const { state, reason } = classify(results, stderr, timedOut, proc.status, params !== undefined);
 
   const entry: ProducerCaseEntry = {
     caseName: c.caseName,

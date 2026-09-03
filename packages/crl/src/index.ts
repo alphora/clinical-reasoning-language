@@ -269,7 +269,9 @@ export {
 // different producer, inputs and lifecycle, and live under `tests/results/<use-case>/`.
 export {
   RESULT_USE_CASES,
+  IMPLEMENTED_USE_CASES,
   isResultUseCase,
+  isImplementedUseCase,
   USE_CASE_RESOURCE_TYPES,
   RESULTS_ROOT,
   resultsRoot,

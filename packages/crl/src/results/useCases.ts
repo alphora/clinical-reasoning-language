@@ -14,6 +14,14 @@
  */
 
 /** The use cases that produce results. Add one here and its directory follows. */
+/**
+ * ⚠ `measure` IS DECLARED BUT NOT IMPLEMENTED. `ApplyDriver` always calls `applyR5` and the extractor
+ * only recognises Questionnaire/QuestionnaireResponse, so a measure run would exit 0 having produced
+ * nothing and record `no-questionnaire` — a missing feature disguised as a legitimate empty result.
+ * The CLI therefore REFUSES it until an `$evaluate-measure` driver exists. It stays in this list
+ * because the layout and the type mapping are real and tested; only the driver is absent.
+ */
+export const IMPLEMENTED_USE_CASES = ["prior-auth"] as const;
 export const RESULT_USE_CASES = ["prior-auth", "measure"] as const;
 export type ResultUseCase = (typeof RESULT_USE_CASES)[number];
 
@@ -82,3 +90,7 @@ export const compartmentIdOf = (compartmentDir: string): string =>
  */
 export const caseResultsGlob = (compartmentId: string): string =>
   `**/${caseResultsDir(compartmentId)}/{questionnaire,questionnaireresponse}/*.json`;
+
+/** Whether a driver exists for this use case. See IMPLEMENTED_USE_CASES. */
+export const isImplementedUseCase = (s: string): boolean =>
+  (IMPLEMENTED_USE_CASES as readonly string[]).includes(s);

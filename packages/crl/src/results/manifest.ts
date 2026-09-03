@@ -27,10 +27,15 @@ export type ProducerCaseState =
    */
   | "no-questionnaire"
   /**
-   * ⚠ The disposition was asserted CORRECT but `$populate` errored — overwhelmingly the known `repeats`
-   * debt, which ANY re-answered question (`most recent this` recency arbitration) trips. This is its own
-   * state deliberately: folding it into `failed` makes every recency case read as broken, KEs learn to
-   * ignore the failure column, and that is how the one real failure ships unnoticed.
+   * ⚠ `$populate` errored while the engine still returned output — overwhelmingly the known `repeats`
+   * debt, which ANY re-answered question (`most recent this` recency arbitration) trips. Its own state
+   * deliberately: folding it into `failed` makes every recency case read as broken, KEs learn to ignore
+   * the failure column, and that is how the one real failure ships unnoticed.
+   *
+   * ⚠ THIS STATE ASSERTS NOTHING ABOUT THE DISPOSITION. An earlier version of this comment said "the
+   * disposition was asserted CORRECT", which the implementation cannot support: V1 runs a baseline
+   * `$apply` and does not compare the outcome to the `result is` oracle at all. Claiming verified
+   * correctness that nothing measures is worse than claiming nothing.
    */
   | "populate-degraded"
   /** The case ran and its outcome was wrong or absent. */
@@ -46,7 +51,8 @@ export type ProducerCaseState =
 
 /** One generated file, identified well enough to verify rather than trust. */
 export interface ProducerArtifact {
-  /** FHIR resource id. ALWAYS producer-owned (`isCelProducerOwnedId`). */
+  /** FHIR resource id, as the ENGINE returned it. ⚠ NOT validated as producer-owned: results
+   *  live in their own tree, so nothing else writes here and no ownership predicate is needed. */
   id: string;
   /** Path relative to the emit root. */
   path: string;
@@ -98,7 +104,11 @@ export const producerManifestName = (celLibrarySlug: string): string =>
   `questionnaire-manifest-${celLibrarySlug}.json`;
 
 /**
- * Resolve the artifacts a consumer should bind for a case — the ONLY supported lookup.
+ * Resolve the artifacts a consumer should bind for a case.
+ *
+ * ⚠ THE MV PANE DOES NOT YET USE THIS. It globs `caseResultsGlob` and takes the first parseable pair,
+ * so it can currently show a stale artifact from a previous run whose case is now `failed`. Making the
+ * manifest the pane's binding authority is owed work, not a description of today.
  *
  * Returns undefined when the manifest has no entry for the compartment (never run, or the case was not
  * eligible) or when its state is not `generated`. ⚠ A non-`generated` state is NOT an error here: the
