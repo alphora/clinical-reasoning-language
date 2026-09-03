@@ -776,6 +776,44 @@ export function celCaseCompartmentId(
 }
 
 /**
+ * ⭐⭐ THE PRODUCER-OWNERSHIP MARKER. `--` (a DOUBLE hyphen) can never occur in an emitter-produced id:
+ * `rawSlug` collapses every hyphen run to one (`slug.ts`, `.replace(/-+/g, "-")`) and every composite id
+ * joins those single-hyphen slugs with single hyphens. So a `q--` prefix is a decidable ownership TEST,
+ * not a guess.
+ *
+ * ⚠ WHY NOT A "RESERVED NAME" THROUGH `celResourceId`: every component of that id goes through
+ * `rawSlug`, whose image is exactly the set of slugs an AUTHORED fact name can reach. For any reserved
+ * token there is therefore a fact name that slugs to it, and ownership would be undecidable. This matters
+ * because `QuestionnaireResponse` is in `SUBJECT_RESOURCES` — a CEL fact can legitimately emit a QR into
+ * the SAME `<compartment>/questionnaireresponse/` directory the producer writes to. Without a decidable
+ * marker, a producer "cleaning up its own output" deletes authored case data.
+ *
+ * PREFIX, not suffix: `uniqueCapSlug` truncates the TAIL to fit the cap, so a suffix marker can be sliced
+ * off while the id still looks deterministic.
+ */
+export const CEL_PRODUCER_ID_MARKER = "q--";
+
+/** A generated-artifact id, owned by the questionnaire producer and never by the CEL emitter. */
+export function celProducerResourceId(
+  libraryName: string,
+  caseName: string,
+  kind: "questionnaire" | "questionnaireresponse",
+): string {
+  return (
+    CEL_PRODUCER_ID_MARKER +
+    uniqueCapSlug(
+      `${rawSlug(libraryName)}-${rawSlug(caseName)}-${rawSlug(kind)}`,
+      CEL_ID_BASE_MAX - CEL_PRODUCER_ID_MARKER.length,
+    )
+  );
+}
+
+/** Decides ownership of an on-disk artifact. FALSE for everything the CEL emitter writes. */
+export function isCelProducerOwnedId(id: string): boolean {
+  return id.startsWith(CEL_PRODUCER_ID_MARKER);
+}
+
+/**
  * The case's directory RELATIVE to an emit `outDir` — what a producer writes into and a viewer reads
  * from. Type subdirectories below it are LOWERCASE (`observation/`, `questionnaire/`), matching what
  * the writer emits.

@@ -261,6 +261,10 @@ export {
   celResourceId,
   celCaseCompartmentId,
   celCaseCompartmentDir,
+  // ⭐ Producer ownership — `--` cannot occur in an emitter id, so this is a decidable test.
+  celProducerResourceId,
+  isCelProducerOwnedId,
+  CEL_PRODUCER_ID_MARKER,
 } from "./cel/emitter";
 export type {
   EmitResult,
