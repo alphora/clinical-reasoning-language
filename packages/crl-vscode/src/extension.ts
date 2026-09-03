@@ -28,7 +28,9 @@ import {
 } from "./hover";
 import { registerDiagnostics } from "./diagnostics";
 import { registerCelDiagnostics } from "./celDiagnostics";
+import { registerApplyQuestionnaireHarness } from "./applyQuestionnaireHarness";
 import { registerCorrespondenceCockpit } from "./correspondenceCockpit";
+import { registerCockpitPaneSerializers } from "./cockpitPaneSerializers";
 import { registerProvenancePanel } from "./provenancePanel";
 import { registerScenarioRunner } from "./scenarioRunner";
 import { CelCompletionProvider, CEL_DOCUMENT_SELECTOR } from "./celCompletion";
@@ -179,6 +181,11 @@ function registerLanguageFeatures(
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  // Reclaim-and-discard any cockpit/MV pane tab VS Code restored from the previous window. MUST run during
+  // activate, before restoration is attempted, and must cover every pane view type — an unregistered view type
+  // comes back as a tab the panel does not own and can never dispose, which reads as the paneOrder setting
+  // being ignored. See cockpitPaneSerializers.ts.
+  registerCockpitPaneSerializers(context);
   // Register commands FIRST so they survive a provisioning failure.
   context.subscriptions.push(
     vscode.commands.registerCommand("crl.setup", async () => {
@@ -224,6 +231,13 @@ export function activate(context: vscode.ExtensionContext): void {
   registerScenarioRunner(context);
   registerProvenancePanel(context);
   registerCorrespondenceCockpit(context);
+  // DEV-HOST ONLY. The CSP harness is an instrument, not a feature: it answered the LForms policy question and
+  // is kept for re-walking the ladder on an LForms upgrade (media/lforms/README.md). It contributes no command
+  // and no setting, so it never appears in a user's palette or settings UI — it is reachable only when running
+  // under `--extensionDevelopmentPath`.
+  if (context.extensionMode === vscode.ExtensionMode.Development) {
+    registerApplyQuestionnaireHarness(context, getOutputChannel());
+  }
   registerDiagnostics(context, index);
   registerCelDiagnostics(context, index);
 

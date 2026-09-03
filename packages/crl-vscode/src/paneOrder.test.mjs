@@ -1,117 +1,115 @@
-// Unit tests for normalizePaneOrder (#156 C2b-4 + medical-validation slice 3) — a malformed setting must never break a
-// panel. vscode-free. The cockpit checks below assert the BYTE-IDENTICAL pre-spec behavior (COCKPIT_PANE_SPEC); the
-// medical-validation block exercises `worklist` as a first-class pane (pane split, disc 179) + the MV default + valid set.
+// Unit tests for normalizePaneOrder (#156 C2b-4 + medical-validation slice 3). vscode-free.
+//
+// ⚠ CONTRACT CHANGED 2026-08-16 — THE SETTING IS THE SOURCE OF TRUTH.
+// Panes used to be force-appended: an order that omitted a "canonical" pane silently got it back, so no pane
+// could be turned off. Now any ARRAY the user writes is honored exactly, an EMPTY array yields an empty panel,
+// and `canonical` is only the FALLBACK for a setting that is unset or not an array.
+//
+// The old behaviour was already confusing; it became indefensible once MV had two questionnaire panes and the
+// user has to choose between them.
 import assert from "node:assert/strict";
 
 import { normalizePaneOrder, COCKPIT_PANE_SPEC, MEDICAL_VALIDATION_PANE_SPEC } from "./paneOrder.ts";
 
-// The cockpit canonical set (for the invariant) — derived from the spec so the test stays in lockstep with it.
-const CANONICAL_PANE_ORDER = COCKPIT_PANE_SPEC.canonical;
-// A thin alias so the cockpit checks read like the pre-spec single-arg calls.
 const cockpit = (raw) => normalizePaneOrder(raw, COCKPIT_PANE_SPEC);
 const mv = (raw) => normalizePaneOrder(raw, MEDICAL_VALIDATION_PANE_SPEC);
-
 const check = test;
-// A valid order: no dupes, ALL canonical panes present, and only valid ids (the 3 canonical + the opt-in "tree").
-const VALID_IDS = ["source", "crl", "cel", "tree"];
-const isValidOrder = (a) =>
-  Array.isArray(a) &&
-  new Set(a).size === a.length &&
-  CANONICAL_PANE_ORDER.every((p) => a.includes(p)) &&
-  a.every((x) => VALID_IDS.includes(x));
 
-// ── COCKPIT spec: must stay BYTE-IDENTICAL to the pre-spec behavior ──
-check("a valid permutation is preserved", () => {
+// ── the contract, stated once per rule ──
+
+check("an explicit order is honored EXACTLY — nothing is appended", () => {
   assert.deepEqual(cockpit(["crl", "source", "cel"]), ["crl", "source", "cel"]);
-});
-check("default order passes through", () => {
-  assert.deepEqual(cockpit(["source", "crl", "cel"]), ["source", "crl", "cel"]);
-});
-check("dupes dropped (first wins), missing appended in canonical order", () => {
-  assert.deepEqual(cockpit(["crl", "crl"]), ["crl", "source", "cel"]);
-});
-check("unknown ids dropped", () => {
-  assert.deepEqual(cockpit(["crl", "xxx", "cel"]), ["crl", "cel", "source"]);
-});
-check("mixed valid/invalid/dupe (realistic hand-edit) → repaired", () => {
-  assert.deepEqual(cockpit(["crl", "xxx", "crl", "cel"]), ["crl", "cel", "source"]);
-});
-check("partial array → missing appended", () => {
-  assert.deepEqual(cockpit(["cel"]), ["cel", "source", "crl"]);
-});
-check("case/whitespace variants are NOT recognized (dropped) → canonical fallback", () => {
-  assert.deepEqual(cockpit(["CRL", " source "]), ["source", "crl", "cel"]);
-});
-check("empty array → default", () => {
-  assert.deepEqual(cockpit([]), ["source", "crl", "cel"]);
-});
-check("non-array inputs → default", () => {
-  for (const bad of [undefined, null, "crl", 42, { 0: "crl" }, true])
-    assert.deepEqual(cockpit(bad), ["source", "crl", "cel"]);
-});
-check("tree is honored when the user explicitly lists it (opt-in) — kept in position, missing canonical appended", () => {
-  assert.deepEqual(cockpit(["source", "crl", "cel", "tree"]), ["source", "crl", "cel", "tree"]);
-  assert.deepEqual(cockpit(["tree", "crl"]), ["tree", "crl", "source", "cel"]);
-});
-check("tree is NOT auto-appended when absent (stays opt-in until it graduates to canonical)", () => {
-  assert.deepEqual(cockpit(["source", "crl", "cel"]), ["source", "crl", "cel"]);
-  assert.ok(!cockpit(["cel"]).includes("tree"));
-  assert.ok(!cockpit([]).includes("tree"));
-  assert.ok(!cockpit(undefined).includes("tree"));
-});
-check("tree dupes dropped (first wins)", () => {
-  assert.deepEqual(cockpit(["tree", "tree", "crl"]), ["tree", "crl", "source", "cel"]);
+  assert.deepEqual(cockpit(["cel"]), ["cel"], "a single-pane order stays a single pane");
+  assert.deepEqual(mv(["source", "fhirQuestionnaire", "tree"]), ["source", "fhirQuestionnaire", "tree"]);
 });
 
-check("INVARIANT: every output keeps the 3 canonical panes (once each) + at most the opt-in tree, no dupes/unknowns", () => {
-  for (const raw of [["crl"], ["x"], [], undefined, ["cel", "cel", "source", "crl", "z"], "junk", { a: 1 }, ["tree", "tree", "x"], ["tree", "source", "crl", "cel"]])
-    assert.ok(isValidOrder(cockpit(raw)), `not a valid order for ${JSON.stringify(raw)}`);
+check("EVERY pane is opt-out-able, including the MV worklist and the CRL questionnaire", () => {
+  // The specific report that drove this change: choosing fhirQuestionnaire also got you the CRL questionnaire.
+  assert.ok(!mv(["source", "fhirQuestionnaire"]).includes("questionnaire"));
+  assert.ok(!mv(["source", "fhirQuestionnaire"]).includes("worklist"));
+  assert.ok(!cockpit(["crl"]).includes("source"));
 });
 
-// ── MEDICAL-VALIDATION spec: worklist is a FIRST-CLASS pane (pane split, disc 179), MV default, mode-distinct valid set ──
-// #177 slice 3: questionnaire joined the MV canonical default (worklist/source/tree/questionnaire — the operator's
-// 4-panel set). Since the pane split, `worklist` resolves to its OWN internal pane (no longer aliased to `cel`).
-check("MV default resolves to internal [worklist, source, tree, questionnaire] (worklist is its own pane)", () => {
-  assert.deepEqual(mv(undefined), ["worklist", "source", "tree", "questionnaire"]);
-  assert.deepEqual(mv([]), ["worklist", "source", "tree", "questionnaire"]);
-});
-check("MV: an explicit worklist in the user order, kept in position (a real pane, not aliased)", () => {
-  assert.deepEqual(mv(["source", "worklist"]), ["source", "worklist", "tree", "questionnaire"]);
-});
-check("MV: listing BOTH worklist and cel opens BOTH (distinct internal panes — no alias dedup, disc 179)", () => {
-  assert.deepEqual(mv(["worklist", "cel"]), ["worklist", "cel", "source", "tree", "questionnaire"]);
-  assert.deepEqual(mv(["cel", "worklist"]), ["cel", "worklist", "source", "tree", "questionnaire"]);
-});
-check("MV: questionnaire is canonical — honored in position, auto-appended when absent", () => {
-  assert.deepEqual(mv(["questionnaire", "worklist"]), ["questionnaire", "worklist", "source", "tree"]);
-  assert.ok(mv(["source"]).includes("questionnaire"), "questionnaire is appended (canonical)");
-});
-check("MV: crl is valid-but-non-canonical — honored when listed, never auto-appended", () => {
-  assert.deepEqual(mv(["worklist", "crl"]), ["worklist", "crl", "source", "tree", "questionnaire"]);
-  assert.ok(!mv(["source"]).includes("crl"));
-});
-check("MV: a 6-pane order (all 4 canonical + crl + read-only cel) is preserved — the shell has a 6th column (disc 179)", () => {
-  // A user explicitly listing every distinct internal pane → 6 panes (worklist + cel are now separate); the cockpit's
-  // ORDERED_COLUMNS has a 6th slot so this lays out left-to-right (no overflow onto column One). All 6 survive.
-  const order = mv(["worklist", "cel", "source", "tree", "questionnaire", "crl"]);
-  assert.deepEqual(order, ["worklist", "cel", "source", "tree", "questionnaire", "crl"]);
-  assert.equal(order.length, 6, "six distinct internal panes survive");
-  assert.equal(new Set(order).size, 6, "no dupes");
-});
-check("MV: unknown keys dropped; canonical (worklist/source/tree/questionnaire) appended", () => {
-  assert.deepEqual(mv(["worklist", "zzz", "source"]), ["worklist", "source", "tree", "questionnaire"]);
-});
-check("MV: non-array inputs → the MV default", () => {
-  for (const bad of [null, "worklist", 42, { 0: "worklist" }, true])
-    assert.deepEqual(mv(bad), ["worklist", "source", "tree", "questionnaire"]);
+check("an EMPTY array means an empty panel — it is not repopulated", () => {
+  assert.deepEqual(mv([]), []);
+  assert.deepEqual(cockpit([]), []);
 });
 
-// ── cross-spec isolation: the cockpit spec rejects MV-only keys; the MV spec resolves them ──
-check("cockpit spec does NOT recognize 'worklist' (MV-only public key) → dropped, cockpit default", () => {
-  assert.deepEqual(cockpit(["worklist", "crl"]), ["crl", "source", "cel"]);
-});
-check("cockpit spec does NOT recognize 'questionnaire' (MV-only pane) → dropped, cockpit default", () => {
-  assert.deepEqual(cockpit(["questionnaire", "crl"]), ["crl", "source", "cel"]);
-  assert.ok(!cockpit(["source", "crl", "cel", "tree"]).includes("questionnaire"), "questionnaire never appears in a cockpit order");
+check("a NON-array (unset / malformed type) falls back to the spec's canonical set", () => {
+  for (const bad of [undefined, null, "source", 42, {}, true]) {
+    assert.deepEqual(mv(bad), [...MEDICAL_VALIDATION_PANE_SPEC.canonical], `MV fallback for ${String(bad)}`);
+    assert.deepEqual(cockpit(bad), [...COCKPIT_PANE_SPEC.canonical], `cockpit fallback for ${String(bad)}`);
+  }
 });
 
+check("MV's fallback is the operator's three-pane set, NOT every pane", () => {
+  // Defaulting to all seven was tried and reverted: seven retainContextWhenHidden webviews side by side on a
+  // browser-only clinician's screen, including the 1.85 MB LForms shell, for panes most never open.
+  assert.deepEqual(mv(undefined), ["source", "fhirQuestionnaire", "tree"]);
+});
+
+// ── repair rules that survive unchanged ──
+
+check("dupes dropped, first occurrence wins", () => {
+  assert.deepEqual(cockpit(["crl", "crl", "cel"]), ["crl", "cel"]);
+  assert.deepEqual(mv(["tree", "tree"]), ["tree"]);
+});
+
+check("unknown ids dropped, order of the rest preserved", () => {
+  assert.deepEqual(cockpit(["crl", "xxx", "cel"]), ["crl", "cel"]);
+  assert.deepEqual(mv(["worklist", "zzz", "source"]), ["worklist", "source"]);
+});
+
+check("non-string entries dropped", () => {
+  assert.deepEqual(cockpit(["crl", 7, null, "cel"]), ["crl", "cel"]);
+});
+
+check("an array of ONLY unknown ids yields an empty panel, not the fallback", () => {
+  // It is still an array, so the user expressed something; we do not second-guess it into the defaults.
+  assert.deepEqual(cockpit(["xxx", "yyy"]), []);
+  assert.deepEqual(mv(["nope"]), []);
+});
+
+check("case/whitespace variants are NOT recognized (ids are exact)", () => {
+  assert.deepEqual(cockpit(["Source", " crl", "CEL "]), []);
+});
+
+// ── per-spec valid sets ──
+
+check("each spec only accepts its own pane ids", () => {
+  // questionnaire panes are MV-only; they never appear in a cockpit order.
+  assert.deepEqual(cockpit(["questionnaire", "fhirQuestionnaire", "crl"]), ["crl"]);
+  // `tree` is valid in both.
+  assert.deepEqual(cockpit(["tree"]), ["tree"]);
+  assert.deepEqual(mv(["tree"]), ["tree"]);
+});
+
+check("MV: worklist and cel are DISTINCT panes — listing both opens both (disc 179, no alias dedup)", () => {
+  assert.deepEqual(mv(["worklist", "cel"]), ["worklist", "cel"]);
+  assert.deepEqual(mv(["cel", "worklist"]), ["cel", "worklist"]);
+});
+
+check("MV: both questionnaire panes can be open at once, in either order", () => {
+  assert.deepEqual(mv(["questionnaire", "fhirQuestionnaire"]), ["questionnaire", "fhirQuestionnaire"]);
+  assert.deepEqual(mv(["fhirQuestionnaire", "questionnaire"]), ["fhirQuestionnaire", "questionnaire"]);
+});
+
+check("INVARIANT: output is always a dupe-free subset of the spec's valid set, in the user's order", () => {
+  const inputs = [
+    ["worklist", "source"],
+    ["fhirQuestionnaire"],
+    [],
+    ["zzz", "tree", "tree"],
+    ["cel", "crl", "questionnaire", "worklist", "source", "tree", "fhirQuestionnaire"],
+  ];
+  for (const raw of inputs) {
+    const out = mv(raw);
+    assert.equal(new Set(out).size, out.length, `dupes in output for ${JSON.stringify(raw)}`);
+    assert.ok(
+      out.every((p) => MEDICAL_VALIDATION_PANE_SPEC.valid.includes(p)),
+      `output contains a non-valid pane for ${JSON.stringify(raw)}`,
+    );
+    const listed = raw.filter((x) => MEDICAL_VALIDATION_PANE_SPEC.valid.includes(x));
+    assert.deepEqual(out, [...new Set(listed)], `output is not the user's order for ${JSON.stringify(raw)}`);
+  }
+});
