@@ -279,6 +279,8 @@ export {
 export type { ResultUseCase } from "./results/useCases";
 export { buildProducerInputs, casesMissingFromEmit } from "./results/caseInput";
 export type { ProducerCaseInput, CaseInputDiagnostic } from "./results/caseInput";
+export { buildEngineRepoBundle, cqlIndex } from "./results/repoBundle";
+export type { RepoBundleInputs, RepoBundleResult } from "./results/repoBundle";
 export {
   producerManifestName,
   resolveCaseArtifacts,
