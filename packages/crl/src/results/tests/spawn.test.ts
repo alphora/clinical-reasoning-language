@@ -13,6 +13,8 @@ import {
   capTail,
   jvmFlags,
   killTreeCommand,
+  MIN_JDK_MAJOR,
+  parseJavaMajor,
   resolveJava,
   verifyJar,
 } from "../spawn";
@@ -83,22 +85,67 @@ describe("the JVM spawn contract is bounded by construction", () => {
     expect(verifyJar(sub, sha)).toEqual({ ok: false, reason: "not-a-file" });
   });
 
-  it("⭐ JAVA_HOME wins over PATH, and absence is reported rather than guessed", () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "crl-java-"));
-    const bin = path.join(dir, "bin");
-    mkdirSync(bin);
+  it("⭐⭐ A TOO-OLD JDK IS REFUSED BY NAME — existence is not usability", () => {
+    // ⚠ THIS WAS A REAL DEFECT, not a hypothetical. On the machine this was written, `java` on PATH was
+    // 23 while JAVA_HOME still pointed at a JDK 11 from an old install. An earlier cut checked only that
+    // the executable EXISTED, so it preferred JAVA_HOME and would have handed the engine a JDK that
+    // cannot load its classes — surfacing as UnsupportedClassVersionError from inside cqf, nowhere near
+    // the cause. A stale JAVA_HOME is the common case.
+    const dir = mkdtempSync(path.join(tmpdir(), "crl-jdk-"));
+    const oldHome = path.join(dir, "jdk11");
+    const newDir = path.join(dir, "jdk23bin");
+    mkdirSync(path.join(oldHome, "bin"), { recursive: true });
+    mkdirSync(newDir, { recursive: true });
     const isWin = process.platform === "win32";
-    writeFileSync(path.join(bin, isWin ? "java.exe" : "java"), "");
+    const exe = isWin ? "java.exe" : "java";
+    writeFileSync(path.join(oldHome, "bin", exe), "");
+    writeFileSync(path.join(newDir, exe), "");
 
-    const viaHome = resolveJava({ JAVA_HOME: dir } as NodeJS.ProcessEnv, isWin);
-    expect(viaHome.ok && viaHome.source).toBe("JAVA_HOME");
+    const probe = (p: string): string =>
+      p.includes("jdk11") ? 'java version "11.0.13"' : 'java version "23.0.1"';
 
-    const viaPath = resolveJava({ PATH: bin } as NodeJS.ProcessEnv, isWin);
-    expect(viaPath.ok && viaPath.source).toBe("PATH");
+    // JAVA_HOME is stale-but-present; PATH has a usable one. The usable one must win.
+    const r = resolveJava({ JAVA_HOME: oldHome, PATH: newDir } as NodeJS.ProcessEnv, isWin, probe);
+    expect(r.ok).toBe(true);
+    expect(r.ok === true && r.major).toBe(23);
+    expect(r.ok === true && r.source).toBe("PATH");
 
-    // No registry scan, no common-directory crawl: a loud "set JAVA_HOME" beats picking a JRE the engine
-    // cannot use.
-    expect(resolveJava({} as NodeJS.ProcessEnv, isWin)).toEqual({ ok: false, reason: "not-found" });
+    // Only a too-old JDK: refuse BY NAME AND VERSION. "not-found" would be a lie that sends a KE to
+    // install a second copy of something they already have.
+    const only = resolveJava({ JAVA_HOME: oldHome } as NodeJS.ProcessEnv, isWin, probe);
+    expect(only.ok).toBe(false);
+    expect(only.ok === false && only.reason).toBe("too-old");
+    expect(only.ok === false && only.reason === "too-old" && only.required).toBe(MIN_JDK_MAJOR);
+
+    expect(resolveJava({} as NodeJS.ProcessEnv, isWin, probe)).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
+  });
+
+  it("⚠ a probe that reads only STDOUT sees NO java at all", () => {
+    // `java -version` writes to stderr. The first check written against `resolveJava` captured stdout and
+    // reported `not-found` on a machine with JDK 23 on PATH — pinned here so the trap is a test, not a
+    // comment somebody skims.
+    const dir = mkdtempSync(path.join(tmpdir(), "crl-stderr-"));
+    const isWin = process.platform === "win32";
+    writeFileSync(path.join(dir, isWin ? "java.exe" : "java"), "");
+    const stdoutOnlyProbe = (): string => ""; // what you get capturing the wrong stream
+    expect(resolveJava({ PATH: dir } as NodeJS.ProcessEnv, isWin, stdoutOnlyProbe)).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
+    const stderrProbe = (): string => 'java version "23.0.1"';
+    expect(resolveJava({ PATH: dir } as NodeJS.ProcessEnv, isWin, stderrProbe).ok).toBe(true);
+  });
+
+  it("⭐ the minimum is MEASURED from the jar, not chosen", () => {
+    // Every class in cqf-fhir-cr-cli-4.7.0.jar is class-file major 61 = Java 17.
+    expect(MIN_JDK_MAJOR).toBe(17);
+    expect(parseJavaMajor('java version "23.0.1" 2024-10-15')).toBe(23);
+    expect(parseJavaMajor('openjdk version "17.0.9"')).toBe(17);
+    expect(parseJavaMajor('java version "1.8.0_392"')).toBe(8); // legacy 1.x spelling
+    expect(parseJavaMajor("garbage")).toBeUndefined();
   });
 
   it("⚠ the engine entry point and retrieve settings are PINNED, not configurable", () => {

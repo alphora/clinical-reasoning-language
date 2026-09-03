@@ -292,6 +292,8 @@ export {
   jvmFlags,
   killTreeCommand,
   capTail,
+  MIN_JDK_MAJOR,
+  parseJavaMajor,
   resolveJava,
   verifyJar,
   assertSafeWorkingDir,

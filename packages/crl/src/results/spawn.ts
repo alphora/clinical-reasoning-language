@@ -59,27 +59,75 @@ export const jvmFlags = (b: JvmBounds): string[] => [
  */
 export const RETRIEVE_SETTINGS = "FILTER_IN_MEMORY" as const;
 
+/**
+ * ⭐ MEASURED, not guessed: every class in `cqf-fhir-cr-cli-4.7.0.jar` is class-file major 61 = Java 17.
+ * The KE's working runs were on JDK 23, so 17 is the conservative floor. A JDK below this fails with
+ * `UnsupportedClassVersionError` deep inside the engine, which reads as a mysterious producer crash.
+ */
+export const MIN_JDK_MAJOR = 17;
+
 export type JavaResolution =
-  | { ok: true; javaExe: string; source: "JAVA_HOME" | "PATH" }
-  | { ok: false; reason: "not-found" };
+  | { ok: true; javaExe: string; source: "JAVA_HOME" | "PATH"; major: number }
+  | { ok: false; reason: "not-found" }
+  | { ok: false; reason: "too-old"; javaExe: string; major: number; required: number };
 
 /**
- * Find a JDK. JAVA_HOME first, then PATH — deliberately NOT the Windows registry or common-directory
- * scanning. For a default-off tool a KE opts into, a loud "set JAVA_HOME" beats a filesystem crawl that
- * can pick a JRE the engine cannot use.
+ * Parse `java -version` output into a major version.
+ *
+ * ⚠ `java -version` WRITES TO STDERR, not stdout — a probe that captures only stdout gets an empty
+ * string and every JDK on the machine looks absent. That is not a hypothetical: the first check written
+ * against this function made exactly that mistake and reported `not-found` on a box with JDK 23 on PATH.
+ * A caller MUST concatenate stderr (and may add stdout).
  */
-export function resolveJava(env: NodeJS.ProcessEnv, isWindows: boolean): JavaResolution {
+export function parseJavaMajor(versionOutput: string): number | undefined {
+  // `"23.0.1"` / `"17.0.9"` / legacy `"1.8.0_392"`.
+  const m = /version "(\d+)(?:\.(\d+))?/.exec(versionOutput);
+  if (!m) return undefined;
+  const first = Number(m[1]);
+  return first === 1 ? Number(m[2]) : first;
+}
+
+/**
+ * Find a USABLE JDK. JAVA_HOME first, then PATH — deliberately NOT the Windows registry or
+ * common-directory scanning. For a default-off tool a KE opts into, a loud refusal beats a filesystem
+ * crawl that can pick a JRE the engine cannot use.
+ *
+ * ⚠ EXISTENCE IS NOT ENOUGH, and this was a real defect here rather than a hypothetical. On the machine
+ * this was written, `java` on PATH was 23 while `JAVA_HOME` still pointed at a JDK 11 from an old
+ * install. An earlier cut of this function checked only that the executable existed, so it preferred
+ * JAVA_HOME and would have handed the engine a JDK that cannot load its classes — surfacing as
+ * `UnsupportedClassVersionError` from inside cqf, nowhere near the cause. A stale JAVA_HOME is the
+ * COMMON case, not an edge one.
+ *
+ * So: probe each candidate and take the first that SATISFIES the minimum. Report a too-old JDK by name
+ * and version rather than falling through silently, because "no Java found" would be a lie that sends a
+ * KE to install a second copy.
+ */
+export function resolveJava(
+  env: NodeJS.ProcessEnv,
+  isWindows: boolean,
+  probe: (javaExe: string) => string | undefined,
+): JavaResolution {
   const exe = isWindows ? "java.exe" : "java";
+  const candidates: { javaExe: string; source: "JAVA_HOME" | "PATH" }[] = [];
   const home = env.JAVA_HOME?.trim();
   if (home) {
-    const candidate = path.join(home, "bin", exe);
-    if (existsSync(candidate)) return { ok: true, javaExe: candidate, source: "JAVA_HOME" };
+    const c = path.join(home, "bin", exe);
+    if (existsSync(c)) candidates.push({ javaExe: c, source: "JAVA_HOME" });
   }
   for (const dir of (env.PATH ?? "").split(path.delimiter)) {
     if (!dir) continue;
-    const candidate = path.join(dir, exe);
-    if (existsSync(candidate)) return { ok: true, javaExe: candidate, source: "PATH" };
+    const c = path.join(dir, exe);
+    if (existsSync(c)) candidates.push({ javaExe: c, source: "PATH" });
   }
+  let tooOld: { javaExe: string; major: number } | undefined;
+  for (const c of candidates) {
+    const major = parseJavaMajor(probe(c.javaExe) ?? "");
+    if (major === undefined) continue;
+    if (major >= MIN_JDK_MAJOR) return { ok: true, ...c, major };
+    tooOld ??= { javaExe: c.javaExe, major };
+  }
+  if (tooOld) return { ok: false, reason: "too-old", ...tooOld, required: MIN_JDK_MAJOR };
   return { ok: false, reason: "not-found" };
 }
 
