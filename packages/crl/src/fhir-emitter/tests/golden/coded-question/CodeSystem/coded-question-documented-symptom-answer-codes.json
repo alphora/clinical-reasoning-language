@@ -1,0 +1,49 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "coded-question-documented-symptom-answer-codes",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://example.org/crl/coded-question/CodeSystem/coded-question-documented-symptom-answer-codes",
+  "version": "1.0.0",
+  "name": "CodedQuestionDocumentedSymptomAnswerCodes",
+  "title": "Inline answer options reference corpus",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "Smile Digital Health",
+  "description": "Inline answer options reference corpus",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "functional-limitation",
+      "display": "Functional limitation affecting daily activity"
+    },
+    {
+      "code": "persistent-pain",
+      "display": "Persistent pain despite conservative therapy"
+    },
+    {
+      "code": "none-of-listed",
+      "display": "None of the listed symptoms is documented"
+    }
+  ]
+}

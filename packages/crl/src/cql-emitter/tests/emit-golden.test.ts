@@ -35,6 +35,9 @@ const CORPORA: Record<string, string> = {
   // inc-4, cms22-strategy inc-6) has a durable emit oracle, not just a one-off
   // review diff (disc 471 nit / disc 473 gpt56 [important]).
   "cms22-strategy": path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22-strategy.crl"),
+  // ⭐⭐ #189 — the INLINE `value from:` form. Pins the generated `valueset` declaration, its url, and the
+  // `in qualifying` lowering (including the three-state null guard) as a reviewable diff.
+  "coded-question": path.join(REPO_ROOT, "src/tests/fixtures/corpus/coded-question/coded-question.crl"),
   "cms69-strategy": path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69/cms69-strategy.crl"),
   // Slice 2 (layeredEmit): a single multi-layer CRL library that auto-splits
   // into `Layered Basic Concepts` / `Layered Basic Asserted` /

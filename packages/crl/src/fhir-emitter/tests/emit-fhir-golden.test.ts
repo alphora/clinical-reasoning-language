@@ -41,6 +41,10 @@ const CORPORA: Record<string, string> = {
   // ⚠ Reached by a relative escape rather than by MOVING the fixture: it is the #189 canonical target and
   // several behavioural tests reference it at this path.
   "service-request": "../service-request/policy.crl",
+  // ⭐⭐ #189 — the INLINE `value from:` form + the `in qualifying` predicate. Generic by construction (no
+  // customer content), so the new construct has a durable emit oracle in BOTH lanes rather than living only
+  // in a gitignored artifact.
+  "coded-question": "coded-question/coded-question.crl",
 };
 
 // Hermetic, reproducible emit: pass an explicit `date` override (highest

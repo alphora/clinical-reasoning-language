@@ -1,0 +1,62 @@
+# ⭐⭐ THE INLINE ANSWER OPTIONS REFERENCE (#189) — a coverage determination driven by a CODED QUESTION.
+//
+// Deliberately GENERIC: no customer content, no real policy. Its job is to be the golden oracle for the
+// inline `value from:` construct and the `in qualifying` predicate, so a change to either shows up as a
+// reviewable diff in BOTH emit lanes.
+//
+// What it exercises, and why each piece is here:
+//
+//   · INLINE OPTIONS — the codes live on the question, written ONCE, in the concept's OWN CodeSystem. No
+//     system URL appears anywhere in this file, and none appears in the `.cel` beside it either.
+//   · THE `qualifying` / `not qualifying` MARKER — required because this concept IS the subject of an
+//     `in qualifying` predicate. Adding a fourth option cannot compile until it says what it does.
+//   · A "NONE OF THE LISTED …" OPTION — the reason a denial costs ONE answer instead of one per option. With
+//     the options unanswered the criterion is UNKNOWN and the tree PAUSES; answering `none` makes it a
+//     determinate FALSE. That is the whole point of the construct, and it is what the `.cel` proves.
+//   · A PURE QUESTION (`Service Requested`) — a plain local boolean with nothing that can compute it, so an
+//     unanswered run pauses at the gate rather than reaching the outer `otherwise`.
+library "Coded Question Reference".
+
+// The gate. A bare `code is` boolean: nothing derives it, so unanswered it is UNKNOWN — not false.
+concept "Service Requested":
+- shape is Scalar.
+- type is Observation.
+- value type is boolean.
+- code is `service-requested`.
+
+// ⭐ THE CODED QUESTION. `shape is Record` + `most recent this` means it publishes ONE record: the newest
+// answer wins, so a later answer overrides an earlier one.
+concept "Documented Symptom":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is `documented-symptom`.
+- definition is most recent this.
+- value from:
+  - `functional-limitation` display is `Functional limitation affecting daily activity`, qualifying.
+  - `persistent-pain` display is `Persistent pain despite conservative therapy`, qualifying.
+  - `none-of-listed` display is `None of the listed symptoms is documented`, not qualifying.
+
+// ⭐ THE PREDICATE. No `type is`: this is an ephemeral derivation — it publishes a computed boolean, emits no
+// resource, and gets no case-feature StructureDefinition.
+concept "Qualifying Symptom Documented":
+- shape is Scalar.
+- value type is boolean.
+- definition is "Documented Symptom" in qualifying.
+
+activity "certify.Met":
+- request CPGCommunicationRequest.
+- with `APPROVED`.
+
+activity "not-certify.Unmet":
+- request CPGCommunicationRequest.
+- with `NOT APPROVED`.
+
+decision "Coverage Determination":
+first:
+- when "Service Requested" then:
+    first:
+    - when "Qualifying Symptom Documented" then recommend activity "certify.Met".
+    - otherwise then recommend activity "not-certify.Unmet".
+    end.
+- otherwise then recommend activity "not-certify.Unmet".
