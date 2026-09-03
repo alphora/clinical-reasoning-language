@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import * as path from "node:path";
 
 import { describe, it } from "vitest";
@@ -271,6 +271,11 @@ describe("#189 T5-CQL step 1 — truth-set retirement inventory", () => {
     if (unparsed.length > 0) {
       out.push("## Unparsed (excluded from the counts)", "", ...unparsed.map((f) => `- \`${f}\``), "");
     }
+    // ⚠ `tmp/` IS GITIGNORED, so it does NOT exist in a fresh clone — this write was an ENOENT on every CI
+    // run while passing locally, where the directory happens to be there. It failed the v4.112.0 release
+    // gate. A probe that writes an artifact must create its own directory; do not assume a workspace layout
+    // that only exists on a machine somebody has already worked in.
+    mkdirSync(path.join(REPO, "tmp"), { recursive: true });
     writeFileSync(path.join(REPO, "tmp/INVENTORY-truthset.md"), out.join(nl), "utf8");
   });
 });
