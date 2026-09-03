@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { buildEngineRepoBundle, cqlIndex } from "../repoBundle";
+import { buildEngineRepoBundle, cqlIndex, parseDriverStdout } from "../repoBundle";
 
 /**
  * ⭐⭐ PINS A MEASURED ENGINE REQUIREMENT.
@@ -85,5 +85,20 @@ describe("the engine repository inlines CQL, because a URL is unresolvable in me
     });
     expect(r.bundle.entry.length).toBe(2);
     expect(r.bundle.type).toBe("collection");
+  });
+});
+
+describe("the driver's stdout is not pure JSON", () => {
+  it("⚠ a bare JSON.parse of stdout fails on EVERY successful run", () => {
+    // Measured: a transitive engine dependency prints this to STDOUT before main() runs.
+    const real = 'kotlin-logging: initializing... active logger factory: Slf4jLoggerFactory\n{"resourceType":"Parameters"}';
+    expect(() => JSON.parse(real)).toThrow();
+    expect(parseDriverStdout(real)).toEqual({ resourceType: "Parameters" });
+  });
+
+  it("⭐ unreadable output is undefined, not an empty result", () => {
+    // "produced nothing" and "produced something unreadable" must stay distinguishable.
+    expect(parseDriverStdout("no json here")).toBeUndefined();
+    expect(parseDriverStdout("{ broken")).toBeUndefined();
   });
 });

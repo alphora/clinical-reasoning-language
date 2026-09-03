@@ -100,3 +100,23 @@ export const cqlIndex = (
 
 /** All cases from an emit result, for a caller building one repository per case. */
 export const emittedCaseCount = (emit: EmitResult): number => emit.emittedCases.length;
+
+/**
+ * Extract the engine's `Parameters` from a driver's stdout.
+ *
+ * ⚠ STDOUT IS NOT PURE JSON, measured rather than assumed: a transitive dependency of the engine prints
+ * `kotlin-logging: initializing...` to STDOUT before `main()` runs, so nothing the driver does can stop
+ * it. A caller that does `JSON.parse(stdout)` fails on the first line of every successful run.
+ *
+ * Returns undefined when no JSON object is present, so "the engine produced nothing" and "the engine
+ * produced something we could not read" stay distinguishable at the call site.
+ */
+export function parseDriverStdout(stdout: string): Record<string, unknown> | undefined {
+  const start = stdout.indexOf("{");
+  if (start === -1) return undefined;
+  try {
+    return JSON.parse(stdout.slice(start)) as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
