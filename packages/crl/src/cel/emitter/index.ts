@@ -3,9 +3,6 @@ export {
   celResourceId,
   celCaseCompartmentId,
   celCaseCompartmentDir,
-  celProducerResourceId,
-  isCelProducerOwnedId,
-  CEL_PRODUCER_ID_MARKER,
 } from "./emitFhir";
 export { writeEmitResult } from "./writer";
 export type {

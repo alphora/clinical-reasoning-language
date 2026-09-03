@@ -261,11 +261,27 @@ export {
   celResourceId,
   celCaseCompartmentId,
   celCaseCompartmentDir,
-  // ⭐ Producer ownership — `--` cannot occur in an emitter id, so this is a decidable test.
-  celProducerResourceId,
-  isCelProducerOwnedId,
-  CEL_PRODUCER_ID_MARKER,
 } from "./cel/emitter";
+
+// ⭐ The questionnaire PRODUCER — generated Q/QR artifacts and their ownership record. Deliberately
+// NOT part of CEL emit: a Questionnaire is not a fact about a patient, it is what the engine ASKED
+// when `$apply` ran, with a different producer, inputs and lifecycle from case data.
+export {
+  producerManifestName,
+  resolveCaseArtifacts,
+  caseState,
+} from "./questionnaire/manifest";
+export {
+  questionnaireArtifactId,
+  isProducerOwnedId,
+  PRODUCER_ID_MARKER,
+} from "./questionnaire/ownership";
+export type {
+  ProducerManifest,
+  ProducerCaseEntry,
+  ProducerCaseState,
+  ProducerArtifact,
+} from "./questionnaire/manifest";
 export type {
   EmitResult,
   EmittedCase,

@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 
 import {
-  CEL_PRODUCER_ID_MARKER,
-  celProducerResourceId,
+  PRODUCER_ID_MARKER,
+  questionnaireArtifactId,
   celResourceId,
-  isCelProducerOwnedId,
-} from "../../../index";
+  isProducerOwnedId,
+} from "../../index";
 
 /**
  * ⭐⭐ OWNERSHIP MUST BE DECIDABLE, because two writers share one directory.
@@ -40,7 +40,7 @@ describe("producer ownership is decidable against every emitter id", () => {
         for (const f of hostile) {
           const id = celResourceId(lib, c, f);
           expect(id).not.toContain("--");
-          expect(isCelProducerOwnedId(id)).toBe(false);
+          expect(isProducerOwnedId(id)).toBe(false);
         }
       }
     }
@@ -48,13 +48,13 @@ describe("producer ownership is decidable against every emitter id", () => {
 
   it("⭐ every producer id IS owned, and stays within the FHIR id cap", () => {
     for (const kind of ["questionnaire", "questionnaireresponse"] as const) {
-      const id = celProducerResourceId(
+      const id = questionnaireArtifactId(
         "A Deliberately Very Long Clinical Reasoning Library Name For Capping",
         "a deliberately very long authored case name -> unmet (ordered precedence)",
         kind,
       );
-      expect(isCelProducerOwnedId(id)).toBe(true);
-      expect(id.startsWith(CEL_PRODUCER_ID_MARKER)).toBe(true);
+      expect(isProducerOwnedId(id)).toBe(true);
+      expect(id.startsWith(PRODUCER_ID_MARKER)).toBe(true);
       expect(id.length).toBeLessThanOrEqual(64); // FHIR id regex
       expect(/^[A-Za-z0-9\-.]{1,64}$/.test(id)).toBe(true);
     }
@@ -63,20 +63,20 @@ describe("producer ownership is decidable against every emitter id", () => {
   it("⚠ the marker is a PREFIX, so the cap cannot truncate it away", () => {
     // `uniqueCapSlug` truncates the TAIL. A suffix marker would be sliced off exactly on the long names
     // that need disambiguating most — i.e. it would fail silently, on the hard cases only.
-    const id = celProducerResourceId("x".repeat(200), "y".repeat(200), "questionnaire");
-    expect(id.startsWith(CEL_PRODUCER_ID_MARKER)).toBe(true);
-    expect(isCelProducerOwnedId(id)).toBe(true);
+    const id = questionnaireArtifactId("x".repeat(200), "y".repeat(200), "questionnaire");
+    expect(id.startsWith(PRODUCER_ID_MARKER)).toBe(true);
+    expect(isProducerOwnedId(id)).toBe(true);
   });
 
   it("⭐ the two kinds do not collide for one case", () => {
-    const q = celProducerResourceId("Lib", "case one", "questionnaire");
-    const qr = celProducerResourceId("Lib", "case one", "questionnaireresponse");
+    const q = questionnaireArtifactId("Lib", "case one", "questionnaire");
+    const qr = questionnaireArtifactId("Lib", "case one", "questionnaireresponse");
     expect(q).not.toBe(qr);
   });
 
   it("⭐ producer ids are DETERMINISTIC — a re-run overwrites, never accumulates", () => {
-    const a = celProducerResourceId("Lib", "case one", "questionnaire");
-    const b = celProducerResourceId("Lib", "case one", "questionnaire");
+    const a = questionnaireArtifactId("Lib", "case one", "questionnaire");
+    const b = questionnaireArtifactId("Lib", "case one", "questionnaire");
     expect(a).toBe(b);
   });
 });
