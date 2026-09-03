@@ -176,7 +176,7 @@ The validator runs over a `ResolvedCelGraph` (the covered library's CRL registry
 Per pitch v4 critical decision #2 (bounded MVP). Emits FHIR JSON instance fixtures per case to the KALM directory shape:
 
 ```
-<out-dir>/patient/<library-slug>/<case-slug>/<FHIR Type>/<resource-id>.json
+<out-dir>/patient/<compartmentId>/<lowercase-fhir-type>/<resource-id>.json
 ```
 
 - Slugs are kebab-case lowercase.
@@ -289,7 +289,8 @@ The pieces that won't change without a feature pitch:
 - Six cross-resource keywords (named above).
 - Per-reference relative dates with explicit case anchor; named multi-anchor.
 - FHIR resource id at case level; same fact in N cases produces N distinct resources.
-- FHIR emit directory: `tests/data/fhir/patient/<library-id>/<case-id>/<FHIR Type>/<resource-id>.json`.
+- FHIR emit directory: `tests/data/fhir/patient/<compartmentId>/<lowercase-fhir-type>/<resource-id>.json`
+  — ONE hashed compartment segment (`celCaseCompartmentId`), not a library/case pair.
 - Caseload coverage is NOT exhaustive — a CEL library is a curated set of scenarios.
 - CEL → FHIR JSON directly (no FSH intermediate).
 

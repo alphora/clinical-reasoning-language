@@ -32,8 +32,6 @@ import {
   type FlagStatus,
   type RenderScenarioResult,
   type ScenarioViewModel,
-  // ⭐ The ONE path authority for a CEL case on disk — never recompose a case directory here.
-  celCaseCompartmentDir,
 } from "@smile-digital-health/crl";
 import type { LsLocation, ZeroBasedRange } from "@smile-digital-health/crl/language-services";
 import {
@@ -2127,11 +2125,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         const caseName = focused?.case?.name ?? "";
         if (!focused || !cid || !caseName) post();
         else
-          void loadFhirQuestionnaireCase(
-            caseName,
-            focused.decision?.libraryName,
-            focused.case?.subject,
-          ).then((r) => post(r.q, r.qr, r.lookedFor));
+          void loadFhirQuestionnaireCase(focused.compartmentDir).then((r) =>
+            post(r.q, r.qr, r.lookedFor),
+          );
       }
     } else {
       // questionnaire (#177 slice 3) — a STATIC, read-only projection of the FOCUSED cel case's fired path. Gets the
@@ -2164,11 +2160,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  `scenarioByCaseId` join the failed-criterion peek uses (caseId → sv; ambiguous/unfrozen cases excluded in
    *  rebuild). undefined when the selection is not a cel case (or no case is selected) → the pane shows a placeholder. */
   /**
-   * Read the FHIR Questionnaire + QuestionnaireResponse for a case FROM DISK, at the settled qa layout
-   * (docs/questionnaire-pane-integration-plan.md §5a):
+   * Read the FHIR Questionnaire + QuestionnaireResponse for a case FROM DISK, at the directory the
+   * EMITTER reports — `ScenarioViewModel.compartmentDir`, never a path composed here:
    *
-   *   <artifact>/tests/data/fhir/patient/<library-slug>-cases/<case-slug>/Questionnaire/*.json
-   *   <artifact>/tests/data/fhir/patient/<library-slug>-cases/<case-slug>/QuestionnaireResponse/*.json
+   *   <artifact>/tests/data/fhir/<compartmentDir>/questionnaire/*.json
+   *   <artifact>/tests/data/fhir/<compartmentDir>/questionnaireresponse/*.json
    *
    * This is deliberately a real filesystem read and not a compiled-in fixture: it exercises the exact path the
    * producer (issue #277) will write to, so when the producer lands nothing here changes. To test it today,
@@ -2178,9 +2174,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    * trailing `*` on the slug.
    */
   async function loadFhirQuestionnaireCase(
-    caseName: string,
-    libraryName: string | undefined,
-    subjectName: string | undefined,
+    compartmentDir: string | undefined,
   ): Promise<{ q?: unknown; qr?: unknown; lookedFor: string }> {
     const slugify = artifactSlug;
     // ⚠ Keyed on the case's FULL AUTHORED NAME, including its `-> outcome` suffix — that is what the emitter
@@ -2205,19 +2199,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // `subjectName` is therefore REQUIRED to address a case. A case with no subject emits no resources at
     // all (`emitCase` returns undefined), so "no subject" and "no artifacts" are the same state.
     const out: { q?: unknown; qr?: unknown; lookedFor: string } = { lookedFor: "" };
-    if (!caseName || !libraryName || !subjectName) {
-      return {
-        ...out,
-        lookedFor: `(need library + case + subject to address a case directory; had ${[
-          libraryName ? "" : "library",
-          caseName ? "" : "case",
-          subjectName ? "" : "subject",
-        ]
-          .filter(Boolean)
-          .join(" + ")} missing)`,
-      };
+    if (!compartmentDir) {
+      // Absent iff the CEL library name or the case's subject is unknown — the same state as "this case
+      // emits nothing", since `emitCase` returns undefined without a subject.
+      return { ...out, lookedFor: "(this case has no emitted compartment — nothing was searched)" };
     }
-    const compartmentDir = celCaseCompartmentDir(libraryName, caseName, subjectName);
     const lookedFor = `**/tests/data/fhir/${compartmentDir}/{questionnaire,questionnaireresponse}/*.json`;
     out.lookedFor = lookedFor;
     let hits: readonly vscode.Uri[] = [];

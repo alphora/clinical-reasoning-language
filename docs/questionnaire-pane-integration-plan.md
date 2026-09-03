@@ -191,9 +191,14 @@ whose explicit order omitted a pane and relied on the append loses it.
 **Operator decision (2026-08-16): they go in `qa`**, in the existing per-case directory:
 
 ```
-tests/data/fhir/patient/<libraryId>/<caseSlug>/Questionnaire/<id>.json
-tests/data/fhir/patient/<libraryId>/<caseSlug>/QuestionnaireResponse/<id>.json
+tests/data/fhir/patient/<compartmentId>/questionnaire/<id>.json
+tests/data/fhir/patient/<compartmentId>/questionnaireresponse/<id>.json
 ```
+
+`<compartmentId>` is `celCaseCompartmentId(celLibraryName, caseName, subjectFactName)` — a 56-char-capped
+slug of all THREE names plus a 12-hex hash. ⚠ DO NOT compose it from a library/case pair: that was the
+layout before `0e7641da` merged the two segments, and every reader that kept composing it by hand
+silently matched nothing. Read `ScenarioViewModel.compartmentDir` or `EmittedCase.compartmentDir`.
 
 Why there rather than a new home:
 

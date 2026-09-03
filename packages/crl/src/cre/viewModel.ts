@@ -27,6 +27,8 @@ import { describeBranchCondition } from "../ast/branchCondition";
 import type { BranchCondition } from "../ast/types";
 import type { CELCase, CELDefinedByField, CELFact } from "../cel/ast/types";
 import { resolveDefinedByTarget } from "../cel/definedByResolve";
+// ⭐ The ONE path authority — the view model resolves the directory so no CONSUMER ever composes one.
+import { celCaseCompartmentDir } from "../cel/emitter";
 import type { ResolvedCelGraph, CelImportDiagnostic } from "../cel/imports/types";
 import type { LsLocation } from "../language-services/contracts";
 import { toZeroBasedRange } from "../language-services/contracts";
@@ -91,6 +93,18 @@ export interface RenderScenarioResult {
 
 export interface ScenarioViewModel {
   case: CaseView;
+  /**
+   * ⭐⭐ THE CASE'S EMITTED DIRECTORY, relative to the FHIR emit root — `patient/<compartmentId>`.
+   * Present iff the CEL library name and the case's SUBJECT are both known; absent otherwise, which is
+   * the same state as "this case emits nothing" (`emitCase` returns undefined without a subject).
+   *
+   * ⚠ EXISTS SO NO CONSUMER COMPOSES A PATH. The MV questionnaire pane used to build
+   * `<library>-cases/<case>/` by hand; `0e7641da` merged those segments into one hashed compartment and
+   * the pane silently matched nothing for months. Worse, the obvious repair — handing the pane a library
+   * name — is ALSO wrong: `DecisionView.libraryName` is the COVERED CRL library, while the compartment
+   * derives from the CEL library's OWN name. Two different strings for one artifact. Read this field.
+   */
+  compartmentDir?: string;
   /** null when the case names no decision; `{ resolved:false }` when it names one not found in the
    *  covered library (no nodeId/source there); fully populated when resolved. */
   decision: DecisionView | null;
@@ -360,8 +374,16 @@ function buildScenario(
   };
   collectProduced(tree);
 
+  const caseView = buildCaseView(run.case, celCase, facts, graph);
+  // ⚠ The CEL library's OWN name — NOT `coveredLib`, which is the covered CRL library. The emitter
+  // derives the compartment from `cel.library.name`, so using the covered name here would compute a
+  // directory that does not exist. Both are "the library name" in English, which is exactly the trap.
+  const celLibraryName = graph.cel?.library?.name;
   return {
-    case: buildCaseView(run.case, celCase, facts, graph),
+    case: caseView,
+    ...(celLibraryName && caseView.subject
+      ? { compartmentDir: celCaseCompartmentDir(celLibraryName, run.case, caseView.subject) }
+      : {}),
     decision,
     status: run.status,
     expected: run.expected ? { decision: run.expected.leaf, branch: run.expected.branch } : null,

@@ -3,7 +3,12 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { celCaseCompartmentDir, emitCelToFhir, resolveCelImports } from "../../../index";
+import {
+  celCaseCompartmentDir,
+  emitCelToFhir,
+  renderScenario,
+  resolveCelImports,
+} from "../../../index";
 
 /**
  * ⭐⭐ THE DRIFT GATE. Pins the EXPORTED path authority against what the emitter ACTUALLY writes.
@@ -37,7 +42,7 @@ concept "Asked":
 covers "Compartment Probe".
 
 fact "Subject Pat":
-- name is "Subject Pat".
+- name is "Patricia Q".
 - birth date is "1970-01-01".
 - defined by "Patient".
 
@@ -60,6 +65,25 @@ const emit = () => {
 };
 
 describe("the compartment path authority agrees with what the emitter writes", () => {
+  it("⭐⭐ THE CONSUMER PATH: the view model's compartmentDir equals the emitter's", () => {
+    // ⚠ THIS IS THE GATE THAT WAS MISSING, and its absence is why the first fix was still broken.
+    // The original test related the exported HELPER to the emitter and passed — while the pane fed that
+    // helper `DecisionView.libraryName` (the COVERED CRL library) instead of the CEL library's own name.
+    // Two different strings, both honestly called "the library name", so the helper was correct and the
+    // caller was wrong and nothing failed. Relating the CONSUMER's value to the emitter's is the only
+    // formulation that catches that class.
+    const dir = mkdtempSync(join(tmpdir(), "crl-compartment-vm-"));
+    for (const [name, body] of Object.entries(PROJECT)) writeFileSync(join(dir, name), body);
+    const graph = resolveCelImports(join(dir, "c.cel"));
+    const rendered = renderScenario(graph) as unknown as {
+      scenarios: { compartmentDir?: string }[];
+    };
+    const emitted = emitCelToFhir(graph);
+    expect(rendered.scenarios.length).toBe(1);
+    expect(emitted.emittedCases.length).toBe(1);
+    expect(rendered.scenarios[0].compartmentDir).toBe(emitted.emittedCases[0].compartmentDir);
+  });
+
   it("⭐ celCaseCompartmentDir reproduces the emitted case's compartmentDir EXACTLY", () => {
     const { emittedCases } = emit();
     expect(emittedCases.length).toBe(1);
