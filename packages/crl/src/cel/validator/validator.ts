@@ -227,6 +227,9 @@ export function validateCEL(
   // 6. Fact body `defined by` resolution + #189 Piece 2 local-membership + Piece 3 source-membership warnings.
   const domainCtx = makeLocalDomainContext(graph);
   const { keys: sourceMemberKeys, types: sourceTypes } = buildSourceMembership(graph, domainCtx.base);
+  // ⭐ #280 defect 1 — the LOCAL near-miss index, keyed WITHOUT the system so a right-code/wrong-system fact
+  // can be recognised. See `validateBareFactLocalNearMiss`.
+  const localByTypeCode = buildLocalByTypeCode(graph, domainCtx);
   for (const f of cel.statements) {
     if (f.type !== "CELFact") continue;
     for (const fb of f.body) {
@@ -236,6 +239,7 @@ export function validateCEL(
     }
     validateFactCodeMembership(f, graph, domainCtx, errors, warnings, fp);
     validateSourceFactMembership(f, sourceMemberKeys, sourceTypes, warnings, fp);
+    validateBareFactLocalNearMiss(f, localByTypeCode, warnings, fp);
     validateBooleanValueRules(f, graph, domainCtx, errors, warnings, fp);
     validateNumericValueRules(f, graph, errors, fp);
   }
@@ -789,6 +793,80 @@ function buildSourceMembership(
     }
   }
   return { keys, types };
+}
+
+/** #280 defect 1 — `<fhirType>|<code>` → the local member the concept ACTUALLY declares. Keyed WITHOUT the
+ *  system, which is the whole point: it is how a right-code/wrong-system fact is recognised as a near miss
+ *  rather than as an unrelated datum. */
+function buildLocalByTypeCode(
+  graph: ResolvedCelGraph,
+  domainCtx: LocalDomainContext,
+): Map<string, { system: string; code: string; concept: string }> {
+  const out = new Map<string, { system: string; code: string; concept: string }>();
+  const reg = graph.crlRegistry;
+  if (!reg || !domainCtx.base) return out;
+  for (const e of [...reg.byNamePackage.values(), ...reg.byNameLocal.values()]) {
+    for (const st of e.ast.statements) {
+      if (st.type !== "Concept") continue;
+      const res = localMemberOfConcept(
+        st,
+        { filePath: e.filePath, entryName: e.name, fallbackLib: e.ast.library.name },
+        domainCtx,
+      );
+      if ("notLocal" in res || "error" in res) continue;
+      const k = `${res.member.fhirType}|${res.member.code}`;
+      // First writer wins; a genuine duplicate local code is the closure's own collision error, not ours.
+      if (!out.has(k)) out.set(k, { system: res.member.system, code: res.member.code, concept: st.name });
+    }
+  }
+  return out;
+}
+
+/**
+ * ⭐⭐ #280 defect 1 — A BARE-TYPE FACT WITH THE RIGHT CODE AND THE WRONG SYSTEM POPULATES NOTHING, SILENTLY.
+ *
+ * The emitted CQL retrieves `[Observation: <code> from "<local codesystem>"]`, so an instance whose
+ * `code.coding.system` is anything else is NEVER retrieved — every case then returns the residual
+ * disposition regardless of its facts.
+ *
+ * ⚠ THE NATURAL WRONG VALUE IS THE BARE `canonicalBase`. The local CodeSystem url is
+ * `<canonicalBase>/CodeSystem/<domain>-local`, and nothing tells an author that; the issue reports committed
+ * QA data doing exactly this.
+ *
+ * ⚠ SCOPED TO A NEAR MISS — the fact's TYPE and CODE match a local concept's, and only the SYSTEM differs.
+ * An unrelated bare-type datum (a context Encounter, a source-rep record) matches no local code and is never
+ * warned. That keeps this from firing on the legitimate source-authoring lane beside it.
+ *
+ * ⚠ The QUALIFIED spelling (`defined by "Lib"."Concept"`) was ALREADY covered by
+ * `fact-code-not-in-local-set`. Only the bare-type spelling fell through both lanes — verified before
+ * writing this.
+ */
+function validateBareFactLocalNearMiss(
+  f: CELFact,
+  localByTypeCode: Map<string, { system: string; code: string; concept: string }>,
+  warnings: CELValidationError[],
+  fp: string,
+): void {
+  const codeField = f.body.find((b): b is CELCodeField => b.type === "CELCodeField");
+  if (!codeField) return;
+  const db = f.body.find((b): b is CELDefinedByField => b.type === "CELDefinedByField");
+  if (!db || isQualifiedRef(db.ref)) return; // the qualified lane is `fact-code-not-in-local-set`
+  const cls = classifyCanonicalToken(codeField.value);
+  if (cls.kind !== "coded" || cls.parts.system === undefined) return;
+  const expected = localByTypeCode.get(`${getRefName(db.ref)}|${cls.parts.code}`);
+  if (!expected || expected.system === cls.parts.system) return;
+  warnings.push(
+    warn(
+      "fact-code-wrong-local-system",
+      `Fact "${f.name}" authors code \`${codeField.value}\`, whose CODE matches local concept ` +
+        `"${expected.concept}" but whose SYSTEM does not: that concept's local code is ` +
+        `\`${expected.system}|${expected.code}\`. The emitted CQL retrieves from the local CodeSystem, so this ` +
+        `instance is never retrieved and the concept computes absent / false. If a wrong-system datum is the ` +
+        `point of the case, ignore.`,
+      codeField.location,
+      fp,
+    ),
+  );
 }
 
 /** #189 Piece 3 — the SOURCE-membership WARNING. A BARE-TYPE fact (`defined by "<FhirType>"` + `code is <token>`,

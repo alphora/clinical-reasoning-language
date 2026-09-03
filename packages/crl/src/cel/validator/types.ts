@@ -27,6 +27,9 @@ export type CELValidationErrorKind =
   // false in both lanes), but it is usually an author mistake, so it is surfaced. (A MALFORMED token is the
   // emitter's `local-authored-code-malformed` error, not this.)
   | "fact-code-not-in-local-set"
+  // ⭐ #280 defect 1 — a BARE-TYPE fact whose CODE matches a local concept but whose SYSTEM does not. The
+  // qualified spelling is covered by `fact-code-not-in-local-set` above; this is the lane that fell through.
+  | "fact-code-wrong-local-system"
   // #189 Piece 3 — a BARE-TYPE source fact (`defined by "<FhirType>"` + `code is <token>`, the sanctioned source
   // authoring) whose `(fhirType, system, code)` is a member of NO concept's SOURCE set (the mechanical stub set of
   // a `coded from` reference/instantiated VS). It populates nothing (closed-world → the concept it would feed is
