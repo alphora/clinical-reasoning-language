@@ -12,9 +12,18 @@ export interface EmittedResource {
 
 /** Per-case grouping of emitted resources (all inside the one Patient compartment). */
 export interface EmittedCase {
-  /** Slugified case name. */
+  /**
+   * ⭐ THE CASE'S DIRECTORY, relative to the emit `outDir` — `patient/<compartmentId>`. This is the
+   * ONLY thing that addresses a case on disk; a producer writes into it and a viewer reads from it.
+   *
+   * ⚠ It is NOT `<librarySlug>/<caseSlug>`. Those two fields below are the case's IDENTITY, not its
+   * location, and the two stopped agreeing at `0e7641da` when the compartment layout merged them into
+   * one hashed segment. Compose a path from them and it will compile, run, and silently match nothing.
+   */
+  compartmentDir: string;
+  /** Slugified case name — IDENTITY, not a path segment (see `compartmentDir`). */
   caseSlug: string;
-  /** Slugified library name. */
+  /** Slugified library name — IDENTITY, not a path segment (see `compartmentDir`). */
   librarySlug: string;
   /** Resources emitted for this case, all inside the one Patient compartment. */
   resources: EmittedResource[];
@@ -95,8 +104,10 @@ export interface EmitCelOptions {
 export interface EmitOptions {
   /**
    * Output directory root. Resources are written under
-   * <outDir>/patient/<library-slug>/<case-slug>/<FHIR Type>/<resource-id>.json
-   * per pitch v4 success signal. Required when calling `emitCelToFhirAndWrite`.
+   *   <outDir>/patient/<compartmentId>/<lowercase-fhir-type>/<resource-id>.json
+   * where `<compartmentId>` is `celCaseCompartmentId(library, case, subject)` — a capped slug of all
+   * THREE names plus a 12-hex hash, not a library/case pair. Use `EmittedCase.compartmentDir` or the
+   * exported helper; do not recompose it.
    */
   outDir?: string;
   /**

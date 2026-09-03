@@ -736,10 +736,56 @@ interface EmitContext {
 // `rawSlug` composite of the raw library/case/fact names — one id formatter across
 // both lanes, ids always ≤64.
 function makeResourceId(ctx: EmitContext, factName: string): string {
+  return celResourceId(ctx.libraryName, ctx.c.name, factName);
+}
+
+/**
+ * ⭐⭐ THE ONE AUTHORITY for a CEL case's on-disk identity. EXPORTED because it is NOT RECOMPOSABLE
+ * by a caller: the id is a capped slug of THREE names (library, case, subject) plus a 12-hex hash, so
+ * anything that recomputes it by hand reproduces a truncation rule that must then agree forever.
+ *
+ * ⚠ THAT DRIFT IS NOT HYPOTHETICAL — IT IS THE BUG THIS EXISTS TO STOP. `0e7641da` (#189 remote-channel
+ * T1, the KALM Patient-compartment layout) MERGED the former `<library>-cases/<case>/` pair into ONE
+ * hashed compartment segment and lowercased the type segment. Everything that had hard-coded the old
+ * three-segment shape kept compiling and silently stopped matching: the MV questionnaire pane's disk
+ * read, this file's own `EmittedCase.caseSlug`/`librarySlug` doc, `types.ts`'s `EmitOptions` comment,
+ * `docs/questionnaire-pane-integration-plan.md` §5a and `docs/questionnaire-pane-api-contract.md`. Five
+ * readers, one writer, no error anywhere — found only by a KE diffing the same artifact across two
+ * emitter versions.
+ *
+ * So: CALL THIS. Never re-derive a case directory from names, and never document the path as a string
+ * a human is expected to reproduce.
+ */
+export function celResourceId(libraryName: string, caseName: string, factName: string): string {
   return uniqueCapSlug(
-    `${rawSlug(ctx.libraryName)}-${rawSlug(ctx.c.name)}-${rawSlug(factName)}`,
+    `${rawSlug(libraryName)}-${rawSlug(caseName)}-${rawSlug(factName)}`,
     CEL_ID_BASE_MAX,
   );
+}
+
+/**
+ * The case's Patient-compartment id — `celResourceId` over the SUBJECT's name, which is why
+ * `{library, case}` alone cannot address a case directory. Every resource of the case lands under it.
+ */
+export function celCaseCompartmentId(
+  libraryName: string,
+  caseName: string,
+  subjectName: string,
+): string {
+  return celResourceId(libraryName, caseName, subjectName);
+}
+
+/**
+ * The case's directory RELATIVE to an emit `outDir` — what a producer writes into and a viewer reads
+ * from. Type subdirectories below it are LOWERCASE (`observation/`, `questionnaire/`), matching what
+ * the writer emits.
+ */
+export function celCaseCompartmentDir(
+  libraryName: string,
+  caseName: string,
+  subjectName: string,
+): string {
+  return `patient/${celCaseCompartmentId(libraryName, caseName, subjectName)}`;
 }
 
 // T12 / #91: per-case namespace prefix so subject Patient ids don't collide
@@ -1335,6 +1381,9 @@ function emitCase(ctx: EmitContext): EmittedCase | undefined {
 
   if (resources.length === 0) return undefined;
   return {
+    // The ONE addressable location for this case. `ctx.patientCompartmentId` is set in `emitCase`
+    // before any resource is emitted, so every resource's `outputPath` sits under exactly this.
+    compartmentDir: `patient/${ctx.patientCompartmentId}`,
     caseSlug: ctx.caseSlug,
     librarySlug: ctx.librarySlug,
     resources,

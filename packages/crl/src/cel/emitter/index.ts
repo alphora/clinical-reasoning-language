@@ -1,4 +1,9 @@
-export { emitCelToFhir } from "./emitFhir";
+export {
+  emitCelToFhir,
+  celResourceId,
+  celCaseCompartmentId,
+  celCaseCompartmentDir,
+} from "./emitFhir";
 export { writeEmitResult } from "./writer";
 export type {
   EmittedResource,

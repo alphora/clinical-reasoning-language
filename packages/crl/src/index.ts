@@ -252,7 +252,16 @@ export type {
   CELValidationResult,
   CELValidationOptions,
 } from "./cel/validator";
-export { emitCelToFhir, writeEmitResult } from "./cel/emitter";
+export {
+  emitCelToFhir,
+  writeEmitResult,
+  // ⭐ The ONE path authority for a CEL case on disk. Consumers (the MV questionnaire pane, the
+  // $apply producer) MUST call these rather than recomposing a directory from names — see the
+  // doc on `celResourceId` for the drift this exists to prevent.
+  celResourceId,
+  celCaseCompartmentId,
+  celCaseCompartmentDir,
+} from "./cel/emitter";
 export type {
   EmitResult,
   EmittedCase,

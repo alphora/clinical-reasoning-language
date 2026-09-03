@@ -32,6 +32,8 @@ import {
   type FlagStatus,
   type RenderScenarioResult,
   type ScenarioViewModel,
+  // ⭐ The ONE path authority for a CEL case on disk — never recompose a case directory here.
+  celCaseCompartmentDir,
 } from "@smile-digital-health/crl";
 import type { LsLocation, ZeroBasedRange } from "@smile-digital-health/crl/language-services";
 import {
@@ -2124,7 +2126,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         // loadFhirQuestionnaireCase. `label` above is the display form, which deliberately strips it.
         const caseName = focused?.case?.name ?? "";
         if (!focused || !cid || !caseName) post();
-        else void loadFhirQuestionnaireCase(caseName, focused.decision?.libraryName).then((r) => post(r.q, r.qr, r.lookedFor));
+        else
+          void loadFhirQuestionnaireCase(
+            caseName,
+            focused.decision?.libraryName,
+            focused.case?.subject,
+          ).then((r) => post(r.q, r.qr, r.lookedFor));
       }
     } else {
       // questionnaire (#177 slice 3) — a STATIC, read-only projection of the FOCUSED cel case's fired path. Gets the
@@ -2173,6 +2180,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   async function loadFhirQuestionnaireCase(
     caseName: string,
     libraryName: string | undefined,
+    subjectName: string | undefined,
   ): Promise<{ q?: unknown; qr?: unknown; lookedFor: string }> {
     const slugify = artifactSlug;
     // ⚠ Keyed on the case's FULL AUTHORED NAME, including its `-> outcome` suffix — that is what the emitter
@@ -2185,13 +2193,33 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     //
     // Because the whole name is used, the match is EXACT — no prefix glob, so no risk of binding a sibling case
     // whose slug extends this one.
-    const slug = slugify(caseName);
-    // Scope by library too when we know it — two libraries can carry the same case slug, and in a multi-root
-    // workspace findFiles spans every folder.
-    const libSeg = libraryName ? `${slugify(libraryName)}-cases` : "*";
-    const lookedFor = `**/tests/data/fhir/patient/${libSeg}/${slug}/{Questionnaire,QuestionnaireResponse}/*.json`;
-    const out: { q?: unknown; qr?: unknown; lookedFor: string } = { lookedFor };
-    if (!slug) return { ...out, lookedFor: "(no case id — nothing was searched)" };
+    // ⭐⭐ THE DIRECTORY COMES FROM THE EMITTER, NEVER FROM A SLUG COMPOSED HERE.
+    //
+    // ⚠ This function used to build `<slugify(library)>-cases/<slugify(case)>/Questionnaire/`. That was
+    // CORRECT against the emitter of the day and silently stopped matching at `0e7641da` (#189 KALM
+    // Patient-compartment layout), which merged the library/case pair into ONE hashed compartment segment
+    // and lowercased the type dir. Nothing errored — the pane simply found nothing, forever, and four
+    // documents went on describing the old shape. The id is a capped slug of library + case + SUBJECT plus
+    // a 12-hex hash, so it is not reproducible by any rule written down here.
+    //
+    // `subjectName` is therefore REQUIRED to address a case. A case with no subject emits no resources at
+    // all (`emitCase` returns undefined), so "no subject" and "no artifacts" are the same state.
+    const out: { q?: unknown; qr?: unknown; lookedFor: string } = { lookedFor: "" };
+    if (!caseName || !libraryName || !subjectName) {
+      return {
+        ...out,
+        lookedFor: `(need library + case + subject to address a case directory; had ${[
+          libraryName ? "" : "library",
+          caseName ? "" : "case",
+          subjectName ? "" : "subject",
+        ]
+          .filter(Boolean)
+          .join(" + ")} missing)`,
+      };
+    }
+    const compartmentDir = celCaseCompartmentDir(libraryName, caseName, subjectName);
+    const lookedFor = `**/tests/data/fhir/${compartmentDir}/{questionnaire,questionnaireresponse}/*.json`;
+    out.lookedFor = lookedFor;
     let hits: readonly vscode.Uri[] = [];
     try {
       hits = await vscode.workspace.findFiles(lookedFor, "**/node_modules/**", 200);
@@ -2200,16 +2228,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
     for (const uri of hits) {
       const segs = uri.path.split("/");
-      const type = segs[segs.length - 2]; // the <ResourceType> dir holding the file
-      const caseDir = segs[segs.length - 3]; // the <case-slug> dir holding that
-      if (type !== "Questionnaire" && type !== "QuestionnaireResponse") continue;
-      if (caseDir !== slug) continue; // exact case-directory match; belt and braces against a glob surprise
-      if (type === "Questionnaire" && out.q) continue; // a case has one of each
-      if (type === "QuestionnaireResponse" && out.qr) continue;
+      const type = segs[segs.length - 2]; // the LOWERCASE type dir holding the file
+      const caseDir = segs[segs.length - 3]; // the compartment dir holding that
+      if (type !== "questionnaire" && type !== "questionnaireresponse") continue;
+      // Exact compartment match — belt and braces against a glob surprise in a multi-root workspace.
+      if (`patient/${caseDir}` !== compartmentDir) continue;
+      if (type === "questionnaire" && out.q) continue; // a case has one of each
+      if (type === "questionnaireresponse" && out.qr) continue;
       // Per-FILE try: one malformed document must not abort the search and hide a valid one later in the list.
       try {
         const json: unknown = JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8"));
-        if (type === "Questionnaire") out.q = json;
+        if (type === "questionnaire") out.q = json;
         else out.qr = json;
       } catch {
         // skip this file; keep looking
