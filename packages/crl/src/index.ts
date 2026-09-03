@@ -263,25 +263,31 @@ export {
   celCaseCompartmentDir,
 } from "./cel/emitter";
 
-// ⭐ The questionnaire PRODUCER — generated Q/QR artifacts and their ownership record. Deliberately
-// NOT part of CEL emit: a Questionnaire is not a fact about a patient, it is what the engine ASKED
-// when `$apply` ran, with a different producer, inputs and lifecycle from case data.
+// ⭐ EMITTED RESULTS — what an ENGINE produced over the emitted definitions and a case's data
+// (`$apply`'s Questionnaire for prior auth, a MeasureReport for a measure). Deliberately NOT part of
+// CEL emit: CEL emits the FACTS a case states and owns `tests/data/fhir/patient/`; results have a
+// different producer, inputs and lifecycle, and live under `tests/results/<use-case>/`.
+export {
+  RESULT_USE_CASES,
+  isResultUseCase,
+  USE_CASE_RESOURCE_TYPES,
+  resultsRoot,
+  caseResultsDir,
+  caseResultsTypeDir,
+  compartmentIdOf,
+} from "./results/useCases";
+export type { ResultUseCase } from "./results/useCases";
 export {
   producerManifestName,
   resolveCaseArtifacts,
   caseState,
-} from "./questionnaire/manifest";
-export {
-  questionnaireArtifactId,
-  isProducerOwnedId,
-  PRODUCER_ID_MARKER,
-} from "./questionnaire/ownership";
+} from "./results/manifest";
 export type {
   ProducerManifest,
   ProducerCaseEntry,
   ProducerCaseState,
   ProducerArtifact,
-} from "./questionnaire/manifest";
+} from "./results/manifest";
 export type {
   EmitResult,
   EmittedCase,

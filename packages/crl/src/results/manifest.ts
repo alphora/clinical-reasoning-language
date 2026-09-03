@@ -1,17 +1,16 @@
 /**
- * ⭐⭐ THE PRODUCER MANIFEST — the ownership record for generated Questionnaire/QuestionnaireResponse
- * artifacts, and the ONLY thing a consumer may bind to.
+ * ⭐⭐ THE RESULTS MANIFEST — the per-run record of what an engine produced for each case, and the
+ * authority a consumer binds to.
  *
- * ⚠ WHY A MANIFEST AND NOT A GLOB. Two writers share `<compartment>/questionnaireresponse/`: the CEL
- * emitter (a fact whose `defined by` resolves to a QuestionnaireResponse — it is in `SUBJECT_RESOURCES`)
- * and this producer. A consumer that globs the directory and takes the first hit binds whichever file the
- * filesystem happened to return, which can be authored case data, a stale generation, or — in a
- * multi-root workspace where two checkouts share a compartment id — a file from the other checkout.
- * The manifest names the exact files, so binding is decided rather than discovered.
+ * ⚠ WHY A MANIFEST AND NOT A DIRECTORY LISTING. A directory can only say what files exist. It cannot
+ * distinguish the three states a reader must tell apart: the engine legitimately produced no result for
+ * this case, the run FAILED for this case, and the producer has never run at all. All three look like an
+ * empty directory. Every eligible case therefore gets exactly one terminal state here.
  *
- * ⚠ THIS IS NOT CEL EMIT. A Questionnaire is not a fact about a patient; it is what the engine ASKED
- * when `$apply` ran over the PlanDefinition. It has a different producer, different inputs and a
- * different lifecycle from case data, so it does not belong behind `emit_cel`.
+ * Results live under `tests/results/<use-case>/`, a sibling of the CEL emitter's
+ * `tests/data/fhir/patient/`. An earlier design co-located them in the case compartment and needed an
+ * id-level ownership marker to survive sharing a directory with CEL-emitted `QuestionnaireResponse`
+ * facts; the separate tree removes that problem rather than guarding it.
  */
 
 /**
@@ -53,7 +52,7 @@ export interface ProducerArtifact {
   path: string;
   /** sha256 of the bytes written. The consumer re-verifies before binding. */
   sha256: string;
-  resourceType: "Questionnaire" | "QuestionnaireResponse";
+  resourceType: string;
 }
 
 export interface ProducerCaseEntry {
@@ -78,6 +77,8 @@ export interface ProducerManifest {
   /** The CEL library this manifest covers. One manifest PER CEL SOURCE — a single shared file at the
    *  emit root would lose the ownership records of every other CEL library writing there. */
   celLibrary: string;
+  /** Which engine produced these — `prior-auth` (Questionnaire/QR), `measure` (MeasureReport), … */
+  useCase: string;
   /** Absolute-free identity of the run's inputs, so a reader can tell stale from current. */
   generatedAt: string;
   /** ⚠ Records WHAT PRODUCED THIS, because a stale definition closure makes the CEL oracle and `$apply`

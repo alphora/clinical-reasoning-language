@@ -6,11 +6,12 @@ import {
   resolveCaseArtifacts,
   type ProducerManifest,
 } from "../manifest";
-import { questionnaireArtifactId, isProducerOwnedId } from "../../index";
+
 
 const M = (cases: ProducerManifest["cases"]): ProducerManifest => ({
   schemaVersion: 1,
   celLibrary: "Probe Cases",
+  useCase: "prior-auth",
   generatedAt: "2026-01-01T00:00:00.000Z",
   provenance: { crlVersion: "0.0.0-test" },
   cases,
@@ -26,7 +27,7 @@ describe("the manifest is the binding authority, not the directory", () => {
         state: "generated",
         artifacts: [
           {
-            id: questionnaireArtifactId("Probe Cases", "a case", "questionnaire"),
+            id: "q-probe-cases-a-case",
             path: `${dir}/questionnaire/x.json`,
             sha256: "0".repeat(64),
             resourceType: "Questionnaire",
@@ -36,7 +37,7 @@ describe("the manifest is the binding authority, not the directory", () => {
     ]);
     const bound = resolveCaseArtifacts(m, dir);
     expect(bound?.caseName).toBe("a case");
-    expect(bound?.artifacts?.every((a) => isProducerOwnedId(a.id))).toBe(true);
+    expect(bound?.artifacts?.length).toBe(1);
   });
 
   it("⚠ a legitimately question-less case is SUCCESS with a state, not a silent absence", () => {
