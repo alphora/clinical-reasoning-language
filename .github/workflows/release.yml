@@ -1,12 +1,25 @@
-# This workflow validates releases by running tests. If tests fail, the workflow fails and no further automation is run.
-name: Validate Release
+# The repository's ONE test gate. It runs on every push to a long-lived branch, on pull requests into them, and on release
+# publication — where a failure also stops the npm publish that `needs:` it.
+#
+# ⚠ IT MUST FIRE ON `push`. It previously ran only on `pull_request` into main and on `release`, while the work goes
+# straight to `develop` — so the gate went months without executing and two tests rotted undetected. Both then surfaced for
+# the first time as a FAILED RELEASE. A gate that only fires when you are trying to ship is not a gate; it is an ambush.
+name: CI and Release Validation
 
 on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
   release:
     types: [published]
   workflow_dispatch:
-  pull_request:
-    branches: [ main ]
+
+# Supersede in-flight runs for the same branch, since every push now starts one. Release and PR runs are never cancelled:
+# a cancelled release run would skip `publish-npm`, which `needs:` it.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   test-release:
@@ -27,8 +40,9 @@ jobs:
       # Path-scoped test selection. The dependency is ASYMMETRIC: crl-vscode imports the BUILT @smile-digital-health/crl,
       # so any packages/crl/** change can break the extension (→ run BOTH), but a packages/crl-vscode/**-only change cannot
       # affect core (→ run the extension only, skip core). Anything else (root config, lockfile, .github, docs) defaults to
-      # BOTH — an unclassified path must never skip both and go falsely green. On release/workflow_dispatch there is no PR
-      # base to diff, so both always run. Any error in detection falls back to running BOTH (fail-safe). Kept as step-level
+      # BOTH — an unclassified path must never skip both and go falsely green. On push/release/workflow_dispatch there is no
+      # PR base to diff, so both always run — deliberately, because a push to a long-lived branch is the last gate before a
+      # release and is the wrong place to be clever about skipping. Any error in detection falls back to running BOTH (fail-safe). Kept as step-level
       # `if:` inside this ONE job (not split into separate jobs) so the required-check name `test-release` is unchanged and
       # a skipped step never sits as a never-reported required check on the protected branch.
       - name: Detect changed packages
