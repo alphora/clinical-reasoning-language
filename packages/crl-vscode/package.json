@@ -25,6 +25,12 @@
     "color": "#7E4E9C",
     "theme": "dark"
   },
+    "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Language features (syntax, validation, navigation) work in an untrusted workspace. Repository-scoped and network-backed features — the correspondence cockpit's git/GitHub integration — are disabled until you trust the workspace."
+    }
+  },
   "contributes": {
     "icons": {
       "crl-coral": {

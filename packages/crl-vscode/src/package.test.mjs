@@ -264,6 +264,28 @@ check("every contributed icon id is `component-iconname` (VS Code drops single-s
   }
 });
 
+// ⚠ WITHOUT a `capabilities.untrustedWorkspaces` declaration VS Code DISABLES the extension outright in any
+// untrusted workspace — and a GitHub Codespace does NOT start trusted, so CRL was dead in every fresh one
+// until a user granted trust (#276, measured by the Spaces project 2026-08-15).
+//
+// ⚠ "limited", not "true": the extension already returns early on `workspace.isTrusted` for its
+// repository-scoped and network-backed paths, so claiming FULL support would overstate what works. And not
+// "false": the language features are pure analysis of files the user opened and are safe untrusted.
+check("capabilities.untrustedWorkspaces is declared (VS Code disables the extension without it)", () => {
+  const u = pkg.capabilities?.untrustedWorkspaces;
+  assert.ok(u, "an undeclared extension is DISABLED in every untrusted workspace, incl. a fresh Codespace");
+  assert.ok(
+    u.supported === "limited" || u.supported === true,
+    "must declare support; `limited` is the honest value while trust-gated features exist",
+  );
+  if (u.supported === "limited") {
+    assert.ok(
+      typeof u.description === "string" && u.description.length > 0,
+      "`limited` must say WHAT is limited — the user sees this string",
+    );
+  }
+});
+
 check("the marketplace extension icon is a real PNG (not the default placeholder)", () => {
   assert.equal(pkg.icon, "media/icon.png", "the extension `icon` points to the Coral PNG");
   const png = readFileSync(join(here, "..", pkg.icon));
