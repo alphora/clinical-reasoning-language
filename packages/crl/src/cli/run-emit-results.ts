@@ -8,6 +8,8 @@
  * QuestionnaireResponse, a measure will produce MeasureReport. The use case is an argument, not a tool.
  */
 import { spawnSync } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -18,7 +20,6 @@ import {
   SingleFlight,
   buildEngineRepoBundle,
   buildProducerInputs,
-  caseResultsTypeDir,
   cqlIndex,
   emitCelToFhir,
   emitCrlTwoLane,
@@ -27,7 +28,10 @@ import {
   resolveCelImports,
   resolveJava,
   verifyJar,
+  producerManifestName,
+  type ProducerManifest,
 } from "../index";
+import { runOneCase } from "../results/runProducer";
 
 const HELP_TEXT = `crl-emit-results — run an engine over an emitted artifact and write the results
 
@@ -152,7 +156,46 @@ function main(): void {
   const flight = new SingleFlight();
   if (!flight.tryAcquire()) { process.stderr.write("another run is in flight\n"); process.exit(2); }
 
+  // ⚠ THE REPOSITORY BUNDLE IS A BUILD INPUT, NOT A RESULT. It goes to scratch, never into
+  // `tests/results/` — committing the engine's input beside its output invites the next reader to treat
+  // it as an artifact, and a later bundler to feed it back in as case data.
+  const scratch = mkdtempSync(path.join(tmpdir(), "crl-emit-results-"));
+
+  const defs = (two.fhir.resources as unknown as { resource: Record<string, unknown> }[]).map(
+    (w) => w.resource,
+  );
+  // ⚠ The DECISION PlanDefinition, not an activity-derived one. A library emits one `workflow-definition`
+  // PD for the decision plus an `eca-rule` PD per activity, and applying an activity PD yields nothing
+  // useful — it has no guard to evaluate.
+  const pd = defs.find(
+    (r) =>
+      r.resourceType === "PlanDefinition" &&
+      /determination|decision|coverage/i.test(String(r.id ?? "")),
+  );
+  if (!pd?.id) {
+    process.stderr.write("no decision PlanDefinition found in the emitted definitions\n");
+    process.exit(2);
+  }
+
   let failed = 0;
+
+  const classpath = process.env.CRL_PRODUCER_CLASSPATH;
+  if (!classpath) {
+    process.stderr.write(
+      "CRL_PRODUCER_CLASSPATH is not set — point it at the compiled ApplyDriver plus the engine jars\n",
+    );
+    process.exit(2);
+  }
+
+  const manifest: ProducerManifest = {
+    schemaVersion: 1,
+    celLibrary: path.basename(a.cel, ".cel"),
+    useCase: a.useCase,
+    generatedAt: new Date().toISOString(),
+    provenance: { crlVersion: "dev", producerJarSha256: jarCheck.sha256 },
+    cases: [],
+  };
+
   for (const input of inputs) {
     const repo = buildEngineRepoBundle({
       definitions: two.fhir.resources.map((w: { resource: unknown }) => w.resource) as never,
@@ -160,19 +203,45 @@ function main(): void {
       caseInput: input,
     });
     for (const id of repo.missingCql) {
-      process.stderr.write(`case "${input.caseName}": Library ${id} has no CQL available\n`);
+      process.stderr.write(`case "${input.caseName}": Library ${id} has no CQL available
+`);
     }
-    const dir = caseResultsTypeDir(input.compartmentId, "Questionnaire");
-    mkdirSync(path.join(root, dir), { recursive: true });
-    writeFileSync(
-      path.join(root, dir, "repo.json"),
-      JSON.stringify(repo.bundle),
+    const repoPath = path.join(scratch, `${input.compartmentId}.json`);
+    writeFileSync(repoPath, JSON.stringify(repo.bundle));
+
+    const entry = runOneCase(
+      {
+        javaExe: java.javaExe,
+        classpath,
+        bounds: DEFAULT_BOUNDS,
+        planDefinitionId: String(pd.id),
+        artifactRoot: root,
+      },
+      {
+        caseName: input.caseName,
+        compartmentId: input.compartmentId,
+        subjectReference: input.subjectReference,
+        repoPath,
+      },
     );
+    manifest.cases.push(entry);
+    if (entry.state === "failed" || entry.state === "timeout") failed++;
     process.stdout.write(
-      `${input.caseName}: repository built (${repo.bundle.entry.length} entries, ` +
-        `${repo.inlined.length} CQL inlined) -> ${dir}\n`,
+      `${entry.state.padEnd(18)} ${input.caseName}` +
+        (entry.artifacts?.length ? ` (${entry.artifacts.length} artifact)` : "") +
+        (entry.reason ? ` — ${entry.reason}` : "") +
+        "\n",
     );
   }
+
+  // ⚠ MANIFEST LAST — it is the commit point. A reader that finds it can trust every path in it,
+  // because those files were written before it existed.
+  mkdirSync(path.join(root, "tests/results"), { recursive: true });
+  writeFileSync(
+    path.join(root, "tests/results", producerManifestName(manifest.celLibrary)),
+    JSON.stringify(manifest, null, 2) + "\n",
+    "utf8",
+  );
   flight.release();
 
   process.stdout.write(
