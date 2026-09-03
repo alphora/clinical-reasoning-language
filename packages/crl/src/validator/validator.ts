@@ -346,6 +346,10 @@ export interface AgePredicateUnsupportedError extends ValidationErrorBase {
  *                                      record whose resource is `type is`, so `value type` is optional there)
  */
 export type RepresentationShapeRule =
+  // ⭐ A local `code is` MUST declare its `type is` — there is no implicit default. Removed 2026-09-03:
+  // a type-less local code silently meant `Observation`, which decided the retrieve resource with
+  // nothing on the page saying so, and three lanes applied it while a fourth refused it.
+  | "local-code-missing-type"
   | "incomplete-representation"
   | "value-element-invalid"
   | "value-element-without-code"

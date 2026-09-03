@@ -1028,7 +1028,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     // wants. That is a CORRECTNESS fix, not teaching, so it lands with the slice and re-pins at 1.25 with NO
     // bump — the doctrine re-teach + schemaVersion bump stay BATCHED (`tmp/WORKLIST-kit-deltas.md`).
     expect(cpg.contentHash).toBe(
-      "ca98105f5b4401af1974c3bd32956cb54a6cbb66e68b406d31bf378df8890948",
+      "ac231e05af18d3b17a5858d7c31da794fa3dca524b5b2e3358cdcdde1502a4b2",
     );
     // #189 null/pause — the priorAuth payload embeds the reference `.cel` artifacts, which gained explicit
     // `value is true/false` facts (a NEGATIVE must now be STATED; omission means UNKNOWN and PAUSES). That is
@@ -1040,7 +1040,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     //   changelog entry that explains the re-sync is the `inline-answer-options` rule itself. A KE pinning
     //   1.25 re-syncs and gets the teaching for the new construct in the same step.
     expect(priorAuth.contentHash).toBe(
-      "a0db8235bb07116d642afa996c0c86ce300a56723a21bad4a04a2f04beabbf20",
+      "9792fad1ffe5c978b079281f5604a82014567cad697ea99a9b670c45510a929c",
     );
   });
 

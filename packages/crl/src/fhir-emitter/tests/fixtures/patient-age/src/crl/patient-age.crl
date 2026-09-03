@@ -8,6 +8,7 @@ library "Patient Age".
 concept "Age 18 Or Older":
 - value type is boolean.
 - meta is `@business-logic-deferred: the case-3 human-assert answer Observation for this age criterion must NOT persist beyond the client session (mechanism deferred — #190); the recency lattice treats it as session-fresh`.
+- type is Observation.
 - code is `age-18-or-older`.
 - source representation:
   - type is Patient.

@@ -70,6 +70,7 @@ concept "Administrative Mammogram":
 // ============ Mammogram — locally coded (`code is`) + value-preserving `sem-or` union ============
 concept "Mammogram":
 - value type is dateTime.
+- type is Observation.
 - code is `mammogram`.
 - defined as ( "Clinical Mammogram" sem-or "Administrative Mammogram" ).
 
@@ -78,6 +79,7 @@ concept "Mammogram":
 //   - assert the BOOLEAN ("Up To Date On Mammography") → directly answers the screening question.
 concept "Had Mammogram":
 - value type is boolean.
+- type is Observation.
 - code is `had-mammogram`.
 - defined as exists ("Mammogram").
 
@@ -91,12 +93,14 @@ concept "Mammograms In Last Six Months":
 
 concept "Up To Date On Mammography":
 - value type is boolean.
+- type is Observation.
 - code is `up-to-date-on-mammography`.
 - definition is "Most Recent Mammogram" within last 27 months.
 
 // ============ BMI cascade — Height (no split) contrasts with Mammogram (split) ============
 concept "Height":
 - value type is Quantity.
+- type is Observation.
 - code is `height`.
 - source representation:
   - type is Observation.
@@ -104,6 +108,7 @@ concept "Height":
 
 concept "Weight":
 - value type is Quantity.
+- type is Observation.
 - code is `weight`.
 - source representation:
   - type is Observation.
@@ -111,6 +116,7 @@ concept "Weight":
 
 concept "BMI":
 - value type is Quantity.
+- type is Observation.
 - code is `bmi`.
 - definition is body mass index of "Weight" and "Height".
 - source representation:
@@ -119,6 +125,7 @@ concept "BMI":
 
 concept "High BMI":
 - value type is boolean.
+- type is Observation.
 - code is `high-bmi`.
 - definition is "BMI" at least 30 'kg/m2'.
 

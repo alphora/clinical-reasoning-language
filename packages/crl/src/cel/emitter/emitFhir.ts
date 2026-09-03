@@ -28,7 +28,6 @@ import { inlineAnswerSet } from "../../fhir-emitter/inlineAnswerSet";
 
 /** The resource a local `code is` concept carries when it declares no `type is` (charter §3). Mirrors the
  *  validators' constant of the same name — the emit lane must not disagree with the lane that accepted it. */
-const IMPLICIT_LOCAL_TYPE = "Observation";
 import {
   parseCanonicalToken,
   classifyCanonicalToken,
@@ -262,18 +261,17 @@ function deriveFhirType(
     if (covered) {
       for (const st of covered.ast.statements) {
         if (st.type !== "Concept" || st.name !== name) continue;
-    // ⚠⚠ A LOCAL `code is` CONCEPT WITH NO `type is` IS IMPLICITLY AN Observation, and reading `conceptType`
-    // RAW made it emit nothing at all. That is issue #299 cell 1, and it is the same CRE-vs-$apply
-    // divergence class as the two fixed beside it: the CRE populates the concept BY NAME and passes, while
-    // `$apply` sees no resource and pauses — two lanes, two verdicts, from one source, with only a WARNING.
+    // ⚠⚠ NO IMPLICIT TYPE. A local `code is` concept MUST declare its `type is`; there is no default.
     //
-    // ⚠ The default is the SAME `IMPLICIT_LOCAL_TYPE` the validators already apply
-    // (`representationShapeValidator.ts`, `emitCapabilityValidator.ts`), so the emit lane stops disagreeing
-    // with the lane that told the author their concept was well-formed.
+    // An earlier cut defaulted a type-less `code is` to Observation here, because reading `conceptType` raw
+    // made such a concept emit nothing (#299 cell 1). That fixed the symptom by inventing a value the
+    // author never wrote — the retrieve resource became invisible, decided in three lanes and refused in a
+    // fourth. CRL optimizes WRITTEN == EXECUTED, not fewer keystrokes: a default that no line of the
+    // artifact states is exactly the intent-versus-execution gap the language exists to close.
     //
-    // ⚠ Gated on a local `code is`: without one the concept is read-only, has no answer slot, and must NOT
-    // acquire an implicit resource here.
-        const ct = st.conceptType ?? (st.code !== undefined && st.code !== "" ? IMPLICIT_LOCAL_TYPE : undefined);
+    // The real fix is upstream: `local-code-missing-type` is a VALIDATOR error, so a type-less `code is`
+    // never reaches emit at all.
+        const ct = st.conceptType;
         if (!ct || !CONCEPT_TYPE_SET.has(ct)) return undefined;
         return {
           fhirType: ct,
@@ -306,9 +304,9 @@ function deriveFhirType(
   if (!target) return undefined;
 
   if (target.type === "Concept") {
-    // ⚠ Same implicit-Observation default as the unqualified arm above (#299 cell 1) — the two spellings of
-    // the same reference must not derive different resource types.
-    const c = target.conceptType ?? (target.code !== undefined && target.code !== "" ? IMPLICIT_LOCAL_TYPE : undefined);
+    // ⚠ No implicit type here either — the two spellings of the same reference must agree, and they agree
+    // on requiring the author to have written one.
+    const c = target.conceptType;
     if (c && CONCEPT_TYPE_SET.has(c)) {
       return {
         fhirType: c,

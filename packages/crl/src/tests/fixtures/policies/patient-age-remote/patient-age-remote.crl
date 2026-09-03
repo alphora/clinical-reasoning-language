@@ -14,6 +14,7 @@ instance emit. dme101-030 carries the coded-device both-rep (emit-deferred to th
 
 concept "Adult Eighteen Or Older":
 - value type is boolean.
+- type is Observation.
 - code is `adult-18-or-older`.
 - source representation:
   - type is Patient.

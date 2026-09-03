@@ -555,7 +555,19 @@ export function lowerLocalCodes(
     // throw; `buildNameLayerMaps` Inferences-wins for same-name).
     const rv = resolveRecencyValueConcept(c);
     if (rv.kind === "recency-value") {
-      const localResource = c.conceptType ?? "Observation"; // implicit-standard local Observation (charter §3)
+      // ⚠ NO IMPLICIT TYPE. The author declares `type is`; a default here would decide the retrieve
+      // resource without any line of the artifact saying so.
+      const localResource = c.conceptType;
+      if (localResource === undefined) {
+        errors.push({
+          kind: "emit-local-code-missing-type",
+          message:
+            `Concept "${c.name}" has a local \`code is\` but no \`type is\`. Declare the resource the local record is stored as; there is no implicit default.`,
+          severity: "error",
+          location: c.location,
+        } as never);
+        continue;
+      }
       // Dedup / collision — the THIRD copy of the (5)-(7)+(A2) mirror (DRY note above; keep lock-step).
       const priorForCode = codeValueToConcept.get(codeValue);
       if (priorForCode !== undefined) {

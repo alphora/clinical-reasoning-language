@@ -244,7 +244,7 @@ try {
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
     assert.equal(kit.schemaVersion, "1.27"); // … #250 derivedFrom gate teaching (1.15) … / age posrep recency (1.21) / inline answer options + pa-answers-not-records (1.27)
-    assert.equal(kit.contentHash, "ca98105f5b4401af1974c3bd32956cb54a6cbb66e68b406d31bf378df8890948");
+    assert.equal(kit.contentHash, "ac231e05af18d3b17a5858d7c31da794fa3dca524b5b2e3358cdcdde1502a4b2");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.
@@ -261,7 +261,7 @@ try {
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
     assert.equal(kit.schemaVersion, "1.27");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "a0db8235bb07116d642afa996c0c86ce300a56723a21bad4a04a2f04beabbf20");
+    assert.equal(kit.contentHash, "9792fad1ffe5c978b079281f5604a82014567cad697ea99a9b670c45510a929c");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.equal(refNames.length, 12); // shared medical-policy-determination.crl removed (config-driven local activities); representation-reference.crl added
     assert.ok(!refNames.includes("medical-policy-determination.crl"));

@@ -26,7 +26,6 @@ import { ValidationError } from "./validator";
 
 type Attribution = { libraryName?: string; filePath?: string };
 
-const IMPLICIT_LOCAL_TYPE = "Observation";
 
 export class EmitCapabilityValidator {
   public validate(ast: CRL, sources?: SourceContext[]): ValidationError[] {
@@ -53,7 +52,10 @@ export class EmitCapabilityValidator {
     // Patient-age is Patient-backed (supported/supplied), classified by the shared age authority — not flagged.
     if (resolveAgeConcept(stmt).kind !== "not-age") return;
 
-    const resourceType = stmt.conceptType ?? IMPLICIT_LOCAL_TYPE;
+    // ⚠ NO DEFAULT. A local `code is` with no `type is` is reported by `local-code-missing-type`;
+    // inventing a resource here would let this check pass on a concept whose retrieve is undecided.
+    const resourceType = stmt.conceptType;
+    if (resourceType === undefined) return;
     if (isCaseFeatureEmittable(resourceType)) return;
 
     errors.push({

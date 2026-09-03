@@ -3,4 +3,5 @@ library "Vitals".
 
 concept "Flag":
 - value type is boolean.
+- type is Observation.
 - code is `f`.

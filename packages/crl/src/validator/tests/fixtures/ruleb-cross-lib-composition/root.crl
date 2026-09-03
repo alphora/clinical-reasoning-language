@@ -6,6 +6,7 @@ library "Root".
 
 concept "Local":
 - value type is CodeableConcept.
+- type is Observation.
 - code is `l`.
 
 concept "Bad":

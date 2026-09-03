@@ -545,8 +545,10 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — boolean operand in a refineme
     // for a boolean leaf under a NON-boolean scalar parent).
     const src =
       `library "T".\n` +
-      `concept "A":\n- value type is CodeableConcept.\n- code is \`a\`.\n` +
-      `concept "B":\n- value type is boolean.\n- code is \`b\`.\n` +
+      // `type is` is REQUIRED alongside `code is` — the implicit-Observation default was removed, so a
+      // type-less local code is now `local-code-missing-type` and would make `isValid` false here.
+      `concept "A":\n- value type is CodeableConcept.\n- type is Observation.\n- code is \`a\`.\n` +
+      `concept "B":\n- value type is boolean.\n- type is Observation.\n- code is \`b\`.\n` +
       `concept "OK":\n- value type is boolean.\n- defined as ( "A" sem-and "B" ).\n`;
     expect(mismatches(src, "boolean-in-refinement-composition")).toHaveLength(0); // NOT the error rule
     const warns = mismatchWarnings(src, "composition-result-type-mismatch");
@@ -916,7 +918,8 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — #189 IMPL 2b: record-shaped r
     const src =
       `library "T".\n` +
       `concept "Obs Set":\n- shape is RecordSet.\n- type is Observation.\n- code is \`o\`.\n` +
-      `concept "Bool":\n- value type is boolean.\n- code is \`b\`.\n` +
+      // `type is` REQUIRED with `code is` — no implicit-Observation default any more.
+      `concept "Bool":\n- value type is boolean.\n- type is Observation.\n- code is \`b\`.\n` +
       `concept "Union":\n- shape is RecordSet.\n- type is Observation.\n- defined as ( "Obs Set" sem-or "Bool" ).\n`;
     expect(mismatches(src, "boolean-in-refinement-composition")).toHaveLength(0);
     const warns = mismatchWarnings(src, "composition-result-type-mismatch");

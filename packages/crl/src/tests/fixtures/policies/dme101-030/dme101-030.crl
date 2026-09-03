@@ -47,6 +47,7 @@ terminology "Covered Devices":
 // today (its posrep recency is the built #257 age slice). Mirrors fhir-emitter/tests/fixtures/patient-age.
 concept "Adult Eighteen Or Older":
 - value type is boolean.
+- type is Observation.
 - code is `adult-18-or-older`.
 - source representation:
   - type is Patient.

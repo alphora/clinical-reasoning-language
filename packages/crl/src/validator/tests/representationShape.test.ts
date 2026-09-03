@@ -328,12 +328,16 @@ describe("RepresentationShapeValidator (Todo 2) — static shape rules", () => {
       expect(shapeErrors(src, "duplicate-representation-key")).toHaveLength(0);
     });
 
-    it("A.2 concept-level: names the IMPLICIT local type when no `type is` was written", () => {
+    it("⚠ A.2 concept-level: a type-less local `code is` is REPORTED, not silently defaulted", () => {
+      // ⚠ THIS TEST PINNED THE OPPOSITE BEHAVIOUR — it asserted the diagnostic would "name the implicit
+      // local type `Observation`", i.e. that a concept with no `type is` was silently treated as one.
+      // That default is REMOVED: it decided the retrieve resource with nothing on the page saying so,
+      // three lanes applied it and a fourth refused it, so the same artifact was well-formed to the
+      // validator and unemittable to the emitter. A local `code is` is ANSWERABLE, so its record must be
+      // storable, and storing needs a declared type.
       const src =
         `library "T".\nconcept "C":\n- value element is ImagingStudy.started.\n- value type is dateTime.\n- code is \`c\`.\n`;
-      const errs = shapeErrors(src, "value-element-invalid");
-      expect(errs).toHaveLength(1);
-      expect(errs[0].message).toMatch(/implicit local type `Observation`/);
+      expect(shapeErrors(src, "local-code-missing-type")).toHaveLength(1);
     });
 
     it("stays a hard ERROR under `soft: true` (structural, non-demotable)", () => {

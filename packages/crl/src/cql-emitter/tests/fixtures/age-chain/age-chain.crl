@@ -14,6 +14,7 @@ library "AgeChain".
 
 concept "Adult Eighteen Or Older":
 - value type is boolean.
+- type is Observation.
 - code is `adult-18-or-older`.
 - source representation:
   - type is Patient.

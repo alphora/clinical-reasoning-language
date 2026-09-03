@@ -218,15 +218,34 @@ export class RepresentationShapeValidator {
       );
     }
 
-    // A.2 — the concept-level value element's path shape, checked against the implicit-standard
-    // local type (`Observation` unless the concept declares otherwise). `typeIsImplicit` lets the
-    // diagnostic say "the implicit local type, Observation" so the author isn't left hunting for a
-    // `type is` line they never wrote (refinement 7).
-    if (concept.valueElement) {
+    // ⭐⭐ A LOCAL `code is` MUST DECLARE ITS `type is`. There is NO implicit default.
+    //
+    // ⚠ There used to be one: a type-less local code meant `Observation`/`Observation.value`. It was a
+    // keystroke saving, and it made the retrieve resource INVISIBLE — nothing on the page said what the
+    // record is stored as. Three lanes applied the default and a fourth refused it, so the same artifact
+    // was well-formed to the validator and unemittable to the emitter. CRL optimizes WRITTEN == EXECUTED:
+    // a value the author never wrote, decided differently by different lanes, is the exact intent-versus-
+    // execution gap the language exists to close.
+    if (concept.code !== undefined && concept.code !== "" && concept.conceptType === undefined) {
+      errors.push(
+        this.err(
+          "local-code-missing-type",
+          concept.name,
+          `Concept "${concept.name}" has a local \`code is\` but no \`type is\`. A locally coded concept is ` +
+            `ANSWERABLE — someone can assert it — so the record must be storable, and storing it needs a ` +
+            `resource type. Declare it (e.g. \`- type is Observation.\`); there is no implicit default.`,
+          concept.location,
+          attribution,
+        ),
+      );
+    }
+
+    // A.2 — the concept-level value element's path shape, checked against the concept's DECLARED local type.
+    if (concept.valueElement && concept.conceptType !== undefined) {
       this.checkValueElementPath(
         concept.valueElement,
-        concept.conceptType ?? IMPLICIT_LOCAL_TYPE,
-        concept.conceptType === undefined,
+        concept.conceptType,
+        false,
         concept.name,
         attribution,
         errors,

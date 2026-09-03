@@ -81,22 +81,22 @@ is a communicated decision (see the dispositions rule).
 
 concept "Hard Exclusion":
 - value type is boolean.
-- type is Condition.
+- type is Observation.
 - code is \`hard-exclusion\`.
 
 concept "Qualifying Indication":
 - value type is boolean.
-- type is Condition.
+- type is Observation.
 - code is \`qualifying-indication\`.
 
 concept "Contrast Allergy":
 - value type is boolean.
-- type is AllergyIntolerance.
+- type is Observation.
 - code is \`contrast-allergy\`.
 
 concept "Complex Case":
 - value type is boolean.
-- type is Condition.
+- type is Observation.
 - code is \`complex-case\`.
 
 // ============ Decision ============
@@ -162,18 +162,42 @@ fact "Sample Patient":
 
 fact "Indication Finding":
 - date is "2026-01-01".
+- value is true.
 - defined by "Imaging Coverage Reference"."Qualifying Indication".
 
 fact "Exclusion Finding":
 - date is "2026-01-01".
+- value is true.
 - defined by "Imaging Coverage Reference"."Hard Exclusion".
 
 fact "Contrast Allergy Finding":
 - date is "2026-01-01".
+- value is true.
 - defined by "Imaging Coverage Reference"."Contrast Allergy".
 
 fact "Complex Case Finding":
 - date is "2026-01-01".
+- value is true.
+- defined by "Imaging Coverage Reference"."Complex Case".
+
+// ⚠ NEGATIVE ANSWERS ARE NOT OPTIONAL under value-read semantics. A locally-coded boolean with a
+// bare \`code is\` is a QUESTION: unanswered it is UNKNOWN, so the branch guarding on it can neither
+// fire nor fall through and the decision PAUSES. Omitting "no hard exclusion" does not mean false; it
+// means nobody has been asked. Every case below therefore answers each criterion on its path.
+
+fact "No Hard Exclusion":
+- date is "2026-01-01".
+- value is false.
+- defined by "Imaging Coverage Reference"."Hard Exclusion".
+
+fact "No Contrast Allergy":
+- date is "2026-01-01".
+- value is false.
+- defined by "Imaging Coverage Reference"."Contrast Allergy".
+
+fact "Not A Complex Case":
+- date is "2026-01-01".
+- value is false.
 - defined by "Imaging Coverage Reference"."Complex Case".
 
 // ============ Cases ============
@@ -182,22 +206,29 @@ case "indication, no contraindication -> CT offered":
 - description is \`Qualifying indication present, no contrast allergy and not a
   complex case: the menu offers MRI and CT; Refer To Specialist is guarded out.\`.
 - subject is "Sample Patient".
+- fact is "No Hard Exclusion".
 - fact is "Indication Finding".
+- fact is "No Contrast Allergy".
+- fact is "Not A Complex Case".
 - result is "Imaging Coverage" is "Order CT".
 
 case "contrast allergy -> CT dropped, MRI still offered":
 - description is \`Contrast allergy contraindicates CT (unless drops it); MRI is
   always offered, so the menu still produces MRI.\`.
 - subject is "Sample Patient".
+- fact is "No Hard Exclusion".
 - fact is "Indication Finding".
 - fact is "Contrast Allergy Finding".
+- fact is "Not A Complex Case".
 - result is "Imaging Coverage" is "Order MRI".
 
 case "complex case -> specialist referral offered":
 - description is \`A complex case enables the only-when-guarded specialist
   referral option.\`.
 - subject is "Sample Patient".
+- fact is "No Hard Exclusion".
 - fact is "Indication Finding".
+- fact is "No Contrast Allergy".
 - fact is "Complex Case Finding".
 - result is "Imaging Coverage" is "Refer To Specialist".
 
@@ -252,7 +283,7 @@ not-certify.Deny), validated against crl.dispositions.
 
 concept "Has Qualifying Diagnosis":
 - value type is boolean.
-- type is Condition.
+- type is Observation.
 - code is \`qualifying-diagnosis\`.
 
 concept "Failed Drug Therapy":
@@ -314,6 +345,12 @@ fact "Sample Patient":
 
 fact "Diagnosis Finding":
 - date is "2026-01-01".
+- value is true.
+- defined by "Coverage Criteria Reference"."Has Qualifying Diagnosis".
+
+fact "No Qualifying Diagnosis":
+- date is "2026-01-01".
+- value is false.
 - defined by "Coverage Criteria Reference"."Has Qualifying Diagnosis".
 
 fact "Drug Therapy Failure":
@@ -379,6 +416,7 @@ case "diagnosis + viral suppression but no conservative-therapy failure -> deny 
 
 case "no qualifying diagnosis -> deny (criterion-1 node otherwise)":
 - subject is "Sample Patient".
+- fact is "No Qualifying Diagnosis".
 - fact is "Drug Therapy Failure".
 - fact is "Viral Load Lab Result".
 - result is "Coverage Determination" is "not-certify.Deny".
@@ -411,7 +449,7 @@ criteria as decision-tree nodes (see criteria-decision-reference).
 // here a single local leaf keeps the focus on the determination pattern)
 concept "Has Qualifying Diagnosis":
 - value type is boolean.
-- type is Condition.
+- type is Observation.
 - code is \`qualifying-diagnosis\`.
 
 decision "Coverage Determination":
@@ -431,6 +469,12 @@ fact "Sample Patient":
 
 fact "Diagnosis Finding":
 - date is "2026-01-01".
+- value is true.
+- defined by "PA Determination Reference"."Has Qualifying Diagnosis".
+
+fact "No Qualifying Diagnosis":
+- date is "2026-01-01".
+- value is false.
 - defined by "PA Determination Reference"."Has Qualifying Diagnosis".
 
 case "qualifying diagnosis -> approve":
@@ -438,8 +482,11 @@ case "qualifying diagnosis -> approve":
 - fact is "Diagnosis Finding".
 - result is "Coverage Determination" is "certify.Approve".
 
+// ⚠ An UNANSWERED criterion is UNKNOWN, not false: the tree PAUSES rather than falling through.
+// A case that means "not met" must ANSWER it.
 case "no qualifying diagnosis -> deny (otherwise)":
 - subject is "Sample Patient".
+- fact is "No Qualifying Diagnosis".
 - result is "Coverage Determination" is "not-certify.Deny".
 `;
 
@@ -475,7 +522,7 @@ determination + one delegated sub.
 
 concept "Continuation Request":
 - value type is boolean.
-- type is Condition.
+- type is Observation.
 - code is \`continuation-request\`.
 concept "Demonstrated Response":
 - value type is boolean.
@@ -483,7 +530,7 @@ concept "Demonstrated Response":
 - code is \`demonstrated-response\`.
 concept "Clinically Indicated":
 - value type is boolean.
-- type is Condition.
+- type is Observation.
 - code is \`clinically-indicated\`.
 
 decision "Coverage Determination":
@@ -516,6 +563,7 @@ fact "Sample Patient":
 
 fact "Continuation Request Finding":
 - date is "2026-01-01".
+- value is true.
 - defined by "Source Delegated Decision Reference"."Continuation Request".
 
 // #189 null/pause — the NEGATIVE is now STATED, not implied by omission. Omission means UNKNOWN
@@ -532,6 +580,17 @@ fact "Demonstrated Response Finding":
 
 fact "Clinically Indicated Finding":
 - date is "2026-01-01".
+- value is true.
+- defined by "Source Delegated Decision Reference"."Clinically Indicated".
+
+fact "No Continuation Request":
+- date is "2026-01-01".
+- value is false.
+- defined by "Source Delegated Decision Reference"."Continuation Request".
+
+fact "Not Clinically Indicated":
+- date is "2026-01-01".
+- value is false.
 - defined by "Source Delegated Decision Reference"."Clinically Indicated".
 
 case "continuation + demonstrated response -> approve via delegated sub":
@@ -548,11 +607,14 @@ case "continuation, no response -> deny via delegated sub otherwise":
 
 case "clinically indicated (no continuation) -> approve in parent":
 - subject is "Sample Patient".
+- fact is "No Continuation Request".
 - fact is "Clinically Indicated Finding".
 - result is "Coverage Determination" is "certify.Approve".
 
 case "neither -> deny in parent otherwise":
 - subject is "Sample Patient".
+- fact is "No Continuation Request".
+- fact is "Not Clinically Indicated".
 - result is "Coverage Determination" is "not-certify.Deny".
 `;
 
@@ -606,7 +668,7 @@ WHICH outcome wins (the EXACT disposition under \`first:\`), so a precedence inv
 // ===== Clinical criteria (local case-features; visible decision nodes) =====
 concept "Has Indication X":
 - value type is boolean.
-- type is Condition.
+- type is Observation.
 - code is \`indication-x\`.
 concept "Failed Standard Therapy":
 - value type is boolean.
@@ -614,7 +676,7 @@ concept "Failed Standard Therapy":
 - code is \`failed-standard-therapy\`.
 concept "Has Indication Y":
 - value type is boolean.
-- type is Condition.
+- type is Observation.
 - code is \`indication-y\`.
 concept "Has Severe Markers":
 - value type is boolean.
@@ -655,6 +717,7 @@ fact "Sample Patient":
 
 fact "Indication X Finding":
 - date is "2026-01-01".
+- value is true.
 - defined by "Disposition Arbitration Reference"."Has Indication X".
 
 // #189 null/pause — the NEGATIVE is now STATED, not implied by omission. Omission means UNKNOWN
@@ -671,6 +734,17 @@ fact "Failed Standard Therapy Finding":
 
 fact "Indication Y Finding":
 - date is "2026-01-01".
+- value is true.
+- defined by "Disposition Arbitration Reference"."Has Indication Y".
+
+fact "No Indication X":
+- date is "2026-01-01".
+- value is false.
+- defined by "Disposition Arbitration Reference"."Has Indication X".
+
+fact "No Indication Y":
+- date is "2026-01-01".
+- value is false.
 - defined by "Disposition Arbitration Reference"."Has Indication Y".
 
 fact "Severe Markers Finding":
@@ -686,6 +760,7 @@ case "X pathway qualifies -> approve":
 
 case "Y pathway qualifies -> approve":
 - subject is "Sample Patient".
+- fact is "No Indication X".
 - fact is "Indication Y Finding".
 - fact is "Severe Markers Finding".
 - result is "Coverage Determination" is "certify.Approve".
@@ -709,10 +784,13 @@ case "within-indication: X present but pathway fails, no Y -> Deny":
 - subject is "Sample Patient".
 - fact is "Indication X Finding".
 - fact is "No Failed Standard Therapy".
+- fact is "No Indication Y".
 - result is "Coverage Determination" is "not-certify.Deny".
 
 case "off-indication: neither indication -> Deny EIU":
 - subject is "Sample Patient".
+- fact is "No Indication X".
+- fact is "No Indication Y".
 - result is "Coverage Determination" is "not-certify.EIU".
 `;
 
@@ -753,6 +831,7 @@ recency; the recency arbitration is unit-independent).
 concept "Age 18 Or Older":
 - value type is boolean.
 - meta is \`@business-logic-deferred: the human-assert answer Observation for this age criterion must NOT persist beyond the client session (mechanism deferred — #190); the recency lattice treats it as session-fresh\`.
+- type is Observation.
 - code is \`age-18-or-older\`.
 - source representation:
   - type is Patient.
@@ -765,6 +844,7 @@ concept "Age 18 Or Older":
 concept "Patient Under Twenty One Years":
 - value type is boolean.
 - meta is \`@business-logic-deferred: the human-assert answer Observation for this age criterion must NOT persist beyond the client session (mechanism deferred — #190); the recency lattice treats it as session-fresh\`.
+- type is Observation.
 - code is \`under-21\`.
 - source representation:
   - type is Patient.
@@ -875,6 +955,7 @@ concept "Administrative Mammogram":
 // ============ Mammogram — locally coded (\`code is\`) + value-preserving \`sem-or\` union ============
 concept "Mammogram":
 - value type is dateTime.
+- type is Observation.
 - code is \`mammogram\`.
 - defined as ( "Clinical Mammogram" sem-or "Administrative Mammogram" ).
 
@@ -883,6 +964,7 @@ concept "Mammogram":
 //   - assert the BOOLEAN ("Up To Date On Mammography") → directly answers the screening question.
 concept "Had Mammogram":
 - value type is boolean.
+- type is Observation.
 - code is \`had-mammogram\`.
 - defined as exists ("Mammogram").
 
@@ -896,12 +978,14 @@ concept "Mammograms In Last Six Months":
 
 concept "Up To Date On Mammography":
 - value type is boolean.
+- type is Observation.
 - code is \`up-to-date-on-mammography\`.
 - definition is "Most Recent Mammogram" within last 27 months.
 
 // ============ BMI cascade — Height (no split) contrasts with Mammogram (split) ============
 concept "Height":
 - value type is Quantity.
+- type is Observation.
 - code is \`height\`.
 - source representation:
   - type is Observation.
@@ -909,6 +993,7 @@ concept "Height":
 
 concept "Weight":
 - value type is Quantity.
+- type is Observation.
 - code is \`weight\`.
 - source representation:
   - type is Observation.
@@ -916,6 +1001,7 @@ concept "Weight":
 
 concept "BMI":
 - value type is Quantity.
+- type is Observation.
 - code is \`bmi\`.
 - definition is body mass index of "Weight" and "Height".
 - source representation:
@@ -924,6 +1010,7 @@ concept "BMI":
 
 concept "High BMI":
 - value type is boolean.
+- type is Observation.
 - code is \`high-bmi\`.
 - definition is "BMI" at least 30 'kg/m2'.
 

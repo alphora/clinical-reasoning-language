@@ -6,6 +6,7 @@ library "Semnot Age 232".
 // retired `definition is age today` carve-out).
 concept "Age 21 Or Older":
 - value type is boolean.
+- type is Observation.
 - code is `age-21-or-older`.
 - source representation:
   - type is Patient.
