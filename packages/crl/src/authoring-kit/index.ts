@@ -298,7 +298,7 @@ export type {
 //   decision-shapes.md` folded into the same transaction (it was cited by the flipped rules' `ref` fields).
 //   CONTENT bump; NO payload-shape change. BOTH useCase hashes re-pin.
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.26";
+const SCHEMA_VERSION = "1.27";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -577,6 +577,40 @@ const RULES: KitRule[] = [
           "predicates need different qualifying subsets of one question.",
         force: "default",
       },
+      {
+        text:
+          "MIGRATING N BOOLEAN LEAVES INTO ONE CODED QUESTION: each leaf's `code is` becomes an OPTION code " +
+          "(keep the code text \u2014 it is the clinical identity, and shortening it loses the distinctions the " +
+          "leaves were carrying), its concept NAME becomes the `display`, and the criterion's disjunction is " +
+          "replaced by `definition is \"<question>\" in qualifying`. ADD a \"none of the listed \u2026\" option " +
+          "\u2014 without it the migration does not reduce the denial cost at all.",
+        force: "default",
+      },
+      {
+        text:
+          "\u26a0 MIGRATION CHANGES BEHAVIOUR, and the change is worth stating to whoever owns the policy: N " +
+          "booleans are N INDEPENDENT facts that COEXIST, while a coded question has ONE answer slot arbitrated " +
+          "by `most recent this`. So a later answer OVERRIDES an earlier one, where before both stood. It also " +
+          "means only ONE qualifying answer can be recorded \u2014 harmless for a disjunctive criterion (one " +
+          "qualifying answer decides it), but a real loss if anything downstream needs the full set.",
+        force: "default",
+      },
+      {
+        text:
+          "\u26a0 DO NOT COLLAPSE A LAYER WHOSE LEAVES ARE CHARTABLE. A boolean leaf can grow an evidence arm " +
+          "later (`coded from` over external records, additively, one leaf at a time); a coded question cannot, " +
+          "because its options live in a LOCAL system that external codes are never members of. Collapse the " +
+          "layers whose answers are ASSERTED (patient-reported, reviewer-attested); leave the layers whose " +
+          "answers are, or may become, READ FROM THE CHART.",
+        force: "default",
+      },
+      {
+        text:
+          "\u26a0 A concept with inline options and a CODED `source representation` is a contradiction the " +
+          "validator warns about: the options live in a minted LOCAL system, so a source-supplied datum can " +
+          "never be a member and every such record computes a determinate FALSE.",
+        force: "validator-enforced",
+      },
     ],
   },
   {
@@ -764,6 +798,50 @@ const RULES: KitRule[] = [
       },
       {
         text: "Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept (the emitter surfaces it from the concept's `meta is`).",
+        force: "default",
+      },
+    ],
+  },
+  {
+    id: "pa-answers-not-records",
+    edge: "prior-auth",
+    category: "concept-model",
+    rule:
+      "IN PRIOR AUTH, ALMOST NOTHING IS READ FROM THE CHART. The submitted request and the patient are the " +
+      "record arm \u2014 a `ServiceRequest` (what is being asked for) and `Patient` (demographics, age). " +
+      "EVERYTHING ELSE IS AN ANSWER: the clinical criteria are ATTESTED by whoever submits or reviews the " +
+      "request, not retrieved from a chart the payer does not have. So the DEFAULT shape for a PA criterion " +
+      "is a LOCALLY-CODED question \u2014 a `code is` boolean, or a coded question with INLINE `value from:` " +
+      "options (see `inline-answer-options`) \u2014 and NOT a `source representation` with `coded from`. Reach " +
+      "for a source representation only for the request itself, for Patient, or where a deployment genuinely " +
+      "does have the clinical data. \u26a0 THE CONSEQUENCE FOR ANSWER OPTIONS: because PA criteria are local, " +
+      "their option codes belong to the policy, so the INLINE form is the normal one and the named-terminology " +
+      "form is for the request's service codes (CPT and the like) \u2014 the opposite default from a measure or a " +
+      "CDS artifact working over a real record.",
+    why:
+      "A PA artifact authored as though it could read the chart produces criteria that are UNANSWERABLE in " +
+      "the deployment that runs it: nothing populates them, every determination pauses, and the policy looks " +
+      "broken rather than under-informed. Naming the record arm precisely \u2014 request and patient \u2014 is what " +
+      "keeps the rest of the model honest about where its facts come from.",
+    ref: "#189; concept-layer-model; inline-answer-options",
+    clauses: [
+      {
+        text:
+          "The RECORD arm in PA is the submitted `ServiceRequest` and `Patient`. Model every other criterion " +
+          "as a locally-coded ANSWER unless the deployment is known to hold the clinical data.",
+        force: "default",
+      },
+      {
+        text:
+          "Prefer INLINE `value from:` options for a PA coded question \u2014 the codes are the policy's own. Use " +
+          "`value from \"<terminology>\"` for the REQUEST's service codes and other external code sets.",
+        force: "default",
+      },
+      {
+        text:
+          "\u26a0 An unanswered local criterion is UNKNOWN, not false, so the tree PAUSES and the question is asked. " +
+          "That is the intended behaviour \u2014 do not add a source representation merely to make a criterion " +
+          "resolve, because that trades a recoverable pause for a confident wrong answer.",
         force: "default",
       },
     ],
