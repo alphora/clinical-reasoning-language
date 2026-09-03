@@ -52,7 +52,7 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 19 registered (+ #205 create_flag / set_flag_status; + #17 canonicalize_source; + #250 E normalize_provenance; + #237/T3 check_fhir_ids)", async () => {
+  await check("MCP tools: 20 registered (+ #205 create_flag / set_flag_status; + #17 canonicalize_source; + #250 E normalize_provenance; + #237/T3 check_fhir_ids; + emit_results)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
@@ -65,6 +65,7 @@ try {
       "emit_cql",
       "emit_crl",
       "emit_crl_fhir",
+      "emit_results",
       "generate_provenance",
       "normalize_provenance",
       "render_scenario",

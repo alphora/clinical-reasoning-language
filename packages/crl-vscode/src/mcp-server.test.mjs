@@ -71,7 +71,7 @@ afterAll(async () => {
   if (connected) await client.close();
 });
 
-check("MCP tools: 19 registered (+ canonicalize_source; + #237/T3 check_fhir_ids)", async () => {
+check("MCP tools: 20 registered (+ canonicalize_source; + #237/T3 check_fhir_ids; + emit_results)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
@@ -84,6 +84,7 @@ check("MCP tools: 19 registered (+ canonicalize_source; + #237/T3 check_fhir_ids
       "emit_cql",
       "emit_crl",
       "emit_crl_fhir",
+      "emit_results",
       "generate_provenance",
       "normalize_provenance",
       "render_scenario",

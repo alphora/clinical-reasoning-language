@@ -4,11 +4,14 @@
 // createServer/main/selfTest from here, so the two can no longer drift. No module-level dispatch:
 // importing this module must NOT start a server (the thin entries own the argv dispatch).
 import { readFileSync, statSync } from "node:fs";
-import { isAbsolute } from "node:path";
+import { dirname, isAbsolute } from "node:path";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+
+// Provenance must name the version that actually ran.
+const CRL_PACKAGE_VERSION: string = (require("../../package.json") as { version: string }).version;
 
 import { getAuthoringKit, DEFAULT_STAGE, DEFAULT_USE_CASE } from "../authoring-kit";
 import { emitCelToFhir, writeEmitResult } from "../cel/emitter";
@@ -16,6 +19,8 @@ import { resolveCelImports } from "../cel/imports";
 import { validateCELFile } from "../cel/validator";
 import { runCel, renderScenario } from "../cre";
 import { emitCrlTwoLane } from "../emit-two-lane";
+import { produceResults } from "../results/produce";
+import { RESULT_USE_CASES, isResultUseCase } from "../results/useCases";
 import { writeTwoLane, EmitWriteError } from "../emit-writers";
 import { emitFhirDefFromPath, scanFhirIds } from "../fhir-emitter";
 import { readCanonicalBase, readPolicyId } from "../fhir-emitter/metadata";
@@ -734,6 +739,58 @@ export function createServer(): McpServer {
       },
     },
     (args) => runDecision(args as { path: string; case?: string }),
+  );
+
+  server.registerTool(
+    "emit_results",
+    {
+      title: "Run an engine over an emitted artifact and write the results (JVM)",
+      description:
+        "Produce what an ENGINE returns for each CEL case and write it to the results tree. For " +
+        "`prior-auth` that is a Questionnaire + QuestionnaireResponse per case, from " +
+        "`PlanDefinition/$apply`. ⚠ THIS IS NOT AN `emit_*` IN THE PURE SENSE: every other `emit_*` here " +
+        "is a function of source, while this SPAWNS A JVM. Results are not case data — CEL emits the " +
+        "facts a case STATES into `tests/data/fhir/patient/<compartmentId>/`; this writes what an engine " +
+        "PRODUCED into `tests/results/fhir/patient/<compartmentId>/<type>/`. The only difference in the " +
+        "two paths is `data` vs `results`, and the compartmentId is the same, so a case's data and its " +
+        "results address alike. " +
+        "⚠ DISABLED UNLESS THE ENVIRONMENT ENABLES IT. `CRL_PRODUCER_CLASSPATH` (compiled ApplyDriver + " +
+        "the engine jars) must be set in the SERVER's environment — deliberately not read from the " +
+        "workspace, so a repository cannot opt a user into JVM execution. A JDK 17+ is required (measured " +
+        "from the engine jar's class-file version) and the jar's sha256 is verified before every launch. " +
+        "Returns `{ ok, manifestPath, cases:[{caseName, state, reason?, artifacts?}], notEmitted, failed, " +
+        "java }`. Every case gets exactly ONE terminal state — `generated` | `no-questionnaire` | " +
+        "`populate-degraded` | `failed` | `timeout` | `not-run` — so 'the policy asked nothing', 'the run " +
+        "failed' and 'the producer never ran' stay distinguishable, which a directory listing cannot do. " +
+        "⚠ V1 runs a baseline `$apply` whose answers come from `$populate` over the case's emitted facts; " +
+        "it does NOT yet drive the answer-reveal loop or assert dispositions against the `result is` " +
+        "oracle, so a form whose deeper questions are revealed only by answering may under-reach.",
+      inputSchema: {
+        celPath: z.string().min(1).describe("Absolute path to the .cel suite."),
+        crlPath: z.string().min(1).describe("Absolute path to the .crl library the suite covers."),
+        useCase: z
+          .string()
+          .min(1)
+          .describe("Result use case. Only `prior-auth` has a driver today; `measure` is refused."),
+        jarPath: z.string().min(1).describe("Absolute path to the engine jar."),
+        jarSha256: z.string().min(1).describe("Expected sha256, verified before every launch."),
+        outRoot: z
+          .string()
+          .optional()
+          .describe("Artifact root the tests/results tree hangs from. Defaults to the .cel's directory."),
+      },
+    },
+    (args) =>
+      emitResults(
+        args as {
+          celPath: string;
+          crlPath: string;
+          useCase: string;
+          jarPath: string;
+          jarSha256: string;
+          outRoot?: string;
+        },
+      ),
   );
 
   server.registerTool(
@@ -1620,6 +1677,91 @@ function runAuthoringKit(args: { stage?: string; useCase?: string }): {
   } catch (e) {
     return { content: [{ type: "text", text: (e as Error).message }], isError: true };
   }
+}
+
+/**
+ * `emit_results` — the MCP surface over the SAME pipeline `crl-emit-results` calls.
+ *
+ * ⚠ IT CALLS `produceResults`; it does not re-orchestrate. Two entry points each running their own
+ * emit → bundle → spawn → write sequence is how a helper ends up right and a caller wrong, with the
+ * helper's tests passing throughout — the defect shape this whole area has been fixing.
+ *
+ * ⚠ ENABLEMENT COMES FROM THE SERVER'S ENVIRONMENT, NOT THE WORKSPACE. `CRL_PRODUCER_CLASSPATH` is read
+ * from `process.env` so that opening a repository cannot opt a user into spawning a JVM. A workspace can
+ * supply arguments; it cannot supply the environment the server was launched with.
+ */
+function emitResults(args: {
+  celPath: string;
+  crlPath: string;
+  useCase: string;
+  jarPath: string;
+  jarSha256: string;
+  outRoot?: string;
+}): { content: Array<{ type: "text"; text: string }>; isError?: boolean } {
+  const err = (text: string) => ({ content: [{ type: "text" as const, text }], isError: true });
+
+  for (const [k, v] of [
+    ["celPath", args.celPath],
+    ["crlPath", args.crlPath],
+    ["jarPath", args.jarPath],
+  ] as const) {
+    if (!isAbsolute(v)) return err(`${k} must be an ABSOLUTE path (got "${v}").`);
+  }
+  if (!isResultUseCase(args.useCase)) {
+    return err(`Unknown useCase "${args.useCase}". Valid: ${RESULT_USE_CASES.join(", ")}.`);
+  }
+
+  const classpath = process.env.CRL_PRODUCER_CLASSPATH;
+  if (!classpath) {
+    return err(
+      "CRL_PRODUCER_CLASSPATH is not set in this server's environment, so result production is " +
+        "disabled. It must point at the compiled ApplyDriver plus the engine jars. This is read from " +
+        "the environment rather than the workspace on purpose: a repository must not be able to opt a " +
+        "user into running a JVM.",
+    );
+  }
+
+  const outcome = produceResults({
+    celPath: args.celPath,
+    crlPath: args.crlPath,
+    useCase: args.useCase,
+    outRoot: args.outRoot ?? dirname(args.celPath),
+    jarPath: args.jarPath,
+    jarSha256: args.jarSha256,
+    classpath,
+    crlVersion: CRL_PACKAGE_VERSION,
+  });
+
+  if (!outcome.ok) {
+    return err([outcome.reason, ...(outcome.detail ?? [])].join("\n"));
+  }
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(
+          {
+            ok: true,
+            manifestPath: outcome.manifestPath,
+            failed: outcome.failed,
+            notEmitted: outcome.notEmitted,
+            java: outcome.java,
+            cases: outcome.manifest.cases.map((c) => ({
+              caseName: c.caseName,
+              state: c.state,
+              ...(c.reason ? { reason: c.reason } : {}),
+              ...(c.artifacts ? { artifacts: c.artifacts.map((a) => a.path) } : {}),
+            })),
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+    // ⚠ A failed case is a TOOL-LEVEL error, not a quiet field: a caller that reads only `content`
+    // must not take a run with failures for a clean one.
+    ...(outcome.failed > 0 ? { isError: true } : {}),
+  };
 }
 
 function runDecision(args: { path: string; case?: string }): {

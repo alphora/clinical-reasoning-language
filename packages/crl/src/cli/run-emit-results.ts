@@ -34,7 +34,7 @@ import {
   producerManifestName,
   type ProducerManifest,
 } from "../index";
-import { runOneCase } from "../results/runProducer";
+import { produceResults } from "../results/produce";
 
 // Provenance must name the version that actually ran, not a placeholder.
 const CRL_VERSION: string = (require("../../package.json") as { version: string }).version;
@@ -138,97 +138,6 @@ function main(): void {
     process.exit(1);
   }
 
-  const jarCheck = verifyJar(a.jar, a.jarSha);
-  if (!jarCheck.ok) {
-    process.stderr.write(
-      `engine jar unusable (${jarCheck.reason})` +
-        (jarCheck.reason === "sha-mismatch" ? `: got ${jarCheck.actualSha256}` : "") + "\n",
-    );
-    process.exit(2);
-  }
-
-  const probe = (exe: string): string => {
-    const r = spawnSync(exe, ["-version"], { encoding: "utf8" });
-    // ⚠ `java -version` writes to STDERR.
-    return (r.stderr ?? "") + (r.stdout ?? "");
-  };
-  const java = resolveJava(process.env, process.platform === "win32", probe);
-  if (!java.ok) {
-    process.stderr.write(
-      java.reason === "too-old"
-        ? `JDK ${java.major} at ${java.javaExe} is too old; ${MIN_JDK_MAJOR}+ required\n`
-        : `no JDK found; set JAVA_HOME or put java on PATH (${MIN_JDK_MAJOR}+ required)\n`,
-    );
-    process.exit(2);
-  }
-
-  const two = emitCrlTwoLane(a.crl);
-  // ⚠ A FAILED EMIT MUST NOT PRODUCE A "SUCCESSFUL" EMPTY RUN. Applying a partial definition closure
-  // makes the engine evaluate a different artifact from the one the CEL oracle describes, and every
-  // downstream state would be measured against the wrong definitions.
-  if (two.success === false || (two.hardErrors?.length ?? 0) > 0) {
-    for (const e of two.hardErrors ?? []) {
-      process.stderr.write(`emit: ${String((e as { kind?: string }).kind ?? "error")}\n`);
-    }
-    process.stderr.write("refusing to run: the CRL emit did not succeed\n");
-    process.exit(2);
-  }
-
-  const cql = cqlIndex(two.cqlLibraries ?? []);
-  const celGraph = resolveCelImports(a.cel);
-  const celEmit = emitCelToFhir(celGraph);
-  const { inputs, diagnostics } = buildProducerInputs(celEmit);
-  for (const d of diagnostics) process.stderr.write(`case "${d.caseName}": ${d.message}\n`);
-
-  // ⚠ ACCOUNT FOR EVERY CASE. Emit is source-atomic per case, so a case the emitter skipped has no
-  // compartment and would simply be absent from the run — indistinguishable from a suite that never
-  // declared it. The DECLARED names come from the parsed suite; comparing the emitted set against
-  // ITSELF (an earlier cut of this line) can never find anything, which is worse than not checking
-  // at all because it looks checked.
-  const declaredCases = ((celGraph.cel?.statements ?? []) as { type: string; name?: string }[])
-    .filter((st) => st.type === "CELCase")
-    .map((st) => String(st.name ?? ""));
-  const missing = casesMissingFromEmit(declaredCases, celEmit);
-  for (const name of missing) {
-    process.stderr.write(`case "${name}": present in the suite but not emitted; skipped\n`);
-  }
-
-  const root = a.out ?? path.dirname(a.cel);
-  const flight = new SingleFlight();
-  if (!flight.tryAcquire()) { process.stderr.write("another run is in flight\n"); process.exit(2); }
-
-  // ⚠ THE REPOSITORY BUNDLE IS A BUILD INPUT, NOT A RESULT. It goes to scratch, never into
-  // `tests/results/` — committing the engine's input beside its output invites the next reader to treat
-  // it as an artifact, and a later bundler to feed it back in as case data.
-  const scratch = mkdtempSync(path.join(tmpdir(), "crl-emit-results-"));
-
-  const defs = (two.fhir.resources as unknown as { resource: Record<string, unknown> }[]).map(
-    (w) => w.resource,
-  );
-  // ⚠ SELECT BY `type`, NOT BY NAME. An earlier cut matched ids against /determination|decision|coverage/,
-  // which is a heuristic over authored names: a root decision called "TAR" would not match, and an
-  // included artifact could match by accident. The emitter's own authority is the type coding —
-  // `fhir-emitter/decision.ts` stamps `workflow-definition` on the ROOT decision and `eca-rule` on every
-  // sub/recommendation PD. Applying an `eca-rule` PD yields nothing useful: it has no guard to evaluate.
-  const isWorkflowDefinition = (r: Record<string, unknown>): boolean => {
-    const coding = (r.type as { coding?: { code?: string }[] } | undefined)?.coding ?? [];
-    return coding.some((c) => c.code === "workflow-definition");
-  };
-  const roots = defs.filter((r) => r.resourceType === "PlanDefinition" && isWorkflowDefinition(r));
-  if (roots.length !== 1) {
-    process.stderr.write(
-      roots.length === 0
-        ? "no root PlanDefinition (type `workflow-definition`) in the emitted definitions\n"
-        : `ambiguous root: ${roots.length} PlanDefinitions carry type \`workflow-definition\` (${roots
-            .map((r) => String(r.id))
-            .join(", ")})\n`,
-    );
-    process.exit(2);
-  }
-  const pd = roots[0];
-
-  let failed = 0;
-
   const classpath = process.env.CRL_PRODUCER_CLASSPATH;
   if (!classpath) {
     process.stderr.write(
@@ -237,99 +146,48 @@ function main(): void {
     process.exit(2);
   }
 
-  // ⚠ THE VERIFIED JAR MUST BE THE JAR EXECUTED. An earlier cut hashed `--jar`, recorded that hash as
-  // provenance, and then launched with only CRL_PRODUCER_CLASSPATH — which need not contain it. A KE
-  // could verify jar A while running jar B, and the manifest would assert a hash for something that never
-  // ran. A provenance claim nobody checks is worse than none, because it is believed.
-  const jarPath: string = a.jar;
-  const jarOnClasspath = classpath
-    .split(path.delimiter)
-    .some((seg) => path.resolve(seg.replace(/[\\/]\*$/, "")) === path.resolve(path.dirname(jarPath))
-      || path.resolve(seg) === path.resolve(jarPath));
-  if (!jarOnClasspath) {
-    process.stderr.write(
-      `the verified jar (${jarPath}) is not on CRL_PRODUCER_CLASSPATH — refusing to record a provenance ` +
-        `hash for an artifact that will not be loaded\n`,
-    );
+  // ⭐ ONE PIPELINE. The MCP `emit_results` tool calls this same function; this file only parses flags and
+  // reports. Two entry points each orchestrating emit → bundle → spawn → write is how a helper ends up
+  // right and a caller wrong, with the helper's tests green throughout.
+  const outcome = produceResults({
+    celPath: a.cel,
+    crlPath: a.crl,
+    useCase: a.useCase,
+    outRoot: a.out ?? path.dirname(a.cel),
+    jarPath: a.jar,
+    jarSha256: a.jarSha,
+    classpath,
+    crlVersion: CRL_VERSION,
+  });
+
+  if (!outcome.ok) {
+    for (const d of outcome.detail ?? []) process.stderr.write(`  ${d}
+`);
+    process.stderr.write(`${outcome.reason}
+`);
     process.exit(2);
   }
 
-  const manifest: ProducerManifest = {
-    schemaVersion: 1,
-    celLibrary: path.basename(a.cel, ".cel"),
-    useCase: a.useCase,
-    generatedAt: new Date().toISOString(),
-    provenance: { crlVersion: CRL_VERSION, producerJarSha256: jarCheck.sha256 },
-    cases: [],
-  };
-
-  for (const input of inputs) {
-    const repo = buildEngineRepoBundle({
-      definitions: two.fhir.resources.map((w: { resource: unknown }) => w.resource) as never,
-      cqlByLibraryFile: cql,
-      caseInput: input,
-    });
-    if (repo.missingCql.length > 0) {
-      // ⚠ FAIL THE CASE. `buildEngineRepoBundle` says a missing Library is "NOT a warning to log and
-      // continue past", and an earlier cut did exactly that: the engine then fails with an
-      // expression-level error that never mentions the missing CQL, and `classify` reads it as
-      // `no-questionnaire` — a broken run recorded as a legitimate empty one.
-      const reason = `no CQL available for ${repo.missingCql.join(", ")}`;
-      process.stderr.write(`case "${input.caseName}": ${reason}
+  for (const name of outcome.notEmitted) {
+    process.stderr.write(`case "${name}": declared in the suite but not emitted; skipped
 `);
-      manifest.cases.push({
-        caseName: input.caseName,
-        compartmentDir: `patient/${input.compartmentId}`,
-        state: "failed",
-        reason,
-      });
-      failed++;
-      continue;
-    }
-    const repoPath = path.join(scratch, `${input.compartmentId}.json`);
-    writeFileSync(repoPath, JSON.stringify(repo.bundle));
-
-    const entry = runOneCase(
-      {
-        javaExe: java.javaExe,
-        classpath,
-        bounds: DEFAULT_BOUNDS,
-        planDefinitionId: String(pd.id),
-        artifactRoot: root,
-      },
-      {
-        caseName: input.caseName,
-        compartmentId: input.compartmentId,
-        subjectReference: input.subjectReference,
-        repoPath,
-      },
-    );
-    manifest.cases.push(entry);
-    if (entry.state === "failed" || entry.state === "timeout") failed++;
+  }
+  for (const c of outcome.manifest.cases) {
     process.stdout.write(
-      `${entry.state.padEnd(18)} ${input.caseName}` +
-        (entry.artifacts?.length ? ` (${entry.artifacts.length} artifact)` : "") +
-        (entry.reason ? ` — ${entry.reason}` : "") +
+      c.state.padEnd(18) +
+        " " +
+        c.caseName +
+        (c.artifacts?.length ? ` (${c.artifacts.length} artifact)` : "") +
+        (c.reason ? ` — ${c.reason}` : "") +
         "\n",
     );
   }
-
-  // ⚠ MANIFEST LAST — it is the commit point. A reader that finds it can trust every path in it,
-  // because those files were written before it existed.
-  mkdirSync(path.join(root, "tests/results"), { recursive: true });
-  writeFileSync(
-    path.join(root, "tests/results", producerManifestName(manifest.celLibrary)),
-    JSON.stringify(manifest, null, 2) + "\n",
-    "utf8",
-  );
-  flight.release();
-
   process.stdout.write(
-    `\njava ${java.major} at ${java.javaExe} (${java.source})\n` +
-      `jvm bounds: ${jvmFlags(DEFAULT_BOUNDS).join(" ")}\n` +
-      `cases: ${inputs.length}, failed: ${failed}\n`,
+    `\njava ${outcome.java.major} at ${outcome.java.exe}\n` +
+      `manifest: ${outcome.manifestPath}\n` +
+      `cases: ${outcome.manifest.cases.length}, failed: ${outcome.failed}\n`,
   );
-  process.exit(failed > 0 ? 2 : 0);
+  process.exit(outcome.failed > 0 ? 2 : 0);
 }
 
 main();
