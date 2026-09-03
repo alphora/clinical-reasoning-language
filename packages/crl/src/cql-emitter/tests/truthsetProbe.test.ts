@@ -210,7 +210,16 @@ describe("#189 T5-CQL step 1 — truth-set retirement inventory", () => {
       .map((x) => x.trim())
       .filter((x) => x.endsWith(".test.ts"));
     for (const f of testFiles) {
-      const src = readFileSync(path.join(REPO, f), "utf8");
+      // ⚠ `git ls-files` lists the INDEX, which legitimately diverges from disk: during a rename a path
+      // is still indexed after it is gone. A bare read therefore ENOENTs and fails the whole suite for the
+      // duration of any restructure — which is exactly what happened, and it is the same defect class as
+      // this probe's `tmp/` write. A file we cannot read contributes no inline CRL; skip it.
+      let src: string;
+      try {
+        src = readFileSync(path.join(REPO, f), "utf8");
+      } catch {
+        continue;
+      }
       // A backtick block containing a `library "..."` line — the shape every inline CRL fixture uses.
       // ⚠ The delimiter is built rather than written: a backtick inside a regex literal in a .ts file trips
       // the transform. `BT` is that character.
