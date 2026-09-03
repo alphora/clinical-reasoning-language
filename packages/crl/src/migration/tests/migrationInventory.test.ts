@@ -149,6 +149,7 @@ concept "Cond Val":
     const ast = parse(`library "T".
 concept "Bare CC":
 - value type is CodeableConcept.
+- type is Observation.
 - code is \`x\`.
 `);
     expect(valueReadPathBlocker(conceptNamed(ast, "Bare CC"))).toBeNull();

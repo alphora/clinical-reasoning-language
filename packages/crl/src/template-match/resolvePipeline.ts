@@ -212,7 +212,8 @@ interface ConceptSignature {
 function signatureOf(concept: Concept): ConceptSignature {
   return {
     shape: concept.shape,
-    recordType: concept.conceptType ?? "Observation",
+    // ⚠ NO DEFAULT: `local-code-missing-type` guarantees `conceptType` is set on any `code is` concept.
+    recordType: concept.conceptType ?? "", // guaranteed set for a `code is` concept by the validator
     valueType: concept.valueTypes?.length === 1 ? concept.valueTypes[0] : undefined,
   };
 }

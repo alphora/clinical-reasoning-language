@@ -305,7 +305,8 @@ export function migrationClassFor(concept: Concept): { migrationClass: Migration
 export function valueReadPathBlocker(concept: Concept): string | null {
   const vt = singleValueType(concept);
   if (vt === undefined || vt === "boolean") return null; // not a value-read migration
-  const rt = concept.conceptType ?? "Observation"; // implicit-standard local resource (charter §3)
+  // ⚠ NO DEFAULT: `local-code-missing-type` guarantees `conceptType` is set on any `code is` concept.
+  const rt = concept.conceptType ?? "(untyped)"; // inventory/report only — never used to emit
   const raw = concept.valueElement?.path;
   const relPath = raw ? relativeElementPath(raw, rt) : "value"; // implicit-standard value element
   const admitted = valueReadValueTypes(rt, relPath);

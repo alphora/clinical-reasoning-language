@@ -1817,7 +1817,10 @@ export function lowerLocalCodes(
     const codedFrom: CodedFromDefinition = {
       type: "CodedFromDefinition",
       terminologyName: c.name,
-      retrieveResourceType: assumedShapePreMigration(c.shape) === "Scalar" ? "Observation" : (c.conceptType ?? "Observation"),
+      // ⚠ SYNTHESIZED-TWIN backstop, not the author-facing default (see emitCQL). An authored `code is`
+      // with no `type is` is rejected upstream.
+      retrieveResourceType:
+        assumedShapePreMigration(c.shape) === "Scalar" ? "Observation" : (c.conceptType ?? "Observation"),
       location: loc,
     };
 

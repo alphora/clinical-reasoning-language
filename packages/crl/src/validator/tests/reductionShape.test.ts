@@ -270,10 +270,13 @@ concept "C":
       expect(redWarnings(src, "no-bare-scalar-code", "C")).toHaveLength(0);
     });
 
-    it("an OMITTED `type is` is the implicit Observation, so it is exempt too (#189)", () => {
+    it("a DECLARED Observation boolean `code is` is a QUESTION, so it is exempt (#189)", () => {
+      // ⚠ This pinned "an OMITTED `type is` is the implicit Observation". That default is REMOVED —
+      // a local `code is` declares its type, and a type-less one is `local-code-missing-type`.
       const src = `library "T".
 concept "C":
 - value type is boolean.
+- type is Observation.
 - code is \`c\`.
 `;
       expect(redWarnings(src, "no-bare-scalar-code", "C")).toHaveLength(0);

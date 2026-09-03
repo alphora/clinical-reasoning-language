@@ -68,8 +68,6 @@ interface Attribution {
   filePath?: string;
 }
 
-const IMPLICIT_LOCAL_TYPE = "Observation";
-const IMPLICIT_LOCAL_ELEMENT = "Observation.value";
 
 export class RepresentationShapeValidator {
   public validate(ast: CRL, sources?: SourceContext[]): ValidationError[] {
@@ -570,15 +568,19 @@ export class RepresentationShapeValidator {
     };
 
     // Local rep — present iff the concept has a `code is`. Keyed by its local code so it never
-    // collides with an externally-coded posrep. The element is the explicit value element, else
-    // the implicit `.value` ONLY when the type is the implicit-standard Observation; a deviating
-    // type (e.g. a Condition presence concept, the A.4-drop population) keys with element `∅`
-    // rather than a bogus `Observation.value` — this key becomes Todo 3's emit/fact-bridge
-    // selector, where a wrong element would matter.
+    // collides with an externally-coded posrep. This key becomes the emit/fact-bridge selector, so a
+    // wrong element would matter.
+    //
+    // ⚠ NO IMPLICIT ELEMENT. This used to substitute `Observation.value` when the author wrote no
+    // `value element is` and the type happened to be Observation — the same invisible default as the
+    // implicit `type is`, one field over. An unwritten element keys as `∅`: absent, not assumed.
+    //
+    // The `(untyped)` label is not a default either — `local-code-missing-type` already rejects a
+    // `code is` with no `type is`, so this only keeps the key well-formed for a concept that is
+    // being reported anyway.
     if (concept.code !== undefined) {
-      const type = concept.conceptType ?? IMPLICIT_LOCAL_TYPE;
-      const element =
-        concept.valueElement?.path ?? (type === IMPLICIT_LOCAL_TYPE ? IMPLICIT_LOCAL_ELEMENT : "∅");
+      const type = concept.conceptType ?? "(untyped)";
+      const element = concept.valueElement?.path ?? "∅";
       consider(structuralKey(type, element, `local:${concept.code}`), concept.location);
     }
 

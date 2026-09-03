@@ -85,7 +85,9 @@ describe("deriveEffectiveRepresentations — local-exact arm", () => {
 
   it("omitted `type is` RecordSet → resourceType Observation + resultType RecordSet<Observation> (NOT <undefined>)", () => {
     const [d] = derived(
-      `library "T".\nconcept "AnySet":\n- shape is RecordSet.\n- code is \`anyset\`.\n`,
+      // ⚠ Was `code is` with NO `type is`, pinning the implicit-Observation default. That default is
+      // REMOVED — a local `code is` declares its type.
+      `library "T".\nconcept "AnySet":\n- shape is RecordSet.\n- type is Observation.\n- code is \`anyset\`.\n`,
       "AnySet",
     );
     if (d.arm !== "local-exact") throw new Error("expected local-exact");
@@ -95,7 +97,8 @@ describe("deriveEffectiveRepresentations — local-exact arm", () => {
 
   it("missing `type is` scalar → implicit Observation (charter §3)", () => {
     const [d] = derived(
-      `library "T".\nconcept "Implicit":\n- value type is boolean.\n- code is \`implicit\`.\n- definition is exists this.\n`,
+      // ⚠ Was type-less, pinning the implicit-Observation default (now removed).
+      `library "T".\nconcept "Implicit":\n- value type is boolean.\n- type is Observation.\n- code is \`implicit\`.\n- definition is exists this.\n`,
       "Implicit",
     );
     if (d.arm !== "local-exact") throw new Error("expected local-exact");

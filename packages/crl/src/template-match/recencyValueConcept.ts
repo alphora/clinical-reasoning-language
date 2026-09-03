@@ -253,6 +253,7 @@ export function isPureQuestionConcept(concept: Concept): boolean {
   if (assumedShapePreMigration(concept.shape) !== "Scalar") return false;
   // Only a resource with a stored boolean can carry an answer; a pure question is Observation by construction
   // (the implicit-standard local resource when `type is` is omitted — charter §3).
-  if ((concept.conceptType ?? "Observation") !== "Observation") return false;
+  // ⚠ NO DEFAULT: `local-code-missing-type` guarantees `conceptType` is set on any `code is` concept.
+  if (concept.conceptType !== "Observation") return false;
   return concept.valueTypes.length === 1 && concept.valueTypes[0] === "boolean";
 }

@@ -519,7 +519,15 @@ function notAgeLocalExact(
   | { status: "derived"; descriptor: EffectiveRepresentationDescriptor }
   | { status: "error"; error: DerivationError } {
   const base = { concept: concept.name, owningLibrary: owningLibrary.libraryName };
-  const resourceType = concept.conceptType ?? "Observation"; // implicit-standard local Observation (charter §3)
+  // ⚠ NO DEFAULT: `local-code-missing-type` guarantees `conceptType` is set on any `code is` concept.
+  // A `code is` concept without a type never reaches emit (`local-code-missing-type` is a validator
+  // ERROR), so this is an invariant, not a default: assert rather than substitute a value.
+  const resourceType = concept.conceptType;
+  if (resourceType === undefined) {
+    throw new Error(
+      `effectiveRepresentation: concept "${concept.name}" has no \`type is\`; the validator must reject that before emit.`,
+    );
+  }
   // A′ gate (#189 CEL-writer T2): the descriptor deriver is a DEFINITION-lane consumer, so it honors only
   // case-feature rows. A row whose case-feature cells are not yet ESTABLISHED (`caseFeature: false`) derives no
   // descriptor — a statement about us, not a category of resource (see the flag's docstring) —

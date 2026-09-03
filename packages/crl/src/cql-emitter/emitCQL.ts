@@ -3139,6 +3139,9 @@ class Emitter {
     // retrieve to `[Observation: …]` regardless of the concept's `type is`.
     // Hand-authored `coded from` has no `retrieveResourceType` → keeps the
     // historical `conceptType ?? "Observation"` (byte-identical emit).
+    // ⚠ This is a SYNTHESIZED-TWIN backstop, not the author-facing default. A twin the emitter builds
+    // may carry no `conceptType` of its own; an AUTHORED `code is` with no `type is` is rejected upstream
+    // by `local-code-missing-type` and never reaches here.
     const resource = def.retrieveResourceType ?? c.conceptType ?? "Observation";
     const crossLib = this.crossLibraryOf(def.terminologyName);
     const termName = getRefName(def.terminologyName);
