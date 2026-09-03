@@ -41,7 +41,7 @@ WHAT IT DOES
   (CQL inlined — an emitted Library points at a relative .cql url that an in-memory repo
   cannot follow), runs the engine, and writes what came back to
 
-      tests/results/<use-case>/<compartmentId>/<resourceType>/
+      tests/results/fhir/patient/<compartmentId>/<resourceType>/
 
   Case DATA stays where the CEL emitter puts it (tests/data/fhir/patient/...). Results are
   what an ENGINE produced and live in their own tree.
@@ -162,7 +162,7 @@ function main(): void {
     for (const id of repo.missingCql) {
       process.stderr.write(`case "${input.caseName}": Library ${id} has no CQL available\n`);
     }
-    const dir = caseResultsTypeDir(a.useCase as never, input.compartmentId, "Questionnaire");
+    const dir = caseResultsTypeDir(input.compartmentId, "Questionnaire");
     mkdirSync(path.join(root, dir), { recursive: true });
     writeFileSync(
       path.join(root, dir, "repo.json"),

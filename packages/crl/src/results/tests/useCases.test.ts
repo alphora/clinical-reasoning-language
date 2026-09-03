@@ -4,6 +4,7 @@ import {
   RESULT_USE_CASES,
   USE_CASE_RESOURCE_TYPES,
   caseResultsDir,
+  caseResultsGlob,
   caseResultsTypeDir,
   compartmentIdOf,
   isResultUseCase,
@@ -21,9 +22,12 @@ import {
 describe("the results layout keeps engine output out of the case's data", () => {
   it("⭐ results never land under the CEL emitter's tree", () => {
     for (const uc of RESULT_USE_CASES) {
-      expect(resultsRoot(uc).startsWith("tests/results/")).toBe(true);
-      expect(resultsRoot(uc).startsWith("tests/data/")).toBe(false);
-      expect(caseResultsDir(uc, "abc-123")).not.toContain("tests/data");
+      expect(resultsRoot().startsWith("tests/results/")).toBe(true);
+      // The lane + compartment segments are what make this loadable as a repository, not decoration.
+      expect(resultsRoot().endsWith("/fhir")).toBe(true);
+      expect(caseResultsDir("abc-123")).toContain("/fhir/patient/");
+      expect(resultsRoot().startsWith("tests/data/")).toBe(false);
+      expect(caseResultsDir("abc-123")).not.toContain("tests/data");
     }
   });
 
@@ -33,22 +37,22 @@ describe("the results layout keeps engine output out of the case's data", () => 
     const compartmentDir = "patient/probe-cases-a-case-abc123def456";
     const id = compartmentIdOf(compartmentDir);
     expect(id).toBe("probe-cases-a-case-abc123def456");
-    expect(caseResultsDir("prior-auth", id)).toBe(
-      "tests/results/prior-auth/probe-cases-a-case-abc123def456",
+    expect(caseResultsDir(id)).toBe(
+      "tests/results/fhir/patient/probe-cases-a-case-abc123def456",
     );
   });
 
-  it("⭐ the layout scales to N use cases without a new convention each time", () => {
-    expect(caseResultsTypeDir("prior-auth", "c1", "Questionnaire")).toBe(
-      "tests/results/prior-auth/c1/questionnaire",
+  it("⭐ the RESOURCE TYPE discriminates the use case — no use-case path segment", () => {
+    expect(caseResultsTypeDir("c1", "Questionnaire")).toBe(
+      "tests/results/fhir/patient/c1/questionnaire",
     );
-    expect(caseResultsTypeDir("measure", "c1", "MeasureReport")).toBe(
-      "tests/results/measure/c1/measurereport",
+    expect(caseResultsTypeDir("c1", "MeasureReport")).toBe(
+      "tests/results/fhir/patient/c1/measurereport",
     );
   });
 
   it("⚠ the type segment is LOWERCASE, matching the CEL emitter's own convention", () => {
-    const d = caseResultsTypeDir("prior-auth", "c1", "QuestionnaireResponse");
+    const d = caseResultsTypeDir("c1", "QuestionnaireResponse");
     expect(d.endsWith("/questionnaireresponse")).toBe(true);
   });
 
@@ -65,5 +69,29 @@ describe("the results layout keeps engine output out of the case's data", () => 
     expect(isResultUseCase("measure")).toBe(true);
     expect(isResultUseCase("cds")).toBe(false);
     expect(isResultUseCase("")).toBe(false);
+  });
+});
+
+describe("the results glob and the producer's output path cannot drift", () => {
+  it("⭐⭐ the CONSUMER's glob matches the PRODUCER's path for the same case", () => {
+    // ⚠ THE GATE THAT WAS MISSING BEFORE. The MV pane hard-coded a path, the emitter's layout moved at
+    // `0e7641da`, both sides kept compiling and the pane matched nothing for months. Relating the two
+    // ends is the only formulation that catches it; asserting either one alone proves nothing.
+    const id = "probe-cases-a-case-abc123def456";
+    const glob = caseResultsGlob(id);
+    for (const type of ["Questionnaire", "QuestionnaireResponse"]) {
+      const produced = `${caseResultsTypeDir(id, type)}/some-id.json`;
+      // The glob is `**/<dir>/{a,b}/*.json`; the produced path must sit under exactly that directory.
+      const dir = caseResultsDir(id);
+      expect(glob).toContain(dir);
+      expect(produced.startsWith(`${dir}/`)).toBe(true);
+      expect(glob).toContain(type.toLowerCase());
+    }
+  });
+
+  it("⚠ the glob is anchored on the results tree, never the data tree", () => {
+    const glob = caseResultsGlob("c1");
+    expect(glob).toContain("tests/results/fhir/patient/");
+    expect(glob).not.toContain("tests/data/");
   });
 });

@@ -27,33 +27,58 @@ export const USE_CASE_RESOURCE_TYPES: Readonly<Record<ResultUseCase, readonly st
 };
 
 /**
- * The results ROOT for a use case, relative to the artifact root — the sibling of `tests/data`.
+ * The results ROOT — the sibling of `tests/data`, laid out identically.
  *
- * `tests/results/<use-case>/`
+ * `tests/results/fhir/`
+ *
+ * ⭐ NO USE-CASE SEGMENT, deliberately. The RESOURCE TYPE already discriminates: prior-auth tooling
+ * reads `questionnaire/` and `questionnaireresponse/`, quality measures read the sibling
+ * `measurereport/`. A `<use-case>/` segment would restate what the type dir says, and would split one
+ * loadable repository into N — losing the property that makes matching the convention worth anything.
+ *
+ * The use case stays an ARGUMENT to the producer (it selects which engine runs) and a declaration of
+ * which types that engine may emit. It is not part of the path.
+ *
+ * ⭐ THE `fhir/` AND `patient/` SEGMENTS ARE STRUCTURAL, NOT DECORATION. They mirror
+ * `tests/data/fhir/patient/` because they carry the same two facts the cqf `IgConventions` loader reads:
+ * `fhir/` is the LANE (the sibling of a `cql/` lane), and `patient/` is COMPARTMENT ISOLATION — resources
+ * grouped by the patient compartment they belong to.
+ *
+ * ⚠ Dropping them would make this tree merely LOOK like a repository. Keeping them means a results tree
+ * is itself loadable by the engine, so results can be fed back for re-verification rather than being a
+ * write-only artifact. That is the whole reason to match the convention instead of inventing one.
  */
-export const resultsRoot = (useCase: ResultUseCase): string => `tests/results/${useCase}`;
+export const RESULTS_ROOT = "tests/results/fhir";
+export const resultsRoot = (): string => RESULTS_ROOT;
 
 /**
  * A case's results directory. Keyed on the SAME `compartmentId` the CEL emitter uses for the case's
  * data, so the join between a case, its data and its results is one identity rather than three.
  *
- * `tests/results/<use-case>/<compartmentId>/<resourceType>/`
+ * `tests/results/fhir/patient/<compartmentId>/<resourceType>/`
  *
  * ⚠ Pass the compartment id from `EmittedCase.compartmentDir` (strip the `patient/` prefix) or
  * `ScenarioViewModel.compartmentDir` — never recompose it. It is a capped slug of library + case +
  * subject plus a 12-hex hash; `0e7641da` moved that scheme once already and every consumer that had
  * hard-coded the old shape silently matched nothing for months.
  */
-export const caseResultsDir = (useCase: ResultUseCase, compartmentId: string): string =>
-  `${resultsRoot(useCase)}/${compartmentId}`;
+export const caseResultsDir = (compartmentId: string): string =>
+  `${RESULTS_ROOT}/patient/${compartmentId}`;
 
 /** Where one resource type's results land for a case. Lowercase, matching the CEL emitter's convention. */
-export const caseResultsTypeDir = (
-  useCase: ResultUseCase,
-  compartmentId: string,
-  resourceType: string,
-): string => `${caseResultsDir(useCase, compartmentId)}/${resourceType.toLowerCase()}`;
+export const caseResultsTypeDir = (compartmentId: string, resourceType: string): string =>
+  `${caseResultsDir(compartmentId)}/${resourceType.toLowerCase()}`;
 
 /** Strip the `patient/` prefix the CEL emitter carries, yielding the bare compartment id. */
 export const compartmentIdOf = (compartmentDir: string): string =>
   compartmentDir.replace(/^patient\//, "");
+
+/**
+ * ⭐ THE GLOB a consumer uses to find a case's results, relative to an artifact root.
+ *
+ * ⚠ EXPORTED SO NO CONSUMER COMPOSES ONE. This is the same defect class that made the MV questionnaire
+ * pane silently match nothing for months: the pane hard-coded a path, the emitter's layout moved, both
+ * kept compiling, and nothing failed. A path spelled in two places is a path that will disagree in one.
+ */
+export const caseResultsGlob = (compartmentId: string): string =>
+  `**/${caseResultsDir(compartmentId)}/{questionnaire,questionnaireresponse}/*.json`;

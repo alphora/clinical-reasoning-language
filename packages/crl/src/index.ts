@@ -271,9 +271,11 @@ export {
   RESULT_USE_CASES,
   isResultUseCase,
   USE_CASE_RESOURCE_TYPES,
+  RESULTS_ROOT,
   resultsRoot,
   caseResultsDir,
   caseResultsTypeDir,
+  caseResultsGlob,
   compartmentIdOf,
 } from "./results/useCases";
 export type { ResultUseCase } from "./results/useCases";

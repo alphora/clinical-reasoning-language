@@ -32,6 +32,8 @@ import {
   type FlagStatus,
   type RenderScenarioResult,
   type ScenarioViewModel,
+  caseResultsGlob,
+  compartmentIdOf,
 } from "@smile-digital-health/crl";
 import type { LsLocation, ZeroBasedRange } from "@smile-digital-health/crl/language-services";
 import {
@@ -2163,8 +2165,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    * Read the FHIR Questionnaire + QuestionnaireResponse for a case FROM DISK, at the directory the
    * EMITTER reports — `ScenarioViewModel.compartmentDir`, never a path composed here:
    *
-   *   <artifact>/tests/data/fhir/<compartmentDir>/questionnaire/*.json
-   *   <artifact>/tests/data/fhir/<compartmentDir>/questionnaireresponse/*.json
+   *   <artifact>/tests/results/fhir/patient/<compartmentId>/questionnaire/*.json
+   *   <artifact>/tests/results/fhir/patient/<compartmentId>/questionnaireresponse/*.json
+   *
+   * ⚠ RESULTS, NOT CASE DATA. `tests/data/fhir/patient/<compartmentId>/` is what the CEL emitter
+   * writes — the FACTS a case states. A Questionnaire is not a fact about a patient; it is what an
+   * ENGINE produced when `$apply` ran, so it lives in its own tree with its own producer and lifecycle.
+   * Reading the data tree for a Questionnaire found nothing, and would have found a CEL-authored
+   * QuestionnaireResponse if one existed — `QuestionnaireResponse` is a legal CEL emit target.
    *
    * This is deliberately a real filesystem read and not a compiled-in fixture: it exercises the exact path the
    * producer (issue #277) will write to, so when the producer lands nothing here changes. To test it today,
@@ -2204,7 +2212,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // emits nothing", since `emitCase` returns undefined without a subject.
       return { ...out, lookedFor: "(this case has no emitted compartment — nothing was searched)" };
     }
-    const lookedFor = `**/tests/data/fhir/${compartmentDir}/{questionnaire,questionnaireresponse}/*.json`;
+    // The compartment id is the join key: the SAME segment addresses a case's data under
+    // `tests/data/fhir/patient/` and its results here, so one identity serves both trees.
+    const compartmentId = compartmentIdOf(compartmentDir);
+    // ⚠ The glob comes from core, NOT spelled here. Hard-coding it is exactly what made this pane match
+    // nothing for months when the emitter's layout moved: both sides compiled, neither failed.
+    const lookedFor = caseResultsGlob(compartmentId);
     out.lookedFor = lookedFor;
     let hits: readonly vscode.Uri[] = [];
     try {
@@ -2215,10 +2228,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     for (const uri of hits) {
       const segs = uri.path.split("/");
       const type = segs[segs.length - 2]; // the LOWERCASE type dir holding the file
-      const caseDir = segs[segs.length - 3]; // the compartment dir holding that
+      const caseDir = segs[segs.length - 3]; // the compartment id dir holding that
       if (type !== "questionnaire" && type !== "questionnaireresponse") continue;
       // Exact compartment match — belt and braces against a glob surprise in a multi-root workspace.
-      if (`patient/${caseDir}` !== compartmentDir) continue;
+      if (caseDir !== compartmentId) continue;
       if (type === "questionnaire" && out.q) continue; // a case has one of each
       if (type === "questionnaireresponse" && out.qr) continue;
       // Per-FILE try: one malformed document must not abort the search and hide a valid one later in the list.
