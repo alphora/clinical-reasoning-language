@@ -33,7 +33,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const serverPath = resolve(here, "../../../dist/cli/run-mcp-server.js");
 const cms22Inferred = resolve(
   here,
-  "../../../src/tests/fixtures/corpus/cms22/cms22-inferred.crl"
+  "../../../src/tests/fixtures/corpus/cms22/cms22-inferences.crl"
 );
 
 const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath] });
@@ -237,12 +237,13 @@ try {
       "decision-reference.cel",
       "decision-reference.crl",
       "patient-age-both-rep-reference.crl",
+      "representation-reference.crl",
     ]);
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
-    assert.equal(kit.schemaVersion, "1.15"); // …/#212 4c flags→store (1.10) … / #215 (1.13) / #230 flags→medical-validation store (1.14) / #250 derivedFrom gate teaching (1.15)
-    assert.equal(kit.contentHash, "ab98184979e6483a33dd8fb610a1cd106dd03fd89d8f2b86f3eae8fd6b14d83c");
+    assert.equal(kit.schemaVersion, "1.27"); // … #250 derivedFrom gate teaching (1.15) … / age posrep recency (1.21) / inline answer options + pa-answers-not-records (1.27)
+    assert.equal(kit.contentHash, "ca98105f5b4401af1974c3bd32956cb54a6cbb66e68b406d31bf378df8890948");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.
@@ -257,11 +258,11 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.useCase, "prior-auth");
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    assert.equal(kit.schemaVersion, "1.15");
+    assert.equal(kit.schemaVersion, "1.27");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "2dcc5468eac3ecbe64b0b2a4cf1aabb9d194b375d912f3839c882f1630354f57");
+    assert.equal(kit.contentHash, "a0db8235bb07116d642afa996c0c86ce300a56723a21bad4a04a2f04beabbf20");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
-    assert.equal(refNames.length, 11); // shared medical-policy-determination.crl removed (config-driven local activities)
+    assert.equal(refNames.length, 12); // shared medical-policy-determination.crl removed (config-driven local activities); representation-reference.crl added
     assert.ok(!refNames.includes("medical-policy-determination.crl"));
     assert.ok(!kit.facets, "advisory facets are retired");
     assert.ok(kit.dispositionModel && kit.dispositionModel.categories.length === 3, "prior-auth surfaces the dispositionModel (3 categories)");
@@ -611,7 +612,7 @@ try {
     assert.equal(
       out.success,
       true,
-      `cms22-inferred should validate cleanly in project mode; got errors: ${JSON.stringify(out.errors).slice(0, 200)}`
+      `cms22-inferences should validate cleanly in project mode; got errors: ${JSON.stringify(out.errors).slice(0, 200)}`
     );
   });
 
