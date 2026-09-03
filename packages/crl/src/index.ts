@@ -282,6 +282,21 @@ export {
   resolveCaseArtifacts,
   caseState,
 } from "./results/manifest";
+// ⭐ The JVM spawn contract for result producers — bounded by construction, because an unbounded run
+// of this crashed VS Code and the machine.
+export {
+  APPLY_OPERATION,
+  RETRIEVE_SETTINGS,
+  DEFAULT_BOUNDS,
+  SingleFlight,
+  jvmFlags,
+  killTreeCommand,
+  capTail,
+  resolveJava,
+  verifyJar,
+  assertSafeWorkingDir,
+} from "./results/spawn";
+export type { JvmBounds, JavaResolution, JarVerification } from "./results/spawn";
 export type {
   ProducerManifest,
   ProducerCaseEntry,
