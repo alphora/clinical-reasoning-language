@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 
-import { classify, extractResults } from "../runProducer";
+import {
+  classify,
+  extractResults,
+  normalizePersistedPair,
+  pairIsConsistent,
+} from "../runProducer";
 
 /** The real envelope shape an `$apply` run returns, reduced. */
 const PARAMS = {
@@ -82,5 +87,49 @@ describe("every case gets exactly one terminal state", () => {
       expect(c.state).not.toBe("generated");
       expect(c.reason).toBeTruthy();
     }
+  });
+});
+
+describe("the persisted pair carries its own identity and resolves to itself", () => {
+  const Q = {
+    resourceType: "Questionnaire",
+    id: "coverage-determination",
+    url: "http://x/Questionnaire/coverage-determination",
+  };
+  const QR = {
+    resourceType: "QuestionnaireResponse",
+    id: "qr1",
+    // The engine's real shape: a VERSIONED canonical embedding the run timestamp.
+    questionnaire: "http://x/Questionnaire/coverage-determination|1.0.0-abc123-2026-09-03-03.22.02",
+  };
+
+  it("⚠ every case's Questionnaire arrives with the SAME id — give it its own", () => {
+    // Measured: the engine stamps the PlanDefinition's id on every case's form while the CONTENT differs
+    // per case (each holds only what its path reached). N distinct resources, one identity.
+    const a = normalizePersistedPair(Q, QR, "case-aaa");
+    const b = normalizePersistedPair(Q, QR, "case-bbb");
+    expect(a.questionnaire?.id).not.toBe(b.questionnaire?.id);
+    expect(String(a.questionnaire?.id)).toContain("case-aaa");
+    expect(String(a.questionnaire?.id).length).toBeLessThanOrEqual(64); // FHIR id cap
+  });
+
+  it("⚠ the RESPONSE's reference is rewritten in the same pass", () => {
+    // Restamping the Questionnaire and leaving the response pointing at the old canonical yields a pair
+    // that is individually valid and jointly broken — and nothing validates the link at write time.
+    const { questionnaire, questionnaireResponse } = normalizePersistedPair(Q, QR, "case-aaa");
+    expect(questionnaireResponse?.questionnaire).toBe(questionnaire?.url);
+    expect(pairIsConsistent(questionnaire, questionnaireResponse)).toBe(true);
+  });
+
+  it("⚠ the RUN TIMESTAMP is gone — a committed artifact must not churn per run", () => {
+    const first = normalizePersistedPair(Q, QR, "case-aaa");
+    const second = normalizePersistedPair(Q, QR, "case-aaa");
+    expect(first.questionnaireResponse?.questionnaire).toBe(second.questionnaireResponse?.questionnaire);
+    expect(String(first.questionnaireResponse?.questionnaire)).not.toMatch(/\d{4}-\d{2}-\d{2}-\d{2}\./);
+  });
+
+  it("⭐ an inconsistent pair is detectable", () => {
+    expect(pairIsConsistent(Q, QR)).toBe(false); // as the engine emits it
+    expect(pairIsConsistent(Q, undefined)).toBe(true); // nothing to disagree with
   });
 });

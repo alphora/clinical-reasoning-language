@@ -143,10 +143,17 @@ export function runOneCase(ctx: RunContext, c: RunOneCase): ProducerCaseEntry {
   };
   if (state !== "generated" && state !== "populate-degraded") return entry;
 
+  // ⚠ Normalise BEFORE writing: the engine stamps every case's Questionnaire with the PlanDefinition's
+  // id and points the response at a timestamped canonical the Questionnaire does not carry.
+  const norm = normalizePersistedPair(results.questionnaire, results.questionnaireResponse, c.compartmentId);
+  if (!pairIsConsistent(norm.questionnaire, norm.questionnaireResponse)) {
+    return { ...entry, state: "failed", reason: "persisted Q/QR pair does not resolve to itself" };
+  }
+
   const artifacts: NonNullable<ProducerCaseEntry["artifacts"]> = [];
   for (const [resource, type] of [
-    [results.questionnaire, "Questionnaire"],
-    [results.questionnaireResponse, "QuestionnaireResponse"],
+    [norm.questionnaire, "Questionnaire"],
+    [norm.questionnaireResponse, "QuestionnaireResponse"],
   ] as const) {
     if (!resource) continue;
     const dir = caseResultsTypeDir(c.compartmentId, type);
@@ -163,4 +170,62 @@ export function runOneCase(ctx: RunContext, c: RunOneCase): ProducerCaseEntry {
     });
   }
   return { ...entry, artifacts };
+}
+
+/**
+ * ⭐⭐ NORMALISE THE PERSISTED PAIR so it is internally consistent and reproducible.
+ *
+ * ⚠ TWO DEFECTS, BOTH MEASURED on real engine output, both invisible until someone asked what identity a
+ * per-case Questionnaire carries:
+ *
+ *  1. EVERY case's Questionnaire arrives with the SAME id — the PlanDefinition's — while carrying
+ *     DIFFERENT content per case (each form holds only what its path reached). N distinct resources
+ *     claiming one identity. They do not collide on disk only because each sits in its own compartment
+ *     directory; anything that flattened them, or resolved by id, would bind whichever it saw first.
+ *
+ *  2. The QuestionnaireResponse references a VERSIONED canonical that embeds the RUN TIMESTAMP:
+ *         …/Questionnaire/<pd-id>|1.0.0-<compartmentId>-2026-09-03-03.22.02
+ *     while the persisted Questionnaire's `url` carries no version at all. So the pair does not resolve
+ *     to itself, and a re-run rewrites the reference — churning the diff of a committed artifact on every
+ *     execution, with nothing about the content having changed.
+ *
+ * Both are fixed here rather than in the driver: the engine's output is what it is, and the producer owns
+ * what gets written down.
+ */
+export function normalizePersistedPair(
+  questionnaire: Record<string, unknown> | undefined,
+  questionnaireResponse: Record<string, unknown> | undefined,
+  compartmentId: string,
+): { questionnaire?: Record<string, unknown>; questionnaireResponse?: Record<string, unknown> } {
+  if (!questionnaire) return { questionnaire, questionnaireResponse };
+
+  // Compartment-derived, so a case's form has an identity that is its own and is stable across runs.
+  const qId = `${String(questionnaire.id ?? "questionnaire")}-${compartmentId}`.slice(0, 64);
+  const baseUrl = String(questionnaire.url ?? "");
+  const qUrl = baseUrl ? `${baseUrl}-${compartmentId}` : undefined;
+
+  const q = { ...questionnaire, id: qId, ...(qUrl ? { url: qUrl } : {}) };
+
+  if (!questionnaireResponse) return { questionnaire: q, questionnaireResponse };
+
+  // ⚠ Rewrite the REFERENCE in the same pass. Restamping the Questionnaire's identity while leaving the
+  // response pointing at the old one produces a pair that is individually valid and jointly broken —
+  // the failure mode is silence, since nothing validates the link at write time.
+  const qr = {
+    ...questionnaireResponse,
+    ...(qUrl ? { questionnaire: qUrl } : {}),
+  };
+
+  return { questionnaire: q, questionnaireResponse: qr };
+}
+
+/** The pair a consumer binds must resolve to itself. Cheap to assert; expensive to discover later. */
+export function pairIsConsistent(
+  questionnaire: Record<string, unknown> | undefined,
+  questionnaireResponse: Record<string, unknown> | undefined,
+): boolean {
+  if (!questionnaire || !questionnaireResponse) return true;
+  const url = questionnaire.url;
+  const ref = questionnaireResponse.questionnaire;
+  return typeof url !== "string" || typeof ref !== "string" || ref === url;
 }
