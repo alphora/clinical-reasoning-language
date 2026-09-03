@@ -25,6 +25,10 @@ import {
 import { readCanonicalBase, readPolicyId } from "../../fhir-emitter/metadata";
 import { createLocalDomainResolver, deriveLocalConceptCoding } from "../../fhir-emitter/localDomain";
 import { inlineAnswerSet } from "../../fhir-emitter/inlineAnswerSet";
+
+/** The resource a local `code is` concept carries when it declares no `type is` (charter §3). Mirrors the
+ *  validators' constant of the same name — the emit lane must not disagree with the lane that accepted it. */
+const IMPLICIT_LOCAL_TYPE = "Observation";
 import {
   parseCanonicalToken,
   classifyCanonicalToken,
@@ -258,7 +262,18 @@ function deriveFhirType(
     if (covered) {
       for (const st of covered.ast.statements) {
         if (st.type !== "Concept" || st.name !== name) continue;
-        const ct = st.conceptType;
+    // ⚠⚠ A LOCAL `code is` CONCEPT WITH NO `type is` IS IMPLICITLY AN Observation, and reading `conceptType`
+    // RAW made it emit nothing at all. That is issue #299 cell 1, and it is the same CRE-vs-$apply
+    // divergence class as the two fixed beside it: the CRE populates the concept BY NAME and passes, while
+    // `$apply` sees no resource and pauses — two lanes, two verdicts, from one source, with only a WARNING.
+    //
+    // ⚠ The default is the SAME `IMPLICIT_LOCAL_TYPE` the validators already apply
+    // (`representationShapeValidator.ts`, `emitCapabilityValidator.ts`), so the emit lane stops disagreeing
+    // with the lane that told the author their concept was well-formed.
+    //
+    // ⚠ Gated on a local `code is`: without one the concept is read-only, has no answer slot, and must NOT
+    // acquire an implicit resource here.
+        const ct = st.conceptType ?? (st.code !== undefined && st.code !== "" ? IMPLICIT_LOCAL_TYPE : undefined);
         if (!ct || !CONCEPT_TYPE_SET.has(ct)) return undefined;
         return {
           fhirType: ct,
@@ -291,7 +306,9 @@ function deriveFhirType(
   if (!target) return undefined;
 
   if (target.type === "Concept") {
-    const c = target.conceptType;
+    // ⚠ Same implicit-Observation default as the unqualified arm above (#299 cell 1) — the two spellings of
+    // the same reference must not derive different resource types.
+    const c = target.conceptType ?? (target.code !== undefined && target.code !== "" ? IMPLICIT_LOCAL_TYPE : undefined);
     if (c && CONCEPT_TYPE_SET.has(c)) {
       return {
         fhirType: c,
