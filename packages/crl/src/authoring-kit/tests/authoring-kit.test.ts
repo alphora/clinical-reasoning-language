@@ -417,7 +417,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.28");
+    expect(kit.schemaVersion).toBe("1.29");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -1028,7 +1028,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     // wants. That is a CORRECTNESS fix, not teaching, so it lands with the slice and re-pins at 1.25 with NO
     // bump — the doctrine re-teach + schemaVersion bump stay BATCHED (`tmp/WORKLIST-kit-deltas.md`).
     expect(cpg.contentHash).toBe(
-      "47c298a75a233774842a4ca15163e5b835fbabfb1e716691d600309d9ba7fa57",
+      "d2e88ac031928abbed94cfa4fe5b5795fa16226d6050ac58e98e7fded91d974d",
     );
     // #189 null/pause — the priorAuth payload embeds the reference `.cel` artifacts, which gained explicit
     // `value is true/false` facts (a NEGATIVE must now be STATED; omission means UNKNOWN and PAUSES). That is
@@ -1041,7 +1041,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     //   changelog entry that explains the re-sync is the `inline-answer-options` rule itself. A KE pinning
     //   1.25 re-syncs and gets the teaching for the new construct in the same step.
     expect(priorAuth.contentHash).toBe(
-      "b2c88913580bc782cd95970bbde0460b2a84f981f5b5016f25ba2c98202314f1",
+      "0bc71aad566638e321a1428df0d72137e0ddbb6e1b04d75918bb2772a3905b39",
     );
   });
 
@@ -1062,9 +1062,9 @@ describe("authoring-kit — getAuthoringKit", () => {
   //   - edit a HISTORICAL entry, which is visible in review as rewriting the past.
   // There is no longer a way to re-pin that looks like routine test maintenance.
   const KIT_PINS: Readonly<Record<string, { cpg: string; priorAuth: string }>> = {
-    "1.28": {
-      cpg: "47c298a75a233774842a4ca15163e5b835fbabfb1e716691d600309d9ba7fa57",
-      priorAuth: "b2c88913580bc782cd95970bbde0460b2a84f981f5b5016f25ba2c98202314f1",
+    "1.29": {
+      cpg: "d2e88ac031928abbed94cfa4fe5b5795fa16226d6050ac58e98e7fded91d974d",
+      priorAuth: "0bc71aad566638e321a1428df0d72137e0ddbb6e1b04d75918bb2772a3905b39",
     },
   };
 

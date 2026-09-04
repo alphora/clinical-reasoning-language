@@ -4,7 +4,7 @@ export {
   celCaseCompartmentId,
   celCaseCompartmentDir,
 } from "./emitFhir";
-export { writeEmitResult } from "./writer";
+export { CEL_DATA_MANIFEST, writeEmitResult } from "./writer";
 export type {
   EmittedResource,
   EmittedCase,

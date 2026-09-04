@@ -4,7 +4,7 @@
 // createServer/main/selfTest from here, so the two can no longer drift. No module-level dispatch:
 // importing this module must NOT start a server (the thin entries own the argv dispatch).
 import { readFileSync, statSync } from "node:fs";
-import { dirname, isAbsolute } from "node:path";
+import { dirname, isAbsolute, join as pathJoin } from "node:path";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -14,7 +14,7 @@ import { z } from "zod";
 const CRL_PACKAGE_VERSION: string = (require("../../package.json") as { version: string }).version;
 
 import { getAuthoringKit, DEFAULT_STAGE, DEFAULT_USE_CASE } from "../authoring-kit";
-import { emitCelToFhir, writeEmitResult } from "../cel/emitter";
+import { CEL_DATA_MANIFEST, emitCelToFhir, writeEmitResult } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
 import { validateCELFile } from "../cel/validator";
 import { runCel, renderScenario } from "../cre";
@@ -662,8 +662,12 @@ export function createServer(): McpServer {
               "`written: string[]` (ABSOLUTE paths). Nothing is written if any error-severity diagnostic is " +
               "present (`written: null`); warning-only results (unsupported-yet / result-deferred) still write " +
               "(mirrors the CLI's write-then-exit-2). Relative paths are REJECTED (the server CWD is not your " +
-              "workspace). The write is NOT transactional; existing files are overwritten and stale files from a " +
-              "prior emit are NOT pruned.",
+              "workspace). The write is NOT transactional. ⚠ `<out>/patient/` is WIPED AND REPOPULATED — the " +
+              "CEL data tree is producer-owned, so a renamed case cannot leave its old compartment behind. Do " +
+              "not hand-author under `<out>/patient/`, and do not target one directory from concurrent calls — " +
+              "the wipe makes that strictly worse than it was. A `cel-data-manifest.json` is written beside the tree " +
+              "(case → compartmentDir → [{path, sha256}]) so the tree can be audited later by anyone, " +
+              "without the response that produced it.",
           ),
       },
     },
@@ -2201,6 +2205,12 @@ function runEmitCel(args: { path: string; includeResources?: boolean; out?: stri
       })),
     ),
     diagnostics: result.diagnostics,
+    // ⚠ The manifest is deliberately NOT in `written` (that array means resource paths), but a consumer
+    // mirroring the tree must not silently MISS it either — an MCP caller cannot import the exported
+    // constant, so the absolute path is surfaced here rather than left to be composed by hand.
+    ...(outDir !== undefined && written !== null
+      ? { manifest: pathJoin(outDir, CEL_DATA_MANIFEST) }
+      : {}),
     ...(args.includeResources ? { emittedCases: result.emittedCases } : {}),
     ...(outDir !== undefined ? { written } : {}),
   };

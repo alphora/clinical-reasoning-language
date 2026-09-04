@@ -317,8 +317,15 @@ export type {
 //      PRODUCER-OWNED and hand-authored Q/QR placed there WILL be deleted.
 //
 //   NO payload-shape change. BOTH useCase hashes re-pin.
+// "1.28" → "1.29": CONTENT bump — the emitted trees became PRODUCER-OWNED and a KE must be told before
+//   they lose something. `emit_cel` now WIPES `tests/data/fhir/patient/` and repopulates; `emit_results`
+//   already deleted unclaimed Q/QR. Both now write a MANIFEST beside their tree so it can be audited
+//   later by anyone, without the response that produced it. New `emitted-trees-are-ours` rule carries the
+//   field measurement that motivated it (a 47→48 suite with 12 renames left 60 dirs / 964 stale files) AND
+//   the non-obvious consequence: stale output defeats a downstream mirror-and-prune, which reports 0 pruned
+//   and is correct, because the junk is in its source. NO payload-shape change. BOTH useCase hashes re-pin.
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.28";
+const SCHEMA_VERSION = "1.29";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -946,6 +953,29 @@ const RULES: KitRule[] = [
     edge: "cpg",
     category: "process",
     rule: "Verify with the MCP tools in order: validate_crl(path) clean → validate_cel(path) clean → run_decision(path) with every case's `result is` passing. validate_cel and run_decision need FILES under a project root (a package.json) — they do not accept inline code. For a COMPOUND-GUARD branch, cite the run_decision `conditionTrace` (the per-operand truth-table) as the audit surface, and confirm the DROP-ONE battery (see cel-cases) — a satisfying case alone does not prove each conjunct is load-bearing.",
+    ref: "verifyLoop",
+  },
+  {
+    id: "emitted-trees-are-ours",
+    edge: "cpg",
+    category: "process",
+    rule:
+      "⚠ THE EMITTED TREES ARE PRODUCER-OWNED — do not hand-author into them, and do not keep anything " +
+      "there you are not willing to lose. `emit_cel` WIPES `<out>/patient/` (conventionally " +
+      "`tests/data/fhir/`) and repopulates it; `emit_results` DELETES unclaimed files of the resource types " +
+      "it owns under `tests/results/fhir/` — by default, and unless you pass `prune: false`; symlinks and " +
+      "files it could not remove are REPORTED rather than deleted. Both leave a MANIFEST beside their tree " +
+      "(`cel-data-manifest.json`, `questionnaire-manifest-<library>.json`) listing case → compartmentDir → " +
+      "[{path, sha256}], so ONE verification routine covers both. " +
+      "⚠ RE-HASHING THE LISTED FILES PROVES INTEGRITY, NOT COMPLETENESS — it says the manifested artifacts " +
+      "have the expected bytes, and says NOTHING about extra files. To verify a tree exactly you must also " +
+      "enumerate it and compare the path SET against the manifest. " +
+      "⭐ WHY THIS MATTERS EVEN IF YOU NEVER LOOK IN THE TREE: renaming a case changes its compartmentId, so " +
+      "without a wipe the OLD compartment stays on disk, complete and plausible. Measured in the field: a " +
+      "47→48 case suite with 12 renames left 60 directories and 964 stale files. Worse, those stale files " +
+      "then defeat any downstream mirror-and-prune step — it reports 0 pruned and is CORRECT, because the " +
+      "junk is in its SOURCE, so it copies it onward and certifies it. A dirty generator does not just leave " +
+      "junk; it manufactures confidence downstream. Verify against the manifest, not a directory listing.",
     ref: "verifyLoop",
   },
   {

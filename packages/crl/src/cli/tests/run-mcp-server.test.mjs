@@ -243,8 +243,8 @@ try {
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
-    assert.equal(kit.schemaVersion, "1.28"); // … age posrep recency (1.21) / inline answer options (1.27) / emit_results taught + reference-artifact correction versioned (1.28)
-    assert.equal(kit.contentHash, "47c298a75a233774842a4ca15163e5b835fbabfb1e716691d600309d9ba7fa57");
+    assert.equal(kit.schemaVersion, "1.29"); // … age posrep recency (1.21) / inline answer options (1.27) / emit_results taught + reference-artifact correction versioned (1.28)
+    assert.equal(kit.contentHash, "d2e88ac031928abbed94cfa4fe5b5795fa16226d6050ac58e98e7fded91d974d");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.
@@ -259,9 +259,9 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.useCase, "prior-auth");
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    assert.equal(kit.schemaVersion, "1.28");
+    assert.equal(kit.schemaVersion, "1.29");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "b2c88913580bc782cd95970bbde0460b2a84f981f5b5016f25ba2c98202314f1");
+    assert.equal(kit.contentHash, "0bc71aad566638e321a1428df0d72137e0ddbb6e1b04d75918bb2772a3905b39");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.equal(refNames.length, 12); // shared medical-policy-determination.crl removed (config-driven local activities); representation-reference.crl added
     assert.ok(!refNames.includes("medical-policy-determination.crl"));

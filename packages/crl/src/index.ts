@@ -253,6 +253,7 @@ export type {
   CELValidationOptions,
 } from "./cel/validator";
 export {
+  CEL_DATA_MANIFEST,
   emitCelToFhir,
   writeEmitResult,
   // ⭐ The ONE path authority for a CEL case on disk. Consumers (the MV questionnaire pane, the
