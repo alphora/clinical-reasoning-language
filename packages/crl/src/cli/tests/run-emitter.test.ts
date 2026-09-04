@@ -1,7 +1,7 @@
 /**
  * CLI dispatch matrix integration test (Todo 4 of #73, round-5 gpt55).
  *
- * Spawns `npx tsx src/cli/run-emitter.ts ...` and validates the
+ * Spawns the CLI through the local `ts-node` and validates the
  * exit code + stderr matrix for the supported flag combinations.
  * Uses small corpus fixtures that already emit clean for both lanes
  * (cms22 / cc-screening) so exits can be deterministically verified.
@@ -26,16 +26,34 @@ const CC_SCREENING = join(
 const CMS22 = join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22-strategy.crl");
 const CMS22_CEL = join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22-strategy.cel");
 
+/**
+ * ⚠ RUNS THE LOCAL `ts-node`, NOT `npx tsx`. It used to shell out to `npx tsx`, and `tsx` is not a
+ * dependency of this repo — so on a cold CI runner npx FETCHED IT FROM THE NETWORK, and the whole
+ * matrix raced a 60s ceiling it sometimes lost. Measured: two CI runs on the SAME commit (a666e2a3),
+ * one green and one red, which is what proved it was the runner and not the code. It also blocked a
+ * release: `publish-npm` is gated on these tests, so a network hiccup silently became "no npm package".
+ *
+ * `ts-node` IS a real devDependency and resolves from `node_modules` with no network at all. `-T` is
+ * transpile-only — types are checked by `tsc --noEmit`, not here. Measured 2.9s against the 60s that
+ * timed out.
+ */
+const TS_NODE = join(REPO_ROOT, "..", "..", "node_modules", "ts-node", "dist", "bin.js");
+
 function runCli(args: string[]): { exitCode: number; stdout: string; stderr: string } {
-  // Use npx tsx via shell — tsx isn't a direct dep so we can't import its
-  // loader as a bare module from the test harness. Shell overhead is ~1s
-  // per run; acceptable for the small dispatch matrix.
-  const result = spawnSync("npx", ["tsx", CLI, ...args], {
+  const result = spawnSync(process.execPath, [TS_NODE, "-T", CLI, ...args], {
     cwd: REPO_ROOT,
     encoding: "utf-8",
-    timeout: 60_000,
-    shell: true,
+    timeout: 120_000,
   });
+  // ⚠ A TIMEOUT MUST SAY SO. `status ?? -1` renders a killed process as exit -1, so the assertion
+  // failed with "expected -1 to be 1" — which reads as the CLI returning the wrong code, not as the
+  // CLI never finishing. That misdirection is what made this flake look like a logic bug for a while.
+  if (result.error !== undefined || result.signal !== null) {
+    throw new Error(
+      `CLI did not complete: ${result.error?.message ?? `killed by ${result.signal}`}` +
+        ` (args: ${args.join(" ")})`,
+    );
+  }
   return {
     exitCode: result.status ?? -1,
     stdout: result.stdout ?? "",
