@@ -317,6 +317,24 @@ currently permits is a **warning** (`composition-result-type-mismatch`) today th
   stage's own output (which is what keeps `<derivation>, then most recent this` a pipeline and not a fixed
   point). A reduction over a NAMED set reduces `this` ∪ that set, so a coded concept's own assertions compete
   with the records it reduces.
+- ⭐⭐ **BUT OWN ANSWERS COMPETE AT THE *SELECTION*, AND ARE NEVER INPUTS TO A *PRODUCER*** (operator,
+  2026-09-04). The producer computes from EVIDENCE; the selection arbitrates between that computation and the
+  concept's own answers. An answer ABOUT a set is not a MEMBER of it.
+
+  ⚠ **Why the scope is load-bearing, worked:** `definition is exists "V", then most recent this` on a coded
+  concept. A reviewer sees no evidence and answers **"No"** — an own record. Unioned into the PRODUCER,
+  `exists (this ∪ V)` is `exists({the "No" record})` = **TRUE**: the derivation reports that V exists
+  *because the reviewer said it does not*. The candidate it constructs is newer than the answer, so the
+  selection picks it and **the reviewer's "No" flips itself to "Yes".**
+
+  This is not `exists` being special. It is the general shape: `this` and a named set are the same KIND for
+  `most recent "X"` (both are records of this concept's value, so competing is exactly right) and DIFFERENT
+  kinds when the named set is the SUBJECT of the test (`exists "V"`, `count "V"` — an answer about V is not
+  a member of V).
+
+  ⭐ The goal already behaves this way and this makes it general rather than incidental: `Obese`'s
+  `"BMI" at least 30 'kg/m2'` reads BMI, never `Obese`'s own answers; those enter at
+  `, then most recent this`, which is where they belong.
 - ⚠ **`this` inside a `value projection` is a DIFFERENT binding and is always REP-LOCAL:** that
   representation's own records, with the projection invoked once per retrieved datum. Zero records ⇒ nothing
   to project ⇒ the arm contributes NOTHING (it does not contribute a closed-world `false`). See §4.
