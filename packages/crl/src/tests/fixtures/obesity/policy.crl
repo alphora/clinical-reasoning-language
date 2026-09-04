@@ -25,10 +25,31 @@
 //
 // RECORD version. A complete, runnable policy.
 //
-// Every concept carries a local `code is` AND `shape is Record`, so every one
-// is a QUESTION (= an answerable = a valid `cpg-featureExpression` target).
-// Four questions, and the user may answer at any level: assert obesity
-// directly, give a BMI, or give height and weight.
+// Every concept HERE carries a local `code is` AND `shape is Record`, so every
+// one is a QUESTION the user may answer at any level: assert obesity directly,
+// give a BMI, or give height and weight. Four questions.
+//
+// ⚠ THAT IS THIS FIXTURE, NOT A RULE. An earlier phrasing read as though a
+// concept must carry both, and it misled a design round: `code is` is the gate
+// and `shape is Record` is not part of it. The accurate chain:
+//
+//   `code is`  =>  QUESTION  =>  ANSWERABLE  =>  CASE FEATURE
+//
+// with two carve-outs the chain does NOT extend through:
+//   - a `shape is RecordSet` case feature is ASKED but gets NO
+//     `cpg-featureExpression` — answering APPENDS a record, so there is nothing
+//     to pre-fill (`caseFeatureRecord.ts`). So case-feature != pre-fillable.
+//   - the uncoded Patient arm is SUPPLIED, not gathered — no SD at all, and
+//     that is not an error (charter §2).
+//
+// ⭐ ANSWERABLE and PRE-FILLABLE are DIFFERENT PROPERTIES. `code is` decides the
+// first; where the `cpg-featureExpression` points decides the second. The whole
+// of #317 lives in that gap — a concept that IS a case feature and IS asked,
+// whose featureExpression aims at answer records nobody writes.
+//
+// ⭐ WHY `shape is Record` STILL EARNS ITS PLACE here: it is not what makes a
+// concept answerable, it is what gives it ONE record for a featureExpression to
+// target. That is the reason, not "answerables are Records".
 //
 // Every concept here publishes ONE record, so every one owes a reduction that
 // merges its arms — the derived arm and the source-representation arm.

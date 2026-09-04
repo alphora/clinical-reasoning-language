@@ -156,3 +156,56 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     expect(r.kind).toBe("supplied-patient");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// ⭐⭐ THE ANSWERABILITY CHAIN, pinned — because prose has not held it.
+//
+// Charter (§3, "QUESTIONS, ANSWERS AND featureExpression ARE THE SAME THING") states this correctly and
+// records that it "has been re-derived wrongly at least four times in one session, by me and by both
+// review arms". It was re-derived wrongly AGAIN on 2026-09-04, in a design round, from an overstated
+// comment in the goal fixture — while the charter clause itself sat unread.
+//
+// So the rule is pinned HERE, where breaking it fails a test at the moment of the edit, rather than
+// relying on a document that is read once at the start of a round.
+//
+//     `code is`  ⇒  QUESTION  ⇒  ANSWERABLE  ⇒  CASE FEATURE
+//
+// ⚠ AND THE CHAIN DOES NOT EXTEND TO PRE-FILLABLE. "Answerable" and "has a `cpg-featureExpression`" are
+// DIFFERENT PROPERTIES — charter: *"An answerable is not automatically one."* The gap between them is
+// where #317 lives.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+describe("the answerability chain — answerable ≠ pre-fillable", () => {
+  // ⚠ THE CARVE-OUT THAT BREAKS THE CHAIN, and the one nothing pinned. A coded history IS a case feature
+  // and IS asked — but it gets NO featureExpression, because answering APPENDS a record, so there is
+  // nothing to confirm. It is also what makes the question work: a target yielding MULTIPLE values into a
+  // non-repeating group makes `$populate` DELETE the item.
+  it("a `shape is RecordSet` coded concept IS a case feature but gets NO featureExpression target", () => {
+    const r = resolve(
+      `concept "Height History":\n- shape is RecordSet.\n- type is Observation.\n- value type is Quantity.\n- code is \`hh\`.\n`,
+      "Height History",
+    );
+    expect(r.kind).toBe("record"); // asked — it IS a case feature
+    if (r.kind !== "record") return;
+    expect(r.target).toBeUndefined(); // …and deliberately NOT pre-fillable
+  });
+
+  // The positive half of the same distinction: shape decides what a concept PUBLISHES, never whether it
+  // may be asked. A RecordSet and a pure question are both answerable; they differ only in the target.
+  it("a bare `code is` pure question IS both a case feature AND pre-fillable", () => {
+    const r = resolve(
+      `concept "Smoker":\n- type is Observation.\n- value type is boolean.\n- code is \`sm\`.\n`,
+      "Smoker",
+    );
+    expect(r.kind).toBe("record");
+    if (r.kind !== "record") return;
+    expect(r.target).toBeDefined();
+    expect(r.target!.define).toBe("Smoker Records");
+  });
+
+  // ⚠ THE THIRD TERMINATOR of a derivation closure is already pinned above — "standalone Patient age
+  // (uncoded arm, posrep) → supplied-patient". Not duplicated here. A closure may bottom out in `code is`
+  // (ANSWERABLE), a representation (SOURCED), or the supplied Patient arm (SUPPLIED); #291 is the check
+  // that a closure reaching NONE of the three is an authoring error rather than a concept that is null
+  // forever. That matters most once `defined as exists` may drop its `code is` (#318), because today the
+  // emitter's refusal prevents the degenerate case by accident.
+});

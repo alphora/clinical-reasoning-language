@@ -117,6 +117,15 @@ function requiredElementCql(
  * The guard is the semantic heart (design D3/D0b): a null value — or, for an existence record, anything
  * but `true` — yields NO candidate. There is deliberately no `Now()` fallback and no evaluation-time
  * parameter, so an absent component can never become a candidate stamped with the current time.
+ *
+ * ⚠⚠ SCOPE, ruled 2026-09-04 — THIS IS ABOUT THE CONSTRUCTOR BODY, NOT ABOUT EVERY STAMP.
+ * The ban exists because an invented stamp inside a CANDIDATE lets a stale calculation outrank a fresh
+ * assertion in the RECENCY MERGE. It does NOT say `Now()` is never a correct stamp anywhere: a
+ * population-only EXISTENCE determination is stamped `Now()` AT THE CALL SITE (the `stampExpr` argument),
+ * because `exists` is a claim about the present — *"you calculated it was boolean-exists NOW"* (operator).
+ * That record enters no merge, so the hazard above cannot arise. The constructor body stays propagated,
+ * which is why this rule and that one coexist. Read this before citing the sentence above as a blanket
+ * prohibition; that misreading has already cost a design round.
  */
 export function renderRecordConstructor(sig: ConstructorSignature): string {
   const params = sig.params.map((p) => `  ${p.name} ${p.cqlType}`).join(",\n");

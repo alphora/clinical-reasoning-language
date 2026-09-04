@@ -199,9 +199,16 @@ export function renderProjectedSourceArm(inputs: {
  * result"* — a recalculation triggered by a newer input is a NEW claim, made as of that input. So a FORMULA
  * over several operands takes the max of their stamps; a THRESHOLD over one takes that one's.
  *
- * ⚠ Evaluation time (`Now()`) is FORBIDDEN as a fallback: an invented stamp lets a stale calculation outrank
- * a fresh assertion. With no components there is no stamp, the constructor drops the candidate, and the
- * determination is correctly unknown.
+ * ⚠ Evaluation time (`Now()`) is FORBIDDEN as a fallback FOR A CALCULATION: an invented stamp lets a stale
+ * calculation outrank a fresh assertion. With no components there is no stamp, the constructor drops the
+ * candidate, and the determination is correctly unknown — right for a CALCULATION (no height ⇒ no BMI).
+ *
+ * ⚠⚠ `exists` IS NOT A CALCULATION OVER INPUTS THAT MAY BE MISSING — ABSENCE IS THE INPUT, and `exists` over
+ * nothing is a determinate `false` (two-valued by ruling; `known exists` is the separate keyword for
+ * anything else). Applying the rule above to an existence determination would import UNKNOWN semantics into
+ * a two-valued operation THROUGH A TIMESTAMP: the candidate drops, the item renders blank, and it reads as a
+ * pause nobody declared. So an existence determination is stamped `Now()` at the CALL SITE. Ruled
+ * 2026-09-04. Pattern-by-pattern: calculations propagate, existence stamps now.
  *
  * ⚠ Returns `null as System.DateTime` for zero components rather than omitting the argument — the
  * constructor's guard is what turns that into "no candidate", and it must be reached, not bypassed.
