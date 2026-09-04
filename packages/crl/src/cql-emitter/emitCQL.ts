@@ -407,6 +407,35 @@ const cqlString = cqlStringLiteral;
 // inline `text/cql-expression` guard can't drift. Escapes `\` first, then `"`.
 const cqlIdent = cqlQuotedIdentifier;
 
+/**
+ * ⭐ #316 — every top-level identifier the emitted CQL declares MORE THAN ONCE, name → count.
+ *
+ * ⚠ Reads the EMITTED TEXT, not the AST. That is the point: a preflight knows only about the one
+ * collision pair it was written for, so a new way to mint a duplicate slips past it. This cannot be
+ * out-of-date with respect to output it is reading.
+ *
+ * ⚠⚠ `define function` IS DELIBERATELY NOT COUNTED — CQL PERMITS FUNCTION OVERLOADS, and this repository
+ * depends on them: `CRLCommon.cql` declares SEVEN `"Has"` and SEVEN `"AtLeast"` functions, one per resource
+ * type, dispatched on the argument. Counting them would make the catalog itself fail this gate. (Today the
+ * emitter writes functions UNQUOTED — `define function CRLConstructObservationBoolean(` — so a quoted-name
+ * regex would miss them anyway; that is luck, not design, and this exclusion is the actual rule.)
+ *
+ * ⚠ SCOPE: this recognizes THIS EMITTER'S declaration templates, not general CQL. Verified against them —
+ * every emitted declaration is single-line, block-comment bodies are ` * `-prefixed and FIXME lines start
+ * with `//`, so neither can be mistaken for a declaration. `define public|private "X"` is not emitted. The
+ * escaped-quote form is handled below although CRL names cannot currently contain a quote.
+ */
+export function duplicateTopLevelIdentifiers(cql: string): Map<string, number> {
+  const decl = /^(?:valueset|codesystem|code|parameter)\s+"((?:[^"\\]|\\.)*)"/;
+  const seen = new Map<string, number>();
+  for (const raw of cql.split("\n")) {
+    const m = decl.exec(raw.trim());
+    if (!m) continue;
+    seen.set(m[1], (seen.get(m[1]) ?? 0) + 1);
+  }
+  return new Map([...seen].filter(([, c]) => c > 1));
+}
+
 // #189 Slice 0b — the boolean-composition leaf policy for the SHARED renderer (`emitTotalBooleanExpr`).
 // A concept leaf is referenced BARE: the emit pivot (`emitBooleanComposition`) has ALREADY proven every
 // operand a total scalar boolean via `emitsTotalScalarBoolean`, so a `Coalesce` here would MASK a proof
@@ -1075,6 +1104,10 @@ class Emitter {
    * name (all produce CQL top-level identifiers `define X` / `valueset X` /
    * `parameter X`), the terminology gets the " ValueSet" / " Code" disambiguating
    * suffix. A criterion is treated exactly like a concept here (both emit `define X`).
+   *
+   * ⚠ The " Code" half of that pair is now a MISNOMER for a hand-authored body carrying codes: since #316
+   * such a terminology emits a `valueset` declaration, not `code` declarations. The suffix still
+   * disambiguates correctly — it only has to be unique — but do not read it as describing what is emitted.
    */
   private detectCollisions(): void {
     for (const stmt of this.ast.statements) {
@@ -1187,7 +1220,57 @@ class Emitter {
     if (criteria.length > 0) {
       sections.push(this.emitCriteria(criteria));
     }
-    return sections.join("\n\n") + "\n";
+    const cql = sections.join("\n\n") + "\n";
+    this.detectDuplicateTopLevelIdentifiers(cql);
+    return cql;
+  }
+
+  /**
+   * ⭐⭐ #316 — NEVER RETURN `success: true` OVER CQL THAT CANNOT COMPILE.
+   *
+   * ⚠ THIS IS A POSTFLIGHT ON THE EMITTED TEXT, ON PURPOSE. Every other collision guard here is a
+   * PREFLIGHT over the AST and each knows about one pair it was written for (`criterion` vs `parameter`,
+   * the codesystem url conflict). A postflight cannot be out-of-date with respect to a NEW way to mint a
+   * duplicate, because it reads what actually came out.
+   *
+   * ⚠⚠ THE MEASURED COST OF NOT HAVING IT. A terminology carrying `valueset is` PLUS `code is` lines
+   * emitted 1 + N declarations of one identifier — 3 for a 2-code body, 9 for an 8-code one — and
+   * `emitCQL` returned SUCCESS. Downstream: the library failed to compile, every library that included it
+   * failed, `$populate` answered nothing, and all 47 QuestionnaireResponses in a shipped artifact came
+   * back empty behind a 47/47 green `run_decision`. FOUR separate diagnoses were spent before anyone
+   * looked at the emitted CQL, because nothing in our stack said the output was invalid.
+   *
+   * The charter calls silent success on invalid output the worst of the three options — worse than
+   * failing, and worse than an honest placeholder — because it reads as "this works" to every consumer
+   * and every progress report. That was exactly the shape of it.
+   *
+   * ⚠ HARD ERROR, ruled by the operator 2026-09-04, and the reasoning is not "be strict": CQL that
+   * duplicates a top-level identifier does not compile ANYWHERE, so nothing downstream can consume it. A
+   * warning would leave the producer reporting on whether it RAN rather than on whether what it produced
+   * is usable, which is the whole family of defect this closes.
+   */
+  private detectDuplicateTopLevelIdentifiers(cql: string): void {
+    for (const [name, count] of duplicateTopLevelIdentifiers(cql)) {
+      // ⚠ ANCHOR ON THE DECLARATION THAT MINTED IT, never a fabricated `line: 1`. A location pointing at
+      // the library header is worse than none: the cockpit highlights a line that has nothing to do with
+      // the collision, and a reader trusts it because a coordinate looks like evidence. The emitted name
+      // maps back through `terminologyEmitName` (emit name → source name), so a terminology-minted
+      // duplicate resolves to its own statement; anything else reports WITHOUT coordinates.
+      const sourceName = [...this.terminologyEmitName.entries()].find(([, emit]) => emit === name)?.[0];
+      const stmt = sourceName
+        ? this.ast.statements.find((s) => s.type === "Terminology" && s.name === sourceName)
+        : undefined;
+      this.emitErrors.push({
+        type: "Validation",
+        kind: "emit-duplicate-top-level-identifier",
+        ...(stmt?.location ? { line: stmt.location.start.line, column: stmt.location.start.column } : {}),
+        message:
+          `The emitted CQL declares the top-level identifier \`${name}\` ${count} times in library ` +
+          `"${this.options.libraryName ?? "?"}". CQL requires top-level identifiers to be unique, so this ` +
+          `library cannot compile and every library that includes it fails with it. Emit is refused rather ` +
+          `than returning success over output no consumer can load.`,
+      });
+    }
   }
 
   /**
@@ -1903,9 +1986,11 @@ class Emitter {
     return terms
       .map((t) => this.emitOneTerminology(t, emittedCodesystems))
       // Future-proofing: drops a terminology whose every line vanished. Today
-      // the `code` line always survives (only the deduped `codesystem` line can
-      // return ""), so no terminology fully vanishes — but the guard keeps the
-      // join clean if that ever changes.
+      // ⚠ A TERMINOLOGY CAN NOW VANISH ENTIRELY, and this filter is what keeps the join clean when it
+      // does: a hand-authored terminology carrying codes returns "" when the emit was given no
+      // canonicalBase/policyId (it pushes `emit-terminology-needs-policy-id` instead — see
+      // `emitOneTerminology`). The older note here said the `code` line always survives; that stopped
+      // being true when #316 moved hand-authored bodies onto the single-`valueset` path.
       .filter((s) => s.length > 0)
       .join("\n");
   }
@@ -1934,13 +2019,68 @@ class Emitter {
     // `policyId` (orchestrated path only) so no direct/test caller silently changes; the url is byte-matched to the
     // FHIR `ValueSet.url` via the shared `valueSetUrl`, so the `[Resource: "X"]` retrieve resolves membership over
     // ALL the terminology's codes.
-    const hasValueset = t.body.some((l) => l.type === "TerminologyValueset");
     const hasCode = t.body.some((l) => l.type === "TerminologyCode");
+    // ⚠⚠ `hasCode` IS THE WHOLE DISCRIMINATOR — do NOT re-add `&& !hasValueset`.
+    //
+    // This branch originally excluded a body carrying a `valueset is` line, and that exclusion was the
+    // #316 defect: a terminology with BOTH emitted one `valueset` decl AND one `code` decl per code, every
+    // one of them named after the TERMINOLOGY, so the identifier count was 1 + N and anything past a single
+    // code was uncompilable CQL. MEASURED on the reporting artifact: 3 declarations of one identifier for a
+    // 2-code terminology, 9 for an 8-code one, `Identifier ... is already in use in this library` at
+    // $populate, and every QuestionnaireResponse across 47 cases came back empty behind it.
+    //
+    // The `code` decls were never load-bearing here: the retrieve binds the terminology NAME, which this
+    // branch declares as a `valueset` either way (byte-matched to the FHIR `ValueSet.url` via the shared
+    // `valueSetUrl`). A mixed body's FHIR ValueSet already emits at the SLUG url, not the declared one —
+    // `resolveReferenceStub` returns null for anything but a pure reference — so the slug is the correct
+    // binding for both halves and the two lanes agree by construction.
+    //
+    // A PURE reference (`valueset is` with NO codes) has `hasCode === false`, so it still falls through to
+    // the per-line path and binds its DECLARED canonical, which is the deployment-swap contract.
     const isHandAuthoredFunctional =
-      systemLine !== undefined && systemLine.name === undefined && hasCode && !hasValueset;
-    if (isHandAuthoredFunctional && this.options.canonicalBase && this.options.policyId) {
-      const url = valueSetUrl(this.options.canonicalBase, this.options.policyId, t.name);
-      return `valueset ${cqlIdent(emitName)}: ${cqlString(url)}`;
+      systemLine !== undefined && systemLine.name === undefined && hasCode;
+    if (isHandAuthoredFunctional) {
+      // ⚠⚠ REFUSE BY NAME WHEN THE CALLER GAVE US NO URL TO BIND — do not fall through to the per-line path.
+      //
+      // The url is a pure function of `(canonicalBase, policyId, name)`. Without them this branch cannot
+      // run, and the per-line fallback emits one `code "<terminology>"` decl PER CODE — which the duplicate
+      // postflight now (correctly) refuses. The author would then be told their terminology declares an
+      // identifier three times, which is TRUE of the output and NOT their fault: their CRL is fine and the
+      // CALLER omitted an option. `emit_cql` over inline source is exactly that caller — `mcp/server.ts`
+      // reads the policy id from a resolved project root, so source passed as text has none.
+      //
+      // ⚠ The `policyId` gate used to mean "leave direct/test callers on the unchanged path". Since the
+      // postflight landed, that path is a hard error, so the gate's old rationale is stale — the honest
+      // options are a correct url or a diagnostic naming the missing input, never invalid CQL.
+      //
+      // ⚠⚠ ONLY WHEN THE LEGACY PATH WOULD ACTUALLY COLLIDE — i.e. MORE THAN ONE code. A single-code body
+      // emits one `codesystem` + one `code "<name>"` decl, which is VALID CQL and a legal code-based
+      // retrieve, and `functionalVsBinding.test.ts` pins it deliberately as the direct/test-caller path. A
+      // blanket refusal here broke that, and the suite caught it — the missing option is only a problem
+      // when the fallback it forces cannot compile.
+      const { canonicalBase, policyId } = this.options;
+      if (canonicalBase && policyId) {
+        return `valueset ${cqlIdent(emitName)}: ${cqlString(valueSetUrl(canonicalBase, policyId, t.name))}`;
+      }
+      // No url to bind. A SINGLE code still emits valid CQL on the legacy path below (one `codesystem` +
+      // one `code "<name>"`, a legal code-based retrieve), so let it through unchanged. MORE than one code
+      // cannot: that path mints a duplicate, so refuse by name here rather than letting the postflight
+      // blame the author for output the caller's missing option forced.
+      if (t.body.filter((l) => l.type === "TerminologyCode").length > 1) {
+        this.emitErrors.push({
+          type: "Validation",
+          kind: "emit-terminology-needs-policy-id",
+          line: t.location?.start.line,
+          column: t.location?.start.column,
+          message:
+            `Terminology "${t.name}" carries ${t.body.filter((l) => l.type === "TerminologyCode").length} ` +
+            `codes, so it emits as a CQL \`valueset\` bound to the ValueSet this policy emits — and that url ` +
+            `needs a canonical base and a policy id, which this emit was not given. Nothing is wrong with ` +
+            `the terminology. Emit through a resolved project (pass a file path rather than inline source) ` +
+            `so both are available.`,
+        });
+        return "";
+      }
     }
 
     // Reference terminologies (`valueset is`) + synthetic lowered-local-code terminologies (system `name` set):

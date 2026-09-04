@@ -1523,6 +1523,24 @@ describe("emitCQLFromAST — D1 codesystem url-conflict guard", () => {
     expect(conflict!.message).toMatch(/urn:crl:codesystem:b/);
   });
 
+  // ⭐⭐ #316 END-TO-END: this fixture is the one path that still emits a genuine duplicate top-level
+  // identifier, so it is where the duplicate POSTFLIGHT is pinned driving a real `emitCQLFromAST` run.
+  //
+  // ⚠ ONE CAUSE, TWO ERRORS, ON PURPOSE. D1 emits both conflicting decls deliberately so the divergence is
+  // visible rather than silently mis-bound; the postflight then also reports the resulting duplicate. Both
+  // statements are true — the CQL is invalid, and invalid for both stated reasons — so the overlap is noise,
+  // not a defect. Do NOT "fix" it by suppressing one: the postflight must stay ignorant of why a duplicate
+  // arose, which is the property that lets it catch a cause nobody has thought of yet.
+  it("#316: the duplicate postflight ALSO fires here, and flips success", () => {
+    const r = emitCQLFromAST(astWithConflictingCodesystem(), { libraryName: "T" });
+    expect(r.success).toBe(false);
+    const dup = r.errors!.find((e) => e.kind === "emit-duplicate-top-level-identifier");
+    expect(dup).toBeDefined();
+    expect(dup!.message).toMatch(/`Shared` 2 times/);
+    // Both reports survive — neither suppresses the other.
+    expect(r.errors!.some((e) => e.kind === "emit-codesystem-url-conflict")).toBe(true);
+  });
+
   it("clean-error-channel path: BOTH conflicting codesystem decls are still emitted (no silent drop)", () => {
     const r = emitCQLFromAST(astWithConflictingCodesystem(), { libraryName: "T" });
     const cql = r.result ?? "";
