@@ -30,6 +30,10 @@ export interface SubQuestionHit {
 
 /** #233 Todo 2a: a NON-ROOT criterion box's collapse chevron. Carries the criterion occurrence's POSITION key
  *  (`leaf::[whenKey,opPath,"crit"]`, render-independent), which `toggleCriterionExpand` flips in `expandedGuardWhens`
+ *  ⚠ #189 REUSES THIS CHANNEL for a coded question's ANSWER OPTIONS, with a `"opts"`-tagged key
+ *  (`leaf::[whenKey,opPath,"opts"]`) — disjoint from `"crit"` by the tag, so the two collapse bits are
+ *  independent on the same node. A THIRD tag must stay disjoint from both; that is what makes one toggle
+ *  message serve every disclosure without new host plumbing.
  *  (which now holds BOTH root when-nodeKeys and these position keys — disjoint by the `leaf::` prefix). Kept OUT of
  *  `RevealHit` (it is neither a selection nor a peek — only the toggle channel resolves it). A ROOT criterion's chevron
  *  still resolves to `{nodeKey}` (the `when` box is the criterion, absorbed), so both toggle paths converge on the flip. */

@@ -95,11 +95,13 @@ const flowRing = (x: number, y: number, w: number, h: number, off: number, rx: n
 /** #224 ii.3 Slice 2: the criterion COLLAPSE disclosure — a `▸` (collapsed) / `▾` (expanded) triangle, its OWN hit
  *  surface (`data-toggle-crit`, resolved host-side via the row's reveal key exactly like a peek). A grandchild of the
  *  when `<g>`, so `closest('[data-toggle-crit]')` wins for a chevron click and `closest('[data-reveal]')` for the box. */
-const critToggle = (cx: number, cy: number, collapsed: boolean, revealKey: string): string => {
+const critToggle = (cx: number, cy: number, collapsed: boolean, revealKey: string, what = "criterion body"): string => {
   const d = collapsed ? `M${cx - 3} ${cy - 4} L${cx + 3} ${cy} L${cx - 3} ${cy + 4} Z` : `M${cx - 4} ${cy - 3} L${cx + 4} ${cy - 3} L${cx} ${cy + 3} Z`;
   return (
     `<g class="flow-crit-toggle" data-toggle-crit="${escapeHtml(revealKey)}">` +
-    `<title>${collapsed ? "expand criterion body" : "collapse criterion body"}</title>` +
+    // `what` names what this chevron opens. #189 reuses this toggle for a coded question's ANSWERS, and a
+    // hardcoded "criterion body" would have told a clinician the wrong thing about their own question.
+    `<title>${collapsed ? `expand ${what}` : `collapse ${what}`}</title>` +
     `<rect class="flow-crit-hit" x="${cx - 7}" y="${cy - 8}" width="16" height="16" rx="3"/>` +
     `<path class="flow-crit-chevron" d="${d}"/></g>`
   );
@@ -493,6 +495,55 @@ function buildLaid(
         slot = Math.max(slot, cursor.y); // reserve the outline's vertical extent so the next sibling doesn't overlap it
       }
     }
+    // ⭐⭐ #189 — THE CANONICAL SHAPE, which BOTH branches above decline.
+    //
+    // ⚠ MEASURED (0 chevrons) before this existed, on `coded-question.crl:59` — our OWN reference fixture
+    // for this feature, and `example-direct.crl:12`. A bare single-ref `when "Q"` has NO `guardOutline`
+    // (`buildGuardOutlines` skips a `BranchConditionRef`), and the #189 wrapper is `definition is "…" in
+    // …` — a REDUCTION, so `hasDefinedAs` is false. Neither arm hangs an outline, so no leaf exists for
+    // `answerOptionsByConcept` to be consulted against, and the question renders as one flat box.
+    //
+    // ⚠ WHY IT SURVIVED A REAL-POLICY MEASUREMENT: every question in the policy I measured sat inside a
+    // COMPOUND guard, which takes the `guardOutline` arm. 8 chevrons appeared and this hole did not. A
+    // measurement against live content is worth more than a fixture AND is still only evidence about the
+    // shapes that content happens to use.
+    //
+    // Keyed on `n.outlineRoots.length === 0` rather than on the negation of the two conditions above, so a
+    // future third outline path cannot silently reintroduce a double render.
+    const selfAnswers = n.kind === "when" && cf.conceptKey !== undefined ? opts.answerOptionsByConcept?.get(cf.conceptKey) : undefined;
+    if (outlineRoots.length === 0 && selfAnswers && selfAnswers.length > 0) {
+      const whenLeft = PAD + depth * COL;
+      const cursor = { y: nodeY + (NODE_H * 1.5) / ROW };
+      const posKey = outlineKey(n.nodeKey, "self", "opts");
+      const optCollapsed = !(opts.expandedGuardWhens?.has(posKey) ?? false);
+      const y = cursor.y;
+      cursor.y += OUTLINE_ADVANCE;
+      const optChildren: LaidNode[] = [];
+      if (!optCollapsed) {
+        for (const [oi, o] of selfAnswers.entries()) {
+          optChildren.push({
+            nodeKey: outlineKey(n.nodeKey, `self.o${oi}`, "opt"),
+            kind: "leaf", useDecision: false, outline: true, outlineRow: "option",
+            indent: 1, absX: outlineX(whenLeft, 1),
+            label: o.display, full: `${o.display} — answer option \`${o.code}\``,
+            depth: 0, topWhenKey: n.nodeKey, y: cursor.y, children: [],
+          });
+          cursor.y += OUTLINE_ADVANCE;
+        }
+      }
+      // The question itself renders as a leaf so the chevron and the rows sit where they do in every other
+      // shape — one rendering path for option rows, not a second one on the structure box.
+      outlineRoots.push({
+        nodeKey: outlineKey(n.nodeKey, "self", "q"),
+        kind: "leaf", useDecision: false, outline: true, outlineRow: "leaf", isDefLeaf: true,
+        indent: 0, absX: outlineX(whenLeft, 0),
+        label: cf.conceptName ?? "", full: `${cf.conceptName} — concept "${cf.conceptLib}"`,
+        conceptKey: cf.conceptKey, conceptName: cf.conceptName, conceptLib: cf.conceptLib, isSource: cf.isSource,
+        optionsRow: { posKey, collapsed: optCollapsed, count: selfAnswers.length },
+        depth: 0, topWhenKey: n.nodeKey, y, children: optChildren,
+      });
+      slot = Math.max(slot, cursor.y);
+    }
     const children = [...structureChildren, ...outlineRoots];
     return {
       nodeKey: n.nodeKey, kind: n.kind, useDecision, guard, label: display, full, depth, y: nodeY, children, ...cf,
@@ -713,8 +764,11 @@ export function renderFlowPane(
       body +=
         `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}"><title>${escapeHtml(n.full)}</title>` +
         `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
-        labelMarkup(n.label, x + (optRow ? 12 : 0), y, OUTLINE_H, OUTLINE_LABEL_MAX - (optRow ? 12 : 0), 9) +
-        (optRow ? critToggle(x + 8, y + OUTLINE_H / 2, optRow.collapsed, optTogKey) : "") +
+        // ⚠ The 5th arg is maxChars, NOT pixels. `- 12` (mistaking it for the 12px shift) left EIGHT chars
+        // per line out of OUTLINE_LABEL_MAX = 20, so every coded question wrapped to two 8-char fragments.
+        // The crit-row precedent above reserves 5 chars for a 20px gutter; 12px is ~2 chars at ~5.9px/char.
+        labelMarkup(n.label, x + (optRow ? 12 : 0), y, OUTLINE_H, OUTLINE_LABEL_MAX - (optRow ? 2 : 0), 9) +
+        (optRow ? critToggle(x + 8, y + OUTLINE_H / 2, optRow.collapsed, optTogKey, `${optRow.count} answer options`) : "") +
         flowRing(x, y, OUTLINE_NODE_W, OUTLINE_H, 1.5, 7) +
         (leafConcept ? flagBadge(x + OUTLINE_NODE_W - 11, y + 11, gid) : "") +
         `</g>`;

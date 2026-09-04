@@ -11,7 +11,7 @@
  * DIRECT edges only (defined-as operands + definition-is narrative refs); the transitive closure + cycle guard belong to
  * the consumer (Slice 2).
  */
-import type { Concept, ConceptValueType, ReferenceName } from "../ast/types";
+import type { Concept, ConceptValueType } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { ConceptType } from "../grammar/conceptTypes";
@@ -20,12 +20,6 @@ import type { LsLocation } from "../language-services/contracts";
 import { collectLibs, conceptDeclRef, definitionConceptRefs, lsLoc, nodeKey } from "./indexer";
 
 export type ConceptDefinitionKind = "defined-as" | "definition-is" | "coded-from";
-
-/** A `ReferenceName` as authored — bare name, or `lib.name` when qualified. Uses the shared accessors. */
-const refText = (r: ReferenceName): string => {
-  const lib = getRefLibrary(r);
-  return lib ? `${lib}.${getRefName(r)}` : getRefName(r);
-};
 
 export interface CrlConceptNode {
   nodeKey: string; // === indexer concept key === decision-row concept refKey (the cross-pane join)
@@ -48,13 +42,12 @@ export interface CrlConceptNode {
    *
    * INLINE options only. A `kind: "terminology"` `value from` names an external ValueSet that is not
    * resolved here — the concept layer is a projection of the SOURCE, and expanding a terminology
-   * reference would need a resolution step this layer deliberately does not have. Absent rather than
-   * guessed: a renderer can say "options come from <name>" from `valueFromTerminology` instead of
-   * showing a list it made up.
+   * reference needs a resolution step this layer deliberately does not have. Such a concept gets
+   * NOTHING here and renders as it always did: showing a list we made up would be worse than showing
+   * none. (A field naming the ValueSet was added and removed in the same change — nothing read it, and
+   * a signal with no reader is indistinguishable from a feature that works.)
    */
   answerOptions?: { code: string; display: string }[];
-  /** The external ValueSet a `value from "VS"` names, when the options are NOT inline. */
-  valueFromTerminology?: string;
   /** The concept's definition shape, when present — a raw signal for the renderer's later layer classification. */
   definitionKind?: ConceptDefinitionKind;
   hasLocalCode: boolean; // has a local `- code is …` (locally assertable)
@@ -160,9 +153,6 @@ export function buildCrlConceptLayer(
         ...(c.valueFrom?.kind === "inline"
           ? { answerOptions: c.valueFrom.options.map((o) => ({ code: o.code, display: o.display })) }
           : {}),
-        ...(c.valueFrom?.kind === "terminology"
-          ? { valueFromTerminology: refText(c.valueFrom.terminologyName) }
-          : {}),
         ...(c.definition ? { definitionKind: DEF_KIND[c.definition.type] } : {}),
         hasLocalCode: c.code !== undefined,
         hasRepresentations: c.representations.length > 0,
@@ -186,9 +176,22 @@ export function buildCrlConceptLayer(
  *
  * So a concept with no options of its own inherits them from a definition ref that has them.
  *
- * ⚠ ONE HOP, AND ONLY WHEN UNAMBIGUOUS. If several refs carry options there is no single answer set to
- * show, and picking one would invent a question the author never wrote — those get nothing, and the
- * renderer shows the node as it always did.
+ * ⚠⚠ ONLY THROUGH A TRANSPARENT WRAPPER (`definition is …`), NEVER THROUGH A COMPOSITION. `definitionRefs`
+ * carries boolean-composition operands too, so an unrestricted hop makes a composition inherit an
+ * operand's answers. MEASURED before this guard:
+ *
+ *     Eligible defined as ("Adult" sem-and "Documented Complaint")
+ *       → Eligible offered the complaint's 8 answers      ← a question the author never asked
+ *
+ * "Exactly one option-bearing ref" resolves MULTIPLICITY, not semantic OWNERSHIP: a composition with one
+ * coded operand passes that test and is still lying to a clinician. `definition is` is a reduction over a
+ * single question — the wrapper HAS no body of its own — so the answers it shows are that question's.
+ * A `defined as` wrapper is excluded for a second reason as well: it renders its operand as a child leaf,
+ * which would show the identical option list twice, one indent apart.
+ *
+ * ⚠ AND STILL ONLY WHEN UNAMBIGUOUS. If several refs carry options there is no single answer set to show,
+ * and picking one would invent a question the author never wrote — those get nothing, and the renderer
+ * shows the node as it always did.
  */
 export function answerOptionsForDisplay(
   nodes: readonly CrlConceptNode[],
@@ -200,6 +203,9 @@ export function answerOptionsForDisplay(
       out.set(n.nodeKey, n.answerOptions);
       continue;
     }
+    // The wrapper must be TRANSPARENT — see the header. A composition (`defined as`) never forwards, no
+    // matter how few of its operands carry options.
+    if (n.definitionKind !== "definition-is") continue;
     const bearing = n.definitionRefs
       .map((r) => byKey.get(r))
       .filter((r): r is CrlConceptNode => (r?.answerOptions?.length ?? 0) > 0);

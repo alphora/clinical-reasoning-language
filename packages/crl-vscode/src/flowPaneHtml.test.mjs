@@ -1107,3 +1107,29 @@ check("#189: a concept with no options gets no chevron and no rows", () => {
   assert.equal(optRows(rr.html), 0);
   assert.equal(Object.values(rr.reveals).filter((v) => v && "criterionToggle" in v).length, 0);
 });
+
+// ⚠⚠ THE CANONICAL #189 SHAPE — a bare single-ref `when` over a `definition is … in …` wrapper.
+// This is `coded-question.crl:59` and `example-direct.crl:12`: the SIMPLEST policy that has a coded
+// question. It has NO `guardOutlines` entry (a bare `BranchConditionRef` is skipped by
+// `buildGuardOutlines`) and its wrapper is a REDUCTION, so `hasDefinedAs` is false. Both outline
+// paths therefore decline it, and the options never reach a leaf.
+//
+// Every earlier test here hung the question inside a COMPOUND guard, which is why the hole survived a
+// 15-concept measurement against a real policy: that policy happened to use compound guards only.
+check("#189: the CANONICAL bare-ref `when` over a reduction wrapper still offers its answers", () => {
+  const bareStructure = [{
+    decision: "D", lib: "Pol", nodeKey: "d:D", location: {},
+    children: [node("w:Q", "when", "when Q", ["c:Q"], [node("a:X", "action", "ActX", ["act:X"], [], { actionKind: "recommend-activity" })])],
+  }];
+  const bareConcepts = [concept("c:Q", "Q", { definitionKind: "definition-is" })];
+  const bareOpts = { concepts: bareConcepts, answerOptionsByConcept: new Map([["c:Q", ANSWERS]]) };
+
+  const collapsed = renderFlowPane(bareStructure, { ...bareOpts, expandedGuardWhens: new Set() });
+  assert.equal(optRows(collapsed.html), 0, "still collapsed by default");
+  const toggles = Object.values(collapsed.reveals).filter((v) => v && "criterionToggle" in v);
+  assert.equal(toggles.length, 1, "the canonical shape must offer exactly one ▸ disclosure");
+
+  const rr = renderFlowPane(bareStructure, { ...bareOpts, expandedGuardWhens: new Set([toggles[0].criterionToggle]) });
+  assert.equal(optRows(rr.html), ANSWERS.length, "expanding must show every answer");
+  for (const a of ANSWERS) assert.ok(rr.html.includes(a.display), `missing answer "${a.display}"`);
+});

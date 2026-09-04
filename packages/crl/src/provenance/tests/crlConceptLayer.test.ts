@@ -6,7 +6,7 @@ import { parseInput } from "../../ast/tests/parseInput";
 import { buildCEL } from "../../cel";
 import type { ResolvedCelGraph } from "../../cel/imports/types";
 import type { RegistryEntry } from "../../imports/types";
-import { buildCrlConceptLayer, classifyConcept, type CrlConceptNode } from "../crlConceptLayer";
+import { answerOptionsForDisplay, buildCrlConceptLayer, classifyConcept, type CrlConceptNode } from "../crlConceptLayer";
 import { buildCrlStructure } from "../crlStructure";
 import { buildProvenanceIndex, conceptDeclRef, nodeKey } from "../indexer";
 
@@ -224,5 +224,72 @@ describe("classifyConcept — ADR-0001 layer (#166 Slice 3a)", () => {
     expect(c).toEqual({ layer: "inferred", locallyAssertable: true, standardized: false, external: true });
     const s = classifyConcept(mk({ definitionKind: "coded-from", hasLocalCode: true }));
     expect(s).toEqual({ layer: "asserted", locallyAssertable: true, standardized: true, external: false });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// `answerOptionsForDisplay` — WHICH node shows a coded question's answers.
+//
+// ⚠ The rule this pins was shipped with NO test and was WRONG. It forwarded options through any
+// `definitionRefs` edge, and that set includes boolean-composition operands — so a composition
+// inherited an operand's answers and offered a clinician a question the author never asked.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+describe("answerOptionsForDisplay", () => {
+  const OPTS = [
+    { code: "a", display: "Answer A" },
+    { code: "b", display: "Answer B" },
+  ];
+  const node = (nodeKey: string, extra: Partial<CrlConceptNode> = {}): CrlConceptNode =>
+    ({
+      nodeKey, name: nodeKey, lib: "L", label: `concept "${nodeKey}"`, location: {},
+      hasLocalCode: false, hasRepresentations: false, definitionRefs: [], ...extra,
+    }) as unknown as CrlConceptNode;
+
+  it("an option-OWNING concept keeps its own answers", () => {
+    const m = answerOptionsForDisplay([node("Q", { answerOptions: OPTS })]);
+    expect(m.get("Q")).toEqual(OPTS);
+  });
+
+  // The canonical #189 pair: the boolean wrapper is what a `when` guards on, so it is what renders.
+  it("a `definition is` wrapper inherits the question's answers — the shape a tree actually shows", () => {
+    const m = answerOptionsForDisplay([
+      node("Q", { answerOptions: OPTS }),
+      node("W", { definitionKind: "definition-is", definitionRefs: ["Q"] }),
+    ]);
+    expect(m.get("W")).toEqual(OPTS);
+  });
+
+  // ⚠⚠ THE DEFECT. Measured before the fix: `Eligible` was offered the complaint's answers because it
+  // was the only option-bearing operand. One coded operand in a composition is not ownership.
+  it("a COMPOSITION never inherits an operand's answers, even with exactly one bearing operand", () => {
+    const m = answerOptionsForDisplay([
+      node("Q", { answerOptions: OPTS }),
+      node("Adult"),
+      node("Eligible", { definitionKind: "defined-as", definitionRefs: ["Adult", "Q"] }),
+    ]);
+    expect(m.has("Eligible")).toBe(false);
+  });
+
+  it("two option-bearing refs are ambiguous — nothing is shown rather than one picked", () => {
+    const m = answerOptionsForDisplay([
+      node("Q1", { answerOptions: OPTS }),
+      node("Q2", { answerOptions: [{ code: "c", display: "Answer C" }] }),
+      node("W", { definitionKind: "definition-is", definitionRefs: ["Q1", "Q2"] }),
+    ]);
+    expect(m.has("W")).toBe(false);
+  });
+
+  it("does not hop twice — a wrapper of a wrapper shows nothing", () => {
+    const m = answerOptionsForDisplay([
+      node("Q", { answerOptions: OPTS }),
+      node("W", { definitionKind: "definition-is", definitionRefs: ["Q"] }),
+      node("WW", { definitionKind: "definition-is", definitionRefs: ["W"] }),
+    ]);
+    expect(m.get("W")).toEqual(OPTS);
+    expect(m.has("WW")).toBe(false);
+  });
+
+  it("a concept with no options and no refs is absent, not empty", () => {
+    expect(answerOptionsForDisplay([node("Plain")]).has("Plain")).toBe(false);
   });
 });

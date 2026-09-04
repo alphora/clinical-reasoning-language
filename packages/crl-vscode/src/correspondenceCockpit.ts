@@ -2423,7 +2423,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // #224 ii.3 Slice 2: the criterion `▸`/`▾` disclosure. Resolve the opaque reveal key → the collapse key (trusted
       // lookup, never a webview-supplied path), then flip its state + re-render the tree (layout change). #233 Todo 2a:
       // a ROOT criterion resolves to its `when` nodeKey; a NON-ROOT criterion box resolves to `{criterionToggle: posKey}`.
-      // Both flip a string in `expandedGuardWhens` (disjoint keyspaces — a JSON-array nodeKey vs a `leaf::` position key).
+      // Both flip a string in `expandedGuardWhens` (disjoint keyspaces — a JSON-array nodeKey vs a `leaf::` position key,
+      // the latter TAGGED: `"crit"` for a criterion body, `"opts"` for a #189 coded question's answer options).
       const hit = v.reveals[msg.key];
       if (hit && "nodeKey" in hit) toggleCriterionExpand(hit.nodeKey);
       else if (hit && isCriterionToggleHit(hit)) toggleCriterionExpand(hit.criterionToggle);
