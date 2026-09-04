@@ -210,6 +210,15 @@ interface LaidNode {
    *  decision structure row. Rendered with a distinct `.flow-def-edge`; excluded from `{nodeKey}` select + the per-case
    *  overlays. Set ONLY on `outlineRow === "leaf"` rows (the addressable operands). */
   isDefLeaf?: boolean;
+  /**
+   * ⭐ #189: this def-leaf is a CODED QUESTION — the concept declares `value from:` answer options, so the
+   * row gets a ▸/▾ chevron and expands to show the answers a clinician is actually offered.
+   *
+   * ⚠ WITHOUT THIS A CODED QUESTION IS ONE FLAT BOX. A reviewer opening the tree on a policy whose
+   * complaint criterion offers seven alternatives sees a single leaf — the whole point of collapsing
+   * nineteen boolean leaves into four coded questions is invisible in the surface a clinician reads.
+   */
+  optionsRow?: { posKey: string; collapsed: boolean; count: number };
   /** #187 Todo 5: on a def-leaf, the structure nodeKey of the OWNING composite `when` (the leaf's top ancestor, threaded
    *  unchanged through nested operands). The per-case leaf-verdict overlay gates on THIS when being on the fired-satisfied
    *  path — so an off-path composite's leaves stay un-answered (parity with the questionnaire's on-path-only expansion). */
@@ -220,7 +229,7 @@ interface LaidNode {
    *  toggle channel (chevron), an occurrence + collapsed-body flag rollup, but NOT an anchor/verdict target in 2a.
    *  `indent` drives x; `absX` is the precomputed left (indent-based). */
   outline?: boolean;
-  outlineRow?: "topor" | "op" | "leaf" | "external" | "more" | "crit";
+  outlineRow?: "topor" | "op" | "leaf" | "external" | "more" | "crit" | "option";
   /** #233 Todo 2a: set on a `"crit"` outline row (a NON-ROOT criterion boundary) — the criterion IDENTITY (`lib`/`name`),
    *  its `collapsed` state (default collapsed; independent, position-keyed), the addressable leaf identities inside its body
    *  (collapsed-box flag rollup, like `criterionCollapse.bodyConcepts`), and the POSITION collapse key (`n.nodeKey`, flipped
@@ -270,7 +279,12 @@ export function collectDispositionLeafKeys(structure: CrlDecisionStructure[]): S
 function buildLaid(
   structure: CrlDecisionStructure[],
   conceptMap: Map<string, CrlConceptNode>,
-  opts: { defExpr?: ResolveDefExprEntry; guardOutlines?: Map<string, GuardOutline>; expandedGuardWhens?: Set<string> } = {},
+  opts: {
+    defExpr?: ResolveDefExprEntry;
+    guardOutlines?: Map<string, GuardOutline>;
+    expandedGuardWhens?: Set<string>;
+    answerOptionsByConcept?: Map<string, { code: string; display: string }[]>;
+  } = {},
 ): { roots: LaidNode[]; maxDepth: number } {
   let slot = 0;
   let maxDepth = 0;
@@ -320,10 +334,37 @@ function buildLaid(
       case "leaf": {
         const y = take();
         const children = s.composite ? [buildOutline(s.composite, whenLeft, topWhenKey, indent + 1, `${opPath}.c`, cursor)] : [];
+        // ⭐ #189: a concept with `value from:` options is a CODED QUESTION. Expanding it shows the answers,
+        // POSITION-keyed like a criterion and default-COLLAPSED, so a wide option set never bloats the tree
+        // until a reviewer asks for it. Reuses the criterion toggle channel with its own key prefix.
+        const answers = opts.answerOptionsByConcept?.get(s.nodeKey);
+        let optionsRow: LaidNode["optionsRow"];
+        // ⚠ NOT gated on `children.length === 0`. An earlier cut skipped any leaf that already had a
+        // composite body — which silently excluded EVERY coded question in the field, because the node a
+        // tree shows is the boolean wrapper and wrappers have composites. Option rows APPEND after the
+        // composite: the body says how the answer is computed, the options say what may be answered.
+        if (answers && answers.length > 0) {
+          const posKey = outlineKey(topWhenKey, opPath, "opts");
+          const collapsed = !(opts.expandedGuardWhens?.has(posKey) ?? false);
+          optionsRow = { posKey, collapsed, count: answers.length };
+          if (!collapsed) {
+            for (const [oi, o] of answers.entries()) {
+              children.push({
+                ...base,
+                nodeKey: outlineKey(topWhenKey, `${opPath}.o${oi}`, "opt"),
+                kind: "leaf", outlineRow: "option", indent: indent + 1,
+                absX: outlineX(whenLeft, indent + 1),
+                label: o.display, full: `${o.display} — answer option \`${o.code}\``,
+                y: take(), children: [],
+              });
+            }
+          }
+        }
         return {
           ...base, nodeKey: outlineKey(topWhenKey, opPath, s.nodeKey), kind: "leaf", outlineRow: "leaf", isDefLeaf: true,
           label: s.name, full: `${s.name} — concept "${s.lib}"`,
           conceptKey: s.nodeKey, conceptName: s.name, conceptLib: s.lib, isSource: s.isSource,
+          ...(optionsRow ? { optionsRow } : {}),
           y, children,
         };
       }
@@ -492,6 +533,8 @@ export function renderFlowPane(
     /** #224 ii.3 Slice 2: nodeKeys of criterion whens the user has EXPANDED (default: absent ⇒ collapsed). A single-
      *  criterion-ref when not listed renders `▸ <name>` with its body hidden; listed → `▾` + the Slice-1 body outline. */
     expandedGuardWhens?: Set<string>;
+    /** #189: inline `value from:` answers per concept nodeKey — what makes a coded question expandable. */
+    answerOptionsByConcept?: Map<string, { code: string; display: string }[]>;
   } = {},
 ): RenderedFlow {
   const prefix = opts.revealPrefix ?? "";
@@ -508,7 +551,12 @@ export function renderFlowPane(
   }
 
   const conceptMap = new Map(concepts.map((c) => [c.nodeKey, c]));
-  const { roots, maxDepth } = buildLaid(structure, conceptMap, { defExpr: opts.defExpr, guardOutlines: opts.guardOutlines, expandedGuardWhens: opts.expandedGuardWhens });
+  const { roots, maxDepth } = buildLaid(structure, conceptMap, {
+    defExpr: opts.defExpr,
+    guardOutlines: opts.guardOutlines,
+    expandedGuardWhens: opts.expandedGuardWhens,
+    answerOptionsByConcept: opts.answerOptionsByConcept,
+  });
   const startNodeKey = roots[0]?.nodeKey; // the PRIMARY/start node — carries the chrome-mirror count badge (see below)
   let startNodeGid: string | undefined;
 
@@ -598,6 +646,19 @@ export function renderFlowPane(
       continue;
     }
 
+    // ⭐ #189: an ANSWER OPTION row — one coded answer a clinician is offered for the coded question
+    // above it. Render-only and deliberately quiet: it is evidence about the question, not a node anyone
+    // selects, flags or navigates to. A reviewer needs to SEE the seven alternatives; they do not need
+    // seven more things to click.
+    if (n.outline && n.outlineRow === "option") {
+      body +=
+        `<g id="${escapeHtml(gid)}" class="flow-outline flow-opt"><title>${escapeHtml(n.full)}</title>` +
+        `<rect x="${x}" y="${y + 2}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H - 4}" rx="4"/>` +
+        labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX, 9) +
+        `</g>`;
+      continue;
+    }
+
     // #187 Option-C: OUTLINE render-only rows — an operator/top-OR LABEL (no box) or an external/more STUB box.
     if (n.outline && n.outlineRow !== "leaf") {
       if (n.outlineRow === "op" || n.outlineRow === "topor") {
@@ -640,10 +701,20 @@ export function renderFlowPane(
       const classes = ["flow-row", "flow-leaf"];
       if (n.isSource === false) classes.push("flow-inferred"); // inferred sub-question → purple (kept under the ring)
       else classes.push("flow-greyborder"); // a source sub-question's grey border hides under the on-path ring (Todo 3b)
+      // ⭐ #189: a CODED QUESTION gets a ▸/▾ chevron that expands its answer options. Reuses the criterion
+      // toggle channel (`{criterionToggle}` → `toggleCriterionExpand`) with its own disjoint `opts`-suffixed
+      // position key, so no new message type, no new state set, and no new host plumbing.
+      const optRow = n.optionsRow;
+      let optTogKey = "";
+      if (optRow) {
+        optTogKey = `${prefix}o${gid}`;
+        reveals[optTogKey] = { criterionToggle: optRow.posKey };
+      }
       body +=
         `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}"><title>${escapeHtml(n.full)}</title>` +
         `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
-        labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX, 9) +
+        labelMarkup(n.label, x + (optRow ? 12 : 0), y, OUTLINE_H, OUTLINE_LABEL_MAX - (optRow ? 12 : 0), 9) +
+        (optRow ? critToggle(x + 8, y + OUTLINE_H / 2, optRow.collapsed, optTogKey) : "") +
         flowRing(x, y, OUTLINE_NODE_W, OUTLINE_H, 1.5, 7) +
         (leafConcept ? flagBadge(x + OUTLINE_NODE_W - 11, y + 11, gid) : "") +
         `</g>`;
@@ -879,6 +950,11 @@ export const FLOW_STYLE =
   `.flow-op>text,.flow-topor>text{fill:var(--vscode-descriptionForeground,#8c8c8c);font:700 9px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.12em}` +
   `.flow-ext>rect,.flow-more>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#6a6a72);stroke-width:1;stroke-dasharray:2 2;opacity:.7}` +
   `.flow-ext>text,.flow-more>text{fill:var(--vscode-descriptionForeground,#8c8c8c);font-size:11px;font-style:italic}` +
+  // #189: an ANSWER OPTION row — a quiet, borderless chip under its coded question. Deliberately not a
+  // box: it is one of the answers, not another question, and it must not read as a node to click.
+  `.flow-opt{cursor:default}` +
+  `.flow-opt>rect{fill:var(--vscode-editorHoverWidget-background,#252526);stroke:none}` +
+  `.flow-opt>text{fill:var(--vscode-descriptionForeground,#9d9d9d);font-size:10.5px}` +
   // #233 Todo 2a: a NON-ROOT criterion boundary box — a SOLID box (like a sub-question leaf) marking a NAMED criterion,
   // with a left ▸/▾ chevron (`.flow-crit-toggle`, already styled) toggling its body. The collapsed-body flag ROLLUP ⚑
   // shows via `.has-flag` — this row is `.flow-outline` (NOT `.flow-row`), so it needs its OWN has-flag rule (the shared

@@ -91,6 +91,7 @@ import {
   type OccurrenceRef,
   type MvFlag,
   type AnchorContext,
+  answerOptionsForDisplay,
 } from "@smile-digital-health/crl";
 import {
   addNote,
@@ -2084,6 +2085,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         defExpr: buildDefExprResolver(), // #187 Option-C: composite → the ANY OF / ALL OF operator OUTLINE (shared builder)
         guardOutlines, // #224 ii.3 Todo 3: a criterion-when hangs its criterion-body outline (no more dead-end)
         expandedGuardWhens, // #224 ii.3 Slice 2: which single-criterion whens are expanded (default: all collapsed)
+        // ⭐ #189: the answers to show per concept nodeKey. ONE HOP, deliberately: the concept that OWNS
+        // `value from:` is usually not the one on screen — a decision tree shows the BOOLEAN defined over it,
+        // because that is what a `when` guards on. Resolved in core so the rule is testable.
+        answerOptionsByConcept: answerOptionsForDisplay(conceptLayer),
       });
       v.anchors = r.anchors;
       v.reveals = r.reveals;

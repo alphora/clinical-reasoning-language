@@ -1059,3 +1059,51 @@ check("#233 Todo 2a: nested criterion independence — a criterion INSIDE anothe
   const c2 = renderFlowPane(struct, { concepts: cs, revealPrefix: "n2_", guardOutlines: gouts, expandedGuardWhens: new Set([parentKey, childKey]) });
   assert.deepEqual(leafRowsOf(c2.html).map((l) => l.label).sort(), ["A", "B", "P"], "both expanded → Child's leaf B now renders");
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// #189: a CODED QUESTION's answer options, expandable under the question that offers them.
+//
+// ⚠ THE CONCEPT THAT OWNS `value from:` IS USUALLY NOT THE ONE ON SCREEN. A decision tree shows the
+// BOOLEAN defined over the coded question, because that is what a `when` guards on — so the options
+// reach the rendered node through `answerOptionsForDisplay`'s one-hop resolution. Measured on a real
+// policy: 4 coded questions, 26 options, every one reached only via its wrapper.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+const codedStructure = [{
+  decision: "D", lib: "Pol", nodeKey: "d:D", location: {},
+  children: [node("w:Q", "when", "when Q", ["c:Q"], [node("a:X", "action", "ActX", ["act:X"], [], { actionKind: "recommend-activity" })])],
+}];
+const codedConcepts = [concept("c:Q", "Q", { definitionKind: "defined-as" })];
+const ANSWERS = [
+  { code: "a", display: "Answer A" },
+  { code: "b", display: "Answer B" },
+  { code: "none", display: "None of the listed" },
+];
+// A compound guard whose one operand is the coded question — the shape a `when` gets when its guard is
+// hung as an outline. `guardOutlines` takes a built DefStructExpr directly, so this needs no AST.
+const codedGuards = new Map([
+  ["w:Q", { expr: { kind: "and", operands: [{ kind: "leaf", nodeKey: "c:Q", name: "Q", lib: "Pol", isSource: false }] } }],
+]);
+const codedOpts = { concepts: codedConcepts, guardOutlines: codedGuards, answerOptionsByConcept: new Map([["c:Q", ANSWERS]]) };
+const optRows = (html) => (html.match(/class="flow-outline flow-opt"/g) ?? []).length;
+
+check("#189: a coded question renders NO option rows until it is expanded", () => {
+  const rr = renderFlowPane(codedStructure, { ...codedOpts, expandedGuardWhens: new Set() });
+  assert.equal(optRows(rr.html), 0, "options must not bloat the tree before anyone asks");
+  // …but the chevron IS offered, so a reviewer can see there are answers to see.
+  const toggles = Object.values(rr.reveals).filter((v) => v && "criterionToggle" in v);
+  assert.ok(toggles.length >= 1, "a coded question must offer a ▸ disclosure");
+});
+
+check("#189: expanding a coded question shows every answer a clinician is offered", () => {
+  const collapsed = renderFlowPane(codedStructure, { ...codedOpts, expandedGuardWhens: new Set() });
+  const key = Object.values(collapsed.reveals).find((v) => v && "criterionToggle" in v).criterionToggle;
+  const rr = renderFlowPane(codedStructure, { ...codedOpts, expandedGuardWhens: new Set([key]) });
+  assert.equal(optRows(rr.html), ANSWERS.length);
+  for (const a of ANSWERS) assert.ok(rr.html.includes(a.display), `missing answer "${a.display}"`);
+});
+
+check("#189: a concept with no options gets no chevron and no rows", () => {
+  const rr = renderFlowPane(codedStructure, { concepts: codedConcepts, guardOutlines: codedGuards, expandedGuardWhens: new Set() });
+  assert.equal(optRows(rr.html), 0);
+  assert.equal(Object.values(rr.reveals).filter((v) => v && "criterionToggle" in v).length, 0);
+});

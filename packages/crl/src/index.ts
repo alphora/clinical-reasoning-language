@@ -176,6 +176,7 @@ export {
   unitNumbersForCase,
   buildCrlStructure,
   buildCrlConceptLayer,
+  answerOptionsForDisplay,
   classifyConcept,
   buildConceptContainment,
   buildConceptShapeIndex,

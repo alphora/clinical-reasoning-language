@@ -11,7 +11,7 @@
  * DIRECT edges only (defined-as operands + definition-is narrative refs); the transitive closure + cycle guard belong to
  * the consumer (Slice 2).
  */
-import type { Concept, ConceptValueType } from "../ast/types";
+import type { Concept, ConceptValueType, ReferenceName } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { ConceptType } from "../grammar/conceptTypes";
@@ -20,6 +20,12 @@ import type { LsLocation } from "../language-services/contracts";
 import { collectLibs, conceptDeclRef, definitionConceptRefs, lsLoc, nodeKey } from "./indexer";
 
 export type ConceptDefinitionKind = "defined-as" | "definition-is" | "coded-from";
+
+/** A `ReferenceName` as authored — bare name, or `lib.name` when qualified. Uses the shared accessors. */
+const refText = (r: ReferenceName): string => {
+  const lib = getRefLibrary(r);
+  return lib ? `${lib}.${getRefName(r)}` : getRefName(r);
+};
 
 export interface CrlConceptNode {
   nodeKey: string; // === indexer concept key === decision-row concept refKey (the cross-pane join)
@@ -31,6 +37,24 @@ export interface CrlConceptNode {
   /** The concept's authored value type(s) (`- value type is X.`), 0..* (`[]` when none) — a raw signal the
    *  questionnaire panel (#177) uses to render answer options (e.g. boolean → Yes/No). */
   valueTypes: ConceptValueType[];
+  /**
+   * ⭐⭐ THE CODED ANSWERS A CLINICIAN IS OFFERED (`- value from:`, #189) — a raw signal, exactly like
+   * `valueTypes`, for a renderer that wants to SHOW them rather than infer Yes/No.
+   *
+   * ⚠ WITHOUT THIS THE TREE CANNOT DRAW THE FEATURE. A coded question renders as one flat leaf, so a
+   * medical reviewer opening the tree sees a single box where the policy offers seven clinical
+   * alternatives — and the whole point of `#189` (nineteen boolean leaves collapsed into four coded
+   * questions) is invisible in the surface a reviewer actually reads.
+   *
+   * INLINE options only. A `kind: "terminology"` `value from` names an external ValueSet that is not
+   * resolved here — the concept layer is a projection of the SOURCE, and expanding a terminology
+   * reference would need a resolution step this layer deliberately does not have. Absent rather than
+   * guessed: a renderer can say "options come from <name>" from `valueFromTerminology` instead of
+   * showing a list it made up.
+   */
+  answerOptions?: { code: string; display: string }[];
+  /** The external ValueSet a `value from "VS"` names, when the options are NOT inline. */
+  valueFromTerminology?: string;
   /** The concept's definition shape, when present — a raw signal for the renderer's later layer classification. */
   definitionKind?: ConceptDefinitionKind;
   hasLocalCode: boolean; // has a local `- code is …` (locally assertable)
@@ -133,6 +157,12 @@ export function buildCrlConceptLayer(
         location,
         ...(c.conceptType ? { conceptType: c.conceptType } : {}),
         valueTypes: c.valueTypes ?? [],
+        ...(c.valueFrom?.kind === "inline"
+          ? { answerOptions: c.valueFrom.options.map((o) => ({ code: o.code, display: o.display })) }
+          : {}),
+        ...(c.valueFrom?.kind === "terminology"
+          ? { valueFromTerminology: refText(c.valueFrom.terminologyName) }
+          : {}),
         ...(c.definition ? { definitionKind: DEF_KIND[c.definition.type] } : {}),
         hasLocalCode: c.code !== undefined,
         hasRepresentations: c.representations.length > 0,
@@ -140,6 +170,40 @@ export function buildCrlConceptLayer(
         definitionRefs,
       });
     }
+  }
+  return out;
+}
+
+/**
+ * ⭐⭐ THE ANSWERS A RENDERED NODE SHOULD SHOW, keyed by concept nodeKey — including the one-hop case.
+ *
+ * ⚠ THE CONCEPT THAT OWNS THE OPTIONS IS USUALLY NOT THE ONE ON SCREEN. The `#189` shape is a pair: a
+ * coded question holding `value from:` (`"Documented Patient Complaint"`, 8 options) and a BOOLEAN over
+ * it (`"Qualifying Patient Complaint Reported"`, `definition is "Documented Patient Complaint" in
+ * qualifying`) — and it is the boolean that appears in a decision tree, because that is what a `when`
+ * guards on. MEASURED on a real policy: 4 coded questions owning 26 options, and every one of them
+ * reached only through its wrapper. A map built from `answerOptions` alone renders nothing at all.
+ *
+ * So a concept with no options of its own inherits them from a definition ref that has them.
+ *
+ * ⚠ ONE HOP, AND ONLY WHEN UNAMBIGUOUS. If several refs carry options there is no single answer set to
+ * show, and picking one would invent a question the author never wrote — those get nothing, and the
+ * renderer shows the node as it always did.
+ */
+export function answerOptionsForDisplay(
+  nodes: readonly CrlConceptNode[],
+): Map<string, { code: string; display: string }[]> {
+  const byKey = new Map(nodes.map((n) => [n.nodeKey, n]));
+  const out = new Map<string, { code: string; display: string }[]>();
+  for (const n of nodes) {
+    if (n.answerOptions?.length) {
+      out.set(n.nodeKey, n.answerOptions);
+      continue;
+    }
+    const bearing = n.definitionRefs
+      .map((r) => byKey.get(r))
+      .filter((r): r is CrlConceptNode => (r?.answerOptions?.length ?? 0) > 0);
+    if (bearing.length === 1) out.set(n.nodeKey, bearing[0].answerOptions!);
   }
   return out;
 }
