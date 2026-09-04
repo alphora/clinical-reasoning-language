@@ -118,14 +118,21 @@ function requiredElementCql(
  * but `true` — yields NO candidate. There is deliberately no `Now()` fallback and no evaluation-time
  * parameter, so an absent component can never become a candidate stamped with the current time.
  *
- * ⚠⚠ SCOPE, ruled 2026-09-04 — THIS IS ABOUT THE CONSTRUCTOR BODY, NOT ABOUT EVERY STAMP.
- * The ban exists because an invented stamp inside a CANDIDATE lets a stale calculation outrank a fresh
- * assertion in the RECENCY MERGE. It does NOT say `Now()` is never a correct stamp anywhere: a
- * population-only EXISTENCE determination is stamped `Now()` AT THE CALL SITE (the `stampExpr` argument),
- * because `exists` is a claim about the present — *"you calculated it was boolean-exists NOW"* (operator).
- * That record enters no merge, so the hazard above cannot arise. The constructor body stays propagated,
- * which is why this rule and that one coexist. Read this before citing the sentence above as a blanket
- * prohibition; that misreading has already cost a design round.
+ * ⚠⚠ AND THERE IS NO `Now()` EXCEPTION — the SHAPE decides, and it decides both questions at once.
+ * A reduction conforms to the concept's DECLARED shape (charter §3), and that determines whether a record
+ * exists to stamp AT ALL:
+ *
+ *   publishes a BARE VALUE   → no record is constructed → nothing to stamp; the question does not arise
+ *   publishes a RECORD       → that record is an ARM in the union → PROPAGATE, never `Now()`
+ *
+ * There is no third case, so no `Now()`. ⚠ A stamp of `Now()` on an arm is always newest, so it would beat
+ * every stored answer forever — silently abolishing the user-override the analytics ruling requires
+ * (charter §2) rather than implementing it. That is this very ban, read with the substitution: an invented
+ * stamp lets the DERIVATION outrank a fresh ASSERTION.
+ *
+ * ⚠ A "population-only record stamped `Now()`" was designed and DISCARDED (#317 revisions 2-3). It only
+ * seemed to need one because the design had a side define that entered no merge; once the reduction
+ * conforms to the declared shape, that record IS the arm and the exception evaporates.
  */
 export function renderRecordConstructor(sig: ConstructorSignature): string {
   const params = sig.params.map((p) => `  ${p.name} ${p.cqlType}`).join(",\n");

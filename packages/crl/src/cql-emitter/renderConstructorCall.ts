@@ -205,10 +205,19 @@ export function renderProjectedSourceArm(inputs: {
  *
  * ⚠⚠ `exists` IS NOT A CALCULATION OVER INPUTS THAT MAY BE MISSING — ABSENCE IS THE INPUT, and `exists` over
  * nothing is a determinate `false` (two-valued by ruling; `known exists` is the separate keyword for
- * anything else). Applying the rule above to an existence determination would import UNKNOWN semantics into
- * a two-valued operation THROUGH A TIMESTAMP: the candidate drops, the item renders blank, and it reads as a
- * pause nobody declared. So an existence determination is stamped `Now()` at the CALL SITE. Ruled
- * 2026-09-04. Pattern-by-pattern: calculations propagate, existence stamps now.
+ * anything else). So the "no components ⇒ correctly unknown" reading above is about a CALCULATION and must
+ * not be applied to existence: doing so would import UNKNOWN semantics into a two-valued operation THROUGH A
+ * TIMESTAMP — the candidate drops, the item renders blank, and it reads as a pause nobody declared.
+ *
+ * ⚠⚠ THAT DOES NOT MAKE `Now()` THE ANSWER. The SHAPE decides (charter §3 — a reduction conforms to the
+ * DECLARED shape), and it settles whether there is anything to stamp:
+ *
+ *   `exists` publishing a BARE BOOLEAN → no record → NO STAMP; the question does not arise
+ *   `exists` publishing a RECORD       → an ARM in the union → PROPAGATE, exactly like any other arm
+ *
+ * An arm stamped `Now()` is always newest, so it would outrank every stored answer forever — deleting the
+ * user-override the analytics ruling requires (charter §2) instead of implementing it. Read this ban with
+ * the substitution and it IS that rule: an invented stamp lets the DERIVATION outrank a fresh ASSERTION.
  *
  * ⚠ Returns `null as System.DateTime` for zero components rather than omitting the argument — the
  * constructor's guard is what turns that into "no candidate", and it must be reached, not bypassed.
