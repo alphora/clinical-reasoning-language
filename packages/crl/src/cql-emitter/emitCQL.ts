@@ -3862,6 +3862,27 @@ class Emitter {
     // useSiteType validator documents this as a DEFERRED gap it does not yet catch, and `emitCQLFromAST` is
     // validator-free, so enforce it HERE rather than emit a scalar `exists(...)` under a record declaration.
     // Mirrors the reduction coherence guard (`ReductionShapeIncoherentError`).
+    //
+    // ⚠⚠ THIS GUARD IS THE SPECIAL CASE, AND #317/#318 REMOVE IT. Operator, 2026-09-04, and it is now
+    // charter §3 ("A REDUCTION CONFORMS TO THE DECLARED SHAPE. THE OPERATOR DOES NOT DICTATE IT."):
+    //
+    //   `definition is most recent this`  →  Scalar publishes the VALUE, Record publishes the RECORD
+    //                                        (built: `recencyValueConcept.ts` `publishes`)
+    //   `defined as exists ("V")`         →  Scalar publishes a BARE BOOLEAN,
+    //                                        Record publishes a RECORD CARRYING that boolean
+    //
+    // The second line is what this guard currently forbids. It hardcodes the OPERATOR's return shape and
+    // refuses the author's declaration — so the concept no longer describes itself, the operator describes
+    // it. `most recent` was never special-cased this way; `exists` was, and that is the whole reason an
+    // answerable derived boolean has no coherent spelling today (#317) and the purely-derived one is
+    // refused (#318).
+    //
+    // ⚠ Do NOT "fix" #317 by building a side define, an override chain, or a second cardinality around this
+    // guard. All three were designed and discarded — they are workarounds for a rule whose only effect is to
+    // prevent the thing they work around. The rule moves; `exists` becomes ordinary.
+    //
+    // ⚠ What SURVIVES the change: a concept that declares `shape is Scalar` and publishes a bare boolean is
+    // still checked here (form B), and `value type` must still be exactly one `boolean` for both.
     if (assumedShapePreMigration(c.shape) !== "Scalar" || c.valueTypes.length !== 1 || c.valueTypes[0] !== "boolean") {
       const vtClause =
         c.valueTypes.length === 1

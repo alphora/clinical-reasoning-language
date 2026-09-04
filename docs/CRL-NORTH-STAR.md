@@ -812,6 +812,35 @@ recent`), or `Scalar` (a reduced value / `exists`). Set-algebra (`union`/`inters
 `RecordSet`; a reduction moves `RecordSet → Record/Scalar`. The shape is **self-described by the concept**, so
 its CQL is a pure function of its own definition.
 
+#### ⭐⭐ A REDUCTION CONFORMS TO THE DECLARED SHAPE. THE OPERATOR DOES NOT DICTATE IT.
+
+**Operator, 2026-09-04.** The declaration is the authority and the reduction shapes itself to it — the same
+reduction publishes a different thing depending on what the concept says it publishes:
+
+| declared | `definition is most recent this` publishes |
+|---|---|
+| `shape is Scalar` | the newest record's **VALUE** |
+| `shape is Record` | the newest **RECORD** |
+
+That is already built (`recencyValueConcept.ts`: `publishes = declaredShape === "Scalar" ? "value" : "record"`).
+
+⚠ **IT IS THE GENERAL RULE, NOT A `most recent` FEATURE.** Every arm must be shaped to meet the concept's
+shape: the ASSERTED arm is the concept's shape by construction; a RECORD arm must be projected to it, and it
+is an error if it is not explicitly; and **a DERIVED arm is no different**. `exists` is not exempt —
+
+| declared | `defined as exists ("V")` publishes |
+|---|---|
+| `shape is Scalar` | a bare boolean (ephemeral — no record, so no arm, so no recency) |
+| `shape is Record` | a **record carrying** that boolean — an ARM in the union, like any other |
+
+⚠⚠ **A GUARD THAT REFUSES A DECLARATION BECAUSE OF ITS OPERATOR HAS THE MODEL BACKWARDS.** It hardcodes the
+operator's return shape and overrides the author, which is the inversion this section exists to prevent. If
+`exists` may only be Scalar, the concept no longer describes itself — the operator describes it.
+
+⚠ **AND SHAPING IS NOT MANUFACTURING** (§4.0). The emitter inventing a reduction nobody wrote is magic;
+conforming a written reduction to a DECLARED shape is obedience. Refusing to produce the record the author
+declared is the emitter overriding the declaration, not restraint.
+
 ### ⭐ VOCABULARY — established / unestablished, and the three ways to establish
 
 One word, used consistently, because the alternative has already caused a misread: an acceptance rule written
