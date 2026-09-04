@@ -297,8 +297,28 @@ export type {
 //   Retired the `criterion-expansion-overflow`/criterion-atom bound (the guard no longer materializes). `docs/
 //   decision-shapes.md` folded into the same transaction (it was cited by the flipped rules' `ref` fields).
 //   CONTENT bump; NO payload-shape change. BOTH useCase hashes re-pin.
+// "1.27" → "1.28": CONTENT bump covering TWO things a KE must be told.
+//
+//   1. ⚠ THE REFERENCE ARTIFACTS ALREADY CHANGED UNDER 1.27, AND THIS IS THE ENTRY THAT EXPLAINS IT.
+//      `reference.ts` was corrected in-tree (concepts retyped to their natural `type is`, explicit
+//      `type is` added where a local `code is` had been relying on the removed implicit-Observation
+//      default, and the negative facts those cases need) while SCHEMA_VERSION stayed 1.27. That was
+//      correctness, not teaching — but the artifacts are IN the hashed payload, so BOTH contentHashes
+//      moved with no version change and no changelog. MEASURED across releases:
+//          cpg         28386d52… → ac231e05…
+//          prior-auth  8f003cce… → 9792fad1…
+//      A KE agent pinned to 1.27 + the old hash saw a mismatch it could not account for. Shipped that
+//      way in 4.114.0–4.116.0. This bump gives the move a version and a reason.
+//
+//   2. NEW TOOL TAUGHT: `emit_results`. The kit had never mentioned it, so the tool that produces the
+//      Questionnaire/QuestionnaireResponse a medical reviewer reads was invisible to the agent whose
+//      job is to produce them. Adds the `produce-results` rule + the verifyLoop `note` clause: how to
+//      enable it, where the engine jar comes from, where results land, and ⚠ that the results tree is
+//      PRODUCER-OWNED and hand-authored Q/QR placed there WILL be deleted.
+//
+//   NO payload-shape change. BOTH useCase hashes re-pin.
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new content.
-const SCHEMA_VERSION = "1.27";
+const SCHEMA_VERSION = "1.28";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -929,6 +949,30 @@ const RULES: KitRule[] = [
     ref: "verifyLoop",
   },
   {
+    id: "produce-results",
+    edge: "cpg",
+    category: "process",
+    rule:
+      "AFTER the verify loop is clean, produce the artifacts a MEDICAL REVIEWER reads with " +
+      "`emit_results(celPath, crlPath, useCase, jarPath, jarSha256)` — for prior-auth it runs the engine’s " +
+      "`$apply` per case and writes a Questionnaire + QuestionnaireResponse to " +
+      "`tests/results/fhir/patient/<compartmentId>/<type>/`, the SAME compartmentId the CEL emitter uses under " +
+      "`tests/data/`, so a case’s facts and its results address alike. Unlike every other `emit_*` this RUNS AN " +
+      "ENGINE, so it is DISABLED by default: turn on the `crl.enableResults` VS Code setting (User scope) and " +
+      "restart your MCP client — an exported or `setx` CRL_ENABLE_RESULTS is NOT inherited by an editor launched " +
+      "from a pre-existing shell or desktop session, on any OS. You supply the engine jar and its sha256; get it " +
+      "from Maven Central `org.opencds.cqf.fhir:cqf-fhir-cr-cli:4.7.0` (⚠ the `-cli` artifact — the plain " +
+      "`cqf-fhir-cr` jar is not a Spring Boot fat jar and will not launch). Needs a JRE 17+, nothing is extracted. " +
+      "READ THE PER-CASE STATE, never a directory listing: every case gets exactly one of `generated` | " +
+      "`no-questionnaire` | `populate-degraded` | `failed` | `timeout` | `not-run`, so ‘the policy asked nothing’ " +
+      "and ‘the run died’ are different answers rather than both being an absent file. " +
+      "⚠ THE RESULTS TREE IS PRODUCER-OWNED: every Questionnaire and QuestionnaireResponse under it that the run " +
+      "did not write is DELETED (pass `prune: false` to keep them). Do NOT hand-author Q/QR there — put them " +
+      "somewhere else. This is what stops a renamed case leaving a stale pair behind that the viewer then shows a " +
+      "reviewer as a real case.",
+    ref: "verifyLoop",
+  },
+  {
     id: "review-flags",
     edge: "cpg",
     category: "process",
@@ -1168,6 +1212,9 @@ const EXAMPLES: KitExample[] = [
 
 /** The verify-loop `note`, base (edge-invariant) segment. The PA closure paragraph is appended for prior-auth. */
 const VERIFY_LOOP_NOTE_BASE =
+  "AFTER this loop is clean, `emit_results` produces the Questionnaire/QuestionnaireResponse a medical reviewer " +
+  "reads (see the `produce-results` rule): it is DISABLED by default, needs an engine jar you supply, and it " +
+  "DELETES any Q/QR under `tests/results/fhir/` that the run did not write — do not hand-author artifacts there. " +
   "validate_cel and run_decision require FILES under a project root (a package.json); they do not accept inline code. In a content project's artifact-package layout, author <artifact>.crl and <artifact>.cel under the artifact's package and pass absolute paths. " +
   "PROJECT CONFIG — the project's `package.json` MUST declare `crl.canonicalBase` (e.g. `\"crl\": { \"canonicalBase\": \"http://example.org/crl/<project>\" }`): every emitted local CodeSystem url is `<canonicalBase>/CodeSystem/<domain>-local`, so emit fails with `missing-canonical-url-base` without it (no urn fallback). Projects that emit FHIR already require it; `emit_cql` for local-`code is` content likewise needs a `path` (not inline `code`) so it can read the base from the nearest package.json. " +
   "PROVENANCE / PROMOTION (beyond the run_decision proof): generate the scaffold with `generate_provenance` " +

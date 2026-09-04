@@ -1,8 +1,8 @@
 {
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
-  "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL\u2192CQL + CEL\u2192FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "4.116.0",
+  "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL→CQL + CEL→FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
+  "version": "4.117.0",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.95.0"
@@ -28,7 +28,7 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Language features (syntax, validation, navigation) work in an untrusted workspace. Repository-scoped and network-backed features \u2014 the correspondence cockpit's git/GitHub integration \u2014 are disabled until you trust the workspace."
+      "description": "Language features (syntax, validation, navigation) work in an untrusted workspace. Repository-scoped and network-backed features — the correspondence cockpit's git/GitHub integration — are disabled until you trust the workspace."
     }
   },
   "contributes": {
@@ -343,7 +343,7 @@
           "type": "boolean",
           "default": false,
           "scope": "machine",
-          "markdownDescription": "Allow `emit_results` to run the FHIR engine, which **spawns a JVM**. Off by default.\n\nWhen on, the extension writes `CRL_ENABLE_RESULTS=1` into the `env` of the `crl` server block in `.mcp.json`, which your MCP client hands directly to the server process. The rewrite happens as soon as you change this setting \u2014 then **restart your MCP client** so it re-spawns the server with the new environment.\n\nMachine-scoped on purpose, so it cannot be set from a workspace's `.vscode/settings.json`.\n\n\u26a0 The flag is delivered through `.mcp.json`. **Treat that file as commit-sensitive** \u2014 if your project commits it, it commits the flag, and anyone who clones the repository gets a client that will spawn a JVM.\n\nSetting `CRL_ENABLE_RESULTS=1` in the environment also works and is the right mechanism for headless/CI use. It is NOT reliable for a desktop editor: an exported or `setx` variable is not inherited by an application launched from a pre-existing shell or desktop session."
+          "markdownDescription": "Allow `emit_results` to run the FHIR engine, which **spawns a JVM**. Off by default.\n\nWhen on, the extension writes `CRL_ENABLE_RESULTS=1` into the `env` of the `crl` server block in `.mcp.json`, which your MCP client hands directly to the server process. The rewrite happens as soon as you change this setting — then **restart your MCP client** so it re-spawns the server with the new environment.\n\nMachine-scoped on purpose, so it cannot be set from a workspace's `.vscode/settings.json`.\n\n⚠ The flag is delivered through `.mcp.json`. **Treat that file as commit-sensitive** — if your project commits it, it commits the flag, and anyone who clones the repository gets a client that will spawn a JVM.\n\nSetting `CRL_ENABLE_RESULTS=1` in the environment also works and is the right mechanism for headless/CI use. It is NOT reliable for a desktop editor: an exported or `setx` variable is not inherited by an application launched from a pre-existing shell or desktop session."
         },
         "crl.cockpit.primary": {
           "type": "string",
@@ -354,7 +354,7 @@
           ],
           "default": "source",
           "scope": "window",
-          "description": "The Knowledge Engineering default primary pane \u2014 which pane the navigator walks. 'source' lists source units; 'crl' lists CRL decision nodes; 'cel' lists CEL cases. Set per-window; switch live with 'CRL: Set Navigator Primary Pane'."
+          "description": "The Knowledge Engineering default primary pane — which pane the navigator walks. 'source' lists source units; 'crl' lists CRL decision nodes; 'cel' lists CEL cases. Set per-window; switch live with 'CRL: Set Navigator Primary Pane'."
         },
         "crl.cockpit.paneOrder": {
           "type": "array",
@@ -396,7 +396,7 @@
           "type": "boolean",
           "default": false,
           "scope": "window",
-          "description": "Medical Validation only: show why the selected case got its outcome \u2014 highlight the deciding criteria (the ones that, by being false, routed it there, e.g. the age gate for a not-adult denial) across the Source / Tree / CRL panes. Off by default. Toggle live with the Details control on the Tree pane."
+          "description": "Medical Validation only: show why the selected case got its outcome — highlight the deciding criteria (the ones that, by being false, routed it there, e.g. the age gate for a not-adult denial) across the Source / Tree / CRL panes. Off by default. Toggle live with the Details control on the Tree pane."
         },
         "crl.medical-validation.primary": {
           "type": "string",
@@ -406,7 +406,7 @@
           ],
           "default": "cel",
           "scope": "window",
-          "description": "The Medical Validation panel's default primary pane \u2014 which list the navigator walks. 'cel' (default) navigates the scenario cases (surfaced in the Worklist, and in the read-only CEL pane if opened); 'source' lists source units. Set per-window; switch live with 'CRL: Set Navigator Primary Pane'."
+          "description": "The Medical Validation panel's default primary pane — which list the navigator walks. 'cel' (default) navigates the scenario cases (surfaced in the Worklist, and in the read-only CEL pane if opened); 'source' lists source units. Set per-window; switch live with 'CRL: Set Navigator Primary Pane'."
         },
         "crl.medical-validation.paneOrder": {
           "type": "array",
@@ -428,7 +428,7 @@
             "tree"
           ],
           "scope": "window",
-          "description": "Left-to-right column order of the Medical Validation panel's panes. THE SETTING IS THE SOURCE OF TRUTH: the list is honored exactly as written, nothing is added back, and an empty list shows no panes. Available panes: 'source', 'tree', 'worklist' (the review surface \u2014 verdicts + notes, and how you pick a case), 'questionnaire' (the CRL path questionnaire \u2014 what the CRL says), 'fhirQuestionnaire' (the FHIR Questionnaire produced from the emitted artifact by $apply), 'cel' (the read-only case list, a SEPARATE pane from 'worklist'), and 'crl'. Set it in User settings to persist across projects, or in Workspace settings for one project. Unknown entries are dropped. Changes apply live to open panes."
+          "description": "Left-to-right column order of the Medical Validation panel's panes. THE SETTING IS THE SOURCE OF TRUTH: the list is honored exactly as written, nothing is added back, and an empty list shows no panes. Available panes: 'source', 'tree', 'worklist' (the review surface — verdicts + notes, and how you pick a case), 'questionnaire' (the CRL path questionnaire — what the CRL says), 'fhirQuestionnaire' (the FHIR Questionnaire produced from the emitted artifact by $apply), 'cel' (the read-only case list, a SEPARATE pane from 'worklist'), and 'crl'. Set it in User settings to persist across projects, or in Workspace settings for one project. Unknown entries are dropped. Changes apply live to open panes."
         },
         "crl.medical-validation.showKeys": {
           "type": "boolean",
@@ -440,7 +440,7 @@
           "type": "string",
           "default": "",
           "scope": "window",
-          "markdownDescription": "The issue-tracker **collection** URL that a review flag's `; ref #N` resolves into \u2014 e.g. `https://github.com/owner/repo/issues`. In Medical Validation, a flag with a numeric ref shows an **Open issue #N** action that opens `<base>/N`. Must be an `http`/`https` URL with no credentials, query, or fragment. A value set in **workspace** settings applies only in a [trusted workspace](command:workbench.action.manageTrust); set it in **user** settings to use it everywhere. Leave empty to disable the link-out."
+          "markdownDescription": "The issue-tracker **collection** URL that a review flag's `; ref #N` resolves into — e.g. `https://github.com/owner/repo/issues`. In Medical Validation, a flag with a numeric ref shows an **Open issue #N** action that opens `<base>/N`. Must be an `http`/`https` URL with no credentials, query, or fragment. A value set in **workspace** settings applies only in a [trusted workspace](command:workbench.action.manageTrust); set it in **user** settings to use it everywhere. Leave empty to disable the link-out."
         },
         "crl.agent.provider": {
           "type": "string",
@@ -450,7 +450,7 @@
           ],
           "default": "vscode-lm",
           "scope": "window",
-          "markdownDescription": "Which model backend the CRL editor agent uses. `vscode-lm` (default) reuses the language models contributed by the **GitHub Copilot Chat** extension \u2014 zero setup, prompts stay within your VS Code language-model provider. `anthropic` sends prompts directly to **Anthropic's API** (`api.anthropic.com`) and requires an API key \u2014 run 'CRL: Set Anthropic API Key' or set the `ANTHROPIC_API_KEY` environment variable. There is no automatic fallback between the two."
+          "markdownDescription": "Which model backend the CRL editor agent uses. `vscode-lm` (default) reuses the language models contributed by the **GitHub Copilot Chat** extension — zero setup, prompts stay within your VS Code language-model provider. `anthropic` sends prompts directly to **Anthropic's API** (`api.anthropic.com`) and requires an API key — run 'CRL: Set Anthropic API Key' or set the `ANTHROPIC_API_KEY` environment variable. There is no automatic fallback between the two."
         },
         "crl.agent.anthropicModel": {
           "type": "string",

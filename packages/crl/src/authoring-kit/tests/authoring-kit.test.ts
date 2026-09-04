@@ -417,7 +417,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.27");
+    expect(kit.schemaVersion).toBe("1.28");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -1028,7 +1028,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     // wants. That is a CORRECTNESS fix, not teaching, so it lands with the slice and re-pins at 1.25 with NO
     // bump — the doctrine re-teach + schemaVersion bump stay BATCHED (`tmp/WORKLIST-kit-deltas.md`).
     expect(cpg.contentHash).toBe(
-      "ac231e05af18d3b17a5858d7c31da794fa3dca524b5b2e3358cdcdde1502a4b2",
+      "47c298a75a233774842a4ca15163e5b835fbabfb1e716691d600309d9ba7fa57",
     );
     // #189 null/pause — the priorAuth payload embeds the reference `.cel` artifacts, which gained explicit
     // `value is true/false` facts (a NEGATIVE must now be STATED; omission means UNKNOWN and PAUSES). That is
@@ -1036,11 +1036,12 @@ describe("authoring-kit — getAuthoringKit", () => {
     // while the schemaVersion bump + doctrine re-teach are BATCHED to one final kit pass
     // (`tmp/WORKLIST-kit-deltas.md`, operator 2026-08-27). Hence a re-pin at 1.25 with NO bump.
     // ⚠ The cpg hash is UNCHANGED — that payload does not embed the reference artifacts.
-    // ⚠ THE KIT PASS RAN (schemaVersion 1.25 → 1.27, #189 inline answer options + PA record-arm framing). BOTH hashes re-pin, and the
+    // ⚠ 1.27 → 1.28: teaches `emit_results` (the kit had never mentioned it) AND gives a version to the
+    // reference-artifact correction that had already moved BOTH hashes under a static 1.27. BOTH re-pin, and the
     //   changelog entry that explains the re-sync is the `inline-answer-options` rule itself. A KE pinning
     //   1.25 re-syncs and gets the teaching for the new construct in the same step.
     expect(priorAuth.contentHash).toBe(
-      "9792fad1ffe5c978b079281f5604a82014567cad697ea99a9b670c45510a929c",
+      "b2c88913580bc782cd95970bbde0460b2a84f981f5b5016f25ba2c98202314f1",
     );
   });
 
