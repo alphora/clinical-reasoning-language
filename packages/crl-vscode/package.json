@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL→CQL + CEL→FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "4.114.0",
+  "version": "4.115.0",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.95.0"
@@ -25,7 +25,7 @@
     "color": "#7E4E9C",
     "theme": "dark"
   },
-    "capabilities": {
+  "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
       "description": "Language features (syntax, validation, navigation) work in an untrusted workspace. Repository-scoped and network-backed features — the correspondence cockpit's git/GitHub integration — are disabled until you trust the workspace."
