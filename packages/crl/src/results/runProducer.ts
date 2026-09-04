@@ -25,6 +25,7 @@ import { caseResultsTypeDir } from "./useCases";
 import { parseDriverStdout } from "./repoBundle";
 import type { ProducerCaseEntry, ProducerCaseState } from "./manifest";
 import { capTail, jvmFlags, type JvmBounds } from "./spawn";
+import { driverArgs, driverReady } from "./driver";
 
 export interface RunOneCase {
   caseName: string;
@@ -36,7 +37,8 @@ export interface RunOneCase {
 
 export interface RunContext {
   javaExe: string;
-  classpath: string;
+  /** ⚠ ONE JAR PATH, not a classpath. Nothing is extracted and the caller composes nothing. */
+  engineJarPath: string;
   bounds: JvmBounds;
   planDefinitionId: string;
   /** Artifact root the results tree hangs from. */
@@ -75,6 +77,24 @@ export function extractResults(params: Record<string, unknown>): ExtractedResult
   return out;
 }
 
+/**
+ * The most explanatory line of a JVM stderr, appended to a failure reason.
+ *
+ * Prefers an explicit error/exception line over the tail, because the tail of a stack trace is
+ * usually a frame rather than the message. Bounded, so a manifest entry stays one readable line.
+ */
+export function describeStderr(stderr: string, limit = 300): string {
+  const lines = stderr
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const best =
+    lines.find((l) => /^(Error|Exception|Caused by)|Could not find or load|(Error|Exception):/.test(l)) ??
+    lines[lines.length - 1];
+  if (!best) return "";
+  return ` — ${best.length > limit ? `${best.slice(0, limit)}…` : best}`;
+}
+
 /** Classify an engine outcome. ⚠ Every case gets exactly one terminal state; absence is never a state. */
 export function classify(
   results: ExtractedResults,
@@ -85,7 +105,12 @@ export function classify(
 ): { state: ProducerCaseState; reason?: string } {
   if (timedOut) return { state: "timeout", reason: "per-case wall timeout" };
   if (exitCode !== 0) {
-    return { state: "failed", reason: `driver exited ${exitCode ?? "signal"}` };
+    // ⚠ CARRY THE CAUSE. `driver exited 1` is what a missing PropertiesLauncher, a driver compiled
+    // against another engine (`NoSuchMethodError`), a class above the runtime floor
+    // (`UnsupportedClassVersionError`) and a bad `loader.path` (`ClassNotFoundException: ApplyDriver`)
+    // ALL look like. Reporting the bare exit code hands a user N identical lines and no cause, while
+    // the JVM already said exactly what was wrong on a stderr we captured and then dropped.
+    return { state: "failed", reason: `driver exited ${exitCode ?? "signal"}${describeStderr(stderr)}` };
   }
   // ⚠ UNREADABLE OUTPUT IS A FAILURE, NOT AN EMPTY RESULT. An earlier cut turned an unparseable stdout
   // into `{}` and then classified it `no-questionnaire` — recording "the policy asked nothing" for a run
@@ -115,9 +140,25 @@ export function classify(
 
 /** Run one case. Bounded, isolated, and it writes nothing unless the engine produced something. */
 export function runOneCase(ctx: RunContext, c: RunOneCase): ProducerCaseEntry {
+  const ready = driverReady();
+  if (!ready.ok) {
+    return {
+      caseName: c.caseName,
+      compartmentDir: `patient/${c.compartmentId}`,
+      state: "failed",
+      reason: `the shipped driver class is missing at ${ready.expectedAt}`,
+    };
+  }
   const proc = spawnSync(
     ctx.javaExe,
-    [...jvmFlags(ctx.bounds), "-cp", ctx.classpath, "ApplyDriver", c.repoPath, ctx.planDefinitionId, c.subjectReference],
+    driverArgs({
+      jvmFlags: jvmFlags(ctx.bounds),
+      engineJarPath: ctx.engineJarPath,
+      loaderPath: ready.loaderPath,
+      repoPath: c.repoPath,
+      planDefinitionId: ctx.planDefinitionId,
+      subjectReference: c.subjectReference,
+    }),
     {
       timeout: ctx.bounds.batchTimeoutMs,
       maxBuffer: ctx.bounds.maxCapturedBytes * 4,

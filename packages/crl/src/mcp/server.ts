@@ -754,10 +754,10 @@ export function createServer(): McpServer {
         "PRODUCED into `tests/results/fhir/patient/<compartmentId>/<type>/`. The only difference in the " +
         "two paths is `data` vs `results`, and the compartmentId is the same, so a case's data and its " +
         "results address alike. " +
-        "⚠ DISABLED UNLESS THE ENVIRONMENT ENABLES IT. `CRL_PRODUCER_CLASSPATH` (compiled ApplyDriver + " +
-        "the engine jars) must be set in the SERVER's environment — deliberately not read from the " +
-        "workspace, so a repository cannot opt a user into JVM execution. A JDK 17+ is required (measured " +
-        "from the engine jar's class-file version) and the jar's sha256 is verified before every launch. " +
+        "⚠ DISABLED UNLESS THE ENVIRONMENT ENABLES IT. Set `CRL_ENABLE_RESULTS=1` where the MCP server " +
+        "is launched, then restart the client — deliberately read from the SERVER's environment, not the " +
+        "workspace, so a repository cannot opt a user into JVM execution. Needs only a JRE 17+ (the driver " +
+        "ships compiled; the engine runs unextracted) and the jar's sha256 is verified before every launch. " +
         "Returns `{ ok, manifestPath, cases:[{caseName, state, reason?, artifacts?}], notEmitted, failed, " +
         "java }`. Every case gets exactly ONE terminal state — `generated` | `no-questionnaire` | " +
         "`populate-degraded` | `failed` | `timeout` | `not-run` — so 'the policy asked nothing', 'the run " +
@@ -1686,7 +1686,7 @@ function runAuthoringKit(args: { stage?: string; useCase?: string }): {
  * emit → bundle → spawn → write sequence is how a helper ends up right and a caller wrong, with the
  * helper's tests passing throughout — the defect shape this whole area has been fixing.
  *
- * ⚠ ENABLEMENT COMES FROM THE SERVER'S ENVIRONMENT, NOT THE WORKSPACE. `CRL_PRODUCER_CLASSPATH` is read
+ * ⚠ ENABLEMENT COMES FROM THE SERVER'S ENVIRONMENT, NOT THE WORKSPACE. `CRL_ENABLE_RESULTS` is read
  * from `process.env` so that opening a repository cannot opt a user into spawning a JVM. A workspace can
  * supply arguments; it cannot supply the environment the server was launched with.
  */
@@ -1711,13 +1711,20 @@ function emitResults(args: {
     return err(`Unknown useCase "${args.useCase}". Valid: ${RESULT_USE_CASES.join(", ")}.`);
   }
 
-  const classpath = process.env.CRL_PRODUCER_CLASSPATH;
-  if (!classpath) {
+  // ⚠ ENABLEMENT IS AN ENVIRONMENT FLAG, NOT A CLASSPATH. `CRL_ENABLE_RESULTS=1` is read from the
+  // SERVER's environment rather than the workspace on purpose: a repository must not be able to opt a
+  // user into running a JVM.
+  //
+  // ⚠ IT USED TO BE `CRL_PRODUCER_CLASSPATH`, and that was indefensible — it made a knowledge engineer
+  // hand-type `…\out;…\lib\*` after finding a 216 MB jar, hashing it and extracting 131 nested libraries.
+  // The driver now ships COMPILED and the engine runs unextracted through Spring Boot's
+  // PropertiesLauncher, so there is no classpath for anyone to compose.
+  if (process.env.CRL_ENABLE_RESULTS !== "1") {
     return err(
-      "CRL_PRODUCER_CLASSPATH is not set in this server's environment, so result production is " +
-        "disabled. It must point at the compiled ApplyDriver plus the engine jars. This is read from " +
-        "the environment rather than the workspace on purpose: a repository must not be able to opt a " +
-        "user into running a JVM.",
+      "Result production is disabled. Set CRL_ENABLE_RESULTS=1 in the environment this MCP server is " +
+        "launched from, then restart the client. It is read from the environment rather than the " +
+        "workspace on purpose: a repository must not be able to opt a user into running a JVM. " +
+        "Medical-validation users read committed results and never need this.",
     );
   }
 
@@ -1728,7 +1735,6 @@ function emitResults(args: {
     outRoot: args.outRoot ?? dirname(args.celPath),
     jarPath: args.jarPath,
     jarSha256: args.jarSha256,
-    classpath,
     crlVersion: CRL_PACKAGE_VERSION,
   });
 

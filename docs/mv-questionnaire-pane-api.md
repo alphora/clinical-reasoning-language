@@ -116,12 +116,16 @@ confusing result.
 
 ## 6. Deferred: jar distribution
 
-No slimmed `$apply` jar exists. Confirmed with KELP (structural no), HCSC KE and IEHP KE. What
-exists is `harness/PlanDefinition-apply/` in this repo — a ~40 KB Java driver (4 files, tracked)
-running on a 131-jar / 206 MB classpath extracted from `cqf-fhir-cr-cli-4.7.0.jar` (`lib/`, gitignored).
-Carving it is unclaimed work with at least two other interested consumers.
+No slimmed `$apply` jar exists. Confirmed with KELP (structural no), HCSC KE and IEHP KE. Carving one
+is unclaimed work with at least two other interested consumers.
 
-Not a blocker while the producer runs on desktop. Becomes live when it moves to codespaces.
+It is no longer a setup burden. `emit_results` ships ONE compiled class (`ApplyDriver`) and runs the
+engine jar **unextracted**, through Spring Boot's `PropertiesLauncher`. A knowledge engineer supplies
+the jar path and its sha256; nothing is unpacked, no classpath is composed, and a **JRE 17+** suffices
+— `javac` and `jar` were requirements of our own earlier design, not the engine's.
+
+The remaining cost is the 216 MB download. That is what a slimmed jar would address, and it stays
+deferred: not a blocker while the producer runs on desktop, live when it moves to codespaces.
 The operator's shape when it does: host the carved artifact on GitHub, download-if-missing into
 globalStorage, let the codespace image pre-bake it as a cache warm — one code path for desktop and
 codespace, following the KALM precedent.

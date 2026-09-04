@@ -99,9 +99,10 @@ jobs:
         if: steps.changes.outputs.run_core == 'true'
         run: npm test -w @smile-digital-health/crl
 
-      # The MCP integration test spawns the BUILT dist/cli/run-mcp-server.js; it is a build-gated standalone script, NOT part
-      # of `npm test`, so it is wired in explicitly here to stop being orphaned from CI. Invoke the built test directly rather
-      # than `npm run test:mcp` — the latter's `pretest:mcp` would redundantly rebuild core, already done by "Build core".
+      # The MCP integration test spawns the BUILT dist/cli/run-mcp-server.js. It is now part of core's `npm test`, but stays
+      # wired explicitly here too: it is the ONLY test that drives the real MCP server over the protocol — what the KE
+      # actually touches — and it spent a long time orphaned from CI. Invoked directly rather than via `npm run test:mcp`
+      # so its `pretest:mcp` does not rebuild core, already done by "Build core" above.
       - name: Test core — MCP integration
         if: steps.changes.outputs.run_core == 'true'
         run: node packages/crl/src/cli/tests/run-mcp-server.test.mjs

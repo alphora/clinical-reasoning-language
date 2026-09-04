@@ -64,7 +64,7 @@ export const RETRIEVE_SETTINGS = "FILTER_IN_MEMORY" as const;
  * The KE's working runs were on JDK 23, so 17 is the conservative floor. A JDK below this fails with
  * `UnsupportedClassVersionError` deep inside the engine, which reads as a mysterious producer crash.
  */
-export const MIN_JDK_MAJOR = 17;
+export const MIN_JAVA_MAJOR = 17;
 
 export type JavaResolution =
   | { ok: true; javaExe: string; source: "JAVA_HOME" | "PATH"; major: number }
@@ -88,18 +88,23 @@ export function parseJavaMajor(versionOutput: string): number | undefined {
 }
 
 /**
- * Find a USABLE JDK. JAVA_HOME first, then PATH — deliberately NOT the Windows registry or
+ * Find a USABLE JAVA RUNTIME. JAVA_HOME first, then PATH — deliberately NOT the Windows registry or
  * common-directory scanning. For a default-off tool a KE opts into, a loud refusal beats a filesystem
- * crawl that can pick a JRE the engine cannot use.
+ * crawl that can pick a runtime below the floor.
+ *
+ * ⚠ A JRE IS ENOUGH — do not re-derive a JDK requirement from an older comment. The driver ships
+ * COMPILED and the engine runs unextracted through Spring Boot's PropertiesLauncher, so neither
+ * `javac` nor `jar` is needed at runtime. Requiring a JDK is what made this tool unusable in
+ * 4.114.0; on Windows `java` commonly resolves to the Oracle javapath shim, which has no `jar` at all.
  *
  * ⚠ EXISTENCE IS NOT ENOUGH, and this was a real defect here rather than a hypothetical. On the machine
  * this was written, `java` on PATH was 23 while `JAVA_HOME` still pointed at a JDK 11 from an old
  * install. An earlier cut of this function checked only that the executable existed, so it preferred
- * JAVA_HOME and would have handed the engine a JDK that cannot load its classes — surfacing as
+ * JAVA_HOME and would have handed the engine a runtime that cannot load its classes — surfacing as
  * `UnsupportedClassVersionError` from inside cqf, nowhere near the cause. A stale JAVA_HOME is the
  * COMMON case, not an edge one.
  *
- * So: probe each candidate and take the first that SATISFIES the minimum. Report a too-old JDK by name
+ * So: probe each candidate and take the first that SATISFIES the minimum. Report a too-old runtime by name
  * and version rather than falling through silently, because "no Java found" would be a lie that sends a
  * KE to install a second copy.
  */
@@ -124,15 +129,23 @@ export function resolveJava(
   for (const c of candidates) {
     const major = parseJavaMajor(probe(c.javaExe) ?? "");
     if (major === undefined) continue;
-    if (major >= MIN_JDK_MAJOR) return { ok: true, ...c, major };
+    if (major >= MIN_JAVA_MAJOR) return { ok: true, ...c, major };
     tooOld ??= { javaExe: c.javaExe, major };
   }
-  if (tooOld) return { ok: false, reason: "too-old", ...tooOld, required: MIN_JDK_MAJOR };
+  if (tooOld) return { ok: false, reason: "too-old", ...tooOld, required: MIN_JAVA_MAJOR };
   return { ok: false, reason: "not-found" };
 }
 
+/**
+ * The launcher entry `driverArgs` names. Its PACKAGE MOVED in Spring Boot 3.2
+ * (`org.springframework.boot.loader` → `…loader.launch`), so a jar built against an older Boot has no
+ * such class — and the JVM reports that as `Could not find or load main class …`, exit 1, which
+ * `classify` would otherwise render as a bare "driver exited 1" for every case with no cause named.
+ */
+export const LAUNCHER_ENTRY = "org/springframework/boot/loader/launch/PropertiesLauncher.class";
+
 export type JarVerification =
-  | { ok: true; sha256: string }
+  | { ok: true; sha256: string; hasLauncher: boolean }
   | { ok: false; reason: "missing" | "not-a-file" | "sha-mismatch"; actualSha256?: string };
 
 /**
@@ -145,11 +158,16 @@ export type JarVerification =
 export function verifyJar(jarPath: string, expectedSha256: string): JarVerification {
   if (!existsSync(jarPath)) return { ok: false, reason: "missing" };
   if (!statSync(jarPath).isFile()) return { ok: false, reason: "not-a-file" };
-  const actual = createHash("sha256").update(readFileSync(jarPath)).digest("hex");
+  const buf = readFileSync(jarPath);
+  const actual = createHash("sha256").update(buf).digest("hex");
   if (actual !== expectedSha256.toLowerCase()) {
     return { ok: false, reason: "sha-mismatch", actualSha256: actual };
   }
-  return { ok: true, sha256: actual };
+  // ⚠ SAME READ. The buffer is already here and the jar is 216 MB; scanning it for the launcher entry
+  // costs nothing, while reading the file twice to answer a second question about it costs a lot.
+  // A zip stores entry names uncompressed in both the local header and the central directory, so a
+  // plain substring search answers "is this class in the archive" without a zip reader.
+  return { ok: true, sha256: actual, hasLauncher: buf.includes(LAUNCHER_ENTRY) };
 }
 
 /**

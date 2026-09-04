@@ -184,9 +184,28 @@ async function build() {
     fs.copyFileSync(src, path.resolve(__dirname, "dist", name));
   }
 
+  // ⚠ THE COMPILED DRIVER MUST TRAVEL WITH THE BUNDLE, IN A `driver/` SUBDIR. `emit_results`
+  // resolves it as `join(__dirname, "driver", "ApplyDriver.class")`, and in the bundle `__dirname` is
+  // THIS dist/ dir. 4.114.0 shipped `emit_results` with the driver in neither the vsix nor the npm
+  // tarball, so the tool required a class no user could obtain; copying it beside the core .cql is
+  // the same lesson as #187, one directory deeper. Fail loud rather than ship the tool broken again.
+  const DRIVER_ASSET = path.join("driver", "ApplyDriver.class");
+  {
+    const src = path.resolve(__dirname, "../crl/dist/results/driver/ApplyDriver.class");
+    if (!fs.existsSync(src)) {
+      throw new Error(
+        `Compiled driver missing at ${src} — core's copy-catalog build step did not run. ` +
+          "Rebuild core (`npm run build -w @smile-digital-health/crl`)."
+      );
+    }
+    const dst = path.resolve(__dirname, "dist", DRIVER_ASSET);
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    fs.copyFileSync(src, dst);
+  }
+
   console.log(
     "esbuild: built extension.js + mcp-server.js + provision.js; " +
-      `embedded ${patterns.length} catalog patterns; copied ${CATALOG_CQL.length} catalog .cql next to the bundle; ` +
+      `embedded ${patterns.length} catalog patterns; copied ${CATALOG_CQL.length} catalog .cql + the compiled driver next to the bundle; ` +
       `gates passed (externals: ${[...new Set(externalImports)].join(", ") || "none"}).`
   );
 }

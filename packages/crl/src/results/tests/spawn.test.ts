@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
+  LAUNCHER_ENTRY,
   APPLY_OPERATION,
   DEFAULT_BOUNDS,
   RETRIEVE_SETTINGS,
@@ -13,7 +14,7 @@ import {
   capTail,
   jvmFlags,
   killTreeCommand,
-  MIN_JDK_MAJOR,
+  MIN_JAVA_MAJOR,
   parseJavaMajor,
   resolveJava,
   verifyJar,
@@ -71,7 +72,17 @@ describe("the JVM spawn contract is bounded by construction", () => {
     writeFileSync(jar, "pretend-jar-bytes");
     const sha = createHash("sha256").update("pretend-jar-bytes").digest("hex");
 
-    expect(verifyJar(jar, sha)).toEqual({ ok: true, sha256: sha });
+    // `hasLauncher` is false here because these bytes are not a Boot jar — which is the point of the
+    // check: an engine without `PropertiesLauncher` cannot be launched the way `driverArgs` launches it.
+    expect(verifyJar(jar, sha)).toEqual({ ok: true, sha256: sha, hasLauncher: false });
+
+    // A jar CONTAINING the launcher entry reports it. The name is stored uncompressed in the zip
+    // headers, so the substring search finds it without a zip reader.
+    const boot = path.join(dir, "boot.jar");
+    writeFileSync(boot, `PK padding ${LAUNCHER_ENTRY} more padding`);
+    const bootSha = createHash("sha256").update(readFileSync(boot)).digest("hex");
+    const bootCheck = verifyJar(boot, bootSha);
+    expect(bootCheck.ok === true && bootCheck.hasLauncher).toBe(true);
     // An atomic download prevents a TRUNCATED jar. It does not prevent a wrong or substituted one, nor a
     // file that changed after it landed — which is why this runs at launch.
     writeFileSync(jar, "tampered");
@@ -115,7 +126,7 @@ describe("the JVM spawn contract is bounded by construction", () => {
     const only = resolveJava({ JAVA_HOME: oldHome } as NodeJS.ProcessEnv, isWin, probe);
     expect(only.ok).toBe(false);
     expect(only.ok === false && only.reason).toBe("too-old");
-    expect(only.ok === false && only.reason === "too-old" && only.required).toBe(MIN_JDK_MAJOR);
+    expect(only.ok === false && only.reason === "too-old" && only.required).toBe(MIN_JAVA_MAJOR);
 
     expect(resolveJava({} as NodeJS.ProcessEnv, isWin, probe)).toEqual({
       ok: false,
@@ -141,7 +152,7 @@ describe("the JVM spawn contract is bounded by construction", () => {
 
   it("⭐ the minimum is MEASURED from the jar, not chosen", () => {
     // Every class in cqf-fhir-cr-cli-4.7.0.jar is class-file major 61 = Java 17.
-    expect(MIN_JDK_MAJOR).toBe(17);
+    expect(MIN_JAVA_MAJOR).toBe(17);
     expect(parseJavaMajor('java version "23.0.1" 2024-10-15')).toBe(23);
     expect(parseJavaMajor('openjdk version "17.0.9"')).toBe(17);
     expect(parseJavaMajor('java version "1.8.0_392"')).toBe(8); // legacy 1.x spelling

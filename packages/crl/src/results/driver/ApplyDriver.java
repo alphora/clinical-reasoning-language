@@ -11,6 +11,15 @@
  * choose a case, compose a path, or decide what is a pass. Every one of those was a source of drift in
  * the harness this replaces.
  *
+ * ⚠ THE COMPILED CLASS IS COMMITTED BESIDE THIS FILE AND IS WHAT SHIPS. Editing this source alone
+ * changes NOTHING at runtime. Rebuild with:
+ *
+ *     node packages/crl/scripts/build-driver.mjs <engine.jar>
+ *
+ * which extracts the engine (javac cannot see a fat jar's nested BOOT-INF/lib), compiles at
+ * --release 17, and verifies the class-file major before letting you commit. A full JDK is needed
+ * for THAT step only; running the driver needs a JRE.
+ *
  * ⚠ applyR5 ONLY. The R4 processor re-opens the null-behaviour findings this project spent #189 closing.
  */
 import java.nio.charset.StandardCharsets;

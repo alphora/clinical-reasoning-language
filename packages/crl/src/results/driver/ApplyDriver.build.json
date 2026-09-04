@@ -1,0 +1,8 @@
+{
+  "builtFrom": "ApplyDriver.java",
+  "javaSha256": "40fc61db72465f0eabcb012d14d3e6610a441429a5bcf4a6493390980926eeec",
+  "classSha256": "d1725f7f05f9e9e02409d426ead81a001d54907a086b300f477bcbf27f9e1c9c",
+  "classFileMajor": 61,
+  "engineJar": "cqf-fhir-cr-cli-4.7.0.jar",
+  "engineJarSha256": "10e6ae4e0846671bdfb8005fd577e9c195c7e9896bbd21342002eecd055e6ae0"
+}

@@ -300,7 +300,7 @@ export {
   jvmFlags,
   killTreeCommand,
   capTail,
-  MIN_JDK_MAJOR,
+  MIN_JAVA_MAJOR,
   parseJavaMajor,
   resolveJava,
   verifyJar,

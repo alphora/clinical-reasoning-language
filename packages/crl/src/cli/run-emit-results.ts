@@ -4,35 +4,21 @@
  *
  * ⚠ NOT AN `emit_*` IN THE PURE SENSE, and named `emit-results` rather than `emit-questionnaire` for two
  * reasons. First, every other `emit_*` here is a pure function of source; this one RUNS AN ENGINE and
- * needs a JDK. Second, questionnaires are one use case: prior auth produces Questionnaire +
- * QuestionnaireResponse, a measure will produce MeasureReport. The use case is an argument, not a tool.
+ * needs a Java RUNTIME (a JRE 17+; the driver ships compiled). Second, questionnaires are one use
+ * case: prior auth produces Questionnaire + QuestionnaireResponse, a measure will produce
+ * MeasureReport. The use case is an argument, not a tool.
  */
-import { spawnSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+// ⚠ THIS FILE PARSES FLAGS AND REPORTS. It once imported twenty more symbols — the emitters, the
+// bundler, the JVM resolver — from when it orchestrated the run itself. They outlived that job and
+// stayed, which is the same defined-but-never-called shape review has caught here four times: they read
+// as evidence this file still does that work.
 import {
-  DEFAULT_BOUNDS,
-  MIN_JDK_MAJOR,
   RESULT_USE_CASES,
   IMPLEMENTED_USE_CASES,
   isImplementedUseCase,
-  SingleFlight,
-  buildEngineRepoBundle,
-  buildProducerInputs,
-  casesMissingFromEmit,
-  cqlIndex,
-  emitCelToFhir,
-  emitCrlTwoLane,
   isResultUseCase,
-  jvmFlags,
-  resolveCelImports,
-  resolveJava,
-  verifyJar,
-  producerManifestName,
-  type ProducerManifest,
 } from "../index";
 import { produceResults } from "../results/produce";
 
@@ -138,14 +124,6 @@ function main(): void {
     process.exit(1);
   }
 
-  const classpath = process.env.CRL_PRODUCER_CLASSPATH;
-  if (!classpath) {
-    process.stderr.write(
-      "CRL_PRODUCER_CLASSPATH is not set — point it at the compiled ApplyDriver plus the engine jars\n",
-    );
-    process.exit(2);
-  }
-
   // ⭐ ONE PIPELINE. The MCP `emit_results` tool calls this same function; this file only parses flags and
   // reports. Two entry points each orchestrating emit → bundle → spawn → write is how a helper ends up
   // right and a caller wrong, with the helper's tests green throughout.
@@ -156,7 +134,6 @@ function main(): void {
     outRoot: a.out ?? path.dirname(a.cel),
     jarPath: a.jar,
     jarSha256: a.jarSha,
-    classpath,
     crlVersion: CRL_VERSION,
   });
 

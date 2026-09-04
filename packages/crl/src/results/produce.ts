@@ -18,7 +18,8 @@ import { buildProducerInputs, casesMissingFromEmit } from "./caseInput";
 import { producerManifestName, type ProducerManifest } from "./manifest";
 import { buildEngineRepoBundle, cqlIndex } from "./repoBundle";
 import { runOneCase } from "./runProducer";
-import { DEFAULT_BOUNDS, resolveJava, verifyJar, type JvmBounds } from "./spawn";
+import { DEFAULT_BOUNDS, LAUNCHER_ENTRY, MIN_JAVA_MAJOR, resolveJava, verifyJar, type JvmBounds } from "./spawn";
+import { driverReady } from "./driver";
 import { isImplementedUseCase, type ResultUseCase } from "./useCases";
 
 export interface ProduceRequest {
@@ -27,10 +28,14 @@ export interface ProduceRequest {
   useCase: ResultUseCase;
   /** Artifact root the `tests/results/` tree hangs from. */
   outRoot: string;
+  /**
+   * ⚠ THE ENGINE JAR — ONE FILE, AND THE ONLY ONE. It is verified against `jarSha256` and then
+   * executed; there is deliberately NO second path to override what runs. An `engineJarPath`
+   * override briefly existed here and no caller ever set it — its only reachable effect was to let a
+   * caller hash jar A, execute jar B, and record A's sha in the manifest as provenance for B.
+   */
   jarPath: string;
   jarSha256: string;
-  /** Compiled `ApplyDriver` + the engine jars. */
-  classpath: string;
   bounds?: JvmBounds;
   crlVersion: string;
 }
@@ -67,20 +72,34 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
     };
   }
 
-  // ⚠ THE VERIFIED JAR MUST BE THE JAR EXECUTED. Hashing `--jar` and then launching whatever the
-  // classpath happens to hold makes `producerJarSha256` a claim about an artifact that never ran — and a
-  // provenance claim nobody checks is worse than none, because it is believed.
-  const onClasspath = req.classpath
-    .split(path.delimiter)
-    .some(
-      (seg) =>
-        path.resolve(seg.replace(/[\\/]\*$/, "")) === path.resolve(path.dirname(req.jarPath)) ||
-        path.resolve(seg) === path.resolve(req.jarPath),
-    );
-  if (!onClasspath) {
-    return { ok: false, reason: "the verified jar is not on the producer classpath" };
+  // ⚠ PRECONDITIONS BELONG HERE, NOT IN THE PER-CASE LOOP. A missing driver or a launcher-less jar
+  // is one fact about the run, not N facts about N cases: checked per-case it yields a manifest of N
+  // identical `failed` entries and an `ok: true` envelope, which reads as "the policy produced
+  // nothing" rather than "we could not start". That mistranslation is the exact shape this file
+  // exists to prevent.
+  if (!jarCheck.hasLauncher) {
+    return {
+      ok: false,
+      reason: "engine jar has no Spring Boot PropertiesLauncher — it is not a supported engine build",
+      detail: [
+        `expected the zip entry ${LAUNCHER_ENTRY}`,
+        "that package moved in Spring Boot 3.2; a jar built against an older Boot will not launch this way",
+      ],
+    };
   }
 
+  const driver = driverReady();
+  if (!driver.ok) {
+    return {
+      ok: false,
+      reason: `the compiled driver did not ship (${driver.reason})`,
+      detail: [`expected at ${driver.expectedAt}`, ...(driver.detail ?? [])],
+    };
+  }
+
+  // ⚠ The verified jar IS the jar executed — it goes on `-cp` directly. The classpath-containment
+  // check this replaces existed only because the user supplied a separate classpath that need not
+  // have contained it, which made `producerJarSha256` a claim about an artifact that never ran.
   const probe = (exe: string): string => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
@@ -92,7 +111,7 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
   if (!java.ok) {
     return {
       ok: false,
-      reason: java.reason === "too-old" ? `JDK too old (${java.major})` : "no usable JDK found",
+      reason: java.reason === "too-old" ? `Java too old (${java.major}); need ${MIN_JAVA_MAJOR}+ (a JRE is enough)` : "no usable Java runtime found",
     };
   }
 
@@ -178,7 +197,7 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
     const entry = runOneCase(
       {
         javaExe: java.javaExe,
-        classpath: req.classpath,
+        engineJarPath: req.jarPath, // the VERIFIED jar, and nothing else, is what runs
         bounds: req.bounds ?? DEFAULT_BOUNDS,
         planDefinitionId,
         artifactRoot: req.outRoot,

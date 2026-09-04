@@ -48,6 +48,8 @@
     "dist/**/*.d.ts",
     "dist/**/*.js.map",
     "dist/**/*.cql",
+    "dist/**/*.java",
+    "dist/**/*.class",
     "README.md"
   ],
   "publishConfig": {
@@ -57,7 +59,7 @@
     "lint": "eslint \"src/**/*.ts\" --quiet",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write 'src/**/*.ts'",
-    "test": "vitest run --root ../.. --project crl --no-file-parallelism",
+    "test": "vitest run --root ../.. --project crl --no-file-parallelism && npm run test:mcp",
     "pretest:mcp": "npm run build",
     "test:mcp": "node src/cli/tests/run-mcp-server.test.mjs",
     "prebuild": "rimraf dist && shx mkdir -p dist && npm run generate && cpx \"src/grammar/generated/types/*.json\" dist/grammar/generated/types/ && node scripts/checkGrammarJsonFiles.js",
