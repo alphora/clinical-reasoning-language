@@ -177,6 +177,7 @@ export {
   buildCrlStructure,
   buildCrlConceptLayer,
   answerOptionsForDisplay,
+  answersFromTerminologyForDisplay,
   classifyConcept,
   buildConceptContainment,
   buildConceptShapeIndex,

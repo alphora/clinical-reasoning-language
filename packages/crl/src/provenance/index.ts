@@ -34,7 +34,12 @@ export type {
   CrlNodeKind,
   CrlActionKind,
 } from "./crlStructure";
-export { buildCrlConceptLayer, answerOptionsForDisplay, classifyConcept } from "./crlConceptLayer";
+export {
+  buildCrlConceptLayer,
+  answerOptionsForDisplay,
+  answersFromTerminologyForDisplay,
+  classifyConcept,
+} from "./crlConceptLayer";
 export type {
   CrlConceptNode,
   ConceptDefinitionKind,

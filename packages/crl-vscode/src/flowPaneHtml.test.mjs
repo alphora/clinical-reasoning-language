@@ -1133,3 +1133,28 @@ check("#189: the CANONICAL bare-ref `when` over a reduction wrapper still offers
   assert.equal(optRows(rr.html), ANSWERS.length, "expanding must show every answer");
   for (const a of ANSWERS) assert.ok(rr.html.includes(a.display), `missing answer "${a.display}"`);
 });
+
+// A question whose answers live in a pure-REFERENCE terminology: ONE plain row, NO chevron. A chevron
+// promises content, and we hold no member list — only a synthetic stub code that is not an answer.
+check("#189: a reference-terminology question points at its value set and offers NO disclosure", () => {
+  const bareStructure = [{
+    decision: "D", lib: "Pol", nodeKey: "d:D", location: {},
+    children: [node("w:Q", "when", "when Q", ["c:Q"], [node("a:X", "action", "ActX", ["act:X"], [], { actionKind: "recommend-activity" })])],
+  }];
+  const rr = renderFlowPane(bareStructure, {
+    concepts: [concept("c:Q", "Q", { definitionKind: "definition-is" })],
+    answersFromByConcept: new Map([["c:Q", "Requestable Services"]]),
+    expandedGuardWhens: new Set(),
+  });
+  // ⚠ Assert on the <title>, not the visible label: a 29-char label WRAPS into two tspans, so a
+  // substring check against the rendered text fails on a row that is rendering perfectly.
+  assert.ok(
+    rr.html.includes('answers come from the value set &quot;Requestable Services&quot;'),
+    "the row must name the value set and say why it cannot be expanded",
+  );
+  assert.ok(rr.html.includes("answers: Requestable"), "the visible label names it too");
+  assert.equal(
+    Object.values(rr.reveals).filter((v) => v && "criterionToggle" in v).length, 0,
+    "a chevron would promise a list we do not have",
+  );
+});

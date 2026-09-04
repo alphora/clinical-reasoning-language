@@ -92,6 +92,7 @@ import {
   type MvFlag,
   type AnchorContext,
   answerOptionsForDisplay,
+  answersFromTerminologyForDisplay,
 } from "@smile-digital-health/crl";
 import {
   addNote,
@@ -2089,6 +2090,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         // `value from:` is usually not the one on screen — a decision tree shows the BOOLEAN defined over it,
         // because that is what a `when` guards on. Resolved in core so the rule is testable.
         answerOptionsByConcept: answerOptionsForDisplay(conceptLayer),
+        answersFromByConcept: answersFromTerminologyForDisplay(conceptLayer),
       });
       v.anchors = r.anchors;
       v.reveals = r.reveals;

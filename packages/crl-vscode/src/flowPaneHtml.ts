@@ -286,6 +286,9 @@ function buildLaid(
     guardOutlines?: Map<string, GuardOutline>;
     expandedGuardWhens?: Set<string>;
     answerOptionsByConcept?: Map<string, { code: string; display: string }[]>;
+    /** #189 — for a question whose answers live in a pure-REFERENCE terminology we cannot expand: the
+     *  terminology NAME, rendered as one plain row and NEVER a chevron. See `answersFromTerminology`. */
+    answersFromByConcept?: Map<string, string>;
   } = {},
 ): { roots: LaidNode[]; maxDepth: number } {
   let slot = 0;
@@ -361,6 +364,21 @@ function buildLaid(
               });
             }
           }
+        }
+        // ⭐ #189 — a question whose answers live in a pure-REFERENCE terminology. ONE plain row, ALWAYS
+        // visible, NO chevron: we hold no member list, and a disclosure promises content. Without it the
+        // node is indistinguishable from a concept that asks nothing at all.
+        const answersFrom = !answers?.length ? opts.answersFromByConcept?.get(s.nodeKey) : undefined;
+        if (answersFrom) {
+          children.push({
+            ...base,
+            nodeKey: outlineKey(topWhenKey, `${opPath}.vs`, "opt"),
+            kind: "leaf", outlineRow: "option", indent: indent + 1,
+            absX: outlineX(whenLeft, indent + 1),
+            label: `answers: ${answersFrom}`,
+            full: `answers come from the value set "${answersFrom}" — resolved at deployment, so its members are not known here`,
+            y: take(), children: [],
+          });
         }
         return {
           ...base, nodeKey: outlineKey(topWhenKey, opPath, s.nodeKey), kind: "leaf", outlineRow: "leaf", isDefLeaf: true,
@@ -511,6 +529,23 @@ function buildLaid(
     // Keyed on `n.outlineRoots.length === 0` rather than on the negation of the two conditions above, so a
     // future third outline path cannot silently reintroduce a double render.
     const selfAnswers = n.kind === "when" && cf.conceptKey !== undefined ? opts.answerOptionsByConcept?.get(cf.conceptKey) : undefined;
+    const selfAnswersFrom =
+      n.kind === "when" && cf.conceptKey !== undefined && !selfAnswers?.length
+        ? opts.answersFromByConcept?.get(cf.conceptKey)
+        : undefined;
+    if (outlineRoots.length === 0 && selfAnswersFrom) {
+      // The pointer case on the canonical shape — one plain row under the `when`, no disclosure.
+      const whenLeft = PAD + depth * COL;
+      outlineRoots.push({
+        nodeKey: outlineKey(n.nodeKey, "self.vs", "opt"),
+        kind: "leaf", useDecision: false, outline: true, outlineRow: "option",
+        indent: 0, absX: outlineX(whenLeft, 0),
+        label: `answers: ${selfAnswersFrom}`,
+        full: `answers come from the value set "${selfAnswersFrom}" — resolved at deployment, so its members are not known here`,
+        depth: 0, topWhenKey: n.nodeKey, y: nodeY + (NODE_H * 1.5) / ROW, children: [],
+      });
+      slot = Math.max(slot, nodeY + (NODE_H * 1.5) / ROW + OUTLINE_ADVANCE);
+    }
     if (outlineRoots.length === 0 && selfAnswers && selfAnswers.length > 0) {
       const whenLeft = PAD + depth * COL;
       const cursor = { y: nodeY + (NODE_H * 1.5) / ROW };
@@ -586,6 +621,9 @@ export function renderFlowPane(
     expandedGuardWhens?: Set<string>;
     /** #189: inline `value from:` answers per concept nodeKey — what makes a coded question expandable. */
     answerOptionsByConcept?: Map<string, { code: string; display: string }[]>;
+    /** #189 — for a question whose answers live in a pure-REFERENCE terminology we cannot expand: the
+     *  terminology NAME, rendered as one plain row and NEVER a chevron. See `answersFromTerminology`. */
+    answersFromByConcept?: Map<string, string>;
   } = {},
 ): RenderedFlow {
   const prefix = opts.revealPrefix ?? "";
@@ -607,6 +645,7 @@ export function renderFlowPane(
     guardOutlines: opts.guardOutlines,
     expandedGuardWhens: opts.expandedGuardWhens,
     answerOptionsByConcept: opts.answerOptionsByConcept,
+    answersFromByConcept: opts.answersFromByConcept,
   });
   const startNodeKey = roots[0]?.nodeKey; // the PRIMARY/start node — carries the chrome-mirror count badge (see below)
   let startNodeGid: string | undefined;

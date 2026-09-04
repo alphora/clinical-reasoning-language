@@ -6,7 +6,13 @@ import { parseInput } from "../../ast/tests/parseInput";
 import { buildCEL } from "../../cel";
 import type { ResolvedCelGraph } from "../../cel/imports/types";
 import type { RegistryEntry } from "../../imports/types";
-import { answerOptionsForDisplay, buildCrlConceptLayer, classifyConcept, type CrlConceptNode } from "../crlConceptLayer";
+import {
+  answerOptionsForDisplay,
+  answersFromTerminologyForDisplay,
+  buildCrlConceptLayer,
+  classifyConcept,
+  type CrlConceptNode,
+} from "../crlConceptLayer";
 import { buildCrlStructure } from "../crlStructure";
 import { buildProvenanceIndex, conceptDeclRef, nodeKey } from "../indexer";
 
@@ -291,5 +297,86 @@ describe("answerOptionsForDisplay", () => {
 
   it("a concept with no options and no refs is absent, not empty", () => {
     expect(answerOptionsForDisplay([node("Plain")]).has("Plain")).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// `value from` — THREE outcomes, not two. The middle one was misread as unresolvable and rendered
+// nothing: an INSTANTIATED terminology's codes sit in the same closure this layer already walks.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+const VF = `# VF
+library "VF".
+terminology "Inline Codes":
+- system is \`http://www.ama-assn.org/go/cpt\`.
+- code is \`15822\`.
+- code is \`15823\`.
+terminology "External VS":
+- valueset is \`http://example.org/ValueSet/requestable-services\`.
+concept "Instantiated Q":
+- type is Observation.
+- value type is CodeableConcept.
+- value from "Inline Codes".
+- code is \`iq\`.
+concept "Reference Q":
+- type is Observation.
+- value type is CodeableConcept.
+- value from "External VS".
+- code is \`rq\`.
+concept "Missing Q":
+- type is Observation.
+- value type is CodeableConcept.
+- value from "Nonexistent VS".
+- code is \`mq\`.
+concept "Wraps Instantiated":
+- type is Observation.
+- value type is boolean.
+- definition is "Instantiated Q" in qualifying.
+concept "Wraps Reference":
+- type is Observation.
+- value type is boolean.
+- definition is "Reference Q" in qualifying.
+activity "X":
+- request CPGCommunicationRequest.
+- with \`x\`.
+decision "D":
+first:
+- when "Wraps Instantiated" then recommend activity "X".
+- otherwise then recommend activity "X".`;
+
+describe("value from — instantiated vs reference terminology", () => {
+  const nodes = buildCrlConceptLayer(graphFrom(VF, CEL));
+  const by = new Map(nodes.map((c) => [c.name, c]));
+
+  // ⚠ THE CASE THAT WAS WRONG. `system is` + `code is` means WE KNOW THE ANSWERS.
+  it("an INSTANTIATED terminology's codes ARE the concept's answers", () => {
+    expect(by.get("Instantiated Q")?.answerOptions).toEqual([
+      { code: "15822", display: "15822" },
+      { code: "15823", display: "15823" },
+    ]);
+    expect(by.get("Instantiated Q")?.answersFromTerminology).toBeUndefined();
+  });
+
+  // A pure reference resolves at deployment; the only code we hold is the synthetic stub, which is not
+  // an answer. A NAME to point at, never a list to expand.
+  it("a pure REFERENCE terminology yields a name to point at, and no options", () => {
+    expect(by.get("Reference Q")?.answerOptions).toBeUndefined();
+    expect(by.get("Reference Q")?.answersFromTerminology).toBe("External VS");
+  });
+
+  it("an UNRESOLVED terminology reference yields neither — we assert nothing we cannot stand behind", () => {
+    expect(by.get("Missing Q")?.answerOptions).toBeUndefined();
+    expect(by.get("Missing Q")?.answersFromTerminology).toBeUndefined();
+  });
+
+  // Both signals must travel the SAME hop, or a wrapper shows answers for one kind of question and
+  // reads as "no answers at all" for the other.
+  it("both signals reach the boolean wrapper a `when` actually guards on", () => {
+    const opts = answerOptionsForDisplay(nodes);
+    const from = answersFromTerminologyForDisplay(nodes);
+    expect(opts.get(by.get("Wraps Instantiated")!.nodeKey)?.map((o) => o.code)).toEqual(["15822", "15823"]);
+    expect(from.get(by.get("Wraps Reference")!.nodeKey)).toBe("External VS");
+    // …and never both on one node.
+    expect(from.has(by.get("Wraps Instantiated")!.nodeKey)).toBe(false);
+    expect(opts.has(by.get("Wraps Reference")!.nodeKey)).toBe(false);
   });
 });

@@ -11,13 +11,14 @@
  * DIRECT edges only (defined-as operands + definition-is narrative refs); the transitive closure + cycle guard belong to
  * the consumer (Slice 2).
  */
-import type { Concept, ConceptValueType } from "../ast/types";
+import type { Concept, ConceptValueType, Terminology, TerminologyCode } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { ConceptType } from "../grammar/conceptTypes";
 import type { LsLocation } from "../language-services/contracts";
 
 import { collectLibs, conceptDeclRef, definitionConceptRefs, lsLoc, nodeKey } from "./indexer";
+import type { LibInfo } from "./indexer";
 
 export type ConceptDefinitionKind = "defined-as" | "definition-is" | "coded-from";
 
@@ -40,14 +41,21 @@ export interface CrlConceptNode {
    * alternatives — and the whole point of `#189` (nineteen boolean leaves collapsed into four coded
    * questions) is invisible in the surface a reviewer actually reads.
    *
-   * INLINE options only. A `kind: "terminology"` `value from` names an external ValueSet that is not
-   * resolved here — the concept layer is a projection of the SOURCE, and expanding a terminology
-   * reference needs a resolution step this layer deliberately does not have. Such a concept gets
-   * NOTHING here and renders as it always did: showing a list we made up would be worse than showing
-   * none. (A field naming the ValueSet was added and removed in the same change — nothing read it, and
-   * a signal with no reader is indistinguishable from a feature that works.)
+   * Carries INLINE options AND the codes of an INSTANTIATED terminology — see `answerFields` for why
+   * those are one case and not two. A concept whose `value from` names a pure REFERENCE terminology
+   * gets `answersFromTerminology` instead; one whose reference does not resolve gets neither.
    */
   answerOptions?: { code: string; display: string }[];
+  /**
+   * The terminology NAME whose members are this concept's answers, when we cannot know them — a pure
+   * `valueset is <url>` reference, resolved at deployment.
+   *
+   * ⚠ NEVER SET ALONGSIDE `answerOptions`, and never a list. It exists so a renderer can say "answers
+   * come from <name>" WITHOUT offering a disclosure, because there is nothing behind one. A concept
+   * that is a question but cannot show its answers is otherwise indistinguishable from a concept that
+   * is not a question at all, which is the state this replaces.
+   */
+  answersFromTerminology?: string;
   /** The concept's definition shape, when present — a raw signal for the renderer's later layer classification. */
   definitionKind?: ConceptDefinitionKind;
   hasLocalCode: boolean; // has a local `- code is …` (locally assertable)
@@ -103,6 +111,54 @@ export function classifyConcept(c: CrlConceptNode): ConceptClassification {
   };
 }
 
+/**
+ * ⭐⭐ THE ANSWERS A CONCEPT OFFERS — and there are THREE cases, not two.
+ *
+ * `value from` has two syntactic forms but three OUTCOMES, and conflating the last two is the bug this
+ * exists to stop (an earlier comment here claimed a terminology "is not resolved" — true of a pure
+ * reference, FALSE of an instantiated one, which is the form a policy is most likely to use):
+ *
+ *   1. INLINE `value from:` .................. options with displays, authored on the concept.
+ *   2. `value from "X"`, X INSTANTIATED ...... `system is` + `code is` lines — WE KNOW THE CODES. They
+ *      are in the same closure this function already walks, indexed by name (`STATEMENT_KIND` maps
+ *      `Terminology`), so there is nothing external about them.
+ *   3. `value from "X"`, X a pure REFERENCE ... `valueset is <url>` — membership resolves at DEPLOYMENT.
+ *      We genuinely do not know it, and the one code we hold is the synthetic `reference-vs-stub`
+ *      placeholder, which is NOT an answer. Surfacing that as one would show a reviewer a fake option
+ *      with the same affordance as a real one.
+ *
+ * So (1) and (2) yield `answerOptions`; (3) yields `answersFromTerminology` — a NAME to point at, never
+ * a list to expand. A renderer must not offer a disclosure for (3): a chevron promises content.
+ *
+ * ⚠ CASE 2 HAS NO DISPLAY TEXT. `terminologyCode` is `- code is \`15822\`.` and nothing else — there is
+ * no display slot, while inline options REQUIRE one (#313). The code is used as its own display until
+ * that closes; a bare code is honest and thin, and inventing text for it would not be.
+ */
+function answerFields(
+  c: Concept,
+  lib: string,
+  libs: Map<string, LibInfo>,
+): { answerOptions?: { code: string; display: string }[]; answersFromTerminology?: string } {
+  const vf = c.valueFrom;
+  if (!vf) return {};
+  if (vf.kind === "inline") {
+    return { answerOptions: vf.options.map((o) => ({ code: o.code, display: o.display })) };
+  }
+  const targetLib = getRefLibrary(vf.terminologyName) ?? lib;
+  const name = getRefName(vf.terminologyName);
+  const decl = libs
+    .get(targetLib)
+    ?.decls.get(name)
+    ?.find((e) => e.kind === "terminology");
+  // Unresolved (a typo, or a library outside the closure) → neither field. The concept renders as it
+  // always did rather than asserting an answer set we cannot stand behind.
+  if (!decl) return {};
+  const body = (decl.node as Terminology).body;
+  const codes = body.filter((l): l is TerminologyCode => l.type === "TerminologyCode");
+  if (codes.length > 0) return { answerOptions: codes.map((l) => ({ code: l.code, display: l.code })) };
+  return { answersFromTerminology: name };
+}
+
 export function buildCrlConceptLayer(
   graph: ResolvedCelGraph,
   opts?: { sharedLibraries?: string[] },
@@ -150,9 +206,7 @@ export function buildCrlConceptLayer(
         location,
         ...(c.conceptType ? { conceptType: c.conceptType } : {}),
         valueTypes: c.valueTypes ?? [],
-        ...(c.valueFrom?.kind === "inline"
-          ? { answerOptions: c.valueFrom.options.map((o) => ({ code: o.code, display: o.display })) }
-          : {}),
+        ...answerFields(c, lib, libs),
         ...(c.definition ? { definitionKind: DEF_KIND[c.definition.type] } : {}),
         hasLocalCode: c.code !== undefined,
         hasRepresentations: c.representations.length > 0,
@@ -196,20 +250,48 @@ export function buildCrlConceptLayer(
 export function answerOptionsForDisplay(
   nodes: readonly CrlConceptNode[],
 ): Map<string, { code: string; display: string }[]> {
+  return oneHop(nodes, (n) => (n.answerOptions?.length ? n.answerOptions : undefined));
+}
+
+/**
+ * The same one-hop rule for a PURE-REFERENCE question's terminology name — a pointer to render, never a
+ * list to expand (`CrlConceptNode.answersFromTerminology`).
+ *
+ * ⚠ It must travel the identical path, or the two disagree about which node is the question: a wrapper
+ * would show answers for an instantiated terminology and nothing at all for a referenced one, which
+ * reads as "this concept has no answers" rather than "its answers live elsewhere". Sharing `oneHop` is
+ * what makes that agreement structural instead of a pair of rules someone has to keep aligned.
+ */
+export function answersFromTerminologyForDisplay(
+  nodes: readonly CrlConceptNode[],
+): Map<string, string> {
+  return oneHop(nodes, (n) => n.answersFromTerminology);
+}
+
+/**
+ * ⭐ THE HOP ITSELF, once. `pick` says what a node carries; everything else is the rule in the header
+ * above — own value wins, else exactly one TRANSPARENT (`definition is`) ref that carries one.
+ */
+function oneHop<T>(
+  nodes: readonly CrlConceptNode[],
+  pick: (n: CrlConceptNode) => T | undefined,
+): Map<string, T> {
   const byKey = new Map(nodes.map((n) => [n.nodeKey, n]));
-  const out = new Map<string, { code: string; display: string }[]>();
+  const out = new Map<string, T>();
   for (const n of nodes) {
-    if (n.answerOptions?.length) {
-      out.set(n.nodeKey, n.answerOptions);
+    const own = pick(n);
+    if (own !== undefined) {
+      out.set(n.nodeKey, own);
       continue;
     }
     // The wrapper must be TRANSPARENT — see the header. A composition (`defined as`) never forwards, no
-    // matter how few of its operands carry options.
+    // matter how few of its operands carry a value.
     if (n.definitionKind !== "definition-is") continue;
     const bearing = n.definitionRefs
       .map((r) => byKey.get(r))
-      .filter((r): r is CrlConceptNode => (r?.answerOptions?.length ?? 0) > 0);
-    if (bearing.length === 1) out.set(n.nodeKey, bearing[0].answerOptions!);
+      .map((r) => (r ? pick(r) : undefined))
+      .filter((v): v is T => v !== undefined);
+    if (bearing.length === 1) out.set(n.nodeKey, bearing[0]);
   }
   return out;
 }
