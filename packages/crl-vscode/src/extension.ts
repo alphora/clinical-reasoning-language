@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { claudeCodeTarget, resolveAutoProvisionMode, decideProvisioning, isProvisionedByPath, type ProvisionContext, type ProvisionDecision } from "./provision";
+import { claudeCodeTarget, resolveAutoProvisionMode, decideProvisioning, isProvisionedByPath, refreshMcpEnv, type ProvisionContext, type ProvisionDecision } from "./provision";
 import { stageStableServer } from "./stableServer";
 import {
   applyHighlight,
@@ -186,29 +186,49 @@ export function activate(context: vscode.ExtensionContext): void {
   // comes back as a tab the panel does not own and can never dispose, which reads as the paneOrder setting
   // being ignored. See cockpitPaneSerializers.ts.
   registerCockpitPaneSerializers(context);
-  // ⚠ RE-PROVISION THE MOMENT `crl.enableResults` CHANGES — not on the next window reload.
+  // ⚠ REWRITE `.mcp.json` THE MOMENT `crl.enableResults` CHANGES — not on the next window reload.
   //
-  // Toggling it has to reach `.mcp.json` before the user restarts their MCP client, because the
-  // restart is what re-spawns the server with the new `env`. Waiting for an activation would mean a
-  // user who flips the setting and restarts the client (the obvious sequence) gets no change and no
-  // explanation — which is the exact failure this whole setting exists to remove.
+  // Toggling it has to reach the file before the user restarts their MCP client, because the restart
+  // is what re-spawns the server with the new `env`. Waiting for an activation would mean a user who
+  // flips the setting and restarts the client — the obvious sequence — gets no change and no
+  // explanation, which is the exact failure this setting exists to remove.
   //
-  // Only for ALREADY-PROVISIONED workspaces: changing a setting is not consent to write files into a
-  // workspace that never opted in.
+  // ⚠ `refreshMcpEnv`, NOT `provisionAll`: the user changed a setting, they did not ask us to rewrite
+  // CLAUDE.md, touch their highlighting settings, or raise a toast. Only for ALREADY-PROVISIONED
+  // workspaces — changing a setting is not consent to write into a workspace that never opted in.
   context.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration(async (e) => {
+    vscode.workspace.onDidChangeConfiguration((e) => {
       if (!e.affectsConfiguration("crl.enableResults")) return;
+      // ⚠ #243: SILENCE MUST NEVER MEAN "NO EVIDENCE". Every skip is logged with its reason — a
+      // setting that quietly does nothing is the same "I did what you said and nothing happened"
+      // failure this feature exists to remove.
       const root = workspaceRoot();
-      if (!root) return;
+      if (!root) {
+        getOutputChannel().appendLine("[provision] crl.enableResults changed — no workspace folder open; skipped");
+        return;
+      }
       const serverScriptPath = resolveStableMcpServerScript(context);
-      if (!serverScriptPath || !isProvisionedByPath(root, serverScriptPath)) return;
-      try {
-        await provisionAll(context, false, root, serverScriptPath);
+      if (!serverScriptPath) {
         getOutputChannel().appendLine(
-          `[provision] crl.enableResults changed — rewrote .mcp.json env; restart your MCP client to apply`,
+          "[provision] crl.enableResults changed — the MCP server is not staged; skipped",
+        );
+        return;
+      }
+      if (!isProvisionedByPath(root, serverScriptPath)) {
+        getOutputChannel().appendLine(
+          "[provision] crl.enableResults changed — this workspace is not provisioned by this extension, " +
+            "so .mcp.json was left alone. Run `CRL: Set up tools` first.",
+        );
+        return;
+      }
+      try {
+        const outcome = refreshMcpEnv(ctxFor(context, root, serverScriptPath));
+        getOutputChannel().appendLine(
+          `[provision] crl.enableResults changed — .mcp.json ${outcome}; restart your MCP client to apply`,
         );
       } catch (err) {
-        // Never a modal: the user changed a setting, they did not ask us to do anything.
+        // Log only. A refusal here (malformed .mcp.json) is worth recording, but the user ticked a
+        // checkbox — interrupting them with a modal for it would be the wrong trade.
         getOutputChannel().appendLine(`[provision] crl.enableResults rewrite failed — ${messageOf(err)}`);
       }
     }),

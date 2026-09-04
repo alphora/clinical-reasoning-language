@@ -164,7 +164,6 @@ export const ENGINE_JAR_SOURCE = {
   coordinates: "org.opencds.cqf.fhir:cqf-fhir-cr-cli:4.7.0",
   url: "https://repo1.maven.org/maven2/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/cqf-fhir-cr-cli-4.7.0.jar",
   sha256: "10e6ae4e0846671bdfb8005fd577e9c195c7e9896bbd21342002eecd055e6ae0",
-  bytes: 215810763,
 } as const;
 
 /** The jar source, formatted for an error message a human has to act on. */

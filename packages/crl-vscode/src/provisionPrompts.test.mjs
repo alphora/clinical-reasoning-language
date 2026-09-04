@@ -68,16 +68,19 @@ check("#243: the automatic path passes userInitiated=false; both user-asked path
     /await provisionAll\(context, true, root, serverScriptPath\)/.test(EXT_SRC),
     "an 'Install' click must provision with userInitiated=true — the user asked for it just as explicitly as the command",
   );
-  // The `crl.enableResults` config watcher: a settings change is NOT a request to provision, so it is
-  // userInitiated=false — it must stay silent on success like the automatic path, and it only ever
-  // rewrites a workspace that is ALREADY provisioned (guarded by isProvisionedByPath at the call site).
+  // The `crl.enableResults` watcher deliberately does NOT go through provisionAll: a settings change
+  // is not consent to rewrite CLAUDE.md, touch highlighting settings, or raise a toast. It calls the
+  // narrow refreshMcpEnv instead, which is why the provisionAll call-site count stays at three.
   assert.ok(
-    /await provisionAll\(context, false, root, serverScriptPath\)/.test(EXT_SRC),
-    "the crl.enableResults watcher must provision with userInitiated=false — changing a setting is not asking us to talk",
+    /refreshMcpEnv\(ctxFor\(context, root, serverScriptPath\)\)/.test(EXT_SRC),
+    "the crl.enableResults watcher must use refreshMcpEnv, not provisionAll",
   );
-  // A FIFTH call site added later would otherwise pass all of the above unclassified: force it through this test.
+  assert.ok(
+    !/affectsConfiguration\("crl\.enableResults"\)[\s\S]{0,600}provisionAll/.test(EXT_SRC),
+    "the crl.enableResults watcher must not reach provisionAll",
+  );
   const callSites = EXT_SRC.match(/provisionAll\(context, /g) ?? [];
-  assert.equal(callSites.length, 4, "unexpected provisionAll call site — classify it as userInitiated true/false and update this test");
+  assert.equal(callSites.length, 3, "unexpected provisionAll call site — classify it as userInitiated true/false and update this test");
 });
 
 check("#243: silence covers SUCCESS only — errors and warnings still surface", () => {

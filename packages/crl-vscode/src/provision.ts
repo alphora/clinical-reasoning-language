@@ -96,8 +96,14 @@ export const ENABLE_RESULTS_ENV = "CRL_ENABLE_RESULTS";
  *
  * `.mcp.json` `env` is handed DIRECTLY to the spawned process by the client. No inheritance chain
  * exists to break, on any OS. And it keeps the property the env var was chosen for: `.mcp.json` is
- * gitignored, so the opt-in is machine-local and no repository can opt anyone into running a JVM —
- * which is why `crl.enableResults` is MACHINE-scoped and cannot be set by a workspace.
+ * gitignored, so the opt-in stays machine-local — which is why `crl.enableResults` is MACHINE-scoped
+ * and cannot be set from `.vscode/settings.json`.
+ *
+ * ⚠ THAT BOUNDARY IS NARROWER THAN "no repository can opt anyone in". Machine scope blocks WORKSPACE
+ * settings; it does not block a `devcontainer.json` `customizations.vscode.settings` block, which
+ * seeds the settings of the remote machine it creates. A repository shipping a devcontainer can
+ * therefore opt a Codespace user in. `crl.autoProvision` has the same hole. Worth saying plainly
+ * rather than claiming a guarantee we do not have.
  *
  * ⚠ PRESERVES EVERY OTHER `env` KEY. A user may have put their own variables on this server; we own
  * exactly one name. Turning the setting OFF removes ours and leaves theirs, and an env block emptied
@@ -180,6 +186,22 @@ function removeMcp(ctx: ProvisionContext, warnings: string[]): McpOutcome {
 }
 
 // --- CLAUDE.md managed block ---
+
+/**
+ * Rewrite ONLY the `crl` server block in `.mcp.json`. Nothing else.
+ *
+ * ⚠ DELIBERATELY NARROWER THAN `apply`. This exists for the `crl.enableResults` watcher, where the
+ * user changed a SETTING and did not ask us to do anything. Routing that through the full provisioning
+ * path would also rewrite CLAUDE.md and apply global highlighting settings, and would surface
+ * error/warning toasts from inside — all as a side effect of ticking a checkbox. A settings change
+ * gets the one write it implies and no more.
+ *
+ * Throws like `mergeMcp` does, so a malformed `.mcp.json` refuses loudly rather than being clobbered;
+ * the caller decides how quiet to be about it.
+ */
+export function refreshMcpEnv(ctx: ProvisionContext): McpOutcome {
+  return mergeMcp(ctx);
+}
 
 export function crlBlockBody(): string {
   return `## Clinical Reasoning Language (CRL) tools

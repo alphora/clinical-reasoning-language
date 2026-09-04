@@ -15,7 +15,14 @@ import { emitCelToFhir } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
 import { emitCrlTwoLane } from "../emit-two-lane";
 import { buildProducerInputs, casesMissingFromEmit } from "./caseInput";
-import { findOrphans, splitOrphans } from "./orphans";
+import {
+  heldBackCompartments,
+  isInsideResultsTree,
+  pruneRefusalReason,
+  scanOrphans,
+  splitOrphans,
+} from "./orphans";
+import { RESULTS_ROOT } from "./useCases";
 import { producerManifestName, type ProducerManifest } from "./manifest";
 import { buildEngineRepoBundle, cqlIndex } from "./repoBundle";
 import { runOneCase } from "./runProducer";
@@ -73,6 +80,16 @@ export type ProduceOutcome =
       orphaned: string[];
       /** Superseded artifacts this run DELETED. Empty when `prune: false`. */
       pruned: string[];
+      /**
+       * Directories/entries orphan detection could not read, and sibling manifests it could not parse.
+       * ⚠ Non-empty means the orphan list is INCOMPLETE — "no orphans" from an unreadable tree would
+       * claim it is clean.
+       */
+      unreadable: string[];
+      /** Symlinks found under the results tree and deliberately not followed. */
+      skippedLinks: string[];
+      /** Why nothing was deleted, when pruning was skipped. Undefined when pruning ran. */
+      pruneRefusal?: string;
       failed: number;
       java: { exe: string; major: number };
     };
@@ -253,11 +270,27 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
 
   // AFTER the manifest is written: it is the definition of what this run claims, so orphans are
   // computed against the committed answer rather than an in-flight one.
-  const orphaned = findOrphans(req.outRoot, manifest);
-  const { prunable, reportOnly } = splitOrphans(orphaned, req.useCase);
+  const scan = scanOrphans(req.outRoot, manifest);
+  const { prunable, reportOnly } = splitOrphans(scan.orphans, req.useCase);
   const pruned: string[] = [];
-  if (req.prune !== false) {
+
+  // The decision to delete is pure and lives in orphans.ts, so CI can exercise it without a JVM.
+  const pruneRefusal = pruneRefusalReason(manifest, scan, req.prune);
+  const heldBack = heldBackCompartments(manifest);
+
+  if (pruneRefusal === undefined) {
     for (const rel of prunable) {
+      if (heldBack.some((prefix) => rel.startsWith(prefix))) {
+        reportOnly.push(rel);
+        continue;
+      }
+      // ⚠ CONTAINMENT BEFORE DELETION. The scan already refuses to follow symlinks; this re-checks
+      // that the path really is inside the results tree, because the cost of being wrong is
+      // someone else’s file.
+      if (!isInsideResultsTree(req.outRoot, rel)) {
+        reportOnly.push(rel);
+        continue;
+      }
       try {
         rmSync(path.join(req.outRoot, rel));
         pruned.push(rel);
@@ -279,6 +312,9 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
     notEmitted,
     orphaned: reportOnly,
     pruned,
+    unreadable: scan.unreadable,
+    pruneRefusal,
+    skippedLinks: scan.skippedLinks,
     failed,
     java: { exe: java.javaExe, major: java.major },
   };

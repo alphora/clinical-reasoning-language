@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL\u2192CQL + CEL\u2192FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "4.115.0",
+  "version": "4.116.0",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.95.0"
@@ -343,7 +343,7 @@
           "type": "boolean",
           "default": false,
           "scope": "machine",
-          "markdownDescription": "Allow `emit_results` to run the FHIR engine, which **spawns a JVM**. Off by default.\n\nWhen on, the extension writes `CRL_ENABLE_RESULTS=1` into the `env` of the `crl` server block in `.mcp.json`, which the client hands directly to the server process. Reload the window after changing this, then restart your MCP client.\n\nMachine-scoped on purpose: a repository must not be able to opt you into running a JVM. `.mcp.json` is gitignored, so the opt-in stays on this machine.\n\nSetting `CRL_ENABLE_RESULTS=1` in the environment still works and is the right mechanism for headless/CI use."
+          "markdownDescription": "Allow `emit_results` to run the FHIR engine, which **spawns a JVM**. Off by default.\n\nWhen on, the extension writes `CRL_ENABLE_RESULTS=1` into the `env` of the `crl` server block in `.mcp.json`, which your MCP client hands directly to the server process. The rewrite happens as soon as you change this setting \u2014 then **restart your MCP client** so it re-spawns the server with the new environment.\n\nMachine-scoped on purpose: a repository must not be able to opt you into running a JVM. `.mcp.json` is gitignored, so the opt-in stays on this machine.\n\nSetting `CRL_ENABLE_RESULTS=1` in the environment also works and is the right mechanism for headless/CI use. It is NOT reliable for a desktop editor: an exported or `setx` variable is not inherited by an application launched from a pre-existing shell or desktop session."
         },
         "crl.cockpit.primary": {
           "type": "string",

@@ -754,10 +754,13 @@ export function createServer(): McpServer {
         "PRODUCED into `tests/results/fhir/patient/<compartmentId>/<type>/`. The only difference in the " +
         "two paths is `data` vs `results`, and the compartmentId is the same, so a case's data and its " +
         "results address alike. " +
-        "⚠ DISABLED UNLESS THE ENVIRONMENT ENABLES IT. Set `CRL_ENABLE_RESULTS=1` where the MCP server " +
-        "is launched, then restart the client — deliberately read from the SERVER's environment, not the " +
-        "workspace, so a repository cannot opt a user into JVM execution. Needs only a JRE 17+ (the driver " +
-        "ships compiled; the engine runs unextracted) and the jar's sha256 is verified before every launch. " +
+        "⚠ DISABLED UNLESS ENABLED. In VS Code turn on `crl.enableResults` (User scope) and restart the " +
+        "client; the extension writes the flag into the `crl` server's `env` in .mcp.json, which reaches " +
+        "this process directly. Headless/CI can set `CRL_ENABLE_RESULTS=1` in the launching environment. " +
+        "Never read from the workspace, so a repository cannot opt a user into JVM execution. Needs only a " +
+        "JRE 17+ (the driver ships compiled; the engine runs unextracted) and the jar's sha256 is verified " +
+        "before every launch. ⚠ PRUNES superseded Questionnaire/QuestionnaireResponse files by default — " +
+        "pass `prune: false` to keep them. " +
         "Returns `{ ok, manifestPath, cases:[{caseName, state, reason?, artifacts?}], notEmitted, pruned, " +
         "orphaned, failed, " +
         "java }`. Every case gets exactly ONE terminal state — `generated` | `no-questionnaire` | " +
@@ -778,7 +781,20 @@ export function createServer(): McpServer {
         outRoot: z
           .string()
           .optional()
-          .describe("Artifact root the tests/results tree hangs from. Defaults to the .cel's directory."),
+          .describe(
+            "ABSOLUTE path to the artifact root the tests/results tree hangs from. Defaults to the " +
+              ".cel's directory. Must be absolute: the MCP server's working directory is not your workspace.",
+          ),
+        prune: z
+          .boolean()
+          .optional()
+          .describe(
+            "Delete superseded Questionnaire/QuestionnaireResponse files under the results tree that " +
+              "this run did not write. DEFAULTS TO TRUE — a stale pair from a renamed case is shown to " +
+              "reviewers as a real case. Only types this use case owns are ever removed, symlinks are " +
+              "never followed, and artifacts claimed by another suite's manifest are protected. Pass " +
+              "false to keep them; they are reported as `orphaned` either way.",
+          ),
       },
     },
     (args) =>
@@ -790,6 +806,7 @@ export function createServer(): McpServer {
           jarPath: string;
           jarSha256: string;
           outRoot?: string;
+          prune?: boolean;
         },
       ),
   );
@@ -1698,6 +1715,7 @@ function emitResults(args: {
   jarPath: string;
   jarSha256: string;
   outRoot?: string;
+  prune?: boolean;
 }): { content: Array<{ type: "text"; text: string }>; isError?: boolean } {
   const err = (text: string) => ({ content: [{ type: "text" as const, text }], isError: true });
 
@@ -1707,6 +1725,12 @@ function emitResults(args: {
     ["jarPath", args.jarPath],
   ] as const) {
     if (!isAbsolute(v)) return err(`${k} must be an ABSOLUTE path (got "${v}").`);
+  }
+  // ⚠ `outRoot` IS OPTIONAL BUT MUST STILL BE ABSOLUTE WHEN GIVEN. It is the root this tool WRITES
+  // to and now DELETES under, and the server’s working directory is not the user’s workspace — a
+  // relative value would resolve somewhere neither of them meant.
+  if (args.outRoot !== undefined && !isAbsolute(args.outRoot)) {
+    return err(`outRoot must be an ABSOLUTE path (got "${args.outRoot}").`);
   }
   if (!isResultUseCase(args.useCase)) {
     return err(`Unknown useCase "${args.useCase}". Valid: ${RESULT_USE_CASES.join(", ")}.`);
@@ -1722,10 +1746,15 @@ function emitResults(args: {
   // PropertiesLauncher, so there is no classpath for anyone to compose.
   if (process.env.CRL_ENABLE_RESULTS !== "1") {
     return err(
-      "Result production is disabled. Set CRL_ENABLE_RESULTS=1 in the environment this MCP server is " +
-        "launched from, then restart the client. It is read from the environment rather than the " +
-        "workspace on purpose: a repository must not be able to opt a user into running a JVM. " +
-        "Medical-validation users read committed results and never need this.",
+      "Result production is disabled, because it spawns a JVM.\n" +
+        "In VS Code: turn on the `crl.enableResults` setting (User scope). The extension writes " +
+        "CRL_ENABLE_RESULTS=1 into the `env` of the `crl` server in .mcp.json, which is handed " +
+        "directly to this process; then restart your MCP client.\n" +
+        "Headless/CI: set CRL_ENABLE_RESULTS=1 in the environment this server is launched from. " +
+        "⚠ An exported/`setx` variable is NOT inherited by an editor launched from a pre-existing " +
+        "shell or desktop session on any OS, which is why the setting exists.\n" +
+        "It is never read from the workspace: a repository must not be able to opt a user into " +
+        "running a JVM. Medical-validation users read committed results and never need this.",
     );
   }
 
@@ -1736,6 +1765,7 @@ function emitResults(args: {
     outRoot: args.outRoot ?? dirname(args.celPath),
     jarPath: args.jarPath,
     jarSha256: args.jarSha256,
+    prune: args.prune,
     crlVersion: CRL_PACKAGE_VERSION,
   });
 
@@ -1755,6 +1785,11 @@ function emitResults(args: {
             // Superseded artifacts this run removed, and unclaimed files it LEFT (types it does
             // not own). A renamed case leaves a complete pair behind that the viewer shows as real.
             pruned: outcome.pruned,
+            // ⚠ Why nothing was deleted, when it was not. Silence about a refusal reads as "the tree
+            // is clean", which is the failure mode this whole area exists to remove.
+            ...(outcome.pruneRefusal ? { pruneRefusal: outcome.pruneRefusal } : {}),
+            ...(outcome.unreadable.length ? { unreadable: outcome.unreadable } : {}),
+            ...(outcome.skippedLinks.length ? { skippedLinks: outcome.skippedLinks } : {}),
             orphaned: outcome.orphaned,
             java: outcome.java,
             cases: outcome.manifest.cases.map((c) => ({
