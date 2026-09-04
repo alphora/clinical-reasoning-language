@@ -18,6 +18,14 @@ const OWNERSHIP_MARKER = "crl-language-support";
 export interface ProvisionContext {
   workspaceRoot: string;
   serverScriptPath: string;
+  /**
+   * Whether `emit_results` may spawn a JVM — from the MACHINE-scoped `crl.enableResults` setting.
+   *
+   * ⚠ This is the opt-in itself, not a hint about it. It is written into the server block’s `env`,
+   * which the client hands DIRECTLY to the spawned process — so it does not depend on the process
+   * inheriting anything. See ENABLE_RESULTS_ENV below for why that distinction is the whole fix.
+   */
+  enableResults: boolean;
 }
 
 export type McpOutcome = "created" | "updated" | "unchanged" | "removed";
@@ -68,6 +76,48 @@ function readMcpRoot(file: string): { raw: string; root: Record<string, unknown>
   return { raw, root: parsed };
 }
 
+/** The variable the MCP server gates result production on. Must match `server.ts`. */
+export const ENABLE_RESULTS_ENV = "CRL_ENABLE_RESULTS";
+
+/**
+ * ⭐ WHY THE OPT-IN IS WRITTEN HERE AND NOT LEFT TO THE USER’S ENVIRONMENT.
+ *
+ * The server reads `CRL_ENABLE_RESULTS` from its own process environment, and telling a human to put
+ * it there is advice that CANNOT BE RELIABLY FOLLOWED on any platform:
+ *
+ *   Windows  `setx` writes the registry; a process launched from a window that predates it never
+ *            re-reads it, so "set it and restart the client" silently does nothing.
+ *   macOS    a GUI-launched editor inherits launchd’s environment, not your shell rc exports.
+ *   Linux    a desktop-launched app inherits the session environment, not your shell rc.
+ *
+ * Reported by the IEHP knowledge-engineering project, who did exactly what our error message said and
+ * were told to do it again — the worst failure available, because the instruction and the remedy are
+ * the same sentence. It is NOT a Windows bug; Windows is just the spelling they hit.
+ *
+ * `.mcp.json` `env` is handed DIRECTLY to the spawned process by the client. No inheritance chain
+ * exists to break, on any OS. And it keeps the property the env var was chosen for: `.mcp.json` is
+ * gitignored, so the opt-in is machine-local and no repository can opt anyone into running a JVM —
+ * which is why `crl.enableResults` is MACHINE-scoped and cannot be set by a workspace.
+ *
+ * ⚠ PRESERVES EVERY OTHER `env` KEY. A user may have put their own variables on this server; we own
+ * exactly one name. Turning the setting OFF removes ours and leaves theirs, and an env block emptied
+ * that way is dropped entirely so the file returns to its previous bytes rather than keeping `{}`.
+ */
+export function mergeEnableResultsEnv(
+  existingEnv: unknown,
+  enable: boolean,
+): Record<string, unknown> | undefined {
+  // A non-object `env` is a user file we do not understand; leave it exactly as found rather than
+  // replacing it, matching the refuse-to-clobber posture used for the server entry itself.
+  if (existingEnv !== undefined && !isPlainObject(existingEnv)) {
+    return existingEnv as Record<string, unknown>;
+  }
+  const env: Record<string, unknown> = { ...(isPlainObject(existingEnv) ? existingEnv : {}) };
+  if (enable) env[ENABLE_RESULTS_ENV] = "1";
+  else delete env[ENABLE_RESULTS_ENV];
+  return Object.keys(env).length > 0 ? env : undefined;
+}
+
 function mergeMcp(ctx: ProvisionContext): McpOutcome {
   const file = join(ctx.workspaceRoot, ".mcp.json");
   const preExisting = existsSync(file);
@@ -81,14 +131,16 @@ function mergeMcp(ctx: ProvisionContext): McpOutcome {
   }
   const existing = isPlainObject(servers[SERVER_KEY]) ? (servers[SERVER_KEY] as Record<string, unknown>) : {};
 
-  // Spread-then-override: preserve unknown fields + a user-pinned `command`;
-  // force `type` and `args`; never synthesize an `env` (the server reads none).
+  // Spread-then-override: preserve unknown fields + a user-pinned `command`; force `type` and `args`.
   servers[SERVER_KEY] = {
     ...existing,
     type: "stdio",
     command: typeof existing.command === "string" ? existing.command : "node",
     args: [ctx.serverScriptPath],
   };
+  const env = mergeEnableResultsEnv(existing.env, ctx.enableResults);
+  if (env === undefined) delete (servers[SERVER_KEY] as Record<string, unknown>).env;
+  else (servers[SERVER_KEY] as Record<string, unknown>).env = env;
   root.mcpServers = servers;
 
   // Full-file string compare (matching vibe-tools). A user file authored with a

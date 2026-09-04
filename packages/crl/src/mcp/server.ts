@@ -758,7 +758,8 @@ export function createServer(): McpServer {
         "is launched, then restart the client — deliberately read from the SERVER's environment, not the " +
         "workspace, so a repository cannot opt a user into JVM execution. Needs only a JRE 17+ (the driver " +
         "ships compiled; the engine runs unextracted) and the jar's sha256 is verified before every launch. " +
-        "Returns `{ ok, manifestPath, cases:[{caseName, state, reason?, artifacts?}], notEmitted, failed, " +
+        "Returns `{ ok, manifestPath, cases:[{caseName, state, reason?, artifacts?}], notEmitted, pruned, " +
+        "orphaned, failed, " +
         "java }`. Every case gets exactly ONE terminal state — `generated` | `no-questionnaire` | " +
         "`populate-degraded` | `failed` | `timeout` | `not-run` — so 'the policy asked nothing', 'the run " +
         "failed' and 'the producer never ran' stay distinguishable, which a directory listing cannot do. " +
@@ -1751,6 +1752,10 @@ function emitResults(args: {
             manifestPath: outcome.manifestPath,
             failed: outcome.failed,
             notEmitted: outcome.notEmitted,
+            // Superseded artifacts this run removed, and unclaimed files it LEFT (types it does
+            // not own). A renamed case leaves a complete pair behind that the viewer shows as real.
+            pruned: outcome.pruned,
+            orphaned: outcome.orphaned,
             java: outcome.java,
             cases: outcome.manifest.cases.map((c) => ({
               caseName: c.caseName,

@@ -186,6 +186,34 @@ export function activate(context: vscode.ExtensionContext): void {
   // comes back as a tab the panel does not own and can never dispose, which reads as the paneOrder setting
   // being ignored. See cockpitPaneSerializers.ts.
   registerCockpitPaneSerializers(context);
+  // ⚠ RE-PROVISION THE MOMENT `crl.enableResults` CHANGES — not on the next window reload.
+  //
+  // Toggling it has to reach `.mcp.json` before the user restarts their MCP client, because the
+  // restart is what re-spawns the server with the new `env`. Waiting for an activation would mean a
+  // user who flips the setting and restarts the client (the obvious sequence) gets no change and no
+  // explanation — which is the exact failure this whole setting exists to remove.
+  //
+  // Only for ALREADY-PROVISIONED workspaces: changing a setting is not consent to write files into a
+  // workspace that never opted in.
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(async (e) => {
+      if (!e.affectsConfiguration("crl.enableResults")) return;
+      const root = workspaceRoot();
+      if (!root) return;
+      const serverScriptPath = resolveStableMcpServerScript(context);
+      if (!serverScriptPath || !isProvisionedByPath(root, serverScriptPath)) return;
+      try {
+        await provisionAll(context, false, root, serverScriptPath);
+        getOutputChannel().appendLine(
+          `[provision] crl.enableResults changed — rewrote .mcp.json env; restart your MCP client to apply`,
+        );
+      } catch (err) {
+        // Never a modal: the user changed a setting, they did not ask us to do anything.
+        getOutputChannel().appendLine(`[provision] crl.enableResults rewrite failed — ${messageOf(err)}`);
+      }
+    }),
+  );
+
   // Register commands FIRST so they survive a provisioning failure.
   context.subscriptions.push(
     vscode.commands.registerCommand("crl.setup", async () => {
@@ -414,6 +442,11 @@ function ctxFor(context: vscode.ExtensionContext, root: string, serverScriptPath
     // Reuse an already-staged path when the caller has one (disc 370 #4: avoids re-staging + a duplicate storage-failure warning);
     // otherwise resolve (which stages) — the manual `crl.setup` path.
     serverScriptPath: serverScriptPath ?? resolveStableMcpServerScript(context),
+    // ⚠ READ FRESH ON EVERY PROVISION, and MACHINE-scoped so a workspace cannot supply it. Passing
+    // the opt-in through `.mcp.json` env is what makes it actually arrive: an environment variable a
+    // user exports is not inherited by an editor launched from a pre-existing shell/session on any
+    // OS, which is how a KE followed our instructions exactly and was told to follow them again.
+    enableResults: vscode.workspace.getConfiguration("crl").get<boolean>("enableResults", false),
   };
 }
 

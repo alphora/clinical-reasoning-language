@@ -7,7 +7,7 @@
  * surfaces call it and differ only in how they report.
  */
 
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -15,10 +15,19 @@ import { emitCelToFhir } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
 import { emitCrlTwoLane } from "../emit-two-lane";
 import { buildProducerInputs, casesMissingFromEmit } from "./caseInput";
+import { findOrphans, splitOrphans } from "./orphans";
 import { producerManifestName, type ProducerManifest } from "./manifest";
 import { buildEngineRepoBundle, cqlIndex } from "./repoBundle";
 import { runOneCase } from "./runProducer";
-import { DEFAULT_BOUNDS, LAUNCHER_ENTRY, MIN_JAVA_MAJOR, resolveJava, verifyJar, type JvmBounds } from "./spawn";
+import {
+  DEFAULT_BOUNDS,
+  LAUNCHER_ENTRY,
+  MIN_JAVA_MAJOR,
+  engineJarHelp,
+  resolveJava,
+  verifyJar,
+  type JvmBounds,
+} from "./spawn";
 import { driverReady } from "./driver";
 import { isImplementedUseCase, type ResultUseCase } from "./useCases";
 
@@ -26,6 +35,14 @@ export interface ProduceRequest {
   celPath: string;
   crlPath: string;
   useCase: ResultUseCase;
+  /**
+   * Delete superseded Questionnaire/QuestionnaireResponse files this run did not write. Default TRUE.
+   *
+   * The results tree is regenerated output, so a stale artifact in it is superseded by definition —
+   * and a stale one is not inert: a renamed CEL case leaves a complete pair behind that the viewer
+   * offers a medical reviewer as a real case. Only types this use case OWNS are ever removed.
+   */
+  prune?: boolean;
   /** Artifact root the `tests/results/` tree hangs from. */
   outRoot: string;
   /**
@@ -48,6 +65,14 @@ export type ProduceOutcome =
       manifestPath: string;
       /** Cases the suite declares that the emitter did not produce — reported, never silently skipped. */
       notEmitted: string[];
+      /**
+       * Unclaimed files this run did NOT delete — types outside this use case, plus anything pruning
+       * could not remove. Never emptied silently: a file we failed to delete is reported here rather
+       * than counted as pruned.
+       */
+      orphaned: string[];
+      /** Superseded artifacts this run DELETED. Empty when `prune: false`. */
+      pruned: string[];
       failed: number;
       java: { exe: string; major: number };
     };
@@ -68,7 +93,10 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
     return {
       ok: false,
       reason: `engine jar unusable (${jarCheck.reason})`,
-      detail: jarCheck.reason === "sha-mismatch" ? [`actual sha256: ${jarCheck.actualSha256}`] : [],
+      detail: [
+        ...(jarCheck.reason === "sha-mismatch" ? [`actual sha256: ${jarCheck.actualSha256}`] : []),
+        ...engineJarHelp(),
+      ],
     };
   }
 
@@ -84,6 +112,7 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
       detail: [
         `expected the zip entry ${LAUNCHER_ENTRY}`,
         "that package moved in Spring Boot 3.2; a jar built against an older Boot will not launch this way",
+        ...engineJarHelp(),
       ],
     };
   }
@@ -222,11 +251,34 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
   );
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
+  // AFTER the manifest is written: it is the definition of what this run claims, so orphans are
+  // computed against the committed answer rather than an in-flight one.
+  const orphaned = findOrphans(req.outRoot, manifest);
+  const { prunable, reportOnly } = splitOrphans(orphaned, req.useCase);
+  const pruned: string[] = [];
+  if (req.prune !== false) {
+    for (const rel of prunable) {
+      try {
+        rmSync(path.join(req.outRoot, rel));
+        pruned.push(rel);
+      } catch {
+        // A file we could not remove stays REPORTED rather than silently claimed as pruned — the
+        // caller must not be told the tree is clean when it is not.
+        reportOnly.push(rel);
+      }
+    }
+  } else {
+    reportOnly.push(...prunable);
+  }
+  reportOnly.sort();
+
   return {
     ok: true,
     manifest,
     manifestPath,
     notEmitted,
+    orphaned: reportOnly,
+    pruned,
     failed,
     java: { exe: java.javaExe, major: java.major },
   };

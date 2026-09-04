@@ -142,6 +142,41 @@ export function resolveJava(
  * such class — and the JVM reports that as `Could not find or load main class …`, exit 1, which
  * `classify` would otherwise render as a bare "driver exited 1" for every case with no cause named.
  */
+/**
+ * ⭐ WHERE THE ENGINE JAR COMES FROM — CARRIED IN THE REFUSAL, NOT LEFT TO THE READER.
+ *
+ * `emit_results` verifies a jar it never told anyone how to obtain. The IEHP KE hit the
+ * launcher refusal, had no fat jar, and found exactly ONE copy on their machine: OUR repository’s
+ * `tmp/`. Their working configuration was reaching across the filesystem into another team’s checkout,
+ * which is a coincidence of that workstation, not a dependency — on any machine that does not also
+ * host this repo the tool could not run at all.
+ *
+ * A gate that knows the input is wrong and cannot say what right looks like is half a feature.
+ *
+ * ⚠ `cqf-fhir-cr` AND `cqf-fhir-cr-cli` ARE DIFFERENT ARTIFACTS. Only the `-cli` one is the Spring
+ * Boot fat jar carrying PropertiesLauncher; the plain library jar fails the launcher check. That is the
+ * exact wrong turn taken in the field, so the coordinates below are spelled out rather than described.
+ *
+ * VERIFIED 2026-09-04: fetched Maven Central’s published `.sha1` and compared it against the local copy
+ * that produced a 44-case run — identical, with Content-Length matching to the byte.
+ */
+export const ENGINE_JAR_SOURCE = {
+  coordinates: "org.opencds.cqf.fhir:cqf-fhir-cr-cli:4.7.0",
+  url: "https://repo1.maven.org/maven2/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/cqf-fhir-cr-cli-4.7.0.jar",
+  sha256: "10e6ae4e0846671bdfb8005fd577e9c195c7e9896bbd21342002eecd055e6ae0",
+  bytes: 215810763,
+} as const;
+
+/** The jar source, formatted for an error message a human has to act on. */
+export function engineJarHelp(): string[] {
+  return [
+    `download: ${ENGINE_JAR_SOURCE.url}`,
+    `sha256:   ${ENGINE_JAR_SOURCE.sha256}  (pass this as --jar-sha256 / jarSha256)`,
+    `maven:    ${ENGINE_JAR_SOURCE.coordinates}`,
+    "⚠ it must be the -cli artifact: the plain cqf-fhir-cr jar is not a Spring Boot fat jar and will not launch",
+  ];
+}
+
 export const LAUNCHER_ENTRY = "org/springframework/boot/loader/launch/PropertiesLauncher.class";
 
 export type JarVerification =

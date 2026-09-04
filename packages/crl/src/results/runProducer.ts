@@ -16,6 +16,7 @@
  * over tens of cases. If a suite grows to hundreds this is the first thing to revisit.
  */
 
+import { uniqueCapSlug } from "../fhir-emitter/slug";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -214,6 +215,19 @@ export function runOneCase(ctx: RunContext, c: RunOneCase): ProducerCaseEntry {
 }
 
 /**
+ * Remove a trailing engine run-timestamp (`-YYYY-MM-DD-HH.MM.SS`) from a version string.
+ *
+ * Deliberately a SUFFIX strip rather than a reconstruction: the rest of the version is the engine’s to
+ * compose, and rebuilding it here would silently drop anything it adds later. A version that carries no
+ * timestamp is returned untouched.
+ */
+export function stripRunTimestamp(version: unknown): string | undefined {
+  if (typeof version !== "string") return undefined;
+  const stripped = version.replace(/-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}[.][0-9]{2}[.][0-9]{2}$/, "");
+  return stripped.length > 0 ? stripped : undefined;
+}
+
+/**
  * ⭐⭐ NORMALISE THE PERSISTED PAIR so it is internally consistent and reproducible.
  *
  * ⚠ TWO DEFECTS, BOTH MEASURED on real engine output, both invisible until someone asked what identity a
@@ -241,11 +255,40 @@ export function normalizePersistedPair(
   if (!questionnaire) return { questionnaire, questionnaireResponse };
 
   // Compartment-derived, so a case's form has an identity that is its own and is stable across runs.
-  const qId = `${String(questionnaire.id ?? "questionnaire")}-${compartmentId}`.slice(0, 64);
+  //
+  // ⚠ CAP WITH A HASH, NEVER `.slice(64)`. A bare truncation silently DELETES the discriminator when
+  // the engine id already fills the FHIR id ceiling — and a CRL PlanDefinition id is
+  // `<package>-<decision>-<hash>`, so reaching 64 is ordinary for a real policy, not an edge case.
+  // MEASURED by the IEHP KE: a 64-char engine id gave all 44 of their compartments ONE id, which is
+  // exactly the collision compartment-suffixing exists to prevent. It survived our own tests because
+  // the fixture id is 36 chars, and it is invisible from the pane because `caseResultsTypeDir` keys on
+  // the compartment DIRECTORY — it only bites when something loads these into a repository keyed by
+  // `id`, at which point 43 of 44 are clobbered in silence.
+  //
+  // `uniqueCapSlug` hashes the FULL string, so two compartments sharing a stem still separate.
+  // (`uniqueCapSlugForSuffix` is the wrong tool here: it guarantees <= 64 only for a suffix of <= 52
+  // chars, and a compartmentId is capped at 56.)
+  const qId = uniqueCapSlug(`${String(questionnaire.id ?? "questionnaire")}-${compartmentId}`, 64);
   const baseUrl = String(questionnaire.url ?? "");
   const qUrl = baseUrl ? `${baseUrl}-${compartmentId}` : undefined;
 
-  const q = { ...questionnaire, id: qId, ...(qUrl ? { url: qUrl } : {}) };
+  // ⚠ STRIP THE RUN CLOCK. The engine stamps `version` as `<base>-<compartmentId>-YYYY-MM-DD-HH.MM.SS`
+  // and `authored` as the instant that case was applied. These are COMMITTED artifacts, so every
+  // re-run rewrites every file with no semantic change: the IEHP KE measured all 88 of theirs churning
+  // across two identical runs. That buries a real diff under timestamp noise and defeats the obvious
+  // integrity check — re-run and compare — because the comparison can never succeed.
+  //
+  // It is not even stable WITHIN one run: our own fixture emits 10.56.41, 10.56.54 and 10.57.02 for
+  // three cases of a single invocation, because each `$apply` reads the clock as it runs.
+  //
+  // The run time is not lost — the manifest records `generatedAt` ONCE for the run, which is where a
+  // fact about the run belongs, rather than restamped into 88 artifacts that did not change.
+  // This is the same defect as the versioned `QR.questionnaire` reference, in the two fields that
+  // fix did not reach.
+  const q: Record<string, unknown> = { ...questionnaire, id: qId, ...(qUrl ? { url: qUrl } : {}) };
+  const version = stripRunTimestamp(q.version);
+  if (version === undefined) delete q.version;
+  else q.version = version;
 
   if (!questionnaireResponse) return { questionnaire: q, questionnaireResponse };
 
@@ -256,6 +299,9 @@ export function normalizePersistedPair(
     ...questionnaireResponse,
     ...(qUrl ? { questionnaire: qUrl } : {}),
   };
+  // `authored` is 0..1 in FHIR, and an accurate "when this artifact was produced" already lives in
+  // the manifest. A per-case wall-clock here buys nothing and costs idempotence.
+  delete (qr as Record<string, unknown>).authored;
 
   return { questionnaire: q, questionnaireResponse: qr };
 }

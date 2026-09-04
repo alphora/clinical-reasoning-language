@@ -54,6 +54,9 @@ FLAGS:
   --jar-sha256 <hex>   Expected sha256, verified BEFORE EVERY LAUNCH. Required with --jar.
   --out <dir>          Artifact root. Default: the .cel file's project root.
   --enable             Opt in to running a JVM. Without it, nothing runs.
+  --no-prune           Keep superseded Questionnaire/QuestionnaireResponse files that this run
+                       did not write. They are reported either way; by default they are deleted,
+                       because a stale pair from a renamed case is shown to reviewers as real.
   --help               Show this message and exit 0.
 
 EXIT CODES:
@@ -64,11 +67,11 @@ EXIT CODES:
 
 interface Args {
   cel?: string; crl?: string; useCase?: string; jar?: string; jarSha?: string;
-  out?: string; enable: boolean;
+  out?: string; enable: boolean; prune: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { enable: false };
+  const a: Args = { enable: false, prune: true };
   const need = (i: number, flag: string): string => {
     const v = argv[i + 1];
     if (!v || v.startsWith("--")) {
@@ -87,6 +90,7 @@ function parseArgs(argv: string[]): Args {
     else if (f === "--jar-sha256") a.jarSha = need(i++, f);
     else if (f === "--out") a.out = need(i++, f);
     else if (f === "--enable") a.enable = true;
+    else if (f === "--no-prune") a.prune = false;
     else { process.stderr.write(`unknown flag ${f}\n`); process.exit(1); }
   }
   return a;
@@ -134,6 +138,7 @@ function main(): void {
     outRoot: a.out ?? path.dirname(a.cel),
     jarPath: a.jar,
     jarSha256: a.jarSha,
+    prune: a.prune,
     crlVersion: CRL_VERSION,
   });
 
@@ -159,6 +164,20 @@ function main(): void {
         "\n",
     );
   }
+  // ⚠ SAY WHAT WAS DELETED. Pruning is on by default because the results tree is regenerated output,
+  // but a silent deletion is indistinguishable from a file that was never there.
+  if (outcome.pruned.length > 0) {
+    process.stderr.write(`\npruned ${outcome.pruned.length} superseded artifact(s):\n`);
+    for (const p of outcome.pruned) process.stderr.write(`  ${p}\n`);
+  }
+  if (outcome.orphaned.length > 0) {
+    process.stderr.write(
+      `\n${outcome.orphaned.length} file(s) in the results tree were not written by this run and were LEFT:\n`,
+    );
+    for (const o of outcome.orphaned) process.stderr.write(`  ${o}\n`);
+    process.stderr.write("these are outside the types this use case owns, so nothing was deleted.\n");
+  }
+
   process.stdout.write(
     `\njava ${outcome.java.major} at ${outcome.java.exe}\n` +
       `manifest: ${outcome.manifestPath}\n` +

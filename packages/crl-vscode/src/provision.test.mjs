@@ -28,7 +28,8 @@ function ctxFor(ws, version = "0.1.0") {
   mkdirSync(dir, { recursive: true });
   const serverScriptPath = join(dir, "mcp-server.js");
   writeFileSync(serverScriptPath, "// dummy", "utf8");
-  return { workspaceRoot: ws, serverScriptPath }; // version param still shapes the server DIR path (ownership marker), not the CLAUDE.md block
+  // enableResults defaults OFF here, matching the setting default; tests that care pass it explicitly.
+  return { workspaceRoot: ws, serverScriptPath, enableResults: false }; // version param still shapes the server DIR path (ownership marker), not the CLAUDE.md block
 }
 const mcp = (ws) => join(ws, ".mcp.json");
 const md = (ws) => join(ws, "CLAUDE.md");
@@ -240,4 +241,54 @@ check("remove recognizes ownership with backslash paths", (ws) => {
   const args = ["C:\\ext\\smiledigitalhealth.crl-language-support-0.1.0\\dist\\mcp-server.js"];
   writeFileSync(mcp(ws), JSON.stringify({ mcpServers: { crl: { type: "stdio", command: "node", args } } }, null, 2));
   assert.equal(target.remove(ctxFor(ws)).mcp, "removed");
+});
+
+// ── the emit_results opt-in, carried as .mcp.json env (not the user's environment) ────────────────────
+// Reported by the IEHP KE: `setx` + "restart the client" cannot be followed reliably — a process launched
+// from a window predating the setx never inherits it, and the same failure exists on macOS (launchd) and
+// Linux (session env). `.mcp.json` env is handed straight to the spawned process, so there is no chain.
+const { mergeEnableResultsEnv, ENABLE_RESULTS_ENV } = mod;
+
+test("mergeEnableResultsEnv: sets the flag when enabled, and drops the whole block when disabled", () => {
+  assert.deepEqual(mergeEnableResultsEnv(undefined, true), { [ENABLE_RESULTS_ENV]: "1" });
+  // Not `{}`: an emptied env block would leave a permanent diff against the user's original file.
+  assert.equal(mergeEnableResultsEnv(undefined, false), undefined);
+  assert.equal(mergeEnableResultsEnv({ [ENABLE_RESULTS_ENV]: "1" }, false), undefined);
+});
+
+test("mergeEnableResultsEnv: NEVER eats a user's own env keys — on or off", () => {
+  assert.deepEqual(mergeEnableResultsEnv({ MY_VAR: "x" }, true), { MY_VAR: "x", [ENABLE_RESULTS_ENV]: "1" });
+  // Turning the setting off removes OURS and leaves THEIRS. We own exactly one name in this block.
+  assert.deepEqual(mergeEnableResultsEnv({ MY_VAR: "x", [ENABLE_RESULTS_ENV]: "1" }, false), { MY_VAR: "x" });
+});
+
+test("mergeEnableResultsEnv: a non-object env is left exactly as found", () => {
+  // Same refuse-to-clobber posture as the server entry itself: a file we do not understand is not ours
+  // to rewrite, and replacing it could silently discard configuration.
+  assert.equal(mergeEnableResultsEnv("weird", true), "weird");
+});
+
+check("apply writes CRL_ENABLE_RESULTS=1 into the crl server env when enabled", (ws) => {
+  const ctx = { ...ctxFor(ws), enableResults: true };
+  target.apply(ctx);
+  const j = readJson(mcp(ws));
+  assert.deepEqual(j.mcpServers.crl.env, { [ENABLE_RESULTS_ENV]: "1" });
+});
+
+check("apply writes NO env when disabled — default off, and the key is absent, not empty", (ws) => {
+  target.apply(ctxFor(ws));
+  const j = readJson(mcp(ws));
+  assert.equal("env" in j.mcpServers.crl, false);
+});
+
+check("toggling the setting off removes our key and preserves a user-added sibling", (ws) => {
+  target.apply({ ...ctxFor(ws), enableResults: true });
+  // The user then adds their own variable to OUR server block.
+  const withUser = readJson(mcp(ws));
+  withUser.mcpServers.crl.env.USER_SET = "keep-me";
+  writeFileSync(mcp(ws), JSON.stringify(withUser, null, 2), "utf8");
+
+  target.apply({ ...ctxFor(ws), enableResults: false });
+  const j = readJson(mcp(ws));
+  assert.deepEqual(j.mcpServers.crl.env, { USER_SET: "keep-me" });
 });
