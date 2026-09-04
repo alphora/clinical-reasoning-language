@@ -122,6 +122,32 @@ real-world data. The source codes are the *optional* ones. The local code stays 
 1. **fills gaps** where external data is absent, and
 2. **remains the representation the logic uses**, even after a source rep is added.
 
+### ⭐⭐ WHY: this is ANALYTICS, not a medical record — a human answer OVERRIDES the chart
+
+**QUOTED, operator 2026-09-04.** This is the reasoning behind the word *defaults* above, and it is the
+clause reviewers most reliably get backwards:
+
+> This is analytics, not a chart. The reviewer is making a determination, not recording a clinical fact.
+> A ServiceRequest may be erroneous, superseded, or for something else — the reviewer's judgement is the
+> output, and the chart is evidence feeding it. Software that discards the reviewer's answer isn't
+> neutral; it's asserting the chart outranks them.
+
+So *defaults* is load-bearing and literal. External data **seeds** a determination; it does not establish
+one. Where a user has answered, **the answer wins** — not because local data is more trustworthy as
+clinical fact, but because the answer IS the product. We are computing a determination, not maintaining a
+chart, and the person making that determination is the authority over it.
+
+⚠ **A fold that lets source evidence outrank a user's answer is a DEFECT, not a conservative default.**
+`exists(local records) or exists(source records)` OR'd with the user's own answer is exactly that shape: a
+user's `false` cannot refute a present record, so the answer is discarded silently. Contrast
+`recencyLocalWins`, which resolves the same tension correctly one layer down — source wins only when
+positively newer, local wins on every indeterminacy.
+
+⚠ **This is not "the chart might be wrong".** It stays true even when the chart is perfectly accurate: an
+accurate ServiceRequest can still be irrelevant to the determination being made. Reasoning that reaches
+for data quality has already missed the point — the question is never *is the record correct*, it is
+*whose output is this*.
+
 ### Why local codes are essential in production — the argument
 
 Prior Authorization is the first deep use case, and today it runs **exclusively off local domain codes** — it

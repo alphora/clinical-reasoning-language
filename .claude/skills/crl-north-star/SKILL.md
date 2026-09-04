@@ -16,6 +16,14 @@ firing a review panel, **ground yourself (and the reviewers) in how CRL actually
      artifact. `source representation` + `coded from` is the OPTIONAL, ADDITIVE path (external data defaults
      the local concept when available). "Won't match a real SNOMED chart" measures the optional path and is
      usually irrelevant to local production-correctness.
+   - **⭐⭐ CRL IS ANALYTICS, NOT A MEDICAL RECORD — a user's answer OVERRIDES the chart** (charter §2,
+     operator QUOTED 2026-09-04): *"the reviewer is making a determination, not recording a clinical fact …
+     the reviewer's judgement is the output, and the chart is evidence feeding it. Software that discards
+     the reviewer's answer isn't neutral; it's asserting the chart outranks them."* External data SEEDS a
+     determination and never establishes one; where a user has answered, the answer wins. ⚠ Reviewers
+     import chart-authority by default — hand them this clause explicitly, and treat a finding that asserts
+     chart precedence without engaging it as a non-finding. It holds even when the chart is ACCURATE: the
+     question is never *is the record correct*, but *whose output is this*.
    - **A concept is self-describing:** its declared **value type** decides whether a reduction is owed
      (scalar ⇒ explicit reduction required; record/record-set ⇒ publishes its records); its **cardinality**
      (`RecordSet | Record | Scalar`) is declared, not inferred from use; its CQL is **context-free**.
