@@ -880,6 +880,30 @@ An absent datum is not established, and pauses.
 | **RECORDS** — a DERIVATION like `defined as exists ("V")`, `count this` | *no records exist*, which ANSWERS the question asked | **false** |
 | **A DATUM** — `at least 30`, `within last 6 months` | *nothing to test*, so the question has no subject | **unknown** |
 
+#### ⭐⭐ ABSENCE CONSTRUCTS NOTHING — and the two-valued read is still `false`
+
+**Operator, 2026-09-04.** These look contradictory and are not, so the bridge is stated here rather than
+re-derived:
+
+> A determinate `false` **by absence** has NO WITNESS RECORD, because there is nothing to date. So it
+> constructs no candidate — and the concept's BOOLEAN READ totalizes the resulting null to `false`.
+
+The constructor already enforces the first half and needs no exception: its guard is
+`if <value is null> or recorded is null then` — zero components yield `null as System.DateTime`
+(`derivedStampCql([])`), so no candidate is built. That is the `Now()` ban working, not a gap in it.
+
+The second half is the ordinary closed-world totalization the emitter already applies to a boolean
+`most recent this` — `Coalesce(FHIRHelpers.ToBoolean(<newest value read>), false)`. The RECORD may be absent
+while the DETERMINATION is `false`.
+
+⚠ **So an empty union is not a counter-example to "absence is false".** The record layer and the read layer
+answer different questions: *is there a witness* (no) and *what does the concept determine* (false).
+
+⚠⚠ **DO NOT MANUFACTURE A DATE TO GET THE RECORD BACK.** Stamping a false-by-absence arm `Now()` makes it
+the newest thing in the union, so it outranks every stored answer — deleting the user override §2 requires.
+The record is absent BECAUSE there is nothing to date it, and that is the honest state: a form shows the
+question blank (answerable, nothing to pre-fill) while the decision denies closed-world.
+
 ⚠⚠ **A REP-LOCAL `value projection` is NEITHER ROW, and putting it in the first one kills the pause row.** A
 projection is invoked ONCE PER RETRIEVED RECORD, so **zero records ⇒ zero invocations ⇒ the arm contributes
 NOTHING** — not `false`. That is what leaves the concept unestablished, and it is the only reason an
