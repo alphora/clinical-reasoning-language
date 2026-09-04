@@ -1,6 +1,18 @@
 // #189 B2 — the general cross-representation recency VALUE merge (pure emit-fragment assembler).
 //
-// INERT: no concept-lowering path calls this yet. The atomic flip F wires it — supplying a both-rep concept's
+// ⚠ NO LONGER INERT — flip F landed. `emitCQL.ts:3268` calls this from the live both-rep VALUE merge. The
+// paragraph below describes how it is wired, not a future.
+//
+// ⚠⚠ TWO ARMS ONLY, AND THAT IS A CEILING, NOT A CHOICE. `CrossRepRecencyMergeArms` has slots for LOCAL and
+// SOURCE and no third, so a value-publishing concept cannot union a DERIVATION arm alongside them. The
+// charter's model is `own ∪ derivation ∪ record` reduced once (goal `fixtures/obesity/policy.crl`: "THREE,
+// not two — the local code is an arm like any other"), and the RECORD path implements it N-ary via
+// `renderSpaceTerms(terms: readonly RecordUnionTerm[])`. This path does not. Today the gap is GUARDED, not
+// silent — `code is` + a top-level `definition` is a hard `emit-mixed-code-and-definition` — so the
+// unbuildable case is refused rather than mis-emitted. If a three-arm VALUE concept is ever wanted, this
+// signature is what has to change; do not add a third arm by threading another pair through the call site.
+//
+// The atomic flip F wired it — supplying a both-rep concept's
 // [local-exact, source] value-read + recency fragments (from the effective-representation descriptors, B1) and the
 // newest-record select defines (the #236 concept-owned-DAG precedent — value + timestamp read from ONE bound
 // select, not two independent `Last(...)`). This module ONLY assembles the two-tier selection structure; it invents
