@@ -73,3 +73,6 @@ packages/*/test/oracle/.gen/
 .claude/agents/vibe-reviewer-*.md
 .claude/agents/vibe-panel-*.md
 .claude/settings.local.json
+
+# Release checksums — generated per release, attached as an asset, never committed.
+SHA256SUMS

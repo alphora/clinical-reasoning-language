@@ -569,9 +569,16 @@ export interface Concept extends ASTNode {
    * representation at all to hang it on, and post-multi-rep a rep-local spelling could not say which
    * representation's set wins.
    *
-   * ⚠⚠ A DIFFERENT AXIS FROM `coded from`, which scopes the RETRIEVE. Naming the same set for both is
-   * legal but usually wrong — it filters non-members out of the retrieve, so a record carrying an unoffered
-   * code vanishes into the same empty set as no record, collapsing a determinate `false` into `unknown`.
+   * ⚠⚠ A DIFFERENT AXIS FROM `coded from`, which scopes the RETRIEVE. They are free to diverge and often
+   * should — a smoking-status concept's `coded from` names WHICH observation, while its answers are
+   * never-smoked / former / current. But naming the SAME terminology for both is CORRECT whenever the
+   * offered codes and the acceptable record codes genuinely are one set, as they are for a request's
+   * service codes.
+   *
+   * ⚠ `value from` NEVER SCOPES A RETRIEVE — it reaches the SD binding and the emit closure, and nothing
+   * in the CQL or CEL lanes. The real hazard belongs to `coded from` alone: narrow it and a record whose
+   * code falls outside it is not retrieved at all, so closed-world reads a record that EXISTS as `false`,
+   * indistinguishable from no record. Do not attribute that to the answer set.
    *
    * ⚠ OFFERED, not ADMISSIBLE. This does NOT constrain what the concept may hold: an `ElementDefinition`
    * binding governs FHIR conformance, never evaluation, so a value outside the set still reaches CQL. A

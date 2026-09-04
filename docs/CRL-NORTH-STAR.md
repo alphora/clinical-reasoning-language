@@ -643,11 +643,17 @@ current level). There is no ServiceRequest special case and no membership specia
   declares its ANSWER OPTIONS with a concept-level `value from "VS"` — the codes a user is OFFERED. That is
   a DIFFERENT AXIS from `coded from`, which scopes the RETRIEVE (which external records represent this
   concept), and the two must be free to diverge: a smoking-status concept's `coded from` names WHICH
-  observation, while its answers are never-smoked / former / current. Authoring them as the same set is
-  legal but usually wrong — it filters non-members out of the retrieve, so a record carrying an unoffered
-  code vanishes into the same empty set as no record at all, collapsing a determinate `false` into
-  `unknown`. The answer set lives on the CONCEPT because the answer slot does: a concept with no
-  representation at all still has one.
+  observation, while its answers are never-smoked / former / current. But naming them as the SAME set is
+  CORRECT whenever the offered codes and the acceptable record codes genuinely are one set — a request's
+  service codes are the standing example, and refusing that pairing leaves the question unanswerable.
+  The answer set lives on the CONCEPT because the answer slot does: a concept with no representation at
+  all still has one.
+
+  ⚠ **`value from` never scopes a retrieve.** It reaches the case-feature binding and the emit closure;
+  nothing in the CQL or CEL lanes reads it. The hazard that sounds like it belongs here belongs to
+  `coded from` ALONE: narrow that and a record whose code falls outside it is never retrieved, so
+  closed-world reads a record that EXISTS as `false` — indistinguishable from no record. Attributing it
+  to the answer set turns a correct authoring choice into one authors talk themselves out of.
 
 ```crl
 terminology "Requestable Services":   // the REQUESTABLE universe — what this concept is ABOUT

@@ -233,11 +233,13 @@ export class AnswerOptionsValidator {
           `Concept "${concept.name}" is a coded question (\`value type is CodeableConcept\` + \`code is\`) ` +
           `with no \`value from\`, so the generated questionnaire offers NO options and the user cannot ` +
           `answer it. If this concept's value is a stored code a user picks, add ` +
-          `\`value from "<terminology>"\` naming the codes to offer. (If its truth is instead the RECORD'S ` +
-          `PRESENCE, it has no answer slot and wants no options — the emitter will say so.) ` +
-          `⚠ NOT the same set as a \`coded from\` on a representation unless you mean it: that scopes which ` +
-          `external records represent this concept, and authoring them alike filters non-members out of the ` +
-          `retrieve, collapsing a determinate answer into "unknown".`,
+          `\`value from "<terminology>"\` naming the codes to offer — the SAME terminology as a ` +
+          `\`coded from\` when the offered codes and the acceptable record codes genuinely are one set, ` +
+          `as they are for a request's service codes. (If its truth is instead the RECORD'S PRESENCE — a ` +
+          `\`defined as exists\` boolean — it has no answer slot and wants no options.) \`value from\` ` +
+          `offers ANSWERS and never scopes a retrieve; \`coded from\` scopes the RETRIEVE. They are free ` +
+          `to diverge and often should: a smoking-status concept's \`coded from\` names WHICH observation, ` +
+          `while its answers are never-smoked / former / current.`,
         location: concept.location,
         severity: "warning",
         ...attrib,
