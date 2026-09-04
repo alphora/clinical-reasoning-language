@@ -777,8 +777,30 @@ export function createServer(): McpServer {
           .string()
           .min(1)
           .describe("Result use case. Only `prior-auth` has a driver today; `measure` is refused."),
-        jarPath: z.string().min(1).describe("Absolute path to the engine jar."),
-        jarSha256: z.string().min(1).describe("Expected sha256, verified before every launch."),
+        // ⭐ THE URL LIVES HERE, in the PARAMETER the caller is looking at while composing the call —
+        // not only in a refusal they reach after making it. Both are optional so the common case
+        // needs neither.
+        jarPath: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "OPTIONAL absolute path to the engine jar. Omit it and the local Maven repository copy is " +
+              "used: <home>/.m2/repository/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/" +
+              "cqf-fhir-cr-cli-4.7.0.jar. Do not have it? It is ~215 MB from " +
+              "https://repo1.maven.org/maven2/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/" +
+              "cqf-fhir-cr-cli-4.7.0.jar (maven org.opencds.cqf.fhir:cqf-fhir-cr-cli:4.7.0). ⚠ It must be " +
+              "the -cli artifact — the plain cqf-fhir-cr jar is not a Spring Boot fat jar and will not launch.",
+          ),
+        jarSha256: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "OPTIONAL expected sha256, verified before every launch. Omit it and this build’s pinned " +
+              "value is used: 10e6ae4e0846671bdfb8005fd577e9c195c7e9896bbd21342002eecd055e6ae0. Pass one " +
+              "only to pin a different engine build.",
+          ),
         outRoot: z
           .string()
           .optional()
@@ -804,8 +826,8 @@ export function createServer(): McpServer {
           celPath: string;
           crlPath: string;
           useCase: string;
-          jarPath: string;
-          jarSha256: string;
+          jarPath?: string;
+          jarSha256?: string;
           outRoot?: string;
           prune?: boolean;
         },
@@ -1715,8 +1737,8 @@ function emitResults(args: {
   celPath: string;
   crlPath: string;
   useCase: string;
-  jarPath: string;
-  jarSha256: string;
+  jarPath?: string;
+  jarSha256?: string;
   outRoot?: string;
   prune?: boolean;
 }): { content: Array<{ type: "text"; text: string }>; isError?: boolean } {
@@ -1725,13 +1747,16 @@ function emitResults(args: {
   for (const [k, v] of [
     ["celPath", args.celPath],
     ["crlPath", args.crlPath],
-    ["jarPath", args.jarPath],
   ] as const) {
     if (!isAbsolute(v)) return err(`${k} must be an ABSOLUTE path (got "${v}").`);
   }
   // ⚠ `outRoot` IS OPTIONAL BUT MUST STILL BE ABSOLUTE WHEN GIVEN. It is the root this tool WRITES
   // to and now DELETES under, and the server’s working directory is not the user’s workspace — a
   // relative value would resolve somewhere neither of them meant.
+  // jarPath is optional now, but an absolute path is still the only kind that means anything here.
+  if (args.jarPath !== undefined && !isAbsolute(args.jarPath)) {
+    return err(`jarPath must be an ABSOLUTE path (got "${args.jarPath}").`);
+  }
   if (args.outRoot !== undefined && !isAbsolute(args.outRoot)) {
     return err(`outRoot must be an ABSOLUTE path (got "${args.outRoot}").`);
   }
@@ -1795,6 +1820,8 @@ function emitResults(args: {
             ...(outcome.skippedLinks.length ? { skippedLinks: outcome.skippedLinks } : {}),
             orphaned: outcome.orphaned,
             java: outcome.java,
+            // Which 215 MB file ran, and whether we chose it. Never silent.
+            engineJar: outcome.engineJar,
             cases: outcome.manifest.cases.map((c) => ({
               caseName: c.caseName,
               state: c.state,

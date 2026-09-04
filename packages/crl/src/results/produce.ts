@@ -23,6 +23,9 @@ import {
   DEFAULT_BOUNDS,
   LAUNCHER_ENTRY,
   MIN_JAVA_MAJOR,
+  ENGINE_JAR_SOURCE,
+  defaultEngineJarPath,
+  engineJarFetchCommand,
   engineJarHelp,
   resolveJava,
   verifyJar,
@@ -51,8 +54,13 @@ export interface ProduceRequest {
    * override briefly existed here and no caller ever set it — its only reachable effect was to let a
    * caller hash jar A, execute jar B, and record A's sha in the manifest as provenance for B.
    */
-  jarPath: string;
-  jarSha256: string;
+  /**
+   * ⚠ OPTIONAL. Omitted → the local Maven repository copy, if it is there. The consumer should not
+   * have to restate a constant we own; requiring it is what made this tool unreachable in the field.
+   */
+  jarPath?: string;
+  /** ⚠ OPTIONAL. Omitted → the sha256 this build pins. Pass one only to pin something else. */
+  jarSha256?: string;
   bounds?: JvmBounds;
   crlVersion: string;
 }
@@ -73,6 +81,15 @@ export type ProduceOutcome =
       skippedLinks: string[];
       failed: number;
       java: { exe: string; major: number };
+      /**
+       * The engine jar that actually ran, and whether it was DEFAULTED.
+       *
+       * ⚠ REPORTED, NEVER PUT IN THE MANIFEST. It is an absolute machine-local path, so committing it
+       * would make the artifact machine-specific and re-break the idempotence just fixed. But a 215 MB
+       * file resolved silently from `~/.m2` is a file the user does not know they have — so it goes in
+       * the OUTPUT every run, where it is visible and costs the artifact nothing.
+       */
+      engineJar: { path: string; defaulted: boolean };
     };
 
 /**
@@ -86,7 +103,20 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
     return { ok: false, reason: `use case "${req.useCase}" has no driver yet` };
   }
 
-  const jarCheck = verifyJar(req.jarPath, req.jarSha256);
+  // ⭐ RESOLVE THE JAR BEFORE VERIFYING IT. Both parameters used to be REQUIRED, which meant a
+  // consumer could not construct the call at all without already possessing a 215 MB artifact and its
+  // hash — and the refusal that names the download URL sits AFTER the call they cannot make. As the
+  // IEHP KE put it: "the gate is not the failure path — it is the signature." They recovered the URL
+  // by reading back an agent-to-agent message thread, because it existed nowhere in the shipped tool.
+  const jarPath = req.jarPath ?? defaultEngineJarPath();
+  if (!jarPath) {
+    return {
+      ok: false,
+      reason: "no engine jar: none was given and none is in the local Maven repository",
+      detail: [...engineJarHelp(), "", "fetch it with:", `  ${engineJarFetchCommand()}`],
+    };
+  }
+  const jarCheck = verifyJar(jarPath, req.jarSha256 ?? ENGINE_JAR_SOURCE.sha256);
   if (!jarCheck.ok) {
     return {
       ok: false,
@@ -224,7 +254,7 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
     const entry = runOneCase(
       {
         javaExe: java.javaExe,
-        engineJarPath: req.jarPath, // the VERIFIED jar, and nothing else, is what runs
+        engineJarPath: jarPath, // the VERIFIED jar, and nothing else, is what runs
         bounds: req.bounds ?? DEFAULT_BOUNDS,
         planDefinitionId,
         artifactRoot: req.outRoot,
@@ -286,5 +316,6 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
     skippedLinks: scan.skippedLinks,
     failed,
     java: { exe: java.javaExe, major: java.major },
+    engineJar: { path: jarPath, defaulted: req.jarPath === undefined },
   };
 }

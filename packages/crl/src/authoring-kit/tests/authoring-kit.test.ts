@@ -1045,6 +1045,55 @@ describe("authoring-kit — getAuthoringKit", () => {
     );
   });
 
+  // ⚠⚠ THE GATE THAT MAKES A SILENT HASH MOVE IMPOSSIBLE.
+  //
+  // The pins above catch that content MOVED. They do not catch the thing that actually hurt a consumer:
+  // content moving while `schemaVersion` STAYS PUT. That happened — `reference.ts` was corrected in-tree
+  // and both hashes changed across three releases under a static `1.27`, with no changelog. To make the
+  // suite green you only had to re-pin, and re-pinning is exactly what a person does without thinking.
+  //
+  // ⭐ WHY IT IS WORSE THAN A STALE AUTHOR. The consuming project's REVIEWER LENSES restate kit rules, so
+  // a stale pin blinds the reviewer too. Measured downstream: two full judge rounds passed an artifact
+  // built on a retired construct model, because neither arm's lens knew the new construct existed. The
+  // reviewer is the thing that is supposed to catch the author, and a silent move takes out both.
+  //
+  // So hashes are keyed BY schemaVersion. Changing content now forces one of:
+  //   - add a NEW version key (a bump, which is the correct move), or
+  //   - edit a HISTORICAL entry, which is visible in review as rewriting the past.
+  // There is no longer a way to re-pin that looks like routine test maintenance.
+  const KIT_PINS: Readonly<Record<string, { cpg: string; priorAuth: string }>> = {
+    "1.28": {
+      cpg: "47c298a75a233774842a4ca15163e5b835fbabfb1e716691d600309d9ba7fa57",
+      priorAuth: "b2c88913580bc782cd95970bbde0460b2a84f981f5b5016f25ba2c98202314f1",
+    },
+  };
+
+  it("⭐ the contentHash cannot move without a schemaVersion bump (hashes are keyed by version)", () => {
+    const cpg = getAuthoringKit("local-decision-support", "cpg");
+    const priorAuth = getAuthoringKit("local-decision-support", "prior-auth");
+    const pinned = KIT_PINS[cpg.schemaVersion];
+
+    expect(
+      pinned,
+      `schemaVersion ${cpg.schemaVersion} has no pinned hashes. If you changed kit CONTENT, bump ` +
+        `SCHEMA_VERSION and add an entry to KIT_PINS — do not re-pin an existing version.`,
+    ).toBeDefined();
+
+    expect(cpg.contentHash, `cpg payload moved under schemaVersion ${cpg.schemaVersion}`).toBe(pinned.cpg);
+    expect(
+      priorAuth.contentHash,
+      `prior-auth payload moved under schemaVersion ${priorAuth.schemaVersion}`,
+    ).toBe(pinned.priorAuth);
+    expect(priorAuth.schemaVersion).toBe(cpg.schemaVersion);
+  });
+
+  it("the changelog names the current schemaVersion, so a bump cannot ship unexplained", () => {
+    // A version with no entry is a hash move a consumer cannot diff — the same defect one step later.
+    const src = readFileSync(join(__dirname, "..", "index.ts"), "utf8");
+    const version = getAuthoringKit("local-decision-support", "cpg").schemaVersion;
+    expect(src, `no changelog entry mentions "${version}"`).toContain(`→ "${version}"`);
+  });
+
   it("SERIALIZED payload teaches the posrep age model with NO residue of the retired `definition is age today` doctrine (#257 T3 sweep guard)", () => {
     // Guards against the T1-era partial state recurring one layer down: a line-list edit is too fragile
     // for a served artifact, so this asserts the ASSEMBLED payload over BOTH useCases. Patterns target

@@ -164,16 +164,44 @@ export const ENGINE_JAR_SOURCE = {
   coordinates: "org.opencds.cqf.fhir:cqf-fhir-cr-cli:4.7.0",
   url: "https://repo1.maven.org/maven2/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/cqf-fhir-cr-cli-4.7.0.jar",
   sha256: "10e6ae4e0846671bdfb8005fd577e9c195c7e9896bbd21342002eecd055e6ae0",
+  /** Where Maven would put it if anything on this machine has ever resolved the coordinates. */
+  mavenLocalPath: "org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/cqf-fhir-cr-cli-4.7.0.jar",
 } as const;
+
+/**
+ * The jar this build expects, if it is already in the local Maven repository.
+ *
+ * ⚠ A DEFAULT, NOT A SEARCH. One deterministic location that Maven itself defines — no filesystem
+ * crawl, no guessing. It is `undefined` when the file is not there, and the caller then refuses with
+ * the URL rather than hunting.
+ */
+export function defaultEngineJarPath(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const home = env.HOME ?? env.USERPROFILE;
+  if (!home) return undefined;
+  const candidate = path.join(home, ".m2", "repository", ...ENGINE_JAR_SOURCE.mavenLocalPath.split("/"));
+  return existsSync(candidate) ? candidate : undefined;
+}
 
 /** The jar source, formatted for an error message a human has to act on. */
 export function engineJarHelp(): string[] {
   return [
     `download: ${ENGINE_JAR_SOURCE.url}`,
-    `sha256:   ${ENGINE_JAR_SOURCE.sha256}  (pass this as --jar-sha256 / jarSha256)`,
+    `sha256:   ${ENGINE_JAR_SOURCE.sha256}  (the default — you only pass it to pin something else)`,
     `maven:    ${ENGINE_JAR_SOURCE.coordinates}`,
+    `or drop it at: <home>/.m2/repository/${ENGINE_JAR_SOURCE.mavenLocalPath} and omit jarPath entirely`,
     "⚠ it must be the -cli artifact: the plain cqf-fhir-cr jar is not a Spring Boot fat jar and will not launch",
   ];
+}
+
+/**
+ * ⭐ THE ONE-LINE FETCH. Printed when the jar cannot be found, because "here is a URL" still leaves a
+ * person composing a command, and the whole finding was that we made them compose too much.
+ */
+export function engineJarFetchCommand(): string {
+  return (
+    `curl -fL --create-dirs -o "$HOME/.m2/repository/${ENGINE_JAR_SOURCE.mavenLocalPath}" ` +
+    `"${ENGINE_JAR_SOURCE.url}"`
+  );
 }
 
 export const LAUNCHER_ENTRY = "org/springframework/boot/loader/launch/PropertiesLauncher.class";

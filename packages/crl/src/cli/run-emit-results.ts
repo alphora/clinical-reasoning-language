@@ -50,8 +50,13 @@ FLAGS:
   --cel <file>         The CEL suite. Required.
   --crl <file>         The CRL library the suite covers. Required.
   --use-case <name>    ${RESULT_USE_CASES.join(" | ")}. Required.
-  --jar <path>         Engine jar. Required with --enable.
-  --jar-sha256 <hex>   Expected sha256, verified BEFORE EVERY LAUNCH. Required with --jar.
+  --jar <path>         Engine jar. OPTIONAL — defaults to the local Maven repository copy at
+                       ~/.m2/repository/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/cqf-fhir-cr-cli-4.7.0.jar
+                       Do not have it? ~215 MB:
+                         curl -fL --create-dirs -o "$HOME/.m2/repository/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/cqf-fhir-cr-cli-4.7.0.jar"                               "https://repo1.maven.org/maven2/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/cqf-fhir-cr-cli-4.7.0.jar"
+                       ⚠ the -cli artifact; the plain cqf-fhir-cr jar will not launch.
+  --jar-sha256 <hex>   Expected sha256, verified BEFORE EVERY LAUNCH. OPTIONAL — defaults to this
+                       build's pinned value. Pass one only to pin a different engine build.
   --out <dir>          Artifact root. Default: the .cel file's project root.
   --enable             Opt in to running a JVM. Without it, nothing runs.
   --no-prune           Keep superseded Questionnaire/QuestionnaireResponse files that this run
@@ -123,10 +128,6 @@ function main(): void {
     );
     process.exit(1);
   }
-  if (!a.jar || !a.jarSha) {
-    process.stderr.write("--jar and --jar-sha256 are required with --enable\n");
-    process.exit(1);
-  }
 
   // ⭐ ONE PIPELINE. The MCP `emit_results` tool calls this same function; this file only parses flags and
   // reports. Two entry points each orchestrating emit → bundle → spawn → write is how a helper ends up
@@ -182,6 +183,7 @@ function main(): void {
 
   process.stdout.write(
     `\njava ${outcome.java.major} at ${outcome.java.exe}\n` +
+      `engine jar${outcome.engineJar.defaulted ? " (defaulted from ~/.m2)" : ""}: ${outcome.engineJar.path}\n` +
       `manifest: ${outcome.manifestPath}\n` +
       `cases: ${outcome.manifest.cases.length}, failed: ${outcome.failed}\n`,
   );
