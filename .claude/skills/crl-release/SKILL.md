@@ -33,7 +33,22 @@ Ask the operator, in chat, unless they have already said to ship. Do NOT self-au
 because the work looks done. Standing operator instruction: *"we can't be releasing garbage"* /
 *"STOP SHIPPING SHIT"*.
 
-## 1. Gate A — build EVERYTHING, then test EVERYTHING
+## 1. Bump FIRST — then everything below runs once, on what actually ships
+
+**Bump all three `package.json` versions to the SAME number** — root (private), `packages/crl`
+(`@smile-digital-health/crl`), `packages/crl-vscode` (`crl-language-support`). They move in LOCKSTEP and
+have desynced before (crl-vscode at 4.89 while core sat at 4.47). Then `npm install --package-lock-only`.
+
+Bumping first, rather than after the gates, is deliberate: the version is baked into the vsix and into
+`emit_results` provenance (`manifest.provenance.crlVersion`), so a pre-bump verification is a
+verification of bytes that will never ship. Bump once, verify once, and what you tested is what goes
+out. **Do not commit the bump yet** — commit it only once the gates pass, so an abort leaves nothing
+to unwind (§8).
+
+⚠ **Gate C needs the crl-vscode bump anyway** — VS Code silently skips installing a same-version
+vsix, so without it you verify the OLD bytes. That alone forces the bump to the front.
+
+## 2. Gate A — build EVERYTHING, then test EVERYTHING
 
 There are four build products and they are built by four different commands. Run all four, in order —
 each later one consumes the earlier one’s output, so a skipped step silently tests stale bytes.
@@ -56,17 +71,17 @@ npx tsc --noEmit -p packages/crl/tsconfig.json
 npx tsc --noEmit -p packages/crl-vscode/tsconfig.json
 ```
 
-Then ALL the tests — which is more than `npm test`:
+Then all the tests — one command, and it genuinely is all of them:
 
 ```bash
-npm test                                   # BOTH vitest projects: crl + crl-vscode (the only two)
-npm run test:mcp -w @smile-digital-health/crl   # <-- NOT part of `npm test`. Separate node script.
+npm test    # crl (vitest) + its MCP integration test + crl-vscode (vitest, compiles first)
 ```
 
-⚠ **`npm test` does not run the MCP integration test.** `test:mcp` is a standalone
-`node src/cli/tests/run-mcp-server.test.mjs` in neither package’s `test` script, so "the suite is
-green" has never included it. It is the ONLY test that spawns the real MCP server and calls tools over
-the protocol — i.e. the only one exercising what the KE actually touches. Run it every time.
+Confirm the MCP test actually ran: `run-mcp-server.test passed` appears in the output. It is the only
+test that spawns the real MCP server and calls tools over the protocol — the thing the KE actually
+touches — and it spent a long time outside `npm test` entirely, so "the suite is green" excluded it.
+It is wired in now (`crl`’s `test` chains `test:mcp`, whose `pretest:mcp` builds core first). **If a
+future change unchains it, fix the script rather than documenting the gap.**
 
 ⚠ **The workspace name is `crl-language-support`, not `crl-vscode`.** `-w crl-vscode` fails with
 "No workspaces found", which is easy to read as "nothing to do". (The *vitest project* IS `crl-vscode`.)
@@ -82,7 +97,7 @@ unexecuted — exactly how 4.114.0’s missing driver stayed invisible through a
       gate that has only ever passed is not known to be a gate — and gates here have compared a helper
       against itself and proved nothing.
 
-## 2. Gate B — the artifacts (THE ONE THAT CATCHES REAL DEFECTS)
+## 3. Gate B — the artifacts (THE ONE THAT CATCHES REAL DEFECTS)
 
 Build both published artifacts and **look inside them as archives**:
 
@@ -109,7 +124,7 @@ npm pack -w @smile-digital-health/crl --dry-run --json   # inspect .files[]
       test asserting the two agree — else an edited source with a stale binary ships and nothing
       anywhere disagrees.
 
-## 3. Gate C — execute the installed artifact as a KE
+## 4. Gate C — execute the installed artifact as a KE
 
 Not the working tree. The thing a user installs.
 
@@ -134,7 +149,7 @@ Not the working tree. The thing a user installs.
 - [ ] Anything with a viewer (pane, cockpit): **open it and confirm it matches.** A pane that renders
       empty is indistinguishable from a pane with nothing to show. That shipped for months.
 
-## 4. Gate D — setup cost is part of the product
+## 5. Gate D — setup cost is part of the product
 
 Write out, literally, every step a KE performs from zero. If that list contains hashing a jar,
 extracting an archive, composing a classpath, or `setx`, **the release is not ready** — those are our
@@ -144,7 +159,7 @@ steps wearing the user’s clothes.
 (`javac`, `jar`) turned out to be consequences of OUR design, not the engine’s. **Ask which of the
 user’s steps exist only because of a choice we made** — that is usually most of them.
 
-## 5. Gate E — the panel, before it becomes durable
+## 6. Gate E — the panel, before it becomes durable
 
 A release is durable by definition. Unless the change is a pure formatting/dependency bump, run the
 panel: **both arms, same lens, byte-identical message, same turn**, and carry the DIFF (reviewers
@@ -157,7 +172,7 @@ cannot run git). Then:
 - [ ] Check the packet’s own claims. One here said the change deleted a file that had never been
       committed — a reviewer caught it, and an unchecked packet makes reviewers confidently wrong.
 
-## 6. Cut it — and ship every product, not just the vsix
+## 7. Cut it — and ship every product, not just the vsix
 
 Four things are built (§1); **three are published, by different mechanisms.** Missing one is a
 partial release that looks complete.
@@ -174,22 +189,18 @@ own is a product nothing checks.
 
 ### Steps
 
-1. **Bump all three `package.json` versions to the SAME number** — root (private), `packages/crl`
-   (`@smile-digital-health/crl`), `packages/crl-vscode` (`crl-language-support`). They move in
-   LOCKSTEP; they have desynced before (crl-vscode at 4.89 while core sat at 4.47). Then
-   `npm install --package-lock-only`. Commit `chore(release): X.Y.Z — <what changed>`.
-2. **Re-run §1 and §2 AFTER the bump.** The version is baked into the vsix and into `emit_results`
-   provenance, so what you verified pre-bump is not what ships.
-3. Release notes → **`tmp/RELEASE_NOTES_vX.Y.Z.md`**, never the repo root. The operator posts them to
+1. Commit the bump from §1: `chore(release): X.Y.Z — <what changed>`. The gates have already run
+   against these exact bytes.
+2. Release notes → **`tmp/RELEASE_NOTES_vX.Y.Z.md`**, never the repo root. The operator posts them to
    the GitHub release page and treats that as canonical; they deleted the ones that accumulated in the
    root and asked for them in `tmp/` instead.
-4. Before tagging, **check the in-scope issues are actually closed**: `Closes #N` auto-closes only on
+3. Before tagging, **check the in-scope issues are actually closed**: `Closes #N` auto-closes only on
    the DEFAULT branch, so nothing landing on `develop` closes anything. `gh issue view <N> --json state`
    for each is a 30-second check; a release once shipped with 12 of 13 issues still open.
-5. `git checkout main && git merge --ff-only develop && git push` — main is strictly behind, so this is
+4. `git checkout main && git merge --ff-only develop && git push` — main is strictly behind, so this is
    clean.
-6. **Lightweight** tag `vX.Y.Z` on main (prior tags are lightweight, not annotated); push it.
-7. `gh release create vX.Y.Z --title … --notes-file tmp/… --target main <assets>` — published, not
+5. **Lightweight** tag `vX.Y.Z` on main (prior tags are lightweight, not annotated); push it.
+6. `gh release create vX.Y.Z --title … --notes-file tmp/… --target main <assets>` — published, not
    draft. Publishing is what FIRES `release.yml`. Assets:
    - `packages/crl-vscode/crl-language-support-<ver>.vsix`
    - `smile-digital-health-crl-<ver>.tgz` (`npm pack -w @smile-digital-health/crl`)
@@ -198,7 +209,7 @@ own is a product nothing checks.
    - `packages/crl/src/cql-emitter/catalog/inference-pattern-catalog.md`
    - **`SHA256SUMS`** — `sha256sum <each asset> > SHA256SUMS`. Without it a consumer can only hash
      their own download, which proves their fetch and not the published bytes.
-8. **Watch `release.yml` to green.** A red CI after publish is a FAILED release, not a footnote: the
+7. **Watch `release.yml` to green.** A red CI after publish is a FAILED release, not a footnote: the
    GitHub release looks complete while the npm tarball never shipped.
 
 ### When CI fails after publishing
@@ -217,7 +228,27 @@ own is a product nothing checks.
   again. The built vsix/tgz are reusable if only CI files changed. If you committed the fix directly on
   `main`, FF `develop ← main` afterwards.
 
-## 7. After
+## 8. Aborting — how to unwind, at each point
+
+A release can fail a gate at any stage. What it costs to back out depends entirely on **how far past
+the tag** you got, because everything before the tag is local and everything after is public.
+
+| you are at | to abort |
+|---|---|
+| **bumped, not committed** (§1) | `git checkout -- package.json packages/*/package.json package-lock.json`. Nothing else touched. **This is why §1 says not to commit the bump.** |
+| **bump committed, not tagged** | `git reset --hard HEAD~1` on `develop` if it is the tip and unpushed. If it IS pushed, do NOT rewrite — leave it and land the fix as the next commit; a version bump sitting on `develop` ships nothing by itself. |
+| **merged to `main`, not tagged** | `main` is only a fast-forward of `develop`; nothing is published until a tag + release exist. Fix forward on `develop` and FF again. |
+| **tagged, no GitHub release** | `git tag -d vX.Y.Z && git push origin :refs/tags/vX.Y.Z`. Still nothing published. |
+| **release published** | `gh release delete vX.Y.Z --yes --cleanup-tag`. ⚠ If `publish-npm` already went green, **the npm version is permanent** — npm forbids republishing a version, and unpublish is heavily restricted. Ship `X.Y.Z+1`; do not try to reuse the number. |
+
+⚠ **The one-way door is `publish-npm` going green, not the tag.** Everything up to that is cheap to
+undo. So if a gate is going to fail, it is much better for it to fail LOUD and EARLY — which is the
+whole reason Gates A–C run before anything leaves the machine.
+
+Local artifacts left behind by an abort (`crl-language-support-X.Y.Z.vsix`, `*.tgz`) are gitignored
+scratch; delete them so a later release cannot attach a stale one.
+
+## 9. After
 
 - [ ] Tell whoever was blocked, **naming what changed for them** — especially if you previously sent
       instructions the release invalidates.
