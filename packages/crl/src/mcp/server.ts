@@ -757,7 +757,8 @@ export function createServer(): McpServer {
         "⚠ DISABLED UNLESS ENABLED. In VS Code turn on `crl.enableResults` (User scope) and restart the " +
         "client; the extension writes the flag into the `crl` server's `env` in .mcp.json, which reaches " +
         "this process directly. Headless/CI can set `CRL_ENABLE_RESULTS=1` in the launching environment. " +
-        "Never read from the workspace, so a repository cannot opt a user into JVM execution. Needs only a " +
+        "Never read from workspace settings. ⚠ It IS read from `.mcp.json`, so treat that file as " +
+        "commit-sensitive: committing it commits the flag. Needs only a " +
         "JRE 17+ (the driver ships compiled; the engine runs unextracted) and the jar's sha256 is verified " +
         "before every launch. ⚠ PRUNES superseded Questionnaire/QuestionnaireResponse files by default — " +
         "pass `prune: false` to keep them. " +
@@ -1705,7 +1706,9 @@ function runAuthoringKit(args: { stage?: string; useCase?: string }): {
  * helper's tests passing throughout — the defect shape this whole area has been fixing.
  *
  * ⚠ ENABLEMENT COMES FROM THE SERVER'S ENVIRONMENT, NOT THE WORKSPACE. `CRL_ENABLE_RESULTS` is read
- * from `process.env` so that opening a repository cannot opt a user into spawning a JVM. A workspace can
+ * from `process.env`, never from workspace settings, so merely opening a repository does not enable it.
+ * ⚠ It IS delivered via `.mcp.json`, which a project CAN commit — that file is commit-sensitive and
+ * the boundary is a convention, not an enforced one. A workspace can
  * supply arguments; it cannot supply the environment the server was launched with.
  */
 function emitResults(args: {
@@ -1737,7 +1740,8 @@ function emitResults(args: {
   }
 
   // ⚠ ENABLEMENT IS AN ENVIRONMENT FLAG, NOT A CLASSPATH. `CRL_ENABLE_RESULTS=1` is read from the
-  // SERVER's environment rather than the workspace on purpose: a repository must not be able to opt a
+  // SERVER's environment rather than workspace settings on purpose. ⚠ The extension delivers it
+  // through `.mcp.json`, which a project can commit, so this is a convention and not a boundary; opt a
   // user into running a JVM.
   //
   // ⚠ IT USED TO BE `CRL_PRODUCER_CLASSPATH`, and that was indefensible — it made a knowledge engineer
@@ -1753,7 +1757,8 @@ function emitResults(args: {
         "Headless/CI: set CRL_ENABLE_RESULTS=1 in the environment this server is launched from. " +
         "⚠ An exported/`setx` variable is NOT inherited by an editor launched from a pre-existing " +
         "shell or desktop session on any OS, which is why the setting exists.\n" +
-        "It is never read from the workspace: a repository must not be able to opt a user into " +
+        "It is never read from workspace settings; it IS read from .mcp.json, so treat that file as " +
+        "commit-sensitive. Opening a repository does not by itself opt a user into " +
         "running a JVM. Medical-validation users read committed results and never need this.",
     );
   }
@@ -1787,8 +1792,6 @@ function emitResults(args: {
             pruned: outcome.pruned,
             // ⚠ Why nothing was deleted, when it was not. Silence about a refusal reads as "the tree
             // is clean", which is the failure mode this whole area exists to remove.
-            ...(outcome.pruneRefusal ? { pruneRefusal: outcome.pruneRefusal } : {}),
-            ...(outcome.unreadable.length ? { unreadable: outcome.unreadable } : {}),
             ...(outcome.skippedLinks.length ? { skippedLinks: outcome.skippedLinks } : {}),
             orphaned: outcome.orphaned,
             java: outcome.java,

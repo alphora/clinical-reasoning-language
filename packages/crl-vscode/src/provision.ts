@@ -96,27 +96,35 @@ export const ENABLE_RESULTS_ENV = "CRL_ENABLE_RESULTS";
  *
  * `.mcp.json` `env` is handed DIRECTLY to the spawned process by the client. No inheritance chain
  * exists to break, on any OS. And it keeps the property the env var was chosen for: `.mcp.json` is
- * gitignored, so the opt-in stays machine-local — which is why `crl.enableResults` is MACHINE-scoped
- * and cannot be set from `.vscode/settings.json`.
+ * The setting is MACHINE-scoped, so it cannot be set from `.vscode/settings.json`.
  *
- * ⚠ THAT BOUNDARY IS NARROWER THAN "no repository can opt anyone in". Machine scope blocks WORKSPACE
- * settings; it does not block a `devcontainer.json` `customizations.vscode.settings` block, which
- * seeds the settings of the remote machine it creates. A repository shipping a devcontainer can
- * therefore opt a Codespace user in. `crl.autoProvision` has the same hole. Worth saying plainly
- * rather than claiming a guarantee we do not have.
+ * ⚠⚠ DO NOT DESCRIBE THIS AS "a repository cannot opt a user into running a JVM". That claim was made
+ * here and it is not enforced. It rests on `.mcp.json` being machine-local, and NOTHING in this
+ * extension puts it in a user's `.gitignore` or checks that it is ignored — that is true of the CRL
+ * repo and was generalised to everyone else's. A project that commits `.mcp.json` commits the flag,
+ * and the next clone spawns a JVM without its owner ever setting anything. Machine scope also does
+ * not block a `devcontainer.json` `customizations.vscode.settings` block, which seeds the settings of
+ * the machine it creates; `crl.autoProvision` has the same hole.
  *
- * ⚠ PRESERVES EVERY OTHER `env` KEY. A user may have put their own variables on this server; we own
- * exactly one name. Turning the setting OFF removes ours and leaves theirs, and an env block emptied
- * that way is dropped entirely so the file returns to its previous bytes rather than keeping `{}`.
+ * What IS true: the flag is never read from workspace SETTINGS, and it is never synthesised from
+ * repository content. Say that, and treat `.mcp.json` as commit-sensitive.
  */
 export function mergeEnableResultsEnv(
   existingEnv: unknown,
   enable: boolean,
 ): Record<string, unknown> | undefined {
-  // A non-object `env` is a user file we do not understand; leave it exactly as found rather than
-  // replacing it, matching the refuse-to-clobber posture used for the server entry itself.
+  // ⚠ THROW, do not silently pass through. Returning the value untouched preserved the user’s file
+  // but wrote NOTHING — so turning the setting on produced `unchanged`, the watcher said "restart
+  // your MCP client to apply", and nothing had been applied. That is verbatim the "I did what you
+  // said and nothing happened" failure this whole setting exists to remove.
+  //
+  // The refuse-to-clobber posture for the server entry is a THROW (see `mergeMcp`), so this now
+  // matches it rather than merely citing it. The caller catches and reports.
   if (existingEnv !== undefined && !isPlainObject(existingEnv)) {
-    return existingEnv as Record<string, unknown>;
+    throw new Error(
+      `.mcp.json "${SERVER_KEY}" has an \`env\` that is not an object; refusing to overwrite it. ` +
+        "Fix or remove it, then toggle crl.enableResults again.",
+    );
   }
   const env: Record<string, unknown> = { ...(isPlainObject(existingEnv) ? existingEnv : {}) };
   if (enable) env[ENABLE_RESULTS_ENV] = "1";

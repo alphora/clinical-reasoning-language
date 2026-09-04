@@ -164,21 +164,10 @@ function main(): void {
         "\n",
     );
   }
-  // ⚠ SAY WHAT WAS DELETED, AND WHY NOTHING WAS. Pruning is on by default because the results tree
-  // is regenerated output, but a silent deletion is indistinguishable from a file that was never
-  // there — and a silent REFUSAL reads as "the tree is clean", which is worse.
+  // Say what was deleted. A silent deletion is indistinguishable from a file that was never there.
   if (outcome.pruned.length > 0) {
     process.stderr.write(`\npruned ${outcome.pruned.length} superseded artifact(s):\n`);
     for (const f of outcome.pruned) process.stderr.write(`  ${f}\n`);
-  }
-  if (outcome.pruneRefusal) {
-    process.stderr.write(`\nNOTHING was pruned: ${outcome.pruneRefusal}.\n`);
-  }
-  if (outcome.unreadable.length > 0) {
-    process.stderr.write(
-      `\n${outcome.unreadable.length} path(s) could not be read, so the orphan list is INCOMPLETE:\n`,
-    );
-    for (const f of outcome.unreadable) process.stderr.write(`  ${f}\n`);
   }
   if (outcome.skippedLinks.length > 0) {
     process.stderr.write(`\n${outcome.skippedLinks.length} symlink(s) under the results tree were not followed:\n`);
@@ -186,7 +175,7 @@ function main(): void {
   }
   if (outcome.orphaned.length > 0) {
     process.stderr.write(
-      `\n${outcome.orphaned.length} file(s) in the results tree were not written by this run and were LEFT:\n`,
+      `\n${outcome.orphaned.length} file(s) were left alone (types this use case does not own):\n`,
     );
     for (const f of outcome.orphaned) process.stderr.write(`  ${f}\n`);
   }

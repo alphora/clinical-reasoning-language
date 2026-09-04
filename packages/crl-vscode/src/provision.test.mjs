@@ -262,10 +262,11 @@ test("mergeEnableResultsEnv: NEVER eats a user's own env keys — on or off", ()
   assert.deepEqual(mergeEnableResultsEnv({ MY_VAR: "x", [ENABLE_RESULTS_ENV]: "1" }, false), { MY_VAR: "x" });
 });
 
-test("mergeEnableResultsEnv: a non-object env is left exactly as found", () => {
-  // Same refuse-to-clobber posture as the server entry itself: a file we do not understand is not ours
-  // to rewrite, and replacing it could silently discard configuration.
-  assert.equal(mergeEnableResultsEnv("weird", true), "weird");
+test("mergeEnableResultsEnv: a non-object env REFUSES loudly instead of doing nothing", () => {
+  // Returning it untouched preserved the file but wrote nothing, so the user turned the setting on,
+  // was told to restart, and nothing had been applied — the exact failure this setting removes.
+  assert.throws(() => mergeEnableResultsEnv("weird", true), /not an object/);
+  assert.throws(() => mergeEnableResultsEnv(["a"], false), /not an object/);
 });
 
 check("apply writes CRL_ENABLE_RESULTS=1 into the crl server env when enabled", (ws) => {

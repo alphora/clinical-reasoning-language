@@ -15,14 +15,7 @@ import { emitCelToFhir } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
 import { emitCrlTwoLane } from "../emit-two-lane";
 import { buildProducerInputs, casesMissingFromEmit } from "./caseInput";
-import {
-  heldBackCompartments,
-  isInsideResultsTree,
-  pruneRefusalReason,
-  scanOrphans,
-  splitOrphans,
-} from "./orphans";
-import { RESULTS_ROOT } from "./useCases";
+import { isInsideResultsTree, scanOrphans, splitOrphans } from "./orphans";
 import { producerManifestName, type ProducerManifest } from "./manifest";
 import { buildEngineRepoBundle, cqlIndex } from "./repoBundle";
 import { runOneCase } from "./runProducer";
@@ -72,24 +65,12 @@ export type ProduceOutcome =
       manifestPath: string;
       /** Cases the suite declares that the emitter did not produce — reported, never silently skipped. */
       notEmitted: string[];
-      /**
-       * Unclaimed files this run did NOT delete — types outside this use case, plus anything pruning
-       * could not remove. Never emptied silently: a file we failed to delete is reported here rather
-       * than counted as pruned.
-       */
-      orphaned: string[];
-      /** Superseded artifacts this run DELETED. Empty when `prune: false`. */
+      /** Q/QR this run DELETED from the results tree. Empty when `prune: false`. */
       pruned: string[];
-      /**
-       * Directories/entries orphan detection could not read, and sibling manifests it could not parse.
-       * ⚠ Non-empty means the orphan list is INCOMPLETE — "no orphans" from an unreadable tree would
-       * claim it is clean.
-       */
-      unreadable: string[];
+      /** Unclaimed files LEFT alone: types we do not own, or a delete that failed. */
+      orphaned: string[];
       /** Symlinks found under the results tree and deliberately not followed. */
       skippedLinks: string[];
-      /** Why nothing was deleted, when pruning was skipped. Undefined when pruning ran. */
-      pruneRefusal?: string;
       failed: number;
       java: { exe: string; major: number };
     };
@@ -270,23 +251,15 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
 
   // AFTER the manifest is written: it is the definition of what this run claims, so orphans are
   // computed against the committed answer rather than an in-flight one.
+  // ⭐ THE RESULTS TREE IS OURS: delete every Q/QR in it this run did not write. No sibling-suite
+  // protection, no held-back states, no refusal when the run produced nothing — all of that was built
+  // and then removed by operator ruling, because it only matters if the tree is shared and it is not.
   const scan = scanOrphans(req.outRoot, manifest);
   const { prunable, reportOnly } = splitOrphans(scan.orphans, req.useCase);
   const pruned: string[] = [];
-
-  // The decision to delete is pure and lives in orphans.ts, so CI can exercise it without a JVM.
-  const pruneRefusal = pruneRefusalReason(manifest, scan, req.prune);
-  const heldBack = heldBackCompartments(manifest);
-
-  if (pruneRefusal === undefined) {
+  if (req.prune !== false) {
     for (const rel of prunable) {
-      if (heldBack.some((prefix) => rel.startsWith(prefix))) {
-        reportOnly.push(rel);
-        continue;
-      }
-      // ⚠ CONTAINMENT BEFORE DELETION. The scan already refuses to follow symlinks; this re-checks
-      // that the path really is inside the results tree, because the cost of being wrong is
-      // someone else’s file.
+      // Stay inside the tree. "Our folder" is the authorization; it is also the limit.
       if (!isInsideResultsTree(req.outRoot, rel)) {
         reportOnly.push(rel);
         continue;
@@ -295,9 +268,7 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
         rmSync(path.join(req.outRoot, rel));
         pruned.push(rel);
       } catch {
-        // A file we could not remove stays REPORTED rather than silently claimed as pruned — the
-        // caller must not be told the tree is clean when it is not.
-        reportOnly.push(rel);
+        reportOnly.push(rel); // could not remove it: report rather than claim it is gone
       }
     }
   } else {
@@ -312,8 +283,6 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
     notEmitted,
     orphaned: reportOnly,
     pruned,
-    unreadable: scan.unreadable,
-    pruneRefusal,
     skippedLinks: scan.skippedLinks,
     failed,
     java: { exe: java.javaExe, major: java.major },
