@@ -8,11 +8,9 @@ import { validateCELFile } from "../validator";
 import type { CELValidationResult } from "../types";
 
 // #189 Piece 3 (Option C, disc 512) — the value-reading boolean assertion rules.
-//  - A direct assertion of a VALUE-READING boolean concept (a member-existence interface, whose emitted CQL own-arm
-//    reads `.value as FHIR.boolean`) MUST carry an explicit boolean `value is` — bare / non-boolean is an ERROR (no
-//    manufactured default; the author states the determination).
-//  - An authored `value is` on a PRESENCE-based (value-blind) boolean concept (`exists this`) is a WARNING (both
-//    lanes ignore it; `value is false` there computes the concept TRUE).
+//  - Recognized value-reading boolean concepts allow omitted values (unknown) and reject authored non-booleans.
+//  - Values outside the validator's recognized value-reading forms get a conditional warning. That includes
+//    existence-only computations and some answer/merge forms; the warning must not tell authors to discard answers.
 
 const POLICY = [
   '# P',
@@ -43,13 +41,13 @@ const POLICY = [
   '- definition is exists this.',
 ].join('\n');
 
-function validateInline(factsAndCases: string): CELValidationResult {
+function validateInline(factsAndCases: string, additionalCrl = ""): CELValidationResult {
   const root = mkdtempSync(path.join(os.tmpdir(), "bool-value-rules-"));
   try {
     writeFileSync(path.join(root, "package.json"), JSON.stringify({
       name: "l", version: "0.0.0", private: true, crl: { canonicalBase: "http://example.org/hcsc/dme-iface" },
     }));
-    writeFileSync(path.join(root, "policy.crl"), POLICY);
+    writeFileSync(path.join(root, "policy.crl"), POLICY + "\n" + additionalCrl);
     const cel = path.join(root, "cases.cel");
     writeFileSync(cel, [
       '# C', 'library "C".', 'covers "L".',
@@ -103,6 +101,11 @@ describe("#189 Piece 3 (Option C) — value-reading boolean assertion rules", ()
       'case "c":', '- subject is "Pat".', '- fact is "W".', '- result is "D" is "Deny".',
     ].join('\n'));
     expect(kinds(r).warnings).toContain("value-ignored-on-presence-concept");
+    const message = r.warnings.find(w => w.kind === "value-ignored-on-presence-concept")!.message;
+    expect(message).toContain("preserve an explicit false answer");
+    expect(message).toContain("For an existence-only determination");
+    expect(message).not.toMatch(/omit the fact/i);
+    expect(message).not.toMatch(/explicit absence is an? absence code/i);
     // It is a WARNING, not an error — the fact still populates by presence.
     expect(kinds(r).errors).not.toContain("value-reading-assertion-needs-boolean");
   });
@@ -113,6 +116,21 @@ describe("#189 Piece 3 (Option C) — value-reading boolean assertion rules", ()
       'case "c":', '- subject is "Pat".', '- fact is "W".', '- result is "D" is "Deny".',
     ].join('\n'));
     expect(kinds(r).warnings).not.toContain("value-ignored-on-presence-concept");
+  });
+
+  it("the current broader classifier warns on composition without discarding its explicit answer", () => {
+    // Current diagnostic coverage, not an endorsement of the broad classifier; update when #320 repairs it.
+    const r = validateInline([
+      'fact "Composite No":', '- value is false.', '- defined by "L"."Widget Documented".',
+      'case "c":', '- subject is "Pat".', '- fact is "Composite No".',
+    ].join('\n'), [
+      'concept "Widget Documented":', '- type is Observation.', '- value type is boolean.',
+      '- code is `widget-documented`.', '- defined as ("Has Widget" sem-or "Has Widget").',
+    ].join('\n'));
+    const warning = r.warnings.find(w => w.kind === "value-ignored-on-presence-concept");
+    expect(warning?.message).toContain("preserve an explicit false answer");
+    expect(warning?.message).toContain("For an existence-only determination");
+    expect(warning?.message).not.toMatch(/omit the fact/i);
   });
 
   it("a WRONG code naming the interface (non-member) → NO value-reading error (owned by fact-code-not-in-local-set)", () => {

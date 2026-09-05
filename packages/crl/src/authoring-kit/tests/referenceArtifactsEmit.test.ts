@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import { getAuthoringKit } from "../index";
 import { emitFhirDefFromPath, validateCRL } from "../../index";
+import { parseInput } from "../../ast/tests/parseInput";
 
 /**
  * ⭐⭐ EVERY REFERENCE ARTIFACT MUST EMIT. This is the gate whose absence let SIX of seven ship broken.
@@ -27,7 +28,13 @@ import { emitFhirDefFromPath, validateCRL } from "../../index";
  */
 
 const kit = getAuthoringKit("local-decision-support", "prior-auth");
-const crlArtifacts = kit.referenceArtifacts.filter((a) => a.name.endsWith(".crl"));
+const crlArtifacts = kit.referenceArtifacts.filter((a) => a.language === "crl");
+
+const bareNonObservationAnswers = (source: string) => parseInput(source).statements
+  .filter(c => c.type === "Concept" && c.code && c.valueTypes.includes("boolean") &&
+    (!c.shape || c.shape === "Scalar") && !c.definition && c.representations.length === 0 &&
+    c.conceptType !== "Observation")
+  .map(c => c.type === "Concept" ? c.name : "");
 
 /**
  * The ONE artifact that legitimately does not emit, with the reason stated.
@@ -38,8 +45,8 @@ const crlArtifacts = kit.referenceArtifacts.filter((a) => a.name.endsWith(".crl"
 const NON_EMITTING: Readonly<Record<string, string>> = {
   "representation-reference.crl":
     "teaches the representation MODEL at the grammar/validator surface; its `code is` concepts " +
-    "deliberately carry no `type is` and pair a local code with a top-level definition, neither of " +
-    "which the emitter accepts yet. Stamped `validate-only`, and it satisfies that stamp.",
+    "pair a local code with top-level DefinitionIsDefinition forms (Up To Date On Mammography, BMI, " +
+    "High BMI) that still produce emit-mixed-code-and-definition. Stamped validate-only, and it satisfies that stamp.",
 };
 
 const PROJECT = {
@@ -68,7 +75,8 @@ const emitArtifact = (name: string, source: string) => {
   const dir = mkdtempSync(join(tmpdir(), "crl-kit-emit-"));
   for (const [f, body] of Object.entries(PROJECT)) writeFileSync(join(dir, f), body);
   // Every `.crl` artifact is written, so a cross-library reference resolves.
-  for (const a of crlArtifacts) writeFileSync(join(dir, a.name), a.source);
+  for (const a of crlArtifacts)
+    writeFileSync(join(dir, a.name), a.name === name ? source : a.source);
   const r = emitFhirDefFromPath(join(dir, name));
   return {
     success: r.success,
@@ -85,6 +93,10 @@ describe("every kit reference artifact does what its stamp claims", () => {
   for (const a of crlArtifacts) {
     const exemptReason = NON_EMITTING[a.name];
 
+    it(`${a.name} carries exactly the emit claim its executed gate supports`, () => {
+      expect(a.verification.includes("fhir-emit")).toBe(!exemptReason);
+    });
+
     it(`⭐ ${a.name} VALIDATES clean`, () => {
       const v = validateCRL(a.source) as unknown as { errors?: unknown[] };
       expect(v.errors ?? []).toEqual([]);
@@ -95,7 +107,12 @@ describe("every kit reference artifact does what its stamp claims", () => {
         // Pinned so the exemption is a decision, not a silence. If this artifact starts emitting, this
         // test fails and the exemption gets removed deliberately.
         const r = emitArtifact(a.name, a.source);
-        expect(r.hardErrors.length).toBeGreaterThan(0);
+        expect(r.hardErrors).toHaveLength(3);
+        for (const name of ["Up To Date On Mammography", "BMI", "High BMI"]) {
+          expect(r.hardErrors).toEqual(expect.arrayContaining([
+            expect.objectContaining({ kind: "emit-mixed-code-and-definition", message: expect.stringContaining(`"${name}"`) }),
+          ]));
+        }
       });
       continue;
     }
@@ -106,26 +123,44 @@ describe("every kit reference artifact does what its stamp claims", () => {
       // is teaching a shape the emitter rejects.
       expect(
         r.hardErrors.map((e) => (e as { kind?: string }).kind ?? "error"),
-        `${a.name} does not emit — a KE copying it authors a shape the emitter rejects`,
+        `${a.name} or its dependency closure does not emit: ${JSON.stringify(r.hardErrors)}`,
       ).toEqual([]);
       expect(r.success).toBe(true);
       expect(r.caseFeatureSds).toBeGreaterThan(0);
     });
   }
 
-  it("⚠ no locally-coded boolean criterion uses a non-Observation `type is`", () => {
+  it("a broken reference cannot retain an apparently successful FHIR emission", () => {
+    const a = crlArtifacts.find((a) => a.name === "decision-reference.crl")!;
+    const broken = a.source.replace("- type is Observation.", "");
+    expect(broken).not.toBe(a.source);
+    const r = emitArtifact(a.name, broken);
+    expect(r.success).toBe(false);
+    expect(r.hardErrors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "emit-local-code-missing-type", message: expect.stringContaining('"Hard Exclusion"') }),
+    ]));
+  });
+
+  it("CEL companions carry no unexecuted FHIR-emission claim", () => {
+    for (const a of kit.referenceArtifacts.filter((a) => a.language === "cel")) {
+      expect(a.verification).not.toContain("fhir-emit");
+    }
+  });
+
+  it("bare local boolean answers use Observation; record derivations retain their resource type", () => {
     // The exact defect, pinned at the source rather than only via its emit consequence: a local `code is`
     // boolean with no source representation is an ANSWER and must be an Observation. A non-Observation
     // type is emittable only as an INFERENCE (`definition is exists this`), and bare `code is` on one is
     // neither — which is why it emitted nothing.
     for (const a of crlArtifacts) {
       if (NON_EMITTING[a.name]) continue;
-      const offenders = [
-        ...a.source.matchAll(/- value type is boolean\.\s*\n- type is (\w+)\.\s*\n- code is /g),
-      ]
-        .map((m) => m[1])
-        .filter((t) => t !== "Observation");
-      expect(offenders, `${a.name} declares a local boolean on ${offenders.join(", ")}`).toEqual([]);
+      expect(bareNonObservationAnswers(a.source), a.name).toEqual([]);
     }
+  });
+
+  it("the answer check admits Condition existence and catches a bare answer regardless of line order", () => {
+    const source = 'library "T".\nconcept "Prior Surgery":\n- type is Condition.\n- code is `prior-surgery`.\n- value type is boolean.\n- definition is exists this.';
+    expect(bareNonObservationAnswers(source)).toEqual([]);
+    expect(bareNonObservationAnswers(source.replace('- definition is exists this.', ''))).toEqual(["Prior Surgery"]);
   });
 });

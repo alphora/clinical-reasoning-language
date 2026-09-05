@@ -1,11 +1,11 @@
 # Representation-model reference — Mammogram (multi-source) + BMI (cascade)
 // Canonical `concept-layer-model` exemplar (authoring-kit). The v3 concept model, reconciled
-// with both KE teams. FORWARD-LOOKING capability preview: it exercises constructs that PARSE +
-// VALIDATE but are mostly runtime-DEFERRED (the general external posrep #257; `defined as exists`
-// #270; `definition is` selection/count/within) — EXCEPT the patient-age `value projection` (the
-// #257 age slice: T1 recency + T2 months) which RUNS. Shipped as `verification: validate-only` —
-// NOT a Stage-1 authoring license (see the kit `boundary`); the value-preserving `sem-or` union +
-// the standalone age `value projection` are the pieces to learn.
+// with both KE teams. This exact artifact is validated, not runtime-proven.
+// External representations (#257) and record-existence reach-through (#270) have shipped
+// elsewhere; that does not establish this artifact's emission or engine behavior. Its local
+// code + top-level definition forms remain unlowered. Shipped as `verification: ["validate-only"]`.
+// Learn the value-preserving sem-or union and addressability discipline; execute each actual
+// form before treating it as a runtime template.
 // NOTE: when the concept-form addressability clause lands, this header's discipline duplicates it
 // and this artifact is byte-pinned — reconcile the two then (cite the clause; #257).
 //
@@ -129,14 +129,11 @@ concept "High BMI":
 - code is `high-bmi`.
 - definition is "BMI" at least 30 'kg/m2'.
 
-// ============ Patient age — the one sanctioned `value projection` posrep (standalone, months) ============
-// A STANDALONE age determination: the Patient age `source representation` ALONE (no local `code is`),
-// so the determination IS the live projection over `Patient.birthDate`. `value projection` is the
-// rep-level COMPUTATION — the sole one with a built emit-lowering is `age today` (#257 T1; T2 added
-// the `months` unit alongside `years`); an `age today` projection with a bad comparator/unit/carrier
-// is tool-rejected (other projection phrases parse but are runtime-deferred, not rejected). Recency
-// applies ONLY when a local `code is` override is also present (see the patient-age recency
-// exemplar); this standalone form has none.
+// ============ Patient age projection (standalone, months) ============
+// This standalone determination computes from Patient.birthDate, with no local code override.
+// Age today supports years/months and rejects unsupported comparators, units and carriers.
+// Rep-local exists this projections are also implemented; arbitrary projection phrases need
+// their own execution proof. Recency applies when a local code producer is also present.
 concept "Patient Under Six Months":
 - value type is boolean.
 - source representation:

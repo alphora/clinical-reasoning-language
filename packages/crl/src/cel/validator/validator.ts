@@ -670,14 +670,10 @@ function validateNumericValueRules(
   );
 }
 
-/** #189 Piece 3 (Option C, disc 512) — the VALUE-READING boolean assertion rules. A fact that directly asserts (by
- *  qualified `defined by`) a value-reading boolean determination (a member-existence interface) MUST carry an explicit
- *  boolean `value is` — its determination IS its value, so a bare assertion (which emits a valueless Observation the
- *  own-arm reads as null → false, while the CRE would presence-satisfy it → true) is an ERROR that tells the author to
- *  be explicit; a non-boolean value is the same error. Conversely, an authored `value is` on a PRESENCE-based
- *  (value-blind) boolean concept is a WARNING — both lanes read it by existence, so the value is ignored (a
- *  `value is false` there computes the concept TRUE). Classification is the SHARED `isValueReadingBooleanConcept`, so
- *  the validator, the CRE, and the emitter agree on which concepts read their value. */
+/** Boolean assertion checks for facts that populate the named concept. Recognized value-reading forms accept
+ *  omitted values (unknown) and reject authored non-boolean values. Other locally coded boolean forms receive a
+ *  conditional warning when a value is supplied. That classifier also misses answer/merge forms, so this warning
+ *  must not claim universal existence semantics or tell authors to discard an explicit answer. */
 function validateBooleanValueRules(
   f: CELFact,
   graph: ResolvedCelGraph,
@@ -756,15 +752,16 @@ function validateBooleanValueRules(
     return;
   }
 
-  // A PRESENCE-based (value-blind) boolean concept: an authored value is ignored by both lanes → warn.
+  // The classifier also misses some answer/merge forms; keep the warning conditional, not a universal value-blind claim.
   if (isBooleanValued && hasCode && valueField) {
     warnings.push(
       warn(
         "value-ignored-on-presence-concept",
-        `Fact "${f.name}" authors \`value is ${JSON.stringify(celValueScalar(valueField.value))}\` on presence-based boolean concept ` +
-          `"${libName}"."${declName}", whose determination is computed by EXISTENCE — the value is ignored (both ` +
-          `lanes compute it true when the record is present, regardless of the value). To assert it false, omit the ` +
-          `fact (closed-world absence); explicit absence is an absence code, not \`value is false\`.`,
+        `Fact "${f.name}" authors \`value is ${JSON.stringify(celValueScalar(valueField.value))}\` on boolean concept ` +
+          `"${libName}"."${declName}", whose determination this validator cannot confirm is read from the stored value. If its local code ` +
+          `is an answer arm, preserve an explicit false answer and verify the emitted behavior. For an ` +
+          `existence-only determination, a false value does not negate a matching record's existence. ` +
+          `Do not discard an answer or remodel the concept merely to silence this warning.`,
         valueField.location,
         fp,
       ),

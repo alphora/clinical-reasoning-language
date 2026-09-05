@@ -5,14 +5,14 @@
  * kit's worked examples. They are embedded as TS string constants (NOT `.crl`/`.cel`
  * files) because the npm package and the VSIX ship `dist/**` only — a source-tree
  * `.crl` would not be present at runtime for the MCP consumers. Each artifact carries a
- * `verification` tier, and the kit's unit test enforces each tier's in-repository FLOOR
+ * `verification` set, and the kit's unit test enforces each tier's in-repository FLOOR
  * (see the payload `verificationLegend`): EVERY artifact is built + validator-clean;
  * a `cre-run` `.crl`+`.cel` pair is ADDITIONALLY executed through the CRE (the engine
  * behind `run_decision`) every build. An `engine-run` artifact only RECORDS a
  * point-in-time external-harness `$r5.apply` claim over its construct — the kit suite
  * does NOT re-run that, so `engine-run` is not proven here, only the validate floor is.
- * So the embedded text is proven to (or, for engine-run, recorded at) its declared tier,
- * never over-claimed past it.
+ * So the embedded text is proven to (or, for engine-run, recorded at) its declared proof methods,
+ * never over-claimed past them. `fhir-emit` additionally executes CRL emission in referenceArtifactsEmit.test.ts.
  * (THE EXCEPTION — `REPRESENTATION_REFERENCE_CRL`: the CANONICAL source is the
  * `tests/fixtures/representation/mammogram-and-bmi.crl` FILE — which is ALSO the rule-B
  * positive exemplar, so it must stay a file — and this const is its SHIPPED MIRROR, kept
@@ -256,7 +256,8 @@ case "hard exclusion -> denied":
  * drives the real CRE over it (criterion-1 node, the criterion `or`-guard resolving on
  * either distinct criterion, and the `defined as` node resolving on either record). #234.
  */
-export const CRITERIA_DECISION_REFERENCE_CRL = `# Criteria Decision Reference — coverage criteria as DECISION NODES (Stage 1)
+export const CRITERIA_DECISION_REFERENCE_CRL =
+  `# Criteria Decision Reference — coverage criteria as DECISION NODES (Stage 1)
 library "Coverage Criteria Reference".
 
 /*
@@ -422,7 +423,6 @@ case "no qualifying diagnosis -> deny (criterion-1 node otherwise)":
 - result is "Coverage Determination" is "not-certify.Deny".
 `;
 
-
 /**
  * Canonical PRIOR-AUTHORIZATION exemplar (#134) — distinct from the CDS
  * `decision-reference` (which ORDERs a service via `CPGServiceRequest`). Here the
@@ -432,7 +432,8 @@ case "no qualifying diagnosis -> deny (criterion-1 node otherwise)":
  * mode. A single local criterion keeps the focus on the determination pattern; a real
  * policy authors its DISTINCT criteria as decision-tree nodes (see criteria-decision-reference).
  */
-export const PA_DETERMINATION_REFERENCE_CRL = `# PA Determination Reference — Coverage Determination (Stage 1 PA exemplar)
+export const PA_DETERMINATION_REFERENCE_CRL =
+  `# PA Determination Reference — Coverage Determination (Stage 1 PA exemplar)
 library "PA Determination Reference".
 
 /*
@@ -504,7 +505,8 @@ case "no qualifying diagnosis -> deny (otherwise)":
  * the `use decision` node), not the disposition alone — a sub's `otherwise` Deny and the parent's `otherwise`
  * Deny are indistinguishable by membership (§4-req1).
  */
-export const SOURCE_DELEGATED_DECISION_REFERENCE_CRL = `# Source-Delegated Decision Reference — source-required \`use decision\` delegation (Stage 1)
+export const SOURCE_DELEGATED_DECISION_REFERENCE_CRL =
+  `# Source-Delegated Decision Reference — source-required \`use decision\` delegation (Stage 1)
 library "Source Delegated Decision Reference".
 
 /*
@@ -631,7 +633,8 @@ case "neither -> deny in parent otherwise":
  * from the pre-#224 \`sem-not\` form (run_decision 6/6); this artifact RE-GROUNDS that form to the decision layer —
  * the \`sem-not\` FINAL-* arbitration was the single-concept-\`when\`-era workaround the decision layer now subsumes.
  */
-export const DISPOSITION_ARBITRATION_REFERENCE_CRL = `# Disposition-Arbitration Reference — overlapping qualifying pathways with outcome precedence (Stage 1)
+export const DISPOSITION_ARBITRATION_REFERENCE_CRL =
+  `# Disposition-Arbitration Reference — overlapping qualifying pathways with outcome precedence (Stage 1)
 library "Disposition Arbitration Reference".
 
 /*
@@ -807,9 +810,8 @@ The Inferred layer RECENCY-MERGES the two: newest of the local age Observation
 (\`Observation.effective\`) vs \`Patient.meta.lastUpdated\` wins; indeterminate
 (\`lastUpdated\` absent) -> the session-fresh local-source wins. The recency timestamp is
 an INVARIANT of the built Patient age projection, NOT authored (no \`recency is\` keyword).
-AGE ONLY — the ONLY projection with a built emit-lowering is \`age today\`; an \`age today\`
-projection with a bad comparator/unit/carrier is tool-rejected (any OTHER projection phrase
-parses + validates but is runtime-deferred, OUT of scope by rule — not tool-rejected). This is a
+PROJECTION COVERAGE: this example works age today. Rep-local existence projections also emit;
+other phrases need their own execution proof. This is a
 2-representation concept in the MODEL sense — ONE authored \`source representation\` block PLUS
 one local \`code is\` producer — NOT two \`source representation\` blocks (a second age posrep is
 rejected). A STANDALONE age (no local override — see the \`representation-reference\` exemplar) is
@@ -835,8 +837,6 @@ concept "Age 18 Or Older":
 - code is \`age-18-or-older\`.
 - source representation:
   - type is Patient.
-  - value element is Patient.birthDate.
-  - value type is date.
   - value projection is age today at least 18 years.
 
 // UPPER bound (#215) — the pediatric "under 21" gate as ONE positive concept, NOT the
@@ -848,8 +848,6 @@ concept "Patient Under Twenty One Years":
 - code is \`under-21\`.
 - source representation:
   - type is Patient.
-  - value element is Patient.birthDate.
-  - value type is date.
   - value projection is age today under 21 years.
 
 decision "Adult Eligibility Determination":
@@ -885,12 +883,12 @@ activity "Deny":
  */
 export const REPRESENTATION_REFERENCE_CRL = `# Representation-model reference — Mammogram (multi-source) + BMI (cascade)
 // Canonical \`concept-layer-model\` exemplar (authoring-kit). The v3 concept model, reconciled
-// with both KE teams. FORWARD-LOOKING capability preview: it exercises constructs that PARSE +
-// VALIDATE but are mostly runtime-DEFERRED (the general external posrep #257; \`defined as exists\`
-// #270; \`definition is\` selection/count/within) — EXCEPT the patient-age \`value projection\` (the
-// #257 age slice: T1 recency + T2 months) which RUNS. Shipped as \`verification: validate-only\` —
-// NOT a Stage-1 authoring license (see the kit \`boundary\`); the value-preserving \`sem-or\` union +
-// the standalone age \`value projection\` are the pieces to learn.
+// with both KE teams. This exact artifact is validated, not runtime-proven.
+// External representations (#257) and record-existence reach-through (#270) have shipped
+// elsewhere; that does not establish this artifact's emission or engine behavior. Its local
+// code + top-level definition forms remain unlowered. Shipped as \`verification: ["validate-only"]\`.
+// Learn the value-preserving sem-or union and addressability discipline; execute each actual
+// form before treating it as a runtime template.
 // NOTE: when the concept-form addressability clause lands, this header's discipline duplicates it
 // and this artifact is byte-pinned — reconcile the two then (cite the clause; #257).
 //
@@ -1014,14 +1012,11 @@ concept "High BMI":
 - code is \`high-bmi\`.
 - definition is "BMI" at least 30 'kg/m2'.
 
-// ============ Patient age — the one sanctioned \`value projection\` posrep (standalone, months) ============
-// A STANDALONE age determination: the Patient age \`source representation\` ALONE (no local \`code is\`),
-// so the determination IS the live projection over \`Patient.birthDate\`. \`value projection\` is the
-// rep-level COMPUTATION — the sole one with a built emit-lowering is \`age today\` (#257 T1; T2 added
-// the \`months\` unit alongside \`years\`); an \`age today\` projection with a bad comparator/unit/carrier
-// is tool-rejected (other projection phrases parse but are runtime-deferred, not rejected). Recency
-// applies ONLY when a local \`code is\` override is also present (see the patient-age recency
-// exemplar); this standalone form has none.
+// ============ Patient age projection (standalone, months) ============
+// This standalone determination computes from Patient.birthDate, with no local code override.
+// Age today supports years/months and rejects unsupported comparators, units and carriers.
+// Rep-local exists this projections are also implemented; arbitrary projection phrases need
+// their own execution proof. Recency applies when a local code producer is also present.
 concept "Patient Under Six Months":
 - value type is boolean.
 - source representation:

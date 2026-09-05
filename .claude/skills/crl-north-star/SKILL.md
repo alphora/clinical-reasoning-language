@@ -1,6 +1,6 @@
 ---
 name: crl-north-star
-description: Load the CRL north star before any CRL language, emitter, representation, or #189/emit-cluster work — and hand it to reviewers. Invoke at the START of every such round so you (and the panel) measure against how CRL actually works, not CQL idioms or chart-matching assumptions.
+description: "Load the CRL north star before any CRL language, emitter, representation, or #189/emit-cluster work — and hand it to reviewers. Invoke at the START of every such round so you (and the panel) measure against how CRL actually works, not CQL idioms or chart-matching assumptions."
 ---
 
 # CRL North Star — round-start protocol
@@ -28,7 +28,11 @@ firing a review panel, **ground yourself (and the reviewers) in how CRL actually
      (scalar ⇒ explicit reduction required; record/record-set ⇒ publishes its records); its **cardinality**
      (`RecordSet | Record | Scalar`) is declared, not inferred from use; its CQL is **context-free**.
    - **The emitter manufactures nothing** — every set→scalar reduction is explicit.
-   - **Closed-world:** absence = empty/false; explicit absence = an absence code (a record), not "unknown."
+   - **Absence follows what is read:** existence over records is false when no record matches; an unanswered
+     question is unknown. Explicit false is a stated boolean value, never an absence code. Boolean
+     composition must preserve unknown in the model; the current CRE's `defined as` composition still
+     collapses it, so a green CRE run does not prove that requirement. Per-action guards retain their
+     documented two-valued behavior (§4).
    - **Maturity:** PA is the deep, correct use case; QM *artifacts* are a provisional smoke test (don't
      anchor on them), but the *capabilities* they validated (`sem-and`/`sem-not`) are real.
 

@@ -114,7 +114,7 @@ describe("authoring-kit — reference artifacts", () => {
       /- value projection is age today under 21 years\./,
     );
     // Both concepts carry the Patient/birthDate posrep carrier.
-    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL.match(/- value element is Patient\.birthDate\./g) ?? []).toHaveLength(2);
+    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).not.toMatch(/value element is|value type is date/);
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(
       /when "Patient Under Twenty One Years" then recommend activity "Approve"/,
     );
@@ -417,7 +417,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.29");
+    expect(kit.schemaVersion).toBe("1.30");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -521,19 +521,22 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("STEP-4 (kit 1.18) — the `verification` taxonomy is honest, in-payload, and tier↔proof-consistent (disc 408)", () => {
     for (const uc of ["cpg", "prior-auth"] as const) {
       const kit = getAuthoringKit("local-decision-support", uc);
-      // (a) EVERY artifact declares exactly one recognized tier.
-      const tiers = new Set(["cre-run", "engine-run", "validate-only"]);
+      // (a) EVERY artifact declares a nonempty set of recognized tiers.
+      const tiers = new Set(["cre-run", "fhir-emit", "engine-run", "validate-only"]);
       for (const a of kit.referenceArtifacts) {
-        expect(tiers.has(a.verification), `${a.name} has an unrecognized tier ${a.verification} in ${uc}`).toBe(
-          true,
-        );
+        expect(a.verification.length).toBeGreaterThan(0);
+        expect(new Set(a.verification).size).toBe(a.verification.length);
+        expect(
+          a.verification.every((tier) => tiers.has(tier)),
+          a.name,
+        ).toBe(true);
       }
       // (b) The legend is IN the (hashed) payload — a TS docstring never reaches the MCP consumer. It is EXACTLY
       //     the set of tiers the shipped artifacts use — no duplicate entries (uniqueness), no dangling entry for
       //     an unused tier (coverage both ways = set equality) — each with a non-empty `means` + `doesNotProve`.
       const legendTierList = kit.verificationLegend.map((l) => l.tier);
       const legendTiers = new Set(legendTierList);
-      const usedTiers = new Set(kit.referenceArtifacts.map((a) => a.verification));
+      const usedTiers = new Set(kit.referenceArtifacts.flatMap((a) => a.verification));
       expect(legendTierList.length, `duplicate legend entries in ${uc}`).toBe(legendTiers.size);
       expect([...legendTiers].sort(), `legend tiers != tiers artifacts use in ${uc}`).toEqual(
         [...usedTiers].sort(),
@@ -551,22 +554,25 @@ describe("authoring-kit — getAuthoringKit", () => {
       for (const a of kit.referenceArtifacts) {
         const cel = byName.get(`${base(a.name)}.cel`);
         const crl = byName.get(`${base(a.name)}.crl`);
-        if (a.verification === "cre-run") {
+        if (a.verification.includes("cre-run")) {
           if (a.name.endsWith(".crl")) {
             expect(cel, `cre-run ${a.name} must have a .cel companion in ${uc}`).toBeDefined();
-            expect(cel!.verification).toBe("cre-run");
+            expect(cel!.verification).toContain("cre-run");
           } else {
             expect(crl, `cre-run ${a.name} must have a .crl companion in ${uc}`).toBeDefined();
           }
         } else {
           // engine-run / validate-only are NOT proven via a CEL pair — assert no companion CEL exists.
-          expect(cel, `${a.verification} ${a.name} must NOT have a .cel companion in ${uc}`).toBeUndefined();
+          expect(
+            cel,
+            `${a.name} has no cre-run proof and must NOT have a .cel companion in ${uc}`,
+          ).toBeUndefined();
         }
       }
       // (d) representation-reference is validate-only in BOTH assembled kits (cpg + inherited prior-auth), and its
       //     purpose flags it as a NON-authoring capability preview (proof axis ≠ authoring scope).
       const repr = byName.get("representation-reference.crl")!;
-      expect(repr.verification).toBe("validate-only");
+      expect(repr.verification).toEqual(["validate-only"]);
       expect(repr.edge).toBe("cpg");
       expect(repr.purpose).toMatch(/validate-only|CAPABILITY PREVIEW/);
       expect(repr.purpose).toMatch(/NOT .*Stage-1|OUT of Stage-1|not .*authoring/i);
@@ -602,7 +608,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     const kit = getAuthoringKit("local-decision-support", "prior-auth"); // the full 12-artifact chain
     const byName = new Map(kit.referenceArtifacts.map((a) => [a.name, a]));
     const crePairs = kit.referenceArtifacts.filter(
-      (a) => a.verification === "cre-run" && a.name.endsWith(".crl"),
+      (a) => a.verification.includes("cre-run") && a.name.endsWith(".crl"),
     );
     expect(crePairs.length).toBe(5); // the 5 decision exemplars — a mechanical guard so the loop can't silently no-op
     for (const crl of crePairs) {
@@ -700,7 +706,7 @@ describe("authoring-kit — getAuthoringKit", () => {
 
   it("verifyLoop is honest about what a green run does and does not prove", () => {
     const kit = getAuthoringKit();
-    expect(kit.verifyLoop.doesNotProve).toMatch(/asserted-only|never evaluates `code is`/);
+    expect(kit.verifyLoop.doesNotProve).toMatch(/code membership/);
     expect(kit.verifyLoop.note).toMatch(/project root|package\.json/);
   });
 
@@ -1028,7 +1034,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     // wants. That is a CORRECTNESS fix, not teaching, so it lands with the slice and re-pins at 1.25 with NO
     // bump — the doctrine re-teach + schemaVersion bump stay BATCHED (`tmp/WORKLIST-kit-deltas.md`).
     expect(cpg.contentHash).toBe(
-      "d2e88ac031928abbed94cfa4fe5b5795fa16226d6050ac58e98e7fded91d974d",
+      "017e2016ddc9672eac37acca4cf9d48fad4a8a1dcf6784790f61a9130dc09603",
     );
     // #189 null/pause — the priorAuth payload embeds the reference `.cel` artifacts, which gained explicit
     // `value is true/false` facts (a NEGATIVE must now be STATED; omission means UNKNOWN and PAUSES). That is
@@ -1041,7 +1047,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     //   changelog entry that explains the re-sync is the `inline-answer-options` rule itself. A KE pinning
     //   1.25 re-syncs and gets the teaching for the new construct in the same step.
     expect(priorAuth.contentHash).toBe(
-      "0bc71aad566638e321a1428df0d72137e0ddbb6e1b04d75918bb2772a3905b39",
+      "0c94484c277b7624ee9accd56a8b610eb49dffaa5b44b0798497f0108d718b85",
     );
   });
 
@@ -1062,6 +1068,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   //   - edit a HISTORICAL entry, which is visible in review as rewriting the past.
   // There is no longer a way to re-pin that looks like routine test maintenance.
   const KIT_PINS: Readonly<Record<string, { cpg: string; priorAuth: string }>> = {
+    "1.30": { cpg: "017e2016ddc9672eac37acca4cf9d48fad4a8a1dcf6784790f61a9130dc09603", priorAuth: "0c94484c277b7624ee9accd56a8b610eb49dffaa5b44b0798497f0108d718b85" },
     "1.29": {
       cpg: "d2e88ac031928abbed94cfa4fe5b5795fa16226d6050ac58e98e7fded91d974d",
       priorAuth: "0bc71aad566638e321a1428df0d72137e0ddbb6e1b04d75918bb2772a3905b39",
@@ -1079,7 +1086,9 @@ describe("authoring-kit — getAuthoringKit", () => {
         `SCHEMA_VERSION and add an entry to KIT_PINS — do not re-pin an existing version.`,
     ).toBeDefined();
 
-    expect(cpg.contentHash, `cpg payload moved under schemaVersion ${cpg.schemaVersion}`).toBe(pinned.cpg);
+    expect(cpg.contentHash, `cpg payload moved under schemaVersion ${cpg.schemaVersion}`).toBe(
+      pinned.cpg,
+    );
     expect(
       priorAuth.contentHash,
       `prior-auth payload moved under schemaVersion ${priorAuth.schemaVersion}`,
@@ -1100,6 +1109,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     // POSITIVE retired doctrine only — retirement/anchored MENTIONS (e.g. "`definition is age today` is
     // now an author-time + emit error") are legitimately present and must pass.
     const forbidden: [RegExp, string][] = [
+      [/AGE-ONLY guardrail|value projection` is age-only|only rep-level `value projection`|sole one with a built emit-lowering/i, "retired age-only implementation claim"],
       [/unit MUST be [`'"]?years/i, "years-only unit rule"],
       [/months`?\s*\/\s*`?days/i, "`months`/`days` error ordering (T2 sanctioned months)"],
       [/AgeAt\(\) is in (whole )?years/i, "AgeAt()-is-years rationale"],
@@ -1107,21 +1117,33 @@ describe("authoring-kit — getAuthoringKit", () => {
       // NOTHING against the very form it guards. Use a punctuation-crossing gap; verified green against the
       // current payload (the legit "retired `definition is age today` form" mention is >120 chars from any
       // preceding `code is`).
-      [/`code is`[\s\S]{0,120}`definition is age today`/i, "the retired `code is` + `definition is age today` both-rep form"],
+      [
+        /`code is`[\s\S]{0,120}`definition is age today`/i,
+        "the retired `code is` + `definition is age today` both-rep form",
+      ],
       // The retired FRAMING family (the "ONE/SOLE `definition is` exception/carve-out" doctrine) — patterns
       // above miss it. No false-positive surface: surviving "carve-out" hits are non-served comments or the
       // decision-composition "no carve-out"; current age doctrine says "SOLE sanctioned Stage-1 posrep".
-      [/the (ONE|SOLE)[^.]{0,40}`?definition is`?[^.]{0,20}(exception|carve-out)/i, "the retired `definition is` exception/carve-out framing"],
+      [
+        /the (ONE|SOLE)[^.]{0,40}`?definition is`?[^.]{0,20}(exception|carve-out)/i,
+        "the retired `definition is` exception/carve-out framing",
+      ],
     ];
     for (const useCase of ["cpg", "prior-auth"] as const) {
       const payload = JSON.stringify(getAuthoringKit(undefined, useCase));
       for (const [re, label] of forbidden) {
-        expect(re.test(payload), `${useCase}: retired doctrine "${label}" must not appear in the served payload`).toBe(false);
+        expect(
+          re.test(payload),
+          `${useCase}: retired doctrine "${label}" must not appear in the served payload`,
+        ).toBe(false);
       }
       // POSITIVE — the posrep model + T2 months ARE taught.
       expect(payload, useCase).toContain("value projection");
       expect(payload, useCase).toContain("patient-age-projection"); // the renamed rule id (accurate teaching surface)
       expect(payload, useCase).toContain("AgeInMonths"); // the months compute fn is taught
+      const age = getAuthoringKit(undefined, useCase).rules.find(r => r.id === "patient-age-projection")!;
+      expect(age.rule).toContain("PROJECTION COVERAGE");
+      expect(age.clauses?.some(c => c.force === "invariant" && /age family only/.test(c.text))).toBe(true);
     }
   });
 
@@ -1141,10 +1163,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(src).not.toContain("value element is");
     expect(src).not.toContain("- value type is date.");
     // STANDALONE = no local `code is` inside this concept's block (recency requires a `code is` arm).
-    const block = src.slice(
-      src.indexOf('concept "Patient Under Six Months":'),
-      src.length,
-    );
+    const block = src.slice(src.indexOf('concept "Patient Under Six Months":'), src.length);
     expect(block).not.toContain("code is");
   });
 
@@ -1204,7 +1223,10 @@ describe("authoring-kit — getAuthoringKit", () => {
         /criterion atom \/ nesting/i,
       ];
       for (const re of retired) {
-        expect(blob, `${uc}: retired #236 criterion framing "${re}" must not appear in the served payload`).not.toMatch(re);
+        expect(
+          blob,
+          `${uc}: retired #236 criterion framing "${re}" must not appear in the served payload`,
+        ).not.toMatch(re);
       }
       // POSITIVE — the define-reference reality is taught on the `criterion` rule.
       const crit = kit.rules.find((r) => r.id === "criterion")!;
@@ -1226,11 +1248,17 @@ describe("authoring-kit — getAuthoringKit", () => {
       // the EXAMPLE notes + reference-artifact purpose carry the post-flip phrasing (gpt/Claude R2/R3:
       // these had NO pin — a regression to "each conjunct its own action condition" matched no retired
       // regex and would pass). Pin on the serialized payload so the exact C2-class residue goes red HERE.
-      expect(blob, `${uc}: policy-alternatives example`).toMatch(/stay visible in the criterion's TRANSPARENT define body/i);
-      expect(blob, `${uc}: compound-guard example`).toMatch(/resolves to ONE identifier `condition\[\]` naming that criterion/i);
+      expect(blob, `${uc}: policy-alternatives example`).toMatch(
+        /stay visible in the criterion's TRANSPARENT define body/i,
+      );
+      expect(blob, `${uc}: compound-guard example`).toMatch(
+        /resolves to ONE identifier `condition\[\]` naming that criterion/i,
+      );
       // the criteria-decision-reference artifact is prior-auth-edge (filtered out of the cpg payload).
       if (uc === "prior-auth") {
-        expect(blob, `${uc}: criteria-decision reference purpose`).toMatch(/a named `criterion` is one identifier `condition\[\]` whose TRANSPARENT decomposable define/i);
+        expect(blob, `${uc}: criteria-decision reference purpose`).toMatch(
+          /a named `criterion` is one identifier `condition\[\]` whose TRANSPARENT decomposable define/i,
+        );
       }
       // POSITIVE — the re-grounded discriminator lands on the hollowed-criteria judge lens (opacity, not count).
       const lens = kit.judgeLens.composition.find((c) => c.check === "hollowed-criteria")!;
@@ -1240,21 +1268,38 @@ describe("authoring-kit — getAuthoringKit", () => {
       // action-condition-count framing (Claude#2/gpt#C2: these had NO structural pin and DID survive
       // the first pass). Pin the inline-vs-named qualification on each so a regression goes red HERE.
       const dc = kit.rules.find((r) => r.id === "decision-composition")!;
-      expect(dc.why).toMatch(/a named criterion as one identifier `condition\[\]` resolving to a transparent define/i);
-      const dcInvariant = (dc.clauses ?? []).find((c) => /The faithful home is decision STRUCTURE/.test(c.text))!;
+      expect(dc.why).toMatch(
+        /a named criterion as one identifier `condition\[\]` resolving to a transparent define/i,
+      );
+      const dcInvariant = (dc.clauses ?? []).find((c) =>
+        /The faithful home is decision STRUCTURE/.test(c.text),
+      )!;
       expect(dcInvariant.text).toMatch(/a named criterion as one identifier `condition\[\]`/i);
       const bg = kit.rules.find((r) => r.id === "branch-guards")!;
       expect(bg.rule).toMatch(/a CRITERION atom is one `condition\[\]` naming the criterion/i);
-      const bgClause = (bg.clauses ?? []).find((c) => /a CRITERION atom is one identifier/.test(c.text))!;
-      expect(bgClause, `${uc}: branch-guards clause must carry the inline-vs-named carve-out`).toBeDefined();
+      const bgClause = (bg.clauses ?? []).find((c) =>
+        /a CRITERION atom is one identifier/.test(c.text),
+      )!;
+      expect(
+        bgClause,
+        `${uc}: branch-guards clause must carry the inline-vs-named carve-out`,
+      ).toBeDefined();
       const conceptForm = kit.rules.find((r) => r.id === "concept-form")!;
-      const cfInvariant = (conceptForm.clauses ?? []).find((c) => /the faithful form keeps each criterion/.test(c.text))!;
+      const cfInvariant = (conceptForm.clauses ?? []).find((c) =>
+        /the faithful form keeps each criterion/.test(c.text),
+      )!;
       expect(cfInvariant.text).toMatch(/a named criterion as one identifier `condition\[\]`/i);
       const minimalism = kit.rules.find((r) => r.id === "minimalism")!;
       expect(minimalism.rule).toMatch(/a named criterion as one identifier `condition\[\]`/i);
       // the dropped-or-added-criterion checkpoint now names the criterion define/input[] as a visible surface.
-      const dropped = kit.judgeLens.composition.find((c) => c.check === "dropped-or-added-criterion")!;
-      expect(dropped.checkpoints.some((c) => /a named criterion's transparent define \+ use-site `input\[\]`/i.test(c))).toBe(true);
+      const dropped = kit.judgeLens.composition.find(
+        (c) => c.check === "dropped-or-added-criterion",
+      )!;
+      expect(
+        dropped.checkpoints.some((c) =>
+          /a named criterion's transparent define \+ use-site `input\[\]`/i.test(c),
+        ),
+      ).toBe(true);
     }
   });
 
@@ -1342,14 +1387,14 @@ describe("authoring-kit — getAuthoringKit", () => {
       expect(vt!.rule).toMatch(/NON-boolean composition requires every LEAF non-boolean/);
       expect(vt!.rule).toMatch(/TOP-LEVEL `sem-not` \/ `defined as exists` result must be boolean/);
       // The lane matrix in the RIGHT direction: standard CQL emits, BUT run_decision cannot prove it ON-PATH.
-      expect(vt!.rule).toMatch(/STANDARD CQL emit lowers it to `exists[\s\S]*?BUT `run_decision` cannot PROVE it/);
-      expect(vt!.rule).toMatch(/EVALUATED ON A DECISION PATH/);
+      expect(vt!.rule).toMatch(/standard CQL and the CRE support record-existence/);
+      expect(vt!.rule).toMatch(/#317\/#318 remain unresolved/);
       // Honesty hedge — split so a bare "#266" token alone can't satisfy it (the most load-bearing assertion).
       expect(vt!.rule).toMatch(/NORMATIVE vs SHIPPED/);
       expect(vt!.rule).toMatch(/#266/);
       // `defined as exists` is CAPABILITY-STATUS, NOT a usable Stage-1 form (run_decision status:errors, #270).
       expect(vt!.rule).toMatch(/LANE MATRIX/);
-      expect(vt!.rule).toMatch(/NOT a usable Stage-1 form/);
+      expect(vt!.rule).toMatch(/not proof of arbitrary scalar reductions/);
       expect(vt!.rule).toMatch(/#270/);
       // CLAUSE FORCES — doctrine must NOT shelter under a `validator-enforced` tag (FORCE_MODEL §0). The
       // value-preserving DOCTRINE + the "don't relabel" guidance are `default`; only the shipped-check list
@@ -1358,8 +1403,12 @@ describe("authoring-kit — getAuthoringKit", () => {
       const preserving = clauses.find((c) => /VALUE-PRESERVING inference \(DOCTRINE/.test(c.text));
       const relabel = clauses.find((c) => /Do NOT relabel/.test(c.text));
       const shipped = clauses.find((c) => /SHIPPED rule-B checks/.test(c.text));
-      expect(preserving?.force, `value-preserving doctrine clause must be default in ${uc}`).toBe("default");
-      expect(relabel?.force, `don't-relabel guidance clause must be default in ${uc}`).toBe("default");
+      expect(preserving?.force, `value-preserving doctrine clause must be default in ${uc}`).toBe(
+        "default",
+      );
+      expect(relabel?.force, `don't-relabel guidance clause must be default in ${uc}`).toBe(
+        "default",
+      );
       expect(shipped?.force, `shipped-checks clause must be validator-enforced in ${uc}`).toBe(
         "validator-enforced",
       );

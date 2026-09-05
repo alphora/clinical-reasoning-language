@@ -84,7 +84,14 @@ export interface KitRuleClause {
 /** One authoring rule, categorized and (where possible) anchored to a source of truth. */
 export interface KitRule {
   id: string;
-  category: "decision-shape" | "guards" | "concept-model" | "dispositions" | "minimalism" | "cel" | "process";
+  category:
+    | "decision-shape"
+    | "guards"
+    | "concept-model"
+    | "dispositions"
+    | "minimalism"
+    | "cel"
+    | "process";
   /**
    * The specialization edge this rule belongs to (#191). EXPLICIT on every rule — a `prior-auth` rule is
    * assembled only into a chain that includes `prior-auth`; a `cpg` rule is in every chain. No implicit default
@@ -130,23 +137,13 @@ export interface KitExample {
   note?: string;
 }
 
-/**
- * The proof method an artifact has actually been VERIFIED to — the HONEST status, not an assurance rank. The three
- * values are different KINDS of proof, NOT an ordered ladder (a future artifact could be both `cre-run` and
- * `engine-run`; when one exists this becomes a set). Full per-tier semantics — including what each does NOT prove —
- * ship in the payload `verificationLegend`, because a TS docstring never reaches the remote-MCP consumer.
- *  - `cre-run` — the artifact (a `.crl` + `.cel` PAIR) is executed through the CRE (the engine behind `run_decision`)
- *    by the kit's OWN test suite every build. A `.cel`'s tier names the pair it proves. Proves the asserted
- *    recommendation is PRODUCED (membership) for each case — NOT exact output, guarded-item absence, or path
- *    identity; nor codes, engine retrieval, FHIR emit, or `$apply` (CRE v1 is asserted-only, never evaluates `code is`).
- *  - `engine-run` — validated by the kit suite AND the CONSTRUCT is verified at `$r5.apply` POINT-IN-TIME by a
- *    separate engine harness (NOT this exact artifact re-run by the kit suite; a historical claim). Used for the
- *    patient-age recency merge, which asserted-only `run_decision` cannot prove.
- *  - `validate-only` — validated by the kit suite (build + validator-clean) only; runtime execution DEFERRED (the
- *    constructs it exercises are runtime-deferred — posreps #257, `defined as exists` #270, `definition is`
- *    predicates). A capability preview, NOT a runtime-proven template.
+/** Independent proof methods; a reference may carry more than one. The payload legend states limits.
+ * cre-run: this exact CRL/CEL pair runs in the kit suite; asserted recommendation membership only.
+ * fhir-emit: this exact CRL emits successfully with case-feature SDs in the kit suite.
+ * engine-run: historical, point-in-time construct proof by an external engine harness.
+ * validate-only: this artifact is built and validated, without an execution claim.
  */
-export type VerificationTier = "cre-run" | "engine-run" | "validate-only";
+export type VerificationTier = "cre-run" | "fhir-emit" | "engine-run" | "validate-only";
 
 /** A full reference artifact, embedded inline (the package ships dist/** only). */
 export interface ReferenceArtifact {
@@ -158,8 +155,8 @@ export interface ReferenceArtifact {
    * library rides `prior-auth` with that library, so a `cpg` kit never ships a determination ref it cannot resolve).
    */
   edge: AuthoringEdge;
-  /** The proof method this artifact has been verified to (see the payload `verificationLegend` for full semantics). */
-  verification: VerificationTier;
+  /** The nonempty set of independent proof methods for this artifact (see the payload `verificationLegend` for full semantics). */
+  verification: [VerificationTier, ...VerificationTier[]];
   purpose: string;
   /** The complete artifact text. */
   source: string;
@@ -209,7 +206,11 @@ export interface VerifyLoop {
  * weighting axis (`weightedBy`), the adjudication `guidance`, and the `checkpoints` to walk per waiver.
  */
 export interface JudgeWaiverRule {
-  kind: "waiver-authored" | "waiver-ignored-span" | "waiver-intentional-unlink" | "waiver-disposition-class";
+  kind:
+    | "waiver-authored"
+    | "waiver-ignored-span"
+    | "waiver-intentional-unlink"
+    | "waiver-disposition-class";
   /** The signal that ranks this waiver's scrutiny (e.g. authoredKind, MN-keyword/clinical-language, dispositionClass). */
   weightedBy: string;
   /** How to judge whether the escape is EARNED vs a finding rubber-stamped away. */
@@ -305,7 +306,12 @@ export interface DispositionModel {
   /** The local `activity` block is required (a determination may live in a separate library; config does not generate it). */
   localActivityRequired: boolean;
   /** The framework categories (spec-anchored PAS review-actions) — the deployment configures options UNDER these. */
-  categories: { name: string; reviewActionCode: string; finality: "final" | "non-final"; meaning: string }[];
+  categories: {
+    name: string;
+    reviewActionCode: string;
+    finality: "final" | "non-final";
+    meaning: string;
+  }[];
   /** The `crl.dispositions` config contract the deployment fills. */
   config: {
     location: string;

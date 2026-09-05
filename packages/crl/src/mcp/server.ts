@@ -571,7 +571,7 @@ export function createServer(): McpServer {
       description:
         "Emit BOTH lanes from one .crl in a single call: the layered CQL closure AND the cpg-conformant FHIR Definition resources that reference it — the SAME two-lane composition as the CLI `crl-emit --target fhir-def` (shared `emitCrlTwoLane`, so the two cannot drift). " +
         "USE THIS (not `emit_cql`) for layered / both-representation policies: `emit_cql` is the single-library DIRECT lane and rejects both-representation with a duplicate `define`; `emit_crl` lowers it correctly via the decision/case-feature lane. The FHIR `Library.content` URLs point at the sibling `cql/<name>.cql`, so emitting one lane without the other ships broken references — this returns both together. " +
-        "Returns `{ success, cql: { libraries: [{ outputFilename, cql }] }, fhir: { resourceCount, resourceManifest: [{ resourceType, id, relativePath, sourceKind, sourceName }], errors, unmatched }, hardErrors, warnings, filenameCollisions, importDiagnostics, metadataErrors }`. `success` is true iff BOTH lanes are clean AND no CQL filename collides. `cql.libraries` carry the full CQL source (write each to `<out>/cql/<outputFilename>`); pass `includeResources: true` to also get the full FHIR `resources[]` (write each to `<out>/fhir/<ResourceType>/<id>.json`). Or pass `out` (an ABSOLUTE dir) to have the tool WRITE both lanes to disk for you via the same shared writer as the CLI — the response then adds `written: { cql, fhir }` (absolute paths) and omits the `cql.libraries[].cql` bodies (see the `out` field). " +
+        "Returns both lane manifests and diagnostics. `success` is true iff BOTH lanes are clean AND no CQL filename collides. Writes BOTH lanes under the project root by default: `src/cql/<outputFilename>` and `src/fhir/<ResourceType>/<id>.json`. Pass `out` to replace that ROOT, retaining the layout. Successful writes return `written: { cql, fhir }` with absolute paths and omit the CQL bodies; `includeResources: true` also returns full FHIR resources. Use an explicit scratch root for inspection because omitting `out` still writes. " +
         "Publishable+ emit needs a publication date — pass `date` (ISO) or set `crl.date` in the artifact package.json. " +
         "A `defined as` `sem-not` whose operand is not a truth-set (a `coded from` resource list, or a cross-library/`definition is`/cyclic operand whose flavor can't be established) cannot be lowered: `success` becomes `false` with an `emit-unlowerable-negation` error, and the CQL carries a compile-failing `CRLCommon.UnsupportedNegation(...)` sentinel (never a silent unnegated body). Express the negation as a positive-anchored `A sem-and sem-not B`, or move it to the decision layer (`not`).",
       inputSchema: {
@@ -601,11 +601,9 @@ export function createServer(): McpServer {
           .min(1)
           .optional()
           .describe(
-            "Optional ABSOLUTE output directory. ⭐ IN A KALM/KELP CONTENT PROJECT THIS IS THE PROJECT'S " +
-              "`src` DIRECTORY — the lanes hang off it, so `<project>/src` yields `src/cql/` + `src/fhir/`, " +
-              "which is where every consumer reads. Passing the PROJECT ROOT instead writes `./cql/` and " +
-              "`./fhir/`, which nothing loads. When set, BOTH lanes are ALSO written to disk — " +
-              "CQL to `<out>/cql/<outputFilename>`, FHIR to `<out>/fhir/<ResourceType>/<id>.json` — via the " +
+            "Optional ABSOLUTE output ROOT; omission uses the nearest package.json project root and STILL WRITES. " +
+              "CQL goes to `<root>/src/cql/<outputFilename>`, FHIR to `<root>/src/fhir/<ResourceType>/<id>.json`. " +
+              "Pass the project root, not its src directory: passing src would produce src/src/cql. Uses the " +
               "SAME shared writer as `crl-emit --target fhir-def --out-dir`, so MCP and CLI cannot drift. The " +
               "response then carries `written: { cql: string[], fhir: string[] }` (ABSOLUTE paths) and OMITS the " +
               "full `cql.libraries[].cql` bodies (they are on disk). Nothing is written if a hard error or CQL " +
@@ -639,7 +637,7 @@ export function createServer(): McpServer {
         "Returns a SUMMARY envelope by default: " +
         "`{ success, caseCount, resourceCount, caseManifest:[{caseSlug, librarySlug, resourceCount}], resourceManifest:[{caseSlug, resourceType, id, outputPath}], diagnostics }`. " +
         "Pass `includeResources: true` to also receive the full `emittedCases[]` array (each case's full FHIR JSON bodies). " +
-        "Or pass `out` (an ABSOLUTE dir) to have the tool WRITE the FHIR instance tree to disk for you via the same shared writer as the CLI, returning a `written` manifest (see the `out` field). " +
+        "Writes the instance tree under the nearest package.json project root by default. Pass `out` (an ABSOLUTE root) to replace that root, retaining `tests/data/fhir/`; returns a `written` manifest. Use a scratch root for inspection because omission still writes. " +
         "success is true iff there are zero error-severity diagnostics; `unsupported-yet`, `result-deferred`, and `precondition-failed` (when not error) are warnings, surfaced but non-fatal. " +
         "Diagnostic kinds: unsupported-yet (fact's `defined by` couldn't derive a bare FHIR type — case skipped), " +
         "result-deferred (`result is` parsed but not emitted, deferred to #70/metric), " +
@@ -660,19 +658,16 @@ export function createServer(): McpServer {
           .min(1)
           .optional()
           .describe(
-            "Optional ABSOLUTE output directory. ⭐ IN A KALM/KELP CONTENT PROJECT THIS IS " +
-              "`<project>/tests/data/fhir` — the writer owns `<out>/patient/`, so that value yields " +
-              "`tests/data/fhir/patient/<compartmentId>/<lowercase-type>/`. Passing `tests/data` instead " +
-              "silently produces a `tests/data/patient/` tree nothing loads. " +
-              "When set, the FHIR instances are ALSO written to disk at " +
-              "`<out>/<outputPath>/<id>.json` (the KALM-style tree) via the SAME shared writer as " +
+            "Optional ABSOLUTE output ROOT; omission uses the nearest package.json project root and STILL WRITES. " +
+              "Instances go to `<root>/tests/data/fhir/patient/<compartmentId>/<lowercase-type>/<id>.json`. " +
+              "Pass the project root, not tests/data/fhir. Uses the SAME shared writer as " +
               "`crl-emit --path x.cel --out-dir`, so MCP and CLI cannot drift. The response then carries " +
               "`written: string[]` (ABSOLUTE paths). Nothing is written if any error-severity diagnostic is " +
               "present (`written: null`); warning-only results (unsupported-yet / result-deferred) still write " +
               "(mirrors the CLI's write-then-exit-2). Relative paths are REJECTED (the server CWD is not your " +
-              "workspace). The write is NOT transactional. ⚠ `<out>/patient/` is WIPED AND REPOPULATED — the " +
+              "workspace). The write is NOT transactional. ⚠ `<root>/tests/data/fhir/patient/` is WIPED AND REPOPULATED — the " +
               "CEL data tree is producer-owned, so a renamed case cannot leave its old compartment behind. Do " +
-              "not hand-author under `<out>/patient/`, and do not target one directory from concurrent calls — " +
+              "not hand-author under that patient tree, and do not target one directory from concurrent calls — " +
               "the wipe makes that strictly worse than it was. A `cel-data-manifest.json` is written beside the tree " +
               "(case → compartmentDir → [{path, sha256}]) so the tree can be audited later by anyone, " +
               "without the response that produced it.",
@@ -719,9 +714,10 @@ export function createServer(): McpServer {
         "Evaluate the CRL decision(s) a CEL document covers over each case's facts and check the case's " +
         "`result is` oracle — the CRL Clinical Reasoning Engine (#115), an authoring-time interpreter " +
         "(NOT the FHIR/CQL engine). Pass `path` (an absolute .cel file path); the resolver walks to the " +
-        "nearest package.json to load the covered CRL closure. A concept is satisfied when a case fact is " +
-        "`defined by` it (asserted) OR its `defined as` inference (sem-and/sem-or/sem-not over one concept's representations, closed-world) " +
-        "evaluates true (#126); it walks the full decision shape (first:/all:/any:/otherwise + " +
+        "nearest package.json to load the covered CRL closure. Supported local/source representations check explicit code membership; unsupported membership falls back to name-based presence and is not a code check. " +
+        "a pure question reads its stated boolean answer, with omission unknown. Branch/criterion guards preserve unknown. " +
+        "CURRENT LIMITATION: `defined as` composition still converts unknown operands to false; its green result does not prove the model's required unknown propagation. " +
+        "It walks the full decision shape (first:/all:/any:/otherwise + " +
         "`unless`/`only when` guards) and a decision-leaf `result is` passes iff the expected branch is " +
         "in the produced recommendation set. A `use decision` target IS evaluated — bare same-library OR " +
         'qualified cross-library (`"Lib"."Sub"`) / self-qualified: the sub is recursed in place and its ' +
@@ -737,8 +733,8 @@ export function createServer(): McpServer {
         "`body` (its own boolean sub-tree, on the criterion's FIRST occurrence per case) or `reference:true` (a later " +
         "occurrence — body shown once, keeping the trace linear in distinct criteria); a single-ref `when` keeps `concept`. " +
         "`conceptTruth` is the case's per-concept answer over the whole closure — including OFF-path concepts " +
-        "`first:` never evaluated; an ABSENT (lib,name) is UNKNOWN, never `false`. NOT yet evaluated (deferred): `definition " +
-        "is` predicates (count/temporal/value) and `coded from`/external value sets.",
+        "`first:` never evaluated; an ABSENT (lib,name) is UNKNOWN, never `false`. Record-existence reach-through is supported; " +
+        "other reductions/projections may remain unsupported. Read runtime diagnostics rather than treating a successful parse as execution proof.",
       inputSchema: {
         path: z
           .string()
@@ -817,8 +813,8 @@ export function createServer(): McpServer {
           .string()
           .optional()
           .describe(
-            "ABSOLUTE path to the artifact root the tests/results tree hangs from. Defaults to the " +
-              ".cel's directory. Must be absolute: the MCP server's working directory is not your workspace.",
+            "ABSOLUTE output root the tests/results tree hangs from. Defaults to the project root " +
+              "(nearest package.json). Must be absolute: the MCP server's working directory is not your workspace.",
           ),
         prune: z
           .boolean()
@@ -901,11 +897,11 @@ export function createServer(): McpServer {
         "(waivers — how to adjudicate the FINAL-mode provenance waivers validate_provenance surfaces; and " +
         "composition — the decision-composition / chaining source-fidelity checks invented-determination-" +
         "boundary / hollowed-criteria / dropped-or-added-criterion that have no mechanical home), and a " +
-        "feedback URL. The verify loop states what a green `run_decision` does AND does NOT prove (it is " +
-        'asserted-only — it never evaluates `code is`). v1 stage: "local-decision-support" (narrow: local ' +
-        "`code is` sources only; shallow: asserted concepts + `defined as` inference over one concept's " +
-        "representations; no `definition is` predicates EXCEPT the sanctioned patient-age both-rep carve-out, " +
-        "and no external sources). " +
+        "feedback URL. The verify loop separates CRE case proofs, FHIR emission, and engine execution. " +
+        "Supported local/source representations check code membership; unsupported membership falls back " +
+        "to name-based presence, so a green CRE run does not prove every code was checked. " +
+        "The introductory examples cover local questions, shallow inference, and Patient age source " +
+        "projections; broader language forms have separate implementation limits recorded in the kit. " +
         'USE CASE (#191 lattice): "cpg" (default) is the neutral base framework (≈ full CRL); "prior-auth" ' +
         "adds the PA / medical-policy narrowings — the CONFIG-DRIVEN determination model (`configure-dispositions` " +
         "+ `disposition-mode` rules + the `dispositionModel` field: a determination is a plain local activity named " +
