@@ -121,13 +121,11 @@ export interface ResolvedStage {
    * catalog's binary `reads: "flow"` onto the occurrence would tell a lowering it consumes only the handed
    * space, which is how it would silently reduce one of the two arms and drop the other.
    *
-   * ⚠⚠ SCOPED, operator 2026-09-04 (charter §3): OWN ANSWERS COMPETE AT THE *SELECTION*, AND ARE NEVER
-   * INPUTS TO A *PRODUCER*. So `definition is exists "X"` on a coded concept reads **only X** — the union
-   * happens at the terminal selection, not inside the existence test. MEASURED consequence of the
-   * unscoped reading: a reviewer answering "No" writes an own record, `exists (this ∪ X)` is then TRUE
-   * *because they answered*, the constructed candidate is newer than their answer, and their "No" flips
-   * itself to "Yes". An answer ABOUT a set is not a MEMBER of it. `most recent "X"` is unaffected — there
-   * `this` and X are the same kind, and competing is the point.
+   * ⚠ A scoping clause was added here 2026-09-04 and RETRACTED the same day: it read "own answers compete at
+   * the SELECTION and are never inputs to a PRODUCER", which was built on "own answer" — a term the model does
+   * not define. The asserted arm is a set of records like any other; `$extract` is a SOURCE of records into it,
+   * not a category carrying precedence. Whether `exists "X"` on a coded concept should read `this ∪ X` or only
+   * X is genuinely OPEN — see the member-existence design notes — and is NOT settled by that clause.
    */
   reads: StageReads;
   /** The space (or value) handed IN. Stage 0's input is the source space, S0. */
