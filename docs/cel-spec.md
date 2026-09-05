@@ -218,9 +218,11 @@ Stage → FHIR intent:
 Per pitch v4 critical decision #1 (option d): `crl-emit` auto-dispatches by file extension.
 
 ```bash
-crl-emit --path features/.../cms22.cel  --out-dir tests/data/fhir            # → FHIR case instances
-crl-emit --path features/.../cms22.crl  --out-dir src --target fhir-def     # → src/cql/ + src/fhir/
+crl-emit --path features/.../cms22.cel                       # → tests/data/fhir/patient/…
+crl-emit --path features/.../cms22.crl  --target fhir-def    # → src/cql/ + src/fhir/
 ```
+
+`--out-dir` is optional; it names the ROOT to write under and defaults to the project root.
 
 Exit codes:
 - `0` — clean emit.

@@ -9,25 +9,41 @@ import type { Capability } from "../fhir-emitter";
 import { emitCQLImports } from "../imports/emit";
 import { emitCrlTwoLane } from "../emit-two-lane";
 import { writeTwoLane, EmitWriteError } from "../emit-writers";
+import { resolveEmitOutput, LANE_PRODUCES, type EmitLane } from "../emit-layout";
 
 type TargetMode = "cql" | "fhir-def" | undefined;
 
 const HELP_TEXT = `crl-emit — CRL/CEL → CQL or FHIR resource emitter
 
 USAGE:
-  crl-emit --path <file.{crl,cel}> --out-dir <dir> [--target <mode>] [--quiet]
+  crl-emit --path <file.{crl,cel}> [--out-dir <root>] [--target <mode>] [--quiet]
   crl-emit --help
+
+OUTPUT LOCATION:
+  --out-dir names the ROOT the layout below hangs off. OMIT IT and it defaults to the
+  project root (the nearest package.json), so output lands where every consumer already
+  reads. Passing the project root explicitly does exactly the same thing.
+
+  Pass any other path to write elsewhere — you get the SAME layout under it, i.e. a
+  mirror. That is what makes copying a scratch emit back into the project a straight
+  copy rather than a re-derivation.
+
+    <root>/src/cql/<library-name>.cql            --target fhir-def, and --target cql
+    <root>/src/fhir/<ResourceType>/<id>.json     --target fhir-def
+    <root>/tests/data/fhir/patient/<compartmentId>/<lowercase-type>/<id>.json   .cel input
 
 FLAGS:
   --path <file>     Input file (.crl or .cel). Required.
-  --out-dir <dir>   Output directory. Required.
+  --out-dir <root>  Root to write under. Optional; defaults to the project root.
   --target <mode>   Emit target for .crl input:
-                      cql       (default) CQL library files flat under <out-dir>/
-                      fhir-def  FHIR Definition resources + CQL libraries written
-                                atomically (either both lanes succeed or nothing is
-                                written). Layout:
-                                  <out-dir>/cql/<library-name>.cql
-                                  <out-dir>/fhir/<ResourceType>/<id>.json
+                      cql       (default) CQL library files only, into <root>/src/cql/
+                      fhir-def  FHIR Definition resources AND the CQL libraries they
+                                reference, from ONE emit. A CRL error writes nothing;
+                                the write itself is per-file and not transactional, so
+                                a filesystem failure can leave part of a deliverable.
+                                Layout:
+                                  <root>/src/cql/<library-name>.cql
+                                  <root>/src/fhir/<ResourceType>/<id>.json
                     Rejected with .cel input (CEL has its own FHIR-instance pipeline).
   --quiet           Print one summary line instead of one "wrote <path>" line per file
                     (--target fhir-def only).
@@ -152,20 +168,32 @@ function parseArgs(argv: string[]): {
 const { filePath, outDir, target, quiet, date, capability } = parseArgs(process.argv.slice(2));
 
 if (!filePath) {
-  console.error("Usage: crl-emit --path <file.crl> --out-dir <output-directory>");
+  console.error("Usage: crl-emit --path <file.{crl,cel}> [--out-dir <root>]");
   process.exit(1);
 }
 
-if (!outDir) {
-  console.error(
-    "Usage: crl-emit --path <file.{crl,cel}> --out-dir <output-directory>\n" +
-      "\n" +
-      ".crl input → per-CRL CQL emit (one library per file in the import closure).\n" +
-      ".cel input → per-case FHIR JSON instance emit (KALM-style directory tree).\n" +
-      "--out-dir is required.",
+// ⭐ `--out-dir` IS OPTIONAL, AND OMITTING IT IS THE NORMAL CASE. It names the ROOT the produces
+// table hangs off; left out, it defaults to the project root, so output lands where every consumer
+// already reads. Passing the project root explicitly is byte-identical to omitting it.
+//
+// ⚠ IT USED TO BE REQUIRED, and that was the defect: three tools took three different LEVELS with no
+// default and no statement anywhere of which level each wanted, so a KE emitted to a temp directory,
+// tested there, and then either forgot to copy back or copied back to the wrong depth. The parameter
+// was the attractive nuisance, not the agents.
+const lane: EmitLane = filePath.toLowerCase().endsWith(".cel")
+  ? "cel"
+  : target === "fhir-def"
+    ? "crl"
+    : "cql-flat";
+const resolved = resolveEmitOutput(lane, filePath, outDir);
+if (!resolved.ok) {
+  process.stderr.write(
+    `${resolved.reason}\n\nUsage: crl-emit --path <file.{crl,cel}> [--out-dir <root>]\n` +
+      `Writes ${LANE_PRODUCES[lane]} under the root.\n`,
   );
   process.exit(1);
 }
+const outDirResolved = resolved.dir;
 
 // Plan v3.2 §"CLI extension": .cel input is not compatible with either
 // CRL emit target. CEL has its own FHIR-instance emit pipeline.
@@ -231,7 +259,7 @@ if (filePath.toLowerCase().endsWith(".crl") && target === "fhir-def") {
   // to <out>/cql/, FHIR to <out>/fhir/, so the two surfaces cannot drift.
   let written;
   try {
-    written = writeTwoLane(two, outDir);
+    written = writeTwoLane(two, outDirResolved);
   } catch (e) {
     // Echo the partial write (so the operator sees what landed) — but not under
     // --quiet, which prints no per-file lines.
@@ -248,7 +276,7 @@ if (filePath.toLowerCase().endsWith(".crl") && target === "fhir-def") {
     for (const p of written.fhir) process.stdout.write(`wrote ${p}\n`);
   } else {
     process.stdout.write(
-      `wrote ${written.cql.length} CQL + ${written.fhir.length} FHIR resource(s) under ${outDir}\n`,
+      `wrote ${written.cql.length} CQL + ${written.fhir.length} FHIR resource(s) under ${outDirResolved}\n`,
     );
   }
 
@@ -276,12 +304,12 @@ if (filePath.toLowerCase().endsWith(".cel")) {
   // stack trace escape.
   let written;
   try {
-    written = writeEmitResult(result, outDir);
+    written = writeEmitResult(result, outDirResolved);
   } catch (e) {
-    process.stderr.write(`Failed to write CEL emit output under "${outDir}": ${(e as Error).message}\n`);
+    process.stderr.write(`Failed to write CEL emit output under "${outDirResolved}": ${(e as Error).message}\n`);
     process.exit(1);
   }
-  process.stdout.write(`wrote ${written.length} FHIR resource(s) under ${outDir}\n`);
+  process.stdout.write(`wrote ${written.length} FHIR resource(s) under ${outDirResolved}\n`);
   // T12 / #85: surface result-deferred (outcomes parsed but not emitted —
   // tied to #70 / `metric`) on stderr the same way unsupported-yet is
   // surfaced, with exit code 2. Pre-fix the deferral was silent and the
@@ -334,16 +362,16 @@ for (const entry of result.cqlByLibrary) {
 }
 
 try {
-  mkdirSync(outDir, { recursive: true });
+  mkdirSync(outDirResolved, { recursive: true });
 } catch (e) {
   process.stderr.write(
-    `Failed to create output directory "${outDir}": ${(e as Error).message}\n`,
+    `Failed to create output directory "${outDirResolved}": ${(e as Error).message}\n`,
   );
   process.exit(1);
 }
 
 for (const entry of result.cqlByLibrary) {
-  const outPath = path.join(outDir, entry.outputFilename);
+  const outPath = path.join(outDirResolved, entry.outputFilename);
   try {
     writeFileSync(outPath, entry.cql, "utf-8");
     process.stdout.write(`wrote ${outPath}\n`);

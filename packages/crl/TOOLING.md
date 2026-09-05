@@ -126,7 +126,7 @@ crl-emit --help
 | Flag | Required | Value | Default | Notes |
 |---|---|---|---|---|
 | `--path` | yes | path to `.crl` or `.cel` file | — | Absolute path recommended |
-| `--out-dir` | yes | output directory | — | Created if missing |
+| `--out-dir` | no | root to write under | the **project root** (nearest `package.json`) | Created if missing. See "the ROOT" below |
 | `--target` | for `.crl` | `cql` \| `fhir-def` | `cql` for `.crl`; rejected for `.cel` | See dispatch table below |
 | `--quiet` | no | (flag) | off | Suppress per-file `wrote …` lines (`--target fhir-def` only) |
 | `--date` | no | ISO date | `SOURCE_DATE_EPOCH` → `crl.date` → wall clock | Reproducible publication date (`--target fhir-def`); only stamped at publishable+ |
@@ -135,26 +135,30 @@ crl-emit --help
 
 **Input → output dispatch**
 
-| Input | `--target` | Output layout |
+| Input | `--target` | Output layout, relative to `<root>` |
 |---|---|---|
-| `.crl` | (omitted) or `cql` | `<out-dir>/<library-name>.cql` (flat) |
-| `.crl` | `fhir-def` | **BOTH lanes written atomically:** `<out-dir>/cql/<library-name>.cql` + `<out-dir>/fhir/<ResourceType>/<id>.json` |
-| `.cel` | (omitted) | `<out-dir>/patient/<compartmentId>/<lowercase-type>/<id>.json` (KALM per-case tree) + `<out-dir>/cel-data-manifest.json` |
+| `.crl` | (omitted) or `cql` | `<root>/src/cql/<library-name>.cql` (CQL only) |
+| `.crl` | `fhir-def` | **BOTH lanes from ONE emit:** `<root>/src/cql/<library-name>.cql` + `<root>/src/fhir/<ResourceType>/<id>.json` |
+| `.cel` | (omitted) | `<root>/tests/data/fhir/patient/<compartmentId>/<lowercase-type>/<id>.json` + `<root>/tests/data/fhir/cel-data-manifest.json` |
 | `.cel` | any | **Hard error** — CEL has its own pipeline; `--target` is rejected |
 
 **Two-lane contract** (`--target fhir-def` only): the emit is computed in full before anything is written, so a CRL error writes NOTHING. The write itself is **not transactional** — files go out per-file, CQL lane first — so a filesystem failure mid-write leaves `<out-dir>` holding a partial deliverable and throws `EmitWriteError` carrying what it managed to write. What the contract guarantees is that both lanes come from ONE emit, so the emitted `Library.content[0].attachment.url = "../../cql/<name>.cql"` reference resolves against a CQL lane produced from the same source.
 
-### ⭐ `--out-dir` is a DIFFERENT level for each lane
+### ⭐ `<root>` — one argument, one meaning, all three tools
 
-Each emit lane roots its own subtree, so the value you pass differs per invocation. These are the values that land output where a KALM/KELP content project expects it — **measured from a real project tree, not composed from the segments above**:
+`--out-dir` (CLI) and `out` / `outRoot` (MCP) all name the **ROOT the layout above hangs off**. Three ways to use it, and only two you will ever need:
 
-| you are emitting | pass | it produces |
+| what you want | what you pass | where output lands |
 |---|---|---|
-| CRL → CQL + FHIR definitions (`--target fhir-def`) | `--out-dir src` | `src/cql/<library>.cql` + `src/fhir/<ResourceType>/<id>.json` |
-| CEL → FHIR case instances | `--out-dir tests/data/fhir` | `tests/data/fhir/patient/<compartmentId>/<lowercase-type>/<id>.json` |
-| engine results (`emit_results`) | `--out <project root>` | `tests/results/fhir/patient/<compartmentId>/<lowercase-type>/<id>.json` |
+| write to the project (the normal case) | **nothing** | the project root — `src/cql/`, `src/fhir/`, `tests/data/fhir/`, `tests/results/fhir/` |
+| the same thing, said explicitly | the project root | identical, byte for byte |
+| write somewhere else | any path | the SAME layout under that path — a mirror |
 
-⚠ **Passing the project root to `--target fhir-def` writes `./cql/` and `./fhir/`, which is not where anything reads from.** The CQL lane is `<out-dir>/cql`, so `src/cql` requires `--out-dir src`. The same arithmetic applies to CEL: the writer owns `<out-dir>/patient/`, so `tests/data/fhir/patient/` requires `--out-dir tests/data/fhir`, and `--out-dir tests/data` silently produces a `tests/data/patient/` tree nothing loads.
+⭐ **A scratch emit is a MIRROR, deliberately.** `--out-dir /tmp/x` gives you `/tmp/x/src/cql/`, `/tmp/x/tests/data/fhir/…`, and so on. That is what makes copying it back into a project a straight copy instead of a re-derivation — and forgetting the copy-back, or doing it at the wrong depth, is the failure this design exists to prevent.
+
+⚠ **`<root>` is NOT required to be a project**, and nothing is appended to it twice. If you pass `src`, you get `src/src/cql`. The old three-different-levels convention (`--out-dir src` for definitions, `--out-dir tests/data/fhir` for cases) is gone — that convention was the defect, because the value that was right for one tool was silently wrong for the others and every wrong value still wrote successfully.
+
+⚠ **A flat dump of any lane is a BROKEN artifact, not a smaller one.** Emitted `Library.content[0].attachment.url` is the relative `../../cql/<name>.cql`, computed from `src/fhir/<Type>/<id>.json`; and `patient/<compartmentId>/<type>/` is what the engine's `IgConventions` loader reads to group by compartment. If you want loose `.cql` files and nothing else, use `--target cql`, which writes only the CQL lane.
 
 **Exit codes**
 
@@ -185,7 +189,7 @@ npx crl-validate --path lib.crl | jq .success
 # Emit CQL only (flat layout — legacy)
 npx crl-emit --path lib.crl --out-dir out/
 
-# Emit FHIR-def + CQL together (atomic two-lane write)
+# Emit FHIR-def + CQL together (both lanes from one emit)
 npx crl-emit --path lib.crl --out-dir out/ --target fhir-def
 
 # Emit FHIR instances from CEL test cases
@@ -400,7 +404,7 @@ Which CLI command reads what, and writes what, when invoked from a project root:
 
    src/crl/<lib>.crl              ──►  crl-emit --target fhir-def    ──┬─► src/cql/<library>.cql
    (+ closure via package.json         --path src/crl/<lib>.crl        │   (one per library in
-    and node_modules)                  --out-dir src                   │    the import closure)
+    and node_modules)                  [--out-dir <root>]              │    the import closure)
                                                                        │
                                        one emit, both lanes written    ├─► src/fhir/<ResourceType>/<id>.json
                                        from it (an error writes        │   (ValueSet / CodeSystem / Library /
@@ -410,7 +414,7 @@ Which CLI command reads what, and writes what, when invoked from a project root:
    src/cel/<cases>.cel              ┐
                                     ├─► crl-emit                   ──► tests/data/fhir/patient/<compartmentId>/<type>/<id>.json
    src/crl/<lib>.crl                ┘   --path src/cel/<cases>.cel      (one compartment per case)
-   (closure named in the .cel           --out-dir tests/data/fhir
+   (closure named in the .cel           [--out-dir <root>]
     `covers "<Library>"` clause)
 
 
@@ -424,14 +428,14 @@ The two-input CEL row matters: a `.cel` file references CRL declarations from it
 Concrete invocations from a project root:
 
 ```bash
-# Regenerate both CQL + FHIR-def lanes for one CRL library (atomic two-lane write):
-npx crl-emit --path src/crl/cms22.crl --out-dir src --target fhir-def
+# Regenerate both CQL + FHIR-def lanes for one CRL library (both lanes from one emit):
+npx crl-emit --path src/crl/cms22.crl --target fhir-def
 #   reads   src/crl/cms22.crl  (+ closure via package.json / node_modules)
 #   writes  src/cql/<library>.cql           (one per library in the import closure)
 #           src/fhir/<ResourceType>/*.json  (ValueSet / Library / ActivityDef / PlanDef)
 
 # Regenerate FHIR instance resources for one CEL case file:
-npx crl-emit --path src/cel/cms22-cases.cel --out-dir tests/data/fhir
+npx crl-emit --path src/cel/cms22-cases.cel
 #   reads   src/cel/cms22-cases.cel + the CRL closure named in its `covers` clause
 #   writes  tests/data/fhir/patient/<compartmentId>/<lowercase-type>/*.json   (compartmentId is HASHED — see the note above)
 #           tests/data/fhir/cel-data-manifest.json                            (the paths this run claimed)

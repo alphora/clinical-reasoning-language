@@ -7,6 +7,7 @@
 # Re-emit the policy from source after a CRL/emitter change (needs a built crl dist):
 #   node ../../packages/crl/dist/cli/run-emitter.js --path src/patient-age-upper/src/crl/patient-age-upper.crl \
 #     --out-dir policies/patient-age-upper --target fhir-def --date 2026-07-30 --quiet
+#   NOTE: --out-dir is the ROOT, so this writes policies/patient-age-upper/src/{cql,fhir}/.
 # Run: $env:JAVA_HOME="C:\Program Files\Java\jdk-23"; ./run_age_upper.ps1   (needs build.ps1 first)
 . "$PSScriptRoot\_env.ps1"
 $PY = "python"

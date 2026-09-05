@@ -20,6 +20,7 @@ import {
   isImplementedUseCase,
   isResultUseCase,
 } from "../index";
+import { resolveEmitOutput } from "../emit-layout";
 import { produceResults } from "../results/produce";
 
 // Provenance must name the version that actually ran, not a placeholder.
@@ -57,7 +58,9 @@ FLAGS:
                        ⚠ the -cli artifact; the plain cqf-fhir-cr jar will not launch.
   --jar-sha256 <hex>   Expected sha256, verified BEFORE EVERY LAUNCH. OPTIONAL — defaults to this
                        build's pinned value. Pass one only to pin a different engine build.
-  --out <dir>          Artifact root. Default: the .cel file's project root.
+  --out <root>         Root the results tree hangs off. Default: the .cel file's PROJECT ROOT
+                       (nearest package.json) — writes <root>/tests/results/fhir/patient/…
+                       Pass any other path to write elsewhere; the layout under it is identical.
   --enable             Opt in to running a JVM. Without it, nothing runs.
   --no-prune           Keep superseded Questionnaire/QuestionnaireResponse files that this run
                        did not write. They are reported either way; by default they are deleted,
@@ -129,6 +132,17 @@ function main(): void {
     process.exit(1);
   }
 
+  // ⚠ THE DEFAULT USED TO BE `path.dirname(a.cel)` WHILE THE HELP SAID "project root", and the two are
+  // only the same when the .cel sits beside package.json. In the documented layout a .cel lives under
+  // `src/cel/`, so the default wrote `src/cel/tests/results/fhir/` — which `useCases.ts`'s consumer glob
+  // (`**/tests/results/fhir/patient/…`) WOULD have picked up. It was never reported because every caller
+  // passes --out; the default was unfired rather than harmless.
+  const outRoot = resolveEmitOutput("results", a.cel, a.out);
+  if (!outRoot.ok) {
+    process.stderr.write(`${outRoot.reason}\n`);
+    process.exit(1);
+  }
+
   // ⭐ ONE PIPELINE. The MCP `emit_results` tool calls this same function; this file only parses flags and
   // reports. Two entry points each orchestrating emit → bundle → spawn → write is how a helper ends up
   // right and a caller wrong, with the helper's tests green throughout.
@@ -136,7 +150,7 @@ function main(): void {
     celPath: a.cel,
     crlPath: a.crl,
     useCase: a.useCase,
-    outRoot: a.out ?? path.dirname(a.cel),
+    outRoot: outRoot.root,
     jarPath: a.jar,
     jarSha256: a.jarSha,
     prune: a.prune,

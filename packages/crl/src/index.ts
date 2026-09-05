@@ -388,6 +388,7 @@ export type {
 export { emitCrlTwoLane } from "./emit-two-lane";
 export type { EmitCrlTwoLaneResult, TwoLaneCqlLibrary } from "./emit-two-lane";
 export { writeTwoLane, EmitWriteError } from "./emit-writers";
+export { resolveEmitOutput, laneOffset, LANE_PRODUCES, type EmitLane, type EmitOutput } from "./emit-layout";
 export type { TwoLaneWritten } from "./emit-writers";
 export type {
   CEL,

@@ -4,7 +4,7 @@
 // createServer/main/selfTest from here, so the two can no longer drift. No module-level dispatch:
 // importing this module must NOT start a server (the thin entries own the argv dispatch).
 import { readFileSync, statSync } from "node:fs";
-import { dirname, isAbsolute, join as pathJoin } from "node:path";
+import { isAbsolute, join as pathJoin } from "node:path";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -22,6 +22,7 @@ import { emitCrlTwoLane } from "../emit-two-lane";
 import { produceResults } from "../results/produce";
 import { RESULT_USE_CASES, isResultUseCase } from "../results/useCases";
 import { writeTwoLane, EmitWriteError } from "../emit-writers";
+import { resolveEmitOutput, LANE_PRODUCES, type EmitLane } from "../emit-layout";
 import { emitFhirDefFromPath, scanFhirIds } from "../fhir-emitter";
 import { readCanonicalBase, readPolicyId } from "../fhir-emitter/metadata";
 // Import from the registry module directly (not the `../imports` barrel, which pulls
@@ -826,7 +827,11 @@ export function createServer(): McpServer {
             "Delete superseded Questionnaire/QuestionnaireResponse files under the results tree that " +
               "this run did not write. DEFAULTS TO TRUE — a stale pair from a renamed case is shown to " +
               "reviewers as a real case. Only types this use case owns are ever removed, symlinks are " +
-              "never followed, and artifacts claimed by another suite's manifest are protected. Pass " +
+              "never followed, and nothing outside the results tree is touched. ⚠ THERE IS NO " +
+              "SIBLING-SUITE PROTECTION: everything this run did not claim is pruned, whoever wrote it. " +
+              "Sparing another suite's manifested artifacts was built and then REMOVED by operator " +
+              "ruling, because it only matters if the results tree is shared and it is not — one CEL " +
+              "suite owns `tests/results/fhir/` per project. Pass " +
               "false to keep them; they are reported as `orphaned` either way.",
           ),
       },
@@ -1799,11 +1804,19 @@ function emitResults(args: {
     );
   }
 
+  // ⚠ THE DEFAULT WAS `dirname(celPath)` WHILE BOTH THE CLI HELP AND THIS TOOL'S OWN SCHEMA SAID
+  // "project root". They coincide only when the .cel sits beside package.json; in the documented layout
+  // it lives under `src/cel/`, so the default wrote `src/cel/tests/results/fhir/` — which the consumer
+  // glob in `results/useCases.ts` (`**/tests/results/fhir/patient/…`) WOULD have matched. Nobody
+  // reported it because every caller passes an explicit root: the default was unfired, not harmless.
+  const resultsRoot = resolveEmitOutput("results", args.celPath, args.outRoot);
+  if (!resultsRoot.ok) return err(resultsRoot.reason);
+
   const outcome = produceResults({
     celPath: args.celPath,
     crlPath: args.crlPath,
     useCase: args.useCase,
-    outRoot: args.outRoot ?? dirname(args.celPath),
+    outRoot: resultsRoot.root,
     jarPath: args.jarPath,
     jarSha256: args.jarSha256,
     prune: args.prune,
@@ -1939,12 +1952,37 @@ function absolutePathProblem(p: unknown, label: string): string | null {
   return null;
 }
 
-type OutDirResult = { ok: true; outDir: string | undefined } | { ok: false; errorText: string };
+type OutDirResult = { ok: true; outDir: string } | { ok: false; errorText: string };
 
-function validateOutDir(out: unknown): OutDirResult {
-  if (out === undefined) return { ok: true, outDir: undefined };
-  const problem = absolutePathProblem(out, "out");
-  return problem ? { ok: false, errorText: problem } : { ok: true, outDir: out as string };
+/**
+ * Resolve where a write-capable emit tool writes.
+ *
+ * ⭐ `out` IS THE ROOT THE PRODUCES TABLE HANGS OFF, and OMITTING IT IS NOW THE NORMAL CASE — it
+ * defaults to the source file's project root, so output lands where every consumer already reads.
+ * Passing the project root explicitly is byte-identical.
+ *
+ * ⚠ THIS IS A BEHAVIOUR CHANGE: omitting `out` used to mean DO NOT WRITE, and `emit_crl` then returned
+ * the full CQL bodies inline. It writes now. **Read-only inspection of a LAYERED closure is genuinely
+ * removed** — `emit_cql` is the single-library direct lane and rejects both-representation policies
+ * (it says so in its own description and points here), and `emit_crl_fhir` returns FHIR only. The
+ * replacement is to pass a scratch `out`: under the rule above a scratch root receives a
+ * layout-identical mirror, so you inspect the real closure rather than a degraded rendering of it.
+ *
+ * `out` still must be ABSOLUTE when given — the server's CWD is the provisioned server copy, not the
+ * caller's workspace.
+ */
+function validateOutDir(out: unknown, lane: EmitLane, sourcePath: string): OutDirResult {
+  if (out !== undefined) {
+    const problem = absolutePathProblem(out, "out");
+    if (problem) return { ok: false, errorText: problem };
+  }
+  const resolved = resolveEmitOutput(lane, sourcePath, out as string | undefined);
+  return resolved.ok
+    ? { ok: true, outDir: resolved.dir }
+    : {
+        ok: false,
+        errorText: `${resolved.reason}\n\nThis tool writes ${LANE_PRODUCES[lane]} under that root.`,
+      };
 }
 
 function runCheckFhirIds(args: { path: string }): {
@@ -2028,7 +2066,7 @@ function runEmitCrl(args: {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 } {
-  const outCheck = validateOutDir(args.out);
+  const outCheck = validateOutDir(args.out, "crl", args.path);
   if (!outCheck.ok) {
     return { content: [{ type: "text", text: outCheck.errorText }], isError: true };
   }
@@ -2076,7 +2114,7 @@ function runEmitCrl(args: {
   // 2, so MCP parity does the same. A blocked write reports `written: null`; a
   // filesystem failure surfaces as isError (with the partial-write list).
   let written: { cql: string[]; fhir: string[] } | null = null;
-  if (outDir !== undefined) {
+  {
     const canWrite =
       two.hardErrors.length === 0 && two.cql.success && two.filenameCollisions.length === 0;
     if (canWrite) {
@@ -2124,7 +2162,7 @@ function runEmitCrl(args: {
     filenameCollisions: two.filenameCollisions,
     importDiagnostics: two.fhir.importDiagnostics,
     metadataErrors: two.fhir.metadataErrors,
-    ...(outDir !== undefined ? { written } : {}),
+    written,
   };
 
   return {
@@ -2136,7 +2174,7 @@ function runEmitCel(args: { path: string; includeResources?: boolean; out?: stri
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 } {
-  const outCheck = validateOutDir(args.out);
+  const outCheck = validateOutDir(args.out, "cel", args.path);
   if (!outCheck.ok) {
     return { content: [{ type: "text", text: outCheck.errorText }], isError: true };
   }
@@ -2166,7 +2204,7 @@ function runEmitCel(args: { path: string; includeResources?: boolean; out?: stri
   // (warnings still write, mirroring the CLI's write-then-exit-2). A blocked
   // write reports `written: null`; a filesystem failure surfaces as isError.
   let written: string[] | null = null;
-  if (outDir !== undefined && !hasErrors) {
+  if (!hasErrors) {
     const partial: string[] = [];
     try {
       written = writeEmitResult(result, outDir, partial);
@@ -2215,11 +2253,11 @@ function runEmitCel(args: { path: string; includeResources?: boolean; out?: stri
     // ⚠ The manifest is deliberately NOT in `written` (that array means resource paths), but a consumer
     // mirroring the tree must not silently MISS it either — an MCP caller cannot import the exported
     // constant, so the absolute path is surfaced here rather than left to be composed by hand.
-    ...(outDir !== undefined && written !== null
+    ...(written !== null
       ? { manifest: pathJoin(outDir, CEL_DATA_MANIFEST) }
       : {}),
     ...(args.includeResources ? { emittedCases: result.emittedCases } : {}),
-    ...(outDir !== undefined ? { written } : {}),
+    written,
   };
 
   return {

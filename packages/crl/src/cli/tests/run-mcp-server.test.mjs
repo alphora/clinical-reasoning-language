@@ -21,6 +21,19 @@ function mkPolicy(crlText = CONCEPT_CRL) {
   writeFileSync(crlPath, crlText, "utf8");
   return { root, crlPath, storeDir: join(root, "src", "medical-validation", "flags") };
 }
+// ⭐ EVERY EMIT TEST WRITES SOMEWHERE DISPOSABLE. Two ways, and they test different things:
+//   `scratchOut()`     — an empty temp root, for calls whose subject is the RESPONSE, not the location.
+//   `freshProjectCopy` — a throwaway copy of a real fixture project, for calls whose subject IS the
+//                        default location. The default resolves to the nearest package.json, so it needs
+//                        a genuine project; pointing it at the in-repo fixture would emit into `packages/`.
+const scratchOut = () => mkdtempSync(join(tmpdir(), "crlmcp-out-"));
+const FIXTURE_PROJECT = resolve(dirname(fileURLToPath(import.meta.url)), "../../../src/tests/fixtures/corpus/cms22");
+function freshProjectCopy(cpSync) {
+  const dest = mkdtempSync(join(tmpdir(), "crlmcp-proj-"));
+  cpSync(FIXTURE_PROJECT, dest, { recursive: true });
+  return dest;
+}
+
 const storeFlags = (storeDir) => {
   try {
     return readdirSync(storeDir).filter((f) => f.endsWith(".json")).map((f) => JSON.parse(readFileSync(join(storeDir, f), "utf8")));
@@ -367,8 +380,13 @@ try {
   });
 
   await check("emit_cel via path → cms22.cel returns summary envelope with cases", async () => {
+    // ⚠ `out` IS PASSED DELIBERATELY, and every no-`out` call in this file now does the same. Omitting
+    // it defaults to the source file's PROJECT ROOT — which for a fixture is the fixture's own
+    // directory, so the call would write `src/cql/`, `src/fhir/` and a wiped-and-repopulated
+    // `tests/data/fhir/patient/` INSIDE `packages/`. A test that mutates the repo it is testing is how
+    // a suite starts passing for the wrong reason.
     const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.cel");
-    const r = await client.callTool({ name: "emit_cel", arguments: { path: cms22Cel } });
+    const r = await client.callTool({ name: "emit_cel", arguments: { path: cms22Cel, out: scratchOut() } });
     assert.ok(!r.isError, "should not be a tool error");
     const out = JSON.parse(r.content[0].text);
     assert.equal(typeof out.success, "boolean");
@@ -384,7 +402,7 @@ try {
     const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.cel");
     const r = await client.callTool({
       name: "emit_cel",
-      arguments: { path: cms22Cel, includeResources: true },
+      arguments: { path: cms22Cel, includeResources: true, out: scratchOut() },
     });
     assert.ok(!r.isError);
     const out = JSON.parse(r.content[0].text);
@@ -417,10 +435,24 @@ try {
     assert.match(r.content[0].text, /ABSOLUTE/);
   });
 
-  await check("emit_cel WITHOUT out → no `written` field (byte-identical to today's summary)", async () => {
-    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.cel");
-    const out = JSON.parse((await client.callTool({ name: "emit_cel", arguments: { path: cms22Cel } })).content[0].text);
-    assert.equal("written" in out, false, "no out → no written key at all (not null)");
+  await check("emit_cel WITHOUT out → writes to the project's canonical tests/data/fhir tree", async () => {
+    // ⭐ THE DEFAULT IS THE POINT OF THE TOOL, so it is tested against a REAL project — a throwaway copy
+    // of the fixture, so the default has a genuine package.json to find and nothing in the repo moves.
+    const { cpSync, rmSync, existsSync } = await import("node:fs");
+    const proj = freshProjectCopy(cpSync);
+    try {
+      const cel = resolve(proj, "cms22.cel");
+      const out = JSON.parse((await client.callTool({ name: "emit_cel", arguments: { path: cel } })).content[0].text);
+      assert.ok(Array.isArray(out.written), "no out → still writes, and reports absolute paths");
+      assert.ok(out.written.length > 0, "at least one resource written");
+      assert.ok(
+        out.written.every((w) => w.replace(/\\/g, "/").includes("/tests/data/fhir/patient/")),
+        `every path under tests/data/fhir/patient/; got ${out.written[0]}`,
+      );
+      assert.ok(existsSync(resolve(proj, "tests/data/fhir/cel-data-manifest.json")), "manifest beside the tree");
+    } finally {
+      rmSync(proj, { recursive: true, force: true });
+    }
   });
 
   await check("emit_crl with out (absolute) → writes both lanes, omits CQL bodies, returns { cql, fhir } manifest", async () => {
@@ -451,11 +483,49 @@ try {
     assert.match(r.content[0].text, /ABSOLUTE/);
   });
 
-  await check("emit_crl WITHOUT out → full cql.libraries bodies retained, no `written` field", async () => {
-    const cms22Crl = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.crl");
-    const out = JSON.parse((await client.callTool({ name: "emit_crl", arguments: { path: cms22Crl } })).content[0].text);
-    assert.equal("written" in out, false, "no out → no written key");
-    assert.ok(out.cql.libraries.every((l) => typeof l.cql === "string"), "no out → full CQL sources present");
+  await check("emit_crl WITHOUT out → writes both lanes under the project's src/", async () => {
+    // ⚠ CONTRACT CHANGE: omitting `out` used to mean DO NOT WRITE and returned the full CQL bodies.
+    // It now writes to the project root. Read-only inspection of a LAYERED closure is genuinely gone —
+    // `emit_cql` is the single-library direct lane — and the replacement is a scratch `out`, which the
+    // "with out (absolute)" case above already covers.
+    const { cpSync, rmSync, existsSync } = await import("node:fs");
+    const proj = freshProjectCopy(cpSync);
+    try {
+      const crl = resolve(proj, "cms22.crl");
+      const out = JSON.parse((await client.callTool({ name: "emit_crl", arguments: { path: crl } })).content[0].text);
+      assert.ok(out.written && Array.isArray(out.written.cql), "no out → still writes");
+      assert.ok(out.written.cql.length > 0 && out.written.fhir.length > 0, "both lanes wrote");
+      assert.ok(existsSync(resolve(proj, "src/cql")), "CQL lane at <root>/src/cql");
+      assert.ok(existsSync(resolve(proj, "src/fhir")), "FHIR lane at <root>/src/fhir");
+      assert.ok(
+        out.written.cql.every((w) => w.replace(/\\/g, "/").includes("/src/cql/")),
+        `written CQL under src/cql; got ${out.written.cql[0]}`,
+      );
+    } finally {
+      rmSync(proj, { recursive: true, force: true });
+    }
+  });
+
+  await check("emit_crl: an explicit project root is byte-identical to omitting out", async () => {
+    // The operator's "or possibly, pass the project root". If these two ever diverge, the offset is
+    // being applied a different number of times in the two paths and the uniformity claim is false.
+    const { cpSync, rmSync } = await import("node:fs");
+    const a = freshProjectCopy(cpSync);
+    const b = freshProjectCopy(cpSync);
+    try {
+      const viaDefault = JSON.parse(
+        (await client.callTool({ name: "emit_crl", arguments: { path: resolve(a, "cms22.crl") } })).content[0].text,
+      );
+      const viaExplicit = JSON.parse(
+        (await client.callTool({ name: "emit_crl", arguments: { path: resolve(b, "cms22.crl"), out: b } })).content[0].text,
+      );
+      const rel = (root, paths) => paths.map((x) => x.slice(root.length).replace(/\\/g, "/")).sort();
+      assert.deepEqual(rel(a, viaDefault.written.cql), rel(b, viaExplicit.written.cql), "CQL lane identical");
+      assert.deepEqual(rel(a, viaDefault.written.fhir), rel(b, viaExplicit.written.fhir), "FHIR lane identical");
+    } finally {
+      rmSync(a, { recursive: true, force: true });
+      rmSync(b, { recursive: true, force: true });
+    }
   });
 
   await check("emit_crl with out on a hard-error .crl → written:null, nothing written, CQL bodies RETAINED", async () => {

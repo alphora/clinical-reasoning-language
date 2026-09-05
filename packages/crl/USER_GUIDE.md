@@ -544,11 +544,12 @@ crl-validate --path src/crl/cms22.crl
 crl-validate --path src/crl/cms22.crl --soft     # demote ref-target errors to warnings
 crl-validate --path src/crl/cms22.crl --pretty   # grouped human-readable output
 
-# Emit (per-CRL — one CQL file per library)
-crl-emit --path src/crl/cms22.crl --out-dir ./out/
+# Emit (per-CRL — one CQL file per library, into src/cql/)
+crl-emit --path src/crl/cms22.crl
 ```
 
-`--out-dir` is required for `crl-emit`. The CLI writes one
+`--out-dir` is OPTIONAL and names the ROOT to write under; omitted, it is the project root (the nearest
+`package.json`), so the CQL lands in `src/cql/`. The CLI writes one
 `<libraryName>.cql` file per library in the emit closure (root's
 include-walked closure + any local sibling transitively qualified-referenced).
 The on-disk filename is `<libraryName>.cql` when the library name is
@@ -663,7 +664,7 @@ Run it:
 
 ```bash
 crl-validate --path my-project/src/crl/screening.crl --pretty
-crl-emit --path my-project/src/crl/screening.crl --out-dir ./out/
+crl-emit --path my-project/src/crl/screening.crl
 ```
 
 What happens under the hood:
@@ -717,7 +718,7 @@ node dist/cli/run-validator.js \
 
 node dist/cli/run-emitter.js \
   --path packages/crl/src/tests/fixtures/corpus/cms22/cms22.crl \
-  --out-dir /tmp/cms22-out/
+  --out-dir /tmp/cms22-out/          # a scratch ROOT: files land in /tmp/cms22-out/src/cql/
 ```
 
 The emitter produces four CQL files: `cms22.cql` (the interface),
@@ -806,28 +807,37 @@ CRL emits CPG-IG-conformant FHIR Definition resources (ValueSet, Library, Activi
 ### CLI
 
 ```
-crl-emit --path <root.crl> --out-dir <project-root> --target fhir-def
+crl-emit --path <root.crl> --target fhir-def          # writes into the project
+crl-emit --path <root.crl> --target fhir-def --out-dir /tmp/x   # ... or a mirror under /tmp/x
 crl-emit --help                                       # print flag reference + exit 0
 ```
 
 `--help` (alias `-h`) prints the full flag reference, input-dispatch rules, and exit-code table, then exits 0.
 
-**One invocation writes both lanes.** `--target fhir-def` runs the CQL emit lane AND the FHIR-def emit lane atomically — either both succeed and write, or neither writes (no partial state). This is required because the emitted Library resources reference the sibling CQL files via `content[0].attachment.url = "../../cql/<name>.cql"`; shipping FHIR without CQL would produce broken Library references.
+**One invocation writes both lanes.** `--target fhir-def` runs the CQL emit lane AND the FHIR-def emit lane from ONE emit, so a CRL error writes nothing at all. The write itself is per-file and **not** transactional: a filesystem failure part-way leaves a partial deliverable and throws, carrying the list of what was written. Both lanes coming from one emit is what matters, because the emitted Library resources reference the sibling CQL files via `content[0].attachment.url = "../../cql/<name>.cql"` — shipping FHIR against CQL from a different emit would produce references that resolve to the wrong thing.
 
-Output layout (operator's locked project convention):
+**`--out-dir` names the ROOT.** Omit it and it is the project root, so output lands where every consumer reads. Pass a path and you get the identical layout under it — a mirror, which is what makes copying a scratch emit back a straight copy.
 
 ```
-<project-root>/
-   cql/
-      <library-name>.cql           ← written from CQL emit lane
-   fhir/
-      ValueSet/<id>.json
-      Library/<id>.json
-      ActivityDefinition/<id>.json
-      PlanDefinition/<id>.json     ← Recommendations + Decisions both
+<root>/
+   src/
+      cql/
+         <library-name>.cql        ← written from CQL emit lane
+      fhir/
+         ValueSet/<id>.json
+         CodeSystem/<id>.json
+         Library/<id>.json
+         StructureDefinition/<id>.json
+         ActivityDefinition/<id>.json
+         PlanDefinition/<id>.json  ← Recommendations + Decisions both
 ```
 
-The legacy `--target cql` (or omitting `--target` on a `.crl` file) writes CQL output flat to `--out-dir` per the v2.2.x behavior — useful when you want only CQL.
+⚠ This layout is MEASURED from a real content project and declared by its `kelp.project.json`
+(`cql → src/cql`, `fhir → src/fhir`). An earlier version of this section documented `<project-root>/cql/`
+and `<project-root>/fhir/` and called it a locked convention; no shipped content has ever used that shape.
+
+`--target cql` (or omitting `--target` on a `.crl` file) writes ONLY the CQL lane, to the same
+`<root>/src/cql/`. That is the way to get CQL files and nothing else.
 
 Exit codes: `0` = clean; `1` = hard errors (CRLError of error severity, or import-time error, or metadata error); `2` = warnings or unresolved references without hard errors.
 

@@ -144,8 +144,8 @@ describe("CLI dispatch matrix — `.crl + --target fhir-def` two-lane contract (
       ]);
       expect(r.exitCode).toBe(1);
       expect(r.stderr).toContain("cql-emit");
-      expect(existsSync(join(outDir, "cql"))).toBe(false);
-      expect(existsSync(join(outDir, "fhir"))).toBe(false);
+      expect(existsSync(join(outDir, "src", "cql"))).toBe(false);
+      expect(existsSync(join(outDir, "src", "fhir"))).toBe(false);
     } finally {
       cleanup();
     }
@@ -159,8 +159,11 @@ describe("CLI dispatch matrix — `.crl + --target fhir-def` two-lane contract (
     try {
       const r = runCli(["--path", CMS22, "--target", "fhir-def", "--out-dir", outDir]);
       expect([0, 2]).toContain(r.exitCode);
-      expect(existsSync(join(outDir, "cql"))).toBe(true);
-      expect(existsSync(join(outDir, "fhir"))).toBe(true);
+      // ⭐ `--out-dir` IS THE ROOT, NOT THE PARENT OF THE LANES. It used to be the latter, which is
+      // why `--out-dir .` produced `./cql/` while every consumer reads `src/cql/`. The lanes now hang
+      // off the root exactly as they do in a real content project, so a scratch root is a mirror.
+      expect(existsSync(join(outDir, "src", "cql"))).toBe(true);
+      expect(existsSync(join(outDir, "src", "fhir"))).toBe(true);
     } finally {
       cleanup();
     }
@@ -183,8 +186,8 @@ describe("CLI dispatch matrix — `.crl + --target fhir-def` two-lane contract (
       ]);
       expect(r.exitCode).toBe(1);
       expect(r.stderr).toContain("executable-capability-unsupported");
-      expect(existsSync(join(outDir, "cql"))).toBe(false);
-      expect(existsSync(join(outDir, "fhir"))).toBe(false);
+      expect(existsSync(join(outDir, "src", "cql"))).toBe(false);
+      expect(existsSync(join(outDir, "src", "fhir"))).toBe(false);
     } finally {
       cleanup();
     }

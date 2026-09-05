@@ -373,22 +373,34 @@ check("emit_crl via path → both-rep patient-age emits BOTH cql.libraries AND f
       here,
       "../../crl/src/fhir-emitter/tests/fixtures/patient-age/src/crl/patient-age.crl"
     );
-    const r = await client.callTool({
-      name: "emit_crl",
-      arguments: { path: patientAgeCrl, date: "2026-01-01T00:00:00.000Z" },
-    });
-    assert.ok(!r.isError, `emit_crl should not be a tool error: ${r.content?.[0]?.text?.slice(0, 300)}`);
-    const out = JSON.parse(r.content[0].text);
-    assert.equal(out.success, true, `emit_crl should succeed; hardErrors: ${JSON.stringify(out.hardErrors).slice(0, 400)}`);
-    // CQL lane: the closure the FHIR Libraries reference (with full source to write to disk).
-    assert.ok(Array.isArray(out.cql?.libraries) && out.cql.libraries.length > 0, "cql.libraries must be non-empty");
-    assert.ok(
-      out.cql.libraries.every((l) => typeof l.outputFilename === "string" && typeof l.cql === "string"),
-      "each cql library carries { outputFilename, cql }"
-    );
-    // FHIR lane: resources emitted alongside, in the same call.
-    assert.ok(out.fhir?.resourceCount > 0, "fhir.resourceCount must be > 0");
-    assert.equal(out.filenameCollisions.length, 0, "no CQL filename collisions");
+    // ⚠ `out` IS AN EXPLICIT SCRATCH ROOT. Omitting it now defaults to the source's project root,
+    // which for this fixture is `fixtures/patient-age/` — the call would emit into `packages/`.
+    const { mkdtempSync, rmSync } = await import("node:fs");
+    const os = await import("node:os");
+    const outDir = mkdtempSync(resolve(os.tmpdir(), "vsc-emitcrl-"));
+    try {
+      const r = await client.callTool({
+        name: "emit_crl",
+        arguments: { path: patientAgeCrl, date: "2026-01-01T00:00:00.000Z", out: outDir },
+      });
+      assert.ok(!r.isError, `emit_crl should not be a tool error: ${r.content?.[0]?.text?.slice(0, 300)}`);
+      const out = JSON.parse(r.content[0].text);
+      assert.equal(out.success, true, `emit_crl should succeed; hardErrors: ${JSON.stringify(out.hardErrors).slice(0, 400)}`);
+      // CQL lane: the closure the FHIR Libraries reference. Bodies are suppressed once they are on
+      // disk, so the lane is proven by `written.cql` — which is the stronger evidence anyway.
+      assert.ok(Array.isArray(out.cql?.libraries) && out.cql.libraries.length > 0, "cql.libraries must be non-empty");
+      assert.ok(
+        out.cql.libraries.every((l) => typeof l.outputFilename === "string"),
+        "each cql library carries an outputFilename"
+      );
+      assert.ok(out.written?.cql?.length > 0, "CQL lane written to disk");
+      // FHIR lane: resources emitted alongside, in the same call.
+      assert.ok(out.fhir?.resourceCount > 0, "fhir.resourceCount must be > 0");
+      assert.ok(out.written?.fhir?.length > 0, "FHIR lane written to disk");
+      assert.equal(out.filenameCollisions.length, 0, "no CQL filename collisions");
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
   });
 
 check("validate_crl via inline code → single-file mode (no cross-file context)", async () => {
