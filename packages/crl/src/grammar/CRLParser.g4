@@ -239,8 +239,19 @@ terminologySystem
     : DASH SYSTEM_IS backtickString DOT
     ;
 
+// ⭐ #313 — an OPTIONAL `display is`, so a terminology code can carry the text a human reads.
+//
+// ⚠ THE ASYMMETRY THIS CLOSES: `inlineOptionLine` above REQUIRES a display, on the stated grounds that it is
+// "the text a clinician READS" and must never be derived by title-casing a code. A terminology code is read
+// by exactly the same people — a medical-validation reviewer opening the emitted ValueSet sees `15822` and
+// learns nothing — yet could not carry one. Requested through the IEHP KE by their operator, for that reason.
+//
+// ⚠ OPTIONAL here, REQUIRED there, and the difference is real rather than lax: an inline option is an answer
+// CRL itself offers, so we own its wording; a terminology code is frequently an external code (CPT, SNOMED)
+// whose display belongs to the code system, and forcing the author to retype it would invite drift from the
+// authority. Absent display ⇒ emit no `display`, never a manufactured one.
 terminologyCode
-    : DASH CODE_IS backtickString DOT
+    : DASH CODE_IS backtickString (DISPLAY_IS backtickString)? DOT
     ;
 
 // ============================

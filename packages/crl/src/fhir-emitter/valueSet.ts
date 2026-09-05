@@ -183,6 +183,41 @@ export function emitValueSet(
   // tuple and must not be derived from two readings of the same predicate.
   const referenceStub = resolveReferenceStub(terminology, metadata.canonicalBase);
 
+  // ⚠ #313 — A "SELF-REFERENCE" WARNING WAS BUILT HERE AND REVERTED. Do not rebuild it.
+  //
+  // The idea: a pure reference (`valueset is`, no codes) whose canonical sits under this project's own
+  // `canonicalBase` has nobody to swap content in, so the placeholder is what ships and matches nothing.
+  // It fired on FOUR in-tree fixtures including the reference artifact `dme101-030` ("Covered Devices" at
+  // `.../hcsc/dme101-030/ValueSet/covered-devices`), and those fixtures are RIGHT: self-reference is the
+  // intended customization pattern. The charter states it — a customer customizes the instance AT THAT ID,
+  // "the identifier is the fixed point and the CONTENT is what varies" — and the swapping deployment is
+  // frequently the same organization that authored the policy.
+  //
+  // ⚠ The reported failure was real but is NOT statically detectable: a KE MEANT to own the membership in
+  // CRL and wrote a reference instead. Nothing in the source distinguishes "my deployment will supply this"
+  // from "I meant to write the codes here". The fix is DISCOVERABILITY, not a diagnostic — the kit's
+  // terminology exemplars show only the bare reference form, so an author pattern-matching them never learns
+  // the instantiated form exists. Logged as a kit delta.
+
+  // ⚠ #313 — A "MIXED BODY MOVES ITS IDENTITY" WARNING WAS BUILT HERE AND REVERTED. Do not rebuild it.
+  //
+  // The observation is TRUE: `valueset is` + `code is` reads as "this VS's canonical is <url>, and here are
+  // its codes", and it is not — identity moves to the slug and the authored canonical becomes an
+  // include-by-reference. A KE read `include[0]`'s empty `system`/`concept` and concluded membership was
+  // missing from `compose` entirely.
+  //
+  // ⚠ BUT THE BEHAVIOUR IS DESIGNED, TESTED AND CORRECT — `answerOptionsBinding.test.ts` pins it by name
+  // ("a MIXED body is not a pure reference → binds the SLUG canonical, and binds what the ValueSet emits
+  // at"), and `buildCompose` supports mixed bodies deliberately. Warning here would make a CORRECT authoring
+  // choice look like a trap, which is the exact defect removed from `answer-options-missing` the same week:
+  // a hedge an author has to talk themselves past is a defect, not caution.
+  //
+  // ⚠ A census claiming "zero in-tree mixed bodies" was WRONG because it scanned only `.crl` files; the form
+  // is exercised through programmatically built ASTs. Measure both before reasoning from a count.
+  //
+  // The real gap is DISCOVERABILITY — the kit's terminology exemplars show only the bare reference form.
+  // Logged as a kit delta.
+
   // #237/T1 — one exported id helper, collision-safe via `uniqueCapSlug` over the component-wise `rawSlug`
   // composite (for an INSTANTIATED VS the `url` derives from `id`, so id↔url stay byte-equal). A reference stub
   // instead takes id/url from the declared canonical (above).
@@ -222,11 +257,11 @@ export function emitValueSet(
   // on the CodeSystem may never reach the questionnaire, and the answer list renders as RAW SLUGS — which
   // would defeat the entire point of requiring authored displays on inline answer options.
   //
-  // ⚠ INERT TODAY, DELIBERATELY. `buildCompose` emits `{ code }` with no display, because an AUTHORED
-  // instantiated terminology has no display grammar — and it must STAY that way: do NOT invent a display
-  // there by title-casing a slug, which manufactures clinician-facing text the author never wrote. This
-  // copies a display only when one EXISTS, so byte output is unchanged until inline `value from` options
-  // (which do carry authored displays) start supplying them.
+  // ⚠ NO LONGER INERT (#313): `- code is `x` display is `y`.` now exists, so `buildCompose` supplies a
+  // display whenever the author wrote one. The RULE it was written to protect is unchanged and still
+  // load-bearing: a display is copied only when AUTHORED — never invented by title-casing a code, which
+  // manufactures clinician-facing text nobody wrote. An unauthored code emits with no `display`, exactly as
+  // before, so existing byte output is untouched.
   const expansionContains = compose.include.flatMap((inc) => {
     const system = (inc as { system?: string }).system;
     const concepts = (inc as { concept?: Array<{ code: string; display?: string }> }).concept;
@@ -331,7 +366,9 @@ function buildCompose(
       }
       const last = include[include.length - 1] as { concept?: Array<{ code: string }> };
       last.concept = last.concept ?? [];
-      last.concept.push({ code: line.code });
+      // #313 — carry the AUTHORED display when there is one. ⚠ Only when authored: absent stays absent, and
+      // is never derived from the code. `expansionContains` below mirrors whatever lands here.
+      last.concept.push({ code: line.code, ...(line.display === undefined ? {} : { display: line.display }) });
     }
   }
 

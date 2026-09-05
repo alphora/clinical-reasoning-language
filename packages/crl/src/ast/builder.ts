@@ -586,8 +586,18 @@ export class CRLAstBuilder
   visitTerminologyCode(
     ctx: import("../grammar/generated/antlr/CRLParser").TerminologyCodeContext,
   ): TerminologyCode {
-    const code = ctx.backtickString().text.slice(1, -1);
-    return { type: "TerminologyCode", code, location: getLocation(ctx) };
+    // #313 — `- code is `x` [display is `y`].` The rule now holds up to TWO backtickStrings, so index them:
+    // [0] is the code, [1] the optional display. ⚠ `ctx.backtickString()` with no argument returns the ARRAY
+    // in antlr4ts, so the previous `.text` read silently became a type error rather than a wrong value.
+    const parts = ctx.backtickString();
+    const code = parts[0].text.slice(1, -1);
+    const display = parts.length > 1 ? parts[1].text.slice(1, -1) : undefined;
+    return {
+      type: "TerminologyCode",
+      code,
+      ...(display !== undefined ? { display } : {}),
+      location: getLocation(ctx),
+    };
   }
 
   visitActivityStatement(ctx: ActivityStatementContext): Activity {

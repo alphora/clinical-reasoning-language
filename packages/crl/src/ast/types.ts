@@ -376,6 +376,12 @@ export interface TerminologySystem extends ASTNode {
 export interface TerminologyCode extends ASTNode {
   type: "TerminologyCode";
   code: string;
+  /** #313 — the text a human reads for this code, when the author gave one (`- code is \`x\` display is \`y\`.`).
+   *  ⚠ OPTIONAL, and absent means EMIT NO DISPLAY — never a value derived from the code. Title-casing a code
+   *  manufactures clinician-facing wording nobody wrote, which is the same rule `inlineOptionLine` states for
+   *  its own REQUIRED display. It is optional here because an external code's display belongs to its code
+   *  system (CPT, SNOMED), and forcing a retype invites drift from the authority. */
+  display?: string;
   location: Location;
 }
 
