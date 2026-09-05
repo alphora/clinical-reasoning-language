@@ -187,6 +187,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // being ignored. See cockpitPaneSerializers.ts.
   registerCockpitPaneSerializers(context);
   // ⚠ REWRITE `.mcp.json` THE MOMENT `crl.enableResults` CHANGES — not on the next window reload.
+  // (`readEnableResults` is defined below, beside the other provision-context readers.)
   //
   // Toggling it has to reach the file before the user restarts their MCP client, because the restart
   // is what re-spawns the server with the new `env`. Waiting for an activation would mean a user who
@@ -456,6 +457,30 @@ function flushWarnings(warnings: string[]): void {
   }
 }
 
+
+/**
+ * ⭐ #315 — the MACHINE-scoped `crl.enableResults` opt-in, THREE-VALUED.
+ *
+ * ⚠⚠ `get("enableResults", false)` COLLAPSES UNSET INTO FALSE, and that made provisioning destructive by
+ * default: provisioning runs on activation, `mergeEnableResultsEnv` DELETES `CRL_ENABLE_RESULTS` on a
+ * false, and the setting is absent on a new machine, an unsynced profile or a settings reset. So an
+ * upgrade silently removed an opt-in that was working the day before, and the resulting error
+ * ("Result production is disabled") reads as "you never enabled it" — telling the user to do the thing
+ * they had already done. MEASURED in the field by a knowledge engineer.
+ *
+ * ⚠ Only the MACHINE-scoped values are read. The setting is deliberately not workspace-settable (a
+ * repository must not opt a user into spawning a JVM), so a workspace value here would be a scope
+ * violation rather than an opinion — `inspect()` lets us ignore it rather than silently honour it.
+ */
+function readEnableResults(): boolean | undefined {
+  const i = vscode.workspace.getConfiguration("crl").inspect<boolean>("enableResults");
+  // ⚠⚠ `globalValue` ONLY — never `?? defaultValue`. `package.json` contributes `"default": false`, so
+  // falling back to it reintroduces the exact collapse this function exists to remove, one line lower.
+  // (Caught while verifying the fix; the first cut had `?? i?.defaultValue`.)
+  // ⚠ `workspaceValue` is deliberately ignored: the setting is machine-scoped so a repository cannot opt a
+  // user into spawning a JVM, which makes a workspace value a scope violation rather than an opinion.
+  return i?.globalValue;
+}
 function ctxFor(context: vscode.ExtensionContext, root: string, serverScriptPath?: string): ProvisionContext {
   return {
     workspaceRoot: root,
@@ -466,7 +491,11 @@ function ctxFor(context: vscode.ExtensionContext, root: string, serverScriptPath
     // the opt-in through `.mcp.json` env is what makes it actually arrive: an environment variable a
     // user exports is not inherited by an editor launched from a pre-existing shell/session on any
     // OS, which is how a KE followed our instructions exactly and was told to follow them again.
-    enableResults: vscode.workspace.getConfiguration("crl").get<boolean>("enableResults", false),
+    // ⚠ #315 — see `readEnableResults`: `inspect()`, NOT `get(key, false)`. `get` with a default collapses UNSET into FALSE, and
+    // `mergeEnableResultsEnv` then DELETES a working `CRL_ENABLE_RESULTS` on any activation where the
+    // machine setting is absent (new machine, unsynced profile, settings reset). Reading the explicit
+    // values keeps "nobody has expressed an opinion" distinguishable from "turn it off".
+    enableResults: readEnableResults(),
   };
 }
 

@@ -256,6 +256,32 @@ test("mergeEnableResultsEnv: sets the flag when enabled, and drops the whole blo
   assert.equal(mergeEnableResultsEnv({ [ENABLE_RESULTS_ENV]: "1" }, false), undefined);
 });
 
+// ⚠⚠ #315 — THE THIRD VALUE, and it is what makes provisioning non-destructive.
+//
+// MEASURED IN THE FIELD: `crl.enableResults` was read with `get(key, false)`, which returns FALSE when the
+// setting is merely ABSENT — a new machine, an unsynced profile, a settings reset. Provisioning runs on
+// activation, so an upgrade silently DELETED a working `CRL_ENABLE_RESULTS`, and the resulting
+// "Result production is disabled" reads as "you never enabled it" — telling the user to do the thing they
+// had already done.
+//
+// `undefined` means NOBODY HAS EXPRESSED AN OPINION. Removing a capability requires someone to ask for it.
+test("mergeEnableResultsEnv: `undefined` (unset) leaves an existing opt-in ALONE — only explicit false deletes", () => {
+  // The regression this pins: unset must NOT behave like false.
+  assert.deepEqual(mergeEnableResultsEnv({ [ENABLE_RESULTS_ENV]: "1" }, undefined), {
+    [ENABLE_RESULTS_ENV]: "1",
+  });
+  assert.equal(mergeEnableResultsEnv({ [ENABLE_RESULTS_ENV]: "1" }, false), undefined);
+
+  // Unset does not CREATE one either — it is "no opinion", not "on".
+  assert.equal(mergeEnableResultsEnv(undefined, undefined), undefined);
+
+  // And it still never touches the user's own keys.
+  assert.deepEqual(mergeEnableResultsEnv({ MY_VAR: "x", [ENABLE_RESULTS_ENV]: "1" }, undefined), {
+    MY_VAR: "x",
+    [ENABLE_RESULTS_ENV]: "1",
+  });
+});
+
 test("mergeEnableResultsEnv: NEVER eats a user's own env keys — on or off", () => {
   assert.deepEqual(mergeEnableResultsEnv({ MY_VAR: "x" }, true), { MY_VAR: "x", [ENABLE_RESULTS_ENV]: "1" });
   // Turning the setting off removes OURS and leaves THEIRS. We own exactly one name in this block.

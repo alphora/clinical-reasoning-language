@@ -24,8 +24,15 @@ export interface ProvisionContext {
    * ⚠ This is the opt-in itself, not a hint about it. It is written into the server block’s `env`,
    * which the client hands DIRECTLY to the spawned process — so it does not depend on the process
    * inheriting anything. See ENABLE_RESULTS_ENV below for why that distinction is the whole fix.
+   *
+   * ⚠⚠ THREE-VALUED, AND `undefined` IS THE POINT (#315). `true` writes the env, `false` DELETES it, and
+   * `undefined` — nobody has expressed an opinion — LEAVES AN EXISTING ONE ALONE. Collapsing unset into
+   * `false` made provisioning DESTRUCTIVE by default: `get("enableResults", false)` returns `false` on a
+   * new machine, an unsynced profile or a settings reset, and provisioning (which runs on activation) then
+   * deleted an opt-in that was working the day before. MEASURED in the field — the user's remedy was the
+   * thing they had already done, because the error reads as "you never enabled it".
    */
-  enableResults: boolean;
+  enableResults: boolean | undefined;
 }
 
 export type McpOutcome = "created" | "updated" | "unchanged" | "removed";
@@ -111,7 +118,7 @@ export const ENABLE_RESULTS_ENV = "CRL_ENABLE_RESULTS";
  */
 export function mergeEnableResultsEnv(
   existingEnv: unknown,
-  enable: boolean,
+  enable: boolean | undefined,
 ): Record<string, unknown> | undefined {
   // ⚠ THROW, do not silently pass through. Returning the value untouched preserved the user’s file
   // but wrote NOTHING — so turning the setting on produced `unchanged`, the watcher said "restart
@@ -127,8 +134,11 @@ export function mergeEnableResultsEnv(
     );
   }
   const env: Record<string, unknown> = { ...(isPlainObject(existingEnv) ? existingEnv : {}) };
-  if (enable) env[ENABLE_RESULTS_ENV] = "1";
-  else delete env[ENABLE_RESULTS_ENV];
+  // ⚠ #315 — REMOVING A CAPABILITY REQUIRES SOMEONE TO HAVE ASKED FOR IT. `undefined` means the setting is
+  // absent, which is NOT the same as `false`: it is "no opinion", and provisioning must leave whatever is
+  // there. Only an explicit `false` deletes.
+  if (enable === true) env[ENABLE_RESULTS_ENV] = "1";
+  else if (enable === false) delete env[ENABLE_RESULTS_ENV];
   return Object.keys(env).length > 0 ? env : undefined;
 }
 
