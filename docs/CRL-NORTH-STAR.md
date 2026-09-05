@@ -183,6 +183,64 @@ concepts should be "moved to source representations to match charts": every conc
 
 ## 3. The concept model
 
+### ⭐⭐⭐ THE ASSEMBLY MODEL — three arms, one collection, one reduction
+
+**Operator’s model, drawn 2026-09-05.** This is the frame every other clause in §3 sits inside. It has been
+re-derived wrongly more than once by reasoning from an individual construct outward; read it first.
+
+```
+   ASSERTED arm     `code is`               ← $extract and local assertions land here
+   SOURCE arm       `source representation` ← shaped by `value projection is`
+   DERIVED arm      `definition is` / `defined as`
+        |
+        +--- union ---> CONCEPT COLLECTION ---> [ one optional REDUCTION ] ---> the concept
+                                                                                   |
+                                                                          emit interfaces
+```
+
+**Each arm is shaped to the concept.** The asserted arm is the concept’s shape by construction; a source arm
+must be projected to it, EXPLICITLY, or it is an error; a derived arm is no different. `defined as` and the
+asserted arm INHERIT the concept’s shape, `definition is` declares its own.
+
+⚠ **No arm is privileged.** The local code is an arm like any other — the goal says so on `Obese`:
+*“THREE, not two — the local code is an arm like any other, and the easiest to overlook because NO LINE OF THE
+DEFINITION NAMES IT.”*
+
+⚠ **“OWN ANSWER” IS NOT A KIND OF RECORD.** It is a case feature created by `$extract` — a *source* of records
+into the asserted arm. Nothing marks a record as human-written, and no record carries precedence by
+provenance. A clause built on the term was added to this charter and retracted within a day.
+
+### ⭐⭐ THE REDUCTION DECIDES THREE THINGS THAT LOOK SEPARATE
+
+A concept has **at most one** reduction over its collection. Present ⇒ the concept publishes ONE; absent ⇒ it
+publishes the collection.
+
+| | a SELECTING reduction (`most recent`) | a COMPUTING reduction (`exists`) |
+|---|---|---|
+| yields | an existing record | a new one, about the collection |
+| over an EMPTY collection | nothing selected → null → **PAUSE** | a determinate answer about emptiness → **DENY** |
+| precedence | symmetric recency | n/a |
+
+⭐ **PRECEDENCE IS AN AUTHORING CHOICE, NOT A LANGUAGE GUARANTEE.** *“A user’s answer overrides the chart”* is
+what `most recent` PRODUCES — a fresh answer beats old evidence AND fresh evidence beats an old answer. §2
+says the reviewer’s judgement is the output; the language ENABLES that and the author CHOOSES it.
+
+⭐ **AND IT SETTLES PAUSE-vs-DENY**, which reads as three contradictory clauses until the reduction is named:
+the `record-boolean-value` façade is three-state because it serves SELECTIONS; `exists` is two-valued because
+it COMPUTES over the collection; and *“a derivation over a QUESTION inherits the question’s unknown”* governs a
+derivation that READS A VALUE — `exists` counts members instead, so it does not inherit.
+
+⚠ **A REDUCTION IS NOT A COMPOSITION.** `exists` is a reduction (collection → boolean) and belongs in the
+reduction lane, not in `defined as` (operator, 2026-09-05). Four design revisions in one day each needed new
+machinery — a side define, an override chain, a hidden second cardinality, a scoped charter clause — because
+they were making a reduction work inside the composition construct. ⚠ The in-tree `defined as exists ( … )`
+uses are the DESIGNED PROMOTION IDIOM (record set → boolean so it can enter a boolean composition, per #281
+“no `exists` inside a composition”), not misuse; they move lanes, and the capability is not lost.
+
+⚠ **PROPOSED, NOT ADOPTED** — see `tmp/DESIGN-language-open-questions.md`: replacing Scalar/Record/RecordSet
+with **tuples and relations** (a tuple carries a value plus its meta), which would make shape derivable from
+the reduction rather than separately declared. Do not build to it; do not treat it as settled.
+
 ### One identity, declared value type
 
 A **concept** is one determination with **one identity** and a **declared value type**. Provenance rides on
