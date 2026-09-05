@@ -137,8 +137,10 @@ codespace, following the KALM precedent.
   introduces the convention rather than adopting one.
 - **`um-css-04` has zero qa files** — valid config, full `.crl`/`.cel`, no data. The picker will meet
   artifacts that are configured but unbuilt; that is what `available: false` is for.
-- **The qa root is KELP-discoverable** (`tests/data/fhir/patient`), but is reported via `kelp status`
-  from `kelp.project.json`. The tools should resolve it, not the pane.
+- **The qa root is KELP-discoverable** — the `qa` entity's folder is `tests`, reported via `kelp status`
+  from `kelp.project.json`. It holds TWO trees: `tests/data/fhir/patient/` (CEL case data) and
+  `tests/results/fhir/patient/` (engine results, where built Questionnaires land). The tools should resolve
+  them, not the pane.
 
 ## 8. Sources — what is and is not authoritative
 

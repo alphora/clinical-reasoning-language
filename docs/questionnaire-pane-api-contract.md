@@ -72,9 +72,10 @@ says otherwise: **per-case / build-time flatten / disk read.**
 
 ## Access mechanism (stable)
 The producer runs `PlanDefinition/$apply` (cqf-fhir-cr-cli harness) against the emitted PlanDefinition canonical +
-the case's patient bundle (qa `tests/data/fhir/patient`). For the flatten-to-leaf variant it drives the reveal
-loop to completion. Case identity key = `libraryId` + `caseSlug` (the tool owns path resolution; the pane never
-sees a path). Where built Q artifacts land (QA vs elsewhere) is a producer-side decision the tool hides.
+the case's patient bundle (`tests/data/fhir/patient`, the CEL-emitted case data). For the flatten-to-leaf
+variant it drives the reveal loop to completion. Case identity key = `libraryId` + `caseSlug` (the tool owns
+path resolution; the pane never sees a path). Built Q artifacts land in the sibling results tree
+(`tests/results/fhir/patient/<compartmentId>/`), which the tool hides from the pane.
 
 ## Timing
 Contract: FIXED now — the pane session builds the renderer + fixture against it. Producer + tool implementation:

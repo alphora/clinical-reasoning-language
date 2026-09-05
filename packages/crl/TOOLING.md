@@ -139,10 +139,22 @@ crl-emit --help
 |---|---|---|
 | `.crl` | (omitted) or `cql` | `<out-dir>/<library-name>.cql` (flat) |
 | `.crl` | `fhir-def` | **BOTH lanes written atomically:** `<out-dir>/cql/<library-name>.cql` + `<out-dir>/fhir/<ResourceType>/<id>.json` |
-| `.cel` | (omitted) | `<out-dir>/patient/<library-slug>/<case-slug>/<ResourceType>/<id>.json` (KALM-style per-case tree) |
+| `.cel` | (omitted) | `<out-dir>/patient/<compartmentId>/<lowercase-type>/<id>.json` (KALM per-case tree) + `<out-dir>/cel-data-manifest.json` |
 | `.cel` | any | **Hard error** — CEL has its own pipeline; `--target` is rejected |
 
-**Atomic-write contract** (`--target fhir-def` only): either both the CQL lane AND the FHIR-def lane succeed and write, or neither writes. This guarantees the emitted `Library.content[0].attachment.url = "../../cql/<name>.cql"` references always resolve.
+**Two-lane contract** (`--target fhir-def` only): the emit is computed in full before anything is written, so a CRL error writes NOTHING. The write itself is **not transactional** — files go out per-file, CQL lane first — so a filesystem failure mid-write leaves `<out-dir>` holding a partial deliverable and throws `EmitWriteError` carrying what it managed to write. What the contract guarantees is that both lanes come from ONE emit, so the emitted `Library.content[0].attachment.url = "../../cql/<name>.cql"` reference resolves against a CQL lane produced from the same source.
+
+### ⭐ `--out-dir` is a DIFFERENT level for each lane
+
+Each emit lane roots its own subtree, so the value you pass differs per invocation. These are the values that land output where a KALM/KELP content project expects it — **measured from a real project tree, not composed from the segments above**:
+
+| you are emitting | pass | it produces |
+|---|---|---|
+| CRL → CQL + FHIR definitions (`--target fhir-def`) | `--out-dir src` | `src/cql/<library>.cql` + `src/fhir/<ResourceType>/<id>.json` |
+| CEL → FHIR case instances | `--out-dir tests/data/fhir` | `tests/data/fhir/patient/<compartmentId>/<lowercase-type>/<id>.json` |
+| engine results (`emit_results`) | `--out <project root>` | `tests/results/fhir/patient/<compartmentId>/<lowercase-type>/<id>.json` |
+
+⚠ **Passing the project root to `--target fhir-def` writes `./cql/` and `./fhir/`, which is not where anything reads from.** The CQL lane is `<out-dir>/cql`, so `src/cql` requires `--out-dir src`. The same arithmetic applies to CEL: the writer owns `<out-dir>/patient/`, so `tests/data/fhir/patient/` requires `--out-dir tests/data/fhir`, and `--out-dir tests/data` silently produces a `tests/data/patient/` tree nothing loads.
 
 **Exit codes**
 
@@ -370,7 +382,13 @@ A typical clinical artifact project has authored CRL/CEL sources plus generated 
 | `src/cel/*.cel` | CEL case-example libraries (authored) | hand-authored |
 | `src/cql/<library>.cql` | Emitted CQL libraries | CQL lane of `--target fhir-def`, or `--target cql` |
 | `src/fhir/<ResourceType>/<id>.json` | Emitted FHIR Definition resources (ValueSet / Library / ActivityDef / PlanDef) | FHIR lane of `--target fhir-def` |
-| `tests/data/patient/<library>/<case>/<ResourceType>/<id>.json` | Emitted FHIR instance resources per CEL case | `crl-emit` on a `.cel` file |
+| `tests/data/fhir/patient/<compartmentId>/<lowercase-type>/<id>.json` | Emitted FHIR instance resources per CEL case | `crl-emit` on a `.cel` file |
+
+| `tests/results/fhir/patient/<compartmentId>/<lowercase-type>/<id>.json` | Engine RESULTS per CEL case (Questionnaire / QuestionnaireResponse from `$apply`) | `emit_results` |
+
+⚠ **The instance path is ONE hashed compartment segment and a LOWERCASE type** — not `<library>/<case>/<ResourceType>`. A reader who has met the older three-segment shape will re-derive it, and a hard-coded copy of it keeps compiling while silently matching nothing. ⭐ The authority is `celCaseCompartmentDir` / the emitter's `outputPath` — **never re-derive a case directory from names, and never document it as a string a human is expected to reproduce.**
+
+⚠ **`tests/data/fhir/` and `tests/results/fhir/` are different trees with different producers.** CEL emits the case DATA; an engine produces RESULTS from that data plus the definitions. A Questionnaire never appears under `tests/data/`.
 
 ### Read / write flow
 
@@ -382,17 +400,17 @@ Which CLI command reads what, and writes what, when invoked from a project root:
 
    src/crl/<lib>.crl              ──►  crl-emit --target fhir-def    ──┬─► src/cql/<library>.cql
    (+ closure via package.json         --path src/crl/<lib>.crl        │   (one per library in
-    and node_modules)                  --out-dir .                     │    the import closure)
+    and node_modules)                  --out-dir src                   │    the import closure)
                                                                        │
-                                       atomic two-lane write:          ├─► src/fhir/<ResourceType>/<id>.json
-                                       BOTH lanes succeed and write,   │   (ValueSet / Library /
-                                       or NEITHER writes               │    ActivityDef / PlanDef)
+                                       one emit, both lanes written    ├─► src/fhir/<ResourceType>/<id>.json
+                                       from it (an error writes        │   (ValueSet / CodeSystem / Library /
+                                       nothing; I/O can leave part)    │    ActivityDef / PlanDef / StructureDef)
 
 
    src/cel/<cases>.cel              ┐
-                                    ├─► crl-emit                   ──► tests/data/patient/<lib>/<case>/<RT>/<id>.json
-   src/crl/<lib>.crl                ┘   --path src/cel/<cases>.cel      (one tree per case)
-   (closure named in the .cel           --out-dir tests/data
+                                    ├─► crl-emit                   ──► tests/data/fhir/patient/<compartmentId>/<type>/<id>.json
+   src/crl/<lib>.crl                ┘   --path src/cel/<cases>.cel      (one compartment per case)
+   (closure named in the .cel           --out-dir tests/data/fhir
     `covers "<Library>"` clause)
 
 
@@ -407,15 +425,16 @@ Concrete invocations from a project root:
 
 ```bash
 # Regenerate both CQL + FHIR-def lanes for one CRL library (atomic two-lane write):
-npx crl-emit --path src/crl/cms22.crl --out-dir . --target fhir-def
+npx crl-emit --path src/crl/cms22.crl --out-dir src --target fhir-def
 #   reads   src/crl/cms22.crl  (+ closure via package.json / node_modules)
 #   writes  src/cql/<library>.cql           (one per library in the import closure)
 #           src/fhir/<ResourceType>/*.json  (ValueSet / Library / ActivityDef / PlanDef)
 
 # Regenerate FHIR instance resources for one CEL case file:
-npx crl-emit --path src/cel/cms22-cases.cel --out-dir tests/data
+npx crl-emit --path src/cel/cms22-cases.cel --out-dir tests/data/fhir
 #   reads   src/cel/cms22-cases.cel + the CRL closure named in its `covers` clause
-#   writes  tests/data/patient/<library>/<case>/<ResourceType>/*.json
+#   writes  tests/data/fhir/patient/<compartmentId>/<lowercase-type>/*.json   (compartmentId is HASHED — see the note above)
+#           tests/data/fhir/cel-data-manifest.json                            (the paths this run claimed)
 
 # Validate a CRL file without writing anything:
 npx crl-validate --path src/crl/cms22.crl
@@ -423,7 +442,7 @@ npx crl-validate --path src/crl/cms22.crl
 #   writes  nothing — emits `{success, errors[], warnings[]}` on stdout
 ```
 
-The atomic two-lane contract on `--target fhir-def` is the load-bearing piece: a single CRL change regenerates `src/cql/` and `src/fhir/` together so `Library.content` URLs never drift out of sync.
+Emitting both lanes from ONE `--target fhir-def` run is the load-bearing piece: a single CRL change regenerates `src/cql/` and `src/fhir/` together, so `Library.content` URLs never point at a CQL lane emitted from different source. Running the lanes separately, or pointing them at different `--out-dir` values, is what breaks that.
 
 ---
 

@@ -7,8 +7,15 @@
 // they are seeded rather than produced.
 //
 // Layout it writes (settled — docs/questionnaire-pane-integration-plan.md §5a):
-//   <content-repo>/**/tests/data/fhir/patient/<library-slug>-cases/<case-slug>/Questionnaire/<id>.json
-//   <content-repo>/**/tests/data/fhir/patient/<library-slug>-cases/<case-slug>/QuestionnaireResponse/<id>.json
+//   <content-repo>/**/tests/results/fhir/patient/<compartmentId>/questionnaire/<id>.json
+//   <content-repo>/**/tests/results/fhir/patient/<compartmentId>/questionnaireresponse/<id>.json
+//
+// ⚠ THREE THINGS THAT ARE EASY TO GET WRONG, all measured against a real content tree:
+//   1. The RESULTS tree, not `tests/data/`. `tests/data/` is CEL's, and `emit_cel` wipes it wholesale.
+//      KELP's `qa` entity has folder `tests` because it governs BOTH emitters — data and results.
+//   2. ONE compartment segment, not `<library>/<case>`. It is a capped slug of library + case + subject
+//      plus a 12-hex hash. Never compose it; only ever discover it by listing.
+//   3. LOWERCASE type directories (`questionnaire`), matching what the real producer writes.
 //
 // Usage (from the WORKTREE ROOT — E:\src\mv-plandefinition-questionnaire):
 //   npm run seed:questionnaire -- --root <content-repo> --all
@@ -74,14 +81,14 @@ const load = (file) => JSON.parse(readFileSync(join(testdata, file), "utf8"));
 
 /** Filenames ANY fixture could have written, per resource type — the exact set `--clean` may delete and a write
  *  must clear first. Derived from the fixture contents so it can never drift from what was actually written. */
-const knownNames = { Questionnaire: new Set(), QuestionnaireResponse: new Set() };
+const knownNames = { questionnaire: new Set(), questionnaireresponse: new Set() };
 for (const file of Object.values(FIXTURES)) {
   const f = load(file);
-  knownNames.Questionnaire.add(`${f.questionnaire.id}.json`);
-  knownNames.QuestionnaireResponse.add(`${f.questionnaireResponse.id}.json`);
+  knownNames.questionnaire.add(`${f.questionnaire.id}.json`);
+  knownNames.questionnaireresponse.add(`${f.questionnaireResponse.id}.json`);
 }
 
-/** Every `<...>/tests/data/fhir/patient/<library>/<case>` directory under root. */
+/** Every `<...>/tests/results/fhir/patient/<compartmentId>` directory under root. */
 function caseDirs(dir, acc = [], depth = 0) {
   if (depth > 8) return acc;
   let entries;
@@ -93,11 +100,11 @@ function caseDirs(dir, acc = [], depth = 0) {
   for (const e of entries) {
     if (!e.isDirectory() || e.name === "node_modules" || e.name === ".git") continue;
     const p = join(dir, e.name);
-    if (p.replace(/\\/g, "/").endsWith("tests/data/fhir/patient")) {
-      for (const lib of readdirSync(p, { withFileTypes: true }).filter((d) => d.isDirectory())) {
-        for (const c of readdirSync(join(p, lib.name), { withFileTypes: true }).filter((d) => d.isDirectory())) {
-          acc.push(join(p, lib.name, c.name));
-        }
+    if (p.replace(/\\/g, "/").endsWith("tests/results/fhir/patient")) {
+      // ONE level down: the compartment id IS the case directory. Descending a second level was the
+      // pre-`0e7641da` two-segment shape and now matches nothing at all.
+      for (const c of readdirSync(p, { withFileTypes: true }).filter((d) => d.isDirectory())) {
+        acc.push(join(p, c.name));
       }
       continue;
     }
@@ -136,8 +143,8 @@ let n = 0;
 let kept = 0;
 for (const caseDir of targets) {
   for (const [type, resource] of [
-    ["Questionnaire", fixture.questionnaire],
-    ["QuestionnaireResponse", fixture.questionnaireResponse],
+    ["questionnaire", fixture.questionnaire],
+    ["questionnaireresponse", fixture.questionnaireResponse],
   ]) {
     const dir = join(caseDir, type);
     if (clean) {

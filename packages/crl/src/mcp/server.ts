@@ -600,7 +600,10 @@ export function createServer(): McpServer {
           .min(1)
           .optional()
           .describe(
-            "Optional ABSOLUTE output directory. When set, BOTH lanes are ALSO written to disk — " +
+            "Optional ABSOLUTE output directory. ⭐ IN A KALM/KELP CONTENT PROJECT THIS IS THE PROJECT'S " +
+              "`src` DIRECTORY — the lanes hang off it, so `<project>/src` yields `src/cql/` + `src/fhir/`, " +
+              "which is where every consumer reads. Passing the PROJECT ROOT instead writes `./cql/` and " +
+              "`./fhir/`, which nothing loads. When set, BOTH lanes are ALSO written to disk — " +
               "CQL to `<out>/cql/<outputFilename>`, FHIR to `<out>/fhir/<ResourceType>/<id>.json` — via the " +
               "SAME shared writer as `crl-emit --target fhir-def --out-dir`, so MCP and CLI cannot drift. The " +
               "response then carries `written: { cql: string[], fhir: string[] }` (ABSOLUTE paths) and OMITS the " +
@@ -656,7 +659,11 @@ export function createServer(): McpServer {
           .min(1)
           .optional()
           .describe(
-            "Optional ABSOLUTE output directory. When set, the FHIR instances are ALSO written to disk at " +
+            "Optional ABSOLUTE output directory. ⭐ IN A KALM/KELP CONTENT PROJECT THIS IS " +
+              "`<project>/tests/data/fhir` — the writer owns `<out>/patient/`, so that value yields " +
+              "`tests/data/fhir/patient/<compartmentId>/<lowercase-type>/`. Passing `tests/data` instead " +
+              "silently produces a `tests/data/patient/` tree nothing loads. " +
+              "When set, the FHIR instances are ALSO written to disk at " +
               "`<out>/<outputPath>/<id>.json` (the KALM-style tree) via the SAME shared writer as " +
               "`crl-emit --path x.cel --out-dir`, so MCP and CLI cannot drift. The response then carries " +
               "`written: string[]` (ABSOLUTE paths). Nothing is written if any error-severity diagnostic is " +
