@@ -76,3 +76,16 @@ packages/*/test/oracle/.gen/
 
 # Release checksums — generated per release, attached as an asset, never committed.
 SHA256SUMS
+
+# vibe-tools:begin
+/.codex/config.toml
+/.codex/agents/vibe-reviewer-*.toml
+# vibe-tools:end
+
+# Per-machine lifecycle wiring; shared implementation remains tracked.
+/.codex/hooks.json
+/.codex/lifecycle.local.json
+/.codex/**/__pycache__/
+!.claude/hooks/
+.claude/hooks/*
+!.claude/hooks/refactor-state.sh

@@ -352,17 +352,17 @@ carrying the before-state into the review packet so your own corrections do not 
 
 The operator does not need to remember to ask for it. They may force it with `/stale-requirements`.
 
-## GATE — at session start AND after every compaction: read `tmp/REFACTORS-IN-FORCE.md`
+## GATE — at session start: read `tmp/REFACTORS-IN-FORCE.md`
 
 `large-refactor` is a **MODE, not an event.** Invoking it once at the start of a multi-session effort does
-not work: its discipline is per-edit, and it has to survive compactions and hand-offs. So it is carried as
+not work: its discipline is per-edit, and it has to survive hand-offs. So it is carried as
 STATE, not as an instruction the operator repeats.
 
 If that file lists an ACTIVE refactor, **the `large-refactor` protocol is in force for its paths** — the
 code there is the PATIENT, unmarked code is presumed-wrong and may not be cited as authority, and any
 review packet touching those paths must hand reviewers the taxonomy.
 
-- Read it at session start and again after each compaction. It names the target model (the authority),
+- Read it at session start. It names the target model (the authority),
   the blast radius, the done-gate, and the open `REFACTOR:suspect` list.
 - When you finish a slice, UPDATE it — the `suspect` list is the live to-do, and it is the only thing that
   survives you.

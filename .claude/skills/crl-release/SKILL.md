@@ -1,6 +1,6 @@
 ---
 name: crl-release
-description: Cut a CRL release. Invoke for ANY release, re-release, or "let's ship this to the KE" — including a hotfix. Encodes the artifact-execution gate that four consecutive releases failed.
+description: "Cut a CRL release. Invoke for ANY release, re-release, or \"let's ship this to the KE\" — including a hotfix. Encodes the artifact-execution gate that four consecutive releases failed."
 ---
 
 # Cutting a CRL release

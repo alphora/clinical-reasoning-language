@@ -1,7 +1,7 @@
 # Emit follow-ups assessment + plan — issues #236, #238, PR #272
 
 **STATUS:** captured assessment + plan (2026-08-12). This is a **working-state capture to be refined**, NOT
-yet a design-of-record. It exists so the full reasoning survives a context compaction intact — deliberately
+yet a design-of-record. It exists so the full reasoning remains available across sessions — deliberately
 detailed, not a lossy handoff. The durable *design principle* in §0 will graduate into the charter/design doc
 once refined; the *plans* here are the starting point for that refinement.
 

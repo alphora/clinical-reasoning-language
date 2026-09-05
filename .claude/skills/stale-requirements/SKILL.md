@@ -1,6 +1,6 @@
 ---
 name: stale-requirements
-description: Invoke whenever a RULE is about to change, or a rule is being used to block work — a charter clause, a memory, a doctrine comment, a kit rule, an operator escalation. It exists to stop two failures: a stale requirement vetoing a fix that was just agreed, and a correction that leaves stale copies alive elsewhere. Use it before correcting any rule, and the moment a reviewer (or you) cites a requirement as a reason NOT to do something.
+description: "Invoke whenever a RULE is about to change, or a rule is being used to block work — a charter clause, a memory, a doctrine comment, a kit rule, an operator escalation. It exists to stop two failures: a stale requirement vetoing a fix that was just agreed, and a correction that leaves stale copies alive elsewhere. Use it before correcting any rule, and the moment a reviewer (or you) cites a requirement as a reason NOT to do something."
 ---
 
 # Stale requirements — the rules are also the patient

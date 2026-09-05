@@ -1,6 +1,6 @@
 ---
 name: large-refactor
-description: Invoke at the START of any large refactor — where a body of existing code is deliberately being changed from a known-wrong model to a target model (an emit flip, a representation redesign, a hack removal). It exists to stop the single most expensive failure of refactor work: anchoring on the code being fixed as if it were authority. Use it when the work spans many files and the point is that the current behavior is wrong until you finish.
+description: "Invoke at the START of any large refactor — where a body of existing code is deliberately being changed from a known-wrong model to a target model (an emit flip, a representation redesign, a hack removal). It exists to stop the single most expensive failure of refactor work: anchoring on the code being fixed as if it were authority. Use it when the work spans many files and the point is that the current behavior is wrong until you finish."
 ---
 
 # Large-refactor protocol — the code is the patient, not the doctor

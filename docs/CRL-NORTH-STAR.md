@@ -583,7 +583,7 @@ must precede removing the `exists` shape bridges.)
   the shared `isValueReadingBooleanConcept`.)
 - **⭐ No magic in the EVAL/TEST path either — matching is EXPLICIT MEMBERSHIP, both lanes, local AND remote.**
   This is the single biggest spin-cause in #189: "clever" shortcuts that *technically work* but are impossible to
-  hold in your head, so they re-confuse every reader and every compaction. **Banned in both the `$apply`/emit lane
+  hold in your head, so they re-confuse every reader. **Banned in both the `$apply`/emit lane
   and the CRE/tree lane, for local and remote alike:** *presence* standing in for membership (asking only *whether*
   a fact exists, not *which* code it carries); *auto-supplied* codes the emitter picks that the author never stated;
   *implicit arm-selection* (a fact silently becoming local vs source by channel/role/hash); and *"trusted" skips*
