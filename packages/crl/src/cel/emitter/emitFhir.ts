@@ -1102,6 +1102,38 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
     } else {
       resourceBody.code = cc;
     }
+  } else if (derived.role === "bare-type" && resourceCodingPlacement(fhirType) !== undefined) {
+    // ⚠⚠ #312 — AN UNCODED RESOURCE OF A CODED-RETRIEVE TYPE IS INERT, AND NOTHING ELSE SAYS SO.
+    //
+    // A bare-type fact (`- defined by "ServiceRequest".`) supplies a resource directly. Its coding comes from
+    // `code is`, and there is no fallback: a LOCAL fact derives one from its concept (`deriveLocalCoding`),
+    // but a bare-type fact has no concept to derive from. So omitting `code is` emits a resource with no
+    // coding at all, on a type whose retrieves filter BY that coding.
+    //
+    // MEASURED IN THE FIELD: a KE wrote `- value is "<system>|<code>".` instead of `- code is`. `validate_cel`
+    // clean, `emit_cel` success, and the emitted ServiceRequest carried no `code` — so the posrep retrieve
+    // could never find it. Silent, and green at every gate.
+    //
+    // ⚠ A WARNING, NOT AN ERROR, and the reason is honest rather than cautious: a `source representation` may
+    // omit `coded from`, which emits an UNFILTERED retrieve that an uncoded resource legitimately matches. We
+    // cannot prove from here that no concept retrieves this type uncoded, so we say "probably inert" and name
+    // the cause instead of refusing.
+    //
+    // ⚠ Types with NO coding placement (Patient, Task) never reach this branch — measured — so supplying an
+    // uncoded Patient, the commonest bare-type fact there is, stays silent.
+    ctx.diagnostics.push({
+      kind: "bare-type-fact-uncoded",
+      severity: "warning",
+      message:
+        `Fact "${factName}" supplies a bare \`${fhirType}\` with no \`code is\`, so the emitted resource ` +
+        `carries no ${resourceCodingPlacement(fhirType)?.jsonName}. A ${fhirType} retrieve filters on that ` +
+        `element, so nothing coded will match this resource — it is inert unless some concept retrieves ` +
+        `${fhirType} unfiltered. If you meant to give it a code, the property is \`code is\` ` +
+        `(\`value is\` sets the datum, not the coding).`,
+      caseSlug: ctx.caseSlug,
+      factName,
+      filePath: ctx.graph.filePath,
+    });
   }
 
   // Status — #189 homeostasis-core (disc 493): `Observation.status` (REQUIRED 1..1; an Observation emitted

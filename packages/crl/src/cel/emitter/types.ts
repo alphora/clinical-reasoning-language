@@ -64,6 +64,15 @@ export type EmitDiagnosticKind =
    *  member of the concept's local set is NOT an error — it is the legitimate wrong-code datum; it emits, and the
    *  CEL validator flags it with a `fact-code-not-in-local-set` warning.) */
   | "local-authored-code-malformed"
+  /** #312 — a BARE-TYPE fact (`- defined by "ServiceRequest".`) with no `code is`, on a resource type whose
+   *  retrieves filter by a coding element. It emits with NO coding, so nothing coded can match it. Unlike a
+   *  LOCAL fact there is no fallback: a local fact derives its coding from its concept, a bare-type fact has
+   *  no concept to derive from. MEASURED: a KE wrote `value is` (which sets the datum) where `code is` was
+   *  meant, and got a clean validate, a successful emit, and a ServiceRequest the retrieve could never find.
+   *  ⚠ WARNING, not error — a `source representation` may omit `coded from`, emitting an UNFILTERED retrieve
+   *  that an uncoded resource legitimately matches, and we cannot prove from the emit site that no concept
+   *  does. Types with no coding placement (Patient, Task) never reach it. */
+  | "bare-type-fact-uncoded"
   /** #189 Piece 2 (disc 508 D5(3)) — a LOCAL determination fact is referenced with an `absent`/`negative` intent
    *  modifier. The modifier inverts clinical meaning but membership sees only the code, so the emitted resource
    *  (retrieved by code) would read PRESENT — the opposite of the intent. Rejected + skipped until negation
