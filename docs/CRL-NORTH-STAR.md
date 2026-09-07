@@ -178,8 +178,17 @@ repository merging. Height edits do not renew Weight's authored validity or an e
 a later Weight edit can make the calculation newer because Weight is the explicit validity anchor.
 A BMI clear contributes a newer unknown and can pause the decision. It does not mean removing the
 override to restore calculation. See the [bounded BMI session probe](../packages/crl/test/acceptance/bmi/README.md).
-The measurement/comparison prerequisite retains CRE's explicit imported-publication limitation;
-cross-library emitted CQL and CRE imports require separate verification and are not interchangeable claims.
+CRE can evaluate imported publications in the prepared emit closure, including transitive BMI
+operands and direct publication guards. Prepared source identity owns each operand; competing
+participating prepared source owners sharing a library/concept cache key are explicitly refused.
+During prepared-publication evaluation, CEL-backed assertions must resolve to the same
+concept and source owner CRE evaluates, including shadows outside the prepared closure.
+This admission guard does not certify the separate legacy-only evaluation path. Foreign legacy
+expressions, delegated decisions, and CEL-only publications outside that closure remain unsupported.
+Installed CRL source is prepared under the consumer project's canonical base and policy identity;
+this does not certify compatibility with separately compiled package artifacts. Native package
+identity parity remains unverified. CRE is not the full CQL/FHIR artifact preflight: includes and package resolution still require
+separate successful emission and native verification. A CRE pass cannot certify those artifacts.
 
 Acceptance: partial data pauses before an activity; adding the missing answer reaches the intended
 activity; complete data initially reaches the same activity. Verify the visible progression separately

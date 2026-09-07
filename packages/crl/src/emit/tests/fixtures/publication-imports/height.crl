@@ -1,0 +1,14 @@
+// REFACTOR:grounded (#320, plan593): source and local input share selected publication.
+library "Height Library".
+terminology "Height Source":
+- system is `http://loinc.org`.
+- code is `8302-2`.
+concept "Measurement":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `height`.
+- shape reduction is most recent.
+- source representation:
+  - type is Observation.
+  - coded from "Height Source".

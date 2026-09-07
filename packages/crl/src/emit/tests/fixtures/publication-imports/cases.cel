@@ -1,0 +1,87 @@
+// REFACTOR:grounded (#320, plan593): native and CRE consume the same CEL resource inputs.
+library "Import Cases".
+covers "Policy".
+fact "P":
+- defined by "Patient".
+fact "Weight":
+- defined by "Weight Library"."Measurement".
+- value is 120 'kg'.
+- date is "2026-09-01".
+fact "Height":
+- defined by "Height Library"."Measurement".
+- value is 2 'm'.
+- date is "2026-09-01".
+fact "Low Weight":
+- defined by "Weight Library"."Measurement".
+- value is 100 'kg'.
+- date is "2026-09-02".
+fact "Unknown Height":
+- defined by "Height Library"."Measurement".
+- date is "2026-09-02".
+fact "Override BMI":
+- defined by "BMI Library"."BMI".
+- value is 20 'kg/m2'.
+- date is "2026-09-03".
+fact "Clear BMI":
+- defined by "BMI Library"."BMI".
+- date is "2026-09-03".
+fact "Source Weight":
+- defined by "Observation".
+- code is "http://loinc.org|29463-7".
+- value is 120 'kg'.
+- date is "2026-09-01".
+fact "Source Height":
+- defined by "Observation".
+- code is "http://loinc.org|8302-2".
+- value is 2 'm'.
+- date is "2026-09-01".
+fact "Source BMI":
+- defined by "Observation".
+- code is "http://loinc.org|39156-5".
+- value is 35 'kg/m2'.
+- date is "2026-09-02".
+case "Local complete":
+- subject is "P".
+- fact is "Weight".
+- fact is "Height".
+- result is "D" is "Approve".
+case "Newer weight":
+- subject is "P".
+- fact is "Weight".
+- fact is "Height".
+- fact is "Low Weight".
+- result is "D" is "Deny".
+case "Missing height":
+- subject is "P".
+- fact is "Weight".
+- result is "D" is pause.
+case "Unknown height":
+- subject is "P".
+- fact is "Weight".
+- fact is "Height".
+- fact is "Unknown Height".
+- result is "D" is pause.
+case "Own override":
+- subject is "P".
+- fact is "Weight".
+- fact is "Height".
+- fact is "Override BMI".
+- result is "D" is "Deny".
+case "Own clear":
+- subject is "P".
+- fact is "Weight".
+- fact is "Height".
+- fact is "Clear BMI".
+- result is "D" is pause.
+case "External measurements":
+- subject is "P".
+- fact is "Source Weight".
+- fact is "Source Height".
+- result is "D" is "Approve".
+case "All BMI arms":
+- subject is "P".
+- fact is "Source Weight".
+- fact is "Source Height".
+- fact is "Source BMI".
+- fact is "Override BMI".
+- result is "D" is "Deny".

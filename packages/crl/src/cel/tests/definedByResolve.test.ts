@@ -36,6 +36,7 @@ describe("resolveDefinedByTarget (C2c-2)", () => {
       lib: "Lib",
       name: "Diabetes",
       kind: "concept",
+      sourceIdentity: "Lib.crl",
     });
   });
 
@@ -44,6 +45,7 @@ describe("resolveDefinedByTarget (C2c-2)", () => {
       lib: "Lib",
       name: "Approve",
       kind: "activity",
+      sourceIdentity: "Lib.crl",
     });
   });
 
@@ -60,6 +62,7 @@ describe("resolveDefinedByTarget (C2c-2)", () => {
       lib: "Lib",
       name: "Z",
       kind: "activity",
+      sourceIdentity: "Lib.crl",
     });
   });
 
@@ -98,6 +101,7 @@ describe("resolveDefinedByTarget (C2c-2)", () => {
       lib: "Pkg",
       name: "Anemia",
       kind: "concept",
+      sourceIdentity: "Pkg.crl",
     });
   });
 });

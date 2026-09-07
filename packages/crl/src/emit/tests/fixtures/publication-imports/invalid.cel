@@ -1,0 +1,16 @@
+// REFACTOR:grounded (#320, review594): isolated negative test, not authoring guidance.
+library "Import Cases".
+covers "Policy".
+fact "P":
+- defined by "Patient".
+fact "Invalid Weight":
+- defined by "Weight Library"."Measurement".
+- value is 0 'kg'.
+- date is "2026-09-01".
+// REQUIRED: publication-bmi-nonpositive, status error, NO activity.
+// Deny below is a deliberately forbidden outcome. CEL has no expected-error
+// assertion yet; the test invokes D and independently requires its typed error.
+case "Invalid beside missing":
+- subject is "P".
+- fact is "Invalid Weight".
+- result is "D" is "Deny".

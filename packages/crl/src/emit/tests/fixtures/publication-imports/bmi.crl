@@ -1,0 +1,15 @@
+// REFACTOR:grounded (#320, plan593): independent operands, explicit Weight validity.
+library "BMI Library".
+terminology "BMI Source":
+- system is `http://loinc.org`.
+- code is `39156-5`.
+concept "BMI":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `bmi`.
+- definition is body mass index of "Weight Library"."Measurement" and "Height Library"."Measurement" using validity of "Weight Library"."Measurement".
+- shape reduction is most recent.
+- source representation:
+  - type is Observation.
+  - coded from "BMI Source".

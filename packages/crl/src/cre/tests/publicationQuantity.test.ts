@@ -47,13 +47,13 @@ case "Missing":
       expect(run.runs.map(r=>({status:r.status,diagnostics:r.diagnostics}))).toEqual(Array.from({length:3},()=>({status:"pass",diagnostics:[]})));
       const fhir=emitFhirDefFromPath(crl);expect(fhir.success,JSON.stringify(fhir.errors)).toBe(true);
       expect(fhir.resources.filter(x=>x.resource.resourceType==="StructureDefinition").map(x=>x.resource.id)).toEqual(["quantity-publication-height"]);
-      // This prerequisite preserves CRE's explicit imports boundary; CQL emission has its own coverage.
+      // REFACTOR:grounded (#320, plan593): imported operands preserve the same outcomes.
       const full=readFileSync(crl,"utf8"), start=full.indexOf('concept "Flag":');
       writeFileSync(path.join(dir,"measurements.crl"), full.slice(0,start).replace('library "Quantity Publication".', 'library "Measurements".'));
       writeFileSync(crl, 'library "Quantity Publication".\n'+full.slice(start).replace('"Height" at least','"Measurements"."Height" at least'));
       writeFileSync(cel,readFileSync(cel,"utf8").replaceAll('"Quantity Publication"."Height"','"Measurements"."Height"'));
       const foreign=runCel(resolveCelImports(cel));
-      expect(foreign.runs.every(r=>r.status!=="pass" && r.diagnostics.some(d=>d.includes("publication-unsupported-scope")))).toBe(true);
+      expect(foreign.runs.map(r=>({status:r.status,diagnostics:r.diagnostics}))).toEqual(Array.from({length:3},()=>({status:"pass",diagnostics:[]})));
       const emitted=emitCQLImports(crl);expect(emitted.success,JSON.stringify(emitted.errors)).toBe(true);
     } finally { rmSync(dir,{recursive:true,force:true}); }
   });

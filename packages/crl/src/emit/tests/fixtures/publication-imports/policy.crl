@@ -1,0 +1,18 @@
+// REFACTOR:grounded (#320, plan593): synthetic language probe, not a medical policy.
+library "Policy".
+concept "Obese":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- definition is "BMI Library"."BMI" at least 30 'kg/m2'.
+- shape reduction is most recent.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `APPROVED`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `DENIED`.
+decision "D":
+first:
+- when "Obese" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".

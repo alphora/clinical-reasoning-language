@@ -1,0 +1,6 @@
+{
+  "name": "publication-imports",
+  "version": "0.0.0",
+  "private": true,
+  "crl": { "canonicalBase": "http://example.org/imports", "date": "2026-09-07" }
+}

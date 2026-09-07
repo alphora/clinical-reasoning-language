@@ -110,7 +110,7 @@ import type {
 } from "../cel/ast/types";
 import { classifyCanonicalToken, parseCodedValueToken } from "../cel/canonicalToken";
 // REFACTOR:grounded (#320, discussion 555): preserve authored per-reference temporal context.
-import { celIdentityDiagnostics, celResourceId, emitCelToFhir } from "../cel/emitter/emitFhir";
+import { celIdentityDiagnostics, celResourceId, emitCelToFhir, prepareCelPublications } from "../cel/emitter/emitFhir";
 import type { EmittedResource } from "../cel/emitter/types";
 import {
   adaptPublicationCandidate, hasLocalPublicationContribution, prepareSingleLibraryPublication,
@@ -128,6 +128,7 @@ import type { ResolvedCelGraph } from "../cel/imports/types";
 import { createPublicationContext } from "../emit/publicationContext";
 import { buildLibraryScopes, lookupKnownLibrary } from "../imports/scopes";
 import type { RegistryEntry } from "../imports/types";
+import { walkIncludes } from "../imports/resolver";
 import { inlineAnswerSet } from "../fhir-emitter/inlineAnswerSet";
 import { isValueReadingBooleanConcept, isPureQuestionConcept } from "../template-match/recencyValueConcept";
 import { resolveConceptPipeline } from "../template-match/resolvePipeline";
@@ -971,9 +972,12 @@ function evaluatePublication(entry: ConceptEntry, ctx: Ctx): ConceptEval {
   }
   if (descriptor.producer !== undefined) {
     // REFACTOR:grounded (#320, plan589): evaluate every dependency before suppressing a missing producer.
-    const operandIds = publicationProducerOperands(descriptor.producer).map(p => idOf(p.libraryName, p.conceptName));
-    if (operandIds.some(id => ctx.concepts.get(id)?.filePath !== entry.filePath))
-      return fail("publication-unsupported-scope", "CRE foreign publication producers are not implemented.");
+    const dependencies = publicationProducerOperands(descriptor.producer);
+    const operandIds = dependencies.map(p => idOf(p.libraryName, p.conceptName));
+    // REFACTOR:grounded (#320, plan593): prepared source identity, never the caller's file,
+    // determines which imported declaration supplies a selected operand.
+    if (dependencies.some((p, i) => ctx.concepts.get(operandIds[i])?.filePath !== p.sourceIdentity))
+      return fail("publication-ambiguous-scope", "Producer operand does not match its prepared owning declaration.");
     const operands = operandIds.map(id => evalConcept(id, ctx).publicationResult);
     if (operands.some(p => p === undefined)) return fail("publication-missing-envelope", "Producer operand has no publication result.");
     const failed = operands.find(p => p?.state === "failed");
@@ -2608,11 +2612,6 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
   }
   addConcepts(coveredLib, graph.coversTarget.ast, graph.coversTarget.filePath, graph.coversTarget.name);
 
-  // #189 Piece 2 (disc 508) — build the local membership index ONCE: derive each local concept's `{system, code}`
-  // set via the SAME resolver the emitter/CQL lane uses, so the tree lane and `$apply` agree by construction.
-  const localIndex = buildLocalMembershipIndex(concepts, graph);
-  const sourceIndex = buildSourceMembershipIndex(concepts, graph);
-
   const facts = new Map<string, CELFact>();
   for (const s of graph.cel.statements) {
     if (s.type === "CELFact") facts.set(s.name, s);
@@ -2622,7 +2621,8 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
   const runs: CaseRun[] = [];
   // REFACTOR:grounded (#320, review 561 N1/E4): availability and include membership do not
   // establish consumption. Follow referenced declarations, not every concept in a dependency.
-  // Covered publications still share single-library preparation; imported evaluation is not added here.
+  // REFACTOR:grounded (#320, plan593): detection stays consumption-based; preparation below
+  // reuses the CEL/emit closure and its owning declarations, not this registry-wide search context.
   const rawEntries = [...(graph.crlRegistry?.byNameLocal.values() ?? []),
     ...(graph.crlRegistry?.byNamePackage.values() ?? []), graph.coversTarget];
   const registry = graph.crlRegistry ?? { byNameLocal: new Map<string, RegistryEntry>(), byNamePackage: new Map<string, RegistryEntry>() };
@@ -2630,8 +2630,8 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
   const scopes = buildLibraryScopes([...entriesByPath.values()], [], registry);
   // REFACTOR:grounded (#320, review 570): a leaf in a local sibling does not
   // evaluate a foreign publication. Resolve its actual declaration before allowing
-  // that typed slot; all other foreign references retain the preparation boundary.
-  // Delegated decisions evaluate their own guards, so they retain that boundary.
+  // that typed slot. Prepared publication operands/guards are admitted separately below.
+  // Foreign legacy expressions and delegated decisions retain their explicit boundary.
   // Same-library delegation and menu leaves use this same activity admission;
   // action guards retain their separate publication/foreign-expression checks.
   // This is a one-hop activity-label check, not full FHIR closure validation.
@@ -2654,12 +2654,42 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
     }
   };
   if (coveredScope !== undefined) registerActivityLibrary(filePath, coveredScope.localNames.activities);
+  const preparedConcepts = new Map<string, ConceptEntry>();
+  const publicationScopeErrors = new Set<string>();
   const qualifiedLibraries = (node: unknown, allowLeafActivities: boolean, names = new Set<string>()): Set<string> => {
     if (node === null || typeof node !== "object") return names;
     if (Array.isArray(node)) {
       for (const child of node) qualifiedLibraries(child, allowLeafActivities, names);
     } else {
       const value = node as Record<string, unknown>;
+      // REFACTOR:grounded (#320, plan593): the shared program validates every publication
+      // body and its concept/terminology dependencies in the owning source scope.
+      if (value.type === "Concept" && value.shapeReduction !== undefined) return names;
+      if (value.type === "CELDefinedByField") {
+        const ref = value.ref as ReferenceName;
+        const target = resolveDefinedByTarget(ref, graph);
+        const id = idOf(getRefLibrary(ref) ?? coveredLib, getRefName(ref));
+        const evaluated = preparedConcepts.get(id) ?? concepts.get(id);
+        // Activities and bare FHIR types have no concept identity; neither may seed
+        // a same-named concept through runCase's legacy name lookup.
+        if (evaluated && target?.kind !== "concept") {
+          publicationScopeErrors.add(`publication-ambiguous-scope: CEL resolves ${labelOf(getRefLibrary(ref) ?? coveredLib, getRefName(ref))} as ${target?.kind ?? "unresolved"}, not the concept CRE would evaluate.`);
+          return names;
+        }
+        // REFACTOR:grounded (#320, review594 external): use CEL's resolved source
+        // identity, including when its library name equals the covered package's name.
+        if (target?.kind === "concept") {
+          if (target.sourceIdentity !== evaluated?.filePath) {
+            publicationScopeErrors.add(`publication-ambiguous-scope: CEL and CRE resolve ${labelOf(target.lib, target.name)} to different source owners.`);
+            return names;
+          }
+          if (publicationProgram?.lookup(target.sourceIdentity, target.name).kind === "publication") return names;
+          // CEL resolves its own declaration. Do not reinterpret a legacy local shadow
+          // through the covered CRL scope, which may explicitly include a package owner.
+          if (target.lib !== coveredLib) names.add(target.lib);
+          return names;
+        }
+      }
       let resolvedActivity = false;
       if (allowLeafActivities && value.type === "RecommendActivity" && coveredScope !== undefined) {
         const ref = value.activityName as ReferenceName;
@@ -2677,7 +2707,12 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
             : `publication-unresolved-activity: activity "${qualifier ?? coveredLib}"."${name}" does not resolve: ${target === undefined ? "target library is not available" : "target library does not declare this activity"}.`);
         }
       }
-      if (value.type === "QualifiedReference" && typeof value.libraryName === "string") names.add(value.libraryName);
+      if (value.type === "QualifiedReference" && typeof value.libraryName === "string") {
+        const hit = publicationProgram?.declarations.lookupConcept(filePath, value as unknown as ReferenceName);
+        if (hit?.kind === "hit" && hit.node.shapeReduction !== undefined &&
+          (preparedConcepts.get(idOf(hit.identity.libraryName, hit.identity.conceptName)) ?? concepts.get(idOf(hit.identity.libraryName, hit.identity.conceptName)))?.filePath === hit.identity.sourceIdentity) return names;
+        names.add(value.libraryName);
+      }
       for (const [key, child] of Object.entries(value)) {
         if (resolvedActivity && key === "activityName") continue;
         qualifiedLibraries(child, allowLeafActivities, names);
@@ -2731,8 +2766,7 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
       if (field.type !== "CELDefinedByField") continue;
       const target = resolveDefinedByTarget(field.ref, graph);
       if (target?.kind !== "concept") continue;
-      const owner = target.lib === coveredLib ? graph.coversTarget : registry.byNameLocal.get(target.lib) ?? registry.byNamePackage.get(target.lib);
-      if (owner !== undefined) pendingConcepts.push({ from: owner.filePath, ref: target.name });
+      pendingConcepts.push({ from: target.sourceIdentity, ref: target.name });
     }
   }
   const visitedConcepts = new Set<string>();
@@ -2750,37 +2784,77 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
   let publicationError: string | undefined;
   let publicationEmission: ReturnType<typeof emitCelToFhir> | undefined;
   if (hasPublication) {
-    const hasForeignReference = (node: unknown, allowLeafActivities: boolean): boolean =>
-      [...qualifiedLibraries(node, allowLeafActivities)].some((name) => name !== coveredLib);
-    const foreignCrlReference = hasForeignReference(graph.coversTarget.ast, true);
-    const unsupportedScope = graph.coversTarget.ast.includes.length > 0 ||
-      foreignCrlReference || hasForeignReference(graph.cel, false) ||
-      [...publicationPaths].some((source) => source !== filePath);
-    // Declaration admission is file-wide, not conditional on which case path runs.
-    if (graph.coversTarget.ast.includes.length > 0) {
-      publicationError = "publication-unsupported-scope: run_decision does not yet evaluate covered publication libraries with includes. Use emitted artifacts for this scope.";
-    } else if (activityErrors.size > 0) {
-      publicationError = [...activityErrors].join("\n");
-    } else if (unsupportedScope) {
-      publicationError = "publication-unsupported-scope: run_decision evaluates selected publications in the covered library without imports. Foreign references are supported only for resolved local sibling activities with distinct result labels. Use emitted artifacts for other scopes.";
-    } else {
-      try {
-        const domain = makeLocalDomainContext(graph);
-        publicationProgram = prepareSingleLibraryPublication(graph.coversTarget.ast, {
+    try {
+      const domain = makeLocalDomainContext(graph);
+      // REFACTOR:grounded (#320, plan593): reuse the already resolved, overlay-aware
+      // CEL graph. A second filesystem resolve could change declarations or local codes.
+      publicationProgram = graph.crlRegistry && graph.resolvedLibraryPaths
+        ? prepareCelPublications(graph)
+        : prepareSingleLibraryPublication(graph.coversTarget.ast, {
           canonicalBase: domain.base,
           localDomainId: domain.resolver?.domainIdFor(graph.coversTarget) ?? coveredLib,
           policyId: graph.projectRoot ? readPolicyId(graph.projectRoot) : undefined,
         }, filePath, graph.coversTarget.packageIdentity);
-        if (publicationProgram.diagnostics.length > 0) {
-          publicationError = publicationProgram.diagnostics.map((d) => `${d.kind}: ${d.message}`).join("\n");
-        } else {
-          publicationEmission = emitCelToFhir(graph, { now });
+      if (publicationProgram === undefined) throw new Error("No prepared publication closure is available.");
+      const admissionErrors: string[] = publicationProgram.diagnostics.map(d => `${d.kind}: ${d.message}`);
+      // Preparation is not import validation. Validate only participating owners' include
+      // walks; an unrelated registered sibling's parse/include errors must not poison a case.
+      const participating = new Set([filePath, ...publicationProgram.declarations.getLibraries().map(l => l.sourceIdentity)]);
+      const importErrors = new Set<string>();
+      for (const source of participating) {
+        const owner = entriesByPath.get(source);
+        if (owner) for (const diagnostic of walkIncludes(owner, registry).diagnostics) {
+          if (diagnostic.severity !== "error") continue;
+          const message = diagnostic.kind === "unresolved-include" ? `Cannot resolve include "${diagnostic.include.name}" from "${diagnostic.from.libraryName ?? diagnostic.from.filePath}".`
+            : diagnostic.kind === "cycle" ? `Include cycle: ${diagnostic.filePaths.join(" -> ")}`
+            : "message" in diagnostic ? diagnostic.message : diagnostic.kind;
+          importErrors.add(`publication-import-error: ${diagnostic.kind}: ${message}`);
         }
-      } catch (error) {
-        publicationError = `publication-preparation-failed: ${error instanceof Error ? error.message : String(error)}`;
       }
+      admissionErrors.push(...importErrors);
+      // The existing trace/cache key is library+concept. Rebind each publication to its
+      // actual prepared owner (an explicit include may choose a package over a local shadow).
+      // Two simultaneously participating owners of one key require a richer trace identity.
+      // REFACTOR:grounded (#320, review594): a publication must not overwrite a
+      // participating legacy concept either; bare guards also use this shared key.
+      const preparedOwners = new Map<string, Array<{ source: string; publication: boolean }>>();
+      for (const library of publicationProgram.declarations.getLibraries()) for (const node of library.ast.statements) {
+        if (node.type !== "Concept") continue;
+        const id = idOf(library.libraryName, node.name), previous = preparedOwners.get(id) ?? [];
+        const publication = node.shapeReduction !== undefined;
+        if (previous.some(p => p.source !== library.sourceIdentity && (p.publication || publication))) {
+          admissionErrors.push(`publication-ambiguous-scope: ${labelOf(library.libraryName, node.name)} has multiple participating source owners.`);
+        }
+        previous.push({ source: library.sourceIdentity, publication });
+        preparedOwners.set(id, previous);
+        if (!publication) continue;
+        const owner = entriesByPath.get(library.sourceIdentity);
+        if (owner) preparedConcepts.set(id, { node, lib: library.libraryName, filePath: library.sourceIdentity, entryName: owner.name, fallbackLib: library.libraryName });
+      }
+      const hasForeignReference = (node: unknown, allowLeafActivities: boolean): boolean =>
+        [...qualifiedLibraries(node, allowLeafActivities)].some(name => name !== coveredLib);
+      // Run both walks before combining results so neither loses its diagnostics to short-circuiting.
+      const foreignCrlReference = hasForeignReference(graph.coversTarget.ast, true);
+      const foreignCelReference = hasForeignReference(graph.cel, false);
+      const unsupportedScope = foreignCrlReference || foreignCelReference ||
+        [...publicationPaths].some(source => publicationProgram!.declarations.getLibrary(source) === undefined);
+      admissionErrors.push(...activityErrors, ...publicationScopeErrors);
+      if (unsupportedScope) admissionErrors.push("publication-unsupported-scope: CRE admits prepared publication dependencies and local sibling activities; foreign legacy expressions, delegated decisions, and publications outside the emitted closure remain unsupported.");
+      if (admissionErrors.length) publicationError = [...new Set(admissionErrors)].join("\n");
+      else {
+        // Commit prepared owners only after admission succeeds; failed contexts keep
+        // their original indexes instead of an arbitrary last publication owner.
+        for (const [id, entry] of preparedConcepts) concepts.set(id, entry);
+        publicationEmission = emitCelToFhir(graph, { now });
+      }
+    } catch (error) {
+      publicationError = `publication-preparation-failed: ${error instanceof Error ? error.message : String(error)}`;
     }
   }
+  // REFACTOR:grounded (#320, plan593): build indexes after prepared publication owners
+  // have replaced any registry-default shadow, so resource membership shares that identity.
+  const localIndex = buildLocalMembershipIndex(concepts, graph);
+  const sourceIndex = buildSourceMembershipIndex(concepts, graph);
   // REFACTOR:grounded (#320, review 556): share actual output identity diagnostics with authoring.
   const collisions = celIdentityDiagnostics(graph, { now });
   for (const s of graph.cel.statements) {

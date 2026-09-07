@@ -251,7 +251,7 @@ first:
     expect(run.produced.map((p) => p.recommendation)).toEqual(["Deny"]);
   });
 
-  it.each(["direct", "criterion alias", "delegated criterion", "CEL alias"])("still refuses consumed included publication through %s", (site) => {
+  it.each(["direct", "criterion alias", "delegated criterion", "CEL alias"])("admits direct imported publication but retains unsupported %s contexts", (site) => {
     const legacy = POLICY.replace("- shape is Record.", "- shape is Scalar.").replace("- shape reduction is most recent.\n", "")
       .replace('library "Publication".', 'library "Publication".\ninclude "Shared".');
     const shared = POLICY.replace('library "Publication".', 'library "Shared".') + `
@@ -272,19 +272,23 @@ first:
         : site === "direct" ? DECISION.replace('when "Answer"', 'when "Shared"."Answer"') : DECISION;
     const authoredFact = site === "CEL alias" ? fact("True", "true").replace('"Publication"."Answer"', '"Shared"."Alias"') : fact("True", "true");
     const { run } = evaluate(authoredFact, ["True"], decision, "", "Approve", "", { policy: legacy, siblings: [shared] });
+    if (site === "direct") {
+      expect(run.status).toBe("pass"); expect(run.produced.map(p=>p.recommendation)).toEqual(["Approve"]);
+      expect(run.diagnostics).toEqual([]); return;
+    }
     expect(run.status).toBe("error");
     expect(run.produced).toEqual([]);
     expect(run.diagnostics.join("\n")).toContain("publication-unsupported-scope");
   });
 
-  it("retains the covered publication's unsupported imports boundary", () => {
+  it("allows a valid include beside a covered publication", () => {
     const policy = POLICY.replace('library "Publication".', 'library "Publication".\ninclude "Shared".');
     const { run } = evaluate(fact("False", "false"), ["False"], DECISION, "", "Deny", "", {
       policy, siblings: ['library "Shared".\nactivity "Unused":\n- request CPGCommunicationRequest.\n- with `UNUSED`.'],
     });
-    expect(run.status).toBe("error");
-    expect(run.produced).toEqual([]);
-    expect(run.diagnostics.join("\n")).toContain("publication-unsupported-scope");
+    expect(run.status).toBe("pass");
+    expect(run.produced.map(p=>p.recommendation)).toEqual(["Deny"]);
+    expect(run.diagnostics).toEqual([]);
   });
 
   // REFACTOR:grounded (#320, review 570): leaf ownership does not change selected
@@ -355,14 +359,15 @@ first:
     expect(run.diagnostics.join("\n")).toContain("publication-unsupported-scope");
   });
 
-  it.each([false, true])("allows a sibling publication to exist but refuses its consumption (consumed=%s)", (consumed) => {
+  it.each([false, true])("admits a sibling publication already in the emitted closure (consumed=%s)", (consumed) => {
     const shared = POLICY.replace('library "Publication".', 'library "Shared".');
     const foreignFact = consumed ? fact("Foreign", "true").replace('"Publication"."Answer"', '"Shared"."Answer"') : "";
     const { run } = evaluate(fact("A", "true") + foreignFact, consumed ? ["A", "Foreign"] : ["A"],
       sharedDecision, "", "Approve", "", { policy: POLICY.slice(0, POLICY.indexOf('activity "Approve"')), siblings: [shared] });
-    expect(run.status).toBe(consumed ? "error" : "pass");
-    expect(run.produced.map((p) => p.recommendation)).toEqual(consumed ? [] : ["Approve"]);
-    if (consumed) expect(run.diagnostics.join("\n")).toContain("publication-unsupported-scope");
+    expect(run.status).toBe("pass");
+    expect(run.produced.map((p) => p.recommendation)).toEqual(["Approve"]);
+    expect(run.diagnostics).toEqual([]);
+    if (consumed) expect(run.conceptTruth.find(c=>c.lib==="Shared"&&c.name==="Answer")?.satisfied).toBe(true);
   });
 
   it("characterizes the unchecked legacy activity path without treating it as publication correctness", () => {
@@ -540,12 +545,16 @@ first:
     expect(view?.produced).toEqual([]);
   });
 
-  it.each(["CRL", "CEL"])("refuses a genuinely referenced foreign publication through %s", (site) => {
+  it.each(["CRL", "CEL"])("admits CRL closure dependencies but refuses CEL-only closure expansion through %s", (site) => {
     const legacy = POLICY.replace("- shape is Record.", "- shape is Scalar.").replace("- shape reduction is most recent.\n", "");
     const foreign = POLICY.replace('library "Publication".', 'library "Foreign".') + DECISION;
-    const authoredFact = site === "CEL" ? fact("False", "false").replace('"Publication"."Answer"', '"Foreign"."Answer"') : fact("False", "false");
+    const authoredFact = fact("False", "false").replace('"Publication"."Answer"', '"Foreign"."Answer"');
     const decision = site === "CRL" ? DECISION.replace('when "Answer"', 'when "Foreign"."Answer"') : DECISION;
     const { run } = evaluate(authoredFact, ["False"], decision, "", "Deny", "", { policy: legacy, siblings: [foreign] });
+    if (site === "CRL") {
+      expect(run.status).toBe("pass"); expect(run.produced.map(p=>p.recommendation)).toEqual(["Deny"]);
+      expect(run.diagnostics).toEqual([]); return;
+    }
     expect(run.status).toBe("error");
     expect(run.produced).toEqual([]);
     expect(run.diagnostics.join("\n")).toContain("publication-unsupported-scope");
@@ -606,18 +615,18 @@ const procedureFact = (name: string, value?: string, date?: string) => fact(name
 
 describe("CRE selected-datum membership production", () => {
   it("uses the same owning policy/package identity and derived key as emit preparation", () => {
-    const spy = vi.spyOn(publicationProgramModule, "prepareSingleLibraryPublication");
+    const spy = vi.spyOn(celEmission, "prepareCelPublications");
     try {
       const policy = membershipPolicy.replace('- definition is "Procedure" in qualifying.', '- code is `answer`.\n- definition is "Procedure" in qualifying.');
       const {run, preparedPublications} = evaluate(procedureFact("Selected", "`yes`"), ["Selected"], DECISION, "", "Approve", "", {policy, packageName:"distinct-owning-package", capturePublication:true});
       expect(run.status, run.diagnostics.join("\n")).toBe("pass");
-      const call = spy.mock.calls.findIndex((args) => args[0].library.name === "Publication");
+      const call = spy.mock.calls.findIndex((args) => args[0].coversTarget?.name === "Publication");
       expect(call).toBeGreaterThanOrEqual(0);
-      expect(spy.mock.calls[call][1].policyId).toBe("distinct-owning-package");
-      expect(spy.mock.calls[call][3]).toEqual({name:"distinct-owning-package",version:"0.0.0"});
       const result = spy.mock.results[call];
       if (result.type !== "return") throw new Error("CRE preparation failed");
       const cre = result.value.descriptors.find((d: publicationProgramModule.PublicationDescriptor) => d.identity.conceptName === "Answer")!;
+      expect(cre.identity.packageIdentity).toEqual({name:"distinct-owning-package",version:"0.0.0"});
+      expect(result.value.declarations.getLibrary(cre.identity.sourceIdentity)?.artifact.policyId).toBe("distinct-owning-package");
       const emitted = preparedPublications!.descriptors.find((d) => d.identity.conceptName === "Answer")!;
       expect({conceptId:cre.conceptId,producerId:cre.producer?.producerId,profileUrl:cre.profileUrl})
         .toEqual({conceptId:emitted.conceptId,producerId:emitted.producer?.producerId,profileUrl:emitted.profileUrl});

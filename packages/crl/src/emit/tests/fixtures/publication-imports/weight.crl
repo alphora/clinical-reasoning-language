@@ -1,0 +1,14 @@
+// REFACTOR:grounded (#320, plan593): same concept name in distinct owning libraries.
+library "Weight Library".
+terminology "Weight Source":
+- system is `http://loinc.org`.
+- code is `29463-7`.
+concept "Measurement":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `weight`.
+- shape reduction is most recent.
+- source representation:
+  - type is Observation.
+  - coded from "Weight Source".

@@ -28,6 +28,8 @@ export interface DefinedByTarget {
   /** The declaration name. */
   name: string;
   kind: "concept" | "activity";
+  /** Canonical source path selected by this resolver, including local/package precedence. */
+  sourceIdentity: string;
 }
 
 /**
@@ -49,5 +51,5 @@ export function resolveDefinedByTarget(
   const name = getRefName(ref);
   const target = buildDefinedByCandidates(entry.ast.statements).get(name);
   if (!target) return undefined;
-  return { lib, name, kind: target.type === "Activity" ? "activity" : "concept" };
+  return { lib, name, kind: target.type === "Activity" ? "activity" : "concept", sourceIdentity: entry.filePath };
 }
