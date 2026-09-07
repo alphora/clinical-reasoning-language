@@ -30,8 +30,9 @@
  */
 
 import { buildCRL } from "../index";
-import { prepareSingleLibraryPublication, publicationBooleanRead, hasLocalPublicationContribution, type PublicationDescriptor, type PublicationEmitScope } from "../emit/publicationProgram";
+import { publicationProducerOperands, prepareSingleLibraryPublication, publicationBooleanRead, hasLocalPublicationContribution, type PublicationDescriptor, type PublicationEmitScope } from "../emit/publicationProgram";
 import { visitConceptDefinitionRefs } from "../imports/computeEmitClosure";
+import { renderPublicationBMIHelpers, BMI_CQL } from "./renderPublicationBMI";
 import { renderPublicationQuantityHelpers, renderPublicationThresholdHelpers, QUANTITY_CQL, PUBLICATION_OBSERVATION_QUANTITY_CANDIDATE } from "./renderPublicationQuantity";
 import { PUBLICATION_LOCAL_QUANTITY_CANDIDATE } from "./renderPublicationSelection";
 import { PUBLICATION_SERVICE_REQUEST_CANDIDATE } from "./renderPublicationSelection";
@@ -1262,8 +1263,10 @@ class Emitter {
       const quantities = this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.valueType === "Quantity");
       sections.push(renderPublicationSelectionHelpers(), renderPublicationCandidateHelpers(quantities));
       if (quantities) sections.push(renderPublicationQuantityHelpers());
-      if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.role === "public" && s.__publication.descriptor.producer?.kind === "quantityThreshold"))
+      if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.role === "public" && ["quantityThreshold", "bodyMassIndex"].includes(s.__publication.descriptor.producer?.kind ?? "")))
         sections.push(renderPublicationThresholdHelpers());
+      if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.role === "public" && s.__publication.descriptor.producer?.kind === "bodyMassIndex"))
+        sections.push(renderPublicationBMIHelpers());
       if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.role === "public" && hasAgeSource(s.__publication.descriptor)))
         sections.push(renderPublicationAgeHelpers());
       if (this.ast.statements.some((s) => s.type === "Concept" && s.__publication?.role === "public" &&
@@ -2472,9 +2475,11 @@ class Emitter {
     }
     const producer = descriptor.producer;
     if (producer !== undefined) {
+      // REFACTOR:grounded (#320, plan589): both operands resolve to selected envelopes, never raw values.
+      const operands = publicationProducerOperands(producer).map(dependency => {
       const localOperand = [...this.conceptByName.values()].find((node) => node.__publication !== undefined &&
-        node.__publication.role !== "retrieve" && node.__publication.descriptor.identity.key === producer.operand.key);
-      const publicTarget = this.publication?.publicTarget(producer.operand.key);
+        node.__publication.role !== "retrieve" && node.__publication.descriptor.identity.key === dependency.key);
+      const publicTarget = this.publication?.publicTarget(dependency.key);
       const operand = localOperand !== undefined ? cqlIdent(publicationEnvelopeName(localOperand.name))
         : publicTarget !== undefined ? cqlQualifiedRef(this.renderLib(publicTarget.libraryName), publicationEnvelopeName(publicTarget.define)) : undefined;
       if (operand === undefined) {
@@ -2483,15 +2488,20 @@ class Emitter {
           kind: "publication-missing-envelope",
           line: c.location.start.line,
           column: c.location.start.column,
-          message: `Publication "${c.name}" has no physical envelope for operand "${producer.operand.conceptName}". Include its lowered declaration or provide its prepared physical target.`,
+          message: `Publication "${c.name}" has no physical envelope for operand "${dependency.conceptName}". Include its lowered declaration or provide its prepared physical target.`,
         });
         return "null /* publication-missing-envelope; emit fails */";
       }
+      return operand;
+      });
+      const operand = operands[0];
       const title = `FHIR.string { value: ${cqlStringLiteral(descriptor.title)} }`;
       const code = descriptor.localCode === undefined ? `FHIR.CodeableConcept { text: ${title} }`
         : `FHIR.CodeableConcept { text: ${title}, coding: { FHIR.Coding { system: FHIR.uri { value: ${cqlStringLiteral(descriptor.localCode.system)} }, code: FHIR.code { value: ${cqlStringLiteral(descriptor.localCode.code)} } } } }`;
       const profile = descriptor.profileUrl === undefined ? "null as System.String" : cqlStringLiteral(descriptor.profileUrl);
-      const produced = producer.kind === "quantityThreshold"
+      const produced = producer.kind === "bodyMassIndex"
+        ? `${cqlIdent(BMI_CQL.candidate)}(${operands[0]}, ${operands[1]}, ${producer.validityOperand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, 'Patient/' + Patient.id.value)`
+        : producer.kind === "quantityThreshold"
         ? `${cqlIdent(QUANTITY_CQL.candidate)}(${operand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, ${producer.threshold.value.toFixed(8)}, ${cqlStringLiteral(producer.threshold.unit)}, ${cqlStringLiteral(descriptor.conceptId)}, 'Patient/' + Patient.id.value)`
         : `${cqlIdent(PUBLICATION_PRODUCER_FUNCTIONS.candidate)}(${operand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, ${renderPublicationCodeTable(producer.domain)}, ${renderPublicationCodeTable(producer.qualifying)}, ${cqlStringLiteral(descriptor.conceptId)}, 'Patient/' + Patient.id.value)`;
       // Flatten preserves duplicate inputs for the selector's diagnostic; union could silently erase them.

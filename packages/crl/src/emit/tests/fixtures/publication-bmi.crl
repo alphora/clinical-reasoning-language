@@ -1,0 +1,55 @@
+// REFACTOR:grounded (#320, plan589): synthetic BMI threshold, not a customer clinical policy.
+library "BMI Publication".
+terminology "Height Source":
+- system is `http://loinc.org`.
+- code is `8302-2`.
+terminology "Weight Source":
+- system is `http://loinc.org`.
+- code is `29463-7`.
+terminology "BMI Source":
+- system is `http://loinc.org`.
+- code is `39156-5`.
+concept "Height":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `height`.
+- shape reduction is most recent.
+- source representation:
+  - type is Observation.
+  - coded from "Height Source".
+concept "Weight":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `weight`.
+- shape reduction is most recent.
+- source representation:
+  - type is Observation.
+  - coded from "Weight Source".
+concept "BMI":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `bmi`.
+- definition is body mass index of "Weight" and "Height" using validity of "Weight".
+- shape reduction is most recent.
+- source representation:
+  - type is Observation.
+  - coded from "BMI Source".
+concept "Obese":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- definition is "BMI" at least 30 'kg/m2'.
+- shape reduction is most recent.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `APPROVED`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `DENIED`.
+decision "D":
+first:
+- when "Obese" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".

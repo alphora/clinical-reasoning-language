@@ -1,3 +1,5 @@
+import { produceBMICandidate } from "../emit/publicationBMI";
+import { publicationProducerOperands } from "../emit/publicationProgram";
 /**
  * CRE — CRL Clinical Reasoning Engine (#115), v1.
  *
@@ -968,18 +970,22 @@ function evaluatePublication(entry: ConceptEntry, ctx: Ctx): ConceptEval {
     factsByCandidate.set(adapted.candidate.key, fact === undefined ? [] : [fact]);
   }
   if (descriptor.producer !== undefined) {
-    const operandId = idOf(descriptor.producer.operand.libraryName, descriptor.producer.operand.conceptName);
-    const operandEntry = ctx.concepts.get(operandId);
-    if (operandEntry === undefined || operandEntry.filePath !== entry.filePath)
+    // REFACTOR:grounded (#320, plan589): evaluate every dependency before suppressing a missing producer.
+    const operandIds = publicationProducerOperands(descriptor.producer).map(p => idOf(p.libraryName, p.conceptName));
+    if (operandIds.some(id => ctx.concepts.get(id)?.filePath !== entry.filePath))
       return fail("publication-unsupported-scope", "CRE foreign publication producers are not implemented.");
-    const operand = evalConcept(operandId, ctx).publicationResult;
-    if (operand === undefined) return fail("publication-missing-envelope", "Membership operand has no publication result.");
-    if (operand.state === "failed") return { sat: null, publicationResult: operand };
-    const produced = produceMembershipCandidate(descriptor, operand.state === "selected" ? operand.candidate : undefined, ctx.publicationSubjectReference);
+    const operands = operandIds.map(id => evalConcept(id, ctx).publicationResult);
+    if (operands.some(p => p === undefined)) return fail("publication-missing-envelope", "Producer operand has no publication result.");
+    const failed = operands.find(p => p?.state === "failed");
+    if (failed?.state === "failed") return { sat: null, publicationResult: failed };
+    const selectedOperands = operands.map(p => p?.state === "selected" ? p.candidate : undefined);
+    const produced = descriptor.producer.kind === "bodyMassIndex"
+      ? produceBMICandidate(descriptor, selectedOperands[0], selectedOperands[1], ctx.publicationSubjectReference)
+      : produceMembershipCandidate(descriptor, selectedOperands[0], ctx.publicationSubjectReference);
     if (produced.kind === "error") return fail(produced.code, produced.message);
     if (produced.kind === "candidate") {
       candidates.push(produced.candidate);
-      factsByCandidate.set(produced.candidate.key, ctx.factsByConcept.get(operandId) ?? []);
+      factsByCandidate.set(produced.candidate.key, [...new Set(operandIds.flatMap(id => ctx.factsByConcept.get(id) ?? []))]);
     }
   }
   const eligible = hasAgeSource(descriptor) ? eligibleAgeCandidates(descriptor, candidates, ageClock(ctx.publicationNow)) : { kind: "eligible" as const, candidates };

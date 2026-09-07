@@ -27,7 +27,7 @@ export function produceMembershipCandidate(
     }
   | PublicationValueError {
   const producer = descriptor.producer;
-  if (producer === undefined)
+  if (producer === undefined || producer.kind === "bodyMassIndex")
     return {
       kind: "error",
       code: "publication-no-producer",

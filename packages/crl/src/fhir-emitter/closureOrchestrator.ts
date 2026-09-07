@@ -1,3 +1,4 @@
+import { publicationProducerOperands } from "../emit/publicationProgram";
 /**
  * CRL → FHIR Definition emit — closure orchestrator (Todo 4 of #73).
  *
@@ -439,7 +440,8 @@ function publicationCaseFeatures(program: PublicationProgram, source: string, re
     const descriptor = program.get(declaration.identity.key);
     if (descriptor !== undefined) {
       if (hasLocalPublicationContribution(descriptor)) result.push(descriptor);
-      if (descriptor.producer !== undefined) visit(descriptor.producer.operand.sourceIdentity, descriptor.producer.operand.conceptName);
+      // REFACTOR:grounded (#320, plan589): both BMI inputs remain answerable dependencies.
+      for (const operand of publicationProducerOperands(descriptor.producer)) visit(operand.sourceIdentity, operand.conceptName);
       return;
     }
     for (const dependency of conceptDependencies(declaration.node)) visit(declaration.identity.sourceIdentity, dependency);

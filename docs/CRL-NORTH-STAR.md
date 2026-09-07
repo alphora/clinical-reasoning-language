@@ -143,7 +143,34 @@ unit-only representation is supported. Supplied systems must be UCUM with a code
 are not exact measurements. This comparison currently supports m/cm, kg/g and kg/m2, magnitude at most
 10^6 and at most eight decimal places, with exact decimal unit-factor comparison. This is a bounded
 implementation domain, not a clinical range. It does not recover unsupported lexical precision already
-lost in a caller's numeric parsing. BMI's two-operand calculation and validity contract are separate work.
+lost in a caller's numeric parsing.
+
+BMI production uses `definition is body mass index of "Weight" and "Height" using validity of "Weight"`.
+Both operands must be selected Quantity publications; the validity operand must name one of them.
+An absent operand produces no candidate. Two selected records with a missing value produce an unknown
+candidate carrying the anchor's actual optional validity. Errors are not hidden by an absent counterpart.
+Both operand identities remain computational dependencies; only the named anchor supplies validity.
+The independent final selector can select a local, external or calculated BMI candidate.
+Current arithmetic admits positive kg/g and m/cm measurements within the comparison input domain.
+Height normalized to centimetres admits at most four decimal places, keeping its squared denominator exact.
+BMI is emitted in UCUM kg/m2, truncated to eight decimal places with a published-value limit of10^6.
+This precision preserves `at least` comparisons against supported thresholds; no four-place rounding occurs.
+No timestamp is invented and the producer does not assign a persistence id.
+
+The coded BMI full-QuestionnaireResponse session is **not yet supported end to end**. The current
+generated questionnaire/extraction path also turns untouched BMI defaults or blanks into local
+Observations with the response timestamp. When Height/Weight are answered in that same response,
+the inferred BMI can tie this untouched local candidate. Measurement repair then fails selection.
+Uncoded BMI has a passing separate repair/clear control; this does not close coded BMI's own-answer
+contract. The response/extraction contract must distinguish untouched fields from intentional
+assertions and clears. Dropping valueless records would lose clears; unconditional local preference
+could freeze a stale populated BMI. Neither is the correction. Direct-data candidate selection and
+arithmetic evidence does not certify this session behavior.
+An alternative request shape has a bounded native control: send the full returned Questionnaire with
+only explicitly edited response items and their ancestors. Height repair/clear and direct BMI
+override/clear each pass this way. Untouched fields are absent from that response, while an explicitly
+cleared item is retained without its answer. This is distinct from full-response resubmission; it does
+not certify a rendered client, cumulative session-state management, or persistence reconciliation.
 The measurement/comparison prerequisite retains CRE's explicit imported-publication limitation;
 cross-library emitted CQL and CRE imports require separate verification and are not interchangeable claims.
 

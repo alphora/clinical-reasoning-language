@@ -27,7 +27,7 @@ const units: Record<string, { group: string; factor: bigint }> = {
   "kg/m2": { group: "bmi", factor: 1n },
 };
 /** Exact coefficient/rational comparison; no binary floating-point multiplication at thresholds. */
-function decimal(value: number): { coefficient: bigint; scale: bigint } {
+export function publicationDecimal(value: number): { coefficient: bigint; scale: bigint } {
   const [mantissa, exponent = "0"] = value.toString().toLowerCase().split("e");
   const [whole, fraction = ""] = mantissa.split(".");
   const power = fraction.length - Number(exponent);
@@ -35,7 +35,7 @@ function decimal(value: number): { coefficient: bigint; scale: bigint } {
   return power >= 0 ? { coefficient, scale: 10n ** BigInt(power) } : { coefficient: coefficient * 10n ** BigInt(-power), scale: 1n };
 }
 export function isPublicationComparisonDecimal(value: number): boolean {
-  return Number.isFinite(value) && Math.abs(value) <= 1e6 && decimal(value).scale <= 100000000n;
+  return Number.isFinite(value) && Math.abs(value) <= 1e6 && publicationDecimal(value).scale <= 100000000n;
 }
 export function publicationQuantityAtLeast(value: unknown, threshold: { value: number; unit: string }):
   { kind: "unknown" } | { kind: "known"; value: boolean } | PublicationValueError {
@@ -46,6 +46,6 @@ export function publicationQuantityAtLeast(value: unknown, threshold: { value: n
   const a = units[q.unit], b = units[threshold.unit];
   if (a === undefined || b === undefined || a.group !== b.group)
     return { kind: "error", code: "publication-quantity-unit-unsupported", message: "Quantity comparison requires compatible supported units." };
-  const left = decimal(q.value), right = decimal(threshold.value);
+  const left = publicationDecimal(q.value), right = publicationDecimal(threshold.value);
   return { kind: "known", value: left.coefficient * a.factor * right.scale >= right.coefficient * b.factor * left.scale };
 }

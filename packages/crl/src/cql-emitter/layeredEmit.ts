@@ -1,3 +1,4 @@
+import { publicationProducerOperands } from "../emit/publicationProgram";
 /**
  * Layered CQL emit — auto-split a single multi-layer CRL library into
  * dependency-ordered layer CQL libraries.
@@ -1734,6 +1735,17 @@ export function emitPartitioned(
     const libraryName = partition.libraryNameFor(policyId, value);
     const { synthetic, requalified } = buildLayerAst(workingAst, value, maps, lib, policyId, partition);
     const crossLibraryIncludes = collectLayerIncludes(requalified, libraryName, value, policyId, partition);
+    // REFACTOR:grounded (#320, plan589): lowering replaces producer syntax with a binding.
+    // The physical layer still needs every foreign selected-envelope dependency in that binding.
+    for (const statement of requalified) {
+      if (statement.type !== "Concept" || statement.__publication?.role !== "public") continue;
+      for (const operand of publicationProducerOperands(statement.__publication.descriptor.producer)) {
+        if (operand.sourceIdentity === baseOptions.publication?.fromSourceIdentity) continue;
+        const target = baseOptions.publication?.publicTarget(operand.key);
+        if (target !== undefined && target.libraryName !== libraryName && !crossLibraryIncludes.includes(target.libraryName))
+          crossLibraryIncludes.push(target.libraryName);
+      }
+    }
     if (value === "Interface") {
       for (const dependency of foreignInterfaceIncludes) {
         if (dependency !== libraryName && !crossLibraryIncludes.includes(dependency)) crossLibraryIncludes.push(dependency);

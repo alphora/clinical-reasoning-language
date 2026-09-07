@@ -1,3 +1,4 @@
+import { publicationProducerOperands } from "../emit/publicationProgram";
 import type {
   CRL,
   Concept,
@@ -410,8 +411,9 @@ function routePublicationReferences(entry: RegistryEntry, scope: PublicationEmit
   // would lose it. Same-source layer edges are handled by the CQL partitioner.
   for (const statement of statements) {
     if (statement.type !== "Concept" || statement.__publication?.role !== "public") continue;
-    const operand = statement.__publication.descriptor.producer?.operand;
-    if (operand === undefined || operand.sourceIdentity === entry.filePath) continue;
+    // REFACTOR:grounded (#320, plan589): retain physical dependencies for every producer operand.
+    for (const operand of publicationProducerOperands(statement.__publication.descriptor.producer)) {
+    if (operand.sourceIdentity === entry.filePath) continue;
     const target = scope.publicTarget(operand.key);
     if (target === undefined) {
       errors.push({ type: "Validation", kind: "publication-missing-operand-target",
@@ -421,6 +423,7 @@ function routePublicationReferences(entry: RegistryEntry, scope: PublicationEmit
     }
     routed.add(operand.libraryName);
     routedLibraries.add(target.libraryName);
+    }
   }
   const includes = entry.ast.includes.filter((include) => !routed.has(include.name) || retained.has(include.name));
   for (const name of routedLibraries) {

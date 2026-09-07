@@ -8,6 +8,7 @@ import { publicationCodeKey, normalizePublicationCodes, readFinitePublicationTer
 import type { PublicationCandidate } from "./publicationSelection";
 import { publicationSourceAdmissionReason, type PublicationSource } from "./publicationSource";
 import { readAgeProjection } from "./publicationAge";
+import { readPublicationBMI } from "./publicationBMI";
 import { readPublicationQuantity, isPublicationComparisonDecimal } from "./publicationQuantity";
 import {
   createPublicationContext,
@@ -33,7 +34,7 @@ export interface PublicationDescriptor {
   readonly selector: { readonly kind: "mostRecent"; readonly equalTime: "error" | "preferLocal" };
   readonly valueDomain?: readonly PublicationCode[];
   readonly answerOptions?: { readonly valueSetUrl: string; readonly codes: readonly PublicationCode[] };
-  readonly producer?: PublicationMembershipProducer | PublicationThresholdProducer;
+  readonly producer?: PublicationProducer;
   readonly sources?: readonly PublicationSource[];
 }
 
@@ -51,6 +52,18 @@ export interface PublicationThresholdProducer {
   readonly producerId: string;
   readonly operand: QualifiedConceptIdentity;
   readonly threshold: { readonly value: number; readonly unit: string };
+}
+
+// REFACTOR:grounded (#320, plan589): ordered dependencies and validity are distinct.
+export interface PublicationBMIProducer {
+  readonly kind: "bodyMassIndex";
+  readonly producerId: string;
+  readonly operands: readonly [QualifiedConceptIdentity, QualifiedConceptIdentity];
+  readonly validityOperand: 0 | 1;
+}
+export type PublicationProducer = PublicationMembershipProducer | PublicationThresholdProducer | PublicationBMIProducer;
+export function publicationProducerOperands(p: PublicationProducer | undefined): readonly QualifiedConceptIdentity[] {
+  return p === undefined ? [] : p.kind === "bodyMassIndex" ? p.operands : [p.operand];
 }
 
 // REFACTOR:grounded (#320, plan587): unary comparison contributes its own Boolean record.
@@ -135,15 +148,17 @@ export function publicationAdmissionReason(concept: Readonly<Concept>): string |
     return "This publication slice supports Observation with exactly one boolean, CodeableConcept or Quantity value type.";
   const membership = readPublicationMembership(concept);
   const threshold = readPublicationThreshold(concept);
+  const bmi = readPublicationBMI(concept);
   if (concept.code !== undefined && concept.code.trim().length === 0) return "A local `code is` must be nonempty.";
   // REFACTOR:grounded (#320, plan585): an age calculation needs no invented answer identity.
-  if (concept.code === undefined && membership === undefined && threshold === undefined && concept.representations.length === 0) return "A publication requires a local code or an admitted producer/source.";
-  if (concept.definition !== undefined && membership === undefined && threshold === undefined)
-    return "Only selected-value membership and quantity threshold production are implemented with this final selector; other definitions cannot be ignored.";
+  if (concept.code === undefined && membership === undefined && threshold === undefined && bmi === undefined && concept.representations.length === 0) return "A publication requires a local code or an admitted producer/source.";
+  if (concept.definition !== undefined && membership === undefined && threshold === undefined && bmi === undefined)
+    return "Supported production is selected-value membership, quantity threshold, or body mass index with an explicit validity operand; other definitions cannot be ignored.";
   const sourceReason = publicationSourceAdmissionReason(concept);
   if (sourceReason !== undefined) return sourceReason;
   if (membership !== undefined && concept.valueTypes[0] !== "boolean") return "Membership produces an Observation with a boolean value.";
   if (threshold !== undefined && concept.valueTypes[0] !== "boolean") return "A quantity comparison produces an Observation with a boolean value.";
+  if (bmi !== undefined && concept.valueTypes[0] !== "Quantity") return "Body mass index produces an Observation with a Quantity value.";
   if (concept.valueElement !== undefined && concept.valueElement.path !== "value")
     return "An Observation<boolean> publication reads its `value` element.";
   if (concept.valueFrom !== undefined && concept.valueTypes[0] !== "CodeableConcept")
@@ -270,7 +285,7 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
         }
       }
       const syntax = readPublicationMembership(concept);
-      let producer: PublicationMembershipProducer | PublicationThresholdProducer | undefined;
+      let producer: PublicationProducer | undefined;
       if (syntax !== undefined) {
         // REFACTOR:grounded (#320, code review 563): a coded computation promises
         // its own CF profile. Missing metadata cannot silently make it uncoded-like.
@@ -319,6 +334,24 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
           return fail("Quantity threshold requires a finite value and a supported unit: m, cm, kg, g, kg/m2.", comparison.location, "publication-quantity-unit-unsupported");
         producer = Object.freeze({ kind: "quantityThreshold", producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["quantityThreshold", 0]]))}`,
           operand: operand.identity, threshold: Object.freeze(comparison.threshold) });
+      }
+      // REFACTOR:grounded (#320, plan589): prepare both selected inputs and resolve anchor identity.
+      const bmi = readPublicationBMI(concept);
+      if (bmi !== undefined) {
+        if (localCode !== undefined && !library.artifact.policyId) return fail("A coded producer requires an owning policy identity.", concept.location, "publication-producer-profile-identity-missing");
+        const operands = [bmi.weight, bmi.height].map(ref => {
+          const dependency = declarations.lookupConcept(library.sourceIdentity, ref, bmi.location);
+          if (dependency.kind !== "hit") return fail("A BMI operand cannot resolve.", bmi.location, "publication-reference-resolution");
+          if (dependency.node.shapeReduction === undefined) return fail("BMI requires explicitly selected Record operands.", bmi.location, "publication-bmi-operand-unsupported");
+          const prepared = prepare(dependency.library, dependency.node);
+          if (prepared?.valueType !== "Quantity") return fail("BMI requires Quantity-valued publications.", bmi.location, "publication-bmi-operand-unsupported");
+          return prepared.identity;
+        }) as [QualifiedConceptIdentity, QualifiedConceptIdentity];
+        const anchor = declarations.lookupConcept(library.sourceIdentity, bmi.validity, bmi.location);
+        const index = anchor.kind === "hit" ? operands.findIndex(operand => operand.key === anchor.identity.key) : -1;
+        if (index < 0) return fail("BMI validity must name one of its two operands.", bmi.location, "publication-bmi-validity-operand");
+        producer = Object.freeze({ kind: "bodyMassIndex", producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["bodyMassIndex", 0]]))}`,
+          operands: Object.freeze(operands), validityOperand: index as 0 | 1 });
       }
       const descriptor: PublicationDescriptor = Object.freeze({ identity: hit.identity, conceptId, title: concept.name,
         ...(localCode === undefined ? {} : { localCode, localContributorId: `${conceptId}/local`,
