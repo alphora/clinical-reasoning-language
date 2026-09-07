@@ -9,7 +9,7 @@ export type CelSlot =
   | { kind: "concept-or-activity"; library: string } // - defined by "Lib"."…"  (qualified)
   | { kind: "leaf" } // - result is "…"  (a decision OR a boolean concept)
   | { kind: "result-arm"; leaf: string } // - result is "leaf" is "…"  (QUOTED → a decision branch)
-  | { kind: "result-bool" }; // - result is "leaf" is <here>  (BARE → a concept's true/false)
+  | { kind: "result-bool"; leaf: string }; // bare result keyword: Concept true/false or Decision pause
 
 export function detectCelSlot(linePrefix: string): CelSlot | null {
   // `result is "leaf" is "<here>"` — a QUOTED value is a decision branch (an arm). Check first.
@@ -17,7 +17,8 @@ export function detectCelSlot(linePrefix: string): CelSlot | null {
   if (arm) return { kind: "result-arm", leaf: arm[1] };
   // `result is "leaf" is <here>` — a BARE value (no quote) is a concept's true/false keyword
   // (CELParser.g4: resultValue : TRUE | FALSE | stringLiteral). Match the post-`is ` bare-word position.
-  if (/^\s*-\s*result\s+is\s+"[^"]+"\s+is\s+[A-Za-z]*$/i.test(linePrefix)) return { kind: "result-bool" };
+  const bare = /^\s*-\s*result\s+is\s+"([^"]+)"\s+is\s+[A-Za-z]*$/i.exec(linePrefix);
+  if (bare) return { kind: "result-bool", leaf: bare[1] };
   if (/^\s*-\s*result\s+is\s+"[^"]*$/i.test(linePrefix)) return { kind: "leaf" };
 
   // `defined by "Lib"."<here>"` qualified — check before the bare slot.

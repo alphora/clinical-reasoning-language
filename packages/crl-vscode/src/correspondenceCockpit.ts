@@ -883,19 +883,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     return { segmentIds, scrollTo };
   }
 
-  function markFailedCriteria(v: PaneView, blockerKeys: string[], preemptKeys: string[], suppressScroll = false): void {
+  function markFailedCriteria(v: PaneView, blockerKeys: string[], preemptKeys: string[], pendingKeys: string[], suppressScroll = false): void {
     // #173 T3 FIX 3 (disc 160): TWO honesty channels in one message — a real blocker (unsatisfied-when / guarded-out)
     // paints `.failed-criterion` (red); a `preemption` row is the SATISFIED matched sibling that DIVERTED the run, so it
     // paints the DISTINCT `.failed-criterion-preempt` (amber "diverted"), never red — consistent with the run-tree.
     const blocker = segmentsFor(v, blockerKeys);
     const preempt = segmentsFor(v, preemptKeys);
-    const scrollTo = blocker.scrollTo ?? preempt.scrollTo;
+    const pending = segmentsFor(v, pendingKeys);
+    const scrollTo = blocker.scrollTo ?? pending.scrollTo ?? preempt.scrollTo;
     // #219: this overlay ALSO scrolls (its own scroll path, distinct from highlightRows). It runs AFTER the selection's
     // highlight in the SAME dispatch, so for a same-pane click it would re-scroll the pane the click's highlight just left
     // in place — suppress it too (omit scrollTo; the mark still paints the `.failed-criterion` channel).
     void v.panel.webview.postMessage(
       scrollTo
-        ? { type: "markFailedCriteria", gen: v.gen, scrollTo: suppressScroll ? undefined : scrollTo, blockerIds: blocker.segmentIds, preemptIds: preempt.segmentIds }
+        ? { type: "markFailedCriteria", gen: v.gen, scrollTo: suppressScroll ? undefined : scrollTo, blockerIds: blocker.segmentIds, preemptIds: preempt.segmentIds, pendingIds: pending.segmentIds }
         : { type: "clearFailedCriteria" },
     );
   }
@@ -1470,14 +1471,21 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (crlMaps) {
       const m = crlMaps;
       // Split grounded rows by reason (FIX 3): a `preemption` row is a SATISFIED diverting sibling → its own amber
-      // channel; all other reasons are red blockers. (A nodeKey shared by a blocker + a preemption — structurally
+      // channel; unknown-when uses a separate pending channel, never a red blocker. (A nodeKey shared by a blocker + a preemption — structurally
       // unlikely — favors the blocker: a real failed criterion outranks the diversion marker.)
       const blockerKeys: string[] = [];
       const preemptKeys: string[] = [];
+      const pendingKeys: string[] = [];
       for (const r of resolved) {
         if (!r.grounded) continue;
-        const target = r.criterion.reason === "preemption" ? preemptKeys : blockerKeys;
+        const target = r.criterion.reason === "preemption" ? preemptKeys : r.criterion.reason === "unknown-when" ? pendingKeys : blockerKeys;
         if (!target.includes(r.nodeKey) && !blockerKeys.includes(r.nodeKey)) target.push(r.nodeKey);
+      }
+      for (const key of blockerKeys) {
+        for (const keys of [preemptKeys, pendingKeys]) {
+          const index = keys.indexOf(key);
+          if (index >= 0) keys.splice(index, 1);
+        }
       }
       const unitsOf = (keys: string[]): string[] => {
         const units: string[] = [];
@@ -1488,10 +1496,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const tree = views.get("tree");
       const src = views.get("source");
       // #219: suppress the overlay's scroll for the pane the click originated in (each pane checks the shared origin flag).
-      if (crl) markFailedCriteria(crl, blockerKeys, preemptKeys, scrollSuppressPane === "crl"); // CRL pane: the standalone rows
-      if (tree) markFailedCriteria(tree, blockerKeys, preemptKeys, scrollSuppressPane === "tree"); // tree flowchart: same structure nodeKeys (FLOW_STYLE paints the rect)
+      if (crl) markFailedCriteria(crl, blockerKeys, preemptKeys, pendingKeys, scrollSuppressPane === "crl"); // CRL pane: the standalone rows
+      if (tree) markFailedCriteria(tree, blockerKeys, preemptKeys, pendingKeys, scrollSuppressPane === "tree"); // tree flowchart: same structure nodeKeys (FLOW_STYLE paints the rect)
       // Source: the grounded rows' source-bearing units, split into the two channels. A gap row gets NO source mark.
-      if (src) markFailedCriteria(src, unitsOf(blockerKeys), unitsOf(preemptKeys), scrollSuppressPane === "source");
+      if (src) markFailedCriteria(src, unitsOf(blockerKeys), unitsOf(preemptKeys), unitsOf(pendingKeys), scrollSuppressPane === "source");
     }
 
     // Gap list: the ungroundable criteria → the "Open CRL source at criterion" fallback (the node's own source).
@@ -5424,6 +5432,8 @@ function shellHtml(pane: Pane, cspSource: string, asset: (f: string) => string):
    diverter's teal on the rare overlap — matching the tree precedence in flowPaneHtml (gpt55 impl review, disc 164). */
 .diverter{outline:2px dotted var(--vscode-terminal-ansiCyan,#4ec9b0);outline-offset:1px}
 .failed-criterion{outline:2px dashed var(--vscode-editorError-foreground,#f14c4c);outline-offset:1px}
+.failed-criterion-pending{outline:2px dashed var(--vscode-charts-yellow,#d29922);outline-offset:1px}
+.failed-criterion-pending::after{content:" awaiting information";color:var(--vscode-charts-yellow,#d29922);font-size:.85em}
 .failed-criterion-preempt{outline:2px dashed var(--vscode-charts-yellow,#d29922);outline-offset:1px}
 /* #177 slice 4: the "this node" cross-pane marker on the HTML panes (crl + source). ONLY a left-edge accent BAR (inset
    box-shadow) and NO background (FIX 2 impl review): .current also sets a background, so a background here would override
@@ -5553,7 +5563,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `let treeZoom=1;` +
   `const applyZoom=()=>{const s=root.querySelector('.flow-svg');if(!s)return;const vb=s.viewBox&&s.viewBox.baseVal;const bw=vb&&vb.width?vb.width:parseFloat(s.getAttribute('width'))||0;const bh=vb&&vb.height?vb.height:parseFloat(s.getAttribute('height'))||0;s.style.width=(bw*treeZoom)+'px';s.style.height=(bh*treeZoom)+'px';const p=root.querySelector('.flow-zoom-pct');if(p)p.textContent=Math.round(treeZoom*100)+'%';};` +
   `const setZoom=(z)=>{treeZoom=Math.min(3,Math.max(.25,z));applyZoom();};` +
-  `const clrFC=()=>{for(const el of root.querySelectorAll('.failed-criterion,.failed-criterion-preempt')){el.classList.remove('failed-criterion');el.classList.remove('failed-criterion-preempt');}};` +
+  `const clrFC=()=>{for(const el of root.querySelectorAll('.failed-criterion,.failed-criterion-preempt,.failed-criterion-pending')){el.classList.remove('failed-criterion');el.classList.remove('failed-criterion-preempt');el.classList.remove('failed-criterion-pending');}};` +
   // #156 slice 5 / #210: the review-overlay clear. DISTINCT from clrFC — called ONLY by mark/clearReviewOverlay, NEVER by the
   // selection channel (highlight/clearHighlight), so the verdict fills SURVIVE selection (the survives-selection invariant).
   `const clrRO=()=>{for(const el of root.querySelectorAll('.review-pass,.review-fail,.review-pending,.error-node,.leaf-allpass')){el.classList.remove('review-pass');el.classList.remove('review-fail');el.classList.remove('review-pending');el.classList.remove('error-node');el.classList.remove('leaf-allpass');}};` +
@@ -5608,6 +5618,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // diverting sibling, honestly distinct from a real blocker — disc 160 FIX 3).
   `for(const id of (m.blockerIds||[])){const el=document.getElementById(id);if(el)el.classList.add('failed-criterion');}` +
   `for(const id of (m.preemptIds||[])){const el=document.getElementById(id);if(el)el.classList.add('failed-criterion-preempt');}` +
+  `for(const id of (m.pendingIds||[])){const el=document.getElementById(id);if(el)el.classList.add('failed-criterion-pending');}` +
   // #219: scroll ONLY when scrollTo is present — a same-pane click suppresses it so the clicked pane keeps its viewport.
   `if(m.scrollTo){const t=document.getElementById(m.scrollTo);if(t)t.scrollIntoView({block:'center'});}}` +
   // #156 slice 5 / #210: the PERSISTENT Medical Validation VERDICT overlay — a SEPARATE channel from .current and

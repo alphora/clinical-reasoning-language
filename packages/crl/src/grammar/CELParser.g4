@@ -158,6 +158,7 @@ resultField
 resultValue
     : TRUE                # TrueResult
     | FALSE               # FalseResult
+    | PAUSE               # PauseResult
     | stringLiteral       # BranchResult
     ;
 

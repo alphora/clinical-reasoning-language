@@ -43,6 +43,12 @@ for the other. Correctness includes narrative fidelity, executable logic, and a 
 
 ## 1. What CRL and CEL express and emit
 
+CEL may also state an expected execution pause with `result is "Decision" is pause.` This creates
+no patient data and adds no policy disposition. CRE checks its own prediction; native `$apply` is
+the source of truth for emitted behavior. Each acceptance case needs separate native evidence of
+errors, activities and missing/populated answers. Returning no activity does not by itself establish a pause: all-false
+conditions can also produce nothing. A green CRE assertion cannot substitute for native execution.
+
 | Language | Meaning | Output |
 |---|---|---|
 | CRL | Logic and knowledge/structure | CQL plus FHIR definitional resources |

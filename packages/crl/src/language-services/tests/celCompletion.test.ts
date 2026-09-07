@@ -20,8 +20,8 @@ describe("detectCelSlot (#4)", () => {
   it("result: leaf slot; quoted value → result-arm; bare value → result-bool", () => {
     expect(detectCelSlot('- result is "')).toEqual({ kind: "leaf" });
     expect(detectCelSlot('- result is "Coverage" is "')).toEqual({ kind: "result-arm", leaf: "Coverage" });
-    expect(detectCelSlot('- result is "IsBool" is ')).toEqual({ kind: "result-bool" });
-    expect(detectCelSlot('- result is "IsBool" is fa')).toEqual({ kind: "result-bool" }); // partial bare word
+    expect(detectCelSlot('- result is "IsBool" is ')).toEqual({ kind: "result-bool", leaf: "IsBool" });
+    expect(detectCelSlot('- result is "IsBool" is fa')).toEqual({ kind: "result-bool", leaf: "IsBool" }); // partial bare word
   });
   it("cross-resource operands → fact (both `- \"src\"` and after the relation)", () => {
     expect(detectCelSlot('- "')).toEqual({ kind: "fact" });
@@ -39,8 +39,8 @@ describe("detectCelSlot (#4)", () => {
 
 const decls = [
   { name: "Coverage", kind: "decision", libraryName: "Lib", arms: ["Approve", "Deny"] },
-  { name: "Nonunion", kind: "concept", libraryName: "Lib" },
-  { name: "IsEligible", kind: "concept", libraryName: "Lib" },
+  { name: "Nonunion", kind: "concept", libraryName: "Lib", valuetype: "boolean" },
+  { name: "IsEligible", kind: "concept", libraryName: "Lib", valuetype: "Quantity" },
   { name: "SomeActivity", kind: "activity", libraryName: "Lib" },
   { name: "Other", kind: "concept", libraryName: "OtherLib" },
 ] as unknown as IndexedDeclaration[];
@@ -68,6 +68,15 @@ describe("computeCelCompletion (#4)", () => {
     expect(labels('- result is "Coverage" is "')).toEqual(["Approve", "Deny"]));
   it("result-arm (quoted) for a concept → [] (a quoted value is only valid for a decision branch)", () =>
     expect(labels('- result is "Nonunion" is "')).toEqual([]));
+  it("Decision bare result offers pause; unresolved targets offer nothing", () => {
+    expect(labels('- result is "Coverage" is ')).toEqual(["pause"]);
+    expect(labels('- result is "Missing" is ')).toEqual([]);
+    expect(labels('- result is "IsEligible" is ')).toEqual([]);
+  });
+  it("Boolean result completion includes multi-type concepts with boolean after another type", () => {
+    const mixed = { ...index, getAllProjectDeclarations: () => [{ name: "Mixed", kind: "concept", libraryName: "Lib", valuetype: "CodeableConcept", valueTypes: ["CodeableConcept", "boolean"] }] } as unknown as ProjectIndex;
+    expect(computeCelCompletion('- result is "Mixed" is ', doc, mixed, ["/proj"], TYPES).map((x) => x.label)).toEqual(["true", "false"]);
+  });
   it("result-bool (bare value) → true/false", () =>
     expect(labels('- result is "Nonunion" is ')).toEqual(["true", "false"]));
   it("result-arm: a local concept shadows a same-named package decision → [] (resolver precedence)", () => {

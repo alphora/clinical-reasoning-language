@@ -116,7 +116,7 @@ function evaluate(
     const before = JSON.stringify(graph.cel);
     const cre = runCel(graph, { now });
     const fhir = emitCelToFhir(graph, { now });
-    const validation = validateCEL(graph);
+    const validation = validateCEL(graph, { now });
     expect(
       JSON.stringify(graph.cel),
       "Date resolution must not mutate reusable facts or clauses",
@@ -171,6 +171,14 @@ describe("case fact dates shared by CRE and FHIR", () => {
       ["Approve"],
       ["2026-03-01"],
     );
+  });
+
+  it("pause validation and execution share the caller's clock", () => {
+    const cases = celCase("clock overflow", " at anchor + 1 day", "", "- anchor is now.").replace('is "Approve".', 'is pause.');
+    const result = evaluate(cases, FACTS, new Date("9999-12-31T00:00:00Z"));
+    expect(result.validation.errors.some(d => d.kind === "invalid-date")).toBe(true);
+    expect(result.cre.runs[0].status).toBe("error");
+    expect(result.cre.runs[0].diagnostics.some(d => d.startsWith("pause-graph-validation:") && d.includes("invalid-date"))).toBe(true);
   });
 
   it("resolves a named anchor plus its offset", () => {

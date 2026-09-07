@@ -42,6 +42,7 @@ export interface FcViewNode {
   label: string;
   source: unknown;
   evaluated: boolean;
+  unknown?: true;
   /** Only on an unreached BRANCH whose ordered block had a prior matching sibling. */
   unreachedReason?: "preempted";
   /** #224: the guard EXPRESSION (was a single `concept`). i.4b widens `expr` to the REAL
@@ -56,6 +57,7 @@ export interface FcViewNode {
     concept: { name: string; libraryName?: string };
     evaluated: boolean;
     satisfied?: boolean;
+    unknown?: true;
   };
   action?: { actionKind: "recommend-activity" | "use-decision"; produced: boolean };
   guardedOut?: boolean;
@@ -65,7 +67,7 @@ export interface FcViewNode {
 /** DUCK-TYPED ScenarioViewModel — only the fields the two functions read (status / expected / tree). */
 export interface FcScenario {
   status: "pass" | "fail" | "error";
-  expected: { decision: string; branch: string } | null;
+  expected: ({ decision: string; branch: string; pause?: never } | { decision: string; pause: true; branch?: never }) | null;
   tree: FcViewNode[];
 }
 
@@ -82,6 +84,7 @@ export interface FcScenario {
  *     "only-when Indication"). `concept` is absent only for the structurally-degenerate guard with no concept.
  */
 export type FailedCriterionDisplay =
+  | { reason: "unknown-when"; guardLabel: string }
   | { reason: "unsatisfied-when"; guard: "single"; concept: { name: string; libraryName?: string } }
   | { reason: "unsatisfied-when"; guard: "compound"; guardLabel: string; frontier: Frontier }
   | {
@@ -114,7 +117,7 @@ export interface FailedCriterionNode {
    *  raw unsatisfied `when`. "unsatisfied-when": an evaluated `when` whose condition is false. "preemption": a prior
    *  sibling that MATCHED and short-circuited past the expected branch (satisfied:TRUE — the case All-mode misses).
    *  "guarded-out": the expected (or an ancestor) action's guard excluded it. */
-  reason: "unsatisfied-when" | "preemption" | "guarded-out";
+  reason: "unsatisfied-when" | "unknown-when" | "preemption" | "guarded-out";
   /** The precise display payload (FIX 3) — discriminated by `reason`; renders the blocker with no second VM lookup. */
   display: FailedCriterionDisplay;
 }
@@ -162,7 +165,7 @@ export function allUnsatisfiedCriteria(sv: FcScenario): FailedCriterionNode[] {
  * node anywhere → empty (a CEL/authoring inconsistency the cockpit surfaces elsewhere — disc 158 §T2).
  */
 export function failedCriterionFrontier(sv: FcScenario): FailedCriterionNode[] {
-  if (sv.status !== "fail" || !sv.expected) return [];
+  if (sv.status !== "fail" || !sv.expected || sv.expected.pause) return [];
   const expectedBranch = sv.expected.branch;
 
   // Collect every target action site (label == expected.branch) WITH its inclusive ancestor chain (root→target). The
@@ -227,6 +230,14 @@ function firstBlockerOnPath(
     const n = chain[i];
     const isTarget = i === chain.length - 1;
 
+    if (n.kind === "when" && n.evaluated && n.unknown) return unknownWhenNode(n);
+    // An ordered unknown also blocks later siblings (e.g. an expected otherwise activity).
+    if (!n.evaluated && n.kind !== "action") {
+      const siblingIndex = siblings[i].findIndex((s) => s.nodeId === n.nodeId);
+      const prior = siblingIndex > 0 ? siblings[i].slice(0, siblingIndex)
+        .find((s) => s.kind === "when" && s.evaluated && s.unknown) : undefined;
+      if (prior) return unknownWhenNode(prior);
+    }
     // (a) an ancestor `when` evaluated && unsatisfied.
     if (!isTarget && isUnsatisfiedWhen(n)) {
       return unsatisfiedWhenNode(n);
@@ -334,8 +345,14 @@ function preemptionNode(matched: FcViewNode): FailedCriterionNode {
   };
 }
 
-/** The EXACT evaluated-unsatisfied `when` signal — `kind === "when" && evaluated && condition.satisfied === false`
- *  (`walkBranchesVM` sets `evaluated = !!t` and `condition.satisfied` only when the when ran). */
+/** A reached unknown condition, separate from a false criterion. */
+function unknownWhenNode(n: FcViewNode): FailedCriterionNode {
+  const label = n.label.replace(/^when\s+/, "");
+  return { nodeId: n.nodeId, conceptLabel: n.label, source: n.source, reason: "unknown-when",
+    display: { reason: "unknown-when", guardLabel: label } };
+}
+
+/** The evaluated-unsatisfied signal: only explicit false, never missing satisfaction. */
 function isUnsatisfiedWhen(n: FcViewNode): boolean {
   return n.kind === "when" && n.evaluated === true && n.condition?.satisfied === false;
 }
@@ -343,7 +360,7 @@ function isUnsatisfiedWhen(n: FcViewNode): boolean {
 /** An action whose GUARD excluded it → ViewNode.guardedOut === true (projected in `buildActionVM`). On the ancestor
  *  path this gates the whole sub-tree; the guard polarity/concept live on ViewNode.guard (GuardView). */
 function isGuardBlocked(n: FcViewNode): boolean {
-  return n.kind === "action" && n.guardedOut === true;
+  return n.kind === "action" && n.guardedOut === true && !n.guard?.unknown;
 }
 
 /**

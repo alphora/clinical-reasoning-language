@@ -30,6 +30,8 @@ case "obese stated false -> deny":
 - fact is "Obese No".
 - result is "Bariatric Surgery Coverage" is "Deny Bariatric Surgery".
 
+// #320 migration debt: this historical activity assertion contradicts the named pause intent.
+// CEL now supports unquoted pause; re-author and verify this obsolete representation with native $apply.
 case "obese unanswered -> no recommendation":
 - subject is "Pat".
 - result is "Bariatric Surgery Coverage" is "Approve Bariatric Surgery".

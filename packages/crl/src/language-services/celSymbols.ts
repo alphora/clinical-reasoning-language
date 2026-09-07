@@ -70,6 +70,10 @@ export function celSymbolsIndex(graph: ResolvedCelGraph): CelSymbolSource {
       if (kind === "concept") {
         const t = (s as { conceptType?: string }).conceptType;
         if (t) d.type = t;
+        const valueType = (s as { valueTypes?: string[] }).valueTypes?.[0];
+        if (valueType) d.valuetype = valueType;
+        const valueTypes = (s as { valueTypes?: string[] }).valueTypes;
+        if (valueTypes) d.valueTypes = [...valueTypes];
       }
       decls.push(d);
     }

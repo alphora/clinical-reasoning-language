@@ -106,7 +106,7 @@ export interface Question {
 export interface Questionnaire {
   questions: Question[];
   outcome: { activity: string } | null;
-  terminalKind: "produced" | "blocked" | "blocked-guard" | "error" | "empty";
+  terminalKind: "produced" | "paused" | "blocked" | "blocked-guard" | "error" | "empty";
   note?: string;
 }
 
@@ -143,7 +143,7 @@ export function buildQuestionnaire(
   rootLib: string | undefined,
   opts: { conceptShape?: ResolveConceptShape; defExpr?: ResolveDefExpr } = {},
 ): Questionnaire {
-  if (sv.status === "error") {
+  if (sv.status === "error" && !sv.discardedUnknown) {
     return { questions: [], outcome: null, terminalKind: "error", note: sv.diagnostics[0] ?? "evaluation error" };
   }
 
@@ -368,6 +368,7 @@ export function buildQuestionnaire(
 
   type GuardTerminal = { node: ViewNode; guard: GuardView; frameLib: string | undefined; depth: number };
   const guardTerminals: GuardTerminal[] = [];
+  let hasUnknown = false;
   const isBlocked = produced.length === 0;
 
   // Depth-first walk of the FULL tree. `frameLib` switches on a cross-library use-decision expansion; `depth` is the
@@ -392,6 +393,17 @@ export function buildQuestionnaire(
           // #224 i.4c: a COMPOUND preempted guard shows its per-atom case-feature box (informational — never
           // evaluated, so no blocking). A single-ref preempted stays a flat row (pre-#224).
           if (!isSingleRef) attachGuardStruct(wq, cond, frameLib);
+          continue;
+        }
+        // REFACTOR:grounded (#320): a reached unknown is not an established false or a disposition.
+        if (node.unknown) {
+          hasUnknown = true;
+          const q = emitWhen(guardConcept, node, frameLib, depth, "when-evaluated", "evaluated", undefined);
+          q.answer = "unknown";
+          q.diverterEligible = false;
+          // Known concept answers remain useful; unknown operands have no false-blocking styling.
+          if (isSingleRef) attachExpansion(q, guardConcept, frameLib);
+          else attachGuardStruct(q, cond, frameLib);
           continue;
         }
         if (cond.satisfied === true) {
@@ -454,6 +466,7 @@ export function buildQuestionnaire(
       note = `multiple produced; showing ${activity}`;
     }
     const terminalKind = questions.length === 0 ? "empty" : "produced";
+    if (sv.discardedUnknown) note = [note, "CRE capability limit: a reached legacy guard discarded unknown evidence; this is not complete menu or pause verification."].filter(Boolean).join("; ");
     return { questions, outcome: { activity }, terminalKind, ...(note ? { note } : {}) };
   }
 
@@ -461,9 +474,9 @@ export function buildQuestionnaire(
     // A guarded-out action blocked the path — its guard is the terminal question (a runtime nav-stop row), rendered at
     // the guard's OWN depth (not left-aligned at 0), so it reads as nested under the whens that led to it.
     emitWhen(blockedGuard.guard.concept, blockedGuard.node, blockedGuard.frameLib, blockedGuard.depth, "guard", "evaluated", blockedGuard.guard.satisfied);
-    return { questions, outcome: null, terminalKind: "blocked-guard" };
   }
-  return { questions, outcome: null, terminalKind: "blocked" };
+  if (sv.discardedUnknown) return { questions, outcome: null, terminalKind: "error", note: "Pause unavailable: a legacy action guard discarded unknown evidence (CRE capability limit)." };
+  return { questions, outcome: null, terminalKind: hasUnknown ? "paused" : blockedGuard ? "blocked-guard" : "blocked" };
 }
 
 /** Collect produced recommend-activity leaves (label + nodeId) in fired-tree order (unchanged). EXPORTED (#210 all-pass

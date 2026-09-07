@@ -240,7 +240,7 @@ describe("authoring-kit — reference artifacts", () => {
     const body = guard.conditionTrace!.body!;
     expect(body.op).toBe("or");
     const operand = (nm: string) => body.operands.find((o) => o.concept?.name === nm)!;
-    expect(operand("Failed Drug Therapy").satisfied).toBe(false); // drug absent in this case
+    expect(operand("Failed Drug Therapy").satisfied).toBeUndefined(); // unanswered alternative; true PT still determines the or
     expect(operand("Failed Physical Therapy").satisfied).toBe(true); // PT alone satisfies the distinct-criterion `or`
     // The CONTRAST node (#234 follow-up): "Viral Suppression Documented" is a GENUINE rung-1 `defined as` (one
     // occurrence recorded two ways). Unlike the or-guard above it rides the tree as a single-concept `when` that
@@ -262,7 +262,7 @@ describe("authoring-kit — reference artifacts", () => {
     expect(comp.satisfied).toBe(true);
     const rec = (nm: string) => comp.operands.find((o) => o.concept === nm)!;
     expect(rec("Viral Load Below Threshold Lab Result").satisfied).toBe(true); // lab record present
-    expect(rec("Viral Suppression Charted By Clinician").satisfied).toBe(false); // chart note absent — either record satisfies the ONE fact
+    expect(rec("Viral Suppression Charted By Clinician").satisfied).toBeUndefined(); // chart unanswered; lab true determines the or
     // The OTHER arm, inspected directly (not just diagonally): the chart-record approve case satisfies the SAME
     // `defined as` via the chart operand with the lab operand FALSE — proving both sem-or arms independently (panel r1).
     const approveViaChart = run.runs.find((r) => r.case.includes("chart record"))!;
@@ -276,7 +276,7 @@ describe("authoring-kit — reference artifacts", () => {
     };
     expect(compChart.satisfied).toBe(true);
     const recChart = (nm: string) => compChart.operands.find((o) => o.concept === nm)!;
-    expect(recChart("Viral Load Below Threshold Lab Result").satisfied).toBe(false); // lab absent this case
+    expect(recChart("Viral Load Below Threshold Lab Result").satisfied).toBeUndefined(); // lab unanswered; chart true determines the or
     expect(recChart("Viral Suppression Charted By Clinician").satisfied).toBe(true); // chart alone satisfies the ONE fact
     // And the crit-3 DENY path, pinned in-trace (the CEL `result is` oracle can't distinguish same-`Deny` nodes): the
     // no-viral case has dx + failed drug therapy, so ONLY the `defined as` node can fail — assert it does (panel r1).
@@ -417,7 +417,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.30");
+    expect(kit.schemaVersion).toBe("1.31");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -1034,7 +1034,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     // wants. That is a CORRECTNESS fix, not teaching, so it lands with the slice and re-pins at 1.25 with NO
     // bump — the doctrine re-teach + schemaVersion bump stay BATCHED (`tmp/WORKLIST-kit-deltas.md`).
     expect(cpg.contentHash).toBe(
-      "017e2016ddc9672eac37acca4cf9d48fad4a8a1dcf6784790f61a9130dc09603",
+      "c0c2bc07da34e315af33fbfae40782396895ae7ff7b074a2951db50b815ee8c0",
     );
     // #189 null/pause — the priorAuth payload embeds the reference `.cel` artifacts, which gained explicit
     // `value is true/false` facts (a NEGATIVE must now be STATED; omission means UNKNOWN and PAUSES). That is
@@ -1047,7 +1047,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     //   changelog entry that explains the re-sync is the `inline-answer-options` rule itself. A KE pinning
     //   1.25 re-syncs and gets the teaching for the new construct in the same step.
     expect(priorAuth.contentHash).toBe(
-      "0c94484c277b7624ee9accd56a8b610eb49dffaa5b44b0798497f0108d718b85",
+      "fcae7880574b91ffa1fef562cf9878478e3ba36e6a23f49f7d9c1e564ce48342",
     );
   });
 
@@ -1068,6 +1068,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   //   - edit a HISTORICAL entry, which is visible in review as rewriting the past.
   // There is no longer a way to re-pin that looks like routine test maintenance.
   const KIT_PINS: Readonly<Record<string, { cpg: string; priorAuth: string }>> = {
+    "1.31": { cpg: "c0c2bc07da34e315af33fbfae40782396895ae7ff7b074a2951db50b815ee8c0", priorAuth: "fcae7880574b91ffa1fef562cf9878478e3ba36e6a23f49f7d9c1e564ce48342" },
     "1.30": { cpg: "017e2016ddc9672eac37acca4cf9d48fad4a8a1dcf6784790f61a9130dc09603", priorAuth: "0c94484c277b7624ee9accd56a8b610eb49dffaa5b44b0798497f0108d718b85" },
     "1.29": {
       cpg: "d2e88ac031928abbed94cfa4fe5b5795fa16226d6050ac58e98e7fded91d974d",

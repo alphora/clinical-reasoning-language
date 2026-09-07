@@ -19,7 +19,7 @@ import { failedCriterionLabel } from "./failedCriterionLabel";
 interface FcMark {
   /** unsatisfied-when | guarded-out | preemption — drives the DISTINCT marking (preemption = a satisfied diverting
    *  sibling, NOT a failed criterion → its own amber attribute). */
-  reason: "unsatisfied-when" | "guarded-out" | "preemption";
+  reason: "unsatisfied-when" | "unknown-when" | "guarded-out" | "preemption";
   /** Short label for the node's tooltip (failedCriterionLabel). */
   label: string;
   /** #224 i.4b: for a COMPOUND guard whose failure was a false `or` (a `no-alternative` frontier), the rich
@@ -103,8 +103,10 @@ function nodeState(n: ViewNode): { cls: string; badge: string } {
   // REFACTOR:grounded (#320): failure is neither a produced action nor a false condition.
   if (n.invalidated) return { cls: "st-invalidated", badge: "invalidated by case error" };
   if (n.publicationErrors?.length) return { cls: "st-invalidated", badge: "data evaluation error" };
+  if (n.unknown) return { cls: "st-eval", badge: "unknown — awaiting information (CRE)" };
   if (n.kind === "action") {
     if (!n.evaluated) return { cls: "st-skip", badge: "not reached" };
+    if (n.guard?.unknown) return { cls: "st-eval", badge: "unknown guard (CRE capability limit)" };
     if (n.guardedOut) return { cls: "st-guard", badge: "guarded out" };
     if (n.action?.produced) return { cls: "st-produced", badge: "PRODUCED" };
     return { cls: "st-eval", badge: "evaluated" };
@@ -143,6 +145,9 @@ function renderNode(
     if (mark.reason === "preemption") {
       parts.push(`data-fc-preempt="1"`);
       tipCls = "fc-tip-preempt";
+    } else if (mark.reason === "unknown-when") {
+      parts.push(`data-fc-pending="1"`);
+      tipCls = "fc-tip-pending";
     } else {
       if (mark.inBlocking) parts.push(`data-fc-blocking="1"`);
       if (mark.inAll) parts.push(`data-fc-all="1"`);
@@ -151,7 +156,7 @@ function renderNode(
     parts.push(`data-fc-reason="${mark.reason}"`);
     // Short line drives the inline VISIBLE label; the HOVER (data-fc-tip + title) appends the compound per-alternative
     // detail when present (#224 i.4b), so "which alternative failed" is available without cluttering the always-on label.
-    const fcTipShort = mark.reason === "preemption" ? `matched first and diverted the run — ${mark.label}` : `blocked: ${mark.label}`;
+    const fcTipShort = mark.reason === "preemption" ? `matched first and diverted the run — ${mark.label}` : mark.reason === "unknown-when" ? mark.label : `blocked: ${mark.label}`;
     fcTip = mark.tooltip ? `${fcTipShort} — ${mark.tooltip}` : fcTipShort;
     parts.push(`data-fc-tip="${esc(fcTip)}"`);
     fcAttrs = ` ${parts.join(" ")}`;
@@ -168,7 +173,7 @@ function renderNode(
   const guard =
     n.kind === "action" && n.guard
       ? `<span class="guard">[${esc(n.guard.polarity)} ${esc(n.guard.concept.name)}${
-          n.guard.evaluated ? (n.guard.satisfied ? " ✓" : " ✗") : ""
+          n.guard.unknown ? " unknown" : n.guard.evaluated ? (n.guard.satisfied ? " ✓" : " ✗") : ""
         }]</span>`
       : "";
   const children = n.children?.length
@@ -193,8 +198,12 @@ function renderCase(s: ScenarioViewModel, caseIdx: number, prefix: string, revea
   // expected = just the branch (the decision name is already on the `decision` row above).
   // DISPLAY-only: a determination outcome (`certify.Met`) shows as its human key (`Met`). No-op for ordinary branch /
   // activity names. The pass/fail verdict is computed in the CRE from the RAW names — this only touches the strings shown.
-  const expected = s.expected ? esc(displayDetermination(s.expected.branch)) : "—";
-  const actual = s.produced.length ? s.produced.map((p) => esc(displayDetermination(p.recommendation))).join(", ") : "(none)";
+  const expected = s.expected ? (s.expected.pause ? "pause" : esc(displayDetermination(s.expected.branch))) : "—";
+  const unknownNodes = (nodes: ViewNode[]): ViewNode[] => nodes.flatMap((n) => [...(n.unknown ? [n] : []), ...unknownNodes(n.children ?? [])]);
+  const pending = unknownNodes(s.tree);
+  const actual = s.produced.length ? s.produced.map((p) => esc(displayDetermination(p.recommendation))).join(", ") + (s.discardedUnknown ? " (CRE capability limit: unknown guard discarded)" : "")
+    : s.discardedUnknown ? "pause unavailable (CRE capability limit)"
+    : s.status !== "error" && pending.length ? `paused (CRE prediction; unknown at ${pending.map((n) => esc(n.label)).join(", ")})` : "(none)";
   const decision = s.decision
     ? esc(s.decision.name) + (s.decision.resolved ? "" : " <span class=\"err\">(unresolved)</span>")
     : "(no decision)";
@@ -268,12 +277,13 @@ body.fc-mode-blocking .node[data-fc-blocking] > .row,
 body.fc-mode-all .node[data-fc-all] > .row { outline: 2px dashed var(--vscode-editorError-foreground, #f14c4c); outline-offset: 1px; }
 /* A preemption: a SATISFIED matched sibling that diverted the run — amber, distinct from the red blockers. It is a
    Blocking-set blocker (the satisfied sibling is not an unsatisfied when, so it is NOT in All) so it shows in Blocking. */
+body.fc-mode-blocking .node[data-fc-pending] > .row,
 body.fc-mode-blocking .node[data-fc-preempt] > .row { outline: 2px dashed var(--vscode-charts-yellow, #d29922); outline-offset: 1px; }
 /* The VISIBLE inline label (FIX 3 disc 160 — the reason, not just an inert data attr). Hidden by default; shown ONLY in
    the active mode for the channel(s) the node belongs to (a blocker in its set; a preemption in Blocking). */
 .fc-tip { margin-left: 8px; font-size: .85em; opacity: .9; display: none; }
 .fc-tip-blk { color: var(--vscode-editorError-foreground, #f14c4c); }
-.fc-tip-preempt { color: var(--vscode-charts-yellow, #d29922); }
+.fc-tip-pending, .fc-tip-preempt { color: var(--vscode-charts-yellow, #d29922); }
 .fc-tip-preempt::before { content: "◂ "; }
 body.fc-mode-blocking .fc-tip-preempt,
 body.fc-mode-blocking .fc-in-blocking,

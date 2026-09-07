@@ -685,9 +685,9 @@ check("#219 host: postReveal suppresses scroll for the origin pane; highlightRow
   assert.ok(/scrollTo: suppressScroll \? undefined : scrollTo, segmentIds/.test(COCKPIT_SRC), "highlightRows omits scrollTo when suppressScroll (paints .current, no scroll)");
 });
 check("#219 host: the OTHER scroll path — markFailedCriteria — is ALSO suppressed for the origin pane (it runs in the same dispatch)", () => {
-  assert.ok(/markFailedCriteria\(tree, blockerKeys, preemptKeys, scrollSuppressPane === "tree"\)/.test(COCKPIT_SRC), "the failed-criteria overlay suppresses scroll for the origin tree pane");
-  assert.ok(/markFailedCriteria\(crl, blockerKeys, preemptKeys, scrollSuppressPane === "crl"\)/.test(COCKPIT_SRC), "…and for crl origin");
-  assert.ok(/markFailedCriteria\(src, unitsOf\(blockerKeys\), unitsOf\(preemptKeys\), scrollSuppressPane === "source"\)/.test(COCKPIT_SRC), "…and for source origin");
+  assert.ok(/markFailedCriteria\(tree, blockerKeys, preemptKeys, pendingKeys, scrollSuppressPane === "tree"\)/.test(COCKPIT_SRC), "the failed-criteria overlay suppresses scroll for the origin tree pane");
+  assert.ok(/markFailedCriteria\(crl, blockerKeys, preemptKeys, pendingKeys, scrollSuppressPane === "crl"\)/.test(COCKPIT_SRC), "…and for crl origin");
+  assert.ok(/markFailedCriteria\(src, unitsOf\(blockerKeys\), unitsOf\(preemptKeys\), unitsOf\(pendingKeys\), scrollSuppressPane === "source"\)/.test(COCKPIT_SRC), "…and for source origin");
   // the mark poster omits scrollTo when suppressed (mirrors highlightRows).
   assert.ok(/type: "markFailedCriteria", gen: v\.gen, scrollTo: suppressScroll \? undefined : scrollTo/.test(COCKPIT_SRC), "markFailedCriteria omits scrollTo when suppressed");
 });

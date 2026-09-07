@@ -335,8 +335,9 @@ composite), and criterion-3 (\`when[0]/when[0]/when[0]\` — the viral-suppressi
 \`defined as\` node). The two approve cases prove the criterion-2 guard resolves on
 EITHER distinct criterion (failed drug OR failed physical therapy independently) AND
 that the criterion-3 \`defined as\` resolves on EITHER record (lab OR chart note) of the
-one occurrence; the no-viral-suppression case proves the \`defined as\` node denies when
-neither record is present.
+one occurrence. One positive record is sufficient for either approval case; the other record remains
+unanswered. The denial case explicitly answers both evidence predicates false. Missing
+answers are unknown and do not become false through composition.
 */
 
 fact "Sample Patient":
@@ -387,6 +388,17 @@ fact "Viral Suppression Chart Note":
 - value is true.
 - defined by "Coverage Criteria Reference"."Viral Suppression Charted By Clinician".
 
+// Explicit negative answers, not an inference from absent source records.
+fact "No Viral Suppression Lab Evidence":
+- date is "2026-01-01".
+- value is false.
+- defined by "Coverage Criteria Reference"."Viral Load Below Threshold Lab Result".
+
+fact "No Viral Suppression Chart Evidence":
+- date is "2026-01-01".
+- value is false.
+- defined by "Coverage Criteria Reference"."Viral Suppression Charted By Clinician".
+
 case "diagnosis + failed drug therapy + viral suppression (lab record) -> approve":
 - subject is "Sample Patient".
 - fact is "Diagnosis Finding".
@@ -405,6 +417,8 @@ case "diagnosis + failed conservative therapy but no documented viral suppressio
 - subject is "Sample Patient".
 - fact is "Diagnosis Finding".
 - fact is "Drug Therapy Failure".
+- fact is "No Viral Suppression Lab Evidence".
+- fact is "No Viral Suppression Chart Evidence".
 - result is "Coverage Determination" is "not-certify.Deny".
 
 case "diagnosis + viral suppression but no conservative-therapy failure -> deny (criterion-2 node otherwise)":

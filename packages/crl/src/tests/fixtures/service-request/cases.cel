@@ -65,23 +65,10 @@ case "request is a different service -> deny":
 - fact is "Other Service Request".
 - result is "Endoluminal Ablation Coverage" is "Deny Endoluminal Ablation".
 
-// ⚠⚠ THE PAUSE ROWS ARE DELIBERATELY ABSENT FROM THIS FILE, AND THAT IS NOT AN OMISSION.
-//
-// CEL cannot say "no recommendation". `result is "<leaf>" is <branch | boolean>` is the whole surface
-// (`cel/ast/types.ts`: `CELResultValue = CELBooleanResult | CELBranchResult`), so every case MUST name a
-// branch. Writing the pause rows here would mean asserting a branch for a row whose correct answer is that
-// NO branch fires — i.e. authoring the exact collapse this fixture exists to prevent, inside the oracle
-// that is supposed to catch it.
-//
-// ⚠ THIS IS A PERMANENT BOUNDARY, NOT A GAP TO CLOSE. CEL is Case EXAMPLE Language: a case exemplifies what
-// a decision DOES, and you cannot exemplify an absence. There is no pause form and there will not be one —
-// pause testing is what our tests are for.
-//
-// So the pause rows live where they can be stated truthfully: `MUST_PRODUCE` in
-// `tests/serviceRequestTarget.test.ts` records them as `[]`, and `$apply` owns their EXECUTION. The two
-// pause rows this fixture owes are:
-//     no ServiceRequest at all              -> no recommendation
-//     a ServiceRequest carrying NO code     -> no recommendation
+// REFACTOR:grounded (#320): CEL now supports an unquoted `pause` result expectation.
+// This historical fixture is not migrated here. Its two native acceptance rows remain:
+// no ServiceRequest, and ServiceRequest without code. A CRE assertion alone cannot establish
+// their emitted behavior; see tests/serviceRequestTarget.test.ts and execute native $apply.
 
 // ── The asserted arm, and its recency merge with the recorded one ──────────────────────────────
 

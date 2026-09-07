@@ -103,6 +103,18 @@ afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 const gen = () => generateProvenanceScaffold(resolveCelImports(celPath), OPTS);
 
+it("pause attribution is explicitly deferred, never treated as a Boolean concept assertion", () => {
+  const graph = resolveCelImports(celPath);
+  const assertion = graph.cel!.statements.find((s) => s.type === "CELCase")!;
+  if (assertion.type !== "CELCase") throw new Error("Expected fixture case");
+  const result = assertion.body.find((b) => b.type === "CELResultField")!;
+  if (result.type !== "CELResultField") throw new Error("Expected fixture result");
+  result.value = { type: "CELPauseResult", location: result.value.location };
+  const { diagnostics } = generateProvenanceScaffold(graph, OPTS);
+  expect(diagnostics.some((d) => d.kind === "unsupported-cel-result" && d.message.includes("pause-to-cluster attribution"))).toBe(true);
+  expect(diagnostics.some((d) => d.message.includes('boolean result "Dec"'))).toBe(false);
+});
+
 describe("generateProvenanceScaffold — Model A artifact shape", () => {
   it("emits NO items at the artifact level or in any cluster (the source-attribution layer is the KE's)", () => {
     const { artifact } = gen();

@@ -14,6 +14,7 @@ import { frontierShortLabel } from "@smile-digital-health/crl";
  */
 export function failedCriterionLabel(n: FailedCriterionNode): string {
   const d = n.display;
+  if (d.reason === "unknown-when") return `awaiting information: ${d.guardLabel}`;
   if (d.reason === "unsatisfied-when") {
     return d.guard === "single"
       ? `when ${d.concept.name}`

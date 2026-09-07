@@ -107,9 +107,15 @@ export function computeCelCompletion(
       return decision ? (decision.arms ?? []).map((a) => item(a, "property", `arm of "${slot.leaf}"`)) : [];
     }
 
-    case "result-bool":
-      // A BARE result value is a concept's boolean — inserted unquoted (the cursor is not in a quote).
-      return ["true", "false"].map((b) => item(b, "property", "boolean result"));
+    case "result-bool": {
+      // REFACTOR:grounded (#320): resolve the target before suggesting an execution expectation.
+      if (!doc.coveredLib) return [];
+      const matches = projectDecls().filter((d) => d.libraryName === doc.coveredLib && d.name === slot.leaf);
+      const bestRank = Math.min(...matches.map((d) => originRank(d.origin)));
+      const target = matches.find((d) => originRank(d.origin) === bestRank);
+      if (target?.kind === "decision") return [item("pause", "property", "expected pause before any activity; CRE prediction, verify with native $apply")];
+      return target?.kind === "concept" && (target.valueTypes?.includes("boolean") ?? target.valuetype === "boolean") ? ["true", "false"].map((b) => item(b, "property", "boolean result")) : [];
+    }
   }
 }
 

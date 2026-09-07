@@ -11,8 +11,66 @@ import { dirname, join } from "node:path";
 import { resolveCelImports, renderScenario } from "@smile-digital-health/crl";
 
 import { buildQuestionnaire, producedPathDiverterIds, collectProducedActions } from "./questionnaireModel.ts";
+import { renderScenarioHtml } from "./renderScenarioHtml.ts";
 
 const check = test;
+
+check("mixed unknown branch and legacy unknown action guard cannot be displayed as a supported pause", () => {
+  const crl = `library "Mixed".
+concept "X":
+- shape is Scalar.
+- type is Observation.
+- value type is boolean.
+- code is \`x\`.
+concept "Y":
+- shape is Scalar.
+- type is Observation.
+- value type is boolean.
+- code is \`y\`.
+activity "A":
+- request CPGCommunicationRequest.
+- with \`a\`.
+decision "D":
+all:
+- when "X" then recommend activity "A".
+- when "Y" then:
+  any:
+  - recommend activity "A" only when "X".
+  end.`;
+  const cel = `library "Cases".
+covers "Mixed".
+fact "P":
+- name is "Synthetic".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "Y":
+- defined by "Mixed"."Y".
+- value is true.
+case "mixed":
+- subject is "P".
+- fact is "Y".
+- result is "D" is pause.`;
+  const { sv, rootLib } = renderCase({ "p.crl": crl, "p.cel": cel }, "p.cel", "mixed");
+  assert.equal(sv.status, "error");
+  assert.equal(sv.discardedUnknown, true);
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  assert.equal(q.terminalKind, "error");
+  assert.equal(q.outcome, null);
+  assert.ok(q.questions.length > 0);
+  assert.equal(q.questions.find((q) => q.rowKind === "guard")?.answer, "unknown");
+  const html = renderScenarioHtml({ scenarios: [sv], source: { celFilePath: "p.cel" }, errors: [], caseCount: 1, passCount: 0, failCount: 1, errorCount: 0 }).html;
+  assert.ok(html.includes("pause unavailable (CRE capability limit)"));
+  assert.ok(!html.includes("paused (CRE prediction;"));
+  const withSibling = crl.replace('  end.', '  - recommend activity "A".\n  end.');
+  const sibling = renderCase({ "p.crl": withSibling, "p.cel": cel }, "p.cel", "mixed").sv;
+  assert.equal(sibling.discardedUnknown, true);
+  assert.equal(sibling.produced.length, 1);
+  const siblingQuestionnaire = buildQuestionnaire(sibling, booleanResolver, rootLib);
+  assert.ok(siblingQuestionnaire.outcome);
+  assert.match(siblingQuestionnaire.note, /unknown/i);
+  const siblingHtml = renderScenarioHtml({ scenarios: [sibling], source: { celFilePath: "p.cel" }, errors: [], caseCount: 1, passCount: 0, failCount: 1, errorCount: 0 }).html;
+  assert.match(siblingHtml, /CRE capability limit/);
+});
 
 // Write a CRL+CEL project to a fresh temp dir (its own project root) and render the named case.
 // `files` is a map of relative-name → contents. Returns the single ScenarioViewModel + its decision lib.
@@ -49,6 +107,107 @@ function renderCase(files, celName, caseName) {
 // A resolver stub that returns boolean for every concept (the common case). Per-lib/per-name overrides
 // let a test assert WHICH (lib,name) the builder queried (the cross-lib same-name trap).
 const booleanResolver = () => ["boolean"];
+
+check("a reached unknown composite retains known and missing operand answers", () => {
+  const crl = `library "CompositePolicy".
+concept "X":
+- shape is Scalar.
+- type is Observation.
+- value type is boolean.
+- code is \`x\`.
+concept "Y":
+- shape is Scalar.
+- type is Observation.
+- value type is boolean.
+- code is \`y\`.
+concept "Composite":
+- shape is Scalar.
+- type is Observation.
+- value type is boolean.
+- defined as ("X" and "Y").
+activity "A":
+- request CPGCommunicationRequest.
+- with \`a\`.
+decision "D":
+first:
+- when "Composite" then recommend activity "A".`;
+  const cel = `library "Cases".
+covers "CompositePolicy".
+fact "P":
+- name is "Synthetic".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "X":
+- defined by "CompositePolicy"."X".
+- value is true.
+case "partial":
+- subject is "P".
+- fact is "X".
+- result is "D" is pause.`;
+  const { sv, rootLib } = renderCase({ "p.crl": crl, "p.cel": cel }, "p.cel", "partial");
+  assert.equal(sv.status, "pass");
+  const ref = (name) => ({ kind: "ref", ref: { name, lib: rootLib, crossLib: false, nodeKey: `k:${name}`, hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false } });
+  const entry = { nodeKey: "k:Composite", lib: rootLib, name: "Composite", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, body: { kind: "and", operands: [ref("X"), ref("Y")] } };
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib, { defExpr: (_lib, name) => name === "Composite" ? entry : undefined });
+  assert.equal(q.terminalKind, "paused");
+  assert.equal(q.questions[0].answer, "unknown");
+  assert.equal(q.questions[0].expansionKind, "defined-as");
+  assert.deepEqual(q.questions[0].expansion.operands.map(o => [o.name, o.answer, o.blocking]), [["X", "yes", undefined], ["Y", "unknown", undefined]]);
+});
+
+check("paused compound retains known answers and an independent guarded-out row", () => {
+  const sv = {
+    status: "pass", expected: { decision: "D", pause: true }, decision: { name: "D", libraryName: "P" },
+    diagnostics: [], produced: [], conceptTruth: [{ libraryName: "P", name: "A", satisfied: true }],
+    tree: [{ nodeId: "when[0]", kind: "when", label: "when A and B", evaluated: true, unknown: true,
+      condition: { facts: [], expr: { op: "and", operands: [
+        { op: "ref", concept: { name: "A" }, satisfied: true }, { op: "ref", concept: { name: "B" } },
+      ] } }, children: [] },
+      { nodeId: "otherwise/action[0]", kind: "action", label: "A", evaluated: true, guardedOut: true,
+        action: { actionKind: "recommend-activity", produced: false },
+        guard: { polarity: "only-when", concept: { name: "Allowed" }, evaluated: true, satisfied: false } }],
+  };
+  const q = buildQuestionnaire(sv, booleanResolver);
+  assert.equal(q.terminalKind, "paused");
+  assert.equal(q.questions[0].answer, "unknown");
+  assert.equal(q.questions[0].expansion.operands[0].answer, "yes");
+  assert.equal(q.questions[0].expansion.operands[1].answer, "unknown");
+  assert.equal(q.questions[1].rowKind, "guard");
+  assert.equal(q.questions[1].answer, "no");
+});
+
+// REFACTOR:grounded (#320): real CRE projection, explicitly not native $apply evidence.
+check("expected pause leaves a reached question unanswered and has no disposition", () => {
+  const { sv } = renderCase({
+    "p.crl": `library "PausePolicy".
+concept "Answer":
+- type is Observation.
+- value type is boolean.
+- shape is Record.
+- code is \`answer\`.
+- shape reduction is most recent.
+activity "A":
+- request CPGCommunicationRequest.
+- with \`a\`.
+decision "D":
+first:
+- when "Answer" then recommend activity "A".`,
+    "c.cel": `library "Cases".
+covers "PausePolicy".
+fact "P":
+- defined by "Patient".
+case "Missing":
+- subject is "P".
+- result is "D" is pause.`,
+  }, "c.cel", "Missing");
+  assert.equal(sv.status, "pass");
+  const q = buildQuestionnaire(sv, booleanResolver);
+  assert.equal(q.terminalKind, "paused");
+  assert.equal(q.outcome, null);
+  assert.equal(q.questions.length, 1);
+  assert.equal(q.questions[0].answer, "unknown");
+  assert.equal(q.questions[0].diverterEligible, false);
+});
 
 // ── 1. PASS path: N nested satisfied whens → N questions in order, each "yes", outcome = the activity ──
 check("PASS nested-yes: N nested satisfied whens → N ordered yes-questions + the produced activity", () => {

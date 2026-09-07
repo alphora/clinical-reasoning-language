@@ -1164,6 +1164,12 @@ function processCelCase(
         runPath,
         coveredLib,
       );
+    } else if (rf.value.type === "CELPauseResult") {
+      diagnostics.push({
+        kind: "unsupported-cel-result",
+        message: `CEL case ${celCase.name} expects decision "${rf.leafName}" to pause; pause-to-cluster attribution is not supported yet.`,
+        caseId: celCase.caseId,
+      });
     } else {
       // handleBooleanResult is UNCHANGED by #175 (disc 154 Claude-3). INTENTIONAL ASYMMETRY: a chained case's BRANCH ref
       // lands in the ONE sub-decision cluster its disposition actually fired in (handleBranchResult below), but its

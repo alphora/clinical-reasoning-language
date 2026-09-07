@@ -54,22 +54,9 @@ const MUST_PRODUCE: Record<string, readonly string[]> = {
 };
 
 /**
- * ⚠⚠ THE PAUSE ROWS, WHICH CEL CANNOT STATE — and they are the acceptance criterion's whole point.
- *
- * `result is "<leaf>" is <branch | boolean>` is CEL's entire result surface
- * (`cel/ast/types.ts`: `CELResultValue = CELBooleanResult | CELBranchResult`), so every case must name a
- * branch. A pause row's correct answer is that NO branch fires, so writing it in CEL means asserting the
- * collapse the fixture exists to catch.
- *
- * ⚠ THE BOUNDARY IS PERMANENT, NOT A GAP. CEL is Case EXAMPLE Language: a case exemplifies what a decision
- * DOES, and an absence cannot be exemplified. There is no pause form and there will not be one — pause
- * testing is what THIS file is for.
- *
- * ⚠ `fixtures/obesity/cases.cel` carries the same consequence — `case "obese unanswered -> no
- * recommendation"` asserts `"Approve Bariatric Surgery"`, so its name and its assertion disagree. That is a
- * known effect of the boundary and the OPERATOR'S CALL, not a defect to go fix.
- *
- * These rows are recorded here; `$apply` owns their execution.
+ * REFACTOR:grounded (#320): these historical pause rows still require native $apply execution.
+ * CEL now permits `result is "Decision" is pause`; a passing CRE prediction cannot discharge
+ * this native acceptance debt. The old fixture remains unchanged and is not an authoring exemplar.
  */
 const OWED_PAUSE_ROWS: readonly string[] = [
   "no ServiceRequest at all -> no recommendation",
@@ -148,9 +135,9 @@ describe("ServiceRequest membership target — fixtures/service-request", () => 
     expect(matched.known).toBe(true);
   });
 
-  it("the PAUSE rows are recorded even though CEL cannot state them", () => {
+  it("the native PAUSE acceptance rows remain recorded independently of CEL assertions", () => {
     // Their absence from `cases.cel` is deliberate and documented there; this keeps them from being quietly
-    // forgotten, and fails if someone trims the list without adding the CEL surface that would let them land.
+    // forgotten, and retains native acceptance debt until the rows have been executed with $apply.
     expect(OWED_PAUSE_ROWS).toHaveLength(2);
   });
 

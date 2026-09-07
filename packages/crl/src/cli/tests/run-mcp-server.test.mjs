@@ -258,8 +258,8 @@ try {
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
-    assert.equal(kit.schemaVersion, "1.30"); // independent verification arrays and consolidated release guidance
-    assert.equal(kit.contentHash, "017e2016ddc9672eac37acca4cf9d48fad4a8a1dcf6784790f61a9130dc09603");
+    assert.equal(kit.schemaVersion, "1.31"); // expected pause and separate native acceptance guidance
+    assert.equal(kit.contentHash, "c0c2bc07da34e315af33fbfae40782396895ae7ff7b074a2951db50b815ee8c0");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.
@@ -274,9 +274,9 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.useCase, "prior-auth");
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    assert.equal(kit.schemaVersion, "1.30");
+    assert.equal(kit.schemaVersion, "1.31");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "0c94484c277b7624ee9accd56a8b610eb49dffaa5b44b0798497f0108d718b85");
+    assert.equal(kit.contentHash, "fcae7880574b91ffa1fef562cf9878478e3ba36e6a23f49f7d9c1e564ce48342");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.equal(refNames.length, 12); // shared medical-policy-determination.crl removed (config-driven local activities); representation-reference.crl added
     assert.ok(!refNames.includes("medical-policy-determination.crl"));
@@ -321,6 +321,7 @@ try {
     const r = await client.callTool({ name: "run_decision", arguments: { path: dme101Cel } });
     assert.ok(!r.isError, "should not be a tool error");
     const out = JSON.parse(r.content[0].text);
+    assert.equal(out.schemaVersion, 1);
     assert.equal(out.success, true);
     assert.equal(out.caseCount, 3);
     assert.equal(out.passCount, 3);
@@ -345,6 +346,34 @@ try {
   await check("run_decision without path → isError", async () => {
     const r = await client.callTool({ name: "run_decision", arguments: {} });
     assert.equal(r.isError, true);
+  });
+
+  await check("run_decision reports an unsupported pause as a versioned error, not successful acceptance", async () => {
+    const { root } = mkPolicy(`library "L".
+concept "X":
+- shape is Scalar.
+- type is Observation.
+- value type is boolean.
+- code is \`x\`.
+activity "A":
+- request CPGCommunicationRequest.
+- with \`a\`.
+decision "D":
+first:
+- otherwise then:
+  any:
+  - recommend activity "A" only when "X".
+  end.`);
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "pause-contract", version: "0.0.0", crl: { canonicalBase: "http://example.org/pause-contract" } }));
+    const celPath = join(root, "cases.cel");
+    writeFileSync(celPath, 'library "Cases".\ncovers "L".\nfact "P":\n- defined by "Patient".\ncase "Pending":\n- subject is "P".\n- result is "D" is pause.');
+    const out = JSON.parse((await client.callTool({ name: "run_decision", arguments: { path: celPath } })).content[0].text);
+    assert.equal(out.schemaVersion, 1);
+    assert.equal(out.success, false);
+    assert.equal(out.errorCount, 1);
+    assert.equal(out.runs[0].status, "error");
+    assert.equal(out.runs[0].discardedUnknown, true);
+    assert.deepEqual(out.runs[0].expected, { leaf: "D", pause: true });
   });
 
   await check("run_decision with nonexistent path → isError", async () => {

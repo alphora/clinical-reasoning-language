@@ -257,6 +257,8 @@ function renderTerminal(q: ReturnType<typeof buildQuestionnaire>): string {
       const note = q.note ? ` <span class="q-note">(${escapeHtml(q.note)})</span>` : "";
       return `<p class="q-outcome"><span class="q-outcome-label">Outcome:</span> <span class="q-activity">${escapeHtml(activity)}</span>${note}</p>`;
     }
+    case "paused":
+      return `<p class="q-terminal">Awaiting information (CRE prediction; verify with native $apply).</p>`;
     case "blocked":
       return `<p class="q-terminal q-blocked">Blocked (no determination).</p>`;
     case "blocked-guard":

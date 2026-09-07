@@ -200,7 +200,7 @@ export function validateCEL(
 
   // REFACTOR:grounded (#320, review 556): use the same case-date preflight as emit and CRE.
   // Capture once; only explicitly authored now anchors use it, never undated fact defaults.
-  const now = new Date();
+  const now = options.now ?? new Date();
   for (const s of cel.statements) {
     if (s.type !== "CELCase") continue;
     for (const d of resolveCaseFactDates(s, facts, now).diagnostics) {
@@ -320,6 +320,12 @@ export function validateCEL(
   const coveredLibName = coversTarget?.name ?? "";
   for (const c of cel.statements) {
     if (c.type !== "CELCase") continue;
+    // REFACTOR:grounded (#320): a pause cannot be hidden by last-result-wins execution.
+    const results = c.body.filter((cb): cb is CELResultField => cb.type === "CELResultField");
+    if (results.length > 1 && results.some((cb) => cb.value.type === "CELPauseResult")) {
+      errors.push(err("conflicting-pause-results",
+        `Case "${c.name}" asserts pause; it must contain exactly one result assertion.`, results[1].location, fp));
+    }
     for (const cb of c.body) {
       if (cb.type === "CELSubjectField" || cb.type === "CELEncounterField") {
         if (!facts.has(cb.factName)) {
@@ -1063,11 +1069,12 @@ function validateResult(
   }
   // Step 3: value-shape check.
   if (leaf.type === "Decision") {
+    if (cb.value.type === "CELPauseResult") return;
     if (cb.value.type !== "CELBranchResult") {
       errors.push(
         err(
           "invalid-result-shape",
-          `Result leaf "${cb.leafName}" is a Decision; expected a branch (string) result value, got boolean`,
+          `Result leaf "${cb.leafName}" is a Decision; expected an activity (string) or pause result value, got boolean`,
           cb.location,
           fp,
         ),
@@ -1102,7 +1109,7 @@ function validateResult(
       errors.push(
         err(
           "invalid-result-shape",
-          `Result leaf "${cb.leafName}" is a Concept; expected a boolean result value, got branch (string)`,
+          `Result leaf "${cb.leafName}" is a Concept; expected true/false, got ${cb.value.type === "CELPauseResult" ? "pause (a Decision execution expectation)" : "an activity (string)"}`,
           cb.location,
           fp,
         ),
@@ -1163,6 +1170,6 @@ export function validateCELFile(
   options: CELValidationOptions & ResolveCelImportsOptions = {},
 ): CELValidationResult & { graph: ResolvedCelGraph } {
   const graph = resolveCelImports(filePath, { overlays: options.overlays });
-  const result = validateCEL(graph, { soft: options.soft });
+  const result = validateCEL(graph, { soft: options.soft, now: options.now });
   return { ...result, graph };
 }

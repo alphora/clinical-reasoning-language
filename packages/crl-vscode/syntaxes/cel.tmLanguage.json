@@ -57,6 +57,10 @@
       "match": "(?<![\\w`\"])\\b(true|false)\\b(?![\\w`\"])"
     },
     {
+      "name": "keyword.control.pause.cel",
+      "match": "(?<![\\w`\"])\\bpause\\b(?![\\w`\"])"
+    },
+    {
       "name": "constant.numeric.cel",
       "match": "\\b\\d{4}-\\d{2}-\\d{2}\\b|\\b\\d+(?:\\.\\d+)?\\b"
     },

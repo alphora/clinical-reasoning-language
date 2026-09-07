@@ -51,6 +51,7 @@ NOW                 : 'now';
 IS                  : 'is';
 TRUE                : 'true';
 FALSE               : 'false';
+PAUSE               : 'pause';
 
 // TIME_UNIT — full parity with CRLLexer.g4 (closed allowlist, eligible for the drift-guard).
 TIME_UNIT

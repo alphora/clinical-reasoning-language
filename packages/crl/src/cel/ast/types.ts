@@ -301,7 +301,13 @@ export interface CELResultField {
   location: Location;
 }
 
-export type CELResultValue = CELBooleanResult | CELBranchResult;
+// REFACTOR:grounded (#320): pause is an execution expectation, never patient data.
+export type CELResultValue = CELBooleanResult | CELBranchResult | CELPauseResult;
+
+export interface CELPauseResult {
+  type: "CELPauseResult";
+  location: Location;
+}
 
 export interface CELBooleanResult {
   type: "CELBooleanResult";

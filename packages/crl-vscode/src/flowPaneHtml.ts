@@ -1064,7 +1064,7 @@ export const FLOW_STYLE =
   // (here) are coupled — outer extent = off + stroke/2; keep them in lockstep (leaf ≈2.25px/side < the ~3.36px half-gap;
   // struct ≈3.75px/side < the 7px half-gap). The leaf ring is THINNER to clear the compact outline row pitch. No
   // `pointer-events:none` — the ring is nested in the row `<g data-reveal>`, so a click on the ring band routes to the row.
-  `.flow-row.current,.flow-row.diverter,.flow-row.failed-criterion,.flow-row.failed-criterion-preempt{outline:none}` +
+  `.flow-row.current,.flow-row.diverter,.flow-row.failed-criterion,.flow-row.failed-criterion-preempt,.flow-row.failed-criterion-pending{outline:none}` +
   `.flow-ring{display:none}` +
   `.flow-ring>rect{fill:none;stroke:${TOK_RING};stroke-width:2.5;stroke-dasharray:none}` +
   `.flow-leaf .flow-ring>rect{stroke-width:1.5}` +
@@ -1105,6 +1105,7 @@ export const FLOW_STYLE =
   // paint on a <g>, so paint the rect (a dashed error-colored stroke, visually distinct from `.current`'s solid focus).
   `.flow-row.failed-criterion>rect{stroke:var(--vscode-editorError-foreground,#f14c4c);stroke-width:2.5;stroke-dasharray:4 2}` +
   // FIX 3 (disc 160): a preemption row (a SATISFIED diverting sibling) gets the DISTINCT amber stroke, not the red.
+  `.flow-row.failed-criterion-pending>rect{stroke:var(--vscode-charts-yellow,#d29922);stroke-width:2.5;stroke-dasharray:4 2}` +
   `.flow-row.failed-criterion-preempt>rect{stroke:var(--vscode-charts-yellow,#d29922);stroke-width:2.5;stroke-dasharray:4 2}` +
   // #156 slice 5 / #210 VERDICT PAINTING: the Medical Validation review overlay — a PERSISTENT channel that survives
   // selection (unlike failed-criterion, which clears on every reveal). It is a NON-OUTLINE FILL TINT on the rect, an

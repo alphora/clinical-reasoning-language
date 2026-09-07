@@ -86,7 +86,7 @@ A single scenario — one path through the CRL logic tree. Body lines:
 | `anchor "<name>" is <expr>.` | named anchor (multi-anchor flow) |
 | `fact is "<fact>" [at …] [with … intent] [because \`…\`].` | adds a fact reference to the case |
 | `"<source>" <relation> "<target>".` | cross-resource wiring (six relations — see below) |
-| `result is "<leaf>" is <value>.` | expected outcome; v1 emits no JSON, deferred to [#70](https://github.com/alphora/clinical-reasoning-language/issues/70) |
+| `result is "<leaf>" is <value>.` | expected activity, Boolean or unquoted `pause`; emits no patient-data JSON |
 
 #### Anchor expressions
 
@@ -152,11 +152,24 @@ Six locked relations. The source identifier appears bare (without `fact is`); th
 result is "<leaf>" is true.            # boolean Concept leaf
 result is "<leaf>" is false.
 result is "<leaf>" is "<branch>".      # branch result on a Decision leaf
+result is "<leaf>" is pause.           # expected pause before any activity
 ```
 
-Leaf must be a top-level statement in the covered library. Shape-checked: Decision leaves require branch (string) results, Concept leaves require boolean. Activity / Terminology / Parameter leaves are categorical errors (`invalid-result-leaf-kind`).
+Leaf must be a top-level statement in the covered library. Decisions accept activity (string) or unquoted `pause` results; Concepts require boolean. Quoted `"pause"` remains an ordinary activity name. Activity / Terminology / Parameter leaves are categorical errors (`invalid-result-leaf-kind`). A case asserting pause must have exactly one result assertion (`conflicting-pause-results`).
 
-v1 parses and resolves the leaf; does NOT emit JSON (deferred to [#70](https://github.com/alphora/clinical-reasoning-language/issues/70) / metric). Branch values are parsed but not cross-checked against the resolved Decision's branches.
+Result assertions do not emit FHIR data resources. Activity names are checked against reachable decision activities. A pause is an expected execution outcome, not a patient datum or a policy disposition.
+
+`run_decision` passes a pause assertion when valid input and supported evaluation reach an unknown decision condition and produce no activity. Zero activities alone are insufficient: an all-false decision is not a pause. Under `all:`, unknown conditions alongside a produced activity fail this whole-decision pause assertion; the activity remains visible. Evaluation errors cannot pass as pauses. CEL validation errors anywhere in the graph conservatively prevent pause assertions from passing; warnings do not. This graph-wide gate can error a valid pause case because another case is invalid; pause-graph-validation diagnostics identify the actual source file/line and do not blame the current case. Activity assertions retain their existing validation behavior. Unknown action/menu guards are not covered by this assertion: a reached legacy guard that discards unknown evidence prevents pause success, even if another independent condition is unknown. This limitation is recorded independently of the expected result; changing the assertion does not change evaluation.
+
+**CRE predicts; native `$apply` is the source of truth.** A passing CRE assertion does not prove the emitted artifacts pause. Native acceptance must independently check engine errors, activities, and missing/populated Questionnaire and QuestionnaireResponse answer states for that case. A CRE/native disagreement remains a defect. Neither test proves how a client renders the questionnaire.
+
+`run_decision` returns raw `schemaVersion: 1`; `render_scenario` uses its separate `schemaVersion: 6`. In both contracts an expected pause has `pause: true` instead of an activity `branch`. Unknown trace/explanation satisfaction is omitted, not false. Consumers must handle that union and optional satisfaction.
+
+This is a whole-decision assertion. Per-branch pause assertions for partially producing `all:` decisions, and cross-pane highlighting of failed pause expectations, remain #320 follow-ups owned by the CRL implementation lead. Failed pause diagnostics identify produced activity paths; the actual trace remains available. Later first: siblings after an unknown halt still display generic not-reached; explicit reason labels belong to that UI follow-up. Existing multi-arm fixture migration debt is not retired by this syntax alone.
+
+CRE pause attribution identifies the reached decision condition. Compound branch traces preserve explicit true and false, omitting satisfaction only for unknown. The questionnaire preview leaves pending answers blank. Supported Boolean/sem concept composition preserves unknown: true OR unknown is true, false AND unknown is false, and decisive unknown remains unknown. Explanation trees retain the same distinction. CRL explicit record existence is total, but CRE's legacy value-reading existence path can inspect a determination rather than record presence. It is not certified for present-but-unanswered Boolean records; this CRE/native parity debt is owned by the CRL lead under #320.
+
+This assertion checks reached unknown conditions under authored decision order; it does not perform speculative lookahead to prove whether some future answer could change the final activity. CEL graph validation is an authoring gate, not full CRL validation. Validate CRL separately and execute the emitted artifacts. Guard resolution is intentionally tightened here: a reached guard without a Concept declaration is a case-wide CRE error for every assertion kind, including legacy typo or fact-only names. Legacy concept-composition resolution is not tightened by this slice; that parity remains #320 debt. An unknown legacy action guard cannot establish a supported pause; its row remains unknown and a pause assertion reports status:error, not a failed expectation. Legacy activity assertions retain their existing activity-set verdict and expose discardedUnknown as a capability limit. Raw CRE trace nodes omit `satisfied` when `unknown:true`; compound branch traces omit satisfaction only for unknown operands and preserve explicit false. The API's historical `expected.branch` property means the expected activity name.
 
 ## Validator semantics
 
@@ -167,7 +180,8 @@ The validator runs over a `ResolvedCelGraph` (the covered library's CRL registry
 - `unresolved-qualified-library` — qualified library doesn't exist in the closure.
 - `unresolved-qualified-declaration` — library exists but no Concept/Activity named `Decl`.
 - `unresolved-result-leaf` — `result is` leaf doesn't resolve in the covered library.
-- `invalid-result-shape` — value shape doesn't match the leaf kind (Decision needs branch; Concept needs boolean).
+- `invalid-result-shape` — value shape doesn't match the leaf kind (Decision needs activity or pause; Concept needs boolean).
+- `conflicting-pause-results` — a pause assertion shares a case with another result assertion.
 - `invalid-result-leaf-kind` — result leaf is Activity/Terminology/Parameter (only Concept and Decision are valid).
 - `unresolved-fact-ref` — `subject is` / `encounter is` / `fact is` / cross-resource source/target references a fact not declared in this file.
 - `duplicate-fact-name`, `duplicate-case-name` — intra-file uniqueness violations.
@@ -286,7 +300,7 @@ These are intentional v1 gaps. The [homeostasis lane (#76)](https://github.com/a
 - **Intent modifiers map to a single best-effort field per resource type** (`doNotPerform` / `status: entered-in-error` / `status: stopped`). The CPG-profile-correct shape per intent + resource type is deferred.
 - **`not done because` emits `statusReason` text only** — the canonical mapping is CodeableConcept or Reference per profile.
 - **BP-panel + components emits as separate Observations** rather than R4-canonical `Observation.component[]` (per pitch v4 critical decision #2 documented limitation). v1 ships non-canonical fixtures.
-- **`result is` lines parse + validate but emit no JSON** (deferred to [#70](https://github.com/alphora/clinical-reasoning-language/issues/70) / metric). A future `GuidanceResponse` / `MeasureReport` shape is the natural fit.
+- **`result is` lines express expectations and emit no FHIR patient-data resources.** Execution reporting is separate from case data.
 - **No engine round-trip**. v1 emits "obvious shape" against R4 base resources; the emitted FHIR isn't validated against a FHIR engine + the CRL logic to confirm the case's `result is` claim.
 
 ### Tooling gaps
@@ -331,7 +345,7 @@ Things explicitly easy to revise after v1:
 - [#64](https://github.com/alphora/clinical-reasoning-language/issues/64) — CEL umbrella.
 - [#65](https://github.com/alphora/clinical-reasoning-language/issues/65) — CEL spec design questions (locked decisions).
 - [#69](https://github.com/alphora/clinical-reasoning-language/issues/69) — `summary` (related CRL feature, separate).
-- [#70](https://github.com/alphora/clinical-reasoning-language/issues/70) — `metric` (covers `result is` final form).
+- [#70](https://github.com/alphora/clinical-reasoning-language/issues/70) — metric/reporting work, separate from CEL result expectations.
 - [#71](https://github.com/alphora/clinical-reasoning-language/issues/71) — unified authoring environment (related but separate).
 - [#72](https://github.com/alphora/clinical-reasoning-language/issues/72) — companion-package distribution model.
 - [#73](https://github.com/alphora/clinical-reasoning-language/issues/73) — FHIR Definition emit from CRL (PlanDefinition / ActivityDefinition / ValueSet).

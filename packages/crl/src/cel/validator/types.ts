@@ -25,6 +25,7 @@ export type CELValidationErrorKind =
   // Result is
   | "unresolved-result-leaf"
   | "invalid-result-shape"
+  | "conflicting-pause-results"
   | "invalid-result-leaf-kind"
   | "unresolved-result-branch"
   | "result-leaf-not-boolean-valued"
@@ -111,6 +112,8 @@ export interface CELValidationResult {
 }
 
 export interface CELValidationOptions {
+  /** Shared invocation clock for explicitly authored now anchors. */
+  now?: Date;
   /**
    * Soft mode silences `unsupported-yet` and `alias-not-yet-supported`
    * warnings. Bare/qualified ref-resolution, duplicate-name, and

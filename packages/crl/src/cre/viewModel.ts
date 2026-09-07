@@ -68,7 +68,10 @@ import {
 //   SEPARATE boolean facts) evaluated closed-world by the CRE, distinct from the `sem-*` inference ops. An
 //   exhaustive `ExplanationView.op` decoder MUST handle them. (`BranchConditionView` already carried
 //   `and`/`or`/`not` for decision guards; this bump is for the CONCEPT-space composition view.)
-export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 5;
+// v6 (#320): pause expectation variant and reached unknown condition. Unknown is distinct from
+// false/unevaluated. Compound branch operands preserve both explicit Boolean values; unknown omits satisfied.
+// discardedUnknown identifies a reached legacy capability limit that prevents a supported pause projection.
+export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 6;
 
 type ActionKind = "recommend-activity" | "use-decision";
 export type ConceptView = { name: string; libraryName?: string };
@@ -109,12 +112,14 @@ export interface ScenarioViewModel {
    *  covered library (no nodeId/source there); fully populated when resolved. */
   decision: DecisionView | null;
   status: "pass" | "fail" | "error";
-  expected: { decision: string; branch: string } | null;
+  expected: ({ decision: string; branch: string; pause?: never } | { decision: string; pause: true; branch?: never }) | null;
   produced: { recommendation: string; actionKind: ActionKind }[];
   /** The decision's top-level branches, overlaid with run state (no synthetic root node). */
   tree: ViewNode[];
   /** Case-specific runtime diagnostics (no source position in v1) — for the scenario header. */
   diagnostics: string[];
+  /** Reached evaluation discarded unknown evidence; pause projection is unavailable. */
+  discardedUnknown?: true;
   /** The case's per-concept case-derived answer over the whole closure (#187 Todo 2) — feeds the panes' OFF-path
    *  (dimmed) rendering. Empty on an error run. Additive/optional-in-spirit (no schema bump). */
   conceptTruth: ConceptTruthView[];
@@ -153,6 +158,8 @@ export interface ViewNode {
   evaluated: boolean;
   /** REFACTOR:grounded (#320): attempted node invalidated by a case-wide evaluation error. */
   invalidated?: boolean;
+  /** REFACTOR:grounded (#320): reached unknown condition; separate from false and unevaluated. */
+  unknown?: true;
   /** REFACTOR:grounded (#320): condition failed on data; independent results may remain valid. */
   publicationErrors?: TraceNode["publicationErrors"];
   /** Only on an unreached BRANCH whose block had a prior matching sibling (first:-preemption). */
@@ -222,6 +229,7 @@ export interface GuardView {
   /** false for an unreached action's guard (structurally present, not evaluated → no `satisfied`). */
   evaluated: boolean;
   satisfied?: boolean;
+  unknown?: true;
   explanation?: ExplanationView;
 }
 
@@ -242,9 +250,9 @@ export interface ActionView {
  *  semantic-inference (record-space) ops; `and`/`or`/`not` are the #189 Slice 0b BOOLEAN-composition ops (over
  *  separate boolean facts) — same view shape, distinct semantics (`not` is UNARY in both families). */
 export type ExplanationView =
-  | { op: "sem-and" | "sem-or" | "and" | "or"; satisfied: boolean; operands: ExplanationView[] }
-  | { op: "sem-not" | "not"; satisfied: boolean; operand: ExplanationView }
-  | { op: "ref"; satisfied: boolean; concept: ConceptView; explanation?: ExplanationView };
+  | { op: "sem-and" | "sem-or" | "and" | "or"; satisfied?: boolean; operands: ExplanationView[] }
+  | { op: "sem-not" | "not"; satisfied?: boolean; operand: ExplanationView }
+  | { op: "ref"; satisfied?: boolean; concept: ConceptView; explanation?: ExplanationView };
 
 /** Run the CRE over a resolved CEL graph and project each case to a ScenarioViewModel. `opts.case`
  *  renders only the named case (bounds output for the agent). Mirrors `runCel`'s graph input so it
@@ -390,10 +398,13 @@ function buildScenario(
       : {}),
     decision,
     status: run.status,
-    expected: run.expected ? { decision: run.expected.leaf, branch: run.expected.branch } : null,
+    expected: run.expected ? (run.expected.pause
+      ? { decision: run.expected.leaf, pause: true }
+      : { decision: run.expected.leaf, branch: run.expected.branch }) : null,
     produced,
     tree,
     diagnostics: run.diagnostics,
+    ...(run.discardedUnknown ? { discardedUnknown: true as const } : {}),
     // #187 Todo 2: project the CRE's per-concept truth (lib → the VM's concrete libraryName). Serialization-safe array.
     conceptTruth: run.conceptTruth.map((r) => ({
       name: r.name,
@@ -492,8 +503,9 @@ function walkBranchesVM(
     // runtime trace (per-node satisfied). Single-ref stays a single `ref` leaf.
     const expr = mapConditionExpr(b.condition, t);
     const condition: ConditionView = {
+      // Compound branch traces preserve explicit false separately from omitted unknown satisfaction.
       expr,
-      ...(t?.satisfied !== undefined ? { satisfied: t.satisfied } : {}),
+      ...(!t?.unknown && t?.satisfied !== undefined ? { satisfied: t.satisfied } : {}),
       facts: t?.facts ?? [],
     };
     const node: ViewNode = {
@@ -509,6 +521,7 @@ function walkBranchesVM(
       children: walkBodyVM(b.body, nodeId, traceIndex, filePath, resolve, currentLib, stack),
     };
     // REFACTOR:grounded (#320, review 571): preserve failure channels before UI truth rendering.
+    if (t?.unknown) node.unknown = true;
     if (t?.invalidated) node.invalidated = true;
     if (t?.publicationErrors?.length) node.publicationErrors = t.publicationErrors;
     if (!t && priorMatch) node.unreachedReason = "preempted";
@@ -660,7 +673,7 @@ function buildActionVM(
       polarity: t.guard.polarity,
       concept: stmt.guard ? conceptView(stmt.guard.conceptName) : { name: t.guard.concept },
       evaluated: true,
-      satisfied: t.guard.satisfied,
+      ...(t.guard.unknown ? { unknown: true as const } : { satisfied: t.guard.satisfied }),
       ...(t.guard.composition ? { explanation: mapComposition(t.guard.composition) } : {}),
     };
   } else if (stmt.guard) {
@@ -777,20 +790,20 @@ function traceBodyView(bt: BranchConditionTrace): BranchConditionView {
     case "ref":
       return {
         op: "ref",
-        satisfied: bt.satisfied,
+        ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
         concept: { name: bt.concept.name, ...(bt.concept.libraryName ? { libraryName: bt.concept.libraryName } : {}) },
         ...(bt.composition ? { explanation: mapComposition(bt.composition) } : {}),
         ...(bt.facts && bt.facts.length > 0 ? { facts: bt.facts } : {}),
       };
     case "and":
     case "or":
-      return { op: bt.op, satisfied: bt.satisfied, operands: bt.operands.map(traceBodyView) };
+      return { op: bt.op, ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}), operands: bt.operands.map(traceBodyView) };
     case "not":
-      return { op: "not", satisfied: bt.satisfied, operand: traceBodyView(bt.operand) };
+      return { op: "not", ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}), operand: traceBodyView(bt.operand) };
     case "criterion":
       return {
         op: "criterion",
-        satisfied: bt.satisfied,
+        ...(bt.satisfied !== undefined ? { satisfied: bt.satisfied } : {}),
         criterion: { name: bt.criterion.name, libraryName: bt.criterion.libraryName },
         ...(bt.body ? { body: traceBodyView(bt.body) } : {}),
         ...(bt.reference ? { reference: true } : {}),
@@ -1000,16 +1013,16 @@ function mapComposition(ct: CompositionTrace): ExplanationView {
     case "or":
       return {
         op: ct.op,
-        satisfied: ct.satisfied,
+        ...(ct.satisfied !== undefined ? { satisfied: ct.satisfied } : {}),
         operands: (ct.operands ?? []).map(mapComposition),
       };
     case "sem-not":
     case "not":
-      return { op: ct.op, satisfied: ct.satisfied, operand: mapComposition(ct.operand!) };
+      return { op: ct.op, ...(ct.satisfied !== undefined ? { satisfied: ct.satisfied } : {}), operand: mapComposition(ct.operand!) };
     case "ref":
       return {
         op: "ref",
-        satisfied: ct.satisfied,
+        ...(ct.satisfied !== undefined ? { satisfied: ct.satisfied } : {}),
         concept: { name: ct.concept ?? "" },
         ...(ct.composition ? { explanation: mapComposition(ct.composition) } : {}),
       };

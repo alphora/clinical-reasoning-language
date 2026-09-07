@@ -33,6 +33,8 @@ export interface IndexedDeclaration {
   type?: string;
   /** Concept-only: declared `value type is X.` */
   valuetype?: string;
+  /** All declared value types; preserve Boolean capability for multi-type concepts. */
+  valueTypes?: readonly string[];
   /** First body bullet text for hover preview. */
   bodyPreview?: string;
   /** Decision-only: the direct arm names (sorted) a CEL `result is "<D>" is "<arm>"` may target.
@@ -373,7 +375,7 @@ function enumerateDeclarations(
               ...base,
               kind: "concept",
               ...(c.conceptType ? { type: c.conceptType } : {}),
-              ...(c.valueTypes?.[0] ? { valuetype: c.valueTypes[0] } : {}),
+              ...(c.valueTypes?.[0] ? { valuetype: c.valueTypes[0], valueTypes: [...c.valueTypes] } : {}),
               bodyPreview: describeConceptBody(c.definition),
             });
             break;

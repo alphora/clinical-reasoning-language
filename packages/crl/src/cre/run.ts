@@ -61,6 +61,7 @@
  *    target already on the delegation path → a runtime-error status + a cycle
  *    diagnostic, no hang) so cross-library `A.Sub`/`B.Sub` can't false-collide.
  */
+import { validateCEL } from "../cel/validator/validator";
 import { childId, idOf, nameOf } from "../ast/decisionSpine";
 import type {
   ActionGuard,
@@ -165,7 +166,7 @@ export interface ProducedRec {
  *  #189 Slice 0b BOOLEAN-composition ops (over SEPARATE boolean facts) — same shape, distinct semantics. */
 export interface CompositionTrace {
   op: "sem-and" | "sem-or" | "sem-not" | "and" | "or" | "not" | "ref";
-  satisfied: boolean;
+  satisfied?: boolean;
   concept?: string; // op === "ref"
   operands?: CompositionTrace[]; // op === "sem-and" | "sem-or" | "and" | "or"
   operand?: CompositionTrace; // op === "sem-not" | "not"
@@ -181,16 +182,12 @@ export interface CompositionTrace {
  *  Present ONLY for a compound guard; a single-ref `when` keeps the legacy
  *  `concept` + `composition` fields and omits this. */
 export type BranchConditionTrace =
-  | { op: "and" | "or"; satisfied: boolean; operands: BranchConditionTrace[] }
-  // #224 iii.2: a decision-guard `not`. `satisfied` is the CLOSED-WORLD negation of its
-  // operand (`!operand.satisfied`) — "the negated concept is NOT established", which is exactly
-  // the emit-side `not Coalesce(<sat>, false)` two-valued semantics (iii.1). NOT three-valued
-  // CQL null-logic. The flow/questionnaire panes render this node; precise blocking attribution
-  // under negation is iii.3b.
-  | { op: "not"; satisfied: boolean; operand: BranchConditionTrace }
+  | { op: "and" | "or"; satisfied?: boolean; operands: BranchConditionTrace[] }
+  // Decision guard traces preserve Tri: omitted satisfied means unknown, including under not.
+  | { op: "not"; satisfied?: boolean; operand: BranchConditionTrace }
   | {
       op: "ref";
-      satisfied: boolean;
+      satisfied?: boolean;
       concept: { name: string; libraryName?: string };
       composition?: CompositionTrace;
       facts?: string[];
@@ -205,7 +202,7 @@ export type BranchConditionTrace =
   // opaque/error node. So `reference: true` ALWAYS implies a `body` shown at an earlier occurrence.
   | {
       op: "criterion";
-      satisfied: boolean;
+      satisfied?: boolean;
       criterion: { name: string; libraryName: string };
       body?: BranchConditionTrace;
       reference?: boolean;
@@ -231,10 +228,12 @@ export interface TraceNode {
    * #189 null/pause — this ordered branch's guard evaluated UNKNOWN (nothing established it and nothing
    * could compute it), so the walk HALTED here: no later sibling was evaluated and no disposition was
    * reached. Distinct from `satisfied: false`, which means the guard was established as NOT holding and the
-   * walk moved on. This is the CRE's side of the pause, and the flag is what lets a test assert a pause
-   * rather than infer it from an absent recommendation.
+   * walk moved on. This flag records an ordered halt. `unknown` records any reached unknown
+   * (including unordered conditions) and is used by pause assertions.
    */
   blockedUnknown?: boolean;
+  /** REFACTOR:grounded (#320): reached unknown condition, ordered or unordered; not a fault. */
+  unknown?: true;
   /** An evaluated publication failed. This condition cannot select its activity; independent
    * `all:` siblings may still run. Distinct from a false condition or an unknown-data pause. */
   publicationErrors?: PublicationEvaluationFailure[];
@@ -242,7 +241,8 @@ export interface TraceNode {
   guard?: {
     polarity: "unless" | "only-when";
     concept: string;
-    satisfied: boolean;
+    satisfied?: boolean;
+    unknown?: true;
     composition?: CompositionTrace;
   };
   facts?: string[];
@@ -272,12 +272,14 @@ export interface CaseRun {
   case: string;
   decision: string | null;
   status: "pass" | "fail" | "error";
-  expected: { leaf: string; branch: string } | null;
+  expected: ({ leaf: string; branch: string; pause?: never } | { leaf: string; pause: true; branch?: never }) | null;
   /** Publication condition errors may preserve independent all: activities with status:error.
    * Legacy case-global faults discard the produced set because evaluation is unreliable. */
   produced: ProducedRec[];
   trace: TraceNode[];
   diagnostics: string[];
+  /** A reached legacy guard discarded unknown evidence; no supported pause can be established. */
+  discardedUnknown?: true;
   /** The case's per-concept truth over the whole closure (#187 Todo 2). Lets the Medical-Validation panes show a
    *  case-derived answer for an OFF-path (preempted) concept that `:first` never evaluated. Empty on an error run.
    *  CONTRACT: an ABSENT `(lib,name)` (a concept outside this list) is UNKNOWN — render blank, never as `false`. */
@@ -285,6 +287,8 @@ export interface CaseRun {
 }
 
 export interface CelRunResult {
+  /** First versioned raw CRE contract; distinct from the scenario-view schema. */
+  schemaVersion: 1;
   success: boolean;
   runs: CaseRun[];
   errors: string[];
@@ -473,6 +477,8 @@ interface Ctx {
   delegationStack: Set<Id>;
   /** Set when delegation hit a cycle — the case run reports `status: "error"` (no pass/fail) rather than a partial result. */
   runtimeError: boolean;
+  /** Reached legacy evaluations that discarded unknown evidence; independent of the CEL oracle. */
+  discardedUnknown: boolean;
   /** Typed publication failures invalidate the evaluated condition, not independent `all:`
    * siblings. The case still reports error. Legacy runtimeError remains case-global. */
   publicationErrors: PublicationEvaluationFailure[];
@@ -1047,13 +1053,13 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
   // `truthOf` scratch-cache path (a robust event/counter is a separate follow-up). (disc 513, both arms.)
   const runtimeErrorBefore = ctx.runtimeError;
   let composition: CompositionTrace | undefined;
-  let composed = false;
+  let composed: Tri = false;
   /** Set by the pipeline-family arm's guard so the body reads the verdict it already computed. */
   let pipelineEval: Tri | undefined;
   const def = entry?.node.definition;
   if (def && def.type === "DefinedAsDefinition") {
     composition = walkDefinedAs(def.body, entry!.lib, ctx);
-    composed = composition.satisfied;
+    composed = composition.satisfied ?? null;
   } else if (entry !== undefined && (pipelineEval = pipelineVerdict(entry, ctx)) !== undefined) {
     // ⭐⭐ THE PIPELINE FAMILY — keyed on the RESOLVED PROGRAM, not on an AST node kind.
     //
@@ -1083,7 +1089,8 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
       // exact fabrication the count/most-recent arm below refuses. (`exists this` — a `ThisRecords` target — is
       // the concept's OWN records, sound as `directFacts` presence, so it needs no arm and falls through.)
       composition = refTrace(red.target.ref, entry!.lib, ctx);
-      composed = composition.satisfied;
+      composition = { ...composition, satisfied: composition.satisfied === true };
+      composed = composition.satisfied ?? false;
     } else if (red.kind === "count" || red.kind === "mostRecent") {
       // A `count ... at least N` / `most recent this` reduction CANNOT be soundly evaluated by the presence
       // model (count needs record COUNTS — present/absent would pass a sub-threshold case; `most recent` needs
@@ -1277,8 +1284,8 @@ function collectConceptTruth(ctx: Ctx): ConceptTruthRow[] {
     // "not satisfied" row — the unanswered≡answered-no conflation this whole change exists to kill,
     // reintroduced at the surface KE tooling actually reads. The row contract already says ABSENT ⇒ UNKNOWN,
     // so a question with no answer belongs in the same bucket as a determination the engine won't evaluate.
-    // (Trace nodes keep their two-valued `satisfied`: there, `blockedUnknown` sits alongside and disambiguates.
-    // Nothing distinguishes a truth ROW, which is why it must be omitted rather than coerced.)
+    // Reached unknown trace nodes also omit `satisfied` and carry `unknown`; ordered halts additionally
+    // carry `blockedUnknown`. Truth rows omit unknowns rather than coerce them.
     if (ev.sat === null) continue;
     rows.push({ lib: entry.lib, name: entry.node.name, satisfied: ev.sat === true });
   }
@@ -1288,6 +1295,11 @@ function collectConceptTruth(ctx: Ctx): ConceptTruthRow[] {
 
 /** A composition operand reference resolves against the DEFINING concept's
  *  library when unqualified (`lib`), or its explicit qualifier when present. */
+// REFACTOR:grounded (#320): preserve unknown in composition traces as well as branch traces.
+function traceTruth(sat: Tri): { satisfied?: boolean } {
+  return sat === null ? {} : { satisfied: sat };
+}
+
 function refTrace(ref: ReferenceName, lib: string, ctx: Ctx): CompositionTrace {
   const refLib = getRefLibrary(ref) ?? lib;
   const name = getRefName(ref);
@@ -1305,7 +1317,7 @@ function refTrace(ref: ReferenceName, lib: string, ctx: Ctx): CompositionTrace {
   return {
     op: "ref",
     concept: name,
-    satisfied: ev.sat === true,
+    ...traceTruth(ev.sat),
     ...(ev.composition ? { composition: ev.composition } : {}),
   };
 }
@@ -1326,22 +1338,23 @@ function existsTrace(ref: ReferenceName, lib: string, ctx: Ctx): CompositionTrac
   if (def?.type === "ReductionDefinition" && (def.reduction.kind === "count" || def.reduction.kind === "mostRecent")) {
     return { op: "ref", concept: name, satisfied: ctx.directFacts.has(id) };
   }
-  return refTrace(ref, lib, ctx);
+  const trace = refTrace(ref, lib, ctx);
+  return { ...trace, satisfied: trace.satisfied === true }; // explicit existence remains total
 }
 
 function walkExpr(expr: CompositionExpression, lib: string, ctx: Ctx): CompositionTrace {
   switch (expr.type) {
     case "SemAndExpression": {
       const operands = expr.terms.map((t) => walkExpr(t, lib, ctx));
-      return { op: "sem-and", operands, satisfied: operands.every((o) => o.satisfied) };
+      return { op: "sem-and", operands, ...traceTruth(kAnd(operands.map((o) => o.satisfied ?? null))) };
     }
     case "SemOrExpression": {
       const operands = expr.terms.map((t) => walkExpr(t, lib, ctx));
-      return { op: "sem-or", operands, satisfied: operands.some((o) => o.satisfied) };
+      return { op: "sem-or", operands, ...traceTruth(kOr(operands.map((o) => o.satisfied ?? null))) };
     }
     case "SemNotExpression": {
       const operand = walkExpr(expr.expression, lib, ctx);
-      return { op: "sem-not", operand, satisfied: !operand.satisfied };
+      return { op: "sem-not", operand, ...traceTruth(kNot(operand.satisfied ?? null)) };
     }
     case "CompositionGroup":
       return walkExpr(expr.expression, lib, ctx); // parentheses are transparent
@@ -1350,24 +1363,24 @@ function walkExpr(expr: CompositionExpression, lib: string, ctx: Ctx): Compositi
   }
 }
 
-/** #189 Slice 0b — closed-world eval of a `defined as` BOOLEAN composition's `BranchCondition` tree:
+/** #189 Slice 0b — three-valued evaluation of a `defined as` BOOLEAN composition's `BranchCondition` tree:
  *  `and`/`or`/`not` over evaluated operand booleans, mirroring the emitted CQL `and`/`or`/`not`. The
  *  decision-guard analogue is `evalBranchCondition` (which also handles criteria + the decision frame); this
  *  is the `defined as` (concept) analogue, producing a `CompositionTrace` so `conceptTruth` / the cockpit
- *  renders the operands. Operand existence/refinement inherits `refTrace`'s closed-world verdict. */
+ *  renders the operands. Operand truth comes from refTrace; missing question answers remain unknown. */
 function walkBoolExpr(expr: BranchCondition, lib: string, ctx: Ctx): CompositionTrace {
   switch (expr.type) {
     case "BranchConditionAnd": {
       const operands = expr.operands.map((t) => walkBoolExpr(t, lib, ctx));
-      return { op: "and", operands, satisfied: operands.every((o) => o.satisfied) };
+      return { op: "and", operands, ...traceTruth(kAnd(operands.map((o) => o.satisfied ?? null))) };
     }
     case "BranchConditionOr": {
       const operands = expr.operands.map((t) => walkBoolExpr(t, lib, ctx));
-      return { op: "or", operands, satisfied: operands.some((o) => o.satisfied) };
+      return { op: "or", operands, ...traceTruth(kOr(operands.map((o) => o.satisfied ?? null))) };
     }
     case "BranchConditionNot": {
       const operand = walkBoolExpr(expr.operand, lib, ctx);
-      return { op: "not", operand, satisfied: !operand.satisfied };
+      return { op: "not", operand, ...traceTruth(kNot(operand.satisfied ?? null)) };
     }
     case "BranchConditionRef":
       // #189 Slice 0c — a boolean-composition operand may be a CROSS-LIBRARY qualified ref (`"Sib"."Sib Flag"`).
@@ -1405,6 +1418,15 @@ function conceptSatisfied(
   // case `frame.currentLib === ctx.rootLib`; a cross-library sub carries its own lib so its bare refs bind there (#172).
   const id = idOf(getRefLibrary(ref) ?? frame.currentLib, getRefName(ref));
   const target = ctx.concepts.get(id)?.node;
+  if (!target) {
+    ctx.runtimeError = true;
+    const lib = getRefLibrary(ref) ?? frame.currentLib;
+    const name = getRefName(ref);
+    ctx.diagnostics.push(lib !== frame.currentLib && ctx.criterionTables?.get(lib)?.has(name)
+      ? `criterion-guard-unavailable: ${foreignCriterionMessage(labelOf(lib, name))}`
+      : `unsupported-reference: unresolved guard "${name}" in library "${lib}".`);
+    return { sat: null, facts: [] };
+  }
   if (target?.shapeReduction !== undefined && target.valueTypes[0] !== "boolean") {
     ctx.runtimeError = true;
     ctx.diagnostics.push(`publication-unsupported-context: guard "${getRefName(ref)}" requires a Boolean publication.`);
@@ -1441,7 +1463,7 @@ function evalBranchCondition(
       facts,
       trace: {
         op: "ref",
-        satisfied: sat === true,
+        ...(sat === null ? {} : { satisfied: sat }),
         concept: { name: getRefName(cond.ref), libraryName: lib },
         ...(composition ? { composition } : {}),
         ...(facts.length > 0 ? { facts } : {}),
@@ -1475,7 +1497,7 @@ function evalBranchCondition(
         facts,
         trace: {
           op: "criterion",
-          satisfied: sat === true,
+          ...(sat === null ? {} : { satisfied: sat }),
           criterion: { name, libraryName: lib },
           ...(first ? { body } : bodied ? { reference: true } : {}),
           ...(facts.length > 0 ? { facts } : {}),
@@ -1546,7 +1568,7 @@ function evalBranchCondition(
     return {
       sat: kNot(inner.sat),
       facts: inner.facts,
-      trace: { op: "not", satisfied: kNot(inner.sat) === true, operand: inner.trace },
+      trace: { op: "not", ...(inner.sat === null ? {} : { satisfied: kNot(inner.sat) as boolean }), operand: inner.trace },
     };
   }
   const op: "and" | "or" = cond.type === "BranchConditionAnd" ? "and" : "or";
@@ -1562,7 +1584,7 @@ function evalBranchCondition(
       }
     }
   }
-  return { sat, facts, trace: { op, satisfied: sat === true, operands: results.map((r) => r.trace) } };
+  return { sat, facts, trace: { op, ...(sat === null ? {} : { satisfied: sat }), operands: results.map((r) => r.trace) } };
 }
 
 
@@ -1607,6 +1629,10 @@ function evalGuard(
   // REFACTOR:suspect (#320): legacy non-publication guards still coerce unknown to false.
   // The emitter also retains this coercion; this CRE capability refusal does not fix
   // emitted menu behavior. Integrated menu pause remains CRL developer work under #320.
+  if (sat === null) {
+    ctx.discardedUnknown = true;
+    ctx.diagnostics.push("legacy-discarded-unknown: unanswered action guard; integrated menu pause is unsupported. A pause assertion cannot certify this execution.");
+  }
   const satTotal = sat === true;
   const excluded = guard.polarity === "unless" ? satTotal : !satTotal;
   return {
@@ -1614,7 +1640,7 @@ function evalGuard(
     info: {
       polarity: guard.polarity,
       concept: getRefName(guard.conceptName),
-      satisfied: satTotal,
+      ...(sat === null ? { unknown: true as const } : { satisfied: satTotal }),
       ...(composition ? { composition } : {}),
     },
   };
@@ -1889,6 +1915,11 @@ function walkBranches(
       if (ordered) return;
       continue;
     }
+    // REFACTOR:grounded (#320): retain unknown without changing decision traversal.
+    if (sat === null) {
+      node.unknown = true;
+      delete node.satisfied;
+    }
     into.push(node);
     if (sat === true) {
       executeBody(b.body, label, ctx, frame, node.children!, nodeId);
@@ -2003,6 +2034,7 @@ function runCase(
   // REFACTOR:grounded (#320): shared invocation clock and exact emitted-identity collision finding.
   now: Date,
   collisionDiagnostic?: string,
+  pauseValidationErrors: readonly string[] = [],
   publication?: { program?: PublicationProgram; resources?: readonly EmittedResource[]; error?: string; celLibrary: string },
 ): CaseRun {
   const diagnostics: string[] = [];
@@ -2015,8 +2047,15 @@ function runCase(
     else if (b.type === "CELFactRefField") factRefs.push(b);
     else if (b.type === "CELResultField") result = b; // Existing single-result evaluator contract.
   }
+  const parsedExpected: CaseRun["expected"] = c.body.filter((b) => b.type === "CELResultField").length === 1
+    ? result?.value.type === "CELPauseResult" ? { leaf: result.leafName, pause: true }
+      : result?.value.type === "CELBranchResult" ? { leaf: result.leafName, branch: result.value.branchName } : null
+    : null;
   const caseDates = resolveCaseFactDates(c, facts, now);
   const inputErrors = caseDates.diagnostics.map((d) => `${d.kind}: ${d.message}`);
+  if (c.body.some((b) => b.type === "CELResultField" && b.value.type === "CELPauseResult")) {
+    inputErrors.push(...pauseValidationErrors.filter((d) => !collisionDiagnostic || !d.endsWith(collisionDiagnostic)));
+  }
   if (publication?.error) inputErrors.push(publication.error);
   if (collisionDiagnostic) inputErrors.push(collisionDiagnostic);
   if (inputErrors.length > 0) {
@@ -2024,7 +2063,7 @@ function runCase(
       case: c.name,
       decision: null,
       status: "error",
-      expected: null,
+      expected: parsedExpected,
       produced: [],
       trace: [],
       diagnostics: inputErrors,
@@ -2306,7 +2345,7 @@ function runCase(
       case: c.name,
       decision: null,
       status: "error",
-      expected: null,
+      expected: parsedExpected,
       produced: [],
       trace: [],
       diagnostics: [...diagnostics, membershipError],
@@ -2314,7 +2353,7 @@ function runCase(
     };
   }
 
-  if (!result || result.value.type !== "CELBranchResult") {
+  if (!result || (result.value.type !== "CELBranchResult" && result.value.type !== "CELPauseResult")) {
     return {
       case: c.name,
       decision: null,
@@ -2322,12 +2361,14 @@ function runCase(
       expected: null,
       produced: [],
       trace: [],
-      diagnostics: [...diagnostics, "v1 CRE supports only a decision-branch `result is`"],
+      diagnostics: [...diagnostics, "CRE supports an activity or pause `result is` on a Decision"],
       conceptTruth: [],
     };
   }
   const decisionName = result.leafName;
-  const expectedBranch = result.value.branchName;
+  const expected: NonNullable<CaseRun["expected"]> = result.value.type === "CELPauseResult"
+    ? { leaf: decisionName, pause: true }
+    : { leaf: decisionName, branch: result.value.branchName };
   // #236 — no criterion-expansion-overflow disposition any more: a criterion guard is evaluated by
   // reference (memoized), never materialized, so a decision can never "exceed the envelope".
   const decision = decisions.get(decisionName);
@@ -2336,7 +2377,7 @@ function runCase(
       case: c.name,
       decision: decisionName,
       status: "error",
-      expected: { leaf: decisionName, branch: expectedBranch },
+      expected,
       produced: [],
       trace: [],
       diagnostics: [...diagnostics, `decision "${decisionName}" not found in the covered library`],
@@ -2345,6 +2386,7 @@ function runCase(
   }
 
   const ctx: Ctx = {
+    discardedUnknown: false,
     publicationProgram: publication?.program,
     publicationResources: publication?.resources ?? [],
     publicationFacts: new Map(factRefs.map((ref) => [celResourceId(publication?.celLibrary ?? "", c.name, ref.factName), ref.factName])),
@@ -2401,7 +2443,7 @@ function runCase(
       case: c.name,
       decision: decisionName,
       status: "error",
-      expected: { leaf: decisionName, branch: expectedBranch },
+      expected,
       produced: [],
       trace: ctx.trace,
       diagnostics: ctx.diagnostics,
@@ -2417,7 +2459,7 @@ function runCase(
       case: c.name,
       decision: decisionName,
       status: "error",
-      expected: { leaf: decisionName, branch: expectedBranch },
+      expected,
       produced: ctx.produced,
       trace: ctx.trace,
       diagnostics: ctx.diagnostics,
@@ -2426,23 +2468,43 @@ function runCase(
   }
 
   const producedNames = new Set(ctx.produced.map((p) => p.recommendation));
-  const status: CaseRun["status"] = producedNames.has(expectedBranch) ? "pass" : "fail";
+  // REFACTOR:grounded (#320): this asserts CRE's prediction. Native $apply remains authoritative.
+  const hasUnknown = (nodes: TraceNode[]): boolean => nodes.some((n) => n.unknown || hasUnknown(n.children ?? []));
+  const matches = expected.pause ? ctx.produced.length === 0 && hasUnknown(ctx.trace) && !ctx.discardedUnknown : producedNames.has(expected.branch);
+  const status: CaseRun["status"] = expected.pause && ctx.discardedUnknown ? "error" : matches ? "pass" : "fail";
+  if (expected.pause && !matches) {
+    const activitySites = (nodes: TraceNode[]): string[] => nodes.flatMap((n) => [
+      ...(n.kind === "action" && !n.children && !n.guardedOut && producedNames.has(n.node)
+        ? [`${n.node} at ${n.nodeId}`] : []),
+      ...activitySites(n.children ?? []),
+    ]);
+    diagnostics.push(ctx.discardedUnknown
+      ? "Expected pause cannot be established: a legacy action guard discarded unknown evidence."
+      : ctx.produced.length > 0
+      ? `Expected pause before any activity; CRE produced ${activitySites(ctx.trace).join(", ")}.`
+      : "Expected pause; CRE reached no unknown condition and produced no activity (an empty result is not a pause).");
+  }
   // #187 Todo 2: per-concept case truth. Computed AFTER the runtimeError check (produced/trace are complete + status
   // reads only ctx.produced) and via the isolated `truthOf`, so it cannot change any existing output.
   return {
     case: c.name,
     decision: decisionName,
     status,
-    expected: { leaf: decisionName, branch: expectedBranch },
+    expected,
     produced: ctx.produced,
     trace: ctx.trace,
     diagnostics: ctx.diagnostics,
+    ...(ctx.discardedUnknown ? { discardedUnknown: true as const } : {}),
     conceptTruth: collectConceptTruth(ctx),
   };
 }
 
 /** Run every case in a resolved CEL graph against its covered CRL decision(s). */
 export function runCel(graph: ResolvedCelGraph, opts?: { now?: Date }): CelRunResult {
+  return { schemaVersion: 1, ...runCelInternal(graph, opts) };
+}
+
+function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<CelRunResult, "schemaVersion"> {
   // REFACTOR:grounded (#320): one invocation clock, used only by explicit now anchors.
   const now = opts?.now ?? new Date();
   const errors: string[] = [];
@@ -2450,6 +2512,19 @@ export function runCel(graph: ResolvedCelGraph, opts?: { now?: Date }): CelRunRe
   if (!graph.coversTarget)
     return { success: false, runs: [], errors: ["`covers` target unresolved"] };
 
+  // REFACTOR:grounded (#320): validation errors anywhere in this CEL graph prevent pause success.
+  // This conservative authoring gate avoids interpreting discarded malformed input as missing evidence.
+  // Warnings remain usable test data; legacy activity assertions retain their existing behavior.
+  const hasPause = graph.cel.statements.some((s) => s.type === "CELCase" &&
+    s.body.some((b) => b.type === "CELResultField" && b.value.type === "CELPauseResult"));
+  let pauseValidationErrors: string[] = [];
+  if (hasPause) {
+    try {
+      pauseValidationErrors = validateCEL(graph, { now }).errors.map((d) => `pause-graph-validation: ${d.filePath ?? graph.filePath}:${d.location?.start.line ?? "?"}: ${d.kind}: ${d.message}`);
+    } catch (error) {
+      return { success: false, runs: [], errors: [`pause-input-validation-error: ${String(error)}`] };
+    }
+  }
   const coveredLib = graph.coversTarget.name;
   if (coveredLib === null) {
     return { success: false, runs: [], errors: ["covered library has no name"] };
@@ -2730,6 +2805,7 @@ export function runCel(graph: ResolvedCelGraph, opts?: { now?: Date }): CelRunRe
           terminologyMembersByName(name, makeLocalDomainContext(graph).base, graph.crlRegistry),
         now,
         collisionDiagnostic,
+        pauseValidationErrors,
         hasPublication ? { program: publicationProgram, resources: emittedPublicationCase?.resources, error: casePublicationError, celLibrary: graph.cel.library.name } : undefined,
       ),
     );

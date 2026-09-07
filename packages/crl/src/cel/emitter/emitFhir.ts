@@ -1396,7 +1396,9 @@ function emitCase(ctx: EmitContext): EmittedCase | undefined {
       ctx.diagnostics.push({
         kind: "result-deferred",
         severity: "warning",
-        message: `result is "${cb.leafName}" parsed; FHIR emit deferred (see #70/metric).`,
+        message: cb.value.type === "CELPauseResult"
+          ? `result is "${cb.leafName}" is pause is a test expectation; no FHIR data resource is emitted for it. Native $apply must be checked separately.`
+          : `result is "${cb.leafName}" is a test expectation; no FHIR data resource is emitted for it.`,
         caseSlug: ctx.caseSlug,
         filePath: ctx.graph.filePath,
         location: cb.location,

@@ -640,7 +640,7 @@ export function createServer(): McpServer {
         "Writes the instance tree under the nearest package.json project root by default. Pass `out` (an ABSOLUTE root) to replace that root, retaining `tests/data/fhir/`; returns a `written` manifest. Use a scratch root for inspection because omission still writes. " +
         "success is true iff there are zero error-severity diagnostics; `unsupported-yet`, `result-deferred`, and `precondition-failed` (when not error) are warnings, surfaced but non-fatal. " +
         "Diagnostic kinds: unsupported-yet (fact's `defined by` couldn't derive a bare FHIR type — case skipped), " +
-        "result-deferred (`result is` parsed but not emitted, deferred to #70/metric), " +
+        "result-deferred (`result is` is an expectation and emits no FHIR data resource), " +
         "precondition-failed (parse error / unresolved covers / etc. — case skipped).",
       inputSchema: {
         path: z
@@ -716,15 +716,19 @@ export function createServer(): McpServer {
         "(NOT the FHIR/CQL engine). Pass `path` (an absolute .cel file path); the resolver walks to the " +
         "nearest package.json to load the covered CRL closure. Supported local/source representations check explicit code membership; unsupported membership falls back to name-based presence and is not a code check. " +
         "a pure question reads its stated boolean answer, with omission unknown. Branch/criterion guards preserve unknown. " +
-        "CURRENT LIMITATION: `defined as` composition still converts unknown operands to false; its green result does not prove the model's required unknown propagation. " +
+        "Supported `defined as` Boolean/sem composition preserves unknown; true OR unknown and false AND unknown remain determinate. CRL record existence is total; CRE legacy value-reading existence is not certified for present-but-unanswered records (#320). " +
         "It walks the full decision shape (first:/all:/any:/otherwise + " +
-        "`unless`/`only when` guards) and a decision-leaf `result is` passes iff the expected branch is " +
+        "`unless`/`only when` guards). An unquoted `result is \"Decision\" is pause` asserts CRE's prediction of " +
+        "a reached unknown condition with no produced activity, after input validation; native $apply remains authoritative. " +
+        "Expected is {leaf,branch} or {leaf,pause:true}; a reached unknown trace node has unknown:true and no satisfied field. " +
+        "Compound branch traces preserve explicit true and false, omitting satisfied only for unknown. Validate CRL separately and check native answers. " +
+        "Pause attribution identifies reached decision conditions; their compound traces retain operand truth. An activity `result is` passes iff its branch is " +
         "in the produced recommendation set. A `use decision` target IS evaluated — bare same-library OR " +
         'qualified cross-library (`"Lib"."Sub"`) / self-qualified: the sub is recursed in place and its ' +
         "determinations bubble up into the produced set (the bare sub-NAME is not produced) — so the oracle " +
         "names the delegated disposition. A cross-library sub's bare criteria resolve in ITS library (qualify a " +
         'CEL fact `defined by "Lib"."C"` to satisfy one); an unresolved/cyclic target is non-producing. ' +
-        "Returns { success, caseCount, passCount, " +
+        "Raw run schemaVersion is 1 (separate from render_scenario schemaVersion 6). Returns { schemaVersion, success, caseCount, passCount, " +
         "failCount, errorCount, runs:[{case, decision, status, expected, produced, trace:[{node, nodeId, " +
         "source, satisfied, ...}], diagnostics, conceptTruth:[{lib, name, satisfied}]}], errors, importDiagnostics }. " +
         "#224: a `when` may guard on a compound `and`/`or`/`not` — such a node OMITS `concept` and carries " +
@@ -859,15 +863,16 @@ export function createServer(): McpServer {
         "tree — a single `ref` leaf, `and`/`or` nodes, a `not` node (op:\"not\", carries `operand`), or a #236 " +
         "`criterion` node (op:\"criterion\", carries `criterion:{name,libraryName}` + on its FIRST occurrence per " +
         "case a `body` sub-view, on a LATER occurrence `reference:true` and no body — an undefined/cyclic criterion " +
-        "carries neither), each with per-node satisfied + leaf facts/`defined as` explanation; schemaVersion 2 " +
-        "replaced the old `condition.concept`, v3 added `not`, v4 added `criterion`), " +
+        "carries neither), each with per-node satisfied + leaf facts/`defined as` explanation; v2 replaced condition.concept, v3 added not, v4 added criterion, v5 added composition explanations. SchemaVersion 6 " +
+        "adds expected:{decision,pause:true} and node.unknown:true (condition.satisfied omitted for unknown). Scenario discardedUnknown:true means a reached legacy guard discarded unknown evidence, so a supported pause cannot be established. Compound branch traces preserve explicit true and false, omitting satisfied only for unknown. Supported concept composition and its explanation tree also preserve unknown by omitting satisfied. Raw blockedUnknown means an ordered halt, while unknown includes unordered conditions), " +
         "`guard` provenance, `guardedOut`, `action` (recommend-activity vs use-decision, qualifier, " +
         'produced), `unreachedReason:"preempted"` for first:-short-circuited branches, and a `source` ' +
         "span (filePath + 0-based range) per node for navigation. Pass `path` (absolute .cel); `case` " +
         "renders only one case. Returns { schemaVersion, success, source, caseCount, passCount, failCount, " +
         "errorCount, scenarios:[{case, decision, status, expected, produced, tree, diagnostics, " +
         "conceptTruth:[{name, libraryName, satisfied}]}], errors }. `conceptTruth` is the case's per-concept " +
-        "answer over the whole closure (incl. OFF-path concepts); an ABSENT (libraryName,name) is UNKNOWN, never `false`.",
+        "answer over the whole closure (incl. OFF-path concepts); an ABSENT (libraryName,name) is UNKNOWN, never `false`. " +
+        "This is a CRE preview; verify emitted behavior independently with native $apply.",
       inputSchema: {
         path: z
           .string()
@@ -1883,6 +1888,7 @@ function runDecision(args: { path: string; case?: string }): {
   const result = runCel(graph);
   const runs = args.case ? result.runs.filter((r) => r.case === args.case) : result.runs;
   const summary = {
+    schemaVersion: result.schemaVersion,
     success: result.success && runs.every((r) => r.status !== "error"),
     caseCount: runs.length,
     passCount: runs.filter((r) => r.status === "pass").length,

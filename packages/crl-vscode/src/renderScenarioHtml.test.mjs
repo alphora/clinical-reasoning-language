@@ -144,6 +144,32 @@ if (process.platform === "win32") {
 
 const t3b = test;
 
+test("pause expectation and actual unknown render without a false-condition frontier", () => {
+  const node = vmWhen("when[0]", false, "Missing Answer");
+  node.unknown = true;
+  delete node.condition.satisfied;
+  node.condition.expr = { op: "ref", concept: { name: "Missing Answer" } };
+  const sv = scenario("pass", "unused", [node]);
+  sv.expected = { decision: "Coverage", pause: true };
+  const { html } = renderScenarioHtml(resultOf(sv));
+  assert.ok(html.includes("unknown — awaiting information (CRE)"));
+  assert.ok(html.includes("pause"));
+  assert.equal(failedCriterionMarks(sv).size, 0);
+});
+
+test("an activity expectation explains its pending condition instead of labelling it false", () => {
+  const node = vmWhen("when[0]", false, "Missing Answer", [vmAct("when[0]/action[0]", "Approve")]);
+  node.unknown = true;
+  delete node.condition.satisfied;
+  node.condition.expr = { op: "ref", concept: { name: "Missing Answer" } };
+  node.children[0].evaluated = false;
+  node.children[0].action.produced = false;
+  const sv = scenario("fail", "Approve", [node]);
+  const marks = failedCriterionMarks(sv);
+  assert.equal(marks.get("when[0]").reason, "unknown-when");
+  assert.ok(renderScenarioHtml(resultOf(sv)).html.includes("awaiting information: Missing Answer"));
+});
+
 // VM node builders carrying the run-state fields the T2 selectors read.
 const vmWhen = (nodeId, satisfied, name, children = []) => ({
   nodeId, kind: "when", label: `when ${name}`, source: { filePath: "p.crl", range: { startLine: 0, startCol: 0, endLine: 0, endCol: 1 } },
@@ -298,4 +324,19 @@ t3b("render: All-mode marks survive on a PASS case's untaken-branch unsatisfied 
   assert.ok(marks.get("when[0]") && marks.get("when[0]").inAll && !marks.get("when[0]").inBlocking,
     "untaken false when is in All but not Blocking on a pass");
   assert.ok(renderScenarioHtml(resultOf(sv)).html.includes('data-fc-all="1"'), "stamped for All mode");
+});
+
+t3b("pending input has an amber channel and a distinct CRE actual result", () => {
+  const pending = vmWhen("when[0]", false, "Input", [vmAct("when[0]/action[0]", "Approve")]);
+  pending.unknown = true;
+  delete pending.condition.satisfied;
+  pending.condition.expr = { op: "ref", concept: { name: "Input" } };
+  const sv = scenario("fail", "Approve", [pending]);
+  sv.produced = [];
+  const html = renderScenarioHtml(resultOf(sv)).html;
+  const node = html.match(/<li class="node[^>]*data-fc-pending[^>]*>/)[0];
+  assert.ok(!node.includes('data-fc-blocking'));
+  assert.match(html, /fc-tip-pending/);
+  assert.match(html, /paused \(CRE prediction; unknown at when Input\)/);
+  assert.ok(!html.includes('blocked: awaiting information'));
 });

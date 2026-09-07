@@ -39,6 +39,7 @@ import {
   ResultFieldContext,
   TrueResultContext,
   FalseResultContext,
+  PauseResultContext,
   BranchResultContext,
   CrossResourceFieldContext,
   CrossResourceRelationContext,
@@ -507,6 +508,11 @@ export class CELAstBuilder
   visitFalseResult = (ctx: FalseResultContext): CELResultValue => ({
     type: "CELBooleanResult",
     value: false,
+    location: getLocation(ctx),
+  });
+
+  visitPauseResult = (ctx: PauseResultContext): CELResultValue => ({
+    type: "CELPauseResult",
     location: getLocation(ctx),
   });
 
