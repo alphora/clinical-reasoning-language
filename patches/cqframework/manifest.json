@@ -1,0 +1,42 @@
+{
+  "main": {
+    "upstream": "https://github.com/cqframework/clinical-reasoning",
+    "base": "5be61c98779e7fc06a9d1c4cfafbad81e21a120c",
+    "commits": [
+      "44d54d657bd607a6fe0db3d4b31b69d9aef1fd1f",
+      "234b879120d97e871bb518b5b7e2ccd9e9bdd884"
+    ],
+    "resultTree": "a8a8be4c4bc3695b876df4d51b8a8e2ad6e5b885",
+    "verifiedApplyTree": "a8a8be4c4bc3695b876df4d51b8a8e2ad6e5b885",
+    "patches": [
+      {
+        "path": "main/0001-fix-preserve-Coding-answers-in-profile-constrained-r.patch",
+        "sha256": "f44b9f8b1c110496767aa4e0f7cd64ba9c9d3cc906737ef3367c4c50e97bb956"
+      },
+      {
+        "path": "main/0002-fix-normalize-generated-questionnaire-and-extraction.patch",
+        "sha256": "8217416c4798dda284aebe23d6766f09b8212f622cef201ef0a2cbccbd4561b3"
+      }
+    ]
+  },
+  "4.7": {
+    "upstream": "https://github.com/cqframework/clinical-reasoning",
+    "base": "1335b9443777725220c3520342e1664dda409584",
+    "commits": [
+      "ffa009d78e7f934f199bf28656551da0b6240e58",
+      "bd2b1c19cb5b9d93db3c8f58bb827a85d752ac73"
+    ],
+    "resultTree": "3749585e5f9d8a46de713ad58b953a78dd65e993",
+    "verifiedApplyTree": "3749585e5f9d8a46de713ad58b953a78dd65e993",
+    "patches": [
+      {
+        "path": "4.7/0001-fix-preserve-Coding-answers-in-profile-constrained-r.patch",
+        "sha256": "7869679127375f241aa9c1c5327190c2fb19fd8ebafdc803b667a03e38591f5c"
+      },
+      {
+        "path": "4.7/0002-fix-normalize-generated-questionnaire-and-extraction.patch",
+        "sha256": "382d107175fbdc1b853945abd97a7acefd5f5005f4400c1a434161c030f1b819"
+      }
+    ]
+  }
+}

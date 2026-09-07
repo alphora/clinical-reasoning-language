@@ -1,0 +1,422 @@
+From bd2b1c19cb5b9d93db3c8f58bb827a85d752ac73 Mon Sep 17 00:00:00 2001
+From: rob-reynolds <rob@alphora.com>
+Date: Mon, 7 Sep 2026 01:10:35 -0400
+Subject: [PATCH 2/2] fix: normalize generated questionnaire and extraction IDs
+
+Normalize complete generated composites to legal logical IDs of at most 64 characters, retaining legal IDs and deterministic full-input digests. Use the logical Questionnaire ID for generated responses. References read final resource identities; supplied IDs, subject references and linkIds remain unchanged. Transaction URLs and existing id-less outcome behavior remain separate limitations.
+---
+ .../cqf/fhir/cr/common/IOperationRequest.java |   5 +-
+ .../populate/PopulateRequest.java             |   4 +-
+ .../extract/ExtractProcessor.java             |   4 +-
+ .../extract/ProcessDefinitionItem.java        |   3 +-
+ .../extract/r4/ObservationResolver.java       |   3 +-
+ .../extract/r5/ObservationResolver.java       |   3 +-
+ .../extract/GeneratedResourceIdsTest.java     | 169 ++++++++++++++++++
+ .../cqf/fhir/utility/GeneratedIds.java        |  40 +++++
+ .../cqf/fhir/utility/GeneratedIdsTest.java    |  43 +++++
+ 9 files changed, 267 insertions(+), 7 deletions(-)
+ create mode 100644 cqf-fhir-cr/src/test/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/GeneratedResourceIdsTest.java
+ create mode 100644 cqf-fhir-utility/src/main/java/org/opencds/cqf/fhir/utility/GeneratedIds.java
+ create mode 100644 cqf-fhir-utility/src/test/java/org/opencds/cqf/fhir/utility/GeneratedIdsTest.java
+
+diff --git a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/common/IOperationRequest.java b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/common/IOperationRequest.java
+index 8128168..2c89d83 100644
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/common/IOperationRequest.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/common/IOperationRequest.java
+@@ -19,6 +19,7 @@ import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
+ import org.hl7.fhir.instance.model.api.IBaseResource;
+ import org.hl7.fhir.instance.model.api.IPrimitiveType;
+ import org.opencds.cqf.cql.engine.model.ModelResolver;
++import org.opencds.cqf.fhir.utility.GeneratedIds;
+ import org.opencds.cqf.fhir.utility.adapter.IAdapterFactory;
+ 
+ /**
+@@ -59,9 +60,9 @@ public interface IOperationRequest {
+         var issues = resolvePathList(getOperationOutcome(), "issue");
+         if (issues != null && !issues.isEmpty()) {
+             getOperationOutcome()
+-                    .setId("%s-outcome-%s"
++                    .setId(GeneratedIds.fromComposite("%s-outcome-%s"
+                             .formatted(
+-                                    getOperationName(), resource.getIdElement().getIdPart()));
++                                    getOperationName(), resource.getIdElement().getIdPart())));
+             getModelResolver().setValue(resource, "contained", Collections.singletonList(getOperationOutcome()));
+             getModelResolver()
+                     .setValue(
+diff --git a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaire/populate/PopulateRequest.java b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaire/populate/PopulateRequest.java
+index 24a3466..a916a45 100644
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaire/populate/PopulateRequest.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaire/populate/PopulateRequest.java
+@@ -24,6 +24,7 @@ import org.opencds.cqf.fhir.cql.LibraryEngine;
+ import org.opencds.cqf.fhir.cr.common.IInputParameterResolver;
+ import org.opencds.cqf.fhir.cr.common.IQuestionnaireRequest;
+ import org.opencds.cqf.fhir.utility.Constants;
++import org.opencds.cqf.fhir.utility.GeneratedIds;
+ import org.opencds.cqf.fhir.utility.Resources;
+ import org.opencds.cqf.fhir.utility.adapter.IParametersParameterComponentAdapter;
+ import org.opencds.cqf.fhir.utility.adapter.IQuestionnaireAdapter;
+@@ -188,7 +189,8 @@ public class PopulateRequest implements IQuestionnaireRequest {
+                 .createQuestionnaireResponse(getFhirContext()
+                         .getResourceDefinition("QuestionnaireResponse")
+                         .newInstance())
+-                .setId("%s-%s".formatted(questionnaireAdapter.getId().getIdPart(), subjectId.getIdPart()))
++                .setId(GeneratedIds.fromComposite(
++                        "%s-%s".formatted(questionnaireAdapter.getId().getIdPart(), subjectId.getIdPart())))
+                 .setQuestionnaire(questionnaireAdapter.getCanonical())
+                 .setSubject(subjectId)
+                 .setAuthored(new Date())
+diff --git a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/ExtractProcessor.java b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/ExtractProcessor.java
+index 81f69bf..3783516 100644
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/ExtractProcessor.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/ExtractProcessor.java
+@@ -10,6 +10,7 @@ import org.hl7.fhir.instance.model.api.IBaseReference;
+ import org.hl7.fhir.instance.model.api.IBaseResource;
+ import org.opencds.cqf.fhir.utility.BundleHelper;
+ import org.opencds.cqf.fhir.utility.Constants;
++import org.opencds.cqf.fhir.utility.GeneratedIds;
+ import org.opencds.cqf.fhir.utility.adapter.IQuestionnaireResponseItemComponentAdapter;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+@@ -57,7 +58,8 @@ public class ExtractProcessor implements IExtractProcessor {
+     }
+ 
+     protected IBaseBundle createBundle(ExtractRequest request, List<IBaseResource> resources) {
+-        var bundle = BundleHelper.newBundle(request.getFhirVersion(), request.getExtractId(), "transaction");
++        var bundle = BundleHelper.newBundle(
++                request.getFhirVersion(), GeneratedIds.fromComposite(request.getExtractId()), "transaction");
+         resources.forEach(r -> {
+             var entry = BundleHelper.newEntryWithResource(r);
+             BundleHelper.setEntryRequest(
+diff --git a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/ProcessDefinitionItem.java b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/ProcessDefinitionItem.java
+index 76bb64a..438ce9d 100644
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/ProcessDefinitionItem.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/ProcessDefinitionItem.java
+@@ -34,6 +34,7 @@ import org.opencds.cqf.fhir.cr.common.ICqlOperationRequest;
+ import org.opencds.cqf.fhir.utility.Constants;
+ import org.opencds.cqf.fhir.utility.CqfExpression;
+ import org.opencds.cqf.fhir.utility.FhirPathCache;
++import org.opencds.cqf.fhir.utility.GeneratedIds;
+ import org.opencds.cqf.fhir.utility.Ids;
+ import org.opencds.cqf.fhir.utility.adapter.IElementDefinitionAdapter;
+ import org.opencds.cqf.fhir.utility.adapter.IItemComponentAdapter;
+@@ -174,7 +175,7 @@ public class ProcessDefinitionItem {
+                 id = id.concat("-%s".formatted(linkId));
+             }
+             // casting here to identify the signature
+-            resource.setId((IIdType) Ids.newId(request.getFhirVersion(), id));
++            resource.setId((IIdType) Ids.newId(request.getFhirVersion(), GeneratedIds.fromComposite(id)));
+             resolveMeta(resource, profile);
+         }
+         getValueExtensions(request, item)
+diff --git a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/r4/ObservationResolver.java b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/r4/ObservationResolver.java
+index b7dc281..37bcabf 100644
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/r4/ObservationResolver.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/r4/ObservationResolver.java
+@@ -24,6 +24,7 @@ import org.hl7.fhir.r4.model.Reference;
+ import org.hl7.fhir.r4.model.StringType;
+ import org.opencds.cqf.fhir.cr.questionnaireresponse.extract.ExtractRequest;
+ import org.opencds.cqf.fhir.utility.Constants;
++import org.opencds.cqf.fhir.utility.GeneratedIds;
+ import org.opencds.cqf.fhir.utility.adapter.IQuestionnaireItemComponentAdapter;
+ import org.opencds.cqf.fhir.utility.adapter.IQuestionnaireResponseItemAnswerComponentAdapter;
+ 
+@@ -40,7 +41,7 @@ public class ObservationResolver {
+         var answer = (QuestionnaireResponseItemAnswerComponent) answerAdapter.get();
+         var item = (QuestionnaireItemComponent) (itemAdapter == null ? null : itemAdapter.get());
+         var obs = new Observation();
+-        obs.setId(request.getExtractId() + "." + linkId);
++        obs.setId(GeneratedIds.fromComposite(request.getExtractId() + "." + linkId));
+         obs.setBasedOn(questionnaireResponse.getBasedOn());
+         obs.setPartOf(questionnaireResponse.getPartOf());
+         obs.setStatus(Observation.ObservationStatus.FINAL);
+diff --git a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/r5/ObservationResolver.java b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/r5/ObservationResolver.java
+index a751de6..c957d86 100644
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/r5/ObservationResolver.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/r5/ObservationResolver.java
+@@ -25,6 +25,7 @@ import org.hl7.fhir.r5.model.Reference;
+ import org.hl7.fhir.r5.model.StringType;
+ import org.opencds.cqf.fhir.cr.questionnaireresponse.extract.ExtractRequest;
+ import org.opencds.cqf.fhir.utility.Constants;
++import org.opencds.cqf.fhir.utility.GeneratedIds;
+ import org.opencds.cqf.fhir.utility.adapter.IQuestionnaireItemComponentAdapter;
+ import org.opencds.cqf.fhir.utility.adapter.IQuestionnaireResponseItemAnswerComponentAdapter;
+ 
+@@ -41,7 +42,7 @@ public class ObservationResolver {
+         var answer = (QuestionnaireResponseItemAnswerComponent) answerAdapter.get();
+         var item = (QuestionnaireItemComponent) (itemAdapter == null ? null : itemAdapter.get());
+         var obs = new Observation();
+-        obs.setId(request.getExtractId() + "." + linkId);
++        obs.setId(GeneratedIds.fromComposite(request.getExtractId() + "." + linkId));
+         obs.setBasedOn(questionnaireResponse.getBasedOn());
+         obs.setPartOf(questionnaireResponse.getPartOf());
+         obs.setStatus(ObservationStatus.FINAL);
+diff --git a/cqf-fhir-cr/src/test/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/GeneratedResourceIdsTest.java b/cqf-fhir-cr/src/test/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/GeneratedResourceIdsTest.java
+new file mode 100644
+index 0000000..9fe2c5d
+--- /dev/null
++++ b/cqf-fhir-cr/src/test/java/org/opencds/cqf/fhir/cr/questionnaireresponse/extract/GeneratedResourceIdsTest.java
+@@ -0,0 +1,169 @@
++package org.opencds.cqf.fhir.cr.questionnaireresponse.extract;
++
++import static org.junit.jupiter.api.Assertions.*;
++import static org.opencds.cqf.fhir.cr.helpers.RequestHelpers.newExtractRequestForVersion;
++import static org.opencds.cqf.fhir.cr.helpers.RequestHelpers.newPopulateRequestForVersion;
++
++import ca.uhn.fhir.context.FhirContext;
++import ca.uhn.fhir.context.FhirVersionEnum;
++import java.util.List;
++import java.util.Map;
++import java.util.Optional;
++import org.hl7.fhir.instance.model.api.IBaseCoding;
++import org.hl7.fhir.instance.model.api.IBaseReference;
++import org.hl7.fhir.instance.model.api.IBaseResource;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.EnumSource;
++import org.opencds.cqf.fhir.cql.EvaluationSettings;
++import org.opencds.cqf.fhir.cql.LibraryEngine;
++import org.opencds.cqf.fhir.utility.GeneratedIds;
++import org.opencds.cqf.fhir.utility.adapter.IAdapterFactory;
++import org.opencds.cqf.fhir.utility.repository.InMemoryFhirRepository;
++
++class GeneratedResourceIdsTest {
++    @ParameterizedTest
++    @EnumSource(
++            value = FhirVersionEnum.class,
++            names = {"DSTU3", "R4", "R5"})
++    void qualifiedVersionedQuestionnaireDoesNotQualifyGeneratedResponse(FhirVersionEnum version) {
++        var context = FhirContext.forCached(version);
++        var engine = new LibraryEngine(new InMemoryFhirRepository(context), EvaluationSettings.getDefault());
++        var questionnaire = context.getResourceDefinition("Questionnaire")
++                .newInstance()
++                .setId("http://example.org/fhir/Questionnaire/q/_history/2");
++        var oldComposite = context.getResourceDefinition("QuestionnaireResponse")
++                .newInstance()
++                .setId(questionnaire.getIdElement().getValue() + "-patientId")
++                .getIdElement();
++        assertEquals("q", oldComposite.getIdPart());
++        assertEquals("Questionnaire", oldComposite.getResourceType());
++        assertEquals("2-patientId", oldComposite.getVersionIdPart());
++        var response = newPopulateRequestForVersion(version, engine, questionnaire)
++                .getQuestionnaireResponseAdapter()
++                .get();
++        assertEquals("q-patientId", response.getIdElement().getValue());
++        assertEquals("q-patientId", response.getIdElement().getIdPart());
++        assertNull(response.getIdElement().getResourceType());
++        assertNull(response.getIdElement().getVersionIdPart());
++        assertEquals(
++                "http://example.org/fhir/Questionnaire/q/_history/2",
++                questionnaire.getIdElement().getValue());
++    }
++
++    @ParameterizedTest
++    @EnumSource(
++            value = FhirVersionEnum.class,
++            names = {"DSTU3", "R4", "R5"})
++    void populatedResponseUsesLogicalQuestionnaireId(FhirVersionEnum version) {
++        var context = FhirContext.forCached(version);
++        var engine = new LibraryEngine(new InMemoryFhirRepository(context), EvaluationSettings.getDefault());
++        for (var id : List.of("q", "Q".repeat(64))) {
++            var questionnaire =
++                    context.getResourceDefinition("Questionnaire").newInstance().setId("Questionnaire/" + id);
++            var request = newPopulateRequestForVersion(version, engine, questionnaire);
++            var actual = request.getQuestionnaireResponseAdapter()
++                    .get()
++                    .getIdElement()
++                    .getIdPart();
++            assertEquals(GeneratedIds.fromComposite(id + "-patientId"), actual);
++            if (id.equals("q")) {
++                assertEquals("q-patientId", actual);
++            }
++            assertEquals(id, questionnaire.getIdElement().getIdPart());
++        }
++    }
++
++    @ParameterizedTest
++    @EnumSource(
++            value = FhirVersionEnum.class,
++            names = {"DSTU3", "R4", "R5"})
++    void definitionResourceAndContainedOutcomeUseFinalIds(FhirVersionEnum version) {
++        var context = FhirContext.forCached(version);
++        var factory = IAdapterFactory.forFhirVersion(version);
++        var parser = context.newJsonParser();
++        var id = "q".repeat(64);
++        var qr = parser.parseResource("""
++            {"resourceType":"QuestionnaireResponse","id":"%s","status":"completed",
++             "subject":{"reference":"Patient/patientId"}}
++            """.formatted(id));
++        var engine = new LibraryEngine(new InMemoryFhirRepository(context), EvaluationSettings.getDefault());
++        var request = newExtractRequestForVersion(version, engine, qr, null);
++        var resource = context.getResourceDefinition("Observation").newInstance();
++        new ProcessDefinitionItem()
++                .processResource(request, resource, Optional.empty(), true, new ItemPair(null, null));
++        assertEquals(
++                GeneratedIds.fromComposite("extract-" + id),
++                resource.getIdElement().getIdPart());
++        assertEquals(id, qr.getIdElement().getIdPart());
++        assertEquals("extract-" + id, request.getExtractId());
++        var bundle = new ExtractProcessor().createBundle(request, List.of(resource));
++        assertEquals(
++                GeneratedIds.fromComposite("extract-" + id),
++                bundle.getIdElement().getIdPart());
++        request.logException("Intentional diagnostic for generated-ID reference regression");
++        request.resolveOperationOutcome(qr);
++        var outcome = request.getOperationOutcome();
++        var outcomeId = outcome.getIdElement().getIdPart();
++        assertEquals(GeneratedIds.fromComposite("extract-outcome-" + id), outcomeId);
++        var serialized = parser.parseResource(parser.encodeResourceToString(qr));
++        var references = context.newFhirPath().evaluate(serialized, "extension.value", IBaseReference.class);
++        assertEquals(1, references.size());
++        assertEquals("#" + outcomeId, references.get(0).getReferenceElement().getValue());
++        var contained = context.newFhirPath().evaluate(serialized, "contained", IBaseResource.class);
++        assertEquals(1, contained.size());
++        assertEquals(outcomeId, contained.get(0).getIdElement().getIdPart());
++    }
++
++    @ParameterizedTest
++    @EnumSource(
++            value = FhirVersionEnum.class,
++            names = {"R4", "R5"})
++    void observationIdsPreserveCallerIdentityAndProvenance(FhirVersionEnum version) {
++        var context = FhirContext.forCached(version);
++        var parser = context.newJsonParser();
++        var id = "Caller.QR-" + "A".repeat(54);
++        var link = "Link / æ¼¢å­— " + "z".repeat(90);
++        var qr = parser.parseResource("""
++            {"resourceType":"QuestionnaireResponse","id":"%s","questionnaire":"http://example.org/Q|V1",
++             "status":"completed","subject":{"reference":"Patient/patientId"},"authored":"2026-01-04T00:00:00Z",
++             "item":[{"linkId":"%s","answer":[{"valueBoolean":false}]}]}
++            """.formatted(id, link));
++        var engine = new LibraryEngine(new InMemoryFhirRepository(context), EvaluationSettings.getDefault());
++        var request = newExtractRequestForVersion(version, engine, qr, null);
++        var answer = request.getQuestionnaireResponseAdapter()
++                .getItem()
++                .get(0)
++                .getAnswer()
++                .get(0);
++        var subject = context.newFhirPath()
++                .evaluate(qr, "subject", IBaseReference.class)
++                .get(0);
++        IBaseCoding coding = version == FhirVersionEnum.R4
++                ? new org.hl7.fhir.r4.model.Coding("http://example.org/code", "answer", null)
++                : new org.hl7.fhir.r5.model.Coding("http://example.org/code", "answer", null);
++        var codes = Map.of(link, List.of(coding));
++        var before = parser.encodeResourceToString(qr);
++        var observation = version == FhirVersionEnum.R4
++                ? new org.opencds.cqf.fhir.cr.questionnaireresponse.extract.r4.ObservationResolver()
++                        .resolve(request, answer, null, link, subject, codes, null)
++                : new org.opencds.cqf.fhir.cr.questionnaireresponse.extract.r5.ObservationResolver()
++                        .resolve(request, answer, null, link, subject, codes, null);
++        assertEquals(before, parser.encodeResourceToString(qr));
++        assertEquals(
++                GeneratedIds.fromComposite("extract-" + id + "." + link),
++                observation.getIdElement().getIdPart());
++        var serialized = parser.parseResource(parser.encodeResourceToString(observation));
++        var derived = context.newFhirPath().evaluate(serialized, "derivedFrom", IBaseReference.class);
++        assertEquals(
++                "QuestionnaireResponse/" + id,
++                derived.get(0).getReferenceElement().getValue());
++        assertEquals(
++                "Patient/patientId",
++                context.newFhirPath()
++                        .evaluate(serialized, "subject", IBaseReference.class)
++                        .get(0)
++                        .getReferenceElement()
++                        .getValue());
++        assertTrue(parser.encodeResourceToString(observation).contains(link));
++    }
++}
+diff --git a/cqf-fhir-utility/src/main/java/org/opencds/cqf/fhir/utility/GeneratedIds.java b/cqf-fhir-utility/src/main/java/org/opencds/cqf/fhir/utility/GeneratedIds.java
+new file mode 100644
+index 0000000..99be08d
+--- /dev/null
++++ b/cqf-fhir-utility/src/main/java/org/opencds/cqf/fhir/utility/GeneratedIds.java
+@@ -0,0 +1,40 @@
++package org.opencds.cqf.fhir.utility;
++
++import java.nio.charset.StandardCharsets;
++import java.security.MessageDigest;
++import java.security.NoSuchAlgorithmException;
++import java.util.Objects;
++import java.util.regex.Pattern;
++
++/** Deterministic logical IDs for newly generated resources; never normalize supplied IDs or references. */
++public final class GeneratedIds {
++    private static final Pattern VALID_ID = Pattern.compile("[A-Za-z0-9.-]{1,64}");
++    private static final Pattern INVALID_CHARACTER = Pattern.compile("[^A-Za-z0-9.-]");
++    private static final String HEX = "0123456789abcdef";
++
++    private GeneratedIds() {}
++
++    /** Preserve legal IDs; otherwise retain a readable stem and a digest of the complete UTF-8 input. */
++    public static String fromComposite(String original) {
++        Objects.requireNonNull(original, "original");
++        if (VALID_ID.matcher(original).matches()) {
++            return original;
++        }
++        final byte[] digest;
++        try {
++            digest = MessageDigest.getInstance("SHA-256").digest(original.getBytes(StandardCharsets.UTF_8));
++        } catch (NoSuchAlgorithmException impossible) {
++            throw new IllegalStateException("SHA-256 unavailable", impossible);
++        }
++        var hash = new StringBuilder(12);
++        for (int i = 0; i < 6; i++) {
++            hash.append(HEX.charAt((digest[i] >>> 4) & 0xf));
++            hash.append(HEX.charAt(digest[i] & 0xf));
++        }
++        var stem = INVALID_CHARACTER.matcher(original).replaceAll("");
++        if (stem.length() > 51) {
++            stem = stem.substring(0, 51);
++        }
++        return stem.isEmpty() ? hash.toString() : stem + "-" + hash;
++    }
++}
+diff --git a/cqf-fhir-utility/src/test/java/org/opencds/cqf/fhir/utility/GeneratedIdsTest.java b/cqf-fhir-utility/src/test/java/org/opencds/cqf/fhir/utility/GeneratedIdsTest.java
+new file mode 100644
+index 0000000..6b63c1c
+--- /dev/null
++++ b/cqf-fhir-utility/src/test/java/org/opencds/cqf/fhir/utility/GeneratedIdsTest.java
+@@ -0,0 +1,43 @@
++package org.opencds.cqf.fhir.utility;
++
++import static org.junit.jupiter.api.Assertions.*;
++
++import org.junit.jupiter.api.Test;
++
++class GeneratedIdsTest {
++    @Test
++    void preservesLegalLogicalIdsAndNormalizesCompleteComposites() {
++        var originals = new String[] {
++            "A",
++            "A".repeat(64),
++            "A".repeat(65),
++            "a".repeat(90) + "A",
++            "a".repeat(90) + "B",
++            "A B",
++            "A/B",
++            "AB",
++            "cafÃ©/æ¼¢å­—",
++            "æ¼¢å­—",
++            "",
++            "A.b-C.D",
++            "ðŸ˜ƒ",
++            ".-"
++        };
++        for (var original : originals) {
++            var result = GeneratedIds.fromComposite(original);
++            assertTrue(result.matches("[A-Za-z0-9.-]{1,64}"));
++            assertEquals(result, GeneratedIds.fromComposite(original));
++            if (original.matches("[A-Za-z0-9.-]{1,64}")) {
++                assertEquals(original, result);
++            }
++        }
++        assertEquals("e3b0c44298fc", GeneratedIds.fromComposite(""));
++        assertNotEquals(
++                GeneratedIds.fromComposite("a".repeat(90) + "A"), GeneratedIds.fromComposite("a".repeat(90) + "B"));
++        assertNotEquals(GeneratedIds.fromComposite("A B"), GeneratedIds.fromComposite("A/B"));
++        assertNotEquals(GeneratedIds.fromComposite("AB"), GeneratedIds.fromComposite("A/B"));
++        assertTrue(GeneratedIds.fromComposite("a".repeat(50) + "-" + "z".repeat(30))
++                .startsWith("a".repeat(50) + "--"));
++        assertThrows(NullPointerException.class, () -> GeneratedIds.fromComposite(null));
++    }
++}
