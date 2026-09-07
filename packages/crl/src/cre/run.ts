@@ -61,6 +61,7 @@
  *    target already on the delegation path → a runtime-error status + a cycle
  *    diagnostic, no hang) so cross-library `A.Sub`/`B.Sub` can't false-collide.
  */
+import { ageClock, produceAgeCandidate, eligibleAgeCandidates, hasAgeSource } from "../emit/publicationAge";
 import { validateCEL } from "../cel/validator/validator";
 import { childId, idOf, nameOf } from "../ast/decisionSpine";
 import type {
@@ -390,6 +391,7 @@ export interface OwnCandidate {
 }
 
 interface Ctx {
+  publicationNow: Date;
   publicationProgram?: PublicationProgram;
   publicationResources: readonly EmittedResource[];
   publicationFacts: ReadonlyMap<string, string>;
@@ -954,9 +956,12 @@ function evaluatePublication(entry: ConceptEntry, ctx: Ctx): ConceptEval {
     const resource = emitted.body;
     if (!matchesPublicationSource(source, resource)) continue;
     // Match the CEL/pinned repository compartment before projection, including unresolved subjects.
-    if (!matchesCelPublicationPatient(resource, ctx.publicationSubjectReference)) continue;
-    const adapted = adaptServiceRequestPublicationCandidate(descriptor, source, resource, ctx.publicationSubjectReference);
+    if (source.kind === "ageToday" ? `Patient/${resource.id}` !== ctx.publicationSubjectReference : !matchesCelPublicationPatient(resource, ctx.publicationSubjectReference)) continue;
+    const adapted = source.kind === "ageToday"
+      ? produceAgeCandidate(descriptor, source, resource, ctx.publicationSubjectReference, ageClock(ctx.publicationNow))
+      : adaptServiceRequestPublicationCandidate(descriptor, source, resource, ctx.publicationSubjectReference);
     if (adapted.kind === "error") return fail(adapted.code, adapted.message);
+    if (adapted.kind === "missing") continue;
     candidates.push(adapted.candidate);
     const fact = ctx.publicationFacts.get(String(resource.id));
     factsByCandidate.set(adapted.candidate.key, fact === undefined ? [] : [fact]);
@@ -976,7 +981,9 @@ function evaluatePublication(entry: ConceptEntry, ctx: Ctx): ConceptEval {
       factsByCandidate.set(produced.candidate.key, ctx.factsByConcept.get(operandId) ?? []);
     }
   }
-  const selected = selectPublicationCandidate(candidates, { conceptId: descriptor.conceptId, equalTime: descriptor.selector.equalTime });
+  const eligible = hasAgeSource(descriptor) ? eligibleAgeCandidates(descriptor, candidates, ageClock(ctx.publicationNow)) : { kind: "eligible" as const, candidates };
+  if (eligible.kind === "error") return fail(eligible.code, eligible.message);
+  const selected = selectPublicationCandidate(eligible.candidates, { conceptId: descriptor.conceptId, equalTime: descriptor.selector.equalTime });
   if (selected.state === "failed") {
     return fail(selected.diagnostic.code, JSON.stringify(selected.diagnostic));
   }
@@ -2389,6 +2396,7 @@ function runCase(
     discardedUnknown: false,
     publicationProgram: publication?.program,
     publicationResources: publication?.resources ?? [],
+    publicationNow: now,
     publicationFacts: new Map(factRefs.map((ref) => [celResourceId(publication?.celLibrary ?? "", c.name, ref.factName), ref.factName])),
     publicationSubjectReference: subjectFact === undefined ? "" : `Patient/${celResourceId(publication?.celLibrary ?? "", c.name, subjectFact)}`,
     directFacts,

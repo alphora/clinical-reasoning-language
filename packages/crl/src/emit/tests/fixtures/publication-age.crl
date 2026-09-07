@@ -1,0 +1,23 @@
+// REFACTOR:grounded (#320, plan583): synthetic age eligibility, not a Bleph policy criterion.
+library "Age Publication".
+
+concept "Adult":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `adult`.
+- shape reduction is most recent.
+- source representation:
+  - type is Patient.
+  - value projection is age today at least 18 years.
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `APPROVED`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `DENIED`.
+decision "D":
+first:
+- when "Adult" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".

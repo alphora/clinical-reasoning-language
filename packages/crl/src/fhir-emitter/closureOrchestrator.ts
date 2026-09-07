@@ -65,6 +65,7 @@ import {
   type CollectedCodeIsConcept,
 } from "./caseFeatureCollection";
 import { caseFeatureCanonicalUrl, emitCaseFeatureStructureDefinition } from "./structureDefinition";
+import { hasAgeSource } from "../emit/publicationAge";
 import { resolveCaseFeatureRecord, type CaseFeatureRecordResolution, resolveFeatureExpressionTarget } from "./caseFeatureRecord";
 import { emitLocalCodeSystem, emitReferenceStubCodeSystem } from "./codeSystem";
 import { emitInlineAnswerResources, inlineAnswerSet } from "./inlineAnswerSet";
@@ -2188,7 +2189,7 @@ export function emitFhirDefClosure(
       descriptor.title, descriptor.localCode.code, metadata, resolvedOpts, descriptor.resourceType,
       { librarySuffix: entry.libraryName, define: target.define, resultKind: "record" },
       { valueElement: descriptor.valueElement, datumValueType: descriptor.valueType }, descriptor.answerOptions,
-      undefined, true, { profileUrl: descriptor.profileUrl, localCode: descriptor.localCode },
+      undefined, true, { profileUrl: descriptor.profileUrl, localCode: descriptor.localCode, age: hasAgeSource(descriptor) },
     );
     if (result.resource) resources.push(result.resource);
     errors.push(...result.errors);

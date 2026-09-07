@@ -41,6 +41,7 @@
 
 import type { CRLError } from "../types/errors";
 import { caseFeatureProfileShape, defaultValueJson, requiredStructuralElements } from "../emit/resourceEmitRegistry";
+import { ageMethod } from "../emit/publicationAge";
 import type { CaseFeatureProfileShape, DefaultValue } from "../emit/resourceEmitRegistry";
 
 import { localCodeSystemUrl } from "./slug";
@@ -387,7 +388,7 @@ export function emitCaseFeatureStructureDefinition(
   localDomainId: string = metadata.name,
   // REFACTOR:grounded (#320): optional answer/time applies only to the admitted publication form.
   nullablePublication = false,
-  publicationIdentity?: { profileUrl: string; localCode: { system: string; code: string } },
+  publicationIdentity?: { profileUrl: string; localCode: { system: string; code: string }; age?: boolean },
 ): { resource: EmittedResource | null; errors: CRLError[] } {
   if (target !== undefined && target.librarySuffix === "") {
     throw new Error(
@@ -521,13 +522,14 @@ export function emitCaseFeatureStructureDefinition(
     baseDefinition: nullablePublication ? "http://hl7.org/fhir/StructureDefinition/Observation" : caseFeatureProfile.baseDefinition,
     derivation: "constraint",
     differential: {
-      element: caseFeatureDifferential(
+      element: [...caseFeatureDifferential(
         caseFeatureProfile,
         { system, code, display: conceptName },
         url,
         answerOptions,
         nullablePublication,
-      ),
+      ), ...(publicationIdentity?.age ? [{ id: "Observation.method", path: "Observation.method", min: 1, max: "1", type: [{ code: "CodeableConcept" }],
+        defaultValueCodeableConcept: ageMethod("asserted") }] : [])],
     },
   };
 

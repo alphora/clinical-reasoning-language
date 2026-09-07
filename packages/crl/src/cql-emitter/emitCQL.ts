@@ -33,6 +33,8 @@ import { buildCRL } from "../index";
 import { prepareSingleLibraryPublication, publicationBooleanRead, hasLocalPublicationContribution, type PublicationDescriptor, type PublicationEmitScope } from "../emit/publicationProgram";
 import { visitConceptDefinitionRefs } from "../imports/computeEmitClosure";
 import { PUBLICATION_SERVICE_REQUEST_CANDIDATE } from "./renderPublicationSelection";
+import { AGE_CQL, AGE_CQL_PREFIX, renderPublicationAgeHelpers } from "./renderPublicationAge";
+import { hasAgeSource } from "../emit/publicationAge";
 import { branchConditionRefs } from "../ast/branchCondition";
 import { foreignCriterionScopeErrors } from "./criterionScope";
 import { renderPublicationSelectionHelpers, renderPublicationCandidateHelpers, PUBLICATION_SELECTION_CQL_PREFIX, PUBLICATION_SELECTION_CQL_FUNCTIONS, PUBLICATION_LOCAL_BOOLEAN_CANDIDATE, PUBLICATION_LOCAL_CODEABLE_CANDIDATE, PUBLICATION_CANDIDATE_CQL_TYPE } from "./renderPublicationSelection";
@@ -1256,13 +1258,15 @@ class Emitter {
     if (this.ast.statements.some((s) => s.type === "Concept" && s.__publication !== undefined && s.__publication.role !== "retrieve")) {
       for (const statement of this.ast.statements) {
         const name = (statement as { name?: string }).name;
-        if (name !== undefined && [PUBLICATION_SELECTION_CQL_PREFIX, PUBLICATION_ENVELOPE_PREFIX, PUBLICATION_PRODUCER_PREFIX].some((prefix) => name.startsWith(prefix))) this.emitErrors.push({
+        if (name !== undefined && [PUBLICATION_SELECTION_CQL_PREFIX, PUBLICATION_ENVELOPE_PREFIX, PUBLICATION_PRODUCER_PREFIX, AGE_CQL_PREFIX].some((prefix) => name.startsWith(prefix))) this.emitErrors.push({
           type: "Validation", kind: "publication-name-collision",
           line: statement.location?.start.line, column: statement.location?.start.column,
           message: `Declaration "${name}" uses the reserved publication helper namespace.`,
         });
       }
       sections.push(renderPublicationSelectionHelpers(), renderPublicationCandidateHelpers());
+      if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.role === "public" && hasAgeSource(s.__publication.descriptor)))
+        sections.push(renderPublicationAgeHelpers());
       if (this.ast.statements.some((s) => s.type === "Concept" && s.__publication?.role === "public" &&
         (s.__publication.descriptor.producer !== undefined || s.__publication.descriptor.valueDomain !== undefined)))
         sections.push(renderPublicationProducerHelpers());
@@ -1694,7 +1698,8 @@ class Emitter {
       result: { shape: "Scalar", valueType: "boolean" },
     });
     if (c.__publication !== undefined) return notBoolean("publication", {
-      shape: c.__publication.role === "retrieve" ? "RecordSet" : "Record", resourceType: "Observation",
+      shape: c.__publication.role === "retrieve" ? "RecordSet" : "Record",
+      resourceType: c.__publication.source?.kind === "ageToday" ? "Patient" : c.__publication.source?.kind === "serviceRequestWitness" ? "ServiceRequest" : "Observation",
     });
     // ⭐ #189 null/pause — a sanctioned THREE-STATE read. It IS a Boolean-typed define and it IS null when
     // nothing establishes it; enrolling it as `not-boolean` ("representations-only stub") described the pause
@@ -2281,7 +2286,9 @@ class Emitter {
     // representations-only guard below, because the twin deliberately carries no `definition`: the read is a
     // compiler-synthesized lowering, not an authored form. Without this the compiler would report a define it
     // built itself as unbuilt work.
-    const questionRead = c.__pureQuestionRead === true ? this.emitPureQuestionRead(c) : undefined;
+    const questionRead = c.__publication?.source?.kind === "ageToday"
+      ? "([Patient] P where P.id.value = Patient.id.value)"
+      : c.__pureQuestionRead === true ? this.emitPureQuestionRead(c) : undefined;
     // ⚠ A concept with no definition after lowering is REPRESENTATIONS-ONLY, and its lowering is unbuilt.
     // This used to emit a comment as the define's entire body — a `define` with no expression, i.e. CQL that
     // cannot translate — while the emitter reported SUCCESS. Silent success on invalid output is the worst
@@ -2483,7 +2490,10 @@ class Emitter {
       const source = descriptor.sources![index];
       const target = this.renderPublicationReference(binding.sourceReferences![index]);
       const code = `FHIR.CodeableConcept { text: FHIR.string { value: ${cqlStringLiteral(descriptor.title)} }, coding: { FHIR.Coding { system: FHIR.uri { value: ${cqlStringLiteral(descriptor.localCode!.system)} }, code: FHIR.code { value: ${cqlStringLiteral(descriptor.localCode!.code)} } } } }`;
-      const projected = `((${target}) S return all ${cqlIdent(PUBLICATION_SERVICE_REQUEST_CANDIDATE)}(S, ${cqlStringLiteral(source.contributorId)}, ${cqlStringLiteral(descriptor.conceptId)}, ${code}, ${cqlStringLiteral(descriptor.profileUrl!)}, 'Patient/' + Patient.id.value))`;
+      const helper = source.kind === "ageToday" ? AGE_CQL.produce : PUBLICATION_SERVICE_REQUEST_CANDIDATE;
+      const args = source.kind === "ageToday" ? `, ${cqlStringLiteral(source.op)}, ${cqlStringLiteral(source.unit)}, ${source.threshold}${Number.isInteger(source.threshold) ? ".0" : ""}, Today()` : "";
+      const projection = `((${target}) S return all ${cqlIdent(helper)}(S, ${cqlStringLiteral(source.contributorId)}, ${cqlStringLiteral(descriptor.conceptId)}, ${code}, ${cqlStringLiteral(descriptor.profileUrl!)}, 'Patient/' + Patient.id.value${args}))`;
+      const projected = source.kind === "ageToday" ? `(${projection} C where C is not null)` : projection;
       candidates = `Flatten({ ${candidates}, ${projected} })`;
     }
     const producer = descriptor.producer;
@@ -2511,6 +2521,7 @@ class Emitter {
       // Flatten preserves duplicate inputs for the selector's diagnostic; union could silently erase them.
       candidates = `Flatten({ ${candidates}, (({ ${produced} }) C where C is not null) })`;
     }
+    if (hasAgeSource(descriptor)) candidates = `${cqlIdent(AGE_CQL.eligible)}(${candidates}, Today(), timezoneoffset from Now(), ${cqlStringLiteral(descriptor.conceptId)})`;
     const selected = `${cqlIdent(PUBLICATION_SELECTION_CQL_FUNCTIONS.select)}(${candidates}, ${cqlStringLiteral(descriptor.conceptId)}, ${cqlStringLiteral(descriptor.selector.equalTime)})`;
     return descriptor.valueDomain === undefined ? selected
       : `${cqlIdent(PUBLICATION_PRODUCER_FUNCTIONS.interpret)}(${selected}, ${renderPublicationCodeTable(descriptor.valueDomain)})`;

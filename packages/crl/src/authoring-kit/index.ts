@@ -328,7 +328,8 @@ export type {
 // schemaVersion 1.29 → "1.30": consolidated null/pause, representation, terminology and output-root teaching;
 // verification is now a set, with test-bound fhir-emit evidence alongside CRE/historical engine proof.
 // REFACTOR:grounded (#320): schemaVersion 1.30 → "1.31" teaches CEL pause assertions and native acceptance.
-const SCHEMA_VERSION = "1.31";
+// REFACTOR:grounded (#320, plan583): schemaVersion 1.31 → "1.32" teaches pattern-owned age and the migrated example.
+const SCHEMA_VERSION = "1.32";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -447,11 +448,8 @@ const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
     scope: "out",
   },
   {
-    form: "- code is `age-code`. + - source representation: - type is Patient. - value projection is age today <at least | at most | under | younger than> <N> years|months.",
-    meaning:
-      "PATIENT AGE — a Patient `source representation` whose `value projection` computes live age over `Patient.birthDate`; the worked Patient projection in this introductory kit. TWO shapes: (1) STANDALONE — the age posrep ALONE (no `code is`) — the determination IS the projection; (2) RECENCY — an optional local `code is` age Observation PLUS the age posrep on ONE concept (in the MODEL sense a 2-representation concept: one authored `source representation` + one `code is` producer — NOT two posrep blocks), whose Inferred layer recency-merges the local age Observation (`Observation.effective`) against the live computed age (`Patient.meta.lastUpdated`): NEWEST wins; indeterminate (`lastUpdated` absent) → session-fresh local-source wins (unit-independent). " +
-      'Both bounds (#215): `at least` (≥) plus the upper `at most` (≤) / `under` / `younger than` (<) — under closed world a member with NO usable birthDate AND no local age assertion is FALSE (deny), the engine-verified alternative to the wrong `sem-not "Age N Or Older"` complement (which turns that missing evidence into TRUE). ' +
-      "UNITS (#257 T2): `years` (`AgeAt()`, whole years) OR `months` (`AgeInMonths()`, whole months) — `days`/`weeks` are a hard error. `Patient.birthDate` being a genuine clinical record that COMPUTES the age is what earns the projection. Additional projections such as rep-local `exists this` are implemented; that does not make arbitrary projection phrases executable. Check the particular form; see rule patient-age-projection.",
+    form: "- shape is Record. - type is Observation. - value type is boolean. - code is `age-code`. - shape reduction is most recent. - source representation: - type is Patient. - value projection is age today <at least | at most | under | younger than> <N> years|months.",
+    meaning: "Patient age calculation with local answer publication. The age pattern recalculates for today; same-day assertions take precedence. Missing input stays unknown. See patient-age-projection for temporal, method and migration rules. Other patterns own their own behavior.",
     scope: "in",
   },
 ];
@@ -644,38 +642,32 @@ const RULES: KitRule[] = [
     ],
   },
   {
-    id: "patient-age-projection",
-    edge: "cpg",
-    category: "concept-model",
-    rule: "PATIENT AGE is the SOLE sanctioned Stage-1 `source representation` — a Patient posrep whose `value projection` computes live age over `Patient.birthDate`. It is NOT a `definition is` (that form is RETIRED — an authored `definition is age today` is now an author-time + emit error pointing at this posrep form). TWO shapes: (1) STANDALONE — the age posrep ALONE (no `code is`): the determination IS the projection. (2) RECENCY — a local `code is` age Observation PLUS the age posrep on ONE concept; the Inferred layer RECENCY-MERGES them: newest of the local age Observation (`Observation.effective`) vs `Patient.meta.lastUpdated` wins; indeterminate (`lastUpdated` absent) → the session-fresh local-source wins (unit-independent). This is a 2-representation concept in the MODEL sense — ONE authored `source representation` block plus one `code is` producer — NOT two posrep blocks (a second age posrep is rejected). COMPARATORS (#215): `at least <N>` (≥, lower bound) and the UPPER bounds `at most <N>` (≤, inclusive), `under <N>` / `younger than <N>` (<, exclusive). The upper bounds are the engine-verified alternative to the INCORRECT `sem-not \"Age N Or Older\"` complement — the exact closed-world cell: a member with NO usable birthDate AND no local age assertion evaluates FALSE (deny) through the recency truth-set (a session-fresh local TRUE assertion still wins via recency); the complement instead turns that MISSING evidence into TRUE, granting an under-N pathway for unknown age (a measured wrong determination). UNITS (#257 T2): `years` OR `months` — `days`/`weeks` are a hard error. Years compute via `AgeAt()` (whole years), months via `AgeInMonths()` (whole months); both TRUNCATE, so `at most N` ≡ `under N+1` in the chosen unit (a pediatric \"under 21\" gate is `under 21`; an infant \"under 6 months\" gate is `under 6 months`). `validate_crl` REJECTS an unsupported comparator (`less than`) or an unsanctioned unit (`days`/`weeks`) at AUTHOR time, and emit refuses them loudly. The anchored `age at start of \"<anchor>\" <cmp> <N> years` predicate takes the SAME comparators, but it references ANOTHER concept (the anchor), so it stays a concept-level `definition is` COMPUTE-ONLY inference (a measure-context age, years-only) — engine-supported, yet NEITHER a posrep projection NOR this recency merge; do NOT migrate it to a posrep. Constraints: the RECENCY (local-override) concept is `type is Observation` (emit recency-shape guard); every age concept is `value type is boolean` (author-required; a guard-consumed age concept is author-time REJECTED if non-boolean by rule-B `decision-guard-nonboolean`, the non-guard-consumed residual tracked #241). Arm semantics: `code is` + age posrep = recency-merge; the age posrep ALONE = standalone (projection-only) determination — do NOT call the standalone form a recency merge (recency applies ONLY when the local `code is` arm is present). VERIFICATION (honest tiers): the RECENCY arbitration (years) is verified at `$r5.apply` POINT-IN-TIME (lower bound: 6 cases incl. the indeterminate-recency cell; upper bound: 11 cells incl. unknown→deny, the exclusive/inclusive boundary, and recency — #215); T1 preserved the emitted artifacts byte-identically (golden-confirmed), so that claim transfers to the posrep form. The MONTHS and STANDALONE forms (#257 T2) are construct- + executed-CQL-verified (`AgeInMonths()` truncation + boundary math run through the translator), NOT re-verified at `$r5.apply`. PROJECTION COVERAGE: age today is the worked family here, not the only implemented projection. A rep-local `exists this` projection is also implemented; it runs per source record (zero records produce no candidate, not a false record). Other phrases may parse without an implementation, so execute the actual form. The do-not-persist of a session-asserted age answer is a documentation marker (`@business-logic-deferred` in `meta is`) present ONLY on the local-override (`code is`) arm (a standalone posrep has no human-assert Observation to persist); the persistence mechanism is #190 (deferred).",
-    why: "`Patient.birthDate` is a real clinical record that COMPUTES the age, so a patient-age concept can be determined by a live projection over it (standalone), or — with a local `code is` age assertion — recency-merge the two genuine sources (newest wins); that is why age earns the one sanctioned Stage-1 posrep projection the rest of the stage defers.",
-    ref: "#190; #257; patient-age recency merge; disc 173",
-    clauses: [
+    "id": "patient-age-projection",
+    "edge": "cpg",
+    "category": "concept-model",
+    "rule": "For an answerable age determination, declare shape is Record, type is Observation, value type is boolean, code is, shape reduction is most recent, and one Patient source representation with value projection is age today <comparison> <threshold> years or months. The age pattern owns daily recalculation: a determinate current calculation supersedes older assertions; a same-day assertion takes precedence. Patient record update time does not determine current age. Missing/insufficient birthDate leaves the calculation unknown, never false. A local answer can repair it. COMPARATORS: at least (>=), at most (<=), under / younger than (<); years use completed years and months use completed months (AgeInMonths in the pattern catalog). PROJECTION COVERAGE: this contract concerns age today, not arbitrary patterns or a universal arbitration default. Uncoded/anchored legacy age forms require their own migration and execution evidence.",
+    "why": "Time changes age without any Patient update. Patterns must carry predictable temporal and selection semantics through CRL, CQL and CRE.",
+    "ref": "#320; docs/CRL-NORTH-STAR.md; publicationAge.ts",
+    "clauses": [
       {
-        text: "The RECENCY (local `code is` + age posrep) concept's EFFECTIVE local type is Observation — the recency merge emits an Observation-boolean retrieve. ⚠ Authoring MUST still declare `- type is Observation.` — the recency concept is a local `code is` like any other, and the implicit-standard omission it once relied on has been removed. A STANDALONE age posrep's own `type is` is `Patient` (the projected carrier).",
-        force: "invariant",
-        test: "verifyLoop:patient-age-projection",
+        "text": "Each age family only contract is prepared from its exact supported pattern. This form admits one Patient age projection plus local answers; mixed producers require an implemented policy, not silent dropping.",
+        "force": "invariant",
+        "test": "verifyLoop:patient-age-projection"
       },
       {
-        text: "Every patient-age concept is `value type is boolean` (the exemplar demonstrates it). An age concept CONSUMED as a decision/`criterion` guard is now author-time REJECTED if non-boolean by rule-B `decision-guard-nonboolean`; general enforcement of the boolean declaration for a non-guard-consumed age concept remains tracked — #241.",
-        force: "invariant",
-        test: "verifyLoop:patient-age-projection",
+        "text": "Generated age Observations carry an asserted or calculated determination method. CEL answers and submitted QuestionnaireResponse answers are asserted; this does not prove a human edited them. Same-day saved calculations can supply missing current computation, but cannot suppress an available fresh calculation. Yesterday's calculated age has expired; an older assertion can still supply the answer when no current calculation is available.",
+        "force": "default"
       },
       {
-        text: "The age comparator is one of `at least` (≥) / `at most` (≤) / `under` (<) / `younger than` (< synonym), and its unit is `years` (`AgeAt()`) OR `months` (`AgeInMonths()`) — an unsupported comparator (e.g. `less than`) or an unsanctioned unit (`days`/`weeks`) is a hard error. `validate_crl` rejects both at author time (#215/#257 T2).",
-        force: "invariant",
-        test: "verifyLoop:patient-age-projection",
+        "text": "Unmarked legacy age data needs migration from known provenance; retrieval through the local arm does not prove assertion. Same-day unknown answers remain unknown. Multiple eligible assertions use the authored selector, including its ambiguity errors. A missing validity day cannot establish a same-day override.",
+        "force": "invariant",
+        "test": "verifyLoop:patient-age-projection"
       },
       {
-        text: 'Arm semantics: `code is` + age posrep = recency-merge; the age posrep ALONE = standalone projection-only determination (NOT a recency merge). The anchored `age at start of "<anchor>"` stays a concept-level `definition is` compute-only inference, NOT a posrep.',
-        force: "default",
-      },
-      {
-        text: "AGE CONTRACT: an age today projection with a bad comparator, unit, or carrier is tool-rejected. This invariant concerns the age family only. Rep-local exists this projections also emit; arbitrary projection phrases need individual execution proof.",
-        force: "invariant",
-        test: "verifyLoop:patient-age-projection",
-      },
-    ],
+        "text": "Test emitted $apply behavior separately from CRE, including missing input, repair, birthday recalculation, same-day false override, persisted calculation and full Q/QR answer/clear. Native operation evidence does not establish renderer visibility. Numeric age entry is a separate capability from this Boolean age-eligibility question.",
+        "force": "default"
+      }
+    ]
   },
   {
     id: "interface-concept-naming",
@@ -1284,7 +1276,7 @@ const VERIFY_LOOP_BASE: Omit<VerifyLoop, "note" | "methodologyRequirements"> = {
     "After all steps, the validated decision and its emitted artifacts agree with the independently specified activity or pause expectations for the executed cases. CRE alone establishes only its supported prediction; native $apply supplies emitted-runtime evidence.",
   doesNotProve:
     "That a concept's `code is` is the clinically correct code, or that the concept-to-intent mapping is right. The CRE checks explicit code membership for supported local and source representations; when membership cannot be derived it falls back to name-based presence, so a green run does not prove every code was checked. Passing these cases does not establish that the chosen codes match clinical intent. A green run means the wiring is right, NOT that the encoding is clinically complete or correct. " +
-    "For a PATIENT-AGE RECENCY concept specifically (a local `code is` age Observation + a Patient age `value projection`): run_decision proves the concept integrates into the decision SHAPE (a satisfied case flows to the right branch), NOT the recency EXECUTION — which representation (the local age Observation vs the age computed over `Patient.birthDate`) actually wins the merge. That recency arbitration (newest wins; indeterminate → session-fresh local-source wins) is verified for the YEARS form at the engine level via `PlanDefinition/<id>/$r5.apply` POINT-IN-TIME (6 cases incl. the indeterminate-recency cell), not by this kit's CRE cases.",
+    "Age publication requires independent runtime evidence for its pattern-specific recalculation, same-day assertion and unknown-input behavior. A legacy age fixture is not proof of the new publication contract.",
 };
 
 /** The methodology requirements, edge-tagged. Assembled by chain in buildBase; a prior-auth requirement is present exactly when its anchoring prior-auth clause is. */
@@ -1297,7 +1289,7 @@ const METHODOLOGY_REQUIREMENTS: VerifyLoop["methodologyRequirements"] = [
   {
     id: "patient-age-projection",
     edge: "cpg",
-    text: "PATIENT-AGE projection structural checks (the worked Patient projection — a Patient `source representation` with a `value projection is age today …`, NOT a `definition is`): the RECENCY (local `code is` + age posrep) concept is `type is Observation`; every age concept is `value type is boolean`; the unit is `years` (`AgeAt()`) OR `months` (`AgeInMonths()`) — days/weeks are a hard error; these age checks do not claim coverage of other projection families. The recency-merge EXECUTION (newest of `Observation.effective` vs `Patient.meta.lastUpdated` wins; indeterminate → session-fresh local-source wins) is engine-verified for the YEARS recency form at `$r5.apply` POINT-IN-TIME (6 cases incl. the indeterminate-recency cell; transfers to the posrep form via T1's byte-identical emit), not by this kit's CRE cases; the months/standalone forms are construct- + executed-CQL-verified (#257 T2), not $r5.apply-re-verified (#190; #257; disc 173).",
+    text: "Patient age Record publication: validate the supported comparator/unit, explicit shape reduction and answer representation. Verify birthday recalculation, same-day overrides, missing-input repair and method-preserving extraction through native $apply. CRE is a separate prediction. See patient-age-projection for the pattern-owned contract.",
   },
   {
     id: "mutual-exclusivity-spans-closure",
@@ -1670,7 +1662,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     language: "crl",
     edge: "cpg",
     purpose:
-      "The patient-age RECENCY exemplar — a Patient `source representation` with a `value projection is age today … years`, the worked Patient projection (see rule patient-age-projection). ONE concept carries BOTH arms: `code is` (the LOCAL age Observation) + the age posrep (a live compute over `Patient.birthDate`) — in the MODEL sense a 2-representation concept (one authored `source representation` + one `code is` producer, NOT two posrep blocks). The Inferred layer recency-merges them (newest of the local `Observation.effective` vs `Patient.meta.lastUpdated` wins; indeterminate → session-fresh local-source wins); `Patient.birthDate` being a genuine clinical record that COMPUTES the age is what earns the projection. The YEARS recency arbitration is engine-verified at `$r5.apply` POINT-IN-TIME (6 cases incl. the indeterminate-recency cell; transfers to this posrep form via T1's byte-identical emit); the recency EXECUTION is not proven by the kit CRE cases, so no companion CEL. For the STANDALONE (no `code is`) and MONTHS forms — construct- + executed-CQL-verified (#257 T2) — see the `representation-reference` exemplar. Rep-local exists this projections are also implemented; this exemplar supplies no execution proof for them.",
+      "Synthetic age Record publication with Patient calculation and local answers. The age pattern recalculates daily and admits same-day asserted overrides; missing input remains unknown. Execute the emitted artifact and its full Q/QR interaction. See patient-age-projection for method metadata and temporal rules.",
     verification: ["engine-run", "fhir-emit"],
     source: PATIENT_AGE_BOTH_REP_REFERENCE_CRL,
   },

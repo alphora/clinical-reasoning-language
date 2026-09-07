@@ -1,24 +1,7 @@
-// #257 (age slice) T1 — the catalog-of-HOW behind a rep-level `value projection is` that
-// recency-merges (2-rep, with a local `code is`) or, standalone (1-rep), DETERMINES a concept.
-//
-// This is the SINGLE source of truth both the author-time validator (`AgePredicateValidator`)
-// and the emit lowering (`lowerLocalCodes`) consult, so "is this projection recency-mergeable?"
-// cannot drift between validate and emit — the same lesson `sanctionedAgeTodayOp` already
-// encodes for the retired `definition is age today` carve-out (see the #215 note atop
-// `agePredicateValidator.ts`). It lives in `template-match` (the catalog layer) precisely so the
-// validator can import it WITHOUT importing `cql-emitter` (validate must never depend on emit).
-//
-// A `RecencyProjectionOverride` is catalog DATA, not narrative matching: it names the built
-// resource + value-element carrier, the datum `value type`, the recency-timestamp INVARIANT of
-// the projection (NOT authored — bounded-language principle: no `recency is` keyword), and the
-// CQL helper the emit renders. (The compute fn is NOT on the override — it is a per-unit HOW,
-// `AgeAt` years / `AgeInMonths` months, carried on `AgeProjectionArgs.computeFn`, #257 T2.) T1
-// ships EXACTLY ONE — age-today over `Patient.birthDate`, timestamp `Patient.meta.lastUpdated`.
-// Age is ONE caller of the override mechanism, not a hardcoded `__bothRepMerge === "recency"`
-// engine branch. The recency merge stays age-SHAPED in the CQL catalog
-// (`CaseFeatureCommon.recencyAgeTruths` / `CRLCommon.AgeAt` / `CRLCommon.AgeInMonths`);
-// this module is the compile-time TS seam that makes it a lookup, keeping the emitted CQL
-// byte-identical to the retired carve-out.
+// REFACTOR:suspect (#320): legacy age lowering uses source-update arbitration and false coercion.
+// Migrate remaining legacy consumers to the pattern-owned Record publication contract in publicationAge.ts.
+// This table describes legacy implementation, not the target age semantics. Shared matching below also
+// serves validators; the new publication path does not use this legacy timestamp mapping.
 
 import type { AgeComputeFn, AgeRecencyOp, Concept, NarrativeClause, Representation } from "../ast/types";
 import { isAgeAtStartOfPrefix, isAgeTodayPrefix, sanctionedAgeTodayOp } from "./agePredicate";
@@ -42,7 +25,7 @@ export interface RecencyProjectionOverride {
    *  concept declaring an age projection must declare THIS as its value type, else the emit would
    *  produce a boolean truth-set under a mismatched concept contract. */
   readonly resultValueType: string;
-  /** The recency-timestamp element — an INVARIANT of the built projection, not authored. The CQL
+  /** The timestamp element used only by the legacy lowering. The CQL
    *  helper reads it internally (documented here for the catalog boundary, not rendered by TS). */
   readonly recencyTimestamp: string;
   /** The CaseFeatureCommon helper the recency emit renders (`CFH.<helper>(newestLocal, computed)`). Lifts the

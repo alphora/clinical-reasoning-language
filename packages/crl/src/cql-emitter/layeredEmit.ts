@@ -280,6 +280,8 @@ export function classifyStatementLayer(stmt: Statement): Layer | null {
     // own layer. Its body is pre-qualified; classify it before the code/
     // definition checks (it carries a synthetic `defined as` bare-ref).
     if (stmt.__interfaceReexport) return "Interface";
+    // REFACTOR:grounded (#320, plan583): uncoded Patient retrieval has a prepared source binding.
+    if (stmt.__publication?.source?.kind === "ageToday") return "ExternalPrimitives";
     // Concept-level `code is`-ONLY concepts are LOWERED upstream
     // (`lowerLocalCodes`, run before classification in both `emitCQLImports`
     // and `emitCQLFromAST`) into a synthetic Terminology + `CodedFromDefinition`

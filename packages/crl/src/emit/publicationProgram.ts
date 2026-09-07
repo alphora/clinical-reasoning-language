@@ -6,7 +6,8 @@ import { emittedValueSetUrl } from "../fhir-emitter/valueSet";
 import { matchNarrative } from "../template-match/matcher";
 import { publicationCodeKey, normalizePublicationCodes, readFinitePublicationTerminology } from "./publicationDomain";
 import type { PublicationCandidate } from "./publicationSelection";
-import { publicationSourceAdmissionReason, type PublicationServiceRequestSource } from "./publicationSource";
+import { publicationSourceAdmissionReason, type PublicationSource } from "./publicationSource";
+import { readAgeProjection } from "./publicationAge";
 import {
   createPublicationContext,
   type PublicationContext,
@@ -32,7 +33,7 @@ export interface PublicationDescriptor {
   readonly valueDomain?: readonly PublicationCode[];
   readonly answerOptions?: { readonly valueSetUrl: string; readonly codes: readonly PublicationCode[] };
   readonly producer?: PublicationMembershipProducer;
-  readonly sources?: readonly PublicationServiceRequestSource[];
+  readonly sources?: readonly PublicationSource[];
 }
 
 export type PublicationValueType = "boolean" | "CodeableConcept";
@@ -77,7 +78,7 @@ export interface PublicationNodeBinding {
   readonly role: "retrieve" | "public" | "interface";
   /** Physical source bindings, requalified independently of immutable semantic descriptors. */
   readonly sourceReferences?: readonly ReferenceName[];
-  readonly source?: PublicationServiceRequestSource;
+  readonly source?: PublicationSource;
 }
 
 // FHIR R4 ObservationStatus value domain. Valid statuses do not supply a hidden final-only filter;
@@ -226,12 +227,12 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
       // REFACTOR:grounded (#320, review 564): prepare every declared source before lowering.
       if (concept.representations.length > 0 && !library.artifact.policyId)
         fail("A source-produced Case Feature requires an owning policy identity.", concept.location, "publication-source-profile-required");
-      const sources = concept.representations.map((rep, index): PublicationServiceRequestSource => Object.freeze({
-        kind: "serviceRequestWitness",
-        contributorId: `crl:source:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["source", index]]))}`,
-        terminology: rep.terminologyName!,
-        codes: finiteTerminology(library.sourceIdentity, rep.terminologyName!, rep.location).codes,
-      }));
+      const sources = concept.representations.map((rep, index): PublicationSource => {
+        const contributorId = `crl:source:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["source", index]]))}`;
+        const age = readAgeProjection(rep);
+        return age ? Object.freeze({ ...age, contributorId }) : Object.freeze({ kind: "serviceRequestWitness", contributorId,
+          terminology: rep.terminologyName!, codes: finiteTerminology(library.sourceIdentity, rep.terminologyName!, rep.location).codes });
+      });
       let answerOptions: PublicationDescriptor["answerOptions"];
       if (concept.valueFrom?.kind === "inline") {
         const set = inlineAnswerSet(concept as Concept, library.artifact.localDomainId ?? library.libraryName, base!);

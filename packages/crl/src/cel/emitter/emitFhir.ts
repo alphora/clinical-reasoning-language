@@ -1,4 +1,5 @@
 import { conceptTypes, type ConceptType } from "../../grammar/conceptTypes";
+import { ageMethod, hasAgeSource } from "../../emit/publicationAge";
 import {
   isQualifiedRef,
   getRefName,
@@ -1017,6 +1018,7 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
     resourceType: fhirType,
     id,
     ...(profiles.length ? { meta: { profile: profiles } } : {}),
+    ...(publication !== undefined && hasAgeSource(publication) ? { method: ageMethod("asserted") } : {}),
   };
 
   // Subject reference.

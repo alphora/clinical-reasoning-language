@@ -508,10 +508,11 @@ export function lowerLocalCodes(
       }
       for (let index = 0; index < sourceReferences.length; index++) {
         const sourceName = sourceReferences[index];
+        const source = descriptor.sources![index];
         topLevelIdentifierNames.add(sourceName);
         const sourceTwin: Concept = {
-          ...stmt, name: sourceName, shape: "RecordSet", conceptType: "ServiceRequest", valueTypes: [], representations: [],
-          definition: { type: "CodedFromDefinition", terminologyName: descriptor.sources![index].terminology, location: stmt.location },
+          ...stmt, name: sourceName, shape: "RecordSet", conceptType: source.kind === "ageToday" ? "Patient" : "ServiceRequest", valueTypes: [], representations: [],
+          definition: source.kind === "ageToday" ? undefined : { type: "CodedFromDefinition", terminologyName: source.terminology, location: stmt.location },
           __loweringRole: "source-impl", __publication: Object.freeze({ descriptor, role: "retrieve", source: descriptor.sources![index] }),
         };
         delete sourceTwin.code;

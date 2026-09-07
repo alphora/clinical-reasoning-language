@@ -815,49 +815,27 @@ export const PATIENT_AGE_BOTH_REP_REFERENCE_CRL = `# Patient-Age Both-Representa
 library "Patient Age Reference".
 
 /*
-Patient-age BOTH-REPRESENTATION exemplar. A concept carries BOTH a \`code is\`
-LOCAL age Observation AND a Patient age \`source representation\` — a posrep over
-\`Patient.birthDate\` whose \`value projection is age today <cmp> <N> years\` computes
-the live age (#257: patient age migrated here from the retired \`definition is age today\` form,
-which is now an author-time + emit error).
-The Inferred layer RECENCY-MERGES the two: newest of the local age Observation
-(\`Observation.effective\`) vs \`Patient.meta.lastUpdated\` wins; indeterminate
-(\`lastUpdated\` absent) -> the session-fresh local-source wins. The recency timestamp is
-an INVARIANT of the built Patient age projection, NOT authored (no \`recency is\` keyword).
-PROJECTION COVERAGE: this example works age today. Rep-local existence projections also emit;
-other phrases need their own execution proof. This is a
-2-representation concept in the MODEL sense — ONE authored \`source representation\` block PLUS
-one local \`code is\` producer — NOT two \`source representation\` blocks (a second age posrep is
-rejected). A STANDALONE age (no local override — see the \`representation-reference\` exemplar) is
-just the \`source representation\` with no \`code is\`; the recency merge applies ONLY when the
-local \`code is\` arm is present.
-
-COMPARATORS + UNITS (#215, #257 T2): the comparator is a LOWER bound \`at least <N>\` (>=) or an
-UPPER bound \`at most <N>\` (<=, inclusive) / \`under <N>\` / \`younger than <N>\` (<, exclusive), and
-the unit is \`years\` OR \`months\` — \`days\`/\`weeks\` are a hard error. Years compute via \`AgeAt()\`
-(whole years), months via \`AgeInMonths()\` (whole months); both truncate, so \`at most N\` ≡
-\`under N+1\` in the chosen unit (a pediatric "under 21" gate is \`under 21\`, an infant "under 6
-months" gate is \`under 6 months\`). The upper bounds are the engine-verified alternative to the
-INCORRECT \`sem-not "Age N Or Older"\` complement. The exact closed-world cell: with NO usable
-\`Patient.birthDate\` AND no local age assertion, the concept is FALSE (deny) — unlike \`sem-not\`,
-MISSING evidence does not become TRUE (a session-fresh local TRUE assertion still wins via
-recency; the recency arbitration is unit-independent).
+REFACTOR:grounded (#320, plan583): synthetic age eligibility with explicit Record publication.
+The age pattern recalculates each day; same-day assertions can override. Missing age remains
+unknown until a calculation or answer determines it. Persisted calculations retain their method,
+and cannot suppress a fresh calculation. CEL and extracted answers carry asserted method.
 */
 
 concept "Age 18 Or Older":
+- shape is Record.
+- shape reduction is most recent.
 - value type is boolean.
-- meta is \`@business-logic-deferred: the human-assert answer Observation for this age criterion must NOT persist beyond the client session (mechanism deferred — #190); the recency lattice treats it as session-fresh\`.
 - type is Observation.
 - code is \`age-18-or-older\`.
 - source representation:
   - type is Patient.
   - value projection is age today at least 18 years.
 
-// UPPER bound (#215) — the pediatric "under 21" gate as ONE positive concept, NOT the
-// wrong \`sem-not "Age 21 Or Older"\` complement. Unknown age recency-merges to FALSE (deny).
+// The upper-bound predicate also preserves unknown input.
 concept "Patient Under Twenty One Years":
+- shape is Record.
+- shape reduction is most recent.
 - value type is boolean.
-- meta is \`@business-logic-deferred: the human-assert answer Observation for this age criterion must NOT persist beyond the client session (mechanism deferred — #190); the recency lattice treats it as session-fresh\`.
 - type is Observation.
 - code is \`under-21\`.
 - source representation:

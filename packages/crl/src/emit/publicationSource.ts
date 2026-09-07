@@ -3,6 +3,8 @@ import type { PublicationCode, PublicationDescriptor } from "./publicationProgra
 import type { PublicationCandidate } from "./publicationSelection";
 import { publicationDerivedCandidateKey } from "./publicationProducer";
 import type { PublicationValueError } from "./publicationDomain";
+import { readAgeProjection, type PublicationAgeSource } from "./publicationAge";
+export type PublicationSource = PublicationServiceRequestSource | PublicationAgeSource;
 
 // REFACTOR:grounded (#320, review 564): one source record supplies one positive witness.
 // This is not a closed-world exists reduction or a hidden status/intent exclusion filter.
@@ -17,6 +19,9 @@ export function publicationSourceAdmissionReason(concept: Readonly<Concept>): st
   if (concept.representations.length === 0) return undefined;
   if (!concept.code || concept.valueTypes[0] !== "boolean")
     return "Source publication currently requires a local code and an Observation<boolean> result.";
+  if (concept.representations.some(rep => readAgeProjection(rep) !== undefined))
+    return concept.representations.length === 1 && concept.definition === undefined ? undefined
+      : "Age publication currently supports one age projection plus local answers; mixed producer policies require an explicit implementation.";
   for (const rep of concept.representations) {
     const words = rep.valueProjection?.body.elements;
     if (rep.conceptType !== "ServiceRequest" || rep.terminologyName === undefined ||
@@ -43,7 +48,8 @@ export function matchesCelPublicationPatient(resource: Record<string, unknown>, 
     (resource.subject as { reference?: unknown } | undefined)?.reference === subjectReference;
 }
 
-export function matchesPublicationSource(source: PublicationServiceRequestSource, resource: Record<string, unknown>): boolean {
+export function matchesPublicationSource(source: PublicationSource, resource: Record<string, unknown>): boolean {
+  if (source.kind === "ageToday") return resource.resourceType === "Patient";
   if (resource.resourceType !== "ServiceRequest") return false;
   const coding = (resource.code as { coding?: unknown } | undefined)?.coding;
   return Array.isArray(coding) && coding.some((item) => item !== null && typeof item === "object" &&

@@ -24,6 +24,12 @@ A supported target that is not implemented is build debt, not automatically an i
 Removing a previously supported capability requires an expressible, executable replacement and a
 demonstrated content migration. This is sequencing, not a promise of permanent compatibility syntax.
 
+The operator directs complete deprecation of the old ways and states: "KEs should update to the new
+as they touch existing." New authoring and teaching use the replacement contract. Existing customer
+content migrates when worked on; a bulk rewrite of customer policies is not a prerequisite. Compiler
+retirement must provide actionable diagnostics and an executable replacement, not preserve conflicting
+semantics as a second supported contract.
+
 ## 0. AI authorship and clarity of meaning
 
 CRL makes narrative computable. An AI knowledge-engineering agent expresses narrative intent in CRL,
