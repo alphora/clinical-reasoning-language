@@ -39,7 +39,7 @@ describe("admitted local Boolean publication", () => {
   it.each([
     ["shape", source.replace("shape is Record", "shape is Scalar")],
     ["resource", source.replace("type is Observation", "type is Condition")],
-    ["value", source.replace("value type is boolean", "value type is Quantity")],
+    ["value", source.replace("value type is boolean", "value type is string")],
     ["code", source.replace("- code is `answer`.\n", "")],
     ["old selector", source + '- definition is most recent this.\n'],
   ])("refuses unsupported %s without treating it as legacy", (_label, text) => {

@@ -132,6 +132,21 @@ touching it; new authoring uses the replacement. A criterion may negate the sele
 publication aliases and concept-space composition remain unsupported and are diagnosed explicitly.
 This is an age-specific retirement, not removal of all Scalar declarations or generic recency patterns.
 
+Quantity measurements can use explicit Record/Observation publication with `shape reduction is most recent`.
+An Observation source preserves its Quantity and effectiveDateTime while projecting the analytical identity.
+A local code adds an answer representation; an uncoded source calculation does not invent a question.
+The unary `definition is "Measurement" at least N 'unit'` producer publishes a Boolean Observation and
+inherits the selected operand's actual optional validity. No operand produces no candidate; a selected
+operand with no numeric value produces an unknown-valued candidate. Final selection remains separate.
+Quantity code determines unit identity when present; display unit does not override it. The existing CEL
+unit-only representation is supported. Supplied systems must be UCUM with a code; comparator quantities
+are not exact measurements. This comparison currently supports m/cm, kg/g and kg/m2, magnitude at most
+10^6 and at most eight decimal places, with exact decimal unit-factor comparison. This is a bounded
+implementation domain, not a clinical range. It does not recover unsupported lexical precision already
+lost in a caller's numeric parsing. BMI's two-operand calculation and validity contract are separate work.
+The measurement/comparison prerequisite retains CRE's explicit imported-publication limitation;
+cross-library emitted CQL and CRE imports require separate verification and are not interchangeable claims.
+
 Acceptance: partial data pauses before an activity; adding the missing answer reaches the intended
 activity; complete data initially reaches the same activity. Verify the visible progression separately
 from engine output, and execute the full generated-QuestionnaireResponse edit/resubmit path rather than

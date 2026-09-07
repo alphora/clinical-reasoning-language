@@ -32,6 +32,8 @@
 import { buildCRL } from "../index";
 import { prepareSingleLibraryPublication, publicationBooleanRead, hasLocalPublicationContribution, type PublicationDescriptor, type PublicationEmitScope } from "../emit/publicationProgram";
 import { visitConceptDefinitionRefs } from "../imports/computeEmitClosure";
+import { renderPublicationQuantityHelpers, renderPublicationThresholdHelpers, QUANTITY_CQL, PUBLICATION_OBSERVATION_QUANTITY_CANDIDATE } from "./renderPublicationQuantity";
+import { PUBLICATION_LOCAL_QUANTITY_CANDIDATE } from "./renderPublicationSelection";
 import { PUBLICATION_SERVICE_REQUEST_CANDIDATE } from "./renderPublicationSelection";
 import { AGE_CQL, AGE_CQL_PREFIX, renderPublicationAgeHelpers } from "./renderPublicationAge";
 import { hasAgeSource } from "../emit/publicationAge";
@@ -1257,7 +1259,11 @@ class Emitter {
           message: `Declaration "${name}" uses the reserved publication helper namespace.`,
         });
       }
-      sections.push(renderPublicationSelectionHelpers(), renderPublicationCandidateHelpers());
+      const quantities = this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.valueType === "Quantity");
+      sections.push(renderPublicationSelectionHelpers(), renderPublicationCandidateHelpers(quantities));
+      if (quantities) sections.push(renderPublicationQuantityHelpers());
+      if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.role === "public" && s.__publication.descriptor.producer?.kind === "quantityThreshold"))
+        sections.push(renderPublicationThresholdHelpers());
       if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.role === "public" && hasAgeSource(s.__publication.descriptor)))
         sections.push(renderPublicationAgeHelpers());
       if (this.ast.statements.some((s) => s.type === "Concept" && s.__publication?.role === "public" &&
@@ -2448,7 +2454,7 @@ class Emitter {
       if (c.definition?.type !== "DefinedAsDefinition" || c.definition.body.type !== "DefinedAsBareRef")
         throw new Error(`Publication "${c.name}" has no generated local retrieve reference.`);
       const target = this.renderPublicationReference(c.definition.body.ref);
-      const adapter = descriptor.valueType === "boolean" ? PUBLICATION_LOCAL_BOOLEAN_CANDIDATE : PUBLICATION_LOCAL_CODEABLE_CANDIDATE;
+      const adapter = descriptor.valueType === "boolean" ? PUBLICATION_LOCAL_BOOLEAN_CANDIDATE : descriptor.valueType === "Quantity" ? PUBLICATION_LOCAL_QUANTITY_CANDIDATE : PUBLICATION_LOCAL_CODEABLE_CANDIDATE;
       candidates = `((${target}) O return all ${cqlIdent(adapter)}(O, ${cqlStringLiteral(descriptor.localContributorId)}, ${cqlStringLiteral(descriptor.conceptId)}))`;
     }
     // REFACTOR:grounded (#320, review 564): source rows join the same final candidate selector.
@@ -2458,7 +2464,7 @@ class Emitter {
       const source = descriptor.sources![index];
       const target = this.renderPublicationReference(binding.sourceReferences![index]);
       const code = descriptor.localCode === undefined ? `FHIR.CodeableConcept { text: FHIR.string { value: ${cqlStringLiteral(descriptor.title)} } }` : `FHIR.CodeableConcept { text: FHIR.string { value: ${cqlStringLiteral(descriptor.title)} }, coding: { FHIR.Coding { system: FHIR.uri { value: ${cqlStringLiteral(descriptor.localCode!.system)} }, code: FHIR.code { value: ${cqlStringLiteral(descriptor.localCode!.code)} } } } }`;
-      const helper = source.kind === "ageToday" ? AGE_CQL.produce : PUBLICATION_SERVICE_REQUEST_CANDIDATE;
+      const helper = source.kind === "ageToday" ? AGE_CQL.produce : source.kind === "observationQuantity" ? PUBLICATION_OBSERVATION_QUANTITY_CANDIDATE : PUBLICATION_SERVICE_REQUEST_CANDIDATE;
       const args = source.kind === "ageToday" ? `, ${cqlStringLiteral(source.op)}, ${cqlStringLiteral(source.unit)}, ${source.threshold}${Number.isInteger(source.threshold) ? ".0" : ""}, Today()` : "";
       const projection = `((${target}) S return all ${cqlIdent(helper)}(S, ${cqlStringLiteral(source.contributorId)}, ${cqlStringLiteral(descriptor.conceptId)}, ${code}, ${descriptor.profileUrl === undefined ? "null as System.String" : cqlStringLiteral(descriptor.profileUrl)}, 'Patient/' + Patient.id.value${args}))`;
       const projected = source.kind === "ageToday" ? `(${projection} C where C is not null)` : projection;
@@ -2485,7 +2491,9 @@ class Emitter {
       const code = descriptor.localCode === undefined ? `FHIR.CodeableConcept { text: ${title} }`
         : `FHIR.CodeableConcept { text: ${title}, coding: { FHIR.Coding { system: FHIR.uri { value: ${cqlStringLiteral(descriptor.localCode.system)} }, code: FHIR.code { value: ${cqlStringLiteral(descriptor.localCode.code)} } } } }`;
       const profile = descriptor.profileUrl === undefined ? "null as System.String" : cqlStringLiteral(descriptor.profileUrl);
-      const produced = `${cqlIdent(PUBLICATION_PRODUCER_FUNCTIONS.candidate)}(${operand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, ${renderPublicationCodeTable(producer.domain)}, ${renderPublicationCodeTable(producer.qualifying)}, ${cqlStringLiteral(descriptor.conceptId)}, 'Patient/' + Patient.id.value)`;
+      const produced = producer.kind === "quantityThreshold"
+        ? `${cqlIdent(QUANTITY_CQL.candidate)}(${operand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, ${producer.threshold.value.toFixed(8)}, ${cqlStringLiteral(producer.threshold.unit)}, ${cqlStringLiteral(descriptor.conceptId)}, 'Patient/' + Patient.id.value)`
+        : `${cqlIdent(PUBLICATION_PRODUCER_FUNCTIONS.candidate)}(${operand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, ${renderPublicationCodeTable(producer.domain)}, ${renderPublicationCodeTable(producer.qualifying)}, ${cqlStringLiteral(descriptor.conceptId)}, 'Patient/' + Patient.id.value)`;
       // Flatten preserves duplicate inputs for the selector's diagnostic; union could silently erase them.
       candidates = `Flatten({ ${candidates}, (({ ${produced} }) C where C is not null) })`;
     }
@@ -3329,7 +3337,7 @@ class Emitter {
     // REFACTOR:grounded (#320, review 564 C4): the prepared finite code set is the same
     // matching authority used by CRE. Do not replace it with a server ValueSet expansion.
     if (c.__publication?.source !== undefined) {
-      if (c.__publication.source.kind !== "serviceRequestWitness") {
+      if (c.__publication.source.kind === "ageToday") {
         this.emitErrors.push({ type: "Validation", kind: "publication-source-unsupported",
           message: `Unsupported publication source kind for "${c.name}".`,
           line: c.location.start.line, column: c.location.start.column });
@@ -3337,7 +3345,7 @@ class Emitter {
       }
       const codes = c.__publication.source.codes.map((code) =>
         `System.Code { system: ${cqlStringLiteral(code.system)}, code: ${cqlStringLiteral(code.code)} }`).join(", ");
-      return `[ServiceRequest: { ${codes} }]`;
+      return `[${c.__publication.source.kind === "observationQuantity" ? "Observation" : "ServiceRequest"}: { ${codes} }]`;
     }
     // A synthetic local-source CodedFromDefinition (from `lowerLocalCodes`)
     // supplies `retrieveResourceType: "Observation"` to force the local-source

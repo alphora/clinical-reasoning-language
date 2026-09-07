@@ -118,7 +118,7 @@ import {
 import { selectPublicationCandidate, type PublicationCandidate } from "../emit/publicationSelection";
 import { interpretPublicationCodeableValue } from "../emit/publicationDomain";
 import { produceMembershipCandidate } from "../emit/publicationProducer";
-import { adaptServiceRequestPublicationCandidate, matchesPublicationSource, matchesCelPublicationPatient } from "../emit/publicationSource";
+import { adaptObservationPublicationCandidate, adaptServiceRequestPublicationCandidate, matchesPublicationSource, matchesCelPublicationPatient } from "../emit/publicationSource";
 import { readPolicyId } from "../fhir-emitter/metadata";
 import { resolveCaseFactDates } from "../cel/factDate";
 import { resolveDefinedByTarget } from "../cel/definedByResolve";
@@ -959,6 +959,7 @@ function evaluatePublication(entry: ConceptEntry, ctx: Ctx): ConceptEval {
     if (source.kind === "ageToday" ? `Patient/${resource.id}` !== ctx.publicationSubjectReference : !matchesCelPublicationPatient(resource, ctx.publicationSubjectReference)) continue;
     const adapted = source.kind === "ageToday"
       ? produceAgeCandidate(descriptor, source, resource, ctx.publicationSubjectReference, ageClock(ctx.publicationNow))
+      : source.kind === "observationQuantity" ? adaptObservationPublicationCandidate(descriptor, source, resource, ctx.publicationSubjectReference)
       : adaptServiceRequestPublicationCandidate(descriptor, source, resource, ctx.publicationSubjectReference);
     if (adapted.kind === "error") return fail(adapted.code, adapted.message);
     if (adapted.kind === "missing") continue;

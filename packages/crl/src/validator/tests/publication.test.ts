@@ -60,7 +60,7 @@ describe("selected Boolean publication authoring", () => {
 
   it("does not teach an admitted local preference for an unsupported publication form", () => {
     const ast = parseInput(`library "P".\n${publication.replace("most recent.", "most recent, on equal time prefer local.")}`);
-    (ast.statements[0] as Concept).valueTypes = ["Quantity"];
+    (ast.statements[0] as Concept).valueTypes = ["string"];
     const result = new Validator().validate(ast);
     expect(result.errors.some((e) => "rule" in e && e.rule === "publication-unsupported-form")).toBe(true);
     expect(result.warnings.some((w) => "rule" in w && w.rule === "publication-local-tie-preference-no-op")).toBe(false);
@@ -80,7 +80,7 @@ first:
 
   it.each([
     ['Scalar', (c: Concept) => { c.shape = "Scalar"; }],
-    ['Quantity', (c: Concept) => { c.valueTypes = ["Quantity"]; }],
+    ['string', (c: Concept) => { c.valueTypes = ["string"]; }],
     ['empty code', (c: Concept) => { c.code = ""; }],
     ['producer', (c: Concept) => { c.definition = (parseInput('library "X". concept "X": - value type is boolean. - definition is exists this.').statements[0] as Concept).definition; }],
   ] as const)("rejects unsupported %s opt-in with the shared admission diagnostic", (_name, mutate) => {

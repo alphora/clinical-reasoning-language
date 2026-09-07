@@ -8,6 +8,7 @@ import { publicationCodeKey, normalizePublicationCodes, readFinitePublicationTer
 import type { PublicationCandidate } from "./publicationSelection";
 import { publicationSourceAdmissionReason, type PublicationSource } from "./publicationSource";
 import { readAgeProjection } from "./publicationAge";
+import { readPublicationQuantity, isPublicationComparisonDecimal } from "./publicationQuantity";
 import {
   createPublicationContext,
   type PublicationContext,
@@ -32,11 +33,11 @@ export interface PublicationDescriptor {
   readonly selector: { readonly kind: "mostRecent"; readonly equalTime: "error" | "preferLocal" };
   readonly valueDomain?: readonly PublicationCode[];
   readonly answerOptions?: { readonly valueSetUrl: string; readonly codes: readonly PublicationCode[] };
-  readonly producer?: PublicationMembershipProducer;
+  readonly producer?: PublicationMembershipProducer | PublicationThresholdProducer;
   readonly sources?: readonly PublicationSource[];
 }
 
-export type PublicationValueType = "boolean" | "CodeableConcept";
+export type PublicationValueType = "boolean" | "CodeableConcept" | "Quantity";
 export interface PublicationCode { readonly system: string; readonly code: string }
 export interface PublicationMembershipProducer {
   readonly kind: "membership";
@@ -44,6 +45,23 @@ export interface PublicationMembershipProducer {
   readonly operand: QualifiedConceptIdentity;
   readonly domain: readonly PublicationCode[];
   readonly qualifying: readonly PublicationCode[];
+}
+export interface PublicationThresholdProducer {
+  readonly kind: "quantityThreshold";
+  readonly producerId: string;
+  readonly operand: QualifiedConceptIdentity;
+  readonly threshold: { readonly value: number; readonly unit: string };
+}
+
+// REFACTOR:grounded (#320, plan587): unary comparison contributes its own Boolean record.
+export function readPublicationThreshold(concept: Readonly<Concept>): { operand: ReferenceName; threshold: { value: number; unit: string }; location: Location } | undefined {
+  if (concept.definition?.type !== "DefinitionIsDefinition") return undefined;
+  const call = matchNarrative(concept.definition.body);
+  if (!call.known || call.pattern !== "AtLeast" || call.args.length !== 2) return undefined;
+  const [operand, threshold] = call.args;
+  if (operand.type !== "ConceptRefArg" || threshold.type !== "QuantityArg") return undefined;
+  return { operand: operand.library === undefined ? operand.value : { type: "QualifiedReference", libraryName: operand.library, name: operand.value, location: operand.location },
+    threshold: { value: threshold.value, unit: threshold.unit }, location: call.location };
 }
 
 export function hasLocalPublicationContribution(descriptor: PublicationDescriptor): descriptor is PublicationDescriptor & {
@@ -112,17 +130,20 @@ export interface PublicationWarning extends CRLError {
 export function publicationAdmissionReason(concept: Readonly<Concept>): string | undefined {
   if (concept.shapeReduction === undefined) return "No shape reduction was authored.";
   if (concept.shape !== "Record") return "This shape reduction currently requires explicit `shape is Record`.";
-  if (concept.conceptType !== "Observation" || concept.valueTypes.length !== 1 || !["boolean", "CodeableConcept"].includes(concept.valueTypes[0]))
-    return "This publication slice supports Observation with exactly one boolean or CodeableConcept value type.";
+  // REFACTOR:grounded (#320, plan587): a selected measurement retains its Quantity and metadata.
+  if (concept.conceptType !== "Observation" || concept.valueTypes.length !== 1 || !["boolean", "CodeableConcept", "Quantity"].includes(concept.valueTypes[0]))
+    return "This publication slice supports Observation with exactly one boolean, CodeableConcept or Quantity value type.";
   const membership = readPublicationMembership(concept);
+  const threshold = readPublicationThreshold(concept);
   if (concept.code !== undefined && concept.code.trim().length === 0) return "A local `code is` must be nonempty.";
   // REFACTOR:grounded (#320, plan585): an age calculation needs no invented answer identity.
-  if (concept.code === undefined && membership === undefined && !concept.representations.some(rep => readAgeProjection(rep))) return "A publication requires a local code or an admitted producer.";
-  if (concept.definition !== undefined && membership === undefined)
-    return "Only unary selected-value membership production is implemented with this final selector; other definitions cannot be ignored.";
+  if (concept.code === undefined && membership === undefined && threshold === undefined && concept.representations.length === 0) return "A publication requires a local code or an admitted producer/source.";
+  if (concept.definition !== undefined && membership === undefined && threshold === undefined)
+    return "Only selected-value membership and quantity threshold production are implemented with this final selector; other definitions cannot be ignored.";
   const sourceReason = publicationSourceAdmissionReason(concept);
   if (sourceReason !== undefined) return sourceReason;
   if (membership !== undefined && concept.valueTypes[0] !== "boolean") return "Membership produces an Observation with a boolean value.";
+  if (threshold !== undefined && concept.valueTypes[0] !== "boolean") return "A quantity comparison produces an Observation with a boolean value.";
   if (concept.valueElement !== undefined && concept.valueElement.path !== "value")
     return "An Observation<boolean> publication reads its `value` element.";
   if (concept.valueFrom !== undefined && concept.valueTypes[0] !== "CodeableConcept")
@@ -231,7 +252,7 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
       const sources = concept.representations.map((rep, index): PublicationSource => {
         const contributorId = `crl:source:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["source", index]]))}`;
         const age = readAgeProjection(rep);
-        return age ? Object.freeze({ ...age, contributorId }) : Object.freeze({ kind: "serviceRequestWitness", contributorId,
+        return age ? Object.freeze({ ...age, contributorId }) : Object.freeze({ kind: rep.conceptType === "Observation" ? "observationQuantity" : "serviceRequestWitness", contributorId,
           terminology: rep.terminologyName!, codes: finiteTerminology(library.sourceIdentity, rep.terminologyName!, rep.location).codes });
       });
       let answerOptions: PublicationDescriptor["answerOptions"];
@@ -249,7 +270,7 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
         }
       }
       const syntax = readPublicationMembership(concept);
-      let producer: PublicationMembershipProducer | undefined;
+      let producer: PublicationMembershipProducer | PublicationThresholdProducer | undefined;
       if (syntax !== undefined) {
         // REFACTOR:grounded (#320, code review 563): a coded computation promises
         // its own CF profile. Missing metadata cannot silently make it uncoded-like.
@@ -285,6 +306,19 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
         }));
         producer = Object.freeze({ kind: "membership", producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["membership", 0]]))}`,
           operand: prepared.identity, domain, qualifying: normalized(qualifying) });
+      }
+      const comparison = readPublicationThreshold(concept);
+      if (comparison !== undefined) {
+        if (localCode !== undefined && !library.artifact.policyId) return fail("A coded producer requires an owning policy identity.", concept.location, "publication-producer-profile-identity-missing");
+        const hit = declarations.lookupConcept(library.sourceIdentity, comparison.operand, comparison.location);
+        if (hit.kind !== "hit") return fail("The quantity operand cannot resolve.", comparison.location, "publication-reference-resolution");
+        if (hit.node.shapeReduction === undefined) return fail("Quantity comparison requires an explicitly selected Record operand.", comparison.location, "publication-quantity-operand-unsupported");
+        const operand = prepare(hit.library, hit.node);
+        if (operand?.valueType !== "Quantity") return fail("Quantity comparison requires a Quantity-valued publication.", comparison.location, "publication-quantity-operand-unsupported");
+        if (!isPublicationComparisonDecimal(comparison.threshold.value) || !["m", "cm", "kg", "g", "kg/m2"].includes(comparison.threshold.unit))
+          return fail("Quantity threshold requires a finite value and a supported unit: m, cm, kg, g, kg/m2.", comparison.location, "publication-quantity-unit-unsupported");
+        producer = Object.freeze({ kind: "quantityThreshold", producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["quantityThreshold", 0]]))}`,
+          operand: operand.identity, threshold: Object.freeze(comparison.threshold) });
       }
       const descriptor: PublicationDescriptor = Object.freeze({ identity: hit.identity, conceptId, title: concept.name,
         ...(localCode === undefined ? {} : { localCode, localContributorId: `${conceptId}/local`,
@@ -351,6 +385,33 @@ export function publicationBooleanRead(recordExpression: string): string {
   return `FHIRHelpers.ToBoolean((${recordExpression}).value as FHIR.boolean)`;
 }
 
+/** REFACTOR:grounded (#320, plan587): local and projected measurements share wire validation. */
+export function publicationResourceError(descriptor: PublicationDescriptor, resource: Record<string, unknown>):
+  { kind: "error"; code: string; message: string } | undefined {
+  const fail = (code: string, message: string): { kind: "error"; code: string; message: string } =>
+    ({ kind: "error", code, message: descriptor.conceptId + ": " + message });
+  if (resource.resourceType !== "Observation")
+    return fail("publication-invalid-resource", "Expected an Observation candidate.");
+  if (!PUBLICATION_OBSERVATION_STATUSES.some((status) => status === resource.status))
+    return fail("publication-invalid-status", "Expected a present, valid FHIR Observation status.");
+  if (resource.status === "entered-in-error" || resource.status === "cancelled")
+    return fail("publication-invalidated-record", "Explicitly invalidated or cancelled candidates need an authored eligibility policy.");
+  const choice = `value${descriptor.valueType === "boolean" ? "Boolean" : descriptor.valueType}`;
+  const value = resource[choice];
+  if (Object.keys(resource).some((key) => /^_?value[A-Z]/.test(key) && key !== choice &&
+      !(descriptor.valueType === "boolean" && key === "_valueBoolean")) ||
+      (value != null && (descriptor.valueType === "boolean" ? typeof value !== "boolean"
+        : typeof value !== "object" || Array.isArray(value))))
+    return fail("publication-invalid-value", `A present answer must be a FHIR ${descriptor.valueType}; absence remains unknown.`);
+  if (descriptor.valueType === "Quantity") {
+    const quantity = readPublicationQuantity(value);
+    if (quantity.kind === "error") return fail(quantity.code, quantity.message);
+  }
+  if (Object.keys(resource).some((key) => /^_?effective[A-Z]/.test(key) && key !== "effectiveDateTime" && key !== "_effectiveDateTime") ||
+      (resource.effectiveDateTime != null && typeof resource.effectiveDateTime !== "string"))
+    return fail("publication-invalid-validity-choice", "This publication accepts effectiveDateTime or absent validity.");
+}
+
 /** Observable resource violations are errors, not missing answers. The selector stays opaque. */
 export function adaptPublicationCandidate<T extends Record<string, unknown>>(
   descriptor: PublicationDescriptor,
@@ -359,22 +420,8 @@ export function adaptPublicationCandidate<T extends Record<string, unknown>>(
   const fail = (code: string, message: string): { kind: "error"; code: string; message: string } =>
     ({ kind: "error", code, message: `${descriptor.conceptId}: ${message}` });
   if (!hasLocalPublicationContribution(descriptor)) return fail("publication-no-local-contributor", "This publication has no local answer representation.");
-  if (resource.resourceType !== "Observation")
-    return fail("publication-invalid-resource", "Expected an Observation candidate.");
-  if (!PUBLICATION_OBSERVATION_STATUSES.some((status) => status === resource.status))
-    return fail("publication-invalid-status", "Expected a present, valid FHIR Observation status.");
-  if (resource.status === "entered-in-error" || resource.status === "cancelled")
-    return fail("publication-invalidated-record", "Explicitly invalidated or cancelled candidates need an authored eligibility policy.");
-  const choice = descriptor.valueType === "boolean" ? "valueBoolean" : "valueCodeableConcept";
-  const value = resource[choice];
-  if (Object.keys(resource).some((key) => /^_?value[A-Z]/.test(key) && key !== choice &&
-      !(descriptor.valueType === "boolean" && key === "_valueBoolean")) ||
-      (value != null && (descriptor.valueType === "boolean" ? typeof value !== "boolean"
-        : typeof value !== "object" || Array.isArray(value))))
-    return fail("publication-invalid-value", `A present answer must be a FHIR ${descriptor.valueType}; absence remains unknown.`);
-  if (Object.keys(resource).some((key) => /^_?effective[A-Z]/.test(key) && key !== "effectiveDateTime" && key !== "_effectiveDateTime") ||
-      (resource.effectiveDateTime != null && typeof resource.effectiveDateTime !== "string"))
-    return fail("publication-invalid-validity-choice", "This publication accepts effectiveDateTime or absent validity.");
+  const violation = publicationResourceError(descriptor, resource);
+  if (violation !== undefined) return violation;
   const identity = typeof resource.id === "string" && resource.id.trim() !== "" ? `Observation/${resource.id}` : undefined;
   return { kind: "candidate", candidate: {
     key: identity ?? "Observation/<missing-id>",

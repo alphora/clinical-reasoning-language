@@ -1,0 +1,30 @@
+// REFACTOR:grounded (#320, plan587): synthetic measurement comparison, not a clinical policy.
+library "Quantity Publication".
+terminology "Height Source":
+- system is `http://loinc.org`.
+- code is `8302-2`.
+concept "Height":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is `height`.
+- shape reduction is most recent.
+- source representation:
+  - type is Observation.
+  - coded from "Height Source".
+concept "Flag":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- definition is "Height" at least 1 'm'.
+- shape reduction is most recent.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `APPROVED`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `DENIED`.
+decision "D":
+first:
+- when "Flag" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".

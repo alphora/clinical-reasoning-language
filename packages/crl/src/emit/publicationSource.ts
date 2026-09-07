@@ -1,10 +1,18 @@
 import type { Concept, ReferenceName } from "../ast/types";
-import type { PublicationCode, PublicationDescriptor } from "./publicationProgram";
+import { publicationResourceError, type PublicationCode, type PublicationDescriptor } from "./publicationProgram";
 import type { PublicationCandidate } from "./publicationSelection";
 import { publicationDerivedCandidateKey } from "./publicationProducer";
 import type { PublicationValueError } from "./publicationDomain";
 import { readAgeProjection, type PublicationAgeSource } from "./publicationAge";
-export type PublicationSource = PublicationServiceRequestSource | PublicationAgeSource;
+export type PublicationSource = PublicationServiceRequestSource | PublicationAgeSource | PublicationObservationSource;
+
+// REFACTOR:grounded (#320, plan587): measurement projection preserves value and measurement time.
+export interface PublicationObservationSource {
+  readonly kind: "observationQuantity";
+  readonly contributorId: string;
+  readonly terminology: ReferenceName;
+  readonly codes: readonly PublicationCode[];
+}
 
 // REFACTOR:grounded (#320, review 564): one source record supplies one positive witness.
 // This is not a closed-world exists reduction or a hidden status/intent exclusion filter.
@@ -17,6 +25,11 @@ export interface PublicationServiceRequestSource {
 
 export function publicationSourceAdmissionReason(concept: Readonly<Concept>): string | undefined {
   if (concept.representations.length === 0) return undefined;
+  if (concept.valueTypes[0] === "Quantity") {
+    return concept.representations.every(rep => rep.conceptType === "Observation" && rep.terminologyName !== undefined &&
+      rep.valueProjection === undefined && rep.valueElement === undefined && rep.valueTypes.length === 0)
+      ? undefined : "Quantity sources require Observation coded-from with its native value; other projections are not implemented.";
+  }
   if (concept.valueTypes[0] !== "boolean") return "Source publication requires an Observation<boolean> result.";
   if (concept.representations.some(rep => readAgeProjection(rep) !== undefined))
     return concept.representations.length === 1 && concept.definition === undefined ? undefined
@@ -50,10 +63,42 @@ export function matchesCelPublicationPatient(resource: Record<string, unknown>, 
 
 export function matchesPublicationSource(source: PublicationSource, resource: Record<string, unknown>): boolean {
   if (source.kind === "ageToday") return resource.resourceType === "Patient";
-  if (resource.resourceType !== "ServiceRequest") return false;
+  if (resource.resourceType !== (source.kind === "observationQuantity" ? "Observation" : "ServiceRequest")) return false;
   const coding = (resource.code as { coding?: unknown } | undefined)?.coding;
   return Array.isArray(coding) && coding.some((item) => item !== null && typeof item === "object" &&
     source.codes.some((code) => code.system === item.system && code.code === item.code));
+}
+
+export function adaptObservationPublicationCandidate(
+  descriptor: PublicationDescriptor, source: PublicationObservationSource,
+  resource: Record<string, unknown>, subjectReference: string,
+): { kind: "candidate"; candidate: PublicationCandidate<Record<string, unknown>> } | PublicationValueError {
+  const fail = (code: string, message: string): PublicationValueError => ({ kind: "error", code, message });
+  if (!matchesPublicationSource(source, resource)) return fail("publication-source-mismatch", "The record does not match this Observation contributor.");
+  const violation = publicationResourceError(descriptor, resource);
+  if (violation !== undefined) return violation;
+  if (resource.modifierExtension !== undefined && (!Array.isArray(resource.modifierExtension) || resource.modifierExtension.length))
+    return fail("publication-source-state-unsupported", "Observation modifier extensions require an explicit interpretation.");
+  const patient = publicationPatientId(subjectReference);
+  if (patient === undefined || patient !== publicationPatientId((resource.subject as { reference?: unknown })?.reference))
+    return fail("publication-source-subject-unsupported", "The source must resolve to the current evaluation Patient.");
+  if (typeof resource.id !== "string" || !/^[A-Za-z0-9.-]{1,64}$/.test(resource.id))
+    return fail("publication-missing-input-identity", "A retrieved Observation requires a valid FHIR id.");
+  const input = `Observation/${resource.id}`;
+  const projected: Record<string, unknown> = {
+    resourceType: "Observation", status: "final", subject: { reference: subjectReference },
+    code: descriptor.localCode === undefined ? { text: descriptor.title } : { coding: [descriptor.localCode], text: descriptor.title },
+    ...(descriptor.profileUrl === undefined ? {} : { meta: { profile: [descriptor.profileUrl] } }),
+    ...(resource.valueQuantity === undefined ? {} : { valueQuantity: resource.valueQuantity }),
+    ...(resource.effectiveDateTime === undefined ? {} : { effectiveDateTime: resource.effectiveDateTime }),
+    ...(resource._effectiveDateTime === undefined ? {} : { _effectiveDateTime: resource._effectiveDateTime }),
+    derivedFrom: [{ reference: input }],
+  };
+  return { kind: "candidate", candidate: {
+    key: publicationDerivedCandidateKey(source.contributorId, input), contributorId: source.contributorId,
+    arm: "source", retrievedInputIdentity: input, resource: projected,
+    ...(typeof resource.effectiveDateTime === "string" ? { validity: resource.effectiveDateTime } : {}),
+  } };
 }
 
 export function adaptServiceRequestPublicationCandidate(
