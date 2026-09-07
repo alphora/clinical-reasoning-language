@@ -116,7 +116,8 @@ export function publicationAdmissionReason(concept: Readonly<Concept>): string |
     return "This publication slice supports Observation with exactly one boolean or CodeableConcept value type.";
   const membership = readPublicationMembership(concept);
   if (concept.code !== undefined && concept.code.trim().length === 0) return "A local `code is` must be nonempty.";
-  if (concept.code === undefined && membership === undefined) return "A publication requires a local code or an admitted membership producer.";
+  // REFACTOR:grounded (#320, plan585): an age calculation needs no invented answer identity.
+  if (concept.code === undefined && membership === undefined && !concept.representations.some(rep => readAgeProjection(rep))) return "A publication requires a local code or an admitted producer.";
   if (concept.definition !== undefined && membership === undefined)
     return "Only unary selected-value membership production is implemented with this final selector; other definitions cannot be ignored.";
   const sourceReason = publicationSourceAdmissionReason(concept);
@@ -225,7 +226,7 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
         : `${localCode.system}#${encodeURIComponent(localCode.code)}`;
       const valueDomain = concept.valueTypes[0] === "CodeableConcept" ? domainFor(library, concept) : undefined;
       // REFACTOR:grounded (#320, review 564): prepare every declared source before lowering.
-      if (concept.representations.length > 0 && !library.artifact.policyId)
+      if (localCode !== undefined && concept.representations.length > 0 && !library.artifact.policyId)
         fail("A source-produced Case Feature requires an owning policy identity.", concept.location, "publication-source-profile-required");
       const sources = concept.representations.map((rep, index): PublicationSource => {
         const contributorId = `crl:source:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["source", index]]))}`;

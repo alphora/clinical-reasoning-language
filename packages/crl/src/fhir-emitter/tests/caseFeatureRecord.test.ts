@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 // #189 2d P2 — tests for the per-concept case-feature RECORD resolver (inert precursor).
 // Grounded in the deriver's verified output shapes (see emit/tests/effectiveRepresentation.test.ts): `exists this`
 // on ANY resource → NO value datum (presence is orthogonal to the record's value — a value-bearing Observation is
@@ -147,13 +148,13 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     expect(r.derivationKind).toBe("unsupported-reduction-form");
   });
 
-  it("standalone Patient age (uncoded arm, posrep) → supplied-patient (READ, no case-feature SD — charter §2)", () => {
+  it("retired implicit age cannot create a case-feature record", () => {
     // The uncoded arm is the age POSREP form (birthDate projection), NOT the retired `definition is age` carve-out.
     const r = resolve(
       `concept "Age 18 Or Older":\n- value type is boolean.\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is age today at least 18 years.\n`,
       "Age 18 Or Older",
     );
-    expect(r.kind).toBe("supplied-patient");
+    expect(r.kind).toBe("not-a-record");
   });
 });
 

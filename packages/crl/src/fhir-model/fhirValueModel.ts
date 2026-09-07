@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 import { type ConceptValueType } from "../grammar/conceptValueTypes";
 
 // #189 T3a — the FHIR value-read model (design §8 flip-blocker). The single authority for the question every
@@ -39,7 +40,7 @@ import { type ConceptValueType } from "../grammar/conceptValueTypes";
 //
 // Patient is modeled ONLY for `birthDate` (the uncoded age arm). Its standard `value` carrier is deliberately
 // left `undefined`, NOT ∅: Patient is not a value-read resource on the standard carrier (Patient concepts route
-// through the age-catalog lane, `recencyProjectionOverride`), so the model asserts no positive fact about a
+// through the age-catalog lane, `agePublication`), so the model asserts no positive fact about a
 // `Patient.value` a KE will not author. `("Patient","value") → undefined` is pinned so a later edit is conscious.
 //
 // ── elementPath NORMALIZATION CONTRACT ───────────────────────────────────────────────────────────────────

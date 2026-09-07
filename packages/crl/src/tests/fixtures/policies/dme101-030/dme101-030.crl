@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 # DME101.030 — Ultrasonic Osteogenesis Stimulator
 library "Ultrasonic Osteogenesis Stimulator Coverage".
 
@@ -39,16 +40,15 @@ the SOURCE ServiceRequest data round-trip are Piece 2/3, needing the CEL writer)
 terminology "Covered Devices":
 - valueset is `http://example.org/hcsc/dme101-030/ValueSet/covered-devices`.
 
-// Patient age — a BOTH-representation BOOLEAN determination (North Star §2, Patient is the one
-// both-rep exception). Two assertion points: assert `adult-18-or-older` (the boolean) directly,
-// OR supply `Patient.birthDate` and let the `value projection` compute it. The remote channel
-// supplies the birth date on the subject Patient; the projection reads it. There is no numeric
-// "assert an age" path — supplying birthDate IS the value-side assertion. This both-rep EMITS
-// today (its posrep recency is the built #257 age slice). Mirrors fhir-emitter/tests/fixtures/patient-age.
+// Age publication accepts Patient.birthDate or its own Boolean answer. A same-day assertion wins
+// over today's calculation; otherwise current calculation supersedes older assertions. Missing
+// input remains unknown. Numeric age entry is a separate, unimplemented assertion point.
 concept "Adult Eighteen Or Older":
-- value type is boolean.
+- shape is Record.
 - type is Observation.
+- value type is boolean.
 - code is `adult-18-or-older`.
+- shape reduction is most recent.
 - source representation:
   - type is Patient.
   - value projection is age today at least 18 years.

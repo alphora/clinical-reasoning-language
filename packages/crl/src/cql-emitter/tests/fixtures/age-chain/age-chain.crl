@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 # Age chain — the assertion points for ONE gate, and where the chain breaks today.
 //
 // A gate is a boolean determination. A user must be able to reach it from whatever they actually
@@ -8,14 +9,16 @@
 //   2. assert a BIRTH DATE as its own answer     -> a sub-question         ⚠ NOT EXPRESSIBLE (below)
 //   3. assert "18 or older" directly             -> the main question      WORKS (`code is`)
 //
-// 1 and 3 live on ONE concept and RECENCY-MERGE (newest wins) — that is why the local arm and the
-// Patient arm are two arms of the same determination rather than two concepts.
+// 1 and 3 contribute to one publication under the age pattern's daily rule:
+// a same-day assertion wins; otherwise today's calculation supersedes older assertions.
 library "AgeChain".
 
 concept "Adult Eighteen Or Older":
-- value type is boolean.
+- shape is Record.
 - type is Observation.
+- value type is boolean.
 - code is `adult-18-or-older`.
+- shape reduction is most recent.
 - source representation:
   - type is Patient.
   - value projection is age today at least 18 years.

@@ -108,18 +108,14 @@ describe("#232 — sem-not lowering (pure-question leaves → boolean lane)", ()
   });
 });
 
-describe("#232 — sem-not over the patient-age recency twin (real-artifact shape)", () => {
-  it("flips the recency-twin `sem-not` to the boolean lane (`not (...)`) — the twin emits a TOTAL boolean (#189 2b.3b.1)", () => {
+// REFACTOR:grounded (#320, plan585): age negation is a criterion over the selected Boolean.
+describe("#232 — migrated age criterion negation", () => {
+  it("negates the selected value without totalizing missing evidence", () => {
     const result: any = emitCQLImports(FIX("semnot-age-232"));
-    expect(result.success).toBe(true);
-    const cql = inferredCql(result);
-    // #189 Slice C 2b.3b.1 — `Under Age 21` = `sem-not "Age 21 Or Older"` where the operand is the recency twin,
-    // which now emits a TOTAL boolean (`Coalesce(CFH.recencyAgeSelected(...), false)`). The composition is
-    // all-operands-total → flips to the boolean lane: `not ("Age 21 Or Older")`, NOT the truth-set complement
-    // `({ true } except ("Age 21 Or Older"))`.
-    expect(cql).toMatch(/define "Under Age 21":\s*\n\s*not \("Age 21 Or Older"\)/);
-    expect(cql).not.toMatch(/\{ true \} except/);
-    expect(cql).not.toContain("FIXME");
+    expect(result.success, JSON.stringify(result.errors)).toBe(true);
+    const cql = result.cqlByLibrary.map((x: any) => x.cql).join("\n");
+    expect(cql).toMatch(/define "Under Age 21":\s*not FHIRHelpers\.ToBoolean/);
+    expect(cql).not.toContain("recencyAge");
     expect(cql).not.toContain("UnsupportedNegation");
   });
 });

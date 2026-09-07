@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -5,7 +6,6 @@ import { describe, it, expect } from "vitest";
 
 import { RESOURCE_EMIT_REGISTRY } from "../../emit/resourceEmitRegistry";
 import { conceptValueTypes, type ConceptValueType } from "../../grammar/conceptValueTypes";
-import { AGE_TODAY_OVER_BIRTHDATE } from "../../template-match/recencyProjectionOverride";
 import { relativeElementPath } from "../elementPath";
 import {
   valueReadValueTypes,
@@ -143,15 +143,8 @@ describe("valueReadValueTypes — coherence pins", () => {
     }
   });
 
-  it("Patient.birthDate row agrees with the age catalog on ALL THREE axes (derived, not double-entry)", () => {
-    // Ties resource type, normalized path, AND datum type to AGE_TODAY_OVER_BIRTHDATE via the shared normalizer,
-    // and requires an EXACT singleton (birthDate admits only `date`) — so a drift of any catalog axis is caught,
-    // not just the value-element literal.
-    const o = AGE_TODAY_OVER_BIRTHDATE;
-    const key = relativeElementPath(o.valueElementPath, o.sourceType);
-    const s = valueReadValueTypes(o.sourceType, key);
-    expect(s, `${o.sourceType}.${key} must be modeled`).toBeDefined();
-    expect([...s!]).toEqual([o.repValueType]);
+  it("Patient.birthDate is a FHIR date input; age publication does not redefine it", () => {
+    expect([...valueReadValueTypes("Patient", "birthDate")!]).toEqual(["date"]);
   });
 
   it("the model's keyset is EXACTLY the emit-registry resources ∪ {Patient} (model→registry, both directions)", () => {

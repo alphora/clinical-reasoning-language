@@ -10,6 +10,44 @@ import { ageMethod } from "../../emit/publicationAge";
 
 // REFACTOR:grounded (#320, plan583): ordinary CEL subject/answer emission and coherent consumer wiring.
 describe("age publication CEL and CRE", () => {
+  it("evaluates uncoded age from Patient without creating an answer slot", () => {
+    const parent = path.resolve(os.tmpdir()), dir = mkdtempSync(path.join(parent, "crl-age-uncoded-"));
+    if (path.dirname(dir) !== parent || !path.basename(dir).startsWith("crl-age-uncoded-")) throw Error("Unexpected test directory");
+    try {
+      writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "age-read", version: "0.0.0", crl: { canonicalBase: "http://example.org/age-read", date: "2026-09-07" } }));
+      const crl = path.join(dir, "policy.crl"), cel = path.join(dir, "cases.cel");
+      writeFileSync(crl, readFileSync(path.join(__dirname, "../../emit/tests/fixtures/publication-age.crl"), "utf8").replace(/^- code is .*\r?\n/m, ""));
+      const cases = `library "Age Read Cases".
+covers "Age Publication".
+fact "Adult":
+- defined by "Patient".
+- birth date is "1980-01-01".
+fact "Child":
+- defined by "Patient".
+- birth date is "2020-01-01".
+fact "Missing":
+- defined by "Patient".
+case "Adult":
+- subject is "Adult".
+- result is "D" is "Approve".
+case "Child":
+- subject is "Child".
+- result is "D" is "Deny".
+case "Missing":
+- subject is "Missing".
+- result is "D" is pause.
+`;
+      writeFileSync(cel, cases);
+      const run = runCel(resolveCelImports(cel), { now: new Date("2026-09-07T12:00:00Z") });
+      expect(run.runs.map(r => ({ status: r.status, diagnostics: r.diagnostics }))).toEqual(Array.from({ length: 3 }, () => ({ status: "pass", diagnostics: [] })));
+      const fhir = emitFhirDefFromPath(crl);
+      expect(fhir.success, JSON.stringify(fhir.errors)).toBe(true);
+      expect(fhir.resources.some(r => r.resource.resourceType === "StructureDefinition")).toBe(false);
+      writeFileSync(cel, cases + '\nfact "Invented Answer":\n- defined by "Age Publication"."Adult".\n- value is false.\ncase "Invalid":\n- subject is "Adult".\n- fact is "Invented Answer".\n- result is "D" is "Deny".\n');
+      const invalid = emitCelToFhir(resolveCelImports(cel));
+      expect(invalid.diagnostics.some(d => d.severity === "error" || d.kind === "unsupported-yet"), JSON.stringify(invalid.diagnostics)).toBe(true);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
   it("repairs missing birthDate and applies the pattern's same-day rule", () => {
     const parent = path.resolve(os.tmpdir()), dir = mkdtempSync(path.join(parent, "crl-age-publication-"));
     if (path.dirname(dir) !== parent || !path.basename(dir).startsWith("crl-age-publication-")) throw Error("Unexpected test directory");

@@ -35,3 +35,9 @@ export function hasSourceBinding(concept: Concept): boolean {
 export function isResourcelessDerived(concept: Concept): boolean {
   return !hasLocalCode(concept) && !hasSourceBinding(concept);
 }
+
+/** REFACTOR:grounded (#320, plan585): a computed publication may return a resource without
+ * owning a local answer representation. Its source inputs must not make its result assertable. */
+export function cannotDirectlyAssertConcept(concept: Concept): boolean {
+  return isResourcelessDerived(concept) || (concept.shapeReduction !== undefined && !hasLocalCode(concept));
+}

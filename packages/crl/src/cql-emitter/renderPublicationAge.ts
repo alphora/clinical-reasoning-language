@@ -51,7 +51,7 @@ define function ${q(AGE_CQL.produce)}(P FHIR.Patient, contributorId System.Strin
     resource: FHIR.Observation {
       status: FHIR.ObservationStatus { value: 'final' },
       subject: FHIR.Reference { reference: FHIR.string { value: subjectReference } },
-      meta: FHIR.Meta { profile: { FHIR.canonical { value: profile } } },
+      meta: if profile is null then null as FHIR.Meta else FHIR.Meta { profile: { FHIR.canonical { value: profile } } },
       code: code, effective: FHIR.dateTime { value: ToDateTime(evaluationDay) },
       method: FHIR.CodeableConcept { coding: { FHIR.Coding { system: FHIR.uri { value: ${methodSystem} }, code: FHIR.code { value: 'calculated' } } } },
       value: FHIR.boolean { value: "${AGE_CQL_PREFIX}Value"(

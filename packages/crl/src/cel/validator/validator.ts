@@ -40,7 +40,7 @@ import type { ResolvedCelGraph } from "../imports/types";
 import { classifyCanonicalToken } from "../canonicalToken";
 import { makeLocalDomainContext, localMemberOfConcept, memberKey, type LocalDomainContext } from "../localMembership";
 import { sourceMembersOfConcept } from "../sourceMembership";
-import { hasSourceBinding, isResourcelessDerived } from "../../emit/conceptDatumSignals";
+import { hasSourceBinding, cannotDirectlyAssertConcept } from "../../emit/conceptDatumSignals";
 
 import type {
   CELValidationError,
@@ -492,7 +492,7 @@ function validateDefinedBy(
     // whether any case references it (context-free: validity must not depend on use). This precedes the
     // `unsupported-yet` type-derivation warning (a resourceless concept may also be untyped; the read-only reject is
     // the right diagnosis, not "no derivable FHIR type").
-    if (isResourcelessDerived(target)) {
+    if (cannotDirectlyAssertConcept(target)) {
       errors.push(
         err(
           "cannot-directly-assert-derived-concept",

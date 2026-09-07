@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 # Patient Age Remote — age both-rep round-trip proof
 library "Patient Age Remote".
 
@@ -6,16 +7,17 @@ The bounded EMITTABLE proof for the both-representation posrep round-trip (#189 
 
 `Adult Eighteen Or Older` is a BOTH-representation age determination (North Star §2/§3): a local
 `code is` assertion arm PLUS a Patient `source representation` whose `value projection` computes live
-age over the SUPPLIED `Patient.birthDate`. Age is the one both-rep whose recency merge is already built
-(#257 age slice), so it emits today. Its source arm reads the SUBJECT Patient's birthDate — emitted on
-every channel — so this proves the supplied-data round-trip without the (deferred) remote-channel
-instance emit. dme101-030 carries the coded-device both-rep (emit-deferred to the #189 flip; disc 496).
+age over the supplied Patient.birthDate. Explicit Record publication preserves unknown input.
+A same-day assertion overrides today's calculation; otherwise an available current calculation wins
+over older assertions. This fixture checks supplied Patient data, not endpoint routing or client rendering.
 */
 
 concept "Adult Eighteen Or Older":
-- value type is boolean.
+- shape is Record.
 - type is Observation.
+- value type is boolean.
 - code is `adult-18-or-older`.
+- shape reduction is most recent.
 - source representation:
   - type is Patient.
   - value projection is age today at least 18 years.

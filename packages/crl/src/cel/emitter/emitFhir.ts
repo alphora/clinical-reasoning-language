@@ -10,7 +10,7 @@ import {
 import {
   hasLocalCode,
   hasSourceBinding,
-  isResourcelessDerived,
+  cannotDirectlyAssertConcept,
 } from "../../emit/conceptDatumSignals";
 import {
   resourceCodingPlacement,
@@ -936,7 +936,7 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   // (deriveFhirType would SUCCEED and fabricate a resource for an ephemeral concept — a §4 violation). The validator
   // is the primary gate; this backstops emission for a caller that skips it.
   const targetConcept = resolveDefinedByConcept(definedBy, ctx.graph);
-  if (targetConcept && isResourcelessDerived(targetConcept)) {
+  if (targetConcept && cannotDirectlyAssertConcept(targetConcept)) {
     if (targetConcept.shapeReduction !== undefined) ctx.publicationFailed = true;
     ctx.diagnostics.push({
       kind: "cannot-directly-assert-derived-concept",

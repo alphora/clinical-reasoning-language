@@ -96,8 +96,6 @@
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import type {
-  AgeComputeFn,
-  AgeRecencyOp,
   CRL,
   Concept,
   CodedFromDefinition,
@@ -129,18 +127,13 @@ import {
 } from "../emit/producerCandidate";
 import type { BoundaryTransformSpec, ValueReadSourceSpec } from "../emit/producerCandidate";
 import type { ProducerCandidateSpec, ProjectedSourceSpec } from "../emit/producerCandidate";
-import { isAgeTodayPrefix } from "../template-match/agePredicate";
 import {
   resolveRecencyValueConcept,
   isMemberExistenceInterface,
 } from "../template-match/recencyValueConcept";
 import {
-  ageRetirementMessage,
-  isRetiredAgeTodayDefinition,
   resolveAgeConcept,
-  resolveRecencyProjection,
-  type AgeProjectionArgs,
-} from "../template-match/recencyProjectionOverride";
+} from "../template-match/agePublication";
 import type { CRLError } from "../types/errors";
 import { prepareSingleLibraryPublication, type PublicationEmitScope } from "../emit/publicationProgram";
 import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
@@ -296,6 +289,8 @@ export function lowerLocalCodes(
     return { ast, errors: [...publicationProgram.diagnostics], localCodes: [] };
 
   // Fast path: nothing to lower → return the input untouched (no clone churn).
+  const ageErrors = preLowerAge(ast).errors;
+  if (ageErrors.length) return { ast, errors: ageErrors, localCodes: [] };
   if (!ast.statements.some(isLowerableConcept) && !hasRawPublication) {
     return { ast, errors, localCodes: [] };
   }
@@ -587,35 +582,6 @@ export function lowerLocalCodes(
       continue;
     }
 
-    // (AGE) `code is` + an age `source representation` (patient-age migration, #257).
-    //     A posrep whose `value projection is age today <cmp> <Q>` over `Patient.birthDate`
-    //     RECENCY-MERGES with the local `code is`. The WHOLE-CONCEPT shape is classified by the
-    //     SHARED `resolveAgeConcept` — the SAME source the author-time validator consults, so
-    //     validate and emit cannot drift on the concept-shape lattice (not just the comparator set).
-    //     A `"recency"` verdict consumes the posrep and drives the existing recency machinery below
-    //     via a definition SYNTHESIZED from the projection (marked `__synthesizedFromPosrep`), so
-    //     classification + emit stay byte-identical to the retired `definition is age today`
-    //     carve-out. Every age-shaped mis-authoring is a LOUD hard error (no silent stub). A
-    //     `not-age` concept (non-age posrep, or none) falls through to the (2)/(3)/(4) flow.
-    let ageMerge: { args: AgeProjectionArgs; overrideId: string } | null = null;
-    let synthAgeDef: DefinitionIsDefinition | undefined;
-    const ageShape = resolveAgeConcept(c);
-    if (ageShape.kind === "error") {
-      errors.push(mkError(ageShape.errorKind, ageShape.message, loc));
-      continue;
-    }
-    if (ageShape.kind === "recency") {
-      const rep = (c.representations ?? []).find((r) => resolveRecencyProjection(r).kind === "match")!;
-      ageMerge = { args: ageShape.args, overrideId: ageShape.override.id };
-      synthAgeDef = {
-        type: "DefinitionIsDefinition",
-        body: rep.valueProjection!.body,
-        location: rep.valueProjection!.location,
-      };
-      // Strip the consumed posrep AND default the local type to the implicit-standard Observation
-      // (so the `code is` retrieve + FHIR case-feature lower exactly as the retired form did).
-      c = { ...c, representations: [], conceptType: c.conceptType ?? "Observation" };
-    }
     // ⭐⭐ #189 — HOISTED ABOVE THE `ReductionDefinition` GUARD, and that hoist is the fix.
     //
     // `resolveRecencyValueConcept` now asks the SHARED `resolveConceptPipeline` whether the concept's program
@@ -997,9 +963,6 @@ export function lowerLocalCodes(
       bothRepInferredTwins.push(mergeTwin);
       continue;
     }
-
-    // `ageShape.kind === "standalone"` cannot occur for a code-bearing concept (recency requires the
-    // local `code is`); `resolveAgeConcept` never returns it here.
 
     // (2-pre) `code is` + a `definition is` REDUCTION (#189). Caught HERE, BEFORE the generic mixed
     //   check below. Slice A2 ACTIVATES the ONE emittable form — `exists this` with NO `source
@@ -1551,12 +1514,7 @@ export function lowerLocalCodes(
     //     case-feature model): the concept SPLITS into a LocalPrimitives retrieve twin (the
     //     direct local code) + an Inferences twin. Supported both-rep flavors:
     //       - `code is` + `defined as`                 → UNION fold-in (historical).
-    //       - `code is` + an age `source representation` → RECENCY merge (patient-age;
-    //         handled by the (AGE) block above, which strips the posrep + synthesizes the
-    //         definition).
-    //     `code is` + `definition is age today` is RETIRED (the migration target is the
-    //     age posrep) — the pre-lowering retirement scan owns that error, so it is skipped
-    //     here rather than double-reported.
+    //     Age is handled only through explicit Record publication, before this legacy branch.
     //
     // ⚠ BUILD DEBT, NOT A SCOPE DECISION (charter §0a). `code is` + any other `definition is` hard-errors
     // below because the fold-in is UNBUILT for it, not because the shape is illegal — it is the canonical
@@ -1564,15 +1522,12 @@ export function lowerLocalCodes(
     // target emitting at all. Generalizing the `defined as` fold-in to cover `definition is` is the work.
     // The error stays LOUD meanwhile: emitting nothing beats silently dropping the local-code source side.
     if (c.definition !== undefined && c.definition.type !== "DefinedAsDefinition") {
-      if (c.definition.type === "DefinitionIsDefinition" && isAgeTodayPrefix(c.definition.body)) {
-        continue; // retired `definition is age today` — owned by checkRetiredAgeDefinitions
-      }
       errors.push(
         mkError(
           "emit-mixed-code-and-definition",
           `Concept "${c.name}" carries BOTH a local \`code is\` and a top-level ` +
             `definition (\`${c.definition.type}\`). Only \`code is\` + \`defined as\` ` +
-            `or \`code is\` + an age \`source representation\` (both-representation) is ` +
+            `or an admitted explicit Record publication is ` +
             `supported; \`code is\` + \`${c.definition.type}\` is NOT YET LOWERED — emit ` +
             `nothing rather than silently drop the local-code source side. This is unbuilt work, not an ` +
             `illegal form: do not re-author the concept to avoid it.`,
@@ -1585,23 +1540,14 @@ export function lowerLocalCodes(
       c.definition !== undefined && c.definition.type === "DefinedAsDefinition"
         ? c.definition
         : undefined;
-    // The RECENCY both-rep computed arm — the synthesized age definition + its parsed
-    // {op, threshold}, present only when the (AGE) block consumed a Patient age posrep.
-    const bothRepRecency: { threshold: string; op: AgeRecencyOp; computeFn: AgeComputeFn } | null =
-      ageMerge
-        ? { threshold: ageMerge.args.threshold, op: ageMerge.args.op, computeFn: ageMerge.args.computeFn }
-        : null;
-    const bothRepDefinitionIs = ageMerge !== null ? synthAgeDef : undefined;
-
     // (3a) BOTH-REP + `source representation` 3-way — out of scope this round.
-    //      An ACCEPTED both-rep (`code is` + `defined as`, OR `code is` + the age
-    //      `definition is`) that ALSO carries a `source representation` would fall
+    //      An accepted `code is` + `defined as` that ALSO carries a `source representation` would fall
     //      through to the representation skip below and pass un-split — SILENTLY
     //      DROPPING the local-code side (violating "emit nothing rather than
     //      silently drop"). Diagnose loudly instead. Checked BEFORE the plain
     //      representation skip so the both-rep case is caught, not swallowed.
     if (
-      (bothRepDefinedAs !== undefined || bothRepDefinitionIs !== undefined) &&
+      bothRepDefinedAs !== undefined &&
       c.representations &&
       c.representations.length > 0
     ) {
@@ -1938,7 +1884,7 @@ export function lowerLocalCodes(
     // `not-applicable`). Both share the authored name, so the ROLE is what disambiguates them at enrollment
     // (a name-keyed map alone cannot — disc 439 crit #2).
     const hasInferredTwin =
-      bothRepDefinedAs !== undefined || (bothRepDefinitionIs !== undefined && bothRepRecency !== null);
+      bothRepDefinedAs !== undefined;
     const lowered: Concept = {
       ...c,
       definition: codedFrom,
@@ -2037,12 +1983,6 @@ export function lowerLocalCodes(
     // Same name as the LocalPrimitives twin — they land in different layer libraries;
     // `buildNameLayerMaps` resolves the name to Inferences (the public determination).
     //   - `defined as` twin → `__bothRepMerge: "union"` (asTruths() union inference).
-    //   - age posrep twin → `__bothRepMerge: "recency"` (raw-Observation recency vs live
-    //     computed age); the twin carries the threshold + comparator op + compute fn (`AgeAt`
-    //     years / `AgeInMonths` months, #215/#257 T2) AND the stable `__recencyOverrideId` so the
-    //     emit looks the override up (age is ONE caller). Its `definition` was SYNTHESIZED from the
-    //     posrep projection, so it is
-    //     flagged `__synthesizedFromPosrep` (the retirement guard must never fire on it).
     if (bothRepDefinedAs !== undefined) {
       // #189 Piece 1 (disc 506) — a `defined as exists ("V")` whose referent V is a both-rep RECENCY-VALUE concept
       // is a MEMBER-EXISTENCE interface fold (a TOTAL boolean: `<own newest> or exists(LP."V") or exists(EP."V
@@ -2099,22 +2039,6 @@ export function lowerLocalCodes(
       };
       delete inferredTwin.code;
       bothRepInferredTwins.push(inferredTwin);
-    } else if (bothRepDefinitionIs !== undefined && bothRepRecency !== null) {
-      const inferredTwin: Concept = {
-        ...c,
-        definition: bothRepDefinitionIs,
-        __bothRepFoldInLocalPrimitives: c.name,
-        __bothRepMerge: "recency",
-        __bothRepRecencyThreshold: bothRepRecency.threshold,
-        __bothRepRecencyOp: bothRepRecency.op,
-        __recencyComputeFn: bothRepRecency.computeFn,
-        __recencyOverrideId: ageMerge!.overrideId,
-        __synthesizedFromPosrep: true,
-        // #189 Slice C 2a — the age recency public determination (patient-age carve-out).
-        __loweringRole: "public-determination",
-      };
-      delete inferredTwin.code;
-      bothRepInferredTwins.push(inferredTwin);
     }
   }
 
@@ -2166,83 +2090,14 @@ export function lowerLocalCodes(
   return { ast: outAst, errors, localCodes };
 }
 
-/**
- * #257 (age slice) T1 — lower STANDALONE (1-representation) patient-age posreps: a concept with
- * a single age `source representation`, NO `code is` (no local override), and NO top-level
- * `definition`. This is the age determination WITHOUT a recency merge — there is no local twin, so
- * it simply becomes an Inferences `definition is` concept whose `definition` is SYNTHESIZED from the
- * posrep's `value projection` (flagged `__synthesizedFromPosrep`). It then rides the ordinary
- * `emitDefinitionIs` path — byte-identical to the retired standalone `definition is age today`.
- *
- * PURE (does not mutate the input AST): it shallow-copies only the rewritten concepts. Runs BEFORE
- * `lowerLocalCodes` in the emit pipeline; the 2-representation recency case (`code is` + age
- * posrep) is handled inside `lowerLocalCodes` instead (it reuses the `code is` lowering machinery).
- * The WHOLE-CONCEPT shape is classified by the SHARED `resolveAgeConcept`, so a no-code age-shaped
- * mis-authoring (unsanctioned / wrong-carrier / a second representation / a stray `definition`) is a
- * LOUD hard error — never a silent stub — and cannot drift from the author-time validator.
- */
-export function lowerStandaloneAgePosreps(ast: CRL): { ast: CRL; errors: CRLError[] } {
-  const errors: CRLError[] = [];
-  let changed = false;
-  const rewritten = ast.statements.map((stmt): Statement => {
-    if (stmt.type !== "Concept") return stmt;
-    const c = stmt;
-    // A `code is` concept is the 2-rep recency case (`lowerLocalCodes` owns it); skip it here so its
-    // age shape is not double-processed.
-    if (c.code !== undefined) return stmt;
-    const shape = resolveAgeConcept(c);
-    if (shape.kind === "not-age") return stmt;
-    if (shape.kind === "error") {
-      // Includes the no-code `definition` + age posrep case (the classifier reports it as a shape
-      // error), so a stray definition can no longer silently swallow the age representation.
-      errors.push(mkError(shape.errorKind, shape.message, c.location));
-      return stmt;
-    }
-    // A `"recency"` verdict requires a local `code is`, so it cannot occur on this no-code path.
-    if (shape.kind !== "standalone") return stmt;
-    const rep = (c.representations ?? []).find((r) => resolveRecencyProjection(r).kind === "match")!;
-    changed = true;
-    const synth: Concept = {
-      ...c,
-      representations: [],
-      definition: {
-        type: "DefinitionIsDefinition",
-        body: rep.valueProjection!.body,
-        location: rep.valueProjection!.location,
-      },
-      __synthesizedFromPosrep: true,
-      // #189 Slice C 2a — the standalone patient-age determination (age carve-out); inherits the authored
-      // obligation classified on the raw posrep concept (a `requires-boundary` age).
-      __loweringRole: "public-determination",
-    };
-    return synth;
-  });
-  // Return the input UNTOUCHED (===) when nothing changed and no error, so identity-keyed callers
-  // ("did this library transform?") don't get a false positive from a same-content clone.
-  if (!changed && errors.length === 0) return { ast, errors };
-  return { ast: { ...ast, statements: rewritten }, errors };
-}
-
-/**
- * The shared AGE pre-pipeline: the emit-boundary retirement scan of authored `definition is age
- * today` (via `isRetiredAgeTodayDefinition` on the ORIGINAL ast) + `lowerStandaloneAgePosreps`. Run
- * by EVERY emit lane (`emitCQLFromAST`, the imports/case-feature lane, the FHIR closure) BEFORE
- * `lowerLocalCodes`, so the standalone target is usable everywhere and the retirement fires on every
- * path (none runs the Validator). Returns the (possibly transformed) ast + all errors. Behavior on
- * the ast identity: it returns the input `===` when nothing transformed and no retirement fired, so
- * a caller's `didLower` (computed against THIS output) stays accurate.
- */
+// REFACTOR:grounded (#320, plan585): one authoring gate, no synthetic age definitions.
 export function preLowerAge(ast: CRL): { ast: CRL; errors: CRLError[] } {
-  const retirementErrors: CRLError[] = [];
-  for (const stmt of ast.statements) {
-    if (stmt.type === "Concept" && isRetiredAgeTodayDefinition(stmt)) {
-      const def = stmt.definition;
-      const loc = def && def.type === "DefinitionIsDefinition" ? def.body.location : stmt.location;
-      retirementErrors.push(mkError("emit-age-definition-retired", ageRetirementMessage(stmt.name), loc));
-    }
-  }
-  const standalone = lowerStandaloneAgePosreps(ast);
-  return { ast: standalone.ast, errors: [...retirementErrors, ...standalone.errors] };
+ const errors: CRLError[] = [];
+ for (const stmt of ast.statements) if (stmt.type === "Concept") {
+   const age = resolveAgeConcept(stmt);
+   if (age.kind === "error") errors.push(mkError(age.errorKind, age.message, stmt.location));
+ }
+ return { ast, errors };
 }
 
 /**

@@ -8,5 +8,5 @@ include SemnotAge232FixtureLocalConcepts
 
 context Patient
 
-define "Age 21 Or Older":
+define "Age 21 Or Older Records":
   [Observation: SemnotAge232FixtureLocalConcepts."Age 21 Or Older"]

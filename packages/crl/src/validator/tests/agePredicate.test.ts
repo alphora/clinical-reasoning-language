@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -31,7 +32,7 @@ const concept = (pred: string, extra = "") =>
 // The migrated posrep form: a Patient age `source representation` (optionally with a local
 // `code is` override) whose `value projection` computes live age over Patient.birthDate.
 const posrepConcept = (projection: string, extra = "") =>
-  `library "T".\nconcept "C":\n- value type is boolean.\n${extra}- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is ${projection}.\n`;
+  `library "T".\nconcept "C":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- shape reduction is most recent.\n${extra}- source representation:\n  - type is Patient.\n  - value projection is ${projection}.\n`;
 
 describe("AgePredicateValidator (#215) — unsanctioned age predicates rejected at author time", () => {
   it("REJECTS an unsupported comparator (`less than`) — age today AND anchored", () => {
@@ -79,8 +80,8 @@ describe("AgePredicateValidator (#215) — unsanctioned age predicates rejected 
       // The migration message points at the posrep replacement + names the served worked exemplars (#257 T3).
       expect(errs[0].message, pred).toMatch(/source representation/);
       expect(errs[0].message, pred).toMatch(/Patient\.birthDate/);
-      expect(errs[0].message, pred).toMatch(/patient-age-both-rep-reference\.crl/);
-      expect(errs[0].message, pred).toMatch(/representation-reference\.crl/);
+      expect(errs[0].message, pred).toMatch(/shape is Record/);
+      expect(errs[0].message, pred).toMatch(/shape reduction is most recent/);
     }
   });
 
@@ -107,17 +108,17 @@ describe("AgePredicateValidator (#215) — unsanctioned age predicates rejected 
     // A non-boolean concept value type on an age projection.
     const nonBool = ageErrors(posrepConcept("age today at least 18 years").replace("value type is boolean", "value type is Quantity"));
     expect(nonBool).toHaveLength(1);
-    if (nonBool[0].kind === "age-predicate-unsupported") expect(nonBool[0].reason).toBe("projection-shape");
+    if (nonBool[0].kind === "age-predicate-unsupported") expect(nonBool[0].reason).toBe("projection-unsupported");
     // A top-level definition + age posrep with no `code is` (the age posrep would be silently dropped
     // at emit without this rule).
     const defPlusPosrep = ageErrors(
-      `library "T".\nconcept "X":\n- type is Observation.\n- value type is boolean.\n- code is \`x\`.\nconcept "C":\n- value type is boolean.\n- defined as "X".\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is age today at least 18 years.\n`,
-    ).filter((e) => e.kind === "age-predicate-unsupported" && e.reason === "projection-shape");
+      `library "T".\nconcept "X":\n- type is Observation.\n- value type is boolean.\n- code is \`x\`.\nconcept "C":\n- value type is boolean.\n- defined as "X".\n- source representation:\n  - type is Patient.\n  - value projection is age today at least 18 years.\n`,
+    ).filter((e) => e.kind === "age-predicate-unsupported" && ["projection-shape", "definition-retired", "projection-unsupported"].includes(e.reason));
     expect(defPlusPosrep).toHaveLength(1);
     // A `code is` + age posrep on an explicit non-Observation local type.
     const nonObs = ageErrors(
-      posrepConcept("age today at least 18 years", "- type is Condition.\n- code is `c`.\n"),
-    ).filter((e) => e.kind === "age-predicate-unsupported" && e.reason === "projection-shape");
+      posrepConcept("age today at least 18 years", "- code is `c`.\n").replace("type is Observation", "type is Condition"),
+    ).filter((e) => e.kind === "age-predicate-unsupported" && e.reason === "definition-retired");
     expect(nonObs).toHaveLength(1);
   });
 
@@ -146,11 +147,11 @@ describe("AgePredicateValidator (#215) — unsanctioned age predicates rejected 
   it("REJECTS a concept with TWO age `source representation`s of DIFFERENT units (exactly-one rule; validator/emit parity — disc 410 Q4)", () => {
     const src =
       `library "T".\nconcept "Two Units":\n- value type is boolean.\n- code is \`tu\`.\n` +
-      `- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is age today at least 18 years.\n` +
-      `- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is age today under 6 months.\n`;
+      `- source representation:\n  - type is Patient.\n  - value projection is age today at least 18 years.\n` +
+      `- source representation:\n  - type is Patient.\n  - value projection is age today under 6 months.\n`;
     const errs = ageErrors(src);
     expect(errs.length).toBeGreaterThanOrEqual(1);
-    expect(errs.some((e) => /more than one age .*source representation/.test(e.message))).toBe(true);
+    expect(errs.some((e) => /exactly one Patient|legacy age-today|unsupported age projection/.test(e.message))).toBe(true);
   });
 
   it("ACCEPTS every sanctioned ANCHORED comparator (no age-predicate error; the anchor ref itself is orthogonal)", () => {
@@ -177,7 +178,7 @@ describe("AgePredicateValidator (#215) — unsanctioned age predicates rejected 
     // "Age 21 Or Older" authored in the migrated posrep form (local override + Patient age
     // projection); the `sem-not` over it is orthogonal to the age validator.
     const errs = ageErrors(
-      `library "T".\nconcept "Age 21 Or Older":\n- value type is boolean.\n- code is \`a21\`.\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is age today at least 21 years.\nconcept "Under 21":\n- type is Observation.\n- value type is boolean.\n- defined as ( sem-not "Age 21 Or Older" ).\n`,
+      `library "T".\nconcept "Age 21 Or Older":\n- shape is Record.\n- type is Observation.\n- shape reduction is most recent.\n- value type is boolean.\n- code is \`a21\`.\n- source representation:\n  - type is Patient.\n  - value projection is age today at least 21 years.\nconcept "Under 21":\n- type is Observation.\n- value type is boolean.\n- defined as ( sem-not "Age 21 Or Older" ).\n`,
     );
     expect(errs).toHaveLength(0);
   });

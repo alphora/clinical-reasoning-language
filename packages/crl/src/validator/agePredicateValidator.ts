@@ -3,35 +3,15 @@ import type { SourceContext } from "../imports/scopes";
 import { matchNarrative } from "../template-match";
 import { isAgeAtStartOfPrefix, sanctionedAgeAnchoredOp } from "../template-match/agePredicate";
 import {
-  ageRetirementMessage,
-  isRetiredAgeTodayDefinition,
   resolveAgeConcept,
-} from "../template-match/recencyProjectionOverride";
+} from "../template-match/agePublication";
 
 import type { AgePredicateReason } from "./validator";
 import { ValidationError } from "./validator";
 
-// #215 / #257 — author-time enforcement of the patient-age surface. THREE jobs:
-//
-//  (1) RETIREMENT (#257). An authored `definition is age today <cmp> <Q>` is the RETIRED
-//      carve-out — patient age is now modeled as a Patient `source representation` over
-//      `Patient.birthDate` with a `value projection`. Any `definition is age today …` (sanctioned
-//      or not) is an error pointing at the posrep fix (`ageRetirementMessage` shows both the
-//      local-override and standalone variants). This is the author-time half of the retirement;
-//      the emit pipeline (`emitCQLFromAST`) is the emit-boundary half. The two SHARE
-//      `isRetiredAgeTodayDefinition` + `ageRetirementMessage` so they cannot drift.
-//
-//  (2) ANCHORED (#215, unchanged). `definition is age at start of "<anchor>" <cmp> <Q>` computes
-//      over another concept (the anchor), so it STAYS a concept-level `definition is` (A.5 forbids
-//      it as a datum-local projection). An unsanctioned comparator/unit there is still rejected.
-//
-//  (3) POSREP PROJECTION (#257). A posrep `value projection is age today …` must be a sanctioned
-//      age predicate ON the built Patient age carrier. An unsanctioned attempt, or a sanctioned
-//      projection on the wrong carrier, is rejected — the SAME `resolveRecencyProjection` +
-//      messages the emit lowering uses, so validate and emit cannot drift on the sanctioned set.
-//
-// The "is it sanctioned?" tests are the SHARED classifiers (`template-match`), so `validate_crl`
-// and `emit_crl` cannot disagree on the accepted age forms (the #215 divergence this closes).
+// REFACTOR:grounded (#320, plan585): authoring and emit share resolveAgeConcept.
+// Age-today requires an explicit Record publication; implicit/Scalar and definition-is forms are retired.
+// Anchored age remains a separate concept-level pattern, checked below.
 
 type Attribution = { libraryName?: string; filePath?: string };
 
@@ -57,21 +37,6 @@ export class AgePredicateValidator {
     errors: ValidationError[],
   ): void {
     if (stmt.type !== "Concept") return;
-
-    // (1) RETIREMENT — an authored `definition is age today …` migrates to a posrep.
-    if (isRetiredAgeTodayDefinition(stmt)) {
-      const body =
-        stmt.definition?.type === "DefinitionIsDefinition" ? stmt.definition.body : undefined;
-      errors.push({
-        kind: "age-predicate-unsupported",
-        reason: "definition-retired",
-        conceptName: stmt.name,
-        message: ageRetirementMessage(stmt.name),
-        location: body?.location ?? stmt.location,
-        severity: "error",
-        ...attribution,
-      });
-    }
 
     // (2) ANCHORED `age at start of …` — still a sanctioned concept-level `definition is`.
     //     DELIBERATELY stays YEARS-ONLY (#257 T2 Q2): only the age-TODAY projection widened to
@@ -121,6 +86,7 @@ export class AgePredicateValidator {
 
 /** Map a shared emit-error kind to the validator's `reason` sub-discriminator. */
 function reasonForErrorKind(errorKind: string): AgePredicateReason {
+  if (errorKind === "emit-age-definition-retired" || errorKind === "emit-age-form-retired") return "definition-retired";
   if (errorKind === "emit-age-projection-unsupported") return "projection-unsupported";
   if (errorKind === "emit-age-projection-wrong-carrier") return "projection-wrong-carrier";
   return "projection-shape"; // concept-shape lattice (3-way / 3-rep / non-Observation / value type)

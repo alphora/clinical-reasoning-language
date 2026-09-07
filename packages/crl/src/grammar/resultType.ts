@@ -1,8 +1,9 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 // A concept's FULL discriminated RESULT type (design §2) — the concept-model fact that a Scalar publishes
 // its value type while a Record / RecordSet publishes records of a FHIR resource. This lives in `grammar/`
 // (a leaf beside `conceptShapes`/`conceptValueTypes`/`conceptTypes`) so BOTH the validator and the emit
 // representation-descriptor can share ONE result-type definition without either importing the other —
-// "validate must never depend on emit" (see `template-match/recencyProjectionOverride.ts`), and the emitter
+// "validate must never depend on emit" (see `template-match/agePublication.ts`), and the emitter
 // must not own a language/model type (#189 T1, crl-emit panel R1 P7/P8). Relocated here from
 // `validator/useSiteTypeValidator.ts` (`resolveConceptResultType` stays there — it is scope-resolution-coupled).
 

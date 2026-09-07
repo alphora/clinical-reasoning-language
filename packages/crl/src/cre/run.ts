@@ -130,7 +130,7 @@ import { inlineAnswerSet } from "../fhir-emitter/inlineAnswerSet";
 import { isValueReadingBooleanConcept, isPureQuestionConcept } from "../template-match/recencyValueConcept";
 import { resolveConceptPipeline } from "../template-match/resolvePipeline";
 import type { ResolvedStage } from "../template-match/resolvePipeline";
-import { isResourcelessDerived } from "../emit/conceptDatumSignals";
+import { cannotDirectlyAssertConcept } from "../emit/conceptDatumSignals";
 import {
   makeLocalDomainContext,
   localMemberOfConcept,
@@ -2231,7 +2231,7 @@ function runCase(
     // `run_decision` caller that skips it. The composite is still satisfiable via its COMPOSITION (assert its
     // operands) — only the direct name-assertion is refused. Loud (not silent don't-populate): a dropped assertion
     // would confuse.
-    if (namedEntry && isResourcelessDerived(namedEntry.node)) {
+    if (namedEntry && cannotDirectlyAssertConcept(namedEntry.node)) {
       membershipError =
         `fact "${fn}" names concept "${name}", which is read-only — it has no representation (no \`code is\` and ` +
         `no source binding) and thus no FHIR resource, so it cannot be directly asserted; \`$apply\` has no ` +

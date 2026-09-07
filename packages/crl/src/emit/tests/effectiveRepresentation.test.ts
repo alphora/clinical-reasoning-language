@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -147,37 +148,14 @@ describe("deriveEffectiveRepresentations — local-exact arm", () => {
 describe("deriveEffectiveRepresentations — patient-age arms", () => {
   const AGE_POSREP = `- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is age today at least 18 years.\n`;
 
-  it("standalone age → single uncoded arm off AGE_TODAY_OVER_BIRTHDATE", () => {
-    const [d, ...rest] = derived(
-      `library "T".\nconcept "Adult":\n- value type is boolean.\n${AGE_POSREP}`,
-      "Adult",
-    );
-    expect(rest).toHaveLength(0);
-    expect(d.arm).toBe("uncoded");
-    if (d.arm !== "uncoded") return;
-    expect(d.resourceType).toBe("Patient");
-    expect(d.valueElement).toBe("birthDate");
-    expect(d.datumValueType).toBe("date");
-    expect(d.resultType).toEqual({ shape: "Scalar", valueType: "boolean" });
-    expect(d.recency).toEqual({ sortExpr: "meta.lastUpdated", cast: "none" }); // instant — never `as FHIR.dateTime`
+  it("retired implicit age cannot supply a legacy effective representation", () => {
+    const out = deriveEffectiveRepresentations(concept(`library "T".\nconcept "Adult":\n- value type is boolean.\n${AGE_POSREP}`, "Adult"), OWNING);
+    expect(out).toMatchObject({ status: "error" });
   });
 
-  it("local+age recency → BOTH [local-exact (boolean Observation), uncoded]", () => {
-    const ds = derived(
-      `library "T".\nconcept "AdultLocal":\n- value type is boolean.\n- code is \`adult-local\`.\n${AGE_POSREP}`,
-      "AdultLocal",
-    );
-    expect(ds).toHaveLength(2);
-    const [local, uncoded] = ds;
-    expect(local.arm).toBe("local-exact");
-    if (local.arm === "local-exact") {
-      expect(local.resourceType).toBe("Observation");
-      expect(local.valueElement).toBe("value");
-      expect(local.datumValueType).toBe("boolean");
-      expect(local.recency).toEqual({ sortExpr: "effective", cast: "dateTime" });
-      expect(local.resultType).toEqual({ shape: "Scalar", valueType: "boolean" });
-    }
-    expect(uncoded.arm).toBe("uncoded");
+  it("retired coded age cannot supply legacy arbitration metadata", () => {
+    const out = deriveEffectiveRepresentations(concept(`library "T".\nconcept "AdultLocal":\n- value type is boolean.\n- code is \`adult-local\`.\n${AGE_POSREP}`, "AdultLocal"), OWNING);
+    expect(out).toMatchObject({ status: "error" });
   });
 });
 

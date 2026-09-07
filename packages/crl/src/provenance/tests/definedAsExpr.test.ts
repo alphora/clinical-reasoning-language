@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 // Tests for buildDefExprIndex / collectDefExprLeafKeys (#187 Option-3, disc 199) — the per-concept `defined as`
 // OPERATOR tree the MV Questionnaire renders. The LOAD-BEARING test is the drift sweep: the operator tree's
 // pre-order leafEligible keys MUST equal codeIsLeavesPreorder of the SAME concept's ConceptShapeNode (== the
@@ -15,7 +16,7 @@ import { buildDefExprIndex, collectDefExprLeafKeys, type DefExpr, type DefExprIn
 import { collectLibs, conceptDeclRef, nodeKey } from "../indexer";
 
 // Every axis: pure leaves (A/B), a DIAMOND composite (Comp = A ∧ B ∧ A), a both-rep UNION (BothRep = code + defined as),
-// a both-rep RECENCY (Age = code + definition is → NOT defined-as), a representation-bearing `code is` (Height: Source
+// a own-record existence (Evidence = code + definition is → NOT defined-as), a representation-bearing `code is` (Height: Source
 // but NOT a lowered leaf), a pure sourced concept (Sourced), and a CROSS-LIB composite (CrossComp = A ∨ U."Q").
 const P = `# P
 library "P".
@@ -35,14 +36,11 @@ concept "BothRep":
 - type is Observation.
 - code is \`br\`.
 - defined as ( "A" sem-or "B" ).
-concept "Age":
+concept "Evidence":
+- type is Condition.
 - value type is boolean.
-- code is \`age\`.
-- source representation:
-  - type is Patient.
-  - value element is Patient.birthDate.
-  - value type is date.
-  - value projection is age today at least 18 years.
+- code is \`evidence\`.
+- definition is exists this.
 concept "Height":
 - type is Observation.
 - value type is Quantity.
@@ -71,7 +69,7 @@ decision "D":
 first:
 - when "Comp" then recommend activity "X".
 - when "BothRep" then recommend activity "X".
-- when "Age" then recommend activity "X".
+- when "Evidence" then recommend activity "X".
 - when "CrossComp" then recommend activity "X".
 - otherwise then recommend activity "X".`;
 
@@ -239,12 +237,12 @@ case "c":
     expect(nameOfKeys(collectDefExprLeafKeys(ck("P", "DirectNested"), defIndex))).toEqual(["A", "B"]);
   });
 
-  it("a `definition is` recency concept (Age) has NO body (not defined-as) but is its own leaf", () => {
-    const age = get("Age");
+  it("a `definition is` existence concept (Evidence) has NO body (not defined-as) but is its own leaf", () => {
+    const age = get("Evidence");
     expect(age.body).toBeUndefined();
     expect(age.hasDefinedAs).toBe(false);
     expect(age.leafEligible).toBe(true);
-    expect(nameOfKeys(collectDefExprLeafKeys(ck("P", "Age"), defIndex))).toEqual(["Age"]);
+    expect(nameOfKeys(collectDefExprLeafKeys(ck("P", "Evidence"), defIndex))).toEqual(["Evidence"]);
   });
 
   it("a representation-bearing `code is` (Height) is Source but NOT a leaf; a pure leaf (A) has no body", () => {

@@ -124,6 +124,14 @@ all concepts. Pattern contracts must expose their temporal and selection behavio
 implemented consistently in emitted CQL and evaluation. Precise handling of missing calculation inputs,
 multiple assertions and calendar boundaries must be specified and tested as part of that implementation.
 
+Age-today authoring now uses explicit `shape is Record`, `type is Observation`, Boolean value type,
+one Patient age projection and `shape reduction is most recent`. A local `code is` adds the answer
+representation; an uncoded calculation publishes its result without inventing a question or profile.
+Implicit/Scalar age-today and `definition is age today` are retired. KEs migrate existing content when
+touching it; new authoring uses the replacement. A criterion may negate the selected Boolean value;
+publication aliases and concept-space composition remain unsupported and are diagnosed explicitly.
+This is an age-specific retirement, not removal of all Scalar declarations or generic recency patterns.
+
 Acceptance: partial data pauses before an activity; adding the missing answer reaches the intended
 activity; complete data initially reaches the same activity. Verify the visible progression separately
 from engine output, and execute the full generated-QuestionnaireResponse edit/resubmit path rather than

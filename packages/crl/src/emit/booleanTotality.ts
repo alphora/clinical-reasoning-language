@@ -68,7 +68,7 @@ import type {
 import { refDisplay } from "../ast/types";
 import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import { matchNarrative } from "../template-match/matcher";
-import { resolveAgeConcept } from "../template-match/recencyProjectionOverride";
+import { resolveAgeConcept } from "../template-match/agePublication";
 import {
   resolveRecencyValueConcept,
   isMemberExistenceInterface,
@@ -300,38 +300,6 @@ export function classifyBooleanTotality(
   if (age.kind === "error") {
     return { kind: "rejected", code: "malformed-age", reason: `malformed patient-age concept: ${age.errorKind}: ${age.message}` };
   }
-  // ⭐ #189 O3 — the both-representation MERGE of a QUESTION is three-state, NEVER totalized.
-  //
-  // `recency` means the concept carries a local `code is` (the answer arm) beside the Patient arm — so it
-  // is ANSWERABLE, and when NO arm establishes it the determination is genuinely UNKNOWN. It used to be
-  // `requires-boundary`, and MEASURED (`tmp/nullprobe/analysis/layeredAge-out.txt`) the emit was
-  // `Coalesce(CFH.recencyAgeSelected(<newest local answer>, <computed age>), false)`: unanswered locally AND
-  // no `birthDate` ⇒ null ⇒ **false** ⇒ the `otherwise` fires ⇒ DENY. This was the ONLY working
-  // both-representation merge in the emitter, so it was also the thing a general merge would have been
-  // modelled on — it taught the wrong lesson (`large-refactor`: working code that predates the rule).
-  //
-  // Charter §4 settles it: *"what determines the arm is what it reads, never that it is a derivation"*, and
-  // the operator's acceptance criterion is that the ONLY route to a Deny is a STATED `false`.
-  //
-  // ⚠ `standalone` KEEPS its boundary. With no local `code is` there is no answer slot: the only arm is
-  // `Patient.birthDate`, which is EVIDENCE, and absent evidence is `false` (charter §4). Same split as O1's
-  // `most recent this` cell, and the same test — a local code is what makes it an answer read.
-  if (age.kind === "recency") {
-    return {
-      kind: "sanctioned-three-state",
-      family: "merge",
-      form: "patient age (recency) — both-rep merge of an ANSWERABLE determination",
-      cell: "§3 question → three-state cross-representation merge (NOT totalized)",
-    };
-  }
-  if (age.kind === "standalone") {
-    return {
-      kind: "requires-boundary",
-      form: "patient age (standalone — Patient arm only, no local `code is`)",
-      cell: "§2/§5 patient-age standalone → total-boolean rewrite (absent EVIDENCE is false)",
-    };
-  }
-
   // #189 Piece 1 (disc 506) — the both-rep RECENCY-VALUE merge (`code is` + `most recent this` + a `coded from`
   // `source representation`, e.g. `Covered Device`) is EXEMPT from the `unclassified` build-debt arm below: it now
   // EMITS (a `Scalar<value-type>`-or-null recency merge), and it is NON-boolean, so it is `not-applicable{nullable}`
@@ -601,7 +569,6 @@ export function classifyBooleanTotality(
 export type DefineOrigin =
   | "authored" // an authored concept's define (classified by `classifyBooleanTotality`)
   | "interface-facade" // `define "X": Inferences."X"` — total iff the aliased define is total
-  | "age-helper" // an age-recency synthesized define/helper — §5/§7 total-boolean boundary is the discharge
   | "criterion-guard" // a #236 criterion define (authored or synthesized) — a STRONG-KLEENE guard, never an
   //                       axiom: its leaves render bare so an UNKNOWN leaf makes the guard UNKNOWN
   | "catalog-axiom"; // RESERVED — CRLCommon/CaseFeatureCommon/FHIRHelpers library define, total by
@@ -620,7 +587,6 @@ export type DischargeKind =
   //                    null-presence stays INERT (no corpus operand is scalar-value on this lane).
   | "count-bare" // `Count(...) >= N` — discharges intrinsically-total (count)
   | "boundary-coalesce" // `Coalesce(<predicate>, false)` — discharges requires-boundary
-  | "age-recency-total" // the §5/§7 age-recency total-boolean rewrite — discharges requires-boundary (age)
   | "composite-delegated" // boolean `or`/`and`/`not` over total operands — discharges composite
   | "facade-delegated" // bare `Inferences."X"` re-export — total IFF X is (delegated); discharges composite
   | "facade-satisfied" // `…satisfied()` = `exists(truths)` (CaseFeatureCommon) — total by its OWN existence
@@ -884,7 +850,7 @@ function dischargeKindMatchesObligation(ob: BooleanTotalityObligation, d: Discha
       // totalized a question or a guard (the pause-killer), so it must NOT match.
       return false;
     case "requires-boundary":
-      return d === "boundary-coalesce" || d === "age-recency-total";
+      return d === "boundary-coalesce";
     case "composite":
       return d === "composite-delegated" || d === "facade-delegated";
     default:
@@ -893,7 +859,7 @@ function dischargeKindMatchesObligation(ob: BooleanTotalityObligation, d: Discha
 }
 
 /** Which origins legitimately claim each discharge mechanism (disc 429 #8/C7 — an authored form cannot claim
- *  `axiom` or `facade-delegated`; `age-recency-total` is an authored age concept or a synthesized helper). */
+ *  `axiom` or `facade-delegated`; retired age-specific discharges cannot be claimed). */
 function originMatchesDischarge(origin: DefineOrigin, d: DischargeKind): boolean {
   switch (d) {
     case "axiom":
@@ -901,8 +867,6 @@ function originMatchesDischarge(origin: DefineOrigin, d: DischargeKind): boolean
     case "facade-delegated":
     case "facade-satisfied":
       return origin === "interface-facade";
-    case "age-recency-total":
-      return origin === "authored" || origin === "age-helper";
     case "intrinsic-exists":
     case "null-presence":
     case "count-bare":
@@ -1028,8 +992,8 @@ export function proveWholeBoundaryTotality(
         fail(e, `\`family: "derivation"\` requires the \`authored\` or \`interface-facade\` origin — origin was \`${e.origin}\``);
         continue;
       }
-      if (family === "merge" && e.origin !== "authored" && e.origin !== "interface-facade" && e.origin !== "age-helper") {
-        fail(e, `\`family: "merge"\` requires the \`authored\`, \`interface-facade\` or \`age-helper\` origin — origin was \`${e.origin}\``);
+      if (family === "merge" && e.origin !== "authored" && e.origin !== "interface-facade") {
+        fail(e, `\`family: "merge"\` requires the \`authored\`, \`interface-facade\` origin — origin was \`${e.origin}\``);
         continue;
       }
       if (e.discharge.booleanEffect === "total") {

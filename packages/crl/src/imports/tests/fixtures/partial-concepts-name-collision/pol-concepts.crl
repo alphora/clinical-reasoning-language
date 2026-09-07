@@ -1,12 +1,12 @@
 # partial-concepts-name-collision sibling — a REAL library literally named "Pol Concepts"
 library "Pol Concepts".
 
-// `Sibling Concept` is a STANDALONE patient-age determination (a `source representation` over
-// `Patient.birthDate`, no local `code is`). An age posrep lowers to an intrinsically-total
-// boolean, so it clears the boundary-totality gate. Root's `From Sibling` aliases it
-// cross-library, which forces the `include PolConcepts` on the Inferred layer this fixture asserts.
+// REFACTOR:grounded (#320, plan585): anchored age exercises an ordinary scalar alias without the retired live-age lowering.
+parameter "Measurement Period":
+- param type is Period.
+
 concept "Sibling Concept":
+- shape is Scalar.
+- type is Observation.
 - value type is boolean.
-- source representation:
-  - type is Patient.
-  - value projection is age today at least 18 years.
+- definition is age at start of "Measurement Period" at least 18 years.

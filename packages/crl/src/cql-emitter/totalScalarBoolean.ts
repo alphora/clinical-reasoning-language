@@ -254,7 +254,6 @@ function computeTotality(
   // `CFH.recencyAgeSelected(...)` (no outer `Coalesce`), so an unanswered+uncomputable determination stays
   // null and the tree PAUSES (proven by an executed `$apply` counterfactual — worklist O3).
   // The two questions genuinely differ for this form, which is why the mode exists.
-  if (concept.__bothRepMerge === "recency") return mode === "scalarBoolean" && isScalarBoolean(concept);
   if (concept.__bothRepMerge !== undefined) return false;
   // ⭐ #189 null/pause T5 step 2b — REFACTOR:grounded. The PURE QUESTION's Inferences twin splits the two
   // questions the SAME way the recency merge does, for the same reason:

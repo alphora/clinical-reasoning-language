@@ -1095,79 +1095,52 @@ decision "Cover":
   });
 });
 
-// #189 Slice C 2b.3b.1 (crl-emit code review, gpt56 #3) — the Interface twin-selection WINNER RULE must pick the
-// `public-determination` (recency) twin as the façade source DETERMINISTICALLY, not by lowering's append order.
-// The recency twin reads TOTAL → the re-export is bare; the `source-impl` half reads non-total → `.satisfied()`.
-// This fixture puts the source-impl twin LAST (adversarial to append-order last-write-wins), so it passes ONLY if
-// the winner rule (prefer public) is in force.
-describe("#189 Slice C 2b.3b.1 — Interface twin-selection winner rule", () => {
-  const src = `library "Age Order".
-
-concept "Age 21 Or Older":
-- value type is boolean.
-- code is \`age-21-or-older\`.
-- source representation:
-  - type is Patient.
-  - value element is Patient.birthDate.
-  - value type is date.
-  - value projection is age today at least 21 years.
-
-concept "Under Age 21":
+// REFACTOR:grounded (#320, plan585): explicit publication bindings survive statement order.
+describe("publication Interface binding", () => {
+  it("forwards the public record, independent of lowered statement order", () => {
+    const raw = ast(`library "Age Order".
+concept "Adult":
+- shape is Record.
 - type is Observation.
 - value type is boolean.
-- defined as ( sem-not "Age 21 Or Older" ).
-
-decision "Elig":
+- code is \`adult\`.
+- shape reduction is most recent.
+- source representation:
+  - type is Patient.
+  - value projection is age today at least 18 years.
+decision "D":
 first:
-- when "Under Age 21" then recommend activity "a.Approve".
-
-activity "a.Approve":
+- when "Adult" then recommend activity "Approve".
+activity "Approve":
 - request CPGCommunicationRequest.
-- with \`ok\`.
-`;
-
-  it("picks the recency (public-determination) twin over a LAST-appended source-impl twin → bare Interface re-export (order-independent)", () => {
-    const lowered = lowerLocalCodes(ast(src));
-    const stmts = [...lowered.ast.statements];
-    const isAge = (s: unknown): boolean =>
-      (s as { type?: string; name?: string }).type === "Concept" &&
-      (s as { name?: string }).name === "Age 21 Or Older";
-    const impl = stmts.find(
-      (s) => isAge(s) && (s as { __loweringRole?: string }).__loweringRole === "source-impl",
-    )!;
-    const pub = stmts.find(
-      (s) => isAge(s) && (s as { __bothRepMerge?: string }).__bothRepMerge === "recency",
-    )!;
-    expect(impl).toBeDefined();
-    expect(pub).toBeDefined();
-    const ageIdx = stmts.map((s, i) => [isAge(s), i] as const).filter(([a]) => a).map(([, i]) => i);
-    const lo = Math.min(...ageIdx);
-    const hi = Math.max(...ageIdx);
-    // Adversarial: public twin FIRST, source-impl LAST — append-order last-write would (wrongly) pick source-impl.
-    stmts[lo] = pub;
-    stmts[hi] = impl;
-    const r = emitPartitioned({ ...lowered.ast, statements: stmts }, "AgeOrder", "AgeOrder", FULL_PARTITION);
-    const iface = layer(r, "Interface")!.result.result;
-    expect(iface).toContain(`define "Under Age 21":`);
-    expect(iface).not.toContain(".satisfied()"); // bare re-export, NOT the truth-set façade
+`);
+    const options = { canonicalBase: TEST_CB, policyId: "age-order" };
+    const lowered = lowerLocalCodes(raw, options);
+    expect(lowered.errors).toEqual([]);
+    for (const statements of [lowered.ast.statements, [...lowered.ast.statements].reverse()]) {
+      const r = emitPartitioned({ ...lowered.ast, statements }, "AgeOrder", "age-order", FULL_PARTITION, options);
+      expect(r.success, JSON.stringify(r.errors)).toBe(true);
+      const iface = layer(r, "Interface")!.result.result;
+      expect(iface).toContain('define "Adult":');
+      expect(iface).toContain('Inferences."__CRL_PublicationEnvelope_');
+      expect(iface).not.toContain('.satisfied()');
+    }
   });
 });
 
-// #189 Slice C 2b.3b.1 (crl-emit code review, gpt56 #4) — post-flip a recency twin emits a bare TOTAL boolean, so a
-// REFINEMENT-lane `sem-not` over it must LOUD-REFUSE (`classifyConceptFlavor` recency→"unknown"), NOT render the
-// ill-typed `{ true } except (<Boolean>)`. This pins the defensive classifier change against a silent regression to
-// "truth-set".
-describe("#189 Slice C 2b.3b.1 — refinement-lane sem-not over a recency twin loud-refuses", () => {
-  it("a REFINEMENT parent `defined as ( sem-not <recency> )` refuses (emit-unlowerable-negation + UnsupportedNegation), never `{ true } except (<Boolean>)`", () => {
+// REFACTOR:grounded (#320, plan585): record-space complement cannot consume a selected publication.
+describe("#189 Slice C 2b.3b.1 — refinement-lane sem-not over a publication loud-refuses", () => {
+  it("a record-space sem-not consumer is rejected without a truth-set complement", () => {
     const src = `library "Ref Refuse".
 
 concept "Age 21 Or Older":
+- shape is Record.
+- type is Observation.
+- shape reduction is most recent.
 - value type is boolean.
 - code is \`age-21-or-older\`.
 - source representation:
   - type is Patient.
-  - value element is Patient.birthDate.
-  - value type is date.
   - value projection is age today at least 21 years.
 
 concept "Weird":
@@ -1175,12 +1148,13 @@ concept "Weird":
 - value type is CodeableConcept.
 - defined as ( sem-not "Age 21 Or Older" ).
 `;
-    const lowered = lowerLocalCodes(ast(src));
-    const r = emitPartitioned(lowered.ast, "RefR", "RefR", FULL_PARTITION);
+    const options = { canonicalBase: TEST_CB, policyId: "RefR" };
+    const lowered = lowerLocalCodes(ast(src), options);
+    expect(lowered.errors).toEqual([]);
+    const r = emitPartitioned(lowered.ast, "RefR", "RefR", FULL_PARTITION, options);
     const blob = JSON.stringify(r);
     expect(r.success).toBe(false);
-    expect(blob).toContain("emit-unlowerable-negation");
-    expect(blob).toContain("UnsupportedNegation");
+    expect(blob).toContain("publication-unsupported-context");
     expect(blob).not.toContain("{ true } except"); // the pre-flip ill-typed form must NOT appear
   });
 });

@@ -728,18 +728,6 @@ export interface Concept extends ASTNode {
    */
   __pureQuestionRead?: true;
   /**
-   * SYNTHETIC-EMITTER-ONLY (#189 O3). Marks an Interface re-export whose Inferences SOURCE is a
-   * both-representation RECENCY MERGE of an ANSWERABLE determination — i.e. a merge that is deliberately
-   * THREE-STATE (no outer `Coalesce`), because a determination NO arm establishes is UNKNOWN, not false.
-   *
-   * ⚠ The re-export EMITS the same bare `Inferences."X"` as a total-boolean façade — bare is what propagates
-   * the null — so this marker exists to correct the LEDGER, not the text: without it the façade enrolls
-   * `total("facade-delegated")` over a now-three-state operand and the whole-boundary proof fails with
-   * "composite is not provably total". Exactly the `__pureQuestion` pattern, for the merge family, and set at
-   * the same synthesis site for the same reason (the Interface emitter is layer-isolated).
-   */
-  __interfaceThreeStateMerge?: true;
-  /**
    * SYNTHETIC-EMITTER-ONLY (#189). On an Inferences twin whose concept carried a local `code is` AND a
    * `definition is <selection> "<Named>"`: the name of its LocalPrimitives records twin, so the reduction is
    * applied to `this` ∪ the named set rather than the named set alone.
@@ -790,10 +778,6 @@ export interface Concept extends ASTNode {
    *   - `"union"`   — the historical `code is` + `defined as` fold-in
    *     (`LocalPrimitives."X".asTruths() union (<inference>)`). Every existing
    *     both-rep is "union"; behavior is unchanged.
-   *   - `"recency"` — the `code is` + `definition is age today <cmp> <Q>`
-   *     patient-age merge (`<cmp>` = a sanctioned age comparator, #215):
-   *     RECENCY-SELECT between the newest valid local Observation and the live
-   *     computed age, then lift back to a truth-set.
    *   - `"recency-value"` — the #189 Piece 1 GENERAL both-rep value merge
    *     (`code is` + `definition is most recent this` + a `coded from` `source
    *     representation`, e.g. `Covered Device`): a `Scalar<value-type>`-or-null
@@ -810,58 +794,7 @@ export interface Concept extends ASTNode {
    * `"union"`, which is the BOOLEAN truth-set fold (`.asTruths() union …`); a record-valued concept has no
    * truth-set, so it emits a plain `union` of the two retrieves.
    */
-  __bothRepMerge?: "union" | "recency" | "recency-value" | "record-union";
-  /**
-   * SYNTHETIC-EMITTER-ONLY. For a `"recency"` both-rep Inferences twin, the
-   * threshold of the `age today <cmp> <Q>` computed arm, as an already-emitted CQL
-   * quantity literal (e.g. `18 'years'` / `6 'months'`, #257 T2). Carried so the
-   * recency emit renders `CRLCommon.<op>(CRLCommon.<computeFn>(), <this>)` without
-   * re-matching the narrative. Set in LOCK-STEP with `__bothRepRecencyOp` and
-   * `__recencyComputeFn`. Absent unless `__bothRepMerge === "recency"`.
-   */
-  __bothRepRecencyThreshold?: string;
-  /**
-   * SYNTHETIC-EMITTER-ONLY. For a `"recency"` both-rep Inferences twin, the age
-   * COMPARATOR op (#215): `"AtLeast"` (≥, `at least`), `"AtMost"` (≤, `at most`),
-   * or `"Below"` (<, `under` / `younger than`). Set in LOCK-STEP with
-   * `__bothRepRecencyThreshold` and `__recencyComputeFn`; the recency emit renders
-   * `CRLCommon.<this>(CRLCommon.<computeFn>(), <threshold>)`. Absent unless
-   * `__bothRepMerge === "recency"`.
-   */
-  __bothRepRecencyOp?: AgeRecencyOp;
-  /**
-   * SYNTHETIC-EMITTER-ONLY. #257 (age slice) T1 — the stable id of the built
-   * recency-projection override backing this twin (`age-today-over-patient-birthdate`).
-   * Set in LOCK-STEP with the recency markers when lowering resolves a `code is` +
-   * age `source representation` (`resolveRecencyProjection`). The recency emit looks the
-   * override up (`recencyOverrideById`) to render its CQL helper — so age is ONE caller of
-   * the override mechanism, not a hardcoded engine branch. (The compute fn is NOT on the
-   * override; it is per-unit — carried on `__recencyComputeFn`, #257 T2.) Absent unless
-   * `__bothRepMerge === "recency"`.
-   */
-  __recencyOverrideId?: string;
-  /**
-   * SYNTHETIC-EMITTER-ONLY. #257 (age slice) T2 — the no-arg CRLCommon compute fn for this
-   * recency twin's computed arm: `"AgeAt"` (whole YEARS) or `"AgeInMonths"` (whole MONTHS). The
-   * matcher CHOSE it from the projection's threshold unit (the ONLY choice point); the recency emit
-   * renders `CRLCommon.<this>()` so the compute fn matches the threshold's unit through the
-   * unit-blind comparator overload (#215) — never re-derived from the unit at emit. Set in
-   * LOCK-STEP with `__bothRepRecencyThreshold`/`__bothRepRecencyOp`. Absent unless
-   * `__bothRepMerge === "recency"`.
-   */
-  __recencyComputeFn?: AgeComputeFn;
-  /**
-   * SYNTHETIC-EMITTER-ONLY. #257 (age slice) T1 — marks a concept whose top-level
-   * `definition` was SYNTHESIZED by lowering from a posrep's `value projection` (the age
-   * migration), NOT authored. The `definition is age today` retirement (validator +
-   * emit-boundary guard) must NEVER fire on such a definition: the narrative is
-   * compiler-internal (a projection re-homed as a definition to satisfy the current
-   * Inferences classification / `emitDefinitionIs` path), not an authorable surface form. A
-   * vestige to remove when posrep emit is first-class (#257). Absent on every authored
-   * concept, so a scan of the AUTHORED AST (validation + the pre-lowering retirement scan)
-   * never encounters it.
-   */
-  __synthesizedFromPosrep?: boolean;
+  __bothRepMerge?: "union" | "recency-value" | "record-union";
   /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). #189 Slice B2a — the resolved
    * `local-exact` effective-representation descriptor (`emit/effectiveRepresentation.ts`
@@ -952,8 +885,6 @@ export interface Concept extends ASTNode {
    * ABSENT ⇒ an authored concept no pass mutated (the none-lane fast-path returns the input untouched); such
    * a concept is classified in place at enrollment. This is a STRING union so `ast/types` gains no emit-layer
    * import (the obligation TYPE lives in `emit/booleanTotality`; only the emit read site references it).
-   * (A dedicated `age-helper` role is deferred to 2b — patient-age determinations currently tag
-   * `public-determination` and inherit the authored age obligation; no separate helper define is synthesized.)
    */
   __loweringRole?: "records-impl" | "source-impl" | "public-determination" | "interface-facade";
 }
@@ -967,7 +898,7 @@ export type AgeRecencyOp = "AtLeast" | "AtMost" | "Below";
  * threshold of the matching unit — the matcher pairs them and the shared
  * `sanctionedAgeTodayOp` classifier rejects a mismatch (`AgeAt()` + months, `AgeInMonths()`
  * + years), which would miscompile through the unit-blind comparator overload (#215). The
- * marker `__recencyComputeFn` and `AgeProjectionArgs.computeFn` are the shape twins. */
+ * Age projection matching and publication share this computation name. */
 export type AgeComputeFn = "AgeAt" | "AgeInMonths";
 
 // Concept definition has 3 kinds per v0.7:

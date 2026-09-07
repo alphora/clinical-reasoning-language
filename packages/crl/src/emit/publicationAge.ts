@@ -47,12 +47,12 @@ export function produceAgeCandidate(d: PublicationDescriptor, source: Publicatio
   const [by, bm, bd] = birth.split("-").map(Number), [ty, tm, td] = clock.day.split("-").map(Number);
   const months = (ty - by) * 12 + tm - bm - (td < bd ? 1 : 0), age = source.unit === "months" ? months : Math.floor(months / 12);
   const value = source.op === "AtLeast" ? age >= source.threshold : source.op === "AtMost" ? age <= source.threshold : age < source.threshold;
-  if (!d.localCode || !d.profileUrl) return fail("publication-source-profile-required", "Age publication requires its local code and profile.");
+  if (d.localCode && !d.profileUrl) return fail("publication-source-profile-required", "Coded age publication requires its profile.");
   const input = `Patient/${patient.id}`;
   return { kind: "candidate", candidate: { key: publicationDerivedCandidateKey(source.contributorId, input), contributorId: source.contributorId,
     arm: "source", retrievedInputIdentity: input, validity: clock.day,
-    resource: { resourceType: "Observation", status: "final", subject: { reference: subject }, meta: { profile: [d.profileUrl] },
-      code: { coding: [d.localCode], text: d.title }, valueBoolean: value, effectiveDateTime: clock.day, method: ageMethod("calculated") } } };
+    resource: { resourceType: "Observation", status: "final", subject: { reference: subject }, ...(d.profileUrl ? { meta: { profile: [d.profileUrl] } } : {}),
+      code: { ...(d.localCode ? { coding: [d.localCode] } : {}), text: d.title }, valueBoolean: value, effectiveDateTime: clock.day, method: ageMethod("calculated") } } };
 }
 
 function candidateDay(raw: string | undefined, clock: AgeClock): string | undefined {

@@ -17,11 +17,11 @@ export interface PublicationServiceRequestSource {
 
 export function publicationSourceAdmissionReason(concept: Readonly<Concept>): string | undefined {
   if (concept.representations.length === 0) return undefined;
-  if (!concept.code || concept.valueTypes[0] !== "boolean")
-    return "Source publication currently requires a local code and an Observation<boolean> result.";
+  if (concept.valueTypes[0] !== "boolean") return "Source publication requires an Observation<boolean> result.";
   if (concept.representations.some(rep => readAgeProjection(rep) !== undefined))
     return concept.representations.length === 1 && concept.definition === undefined ? undefined
       : "Age publication currently supports one age projection plus local answers; mixed producer policies require an explicit implementation.";
+  if (!concept.code) return "ServiceRequest source publication currently requires a local code.";
   for (const rep of concept.representations) {
     const words = rep.valueProjection?.body.elements;
     if (rep.conceptType !== "ServiceRequest" || rep.terminologyName === undefined ||

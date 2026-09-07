@@ -35,6 +35,18 @@ function resolve(birth: string | undefined, inputs: Candidate[]) {
   return eligible.kind === "error" ? eligible : selectPublicationCandidate(eligible.candidates, { conceptId: d.conceptId, equalTime: "error" });
 }
 describe("pattern-owned age publication", () => {
+  it("publishes uncoded age without inventing an answer representation", () => {
+    const source = text.replace(/^- code is .*\r?\n/m, "");
+    const { ast, program, d } = prepared(source);
+    expect(program.diagnostics).toEqual([]);
+    expect(d.localCode).toBeUndefined(); expect(d.profileUrl).toBeUndefined();
+    const produced = produceAgeCandidate(d, d.sources![0] as PublicationAgeSource, { resourceType: "Patient", id: "p", birthDate: "2008-09-07" }, "Patient/p", clock);
+    expect(produced).toMatchObject({ kind: "candidate", candidate: { resource: { code: { text: "Adult" }, valueBoolean: true } } });
+    if (produced.kind === "candidate") { expect(produced.candidate.resource.meta).toBeUndefined(); expect((produced.candidate.resource.code as any).coding).toBeUndefined(); }
+    for (const result of [emitCQLFromAST(ast, options), emitPartitioned(lowerLocalCodes(ast, options).ast, "Age Publication", options.policyId, FULL_PARTITION, options)]) {
+      expect(result.success, JSON.stringify(result.errors)).toBe(true);
+    }
+  });
   it("admits the exact age pattern and emits direct/full/custom source bindings", () => {
     const { ast, program } = prepared();expect(program.diagnostics).toEqual([]);
     expect(program.descriptors[0].sources![0]).toMatchObject({ kind: "ageToday", op: "AtLeast", unit: "years", threshold: 18 });

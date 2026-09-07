@@ -1,6 +1,7 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 // #215 — the SINGLE source of truth for "is this canonical call a sanctioned age
 // predicate?", shared by the emit lowering (`resolveRecencyProjection` / `resolveAgeConcept`
-// in recencyProjectionOverride.ts) and the author-time validator (`AgePredicateValidator`).
+// in agePublication.ts) and the author-time validator (`AgePredicateValidator`).
 // Keeping ONE definition prevents a validate/emit drift where the two disagree on the
 // sanctioned op set — which would be WORSE than the divergence #215 closes (the validator
 // would block legal content, or the emitter would silently miscompile what validated green).

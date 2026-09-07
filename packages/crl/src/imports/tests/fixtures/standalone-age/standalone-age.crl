@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 # standalone-age
 library "Standalone Age".
 
@@ -13,7 +14,10 @@ concept "Has Local Thing":
 - code is `thing`.
 
 concept "Adult":
+- shape is Record.
+- type is Observation.
 - value type is boolean.
+- shape reduction is most recent.
 - source representation:
   - type is Patient.
   - value projection is age today at least 18 years.

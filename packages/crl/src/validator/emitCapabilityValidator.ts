@@ -1,7 +1,8 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 import { CRL } from "../ast/types";
 import { isCaseFeatureEmittable } from "../fhir-model/caseFeatureResources";
 import type { SourceContext } from "../imports/scopes";
-import { resolveAgeConcept } from "../template-match/recencyProjectionOverride";
+import { resolveAgeConcept } from "../template-match/agePublication";
 
 import { ValidationError } from "./validator";
 

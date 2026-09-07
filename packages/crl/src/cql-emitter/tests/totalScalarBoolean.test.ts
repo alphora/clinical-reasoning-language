@@ -315,16 +315,12 @@ concept "Bare":
       ...over,
     }) as Concept;
 
-  // ⭐ #189 O3 — a `"recency"` merge is a SCALAR BOOLEAN but NOT total. It emits a bare
-  // `CFH.recencyAgeSelected(...)` with no outer `Coalesce`, so an unanswered + uncomputable determination
-  // stays null and the tree PAUSES instead of Denying (proven by an executed `$apply` counterfactual —
-  // worklist O3). This pin previously asserted TOTAL, which is the claim a boolean composition would have
-  // used to admit the merge as a proven-total operand.
-  it("a `\"recency\"` both-rep twin is a SCALAR BOOLEAN but NOT total; a `\"union\"` twin is neither", () => {
+  // REFACTOR:grounded (#320, plan585): retired private markers confer no scalar or totality capability.
+  it("retired recency markers and union markers confer neither scalar nor totality capability", () => {
     const empty = resolverFor(new Map<string, Concept>());
-    const recency = mkConcept({ __bothRepMerge: "recency" });
+    const recency = mkConcept({ __bothRepMerge: "recency" } as any);
     expect(emitsTotalScalarBoolean(recency, empty)).toBe(false); // three-state — the load-bearing assertion
-    expect(emitsBareReExportableScalarBoolean(recency, empty)).toBe(true); // bare-usable in `not`/`and`/`or`
+    expect(emitsBareReExportableScalarBoolean(recency, empty)).toBe(false); // retired marker is not a value-result contract
     expect(emitsTotalScalarBoolean(mkConcept({ __bothRepMerge: "union" }), empty)).toBe(false);
     expect(emitsBareReExportableScalarBoolean(mkConcept({ __bothRepMerge: "union" }), empty)).toBe(false);
   });
@@ -336,7 +332,7 @@ concept "Bare":
       { __bothRepMerge: "recency" as const, valueTypes: ["boolean", "Quantity"] },
       { __bothRepMerge: "recency" as const, valueTypes: ["Quantity"] },
     ]) {
-      expect(emitsTotalScalarBoolean(mkConcept(over), empty)).toBe(false);
+      expect(emitsTotalScalarBoolean(mkConcept(over as any), empty)).toBe(false);
       expect(emitsBareReExportableScalarBoolean(mkConcept(over), empty)).toBe(false);
     }
   });

@@ -823,10 +823,10 @@ and cannot suppress a fresh calculation. CEL and extracted answers carry asserte
 
 concept "Age 18 Or Older":
 - shape is Record.
-- shape reduction is most recent.
 - value type is boolean.
 - type is Observation.
 - code is \`age-18-or-older\`.
+- shape reduction is most recent.
 - source representation:
   - type is Patient.
   - value projection is age today at least 18 years.
@@ -834,10 +834,10 @@ concept "Age 18 Or Older":
 // The upper-bound predicate also preserves unknown input.
 concept "Patient Under Twenty One Years":
 - shape is Record.
-- shape reduction is most recent.
 - value type is boolean.
 - type is Observation.
 - code is \`under-21\`.
+- shape reduction is most recent.
 - source representation:
   - type is Patient.
   - value projection is age today under 21 years.
@@ -1005,12 +1005,15 @@ concept "High BMI":
 - definition is "BMI" at least 30 'kg/m2'.
 
 // ============ Patient age projection (standalone, months) ============
-// This standalone determination computes from Patient.birthDate, with no local code override.
+// REFACTOR:grounded (#320, plan585): this calculation has no local answer code.
 // Age today supports years/months and rejects unsupported comparators, units and carriers.
 // Rep-local exists this projections are also implemented; arbitrary projection phrases need
-// their own execution proof. Recency applies when a local code producer is also present.
+// their own execution proof. Missing birthDate remains unknown; this concept has no answer slot.
 concept "Patient Under Six Months":
+- shape is Record.
+- type is Observation.
 - value type is boolean.
+- shape reduction is most recent.
 - source representation:
   - type is Patient.
   - value projection is age today under 6 months.

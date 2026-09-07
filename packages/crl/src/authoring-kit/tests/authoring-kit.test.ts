@@ -416,7 +416,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.32");
+    expect(kit.schemaVersion).toBe("1.33");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -1033,7 +1033,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     // wants. That is a CORRECTNESS fix, not teaching, so it lands with the slice and re-pins at 1.25 with NO
     // bump — the doctrine re-teach + schemaVersion bump stay BATCHED (`tmp/WORKLIST-kit-deltas.md`).
     expect(cpg.contentHash).toBe(
-      "6296a7e64112f3002056f23ce1daa4e4a24024f33f4b0f5cddd6a7a212cebbb1",
+      "2aadd7985be1f254d3f326ed67f0c84fd5ac39f98e175279aad2bcb498244718",
     );
     // #189 null/pause — the priorAuth payload embeds the reference `.cel` artifacts, which gained explicit
     // `value is true/false` facts (a NEGATIVE must now be STATED; omission means UNKNOWN and PAUSES). That is
@@ -1046,7 +1046,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     //   changelog entry that explains the re-sync is the `inline-answer-options` rule itself. A KE pinning
     //   1.25 re-syncs and gets the teaching for the new construct in the same step.
     expect(priorAuth.contentHash).toBe(
-      "21dbed3880bd6d9981b330306297db4e0f22f163d4118185b96483294068a298",
+      "681b3cf460b26ca415244e0b65211516bfa401ab4728565a71bf6a4c6bba5fe0",
     );
   });
 
@@ -1067,6 +1067,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   //   - edit a HISTORICAL entry, which is visible in review as rewriting the past.
   // There is no longer a way to re-pin that looks like routine test maintenance.
   const KIT_PINS: Readonly<Record<string, { cpg: string; priorAuth: string }>> = {
+    "1.33": { cpg: "2aadd7985be1f254d3f326ed67f0c84fd5ac39f98e175279aad2bcb498244718", priorAuth: "681b3cf460b26ca415244e0b65211516bfa401ab4728565a71bf6a4c6bba5fe0" },
     "1.31": { cpg: "c0c2bc07da34e315af33fbfae40782396895ae7ff7b074a2951db50b815ee8c0", priorAuth: "fcae7880574b91ffa1fef562cf9878478e3ba36e6a23f49f7d9c1e564ce48342" },
     "1.32": { cpg: "6296a7e64112f3002056f23ce1daa4e4a24024f33f4b0f5cddd6a7a212cebbb1", priorAuth: "21dbed3880bd6d9981b330306297db4e0f22f163d4118185b96483294068a298" },
     "1.30": { cpg: "017e2016ddc9672eac37acca4cf9d48fad4a8a1dcf6784790f61a9130dc09603", priorAuth: "0c94484c277b7624ee9accd56a8b610eb49dffaa5b44b0798497f0108d718b85" },

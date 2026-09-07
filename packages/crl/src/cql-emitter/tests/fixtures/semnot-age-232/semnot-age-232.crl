@@ -1,21 +1,19 @@
 library "Semnot Age 232".
 
-// Mirrors the IEHP #232 real artifact: an under-21 gate = sem-not over the
-// patient-age both-representation (recency) concept — the local `code is` override
-// recency-merged with a Patient age `source representation` (#257, replacing the
-// retired `definition is age today` carve-out).
+// REFACTOR:grounded (#320, plan585): a nullable criterion negates the selected age value.
+// This retains age gating and answer discovery; it does not admit publication aliases or sem-not consumers.
 concept "Age 21 Or Older":
-- value type is boolean.
+- shape is Record.
 - type is Observation.
+- value type is boolean.
 - code is `age-21-or-older`.
+- shape reduction is most recent.
 - source representation:
   - type is Patient.
   - value projection is age today at least 21 years.
 
-concept "Under Age 21":
-- type is Observation.
-- value type is boolean.
-- defined as ( sem-not "Age 21 Or Older" ).
+criterion "Under Age 21":
+- when ( not "Age 21 Or Older" ).
 
 decision "Eligibility":
 first:

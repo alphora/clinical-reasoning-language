@@ -282,6 +282,8 @@ export function classifyStatementLayer(stmt: Statement): Layer | null {
     if (stmt.__interfaceReexport) return "Interface";
     // REFACTOR:grounded (#320, plan583): uncoded Patient retrieval has a prepared source binding.
     if (stmt.__publication?.source?.kind === "ageToday") return "ExternalPrimitives";
+    // REFACTOR:grounded (#320, plan585): uncoded publications need no synthetic definition.
+    if (stmt.__publication?.role === "public") return "Inferences";
     // Concept-level `code is`-ONLY concepts are LOWERED upstream
     // (`lowerLocalCodes`, run before classification in both `emitCQLImports`
     // and `emitCQLFromAST`) into a synthetic Terminology + `CodedFromDefinition`
@@ -1479,8 +1481,8 @@ function buildInterfaceReexports(
       // T5 step 2b moved the READ from here to a first-class Inferences twin (`__pureQuestionRead`), so a
       // question now re-exports from `Inferences` BARE — bare is what propagates the null — rather than
       // applying `.answeredValue()` at the facade. Bare-ness comes from `emitsBareReExportableScalarBoolean`
-      // above (which admits the twin); this marker corrects the LEDGER, exactly as `__interfaceThreeStateMerge`
-      // does for the merge family, so the facade enrolls `sanctioned-three-state` and not a false `total`.
+      // above (which admits the twin); this marker gives the facade its matching
+      // `sanctioned-three-state` ledger entry instead of a false `total`.
       //
       // ⚠ There is NO LocalPrimitives arm for a question any more, and there must not be one. `lowerLocalCodes`
       // publishes a question's records under `"<X> Records"` and its determination under `"<X>"`, so the NAME
@@ -1491,16 +1493,6 @@ function buildInterfaceReexports(
       // `emit-question-facade-not-lowered` guard above refuses that outright rather than shipping it.
       ...(sourceLayer === "Inferences" && src?.__pureQuestionRead === true
         ? { __pureQuestion: true as const }
-        : {}),
-      // ⭐ #189 O3 — an Inferences source that is a both-rep RECENCY MERGE is deliberately THREE-STATE (no
-      // outer `Coalesce`), because a determination NO arm establishes is UNKNOWN. The re-export TEXT is
-      // unchanged — bare `Inferences."X"` is exactly what propagates the null — so this marker corrects the
-      // LEDGER only: without it the façade enrolls `total("facade-delegated")` over a three-state operand and
-      // the whole-boundary proof fails ("composite is not provably total"). MEASURED on dme101-030 before it
-      // was added. Decided HERE for the same reason `__pureQuestion` is: the Interface emitter is
-      // layer-isolated and cannot see the source concept's markers.
-      ...(sourceLayer === "Inferences" && src?.__bothRepMerge === "recency"
-        ? { __interfaceThreeStateMerge: true as const }
         : {}),
     };
     reexports.push(reexport);

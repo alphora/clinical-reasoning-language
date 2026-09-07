@@ -33,14 +33,11 @@ function emit(src: string): {
   return { success: res.success, kinds, inferred };
 }
 
-const AGE_RECENCY = `concept "Age 21 Or Older":
+// REFACTOR:grounded (#320, plan585): a nullable question tests the Boolean consumer independently of age.
+const NULLABLE_QUESTION = `concept "Answer":
+- type is Observation.
 - value type is boolean.
-- code is \`age-21-or-older\`.
-- source representation:
-  - type is Patient.
-  - value element is Patient.birthDate.
-  - value type is date.
-  - value projection is age today at least 21 years.`;
+- code is \`answer\`.`;
 
 const DECISION = `decision "D":
 first:
@@ -85,22 +82,22 @@ concept "CCComp":
 - defined as ( "CC1" sem-or "CC2" ).`;
 
 describe("#189 Slice C 2b.3b.1ii — boolean composition pivot error kinds (same-layer)", () => {
-  it("MIXED three-state (recency merge + a composition over questions) → ADMITTED to the boolean lane, strong Kleene", () => {
+  it("MIXED three-state (nullable question + a composition over questions) → ADMITTED to the boolean lane, strong Kleene", () => {
     const { success, kinds, inferred } = emit(`library "P".
 
-${AGE_RECENCY}
+${NULLABLE_QUESTION}
 
 ${TRUTH_SET}
 
 concept "Gate":
 - type is Observation.
 - value type is boolean.
-- defined as ( "Age 21 Or Older" sem-or "TS" ).
+- defined as ( "Answer" sem-or "TS" ).
 
 ${DECISION}
 `);
     // ⭐ #189 T5 step 2b — this cell FLIPPED, and the flip is the point of the slice. Both operands are
-    // THREE-STATE booleans: `"Age 21 Or Older"` is a both-rep recency merge (three-state since O3 dropped its
+    // THREE-STATE booleans: `"Answer"` is a both-rep nullable question (three-state since O3 dropped its
     // outer `Coalesce`) and `"TS"` is a composition over two PURE QUESTIONS, each of which now publishes a
     // three-state determination instead of a truth-set List. So there is no longer a totality MIXTURE to
     // report — there are two nullable booleans, which is exactly what the boolean lane must accept.
@@ -111,7 +108,7 @@ ${DECISION}
     expect(success).toBe(true);
     expect(kinds).toEqual([]);
     // BARE leaves — no `Coalesce`, no truth-set weave, no compile-failing sentinel.
-    expect(inferred).toMatch(/define "Gate":\s*\n\s*"Age 21 Or Older"\s*\n?\s*or "TS"/);
+    expect(inferred).toMatch(/define "Gate":\s*\n\s*"Answer"\s*\n?\s*or "TS"/);
     expect(inferred).not.toContain("CRLCommon.CompositionTotalityMixed");
     expect(inferred).not.toContain("asTruths()");
   });
@@ -121,12 +118,12 @@ ${DECISION}
 
 ${CC_REFINEMENT}
 
-${AGE_RECENCY}
+${NULLABLE_QUESTION}
 
 concept "Gate":
 - type is Observation.
 - value type is boolean.
-- defined as ( "Age 21 Or Older" sem-or "CCComp" ).
+- defined as ( "Answer" sem-or "CCComp" ).
 
 ${DECISION}
 `);
@@ -142,12 +139,12 @@ ${CC_REFINEMENT}
 
 ${TRUTH_SET}
 
-${AGE_RECENCY}
+${NULLABLE_QUESTION}
 
 concept "Gate":
 - type is Observation.
 - value type is boolean.
-- defined as ( ( "Age 21 Or Older" sem-or "TS" ) sem-or "CCComp" ).
+- defined as ( ( "Answer" sem-or "TS" ) sem-or "CCComp" ).
 
 ${DECISION}
 `);
@@ -159,7 +156,7 @@ ${DECISION}
   it("PARENT CARDINALITY: a `shape is Record` + boolean parent with ALL-total operands does NOT flip to a scalar boolean (loud, not a silent flip — disc 452 #1 at the pivot)", () => {
     const { success, inferred } = emit(`library "P".
 
-${AGE_RECENCY}
+${NULLABLE_QUESTION}
 
 concept "R":
 - type is Condition.
@@ -172,7 +169,7 @@ concept "Gate":
 - type is Observation.
 - value type is boolean.
 - shape is Record.
-- defined as ( "Age 21 Or Older" sem-or "R" ).
+- defined as ( "Answer" sem-or "R" ).
 
 ${DECISION}
 `);
@@ -180,18 +177,18 @@ ${DECISION}
     // would have flipped (the [critical] regression); post-fix it is loud (the retained refinement guard rejects
     // the total operands) → success:false and no flipped `define "Gate": … or …` scalar boolean.
     expect(success).toBe(false);
-    expect(inferred).not.toMatch(/define "Gate":\s*\n\s*"Age 21 Or Older"\s+or\s+"R"/);
+    expect(inferred).not.toMatch(/define "Gate":\s*\n\s*"Answer"\s+or\s+"R"/);
   });
 
   it("UNRESOLVED same-layer bare operand → emit-declared-result-unresolved (loud, not a dangling identifier)", () => {
     const { success, kinds, inferred } = emit(`library "P".
 
-${AGE_RECENCY}
+${NULLABLE_QUESTION}
 
 concept "Gate":
 - type is Observation.
 - value type is boolean.
-- defined as ( "Age 21 Or Older" sem-or "Nonexistent Concept" ).
+- defined as ( "Answer" sem-or "Nonexistent Concept" ).
 
 ${DECISION}
 `);

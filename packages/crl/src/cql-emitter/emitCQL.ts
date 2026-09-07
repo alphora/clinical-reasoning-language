@@ -153,7 +153,6 @@ import type { QualifyLeaf, RenderLeafPolicy } from "./emitCriterionDefine";
 import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import type { CRLError } from "../types/errors";
 import { ageComputeFnForUnit } from "../template-match/agePredicate";
-import { recencyOverrideById } from "../template-match/recencyProjectionOverride";
 import { resolveRecencyValueConcept, isPureQuestionConcept } from "../template-match/recencyValueConcept";
 
 import { lowerLocalCodes, preLowerAge } from "./lowerLocalCodes";
@@ -717,14 +716,8 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
     // pass is idempotent (clears `Concept.code`), so a re-entry from the layered
     // path (`emitLayered` → `emitCQLFromAST`) is a no-op. Hard errors (mixed
     // code+definition, empty code, missing type, duplicate code) short-circuit.
-    // #257 (age slice) T1 — the shared AGE pre-pipeline: the emit-boundary retirement scan of
-    // authored `definition is age today` (the carve-out replaced by the Patient age `source
-    // representation`) + the standalone (1-representation) age-posrep synthesis, run BEFORE the
-    // `code is` lowering (which additionally handles the 2-representation recency case). Runs on the
-    // ORIGINAL ast BEFORE any synthesis, so a definition SYNTHESIZED from a projection (flagged
-    // `__synthesizedFromPosrep`) is never mistaken for the retired authored form. The SAME
-    // `preLowerAge` runs in the imports/case-feature + FHIR lanes, so the standalone target is usable
-    // everywhere and the retirement fires on every path (none runs the Validator).
+    // REFACTOR:grounded (#320, plan585): reject legacy age before any lowering on every emit entry.
+    // The admitted Record form is prepared by the shared publication program; there is no age AST synthesis.
     const pre = preLowerAge(ast);
     const lowered = lowerLocalCodes(pre.ast, {
       publication: options.publication,
@@ -1492,16 +1485,6 @@ class Emitter {
           form: "interface façade of a pure question (`answeredValue()` re-export)",
           cell: "§3 pure question → `answeredValue()` true/false/null (NOT totalized)",
         };
-      } else if (c.__interfaceThreeStateMerge === true) {
-        // ⭐ #189 O3 — the façade of a THREE-STATE both-rep merge. Same shape as the question façade above and
-        // for the same reason: the re-export is bare (which propagates the null), so claiming `total` here
-        // would make the ledger disagree with what ships and fail the whole-boundary proof.
-        obligation = {
-          kind: "sanctioned-three-state",
-          family: "merge",
-          form: "interface façade of a both-rep recency merge (bare re-export of a three-state determination)",
-          cell: "§3 question → three-state cross-representation merge (NOT totalized)",
-        };
       } else if (form === "record-boolean-value") {
         // ⭐⭐ #189 — the façade of a RECORD-BOOLEAN GUARD. It reads the selected record's boolean carrier
         // (`FHIRHelpers.ToBoolean(… as FHIR.boolean)`), which is three-state by construction: no candidate
@@ -1742,7 +1725,6 @@ class Emitter {
       if (c.__pureQuestion === true) return threeStateRead("answeredValue");
       // #189 O3 — lock-step with the obligation above: the façade of a three-state merge re-exports bare, so
       // its discharge is three-state, not `facade-delegated` total.
-      if (c.__interfaceThreeStateMerge === true) return threeStateRead("bare re-export of a three-state merge");
       const form = this.facadeForm(c);
       if (form === "recordsource") return notBoolean("ExternalPrimitives record re-export");
       if (form === "total-boolean") return total("facade-delegated"); // bare re-export — delegates to the reduction
@@ -1751,22 +1733,6 @@ class Emitter {
       // be the dishonest-certificate failure the enrollment above names.
       if (form === "record-boolean-value") return threeStateRead("record-boolean guard (value read of the selected record)");
       return total("facade-satisfied"); // `…satisfied()` = `exists(truths)` — intrinsically total
-    }
-    // #189 Slice C 2b.3b.1 — a both-representation twin's discharge is KINDED, lock-step with the emit flip + the
-    // totality predicate. A `"recency"` twin emits `Coalesce(CFH.recencyAgeSelected(...), false)` — a TOTAL boolean →
-    // discharges `total("boundary-coalesce")`, but ONLY when it declares a Scalar boolean (the SAME invariant
-    // `emitRecencyMerge` + the predicate assert; a malformed twin is a loud emit error, so the discharge reports it
-    // non-boolean rather than certifying a total it cannot emit). A `"union"` twin still emits a truth-set List
-    // (`.asTruths() union …`) → NOT a boolean. Checked before the definition switch because a recency twin's
-    // definition does NOT emit via the catalog path.
-    if (c.__bothRepMerge === "recency") {
-      // ⭐ #189 O3 — THREE-STATE, in lock-step with `emitRecencyMerge` dropping its outer `Coalesce`.
-      // A recency twin has a local `code is` by construction, so it is an ANSWERABLE determination and a
-      // merge no arm establishes is UNKNOWN, not false. It used to discharge `total("boundary-coalesce")`,
-      // which was the pause-killer the proof now rejects for this family.
-      return this.isBooleanScalarConcept(c) && assumedShapePreMigration(c.shape) === "Scalar"
-        ? threeStateRead("recency-merge (three-state, no boundary)")
-        : notBoolean("malformed recency twin (non-scalar-boolean declaration)");
     }
     if (c.__bothRepMerge === "recency-value") return notBoolean("both-rep recency-value scalar value merge");
     if (c.__bothRepMerge !== undefined) return notBoolean(`both-rep ${c.__bothRepMerge} truth-set merge`);
@@ -2286,7 +2252,9 @@ class Emitter {
     // representations-only guard below, because the twin deliberately carries no `definition`: the read is a
     // compiler-synthesized lowering, not an authored form. Without this the compiler would report a define it
     // built itself as unbuilt work.
-    const questionRead = c.__publication?.source?.kind === "ageToday"
+    const questionRead = c.__publication?.role === "public"
+      ? `${cqlIdent(PUBLICATION_SELECTION_CQL_FUNCTIONS.record)}(${cqlIdent(publicationEnvelopeName(c.name))})`
+      : c.__publication?.source?.kind === "ageToday"
       ? "([Patient] P where P.id.value = Patient.id.value)"
       : c.__pureQuestionRead === true ? this.emitPureQuestionRead(c) : undefined;
     // ⚠ A concept with no definition after lowering is REPRESENTATIONS-ONLY, and its lowering is unbuilt.
@@ -2489,10 +2457,10 @@ class Emitter {
     for (let index = 0; index < (descriptor.sources?.length ?? 0); index++) {
       const source = descriptor.sources![index];
       const target = this.renderPublicationReference(binding.sourceReferences![index]);
-      const code = `FHIR.CodeableConcept { text: FHIR.string { value: ${cqlStringLiteral(descriptor.title)} }, coding: { FHIR.Coding { system: FHIR.uri { value: ${cqlStringLiteral(descriptor.localCode!.system)} }, code: FHIR.code { value: ${cqlStringLiteral(descriptor.localCode!.code)} } } } }`;
+      const code = descriptor.localCode === undefined ? `FHIR.CodeableConcept { text: FHIR.string { value: ${cqlStringLiteral(descriptor.title)} } }` : `FHIR.CodeableConcept { text: FHIR.string { value: ${cqlStringLiteral(descriptor.title)} }, coding: { FHIR.Coding { system: FHIR.uri { value: ${cqlStringLiteral(descriptor.localCode!.system)} }, code: FHIR.code { value: ${cqlStringLiteral(descriptor.localCode!.code)} } } } }`;
       const helper = source.kind === "ageToday" ? AGE_CQL.produce : PUBLICATION_SERVICE_REQUEST_CANDIDATE;
       const args = source.kind === "ageToday" ? `, ${cqlStringLiteral(source.op)}, ${cqlStringLiteral(source.unit)}, ${source.threshold}${Number.isInteger(source.threshold) ? ".0" : ""}, Today()` : "";
-      const projection = `((${target}) S return all ${cqlIdent(helper)}(S, ${cqlStringLiteral(source.contributorId)}, ${cqlStringLiteral(descriptor.conceptId)}, ${code}, ${cqlStringLiteral(descriptor.profileUrl!)}, 'Patient/' + Patient.id.value${args}))`;
+      const projection = `((${target}) S return all ${cqlIdent(helper)}(S, ${cqlStringLiteral(source.contributorId)}, ${cqlStringLiteral(descriptor.conceptId)}, ${code}, ${descriptor.profileUrl === undefined ? "null as System.String" : cqlStringLiteral(descriptor.profileUrl)}, 'Patient/' + Patient.id.value${args}))`;
       const projected = source.kind === "ageToday" ? `(${projection} C where C is not null)` : projection;
       candidates = `Flatten({ ${candidates}, ${projected} })`;
     }
@@ -2614,17 +2582,6 @@ class Emitter {
     }
     if (c.__bothRepMerge === "recency-value") {
       return this.emitRecencyValueMerge(c);
-    }
-    // Both-representation RECENCY merge (`code is` + `definition is age today at
-    // least <Q>`): the Inferences twin recency-selects between the newest valid
-    // local Observation and the live computed age, then lifts back to a truth-set.
-    // Only valid in the truth-set Inferences lane; the marker is set at lowering.
-    if (
-      c.__bothRepMerge === "recency" &&
-      this.caseFeature.kind === "inferred" &&
-      c.__bothRepFoldInLocalPrimitives !== undefined
-    ) {
-      return this.emitRecencyMerge(c);
     }
     switch (def.type) {
       case "CodedFromDefinition":
@@ -2921,157 +2878,6 @@ class Emitter {
   ): string {
     const newest = this.emitSelectNewest(twinRef, desc, "FHIR.boolean");
     return `Coalesce(\n  FHIRHelpers.ToBoolean((${newest}).${desc.valueElement!} as FHIR.boolean),\n  false\n)`;
-  }
-
-  /**
-   * Emit the patient-age RECENCY both-rep merge (Inferences twin). #189 Slice C 2b.3b.1 — emits a TOTAL scalar
-   * boolean `Coalesce(CFH.recencyAgeSelected(local, computed), false)` (was the `recencyAgeTruths` `{ true }` / `{}`
-   * truth-set lift, now retired from emit), so it composes in the Inferences/Interface boolean lane.
-   *
-   * The merge CANNOT use `asTruths()` — that reads only `value.value is true`,
-   * discarding the Observation and erasing an explicit `false`. Instead the
-   * newest VALID local Observation is selected from the LocalPrimitives retrieve
-   * (boolean value, sorted by `effective`), and the CaseFeatureCommon
-   * `recencyAgeSelected` helper does the precedence select (asserted-if-newer vs
-   * computed) returning a nullable Boolean, which the outer `Coalesce(..., false)`
-   * totalizes (closed-world — an undetermined merge is false).
-   */
-  private emitRecencyMerge(c: Concept): string {
-    const foldIn = c.__bothRepFoldInLocalPrimitives!;
-    // INTERNAL-INVARIANT: a `"recency"` twin MUST carry BOTH its threshold AND its
-    // comparator op (set in lock-step at lowerLocalCodes when the twin is synthesized).
-    // A missing threshold or op here is a compiler bug, not a defaultable case — fail
-    // loudly (matching the co-invariant assert in lowerLocalCodes), never silently emit
-    // a fabricated `18 'years'` or default the comparator to `AtLeast`.
-    if (
-      c.__bothRepRecencyThreshold === undefined ||
-      c.__bothRepRecencyOp === undefined ||
-      c.__recencyComputeFn === undefined
-    ) {
-      throw new Error(
-        `internal invariant violated: recency both-rep twin "${c.name}" has ` +
-          `__bothRepMerge === "recency" but is missing __bothRepRecencyThreshold ` +
-          `(${c.__bothRepRecencyThreshold}), __bothRepRecencyOp (${c.__bothRepRecencyOp}), ` +
-          `and/or __recencyComputeFn (${c.__recencyComputeFn}). The marker, threshold, op, and ` +
-          `compute fn are set together in lowerLocalCodes; a recency twin missing any is a ` +
-          `compiler bug.`,
-      );
-    }
-    // #189 Slice C 2b.3b.1 — CARDINALITY/coherence invariant (crl-emit code review, both arms). The recency merge
-    // emits a SCALAR boolean (`Coalesce(CFH.recencyAgeSelected(...), false)`); a non-scalar (Record/RecordSet) or
-    // non-single-boolean declaration would emit a shape the concept did NOT declare (charter §3 cardinality is
-    // authoritative / §4 no-magic). `resolveAgeConcept` enforces `value type is boolean` but does NOT gate shape,
-    // and `emitCQLFromAST` is a validator-free public entry, so assert here — the SAME `isScalarBoolean` invariant
-    // the totality predicate + the discharge (`emittedDischargeAndType`) key on, so a malformed twin is ONE loud
-    // emit error, never a predicate/emit/discharge drift.
-    if (!(assumedShapePreMigration(c.shape) === "Scalar" && c.valueTypes.length === 1 && c.valueTypes[0] === "boolean")) {
-      throw new Error(
-        `internal invariant violated: recency both-rep twin "${c.name}" must declare a single \`boolean\` value ` +
-          `type and \`Scalar\` cardinality (has shape=${c.shape ?? "(none)"}, value type(s)=` +
-          `${c.valueTypes.length > 0 ? c.valueTypes.join(", ") : "(none)"}). The recency merge emits a scalar ` +
-          `boolean; a non-scalar/non-boolean declaration would manufacture a shape the concept did not declare ` +
-          `(charter §3/§4). Declare \`- value type is boolean.\` (and Scalar cardinality) on a patient-age ` +
-          `recency concept.`,
-      );
-    }
-    // The recency emit consults the projection OVERRIDE the twin names (`__recencyOverrideId`) for
-    // its CQL helper (the compute fn is per-UNIT, carried on the twin — see below) — age is ONE
-    // caller of the override mechanism, not a hardcoded engine branch. The override's helper is
-    // age-shaped (`recencyAgeTruths`) so the emitted CQL is byte-identical to the retired carve-out
-    // for the years case; the CQL catalog stays age-shaped
-    // (the re-home is a compile-time seam). A missing/unknown id is a compiler bug (the marker is
-    // set in lock-step with the recency markers in lowerLocalCodes).
-    const override = c.__recencyOverrideId ? recencyOverrideById(c.__recencyOverrideId) : undefined;
-    if (override === undefined) {
-      throw new Error(
-        `internal invariant violated: recency both-rep twin "${c.name}" has ` +
-          `__bothRepMerge === "recency" but __recencyOverrideId (${c.__recencyOverrideId}) ` +
-          `resolves to no built recency-projection override. The id is set in lock-step with ` +
-          `the recency markers in lowerLocalCodes; a recency twin without a resolvable override ` +
-          `is a compiler bug.`,
-      );
-    }
-    const threshold = c.__bothRepRecencyThreshold;
-    const op = c.__bothRepRecencyOp;
-    // The compute fn is a per-UNIT HOW carried on the twin (`AgeAt` years / `AgeInMonths` months,
-    // #257 T2) — NOT on the override (which is unit-agnostic), and NOT re-derived from the unit
-    // here. The matcher chose it; the emit renders it so the compute fn matches the threshold's
-    // unit through the unit-blind comparator overload (#215).
-    const computeFn = c.__recencyComputeFn;
-    // INTERNAL-INVARIANT (#215 defense at the EXPORT boundary): the compute fn MUST agree with the
-    // threshold's unit (`AgeAt`↔years, `AgeInMonths`↔months). The compiler pairs them at one site,
-    // but `emitCQLFromAST` is a public entry a caller can feed a hand-built twin — a mismatched
-    // pair (`AgeAt` + `6 'months'`) would silently emit the exact unit-blind miscompile this slice
-    // exists to prevent. Fail loudly instead. The unit is parsed back out of the already-rendered
-    // threshold literal (e.g. `6 'months'`); a unitless threshold cannot be a sanctioned age one.
-    const thresholdUnit = /'([^']+)'/.exec(threshold)?.[1];
-    if (thresholdUnit === undefined || ageComputeFnForUnit(thresholdUnit) !== computeFn) {
-      throw new Error(
-        `internal invariant violated: recency both-rep twin "${c.name}" pairs compute fn ` +
-          `__recencyComputeFn (${computeFn}) with a threshold (${threshold}) whose unit ` +
-          `(${thresholdUnit ?? "(none)"}) does not match — this would emit a unit-blind ` +
-          `miscompile (#215). The matcher pairs the fn and unit; a mismatched twin is a compiler ` +
-          `bug (or an ill-formed hand-built AST).`,
-      );
-    }
-    const localLib =
-      this.caseFeature.kind === "inferred" ? this.caseFeature.localSourceLibrary : "";
-    // The newest valid local boolean Observation (or null). `.value is FHIR.boolean`
-    // keeps only boolean-valued rows (LOCK-STEP with `recencyAgeSelected`'s
-    // `local.value as FHIR.boolean` cast in CaseFeatureCommon.cql — if you change
-    // one filter/cast, change the other). NO status filter: a DTR-extracted answer
-    // (sdc `definitionExtractValue`, ProcessDefinitionItem) is NOT stamped `final`,
-    // so restricting status would silently drop it (operator decision 2026-07-01).
-    // Sort by the COMPARABLE effective value, NOT the raw `effective[x]` choice.
-    // `sort by effective` translates but THROWS at runtime with 2+ rows —
-    // `DateTimeType is not comparable` — because it orders the polymorphic choice
-    // element. Casting to the System.DateTime (`(effective as FHIR.dateTime).value`)
-    // matches the comparable value the lattice reads in `recencyAgeAssertedWins`.
-    // The extraction populates `effective` (from QuestionnaireResponse.authored),
-    // NOT `issued`, so recency keys on `effective`; FHIR sorts null low, so a dated
-    // answer is preferred and an all-null set is deterministic (by `id`). NO status
-    // filter (extracted answers aren't stamped `final`; operator decision 2026-07-01).
-    const newestLocal =
-      `Last(\n` +
-      `    (${cqlQualifiedRef(localLib, foldIn)}) O\n` +
-      `      where O.value is FHIR.boolean\n` +
-      `      sort by (effective as FHIR.dateTime).value, id\n` +
-      `  )`;
-    const computed = `CRLCommon.${op}(CRLCommon.${computeFn}(), ${threshold})`;
-    // #189 Slice C 2b.3b.1 — the recency merge is now a TOTAL boolean at its boundary: the recency-SELECTED
-    // nullable Boolean (`recencyAgeSelected`), `Coalesce`d to `false` (closed-world — an undetermined merge is
-    // false). NOT the `recencyAgeTruths` List lift (retired from emit; the helper stays in the catalog,
-    // unreferenced). Do NOT Coalesce `computed` before arbitration — a null computed (malformed/absent
-    // birthDate) must fall through to the local-source fallback (`CaseFeatureCommon.cql:102-104`), so only the
-    // OUTER arbitration result is Coalesced. `CFH.<recencySelectedHelper>(newestLocalObservation, computedBoolean)`
-    // reads the projected datum + its recency timestamp (`${override.valueElementPath}` /
-    // `${override.recencyTimestamp}`) internally (Patient context), so the call site passes only the two arms.
-    // `CFH` is the include alias for CaseFeatureCommon (see the layered header).
-    const selected =
-      `CFH.${override.recencySelectedHelper}(\n` +
-      `  ${newestLocal},\n` +
-      `  ${computed}\n` +
-      `)`;
-    // ⭐ #189 O3 — NO OUTER `Coalesce`. The merge stays THREE-STATE.
-    //
-    // This used to `return Coalesce(<selected>, false)`, and MEASURED
-    // (`tmp/nullprobe/analysis/layeredAge-out.txt`) that made the ONLY working both-representation merge in
-    // the emitter DENY on absence: unanswered locally AND no `birthDate` ⇒ `recencyAgeSelected` null ⇒
-    // `false` ⇒ the decision's `otherwise` fires. The concept carries a local `code is` (that is what makes
-    // this the RECENCY merge rather than the standalone one), so it is ANSWERABLE, and a determination no
-    // arm establishes is UNKNOWN — charter §4, and the operator's acceptance criterion that the only route
-    // to a Deny is a STATED `false`.
-    //
-    // ⚠ The null is LOAD-BEARING and must survive to the guard: the Interface layer above is a bare
-    // re-export (`define X: Inferences."X"`), a branch guard is deliberately null-propagating (that IS the
-    // pause), and an action-guard carrier totalizes at its OWN reference site. Totality belongs at the ARM.
-    // ⚠ Do NOT Coalesce `computed` before arbitration either — a null computed age must fall through to the
-    // local-source arm (`CaseFeatureCommon.cql`), which is why the inner arms stay bare too.
-    //
-    // The STANDALONE age concept (posrep only, no local `code is`) is a different cell and KEEPS its
-    // boundary: its one arm is `Patient.birthDate`, which is EVIDENCE, and absent evidence is `false`.
-    // `classifyBooleanTotality` splits the two on exactly that test, in lock-step with this emit.
-    return selected;
   }
 
   /**
@@ -4620,12 +4426,6 @@ class Emitter {
     if (visiting.has(name)) return "unknown"; // cycle → loud (never memoize a guess)
     const c = this.conceptByName.get(name);
     if (!c) return "unknown";
-    // #189 Slice C 2b.3b.1 — a Patient-age RECENCY twin now emits a bare TOTAL boolean
-    // (`Coalesce(CFH.recencyAgeSelected(...), false)`), NOT a truth-set. A REFINEMENT-lane `sem-not` over it would
-    // otherwise render `{ true } except (<Boolean>)` — ill-typed (a boolean is not a truth-set universe). Return
-    // `unknown` → the no-base-negation path loud-refuses (the remedy: declare the parent boolean so it flips to the
-    // `not (...)` boolean lane). A boolean-declared parent never reaches this classifier (it flips at the pivot).
-    if (c.__bothRepMerge === "recency") return "unknown";
     const body = c.definition;
     if (!body) return "unknown"; // asserted-only concept in this layer
     const next = new Set(visiting).add(name);

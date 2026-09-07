@@ -15,7 +15,7 @@
 //      building its arm, and the loud `emit-most-recent-derivation` is what keeps the unbuilt arm from
 //      shipping silently. An earlier version of this line claimed the two "cannot disagree"; that is no
 //      longer the design.
-// This is the `resolveAgeConcept` precedent (recencyProjectionOverride.ts:204 — "the SAME source the author-time
+// This is the `resolveAgeConcept` precedent (agePublication.ts:204 — "the SAME source the author-time
 // validator consults, so validate and emit cannot drift"). PURELY STRUCTURAL: no owning-library metadata, so a pure
 // AST consumer (the totality classifier) can call it.
 //
@@ -28,7 +28,7 @@ import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import { isLocalBooleanPublication } from "../emit/publicationProgram";
 import type { Concept, Representation } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
-import { resolveAgeConcept } from "./recencyProjectionOverride";
+import { resolveAgeConcept } from "./agePublication";
 import { resolveConceptPipeline } from "./resolvePipeline";
 import type { ResolvedStage } from "./resolvePipeline";
 

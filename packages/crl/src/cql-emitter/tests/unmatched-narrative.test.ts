@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 import { describe, expect, it } from "vitest";
 
 import { emitCQL } from "../emitCQL";
@@ -302,15 +303,9 @@ describe("issue #77 — catalog↔matcher drift fix (plus audit additions)", () 
     expect(r.result).toMatch(/CRLCommon\.AgeAt\(/);
   });
 
-  it("age today at least <n> years (posrep projection) → AtLeast(AgeAt(), n) with the NO-arg AgeAt()", () => {
-    const src = lib(
-      "T",
-      `concept "Adult Today":\n- value type is boolean.\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is date.\n  - value projection is age today at least 18 years.\n`,
-    );
-    const r = emitCQL(src, { libraryName: "T" });
-    expect(r.success).toBe(true);
-    expect(r.unmatched).toBeUndefined();
-    // The no-arg AgeAt() (live Today() overload) inside AtLeast.
-    expect(r.result).toContain("CRLCommon.AtLeast(CRLCommon.AgeAt(), 18 'years')");
+  it("implicit age projection fails with an actionable retirement diagnostic", () => {
+    const r = emitCQL('library "T".\nconcept "Adult Today":\n- value type is boolean.\n- source representation:\n  - type is Patient.\n  - value projection is age today at least 18 years.');
+    expect(r.success).toBe(false);
+    expect(r.errors?.some(e => e.kind === "emit-age-form-retired")).toBe(true);
   });
 });

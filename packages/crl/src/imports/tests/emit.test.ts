@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 import * as path from "path";
 
 import { emitCQLImports, computeSplitPlan } from "../emit";
@@ -883,7 +884,7 @@ describe("#257 (age slice) — standalone Patient age posrep in the imports/inte
     // The age determination emits the generic computed call in SOME emitted library (the Inferences
     // layer) — proving "Adult" was classified + emitted, not dropped.
     const allCql = result.cqlByLibrary.map((e) => e.cql).join("\n\n");
-    expect(allCql).toContain("CRLCommon.AtLeast(CRLCommon.AgeAt(), 18 'years')");
+    expect(allCql).toContain("__CRL_AgeToday_v1_Produce");
     // And a define for the age concept exists (the decision's `when "Adult"` resolves).
     expect(allCql).toMatch(/define "Adult":/);
   });

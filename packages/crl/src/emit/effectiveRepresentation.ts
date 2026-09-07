@@ -28,8 +28,7 @@ import type { ResultType } from "../grammar/resultType";
 import { conceptResultType } from "../grammar/resultType";
 import {
   resolveAgeConcept,
-  AGE_TODAY_OVER_BIRTHDATE,
-} from "../template-match/recencyProjectionOverride";
+} from "../template-match/agePublication";
 import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
@@ -233,43 +232,6 @@ function firstEmptyOwningField(
   if (!m.canonicalBase?.trim()) return "canonicalBase";
   if (!m.localDomainId?.trim()) return "localDomainId";
   return null;
-}
-
-/** The `uncoded` (Patient age) descriptor — every literal read off the override catalog, the declared single
- *  source of truth (never re-typed here). Recency is `meta.lastUpdated` read directly (`cast:"none"`) — an
- *  `instant`, NOT `as FHIR.dateTime`. */
-function uncodedDescriptor(): EffectiveRepresentationDescriptor {
-  const o = AGE_TODAY_OVER_BIRTHDATE;
-  return {
-    arm: "uncoded",
-    resourceType: "Patient",
-    valueElement: relativePath(o.valueElementPath, "Patient"), // "birthDate"
-    datumValueType: o.repValueType as ConceptValueType, // "date"
-    resultType: { shape: "Scalar", valueType: o.resultValueType as ConceptValueType }, // Scalar<boolean>
-    recency: { sortExpr: relativePath(o.recencyTimestamp, "Patient"), cast: "none" }, // meta.lastUpdated (instant)
-  };
-}
-
-/** The `local-exact` arm of a patient-age RECENCY concept: a boolean Observation whose reduction is supplied by
- *  the recency projection (NOT an `exists`/`most recent`/`count` — the cell the generic datum algorithm below
- *  doesn't enumerate, panel R2). Verified against the recency merge (`CaseFeatureCommon.cql:92-94`). */
-function ageLocalExactDescriptor(
-  concept: Concept,
-  owningLibrary: OwningLibraryMetadata,
-): EffectiveRepresentationDescriptor {
-  const row = resourceEmitRow("Observation")!; // Observation is always in the registry
-  return {
-    arm: "local-exact",
-    resourceType: "Observation",
-    coding: row.coding,
-    system: localCodeSystemUrl(owningLibrary.canonicalBase, owningLibrary.localDomainId),
-    code: concept.code!, // resolveAgeConcept `recency` guarantees a local `code is`
-    resultType: { shape: "Scalar", valueType: "boolean" as ConceptValueType },
-    recency: row.recency, // { effective, dateTime }
-    owningLibrary,
-    valueElement: "value",
-    datumValueType: "boolean" as ConceptValueType,
-  };
 }
 
 type Datum = { valueElement?: string; datumValueType?: ConceptValueType; readRepeats?: boolean };
@@ -853,48 +815,8 @@ export function deriveEffectiveRepresentations(
       },
     };
   }
-  if (age.kind === "recency" || age.kind === "standalone") {
-    // Patient age is inherently a Scalar boolean. `resolveAgeConcept` checks the value type but NOT `shape` or a
-    // deviating local `valueElement`, so guard both here rather than manufacturing a Scalar<boolean>/`value` datum
-    // over a concept that declared otherwise (panel — no manufacturing).
-    if (assumedShapePreMigration(concept.shape) !== "Scalar") {
-      return {
-        status: "error",
-        error: {
-          kind: "malformed-representation",
-          concept: concept.name,
-          owningLibrary,
-          field: "resultType",
-          detail: `a patient-age concept is Scalar, but it declares \`shape is ${concept.shape}\``,
-        },
-      };
-    }
-    if (concept.valueElement) {
-      // recency: the local arm reads Observation.value; standalone: no local `code is`, so a concept-level value
-      // element has nothing to bind to (A.3). Reject anything but a recency `value` — never silently drop it.
-      const rel = relativePath(concept.valueElement.path, "Observation");
-      if (age.kind !== "recency" || rel !== "value") {
-        return {
-          status: "error",
-          error: {
-            kind: "value-element-unmappable",
-            concept: concept.name,
-            owningLibrary,
-            ...(age.kind === "recency" ? { resourceType: "Observation" as const } : {}),
-            field: "valueElement",
-            detail:
-              age.kind === "recency"
-                ? `the patient-age local arm reads Observation.value; an authored value element \`${concept.valueElement.path}\` is not supported (T1)`
-                : `a standalone patient-age concept has no local \`code is\`; an authored value element \`${concept.valueElement.path}\` cannot bind`,
-          },
-        };
-      }
-    }
-    const descriptors: EffectiveRepresentationDescriptor[] = [];
-    if (age.kind === "recency") descriptors.push(ageLocalExactDescriptor(concept, owningLibMeta)); // [local-exact, ...
-    descriptors.push(uncodedDescriptor()); // ..., uncoded]
-    return { status: "derived", descriptors };
-  }
+  // REFACTOR:grounded (#320, plan585): prepared publication owns age source/value metadata.
+  if (age.kind === "publication") return { status: "deferred", reason: "sourced" };
 
   // 3. Not age. A concept-level `coded from` is an external read-only base (charter §3) — a source arm, deferred
   //    by D2 like a `source representation` block; it must NOT read as a pure-derived `derived{[]}` (panel).

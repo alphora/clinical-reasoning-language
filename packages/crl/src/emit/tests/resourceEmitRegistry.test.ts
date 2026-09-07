@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 import { describe, it, expect } from "vitest";
 
 import { parseInput } from "../../ast/tests/parseInput";
@@ -254,21 +255,10 @@ describe("T2 write-name resolvers — recency guard against the LIVE uncoded des
     localDomainId: "t",
   };
 
-  it("the uncoded age descriptor's live recency field → unsupported-recency-path (dotted meta.lastUpdated)", () => {
-    const src = `library "T".\nconcept "Adult":\n- value type is boolean.\n${AGE_POSREP}`;
-    const c = parseInput(src).statements.find(
-      (s) => s.type === "Concept" && s.name === "Adult",
-    ) as Concept;
-    const out = deriveEffectiveRepresentations(c, OWNING);
-    expect(out.status).toBe("derived");
-    if (out.status !== "derived") return;
-    const uncoded = out.descriptors.find((d) => d.arm === "uncoded");
-    expect(uncoded, "standalone age yields an uncoded descriptor").toBeDefined();
-    // The resolver rejects the live catalog recency field, whatever it currently is (dotted today).
-    expect(recencyStampJsonName(uncoded!.recency)).toHaveProperty(
-      "errorKind",
-      "unsupported-recency-path",
-    );
+  it("retired age metadata is rejected; dotted recency paths still cannot be written", () => {
+    const c = parseInput(`library "T".\nconcept "Adult":\n- value type is boolean.\n${AGE_POSREP}`).statements[0] as Concept;
+    expect(deriveEffectiveRepresentations(c, OWNING).status).toBe("error");
+    expect(recencyStampJsonName({ sortExpr: "meta.lastUpdated", cast: "none" })).toHaveProperty("errorKind", "unsupported-recency-path");
   });
 });
 

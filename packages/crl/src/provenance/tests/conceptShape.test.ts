@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 // Tests for buildConceptShapeIndex (#187 Todo 1b) — the per-concept `defined as` shape subtree the Medical-Validation
 // panes consume. Covers: the subtree shape (diamond first-wins, both-rep own-code-first, definition-is no-children),
 // the hasCodeIs-vs-leafEligible split (representation-bearing `code is`), and — the load-bearing GATE — that a `when`'s
@@ -24,7 +25,7 @@ import { buildCrlConceptLayer, type CrlConceptNode } from "../crlConceptLayer";
 import { collectLibs, conceptDeclRef, nodeKey, type LibInfo } from "../indexer";
 
 // A policy exercising every shape axis: pure leaves (A/B), a diamond composite (Comp = A ∧ B ∧ A), a both-rep
-// UNION (BothRep = code + defined as), a both-rep RECENCY (Age = code + definition is age), a representation-bearing
+// UNION (BothRep = code + defined as), a own-record existence (Evidence = code + definition is exists this), a representation-bearing
 // `code is` (Height: Source but NOT a lowered leaf), and a pure sourced concept (Sourced).
 const P = `# P
 library "P".
@@ -44,14 +45,11 @@ concept "BothRep":
 - type is Observation.
 - code is \`br\`.
 - defined as ( "A" sem-or "B" ).
-concept "Age":
+concept "Evidence":
+- type is Condition.
 - value type is boolean.
-- code is \`age\`.
-- source representation:
-  - type is Patient.
-  - value element is Patient.birthDate.
-  - value type is date.
-  - value projection is age today at least 18 years.
+- code is \`evidence\`.
+- definition is exists this.
 concept "Height":
 - type is Observation.
 - value type is Quantity.
@@ -69,7 +67,7 @@ decision "D":
 first:
 - when "Comp" then recommend activity "X".
 - when "BothRep" then recommend activity "X".
-- when "Age" then recommend activity "X".
+- when "Evidence" then recommend activity "X".
 - when "CrossComp" then recommend activity "X".
 - otherwise then recommend activity "X".`;
 
@@ -148,7 +146,7 @@ describe("buildConceptShapeIndex — per-concept shape subtree (#187 Todo 1b)", 
   it("indexes every concept by nodeKey (across the policy + registry libs)", () => {
     expect([...shape.keys()].sort()).toEqual(
       [
-        ...["A", "B", "Comp", "BothRep", "Age", "Height", "Sourced", "CrossComp"].map((n) =>
+        ...["A", "B", "Comp", "BothRep", "Evidence", "Height", "Sourced", "CrossComp"].map((n) =>
           ck("P", n),
         ),
         ck("U", "Q"),
@@ -205,8 +203,8 @@ describe("buildConceptShapeIndex — per-concept shape subtree (#187 Todo 1b)", 
     expect(leafNames(br)).toEqual(["BothRep", "A", "B"]); // self-first, then operands
   });
 
-  it("both-rep RECENCY (code is + definition is age): leafEligible + inferred, but NO children (definition-is, not defined-as)", () => {
-    const age = get("Age");
+  it("own-record existence (code is + definition is exists this): leafEligible + inferred, but NO children (definition-is, not defined-as)", () => {
+    const age = get("Evidence");
     expect({
       hasCodeIs: age.hasCodeIs,
       leafEligible: age.leafEligible,
@@ -219,7 +217,7 @@ describe("buildConceptShapeIndex — per-concept shape subtree (#187 Todo 1b)", 
       isInferred: true,
     });
     expect(age.children).toEqual([]);
-    expect(leafNames(age)).toEqual(["Age"]);
+    expect(leafNames(age)).toEqual(["Evidence"]);
   });
 
   it("representation-bearing `code is` (Height): hasCodeIs TRUE but leafEligible FALSE (Source display, not an emitted leaf)", () => {
