@@ -104,7 +104,19 @@ changed by the user. Session-only answer resources participate even when never p
 
 The operator's intended recency workflow holds external data stable during the session, so a newer local
 answer can win. A later session may retrieve newer external data that wins over a persisted prior answer.
-The app owns dataset refresh; the authored selector owns arbitration. There is no universal local-wins rule.
+The app owns dataset refresh; authored pattern behavior and selection own arbitration. There is no
+universal local-wins rule or universal freshness rule for every computation.
+
+Operator clarification (2026-09-07): "each pattern slash defined arg needs to own its own behavior.
+There's no pure default. For age clearly since time has been passing the calculation should always win.
+Unless there's an assertion the same day."
+
+For the age-today pattern, today's calculation therefore supersedes an older assertion, while a same-day
+assertion takes precedence over that calculation. A Patient record update is not required for age to
+change. This is the age pattern's behavioral contract; it is not an origin-based precedence rule for
+all concepts. Pattern contracts must expose their temporal and selection behavior to authors and be
+implemented consistently in emitted CQL and evaluation. Precise handling of missing calculation inputs,
+multiple assertions and calendar boundaries must be specified and tested as part of that implementation.
 
 Acceptance: partial data pauses before an activity; adding the missing answer reaches the intended
 activity; complete data initially reaches the same activity. Verify the visible progression separately
