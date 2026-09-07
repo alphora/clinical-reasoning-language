@@ -1,0 +1,445 @@
+# Blepharoplasty and/or Repair for Blepharoptosis — IEHP / Medi-Cal Provider Manual (Aug 2020)
+library "Blepharoplasty And Blepharoptosis Repair".
+
+/*
+COVERED-SERVICE CODE SETS - the RECORD ARM of the two request concepts.
+
+These value sets are authored here and are INTENDED TO SURVIVE INTO PRODUCTION. That is an exception
+to the usual convention (an authored value set is normally a placeholder the deployment overwrites)
+and it is deliberate - operator ruling. Do not delete them expecting prod to supply a replacement.
+
+The codes are an INFERENCE, not a quotation: the policy never states its covered-service scope, and
+these CPT codes appear once, inside a parenthetical about photographs. That inference is load-bearing
+because these sets decide which requests DENY, so it is flagged @customer-confirmable for medical
+validation to rule on. See the flag store.
+
+SHAPE, and BOTH halves are load-bearing:
+  - The `system is` + `code is` lines are what make these sets REAL. A terminology with neither emits
+    a STUB value set matching nothing, which would turn "deny when absent" into "deny everything".
+  - There is deliberately NO `valueset is` url line. With one present the emitter also emits a `code`
+    declaration PER CODE, every one of them named after the TERMINOLOGY rather than the code - so the
+    identifier is declared 1+N times and the CQL library never compiles. Downstream, `$populate`
+    evaluates nothing, the request gate never opens, and every questionnaire comes back with only the
+    request items and every response empty. Measured 2026-09-04 and reproduced by the CRL team.
+    Dropping the line costs nothing: the emitted ValueSet url and id are byte-identical either way
+    (both namespaced to `mcpm-bleph-...`), the CPT codes still emit in `compose` and `expansion`, and
+    the retrieve references the terminology by NAME in either shape.
+*/
+
+terminology "Blepharoplasty Service Codes":
+- system is `http://www.ama-assn.org/go/cpt`.
+- code is `15822`.
+- code is `15823`.
+
+terminology "Blepharoptosis Repair Service Codes":
+- system is `http://www.ama-assn.org/go/cpt`.
+- code is `67901`.
+- code is `67902`.
+- code is `67903`.
+- code is `67904`.
+- code is `67905`.
+- code is `67906`.
+- code is `67907`.
+- code is `67908`.
+
+/*
+SOURCE: Medi-Cal Provider Manual, Part 2 - Surgery: Eye and Ocular Adnexa, page updated August 2020.
+PRIOR AUTHORIZATION (TAR). Deployment: IEHP, disposition mode "embedded".
+
+CUSTOMER RULINGS live in the review-flag store (src/medical-validation/flags/) and are CITED, not
+restated here - the store is the authority, and a copy in this header could only drift from it.
+
+DISPOSITION SET - 2-way { certify.Met, not-certify.Unmet }. `pended` is permitted by embedded mode
+but not authorised by this narrative: mode gates finality, it does not supply a reason the policy
+never gives.
+
+--------------------------------------------------------------------------------------------------
+THREE CONJOINED LAYERS, NOT ONE FACT RECORDED THRICE
+--------------------------------------------------------------------------------------------------
+A qualifying INDICATION and a documented COMPLAINT and an objective DEMONSTRATION. The lists run
+near-parallel but do not overlap: the indications carry etiology and "symptomatic"/"chronic"
+qualifiers a photograph cannot establish, and the demonstrations carry numeric bars the indications
+lack. Merging in either direction drops source content.
+  The policy does NOT require the evidence to match the indication. Each list carries its own fresh
+  "one or more of the following" - they quantify independently - so a dermatitis indication supported
+  by a qualifying visual-field printout passes. Adding correspondence would narrow the written rule.
+
+--------------------------------------------------------------------------------------------------
+LEAF DEPTH - THE TEST
+--------------------------------------------------------------------------------------------------
+SPLIT when the parts could be ANSWERED DIFFERENTLY and the decision - or the evidence required -
+could turn on which one is true. RIDE when the parts are interchangeable for the determination.
+
+The test is CRL-native rather than grammatical: a leaf IS a question on the emitted Questionnaire, so
+minting one asks "could a respondent answer these differently, and would anything downstream care?"
+"near or far" rides not because it modifies a noun but because nothing branches on it; if a revision
+paid differently for near vs far, the same words would split.
+
+Applied here: indication and complaint items naming several separately-reportable findings are split
+per finding; "at distance and/or near" and "with upper lid skin and/or lid margin in repose and
+elevated" ride, the latter naming WHAT IS REPOSITIONED during the test rather than two findings.
+
+--------------------------------------------------------------------------------------------------
+"CONFORMING" IS LOAD-BEARING IN EVERY EVIDENCE CONCEPT
+--------------------------------------------------------------------------------------------------
+Page 3 opens "Providers MUST CONFORM to the following standards" - prints not slides, frontal
+canthus-to-canthus, head perpendicular, clarity sufficient to show the corneal light reflex; Goldmann
+III 4-E or an equivalent automated perimeter, 10dB stimulus, 50-60 degrees above fixation, the
+tangent-screen alternative. Those standards are MANDATORY and constrain what counts as evidence.
+
+They do not get leaves of their own - they are CONSTITUTIVE of the evidence answer and ride in its
+identity, because a respondent holds ONE artifact and answers ONE question about it: is this a
+conforming photograph showing X? The test that settles whether that is legitimate rather than a
+criterion-drop is: IS THERE ANY BRANCH THAT CAN FAIL ON NON-CONFORMING EVIDENCE? Here yes - a
+submission missing the required additional or oblique photographs is non-conforming, the evidence
+question is answered no, and the request lands on not-certify.Unmet. Conformance can deny. What it
+does not get is a branch of its OWN.
+
+THE TWO CONDITIONAL PAGE-3 BULLETS, read against the source:
+  - "If redundant skin coexists with true lid ptosis, additional photos must be taken with the upper
+    lid skin retracted" - this is the BOTH-PROCEDURES case, and the next source clause states the
+    requirement it serves: "If both a blepharoplasty and a ptosis repair are planned, both must be
+    individually documented." That IS encoded, as two per-procedure documentation leaves. The
+    retracted-skin photograph is the MECHANISM of individual documentation, not a separate criterion.
+  - "Oblique photos are ONLY NEEDED ... WHEN THIS IS THE ONLY INDICATION for surgery" - read the
+    modality: a RELAXATION, not a requirement. It says when oblique photographs may be SKIPPED.
+    Minting it as a required leaf would ADD a burden the source is removing.
+  KNOWN LIMIT, recorded rather than papered over: both are CONDITIONAL on the decision's own facts
+  and a static adjective cannot carry them. They govern which images to include, not whether the
+  request qualifies - which is why they ride. The third conditional bullet on that page (both
+  procedures individually documented) IS broken out, because it does change whether a request
+  qualifies.
+
+--------------------------------------------------------------------------------------------------
+STAGE BOUNDARY - VALUE THRESHOLDS AS ASSERTED BOOLEANS
+--------------------------------------------------------------------------------------------------
+The value thresholds this policy names are ones the kit defers, so they ship as provider-asserted
+booleans. Because no engine evaluates the comparison, THE COMPARISON LIVES IN THE QUESTION: each
+threshold rides in the concept name and the code.
+  "approaches TO WITHIN 2.5 mm of the corneal light reflex" means 2.5 mm OR LESS - a SMALLER
+  margin-to-reflex distance is worse ptosis and is what qualifies. Every other threshold here reads
+  "a minimum of". Named in the source's own direction so it cannot be inverted.
+  The visual-field criterion is NOT "loss in repose and elevated". The source tests the lid in repose
+  and again elevated by taping "to demonstrate potential correction by the proposed procedure" - the
+  elevation exists to show the improvement is surgically achievable.
+
+NOT ENCODED, deliberately:
+  - The ICD-10-CM list. The source says the codes "support medical necessity" and are expressly "not
+    required for claim reimbursement", so a required-diagnosis conjunct would ADD a gate the policy
+    disclaims.
+  - The page-3 technique standards AS CRITERIA - see the CONFORMING note; they ride instead.
+  - "in respose" is a source typo for "repose"; corrected in the concept identities, and the anchor
+    keeps the source's spelling.
+
+THE PROSTHESIS INDICATION IS ALL BUT UNREACHABLE, and the customer has ruled it correct as encoded.
+"Prosthesis difficulties in an anophthalmic socket" has a matching demonstration option, but the
+COMPLAINT list - a required conjunct - offers no matching member, so that indication plus its
+matching photograph, with no listed complaint, returns not-certify.Unmet. Pinned by a CEL case so the
+behaviour stays visible.
+*/
+
+// ---------------------------------------------------------------------------------------------
+// Determinations - NOT declared here. This workspace vendors the shared IEHP determination
+// library beside the policy (src/crl/medical-policy-determination.crl), trimmed to EXACTLY the
+// two activities this decision recommends, so the disposition vocabulary stays one artifact
+// across policies instead of drifting per file. See that file for why not-certify.Cosmetic is
+// NOT among them (review flag 21dc988d).
+// ---------------------------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------------------------
+// Request gate - TWO separately requestable procedures. Page 3's "if both are planned, both must
+// be individually documented" confirms they are ordered and documented separately, so the source's
+// "and/or" becomes STRUCTURE in the guard rather than a coordinating conjunction inside one leaf.
+// ---------------------------------------------------------------------------------------------
+// REFACTOR:grounded (#320, review 564): requests are independent positive-witness publications.
+// No matching source is unknown, not a negative. Local false/unknown joins source true before final
+// recency selection. This fixture explicitly prefers a unique local candidate at equal time.
+// Active order requests are supported; other states need explicit eligibility capability.
+
+
+concept "Blepharoplasty Requested":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `blepharoplasty-requested`.
+- shape reduction is most recent, on equal time prefer local.
+- source representation:
+  - type is ServiceRequest.
+  - coded from "Blepharoplasty Service Codes".
+  - value projection is exists this.
+
+concept "Blepharoptosis Repair Requested":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `blepharoptosis-repair-requested`.
+- shape reduction is most recent, on equal time prefer local.
+- source representation:
+  - type is ServiceRequest.
+  - coded from "Blepharoptosis Repair Service Codes".
+  - value projection is exists this.
+
+concept "Performed For Cosmetic Purposes":
+- shape is Record.
+- shape reduction is most recent.
+- type is Observation.
+- value type is boolean.
+- code is `performed-for-cosmetic-purposes`.
+
+// ---------------------------------------------------------------------------------------------
+// LAYER 1 - the four medical-necessity indications ("one of the following").
+// Indication 1 names THREE etiologies, which are distinct diagnoses a chart records separately.
+// "near or far" is the source's own scope on the impairment and rides in each identity.
+// ---------------------------------------------------------------------------------------------
+// Customer ruling, flag c7dd860f: the narrative is "Symptomatic redundant skin weighing down upper
+// lashes". Name and code are that wording exactly. "Symptomatic" is load-bearing.
+/*
+These finite coded questions retain one selected answer per concept. An explicit
+listed-negative answer makes membership false; missing evidence remains unknown.
+The selected Record supplies population and value reads. shape reduction is most
+recent chooses among dated alternatives and reports unresolved ties or undated
+competition. Prefer-local cannot choose between two local answers.
+One answer slot does not preserve multiple coexisting findings; revisit that
+model if a downstream use requires the full collection.
+*/
+
+/*
+THE FUSED INDICATION QUESTION - the source sentence encoded as the ONE question it is:
+
+  "The service is considered medically necessary when performed as FUNCTIONAL/RECONSTRUCTIVE SURGERY
+   TO CORRECT ONE OF THE FOLLOWING:"  + four bullets
+
+WHICH listed indication is this surgery performed to correct? One question, one answer.
+
+WHY THE FUSION IS MORE FAITHFUL, not merely smaller:
+  1. THE SOURCE STATES ONE REQUIREMENT, not two. No sentence says the patient must HAVE the
+     condition; having it is entailed by the surgery correcting it. Encoding "has X" as its own
+     criterion asks a question the source never asks.
+  2. THE PAIRING IS STRUCTURAL. With an indication side and a purpose side as separate atoms in
+     different OR-arms, nothing stopped a submitter affirming one indication and a DIFFERENT
+     purpose - the tree accepted the mismatch. One answer cannot be inconsistent with itself.
+  3. THE PURPOSE QUALIFIER STOPS HOLLOWING. "functional/reconstructive" now lives in the QUESTION,
+     where it governs every option at once and cannot be dropped from one of them.
+
+THE FIRST ITEM KEEPS ITS DECOMPOSITION as one option per etiology-by-finding pairing. Vision
+impairment and a visual field defect are separately measured - acuity vs perimetry - and the policy's
+own evidence layer keeps them apart ("either a photograph OR the visual field examination printout").
+The causal "due to" rides IN each option: modelling finding and etiology as separate answers would
+let an unpaired combination qualify, dropping the causal attribution the source requires.
+
+The residual "surgery targets something not on the list" case is the `none of the listed` answer.
+*/
+
+concept "Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is `functional-or-reconstructive-surgery-performed-to-correct-indication`.
+- value domain is answer options.
+- shape reduction is most recent.
+- value from:
+  - `near-or-far-vision-impairment-due-to-dermatochalasis` display is `Impairment of near or far vision due to dermatochalasis`, qualifying.
+  - `near-or-far-vision-impairment-due-to-blepharochalasis` display is `Impairment of near or far vision due to blepharochalasis`, qualifying.
+  - `near-or-far-vision-impairment-due-to-blepharoptosis` display is `Impairment of near or far vision due to blepharoptosis`, qualifying.
+  - `visual-field-defect-due-to-dermatochalasis` display is `Visual field defect due to dermatochalasis`, qualifying.
+  - `visual-field-defect-due-to-blepharochalasis` display is `Visual field defect due to blepharochalasis`, qualifying.
+  - `visual-field-defect-due-to-blepharoptosis` display is `Visual field defect due to blepharoptosis`, qualifying.
+  - `symptomatic-redundant-skin-weighing-down-upper-lashes` display is `Symptomatic redundant skin weighing down upper lashes`, qualifying.
+  - `chronic-symptomatic-dermatitis-of-pretarsal-skin-caused-by-redundant-upper-lid-skin` display is `Chronic, symptomatic dermatitis of pretarsal skin caused by redundant upper lid skin`, qualifying.
+  - `prosthesis-difficulties-in-an-anophthalmic-socket` display is `Prosthesis difficulties in an anophthalmic socket`, qualifying.
+  - `none-of-the-listed-indications` display is `None of the listed indications`, not qualifying.
+
+concept "Qualifying Functional Indication Selected":
+- shape is Record.
+- shape reduction is most recent.
+- type is Observation.
+- value type is boolean.
+- definition is "Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct" in qualifying.
+
+concept "Documented Patient Complaint":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is `documented-patient-complaint`.
+- value domain is answer options.
+- shape reduction is most recent.
+- value from:
+  - `complaint-of-interference-with-near-or-distance-vision` display is `Patient Reports Interference With Near Or Distance Vision`, qualifying.
+  - `complaint-of-interference-with-visual-field` display is `Patient Reports Interference With Visual Field`, qualifying.
+  - `complaint-of-difficulty-seeing-due-to-upper-eyelid-drooping` display is `Patient Reports Difficulty Seeing At Distance Or Near Due To Upper Eyelid Drooping`, qualifying.
+  - `complaint-of-difficulty-seeing-due-to-looking-through-the-eyelashes` display is `Patient Reports Difficulty Seeing At Distance Or Near Due To Looking Through The Eyelashes`, qualifying.
+  - `complaint-of-difficulty-seeing-due-to-seeing-the-upper-eyelid-skin` display is `Patient Reports Difficulty Seeing At Distance Or Near Due To Seeing The Upper Eyelid Skin`, qualifying.
+  - `complaint-of-chronic-blepharitis` display is `Patient Reports Chronic Blepharitis`, qualifying.
+  - `complaint-of-chronic-dermatitis` display is `Patient Reports Chronic Dermatitis`, qualifying.
+  - `none-of-the-listed-complaints` display is `None of the listed complaints`, not qualifying.
+
+concept "Qualifying Patient Complaint Reported":
+- shape is Record.
+- shape reduction is most recent.
+- type is Observation.
+- value type is boolean.
+- definition is "Documented Patient Complaint" in qualifying.
+
+concept "Photographic Demonstration Submitted":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is `photographic-demonstration-submitted`.
+- value domain is answer options.
+- shape reduction is most recent.
+- value from:
+  - `photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex` display is `Photograph Shows The Upper Eyelid Margin Within 2.5 Mm Equivalent To One Quarter Of The Visible Iris Diameter Of The Corneal Light Reflex`, qualifying.
+  - `photograph-upper-eyelid-skin-rests-on-the-eyelashes` display is `Photograph Shows The Upper Eyelid Skin Resting On The Eyelashes`, qualifying.
+  - `photograph-upper-eyelid-indicates-presence-of-dermatitis` display is `Photograph Shows The Upper Eyelid Indicating The Presence Of Dermatitis`, qualifying.
+  - `photograph-upper-eyelid-position-contributes-to-prosthesis-difficulty` display is `Photograph Shows The Upper Eyelid Position Contributing To Difficulty Tolerating A Prosthesis In An Anophthalmic Socket`, qualifying.
+  - `none-of-the-listed-photographic-demonstrations` display is `None of the listed photographic demonstrations`, not qualifying.
+
+concept "Qualifying Photographic Demonstration Shown":
+- shape is Record.
+- shape reduction is most recent.
+- type is Observation.
+- value type is boolean.
+- definition is "Photographic Demonstration Submitted" in qualifying.
+
+concept "Visual Field Demonstration Submitted":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is `visual-field-demonstration-submitted`.
+- value domain is answer options.
+- shape reduction is most recent.
+- value from:
+  - `visual-field-at-least-12-degree-upper-field-loss-repose-and-elevated-demonstrating-potential-correction` display is `Visual Field Printout Shows At Least 12 Degree Upper Field Loss With Upper Lid Skin Or Lid Margin In Repose And Elevated Demonstrating Potential Correction`, qualifying.
+  - `visual-field-at-least-30-percent-upper-field-loss-repose-and-elevated-demonstrating-potential-correction` display is `Visual Field Printout Shows At Least 30 Percent Upper Field Loss With Upper Lid Skin Or Lid Margin In Repose And Elevated Demonstrating Potential Correction`, qualifying.
+  - `none-of-the-listed-visual-field-demonstrations` display is `None of the listed visual field demonstrations`, not qualifying.
+
+concept "Qualifying Visual Field Demonstration Shown":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- definition is "Visual Field Demonstration Submitted" in qualifying.
+- shape reduction is most recent.
+
+// Selected coded answers preserve the narrative pairing between functional/
+// reconstructive purpose and its indication. Unanswered membership stays unknown.
+// -----------------------------------------------------------------------------
+// LAYER 3 - the objective demonstration: a CONFORMING photograph OR a CONFORMING visual field.
+// What is encoded is the DEMONSTRATED FINDING, never "a photograph was attached" - attachment is
+// administrative completeness for the PAS workflow; the finding is substantive.
+// ---------------------------------------------------------------------------------------------
+concept "Submitted Photographs Conform To The Photograph Submission Standards":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `submitted-photographs-conform-to-the-photograph-submission-standards`.
+- shape reduction is most recent.
+
+concept "Submitted Visual Field Examination Conforms To The Visual Field Examination Standards":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `submitted-visual-field-examination-conforms-to-the-examination-standards`.
+- shape reduction is most recent.
+
+// The comparison is repose-vs-elevated to demonstrate POTENTIAL CORRECTION by the proposed
+// procedure - not merely loss measured twice - and it is the upper lid skin and/or lid margin that
+// is placed in repose and elevated by taping.
+// ---------------------------------------------------------------------------------------------
+// The both-procedures documentation rule - "both must be INDIVIDUALLY documented", so two leaves.
+// One opaque yes/no could not say WHICH procedure lacked documentation, and partial documentation
+// is a real state the source distinguishes.
+// ---------------------------------------------------------------------------------------------
+concept "The Requested Blepharoplasty Is Individually Documented":
+- shape is Record.
+- shape reduction is most recent.
+- type is Observation.
+- value type is boolean.
+- code is `blepharoplasty-individually-documented`.
+
+concept "The Requested Blepharoptosis Repair Is Individually Documented":
+- shape is Record.
+- shape reduction is most recent.
+- type is Observation.
+- value type is boolean.
+- code is `blepharoptosis-repair-individually-documented`.
+
+// ---------------------------------------------------------------------------------------------
+// The three layers as named branch guards. Post-#236 a criterion lowers ONCE to a named boolean
+// define referenced by identity, so each disjunction is ONE parent DNF leaf while its atoms stay
+// visible in the define body and the use-site input[].
+// ---------------------------------------------------------------------------------------------
+criterion "Qualifying Functional Indication":
+// ONE ANSWER. See the fused-question block above for why this is no longer four OR-arms pairing an
+// indication with its purpose. `none of the listed indications` is the determinate denial, and it
+// costs one answer where the previous shape cost nine.
+- when ( "Qualifying Functional Indication Selected" ).
+
+criterion "Qualifying Patient Complaint Documented":
+// The source lists several complaints, any one of which satisfies this - so this is ONE question
+// with an answer per listed complaint, not a question per complaint: the coded question "Documented
+// Patient Complaint". As separate booleans it cost one "no" per complaint to deny, and PAUSED the
+// whole determination if any was left blank (a bare `code is` concept is value-read, so unanswered
+// is UNKNOWN, not false). As one question it costs ONE: "None of the listed complaints".
+- when ( "Qualifying Patient Complaint Reported" ).
+
+criterion "Qualifying Objective Demonstration Submitted":
+// TWO EVIDENCE LANES, each gated by ITS OWN conformance atom conjoined with ITS OWN coded
+// demonstration question.
+//
+// CONFORMANCE IS ITS OWN ATOM, one per lane. The source states the submission standards ONCE PER
+// LANE ("Providers must conform to the following standards when submitting photographs"), governing
+// the SUBMISSION - not once per finding. Fusing conformance into each evidence leaf as an adjective
+// would ask the same conformance question once per finding and leave a submitter no way to say the
+// true thing: "the photograph shows skin on the lashes, but it does not meet the standards".
+// As its own atom, conformance is separately answerable and separately deniable.
+//
+// THE FINDINGS ARE A CODED QUESTION PER LANE - photographic, and visual field. As separate booleans
+// it cost one "no" per finding to deny this criterion; as a question per lane it costs one per lane.
+- when ( ( "Submitted Photographs Conform To The Photograph Submission Standards"
+       and "Qualifying Photographic Demonstration Shown" )
+      or ( "Submitted Visual Field Examination Conforms To The Visual Field Examination Standards"
+       and "Qualifying Visual Field Demonstration Shown" ) ).
+
+// ---------------------------------------------------------------------------------------------
+// Decision - the leaves enumerated below, over two dispositions, `first:` operative at every level.
+//   1. both procedure determinations explicitly false               -> not-certify.Unmet
+//      missing request determinations pause before any leaf
+//   2. performed for cosmetic purposes                              -> not-certify.Unmet
+//   3. BOTH requested, three layers + BOTH individually documented   -> certify.Met
+//   4. BOTH requested, otherwise                                     -> not-certify.Unmet
+//   5. one requested, three layers                                   -> certify.Met
+//   6. one requested, otherwise                                      -> not-certify.Unmet
+// The cosmetic branch is hoisted ABOVE the both/one split so it is asked exactly once.
+//
+// ⚠ LEAF 1 IS A DEPLOYMENT CONVENTION, NOT A POLICY STATEMENT. The source says nothing about
+// requests for some other service; in embedded mode this leaf should be unreachable because
+// service routing happens upstream. Retained because the kit prescribes nesting the request gate;
+// its CEL case pins the structure, not a source rule.
+//
+// ⚠ MOST LEAVES SHARE A DISPOSITION - every leaf but the Met ones recommends not-certify.Unmet, so
+// a CEL `result is` oracle cannot tell them apart: it checks disposition MEMBERSHIP only. Leaf
+// coverage is provable; PATH proof is not, and no CEL authoring closes it (`nodeId` is trace-only;
+// `viaWhen` is null on every `otherwise`). REPORTED, not authored around - minting flavors to
+// sharpen the oracle would corrupt a disposition set the customer has already ruled on.
+//   ⚠⚠ THIS GAP IS NOT THEORETICAL, AND IT BIT. The judge pass mutated the tree by ONE LINE -
+//   demoting the cosmetic branch below the both-requested branch - and the whole 29-case suite
+//   stayed green while a cosmetic both-procedure request started returning certify.Met, which the
+//   source forbids outright. The re-encode had DROPPED the case that catches it; the prior
+//   encoding carried it. It is restored as `cosmetic-both-procedures-unmet`, and it is the only
+//   case in the suite that proves the hoist. When a disposition oracle cannot see a re-route, the
+//   defence is a case whose ROUTE differs, not a case whose answer differs.
+// ---------------------------------------------------------------------------------------------
+decision "Blepharoplasty And Blepharoptosis Repair Coverage Determination":
+first:
+- when ( "Blepharoplasty Requested" or "Blepharoptosis Repair Requested" ) then:
+    first:
+    - when "Performed For Cosmetic Purposes" then recommend activity "Medical Policy Determination"."not-certify.Unmet".
+    - when ( "Blepharoplasty Requested" and "Blepharoptosis Repair Requested" ) then:
+        first:
+        - when ( "Qualifying Functional Indication" and "Qualifying Patient Complaint Documented" and "Qualifying Objective Demonstration Submitted" and "The Requested Blepharoplasty Is Individually Documented" and "The Requested Blepharoptosis Repair Is Individually Documented" ) then recommend activity "Medical Policy Determination"."certify.Met".
+        - otherwise then recommend activity "Medical Policy Determination"."not-certify.Unmet".
+        end.
+    - when ( "Qualifying Functional Indication" and "Qualifying Patient Complaint Documented" and "Qualifying Objective Demonstration Submitted" ) then recommend activity "Medical Policy Determination"."certify.Met".
+    - otherwise then recommend activity "Medical Policy Determination"."not-certify.Unmet".
+    end.
+- otherwise then recommend activity "Medical Policy Determination"."not-certify.Unmet".

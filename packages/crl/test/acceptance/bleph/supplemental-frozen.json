@@ -1,0 +1,278 @@
+{
+  "schemaVersion": 1,
+  "authority": "Supplemental authored recency controls: prefer local at equal time; newer authored timestamps win, including valueless unknown. Expectations fixed before execution, not native/CRE-derived.",
+  "originalCelSha256": "6bf26ca5cbbdc82c1538bbf3e665c4c35f5d8da03c101c7f58d4670f80b9546e",
+  "migratedCrlSha256": "4b91b85118c9e3cd958f8c67050900ca1313c9c2a605ff8734f0df7505350e1b",
+  "nativeAuthority": "Native $apply; no CRE success is native evidence.",
+  "conceptNames": {
+    "B": "Blepharoplasty Requested",
+    "P": "Blepharoptosis Repair Requested",
+    "cosmetic": "Performed For Cosmetic Purposes",
+    "photoConform": "Submitted Photographs Conform To The Photograph Submission Standards",
+    "vfConform": "Submitted Visual Field Examination Conforms To The Visual Field Examination Standards",
+    "bdoc": "The Requested Blepharoplasty Is Individually Documented",
+    "pdoc": "The Requested Blepharoptosis Repair Is Individually Documented",
+    "indication": "Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct",
+    "complaint": "Documented Patient Complaint",
+    "photo": "Photographic Demonstration Submitted",
+    "vf": "Visual Field Demonstration Submitted"
+  },
+  "qualifyingAlternatives": {
+    "indication": [
+      "near-or-far-vision-impairment-due-to-dermatochalasis",
+      "near-or-far-vision-impairment-due-to-blepharochalasis",
+      "near-or-far-vision-impairment-due-to-blepharoptosis",
+      "visual-field-defect-due-to-dermatochalasis",
+      "visual-field-defect-due-to-blepharochalasis",
+      "visual-field-defect-due-to-blepharoptosis",
+      "symptomatic-redundant-skin-weighing-down-upper-lashes",
+      "chronic-symptomatic-dermatitis-of-pretarsal-skin-caused-by-redundant-upper-lid-skin",
+      "prosthesis-difficulties-in-an-anophthalmic-socket"
+    ],
+    "complaint": [
+      "complaint-of-interference-with-near-or-distance-vision",
+      "complaint-of-interference-with-visual-field",
+      "complaint-of-difficulty-seeing-due-to-upper-eyelid-drooping",
+      "complaint-of-difficulty-seeing-due-to-looking-through-the-eyelashes",
+      "complaint-of-difficulty-seeing-due-to-seeing-the-upper-eyelid-skin",
+      "complaint-of-chronic-blepharitis",
+      "complaint-of-chronic-dermatitis"
+    ],
+    "photo": [
+      "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+      "photograph-upper-eyelid-skin-rests-on-the-eyelashes",
+      "photograph-upper-eyelid-indicates-presence-of-dermatitis",
+      "photograph-upper-eyelid-position-contributes-to-prosthesis-difficulty"
+    ],
+    "vf": [
+      "visual-field-at-least-12-degree-upper-field-loss-repose-and-elevated-demonstrating-potential-correction",
+      "visual-field-at-least-30-percent-upper-field-loss-repose-and-elevated-demonstrating-potential-correction"
+    ]
+  },
+  "negativeAlternatives": {
+    "indication": "none-of-the-listed-indications",
+    "complaint": "none-of-the-listed-complaints",
+    "photo": "none-of-the-listed-photographic-demonstrations",
+    "vf": "none-of-the-listed-visual-field-demonstrations"
+  },
+  "entries": [
+    {
+      "suite": "supplemental",
+      "case": "Local false wins equal-time positive ServiceRequest",
+      "originalExpected": null,
+      "addedFacts": [
+        "Blepharoplasty Requested No",
+        "Blepharoplasty Requested SR"
+      ],
+      "answers": {
+        "B": false,
+        "P": false,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": false,
+        "bdoc": false,
+        "pdoc": false,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested No",
+          "Blepharoplasty Requested SR"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented No"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented No"
+        ],
+        "vf": [
+          "VF Demo None"
+        ]
+      },
+      "expected": {
+        "kind": "activity",
+        "activity": "not-certify.Unmet",
+        "nodeId": "otherwise/action[0]",
+        "steps": [
+          {
+            "nodeId": "when[0]",
+            "label": "Either procedure requested",
+            "value": false
+          }
+        ]
+      }
+    },
+    {
+      "suite": "supplemental",
+      "case": "Newer positive ServiceRequest wins older local false",
+      "originalExpected": null,
+      "addedFacts": [
+        "Blepharoplasty Requested No",
+        "Newer Blepharoplasty Source"
+      ],
+      "answers": {
+        "B": true,
+        "P": false,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": false,
+        "bdoc": false,
+        "pdoc": false,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested No",
+          "Newer Blepharoplasty Source"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented No"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented No"
+        ],
+        "vf": [
+          "VF Demo None"
+        ]
+      },
+      "expected": {
+        "kind": "activity",
+        "activity": "certify.Met",
+        "nodeId": "when[0]/when[2]/action[0]",
+        "steps": [
+          {
+            "nodeId": "when[0]",
+            "label": "Either procedure requested",
+            "value": true
+          },
+          {
+            "nodeId": "when[0]/when[0]",
+            "label": "Cosmetic purpose",
+            "value": false
+          },
+          {
+            "nodeId": "when[0]/when[1]",
+            "label": "Both procedures requested",
+            "value": false
+          },
+          {
+            "nodeId": "when[0]/when[2]",
+            "label": "Qualification",
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "suite": "supplemental",
+      "case": "Newest local valueless answer displaces positive ServiceRequest",
+      "originalExpected": null,
+      "addedFacts": [
+        "Blepharoplasty Requested No",
+        "Newer Blepharoplasty Source",
+        "Newest Unknown Request"
+      ],
+      "answers": {
+        "B": null,
+        "P": false,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": false,
+        "bdoc": false,
+        "pdoc": false,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested No",
+          "Newer Blepharoplasty Source",
+          "Newest Unknown Request"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented No"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented No"
+        ],
+        "vf": [
+          "VF Demo None"
+        ]
+      },
+      "expected": {
+        "kind": "pause",
+        "activity": null,
+        "nodeId": "when[0]",
+        "steps": [
+          {
+            "nodeId": "when[0]",
+            "label": "Either procedure requested",
+            "value": null
+          }
+        ]
+      }
+    }
+  ]
+}

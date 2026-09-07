@@ -1,0 +1,15 @@
+{
+  "contract.json": "05428e47671566963590ce2924b6bced255940d72f342131a86dd5831ef0c24a",
+  "expected-frozen.json": "e568e1f3f5d5fcb743ee7361cdf432da87b34c94b41579450b899dcda4a84690",
+  "package.json": "30609323e68c4d09c7e7e03faf807b5b1d961ae26176b3c0036460ffa8ad8b8b",
+  "provenance/original-activities.crl.txt": "9a47afdd72db025165cb859836487cba1ba71598333b7d62af5c2a76e785194f",
+  "provenance/original.cel.txt": "6bf26ca5cbbdc82c1538bbf3e665c4c35f5d8da03c101c7f58d4670f80b9546e",
+  "provenance/original.crl.txt": "980f992e6cad772dc028a88071772736a9543414a258f3d12aff625584e41ccb",
+  "src/cel/completed.cel": "7438b7101137463a06b7f8b0c8bfb3a3e3cf27170ea5a06180d1c8b335c30ed8",
+  "src/cel/preserved.cel": "05d1aef9c586540a9b78cc13ee0f856732151e8f16fbe11eeebc2f4e6329b195",
+  "src/cel/supplemental.cel": "cbbccf46a00d503fba71052edaf1767c74ab5ddf6ae5d61cf6d99544dc957ed4",
+  "src/crl/blepharoplasty-blepharoptosis-repair.crl": "4b91b85118c9e3cd958f8c67050900ca1313c9c2a605ff8734f0df7505350e1b",
+  "src/crl/medical-policy-determination.crl": "9a47afdd72db025165cb859836487cba1ba71598333b7d62af5c2a76e785194f",
+  "supplemental-frozen.json": "3692d27863000baa1ca343959408ac78fd061c9346e607ac09b3f64476d7c734",
+  "emitted-inputs.json": "a0c8258c72ae99d4684fa03914deb89494780abb0316fbc336724a770ac0c257"
+}

@@ -1,0 +1,43 @@
+# Medical Policy Determination — shared PA determination activities (CANONICAL)
+library "Medical Policy Determination".
+
+/*
+The SHARED, reusable prior-authorization DETERMINATION activities for every medical-policy coverage
+decision, as CONFIGURED-vocabulary dispositions (kit `configure-dispositions`): activity names are
+`<category>.<key>` — the category a PAS review-action (certify / not-certify / pended), the key a
+deployment reason/flavor. THIS deployment (IEHP) runs `mode: "embedded"`.
+All are COMMUNICATED determinations (CPGCommunicationRequest) — the payer communicates a decision; it
+NEVER orders the service (never CPGServiceRequest). A policy references the ones it uses and declares
+the matching keys in its package.json `crl.dispositions.options`.
+
+This file is CANONICAL; the copy vendored into each artifact's src/crl is a mirror — edit HERE and re-vendor.
+
+VENDORED FOR MCPM BLEPHAROPLASTY: trimmed to EXACTLY the activities this policy's decision
+recommends (kit EMIT-hygiene / CRL #216 — a declared-but-never-recommended activity emits an
+ORPHANED AD/PD that advertises a determination the policy can never produce). That is TWO:
+  • certify.Met        — medical-policy criteria met (certify, PAS review-action A1).
+  • not-certify.Unmet  — criteria not met (not-certify, A3).
+
+⚠⚠ `not-certify.Cosmetic` WAS VENDORED HERE AND HAS BEEN REMOVED — SETTLED BY THE CUSTOMER.
+An earlier vendoring carried a third activity for the benefit exclusion, on the KE argument that
+"not a benefit when performed for cosmetic purposes" is a different KIND of denial from "not
+medically necessary" (a request can fail the criteria without being cosmetic, and a cosmetic request
+can carry documentation satisfying an indication, so the two are not complements). Both KE reviewers
+reached that independently. It was still WRONG for this deployment: review flag 21dc988d, authored by
+a human reviewer, rules "Cosmetic should be unmet". The authority on a coverage-changing question is
+the customer's ruling, not the encoder's parse, so the set is 2-way and the cosmetic exclusion keeps
+its own FIRST-evaluated branch (it short-circuits the medical criteria) while reporting Unmet. The
+reasoning above is kept because it explains what the encoding gives up — a reviewer can no longer
+tell a cosmetic denial from a criteria denial by disposition alone — not to re-litigate the ruling.
+
+The disposition SET is read per-policy from the source and the customer's rulings, never inherited
+from a sibling artifact.
+*/
+
+activity "certify.Met":
+- request CPGCommunicationRequest.
+- with `Medical-policy criteria MET — the requested service meets this policy's coverage criteria. A communicated sub-determination (embedded mode: feeds a larger cross-company adjudication that issues the actual authorization); certify category / PAS review-action A1; NOT a service order.`.
+
+activity "not-certify.Unmet":
+- request CPGCommunicationRequest.
+- with `Medical-policy criteria NOT MET — the requested service does not meet this policy's coverage criteria. A communicated sub-determination (embedded mode); not-certify category / PAS review-action A3; NOT a service order.`.

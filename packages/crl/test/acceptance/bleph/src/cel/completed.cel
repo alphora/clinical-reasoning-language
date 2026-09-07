@@ -1,0 +1,1024 @@
+// Plan572 completed: original assertions retained only in immutable original and expected-frozen.json.
+library "Blepharoplasty And Blepharoptosis Repair Cases".
+covers "Blepharoplasty And Blepharoptosis Repair".
+
+fact "Sample Patient":
+- name is "Sample Patient".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+fact "Cosmetic Purpose":
+- date is "2026-01-01".
+- value is true.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Performed For Cosmetic Purposes".
+
+fact "Cosmetic Purpose No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Performed For Cosmetic Purposes".
+
+fact "Photographs Conform":
+- date is "2026-01-01".
+- value is true.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Submitted Photographs Conform To The Photograph Submission Standards".
+
+fact "Photographs Conform No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Submitted Photographs Conform To The Photograph Submission Standards".
+
+fact "Visual Field Conforms":
+- date is "2026-01-01".
+- value is true.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Submitted Visual Field Examination Conforms To The Visual Field Examination Standards".
+
+fact "Visual Field Conforms No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Submitted Visual Field Examination Conforms To The Visual Field Examination Standards".
+
+fact "Blepharoplasty Documented":
+- date is "2026-01-01".
+- value is true.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."The Requested Blepharoplasty Is Individually Documented".
+
+fact "Blepharoplasty Documented No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."The Requested Blepharoplasty Is Individually Documented".
+
+fact "Ptosis Repair Documented":
+- date is "2026-01-01".
+- value is true.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."The Requested Blepharoptosis Repair Is Individually Documented".
+
+fact "Ptosis Repair Documented No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."The Requested Blepharoptosis Repair Is Individually Documented".
+
+fact "Complaint Vision Interference":
+- date is "2026-01-01".
+- value is "complaint-of-interference-with-near-or-distance-vision".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Complaint Field Interference":
+- date is "2026-01-01".
+- value is "complaint-of-interference-with-visual-field".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Complaint Difficulty Drooping":
+- date is "2026-01-01".
+- value is "complaint-of-difficulty-seeing-due-to-upper-eyelid-drooping".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Complaint Difficulty Eyelashes":
+- date is "2026-01-01".
+- value is "complaint-of-difficulty-seeing-due-to-looking-through-the-eyelashes".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Complaint Difficulty Eyelid Skin":
+- date is "2026-01-01".
+- value is "complaint-of-difficulty-seeing-due-to-seeing-the-upper-eyelid-skin".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Complaint Blepharitis":
+- date is "2026-01-01".
+- value is "complaint-of-chronic-blepharitis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Complaint Dermatitis":
+- date is "2026-01-01".
+- value is "complaint-of-chronic-dermatitis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Complaint None":
+- date is "2026-01-01".
+- value is "none-of-the-listed-complaints".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Ind Vision Dermatochalasis":
+- date is "2026-01-01".
+- value is "near-or-far-vision-impairment-due-to-dermatochalasis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Vision Blepharochalasis":
+- date is "2026-01-01".
+- value is "near-or-far-vision-impairment-due-to-blepharochalasis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Vision Blepharoptosis":
+- date is "2026-01-01".
+- value is "near-or-far-vision-impairment-due-to-blepharoptosis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Field Dermatochalasis":
+- date is "2026-01-01".
+- value is "visual-field-defect-due-to-dermatochalasis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Field Blepharochalasis":
+- date is "2026-01-01".
+- value is "visual-field-defect-due-to-blepharochalasis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Field Blepharoptosis":
+- date is "2026-01-01".
+- value is "visual-field-defect-due-to-blepharoptosis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Redundant Skin":
+- date is "2026-01-01".
+- value is "symptomatic-redundant-skin-weighing-down-upper-lashes".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Pretarsal Dermatitis":
+- date is "2026-01-01".
+- value is "chronic-symptomatic-dermatitis-of-pretarsal-skin-caused-by-redundant-upper-lid-skin".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Prosthesis":
+- date is "2026-01-01".
+- value is "prosthesis-difficulties-in-an-anophthalmic-socket".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Indication None":
+- date is "2026-01-01".
+- value is "none-of-the-listed-indications".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Demo Photo Margin":
+- date is "2026-01-01".
+- value is "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Photographic Demonstration Submitted".
+
+fact "Demo Photo Skin On Lashes":
+- date is "2026-01-01".
+- value is "photograph-upper-eyelid-skin-rests-on-the-eyelashes".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Photographic Demonstration Submitted".
+
+fact "Demo Photo Dermatitis":
+- date is "2026-01-01".
+- value is "photograph-upper-eyelid-indicates-presence-of-dermatitis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Photographic Demonstration Submitted".
+
+fact "Demo Photo Prosthesis":
+- date is "2026-01-01".
+- value is "photograph-upper-eyelid-position-contributes-to-prosthesis-difficulty".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Photographic Demonstration Submitted".
+
+fact "Photo Demo None":
+- date is "2026-01-01".
+- value is "none-of-the-listed-photographic-demonstrations".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Photographic Demonstration Submitted".
+
+fact "Demo VF 12 Degree":
+- date is "2026-01-01".
+- value is "visual-field-at-least-12-degree-upper-field-loss-repose-and-elevated-demonstrating-potential-correction".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Visual Field Demonstration Submitted".
+
+fact "Demo VF 30 Percent":
+- date is "2026-01-01".
+- value is "visual-field-at-least-30-percent-upper-field-loss-repose-and-elevated-demonstrating-potential-correction".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Visual Field Demonstration Submitted".
+
+fact "VF Demo None":
+- date is "2026-01-01".
+- value is "none-of-the-listed-visual-field-demonstrations".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Visual Field Demonstration Submitted".
+
+fact "Blepharoplasty Requested":
+- date is "2026-01-01".
+- value is true.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Blepharoplasty Requested".
+
+fact "Blepharoptosis Repair Requested":
+- date is "2026-01-01".
+- value is true.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Blepharoptosis Repair Requested".
+
+fact "Blepharoplasty Requested SR":
+- code is "http://www.ama-assn.org/go/cpt|15822".
+- date is "2026-01-01".
+- defined by "ServiceRequest".
+
+fact "Blepharoptosis Repair Requested SR":
+- code is "http://www.ama-assn.org/go/cpt|67901".
+- date is "2026-01-01".
+- defined by "ServiceRequest".
+
+fact "Non-Covered Service Request":
+- code is "http://www.ama-assn.org/go/cpt|99999".
+- date is "2026-01-01".
+- defined by "ServiceRequest".
+
+fact "Blepharoplasty Requested No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Blepharoplasty Requested".
+
+fact "Blepharoptosis Repair Requested No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Blepharoptosis Repair Requested".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "indication vision-dermatochalasis selected as what the surgery corrects -> Met":
+- id is "indication-vision-dermatochalasis-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "indication vision-blepharochalasis selected as what the surgery corrects -> Met":
+- id is "indication-vision-blepharochalasis-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Blepharochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "indication vision-blepharoptosis selected as what the surgery corrects -> Met":
+- id is "indication-vision-blepharoptosis-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Blepharoptosis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "indication field-dermatochalasis selected as what the surgery corrects -> Met":
+- id is "indication-field-dermatochalasis-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Field Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "indication field-blepharochalasis selected as what the surgery corrects -> Met":
+- id is "indication-field-blepharochalasis-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Field Blepharochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "indication field-blepharoptosis selected as what the surgery corrects -> Met":
+- id is "indication-field-blepharoptosis-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Field Blepharoptosis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "indication redundant-skin selected as what the surgery corrects -> Met":
+- id is "indication-redundant-skin-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Redundant Skin".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "indication pretarsal-dermatitis selected as what the surgery corrects -> Met":
+- id is "indication-pretarsal-dermatitis-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Pretarsal Dermatitis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "indication prosthesis selected as what the surgery corrects -> Met":
+- id is "indication-prosthesis-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Prosthesis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "complaint vision-interference alone satisfies layer 2 -> Met":
+- id is "complaint-vision-interference-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "complaint field-interference alone satisfies layer 2 -> Met":
+- id is "complaint-field-interference-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Field Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "complaint difficulty-drooping alone satisfies layer 2 -> Met":
+- id is "complaint-difficulty-drooping-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Difficulty Drooping".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "complaint difficulty-eyelashes alone satisfies layer 2 -> Met":
+- id is "complaint-difficulty-eyelashes-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Difficulty Eyelashes".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "complaint difficulty-eyelid-skin alone satisfies layer 2 -> Met":
+- id is "complaint-difficulty-eyelid-skin-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Difficulty Eyelid Skin".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "complaint blepharitis alone satisfies layer 2 -> Met":
+- id is "complaint-blepharitis-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Blepharitis".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "complaint dermatitis alone satisfies layer 2 -> Met":
+- id is "complaint-dermatitis-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Dermatitis".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "demonstration photo-margin with its lane conformance satisfies layer 3 -> Met":
+- id is "demonstration-photo-margin-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "demonstration skin-on-lashes with its lane conformance satisfies layer 3 -> Met":
+- id is "demonstration-skin-on-lashes-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Skin On Lashes".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "demonstration photo-dermatitis with its lane conformance satisfies layer 3 -> Met":
+- id is "demonstration-photo-dermatitis-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Dermatitis".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "demonstration photo-prosthesis with its lane conformance satisfies layer 3 -> Met":
+- id is "demonstration-photo-prosthesis-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Prosthesis".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "demonstration vf-12-degree with its lane conformance satisfies layer 3 -> Met":
+- id is "demonstration-vf-12-degree-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo VF 12 Degree".
+- fact is "Visual Field Conforms".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "Photo Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "demonstration vf-30-percent with its lane conformance satisfies layer 3 -> Met":
+- id is "demonstration-vf-30-percent-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo VF 30 Percent".
+- fact is "Visual Field Conforms".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "Photo Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "CONFORMANCE DISCRIMINATOR - a photograph SHOWS the skin resting on the eyelashes but does NOT meet the page-3 submission standards -> Unmet. This is the case the old fused Conforming-Photograph-Shows-X concept could not express at all.":
+- id is "demonstration-photograph-non-conforming-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Skin On Lashes".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "CONFORMANCE DISCRIMINATOR - a visual field printout SHOWS 12-degree loss but the examination does NOT meet the page-3 standards -> Unmet":
+- id is "demonstration-visual-field-non-conforming-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo VF 12 Degree".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "Photo Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "CONFORMANCE DISCRIMINATOR (the other direction) - both lanes conform but NEITHER demonstrates a listed finding (none of the listed) -> Unmet. Conformance alone is not evidence.":
+- id is "demonstration-conformance-without-any-finding-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Photographs Conform".
+- fact is "Visual Field Conforms".
+- fact is "Cosmetic Purpose No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "Photo Demo None".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "blepharoptosis repair with all three layers -> Met":
+- id is "blepharoptosis-repair-all-layers-met".
+- subject is "Sample Patient".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Ind Vision Blepharoptosis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoplasty Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "one requested, no qualifying indication (none of the listed) -> Unmet":
+- id is "one-drop-indication-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "Indication None".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "one requested, no documented complaint (none of the listed) -> Unmet":
+- id is "one-drop-complaint-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "Complaint None".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "one requested, no objective demonstration (none of the listed) -> Unmet":
+- id is "one-drop-demonstration-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "Photo Demo None".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "requested with nothing documented -> Unmet":
+- id is "request-only-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "Complaint None".
+- fact is "Indication None".
+- fact is "Photo Demo None".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "both procedures, three layers and both individually documented -> Met":
+- id is "both-fully-documented-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "both requested, indication missing -> Unmet":
+- id is "both-drop-indication-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Indication None".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "both requested, complaint missing -> Unmet":
+- id is "both-drop-complaint-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Complaint None".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "both requested, demonstration missing -> Unmet":
+- id is "both-drop-demonstration-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Photographs Conform".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Photo Demo None".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "both requested, blepharoplasty-documentation missing -> Unmet":
+- id is "both-drop-blepharoplasty-documentation-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Ptosis Repair Documented".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "both requested, ptosis-documentation missing -> Unmet":
+- id is "both-drop-ptosis-documentation-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Blepharoplasty Documented".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "cosmetic purpose outranks a fully documented request -> Unmet":
+- id is "cosmetic-outranks-documented-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "PRECEDENCE DISCRIMINATOR - cosmetic purpose on a BOTH-procedure fully documented request -> Unmet. The cosmetic branch is hoisted ABOVE the both/one split; demote it and THIS goes red and nothing else does.":
+- id is "cosmetic-both-procedures-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Cosmetic Purpose".
+- fact is "Visual Field Conforms No".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "neither procedure requested -> Unmet":
+- id is "neither-procedure-requested-unmet".
+- subject is "Sample Patient".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "Complaint None".
+- fact is "Indication None".
+- fact is "Photo Demo None".
+- fact is "VF Demo None".
+- fact is "Blepharoplasty Requested No".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "PINNED per customer flag 9e2927f3 (resolved, correct as encoded) - the prosthesis indication with its purpose and matching photograph but no listed complaint -> Unmet":
+- id is "prosthesis-indication-no-listed-complaint-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Prosthesis".
+- fact is "Demo Photo Prosthesis".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "Complaint None".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "MULTI-ANSWER - a packet carrying BOTH a conforming photograph and a conforming visual field -> Met. These are two DIFFERENT coded questions, so they still co-occur after the migration.":
+- id is "photograph-and-visual-field-both-submitted-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Demo VF 12 Degree".
+- fact is "Visual Field Conforms".
+- fact is "Cosmetic Purpose No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "OVERLAP ORACLE - photograph shows a listed finding but does NOT conform, while the visual field both conforms and demonstrates -> Met via the VF lane":
+- id is "evidence-photo-half-vf-full-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Skin On Lashes".
+- fact is "Demo VF 12 Degree".
+- fact is "Visual Field Conforms".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "OVERLAP ORACLE (the separator) - photograph conforms but demonstrates nothing listed, while the visual field demonstrates but does not conform -> Unmet. Neither lane is complete; a flattened conjunction would wrongly pass this.":
+- id is "evidence-crossed-lanes-unmet".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Photographs Conform".
+- fact is "Demo VF 12 Degree".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "Photo Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "RECORD ARM - no local attestation at all; a submitted ServiceRequest carrying CPT 15822 is what makes the request true -> Met":
+- id is "request-via-record-arm-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested SR".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "BOTH ARMS - a local attestation AND a matching submitted ServiceRequest, same code. The recency arbitration runs and both candidates yield the same answer -> Met":
+- id is "request-both-arms-agree-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoplasty Requested SR".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "DENY DISCRIMINATOR - a REAL ServiceRequest exists, fully documented, but its code is outside both covered sets -> Unmet. This is what the covered-service value sets are FOR, and it is distinct from requesting nothing at all: absence and non-membership both deny, and only this case proves the second one.":
+- id is "non-covered-service-request-unmet".
+- subject is "Sample Patient".
+- fact is "Non-Covered Service Request".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented No".
+- fact is "Ptosis Repair Documented No".
+- fact is "VF Demo None".
+- fact is "Blepharoplasty Requested No".
+- fact is "Blepharoptosis Repair Requested No".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+// Original case name retained for identity; current expectation is the result assertion below.
+case "RECORD ARM, both procedures - two submitted ServiceRequests, one per covered set, both individually documented -> Met":
+- id is "both-procedures-via-record-arm-met".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested SR".
+- fact is "Blepharoptosis Repair Requested SR".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "Photographs Conform".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".

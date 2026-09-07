@@ -1,0 +1,214 @@
+{
+  "schemaVersion": 1,
+  "caseCounts": {
+    "preserved": 47,
+    "completed": 47,
+    "supplemental": 3
+  },
+  "planId": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-67a3764d4a7e",
+  "questionnaireUrl": "http://iehp.org/crl/Questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-67a3764d4a7e",
+  "bindings": {
+    "B": {
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoplasty-requested#Observation.value[x]",
+      "valueType": "valueBoolean",
+      "required": false
+    },
+    "P": {
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoptosis-repair-requested#Observation.value[x]",
+      "valueType": "valueBoolean",
+      "required": false
+    },
+    "cosmetic": {
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-performed-for-cosmetic-purposes#Observation.value[x]",
+      "valueType": "valueBoolean",
+      "required": false
+    },
+    "photoConform": {
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-submitted-photographs-conform-to-the-pho-d1d83b5999d4#Observation.value[x]",
+      "valueType": "valueBoolean",
+      "required": false
+    },
+    "vfConform": {
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-submitted-visual-field-examination-confo-ee893cad7c3f#Observation.value[x]",
+      "valueType": "valueBoolean",
+      "required": false
+    },
+    "indication": {
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-which-listed-indication-is-this-function-32e19f6da13a#Observation.value[x]",
+      "valueType": "valueCoding",
+      "system": "http://iehp.org/crl/CodeSystem/mcpm-bleph-functional-or-reconstructiv-71a963606a94-answer-codes",
+      "required": false,
+      "optionCodes": [
+        "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "near-or-far-vision-impairment-due-to-blepharochalasis",
+        "near-or-far-vision-impairment-due-to-blepharoptosis",
+        "visual-field-defect-due-to-dermatochalasis",
+        "visual-field-defect-due-to-blepharochalasis",
+        "visual-field-defect-due-to-blepharoptosis",
+        "symptomatic-redundant-skin-weighing-down-upper-lashes",
+        "chronic-symptomatic-dermatitis-of-pretarsal-skin-caused-by-redundant-upper-lid-skin",
+        "prosthesis-difficulties-in-an-anophthalmic-socket",
+        "none-of-the-listed-indications"
+      ]
+    },
+    "complaint": {
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-documented-patient-complaint#Observation.value[x]",
+      "valueType": "valueCoding",
+      "system": "http://iehp.org/crl/CodeSystem/mcpm-bleph-documented-patient-complaint-answer-codes",
+      "required": false,
+      "optionCodes": [
+        "complaint-of-interference-with-near-or-distance-vision",
+        "complaint-of-interference-with-visual-field",
+        "complaint-of-difficulty-seeing-due-to-upper-eyelid-drooping",
+        "complaint-of-difficulty-seeing-due-to-looking-through-the-eyelashes",
+        "complaint-of-difficulty-seeing-due-to-seeing-the-upper-eyelid-skin",
+        "complaint-of-chronic-blepharitis",
+        "complaint-of-chronic-dermatitis",
+        "none-of-the-listed-complaints"
+      ]
+    },
+    "photo": {
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-photographic-demonstration-submitted#Observation.value[x]",
+      "valueType": "valueCoding",
+      "system": "http://iehp.org/crl/CodeSystem/mcpm-bleph-photographic-demonstration-submitted-answer-codes",
+      "required": false,
+      "optionCodes": [
+        "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "photograph-upper-eyelid-skin-rests-on-the-eyelashes",
+        "photograph-upper-eyelid-indicates-presence-of-dermatitis",
+        "photograph-upper-eyelid-position-contributes-to-prosthesis-difficulty",
+        "none-of-the-listed-photographic-demonstrations"
+      ]
+    },
+    "vf": {
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-visual-field-demonstration-submitted#Observation.value[x]",
+      "valueType": "valueCoding",
+      "system": "http://iehp.org/crl/CodeSystem/mcpm-bleph-visual-field-demonstration-submitted-answer-codes",
+      "required": false,
+      "optionCodes": [
+        "visual-field-at-least-12-degree-upper-field-loss-repose-and-elevated-demonstrating-potential-correction",
+        "visual-field-at-least-30-percent-upper-field-loss-repose-and-elevated-demonstrating-potential-correction",
+        "none-of-the-listed-visual-field-demonstrations"
+      ]
+    },
+    "bdoc": {
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-the-requested-blepharoplasty-is-individu-1ea70810f676#Observation.value[x]",
+      "valueType": "valueBoolean",
+      "required": false
+    },
+    "pdoc": {
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-the-requested-blepharoptosis-repair-is-i-69707ff7d01e#Observation.value[x]",
+      "valueType": "valueBoolean",
+      "required": false
+    }
+  },
+  "activities": {
+    "certify.Met": "CommunicationRequest/mcpm-bleph-certify-met",
+    "not-certify.Unmet": "CommunicationRequest/mcpm-bleph-not-certify-unmet"
+  },
+  "routes": {
+    "otherwise/action[0]": [
+      "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+      "otherwise"
+    ],
+    "when[0]/when[0]/action[0]": [
+      "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+      "Blepharoplasty Requested or Blepharoptosis Repair Requested",
+      "Performed For Cosmetic Purposes"
+    ],
+    "when[0]/when[1]/when[0]/action[0]": [
+      "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+      "Blepharoplasty Requested or Blepharoptosis Repair Requested",
+      "Blepharoplasty Requested and Blepharoptosis Repair Requested",
+      "Qualifying Functional Indication and Qualifying Patient Complaint Documented and Qualifying Objective Demonstration Submitted and The Requested Blepharoplasty Is Individually Documented and The Requested Blepharoptosis Repair Is Individually Documented"
+    ],
+    "when[0]/when[1]/otherwise/action[0]": [
+      "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+      "Blepharoplasty Requested or Blepharoptosis Repair Requested",
+      "Blepharoplasty Requested and Blepharoptosis Repair Requested",
+      "otherwise"
+    ],
+    "when[0]/when[2]/action[0]": [
+      "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+      "Blepharoplasty Requested or Blepharoptosis Repair Requested",
+      "Qualifying Functional Indication and Qualifying Patient Complaint Documented and Qualifying Objective Demonstration Submitted"
+    ],
+    "when[0]/otherwise/action[0]": [
+      "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+      "Blepharoplasty Requested or Blepharoptosis Repair Requested",
+      "otherwise"
+    ]
+  },
+  "pauseNullExpressions": {
+    "when[0]": [
+      "FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Blepharoplasty Requested\").value as FHIR.boolean) or FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Blepharoptosis Repair Requested\").value as FHIR.boolean)",
+      "not (FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Blepharoplasty Requested\").value as FHIR.boolean) or FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Blepharoptosis Repair Requested\").value as FHIR.boolean))"
+    ],
+    "when[0]/when[1]": [
+      "FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Blepharoplasty Requested\").value as FHIR.boolean) and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Blepharoptosis Repair Requested\").value as FHIR.boolean)",
+      "not (FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Blepharoplasty Requested\").value as FHIR.boolean) and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Blepharoptosis Repair Requested\").value as FHIR.boolean))"
+    ]
+  },
+  "activityContent": {
+    "certify.Met": {
+      "status": "active",
+      "doNotPerform": false,
+      "payload": [
+        {
+          "contentString": "Medical-policy criteria met"
+        }
+      ],
+      "reasonCode": [
+        {
+          "coding": [
+            {
+              "system": "https://codesystem.x12.org/005010/306",
+              "code": "A1",
+              "display": "Certified in total"
+            }
+          ]
+        }
+      ],
+      "meta": {
+        "profile": [
+          "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-communicationrequest"
+        ]
+      },
+      "note": [
+        {
+          "text": "Medical-policy criteria MET — the requested service meets this policy's coverage criteria. A communicated sub-determination (embedded mode: feeds a larger cross-company adjudication that issues the actual authorization); certify category / PAS review-action A1; NOT a service order."
+        }
+      ]
+    },
+    "not-certify.Unmet": {
+      "status": "active",
+      "doNotPerform": false,
+      "payload": [
+        {
+          "contentString": "Medical-policy criteria not met"
+        }
+      ],
+      "reasonCode": [
+        {
+          "coding": [
+            {
+              "system": "https://codesystem.x12.org/005010/306",
+              "code": "A3",
+              "display": "Not certified"
+            }
+          ]
+        }
+      ],
+      "meta": {
+        "profile": [
+          "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-communicationrequest"
+        ]
+      },
+      "note": [
+        {
+          "text": "Medical-policy criteria NOT MET — the requested service does not meet this policy's coverage criteria. A communicated sub-determination (embedded mode); not-certify category / PAS review-action A3; NOT a service order."
+        }
+      ]
+    }
+  }
+}

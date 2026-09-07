@@ -13,6 +13,10 @@
     "test": "npm test -w @smile-digital-health/crl && npm test -w crl-language-support",
     "test:mcp": "npm run test:mcp -w @smile-digital-health/crl",
     "test:ext": "npm test -w crl-language-support",
+    "pretest:native:bleph": "npm run build",
+    "test:native:bleph": "node packages/crl/scripts/native-acceptance/run.cjs",
+    "pretest:native:checks": "npm run build",
+    "test:native:checks": "node --test packages/crl/scripts/native-acceptance/check.test.cjs",
     "test:vitest": "vitest run --no-file-parallelism",
     "package:extension": "npm run package -w crl-language-support",
     "seed:questionnaire": "node packages/crl-vscode/scripts/seed-questionnaire-fixture.mjs"
