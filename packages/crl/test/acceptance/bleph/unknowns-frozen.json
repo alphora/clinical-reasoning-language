@@ -1,0 +1,1115 @@
+{
+  "schemaVersion": 1,
+  "authority": "Operator three-valued intent and authored decision order; expected outcomes fixed before native execution. Existing CEL facts reused only after matching their authored literals.",
+  "conceptNames": {
+    "B": "Blepharoplasty Requested",
+    "P": "Blepharoptosis Repair Requested",
+    "cosmetic": "Performed For Cosmetic Purposes",
+    "photoConform": "Submitted Photographs Conform To The Photograph Submission Standards",
+    "vfConform": "Submitted Visual Field Examination Conforms To The Visual Field Examination Standards",
+    "bdoc": "The Requested Blepharoplasty Is Individually Documented",
+    "pdoc": "The Requested Blepharoptosis Repair Is Individually Documented",
+    "indication": "Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct",
+    "complaint": "Documented Patient Complaint",
+    "photo": "Photographic Demonstration Submitted",
+    "vf": "Visual Field Demonstration Submitted"
+  },
+  "entries": [
+    {
+      "suite": "unknowns",
+      "case": "missing-cosmetic",
+      "caseId": "missing-cosmetic",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": null,
+        "photoConform": true,
+        "vfConform": false,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "expected": {
+        "kind": "pause",
+        "nodeId": "when[0]/when[0]",
+        "activity": null,
+        "pauseInputs": [
+          "cosmetic"
+        ],
+        "repairCase": "complete-photograph"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "vf": [
+          "VF Demo None"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "missing-indication",
+      "caseId": "missing-indication",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": false,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": null,
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "expected": {
+        "kind": "pause",
+        "nodeId": "when[0]/when[1]/when[0]",
+        "activity": null,
+        "pauseInputs": [
+          "indication"
+        ],
+        "repairCase": "complete-photograph"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "vf": [
+          "VF Demo None"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "missing-complaint",
+      "caseId": "missing-complaint",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": false,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": null,
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "expected": {
+        "kind": "pause",
+        "nodeId": "when[0]/when[1]/when[0]",
+        "activity": null,
+        "pauseInputs": [
+          "complaint"
+        ],
+        "repairCase": "complete-photograph"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "vf": [
+          "VF Demo None"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "missing-bdoc",
+      "caseId": "missing-bdoc",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": false,
+        "bdoc": null,
+        "pdoc": true,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "expected": {
+        "kind": "pause",
+        "nodeId": "when[0]/when[1]/when[0]",
+        "activity": null,
+        "pauseInputs": [
+          "bdoc"
+        ],
+        "repairCase": "complete-photograph"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "vf": [
+          "VF Demo None"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "missing-pdoc",
+      "caseId": "missing-pdoc",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": false,
+        "bdoc": true,
+        "pdoc": null,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "expected": {
+        "kind": "pause",
+        "nodeId": "when[0]/when[1]/when[0]",
+        "activity": null,
+        "pauseInputs": [
+          "pdoc"
+        ],
+        "repairCase": "complete-photograph"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "vf": [
+          "VF Demo None"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "missing-photo",
+      "caseId": "missing-photo",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": false,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": null,
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "expected": {
+        "kind": "pause",
+        "nodeId": "when[0]/when[1]/when[0]",
+        "activity": null,
+        "pauseInputs": [
+          "photo"
+        ],
+        "repairCase": "complete-photograph"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [],
+        "vf": [
+          "VF Demo None"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "missing-photoConform",
+      "caseId": "missing-photoConform",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": null,
+        "vfConform": false,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "expected": {
+        "kind": "pause",
+        "nodeId": "when[0]/when[1]/when[0]",
+        "activity": null,
+        "pauseInputs": [
+          "photoConform"
+        ],
+        "repairCase": "complete-photograph"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "vf": [
+          "VF Demo None"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "missing-vf",
+      "caseId": "missing-vf",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": false,
+        "vfConform": true,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "none-of-the-listed-photographic-demonstrations",
+        "vf": null
+      },
+      "expected": {
+        "kind": "pause",
+        "nodeId": "when[0]/when[1]/when[0]",
+        "activity": null,
+        "pauseInputs": [
+          "vf"
+        ],
+        "repairCase": "complete-visual-field"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform No"
+        ],
+        "vfConform": [
+          "Visual Field Conforms"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Photo Demo None"
+        ],
+        "vf": []
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "missing-vfConform",
+      "caseId": "missing-vfConform",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": false,
+        "vfConform": null,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "none-of-the-listed-photographic-demonstrations",
+        "vf": "visual-field-at-least-12-degree-upper-field-loss-repose-and-elevated-demonstrating-potential-correction"
+      },
+      "expected": {
+        "kind": "pause",
+        "nodeId": "when[0]/when[1]/when[0]",
+        "activity": null,
+        "pauseInputs": [
+          "vfConform"
+        ],
+        "repairCase": "complete-visual-field"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform No"
+        ],
+        "vfConform": [],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Photo Demo None"
+        ],
+        "vf": [
+          "Demo VF 12 Degree"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "complete-photograph",
+      "caseId": "complete-photograph",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": false,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "expected": {
+        "kind": "activity",
+        "nodeId": "when[0]/when[1]/when[0]/action[0]",
+        "activity": "certify.Met"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "vf": [
+          "VF Demo None"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "complete-visual-field",
+      "caseId": "complete-visual-field",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": false,
+        "vfConform": true,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "none-of-the-listed-photographic-demonstrations",
+        "vf": "visual-field-at-least-12-degree-upper-field-loss-repose-and-elevated-demonstrating-potential-correction"
+      },
+      "expected": {
+        "kind": "activity",
+        "nodeId": "when[0]/when[1]/when[0]/action[0]",
+        "activity": "certify.Met"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform No"
+        ],
+        "vfConform": [
+          "Visual Field Conforms"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Photo Demo None"
+        ],
+        "vf": [
+          "Demo VF 12 Degree"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "single-missing-indication",
+      "caseId": "single-missing-indication",
+      "answers": {
+        "B": true,
+        "P": false,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": false,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": null,
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "expected": {
+        "kind": "pause",
+        "nodeId": "when[0]/when[2]",
+        "activity": null,
+        "pauseInputs": [
+          "indication"
+        ],
+        "repairCase": "single-complete"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested No"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "vf": [
+          "VF Demo None"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "single-complete",
+      "caseId": "single-complete",
+      "answers": {
+        "B": true,
+        "P": false,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": false,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "expected": {
+        "kind": "activity",
+        "nodeId": "when[0]/when[2]/action[0]",
+        "activity": "certify.Met"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested No"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "vf": [
+          "VF Demo None"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "explicit-negative-indication",
+      "caseId": "explicit-negative-indication",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": false,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": "none-of-the-listed-indications",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "expected": {
+        "kind": "activity",
+        "nodeId": "when[0]/when[1]/otherwise/action[0]",
+        "activity": "not-certify.Unmet"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Indication None"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "vf": [
+          "VF Demo None"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "visual-field-makes-photograph-unnecessary",
+      "caseId": "visual-field-makes-photograph-unnecessary",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": true,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": null,
+        "vf": "visual-field-at-least-12-degree-upper-field-loss-repose-and-elevated-demonstrating-potential-correction"
+      },
+      "expected": {
+        "kind": "activity",
+        "nodeId": "when[0]/when[1]/when[0]/action[0]",
+        "activity": "certify.Met"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "vfConform": [
+          "Visual Field Conforms"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [],
+        "vf": [
+          "Demo VF 12 Degree"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "photograph-makes-visual-field-unnecessary",
+      "caseId": "photograph-makes-visual-field-unnecessary",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": true,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": null
+      },
+      "expected": {
+        "kind": "activity",
+        "nodeId": "when[0]/when[1]/when[0]/action[0]",
+        "activity": "certify.Met"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "vfConform": [
+          "Visual Field Conforms"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "vf": []
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "false-conformance-makes-demonstrations-unnecessary",
+      "caseId": "false-conformance-makes-demonstrations-unnecessary",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": false,
+        "vfConform": false,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "complaint": "complaint-of-interference-with-near-or-distance-vision",
+        "photo": null,
+        "vf": null
+      },
+      "expected": {
+        "kind": "activity",
+        "nodeId": "when[0]/when[1]/otherwise/action[0]",
+        "activity": "not-certify.Unmet"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform No"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Ind Vision Dermatochalasis"
+        ],
+        "complaint": [
+          "Complaint Vision Interference"
+        ],
+        "photo": [],
+        "vf": []
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "negative-indication-makes-complaint-unnecessary",
+      "caseId": "negative-indication-makes-complaint-unnecessary",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": false,
+        "photoConform": true,
+        "vfConform": false,
+        "bdoc": true,
+        "pdoc": true,
+        "indication": "none-of-the-listed-indications",
+        "complaint": null,
+        "photo": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
+        "vf": "none-of-the-listed-visual-field-demonstrations"
+      },
+      "expected": {
+        "kind": "activity",
+        "nodeId": "when[0]/when[1]/otherwise/action[0]",
+        "activity": "not-certify.Unmet"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose No"
+        ],
+        "photoConform": [
+          "Photographs Conform"
+        ],
+        "vfConform": [
+          "Visual Field Conforms No"
+        ],
+        "bdoc": [
+          "Blepharoplasty Documented"
+        ],
+        "pdoc": [
+          "Ptosis Repair Documented"
+        ],
+        "indication": [
+          "Indication None"
+        ],
+        "complaint": [],
+        "photo": [
+          "Demo Photo Margin"
+        ],
+        "vf": [
+          "VF Demo None"
+        ]
+      }
+    },
+    {
+      "suite": "unknowns",
+      "case": "cosmetic-makes-later-inputs-unnecessary",
+      "caseId": "cosmetic-makes-later-inputs-unnecessary",
+      "answers": {
+        "B": true,
+        "P": true,
+        "cosmetic": true,
+        "photoConform": null,
+        "vfConform": null,
+        "bdoc": null,
+        "pdoc": null,
+        "indication": null,
+        "complaint": null,
+        "photo": null,
+        "vf": null
+      },
+      "expected": {
+        "kind": "activity",
+        "nodeId": "when[0]/when[0]/action[0]",
+        "activity": "not-certify.Unmet"
+      },
+      "sources": {
+        "B": [
+          "Blepharoplasty Requested"
+        ],
+        "P": [
+          "Blepharoptosis Repair Requested"
+        ],
+        "cosmetic": [
+          "Cosmetic Purpose"
+        ],
+        "photoConform": [],
+        "vfConform": [],
+        "bdoc": [],
+        "pdoc": [],
+        "indication": [],
+        "complaint": [],
+        "photo": [],
+        "vf": []
+      }
+    }
+  ]
+}

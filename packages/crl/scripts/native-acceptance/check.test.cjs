@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { checkNative, checkCre, nativeVerdict, summarize, loadFixture, exactCases } = require('./check.cjs');
+const { checkNative, checkCre, nativeVerdict, summarize, loadFixture, exactCases, pauseInputs } = require('./check.cjs');
 const { childEnvironment, runBounded } = require('./process.cjs');
 const { options } = require('./run.cjs');
 const fixture = path.resolve(__dirname, '../../test/acceptance/bleph');
@@ -68,7 +68,7 @@ test('valid Questionnaire does not suppress logged errors or wrong null witnesse
   assert.equal(check(s).passed, false);
 });
 test('frozen case-set integrity and independent CRE/native verdicts', () => {
-  const f = loadFixture(fixture); assert.equal(f.entries.length, 97);
+  const f = loadFixture(fixture); assert.equal(f.entries.length, 116);
   assert.equal(exactCases(f.entries, f.entries.slice(1)), false);
   assert.equal(exactCases(f.entries, [...f.entries.slice(1), f.entries[1]]), false);
   const rows = f.entries.map(e => ({ suite: e.suite, case: e.case, native: { passed: true }, cre: { passed: true } }));
@@ -76,8 +76,36 @@ test('frozen case-set integrity and independent CRE/native verdicts', () => {
   rows[0].cre.passed = false;
   const result = summarize(f.entries, rows);
   assert.equal(result.nativeAccepted, true); assert.equal(result.creAccepted, false); assert.equal(result.accepted, false);
-  assert.equal(result.crePassed, 96); assert.equal(result.nativePassed, 97);
+  assert.equal(result.crePassed, 115); assert.equal(result.nativePassed, 116);
   assert.equal(summarize(f.entries, rows.slice(1)).accepted, false);
+});
+test('deeper pauses require valid named unanswered inputs and their returned questions', () => {
+  const s=sample(); s.entry.suite='unknowns'; s.entry.caseId='deep';
+  s.entry.expected.pauseInputs=['choice']; s.entry.answers.choice=null; s.qr.item[2].answer=[];
+  s.contract.unknownQuestionPresence={deep:Object.keys(s.contract.bindings)};
+  assert.equal(check(s).passed,true);
+  for(const keys of [undefined,[],['absent'],['choice','choice'],['B']]){
+    s.entry.expected.pauseInputs=keys; assert.throws(()=>pauseInputs(s.entry,s.contract),/distinct unanswered/);
+  }
+  s.entry.expected.pauseInputs=['choice'];
+  s.q.item.splice(2,1);s.qr.item.splice(2,1);
+  assert.equal(check(s).passed,false);
+});
+test('explicit new-case presence contracts cannot hide an extra or missing item', () => {
+  const s=sample(true);s.entry.suite='unknowns';s.entry.caseId='known';
+  s.contract.unknownQuestionPresence={known:Object.keys(s.contract.bindings)};
+  assert.equal(check(s).passed,true);
+  s.contract.unknownQuestionPresence.known=s.contract.unknownQuestionPresence.known.filter(k=>k!=='choice');
+  assert.equal(check(s).passed,false);
+});
+test('true-OR controls leave the opposite operand unknown before OR', () => {
+  const {entries}=loadFixture(fixture);
+  const left=entries.find(e=>e.case==='visual-field-makes-photograph-unnecessary').answers;
+  const right=entries.find(e=>e.case==='photograph-makes-visual-field-unnecessary').answers;
+  assert.deepEqual([left.photoConform,left.photo,left.vfConform],[true,null,true]);
+  assert.notEqual(left.vf,null);assert.notEqual(left.vf,'none-of-the-listed-visual-field-demonstrations');
+  assert.deepEqual([right.vfConform,right.vf,right.photoConform],[true,null,true]);
+  assert.notEqual(right.photo,null);assert.notEqual(right.photo,'none-of-the-listed-photographic-demonstrations');
 });
 test('CLI rejects missing options, bad worker counts, source/existing output', () => {
   const jar = __filename;

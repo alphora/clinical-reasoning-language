@@ -25,23 +25,26 @@ function loadFixture(dir) {
     return JSON.parse(fs.readFileSync(path.join(dir, name)));
   };
   const contract = read('contract.json');
-  const original = read('expected-frozen.json'), supplemental = read('supplemental-frozen.json');
-  const entries = [...original.entries, ...supplemental.entries];
+  const original = read('expected-frozen.json'), supplemental = read('supplemental-frozen.json'), unknowns = read('unknowns-frozen.json');
+  const entries = [...original.entries, ...supplemental.entries, ...unknowns.entries];
   const inputs = read('emitted-inputs.json');
   assert.ok(exactCases(entries, inputs), 'Pinned emitted input set differs');
   assert.equal(contract.schemaVersion, 1);
   assert.equal(original.schemaVersion, 1);
   assert.equal(supplemental.schemaVersion, 1);
+  assert.equal(unknowns.schemaVersion, 1);
   assert.deepEqual(original.conceptNames, supplemental.conceptNames);
-  assert.deepEqual(Object.keys(contract.caseCounts).sort(), ['completed', 'preserved', 'supplemental']);
-  assert.deepEqual(contract.caseCounts, { preserved: 47, completed: 47, supplemental: 3 });
-  assert.equal(entries.length, 97);
+  assert.deepEqual(original.conceptNames, unknowns.conceptNames);
+  assert.deepEqual(Object.keys(contract.caseCounts).sort(), ['completed', 'preserved', 'supplemental', 'unknowns']);
+  assert.deepEqual(contract.caseCounts, { preserved: 47, completed: 47, supplemental: 3, unknowns: 19 });
+  assert.equal(entries.length, 116);
   assert.equal(new Set(entries.map(caseKey)).size, entries.length, 'Duplicate oracle case');
   assert.equal(new Set(Object.values(contract.routes).map(route => JSON.stringify(route))).size, Object.keys(contract.routes).length, 'Activity routes must be distinct');
   assert.deepEqual([...new Set(entries.filter(e => e.expected.kind === 'activity').map(e => e.expected.nodeId))].sort(), Object.keys(contract.routes).sort(), 'Missing activity route coverage');
   assert.deepEqual([...new Set(entries.filter(e => e.expected.kind === 'activity').map(e => e.expected.activity))].sort(), Object.keys(contract.activities).sort(), 'Missing disposition coverage');
   assert.deepEqual([...new Set(entries.filter(e => e.expected.kind === 'pause').map(e => e.expected.nodeId))].sort(), Object.keys(contract.pauseNullExpressions).sort(), 'Missing pause frontier coverage');
-  const dispositionCounts = { preserved: [38, 2, 7], completed: [0, 29, 18], supplemental: [1, 1, 1] };
+  const dispositionCounts = { preserved: [38, 2, 7], completed: [0, 29, 18], supplemental: [1, 1, 1], unknowns: [10, 5, 4] };
+  assert.deepEqual(Object.keys(contract.unknownQuestionPresence).sort(), unknowns.entries.map(e => e.caseId).sort(), 'Missing/extra unknown-case presence contract');
   for (const [suite, count] of Object.entries(contract.caseCounts)) {
     assert.equal(entries.filter(e => e.suite === suite).length, count);
     const cases = entries.filter(e => e.suite === suite);
@@ -51,6 +54,10 @@ function loadFixture(dir) {
   for (const entry of entries) {
     assert.deepEqual(Object.keys(entry.answers).sort(), Object.keys(contract.bindings).sort());
     assert.ok(['pause', 'activity'].includes(entry.expected.kind));
+    if (entry.suite === 'unknowns') {
+      const present = contract.unknownQuestionPresence[entry.caseId];
+      assert.ok(Array.isArray(present) && new Set(present).size === present.length && present.every(k => Object.hasOwn(contract.bindings, k)), 'Invalid unknown-case question presence');
+    }
     for (const [key, value] of Object.entries(entry.answers)) {
       assert.ok(value === null || typeof value === (contract.bindings[key].valueType === 'valueBoolean' ? 'boolean' : 'string'));
     }
@@ -59,10 +66,24 @@ function loadFixture(dir) {
     } else {
       assert.equal(entry.expected.activity, null);
       assert.ok(Array.isArray(contract.pauseNullExpressions[entry.expected.nodeId]), 'Pause frontier lacks native witness contract');
-      assert.ok(['B', 'P'].some(k => entry.answers[k] === null), 'This pause suite requires an unknown request determination');
+      const required = pauseInputs(entry, contract);
+      if (entry.suite === 'unknowns') {
+        assert.ok(required.every(k => contract.unknownQuestionPresence[entry.caseId].includes(k)), 'Pause input must be present');
+        const repaired = unknowns.entries.filter(e => e.caseId === entry.expected.repairCase);
+        assert.equal(repaired.length, 1, 'Missing/duplicate repair case');
+        assert.equal(repaired[0].expected.kind, 'activity');
+        assert.deepEqual(Object.keys(entry.answers).filter(k => entry.answers[k] !== repaired[0].answers[k]).sort(), [...required].sort(), 'Repair must change only the missing input');
+      }
     }
   }
   return { contract, entries, hashes, inputs };
+}
+
+function pauseInputs(entry, contract) {
+  const keys = entry.suite === 'unknowns' ? entry.expected.pauseInputs : ['B', 'P'].filter(k => entry.answers[k] === null);
+  assert.ok(Array.isArray(keys) && keys.length > 0 && new Set(keys).size === keys.length
+    && keys.every(k => Object.hasOwn(contract.bindings, k) && entry.answers[k] === null), 'Pause requires known, distinct unanswered inputs');
+  return keys;
 }
 
 function exactCases(expected, actual) {
@@ -118,7 +139,8 @@ function checkNative(result, entry, contract, subject, stderr = '') {
     // or client visibility. Later-action inputs can be included at a null frontier.
     const requestEntered = entry.answers.B === true || entry.answers.P === true;
     const nonCosmetic = requestEntered && entry.answers.cosmetic === false;
-    const present = ['B', 'P'].includes(key) || (key === 'cosmetic' ? requestEntered : ['bdoc', 'pdoc'].includes(key) ? nonCosmetic && entry.answers.B === true && entry.answers.P === true : nonCosmetic);
+    const present = entry.suite === 'unknowns' ? contract.unknownQuestionPresence[entry.caseId].includes(key)
+      : ['B', 'P'].includes(key) || (key === 'cosmetic' ? requestEntered : ['bdoc', 'pdoc'].includes(key) ? nonCosmetic && entry.answers.B === true && entry.answers.P === true : nonCosmetic);
     check(matches.length === (present ? 1 : 0), `Wrong question presence: ${key}`);
     if (matches.length === 0) {
       answers[key] = { state: 'item-absent' };
@@ -164,7 +186,7 @@ function checkNative(result, entry, contract, subject, stderr = '') {
     check(actions?.length === 1 && actions[0].title === entry.expected.activity && !actions[0].action && actions[0].resource?.reference === expectedRef, 'Recommendation wrapper points to wrong activity');
   }
   if (entry.expected.kind === 'pause') {
-    for (const key of ['B', 'P'].filter(k => entry.answers[k] === null)) check(answers[key]?.state === 'unanswered', `Pause lacks named unanswered input: ${key}`);
+    for (const key of pauseInputs(entry, contract)) check(answers[key]?.state === 'unanswered', `Pause lacks named unanswered input: ${key}`);
   }
   return { passed: errors.length === 0, errors, routes, answers, nullExpressions };
 }
@@ -207,4 +229,4 @@ function summarize(entries, rows, sourceDirty = null) {
     // A disagreeing CRE fails the paired suite, but never rewrites the native verdict.
     accepted: nativeAccepted && creAccepted };
 }
-module.exports = { hash, loadFixture, caseKey, exactCases, objects, checkNative, checkCre, nativeVerdict, summarize };
+module.exports = { hash, loadFixture, caseKey, exactCases, objects, pauseInputs, checkNative, checkCre, nativeVerdict, summarize };

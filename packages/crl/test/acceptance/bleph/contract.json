@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "caseCounts": {
+    "unknowns": 19,
     "preserved": 47,
     "completed": 47,
     "supplemental": 3
@@ -147,6 +148,18 @@
     "when[0]/when[1]": [
       "FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Blepharoplasty Requested\").value as FHIR.boolean) and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Blepharoptosis Repair Requested\").value as FHIR.boolean)",
       "not (FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Blepharoplasty Requested\").value as FHIR.boolean) and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Blepharoptosis Repair Requested\").value as FHIR.boolean))"
+    ],
+    "when[0]/when[0]": [
+      "FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Performed For Cosmetic Purposes\").value as FHIR.boolean)",
+      "not FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Performed For Cosmetic Purposes\").value as FHIR.boolean)"
+    ],
+    "when[0]/when[1]/when[0]": [
+      "\"McpmBlephInterface\".\"Qualifying Functional Indication\" and \"McpmBlephInterface\".\"Qualifying Patient Complaint Documented\" and \"McpmBlephInterface\".\"Qualifying Objective Demonstration Submitted\" and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"The Requested Blepharoplasty Is Individually Documented\").value as FHIR.boolean) and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"The Requested Blepharoptosis Repair Is Individually Documented\").value as FHIR.boolean)",
+      "not (\"McpmBlephInterface\".\"Qualifying Functional Indication\" and \"McpmBlephInterface\".\"Qualifying Patient Complaint Documented\" and \"McpmBlephInterface\".\"Qualifying Objective Demonstration Submitted\" and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"The Requested Blepharoplasty Is Individually Documented\").value as FHIR.boolean) and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"The Requested Blepharoptosis Repair Is Individually Documented\").value as FHIR.boolean))"
+    ],
+    "when[0]/when[2]": [
+      "\"McpmBlephInterface\".\"Qualifying Functional Indication\" and \"McpmBlephInterface\".\"Qualifying Patient Complaint Documented\" and \"McpmBlephInterface\".\"Qualifying Objective Demonstration Submitted\"",
+      "not (\"McpmBlephInterface\".\"Qualifying Functional Indication\" and \"McpmBlephInterface\".\"Qualifying Patient Complaint Documented\" and \"McpmBlephInterface\".\"Qualifying Objective Demonstration Submitted\")"
     ]
   },
   "activityContent": {
@@ -210,5 +223,240 @@
         }
       ]
     }
+  },
+  "unknownQuestionPresence": {
+    "missing-cosmetic": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "missing-indication": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "missing-complaint": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "missing-bdoc": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "missing-pdoc": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "missing-photo": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "missing-photoConform": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "missing-vf": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "missing-vfConform": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "complete-photograph": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "complete-visual-field": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "single-missing-indication": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "single-complete": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "explicit-negative-indication": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "visual-field-makes-photograph-unnecessary": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "photograph-makes-visual-field-unnecessary": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "false-conformance-makes-demonstrations-unnecessary": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "negative-indication-makes-complaint-unnecessary": [
+      "B",
+      "P",
+      "cosmetic",
+      "photoConform",
+      "vfConform",
+      "bdoc",
+      "pdoc",
+      "indication",
+      "complaint",
+      "photo",
+      "vf"
+    ],
+    "cosmetic-makes-later-inputs-unnecessary": [
+      "B",
+      "P",
+      "cosmetic"
+    ]
   }
 }

@@ -483,5 +483,100 @@
     "suite": "supplemental",
     "case": "Newest local valueless answer displaces positive ServiceRequest",
     "resourcesSha256": "28e17c3ef680c4c93e789cc4d628e5b4972a0b36ea6f1ddf8c04f8a7f864f377"
+  },
+  {
+    "suite": "unknowns",
+    "case": "missing-cosmetic",
+    "resourcesSha256": "1bb3bc42c6063be7a068093e4882c656502b55b4e288d00f6dee38e366773944"
+  },
+  {
+    "suite": "unknowns",
+    "case": "missing-indication",
+    "resourcesSha256": "eb95965d0064bf5797a6ff92acf1744b08dc26d3deea8145093a13b63f2b251a"
+  },
+  {
+    "suite": "unknowns",
+    "case": "missing-complaint",
+    "resourcesSha256": "a5492815b72fc7b1d42d458f02787f33099c11ceb7b7b5bdd67d5e0d5c8183e1"
+  },
+  {
+    "suite": "unknowns",
+    "case": "missing-bdoc",
+    "resourcesSha256": "09dcdfe930de1e1283e1c985b1a33225aa7a829fd191d33edaa6cb74ffc1fef8"
+  },
+  {
+    "suite": "unknowns",
+    "case": "missing-pdoc",
+    "resourcesSha256": "07310b3ee4702e42cef26f20e1f4c668ad75ccfd3a3b842d79eff2805855a1fc"
+  },
+  {
+    "suite": "unknowns",
+    "case": "missing-photo",
+    "resourcesSha256": "6d5006153240e16f85e01dbf48cf1a8a1ab9db57b4c17f8787b08e0ae03ce11e"
+  },
+  {
+    "suite": "unknowns",
+    "case": "missing-photoConform",
+    "resourcesSha256": "f488164d504c59791fe8dfc424ffe30541dc9e4801c7f70ec14b759468b6ab93"
+  },
+  {
+    "suite": "unknowns",
+    "case": "missing-vf",
+    "resourcesSha256": "8b3a8b159f878f2dc228d72c4f4189774eddb7549a5dd431ebd43bb88a6bf806"
+  },
+  {
+    "suite": "unknowns",
+    "case": "missing-vfConform",
+    "resourcesSha256": "fc8df44f7d5bdfea9868a48feb82be9626c79b2b5eb35629d743e292fe13ea07"
+  },
+  {
+    "suite": "unknowns",
+    "case": "complete-photograph",
+    "resourcesSha256": "f2eb481ee1f48d6444321732697a21bfa98f81001b5ebc3b763a18cb201f3f79"
+  },
+  {
+    "suite": "unknowns",
+    "case": "complete-visual-field",
+    "resourcesSha256": "512b49faff42519c5b29b0feee830dfbf6d18f6c54f20edbf97cd734c7b30dd8"
+  },
+  {
+    "suite": "unknowns",
+    "case": "single-missing-indication",
+    "resourcesSha256": "0bac88e272135ba7cd8ac2dcabc4ff22e94ed88d6c5974c583b444eefd85dff9"
+  },
+  {
+    "suite": "unknowns",
+    "case": "single-complete",
+    "resourcesSha256": "6b8e6e9caf1f5e82f7f5c55dab29eaeb13d2fa1cbd21da768fb6036e7c76c2f3"
+  },
+  {
+    "suite": "unknowns",
+    "case": "explicit-negative-indication",
+    "resourcesSha256": "bdd8e1db8c514783b0936ec50bf287cb4d0a2bde0b38d716973278a454681fe4"
+  },
+  {
+    "suite": "unknowns",
+    "case": "visual-field-makes-photograph-unnecessary",
+    "resourcesSha256": "bd675293878e9df19c78dc2b6e148c3d86446bddf8ce95db2700d4f41674b74a"
+  },
+  {
+    "suite": "unknowns",
+    "case": "photograph-makes-visual-field-unnecessary",
+    "resourcesSha256": "4fc012991b5c127214c8753de04feb2ccb993c22f25610951768595d3aabcbc4"
+  },
+  {
+    "suite": "unknowns",
+    "case": "false-conformance-makes-demonstrations-unnecessary",
+    "resourcesSha256": "c0588ee14af5daed99956ef5379f9c0ec12090530a0051e29cc1f7876694d06e"
+  },
+  {
+    "suite": "unknowns",
+    "case": "negative-indication-makes-complaint-unnecessary",
+    "resourcesSha256": "bb9203a3931656fa59f3315f9522813f2e56dc47044324486330e4350655f782"
+  },
+  {
+    "suite": "unknowns",
+    "case": "cosmetic-makes-later-inputs-unnecessary",
+    "resourcesSha256": "f1481f3ab615e6573c0a8efc1f5761aa29979277cc7ec84226266f5705095983"
   }
 ]

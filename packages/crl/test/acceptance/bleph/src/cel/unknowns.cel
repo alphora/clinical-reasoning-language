@@ -1,0 +1,505 @@
+library "Blepharoplasty And Blepharoptosis Repair Cases".
+covers "Blepharoplasty And Blepharoptosis Repair".
+
+fact "Sample Patient":
+- name is "Sample Patient".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+fact "Cosmetic Purpose":
+- date is "2026-01-01".
+- value is true.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Performed For Cosmetic Purposes".
+
+fact "Cosmetic Purpose No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Performed For Cosmetic Purposes".
+
+fact "Photographs Conform":
+- date is "2026-01-01".
+- value is true.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Submitted Photographs Conform To The Photograph Submission Standards".
+
+fact "Photographs Conform No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Submitted Photographs Conform To The Photograph Submission Standards".
+
+fact "Visual Field Conforms":
+- date is "2026-01-01".
+- value is true.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Submitted Visual Field Examination Conforms To The Visual Field Examination Standards".
+
+fact "Visual Field Conforms No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Submitted Visual Field Examination Conforms To The Visual Field Examination Standards".
+
+fact "Blepharoplasty Documented":
+- date is "2026-01-01".
+- value is true.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."The Requested Blepharoplasty Is Individually Documented".
+
+fact "Blepharoplasty Documented No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."The Requested Blepharoplasty Is Individually Documented".
+
+fact "Ptosis Repair Documented":
+- date is "2026-01-01".
+- value is true.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."The Requested Blepharoptosis Repair Is Individually Documented".
+
+fact "Ptosis Repair Documented No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."The Requested Blepharoptosis Repair Is Individually Documented".
+
+fact "Complaint Vision Interference":
+- date is "2026-01-01".
+- value is "complaint-of-interference-with-near-or-distance-vision".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Complaint Field Interference":
+- date is "2026-01-01".
+- value is "complaint-of-interference-with-visual-field".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Complaint Difficulty Drooping":
+- date is "2026-01-01".
+- value is "complaint-of-difficulty-seeing-due-to-upper-eyelid-drooping".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Complaint Difficulty Eyelashes":
+- date is "2026-01-01".
+- value is "complaint-of-difficulty-seeing-due-to-looking-through-the-eyelashes".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Complaint Difficulty Eyelid Skin":
+- date is "2026-01-01".
+- value is "complaint-of-difficulty-seeing-due-to-seeing-the-upper-eyelid-skin".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Complaint Blepharitis":
+- date is "2026-01-01".
+- value is "complaint-of-chronic-blepharitis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Complaint Dermatitis":
+- date is "2026-01-01".
+- value is "complaint-of-chronic-dermatitis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Complaint None":
+- date is "2026-01-01".
+- value is "none-of-the-listed-complaints".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "Ind Vision Dermatochalasis":
+- date is "2026-01-01".
+- value is "near-or-far-vision-impairment-due-to-dermatochalasis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Vision Blepharochalasis":
+- date is "2026-01-01".
+- value is "near-or-far-vision-impairment-due-to-blepharochalasis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Vision Blepharoptosis":
+- date is "2026-01-01".
+- value is "near-or-far-vision-impairment-due-to-blepharoptosis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Field Dermatochalasis":
+- date is "2026-01-01".
+- value is "visual-field-defect-due-to-dermatochalasis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Field Blepharochalasis":
+- date is "2026-01-01".
+- value is "visual-field-defect-due-to-blepharochalasis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Field Blepharoptosis":
+- date is "2026-01-01".
+- value is "visual-field-defect-due-to-blepharoptosis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Redundant Skin":
+- date is "2026-01-01".
+- value is "symptomatic-redundant-skin-weighing-down-upper-lashes".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Pretarsal Dermatitis":
+- date is "2026-01-01".
+- value is "chronic-symptomatic-dermatitis-of-pretarsal-skin-caused-by-redundant-upper-lid-skin".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Ind Prosthesis":
+- date is "2026-01-01".
+- value is "prosthesis-difficulties-in-an-anophthalmic-socket".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Indication None":
+- date is "2026-01-01".
+- value is "none-of-the-listed-indications".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+
+fact "Demo Photo Margin":
+- date is "2026-01-01".
+- value is "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Photographic Demonstration Submitted".
+
+fact "Demo Photo Skin On Lashes":
+- date is "2026-01-01".
+- value is "photograph-upper-eyelid-skin-rests-on-the-eyelashes".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Photographic Demonstration Submitted".
+
+fact "Demo Photo Dermatitis":
+- date is "2026-01-01".
+- value is "photograph-upper-eyelid-indicates-presence-of-dermatitis".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Photographic Demonstration Submitted".
+
+fact "Demo Photo Prosthesis":
+- date is "2026-01-01".
+- value is "photograph-upper-eyelid-position-contributes-to-prosthesis-difficulty".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Photographic Demonstration Submitted".
+
+fact "Photo Demo None":
+- date is "2026-01-01".
+- value is "none-of-the-listed-photographic-demonstrations".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Photographic Demonstration Submitted".
+
+fact "Demo VF 12 Degree":
+- date is "2026-01-01".
+- value is "visual-field-at-least-12-degree-upper-field-loss-repose-and-elevated-demonstrating-potential-correction".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Visual Field Demonstration Submitted".
+
+fact "Demo VF 30 Percent":
+- date is "2026-01-01".
+- value is "visual-field-at-least-30-percent-upper-field-loss-repose-and-elevated-demonstrating-potential-correction".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Visual Field Demonstration Submitted".
+
+fact "VF Demo None":
+- date is "2026-01-01".
+- value is "none-of-the-listed-visual-field-demonstrations".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Visual Field Demonstration Submitted".
+
+fact "Blepharoplasty Requested":
+- date is "2026-01-01".
+- value is true.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Blepharoplasty Requested".
+
+fact "Blepharoptosis Repair Requested":
+- date is "2026-01-01".
+- value is true.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Blepharoptosis Repair Requested".
+
+fact "Blepharoplasty Requested SR":
+- code is "http://www.ama-assn.org/go/cpt|15822".
+- date is "2026-01-01".
+- defined by "ServiceRequest".
+
+fact "Blepharoptosis Repair Requested SR":
+- code is "http://www.ama-assn.org/go/cpt|67901".
+- date is "2026-01-01".
+- defined by "ServiceRequest".
+
+fact "Non-Covered Service Request":
+- code is "http://www.ama-assn.org/go/cpt|99999".
+- date is "2026-01-01".
+- defined by "ServiceRequest".
+
+fact "Blepharoplasty Requested No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Blepharoplasty Requested".
+
+fact "Blepharoptosis Repair Requested No":
+- date is "2026-01-01".
+- value is false.
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Blepharoptosis Repair Requested".
+
+
+// REFACTOR:grounded — explicit missing-input and determinate-operand controls, review577.
+case "missing-cosmetic":
+- id is "missing-cosmetic".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Photographs Conform".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is pause.
+
+case "missing-indication":
+- id is "missing-indication".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is pause.
+
+case "missing-complaint":
+- id is "missing-complaint".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Demo Photo Margin".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is pause.
+
+case "missing-bdoc":
+- id is "missing-bdoc".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform".
+- fact is "Visual Field Conforms No".
+- fact is "Ptosis Repair Documented".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is pause.
+
+case "missing-pdoc":
+- id is "missing-pdoc".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is pause.
+
+case "missing-photo":
+- id is "missing-photo".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is pause.
+
+case "missing-photoConform":
+- id is "missing-photoConform".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is pause.
+
+case "missing-vf":
+- id is "missing-vf".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform No".
+- fact is "Visual Field Conforms".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Photo Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is pause.
+
+case "missing-vfConform":
+- id is "missing-vfConform".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform No".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Photo Demo None".
+- fact is "Demo VF 12 Degree".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is pause.
+
+case "complete-photograph":
+- id is "complete-photograph".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+case "complete-visual-field":
+- id is "complete-visual-field".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform No".
+- fact is "Visual Field Conforms".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Photo Demo None".
+- fact is "Demo VF 12 Degree".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+case "single-missing-indication":
+- id is "single-missing-indication".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested No".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is pause.
+
+case "single-complete":
+- id is "single-complete".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested No".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+case "explicit-negative-indication":
+- id is "explicit-negative-indication".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Indication None".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+case "visual-field-makes-photograph-unnecessary":
+- id is "visual-field-makes-photograph-unnecessary".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform".
+- fact is "Visual Field Conforms".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo VF 12 Degree".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+case "photograph-makes-visual-field-unnecessary":
+- id is "photograph-makes-visual-field-unnecessary".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform".
+- fact is "Visual Field Conforms".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- fact is "Demo Photo Margin".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".
+
+case "false-conformance-makes-demonstrations-unnecessary":
+- id is "false-conformance-makes-demonstrations-unnecessary".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform No".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Ind Vision Dermatochalasis".
+- fact is "Complaint Vision Interference".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+case "negative-indication-makes-complaint-unnecessary":
+- id is "negative-indication-makes-complaint-unnecessary".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose No".
+- fact is "Photographs Conform".
+- fact is "Visual Field Conforms No".
+- fact is "Blepharoplasty Documented".
+- fact is "Ptosis Repair Documented".
+- fact is "Indication None".
+- fact is "Demo Photo Margin".
+- fact is "VF Demo None".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+case "cosmetic-makes-later-inputs-unnecessary":
+- id is "cosmetic-makes-later-inputs-unnecessary".
+- subject is "Sample Patient".
+- fact is "Blepharoplasty Requested".
+- fact is "Blepharoptosis Repair Requested".
+- fact is "Cosmetic Purpose".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
