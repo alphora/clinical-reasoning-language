@@ -2,6 +2,8 @@
 
 These source patches address two engine defects encountered when exercising CRL-generated artifacts with CQFramework's R4 `$apply` implementation (including its R5-operation backport). They are local patch sets, not an upstream release or an installed customer engine.
 
+Upstream review: [Coding extraction PR #1101](https://github.com/cqframework/clinical-reasoning/pull/1101) targets main; [generated IDs PR #1102](https://github.com/cqframework/clinical-reasoning/pull/1102) is stacked on the Coding branch. Merge #1101 first, then retarget #1102 to main. The tested [4.7 backport branch](https://github.com/cqframework/clinical-reasoning/tree/codex/qr-extraction-backport) is also pushed; no 4.7 maintenance branch currently exists for a backport PR. These submissions do not constitute a release or installation.
+
 Upstream: https://github.com/cqframework/clinical-reasoning
 
 | Series | Exact base commit | Apply order |
@@ -39,7 +41,7 @@ The runtime overlays used for these measurements were rebuilt byte-for-byte from
 
 ## Remaining scope
 
-- Extracted transaction Bundles still need the separate `request.url`/resource-addressing correction before transaction persistence is claimed.
+- Extracted transaction Bundles still need the separate `request.url`/resource-addressing correction before transaction persistence is claimed. Tracked upstream as [issue #1103](https://github.com/cqframework/clinical-reasoning/issues/1103); this follow-up is separate from CRL language work.
 - Unsupported nested or multi-type answer conversions and their silent exception handling require separate diagnostic and partial-extraction semantics. This patch does not claim to fix them.
 - Existing id-less target Outcome composites retain their null suffix behavior; contained IDs are scoped to their containing resource.
 - The scoped Bleph measurements do not certify every customer policy, every CRL arm, global Scalar/`this` retirement, or completed customer deployment.
