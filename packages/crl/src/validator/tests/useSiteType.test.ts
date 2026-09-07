@@ -18,7 +18,7 @@ import {
 // concept-model redesign Todo 2, rule B — use-site & result-shape type checking. End-to-end via
 // buildCRL → Validator (the single-file path), mirroring representationShape.test.ts. THE HEADLINE
 // (feedback_patterns-are-semantic): rule B checks pattern OPERAND value types + language-level shape
-// rules, NEVER a pattern's return type. See tmp/todo2-ruleB-plan.md + disc 397.
+// rules, NEVER a pattern's return type. See tmp/_old/todo2-ruleB-plan.md + disc 397.
 
 function validateFull(src: string): ValidationResult {
   const built = buildCRL(src);

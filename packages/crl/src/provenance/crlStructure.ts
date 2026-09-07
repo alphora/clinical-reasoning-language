@@ -136,9 +136,11 @@ function refKeysOf(
     // concept keys rather than a dangling criterion-kind key. The `criterion(<name>)` structure-sig
     // token (refSig above) still identifies the guard node itself; the criterion NAME-level
     // declaration index (find-refs / rename) stays ii.4.
-    return guardConceptClosure((node as WhenBlock).condition, criterionIndex).map((atom) =>
+    // REFACTOR:grounded (#320, review 563): normalize owner identity before deduplicating this
+    // bridge. Bare X and Policy.X name one local declaration; Foreign.X retains its own key.
+    return [...new Set(guardConceptClosure((node as WhenBlock).condition, criterionIndex).map((atom) =>
       refKey(atom.ref, "concept", decisionLib),
-    );
+    ))];
   if (kind === "otherwise") return [];
   const stmt = node as ActionStatement;
   const a = stmt.action;

@@ -1,7 +1,7 @@
 // #189 P2 — THE PIPELINE, as a SHARED structure rather than a matcher-private split.
 //
-// REFACTOR:grounded (#189 P2) — re-derived from `tmp/DESIGN-P2-pipeline-uncollapse.md` and the pipeline
-// model in `tmp/DESIGN-bothrep-derivation-merge.md` §4/§7, NOT from `matchNarrative`'s fold, which is the
+// REFACTOR:grounded (#189 P2) — re-derived from `tmp/_old/DESIGN-P2-pipeline-uncollapse.md` and the pipeline
+// model in `tmp/_old/DESIGN-bothrep-derivation-merge.md` §4/§7, NOT from `matchNarrative`'s fold, which is the
 // PATIENT (it hands stage 2 a scalar and does not translate).
 //
 // WHY THIS EXISTS. `- definition is <stage>, then <stage>, then …` is a PIPELINE: reading order is

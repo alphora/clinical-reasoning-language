@@ -1,7 +1,7 @@
 // #189 P1 build step 3 — render ONE record constructor as CQL text.
 //
 // REFACTOR:grounded (#189 P1) — re-derived from the P1 design of record
-// (`tmp/DESIGN-P1-case-feature-construction.md`) and MEASURED against the CQL engine, never from the
+// (`tmp/_old/DESIGN-P1-case-feature-construction.md`) and MEASURED against the CQL engine, never from the
 // prototype's hand-written `CaseFeatureCommon.cql`, which is explicitly not a golden (operator).
 //
 // SHAPE vs TEXT. `emit/recordConstructor.ts` decides the shape (which resources can be constructed, what

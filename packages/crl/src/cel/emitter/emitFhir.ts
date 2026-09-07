@@ -34,10 +34,14 @@ import {
   parseCodedValueToken,
   type CodeParts,
 } from "../canonicalToken";
-import { localCodePathsOf } from "../localMembership";
 import { buildDefinedByCandidates } from "../definedByResolve";
+// REFACTOR:grounded (#320, discussion 555): one authored date resolver for CEL emit and CRE.
+import { resolveCaseFactDates, resolveFactDate, type CaseAnchors } from "../factDate";
+import { localCodePathsOf } from "../localMembership";
 import { isValueReadingBooleanConcept } from "../../template-match/recencyValueConcept";
-import type { Registry, RegistryEntry } from "../../imports/types";
+import { hasLocalPublicationContribution, type PublicationDescriptor, type PublicationProgram } from "../../emit/publicationProgram";
+import { preparePublicationContext } from "../../imports/preparePublicationContext";
+import { emptyNamespace, type Registry, type RegistryEntry } from "../../imports/types";
 import type { ResolvedCelGraph } from "../imports/types";
 import type {
   CELFact,
@@ -46,10 +50,6 @@ import type {
   CELFactBody,
   CELCaseBody,
   CELFactRefField,
-  CELAnchorField,
-  CELAnchorExpr,
-  CELDurationOffset,
-  CELAtClause,
   CELCrossResourceField,
   CrossResourceRelation,
   CELValue,
@@ -69,6 +69,45 @@ import type {
 const CEL_ID_BASE_MAX = 56;
 
 const CONCEPT_TYPE_SET: Set<string> = new Set<string>(conceptTypes as readonly ConceptType[]);
+
+/** Prepare once from the CEL resolver's existing covers graph. New-form consumers share this
+ * owning declaration/domain snapshot; legacy facts retain their existing metadata path. */
+export function prepareCelPublications(graph: ResolvedCelGraph): PublicationProgram | undefined {
+  const registry = graph.crlRegistry;
+  if (!registry || !graph.coversTarget || !graph.resolvedLibraryPaths) return undefined;
+  const entries = [...new Map([...registry.byNamePackage.values(), ...registry.byNameLocal.values()].map((entry) => [entry.filePath, entry])).values()];
+  if (!entries.some((entry) => entry.ast.statements.some((node) => node.type === "Concept" && node.shapeReduction !== undefined))) return undefined;
+  const prepared = preparePublicationContext({
+    rootPath: graph.coversTarget.filePath, projectRoot: graph.projectRoot,
+    resolvedLibraries: entries.filter((entry) => graph.resolvedLibraryPaths!.has(entry.filePath)),
+    localLibraries: [...registry.byNameLocal.values()].filter((entry) => !graph.resolvedLibraryPaths!.has(entry.filePath)),
+    registry, namespace: emptyNamespace(), diagnostics: [],
+  }, {
+    canonicalBase: graph.projectRoot ? readCanonicalBase(graph.projectRoot) : graph.canonicalBase,
+    policyId: graph.projectRoot ? readPolicyId(graph.projectRoot) : undefined,
+  });
+  return prepared.publications;
+}
+
+/** Public CEL operations diagnose malformed caller-owned graphs instead of throwing or
+ * falling through to legacy emission after publication preparation failed. */
+export function prepareCelPublicationOutcome(graph: ResolvedCelGraph):
+  | { kind: "prepared"; program: PublicationProgram | undefined }
+  | { kind: "failed"; diagnostic: EmitDiagnostic } {
+  try { return { kind: "prepared", program: prepareCelPublications(graph) }; }
+  catch (error) {
+    return { kind: "failed", diagnostic: {
+      kind: "publication-preparation-failed", severity: "error", filePath: graph.filePath,
+      message: `Publication preparation failed: ${error instanceof Error ? error.message : String(error)}`,
+    } };
+  }
+}
+
+function publicationForDerived(ctx: EmitContext, derived: DerivedType): PublicationDescriptor | undefined {
+  if (!derived.concept || !derived.owningEntry) return undefined;
+  const hit = ctx.publications?.lookup(derived.owningEntry.filePath, derived.concept.name);
+  return hit?.kind === "publication" ? hit.descriptor : undefined;
+}
 
 /** REFACTOR:grounded (#189 CEL-writer, design panel disc 486 + impl round disc 487). A CEL fact's RESOLVED
  *  SEMANTIC ROLE — the axis the CEL instance writer dispatches on (NOT the raw resourceType). It determines HOW
@@ -339,88 +378,6 @@ function deriveFhirType(
   return undefined;
 }
 
-interface AnchorMap {
-  ambient?: Date;
-  named: Map<string, Date>;
-}
-
-function dateOnly(d: Date): string {
-  // Format YYYY-MM-DD (ISO date, no time).
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function parseIsoDate(s: string): Date {
-  // The grammar guarantees YYYY-MM-DD; construct UTC-midnight Date.
-  const [y, m, d] = s.split("-").map((p) => parseInt(p, 10));
-  return new Date(Date.UTC(y, m - 1, d));
-}
-
-function applyOffset(base: Date, offset: CELDurationOffset): Date {
-  const sign = offset.sign === "+" ? 1 : -1;
-  const v = offset.value * sign;
-  const d = new Date(base.getTime());
-  const unit = offset.unit;
-  if (unit === "day" || unit === "days") {
-    d.setUTCDate(d.getUTCDate() + v);
-  } else if (unit === "week" || unit === "weeks") {
-    d.setUTCDate(d.getUTCDate() + v * 7);
-  } else if (unit === "month" || unit === "months") {
-    d.setUTCMonth(d.getUTCMonth() + v);
-  } else if (unit === "year" || unit === "years") {
-    d.setUTCFullYear(d.getUTCFullYear() + v);
-  } else if (unit === "hour" || unit === "hours") {
-    d.setUTCHours(d.getUTCHours() + v);
-  } else if (unit === "minute" || unit === "minutes") {
-    d.setUTCMinutes(d.getUTCMinutes() + v);
-  } else if (unit === "second" || unit === "seconds") {
-    d.setUTCSeconds(d.getUTCSeconds() + v);
-  }
-  return d;
-}
-
-function resolveAnchorExpr(expr: CELAnchorExpr): Date {
-  if (expr.type === "CELFixedDateAnchor") {
-    return parseIsoDate(expr.date);
-  }
-  // CELNowAnchor
-  const now = new Date();
-  if (expr.offset) return applyOffset(now, expr.offset);
-  return now;
-}
-
-function buildAnchors(c: CELCase): AnchorMap {
-  const out: AnchorMap = { named: new Map() };
-  for (const b of c.body) {
-    if (b.type === "CELAnchorField") {
-      const d = resolveAnchorExpr(b.expr);
-      if (b.name === undefined) out.ambient = d;
-      else out.named.set(b.name, d);
-    }
-  }
-  return out;
-}
-
-/** Resolve an at-clause to an ISO date string, given the case's anchor map. */
-function resolveAtClause(at: CELAtClause, anchors: AnchorMap): string | undefined {
-  if (at.type === "CELAtAbsoluteDate") return at.date;
-  if (at.type === "CELAtAnchor") {
-    const base = anchors.ambient;
-    if (!base) return undefined;
-    const d = at.offset ? applyOffset(base, at.offset) : base;
-    return dateOnly(d);
-  }
-  if (at.type === "CELAtNamedAnchor") {
-    const base = anchors.named.get(at.anchorName);
-    if (!base) return undefined;
-    const d = at.offset ? applyOffset(base, at.offset) : base;
-    return dateOnly(d);
-  }
-  return undefined;
-}
-
 // REFACTOR:grounded (#189 B4, disc 501 — both crl-emit arms #4). The CHECKED token parser for a CodeableConcept
 // `value is` DATUM. Unlike `parseCanonicalToken` (which tolerates a pipe-less/bare code — historical for the
 // identity `code is`), a DATUM must carry `<system>|<code>` in full: a system-less Coding can never match the B5
@@ -515,6 +472,8 @@ function deriveLocalCoding(
   factName: string,
 ): { parts: CodeParts } | { error: EmitDiagnostic } {
   const graph = ctx.graph;
+  const publication = publicationForDerived(ctx, derived);
+  if (publication && hasLocalPublicationContribution(publication)) return { parts: publication.localCode };
   const mkErr = (message: string): { error: EmitDiagnostic } => ({
     error: {
       kind: "local-coding-derivation-failed",
@@ -576,6 +535,29 @@ function writeCodedLocalValue(
 ): "written" | "error" | "not-applicable" {
   const concept = derived.concept;
   if (!concept) return "not-applicable";
+  const publication = publicationForDerived(ctx, derived);
+  if (publication !== undefined) {
+    if (publication.valueType !== "CodeableConcept") return "not-applicable";
+    let parts: CodeParts | undefined;
+    let error: string | undefined;
+    if (typeof rawValue !== "string") error = "a CodeableConcept answer requires a coded string value";
+    else if (!rawValue.includes("|")) {
+      const matches = publication.answerOptions?.codes.filter((code) => code.code === rawValue) ?? [];
+      if (matches.length === 1) parts = matches[0];
+      else error = `bare answer code ${JSON.stringify(rawValue)} must resolve to exactly one offered code`;
+    } else {
+      const parsed = parseCodedValueToken(rawValue);
+      if ("error" in parsed) error = parsed.error;
+      else parts = parsed.parts;
+    }
+    if (error || !parts) {
+      ctx.publicationFailed = true;
+      ctx.diagnostics.push({ kind: "local-coded-value-invalid", severity: "error", message: `Fact "${factName}": ${error}`, caseSlug: ctx.caseSlug, factName, filePath: ctx.graph.filePath });
+      return "error";
+    }
+    resourceBody.valueCodeableConcept = codeableConceptFromParts(parts);
+    return "written";
+  }
 
   const meta = localOwningMeta(ctx, derived, factName);
   // Unresolvable owning identity — we cannot yet know if this datum is a CodeableConcept (that lives in the
@@ -703,6 +685,8 @@ const STAGE_TO_INTENT: Record<string, string> = {
 
 interface EmitContext {
   graph: ResolvedCelGraph;
+  publications?: PublicationProgram;
+  publicationFailed?: boolean;
   /** Map of fact name → fact declaration for the file. */
   facts: Map<string, CELFact>;
   /** The case being emitted. */
@@ -722,7 +706,9 @@ interface EmitContext {
    * "" before that.
    */
   patientCompartmentId: string;
-  anchors: AnchorMap;
+  // REFACTOR:grounded (#320): date preflight is case-atomic and keyed by reference identity.
+  anchors: CaseAnchors;
+  factDates: Map<CELFactRefField, string | undefined>;
   /** Maps fact-name → emitted resource id (within this case), for cross-resource references. */
   emittedIds: Map<string, { id: string; resourceType: string }>;
   diagnostics: EmitDiagnostic[];
@@ -747,7 +733,7 @@ function makeResourceId(ctx: EmitContext, factName: string): string {
  * hashed compartment segment and lowercased the type segment. Everything that had hard-coded the old
  * three-segment shape kept compiling and silently stopped matching: the MV questionnaire pane's disk
  * read, this file's own `EmittedCase.caseSlug`/`librarySlug` doc, `types.ts`'s `EmitOptions` comment,
- * `docs/questionnaire-pane-integration-plan.md` §5a and `docs/questionnaire-pane-api-contract.md`. Five
+ * `docs/_old/questionnaire-pane-integration-plan.md` §5a and `docs/questionnaire-pane-api-contract.md`. Five
  * readers, one writer, no error anywhere — found only by a KE diffing the same artifact across two
  * emitter versions.
  *
@@ -950,10 +936,11 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   // is the primary gate; this backstops emission for a caller that skips it.
   const targetConcept = resolveDefinedByConcept(definedBy, ctx.graph);
   if (targetConcept && isResourcelessDerived(targetConcept)) {
+    if (targetConcept.shapeReduction !== undefined) ctx.publicationFailed = true;
     ctx.diagnostics.push({
       kind: "cannot-directly-assert-derived-concept",
       severity: "error",
-      message: `Fact "${factName}" is \`defined by\` concept "${targetConcept.name}", which is read-only — it has no representation (no \`code is\` and no source binding) and no FHIR resource, so it cannot be directly asserted. Assert its operands instead, or give it a \`code is\` + \`type is\`.`,
+      message: `Fact "${factName}" is \`defined by\` read-only concept "${targetConcept.name}", which has no local answer representation. Assert its operands instead, or declare a local \`code is\` answer contribution.`,
       caseSlug: ctx.caseSlug,
       factName,
       filePath: ctx.graph.filePath,
@@ -971,13 +958,23 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
     const reg = ctx.graph.crlRegistry;
     const lib = reg ? (reg.byNameLocal.get(libName ?? "") ?? reg.byNamePackage.get(libName ?? "")) : undefined;
     const siblings = lib ? lib.ast.statements.filter((s): s is Concept => s.type === "Concept") : [];
-    if (isValueReadingBooleanConcept(targetConcept, siblings)) {
+    const publicationLookup = lib ? ctx.publications?.lookup(lib.filePath, targetConcept.name) : undefined;
+    if (targetConcept.shapeReduction !== undefined && publicationLookup?.kind !== "publication") {
+      ctx.publicationFailed = true;
+      ctx.diagnostics.push({ kind: "publication-form-unsupported", severity: "error", message: `Fact "${factName}" targets a publication that was not admitted: "${targetConcept.name}".`, caseSlug: ctx.caseSlug, factName, filePath: ctx.graph.filePath });
+      return undefined;
+    }
+    const publication = publicationLookup?.kind === "publication" ? publicationLookup.descriptor : undefined;
+    if (publication?.valueType === "boolean" || (publication === undefined && isValueReadingBooleanConcept(targetConcept, siblings))) {
       const vf = fact.body.find((b): b is CELValueField => b.type === "CELValueField");
-      if (!vf || vf.value.kind !== "boolean") {
+      // REFACTOR:grounded (#320): a new publication can retain an unanswered record. A present
+      // non-Boolean value is invalid; an absent value stays absent and can displace an older answer.
+      if ((!vf && publication === undefined) || (vf && vf.value.kind !== "boolean")) {
+        if (publication !== undefined) ctx.publicationFailed = true;
         ctx.diagnostics.push({
           kind: "value-reading-assertion-needs-boolean",
           severity: "error",
-          message: `Fact "${factName}" directly asserts value-reading boolean concept "${targetConcept.name}", whose determination is read from its value — state it explicitly: \`value is true\` or \`value is false\` (a bare/non-boolean assertion emits a valueless record read as false).`,
+          message: `Fact "${factName}" supplies value-reading boolean concept "${targetConcept.name}": an answer must state \`value is true\` or \`value is false\`. Only an admitted selected Record publication accepts an absent value as an unknown answer.`,
           caseSlug: ctx.caseSlug,
           factName,
           filePath: ctx.graph.filePath,
@@ -1012,7 +1009,8 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   // #189 base QI-Core (disc 495) + T12/#89: stamp `meta.profile` ADDITIVELY — any CPG instance profile (activity
   // output) AND the base QI-Core profile for the resource type; an activity-output resource conforms to both. CPG
   // first (more specific), then the base QI-Core canonical. A type with no QI-Core mapping stays unstamped.
-  const profiles = [derived.profileUrl, qicoreBaseProfile(fhirType)].filter(
+  const publication = publicationForDerived(ctx, derived);
+  const profiles = (publication === undefined ? [derived.profileUrl, qicoreBaseProfile(fhirType)] : [publication.profileUrl]).filter(
     (p): p is string => typeof p === "string",
   );
   const resourceBody: Record<string, unknown> = {
@@ -1038,10 +1036,12 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   // Encounter reference (case-level ambient; cross-resource `during encounter` may override later).
   const encFact = findEncounter(ctx);
   if (encFact && ENCOUNTER_RESOURCES.has(fhirType)) {
-    const encDerived = deriveFhirType(
-      encFact.body.find((b): b is CELDefinedByField => b.type === "CELDefinedByField")!,
-      ctx.graph,
+    // REFACTOR:grounded (#320, review 556): partially authored encounters have no defined-by yet.
+    // emitOneFact reports that unsupported fact; identity preflight must not turn it into a crash.
+    const encDefinedBy = encFact.body.find(
+      (b): b is CELDefinedByField => b.type === "CELDefinedByField",
     );
+    const encDerived = encDefinedBy ? deriveFhirType(encDefinedBy, ctx.graph) : undefined;
     if (encDerived?.fhirType === "Encounter") {
       resourceBody.encounter = { reference: `Encounter/${makeResourceId(ctx, encFact.name)}` };
     }
@@ -1259,25 +1259,20 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
     resourceBody.status = "stopped";
   }
 
-  // Date.
-  let isoDate: string | undefined;
-  if (factRefField?.at) {
-    isoDate = resolveAtClause(factRefField.at, ctx.anchors);
-  }
-  if (!isoDate && typeof body.date === "string") {
-    isoDate = body.date;
-  }
-  if (isoDate) {
-    applyDateField(resourceBody, fhirType, isoDate);
-  }
+  // REFACTOR:grounded (#320, discussion 555): preflight resolves each case clause before emission.
+  // Encounter references have no at-clause and use the same literal fact-body fallback.
+  const fallback = factRefField ? undefined : resolveFactDate(undefined, fact, ctx.anchors);
+  const isoDate = factRefField
+    ? ctx.factDates.get(factRefField)
+    : fallback?.kind === "resolved"
+      ? fallback.date
+      : undefined;
+  if (isoDate) applyDateField(resourceBody, fhirType, isoDate);
 
   // Because text → note (Annotation array).
   if (factRefField?.because) {
     resourceBody.note = [{ text: factRefField.because }];
   }
-
-  // Date defaults from the fact body — when the case body doesn't pin via `at`/`on`.
-  // (Already covered above via body.date fallback.)
 
   // #189 homeostasis-core (disc 493): apply the registry's STRUCTURAL-default floor — a FHIR-required,
   // concept-independent element (Encounter `status`/`class`, ServiceRequest `status`/`intent`) gets its
@@ -1427,9 +1422,20 @@ function emitCase(ctx: EmitContext): EmittedCase | undefined {
  * proceed. Each emitted resource lands in the KALM Patient compartment `patient/<patientId>/<type>/…`. A fact
  * emits its code-determined resource — its representation arm is decided by the fact's code, not a channel.
  */
-export function emitCelToFhir(graph: ResolvedCelGraph, _opts?: EmitCelOptions): EmitResult {
+export function emitCelToFhir(graph: ResolvedCelGraph, opts?: EmitCelOptions): EmitResult {
+  // REFACTOR:grounded (#320): only authored now anchors use this single invocation clock.
+  const now = opts?.now ?? new Date();
   const diagnostics: EmitDiagnostic[] = [];
   const emittedCases: EmittedCase[] = [];
+  const preparation = prepareCelPublicationOutcome(graph);
+  if (preparation.kind === "failed") return { emittedCases, diagnostics: [preparation.diagnostic] };
+  const publications = preparation.program;
+  for (const warning of publications?.warnings ?? []) diagnostics.push({
+    kind: warning.kind as EmitDiagnostic["kind"], severity: "warning", message: warning.message ?? "Publication warning",
+    // REFACTOR:grounded (#320, review 563): point at the owning CRL source, never this CEL file.
+    ...(warning.filePath === undefined ? {} : { filePath: warning.filePath }),
+    ...(warning.line === undefined || warning.column === undefined ? {} : { location: { start: { line: warning.line, column: warning.column }, end: { line: warning.line, column: warning.column } } }),
+  });
 
   const cel = graph.cel;
   if (!cel) {
@@ -1475,22 +1481,39 @@ export function emitCelToFhir(graph: ResolvedCelGraph, _opts?: EmitCelOptions): 
   for (const s of cel.statements) {
     if (s.type !== "CELCase") continue;
     const c = s;
+    // REFACTOR:grounded (#320): a failed authored date cannot fall back or emit a partial case.
+    const caseDates = resolveCaseFactDates(c, facts, now);
+    if (caseDates.diagnostics.length > 0) {
+      diagnostics.push(
+        ...caseDates.diagnostics.map(
+          (d): EmitDiagnostic => ({
+            ...d,
+            severity: "error",
+            caseSlug: slugify(c.name),
+            filePath: graph.filePath,
+          }),
+        ),
+      );
+      continue;
+    }
     const ctx: EmitContext = {
       graph,
+      publications,
       facts,
       c,
       caseSlug: slugify(c.name),
       librarySlug,
       libraryName: cel.library.name,
       patientCompartmentId: "",
-      anchors: buildAnchors(c),
+      anchors: caseDates.anchors,
+      factDates: caseDates.dates,
       emittedIds: new Map(),
       diagnostics: [],
     };
 
     const emitted = emitCase(ctx);
     diagnostics.push(...ctx.diagnostics);
-    if (!emitted) continue;
+    if (!emitted || ctx.publicationFailed) continue;
 
     // Check the case's resource paths for collisions before keeping it (source-atomic: reject the whole case).
     const keys = emitted.resources.map((r) => `${r.outputPath}/${r.id}.json`);
@@ -1503,6 +1526,8 @@ export function emitCelToFhir(graph: ResolvedCelGraph, _opts?: EmitCelOptions): 
         message: `Case "${c.name}" produces a duplicate output path "${collision}"; skipped to avoid a silent overwrite.`,
         caseSlug: ctx.caseSlug,
         filePath: graph.filePath,
+        // REFACTOR:grounded (#320, review 556): distinguish colliding cases even with identical names.
+        location: c.location,
       });
       continue;
     }
@@ -1511,4 +1536,40 @@ export function emitCelToFhir(graph: ResolvedCelGraph, _opts?: EmitCelOptions): 
   }
 
   return { emittedCases, diagnostics };
+}
+
+/**
+ * REFACTOR:grounded (#320, review 556): authoring validation and CRE use the writer's actual
+ * output-path collisions. The cheap scan is deliberately conservative: Patient fact references,
+ * unsupported facts, and different resource types can share a potential key without a collision.
+ * Only one read-only emit runs when needed; no validation call or filesystem write occurs here.
+ */
+export function celIdentityDiagnostics(
+  graph: ResolvedCelGraph,
+  opts?: EmitCelOptions,
+): EmitDiagnostic[] {
+  const cel = graph.cel;
+  if (!cel) return [];
+  const potentialPaths = new Set<string>();
+  let needsCollisionPreflight = false;
+  for (const c of cel.statements) {
+    if (c.type !== "CELCase") continue;
+    const subject = c.body.find((b) => b.type === "CELSubjectField");
+    if (!subject || subject.type !== "CELSubjectField") continue;
+    const compartment = celCaseCompartmentId(cel.library.name, c.name, subject.factName);
+    for (const ref of c.body) {
+      if (
+        ref.type !== "CELSubjectField" &&
+        ref.type !== "CELFactRefField" &&
+        ref.type !== "CELEncounterField"
+      )
+        continue;
+      const key = `${compartment}/${celResourceId(cel.library.name, c.name, ref.factName)}`;
+      if (potentialPaths.has(key)) needsCollisionPreflight = true;
+      potentialPaths.add(key);
+    }
+  }
+  return needsCollisionPreflight
+    ? emitCelToFhir(graph, opts).diagnostics.filter((d) => d.kind === "id-collision")
+    : [];
 }

@@ -1,6 +1,17 @@
 import type { Location } from "../ast/types";
 
 export type CELValidationErrorKind =
+  | "publication-preparation-failed"
+  | "publication-form-unsupported"
+  | "publication-membership-no-negative-domain"
+  | "local-coded-value-invalid"
+  // REFACTOR:grounded (#320): a present selected-publication record may carry an unknown answer.
+  | "publication-unanswered-fact"
+  // REFACTOR:grounded (#320, review 556): author-time temporal errors share the execution-lane kinds.
+  | "invalid-date"
+  | "missing-anchor"
+  | "duplicate-anchor"
+  | "duplicate-date"
   // Bare and qualified defined-by
   | "unresolved-bare-type"
   | "unresolved-qualified-library"
@@ -21,6 +32,9 @@ export type CELValidationErrorKind =
   | "unresolved-fact-ref"
   | "duplicate-fact-name"
   | "duplicate-case-name"
+  // REFACTOR:grounded (#320, review 556): actual emitted output paths collide; changing a
+  // reference's date/intent does not create a distinct instance under the current identity format.
+  | "id-collision"
   // #189 Piece 2 (disc 508) — a fact naming a LOCAL concept authors a WELL-FORMED `code is` that is NOT the
   // concept's own local `{system, code}` (a wrong-code / wrong-system / system-less datum). A WARNING, not an
   // error: this is the legitimate wrong-code test datum (a non-member → closed-world absent → the concept is

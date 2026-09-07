@@ -30,6 +30,13 @@
  */
 
 import { buildCRL } from "../index";
+import { prepareSingleLibraryPublication, publicationBooleanRead, hasLocalPublicationContribution, type PublicationDescriptor, type PublicationEmitScope } from "../emit/publicationProgram";
+import { visitConceptDefinitionRefs } from "../imports/computeEmitClosure";
+import { PUBLICATION_SERVICE_REQUEST_CANDIDATE } from "./renderPublicationSelection";
+import { branchConditionRefs } from "../ast/branchCondition";
+import { foreignCriterionScopeErrors } from "./criterionScope";
+import { renderPublicationSelectionHelpers, renderPublicationCandidateHelpers, PUBLICATION_SELECTION_CQL_PREFIX, PUBLICATION_SELECTION_CQL_FUNCTIONS, PUBLICATION_LOCAL_BOOLEAN_CANDIDATE, PUBLICATION_LOCAL_CODEABLE_CANDIDATE, PUBLICATION_CANDIDATE_CQL_TYPE } from "./renderPublicationSelection";
+import { publicationEnvelopeName, PUBLICATION_ENVELOPE_PREFIX, PUBLICATION_PRODUCER_PREFIX, PUBLICATION_PRODUCER_FUNCTIONS, renderPublicationProducerHelpers, renderPublicationCodeTable } from "./renderPublicationProducer";
 // #203 Todo 5 — status-aware meta emit. Direct `../meta` imports (NOT via `../index`) to avoid a barrel cycle:
 // emitCQL already pulls buildCRL from ../index, and meta/* does not import cql-emitter, so the edge is one-directional.
 import { parseMetaTag } from "../meta/parseMetaTag";
@@ -109,6 +116,7 @@ import type {
   Concept,
   CompositionExpression,
   ConceptDefinition,
+  BranchBlock,
   Criterion,
   CodedFromDefinition,
   DefinedAsBareRef,
@@ -169,6 +177,11 @@ export type AstParameterInfo =
   | { kind: "parameter"; cqlType: string };
 
 export interface EmitOptions {
+  /** REFACTOR:grounded (#320, review 563): compiler-only handoff after synthesis, collision and placement
+   * checks. This complete guard inventory prevents per-library re-synthesis into a
+   * Decision's bucket. Standalone callers omit it; other validation still runs. */
+  partitionedGuardCriteria?: readonly Criterion[];
+  publication?: PublicationEmitScope;
   libraryName?: string;
   // FHIRHelpers ships versioned with the FHIR spec (the R4 release pins
   // its own FHIRHelpers version), so the emitted CQL keeps its version
@@ -663,6 +676,21 @@ export function buildAuthoredObligations(ast: CRL): ReadonlyMap<string, BooleanT
 
 export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult {
   try {
+    const criterionScopeErrors = foreignCriterionScopeErrors(ast);
+    if (criterionScopeErrors.length > 0) return { success: false, errors: criterionScopeErrors };
+    if (options.publication === undefined && ast.statements.some((s) =>
+      s.type === "Concept" && s.shapeReduction !== undefined && s.__publication === undefined)) {
+      const program = prepareSingleLibraryPublication(ast, {
+        canonicalBase: options.canonicalBase, localDomainId: options.localDomainId, policyId: options.policyId,
+      });
+      options = { ...options, publication: {
+        program, fromSourceIdentity: ast.library.name, renderedSourceByLibrary: new Map(),
+        publicTarget: (key) => {
+          const descriptor = program.get(key);
+          return descriptor === undefined ? undefined : { libraryName: options.libraryName ?? ast.library.name, define: descriptor.identity.conceptName };
+        },
+      } };
+    }
     // ⭐⭐ #189 — the inline answer-option descriptors, captured HERE because this is the last point the ast
     // is still AUTHORED. `lowerLocalCodes` below CLEARS `Concept.code`, and these ids key on it, so any
     // later build yields an EMPTY map and every `in qualifying` fails to resolve — MEASURED on the probe.
@@ -697,6 +725,7 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
     // everywhere and the retirement fires on every path (none runs the Validator).
     const pre = preLowerAge(ast);
     const lowered = lowerLocalCodes(pre.ast, {
+      publication: options.publication,
       canonicalBase: options.canonicalBase,
       localDomainId: options.localDomainId,
       // ⭐ #189 — the policy id a PRODUCER stage needs to compose its constructed candidate's
@@ -713,14 +742,32 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
     // for why an `and` prior needs a named define at all, and why it is modelled as a criterion).
     //
     // This entry is the PER-CRL lane, where the whole source is one library and the `Decision` is present.
-    // The LAYERED lane re-enters here with a per-layer AST that carries no `Decision`, so this is a no-op
-    // there — `emitPartitioned` appends the same synthetics to its working AST, from the SAME function, and
-    // `classifyStatementLayer` routes them into the Interface library the FHIR lane qualifies against.
-    const guardCollisions = guardDefineNameCollisions(lowered.ast);
+    // REFACTOR:grounded (#320, review 563): FULL drops Decisions from its per-layer AST,
+    // while a custom partition may retain them. The partitioner has already synthesized
+    // and placed every required guard; do not synthesize another copy in a Decision's bucket.
+    const preparedGuards = options.partitionedGuardCriteria;
+    const collisionAst = preparedGuards === undefined ? lowered.ast : {
+      ...lowered.ast,
+      // Only the exact compiler-produced statements are exempt from being mistaken for
+      // an authored name collision. A different authored declaration is still rejected.
+      statements: lowered.ast.statements.filter((statement) =>
+        statement.type !== "Criterion" || !preparedGuards.includes(statement)),
+    };
+    const guardCollisions = guardDefineNameCollisions(collisionAst);
     if (guardCollisions.length > 0) {
       return { success: false, errors: guardCollisions };
     }
-    const guardCriteria = synthesizeGuardCriteria(lowered.ast);
+    const neededGuards = synthesizeGuardCriteria(collisionAst);
+    if (preparedGuards !== undefined) {
+      const missing = neededGuards.filter((needed) => !preparedGuards.some((prepared) =>
+        prepared.name === needed.name && prepared.condition === needed.condition));
+      if (missing.length > 0) return { success: false, errors: missing.map((guard) => ({
+        type: "Validation", kind: "emit-partition-criterion-dependency",
+        line: guard.location.start.line, column: guard.location.start.column,
+        message: `Generated criterion "${guard.name}" is absent from the prepared partition guard inventory.`,
+      })) };
+    }
+    const guardCriteria = preparedGuards === undefined ? neededGuards : [];
     const withGuards: CRL =
       guardCriteria.length > 0
         ? { ...lowered.ast, statements: [...lowered.ast.statements, ...guardCriteria] }
@@ -862,7 +909,8 @@ class Emitter {
   private readonly ast: CRL;
   // `crossLibraryTotality` is stored on its own field (`this.crossLibraryTotality`), not defaulted into this
   // Required shape — it is genuinely optional (absent for direct callers), so it is `Omit`ted here (#189 Slice 0c).
-  private readonly options: Required<Omit<EmitOptions, "crossLibraryTotality">>;
+  private readonly options: Required<Omit<EmitOptions, "crossLibraryTotality" | "publication" | "partitionedGuardCriteria">>;
+  private readonly publication?: PublicationEmitScope;
   /** Normalized case-feature truth-set emit mode (see `CaseFeatureMode`). */
   private readonly caseFeature: CaseFeatureMode;
   /** Names declared as terminologies (separate set since a name can be BOTH a terminology and a concept in the corpus). */
@@ -962,6 +1010,7 @@ class Emitter {
 
   constructor(ast: CRL, options: EmitOptions) {
     this.ast = ast;
+    this.publication = options.publication;
     this.crossLibraryTotality = options.crossLibraryTotality;
     this.options = {
       libraryName: options.libraryName ?? ast.library.name,
@@ -1163,6 +1212,7 @@ class Emitter {
   }
 
   emit(): string {
+    this.checkPublicationDecisionGuards();
     const sections: string[] = [];
     sections.push(this.header());
 
@@ -1202,6 +1252,21 @@ class Emitter {
     // and value type share ONE function). Deduped by `functionName`.
     const constructors = this.emitGeneratedConstructors();
     if (constructors) sections.push(constructors);
+
+    if (this.ast.statements.some((s) => s.type === "Concept" && s.__publication !== undefined && s.__publication.role !== "retrieve")) {
+      for (const statement of this.ast.statements) {
+        const name = (statement as { name?: string }).name;
+        if (name !== undefined && [PUBLICATION_SELECTION_CQL_PREFIX, PUBLICATION_ENVELOPE_PREFIX, PUBLICATION_PRODUCER_PREFIX].some((prefix) => name.startsWith(prefix))) this.emitErrors.push({
+          type: "Validation", kind: "publication-name-collision",
+          line: statement.location?.start.line, column: statement.location?.start.column,
+          message: `Declaration "${name}" uses the reserved publication helper namespace.`,
+        });
+      }
+      sections.push(renderPublicationSelectionHelpers(), renderPublicationCandidateHelpers());
+      if (this.ast.statements.some((s) => s.type === "Concept" && s.__publication?.role === "public" &&
+        (s.__publication.descriptor.producer !== undefined || s.__publication.descriptor.valueDomain !== undefined)))
+        sections.push(renderPublicationProducerHelpers());
+    }
 
     const concepts = this.ast.statements
       .filter((s): s is Concept => s.type === "Concept" && !!s.name)
@@ -1273,28 +1338,76 @@ class Emitter {
     }
   }
 
-  /**
-   * #236 — emit each `criterion` as a boolean define. The body references co-resident defines BARE:
-   * concept re-exports + sibling criterion defines live in the SAME library (the `none` lane is one
-   * library; the layered Interface lane holds the decision's boolean surface + the criteria). No
-   * cross-library qualification is needed — everything a criterion references is beside it.
-   *
-   * ⚠ The define is STRONG KLEENE, not per-operand totalized: an UNKNOWN leaf makes the guard UNKNOWN
-   * (`emitCriterionDefine`). Totality belongs at the reference site. Also emits the SYNTHETIC guard
-   * criteria (`ast/guardDefines.ts`), which are ordinary criteria in every respect except that the
-   * author did not name them.
-   */
+  private renderPublicationReference(ref: ReferenceName): string {
+    const crossLib = this.crossLibraryOf(ref);
+    return crossLib === null ? cqlIdent(getRefName(ref)) : cqlQualifiedRef(crossLib, getRefName(ref));
+  }
+
+  private publicationDescriptorOf(ref: ReferenceName): PublicationDescriptor | undefined {
+    const qualifier = getRefLibrary(ref);
+    const local = qualifier === null || this.crossLibraryOf(ref) === null
+      ? this.conceptByName.get(getRefName(ref)) : undefined;
+    if (local?.__publication !== undefined)
+      return local.__publication.role === "retrieve" ? undefined : local.__publication.descriptor;
+    const scope = this.publication;
+    if (scope === undefined) return undefined;
+    const renderedSource = qualifier === null ? undefined : scope.renderedSourceByLibrary.get(qualifier);
+    const lookup = renderedSource === undefined
+      ? scope.program.lookup(scope.fromSourceIdentity, ref)
+      : scope.program.lookup(renderedSource, getRefName(ref));
+    return lookup.kind === "publication" ? lookup.descriptor : undefined;
+  }
+
+  /** Emit strong-Kleene criterion defines. Local criterion refs are bare after the
+   * source-scope preflight; partitioning checks their co-location. Publication concept
+   * leaves can instead use a prepared physical foreign binding. Synthetic guard criteria
+   * follow this same path and retain null rather than totalizing individual operands. */
   private emitCriteria(criteria: Criterion[]): string {
     return criteria
       .map((c) => {
-        // A criterion's leaves are all beside it (same library — see the method doc; cross-library criterion refs
-        // are out of scope in v0, `cycleDetector.ts`), so this DELIBERATELY renders bare, dropping any library
-        // token — byte-invariant under the 0c `ReferenceName` signature (was `cqlIdent(name)`, name = getRefName).
-        const cql = emitCriterionDefine(c.name, c.condition, (ref) => cqlIdent(getRefName(ref)), cqlIdent);
+        // REFACTOR:grounded (#320, review 563 C1): foreignCriterionScopeErrors already
+        // rejected foreign criteria. Only bare and genuine raw-source self refs reach
+        // this criterion branch; do not justify qualifier removal by validator assumptions.
+        const cql = emitCriterionDefine(c.name, c.condition, (ref, kind) => {
+          if (kind === "criterion") return cqlIdent(getRefName(ref));
+          const record = this.renderPublicationReference(ref);
+          const descriptor = this.publicationDescriptorOf(ref);
+          if (descriptor !== undefined && descriptor.valueType !== "boolean") {
+            this.emitErrors.push({ type: "Validation", kind: "publication-unsupported-context",
+              message: `Criterion "${c.name}" needs a Boolean value; publication "${getRefName(ref)}" publishes ${descriptor.valueType}.` });
+            return "null /* non-Boolean publication guard; emit fails */";
+          }
+          return descriptor !== undefined ? publicationBooleanRead(record) : cqlIdent(getRefName(ref));
+        }, cqlIdent);
         this.enrollCriterion(c.name, cql);
         return cql;
       })
       .join("\n\n");
+  }
+
+  /** Direct emit callers bypass Validator, and atomic Decision WhenBlock refs need no
+   * synthetic criterion. Check scoped descriptors or local lowered markers. Criterion
+   * leaves are checked separately; action unless/only-when guards belong to FHIR/CRE
+   * enforcement because this CQL emitter does not emit actions. */
+  private checkPublicationDecisionGuards(): void {
+    const visit = (branch: BranchBlock): void => {
+      if (branch.type === "WhenBlock") for (const atom of branchConditionRefs(branch.condition)) {
+        const descriptor = this.publicationDescriptorOf(atom.ref);
+        if (descriptor !== undefined && descriptor.valueType !== "boolean") this.emitErrors.push({
+          type: "Validation",
+          kind: "publication-unsupported-context",
+          line: atom.location?.start.line,
+          column: atom.location?.start.column,
+          message: `Decision guard needs a Boolean value; publication "${getRefName(atom.ref)}" publishes ${descriptor.valueType}.`,
+        });
+      }
+      if (branch.body.type !== "ActionStatement") for (const member of branch.body.statements) {
+        if (member.type === "WhenBlock" || member.type === "OtherwiseBlock") visit(member);
+      }
+    };
+    // emitCriteria checks criterion leaves; this walk covers Decision WhenBlock concept refs.
+    for (const statement of this.ast.statements) if (statement.type === "Decision")
+      for (const branch of statement.body.statements) visit(branch);
   }
 
   /** #189 Slice C 2a — enrolled totality entries for this library's emit (→ `EmitResult.ledgerEntries`). */
@@ -1318,6 +1431,7 @@ class Emitter {
    *  define); `"total-boolean"` = a BARE re-export of a total Inferences reduction (delegates its totality);
    *  `"satisfied"` = `…satisfied()` = `exists(truths)`, intrinsically total by its OWN existence wrapper. */
   private facadeForm(c: Concept): "recordsource" | "total-boolean" | "record-boolean-value" | "satisfied" {
+    if (c.__publication !== undefined) return "recordsource";
     if (c.__interfaceSourceLayer === "ExternalPrimitives") return "recordsource";
     if (c.__interfaceSourceLayer === "Inferences" && c.__interfaceReexportMode === "total-boolean") return "total-boolean";
     // ⚠⚠ THIS ELSE-BRANCH IS THE DANGEROUS ONE, and a panel arm flagged it as the single worst silent-miss
@@ -1343,7 +1457,7 @@ class Emitter {
     let obligation: BooleanTotalityObligation;
     let origin: DefineOrigin = "authored";
     let obligationSource: "manufactured" | "authored-map" | "in-place" = "manufactured";
-    if (role === "records-impl" || role === "source-impl") {
+    if (c.__publication !== undefined || role === "records-impl" || role === "source-impl") {
       // origin stays "authored" — it is DON'T-CARE for a non-boolean subject (the proof skips origin matching
       // for a `not-boolean`/`nullable` discharge); the enum has no implementation-twin arm.
       obligation = {
@@ -1532,6 +1646,22 @@ class Emitter {
     });
   }
 
+  /** Compiler envelope ABI: neither a public CRL value nor a Boolean proof subject. */
+  private enrollPublicationEnvelope(name: string, cql: string): void {
+    this.ledger.appendDefine({
+      library: this.ledgerLibrary(),
+      name,
+      resultType: "non-Boolean(publication envelope)",
+      obligation: { kind: "not-applicable", nullable: false, reason: "#320 compiler publication envelope (no Boolean define)" },
+      discharge: { booleanEffect: "not-boolean" },
+      origin: "authored",
+      cql,
+      obligationSource: "manufactured",
+      result: { shape: "opaque", form: "publication envelope" },
+      visibility: "impl",
+    });
+  }
+
   /**
    * #189 Slice C 2a — the DISCHARGE + result type of a concept's emitted `define`, from its EMITTED form.
    * `resultType === "Boolean"` is the proof's subject gate; a non-boolean form returns a `non-Boolean(...)`
@@ -1562,6 +1692,9 @@ class Emitter {
       resultType: "Boolean",
       discharge: { booleanEffect: "nullable", reason },
       result: { shape: "Scalar", valueType: "boolean" },
+    });
+    if (c.__publication !== undefined) return notBoolean("publication", {
+      shape: c.__publication.role === "retrieve" ? "RecordSet" : "Record", resourceType: "Observation",
     });
     // ⭐ #189 null/pause — a sanctioned THREE-STATE read. It IS a Boolean-typed define and it IS null when
     // nothing establishes it; enrolling it as `not-boolean` ("representations-only stub") described the pause
@@ -2261,6 +2394,12 @@ class Emitter {
     // #189 Slice C 2a — DUAL-WRITE: enroll the emitted define into the totality ledger (report-mode side
     // record). The returned string is UNCHANGED — output stays the section assembly, byte-identical.
     this.enrollConcept(c, cql);
+    if (c.__publication !== undefined && c.__publication.role !== "retrieve") {
+      const envelopeName = publicationEnvelopeName(c.name);
+      const envelope = `define ${cqlIdent(envelopeName)}:\n${indent(this.emitPublicationEnvelope(c), 1)}`;
+      this.enrollPublicationEnvelope(envelopeName, envelope);
+      return `${envelope}\n\n${cql}`;
+    }
     return cql;
   }
 
@@ -2314,7 +2453,84 @@ class Emitter {
     return `${target}.answeredValue()`;
   }
 
+  private emitPublicationEnvelope(c: Concept): string {
+    const binding = c.__publication!;
+    const descriptor = binding.descriptor;
+    if (binding.role === "interface") {
+      // Internal invariant: the partitioner creates this role and its physical bare ref
+      // together. Authored CRL cannot set __publication or erase the generated backing ref.
+      if (c.definition?.type !== "DefinedAsDefinition" || c.definition.body.type !== "DefinedAsBareRef")
+        throw new Error(`Publication interface "${c.name}" has no physical backing reference.`);
+      const ref = c.definition.body.ref;
+      const library = this.crossLibraryOf(ref);
+      return library === null ? cqlIdent(publicationEnvelopeName(getRefName(ref)))
+        : cqlQualifiedRef(library, publicationEnvelopeName(getRefName(ref)));
+    }
+    let candidates = `{} as List<${PUBLICATION_CANDIDATE_CQL_TYPE}>`;
+    if (hasLocalPublicationContribution(descriptor)) {
+      // Internal invariant: lowerLocalCodes constructs the local binding and retrieve ref
+      // atomically. A missing reference here means an invalid compiler-created AST.
+      if (c.definition?.type !== "DefinedAsDefinition" || c.definition.body.type !== "DefinedAsBareRef")
+        throw new Error(`Publication "${c.name}" has no generated local retrieve reference.`);
+      const target = this.renderPublicationReference(c.definition.body.ref);
+      const adapter = descriptor.valueType === "boolean" ? PUBLICATION_LOCAL_BOOLEAN_CANDIDATE : PUBLICATION_LOCAL_CODEABLE_CANDIDATE;
+      candidates = `((${target}) O return all ${cqlIdent(adapter)}(O, ${cqlStringLiteral(descriptor.localContributorId)}, ${cqlStringLiteral(descriptor.conceptId)}))`;
+    }
+    // REFACTOR:grounded (#320, review 564): source rows join the same final candidate selector.
+    if ((descriptor.sources?.length ?? 0) !== (binding.sourceReferences?.length ?? 0))
+      throw new Error(`Publication "${c.name}" lost a prepared source binding.`);
+    for (let index = 0; index < (descriptor.sources?.length ?? 0); index++) {
+      const source = descriptor.sources![index];
+      const target = this.renderPublicationReference(binding.sourceReferences![index]);
+      const code = `FHIR.CodeableConcept { text: FHIR.string { value: ${cqlStringLiteral(descriptor.title)} }, coding: { FHIR.Coding { system: FHIR.uri { value: ${cqlStringLiteral(descriptor.localCode!.system)} }, code: FHIR.code { value: ${cqlStringLiteral(descriptor.localCode!.code)} } } } }`;
+      const projected = `((${target}) S return all ${cqlIdent(PUBLICATION_SERVICE_REQUEST_CANDIDATE)}(S, ${cqlStringLiteral(source.contributorId)}, ${cqlStringLiteral(descriptor.conceptId)}, ${code}, ${cqlStringLiteral(descriptor.profileUrl!)}, 'Patient/' + Patient.id.value))`;
+      candidates = `Flatten({ ${candidates}, ${projected} })`;
+    }
+    const producer = descriptor.producer;
+    if (producer !== undefined) {
+      const localOperand = [...this.conceptByName.values()].find((node) => node.__publication !== undefined &&
+        node.__publication.role !== "retrieve" && node.__publication.descriptor.identity.key === producer.operand.key);
+      const publicTarget = this.publication?.publicTarget(producer.operand.key);
+      const operand = localOperand !== undefined ? cqlIdent(publicationEnvelopeName(localOperand.name))
+        : publicTarget !== undefined ? cqlQualifiedRef(this.renderLib(publicTarget.libraryName), publicationEnvelopeName(publicTarget.define)) : undefined;
+      if (operand === undefined) {
+        this.emitErrors.push({
+          type: "Validation",
+          kind: "publication-missing-envelope",
+          line: c.location.start.line,
+          column: c.location.start.column,
+          message: `Publication "${c.name}" has no physical envelope for operand "${producer.operand.conceptName}". Include its lowered declaration or provide its prepared physical target.`,
+        });
+        return "null /* publication-missing-envelope; emit fails */";
+      }
+      const title = `FHIR.string { value: ${cqlStringLiteral(descriptor.title)} }`;
+      const code = descriptor.localCode === undefined ? `FHIR.CodeableConcept { text: ${title} }`
+        : `FHIR.CodeableConcept { text: ${title}, coding: { FHIR.Coding { system: FHIR.uri { value: ${cqlStringLiteral(descriptor.localCode.system)} }, code: FHIR.code { value: ${cqlStringLiteral(descriptor.localCode.code)} } } } }`;
+      const profile = descriptor.profileUrl === undefined ? "null as System.String" : cqlStringLiteral(descriptor.profileUrl);
+      const produced = `${cqlIdent(PUBLICATION_PRODUCER_FUNCTIONS.candidate)}(${operand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, ${renderPublicationCodeTable(producer.domain)}, ${renderPublicationCodeTable(producer.qualifying)}, ${cqlStringLiteral(descriptor.conceptId)}, 'Patient/' + Patient.id.value)`;
+      // Flatten preserves duplicate inputs for the selector's diagnostic; union could silently erase them.
+      candidates = `Flatten({ ${candidates}, (({ ${produced} }) C where C is not null) })`;
+    }
+    const selected = `${cqlIdent(PUBLICATION_SELECTION_CQL_FUNCTIONS.select)}(${candidates}, ${cqlStringLiteral(descriptor.conceptId)}, ${cqlStringLiteral(descriptor.selector.equalTime)})`;
+    return descriptor.valueDomain === undefined ? selected
+      : `${cqlIdent(PUBLICATION_PRODUCER_FUNCTIONS.interpret)}(${selected}, ${renderPublicationCodeTable(descriptor.valueDomain)})`;
+  }
+
   private emitConceptBody(c: Concept, def: ConceptDefinition): string {
+    if (c.__publication !== undefined && c.__publication.role !== "retrieve") {
+      return `${cqlIdent(PUBLICATION_SELECTION_CQL_FUNCTIONS.record)}(${cqlIdent(publicationEnvelopeName(c.name))})`;
+    }
+    if (c.__publication === undefined && !c.__interfaceReexport && def.type !== "CodedFromDefinition") {
+      let unsupported: ReferenceName | undefined;
+      visitConceptDefinitionRefs(c, (ref) => { if (this.publicationDescriptorOf(ref) !== undefined) unsupported ??= ref; });
+      if (unsupported !== undefined) {
+        this.emitErrors.push({ type: "Validation", kind: "publication-unsupported-context",
+          line: c.location.start.line, column: c.location.start.column,
+          message: `Concept "${c.name}" consumes selected publication "${getRefName(unsupported)}" in a definition. This slice supports Boolean guards and criteria; aliases, composition and pipelines require value-result integration before use.`,
+        });
+        return "null /* publication-unsupported-context; emit fails */";
+      }
+    }
     // Case-feature INTERFACE re-export: collapse the re-exported source-layer
     // truth-set to a boolean for the decision/action-guard surface.
     //   - Inferences source    → `Inferences."X".satisfied()`
@@ -2681,7 +2897,7 @@ class Emitter {
 
   /**
    * #189 Slice B2a — a Scalar BOOLEAN `most recent this` value read → a TOTAL boolean at the boundary
-   * (requires-boundary discharge, `docs/emit-189-boolean-totality.md`): select the newest CONFORMING
+   * (requires-boundary discharge, `docs/_old/emit-189-boolean-totality.md`): select the newest CONFORMING
    * record, read its boolean value, `Coalesce(<read>, false)` (closed-world — absence is false; NEVER the
    * age truth-set `{true}/{}` lift, which is age-specific and retired §7). The read primitive
    * `FHIRHelpers.ToBoolean(O.value as FHIR.boolean)` matches the engine-proven age recency helper
@@ -2902,14 +3118,29 @@ class Emitter {
    * collision is reachable: `concept "CRLConstructObservationQuantity"` parses and keeps that name, because
    * CRL concept names are quoted strings and no lexical rule excludes the prefix. Design D1 is "detect
    * before emission, never rely on a translator error", so an authored define in the reserved namespace
-   * throws HERE rather than silently shadowing (or being shadowed by) a generated function.
+   * is diagnosed HERE rather than silently shadowing (or being shadowed by) a generated function.
    */
   private emitGeneratedConstructors(): string | null {
     const byName = new Map<string, ConstructorSignature>();
+    const register = (signature: ConstructorSignature, concept: Concept): void => {
+      const previous = byName.get(signature.functionName);
+      if (previous !== undefined && (JSON.stringify(previous.params) !== JSON.stringify(signature.params) ||
+        renderRecordConstructor(previous) !== renderRecordConstructor(signature))) {
+        this.emitErrors.push({
+          type: "Validation",
+          kind: "emit-conflicting-constructor-demand",
+          line: concept.location?.start.line,
+          column: concept.location?.start.column,
+          message: `Concept "${concept.name}" has conflicting generated constructor demands for "${signature.functionName}".`,
+        });
+        return;
+      }
+      if (previous === undefined) byName.set(signature.functionName, signature);
+    };
     for (const st of this.ast.statements) {
       if (st.type !== "Concept") continue;
       const specs = ((st as Concept).__recencyProducerSpecs ?? []) as readonly ProducerCandidateSpec[];
-      for (const spec of specs) byName.set(spec.signature.functionName, spec.signature);
+      for (const spec of specs) register(spec.signature, st);
       // ⭐⭐ #189 — A BOUNDARY TRANSFORM DEMANDS A CONSTRUCTOR TOO, AND MAY BE ITS ONLY DEMAND.
       //
       // ⚠ Gathering from producer specs ALONE was a dangling-emit waiting to happen (gpt-5.6 arm, disc 532):
@@ -2917,7 +3148,7 @@ class Emitter {
       // `coded from` — has NO producer and NO projection, so nothing here would have defined the function the
       // boundary transform CALLS. That is a library that fails to translate, not a wrong answer.
       const boundary = (st as Concept).__boundaryTransformSpec as BoundaryTransformSpec | undefined;
-      if (boundary !== undefined) byName.set(boundary.signature.functionName, boundary.signature);
+      if (boundary !== undefined) register(boundary.signature, st);
       // ⭐⭐ #189 — AND SO DOES A CONSTRUCTED HETEROGENEOUS SOURCE ARM — same dangling-emit class.
       //
       // A concept whose posrep is a DIFFERENT resource type (`type is Observation` + a `type is ServiceRequest`
@@ -2926,7 +3157,7 @@ class Emitter {
       // statically excluded from the boundary transform because it already conforms BY CONSTRUCTION. Gathering
       // only the other two emits a call to a function nothing defines — a library that fails to TRANSLATE.
       const valueRead = (st as Concept).__valueReadSourceSpec as ValueReadSourceSpec | undefined;
-      if (valueRead !== undefined) byName.set(valueRead.signature.functionName, valueRead.signature);
+      if (valueRead !== undefined) register(valueRead.signature, st);
       // ⭐⭐ #189 — AND SO DOES A PROJECTED SOURCE ARM. THE FOURTH DEMAND, AND THE THIRD TIME THIS EXACT
       // CLASS HAS BITTEN, so the pattern is worth stating: EVERY spec kind that renders a constructor CALL
       // must be gathered here, or the library fails to TRANSLATE while emit reports success.
@@ -2938,7 +3169,7 @@ class Emitter {
       // therefore not a property of the CALLING concept alone; it depends on its company, which is exactly
       // why gathering must be exhaustive rather than representative.
       const projected = (st as Concept).__projectedSourceSpec as ProjectedSourceSpec | undefined;
-      if (projected !== undefined) byName.set(projected.signature.functionName, projected.signature);
+      if (projected !== undefined) register(projected.signature, st);
     }
     // ⚠ Reached when the library has neither a producer nor a boundary transform — nothing to define.
     if (byName.size === 0) return null;
@@ -2946,11 +3177,15 @@ class Emitter {
     for (const st of this.ast.statements) {
       const name = (st as { name?: string }).name;
       if (name !== undefined && isConstructorName(name)) {
-        throw new Error(
-          `declaration "${name}" is in the RESERVED generated-constructor namespace ` +
+        this.emitErrors.push({
+          type: "Validation",
+          kind: "emit-reserved-constructor-name",
+          line: st.location?.start.line,
+          column: st.location?.start.column,
+          message: `declaration "${name}" is in the RESERVED generated-constructor namespace ` +
             `(\`${CONSTRUCTOR_NAME_PREFIX}\`...), which this library also needs for a producer stage's ` +
             `record construction. Rename the declaration.`,
-        );
+        });
       }
     }
 
@@ -3274,6 +3509,19 @@ class Emitter {
   }
 
   private emitCodedFrom(c: Concept, def: CodedFromDefinition): string {
+    // REFACTOR:grounded (#320, review 564 C4): the prepared finite code set is the same
+    // matching authority used by CRE. Do not replace it with a server ValueSet expansion.
+    if (c.__publication?.source !== undefined) {
+      if (c.__publication.source.kind !== "serviceRequestWitness") {
+        this.emitErrors.push({ type: "Validation", kind: "publication-source-unsupported",
+          message: `Unsupported publication source kind for "${c.name}".`,
+          line: c.location.start.line, column: c.location.start.column });
+        return "null /* publication-source-unsupported; emit fails */";
+      }
+      const codes = c.__publication.source.codes.map((code) =>
+        `System.Code { system: ${cqlStringLiteral(code.system)}, code: ${cqlStringLiteral(code.code)} }`).join(", ");
+      return `[ServiceRequest: { ${codes} }]`;
+    }
     // A synthetic local-source CodedFromDefinition (from `lowerLocalCodes`)
     // supplies `retrieveResourceType: "Observation"` to force the local-source
     // retrieve to `[Observation: …]` regardless of the concept's `type is`.

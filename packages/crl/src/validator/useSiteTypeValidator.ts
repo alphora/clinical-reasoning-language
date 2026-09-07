@@ -35,6 +35,7 @@ import {
 } from "../template-match/operandConstraints";
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
+import { publicationAdmissionReason, readPublicationMembership } from "../emit/publicationProgram";
 import type {
   UseSiteOperandUntypedWarning,
   UseSiteTypeMismatchError,
@@ -81,6 +82,8 @@ interface Attribution {
 
 /** One concept's declared value types + whether its value is computed by inference (derived). */
 interface ConceptTypeInfo {
+  /** REFACTOR:grounded (#320): raw declaration retained for the shared admission predicate. */
+  publication?: Concept;
   // rule A.9 guarantees <=1 here, but 0 or >1 can occur — rule B suppresses on both (A.9 owns >1).
   valueTypes: ConceptValueType[];
   // TRUE iff the concept's value is computed by inference — a `defined as` (sem-* / exists) or a
@@ -199,6 +202,27 @@ export class UseSiteTypeValidator {
     errors: ValidationError[],
   ): void {
     const def = concept.definition;
+    // REFACTOR:grounded (#320, review 562): the only admitted producer consumes a selected coded
+    // publication. Domain/classification is resolved once in raw preparation, not by legacy pipelines.
+    const membership = concept.shapeReduction !== undefined && publicationAdmissionReason(concept) === undefined
+      ? readPublicationMembership(concept) : undefined;
+    if (membership !== undefined) {
+      const name = getRefName(membership.operand);
+      const target = resolveLib(name, getRefLibrary(membership.operand) ?? undefined, ctx)?.types.concepts.get(name)?.publication;
+      if (target !== undefined && (publicationAdmissionReason(target) !== undefined || target.valueTypes[0] !== "CodeableConcept"))
+        errors.push(publicationContextMismatch(concept.name, name, "membership requires a selected CodeableConcept publication", membership.location, attribution));
+      const resolved = resolveLib(name, getRefLibrary(membership.operand) ?? undefined, ctx)?.types.concepts.get(name);
+      if (resolved !== undefined && target === undefined)
+        errors.push(publicationContextMismatch(concept.name, name, "membership requires an explicit operand shape reduction", membership.location, attribution));
+      return;
+    }
+    if (def?.type === "ReductionDefinition" && def.reduction.target.type === "ReductionConceptRef") {
+      const target = def.reduction.target;
+      if (isPublicationOperand(getRefName(target.ref), getRefLibrary(target.ref) ?? undefined, ctx)) {
+        errors.push(publicationContextMismatch(concept.name, getRefName(target.ref), "collection reduction", target.location, attribution));
+        return;
+      }
+    }
 
     // 1. OPERAND constraints on a concept-level `definition is <narrative>`.
     if (def?.type === "DefinitionIsDefinition") {
@@ -208,6 +232,10 @@ export class UseSiteTypeValidator {
 
     // 2. RESULT shape + composition-leaf agreement (#189 IMPL 2b REPLACE).
     if (def?.type === "DefinedAsDefinition") {
+      if (def.body.type === "DefinedAsExists" &&
+          isPublicationOperand(getRefName(def.body.ref), getRefLibrary(def.body.ref) ?? undefined, ctx)) {
+        errors.push(publicationContextMismatch(concept.name, getRefName(def.body.ref), "collection existence", def.body.location, attribution));
+      }
       const vts = concept.valueTypes ?? [];
       const body = def.body;
 
@@ -303,7 +331,10 @@ export class UseSiteTypeValidator {
         // A shape disagreement (`Scalar<Quantity>` alias over a `RecordSet<?>` target) is reportable even
         // when the target's resource is unknown (panel R2 Claude #1); only a same-record-shape/unknown-
         // resource compare is skipped as indeterminate.
-        if (targetResult !== undefined && compareResultTypes(parentResult, targetResult) === "disagree") {
+        const publicationOperand = isPublicationOperand(getRefName(ref), getRefLibrary(ref) ?? undefined, ctx);
+        if (publicationOperand) {
+          errors.push(publicationContextMismatch(concept.name, getRefName(ref), "alias", def.body.location, attribution));
+        } else if (targetResult !== undefined && compareResultTypes(parentResult, targetResult) === "disagree") {
           errors.push(
             bareRefAliasMismatch(
               concept.name,
@@ -383,6 +414,11 @@ export class UseSiteTypeValidator {
     // fail-closed point). The concept-layer `and`/`or`/`not` is STRICT — no criterion exists-bridge; a record
     // operand is steered to `exists`.
     for (const op of branchConditionConceptRefsStrict(body.expression, "useSiteType boolean composition")) {
+      // REFACTOR:grounded (#320): dependent Boolean result typing is a separate integration slice.
+      if (isPublicationOperand(getRefName(op.ref), getRefLibrary(op.ref) ?? undefined, ctx)) {
+        errors.push(publicationContextMismatch(concept.name, getRefName(op.ref), "Boolean concept composition", op.location, attribution));
+        continue;
+      }
       const rt = resolveConceptResultType(getRefName(op.ref), getRefLibrary(op.ref) ?? undefined, ctx);
       if (rt !== undefined && !(rt.shape === "Scalar" && rt.valueType === "boolean")) {
         errors.push(
@@ -427,6 +463,10 @@ export class UseSiteTypeValidator {
       case "CompositionRef": {
         const name = getRefName(expr.ref);
         const library = getRefLibrary(expr.ref) ?? undefined;
+        if (isPublicationOperand(name, library, ctx)) {
+          errors.push(publicationContextMismatch(conceptName, name, "record-space composition", expr.location, attribution));
+          return;
+        }
         // (i) PRESERVED ERROR — value-type-keyed, shape-blind (exactly HEAD + the shape-blind emitter).
         const parentIsNonBoolValueType = parentValueType !== undefined && parentValueType !== "boolean";
         const res = resolveOperand(name, library, ctx, /*allowParameter*/ false);
@@ -522,6 +562,11 @@ export class UseSiteTypeValidator {
     errors: ValidationError[],
   ): void {
     switch (arg.type) {
+      case "ConceptRefArg":
+        if (isPublicationOperand(arg.value, arg.library, ctx)) {
+          errors.push(publicationContextMismatch(conceptName, arg.value, "narrative pipeline", arg.location, attribution));
+        }
+        return;
       case "NestedPatternArg":
         this.checkCall(arg.pattern, conceptName, ctx, attribution, warnedUntyped, errors);
         return;
@@ -586,6 +631,7 @@ export class UseSiteTypeValidator {
   ): void {
     // A narrative operand slot legally resolves to a concept OR a parameter (NARRATIVE_REF_KINDS),
     // so parameters are allowed here (and are type-checkable — a parameter is never untyped).
+    if (isPublicationOperand(arg.value, arg.library, ctx)) return; // scoped diagnostic in recurseNested
     const res = resolveOperand(arg.value, arg.library, ctx, /*allowParameter*/ true);
     switch (res.status) {
       case "multiple":
@@ -683,6 +729,10 @@ export class UseSiteTypeValidator {
   ): void {
     // A per-action guard (`unless` / `only when`) consumes a boolean, like a `when` guard.
     if (stmt.guard) {
+      if (isPublicationOperand(getRefName(stmt.guard.conceptName), getRefLibrary(stmt.guard.conceptName) ?? undefined, ctx)) {
+        errors.push(publicationContextMismatch(decisionName, getRefName(stmt.guard.conceptName), "action guard", stmt.guard.location, attribution));
+        return;
+      }
       this.checkGuardLiteral(stmt.guard.conceptName, stmt.guard.location, decisionName, ctx, attribution, errors);
     }
   }
@@ -762,6 +812,7 @@ function buildTypeIndex(ast: CRL, sources?: SourceContext[]): TypeIndex {
         stmt.definition?.type === "DefinedAsDefinition" ||
         stmt.definition?.type === "DefinitionIsDefinition";
       lib(key).concepts.set(stmt.name, {
+        ...(stmt.shapeReduction !== undefined ? { publication: stmt } : {}),
         valueTypes: stmt.valueTypes ?? [],
         derived,
         shape: assumedShapePreMigration(stmt.shape),
@@ -896,6 +947,24 @@ function resolveConceptResultType(name: string, library: string | undefined, ctx
   const c = found.types.concepts.get(name);
   if (!c) return undefined; // a parameter (or non-concept) — no shape/resource to compare
   return conceptResultType(c.shape, c.valueTypes, c.conceptType);
+}
+
+/** REFACTOR:grounded (#320): retain the Record result type; opt in only its Boolean consumer read. */
+function isPublicationOperand(name: string, library: string | undefined, ctx: ResolveCtx): boolean {
+  const concept = resolveLib(name, library, ctx)?.types.concepts.get(name)?.publication;
+  return concept !== undefined && publicationAdmissionReason(concept) === undefined;
+}
+
+function publicationContextMismatch(
+  conceptName: string, operandName: string, context: string, location: Location, attribution: Attribution,
+): UseSiteTypeMismatchError {
+  return {
+    kind: "use-site-type-mismatch", rule: "publication-unsupported-context", conceptName,
+    expected: "supported selected Record consumer", actual: context, severity: "error",
+    message: `Concept "${conceptName}": selected publication "${operandName}" is not supported in ${context} yet. ` +
+      "Criteria and decision branch guards read its nullable Boolean value. This consumer has not been integrated with the selected Record contract yet.",
+    location: loc(location), ...base(attribution),
+  };
 }
 
 /** Whether a typed operand satisfies a constraint. `not-derived <T>` forbids a DERIVED T. */

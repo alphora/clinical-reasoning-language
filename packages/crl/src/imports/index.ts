@@ -114,6 +114,9 @@ export function resolveImports(
   if (rootAst.library && rootAst.library.name !== "") {
     const existing = registry.byNameLocal.get(rootAst.library.name);
     if (!existing || existing.filePath === rootEntry.filePath) {
+      // REFACTOR:grounded (#320, review 562): the canonical root replaces the
+      // scan node, while retaining its owning package identity snapshot.
+      if (existing?.packageIdentity !== undefined) rootEntry.packageIdentity = existing.packageIdentity;
       registry.byNameLocal.set(rootAst.library.name, rootEntry);
     }
   }

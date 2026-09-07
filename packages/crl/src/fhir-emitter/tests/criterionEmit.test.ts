@@ -1,3 +1,5 @@
+// REFACTOR:grounded (#320, review 563): incomplete criterion graphs refuse emission;
+// complete deep closures remain usable and unresolved priority references diagnose once.
 // #236 — criterion EMIT wiring (FHIR decision lane). A `criterion` guard ref no longer inline-
 // EXPANDS at `emitWhenBlock`. It lowers to a NAMED boolean CQL define, and the decision guard
 // references it BY NAME via a single `text/cql-identifier` applicability condition (the same shape
@@ -22,12 +24,16 @@ import type {
   RecommendActivity,
   WhenBlock,
   WhenBlockBody,
+  ReferenceName,
 } from "../../ast/types";
 import { buildCriterionTable } from "../../ast/criterionExpansion";
+import { buildCriterionIndex, CRITERION_INDEX_MAX_DEPTH } from "../../ast/criterionIndex";
+import { foreignCriterionMessage } from "../../ast/criterionDiagnostics";
 import {
   type ActivityResolver,
   type ConceptResolver,
   type DecisionResolver,
+  type PublicationGuardTargetResolver,
   emitDecisionPlanDefinition,
 } from "../decision";
 import type { CpgMetadata } from "../types";
@@ -96,21 +102,24 @@ function decision(name: string, statements: BranchBlock[], qualifier?: "first" |
 type EmitResult = { resource: PlanDefLike | null; errors: { kind: string }[]; unmatched: { kind: string }[] };
 type CondExpr = { language: string; expression: string };
 type ActionLike = { title?: string; condition?: { expression?: CondExpr }[]; action?: ActionLike[]; definitionCanonical?: string };
-type PlanDefLike = { action?: ActionLike[] };
+type PlanDefLike = { action?: ActionLike[]; library?: string[] };
 
-function emit(d: Decision, table: Criterion[] = [], resolver: ConceptResolver = RESOLVE_ALL): EmitResult {
+function emit(d: Decision, table: Criterion[] = [], resolver: ConceptResolver = RESOLVE_ALL, isPublication: (ref: ReferenceName) => boolean = () => false, publicationTarget?: PublicationGuardTargetResolver, activityResolver: ActivityResolver = RESOLVE_ACT_OK): EmitResult {
   const r = emitDecisionPlanDefinition(
     d,
     "Lib",
     METADATA,
     resolver,
-    RESOLVE_ACT_OK,
+    activityResolver,
     RESOLVE_DEC_OK,
     true,
     { clock: FIXED_CLOCK },
     undefined,
     undefined,
     buildCriterionTable(table),
+    undefined,
+    isPublication,
+    publicationTarget,
   );
   return { resource: (r.resource?.resource ?? null) as PlanDefLike | null, errors: r.errors, unmatched: r.unmatched };
 }
@@ -137,6 +146,87 @@ function actionTitles(resource: PlanDefLike | null): string[] {
 }
 
 describe("#236 — criterion emit: named define reference (not expansion)", () => {
+  // REFACTOR:grounded (#320, review 563 r5): gather all located criterion failures
+  // before emitting a refused Decision; failed branch attempts do not add dependencies.
+  it("reports distinct invalid criterion sites without resolving branches or priority complements", () => {
+    const located = (name: string, line: number): BranchCondition => ({ ...critRefC(name), location: { start: { line, column: 2 }, end: { line, column: 3 } } });
+    const table = [criterion("BrokenA", critRefC("MissingA")), criterion("BrokenB", critRefC("MissingB"))];
+    const d = decision("Top", [whenC(orC(located("BrokenA", 10), located("BrokenB", 11)), leaf(recommend("Act"))),
+      whenC(refC("Unresolved"), leaf(recommend("Later")))], "first");
+    const calls: ReferenceName[] = [];
+    const result = emit(d, table, (ref) => { calls.push(ref); return null; });
+    expect(result.resource).toBeNull();
+    expect(result.errors).toMatchObject([
+      { kind: "criterion-guard-unavailable", line: 10, column: 2 },
+      { kind: "criterion-guard-unavailable", line: 11, column: 2 },
+    ]);
+    expect(result.unmatched).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it("reports a cyclic criterion and its nested foreign reference at their authored locations", () => {
+    const foreign: BranchCondition = { type: "BranchConditionCriterionRef", ref: { type: "QualifiedReference", libraryName: "Foreign", name: "Ready", location: LOC }, location: { start: { line: 3, column: 2 }, end: { line: 3, column: 3 } } };
+    const table = [criterion("Loop", orC(foreign, critRefC("Loop")))];
+    const d = decision("Top", [whenC({ ...critRefC("Loop"), location: { start: { line: 8, column: 2 }, end: { line: 8, column: 3 } } }, leaf(recommend("Act")))]);
+    const result = emit(d, table);
+    expect(result.resource).toBeNull();
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "criterion-guard-unavailable", line: 8, message: expect.stringContaining("has cycle") }),
+      expect.objectContaining({ kind: "criterion-guard-unavailable", line: 3, message: foreignCriterionMessage('"Foreign"."Ready"') }),
+    ]));
+    expect(result.unmatched).toEqual([]);
+  });
+
+  it.each(["all", "first"] as const)("retains a suppressed branch's foreign dependency only if a surviving %s action needs it", (qualifier) => {
+    const foreign: BranchCondition = { type: "BranchConditionRef", ref: { type: "QualifiedReference", libraryName: "Foreign", name: "Answer", location: LOC }, location: LOC };
+    const canonical = "http://example.org/Library/ForeignInferences";
+    const d = decision("Top", [whenC(foreign, leaf(recommend("Missing"))), whenC(refC("Photo"), leaf(recommend("Act")))], qualifier);
+    const result = emit(d, [], RESOLVE_ALL, (ref) => typeof ref !== "string", () => ({ libraryName: "ForeignInferences", define: "Answer", canonical }),
+      (ref) => ref === "Missing" ? null : RESOLVE_ACT_OK(ref));
+    expect(result.resource).not.toBeNull();
+    expect(result.resource!.library!.includes(canonical)).toBe(qualifier === "first");
+    expect(conditionExprs(result.resource).some((item) => item.expression.includes("ForeignInferences"))).toBe(qualifier === "first");
+  });
+
+  it("keeps the existing unresolved diagnostic for a missing criterion index entry", () => {
+    const result = emit(decision("Top", [whenC(orC(refC("Photo"), critRefC("Absent")), leaf(recommend("Act")))]));
+    expect(result.resource).toBeNull();
+    expect(result.unmatched).toMatchObject([{ kind: "unresolved-criterion" }]);
+  });
+  it("does not turn the complete-closure depth label into an authoring limit", () => {
+    const table = [criterion("C0", refC("Photo"))];
+    const depth = CRITERION_INDEX_MAX_DEPTH + 2;
+    for (let i = 1; i <= depth; i++) table.push(criterion(`C${i}`, critRefC(`C${i - 1}`)));
+    expect(buildCriterionIndex(table).get(`C${depth}`)!.status).toBe("depth-exceeded");
+    const result = emit(decision("Top", [whenC(critRefC(`C${depth}`), leaf(recommend("Act")))]), table);
+    expect(result.resource).not.toBeNull();
+    expect(result.errors).toEqual([]);
+  });
+  it.each(["cycle", "undefined-dependency"])("refuses an incomplete criterion graph at the direct emitter: %s", (status) => {
+    const table = [criterion("Ready", critRefC(status === "cycle" ? "Ready" : "Missing"))];
+    const d = decision("Top", [whenC(orC(refC("Photo"), critRefC("Ready")), leaf(recommend("Act"))), whenC(refC("Photo"), leaf(recommend("Independent")))], "all");
+    const result = emit(d, table);
+    expect(result.resource).toBeNull();
+    expect(result.errors).toMatchObject([{ kind: "criterion-guard-unavailable", line: 1, column: 0 }]);
+  });
+  it.each([false, true])("refuses a foreign-qualified criterion before local namesake binding (nested=%s)", (nested) => {
+    const foreign: BranchCondition = { type: "BranchConditionCriterionRef", ref: { type: "QualifiedReference", libraryName: "Foreign", name: "Ready", location: LOC }, location: LOC };
+    const table = [criterion("Ready", refC("Photo")), ...(nested ? [criterion("Outer", foreign)] : [])];
+    const d = decision("Top", [whenC(nested ? critRefC("Outer") : foreign, leaf(recommend("Act"))), whenC(refC("Photo"), leaf(recommend("Later")))], "first");
+    const result = emit(d, table);
+    expect(result.resource).toBeNull();
+    expect(result.errors).toMatchObject([{ kind: "criterion-guard-unavailable", message: expect.stringContaining('Foreign-qualified criterion "Foreign"."Ready"'), line: 1, column: 0 }]);
+  });
+  it("keeps self-qualified criterion references legal at the direct emitter", () => {
+    const self: BranchCondition = { type: "BranchConditionCriterionRef", ref: { type: "QualifiedReference", libraryName: "Lib", name: "Ready", location: LOC }, location: LOC };
+    const result = emit(decision("Top", [whenC(self, leaf(recommend("Act")))]), [criterion("Ready", refC("Photo"))]);
+    expect(result.errors).toEqual([]); expect(result.resource).not.toBeNull();
+  });
+  it("dedupes the same unresolved publication reference revisited by a priority complement", () => {
+    const d = decision("Top", [whenC(orC(refC("Photo"), refC("Missing")), leaf(recommend("Act"))), whenC(refC("Photo"), leaf(recommend("Later")))], "first");
+    const result = emit(d, [], (ref) => ref === "Missing" ? null : typeof ref === "string" ? ref : ref.name, () => true);
+    expect(result.unmatched).toEqual([{ kind: "unresolved-concept", text: '"Missing"', line: 1, column: 0 }]);
+  });
   it("a compound criterion guard emits ONE applicability condition naming the CRITERION (not its body)", () => {
     // criterion "Eligible": - when ( "A" and ( "B" or "C" ) ). The guard references "Eligible" by
     // name — the body atoms A/B/C never appear as conditions in the decision lane (they live in the

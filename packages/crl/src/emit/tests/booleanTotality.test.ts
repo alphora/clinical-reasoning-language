@@ -1,5 +1,5 @@
 // #189 T5 — boolean-totality classifier + enrollment ledger + whole-boundary proof (build order §8.1).
-// Design of record: `docs/emit-189-boolean-totality.md` §1–5. Classifier tests parse real CRL through the
+// Design of record: `docs/_old/emit-189-boolean-totality.md` §1–5. Classifier tests parse real CRL through the
 // SOURCE grammar (`parseInput`) so AST shapes match production; ledger/proof tests construct entries.
 // Revised per crl-emit panel disc 429 (E1-rejected cells, age-first, fixed-point cycles, discharge union,
 // result-type-only subject set, fail-closed catalog default, multiset completeness).

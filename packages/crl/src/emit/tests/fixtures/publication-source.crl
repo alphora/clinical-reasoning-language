@@ -1,0 +1,29 @@
+// REFACTOR:grounded (#320, review 564): positive witnesses compete with local answers.
+library "Source Publication".
+
+terminology "Procedures":
+- system is `http://example.org/procedures`.
+- code is `repair`.
+- code is `second-code`.
+
+concept "Requested":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `requested`.
+- shape reduction is most recent.
+- source representation:
+  - type is ServiceRequest.
+  - coded from "Procedures".
+  - value projection is exists this.
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `APPROVED`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `DENIED`.
+decision "D":
+first:
+- when "Requested" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".

@@ -40,17 +40,19 @@ import { getRefLibrary, getRefName, isQualifiedRef, normalizeLocalRef } from "..
 import { buildCriterionTable } from "../ast/criterionExpansion";
 import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex";
 import { guardDefineNameCollisions } from "../ast/guardDefines";
+import { conceptDependencies } from "../ast/conceptDependencies";
+import { hasLocalPublicationContribution, type PublicationDescriptor, type PublicationProgram } from "../emit/publicationProgram";
 import { resolveDispositionConfig } from "../dispositions";
-import { computeFhirEmitClosure } from "../imports/computeEmitClosure";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
-import { emitCQLImports, type SuppressedActivityBinding } from "../imports/emit";
+import { emitCQLImportsFromPrepared, type SuppressedActivityBinding } from "../imports/emit";
+import { preparePublicationContext, type PreparedPublicationContext } from "../imports/preparePublicationContext";
 import type { PerLibraryEmit } from "../imports/emit";
 import { resolveImports } from "../imports/index";
 import type { ImportDiagnostic, ResolvedGraph } from "../imports/types";
 import type { CRLError } from "../types/errors";
 
 import { catalogFhirLibraries } from "../cql-emitter/catalog/loadCatalog";
-import { lowerLocalCodes, astHasConceptLocalCode, preLowerAge } from "../cql-emitter/lowerLocalCodes";
+import { lowerLocalCodes, preLowerAge } from "../cql-emitter/lowerLocalCodes";
 import type { LowerLocalCodesResult } from "../cql-emitter/lowerLocalCodes";
 // #189 Slice-C boundary 1 — the decision guard-surface concept names (the SAME set the CQL Interface
 // re-exports), used to loud-gate a decision that guards ON a reduction (single source of truth, no drift).
@@ -252,7 +254,6 @@ function makeResolversForSourceLibrary(
 /* ─── slug helpers (mirror per-emit-module slug rules) ──────────────── */
 
 import { pascalCaseNameForId, policyIdBase, slugify } from "./slug";
-import { createLocalDomainResolver } from "./localDomain";
 import { decisionId } from "./decision";
 import { recommendationId } from "./recommendation";
 import { tarjanSCC } from "./tarjan";
@@ -423,6 +424,27 @@ export interface CaseFeatureCollection {
   inputsByCondition: Map<string, CollectedCodeIsConcept[]>;
   /** union of all collected concepts (deduped by name, first-seen order). */
   unionConcepts: CollectedCodeIsConcept[];
+}
+
+/** Gather admitted answer slots by raw declaration identity, including qualified producer operands.
+ * Computed uncoded publications have no answer slot; their dependencies still participate. */
+function publicationCaseFeatures(program: PublicationProgram, source: string, ref: ReferenceName): PublicationDescriptor[] {
+  const seen = new Set<string>();
+  const result: PublicationDescriptor[] = [];
+  const visit = (owner: string, reference: ReferenceName): void => {
+    const declaration = program.declarations.lookupConcept(owner, reference);
+    if (declaration.kind !== "hit" || seen.has(declaration.identity.key)) return;
+    seen.add(declaration.identity.key);
+    const descriptor = program.get(declaration.identity.key);
+    if (descriptor !== undefined) {
+      if (hasLocalPublicationContribution(descriptor)) result.push(descriptor);
+      if (descriptor.producer !== undefined) visit(descriptor.producer.operand.sourceIdentity, descriptor.producer.operand.conceptName);
+      return;
+    }
+    for (const dependency of conceptDependencies(declaration.node)) visit(declaration.identity.sourceIdentity, dependency);
+  };
+  visit(source, ref);
+  return result;
 }
 
 // Exported for the F2 unit test (foreign-qualified-condition clobber). Not part
@@ -1093,10 +1115,16 @@ export function emitFhirDefClosure(
   // and rebinds its ADs/recommendation-PDs onto the consumer's Interface. NEVER
   // recomputed here (the FHIR closure is a strict superset and could disagree).
   suppressedActivityBindings: ReadonlyArray<SuppressedActivityBinding> = [],
+  prepared: PreparedPublicationContext = preparePublicationContext(graph, {
+    canonicalBase: metadata.canonicalBase, policyId: metadata.name,
+  }),
+  publicationTargets: ReadonlyMap<string, { libraryName: string; define: string }> = new Map(),
 ): FhirDefClosureEmitResult {
-  const errors: CRLError[] = [];
+  // REFACTOR:grounded (#320): the FHIR and CQL lanes consume this identical raw admission.
+  const errors: CRLError[] = [...prepared.publications.diagnostics, ...prepared.publications.warnings];
   const unmatched: UnmatchedReference[] = [];
   const resources: EmittedResource[] = [];
+  const gatheredPublications = new Map<string, PublicationDescriptor>();
 
   // Group the manifest by SOURCE library name so each source can emit one FHIR
   // Library per manifest entry. A source absent from the manifest (e.g. the
@@ -1152,7 +1180,7 @@ export function emitFhirDefClosure(
   errors.push(...dateErrors);
   const resolvedOpts: EmitOptions = { ...opts, clock };
 
-  const expandedClosure = computeFhirEmitClosure(graph);
+  const expandedClosure = prepared.rawFhirClosure;
 
   // #198 (Option B) — the PRIMARY (closure-seed) source libraries are those reached
   // by include-walking from the entry `.crl` (`graph.resolvedLibraries`); any source
@@ -1168,19 +1196,12 @@ export function emitFhirDefClosure(
   // predicate up front keeps this lane byte-identical to the CQL lane, which reads its equivalent set from the
   // raw pre-lowering closure. `metadata.name` is always present on the FHIR lane, so `domainIdFor` never falls
   // to the metadata-less `undefined` arm here.
-  const localCodePaths = new Set(
-    expandedClosure.filter((e) => astHasConceptLocalCode(e.ast)).map((e) => e.filePath),
-  );
   // ⭐⭐ #189 — ONE descriptor per inline-options concept, built ONCE and read by BOTH the resource emit
   // and the StructureDefinition binding. Deriving it twice would let the emitted ValueSet url and the url
   // the binding points at drift apart — silently, since nothing validates binding targets today.
   const inlineSetByConcept = new Map<string, InlineAnswerSet>();
 
-  const localDomainResolver = createLocalDomainResolver({
-    primarySeedPaths,
-    localCodePaths,
-    policyId: metadata.name,
-  });
+  const localDomainResolver = prepared.localDomainResolver;
 
   // Filter out parse-error placeholders (null/empty names — parse-failure
   // diagnostic is the real signal).
@@ -1301,6 +1322,12 @@ export function emitFhirDefClosure(
       // lanes: a lane that omitted it would refuse concepts the other lane emits, which is precisely the
       // divergence this refactor removes.
       policyId: metadata.name,
+      publication: {
+        program: prepared.publications,
+        fromSourceIdentity: lib.filePath,
+        renderedSourceByLibrary: new Map(),
+        publicTarget: (key) => publicationTargets.get(key),
+      },
     });
     if (preAge.errors.length > 0 || lowered.errors.length > 0) {
       errors.push(...preAge.errors, ...lowered.errors);
@@ -1713,6 +1740,13 @@ export function emitFhirDefClosure(
     const caseFeatures: CaseFeatureCollection = caseFeatureGateOpen
       ? collectCaseFeatures(lowered, lib.decisions, lib.libraryName)
       : { inputsByCondition: new Map(), unionConcepts: [] };
+    // New publications use the owner-aware prepared walk below. Keep legacy name-based collection
+    // outside this opt-in path, and never emit a second profile for an admitted publication.
+    const isLegacyFeature = (feature: CollectedCodeIsConcept): boolean =>
+      prepared.publications.lookup(lib.filePath, feature.name).kind !== "publication";
+    caseFeatures.unionConcepts = caseFeatures.unionConcepts.filter(isLegacyFeature);
+    for (const [condition, features] of caseFeatures.inputsByCondition)
+      caseFeatures.inputsByCondition.set(condition, features.filter(isLegacyFeature));
 
     // #189 Slice-C boundary 1 — LOUD GATE on a decision that GUARDS ON a reduction. Detection keys on the
     // decision GUARD SURFACE (`interfaceConceptNames` — the when/action-guard/criterion atoms, the SAME set
@@ -1833,7 +1867,14 @@ export function emitFhirDefClosure(
     for (const { name } of caseFeatures.unionConcepts) {
       const raw = rawConceptByName.get(name);
       if (raw === undefined) continue;
-      resolutionByName.set(name, resolveCaseFeatureRecord(raw, owningLibMeta));
+      // REFACTOR:grounded (#320): preserve the admitted descriptor and resolve its actual CQL binding.
+      const lookup = raw.shapeReduction === undefined ? undefined : prepared.publications.lookup(lib.filePath, name);
+      const target = lookup?.kind === "publication" ? publicationTargets.get(lookup.descriptor.identity.key) : undefined;
+      const targetEntry = target === undefined ? undefined : cqlByLibrary.find((entry) => entry.libraryName === target.libraryName);
+      const publication = lookup?.kind === "publication" && target !== undefined && targetEntry !== undefined
+        ? { descriptor: lookup.descriptor, target: { librarySuffix: identityForEntry(targetEntry), define: target.define, resultKind: "record" as const } }
+        : undefined;
+      resolutionByName.set(name, resolveCaseFeatureRecord(raw, owningLibMeta, publication));
     }
 
     // F3 (impl-review) — direct-caller trap. The deliverable always threads a
@@ -1869,8 +1910,13 @@ export function emitFhirDefClosure(
     // by construction). A `supplied-patient` concept (the uncoded Patient arm, READ not gathered) contributes NO
     // input; an unsupported/not-a-record concept contributes no input either (step 6 raises the loud diagnostic).
     // There is NO Observation fallback — an input never carries a resource type the case-feature lane can't stand behind.
-    const caseFeatureInputResolver: CaseFeatureInputResolver = (name) =>
-      (caseFeatures.inputsByCondition.get(name) ?? []).flatMap((c) => {
+    const caseFeatureInputResolver: CaseFeatureInputResolver = (ref) => {
+      const publicationInputs = publicationCaseFeatures(prepared.publications, lib.filePath, ref).flatMap((descriptor) => {
+        gatheredPublications.set(descriptor.identity.key, descriptor);
+        return descriptor.profileUrl === undefined ? [] : [{ name: descriptor.title, canonical: descriptor.profileUrl, resourceType: descriptor.resourceType }];
+      });
+      const normalized = normalizeLocalRef(ref, lib.libraryName);
+      const legacy = (isQualifiedRef(normalized) ? [] : caseFeatures.inputsByCondition.get(normalized) ?? []).flatMap((c) => {
         const res = resolutionByName.get(c.name);
         if (res?.kind !== "record") return [];
         return [
@@ -1881,6 +1927,8 @@ export function emitFhirDefClosure(
           },
         ];
       });
+      return [...legacy, ...publicationInputs];
+    };
 
     // When the contract is violated we skip THIS source's decision emit (handled by
     // the loop guard below); there are no later per-lib steps, so a plain guarded
@@ -1911,6 +1959,19 @@ export function emitFhirDefClosure(
         caseFeatureInputResolver,
         libCriterionTable,
         guardQualifierLibraryName,
+        (ref) => {
+          const hit = prepared.publications.lookup(lib.filePath, ref);
+          return hit.kind === "publication" && hit.descriptor.valueType === "boolean";
+        },
+        // REFACTOR:grounded (#320, review 563): a direct foreign guard consumes the same
+        // prepared public Record and emitted Library identity as its named-criterion spelling.
+        (ref) => {
+          const hit = prepared.publications.lookup(lib.filePath, ref);
+          if (hit.kind !== "publication" || hit.descriptor.valueType !== "boolean") return undefined;
+          const target = publicationTargets.get(hit.descriptor.identity.key);
+          const entry = target && cqlByLibrary.find((candidate) => candidate.libraryName === target.libraryName);
+          return target && entry ? { ...target, canonical: libraryCanonicalUrl(metadata, identityForEntry(entry)) } : undefined;
+        },
       );
       if (decResult.resource) resources.push(decResult.resource);
       errors.push(...decResult.errors);
@@ -1957,7 +2018,7 @@ export function emitFhirDefClosure(
           });
           continue;
         }
-        if (resolution.kind === "supplied-patient") {
+        if (resolution.kind === "supplied-patient" || resolution.kind === "computed-publication") {
           // Supplied/read (the uncoded Patient arm — charter §2) — no gathered SD, NOT an error.
           continue;
         }
@@ -1980,6 +2041,7 @@ export function emitFhirDefClosure(
           continue;
         }
         const record = resolution;
+        const publication = "identity" in record.descriptor ? record.descriptor : undefined;
         // ⭐⭐ #189 — THE ANSWER SLOT. Two sources, and the second is why four questions were offered with
         // nothing to answer:
         //   · a value-READING concept (Scalar) already carries its carrier in the read fields;
@@ -1990,13 +2052,13 @@ export function emitFhirDefClosure(
         // Questionnaire items that were GROUPS WITH ZERO CHILDREN. The tree paused correctly, asked four
         // questions, and none of them could be answered — the pause was a DEAD END.
         const readDatum =
-          record.descriptor.valueElement !== undefined && record.descriptor.datumValueType !== undefined
+          "datumValueType" in record.descriptor && record.descriptor.valueElement !== undefined && record.descriptor.datumValueType !== undefined
             ? { valueElement: record.descriptor.valueElement, datumValueType: record.descriptor.datumValueType }
             : undefined;
         const answerCarrier =
-          record.descriptor.arm === "local-exact" ? record.descriptor.answerCarrier : undefined;
+          "arm" in record.descriptor && record.descriptor.arm === "local-exact" ? record.descriptor.answerCarrier : undefined;
         const valueDatum =
-          readDatum ??
+          (publication === undefined ? undefined : { valueElement: publication.valueElement, datumValueType: publication.valueType }) ?? readDatum ??
           (answerCarrier !== undefined
             ? { valueElement: answerCarrier.element, datumValueType: answerCarrier.valueType }
             : undefined);
@@ -2094,22 +2156,42 @@ export function emitFhirDefClosure(
           // one call deeper. Refuse HERE, naming the layer and the concept.
           // ⚠ `undefined` target → NO `cpg-featureExpression`. That is the `shape is RecordSet` case: the
           // question is asked and always blank (see `caseFeatureRecord.ts`), so there is nothing to resolve.
-          record.target === undefined
+          record.publicationTarget ?? (record.target === undefined
             ? undefined
             : resolveFeatureExpressionTarget(record.target, name, {
                 "local-primitives": localSourceReferenceSuffix,
                 inferences: inferencesReferenceSuffix,
-              }),
+              })),
           valueDatum,
           answerOptions,
           // #198 — the sibling's disambiguated local domain, so the case-feature
           // `patternCodeableConcept.coding.system` matches THIS library's CodeSystem.
           entryLocalDomainId,
+          publication !== undefined,
         );
         if (cfResult.resource) resources.push(cfResult.resource);
         errors.push(...cfResult.errors);
       }
     }
+  }
+
+  // Profiles gathered through a producer belong to the operand's raw owner, even when that
+  // library has no decisions. Canonical, coding, answer set and public target are prepared data.
+  for (const descriptor of gatheredPublications.values()) {
+    const target = publicationTargets.get(descriptor.identity.key);
+    const entry = target === undefined ? undefined : cqlByLibrary.find((candidate) => candidate.libraryName === target.libraryName);
+    if (!hasLocalPublicationContribution(descriptor) || descriptor.profileUrl === undefined || target === undefined || entry === undefined) {
+      errors.push({ type: "Validation", kind: "publication-binding-missing", message: `Publication "${descriptor.identity.libraryName}"."${descriptor.title}" lacks its prepared local profile or emitted public Record target.` });
+      continue;
+    }
+    const result = emitCaseFeatureStructureDefinition(
+      descriptor.title, descriptor.localCode.code, metadata, resolvedOpts, descriptor.resourceType,
+      { librarySuffix: entry.libraryName, define: target.define, resultKind: "record" },
+      { valueElement: descriptor.valueElement, datumValueType: descriptor.valueType }, descriptor.answerOptions,
+      undefined, true, { profileUrl: descriptor.profileUrl, localCode: descriptor.localCode },
+    );
+    if (result.resource) resources.push(result.resource);
+    errors.push(...result.errors);
   }
 
   // #187 — ALWAYS emit the shared catalog Library resources (CRLCommon +
@@ -2224,15 +2306,7 @@ export function emitFhirDefFromPath(
   rootPath: string,
   opts: EmitOptions = {},
 ): FhirDefFromPathResult {
-  // D6 — DOUBLE resolveImports coupling (deferred). This resolves the graph ONCE
-  // here for the FHIR closure (which keys the FHIR Library identities), and the
-  // `emitCQLImports(rootPath)` call below resolves the SAME path AGAIN internally
-  // to produce the split-manifest. Resolution is filesystem-deterministic, so the
-  // two resolutions agree today — but the FHIR Library keying (resolution #1) and
-  // the manifest (resolution #2) are coupled through that determinism rather than
-  // a shared graph. Threading the single resolved graph into emitCQLImports would
-  // remove the coupling; that refactor is DEFERRED (it would change the
-  // emitCQLImports signature and is out of slice-4c scope).
+  // REFACTOR:grounded (#320): resolve and prepare once with the actual loaded metadata.
   const graph = resolveImports(rootPath);
 
   // Try to load metadata; metadataErrors surface separately for CLI/MCP exit code computation.
@@ -2281,7 +2355,11 @@ export function emitFhirDefFromPath(
   // MCP `emit_crl_fhir` could report success while the CQL lane failed.
   // (The CLI re-runs `emitCQLImports` for the CQL-write side; this is the
   // public/MCP path's guard.)
-  const cqlImports = emitCQLImports(rootPath);
+  const prepared = preparePublicationContext(graph, {
+    canonicalBase: metadata.canonicalBase,
+    policyId: metadata.name,
+  });
+  const cqlImports = emitCQLImportsFromPrepared(prepared);
   // Fold kind-LESS `type:"Exception"` throws too (panel R2 Fable [important]): this predicate exists to
   // skip EXCLUDED KINDS (the FHIR lane surfaces those itself), NOT to skip Exceptions. A kind-less throw
   // — its original concrete vehicle, `definedAsExistsNotLowered`, was retired when #270 lowered existence
@@ -2307,6 +2385,8 @@ export function emitFhirDefFromPath(
     { ...opts, dispositionConfig },
     cqlImports.cqlByLibrary,
     cqlImports.suppressedActivityBindings ?? [],
+    prepared,
+    cqlImports.publicationTargets,
   );
   // Round-5 gpt55 [important]: fold importDiagnostics + metadataErrors
   // into success. Otherwise MCP can return success:true with fatal

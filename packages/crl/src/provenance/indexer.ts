@@ -442,7 +442,14 @@ export function buildProvenanceIndex(
   };
 
   // ── PHASE 2b: static reachability, seeded from the covered policy's decisions ──
+  const recordedEdges = new Set<string>();
   const recordEdge = (targetKey: string, edge: ReachEdge): void => {
+    // REFACTOR:grounded (#320, review 563): qualified closure may spell one resolved target
+    // twice. Suppress only identical representative edges after target resolution; different
+    // seeds, source nodes, relations, intermediates, and foreign owners remain distinct.
+    const edgeKey = JSON.stringify([targetKey, edge.fromDecision, edge.fromNodeId, edge.relation, edge.via ?? null]);
+    if (recordedEdges.has(edgeKey)) return;
+    recordedEdges.add(edgeKey);
     let info = decisionReachability.get(targetKey);
     if (!info) {
       info = { reachedBy: new Set(), edges: [] };

@@ -22,7 +22,7 @@ import type { RepresentationShapeError, RepresentationShapeRule, ValidationError
 // CEL conformance (the "does this rep's instance satisfy its retrieve" check) — that is the
 // INDEPENDENT-evaluator work of Todo 3, which owns the fixture producer it cross-checks against.
 //
-// Rules (see tmp/representation-model.md §"Shape rules" + disc 395):
+// Rules (see tmp/_old/representation-model.md §"Shape rules" + disc 395):
 //   A.1 incomplete-representation      — a posrep must carry `type` + `value element` + `value
 //                                        type` (a posrep is ALWAYS fully explicit; `coded from`
 //                                        stays optional — refinement 4/5)

@@ -48,6 +48,14 @@ export interface EmitDiagnostic {
 }
 
 export type EmitDiagnosticKind =
+  | "publication-preparation-failed"
+  | "publication-form-unsupported"
+  | "publication-membership-no-negative-domain"
+  // REFACTOR:grounded (#320, discussion 555): invalid authored temporal input rejects its whole case.
+  | "invalid-date"
+  | "missing-anchor"
+  | "duplicate-anchor"
+  | "duplicate-date"
   /** A fact's `defined by` couldn't derive a bare FHIR type — case is skipped per pitch v4. */
   | "unsupported-yet"
   /** A `result is` line was parsed but not emitted (deferred to #70/metric). */
@@ -115,7 +123,8 @@ export interface EmitResult {
 
 /** Options for `emitCelToFhir`. */
 export interface EmitCelOptions {
-  // (no options today — reserved for future emit knobs.)
+  /** REFACTOR:grounded (#320): one clock for explicitly authored now anchors; never an undated-fact default. */
+  now?: Date;
 }
 
 export interface EmitOptions {

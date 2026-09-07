@@ -1,3 +1,5 @@
+// REFACTOR:grounded (#320, review 563): direct and transitive dependencies preserve full
+// qualified identity while repeated references retain one deterministic closure entry.
 import { describe, it, expect } from "vitest";
 
 import { buildCriterionIndex, CRITERION_INDEX_MAX_DEPTH } from "../criterionIndex";
@@ -10,6 +12,7 @@ import type {
   BranchConditionRef,
   Criterion,
   Location,
+  ReferenceName,
 } from "../types";
 
 // #236/#274 — the CRITERION INDEX (design §3 A/B). The index records, ONCE per distinct
@@ -20,7 +23,7 @@ import type {
 // materializer's exponential case) and a cyclic table never hangs.
 
 const L = (line = 1): Location => ({ start: { line, column: 0 }, end: { line, column: 1 } });
-const ref = (name: string, loc: Location = L()): BranchConditionRef => ({
+const ref = (name: ReferenceName, loc: Location = L()): BranchConditionRef => ({
   type: "BranchConditionRef",
   ref: name,
   location: loc,
@@ -53,6 +56,13 @@ const crit = (name: string, condition: BranchCondition): Criterion => ({
 });
 
 describe("buildCriterionIndex — a single criterion (no dependencies)", () => {
+  it("retains same-named concepts from distinct owners and dedupes repeated qualified references", () => {
+    const foreign = { type: "QualifiedReference" as const, libraryName: "Foreign", name: "X", location: L(2) };
+    const first = ref(foreign);
+    const idx = buildCriterionIndex([crit("Ready", or(ref("X"), first, ref({ ...foreign, location: L(3) })))]);
+    expect(idx.get("Ready")!.recursiveAtomClosure).toEqual([ref("X"), first]);
+    expect(idx.get("Ready")!.recursiveAtomClosure[1]).toBe(first);
+  });
   it("closure = its direct concepts; deps empty; depth 0; defineId = bare name; status ok", () => {
     const idx = buildCriterionIndex([crit("Elig", and(ref("A"), ref("B")))]);
     const e = idx.get("Elig")!;
@@ -72,6 +82,16 @@ describe("buildCriterionIndex — a single criterion (no dependencies)", () => {
 });
 
 describe("buildCriterionIndex — recursive dependencies (the DAG)", () => {
+  it("retains qualified identity while merging transitive criterion closures", () => {
+    const foreign = { type: "QualifiedReference" as const, libraryName: "Foreign", name: "X", location: L(2) };
+    const other = { ...foreign, libraryName: "Other" };
+    const idx = buildCriterionIndex([
+      crit("Ready", or(ref("X"), cref("Inner"), cref("Again"))),
+      crit("Inner", or(ref(foreign), ref(other))),
+      crit("Again", ref({ ...foreign, location: L(8) })),
+    ]);
+    expect(idx.get("Ready")!.recursiveAtomClosure.map((r) => r.ref)).toEqual(["X", foreign, other]);
+  });
   it("follows sub-criteria into their bodies; deps are DIRECT only; depth counts nesting", () => {
     // Parent = A and Child; Child = B and Grand; Grand = C.
     const idx = buildCriterionIndex([

@@ -63,7 +63,7 @@ export function renderInventoryMarkdown(report: InventoryReport, prov: RenderPro
   push();
   push(
     "Generated flip-safety inventory: every buildable in-repo site the #189 emit flip (design of record " +
-      "`docs/emit-consistency-189-design.md` §9 step 4) turns from a validation WARNING into a hard " +
+      "`docs/_old/emit-consistency-189-design.md` §9 step 4) turns from a validation WARNING into a hard " +
       "ERROR. This is the enumeration that keeps the flip from breaking anything silently. The census " +
       "walks the WHOLE repo, skipping the `node_modules/ dist/ build/ tmp/ .git/ coverage/` directories " +
       "and any hidden (dot-prefixed) directory; build-failed and excluded files are accounted for in " +

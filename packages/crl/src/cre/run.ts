@@ -78,6 +78,9 @@ import type {
 } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import { soleRef, describeBranchCondition } from "../ast/branchCondition";
+import { conceptRefsOfConcept } from "../ast/conceptDependencies";
+import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex";
+import { foreignCriterionMessage } from "../ast/criterionDiagnostics";
 import type { BranchCondition } from "../ast/types";
 // #236 — the CRE evaluates a decision's criterion-guard refs BY REFERENCE (memoized per case),
 // never by up-front expansion. `runCel` runs NO semantic validation, so a cyclic/undefined
@@ -90,14 +93,32 @@ import { buildCriterionTablesForGraph } from "./criterionTables";
 import type {
   CELCase,
   CELCodeField,
-  CELDateField,
   CELDefinedByField,
   CELFact,
+  CELFactRefField,
   CELResultField,
   CELValueField,
 } from "../cel/ast/types";
-import type { ResolvedCelGraph } from "../cel/imports/types";
 import { classifyCanonicalToken, parseCodedValueToken } from "../cel/canonicalToken";
+// REFACTOR:grounded (#320, discussion 555): preserve authored per-reference temporal context.
+import { celIdentityDiagnostics, celResourceId, emitCelToFhir } from "../cel/emitter/emitFhir";
+import type { EmittedResource } from "../cel/emitter/types";
+import {
+  adaptPublicationCandidate, hasLocalPublicationContribution, prepareSingleLibraryPublication,
+  isLocalBooleanPublication,
+  type PublicationProgram,
+} from "../emit/publicationProgram";
+import { selectPublicationCandidate, type PublicationCandidate } from "../emit/publicationSelection";
+import { interpretPublicationCodeableValue } from "../emit/publicationDomain";
+import { produceMembershipCandidate } from "../emit/publicationProducer";
+import { adaptServiceRequestPublicationCandidate, matchesPublicationSource, matchesCelPublicationPatient } from "../emit/publicationSource";
+import { readPolicyId } from "../fhir-emitter/metadata";
+import { resolveCaseFactDates } from "../cel/factDate";
+import { resolveDefinedByTarget } from "../cel/definedByResolve";
+import type { ResolvedCelGraph } from "../cel/imports/types";
+import { createPublicationContext } from "../emit/publicationContext";
+import { buildLibraryScopes, lookupKnownLibrary } from "../imports/scopes";
+import type { RegistryEntry } from "../imports/types";
 import { inlineAnswerSet } from "../fhir-emitter/inlineAnswerSet";
 import { isValueReadingBooleanConcept, isPureQuestionConcept } from "../template-match/recencyValueConcept";
 import { resolveConceptPipeline } from "../template-match/resolvePipeline";
@@ -110,6 +131,7 @@ import {
   type LocalConceptMember,
 } from "../cel/localMembership";
 import { sourceMembersOfConcept, terminologyMembersByName } from "../cel/sourceMembership";
+import { compareFhirTemporal } from "../cel/temporal";
 import type { LsLocation } from "../language-services/contracts";
 import { toZeroBasedRange } from "../language-services/contracts";
 // childId + idOf/nameOf are single-sourced in ast/ (natural layer direction); re-exported here for existing consumers
@@ -206,6 +228,9 @@ export interface TraceNode {
    * rather than infer it from an absent recommendation.
    */
   blockedUnknown?: boolean;
+  /** An evaluated publication failed. This condition cannot select its activity; independent
+   * `all:` siblings may still run. Distinct from a false condition or an unknown-data pause. */
+  publicationErrors?: PublicationEvaluationFailure[];
   guardedOut?: boolean;
   guard?: {
     polarity: "unless" | "only-when";
@@ -241,6 +266,8 @@ export interface CaseRun {
   decision: string | null;
   status: "pass" | "fail" | "error";
   expected: { leaf: string; branch: string } | null;
+  /** Publication condition errors may preserve independent all: activities with status:error.
+   * Legacy case-global faults discard the produced set because evaluation is unreliable. */
   produced: ProducedRec[];
   trace: TraceNode[];
   diagnostics: string[];
@@ -300,6 +327,17 @@ interface LocalMembershipIndex {
 interface ConceptEval {
   sat: Tri;
   composition?: CompositionTrace;
+  /** REFACTOR:grounded (#320): preserve the selected opaque resource and its attribution. */
+  publicationCandidate?: PublicationCandidate<Record<string, unknown>>;
+  publicationResult?:
+    | { state: "missing" }
+    | { state: "selected"; candidate: PublicationCandidate<Record<string, unknown>> }
+    | { state: "failed"; code: string; message: string };
+}
+
+interface PublicationEvaluationFailure {
+  code: string;
+  message: string;
 }
 
 /**
@@ -341,6 +379,10 @@ export interface OwnCandidate {
 }
 
 interface Ctx {
+  publicationProgram?: PublicationProgram;
+  publicationResources: readonly EmittedResource[];
+  publicationFacts: ReadonlyMap<string, string>;
+  publicationSubjectReference: string;
   /** Concepts directly satisfied by a case fact (`defined by`). */
   directFacts: Set<Id>;
   factsByConcept: Map<Id, string[]>;
@@ -424,6 +466,9 @@ interface Ctx {
   delegationStack: Set<Id>;
   /** Set when delegation hit a cycle — the case run reports `status: "error"` (no pass/fail) rather than a partial result. */
   runtimeError: boolean;
+  /** Typed publication failures invalidate the evaluated condition, not independent `all:`
+   * siblings. The case still reports error. Legacy runtimeError remains case-global. */
+  publicationErrors: PublicationEvaluationFailure[];
 }
 
 /**
@@ -769,15 +814,43 @@ function evaluateMembership(stage: ResolvedStage, entry: ConceptEntry, ctx: Ctx)
   // Newest wins. ⚠ An undated candidate cannot be ordered against a dated one, so a mix refuses rather than
   // treating "no date" as oldest — a silent assumption that would decide real cases.
   if (cands.some((c) => c.date === undefined) && cands.length > 1) {
-    return refusePipeline(entry, ctx, `subject "${subjectArg.value}" has candidates with and without dates, so newest-wins cannot be ordered`);
+    return refusePipeline(
+      entry,
+      ctx,
+      `subject "${subjectArg.value}" has candidates with and without dates, so newest-wins cannot be ordered`,
+    );
   }
-  const newest = cands.reduce((a, b) => ((b.date ?? "") > (a.date ?? "") ? b : a));
-  const tied = cands.filter((c) => (c.date ?? "") === (newest.date ?? ""));
+  // REFACTOR:grounded (#320, review 556): compare instants by their actual time, preserving authored
+  // offsets and precision in the emitted data. A missing timezone/calendar field is never invented.
+  // One candidate needs no ordering; uncertain or unsupported comparisons refuse without a verdict.
+  let newest = cands[0];
+  let tied = [newest];
+  for (const candidate of cands.slice(1)) {
+    const order = compareFhirTemporal(candidate.date!, newest.date!);
+    if (order === "after") {
+      newest = candidate;
+      tied = [candidate];
+    } else if (order === "equal") {
+      tied.push(candidate);
+    } else if (order !== "before") {
+      return refusePipeline(
+        entry,
+        ctx,
+        `subject "${subjectArg.value}" needs temporal comparison of "${candidate.date}" and "${newest.date}" that is ${order} for this evaluator; no winner was selected. Supply comparable known dates or supported full timestamps with explicit time zones; missing precision is not inferred`,
+      );
+    }
+  }
   if (tied.length > 1) {
-    const distinct = new Set(tied.map((c) => (c.codedValue ? `${c.codedValue.system}|${c.codedValue.code}` : "")));
+    const distinct = new Set(
+      tied.map((c) => (c.codedValue ? `${c.codedValue.system}|${c.codedValue.code}` : "")),
+    );
     if (distinct.size > 1) {
       // ⚠ Exactly the cell the emitted `id` sort would decide and we deliberately do not replicate.
-      return refusePipeline(entry, ctx, `subject "${subjectArg.value}" has disagreeing candidates on the same date, and the tie-break is the emitted record id`);
+      return refusePipeline(
+        entry,
+        ctx,
+        `subject "${subjectArg.value}" has disagreeing candidates on the same date, and the tie-break is the emitted record id`,
+      );
     }
   }
 
@@ -824,15 +897,118 @@ function refusePipeline(entry: ConceptEntry, ctx: Ctx, why: string): Tri {
  */
 type Tri = boolean | null;
 
+function reportPublicationFailure(ctx: Ctx, failure: PublicationEvaluationFailure): void {
+  // Every replay must mark its current branch failed, even when the human diagnostic was
+  // already rendered. Deduplicating this event stream would let cached failures select leaves.
+  ctx.publicationErrors.push({ code: failure.code, message: failure.message });
+  const rendered = `${failure.code}: ${failure.message}`;
+  if (!ctx.diagnostics.includes(rendered)) ctx.diagnostics.push(rendered);
+}
+
+// REFACTOR:grounded (#320, review 560): selection precedes value reading and retains actual CEL FHIR
+// resources. A newer unknown displaces an older answer, and a selector error cannot reach a leaf.
+function evaluatePublication(entry: ConceptEntry, ctx: Ctx): ConceptEval {
+  const fail = (code: string, message: string): ConceptEval => {
+    // Preserve the originating publication through cache/producer propagation. Two concepts
+    // can fail with the same generic adapter message and must remain separately actionable.
+    const locatedMessage = `${labelOf(entry.lib, entry.node.name)}: ${message}`;
+    reportPublicationFailure(ctx, { code, message: locatedMessage });
+    return { sat: null, publicationResult: { state: "failed", code, message: locatedMessage } };
+  };
+  const lookup = ctx.publicationProgram?.lookup(entry.filePath, entry.node.name, entry.node.location);
+  if (lookup?.kind !== "publication") {
+    return lookup?.kind === "error" ? fail(lookup.diagnostic.kind ?? "publication-invalid", lookup.diagnostic.message)
+      : fail("publication-unsupported-scope", "No prepared publication authority is available.");
+  }
+  const descriptor = lookup.descriptor;
+  const candidates: PublicationCandidate<Record<string, unknown>>[] = [];
+  const factsByCandidate = new Map<string, string[]>();
+  if (hasLocalPublicationContribution(descriptor)) for (const emitted of ctx.publicationResources) {
+    const resource = emitted.body;
+    if (resource.resourceType !== descriptor.resourceType) continue;
+    const coding = (resource.code as { coding?: { system?: string; code?: string }[] } | undefined)?.coding;
+    if (!coding?.some((c) => c.system === descriptor.localCode.system && c.code === descriptor.localCode.code)) continue;
+    const adapted = adaptPublicationCandidate(descriptor, resource);
+    if (adapted.kind === "error") {
+      return fail(adapted.code, adapted.message);
+    }
+    candidates.push(adapted.candidate);
+    const fact = ctx.publicationFacts.get(String(resource.id));
+    factsByCandidate.set(adapted.candidate.key, fact === undefined ? [] : [fact]);
+  }
+  // REFACTOR:grounded (#320, review 564): evaluate actual CEL-emitted source resources.
+  for (const source of descriptor.sources ?? []) for (const emitted of ctx.publicationResources) {
+    const resource = emitted.body;
+    if (!matchesPublicationSource(source, resource)) continue;
+    // Match the CEL/pinned repository compartment before projection, including unresolved subjects.
+    if (!matchesCelPublicationPatient(resource, ctx.publicationSubjectReference)) continue;
+    const adapted = adaptServiceRequestPublicationCandidate(descriptor, source, resource, ctx.publicationSubjectReference);
+    if (adapted.kind === "error") return fail(adapted.code, adapted.message);
+    candidates.push(adapted.candidate);
+    const fact = ctx.publicationFacts.get(String(resource.id));
+    factsByCandidate.set(adapted.candidate.key, fact === undefined ? [] : [fact]);
+  }
+  if (descriptor.producer !== undefined) {
+    const operandId = idOf(descriptor.producer.operand.libraryName, descriptor.producer.operand.conceptName);
+    const operandEntry = ctx.concepts.get(operandId);
+    if (operandEntry === undefined || operandEntry.filePath !== entry.filePath)
+      return fail("publication-unsupported-scope", "CRE foreign publication producers are not implemented.");
+    const operand = evalConcept(operandId, ctx).publicationResult;
+    if (operand === undefined) return fail("publication-missing-envelope", "Membership operand has no publication result.");
+    if (operand.state === "failed") return { sat: null, publicationResult: operand };
+    const produced = produceMembershipCandidate(descriptor, operand.state === "selected" ? operand.candidate : undefined, ctx.publicationSubjectReference);
+    if (produced.kind === "error") return fail(produced.code, produced.message);
+    if (produced.kind === "candidate") {
+      candidates.push(produced.candidate);
+      factsByCandidate.set(produced.candidate.key, ctx.factsByConcept.get(operandId) ?? []);
+    }
+  }
+  const selected = selectPublicationCandidate(candidates, { conceptId: descriptor.conceptId, equalTime: descriptor.selector.equalTime });
+  if (selected.state === "failed") {
+    return fail(selected.diagnostic.code, JSON.stringify(selected.diagnostic));
+  }
+  const id = idOf(entry.lib, entry.node.name);
+  if (selected.state === "missing") {
+    ctx.factsByConcept.set(id, []);
+    return { sat: null, publicationResult: selected };
+  }
+  if (descriptor.valueDomain !== undefined) {
+    const interpreted = interpretPublicationCodeableValue(descriptor.valueDomain, selected.candidate.resource);
+    if (interpreted.kind === "error") return fail(interpreted.code, interpreted.message);
+  }
+  ctx.factsByConcept.set(id, factsByCandidate.get(selected.candidate.key) ?? []);
+  const value = selected.candidate.resource.valueBoolean;
+  return { sat: typeof value === "boolean" ? value : null, publicationCandidate: selected.candidate, publicationResult: selected };
+}
+
 const kNot = (a: Tri): Tri => (a === null ? null : !a);
 const kAnd = (xs: readonly Tri[]): Tri =>
   xs.some((x) => x === false) ? false : xs.some((x) => x === null) ? null : true;
 const kOr = (xs: readonly Tri[]): Tri =>
   xs.some((x) => x === true) ? true : xs.some((x) => x === null) ? null : false;
 
+// REFACTOR:grounded (#320): all dependent definitions share one refusal boundary until result
+// typing is integrated. Inspect raw reference nodes, including unmatched narrative operands.
+function definitionUsesPublication(node: unknown, lib: string, ctx: Ctx): boolean {
+  if (node === null || typeof node !== "object") return false;
+  if (Array.isArray(node)) return node.some((item) => definitionUsesPublication(item, lib, ctx));
+  const item = node as Record<string, unknown>;
+  const ref = item.type === "NConceptRef" ? item.value : item.ref;
+  if (typeof ref === "string" || (ref && typeof ref === "object" && (ref as { type?: string }).type === "QualifiedReference")) {
+    const reference = ref as ReferenceName;
+    if (ctx.concepts.get(idOf(getRefLibrary(reference) ?? lib, getRefName(reference)))?.node.shapeReduction !== undefined) return true;
+  }
+  return Object.values(item).some((child) => definitionUsesPublication(child, lib, ctx));
+}
+
 function evalConcept(id: Id, ctx: Ctx): ConceptEval {
   const cached = ctx.cache.get(id);
-  if (cached) return cached;
+  if (cached) {
+    if (cached.publicationResult?.state === "failed") {
+      reportPublicationFailure(ctx, cached.publicationResult);
+    }
+    return cached;
+  }
   if (ctx.stack.has(id)) {
     const e = ctx.concepts.get(id);
     ctx.diagnostics.push(
@@ -844,6 +1020,18 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
   ctx.stack.add(id);
   const cyclesBefore = ctx.cycleHits;
   const entry = ctx.concepts.get(id);
+  if (entry?.node.shapeReduction !== undefined) {
+    const result = evaluatePublication(entry, ctx);
+    ctx.stack.delete(id);
+    ctx.cache.set(id, result);
+    return result;
+  }
+  if (entry && definitionUsesPublication(entry.node.definition, entry.lib, ctx)) {
+    ctx.stack.delete(id);
+    ctx.runtimeError = true;
+    ctx.diagnostics.push(`publication-unsupported-context: concept "${entry.node.name}" consumes a selected publication in a dependent definition; shared dependent result typing is not implemented yet.`);
+    return { sat: null };
+  }
   // `runtimeErrorBefore` is captured at the TOP, before BOTH error-capable arms (the composition/reduction refuse and
   // the value-reading direct-arm conflict refuse below), so an error raised while evaluating THIS node (directly or via
   // a consumed operand) excludes it from memoization. ⚠ It is a monotonic boolean, not a per-eval counter: if a PRIOR
@@ -1040,9 +1228,10 @@ function truthOf(id: Id, ctx: Ctx): { eval: ConceptEval; authoritative: boolean 
     cycleHits: 0,
     reportedUnresolved: new Set(ctx.reportedUnresolved),
     runtimeError: false, // fresh — detect ONLY this off-path eval's unevaluable verdict
+    publicationErrors: [],
   };
   const ev = evalConcept(id, scratch);
-  return { eval: ev, authoritative: !scratch.runtimeError };
+  return { eval: ev, authoritative: !scratch.runtimeError && scratch.publicationErrors.length === 0 };
 }
 
 /**
@@ -1208,6 +1397,12 @@ function conceptSatisfied(
   // A bare `when`/guard ref resolves against the CURRENT decision's library (the frame). Same-library is the degenerate
   // case `frame.currentLib === ctx.rootLib`; a cross-library sub carries its own lib so its bare refs bind there (#172).
   const id = idOf(getRefLibrary(ref) ?? frame.currentLib, getRefName(ref));
+  const target = ctx.concepts.get(id)?.node;
+  if (target?.shapeReduction !== undefined && target.valueTypes[0] !== "boolean") {
+    ctx.runtimeError = true;
+    ctx.diagnostics.push(`publication-unsupported-context: guard "${getRefName(ref)}" requires a Boolean publication.`);
+    return { sat: null, facts: [] };
+  }
   const ev = evalConcept(id, ctx);
   return {
     sat: ev.sat,
@@ -1248,12 +1443,11 @@ function evalBranchCondition(
   }
   if (cond.type === "BranchConditionCriterionRef") {
     // #236: evaluate a criterion by REFERENCE to its boolean body (memoized per case), NOT by
-    // inline expansion. A criterion is library-local (cross-library criterion refs are a
-    // validation error), so it resolves in the current frame's library.
+    // inline expansion. REFACTOR:grounded (#320, review 563 r4): this public entry does
+    // not run validation, so enforce the library-local criterion boundary before lookup.
     const name = getRefName(cond.ref);
     const lib = getRefLibrary(cond.ref) ?? frame.currentLib;
     const cid = idOf(lib, name);
-    const crit = ctx.criterionTables?.get(lib)?.get(name);
     const critTrace = (
       sat: Tri,
       facts: string[],
@@ -1281,29 +1475,54 @@ function evalBranchCondition(
         },
       };
     };
-    if (!crit) {
-      // Undefined criterion → LOUD (deduped) + closed-world false. A SILENT false would invert to
-      // a spurious TRUE under `not <criterion>`, so it must be diagnosed (mirrors an unresolved
-      // concept). Validated emit forbids this; the CRE runs on un-revalidated input, so guard here.
+    if (lib !== frame.currentLib) {
+      ctx.runtimeError = true;
       if (!ctx.reportedUnresolved.has(cid)) {
         ctx.reportedUnresolved.add(cid);
-        ctx.diagnostics.push(`criterion "${name}" resolves to no definition in ${lib} — treated as unsatisfied`);
+        ctx.diagnostics.push(
+          `criterion-guard-unavailable: ${foreignCriterionMessage(labelOf(lib, name))}`,
+        );
+      }
+      return critTrace(false, []);
+    }
+    const crit = ctx.criterionTables?.get(lib)?.get(name);
+    if (!crit) {
+      // A malformed guard is an execution error, not a false determination or a null pause.
+      // Keep the existing global structural-error channel so negation/fallback cannot produce a leaf.
+      ctx.runtimeError = true;
+      if (!ctx.reportedUnresolved.has(cid)) {
+        ctx.reportedUnresolved.add(cid);
+        ctx.diagnostics.push(`criterion-guard-unavailable: criterion "${name}" resolves to no definition in ${lib}.`);
       }
       return critTrace(false, []);
     }
     const cached = ctx.criterionCache.get(cid);
     if (cached) return critTrace(cached.sat, cached.facts, cached.body);
     if (ctx.criterionStack.has(cid)) {
-      // Cycle-break: closed-world false, diagnosed, NOT memoized (mirrors evalConcept).
-      ctx.diagnostics.push(`criterion cycle detected at "${name}" (${lib}) — treated as unsatisfied`);
+      // Break the cycle as a structural error; no dependent value may be cached as a determination.
+      ctx.runtimeError = true;
+      ctx.diagnostics.push(`criterion-guard-unavailable: criterion cycle detected at "${name}" (${lib}).`);
       ctx.cycleHits++;
       return critTrace(false, []);
     }
     ctx.criterionStack.add(cid);
     const cyclesBefore = ctx.cycleHits;
-    const inner = evalBranchCondition(crit.condition, ctx, { ...frame, currentLib: lib });
-    ctx.criterionStack.delete(cid);
-    if (ctx.cycleHits === cyclesBefore) {
+    const publicationErrorsBefore = ctx.publicationErrors.length;
+    // REFACTOR:grounded (#320, review 563): isolate this synchronous evaluation's
+    // fault flag for caching, then restore every prior case fault. A repeated fault
+    // still marks this evaluation even when its diagnostic has already been deduplicated.
+    const runtimeErrorBefore = ctx.runtimeError;
+    ctx.runtimeError = false;
+    let inner: ReturnType<typeof evalBranchCondition>;
+    let evaluationFailed = true;
+    try {
+      inner = evalBranchCondition(crit.condition, ctx, { ...frame, currentLib: lib });
+      evaluationFailed = ctx.runtimeError;
+    } finally {
+      ctx.runtimeError = runtimeErrorBefore || ctx.runtimeError;
+      ctx.criterionStack.delete(cid);
+    }
+    if (!evaluationFailed && ctx.cycleHits === cyclesBefore && ctx.publicationErrors.length === publicationErrorsBefore) {
       ctx.criterionCache.set(cid, { sat: inner.sat, facts: inner.facts, body: inner.trace });
     }
     return critTrace(inner.sat, inner.facts, inner.trace);
@@ -1353,6 +1572,15 @@ function evalGuard(
   frame: Frame,
 ): { excluded: boolean; info?: TraceNode["guard"] } {
   if (!guard) return { excluded: false };
+  // REFACTOR:grounded (#320, review 560 E8): menu-wide null/pause behavior is not integrated
+  // with FHIR apply yet. No CRE-only halt or false coercion may claim parity for this context.
+  const publicationOperand = ctx.concepts.get(idOf(getRefLibrary(guard.conceptName) ?? frame.currentLib,
+    getRefName(guard.conceptName)))?.node.shapeReduction !== undefined;
+  if (publicationOperand) {
+    ctx.runtimeError = true;
+    ctx.diagnostics.push("publication-unsupported-context: action guards over selected publications require integrated menu pause behavior, not available in this slice.");
+    return { excluded: true };
+  }
   const { sat, composition } = conceptSatisfied(guard.conceptName, ctx, frame);
   // #189 null/pause — an ACTION guard stays TWO-VALUED. Its emitted carrier is `not Coalesce(<ref>, false)`
   // (decision.ts), deliberately total so `$apply` and the CRE agree; an unknown there reads FALSE and does
@@ -1588,6 +1816,7 @@ function walkBranches(
     // assert execution against — names the criterion (`Eligible`), consistent with the VM display
     // label. A criterion is a named unit end-to-end (eval trace + VM), never an inlined body.
     const label = describeBranchCondition(b.condition, getRefName);
+    const publicationErrorsBefore = ctx.publicationErrors.length;
     const soleR = soleRef(b.condition);
     let sat: Tri;
     let node: TraceNode;
@@ -1620,6 +1849,21 @@ function walkBranches(
         conditionTrace: r.trace,
         children: [],
       };
+    }
+    if (ctx.runtimeError) {
+      node.satisfied = false;
+      into.push(node);
+      return;
+    }
+    if (ctx.publicationErrors.length !== publicationErrorsBefore) {
+      node.satisfied = false;
+      if (node.conditionTrace) node.conditionTrace.satisfied = false;
+      node.publicationErrors = ctx.publicationErrors.slice(publicationErrorsBefore);
+      into.push(node);
+      // An error is neither false nor unknown: never execute this condition's activity or
+      // cross a failed ordered prerequisite. Native $apply retains independent all: siblings.
+      if (ordered) return;
+      continue;
     }
     into.push(node);
     if (sat === true) {
@@ -1732,20 +1976,36 @@ function runCase(
   // ⭐ #189 gap 3 — the mechanical member set of a named terminology, threaded exactly as `resolveDecision`
   // is (this function has no graph of its own).
   terminologyMembers: (lib: string, name: string) => readonly { system: string; code: string }[] | undefined,
+  // REFACTOR:grounded (#320): shared invocation clock and exact emitted-identity collision finding.
+  now: Date,
+  collisionDiagnostic?: string,
+  publication?: { program?: PublicationProgram; resources?: readonly EmittedResource[]; error?: string; celLibrary: string },
 ): CaseRun {
   const diagnostics: string[] = [];
   let subjectFact: string | undefined;
-  const factRefs: string[] = [];
-  // #189 Piece 2 (disc 508 D5(3)) — fact-refs carrying an `absent`/`negative` intent modifier. On a LOCAL
-  // determination fact this silently inverts membership (the code still matches), so it is rejected loud below.
-  const factRefsWithIntent = new Set<string>();
+  // REFACTOR:grounded (#320): clauses belong to each reference, never a last-wins fact-name map.
+  const factRefs: CELFactRefField[] = [];
   let result: CELResultField | undefined;
   for (const b of c.body) {
     if (b.type === "CELSubjectField") subjectFact = b.factName;
-    else if (b.type === "CELFactRefField") {
-      factRefs.push(b.factName);
-      if (b.intent !== undefined) factRefsWithIntent.add(b.factName);
-    } else if (b.type === "CELResultField") result = b; // v1: single decision-result assertion
+    else if (b.type === "CELFactRefField") factRefs.push(b);
+    else if (b.type === "CELResultField") result = b; // Existing single-result evaluator contract.
+  }
+  const caseDates = resolveCaseFactDates(c, facts, now);
+  const inputErrors = caseDates.diagnostics.map((d) => `${d.kind}: ${d.message}`);
+  if (publication?.error) inputErrors.push(publication.error);
+  if (collisionDiagnostic) inputErrors.push(collisionDiagnostic);
+  if (inputErrors.length > 0) {
+    return {
+      case: c.name,
+      decision: null,
+      status: "error",
+      expected: null,
+      produced: [],
+      trace: [],
+      diagnostics: inputErrors,
+      conceptTruth: [],
+    };
   }
 
   // #189 Piece 2 (disc 508) — build the directly-populated concept set by CODE-DRIVEN membership (compartment-global,
@@ -1806,7 +2066,7 @@ function runCase(
     // ⚠ THE OWN ARM IS THE **LOCAL** ARM. A source representation's fact is a candidate in the collection, not
     // the concept's own answer, so its boolean must never be read as one. Inert today (no value-reading concept
     // has a posrep), and fixed here so it stays right when the classification widens — see `Ctx.candidates`.
-    if (valueReadingIds.has(id) && arm === "local") {
+    if (valueReadingIds.has(id) && arm === "local" && !isLocalBooleanPublication(concepts.get(id)?.node)) {
       if (boolVal !== undefined) {
         const vs = ownBoolValues.get(id) ?? [];
         vs.push(boolVal);
@@ -1832,7 +2092,9 @@ function runCase(
     }
   };
   let membershipError: string | undefined;
-  for (const fn of factRefs) {
+  // REFACTOR:grounded (#320): date and intent stay scoped to the same authored reference.
+  for (const ref of factRefs) {
+    const fn = ref.factName;
     if (fn === subjectFact) continue;
     const fact = facts.get(fn);
     if (!fact) {
@@ -1872,19 +2134,21 @@ function runCase(
       valueField?.value.kind === "string"
         ? parseCodedValueToken(valueField.value.value, localIndex.answerSets.get(namedId))
         : undefined;
-    const dateField = fact.body.find((x): x is CELDateField => x.type === "CELDateField");
+    // REFACTOR:grounded (#320): both local and source candidates use the case-resolved date.
+    const date = caseDates.dates.get(ref);
     const factValue: FactValue = {
       ...(valueField?.value.kind === "boolean" ? { boolValue: valueField.value.value } : {}),
       ...(codedFromValue !== undefined && "parts" in codedFromValue
         ? { codedValue: { system: codedFromValue.parts.system ?? "", code: codedFromValue.parts.code } }
         : {}),
-      ...(dateField !== undefined ? { date: dateField.value } : {}),
+      ...(date !== undefined ? { date } : {}),
     };
 
     // D5(3) backstop: an `absent`/`negative` intent modifier on a LOCAL determination fact inverts its clinical
     // meaning, but membership sees only the code → the concept would compute PRESENT (the opposite). Refuse loud
     // (negation semantics = #257); mirrors the validator error for a direct `run_decision` caller that skips it.
-    if (isLocalShape && factRefsWithIntent.has(fn)) {
+    // REFACTOR:grounded (#320): a modifier on another reference cannot taint this one.
+    if (isLocalShape && ref.intent !== undefined) {
       membershipError =
         `fact "${fn}" names a local determination concept but is referenced with an intent modifier — a negated/` +
         `absent local fact would compute its concept PRESENT (the opposite); rejected (negation semantics = #257).`;
@@ -2057,6 +2321,10 @@ function runCase(
   }
 
   const ctx: Ctx = {
+    publicationProgram: publication?.program,
+    publicationResources: publication?.resources ?? [],
+    publicationFacts: new Map(factRefs.map((ref) => [celResourceId(publication?.celLibrary ?? "", c.name, ref.factName), ref.factName])),
+    publicationSubjectReference: subjectFact === undefined ? "" : `Patient/${celResourceId(publication?.celLibrary ?? "", c.name, subjectFact)}`,
     directFacts,
     factsByConcept,
     // ⭐ #189 gap 3 — closed over the graph, exactly as `resolveDecision` is, so the membership predicate reads
@@ -2086,6 +2354,7 @@ function runCase(
     // same-library recursion this is a 1:1 rename of the old bare-name seed.
     delegationStack: new Set([idOf(coveredLib, decisionName)]),
     runtimeError: false,
+    publicationErrors: [],
   };
   // Root frame: the covered library + its file. A same-library recursion keeps this frame; a cross-library `use
   // decision` pushes the sub's `{ currentLib, currentFilePath }` for its body (#172).
@@ -2107,6 +2376,22 @@ function runCase(
     };
   }
 
+  if (ctx.publicationErrors.length > 0) {
+    // A failed condition suppresses only its dependent activity. Independently satisfied all:
+    // siblings remain meaningful (as measured in native $apply), while status stays error.
+    // This is deliberately separate from the legacy unreliable-case discard above.
+    return {
+      case: c.name,
+      decision: decisionName,
+      status: "error",
+      expected: { leaf: decisionName, branch: expectedBranch },
+      produced: ctx.produced,
+      trace: ctx.trace,
+      diagnostics: ctx.diagnostics,
+      conceptTruth: [],
+    };
+  }
+
   const producedNames = new Set(ctx.produced.map((p) => p.recommendation));
   const status: CaseRun["status"] = producedNames.has(expectedBranch) ? "pass" : "fail";
   // #187 Todo 2: per-concept case truth. Computed AFTER the runtimeError check (produced/trace are complete + status
@@ -2124,7 +2409,9 @@ function runCase(
 }
 
 /** Run every case in a resolved CEL graph against its covered CRL decision(s). */
-export function runCel(graph: ResolvedCelGraph): CelRunResult {
+export function runCel(graph: ResolvedCelGraph, opts?: { now?: Date }): CelRunResult {
+  // REFACTOR:grounded (#320): one invocation clock, used only by explicit now anchors.
+  const now = opts?.now ?? new Date();
   const errors: string[] = [];
   if (!graph.cel) return { success: false, runs: [], errors: ["CEL did not parse"] };
   if (!graph.coversTarget)
@@ -2144,6 +2431,12 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
   // time, memoized), so a doubling-DAG criterion no longer materializes the CRE walk tree. Threaded
   // into Ctx below; the view-model shares the same tables (expandDecisions.ts).
   const criterionTablesByLib = buildCriterionTablesForGraph(graph);
+  // REFACTOR:grounded (#320, review 563): a reached case can pass despite an
+  // off-path invalid declaration. Surface that static emission limit without
+  // changing the reached activity or converting it into a runtime failure.
+  const staticCriterionDiagnostics = buildCriterionIndex(graph.coversTarget.ast.statements).entries
+    .filter((entry) => entry.status === "cycle" || entry.status === "undefined-dependency")
+    .map((entry) => `criterion-guard-unavailable: Static covered-library analysis: criterion ${labelOf(coveredLib, entry.name)} has ${entry.status}; a passing case does not establish that this library can be emitted.`);
   // name → decision (RAW; no expansion). Mirrors the map the old `expandCoveredDecisions` returned,
   // minus the materialization — first-write-wins (a duplicate decision name is a validation error).
   const decisions = new Map<string, Decision>();
@@ -2204,24 +2497,157 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
 
   const filePath = graph.coversTarget.filePath;
   const runs: CaseRun[] = [];
-  for (const s of graph.cel.statements) {
-    if (s.type === "CELCase")
-      runs.push(
-        runCase(
-          s,
-          decisions,
-          facts,
-          coveredLib,
-          filePath,
-          concepts,
-          localIndex,
-          sourceIndex,
-          resolveDecision,
-          criterionTablesByLib,
-          // ⭐ #189 gap 3 — the SAME mechanical set the FHIR ValueSet and the CQL retrieve use.
-          (_lib, name) => terminologyMembersByName(name, makeLocalDomainContext(graph).base, graph.crlRegistry),
-        ),
-      );
+  // REFACTOR:grounded (#320, review 561 N1/E4): availability and include membership do not
+  // establish consumption. Follow referenced declarations, not every concept in a dependency.
+  // Covered publications still share single-library preparation; imported evaluation is not added here.
+  const rawEntries = [...(graph.crlRegistry?.byNameLocal.values() ?? []),
+    ...(graph.crlRegistry?.byNamePackage.values() ?? []), graph.coversTarget];
+  const registry = graph.crlRegistry ?? { byNameLocal: new Map<string, RegistryEntry>(), byNamePackage: new Map<string, RegistryEntry>() };
+  const entriesByPath = new Map(rawEntries.map((entry) => [entry.filePath, entry]));
+  const scopes = buildLibraryScopes([...entriesByPath.values()], [], registry);
+  const qualifiedLibraries = (node: unknown, names = new Set<string>()): Set<string> => {
+    if (node === null || typeof node !== "object") return names;
+    if (Array.isArray(node)) {
+      for (const child of node) qualifiedLibraries(child, names);
+    } else {
+      const value = node as Record<string, unknown>;
+      if (value.type === "QualifiedReference" && typeof value.libraryName === "string") names.add(value.libraryName);
+      for (const child of Object.values(value)) qualifiedLibraries(child, names);
+    }
+    return names;
+  };
+  const declarations = createPublicationContext({
+    libraries: [...entriesByPath.values()].map((entry) => ({ sourceIdentity: entry.filePath, ast: entry.ast, artifact: {} })),
+    resolveLibrary(from, qualifier) {
+      const scope = scopes.get(from);
+      const target = scope === undefined ? undefined : lookupKnownLibrary(scope, qualifier);
+      return target === undefined ? { kind: "missing" } : { kind: "resolved", sourceIdentity: target.filePath };
+    },
+  });
+  const pendingConcepts: { from: string; ref: ReferenceName }[] = [];
+  const visitedDecisions = new Set<string>();
+  const visitDecision = (entry: RegistryEntry, decision: Decision): void => {
+    const key = JSON.stringify([entry.filePath, decision.name]);
+    if (visitedDecisions.has(key)) return;
+    visitedDecisions.add(key);
+    const criteria = buildCriterionIndex(entry.ast.statements);
+    const visitAction = (action: ActionStatement): void => {
+      if (action.guard) pendingConcepts.push({ from: entry.filePath, ref: action.guard.conceptName });
+      if (action.action.type === "UseDecision") {
+        const resolved = resolveDecision(entry.ast.library.name, action.action.decisionName);
+        const owner = resolved === undefined ? undefined : entriesByPath.get(resolved.filePath);
+        if (resolved !== undefined && owner !== undefined) visitDecision(owner, resolved.decision);
+      }
+    };
+    const visitBranch = (branch: BranchBlock): void => {
+      if (branch.type === "WhenBlock") {
+        for (const atom of guardConceptClosure(branch.condition, criteria)) pendingConcepts.push({ from: entry.filePath, ref: atom.ref });
+      }
+      if (branch.body.type === "ActionStatement") visitAction(branch.body);
+      else for (const child of branch.body.statements) {
+        if (child.type === "ActionStatement") visitAction(child);
+        else visitBranch(child);
+      }
+    };
+    decision.body.statements.forEach(visitBranch);
+  };
+  for (const decision of rawDecisions) visitDecision(graph.coversTarget, decision);
+  // Preserve the covered-library preparation boundary even for an unused authored publication.
+  for (const statement of graph.coversTarget.ast.statements) {
+    if (statement.type === "Concept" && statement.shapeReduction !== undefined) pendingConcepts.push({ from: filePath, ref: statement.name });
   }
+  // CEL's existing target resolver owns local-first precedence and the concept/activity distinction.
+  for (const fact of facts.values()) {
+    for (const field of fact.body) {
+      if (field.type !== "CELDefinedByField") continue;
+      const target = resolveDefinedByTarget(field.ref, graph);
+      if (target?.kind !== "concept") continue;
+      const owner = target.lib === coveredLib ? graph.coversTarget : registry.byNameLocal.get(target.lib) ?? registry.byNamePackage.get(target.lib);
+      if (owner !== undefined) pendingConcepts.push({ from: owner.filePath, ref: target.name });
+    }
+  }
+  const visitedConcepts = new Set<string>();
+  const publicationPaths = new Set<string>();
+  while (pendingConcepts.length > 0) {
+    const pending = pendingConcepts.pop()!;
+    const hit = declarations.lookupConcept(pending.from, pending.ref);
+    if (hit.kind !== "hit" || visitedConcepts.has(hit.identity.key)) continue;
+    visitedConcepts.add(hit.identity.key);
+    if (hit.node.shapeReduction !== undefined) publicationPaths.add(hit.identity.sourceIdentity);
+    for (const ref of conceptRefsOfConcept(hit.node)) pendingConcepts.push({ from: hit.identity.sourceIdentity, ref });
+  }
+  const hasPublication = publicationPaths.size > 0;
+  let publicationProgram: PublicationProgram | undefined;
+  let publicationError: string | undefined;
+  let publicationEmission: ReturnType<typeof emitCelToFhir> | undefined;
+  if (hasPublication) {
+    const hasForeignReference = (node: unknown): boolean => [...qualifiedLibraries(node)].some((name) => name !== coveredLib);
+    const unsupportedScope = graph.coversTarget.ast.includes.length > 0 ||
+      hasForeignReference(graph.coversTarget.ast) || hasForeignReference(graph.cel) ||
+      [...publicationPaths].some((source) => source !== filePath);
+    if (unsupportedScope) {
+      publicationError = "publication-unsupported-scope: run_decision currently evaluates selected publications only in an unambiguous covered library without imports or foreign-qualified references. Use emitted artifacts for this scope.";
+    } else {
+      try {
+        const domain = makeLocalDomainContext(graph);
+        publicationProgram = prepareSingleLibraryPublication(graph.coversTarget.ast, {
+          canonicalBase: domain.base,
+          localDomainId: domain.resolver?.domainIdFor(graph.coversTarget) ?? coveredLib,
+          policyId: graph.projectRoot ? readPolicyId(graph.projectRoot) : undefined,
+        }, filePath, graph.coversTarget.packageIdentity);
+        if (publicationProgram.diagnostics.length > 0) {
+          publicationError = publicationProgram.diagnostics.map((d) => `${d.kind}: ${d.message}`).join("\n");
+        } else {
+          publicationEmission = emitCelToFhir(graph, { now });
+        }
+      } catch (error) {
+        publicationError = `publication-preparation-failed: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+  }
+  // REFACTOR:grounded (#320, review 556): share actual output identity diagnostics with authoring.
+  const collisions = celIdentityDiagnostics(graph, { now });
+  for (const s of graph.cel.statements) {
+    if (s.type !== "CELCase") continue;
+    const collision = collisions.find(
+      (d) =>
+        d.location?.start.line === s.location.start.line &&
+        d.location?.start.column === s.location.start.column,
+    );
+    const collisionDiagnostic = collision ? `id-collision: ${collision.message}` : undefined;
+    const emittedPublicationCase = publicationEmission?.emittedCases.find((emitted) => emitted.caseName === s.name);
+    // The writer can diagnose an omitted fact while retaining the case. If any input failed,
+    // localize diagnostics by re-emitting this exact case AST; never join errors on lossy case slugs
+    // or allow one malformed case to poison another. Original cross-case identity errors remain above.
+    const scopedEmission = publicationEmission?.diagnostics.some((d) => d.severity === "error" || d.kind === "unsupported-yet")
+      ? emitCelToFhir({ ...graph, cel: { ...graph.cel, statements: graph.cel.statements.filter((statement) => statement.type !== "CELCase" || statement === s) } }, { now })
+      : undefined;
+    const omittedInputs = scopedEmission?.diagnostics.filter((d) => d.severity === "error" || d.kind === "unsupported-yet") ?? [];
+    const casePublicationError = publicationError ?? (omittedInputs.length > 0
+      ? "publication-input-emission-failed: " + omittedInputs.map((d) => `${d.kind}: ${d.message}`).join("; ")
+      : hasPublication && !emittedPublicationCase
+      ? "publication-input-emission-failed: " + (publicationEmission?.diagnostics.map((d) => `${d.kind}: ${d.message}`).join("; ") ?? "No case resources were emitted.")
+      : undefined);
+    runs.push(
+      runCase(
+        s,
+        decisions,
+        facts,
+        coveredLib,
+        filePath,
+        concepts,
+        localIndex,
+        sourceIndex,
+        resolveDecision,
+        criterionTablesByLib,
+        (_lib, name) =>
+          terminologyMembersByName(name, makeLocalDomainContext(graph).base, graph.crlRegistry),
+        now,
+        collisionDiagnostic,
+        hasPublication ? { program: publicationProgram, resources: emittedPublicationCase?.resources, error: casePublicationError, celLibrary: graph.cel.library.name } : undefined,
+      ),
+    );
+  }
+  for (const run of runs) run.diagnostics.push(...staticCriterionDiagnostics);
   return { success: true, runs, errors };
 }

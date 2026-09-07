@@ -7,6 +7,7 @@ import type {
   NarrativeElement,
   ArgValue,
   ReferenceName,
+  QualifiedReference,
 } from "../ast/types";
 import { getRefLibrary, isQualifiedRef } from "../ast/types";
 import { emitCQLFromAST, infoForParameterStatement, buildAuthoredObligations } from "../cql-emitter/emitCQL";
@@ -28,17 +29,17 @@ import type { Partition } from "../cql-emitter/layeredEmit";
 import { loadCatalogLibraries } from "../cql-emitter/catalog/loadCatalog";
 import {
   lowerLocalCodes,
-  astHasConceptLocalCode,
   preLowerAge,
 } from "../cql-emitter/lowerLocalCodes";
 import { readCanonicalBase, readPolicyId } from "../fhir-emitter/metadata";
 import { pascalCaseNameForId, localCodeSystemUrl } from "../fhir-emitter/slug";
-import { createLocalDomainResolver } from "../fhir-emitter/localDomain";
+import type { PublicationEmitScope } from "../emit/publicationProgram";
 import type { CRLError } from "../types/errors";
 
 import { resolveImports } from "./index";
 import { buildLibraryScopes, lookupKnownLibrary } from "./scopes";
 import { ImportDiagnostic, RegistryEntry, ResolvedGraph } from "./types";
+import { preparePublicationContext, type PreparedPublicationContext } from "./preparePublicationContext";
 
 /**
  * Per-CRL emit (v2.1.0): one CQL file per CRL library.
@@ -165,6 +166,10 @@ export interface EmitImportsResult {
   // each paired with the decision library its ADs/recommendation-PDs rebind to.
   suppressedActivityBindings?: SuppressedActivityBinding[];
   errors?: CRLError[];
+  /** Nonblocking publication preparation findings, distinct from failed emission. */
+  warnings?: readonly CRLError[];
+  /** Actual public Record defines, keyed by the prepared raw declaration identity. */
+  publicationTargets?: ReadonlyMap<string, { readonly libraryName: string; readonly define: string }>;
 }
 
 /**
@@ -191,7 +196,7 @@ export function isActivitiesOnlyLibrary(ast: CRL): boolean {
 import { safeOutputFilename } from "./safeOutputFilename";
 // Ref-walking + closure expansion factored to ./computeEmitClosure so the
 // CRL→FHIR-def lane can compute its own strict-superset closure (Todo 4 of #73).
-import { collectCqlIncludeRefs, computeCqlEmitClosure, usedDecisionLibraries } from "./computeEmitClosure";
+import { collectCqlIncludeRefs, usedDecisionLibraries } from "./computeEmitClosure";
 import type { LibraryScope } from "./scopes";
 
 function collectCrossLibraryRefs(entry: RegistryEntry): Set<string> {
@@ -354,6 +359,77 @@ export function computeSplitPlan(
   return { kind: "none", emittedLibraryNames: [lib], policyId };
 }
 
+// REFACTOR:grounded (#320, review 560) — resolve authored foreign concept references in
+// their raw scope before replacing a qualifier with a proven physical publication target.
+// Other declaration kinds and unsupported publication consumers retain their normal guards.
+function routePublicationReferences(entry: RegistryEntry, scope: PublicationEmitScope, errors: CRLError[]): RegistryEntry {
+  if (scope.program.descriptors.length === 0) return entry;
+  const routed = new Set<string>();
+  const routedLibraries = new Set<string>();
+  const retained = new Set<string>();
+  const conceptRefParents = new Set([
+    "BranchConditionRef", "DefinedAsBareRef", "DefinedAsExists", "CompositionRef", "ReductionConceptRef",
+  ]);
+  const visit = (value: unknown, conceptSlot = false): unknown => {
+    if (Array.isArray(value)) return value.map((item) => visit(item, conceptSlot));
+    if (value === null || typeof value !== "object") return value;
+    const node = value as Record<string, unknown>;
+    if (node.type === "QualifiedReference") {
+      const ref = value as QualifiedReference;
+      if (conceptSlot && ref.libraryName !== entry.name) {
+        const result = scope.program.lookup(entry.filePath, ref, ref.location);
+        if (result.kind === "error") {
+          const raw = scope.program.declarations.lookupConcept(entry.filePath, ref, ref.location);
+          if (raw.kind === "not-visible" && scope.program.descriptors.some(
+            (descriptor) => descriptor.identity.sourceIdentity === raw.targetSourceIdentity,
+          )) errors.push(result.diagnostic);
+        }
+        const target = result.kind === "publication" ? scope.publicTarget(result.descriptor.identity.key) : undefined;
+        if (target !== undefined) {
+          routed.add(ref.libraryName);
+          routedLibraries.add(target.libraryName);
+          return { ...ref, libraryName: target.libraryName, name: target.define };
+        }
+      }
+      retained.add(ref.libraryName);
+      return value;
+    }
+    return Object.fromEntries(Object.entries(node).map(([key, child]) => {
+      // Bindings are shared immutable semantic facts, not AST syntax to rewrite.
+      if (key.startsWith("__")) return [key, child];
+      const isConceptSlot = (key === "ref" && conceptRefParents.has(String(node.type))) ||
+        (node.type === "NConceptRef" && key === "value") ||
+        (node.type === "ActionGuard" && key === "conceptName");
+      return [key, visit(child, isConceptSlot)];
+    }));
+  };
+  const statements = visit(entry.ast.statements) as CRL["statements"];
+  // REFACTOR:grounded (#320, review 562): lowering replaces the authored membership
+  // body with a publication binding. That immutable descriptor still carries a real
+  // dependency on the operand's selected envelope; syntactic reference walking alone
+  // would lose it. Same-source layer edges are handled by the CQL partitioner.
+  for (const statement of statements) {
+    if (statement.type !== "Concept" || statement.__publication?.role !== "public") continue;
+    const operand = statement.__publication.descriptor.producer?.operand;
+    if (operand === undefined || operand.sourceIdentity === entry.filePath) continue;
+    const target = scope.publicTarget(operand.key);
+    if (target === undefined) {
+      errors.push({ type: "Validation", kind: "publication-missing-operand-target",
+        message: `No emitted selected-envelope target exists for ${operand.libraryName}."${operand.conceptName}".`,
+        line: statement.location.start.line, column: statement.location.start.column });
+      continue;
+    }
+    routed.add(operand.libraryName);
+    routedLibraries.add(target.libraryName);
+  }
+  const includes = entry.ast.includes.filter((include) => !routed.has(include.name) || retained.has(include.name));
+  for (const name of routedLibraries) {
+    if (!includes.some((include) => include.name === name))
+      includes.push({ type: "Include", name, location: entry.ast.location });
+  }
+  return { ...entry, ast: { ...entry.ast, statements, includes } };
+}
+
 export function emitCQLImports(rootPath: string): EmitImportsResult {
   const graph: ResolvedGraph = resolveImports(rootPath);
 
@@ -376,82 +452,52 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     };
   }
 
-  // Compute the emit closure via the factored shared expander
-  // (CRL→FHIR-def consumes a strict-superset variant). Scope-aware ref
-  // resolution preserves v2.1.0 lookup precedence (local-first for non-
-  // explicit-include refs).
-  const rawEmitClosure = computeCqlEmitClosure(graph);
+  // REFACTOR:grounded (#320, review 560) — metadata is read once at the path boundary.
+  // Keep the CQL-only reader's existing tolerance of unrelated FHIR metadata failures.
+  const canonicalBase = graph.projectRoot ? readCanonicalBase(graph.projectRoot) : undefined;
+  const policyId = graph.projectRoot ? readPolicyId(graph.projectRoot) : undefined;
+  return emitCQLImportsFromPrepared(preparePublicationContext(graph, { canonicalBase, policyId }));
+}
 
-  // Slice 3 — lower concept-level `code is` local source codes BEFORE any
-  // layer classification / split detection / collision preflight runs below.
-  // `classifyStatementLayer` (layeredEmit.ts) rejects raw `code`-bearing
-  // concepts, so a library would never be eligible for the layered split until
-  // its codes are lowered. Lower ONCE here and thread the lowered AST through
-  // EVERY decision (split detection, collision preflight, layered/per-library
-  // emit) so split-vs-no-split is decided from the SAME representation that is
-  // emitted — no plan-vs-code drift. The pass is pure (the registry AST is left
-  // untouched); we build a new closure with each entry's `ast` replaced.
-  // Direct `emitCQLFromAST` callers (CLI, tests) lower internally; this is the
-  // imports-path counterpart so the layered classification sees lowered ASTs.
-  const lowerErrors: CRLError[] = [];
-  // Slice 4 — load the project's `crl.canonicalBase` so the synthetic local
-  // codesystem's CQL `codesystem` URL is published under it, byte-equal with the
-  // FHIR lane. CQL emit must NOT hard-fail on UNRELATED FHIR-metadata problems
-  // (missing `version` etc. — the FHIR lane's concern), so we use the lightweight
-  // `readCanonicalBase` reader — it reads ONLY `crl.canonicalBase` and swallows
-  // unrelated read/parse errors. #271 — when `crl.canonicalBase` itself is
-  // absent/empty AND the library has local `code is` concepts to lower,
-  // `lowerLocalCodes` hard-errors with `missing-canonical-url-base` (no URN
-  // fallback), mirroring the FHIR lane so the two local-codesystem identities stay
-  // byte-equal.
-  let canonicalBase: string | undefined;
-  // R1 — also read the POLICY ID (`name`) so the synthetic local codesystem URL
-  // slugs from the policy id, byte-equal with the FHIR lane's `CodeSystem.url`.
-  // Like `readCanonicalBase`, this swallows unrelated FHIR-metadata errors (a
-  // missing `version` etc. is the FHIR lane's concern). When absent, the lowering
-  // falls back to the source library name (pre-R1) — but a FHIR-emitting project
-  // always has a `name` (the FHIR lane hard-fails without it), so both lanes agree.
-  let localDomainId: string | undefined;
-  if (graph.projectRoot) {
-    canonicalBase = readCanonicalBase(graph.projectRoot);
-    localDomainId = readPolicyId(graph.projectRoot);
+/** Emit without reading source or metadata again; combined FHIR/CQL emission shares this preparation. */
+export function emitCQLImportsFromPrepared(prepared: PreparedPublicationContext): EmitImportsResult {
+  const { graph, canonicalBase, policyId: localDomainId, localDomainResolver } = prepared;
+  if (graph.resolvedLibraries.length === 0 || graph.diagnostics.some((d) => d.severity === "error")) {
+    return { success: false, graph, importDiagnostics: graph.diagnostics, cqlByLibrary: [] };
   }
-  // #198 (Option B) — the per-entry local-domain / layered-identity base. The
-  // PRIMARY (closure-seed) library keeps the bare policy id; a SIBLING library
-  // (pulled into the closure via a cross-lib ref, i.e. NOT in the include-walked
-  // seed `graph.resolvedLibraries`) that ALSO declares concept-level `code is` gets
-  // a `-<librarySlug>` disambiguator so its local CodeSystem url AND its layered
-  // Library identities `S` (both derived from this base) no longer collide with the
-  // primary's. Only `code is` siblings are disambiguated: a non-`code is` sibling
-  // synthesizes NO local CodeSystem, so it keeps the bare policy-id base and its
-  // (unaffected) layer names stay byte-identical — no golden drift for existing
-  // multi-library `coded from`/decision-only fixtures. `undefined` policyId (direct
-  // single-file callers, no package.json) → no metadata, so no disambiguation is
-  // needed (single library); fall back to the source library name downstream. The
-  // FHIR lane (closureOrchestrator) computes the SAME base from the same
-  // (policyId, libraryName, isPrimary, hasCodeIs) inputs, so every site agrees.
-  const primarySeedPaths = new Set(graph.resolvedLibraries.map((e) => e.filePath));
-  // Capture the `code is` predicate from the RAW (un-lowered) closure: `emitClosure`
-  // below replaces each entry's `ast` with its LOWERED form, and lowering CLEARS
-  // `Concept.code`, so `astHasConceptLocalCode` on a lowered ast reads false. Keying
-  // the disambiguation off this stable per-path set keeps `domainIdFor` consistent
-  // across the raw-map AND every later lowered-closure loop.
-  const codeIsSeedPaths = new Set(
-    rawEmitClosure.filter((e) => astHasConceptLocalCode(e.ast)).map((e) => e.filePath),
-  );
-  // #189 CEL-writer T3b (disc 490) — the two inline domainId/disambiguatedBase closures are now the ONE shared
-  // `createLocalDomainResolver` (fhir-emitter/localDomain.ts), so the CQL lane, the FHIR lane, and the CEL
-  // instance lane compose byte-identical local-domain ids. `codeIsSeedPaths` is captured above at the RAW
-  // pre-lowering boundary (lowering clears `Concept.code`) — the resolver takes it as a stable set, never a
-  // callback that could re-evaluate a lowered ast.
-  const localDomainResolver = createLocalDomainResolver({
-    primarySeedPaths,
-    localCodePaths: codeIsSeedPaths,
-    policyId: localDomainId,
-  });
+  if (prepared.publications.diagnostics.length > 0) {
+    return {
+      success: false, graph, importDiagnostics: graph.diagnostics, cqlByLibrary: [],
+      errors: [...prepared.publications.diagnostics],
+    };
+  }
+  const rawEmitClosure = prepared.rawCqlClosure;
+  const lowerErrors: CRLError[] = [];
   const domainIdFor = (entry: RegistryEntry): string | undefined => localDomainResolver.domainIdFor(entry);
   const disambiguatedBaseFor = (entry: RegistryEntry): string | undefined =>
     localDomainResolver.disambiguatedBaseFor(entry);
+  // Filled from actual split/rename plans before consumers emit. Lowering needs only raw admission.
+  const renderedSourceByLibrary = new Map<string, string>();
+  const publicationTargets = new Map<string, { readonly libraryName: string; readonly define: string }>();
+  const publicationScopeFor = (entry: RegistryEntry): PublicationEmitScope => {
+    // A rendered qualifier is routing metadata, never a grant of package visibility.
+    // Admit foreign source identities only through this owner's original include scope.
+    const visibleSources = new Set([entry.filePath]);
+    for (const descriptor of prepared.publications.descriptors) {
+      const hit = prepared.publications.lookup(entry.filePath, {
+        type: "QualifiedReference", libraryName: descriptor.identity.libraryName,
+        name: descriptor.identity.conceptName, location: entry.ast.location,
+      });
+      if (hit.kind === "publication" && hit.descriptor.identity.key === descriptor.identity.key)
+        visibleSources.add(descriptor.identity.sourceIdentity);
+    }
+    return {
+      program: prepared.publications,
+      fromSourceIdentity: entry.filePath,
+      renderedSourceByLibrary: new Map([...renderedSourceByLibrary].filter(([, source]) => visibleSources.has(source))),
+      publicTarget: (identityKey) => publicationTargets.get(identityKey),
+    };
+  };
   // Track libraries that actually synthesized a local codesystem (lowered at
   // least one `code is` concept), keyed by the deterministic codesystem URL — so
   // the per-policy collision preflight below can fire when 2+ libraries resolve to
@@ -486,7 +532,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   // this from the lowered closure yields an EMPTY map and every `in qualifying` then fails to resolve —
   // MEASURED on the probe before this was moved. Keyed by filePath, threaded into every emit call.
   const inlineAnswerSetsByPath = new Map<string, ReadonlyMap<string, InlineAnswerSet>>();
-  const emitClosure = rawEmitClosure.map((entry) => {
+  let emitClosure = rawEmitClosure.map((entry) => {
     // #198 — per-entry local domain (primary keeps the bare policy id; siblings
     // are disambiguated). Threaded into the lowering so the synthetic `codesystem
     // '<url>'` decl carries the disambiguated url for a sibling `code is` library.
@@ -513,6 +559,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       // FHIR lane passes as `metadata.name`; the PER-ENTRY `entryLocalDomainId` is the disambiguated
       // sibling base and is a different thing.
       policyId: localDomainId,
+      publication: publicationScopeFor(entry),
     });
     if (lowered.errors.length > 0) lowerErrors.push(...lowered.errors);
     // `didLower` = did `lowerLocalCodes` synthesize a local codesystem (the `code is` lowering) —
@@ -683,60 +730,6 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     );
     if (plan.kind === "full" || plan.kind === "interface") splitLibraryNames.add(entry.name);
   }
-  if (splitLibraryNames.size > 0) {
-    // The guard MUST fail-closed over the SAME ref set that becomes the referrer's CQL `include`s
-    // (`collectCqlIncludeRefs` = source `include`s + concept-DEFINITION refs), NOT the narrower concept-definition-
-    // only `librariesReferencedBy`. Otherwise an explicit `include "Shared"` (or, pre-(B), a representation ref)
-    // into an auto-split local library emits a DANGLING `include Shared` that no `Shared.cql` satisfies while the
-    // guard stays silent. SCOPE-AWARE: an `include`/ref name may resolve to a PACKAGE library (fine — it is emitted
-    // under its own name, never split) OR to a LOCAL split source (dangles). Resolve each name against the
-    // referrer's scope and fire ONLY when it resolves to a LOCAL library this emit auto-splits — never blanket-error
-    // every name that merely string-matches a split source.
-    const guardScopes = buildLibraryScopes(
-      graph.resolvedLibraries,
-      graph.localLibraries,
-      graph.registry ?? { byNameLocal: new Map(), byNamePackage: new Map() },
-    );
-    for (const entry of emitClosure) {
-      if (!entry.name) continue;
-      // A suppressed activities-only library emits NO CQL, so its `include`s cannot
-      // dangle — exclude it from the split-library ref guard (a false positive for a
-      // file never written), mirroring the collision-preflight + emit-loop skips.
-      if (willSuppress(entry)) continue;
-      const scope = guardScopes.get(entry.filePath);
-      if (!scope) continue;
-      const refs = collectCqlIncludeRefs(entry, scope);
-      for (const ref of refs) {
-        const target = lookupKnownLibrary(scope, ref);
-        // Unknown (e.g. catalog FHIRHelpers/CRLCommon) or package-origin target → cannot dangle: skip.
-        if (!target || target.origin === "package") continue;
-        if (splitLibraryNames.has(target.libraryName)) {
-          return {
-            success: false,
-            graph,
-            importDiagnostics: graph.diagnostics,
-            cqlByLibrary: [],
-            errors: [
-              {
-                type: "Validation",
-                kind: "emit-cross-library-ref-into-split-library",
-                message:
-                  `Library "${entry.name}" qualified-refs "${ref}", but "${ref}" is a ` +
-                  `library that emit auto-splits into policy-id-named layer libraries ` +
-                  `(its source name no longer exists as an emitted CQL library). ` +
-                  `Cross-library references into an auto-split library are not yet ` +
-                  `supported (referrer re-qualification is a later slice). Reference ` +
-                  `the specific layer library directly, or keep "${ref}" single-layer ` +
-                  `(no decision + no concept-level \`code is\`).`,
-              },
-            ],
-          };
-        }
-      }
-    }
-  }
-
-
   // #227 — the render-only raw→`S` rename map for NAME-KEEPING-ROOT (`none`-path)
   // libraries, built HERE (the preflight sees every entry before the emit loop, so
   // a `none`→`none` cross-ref resolves forward). Keyed by the raw CRL library name,
@@ -835,6 +828,84 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     }
   }
 
+  // REFACTOR:grounded (#320, review 560) — publish physical routing only after the
+  // split/rename collision preflight. Targets are actual public declarations, never helper lists.
+  for (const entry of emitClosure) {
+    if (!entry.name || willSuppress(entry)) continue;
+    const plan = computeSplitPlan(entry.ast, entry.name, domainIdFor(entry) ?? entry.name, localCodesCountFor(entry.name));
+    const names = plan.emittedLibraryNames.map((name) => plan.kind === "none" ? libraryRenames.get(name)! : name);
+    for (const name of names) renderedSourceByLibrary.set(name, entry.filePath);
+    for (const statement of entry.ast.statements) {
+      if (statement.type !== "Concept" || statement.__publication?.role !== "public") continue;
+      const layer = plan.partition?.classify(statement);
+      const libraryName = plan.kind === "none"
+        ? libraryRenames.get(entry.name)!
+        : layer == null ? undefined : plan.partition!.libraryNameFor(plan.policyId!, layer);
+      if (libraryName !== undefined && names.includes(libraryName)) {
+        publicationTargets.set(statement.__publication.descriptor.identity.key, { libraryName, define: statement.name });
+      }
+    }
+  }
+  const routingErrors: CRLError[] = [];
+  emitClosure = emitClosure.map((entry) => routePublicationReferences(entry, publicationScopeFor(entry), routingErrors));
+  if (routingErrors.length > 0) {
+    return { success: false, graph, importDiagnostics: graph.diagnostics, cqlByLibrary: [], errors: routingErrors };
+  }
+
+  if (splitLibraryNames.size > 0) {
+    // The guard MUST fail-closed over the SAME ref set that becomes the referrer's CQL `include`s
+    // (`collectCqlIncludeRefs` = source `include`s + concept-DEFINITION refs), NOT the narrower concept-definition-
+    // only `librariesReferencedBy`. Otherwise an explicit `include "Shared"` (or, pre-(B), a representation ref)
+    // into an auto-split local library emits a DANGLING `include Shared` that no `Shared.cql` satisfies while the
+    // guard stays silent. SCOPE-AWARE: an `include`/ref name may resolve to a PACKAGE library (fine — it is emitted
+    // under its own name, never split) OR to a LOCAL split source (dangles). Resolve each name against the
+    // referrer's scope and fire ONLY when it resolves to a LOCAL library this emit auto-splits — never blanket-error
+    // every name that merely string-matches a split source.
+    const guardScopes = buildLibraryScopes(
+      graph.resolvedLibraries,
+      graph.localLibraries,
+      graph.registry ?? { byNameLocal: new Map(), byNamePackage: new Map() },
+    );
+    for (const entry of emitClosure) {
+      if (!entry.name) continue;
+      // A suppressed activities-only library emits NO CQL, so its `include`s cannot
+      // dangle — exclude it from the split-library ref guard (a false positive for a
+      // file never written), mirroring the collision-preflight + emit-loop skips.
+      if (willSuppress(entry)) continue;
+      const scope = guardScopes.get(entry.filePath);
+      if (!scope) continue;
+      const refs = collectCqlIncludeRefs(entry, scope);
+      for (const ref of refs) {
+        const target = lookupKnownLibrary(scope, ref);
+        // Unknown (e.g. catalog FHIRHelpers/CRLCommon) or package-origin target → cannot dangle: skip.
+        if (!target || target.origin === "package") continue;
+        if (splitLibraryNames.has(target.libraryName)) {
+          return {
+            success: false,
+            graph,
+            importDiagnostics: graph.diagnostics,
+            cqlByLibrary: [],
+            errors: [
+              {
+                type: "Validation",
+                kind: "emit-cross-library-ref-into-split-library",
+                message:
+                  `Library "${entry.name}" qualified-refs "${ref}", but "${ref}" is a ` +
+                  `library that emit auto-splits into policy-id-named layer libraries ` +
+                  `(its source name no longer exists as an emitted CQL library). ` +
+                  `Cross-library references into an auto-split library are not yet ` +
+                  `supported (referrer re-qualification is a later slice). Reference ` +
+                  `the specific layer library directly, or keep "${ref}" single-layer ` +
+                  `(no decision + no concept-level \`code is\`).`,
+              },
+            ],
+          };
+        }
+      }
+    }
+  }
+
+
   // Emit each library independently.
   const cqlByLibrary: PerLibraryEmit[] = [];
   const suppressedActivityBindings: SuppressedActivityBinding[] = [];
@@ -925,6 +996,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
         // augments it with this source's synthesized layer names (rendered-layer classification) per layer emit,
         // and passes the base service to the pre-split Interface façade.
         crossLibraryTotality: { index: declaredResultIndex, fromIdentity: entry.filePath, resolveRawLibrary },
+        publication: publicationScopeFor(entry),
       });
       if (!partitioned.success) {
         return {
@@ -1038,6 +1110,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       // #189 Slice 0c — the cross-library totality service (this single-layer `none` lane has no rendered-layer
       // tokens; a bare operand resolves same-layer, a foreign qualifier via the index).
       crossLibraryTotality: { index: declaredResultIndex, fromIdentity: entry.filePath, resolveRawLibrary },
+      publication: publicationScopeFor(entry),
     });
     if (!emit.success || !emit.result) {
       return {
@@ -1113,5 +1186,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     importDiagnostics: graph.diagnostics,
     cqlByLibrary,
     suppressedActivityBindings,
+    publicationTargets,
+    warnings: prepared.publications.warnings,
   };
 }

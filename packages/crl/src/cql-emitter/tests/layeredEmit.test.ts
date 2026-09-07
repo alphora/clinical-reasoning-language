@@ -10,7 +10,7 @@ import {
   layersPresent,
   librariesReferencedBy,
 } from "../layeredEmit";
-import type { Layer } from "../layeredEmit";
+import type { Layer, Partition } from "../layeredEmit";
 import { lowerLocalCodes as lowerLocalCodesRaw } from "../lowerLocalCodes";
 
 // #271 — lowering local `code is` now REQUIRES `crl.canonicalBase` (no urn
@@ -19,6 +19,7 @@ const TEST_CB = "http://example.org/crl/test";
 const lowerLocalCodes: typeof lowerLocalCodesRaw = (ast, opts = {}) =>
   lowerLocalCodesRaw(ast, { canonicalBase: TEST_CB, ...opts });
 import type { CRL } from "../../ast/types";
+import { synthesizeGuardCriteria } from "../../ast/guardDefines";
 
 /**
  * Unit tests for the slice-2 layeredEmit mechanism. The end-to-end golden
@@ -39,6 +40,164 @@ function ast(body: string): CRL {
 
 const layer = (r: ReturnType<typeof emitLayered>, name: Layer) =>
   r.entries.find((e) => e.layer === name);
+
+// REFACTOR:grounded (#320, review 563 r4): a custom partition may omit unused declarations,
+// but an emitted criterion must never reference a declaration lost or moved by that partition.
+describe("custom partition criterion dependency boundary", () => {
+  const source = () => ast(`library "Partitioned".
+terminology "VS":
+- valueset is \`vs\`.
+concept "Leaf":
+- type is Observation.
+- coded from "VS".
+criterion "Base":
+- when ( "Leaf" ).
+criterion "Ready":
+- when ( "Base" ).
+criterion "Unused":
+- when ( "Leaf" ).`);
+  const together: Partition = {
+    classify: (stmt) => stmt.type === "Criterion" && stmt.name === "Unused" ? null : "Root",
+    order: ["Root"],
+    libraryNameFor: (policyId, value) => `${policyId}${value}`,
+  };
+  const emit = (partition: Partition) => emitPartitioned(source(), "Partitioned", "Partitioned", partition);
+
+  it("keeps a co-located custom partition and permits omission of an unused criterion", () => {
+    const result = emit(together);
+    expect(result.success).toBe(true);
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0]!.result.result).toContain('define "Ready":');
+    expect(result.entries[0]!.result.result).toContain('define "Base":');
+    expect(result.entries[0]!.result.result).not.toContain('define "Unused":');
+  });
+
+  it.each(["split", "omitted", "unordered"])("refuses a %s dependency before emitting partial CQL", (mode) => {
+    const partition: Partition = {
+      ...together,
+      classify: (stmt) => stmt.type === "Criterion" && stmt.name === "Base"
+        ? mode === "omitted" ? null : "Other"
+        : together.classify(stmt),
+      order: mode === "split" ? ["Other", "Root"] : ["Root"],
+    };
+    const result = emit(partition);
+    expect(result.success).toBe(false);
+    expect(result.entries).toEqual([]);
+    expect(result.errors).toContainEqual(expect.objectContaining({
+      type: "Validation", kind: "emit-partition-criterion-dependency", line: expect.any(Number),
+      column: expect.any(Number), message: expect.stringContaining('criterion "Base"'),
+    }));
+  });
+
+  it("refuses a custom criterion whose local concept is emitted in another bucket", () => {
+    const result = emit({
+      ...together,
+      classify: (stmt) => stmt.type === "Concept" ? "Data" : together.classify(stmt),
+      order: ["Data", "Root"],
+    });
+    expect(result.success).toBe(false);
+    expect(result.entries).toEqual([]);
+    expect(result.errors).toContainEqual(expect.objectContaining({
+      kind: "emit-partition-criterion-dependency", message: expect.stringContaining('concept "Leaf"'),
+    }));
+  });
+
+  it("refuses an emitted decision that refers to an omitted criterion", () => {
+    const input = ast(`library "Partitioned".
+terminology "VS":
+- valueset is \`vs\`.
+concept "Leaf":
+- type is Observation.
+- coded from "VS".
+criterion "Ready":
+- when ( "Leaf" ).
+activity "Approve":
+- request CPGServiceRequest.
+- with \`approve\`.
+decision "Decision":
+first:
+- when "Ready" then recommend activity "Approve".`);
+    const result = emitPartitioned(input, "Partitioned", "Partitioned", {
+      ...together, classify: (stmt) => stmt.type === "Criterion" ? null : "Root",
+    });
+    expect(result.success).toBe(false);
+    expect(result.entries).toEqual([]);
+    expect(result.errors).toContainEqual(expect.objectContaining({
+      kind: "emit-partition-criterion-dependency", message: expect.stringContaining('criterion "Ready"'),
+    }));
+  });
+});
+
+// REFACTOR:grounded (#320, review 563 r5): partition behavior is an explicit capability;
+// generated guards live where their Criterion declarations classify, not in the Decision bucket.
+describe("partition capabilities and prepared guard placement", () => {
+  const input = (guard = '"Ready"') => ast(`library "Partitioned".
+terminology "VS":
+- valueset is \`vs\`.
+concept "Leaf":
+- type is Observation.
+- coded from "VS".
+criterion "Ready":
+- when ( "Leaf" ).
+activity "Approve":
+- request CPGServiceRequest.
+- with \`approve\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`deny\`.
+decision "D":
+first:
+- when ${guard} then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`);
+
+  it("supports copied FULL with custom physical names, including facade targets", () => {
+    const partition: Partition = { ...FULL_PARTITION, libraryNameFor: (_, value) => `Custom${value}` };
+    const result = emitPartitioned(input(), "Partitioned", "Policy", partition);
+    expect(result.success).toBe(true);
+    const iface = layer(result, "Interface")!;
+    expect(iface.libraryName).toBe("CustomInterface");
+    expect(iface.crossLibraryIncludes).toContain("CustomExternalPrimitives");
+    expect(iface.result.result).toContain('CustomExternalPrimitives."Leaf"');
+    expect(iface.result.result).not.toContain('PolicyExternalPrimitives."Leaf"');
+  });
+
+  it("keeps a copied FULL's foreign-only Interface and its actual include", () => {
+    const result = emitPartitioned(input('"ForeignPhysical"."X"'), "Partitioned", "Policy", {
+      ...FULL_PARTITION, libraryNameFor: (_, value) => `Custom${value}`,
+    });
+    expect(result.success).toBe(true);
+    expect(layer(result, "Interface")?.libraryName).toBe("CustomInterface");
+    expect(layer(result, "Interface")?.crossLibraryIncludes).toContain("ForeignPhysical");
+  });
+
+  it("emits a compound guard once in its own bucket, independently of the Decision bucket", () => {
+    const source = input('( "Ready" and "Leaf" )');
+    const guards = synthesizeGuardCriteria(source);
+    expect(guards).toHaveLength(1);
+    const result = emitPartitioned(source, "Partitioned", "Policy", {
+      classify: (statement) => statement.type === "Decision" ? "Root" : "Guards",
+      order: ["Guards", "Root"], libraryNameFor: (_, value) => `Custom${value}`,
+    });
+    expect(result.success).toBe(true);
+    expect(layer(result, "Guards")?.result.result).toContain(`define "${guards[0]!.name}":`);
+    expect(layer(result, "Root")?.result.result).not.toContain(`define "${guards[0]!.name}":`);
+    expect(layer(result, "Root")?.result.result).not.toContain('"Ready" and "Leaf"');
+  });
+
+  it("refuses an omitted synthetic guard needed by an emitted Decision", () => {
+    const source = input('( "Ready" and "Leaf" )');
+    const guardName = synthesizeGuardCriteria(source)[0]!.name;
+    const result = emitPartitioned(source, "Partitioned", "Policy", {
+      classify: (statement) => statement.type === "Criterion" && statement.name === guardName ? null : "Root",
+      order: ["Root"], libraryNameFor: () => "CustomRoot",
+    });
+    expect(result.success).toBe(false);
+    expect(result.entries).toEqual([]);
+    expect(result.errors).toContainEqual(expect.objectContaining({
+      kind: "emit-partition-criterion-dependency", message: expect.stringContaining(guardName),
+    }));
+  });
+});
 
 describe("buildConceptShapeMap (#189 Slice-C boundary 1 — cross-layer reduction-operand shapes)", () => {
   it("maps declared shapes by name, and a lowered `code is`+reduction to its RecordSet twin + Scalar reduction", () => {

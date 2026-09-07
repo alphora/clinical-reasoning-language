@@ -222,7 +222,7 @@ describe("resolveConceptPipeline — the effect matrix", () => {
   });
 
   it("⭐ a named target makes the occurrence read BOTH the flow and the operand", () => {
-    // ⚠ THE CHARTER, `docs/CRL-NORTH-STAR.md:208`: "A reduction over a NAMED set reduces `this` ∪ that set,
+    // ⚠ THE CHARTER, `docs/CRL-NORTH-STAR.md (historical named-set rule; reopened in #320)`: "A reduction over a NAMED set reduces `this` ∪ that set,
     // so a coded concept's own assertions compete". Copying the catalog's binary `reads: "flow"` onto the
     // occurrence would tell a lowering it consumes only the handed space — and the emitter's own
     // `localUnionRef` path (emitCQL.ts:3654) exists precisely because it does not.

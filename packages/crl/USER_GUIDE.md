@@ -192,6 +192,59 @@ concept "BMI Range as a Condition":
 - Optional: one or more ``- meta is `Text`.`` lines; one ``- evidence is `Text`.`` line.
 - A body — `- code is ` + a backtick-quoted code (local source); `- coded from "VS".` (external terminology); `- defined as ...` (sem-* inference); or `- definition is <narrative>.` (a catalog narrative predicate). Plus zero or more trailing `- source representation:` lines (the external multi-representation form — see below).
 
+#### Selected publications and membership (unreleased #320)
+
+The development implementation adds an explicit final selector, separate from production:
+
+```crl
+concept "Submitted Demonstration":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is `submitted-demonstration`.
+- value domain is answer options.
+- value from:
+  - `qualifying` display is `Qualifying demonstration`, qualifying.
+  - `none` display is `None of the listed demonstrations`, not qualifying.
+- shape reduction is most recent.
+
+concept "Demonstration Qualifies":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- definition is "Submitted Demonstration" in qualifying.
+- shape reduction is most recent.
+```
+
+The first concept selects an Observation. The second interprets that selected value and produces a
+Boolean Observation, then applies its own final selector. A Boolean decision reads its nullable value;
+the public concept still returns the Record. Missing evidence remains unknown. An explicit nonqualifying
+value produces false. An uncoded producer has no question of its own; its coded input supplies the question.
+
+`value domain is` names the finite codes that can be interpreted. Use `answer options`, a named finite
+terminology (including qualified references), or a comma-separated union of those terms. Offered answers
+must belong to the domain. `in qualifying` requires every inline option to be explicitly marked;
+`in "Named Set"` supplies a separate qualifying subset. URI-only ValueSet declarations do not establish
+a finite domain. A mixed terminology containing a ValueSet reference and explicit codes also requires
+the referenced membership to be resolved; this slice refuses that unresolved expansion. Unknown codings alongside recognized codings are preserved; no recognized coding or
+conflicting recognized classifications raises a typed error, rather than implying false.
+
+A producer may have its own `code is` and local answers. Final selection then compares local and inferred
+candidates by their actual validity. Equal newest times error by default;
+`shape reduction is most recent, on equal time prefer local.` selects a unique local candidate on an exact tie. Same-response answers often
+share one timestamp, including blank answers that extract unknown-valued records.
+
+This slice supports local Observation Boolean/CodeableConcept publications and unary membership producers.
+Broader source pipelines, BMI arithmetic and general Scalar replacement remain under development. Existing
+Scalar and `definition is most recent this` forms still exist. Installed 4.121.0 does not include this new
+surface. See the current [#320 contract](../../tmp/DESIGN-language-320-obese-contract.md) for runtime and
+migration limits, including the pinned engine's Coding extraction defect.
+
+A sole undated candidate is retained; any undated candidate competing with another causes a typed
+selection error. This includes an undated inferred result competing with a local answer. Do not fabricate
+a timestamp to resolve it. Migrating a sibling library to this form can change its profile canonical to
+include the owning domain; regenerate its dependent definitions and Questionnaires together.
+
 #### Inference (`defined as`)
 - `defined as "Concept".` — a single concept reference (AST: `DefinedAsBareRef`)
 - `defined as ( ... )` — a parenthesized SEMANTIC expression using `sem-and` / `sem-or` / `sem-not`, parentheses, and concept references (AST: `DefinedAsComposition`)

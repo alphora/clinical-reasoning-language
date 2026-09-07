@@ -99,6 +99,17 @@ anchor is now - N <time-unit>.
 
 Time units: `year` / `years` / `month` / `months` / `week` / `weeks` / `day` / `days` / `hour` / `hours` / `minute` / `minutes` / `second` / `seconds` / `millisecond` / `milliseconds` (closed allowlist matching CRL's `TIME_UNIT`).
 
+<!-- REFACTOR:grounded (#320, review 556): explicit clinical case time is separate from publication metadata. -->
+**Clock and repeatability (working #320 prerequisite, unreleased in 4.121.0):** An explicitly authored
+`now` uses invocation time, captured once per `runCel` or `emitCelToFhir` call, and retains timestamp
+precision. Independent calls may intentionally produce different dates and FHIR bytes. For repeatable
+CEL resolution, author fixed dates or pass the same `{ now: Date }` to both APIs. Missing dates stay
+missing. Publication metadata resolved from `--date`, `SOURCE_DATE_EPOCH`, or `crl.date` does not set
+clinical case time. The production CLI, MCP CEL/CRE handlers, and scenario renderer currently have no
+separate case-clock override; production clock pinning and byte repeatability for dynamic `now` remain
+named #320 capability limits. `produceResults` emits CEL and executes the Java FHIR/CQL engine rather
+than CRE; pinning CEL alone would not pin that engine's evaluation clock or its `Now`/`Today` results.
+
 #### `at` clauses
 
 ```
@@ -160,6 +171,7 @@ The validator runs over a `ResolvedCelGraph` (the covered library's CRL registry
 - `invalid-result-leaf-kind` — result leaf is Activity/Terminology/Parameter (only Concept and Decision are valid).
 - `unresolved-fact-ref` — `subject is` / `encounter is` / `fact is` / cross-resource source/target references a fact not declared in this file.
 - `duplicate-fact-name`, `duplicate-case-name` — intra-file uniqueness violations.
+- `id-collision` — actual emitted resource paths collide within or across cases; reported at the case that would overwrite a resource.
 - `unresolved-cel-include` — CEL `include "X".` doesn't resolve.
 - Passthrough errors from the resolver (`project-root-not-found`, `unresolved-covers`, `covers-missing-but-cases-present`, severity-error `crl-import` underlying diagnostics, `parse-failure`).
 
@@ -180,9 +192,18 @@ Per pitch v4 critical decision #2 (bounded MVP). Emits FHIR JSON instance fixtur
 ```
 
 - Slugs are kebab-case lowercase.
-- Resource IDs: `<library-slug>-<case-slug>-<fact-slug>` for clinical resources; Patient resources use just the patient's fact slug (shared across cases).
-- One resource per fact reference PLUS the subject Patient.
+<!-- REFACTOR:grounded (#320, review 556): identity follows the shared CEL writer, including its collision check. -->
+- Resource IDs derive from the CEL library, case, and fact names using the shared `celResourceId` formatter (a capped slug with a hash). The subject Patient uses the same formatter; its ID also identifies the case's compartment.
+- The case emits its subject Patient, ambient Encounter when present, and supported fact references. Additional references to a Patient fact do not emit another Patient.
 - Per-case atomic, per-file partial. Cases with unsupported facts are skipped with `unsupported-yet` diagnostic; the CLI exits nonzero if any case is unsupported.
+
+With the current emitter, two data instances in one case require distinctly named facts. Changing only
+a reference's date or intent does not assign a new resource identity. Names that normalize to the same
+output path also collide. The validator reports `id-collision`, and emission rejects the affected case
+before a resource can be overwritten. This is a current emitter constraint, not a grammar prohibition
+on repeating a reference. A fact remains a reusable template across cases; each case gives it a separate
+resource identity. For example, use two facts such as "Recommended Activity" and "Follow-up Recommended
+Activity", with the same authored content, for two differently dated or intended instances in one case.
 
 CRL kind → FHIR resource:
 - Bare `defined by "X"` → `X` (must be in `conceptTypes.json`).
@@ -235,7 +256,7 @@ Exit codes:
 - [`packages/crl/src/tests/fixtures/corpus/cms22/cms22-strategy.cel`](../packages/crl/src/tests/fixtures/corpus/cms22/cms22-strategy.cel) — CMS22 cognitive support strategy case (hypertensive-reading path).
 - [`packages/crl/src/tests/fixtures/corpus/cms69/cms69.cel`](../packages/crl/src/tests/fixtures/corpus/cms69/cms69.cel) — CMS69 BMI screening measure case (high-BMI + follow-up path).
 - [`packages/crl/src/tests/fixtures/corpus/cms69/cms69-strategy.cel`](../packages/crl/src/tests/fixtures/corpus/cms69/cms69-strategy.cel) — CMS69 cognitive support strategy case (high-BMI intervention path).
-- [`docs/cel-syntax-reference.cel`](./cel-syntax-reference.cel) — normative coverage artifact. Four cases exercising every locked CEL syntax feature: dynamic `now` anchor; fixed-date + absolute `on` escape + intent modifiers; multi-anchor (named admission/discharge); all six cross-resource wiring relations.
+- [`cel-syntax-reference.cel`](../packages/crl/src/cel/tests/fixtures/cel-syntax-reference.cel) — syntax coverage artifact using placeholder declarations. Four cases exercise dynamic `now` anchors; fixed-date + absolute `on` escape + intent modifiers; multiple named anchors; all six cross-resource wiring relations. It is a syntax example, not a verified clinical policy or expected-outcome oracle.
 
 ## Required: each CRL/CEL project needs its own `package.json`
 

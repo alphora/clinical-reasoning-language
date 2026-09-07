@@ -10,7 +10,7 @@
  * Pattern[] list.
  *
  * Catalog return-type annotations are stripped as of v0.6.0 ("What not How"
- * sweep) — see `docs/defined-as-is-semantic-composition.md`. The parser does
+ * sweep) — see `docs/_old/defined-as-is-semantic-composition.md`. The parser does
  * not handle them specially; it just captures whatever the canonical column
  * contains.
  */

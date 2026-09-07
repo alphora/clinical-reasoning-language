@@ -1,21 +1,10 @@
-// #189 2d P2 — per-concept case-feature RECORD resolution.
-//
-// The single pure function the case-feature lane calls to answer, for ONE concept: "is this a gatherable
-// case-feature, and if so, what natural resource + records-define does it emit?" It composes the T1 descriptor
-// deriver (`deriveEffectiveRepresentations`) with the records-twin name rule (`recordsTwinDefineName`) and maps the
-// deriver's outcomes onto the case-feature lane's vocabulary. Charter §4 (`docs/CRL-NORTH-STAR.md`): a case-feature
-// is typed by the concept's OWN natural resource (Condition/MedicationRequest/Observation/…), never forced to
-// Observation; only NON-EPHEMERAL local `code is` records are case-features; the boolean is ephemeral CQL; the
-// `cpg-featureExpression` targets the RECORDS-retrieve define — the `"<X> Records"` twin for a `ThisRecords`
-// reduction, or the concept's own name `"<X>"` for a RecordSet publisher / age both-rep (no twin) — NOT the
-// boolean `"<X>"` result.
-//
-// WIRED (#189 2d): `closureOrchestrator` calls this per collected case-feature concept; a `record` → SD + input,
-// `supplied-patient` → read (no SD), a reject → loud. The deriver REJECTS a bare-scalar `code is`
-// (`unsupported-reduction-form`), so this yields a `record` only for a MIGRATED concept (`code is` + a reduction,
-// or a `shape is RecordSet` publisher).
+// REFACTOR:grounded (#320): resolve a gathered case-feature's natural resource and population binding.
+// An explicit publication consumes the shared admitted descriptor and actual emitted public Record target.
+// Legacy declarations retain the effective-representation and twin-name routing below. Population never
+// targets a Boolean facade; a RecordSet declaration still supplies a blank answer slot with no population.
 
 import type { Concept } from "../ast/types";
+import { hasLocalPublicationContribution, type PublicationDescriptor } from "../emit/publicationProgram";
 import type { ResolvedFeatureExpressionTarget } from "./structureDefinition";
 import { recordsTwinDefineName } from "../cql-emitter/lowerLocalCodes";
 import { deriveEffectiveRepresentations } from "../emit/effectiveRepresentation";
@@ -35,6 +24,7 @@ export type CaseFeatureRecordSkip =
   | { kind: "unsupported-resource"; resourceType: string; detail: string }
   // Patient supplies its own resource (charter §2 uncoded arm) — READ, never gathered via a case-feature SD.
   | { kind: "supplied-patient" }
+  | { kind: "computed-publication" }
   // A purely-sourced concept (no local `code is`) — E1/#257 sourced-representation, deferred (design §10, D2).
   | { kind: "deferred-sourced" }
   // Any other deriver rejection (bare-scalar `unsupported-reduction-form` pre-migration, malformed, not-admitted,
@@ -78,7 +68,9 @@ export type FeatureExpressionTarget = {
 /** A gatherable case-feature record: its natural-resource descriptor + where its featureExpression points. */
 export type CaseFeatureRecord = {
   kind: "record";
-  descriptor: LocalExactDescriptor;
+  descriptor: LocalExactDescriptor | PublicationDescriptor;
+  /** REFACTOR:grounded (#320): actual emitted public Record binding, supplied by the shared program. */
+  publicationTarget?: ResolvedFeatureExpressionTarget;
   /**
    * Where the `cpg-featureExpression` points — or `undefined` for NO featureExpression at all.
    *
@@ -106,7 +98,18 @@ export type CaseFeatureRecordResolution = CaseFeatureRecord | CaseFeatureRecordS
 export function resolveCaseFeatureRecord(
   concept: Concept,
   owningLib: OwningLibraryMetadata,
+  publication?: { descriptor: PublicationDescriptor; target: ResolvedFeatureExpressionTarget },
 ): CaseFeatureRecordResolution {
+  // REFACTOR:grounded (#320, review 560): this opt-in cannot enter legacy family classification.
+  if (concept.shapeReduction !== undefined) {
+    if (publication === undefined) return {
+      kind: "not-a-record",
+      derivationKind: "publication-binding-missing",
+      detail: `Publication "${concept.name}" requires its admitted descriptor and emitted public Record binding.`,
+    };
+    if (!hasLocalPublicationContribution(publication.descriptor)) return { kind: "computed-publication" };
+    return { kind: "record", descriptor: publication.descriptor, publicationTarget: publication.target };
+  }
   const outcome = deriveEffectiveRepresentations(concept, owningLib);
 
   if (outcome.status === "error") {

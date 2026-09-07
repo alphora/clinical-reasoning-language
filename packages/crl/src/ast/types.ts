@@ -96,6 +96,14 @@ export function getRefLibrary(ref: ReferenceName): string | null {
   return typeof ref === "string" ? null : ref.libraryName;
 }
 
+/** Location-independent reference key. Preserve the qualifier: bare X and Foreign.X are
+ * different dependencies. An owner-aware caller can normalize self-qualified refs first. */
+export function referenceKey(ref: ReferenceName): string {
+  return isQualifiedRef(ref)
+    ? `q:${JSON.stringify([ref.libraryName, ref.name])}`
+    : `b:${ref}`;
+}
+
 /** Human-readable form, e.g. `"Shared"."Foo"` or just `"Foo"`. */
 export function refDisplay(ref: ReferenceName): string {
   return typeof ref === "string" ? `"${ref}"` : `"${ref.libraryName}"."${ref.name}"`;
@@ -529,6 +537,24 @@ export type ValueFrom =
   | { kind: "terminology"; terminologyName: ReferenceName; location: Location }
   | { kind: "inline"; options: InlineAnswerOption[]; location: Location };
 
+// REFACTOR:grounded (#320, review 562): finite interpreted values, never inferred from the UI options.
+export type ValueDomainTerm =
+  | { type: "AnswerOptionsDomainTerm"; location: Location }
+  | { type: "TerminologyDomainTerm"; terminologyName: ReferenceName; location: Location };
+
+export interface ValueDomain extends ASTNode {
+  type: "ValueDomain";
+  terms: ValueDomainTerm[];
+}
+
+// REFACTOR:grounded (#320, disc 557) — an authored final selector is separate from
+// arm-local definitions/projectors. Omission does not synthesize a selector.
+export interface ShapeReduction extends ASTNode {
+  type: "ShapeReduction";
+  kind: "mostRecent";
+  equalTime: "error" | "preferLocal";
+}
+
 export interface Concept extends ASTNode {
   type: "Concept";
   name: string;
@@ -554,6 +580,10 @@ export interface Concept extends ASTNode {
    * ("which does this publish?"), never a silent default.
    */
   shape?: ConceptShape;
+  // REFACTOR:grounded (#320) — authored selection over the assembled collection.
+  shapeReduction?: ShapeReduction;
+  /** Compiler binding to the single raw #320 descriptor; never populated by the parser. */
+  __publication?: import("../emit/publicationProgram").PublicationNodeBinding;
   // The concept's own local code (`- code is `…`.`). System = the package's
   // local domain (implicit). Present => locally assertable; absent => read-only.
   code?: string;
@@ -593,6 +623,7 @@ export interface Concept extends ASTNode {
    * byte-identical at every binding strength, so strength buys nothing here.
    */
   valueFrom?: ValueFrom;
+  valueDomain?: ValueDomain;
   // Optional: a concept may be representations-only (no top-level definition).
   definition?: ConceptDefinition;
   // `possible representation:` entries (ADR 0001 §3). May be empty.
@@ -1060,7 +1091,7 @@ export interface DefinedAsComposition extends ASTNode {
 }
 
 // `defined as ("A" and "B")` — BOOLEAN composition over SEPARATE boolean facts (design of record
-// `tmp/DESIGN-concept-boolean-composition.md`; T1). REUSES the neutral `BranchCondition` family (the same
+// `tmp/_old/DESIGN-concept-boolean-composition.md`; T1). REUSES the neutral `BranchCondition` family (the same
 // `and`/`or`/`not` a `when` guard uses) under this WRAPPER, which marks the CONCEPT attachment point: the T3
 // lowering produces ONE compound total boolean and never shares the decision DNF/cockpit path. Built via the
 // shared `branchConditionFrom` (inherits chain-flatten, single-ref-stays-ref, and the mixed-`and`/`or`

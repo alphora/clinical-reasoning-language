@@ -26,7 +26,15 @@ import type {
 import { celValueScalar } from "../ast/types";
 import type { Concept } from "../../ast/types";
 import { isValueReadingBooleanConcept } from "../../template-match/recencyValueConcept";
+import { type PublicationProgram } from "../../emit/publicationProgram";
 import { buildDefinedByCandidates } from "../definedByResolve";
+import { celIdentityDiagnostics, prepareCelPublicationOutcome } from "../emitter/emitFhir";
+// REFACTOR:grounded (#320, review 556): surface authored date errors before emission/evaluation.
+import {
+  factDateDeclarationDiagnostic,
+  resolveCaseFactDates,
+  type FactDateDiagnostic,
+} from "../factDate";
 import { resolveCelImports, type ResolveCelImportsOptions } from "../imports";
 import type { ResolvedCelGraph } from "../imports/types";
 import { classifyCanonicalToken } from "../canonicalToken";
@@ -42,6 +50,12 @@ import type {
 } from "./types";
 
 const CONCEPT_TYPE_SET: Set<string> = new Set<string>(conceptTypes as readonly ConceptType[]);
+
+// REFACTOR:grounded (#320, review 556): a declaration diagnostic is the same error at each use.
+// Case offsets have their own locations and must remain independently reported.
+function factDateDiagnosticKey(diagnostic: FactDateDiagnostic): string {
+  return JSON.stringify([diagnostic.kind, diagnostic.factName, diagnostic.location]);
+}
 
 /**
  * Build the leaf-resolution map: top-level statements of the covered
@@ -161,8 +175,15 @@ export function validateCEL(
   // 4. Build per-file name maps.
   const facts = new Map<string, CELFact>();
   const cases = new Map<string, CELCase>();
+  const declarationDateDiagnostics = new Set<string>();
   for (const s of cel.statements) {
     if (s.type === "CELFact") {
+      // REFACTOR:grounded (#320, review 556): validate declarations even when no case references them.
+      const dateDiagnostic = factDateDeclarationDiagnostic(s);
+      if (dateDiagnostic) {
+        errors.push(err(dateDiagnostic.kind, dateDiagnostic.message, dateDiagnostic.location, fp));
+        declarationDateDiagnostics.add(factDateDiagnosticKey(dateDiagnostic));
+      }
       if (facts.has(s.name)) {
         errors.push(err("duplicate-fact-name", `Duplicate fact name "${s.name}"`, s.location, fp));
       } else {
@@ -175,6 +196,26 @@ export function validateCEL(
         cases.set(s.name, s);
       }
     }
+  }
+
+  // REFACTOR:grounded (#320, review 556): use the same case-date preflight as emit and CRE.
+  // Capture once; only explicitly authored now anchors use it, never undated fact defaults.
+  const now = new Date();
+  for (const s of cel.statements) {
+    if (s.type !== "CELCase") continue;
+    for (const d of resolveCaseFactDates(s, facts, now).diagnostics) {
+      // REFACTOR:grounded (#320, review 556): invalid and duplicate body dates are reported at
+      // their declaration once; case-specific date/offset failures keep their own diagnostics.
+      if (!declarationDateDiagnostics.has(factDateDiagnosticKey(d))) {
+        errors.push(err(d.kind, d.message, d.location, fp));
+      }
+    }
+  }
+
+  // REFACTOR:grounded (#320, review 556): changing a date or intent does not create a new
+  // resource identity. Surface actual writer collisions at the author's case before execution.
+  for (const d of celIdentityDiagnostics(graph, { now })) {
+    errors.push(err("id-collision", d.message, d.location, d.filePath ?? fp));
   }
 
   // 4b. Case ids (provenance spec §7): at-most-one per case, bounded format, reserved namespace, per-file uniqueness.
@@ -226,6 +267,18 @@ export function validateCEL(
 
   // 6. Fact body `defined by` resolution + #189 Piece 2 local-membership + Piece 3 source-membership warnings.
   const domainCtx = makeLocalDomainContext(graph);
+  const preparation = prepareCelPublicationOutcome(graph);
+  if (preparation.kind === "failed") {
+    errors.push({ ...preparation.diagnostic, kind: "publication-preparation-failed" });
+    return { errors, warnings };
+  }
+  const publications = preparation.program;
+  // REFACTOR:grounded (#320, review 563): warning coordinates and their owning CRL file travel together.
+  for (const warning of publications?.warnings ?? []) warnings.push(warn(
+    warning.kind as CELValidationErrorKind, warning.message ?? "Publication warning",
+    warning.line === undefined || warning.column === undefined ? undefined : { start: { line: warning.line, column: warning.column }, end: { line: warning.line, column: warning.column } },
+    warning.filePath,
+  ));
   const { keys: sourceMemberKeys, types: sourceTypes } = buildSourceMembership(graph, domainCtx.base);
   // ⭐ #280 defect 1 — the LOCAL near-miss index, keyed WITHOUT the system so a right-code/wrong-system fact
   // can be recognised. See `validateBareFactLocalNearMiss`.
@@ -240,7 +293,7 @@ export function validateCEL(
     validateFactCodeMembership(f, graph, domainCtx, errors, warnings, fp);
     validateSourceFactMembership(f, sourceMemberKeys, sourceTypes, warnings, fp);
     validateBareFactLocalNearMiss(f, localByTypeCode, warnings, fp);
-    validateBooleanValueRules(f, graph, domainCtx, errors, warnings, fp);
+    validateBooleanValueRules(f, graph, domainCtx, errors, warnings, fp, publications);
     validateNumericValueRules(f, graph, errors, fp);
   }
 
@@ -437,7 +490,7 @@ function validateDefinedBy(
       errors.push(
         err(
           "cannot-directly-assert-derived-concept",
-          `Concept "${libName}"."${declName}" is read-only — it has no representation (no \`code is\` and no source binding), so it has no FHIR resource and cannot be directly asserted by a fact. Assert its operands instead, or give it a \`code is\` + \`type is\` to make it a real record assertable in both lanes.`,
+          `Concept "${libName}"."${declName}" is read-only: it has no local answer representation, so it cannot be directly asserted by a fact. Assert its operands instead, or declare a local \`code is\` answer contribution.`,
           fb.location,
           fp,
         ),
@@ -681,6 +734,7 @@ function validateBooleanValueRules(
   errors: CELValidationError[],
   warnings: CELValidationError[],
   fp: string,
+  publications?: PublicationProgram,
 ): void {
   const db = f.body.find((b): b is CELDefinedByField => b.type === "CELDefinedByField");
   if (!db || !isQualifiedRef(db.ref)) return; // only a direct (qualified) concept assertion; bare-type facts are not this rule
@@ -720,7 +774,36 @@ function validateBooleanValueRules(
   }
   if (!populatesNamed) return;
 
-  if (isValueReadingBooleanConcept(target, siblings)) {
+  const publicationLookup = publications?.lookup(lib.filePath, target.name);
+  if (target.shapeReduction !== undefined && publicationLookup?.kind !== "publication") {
+    errors.push(err("publication-form-unsupported", `Fact "${f.name}" targets publication "${target.name}", whose declaration was not admitted.`, db.location, fp));
+    return;
+  }
+  const publication = publicationLookup?.kind === "publication" ? publicationLookup.descriptor : undefined;
+  if (publication !== undefined) {
+    if (!valueField) {
+      warnings.push(warn("publication-unanswered-fact", `Fact "${f.name}" supplies an unanswered Record for "${libName}"."${declName}". If selected, its unknown value can displace an older answer and pause a required branch.`, db.location, fp));
+      return;
+    }
+    if (publication.valueType === "CodeableConcept") {
+      const scalar = celValueScalar(valueField.value);
+      const valid = typeof scalar === "string" && (scalar.includes("|")
+        ? classifyCanonicalToken(scalar).kind === "coded"
+        : (publication.answerOptions?.codes.filter((code) => code.code === scalar).length ?? 0) === 1);
+      if (!valid) errors.push(err("local-coded-value-invalid", `Fact "${f.name}" requires an explicit system|code or one unambiguous offered answer code.`, valueField.location, fp));
+      return;
+    }
+  }
+
+  if (publication?.valueType === "boolean" || isValueReadingBooleanConcept(target, siblings)) {
+    // REFACTOR:grounded (#320): record presence does not assert Boolean true. Preserve an authored
+    // unknown candidate and teach that it can replace an older answer under the final selector.
+    if (!valueField && publication !== undefined) {
+      warnings.push(warn("publication-unanswered-fact",
+        `Fact "${f.name}" supplies an unanswered Record for "${libName}"."${declName}". Its value remains unknown; if selected, it can displace an older answer and pause a required branch. State \`value is true\` or \`value is false\` to provide an answer.`,
+        db.location, fp));
+      return;
+    }
     // Its determination is read from its value → require an explicit boolean value.
     if (!valueField) {
       errors.push(

@@ -2,6 +2,7 @@ import type { CRL, Concept, DefinitionIsDefinition } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
 import { findPatternCalls } from "../template-match/referenceRoles";
+import { publicationAdmissionReason, readPublicationMembership } from "../emit/publicationProgram";
 
 import type { MembershipScopeFinding, ValidationError } from "./validator";
 
@@ -60,6 +61,10 @@ export class MembershipScopeValidator {
     out: ValidationError[],
   ): void {
     const def = concept.definition;
+    // REFACTOR:grounded (#320, review 562): only fully declared new producer syntax owns its
+    // explicit local/inferred arbitration and qualified operand resolution. Legacy forms remain below.
+    if (concept.shapeReduction !== undefined && publicationAdmissionReason(concept) === undefined &&
+        readPublicationMembership(concept) !== undefined) return;
     if (!def || def.type !== "DefinitionIsDefinition") return;
     // ⚠⚠ FIND THE CALL AT ANY DEPTH, not just at the top. `matchNarrative` folds a pipeline, so
     // `"X" in "VS", then most recent this` — the charter's own spelling — matches as

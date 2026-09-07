@@ -127,6 +127,7 @@ export type ValidationErrorKind =
   | "answer-options-missing-marker"
   | "answer-options-none-qualifying"
   | "answer-options-all-qualifying"
+  | "publication-membership-no-negative-domain"
   | "answer-options-unanswerable"
   | "answer-options-not-coded"
   | "membership-scope-equals-comparand"
@@ -318,7 +319,7 @@ export interface AgePredicateUnsupportedError extends ValidationErrorBase {
 /**
  * The specific representation-shape rule a `representation-shape` error violates
  * (concept-model redesign Todo 2). Lets consumers specialize without parsing message text.
- * See tmp/representation-model.md §"Shape rules" + disc 395.
+ * See tmp/_old/representation-model.md §"Shape rules" + disc 395.
  *
  *   - "incomplete-representation"    — a `source representation` missing `type` / `value
  *                                      element` / `value type` (a posrep is ALWAYS fully
@@ -472,6 +473,8 @@ export interface PipelineStageError extends ValidationErrorBase {
  *                                   `decision-guard-nonboolean` ERROR.
  */
 export type UseSiteTypeRule =
+  // REFACTOR:grounded (#320): an unsupported selected-publication consumer is explicit authoring debt.
+  | "publication-unsupported-context"
   | "operand-shape"
   | "boolean-at-refinement-position"
   | "boolean-in-refinement-composition"
@@ -521,7 +524,7 @@ export interface UseSiteOperandUntypedWarning extends ValidationErrorBase {
  * with a `rule` sub-discriminator (mirrors `representation-shape` / `use-site-type-mismatch`); every
  * one is an intrinsic WARNING — this validate-only slice ships one version BEFORE emit consults the
  * reduction/shape model, so the findings teach the migration without failing the build. See
- * .vibe-tools/discussions/415 + docs/emit-consistency-189-design.md §8.
+ * .vibe-tools/discussions/415 + docs/_old/emit-consistency-189-design.md §8.
  *
  *   - "recordset-operand-required"   — a `definition is <exists|count> "X"` whose named operand X is
  *                                      NOT `shape is RecordSet` (a reduction reduces a set of records;
@@ -557,6 +560,11 @@ export interface UseSiteOperandUntypedWarning extends ValidationErrorBase {
  *   - "count-threshold-trivial"      — a `count … at least N` with N < 1 (trivially true).
  */
 export type ReductionShapeRule =
+  | "legacy-boolean-publication-absence"
+  // REFACTOR:grounded (#320): admission is shared with the executable publication program.
+  | "publication-unsupported-form"
+  | "publication-local-tie-preference-no-op"
+  | "publication-value-domain-placement"
   | "recordset-operand-required"
   | "reduction-result-nonboolean"
   | "reduction-this-no-representation"
@@ -638,7 +646,8 @@ export interface AnswerOptionsFinding extends ValidationErrorBase {
     | "answer-options-duplicate-code"
     | "answer-options-missing-marker"
     | "answer-options-none-qualifying"
-    | "answer-options-all-qualifying";
+    | "answer-options-all-qualifying"
+    | "publication-membership-no-negative-domain";
   conceptName: string;
 }
 

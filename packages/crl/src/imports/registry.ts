@@ -88,6 +88,7 @@ function scanProjectLocal(
   const entries: RegistryEntry[] = [];
   const diagnostics: ImportDiagnostic[] = [];
 
+  const packageIdentity = packageIdentityFrom(readPackageJson(path.join(projectRoot, "package.json")));
   for (const filePath of listCrlFiles(projectRoot)) {
     const canonical = canonicalizeFsPath(filePath);
     let source: string;
@@ -135,6 +136,7 @@ function scanProjectLocal(
       ast,
       isRoot: false,
       origin: "local",
+      ...(packageIdentity === undefined ? {} : { packageIdentity }),
     });
   }
 
@@ -148,6 +150,17 @@ interface CrlField {
 }
 
 const packageJsonCache = new Map<string, unknown>();
+
+// REFACTOR:grounded (#320, review 562): preserve only metadata actually supplied
+// by the owner. Missing name/version remains missing; paths are not portable identity.
+function packageIdentityFrom(value: unknown): RegistryEntry["packageIdentity"] {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const pkg = value as { name?: unknown; version?: unknown };
+  if (typeof pkg.name !== "string" || pkg.name.trim() === "") return undefined;
+  return Object.freeze({ name: pkg.name,
+    ...(typeof pkg.version === "string" && pkg.version.trim() !== "" ? { version: pkg.version } : {}),
+  });
+}
 
 function readPackageJson(packagePath: string): unknown | undefined {
   const cached = packageJsonCache.get(packagePath);
@@ -312,6 +325,7 @@ function scanNodeModules(projectRoot: string): {
         ast,
         isRoot: false,
         origin: "package",
+        ...(packageIdentityFrom(pkgRaw) === undefined ? {} : { packageIdentity: packageIdentityFrom(pkgRaw) }),
       });
     }
   }
@@ -340,6 +354,9 @@ export function buildRegistry(
   registry: Registry;
   diagnostics: ImportDiagnostic[];
 } {
+  // Resolve against one invocation snapshot. A prior package version must not
+  // survive an edit merely because an IDE/MCP process remains alive.
+  packageJsonCache.clear();
   const diagnostics: ImportDiagnostic[] = [];
   const registry: Registry = {
     byNameLocal: new Map(),

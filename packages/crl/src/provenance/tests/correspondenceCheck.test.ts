@@ -486,16 +486,73 @@ describe("checkCockpitCorrespondence — unchecked reasons (a green gate must me
     writeFileSync(art5, JSON.stringify(artifact));
     try {
       const model = buildCockpitModel(art5, cel5, anchor5, "final");
+      // REFACTOR:grounded (#320, review 563): the identity preflight errors the second case,
+      // but both scenarios were rendered and must retain their specific ambiguous-name finding.
+      expect(model.scenarios.success).toBe(false);
+      expect(model.scenarios.scenarios.map((scenario) => scenario.status)).toEqual(["pass", "error"]);
       const results = checkCockpitCorrespondence(model);
       const dup = results.filter((r) => r.caseName === "dup");
-      expect(dup.length).toBeGreaterThanOrEqual(1);
+      expect(dup).toHaveLength(2);
       for (const d of dup) {
         expect(d.kind).toBe("unchecked");
         if (d.kind === "unchecked") expect(d.reason).toBe("case-name-collision");
       }
+      expect(validateProvenanceFiles(art5, cel5, anchor5, "final").pass).toBe(false);
     } finally {
       rmSync(r5, { recursive: true, force: true });
     }
+  });
+
+  it("retains a specific run-error finding for a partial failed render", () => {
+    const model = buildCockpitModel(
+      writeArtifact([approveOk, innerDenyOk, outerDenyOk]), celPath, anchorPath, "final",
+    );
+    model.scenarios.success = false;
+    model.scenarios.scenarios[1].status = "error";
+    expect(checkCockpitCorrespondence(model)).toEqual([
+      { kind: "unchecked", caseName: "inner", reason: "run-error" },
+    ]);
+  });
+
+  it("never green-passes a failed render envelope whose retained cases happen to compare cleanly", () => {
+    const model = buildCockpitModel(
+      writeArtifact([approveOk, innerDenyOk, outerDenyOk]), celPath, anchorPath, "final",
+    );
+    model.scenarios.success = false;
+    model.scenarios.errors = ["render interrupted after retaining earlier cases"];
+    expect(checkCockpitCorrespondence(model)).toEqual([
+      { kind: "unchecked", caseName: "(scenario render)", reason: "render-failed", details: model.scenarios.errors },
+    ]);
+  });
+
+  it("retains render failure details alongside an unrelated case mismatch", () => {
+    const broken = cluster(
+      "inner", [decRef("when[0]/otherwise"), decRef("when[0]/otherwise/action[0]")], ["case-inner"],
+    );
+    const model = buildCockpitModel(
+      writeArtifact([approveOk, broken, outerDenyOk]), celPath, anchorPath, "final",
+    );
+    model.scenarios.success = false;
+    model.scenarios.errors = ["render interrupted while loading another scenario"];
+    const results = checkCockpitCorrespondence(model);
+    expect(results).toHaveLength(2);
+    expect(results[0]).toMatchObject({ kind: "mismatch", caseName: "inner" });
+    expect(results[1]).toEqual({
+      kind: "unchecked", caseName: "(scenario render)", reason: "render-failed", details: model.scenarios.errors,
+    });
+  });
+
+  it("retains render failure details without repeating an existing case error", () => {
+    const model = buildCockpitModel(
+      writeArtifact([approveOk, innerDenyOk, outerDenyOk]), celPath, anchorPath, "final",
+    );
+    model.scenarios.success = false;
+    model.scenarios.errors = ["render interrupted while loading another scenario"];
+    model.scenarios.scenarios[1].status = "error";
+    expect(checkCockpitCorrespondence(model)).toEqual([
+      { kind: "unchecked", caseName: "inner", reason: "run-error" },
+      { kind: "unchecked", caseName: "(scenario render)", reason: "render-failed", details: model.scenarios.errors },
+    ]);
   });
 });
 

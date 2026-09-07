@@ -316,12 +316,16 @@ if (filePath.toLowerCase().endsWith(".cel")) {
   // CLI read as success despite zero outcome resources.
   const unsupported = result.diagnostics.filter((d) => d.kind === "unsupported-yet");
   const deferred = result.diagnostics.filter((d) => d.kind === "result-deferred");
-  if (unsupported.length > 0 || deferred.length > 0) {
+  // REFACTOR:grounded (#320, code review 563): CEL must expose the same
+  // nonblocking publication preparation findings as the CRL/CQL entry point.
+  const publicationWarnings = result.diagnostics.filter((d) => d.severity === "warning" && d.kind.startsWith("publication-"));
+  if (unsupported.length > 0 || deferred.length > 0 || publicationWarnings.length > 0) {
     process.stderr.write(
       JSON.stringify(
         {
           ...(unsupported.length > 0 ? { unsupportedYet: unsupported } : {}),
           ...(deferred.length > 0 ? { resultDeferred: deferred } : {}),
+          ...(publicationWarnings.length > 0 ? { warnings: publicationWarnings } : {}),
         },
         null,
         2,
@@ -379,4 +383,11 @@ for (const entry of result.cqlByLibrary) {
     process.stderr.write(`Failed to write ${outPath}: ${(e as Error).message}\n`);
     process.exit(1);
   }
+}
+
+// REFACTOR:grounded (#320, review 562): a finite domain with no negative member
+// is valid, but its nonblocking preparation warning must reach standalone CQL users.
+if ((result.warnings?.length ?? 0) > 0) {
+  process.stderr.write(JSON.stringify({ warnings: result.warnings }, null, 2) + "\n");
+  process.exitCode = 2;
 }

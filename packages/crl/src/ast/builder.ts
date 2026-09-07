@@ -121,6 +121,7 @@ import {
   Reduction,
   ReductionTarget,
   ConceptShape,
+  ShapeReduction,
   ValueProjection,
   NarrativeClause,
   NarrativeElement,
@@ -142,6 +143,8 @@ import type {
   ReferenceName,
   QualifiedReference,
   ValueFrom,
+  ValueDomain,
+  ValueDomainTerm,
   InlineAnswerOption,
 } from "./types";
 
@@ -749,6 +752,19 @@ export class CRLAstBuilder
     return undefined;
   }
 
+  // REFACTOR:grounded (#320, disc 557) — preserve the authored final selector as a
+  // first-class field; never append it to a definition or invent it when absent.
+  private parseShapeReduction(bodyCtx: ConceptBodyContext): ShapeReduction | undefined {
+    const line = bodyCtx.shapeReductionLine()[0];
+    if (!line) return undefined;
+    return {
+      type: "ShapeReduction",
+      kind: "mostRecent",
+      equalTime: line.SHAPE_REDUCTION_LOCAL() ? "preferLocal" : "error",
+      location: getLocation(line),
+    };
+  }
+
   /** disc 402: the concept body is now ORDER-INDEPENDENT, so the grammar no longer caps the
    *  singleton lines at one occurrence. The builder enforces that upper bound HERE (the lower
    *  bound — "must have some producer" — stays in visitConceptStatement). This is deliberately
@@ -813,6 +829,18 @@ export class CRLAstBuilder
       subject,
       "a local `code`",
       "A concept has one local `code`. Keep one `- code is `…`.` line.",
+    );
+    // REFACTOR:grounded (#320) — at most one final selector, independently of definitions.
+    this.reportDuplicateLines(
+      bodyCtx.shapeReductionLine(),
+      "duplicate-shape-reduction",
+      subject,
+      "`shape reduction`",
+      "A concept has at most one final selector. Keep one `- shape reduction is most recent.` line, with its optional equal-time policy.",
+    );
+    this.reportDuplicateLines(
+      bodyCtx.valueDomainLine(), "duplicate-value-domain", subject, "`value domain`",
+      "A concept declares one interpreted value domain. Put all union terms in one clause.",
     );
 
     // multiple-definitions — at most ONE definition body across the three kinds. The kinds live in
@@ -976,6 +1004,26 @@ export class CRLAstBuilder
    * are two different claims about what the user may be offered; picking one quietly would make the emitted
    * dropdown depend on line order, which no author could see (`written == executed`).
    */
+  private parseValueDomain(bodyCtx: ConceptBodyContext): ValueDomain | undefined {
+    const line = bodyCtx.valueDomainLine()[0];
+    if (line === undefined) return undefined;
+    const seen = new Set<string>();
+    const terms: ValueDomainTerm[] = [];
+    for (const term of line.valueDomainTerm()) {
+      const reference = term.terminologyReference();
+      const value: ValueDomainTerm = reference === undefined
+        ? { type: "AnswerOptionsDomainTerm", location: getLocation(term) }
+        : { type: "TerminologyDomainTerm", terminologyName: refFromRefContext(reference), location: getLocation(term) };
+      const key = value.type === "AnswerOptionsDomainTerm" ? "answer-options"
+        : typeof value.terminologyName === "string" ? JSON.stringify([null, value.terminologyName])
+          : JSON.stringify([value.terminologyName.libraryName, value.terminologyName.name]);
+      if (seen.has(key)) this.reportError("A value domain cannot repeat the same term.", term, { rule: "duplicate-value-domain-term" });
+      seen.add(key);
+      terms.push(value);
+    }
+    return { type: "ValueDomain", terms, location: getLocation(line) };
+  }
+
   private parseValueFrom(
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
     name: string,
@@ -1187,7 +1235,10 @@ export class CRLAstBuilder
     // implicit-standard `.value`). Grammar-permissive; the validator enforces pairing.
     const valueElement = this.parseValueElement(bodyCtx.valueElementLine?.()?.[0]);
     const shape = this.parseConceptShape(bodyCtx);
+    // REFACTOR:grounded (#320) — this field does not participate in definition aggregation.
+    const shapeReduction = this.parseShapeReduction(bodyCtx);
     const valueFrom = this.parseValueFrom(bodyCtx, name, ctx);
+    const valueDomain = this.parseValueDomain(bodyCtx);
     this.checkConceptBodyCardinality(bodyCtx, name);
     const definition = this.parseConceptDefinition(bodyCtx, ctx);
     const representations = this.parseRepresentations(bodyCtx);
@@ -1202,9 +1253,11 @@ export class CRLAstBuilder
       ...(conceptType ? { conceptType } : {}),
       valueTypes,
       shape,
+      ...(shapeReduction ? { shapeReduction } : {}),
       ...(code !== undefined ? { code } : {}),
       ...(valueElement ? { valueElement } : {}),
       ...(valueFrom ? { valueFrom } : {}),
+      ...(valueDomain ? { valueDomain } : {}),
       ...(meta.length > 0 ? { meta } : {}),
       ...(evidence ? { evidence } : {}),
       ...(definition ? { definition } : {}),

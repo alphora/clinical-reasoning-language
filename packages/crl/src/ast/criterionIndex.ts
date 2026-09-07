@@ -1,9 +1,11 @@
+// REFACTOR:grounded (#320, review 563): dependency closure retains qualified owner identity;
+// a same-named local concept must not hide a foreign publication or its answer inputs.
 // #236/#274 — the CRITERION INDEX: the shared primitive that lets the emit / CQL / CRE
 // seams LOWER a criterion reference to a NAMED define reference instead of INLINE-EXPANDING
 // (materializing) its body into the DNF. One entry per distinct criterion; consumed by the
 // three lowering seams (FHIR emit guard-lowering, CQL define emission, the CRE evaluator).
 //
-// Design of record: docs/emit-236-274-criterion-lowering-design.md §3 A/B.
+// Design of record: docs/_old/emit-236-274-criterion-lowering-design.md §3 A/B.
 //
 // Contrast `criterionExpansion.ts`, which MATERIALIZES — it clones a fresh subtree per
 // criterion use, so N uses of one criterion carrying an `or` multiply into the parent's
@@ -20,7 +22,7 @@ import {
   type CriterionTable,
 } from "./criterionExpansion";
 import type { BranchCondition, BranchConditionRef, Criterion, Statement } from "./types";
-import { getRefName } from "./types";
+import { getRefName, referenceKey } from "./types";
 
 /** Depth at which a criterion-dependency chain is FLAGGED `status: "depth-exceeded"`. Reuses the
  *  expansion engine's alias-chain bound; post-#236 the emit tree no longer materializes, so this is
@@ -48,8 +50,9 @@ export type CriterionIndexStatus = "ok" | "cycle" | "undefined-dependency" | "de
 /** One distinct criterion, with everything the lowering seams need to emit/evaluate a
  *  REFERENCE to it (never its inline expansion). */
 export interface CriterionIndexEntry {
-  /** The criterion's declared name (library-local; cross-library criterion refs are a
-   *  `criterion-misuse` validation error, so a bare name is unambiguous within a library). */
+  /** The locally declared criterion's name. Owner-aware consumers must normalize self-qualified
+   *  refs and reject unsupported foreign criterion refs BEFORE using this bare-name index.
+   *  The index can also receive unvalidated input; validator rejection is not a lookup guarantee. */
   readonly name: string;
   /** The CQL define identifier this criterion lowers to. The BARE name — mirroring a
    *  `defined as` concept's define (`emitConcept` uses `cqlQuotedIdentifier(c.name)`; the
@@ -60,7 +63,7 @@ export interface CriterionIndexEntry {
   /** The criterion body guard, UNEXPANDED (criterion refs inside it stay refs). */
   readonly sourceCondition: BranchCondition;
   /** Every concept-ref leaf reachable through the body, FOLLOWING sub-criteria into their
-   *  bodies — deduped by name, first-occurrence node kept (for its location), deterministic
+   *  bodies — deduped by full reference identity, first-occurrence node kept (for its location), deterministic
    *  order. This is the criterion's DTR case-feature closure (§2d `input[]`). */
   readonly recursiveAtomClosure: readonly BranchConditionRef[];
   /** The DIRECT sub-criterion names the body references (deduped, source order). Edges of the
@@ -152,7 +155,7 @@ export function buildCriterionIndex(statements: readonly Statement[]): Criterion
   const onStack = new Set<string>();
 
   interface Analysis {
-    closure: BranchConditionRef[]; // deduped by name, deterministic order
+    closure: BranchConditionRef[]; // deduped by full reference identity, deterministic order
     depth: number;
     status: CriterionIndexStatus;
     dependencies: string[];
@@ -176,9 +179,9 @@ export function buildCriterionIndex(statements: readonly Statement[]): Criterion
     // CYCLES, not depth: an acyclic chain still recurses to its full length — see the depth caveat
     // on CRITERION_INDEX_MAX_DEPTH.)
     onStack.add(name);
-    const dedup = new Map<string, BranchConditionRef>(); // name → first-seen ref
+    const dedup = new Map<string, BranchConditionRef>(); // full reference identity → first-seen ref
     for (const c of concepts) {
-      const cn = getRefName(c.ref);
+      const cn = referenceKey(c.ref);
       if (!dedup.has(cn)) dedup.set(cn, c);
     }
     let status: CriterionIndexStatus = "ok";
@@ -192,7 +195,7 @@ export function buildCriterionIndex(statements: readonly Statement[]): Criterion
       status = worseStatus(status, sub.status === "ok" ? "ok" : sub.status);
       if (sub.depth > childDepth) childDepth = sub.depth;
       for (const ref of sub.closure) {
-        const rn = getRefName(ref.ref);
+        const rn = referenceKey(ref.ref);
         if (!dedup.has(rn)) dedup.set(rn, ref);
       }
     }
@@ -251,7 +254,7 @@ export function buildCriterionIndex(statements: readonly Statement[]): Criterion
  * criterion is bounded, never re-walked or atom-capped. Used by the three emit collectors
  * (interface surface, case-feature SDs, emit closure) so a criterion-only concept is surfaced
  * even for a criterion the old expansion walk would have refused. Duplicates across the direct
- * and closure sets are possible — callers dedupe (all three key by name/canonical first-seen).
+ * and closure sets are possible — callers dedupe after resolving owner identity or canonical.
  */
 export function guardConceptClosure(
   cond: BranchCondition,

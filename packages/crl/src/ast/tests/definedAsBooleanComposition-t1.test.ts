@@ -28,7 +28,7 @@ import {
 
 import { parseInput } from "./parseInput";
 
-// Concept boolean composition, Todo 1 (design of record `tmp/DESIGN-concept-boolean-composition.md`).
+// Concept boolean composition, Todo 1 (design of record `tmp/_old/DESIGN-concept-boolean-composition.md`).
 // The NEW `defined as ( <boolean> )` family — plain `and`/`or`/`not` over SEPARATE boolean facts
 // (QM population logic etc.), a THIRD composition family distinct from subsumption `sem-or` and
 // refinement `sem-and`/`sem-not`. T1 is grammar + AST + consumer-safety ONLY: emit stays inert

@@ -67,16 +67,18 @@ export function checkCockpitCorrespondence(model: CockpitModel): CorrespondenceC
   // A wholesale FAILED scenario render (graph/CEL resolution failure) yields an EMPTY scenarios[] — iterating it would
   // silently check nothing and let FINAL green-pass having verified nothing. Report it once as render-failed. (A
   // genuinely case-less artifact with success===true is NOT a failure — no cases to verify is not a bleed.)
-  if (model.scenarios.success === false) {
-    return [
-      {
-        kind: "unchecked",
-        caseName: "(scenario render)",
-        reason: "render-failed",
-        ...(model.scenarios.errors.length ? { details: model.scenarios.errors } : {}),
-      },
-    ];
-  }
+  const renderFailure: CorrespondenceCheckResult | undefined = model.scenarios.success === false
+    ? {
+      kind: "unchecked",
+      caseName: "(scenario render)",
+      reason: "render-failed",
+      ...(model.scenarios.errors.length ? { details: model.scenarios.errors } : {}),
+    }
+    : undefined;
+  // REFACTOR:grounded (#320, review 563): success=false also represents partial rendering with
+  // case errors (including CEL output-identity collisions). Keep those cases for the more precise
+  // duplicate-name/run-error checks below; only a wholesale empty render stops here.
+  if (renderFailure !== undefined && model.scenarios.scenarios.length === 0) return [renderFailure];
 
   const maps = buildCrlRevealMaps(model.correspondence, model.crlStructure, model.conceptLayer);
 
@@ -207,5 +209,11 @@ export function checkCockpitCorrespondence(model: CockpitModel): CorrespondenceC
     }
     // else: clean (push nothing) — the cockpit lights exactly this case's path.
   }
+  // REFACTOR:grounded (#320, review 563 N3): envelope errors have no case ownership, so an unrelated
+  // mismatch or case refusal cannot stand in for their details. Retain them once at the render level;
+  // an empty-error partial failure keeps its precise case findings without another generic finding.
+  // The empty-results fallback also keeps a caller-supplied failed envelope from comparing green.
+  if (renderFailure !== undefined && (model.scenarios.errors.length > 0 || results.length === 0))
+    results.push(renderFailure);
   return results;
 }

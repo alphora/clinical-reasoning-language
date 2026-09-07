@@ -244,6 +244,11 @@ export class ReferenceResolver {
       );
     }
     const def = concept.definition;
+    // REFACTOR:grounded (#320, review 562): domain terms live in the terminology namespace.
+    for (const term of concept.valueDomain?.terms ?? []) {
+      if (term.type === "TerminologyDomainTerm") this.checkRef(term.terminologyName,
+        TERMINOLOGY_REF_KINDS, term.location, ctx, errors, null);
+    }
     if (def) {
       switch (def.type) {
         case "CodedFromDefinition": {

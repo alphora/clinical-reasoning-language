@@ -1,6 +1,6 @@
 // #236/#274 build step C — the DEDICATED total-boolean emitter for a `criterion` define.
 //
-// Design of record: docs/emit-236-274-criterion-lowering-design.md §2d, §3 C.
+// Design of record: docs/_old/emit-236-274-criterion-lowering-design.md §2d, §3 C.
 //
 // A `criterion` lowers to ONE boolean CQL define (like a `defined as` concept), so N uses
 // become N references to it instead of N inline expansions (the #236 tree→DAG collapse).
@@ -19,11 +19,9 @@
 // `false` and runs on to the next arm while the CRE evaluates the same criterion as UNKNOWN and pauses.
 // A two-lane disagreement on an ordinary supported shape.
 //
-// Totality belongs at the ARM, not per operand. The REFERENCE SITE re-totalizes where two-valuedness is
-// genuinely required: the per-action `unless` / `only when` carrier emits `not Coalesce(<ref>, false)`, so an
-// action guard never pauses. ⚠ That carrier names a CONCEPT, never a criterion — `referenceResolver` accepts
-// only `concept` in the action-guard slot — so it re-totalizes a concept's define, not this one. A criterion's
-// reference sites are branch guards, which is exactly where the pause has to be able to happen.
+// Legacy action carriers still totalize their own concept references; that implementation is not a
+// requirement for #320. New publication action guards are refused until menu-level pause is implemented.
+// Criterion reference sites are branch guards, where an unknown condition must be able to pause.
 //
 // The emitter takes a `qualify(name, kind)` callback rather than resolving library prefixes
 // itself: WHICH library a leaf's define lives in (Root / Interface / a concept re-export,
@@ -32,9 +30,10 @@
 
 import type { BranchCondition, BranchConditionCriterionRef, ReferenceName } from "../ast/types";
 
-/** Resolve a guard leaf (a concept ref or a sibling criterion ref) to the CQL identifier its
- *  define is referenced by — bare `"Name"` for a same-library define, `Lib."Name"` for a
- *  cross-library re-export. Receives the FULL `ReferenceName` (#189 Slice 0c) — a name alone
+/** Resolve a guard leaf to an atomic Boolean CQL expression: an identifier, qualified identifier,
+ *  or function call. #320 uses FHIRHelpers.ToBoolean(record.value as FHIR.boolean) for a selected
+ *  Record's nullable datum. An arbitrary infix expression must be parenthesized by the caller.
+ *  Receives the FULL `ReferenceName` (#189 Slice 0c) — a name alone
  *  cannot distinguish `"A"."X"` from `"B"."X"` or a bare `"X"` from a qualified one, so a
  *  cross-library operand must qualify from the ref's own library token, not a name key. Whether
  *  the emitter then totalizes what this returns (`Coalesce(…, false)`) or references it BARE is
@@ -67,7 +66,7 @@ interface Rendered {
  *     no-magic), and a criterion ref is NOT a member of the boolean-composition family → it throws.
  */
 export interface RenderLeafPolicy {
-  /** Render a positive concept leaf from its already-qualified CQL identifier. */
+  /** Render a positive concept leaf from its already-qualified atomic Boolean expression. */
   concept: (qualified: string) => string;
   /** Render — or reject — a criterion-ref leaf, given the node and the layer `qualify` resolver. */
   criterionRef: (node: BranchConditionCriterionRef, qualify: QualifyLeaf) => string;

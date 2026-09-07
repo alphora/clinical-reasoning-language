@@ -28,6 +28,9 @@ VALUE_PROJECTION_IS : 'value projection is';
 // Diverges from `value type is` / `value element is` / `value projection is` at char 6 ('f'), so there is
 // no prefix conflict. No mode: a terminology reference is lexed in DEFAULT exactly as `coded from`'s is.
 VALUE_FROM          : 'value from';
+// REFACTOR:grounded (#320, review 562): an explicit interpreted domain is separate from offered answers.
+VALUE_DOMAIN_IS     : 'value domain is';
+ANSWER_OPTIONS      : 'answer options';
 // ⭐⭐ #189 INLINE ANSWER OPTIONS — the two keywords an inline `value from:` option line needs.
 //
 // ⚠ BOTH ARE ADMITTED AS NARRATIVE WORDS (`narrativeElement`'s NWord alternation). That is REQUIRED, not
@@ -46,11 +49,15 @@ META_IS             : 'meta is';
 DEFINED_AS          : 'defined as';
 CODED_FROM          : 'coded from';
 DEFINITION_IS       : 'definition is';
-// `shape is <Scalar|Record|RecordSet>` — the concept-level declaration of the cardinality
-// of the concept's PUBLISHED value (#189 grammar+validation slice). Scalar is the default
-// when omitted (builder-normalized). Enters a dedicated mode so the value is lexed against a
+// REFACTOR:grounded — `shape is <Scalar|Record|RecordSet>` declares published cardinality.
+// Omission remains undeclared; the builder does not supply Scalar. Enters a dedicated mode
+// so the value is lexed against a
 // closed allowlist (mirrors VALUE_TYPE_MODE). Concept-level only — there is no rep-level shape.
 SHAPE_IS            : 'shape is' -> mode(SHAPE_MODE);
+// REFACTOR:grounded (#320, disc 557) — final collection selection is independent of
+// each arm's definition/projector. Its closed syntax has its own mode so its words
+// keep their existing narrative meaning everywhere else.
+SHAPE_REDUCTION_IS  : 'shape reduction is' -> mode(SHAPE_REDUCTION_MODE);
 SOURCE_REPRESENTATION : 'source representation';
 CODE_IS             : 'code is';
 SYSTEM_IS           : 'system is';
@@ -368,9 +375,9 @@ VALUE_TYPE_COMMENT_BLOCK
     ;
 
 mode SHAPE_MODE;
-// CONCEPT_SHAPE possibilities (case sensitive) — the declared cardinality of the concept's
-// PUBLISHED value. `Scalar` = a single reduced value (the DEFAULT when `shape is` is omitted;
-// builder-normalized). `Record` = a single selected record. `RecordSet` = the set of records.
+// REFACTOR:grounded — CONCEPT_SHAPE possibilities (case sensitive) declare published
+// cardinality: Scalar = one value, Record = one record, RecordSet = a collection.
+// An omitted declaration remains absent rather than defaulting to Scalar.
 // The extract pipeline (scripts/extractConceptShapes.js) mirrors this allowlist to
 // generated/types/conceptShapes.json — the .g4 is the source of truth.
 SHAPE_VALUE
@@ -396,6 +403,27 @@ SHAPE_WS
     ;
 SHAPE_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
+    ;
+
+// REFACTOR:grounded (#320, disc 557) — only the reviewed final selector and optional
+// tie policy are admitted. Invalid tokens remain visible errors, never narrative.
+mode SHAPE_REDUCTION_MODE;
+SHAPE_REDUCTION_MOST   : 'most';
+SHAPE_REDUCTION_RECENT : 'recent';
+SHAPE_REDUCTION_ON     : 'on';
+SHAPE_REDUCTION_EQUAL  : 'equal';
+SHAPE_REDUCTION_TIME   : 'time';
+SHAPE_REDUCTION_PREFER : 'prefer';
+SHAPE_REDUCTION_LOCAL  : 'local';
+SHAPE_REDUCTION_COMMA  : ',' -> type(COMMA);
+SHAPE_REDUCTION_DOT    : '.' -> type(DOT), mode(DEFAULT_MODE);
+SHAPE_REDUCTION_WS    : [ \t\r\n]+ -> skip;
+SHAPE_REDUCTION_COMMENT_BLOCK : BLOCK_COMMENT -> skip;
+SHAPE_REDUCTION_INVALID
+    : ~[ \t\r\n,.]+ {
+        this.text = JSON.stringify({ errorType: 'InvalidShapeReduction', value: this.text });
+        this.type = CRLLexer.ERROR;
+    }
     ;
 
 mode VALUE_ELEMENT_MODE;

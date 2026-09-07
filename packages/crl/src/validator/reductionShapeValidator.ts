@@ -11,6 +11,7 @@ import {
   type Location,
 } from "../ast/types";
 import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
+import { isLocalBooleanPublication, publicationAdmissionReason, readPublicationMembership } from "../emit/publicationProgram";
 
 import type { SourceContext } from "../imports/scopes";
 
@@ -154,6 +155,29 @@ export class ReductionShapeValidator {
     attribution: Attribution,
     errors: ValidationError[],
   ): void {
+    // REFACTOR:grounded (#320, review 560): final publication selection has its own authored
+    // clause. Admitted declarations owe no legacy definition; unsupported opt-ins never fall through.
+    if (concept.valueDomain !== undefined && (concept.shapeReduction === undefined || concept.shape !== "Record" ||
+        concept.conceptType !== "Observation" || concept.valueTypes.length !== 1 || concept.valueTypes[0] !== "CodeableConcept")) {
+      this.warn("publication-value-domain-placement", concept.name,
+        "An interpreted value domain is currently admitted only on an explicitly selected Record Observation<CodeableConcept> publication.",
+        concept.valueDomain.location, attribution, errors, "error");
+    }
+    if (concept.shapeReduction !== undefined) {
+      const reason = publicationAdmissionReason(concept);
+      if (reason !== undefined) {
+        this.warn("publication-unsupported-form", concept.name, `Concept "${concept.name}": ${reason}`,
+          concept.shapeReduction.location, attribution, errors, "error");
+      } else if (concept.shapeReduction.equalTime === "preferLocal" &&
+          (readPublicationMembership(concept) === undefined || concept.code === undefined)) {
+        // REFACTOR:grounded (#320, review 561 E2): admission currently supplies only local
+        // candidates. The authored preference remains valid but cannot break local/local ties.
+        this.warn("publication-local-tie-preference-no-op", concept.name,
+          `Concept "${concept.name}": \`on equal time prefer local\` currently has no effect for this ${concept.code === undefined ? "inferred-only" : "local-only"} selected Record publication. Two local candidates at the same maximal time still cause an ambiguous-selection error. Equal-time candidates receive no automatic chronological or insertion-order precedence, and an answer does not automatically win.`,
+          concept.shapeReduction.location, attribution, errors);
+      }
+      return;
+    }
     // `shape` is REQUIRED on the AST — the builder normalizes an omitted `shape is` to "Scalar"
     // (ast/types.ts Concept.shape) — NO LONGER TRUE: an undeclared shape is `undefined`, and callers route
     // through `assumedShapePreMigration` until the corpus declares one (RETIRE:189-shape-declared).
@@ -176,6 +200,15 @@ export class ReductionShapeValidator {
     const vts = concept.valueTypes ?? [];
     const vt = vts.length === 1 ? vts[0] : undefined;
     const loc = concept.location;
+    // REFACTOR:grounded (#320, review 560 E5): expose the retained legacy absence difference
+    // when an author starts using explicit Record publications in the same library.
+    if (concept.shape === "Scalar" && vt === "boolean" && reduction?.kind === "mostRecent" &&
+        reduction.target.type === "ThisRecords" &&
+        [...(ctx.index.get(ctx.ownKey)?.values() ?? [])].some(isLocalBooleanPublication)) {
+      this.warn("legacy-boolean-publication-absence", concept.name,
+        `Concept "${concept.name}" uses legacy Scalar Boolean most-recent behavior: a missing selected value is emitted as false. This library also declares a selected Record publication, whose missing value remains null and pauses a required branch. Choose the intended absence behavior explicitly; the two forms are not equivalent.`,
+        loc, attribution, errors);
+    }
 
     // -- Reduction-operand & result checks (only when a reduction is present) -----------------
     if (reduction) {

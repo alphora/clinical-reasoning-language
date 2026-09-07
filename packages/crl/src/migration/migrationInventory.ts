@@ -1,5 +1,5 @@
 // #189 emit-flip · T4 — the flip-safety migration inventory scanner (design of record:
-// docs/emit-consistency-189-design.md §9 step 3; plan tmp/PLAN-T4-migration-inventory.md v2).
+// docs/_old/emit-consistency-189-design.md §9 step 3; plan tmp/PLAN-T4-migration-inventory.md v2).
 //
 // WHY THIS LIVES IN src/ (not scripts/): the §9-step-4 flip turns a family of validation
 // WARNINGS into hard ERRORS. Before that flips, every site the flip breaks must be enumerated so

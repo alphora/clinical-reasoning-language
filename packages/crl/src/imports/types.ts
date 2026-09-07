@@ -117,6 +117,9 @@ export type ImportDiagnostic =
 // === Registry ===
 
 export interface RegistryEntry {
+  // REFACTOR:grounded (#320, review 562): owning authored package metadata is
+  // captured at resolution, never guessed from the source path or physical CQL layer.
+  packageIdentity?: { readonly name: string; readonly version?: string };
   name: string | null;       // null only when isRoot && root is anonymous
   filePath: string;          // absolute canonical
   ast: CRL;

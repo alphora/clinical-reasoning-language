@@ -1,6 +1,9 @@
-import type { CRL, Concept } from "../ast/types";
+import type { CRL, Concept, ReferenceName } from "../ast/types";
 import { findPatternCalls } from "../template-match/referenceRoles";
-import type { SourceContext } from "../imports/scopes";
+import { publicationAdmissionReason, readPublicationMembership, type PublicationCode, type PublicationMembershipSyntax } from "../emit/publicationProgram";
+import { lookupKnownLibrary, type SourceContext, type LibraryScope } from "../imports/scopes";
+import { createPublicationContext } from "../emit/publicationContext";
+import { normalizePublicationCodes, publicationCodeKey, readFinitePublicationTerminology } from "../emit/publicationDomain";
 
 import type { AnswerOptionsFinding, ValidationError } from "./validator";
 
@@ -20,9 +23,9 @@ import type { AnswerOptionsFinding, ValidationError } from "./validator";
 //
 // ⚠ WHAT THIS FILE DELIBERATELY CANNOT CHECK: whether the concept's resource actually HAS a distinct
 // `value[x]` answer slot. A `type is Condition` concept carries its identity ON its coding element and has no
-// separate value carrier, so a binding would have nothing to land on. That is REGISTRY knowledge living in
-// `emit/`, and no validator imports from there (a layering boundary this slice is not entitled to breach), so
-// the emitter diagnoses that cell at the point it would otherwise silently emit nothing.
+// separate value carrier, so a binding would have nothing to land on. Resource-carrier eligibility remains
+// an emitter responsibility; the shared declaration and finite-domain helpers used here do not infer a
+// carrier. The emitter diagnoses that cell at the point it would otherwise silently emit nothing.
 
 /**
  * ⭐ RULED (operator, 2026-09-01), on the absence posture: *"b)"* — a coded question with no answer set WARNS
@@ -38,9 +41,88 @@ import type { AnswerOptionsFinding, ValidationError } from "./validator";
 export class AnswerOptionsValidator {
   public validate(ast: CRL, sources?: SourceContext[]): ValidationError[] {
     const out: ValidationError[] = [];
-    const concepts: Concept[] = sources
-      ? sources.flatMap(({ stmt }) => (stmt.type === "Concept" ? [stmt] : []))
-      : ast.statements.flatMap((stmt) => (stmt.type === "Concept" ? [stmt as Concept] : []));
+    const declarations: { concept: Concept; sourceKey: string }[] = sources
+      ? sources.flatMap(({ stmt, scope }) => stmt.type === "Concept"
+        ? [{ concept: stmt, sourceKey: scope.filePath }] : [])
+      : ast.statements.flatMap((stmt) => stmt.type === "Concept"
+        ? [{ concept: stmt, sourceKey: "single-library" }] : []);
+    // REFACTOR:grounded (#320, review 563 r2 I3): reuse the declaration resolver without
+    // constructing another PublicationProgram or inventing canonical/domain metadata. The validator
+    // intentionally includes its supplied non-emitted siblings and only its supplied source statements.
+    const owners = new Map<string, { ast: CRL; scope?: LibraryScope }>();
+    if (sources === undefined) owners.set("single-library", { ast });
+    else for (const source of sources) {
+      let owner = owners.get(source.scope.filePath);
+      if (owner === undefined) {
+        // Real graph scopes come from buildLibraryScopes: currentLibrary is RegistryEntry.name,
+        // which the resolver obtained from this same parsed AST's library.name. Keep the raw AST
+        // name authoritative here; a custom SourceContext must preserve that coherence, not ask us
+        // to silently rename the declaration to repair a mismatched caller-created scope.
+        owner = { ast: { ...source.entry.ast, statements: [] }, scope: source.scope };
+        owners.set(source.scope.filePath, owner);
+      }
+      owner.ast.statements.push(source.stmt);
+    }
+    // Map keys provide exactly one input per scope.filePath, so repeated statement-level sources
+    // cannot cause createPublicationContext's duplicate-sourceIdentity exception. Duplicate named
+    // declarations remain in statements and are handled by lookup's explicit ambiguous result.
+    const context = createPublicationContext({
+      libraries: [...owners].map(([sourceIdentity, owner]) => ({ sourceIdentity, ast: owner.ast, artifact: {} })),
+      resolveLibrary(from, qualifier) {
+        const scope = owners.get(from)?.scope;
+        if (scope === undefined) return { kind: "not-visible" };
+        const target = lookupKnownLibrary(scope, qualifier);
+        if (target === undefined) return { kind: "missing" };
+        if (target.origin === "package" && !scope.explicitIncludes.has(qualifier)) return { kind: "not-visible", sourceIdentity: target.filePath };
+        return { kind: "resolved", sourceIdentity: target.filePath };
+      },
+    });
+    const resolveOperand = (from: typeof declarations[number], ref: ReferenceName): Readonly<Concept> | undefined => {
+      const result = context.lookupConcept(from.sourceKey, ref);
+      return result.kind === "hit" ? result.node : undefined;
+    };
+    const finiteTerms = new Map<string, readonly PublicationCode[] | undefined>();
+    const finiteTerm = (from: string, ref: ReferenceName): { key: string; codes: readonly PublicationCode[] } | undefined => {
+      const hit = context.lookupTerminology(from, ref);
+      if (hit.kind !== "hit") return undefined;
+      if (!finiteTerms.has(hit.identity.key)) {
+        const result = readFinitePublicationTerminology(hit.node);
+        finiteTerms.set(hit.identity.key, result.kind === "finite" ? result.codes : undefined);
+      }
+      const codes = finiteTerms.get(hit.identity.key);
+      return codes === undefined ? undefined : { key: hit.identity.key, codes };
+    };
+    const hasNoNegativeDomain = (from: string, membership: PublicationMembershipSyntax): boolean => {
+      const hit = context.lookupConcept(from, membership.operand, membership.location);
+      if (hit.kind !== "hit" || publicationAdmissionReason(hit.node) !== undefined || hit.node.valueTypes[0] !== "CodeableConcept") return false;
+      const operand = hit.node;
+      if (operand.valueFrom?.kind === "inline") {
+        // This proof is independent of generated canonical metadata. Mixed inline/named domains
+        // require the owning generated answer system, which this declaration-only validator lacks;
+        // preparation retains that check rather than inventing a canonical here.
+        return membership.predicate.kind === "qualifying" && operand.valueDomain?.terms.length === 1 &&
+          operand.valueDomain.terms[0].type === "AnswerOptionsDomainTerm" &&
+          operand.valueFrom.options.length > 0 && operand.valueFrom.options.every((option) => option.qualifying === true);
+      }
+      if (membership.predicate.kind !== "terminology") return false;
+      const offered = operand.valueFrom?.kind === "terminology"
+        ? finiteTerm(hit.identity.sourceIdentity, operand.valueFrom.terminologyName) : { codes: [] };
+      if (offered === undefined) return false;
+      const domainCodes: PublicationCode[] = [];
+      const terms = new Set<string>();
+      for (const term of operand.valueDomain?.terms ?? []) {
+        const resolved = term.type === "AnswerOptionsDomainTerm" ? { key: "answer-options", codes: offered.codes }
+          : finiteTerm(hit.identity.sourceIdentity, term.terminologyName);
+        if (resolved === undefined || resolved.codes.length === 0 || terms.has(resolved.key)) return false;
+        terms.add(resolved.key);
+        domainCodes.push(...resolved.codes);
+      }
+      const domain = normalizePublicationCodes(domainCodes);
+      const keys = new Set(domain.map(publicationCodeKey));
+      if (domain.length === 0 || offered.codes.some((code) => !keys.has(publicationCodeKey(code)))) return false;
+      const qualifying = finiteTerm(from, membership.predicate.reference);
+      return qualifying !== undefined && qualifying.codes.length === domain.length && qualifying.codes.every((code) => keys.has(publicationCodeKey(code)));
+    };
 
     // ⭐⭐ WHICH CONCEPTS ARE THE SUBJECT OF AN `in qualifying` PREDICATE — computed ONCE, because the
     // marker requirement is a property of USE, not of the declaration (operator ruling, 2026-09-02).
@@ -49,13 +131,37 @@ export class AnswerOptionsValidator {
     // pipeline into a `NestedPatternArg`, so a reader that only inspects top-level args misses a membership
     // buried in a stage. That exact bug appeared in THREE separate readers earlier in #189, which is why the
     // shared authority exists. Do not hand-roll this walk.
-    const predicatedOn = new Set<string>();
-    for (const c of concepts) {
+    const legacyPredicatedOn = new Set<Readonly<Concept>>();
+    const publicationPredicatedOn = new Set<Readonly<Concept>>();
+    for (const declaration of declarations) {
+      const c = declaration.concept;
       if (c.definition?.type !== "DefinitionIsDefinition") continue;
+      const membership = c.shapeReduction !== undefined && publicationAdmissionReason(c) === undefined
+        ? readPublicationMembership(c) : undefined;
+      if (membership !== undefined) {
+        if (membership.predicate.kind === "qualifying") {
+          const operand = resolveOperand(declaration, membership.operand);
+          if (operand !== undefined) publicationPredicatedOn.add(operand);
+        }
+        if (hasNoNegativeDomain(declaration.sourceKey, membership)) {
+          const scope = owners.get(declaration.sourceKey)?.scope;
+          out.push({ kind: "publication-membership-no-negative-domain", conceptName: c.name,
+            message: `Membership producer "${c.name}" has no negative value in its explicit domain.`,
+            location: membership.location, severity: "warning",
+            ...(scope === undefined ? {} : { libraryName: scope.currentLibrary, filePath: scope.filePath }),
+          } as AnswerOptionsFinding);
+        }
+        continue;
+      }
       for (const call of findPatternCalls(c.definition.body, "Membership")) {
         if (!call.args.some((a) => a.type === "SubsetRefArg")) continue;
         const subj = call.args.find((a) => a.type === "ConceptRefArg");
-        if (subj && "value" in subj) predicatedOn.add(String(subj.value));
+        if (subj?.type !== "ConceptRefArg") continue;
+        const ref: ReferenceName = subj.library === undefined ? subj.value : {
+          type: "QualifiedReference", libraryName: subj.library, name: subj.value, location: subj.location,
+        };
+        const operand = resolveOperand(declaration, ref);
+        if (operand !== undefined) legacyPredicatedOn.add(operand);
       }
     }
 
@@ -66,13 +172,14 @@ export class AnswerOptionsValidator {
             stmt,
             { libraryName: scope.currentLibrary, filePath: scope.filePath },
             out,
-            predicatedOn,
+            legacyPredicatedOn.has(stmt), publicationPredicatedOn.has(stmt),
           );
         }
       }
     } else {
       for (const stmt of ast.statements) {
-        if (stmt.type === "Concept") this.checkConcept(stmt as Concept, {}, out, predicatedOn);
+        if (stmt.type === "Concept") this.checkConcept(stmt as Concept, {}, out,
+          legacyPredicatedOn.has(stmt), publicationPredicatedOn.has(stmt));
       }
     }
     return out;
@@ -82,8 +189,9 @@ export class AnswerOptionsValidator {
     concept: Concept,
     attribution: { libraryName?: string; filePath?: string },
     out: ValidationError[],
-    /** Concepts that ARE the subject of an `in qualifying` predicate — see `validate`. */
-    predicatedOn: ReadonlySet<string>,
+    /** Obligations belong to resolved consumers, not the operand's shape marker. */
+    legacyPredicatedOn: boolean,
+    publicationPredicatedOn: boolean,
   ): void {
     // ⚠ EXACTLY ONE value type, and it must be the coded one. `includes(...)` was too loose: a multi-typed
     // concept has no single answer carrier (`answerCarrier` requires one), so the absence warning would tell
@@ -98,6 +206,12 @@ export class AnswerOptionsValidator {
       ...(attribution.libraryName ? { libraryName: attribution.libraryName } : {}),
       ...(attribution.filePath ? { filePath: attribution.filePath } : {}),
     };
+    if (publicationPredicatedOn && concept.valueFrom?.kind !== "inline") {
+      out.push({ kind: "answer-options-missing-marker", conceptName: concept.name,
+        message: `Concept "${concept.name}" is consumed by a selected-value \`in qualifying\` producer and requires inline answer options with explicit qualifying/not qualifying markers.`,
+        location: concept.valueFrom?.location ?? concept.location, severity: "error", ...attrib,
+      } as AnswerOptionsFinding);
+    }
 
     if (concept.valueFrom !== undefined) {
       if (!isAnswerable) {
@@ -170,8 +284,9 @@ export class AnswerOptionsValidator {
         }
 
         // ⭐⭐ THE MARKER IS REQUIRED IFF THE CONCEPT IS PREDICATED ON (operator ruling, 2026-09-02).
-        // `predicatedOn` is computed once in `validate` — see the recursion note there.
-        if (predicatedOn.has(concept.name)) {
+        // Consumer sets are resolved once in `validate` — legacy obligations remain even if the
+        // operand alone was migrated. New syntax receives authoring feedback before emit preparation.
+        if (legacyPredicatedOn || publicationPredicatedOn) {
           // A silent default would let a KE add an option, have a patient answer it honestly, and get a
           // determinate `false -> deny` — the UNRECOVERABLE class, since a pause is recoverable but a
           // spurious `false` looks like a decision. Adding an option must not compile until it is classified.
@@ -192,7 +307,7 @@ export class AnswerOptionsValidator {
           }
 
           const marked = options.filter((o) => o.qualifying !== undefined);
-          if (marked.length > 0 && marked.every((o) => o.qualifying === false)) {
+          if (legacyPredicatedOn && marked.length > 0 && marked.every((o) => o.qualifying === false)) {
             out.push({
               kind: "answer-options-none-qualifying",
               conceptName: concept.name,
@@ -204,12 +319,11 @@ export class AnswerOptionsValidator {
               severity: "error",
               ...attrib,
             } as AnswerOptionsFinding);
-          } else if (marked.length > 1 && marked.every((o) => o.qualifying === true)) {
+          } else if (legacyPredicatedOn && marked.length > 1 && marked.every((o) => o.qualifying === true)) {
             out.push({
               kind: "answer-options-all-qualifying",
               conceptName: concept.name,
-              message:
-                `Every option on concept "${concept.name}" is \`qualifying\`, so \`in qualifying\` is false ` +
+              message: `Every option on concept "${concept.name}" is \`qualifying\`, so \`in qualifying\` is false ` +
                 `only for a code that was never offered. If a user should be able to answer in a way that ` +
                 `does NOT qualify — a "none of the listed" option — the set is missing it.`,
               location: concept.valueFrom.location,

@@ -1,7 +1,7 @@
 // #189 P1 — RECORD CONSTRUCTION capability + signature, derived from the resource registry.
 //
 // REFACTOR:grounded (#189 P1) — re-derived from `docs/CRL-NORTH-STAR.md` and the P1 design of record
-// (`tmp/DESIGN-P1-case-feature-construction.md`), NOT from any existing emitter behaviour. Nothing
+// (`tmp/_old/DESIGN-P1-case-feature-construction.md`), NOT from any existing emitter behaviour. Nothing
 // constructs a record today, so there was no current behaviour to anchor on.
 //
 // WHY THIS EXISTS. A concept can be determined three ways at once — ASSERTED (a local `code is` answer),

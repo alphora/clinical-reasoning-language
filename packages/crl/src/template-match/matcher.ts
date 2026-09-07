@@ -66,7 +66,7 @@ export function matchNarrative(clause: NarrativeClause): CanonicalPatternCall {
   // ⭐ THE RULE the fix restores: `this` in a stage ALWAYS denotes THE SPACE handed to it — the previous
   // stage's output — and NEVER a scalar. A PRODUCER's output is its input PLUS its constructed candidate,
   // so a reduction after a producer reduces `S0 ∪ {candidate}`, not the candidate alone. Until the
-  // un-collapse lands, do NOT read this fold as intent (`tmp/DESIGN-P2-pipeline-uncollapse.md`).
+  // un-collapse lands, do NOT read this fold as intent (`tmp/_old/DESIGN-P2-pipeline-uncollapse.md`).
   //
   // ⚠ A pipeline whose stages do not ALL match is unknown as a whole. Reporting a partial chain would claim
   // more than was understood, and half-matched logic that validates is the failure this work exists to remove.

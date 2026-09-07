@@ -142,6 +142,7 @@ import {
   type AgeProjectionArgs,
 } from "../template-match/recencyProjectionOverride";
 import type { CRLError } from "../types/errors";
+import { prepareSingleLibraryPublication, type PublicationEmitScope } from "../emit/publicationProgram";
 import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
 
 /** The result of a lowering pass: the (possibly transformed) AST + any hard errors. */
@@ -161,6 +162,7 @@ export interface LowerLocalCodesResult {
 
 /** Options for the lowering pass. */
 export interface LowerLocalCodesOptions {
+  publication?: PublicationEmitScope;
   /**
    * The project's `crl.canonicalBase`. The synthetic local codesystem's URL is
    * published under it (`<base>/CodeSystem/<slug>-local`). **#271 — REQUIRED when
@@ -281,8 +283,20 @@ export function lowerLocalCodes(
 ): LowerLocalCodesResult {
   const errors: CRLError[] = [];
 
+  // REFACTOR:grounded (#320): inspect every authored opt-in before the no-code fast path.
+  // An unsupported source-only publication must not silently emit through a legacy route.
+  const hasRawPublication = ast.statements.some((s) =>
+    s.type === "Concept" && s.shapeReduction !== undefined && s.__publication === undefined);
+  const publicationProgram = opts.publication?.program ?? (hasRawPublication
+    ? prepareSingleLibraryPublication(ast, {
+      canonicalBase: opts.canonicalBase, localDomainId: opts.localDomainId, policyId: opts.policyId,
+    }) : undefined);
+  const publicationSource = opts.publication?.fromSourceIdentity ?? ast.library.name;
+  if (hasRawPublication && publicationProgram !== undefined && publicationProgram.diagnostics.length > 0)
+    return { ast, errors: [...publicationProgram.diagnostics], localCodes: [] };
+
   // Fast path: nothing to lower → return the input untouched (no clone churn).
-  if (!ast.statements.some(isLowerableConcept)) {
+  if (!ast.statements.some(isLowerableConcept) && !hasRawPublication) {
     return { ast, errors, localCodes: [] };
   }
 
@@ -476,6 +490,72 @@ export function lowerLocalCodes(
   }
 
   for (const stmt of ast.statements) {
+    // REFACTOR:grounded (#320, review 562): publication assembly precedes legacy code-only gates.
+    // An uncoded producer has computational identity without acquiring an invented local retrieve.
+    if (stmt.type === "Concept" && stmt.shapeReduction !== undefined && stmt.__publication === undefined) {
+      const hit = publicationProgram?.lookup(publicationSource, stmt.name, stmt.location);
+      if (hit?.kind !== "publication") {
+        errors.push(hit?.kind === "error" ? hit.diagnostic : mkError("publication-missing-preparation", `Publication "${stmt.name}" has no raw descriptor.`, stmt.location));
+        continue;
+      }
+      const descriptor = hit.descriptor;
+      // REFACTOR:grounded (#320, review 564): reserve all physical source bindings before emission.
+      const sourceReferences = (descriptor.sources ?? []).map((_source, index) => `${stmt.name} Source ${index + 1}`);
+      const collision = sourceReferences.find((name) => topLevelIdentifierNames.has(name) || seenSyntheticNames.has(name));
+      if (collision !== undefined) {
+        errors.push(mkError("publication-name-collision", `Publication "${stmt.name}" source binding "${collision}" collides with a declaration.`, stmt.location));
+        continue;
+      }
+      for (let index = 0; index < sourceReferences.length; index++) {
+        const sourceName = sourceReferences[index];
+        topLevelIdentifierNames.add(sourceName);
+        const sourceTwin: Concept = {
+          ...stmt, name: sourceName, shape: "RecordSet", conceptType: "ServiceRequest", valueTypes: [], representations: [],
+          definition: { type: "CodedFromDefinition", terminologyName: descriptor.sources![index].terminology, location: stmt.location },
+          __loweringRole: "source-impl", __publication: Object.freeze({ descriptor, role: "retrieve", source: descriptor.sources![index] }),
+        };
+        delete sourceTwin.code;
+        delete sourceTwin.shapeReduction;
+        delete sourceTwin.meta;
+        delete sourceTwin.evidence;
+        delete sourceTwin.valueElement;
+        delete sourceTwin.valueFrom;
+        delete sourceTwin.valueDomain;
+        delete sourceTwin.__pureQuestion;
+        externalSourceTwins.push(sourceTwin);
+      }
+      let definition = stmt.definition;
+      if (descriptor.localCode !== undefined) {
+        const twinName = recordsTwinDefineName(stmt.name);
+        const previous = codeValueToConcept.get(descriptor.localCode.code);
+        if (previous !== undefined || seenSyntheticNames.has(stmt.name) || existingTerminologyNames.has(stmt.name) || topLevelIdentifierNames.has(twinName)) {
+          errors.push(mkError("publication-name-collision", `Publication "${stmt.name}" has a duplicate local code or colliding generated declaration.`, stmt.location));
+          continue;
+        }
+        codeValueToConcept.set(descriptor.localCode.code, stmt.name);
+        seenSyntheticNames.add(stmt.name);
+        topLevelIdentifierNames.add(twinName);
+        syntheticTerminologies.push(buildSyntheticTerminology(stmt.name, descriptor.localCode.code, localCodesystemName, descriptor.localCode.system, stmt.location));
+        localCodes.push({ concept: stmt.name, code: descriptor.localCode.code, conceptType: "Observation" });
+        const retrieve: Concept = {
+          ...stmt, name: twinName, shape: "RecordSet", valueTypes: [], representations: [],
+          definition: { type: "CodedFromDefinition", terminologyName: stmt.name, retrieveResourceType: "Observation", location: stmt.location },
+          __loweringRole: "records-impl", __publication: Object.freeze({ descriptor, role: "retrieve" }),
+        };
+        delete retrieve.code;
+        delete retrieve.shapeReduction;
+        delete retrieve.__pureQuestion;
+        delete retrieve.meta;
+        delete retrieve.evidence;
+        recordsTwins.push(retrieve);
+        definition = { type: "DefinedAsDefinition", body: { type: "DefinedAsBareRef", ref: twinName, location: stmt.location }, location: stmt.location };
+      }
+      const selected: Concept = { ...stmt, definition, representations: [], __loweringRole: "public-determination",
+        __publication: Object.freeze({ descriptor, role: "public", sourceReferences: Object.freeze(sourceReferences) }) };
+      delete selected.code;
+      loweredConcepts.push(selected);
+      continue;
+    }
     if (!isLowerableConcept(stmt)) continue;
     // `c` is reassigned once an age `source representation` is CONSUMED (stripped) below,
     // so the downstream `code is` lowering sees a representation-free concept.
@@ -1036,7 +1116,7 @@ export function lowerLocalCodes(
           // `most recent this` (`representationShapeValidator` only errors >1 value types;
           // `useSiteType.test.ts` proves it valid), so rejecting it here would hard-fail validator-clean
           // content at emit — the exact validate/emit split the flip must avoid (crl-emit B2b panel #1, both
-          // arms; design `docs/emit-consistency-189-design.md` §1 + reduction table).
+          // arms; design `docs/_old/emit-consistency-189-design.md` §1 + reduction table).
           if (c.valueTypes.length !== 1) {
             errors.push(
               mkError(
@@ -2231,6 +2311,9 @@ function mkError(kind: string, message: string, loc: Location): CRLError {
  * base-less project shows leaf-eligible concepts in the cockpit while its emit would emit no
  * case-features. That is intentional (this is an eligibility/authoring view, not an emit gate), but it
  * means this set is NOT a promise that emit will succeed.
+ * REFACTOR:grounded (#320, review 565): policyId is likewise probed for source and producer profile
+ * identity. A project without real policy metadata can show eligible leaves while real emit refuses
+ * its missing profile identity. These probe URLs are never emitted as artifacts.
  *
  * KNOWN EDGE (opts): membership is opts-independent EXCEPT one pathological collision. `lowerLocalCodes`
  * derives the synthetic local-codesystem DECL NAME from `opts.localDomainId ?? ast.library.name` and hard-errors
@@ -2246,7 +2329,8 @@ export function leafEligibleConcepts(ast: CRL): Set<string> {
     // synthetic local-codesystem URL, not which concepts are leaf-eligible). Pass
     // a probe base so the eligibility gate is computed even when the caller hasn't
     // resolved `crl.canonicalBase`; the URL it produces is never emitted here.
-    const lowered = lowerLocalCodes(ast, { canonicalBase: "http://example.org/crl/leaf-eligibility-probe" });
+    // REFACTOR:grounded (#320, review 565): profile identity is also metadata, not leaf eligibility.
+    const lowered = lowerLocalCodes(ast, { canonicalBase: "http://example.org/crl/leaf-eligibility-probe", policyId: "leaf-eligibility-probe" });
     if (lowered.errors.length > 0) return new Set();
     return new Set(lowered.localCodes.map((lc) => lc.concept));
   } catch {

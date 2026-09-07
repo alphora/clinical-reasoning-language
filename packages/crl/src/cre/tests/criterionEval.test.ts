@@ -9,11 +9,11 @@ import type { RegistryEntry } from "../../imports/types";
 import { runCel } from "../run";
 import { renderScenario, __zipConditionTraceForTest, unsatisfiedFrontier, frontierTooltip } from "../viewModel";
 import type { BranchConditionView } from "../viewModel";
-import type { BranchCondition } from "../../ast/types";
+import type { BranchCondition, ReferenceName } from "../../ast/types";
 import { allUnsatisfiedCriteria, type FcScenario } from "../../provenance/failedCriteria";
 
 const LOC = { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } } as const;
-const critRef = (ref: string): BranchCondition => ({ type: "BranchConditionCriterionRef", ref, location: LOC });
+const critRef = (ref: ReferenceName): BranchCondition => ({ type: "BranchConditionCriterionRef", ref, location: LOC });
 
 // #236 — the EVAL + RENDER wiring for a `criterion` guard. A `when` that references a criterion no
 // longer inline-EXPANDS the criterion's body into the guard. The CRE evaluates the criterion BY
@@ -542,12 +542,11 @@ function critTraceNodes(node: unknown, out: Array<Record<string, unknown>> = [])
 }
 const critName = (n: Record<string, unknown>): string => (n.criterion as { name: string }).name;
 
-// #236 — the CRE evaluates on UNVALIDATED input (`runCel` runs no validator, run.ts), so the
-// cyclic + undefined-criterion dispositions are production-reachable and must be closed-world false,
-// LOUDLY diagnosed, and (disc 419 both-arms catch) must NOT fabricate a `reference:true` (which
-// would promise a first-occurrence body that never exists).
+// REFACTOR:grounded (#320, review 563 r4): invalid criterion graphs cannot determine a
+// disposition. The validator-free CRE must refuse, not turn an error into false or a null pause.
+// A failed trace also must not fabricate a reference to a first-occurrence body that never exists.
 describe("#236 — CRE criterion error dispositions (unvalidated input)", () => {
-  it("a CYCLIC criterion → closed-world false + a `cycle detected` diagnostic (no hang, no spurious reference)", () => {
+  it("a cyclic criterion refuses instead of selecting the otherwise activity", () => {
     const crl = `library "GuardLib".
 ${LEAVES}
 ${ACTIVITIES}
@@ -566,18 +565,19 @@ case "c":
 - subject is "Pat".
 - result is "D" is "Deny".`;
     const run = runCel(graphFrom(crl, cel)).runs[0]!;
-    // X cycles → closed-world false → otherwise → Deny (matches the expected result) — and it TERMINATED.
-    expect(run.status).toBe("pass");
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.some((d) => d.startsWith("criterion-guard-unavailable:"))).toBe(true);
     expect(run.diagnostics.some((d) => /cycle detected/.test(d))).toBe(true);
     const crits = critTraceNodes(run.trace);
     const xNodes = crits.filter((n) => critName(n) === "X");
     expect(xNodes.length).toBeGreaterThanOrEqual(1);
-    expect(xNodes.every((n) => n.satisfied === false)).toBe(true); // closed-world false everywhere
+    expect(xNodes.every((n) => n.satisfied === false)).toBe(true); // failed trace, not a false determination
     // disc 419: a cyclic criterion never fabricates a `reference:true` anywhere in the trace.
     expect(crits.every((n) => n.reference === undefined)).toBe(true);
   });
 
-  it("an UNDEFINED criterion (defensive `!crit` path) → closed-world false + a `no definition` diagnostic; `not <undefined>` does not silently invert", () => {
+  it("an undefined criterion under not refuses instead of selecting an activity", () => {
     // The classifier only produces a criterion ref when a declaration exists, so the undefined path is
     // defensive — inject a criterion ref to an undeclared name into a decision guard to drive it
     // through the PUBLIC runCel (rather than a test-only eval hook).
@@ -602,14 +602,153 @@ case "c":
     ) as { body: { statements: Array<{ condition: BranchCondition }> } };
     dec.body.statements[0]!.condition = { type: "BranchConditionNot", operand: critRef("Ghost"), location: LOC };
     const run = runCel(graph).runs[0]!;
-    // Ghost undefined → false; `not false` → true → the branch fires → Approve. But it is DIAGNOSED
-    // (never a silent inversion — the whole reason run.ts diagnoses the `!crit` path).
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.some((d) => d.startsWith("criterion-guard-unavailable:"))).toBe(true);
     expect(run.diagnostics.some((d) => /no definition/.test(d))).toBe(true);
     const ghost = critTraceNodes(run.trace).filter((n) => critName(n) === "Ghost");
     expect(ghost.length).toBe(1);
-    expect(ghost[0]!.satisfied).toBe(false); // closed-world false
+    expect(ghost[0]!.satisfied).toBe(false); // error trace
     expect(ghost[0]!.body).toBeUndefined(); // no body …
     expect(ghost[0]!.reference).toBeUndefined(); // … and no fabricated reference
+  });
+
+  it("a true sibling inside an evaluated OR cannot hide a criterion cycle", () => {
+    const graph = graphFrom(`library "GuardLib".
+${LEAVES}
+${ACTIVITIES}
+criterion "X":
+- when ( "X" ).
+decision "D":
+first:
+- when ( "Leaf A" or "X" ) then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`, CASES);
+    for (const run of runCel(graph).runs) {
+      expect(run.status).toBe("error");
+      expect(run.produced).toEqual([]);
+      expect(run.diagnostics.some((d) => /criterion-guard-unavailable:.*cycle detected/.test(d))).toBe(true);
+    }
+  });
+
+  it("an off-path criterion cycle does not poison an earlier successful first branch", () => {
+    const graph = graphFrom(`library "GuardLib".
+${LEAVES}
+${ACTIVITIES}
+criterion "X":
+- when ( "X" ).
+decision "D":
+first:
+- when "Leaf A" then recommend activity "Approve".
+- when "X" then recommend activity "Deny".`, CASES);
+    const run = runCel(graph).runs[0]!;
+    expect(run.status).toBe("pass");
+    expect(run.produced.map((p) => p.recommendation)).toEqual(["Approve"]);
+    expect(run.diagnostics.some((d) => d.includes("Static covered-library analysis") && d.includes("cycle"))).toBe(true);
+  });
+
+  it("warns about an off-path undefined criterion without changing the reached activity", () => {
+    const graph = graphFrom(`library "GuardLib".
+${LEAVES}
+${ACTIVITIES}
+criterion "Bad":
+- when ( "Leaf B" ).
+decision "D":
+first:
+- when "Leaf A" then recommend activity "Approve".
+- when "Bad" then recommend activity "Deny".`, CASES);
+    const bad = graph.coversTarget!.ast.statements.find((s) => s.type === "Criterion" && s.name === "Bad");
+    if (bad?.type !== "Criterion") throw new Error("missing Bad fixture");
+    bad.condition = critRef("Missing");
+    const result = runCel(graph);
+    const run = result.runs[0]!;
+    expect(result.success).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(run.status).toBe("pass");
+    expect(run.produced.map((p) => p.recommendation)).toEqual(["Approve"]);
+    expect(run.diagnostics.some((d) => d.includes("Static covered-library analysis") && d.includes("undefined-dependency"))).toBe(true);
+  });
+
+  it("memoizes independent criteria after an earlier error without caching a failed determination", () => {
+    const exercise = (first: string) => {
+      const graph = graphFrom(`library "GuardLib".
+${LEAVES}
+${ACTIVITIES}
+criterion "Bad":
+- when ( "Bad" ).
+criterion "Good":
+- when ( "Leaf B" ).
+decision "D":
+first:
+- when ( ${first} or ( "Good" and "Good" ) ) then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`, CASES);
+      graph.cel!.statements = graph.cel!.statements.filter((s) => s.type !== "CELCase" || s.name === "both");
+      const good = graph.coversTarget!.ast.statements.find((s) => s.type === "Criterion" && s.name === "Good");
+      if (good?.type !== "Criterion") throw new Error("missing Good fixture");
+      const condition = good.condition;
+      let reads = 0;
+      Object.defineProperty(good, "condition", { enumerable: true, get() { reads++; return condition; } });
+      const run = runCel(graph).runs[0]!;
+      return { reads, run };
+    };
+    const healthy = exercise('"Leaf A"');
+    const errored = exercise('"Bad"');
+    expect(healthy.run.status).toBe("pass");
+    expect(errored.run.status).toBe("error");
+    expect(errored.run.produced).toEqual([]);
+    expect(healthy.reads).toBeGreaterThan(0);
+    expect(errored.reads).toBe(healthy.reads);
+  });
+
+  it.each([false, true])("refuses a foreign-qualified criterion even with a local namesake (nested=%s)", (nested) => {
+    const graph = graphFrom(`library "GuardLib".
+${LEAVES}
+${ACTIVITIES}
+criterion "Ready":
+- when ( "Leaf A" ).
+criterion "Outer":
+- when ( "Ready" ).
+decision "D":
+first:
+- when "Outer" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`, CASES);
+    const foreignAst = classifyCriterionRefs(parseInput(`library "Foreign".
+${LEAVES}
+criterion "Ready":
+- when ( not "Leaf B" ).`));
+    const foreign: RegistryEntry = {
+      name: "Foreign", filePath: "foreign.crl", ast: foreignAst, isRoot: false, origin: "local",
+    };
+    graph.crlRegistry = { byNameLocal: new Map([["Foreign", foreign]]), byNamePackage: new Map() };
+    const foreignRef = critRef({ type: "QualifiedReference", libraryName: "Foreign", name: "Ready", location: LOC });
+    if (nested) {
+      const outer = graph.coversTarget!.ast.statements.find((s) => s.type === "Criterion" && s.name === "Outer");
+      if (outer?.type !== "Criterion") throw new Error("missing Outer fixture");
+      outer.condition = foreignRef;
+    } else {
+      const decision = graph.coversTarget!.ast.statements.find((s) => s.type === "Decision");
+      if (decision?.type !== "Decision" || decision.body.statements[0]?.type !== "WhenBlock") {
+        throw new Error("missing decision fixture");
+      }
+      decision.body.statements[0].condition = foreignRef;
+    }
+    const run = runCel(graph).runs[0]!;
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics).toContain(
+      'criterion-guard-unavailable: Foreign-qualified criterion "Foreign"."Ready" is unsupported; use a criterion declared in the current library.',
+    );
+  });
+
+  it("keeps a self-qualified criterion legal", () => {
+    const graph = graphFrom(VIA_CRITERION, CASES);
+    const decision = graph.coversTarget!.ast.statements.find((s) => s.type === "Decision");
+    if (decision?.type !== "Decision" || decision.body.statements[0]?.type !== "WhenBlock") {
+      throw new Error("missing decision fixture");
+    }
+    decision.body.statements[0].condition = critRef({
+      type: "QualifiedReference", libraryName: "GuardLib", name: "Eligible", location: LOC,
+    });
+    expect(statuses(graph)).toEqual(["both:pass", "onlyA:pass"]);
   });
 
   it("`tracedCriteria` is PER-CASE: each case's FIRST occurrence of a criterion carries its OWN body", () => {

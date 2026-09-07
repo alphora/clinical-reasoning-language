@@ -16,7 +16,7 @@
  *     use-decision — #196, so cross-lib `recommend`/`use decision` pull the
  *     target into the CQL closure without a redundant `include`). Used by the
  *     CQL emit lane (`imports/emit.ts`).
- *   - `collectFhirDefEmitRefs` — strict SUPERSET: everything the CQL collector
+ *   - `collectFhirDefEmitRefs` — a superset: everything the CQL collector
  *     walks + Activity refs (with-terminology). Used by the FHIR-def closure
  *     orchestrator (Todo 4 of #73).
  *
@@ -215,7 +215,7 @@ export function collectCqlEmitRefs(entry: RegistryEntry, scope: LibraryScope): S
 }
 
 /**
- * FHIR-def emit collector — STRICT SUPERSET of `collectCqlEmitRefs`.
+ * FHIR-def emit collector — a superset of `collectCqlEmitRefs`.
  *
  * `collectCqlEmitRefs` already covers includes + Concept refs + Decision refs
  * (#196). This adds ONLY the remaining FHIR-def-specific walk:
@@ -250,7 +250,7 @@ export function computeCqlEmitClosure(graph: ResolvedGraph): RegistryEntry[] {
   return expandClosureViaRefs(graph, collectCqlEmitRefs);
 }
 
-/** Convenience: full FHIR-def emit closure with the strict-superset FHIR-def collector. */
+/** Convenience: full FHIR-def emit closure with the FHIR-def collector. */
 export function computeFhirEmitClosure(graph: ResolvedGraph): RegistryEntry[] {
   return expandClosureViaRefs(graph, collectFhirDefEmitRefs);
 }
@@ -262,7 +262,9 @@ export function computeFhirEmitClosure(graph: ResolvedGraph): RegistryEntry[] {
  * they belong in BOTH the per-library `include` set and the closure. Representations are walked SEPARATELY by
  * `visitConceptRepresentationRefs` — they do NOT lower to CQL, so they are closure-only.
  */
-function visitConceptDefinitionRefs(concept: Concept, visit: (ref: ReferenceName) => void): void {
+export function visitConceptDefinitionRefs(concept: Concept, visit: (ref: ReferenceName) => void): void {
+  // REFACTOR:grounded (#320, review 564): physical source bindings must survive include closure.
+  concept.__publication?.sourceReferences?.forEach(visit);
   const def = concept.definition;
   if (!def) return;
   switch (def.type) {
@@ -318,6 +320,12 @@ function visitConceptRepresentationRefs(concept: Concept, visit: (ref: Reference
   // are emitted beside it rather than resolved from another declaration. Only the terminology form names an
   // external thing that must be dragged in.
   if (concept.valueFrom?.kind === "terminology") visit(concept.valueFrom.terminologyName);
+  // REFACTOR:grounded (#320, review 562): explicit finite interpretation domains are
+  // resolved from raw owning declarations. Their codes are inlined into CQL, so a
+  // terminology-only dependency enters preparation without inventing a runtime include.
+  for (const term of concept.valueDomain?.terms ?? []) {
+    if (term.type === "TerminologyDomainTerm") visit(term.terminologyName);
+  }
 }
 
 function visitComposition(expr: CompositionExpression, visit: (ref: ReferenceName) => void): void {

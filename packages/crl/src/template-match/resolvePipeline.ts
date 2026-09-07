@@ -521,7 +521,7 @@ function finish(
  * The occurrence's read set — the pattern's intrinsic contract, widened by what this call actually names.
  *
  * ⚠ A flow-reader carrying a named operand reads BOTH, per the charter: *"A reduction over a NAMED set
- * reduces `this` ∪ that set"* (`docs/CRL-NORTH-STAR.md:208`). `definition is exists "X"` is that shape.
+ * reduces `this` ∪ that set"* (`docs/CRL-NORTH-STAR.md (historical named-set rule; reopened in #320)`). `definition is exists "X"` is that shape.
  */
 function occurrenceReads(intrinsic: "flow" | "operands", call: CanonicalPatternCall): StageReads {
   if (intrinsic === "operands") return "operands";

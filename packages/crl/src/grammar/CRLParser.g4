@@ -357,11 +357,14 @@ conceptBody
       | valueElementLine
       | valueTypeLine
       | shapeLine
+      // REFACTOR:grounded (#320) — separate final selector, within the existing prefix.
+      | shapeReductionLine
       | metaLine
       | evidenceLine
       | codeIsLine
       | codedFromLine
       | valueFromLine
+      | valueDomainLine
       | definedAsBody
       | definitionIsBody
       )*
@@ -441,13 +444,30 @@ valueTypeLine
     : DASH VALUE_TYPE_IS CONCEPT_VALUE_TYPE DOT
     ;
 
-// `shape is <Scalar|Record|RecordSet>.` — the concept-level declaration of the cardinality of
-// the concept's PUBLISHED value (#189 grammar+validation slice). CONCEPT-LEVEL ONLY: it is not
-// an alternative in `representationBody` (a source representation has no independent shape). The
-// builder normalizes an omitted `shape is` to `Scalar`. The SHAPE_VALUE token is lexed against a
-// closed allowlist in SHAPE_MODE.
+// REFACTOR:grounded (#320, review 562): each union term retains its own qualified reference.
+valueDomainLine
+    : DASH VALUE_DOMAIN_IS valueDomainTerm (COMMA valueDomainTerm)* DOT
+    ;
+
+valueDomainTerm
+    : ANSWER_OPTIONS
+    | terminologyReference
+    ;
+
+// REFACTOR:grounded — `shape is <Scalar|Record|RecordSet>.` declares published cardinality.
+// It is concept-level only, and omission stays undeclared in the AST.
+// SHAPE_VALUE is lexed against a closed allowlist in SHAPE_MODE.
 shapeLine
     : DASH SHAPE_IS SHAPE_VALUE DOT
+    ;
+
+// REFACTOR:grounded (#320, disc 557) — final selection over the assembled collection
+// is not a definition or an arm-local operation. Duplicate clauses are builder errors.
+shapeReductionLine
+    : DASH SHAPE_REDUCTION_IS SHAPE_REDUCTION_MOST SHAPE_REDUCTION_RECENT
+      (COMMA SHAPE_REDUCTION_ON SHAPE_REDUCTION_EQUAL SHAPE_REDUCTION_TIME
+       SHAPE_REDUCTION_PREFER SHAPE_REDUCTION_LOCAL)?
+      DOT
     ;
 
 // ============================
@@ -683,7 +703,7 @@ narrativeElement
     // ⚠ QUALIFYING and DISPLAY_IS are admitted here because the membership predicate is NARRATIVE:
     //   `- definition is "Patient Complaint" in qualifying.`
     // Without this the keyword would eat its own use site and the predicate could not parse.
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | THEN | COMMA | NARRATIVE_WORD | TIME_UNIT | QUALIFYING | DISPLAY_IS)  # NWord
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | THEN | COMMA | NARRATIVE_WORD | TIME_UNIT | QUALIFYING | DISPLAY_IS | ANSWER_OPTIONS)  # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 

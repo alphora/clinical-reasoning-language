@@ -72,6 +72,8 @@ import type { CRLError } from "../types/errors";
 export const FHIR_DEF_WARNING_KINDS: ReadonlySet<string> = new Set([
   "non-ascii-slug-fallback",
   "empty-terminology",
+  // REFACTOR:grounded (#320, review 563): an explicit all-positive domain is legal; keep its warning nonblocking.
+  "publication-membership-no-negative-domain",
   "unresolved-reference-cascade-suppression",
   // #189 null/pause — an ordered `first:` prior whose null-propagating negation cannot lower to
   // conditions on one action, so later branches are UNDER-excluded and can fire past an unknown

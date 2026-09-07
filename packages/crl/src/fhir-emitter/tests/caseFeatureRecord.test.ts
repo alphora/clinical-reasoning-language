@@ -111,7 +111,7 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     expect(r.derivationKind).toBe("unsupported-reduction-form");
   });
 
-  // ⭐ #189 null/pause — the PURE QUESTION cell (`tmp/DESIGN-apply-null-pause.md` §3.1/§3.5).
+  // ⭐ #189 null/pause — the PURE QUESTION cell (`tmp/_old/DESIGN-apply-null-pause.md` §3.1/§3.5).
   // A local-coded boolean with NO definition and no source rep is the ONLY shape a `when` may gate on: only a
   // stored boolean lets a user answer true / false / leave-unanswered. Before this cell it resolved
   // `not-a-record`, NO case-feature StructureDefinition was emitted, and the generated Questionnaire contained

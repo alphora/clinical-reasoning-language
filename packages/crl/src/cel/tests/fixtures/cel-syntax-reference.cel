@@ -65,6 +65,13 @@ fact "Recommended Activity":
 - stage is proposed.
 - defined by "Some Strategy Library"."Some Activity".
 
+// REFACTOR:grounded (#320, review 556): two instances within one case need distinct fact
+// names with the current emitter identity. Each template can still be reused across cases.
+fact "Follow-up Recommended Activity":
+- code is "http://example.org/codesystem/placeholder|REQ-1".
+- stage is proposed.
+- defined by "Some Strategy Library"."Some Activity".
+
 // Event-class fact (something that happened).
 fact "Performed Event":
 - code is "http://example.org/codesystem/placeholder|EVT-1".
@@ -108,7 +115,7 @@ case "Fixed-anchor scenario with intent variants":
 - anchor is 2026-01-15.
 - fact is "Baseline Reading" at anchor.                                              // positive (default)
 - fact is "Recommended Activity" at anchor with absent intent because `not proposed at this visit`.
-- fact is "Recommended Activity" at anchor + 90 days with negative intent because `subject declined the proposal`.
+- fact is "Follow-up Recommended Activity" at anchor + 90 days with negative intent because `subject declined the proposal`.
 - fact is "Performed Event" on 2024-06-30.                                            // absolute date
 - result is "Some Metric" is true.
 

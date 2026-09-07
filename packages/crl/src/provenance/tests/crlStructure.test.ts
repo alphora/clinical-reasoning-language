@@ -1,3 +1,5 @@
+// REFACTOR:grounded (#320, review 563): owner-normalized aliases produce one provenance
+// key/edge, while foreign owners and distinct dependency paths remain separate.
 import { parseInput } from "../../ast/tests/parseInput";
 import { classifyCriterionRefs } from "../../ast/criterionClassify";
 import { buildCEL } from "../../cel";
@@ -345,6 +347,63 @@ first:
     const qKey = nodeKey({ lib: "U", kind: "concept", name: "Q" });
     expect(all.get("when[0]")!.refKeys).toEqual([qKey]);
     expect(index.nodes.has(qKey)).toBe(true);
+  });
+
+  describe("#320 grounded — owner-normalized criterion provenance", () => {
+    function qualifiedGraph(): ResolvedCelGraph {
+      const source = CRL
+        .replace('- when "A" then', '- when "Eligible" then')
+        .replace('- when "B" then', '- when "Eligible" then')
+        .replace('unless "G".', 'unless "A".') + `
+concept "Derived One":
+- type is Condition.
+- defined as "A".
+concept "Derived Two":
+- type is Condition.
+- defined as "A".
+criterion "Eligible":
+- when ("A" or "T"."A" or "U"."A" or "Derived One" or "Derived Two").
+decision "Other Seed":
+first:
+- when "A" then recommend activity "X".`;
+      const graph = graphFrom(source, CEL, [entry(U.replace('"Q"', '"A"'), "u.crl", "local")]);
+      graph.coversTarget!.ast = classifyCriterionRefs(graph.coversTarget!.ast);
+      return graph;
+    }
+
+    it("bridges a bare and self-qualified concept once while retaining a foreign same-named concept", () => {
+      const graph = qualifiedGraph();
+      const row = buildCrlStructure(graph).find((decision) => decision.decision === "D")!.children[0];
+      expect(row.refKeys).toEqual([
+        nodeKey({ lib: "T", kind: "concept", name: "A" }),
+        nodeKey({ lib: "U", kind: "concept", name: "A" }),
+        nodeKey({ lib: "T", kind: "concept", name: "Derived One" }),
+        nodeKey({ lib: "T", kind: "concept", name: "Derived Two" }),
+      ]);
+    });
+
+    it("records each identical normalized reach edge once, keeping the foreign owner separate", () => {
+      const index = buildProvenanceIndex(qualifiedGraph());
+      const decision = nodeKey(decisionDeclRef("T", "D"));
+      for (const lib of ["T", "U"]) {
+        const reached = index.decisionReachability.get(nodeKey({ lib, kind: "concept", name: "A" }))!;
+        expect(reached.edges.filter((edge) => edge.fromDecision === decision &&
+          edge.fromNodeId === "when[0]" && edge.relation === "when-condition")).toHaveLength(1);
+        expect(reached.reachedBy.has(decision)).toBe(true);
+      }
+    });
+
+    it("keeps distinct seed, source-node, relation, and intermediate-concept paths", () => {
+      const index = buildProvenanceIndex(qualifiedGraph());
+      const reached = index.decisionReachability.get(nodeKey({ lib: "T", kind: "concept", name: "A" }))!;
+      const decision = nodeKey(decisionDeclRef("T", "D"));
+      expect(reached.reachedBy).toEqual(new Set([decision, nodeKey(decisionDeclRef("T", "Other Seed"))]));
+      expect(reached.edges.filter((edge) => edge.fromDecision === decision && edge.relation === "when-condition")
+        .map((edge) => edge.fromNodeId)).toEqual(["when[0]", "when[1]"]);
+      expect(reached.edges.filter((edge) => edge.relation === "inference-operand").map((edge) => edge.via))
+        .toEqual(["Derived One", "Derived Two"].map((name) => nodeKey({ lib: "T", kind: "concept", name })));
+      expect(reached.edges.filter((edge) => edge.relation === "guard")).toHaveLength(1);
+    });
   });
 
   it("refKeys honor a QUALIFIED ref's library (when \"U\".\"Q\" → lib U, not the decision's lib)", () => {

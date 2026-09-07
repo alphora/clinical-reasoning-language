@@ -1,7 +1,7 @@
 // #189 T5 — boolean-totality classifier + emitted-define enrollment ledger + whole-boundary proof.
 //
-// Design of record: `docs/emit-189-boolean-totality.md` (this module IS that spec's §1–5) and
-// `docs/emit-consistency-189-design.md` §3 rule 5, under the charter `docs/CRL-NORTH-STAR.md`
+// Design of record: `docs/_old/emit-189-boolean-totality.md` (this module IS that spec's §1–5) and
+// `docs/_old/emit-consistency-189-design.md` §3 rule 5, under the charter `docs/CRL-NORTH-STAR.md`
 // (null-safety by construction).
 //
 // ⭐ THE INVARIANT (REFACTOR:grounded — re-derived from the charter and an executed `$apply` run):
@@ -104,7 +104,7 @@ export type BooleanRejectCode =
   | "boolean-no-definition"; // boolean Scalar with no definition/reduction — nothing to make total
 
 /**
- * The totality obligation a concept's boolean form owes, per `docs/emit-189-boolean-totality.md` §2.
+ * The totality obligation a concept's boolean form owes, per `docs/_old/emit-189-boolean-totality.md` §2.
  * `rejected` (invalid-in-boolean-position) and `unclassified` (a boolean form the emitter may emit but the
  * classifier cannot yet certify) are DISTINCT (§2): the proof enumerates-and-reports `unclassified` (the
  * result is INCOMPLETE, not proven) whereas an enrolled `rejected` is a hard FAILURE (it must never reach

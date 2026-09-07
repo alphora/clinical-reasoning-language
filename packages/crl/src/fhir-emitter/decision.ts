@@ -30,18 +30,22 @@
  * convention for CQL identifier references (confirmed via
  * cc-screening example).
  *
- * #224 COMPOUND GUARDS (`when A and B`, `when (A or B) and C`): a `when` maps to
+ * #224 LEGACY COMPOUND GUARDS (`when A and B`, `when (A or B) and C`): a `when` maps to
  * 1..N actions, NOT one. The decision boolean lowers to `action` STRUCTURE, NEVER
  * to a CQL expression. `and` → one action with N ANDed `condition[]`; `or` → DNF
  * arms placed context-sensitively (spliced under `first:`, or wrapped in one
  * `cqf-applicabilityBehavior` "any" grouping action under `all:`/flat). See
  * `emitCompoundWhenBlock`.
+ * #320 publication-reachable compounds retain ONE authored-condition evaluation.
+ * Splitting their disjuncts lets a true arm bypass another arm's publication error.
+ * Their nullable Boolean projections use the shared guard renderer; the action's
+ * inputs include every reachable case feature, and independent siblings remain independent.
  *
  * #224 iii.3 NEGATION (`when not X`, `when A and not B`): `toNNF` pushes every `not` to the
  * ref LEAVES, so each DNF arm is a conjunction of SIGNED literals. A NEGATED literal lowers to
  * the per-atom negation carrier (`guardApplicabilityCondition` — `not "<Lib>"."<C>"` for a BRANCH guard,
  * shared with iii.1's `unless`); a positive one to the bare `text/cql-identifier`. The
- * decision boolean STILL never lowers to one opaque CQL expression — negation stays per-literal.
+ * legacy decision boolean still lowers structurally — negation stays per-literal.
  *
  * Recursive `when...then` nests as `action.action[]`. Leaves use
  * `action.definitionCanonical`: `recommend activity X` →
@@ -88,17 +92,21 @@ import type {
   WhenBlock,
   WhenBlockBody,
 } from "../ast/types";
-import { getRefName, isQualifiedRef, normalizeLocalRef, refDisplay } from "../ast/types";
+import { getRefName, isQualifiedRef, normalizeLocalRef, refDisplay, referenceKey as atomKey } from "../ast/types";
 import {
   soleRef,
   describeBranchCondition,
   branchConditionDNF,
   branchConditionArmCount,
+  visitBranchCondition,
 } from "../ast/branchCondition";
 import { type CriterionTable } from "../ast/criterionExpansion";
-import { buildCriterionIndex, type CriterionIndex } from "../ast/criterionIndex";
+import { buildCriterionIndex, guardConceptClosure, type CriterionIndex } from "../ast/criterionIndex";
+import { foreignCriterionMessage } from "../ast/criterionDiagnostics";
 import { guardDefineName } from "../ast/guardDefines";
 import { cqlQuotedIdentifier } from "../cql-emitter/cqlStrings";
+import { emitTotalBooleanGuard } from "../cql-emitter/emitCriterionDefine";
+import { publicationBooleanRead } from "../emit/publicationProgram";
 import type { CRLError } from "../types/errors";
 import { libraryCanonicalUrl, libraryId } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
@@ -140,6 +148,8 @@ const CPG_COMMON_PROCESS_CS = "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-
 export type ConceptResolver = (conceptName: ReferenceName) => string | null;
 export type ActivityResolver = (activityName: ReferenceName) => string | null;
 export type DecisionResolver = (decisionName: ReferenceName) => string | null;
+export interface PublicationGuardTarget { libraryName: string; define: string; canonical: string }
+export type PublicationGuardTargetResolver = (ref: ReferenceName) => PublicationGuardTarget | undefined;
 
 /** One action-level case-feature input (DTR pattern). */
 export interface CaseFeatureInput {
@@ -175,7 +185,7 @@ export interface CaseFeatureInput {
  * ancestor/descendant aggregation. A nested `when` on an inferred condition gets
  * its own recursive inputs exactly like a top-level one.
  */
-export type CaseFeatureInputResolver = (conceptName: string) => readonly CaseFeatureInput[];
+export type CaseFeatureInputResolver = (conceptName: ReferenceName) => readonly CaseFeatureInput[];
 
 // The CPG `cpg-input-text` / `cpg-input-description` extensions stamp a
 // human-askable label + description onto an action input (DTR pattern). Verified
@@ -359,6 +369,9 @@ export function emitDecisionPlanDefinition(
   // caller/test that omits it falls back to `libraryId(metadata, libraryReferenceSuffix)` —
   // the pre-A″ value, correct whenever the CQL header == the FHIR id (layered policies).
   guardQualifierLibraryName: string | undefined = undefined,
+  // REFACTOR:grounded (#320): the raw prepared descriptor decides whether a guard reads a Record value.
+  isPublication: (ref: ReferenceName) => boolean = () => false,
+  publicationGuardTarget: PublicationGuardTargetResolver = () => undefined,
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -399,17 +412,27 @@ export function emitDecisionPlanDefinition(
     criterionIndex: buildCriterionIndex([...criterionTable.values()]),
     guardQualifierLibraryName:
       guardQualifierLibraryName ?? libraryId(metadata, libraryReferenceSuffix),
+    isPublication,
+    publicationGuardTarget,
+    publicationLibraries: new Set(),
   };
+  // REFACTOR:grounded (#320, review 563): diagnose every invalid criterion site before
+  // branch/priority emission can introduce unrelated resolution failures or dependencies.
+  checkDecisionCriteria(decision, ctx);
+  if (errors.some((error) => error.kind === "criterion-guard-unavailable")) return { resource: null, errors, unmatched };
   // #189 null/pause — under an ordered `first:`, each branch also carries the NEGATION of its prior
   // siblings' guards, so an unknown earlier guard poisons every later arm and traversal HALTS (V4).
   const topLevelResults = decision.body.statements.map((branch, i) =>
-    withPriorityExclusions(
+    withPublicationDependencies(ctx, () => withPriorityExclusions(
       emitBranch(branch, ctx, decision.body.qualifier),
       decision.body.qualifier === "first"
         ? priorityExclusions(decision.body.statements.slice(0, i), ctx)
         : [],
-    ),
+    )),
   );
+  // An incomplete criterion graph cannot establish publication reachability or a safe priority
+  // complement. Refuse the resource even if independent branches otherwise survived emission.
+  if (errors.some((error) => error.kind === "criterion-guard-unavailable")) return { resource: null, errors, unmatched };
   const topLevelActions = topLevelResults
     .filter((r): r is { kind: "emitted"; actions: Record<string, unknown>[] } => r.kind === "emitted")
     .flatMap((r) => r.actions);
@@ -502,7 +525,7 @@ export function emitDecisionPlanDefinition(
     type: {
       coding: [{ system: PLAN_DEFINITION_TYPE_CS, code: planTypeCode }],
     },
-    library: [libraryUrl],
+    library: [...new Set([libraryUrl, ...ctx.publicationLibraries])],
     action: rootActions,
   };
 
@@ -552,6 +575,77 @@ interface EmitCtx {
   // cqf-fhir-cr's synthetic expression library can resolve it (disc 310). = `libraryId(
   // metadata, libraryReferenceSuffix)`, matching the emitted Library.id / CQL `library X`.
   guardQualifierLibraryName: string;
+  isPublication: (ref: ReferenceName) => boolean;
+  publicationGuardTarget: PublicationGuardTargetResolver;
+  publicationLibraries: Set<string>;
+}
+
+// REFACTOR:grounded (#320): synthetic expressions already include FHIRHelpers (native run-03/04).
+function publicationGuard(ref: ReferenceName, ctx: EmitCtx): boolean {
+  return ctx.isPublication(ref);
+}
+
+/** Foreign publication guards read the actual prepared public Record target. Local guards
+ * retain their Interface binding; no additional facade or guessed physical name is created. */
+function conceptGuardTarget(ref: ReferenceName, ctx: EmitCtx): { libraryName: string; define: string } | null {
+  const normalized = normalizeLocalRef(ref, ctx.libraryName);
+  if (isQualifiedRef(normalized) && publicationGuard(normalized, ctx)) {
+    const target = ctx.publicationGuardTarget(normalized);
+    if (!target) return null;
+    ctx.publicationLibraries.add(target.canonical);
+    return target;
+  }
+  const define = ctx.conceptResolver(normalized);
+  return define === null ? null : { define, libraryName: ctx.guardQualifierLibraryName };
+}
+
+function readsPublication(condition: BranchCondition, ctx: EmitCtx): boolean {
+  return guardConceptClosure(condition, ctx.criterionIndex).some((atom) => publicationGuard(atom.ref, ctx));
+}
+
+/** #320: preserve the authored condition as the failure boundary. Resolve through the same
+ * physical public bindings used by atomic guards, and keep criterion references atomic. */
+function publicationCondition(condition: BranchCondition, ctx: EmitCtx, negated = false): Record<string, unknown> | null {
+  const resolved = new Map<string, { libraryName: string; define: string }>();
+  let missing = false;
+  const key = (ref: ReferenceName, kind: "concept" | "criterion"): string => `${kind}:${atomKey(normalizeLocalRef(ref, ctx.libraryName))}`;
+  const resolve = (atom: BranchConditionRef | BranchConditionCriterionRef, kind: "concept" | "criterion"): void => {
+    const normalized = normalizeLocalRef(atom.ref, ctx.libraryName);
+    const criterionId = kind === "criterion" ? ctx.criterionIndex.get(getRefName(atom.ref))?.defineId : undefined;
+    const target = kind === "concept" ? conceptGuardTarget(normalized, ctx)
+      : criterionId === undefined ? null : { define: criterionId, libraryName: ctx.guardQualifierLibraryName };
+    if (target === null) {
+      missing = true;
+      const diagnostic: UnmatchedReference = { kind: kind === "concept" ? "unresolved-concept" : "unresolved-criterion",
+        text: refDisplay(atom.ref), line: atom.location?.start.line, column: atom.location?.start.column };
+      // Positive and priority-complement emission revisit the same authored reference.
+      if (!ctx.unmatched.some((item) => item.kind === diagnostic.kind && item.text === diagnostic.text &&
+        item.line === diagnostic.line && item.column === diagnostic.column)) ctx.unmatched.push(diagnostic);
+    } else resolved.set(key(atom.ref, kind), target);
+  };
+  visitBranchCondition<void>(condition, {
+    ref: (atom) => resolve(atom, "concept"), criterionRef: (atom) => resolve(atom, "criterion"),
+    and: () => {}, or: () => {}, not: () => {},
+  });
+  if (missing) return null;
+  const expression = emitTotalBooleanGuard(condition, (ref, kind) => {
+    const target = resolved.get(key(ref, kind))!;
+    const qualified = `${cqlQuotedIdentifier(target.libraryName)}.${cqlQuotedIdentifier(target.define)}`;
+    return kind === "concept" && publicationGuard(ref, ctx) ? publicationBooleanRead(qualified) : qualified;
+  });
+  return { kind: "applicability", expression: { language: "text/cql-expression", expression: negated ? `not (${expression})` : expression } };
+}
+
+function emitPublicationWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
+  const condition = publicationCondition(wb.condition, ctx);
+  if (condition === null) return { kind: "suppressed", reason: "unresolved-ref" };
+  const label = describeBranchCondition(wb.condition, getRefName);
+  const refs = guardConceptClosure(wb.condition, ctx.criterionIndex)
+    .map((atom) => normalizeLocalRef(atom.ref, ctx.libraryName))
+    .filter((ref) => !isQualifiedRef(ref) || publicationGuard(ref, ctx));
+  const inputs = buildActionInputs(refs, ctx);
+  return fillBranchBody({ title: label, description: label, code: guidelineCareCode(),
+    condition: [condition], ...(inputs ? { input: inputs } : {}) }, wb.body, ctx);
 }
 
 /**
@@ -578,7 +672,7 @@ function emitBranch(
  * model (a product of small OR-widths — 4×4=16, 4×5=20, 4×4×4=64 all emit fine) and
  * far below OOM. The "how complex is too complex / how to factor" doctrine belongs to
  * the authoring kit + KE, not a baked-in emitter opinion (#224 KE feedback): the
- * emitter enforces the lowering contract (structural, never CQL) and REPORTS its
+ * legacy emitter enforces its structural lowering contract and REPORTS its
  * envelope; it does not gate authoring or prescribe a restructure.
  */
 const COMPOUND_GUARD_ARM_CAP = 256;
@@ -607,7 +701,7 @@ function cloneJson<T>(value: T): T {
  * a genuinely-foreign atom has no case-features in v0. Returns `undefined` when empty.
  */
 function buildActionInputs(
-  conceptNames: string[],
+  conceptNames: ReferenceName[],
   ctx: EmitCtx,
 ): Array<Record<string, unknown>> | undefined {
   const seenCanonicals = new Set<string>();
@@ -631,18 +725,10 @@ function buildActionInputs(
   return inputs.length > 0 ? inputs : undefined;
 }
 
-/** Dedup key for a normalized atom (ReferenceName is string | QualifiedReference,
- *  so a Set on the raw node would key by object identity). */
-function atomKey(normalized: ReferenceName): string {
-  return isQualifiedRef(normalized)
-    ? `q:${JSON.stringify([normalized.libraryName, normalized.name])}`
-    : `b:${normalized}`;
-}
-
 /**
  * The `condition[kind="applicability"]` entry for a SINGLE guard atom (#224 iii.1).
  *
- * `"positive"` → the byte-identical `text/cql-identifier` form the `when` single-ref
+ * Legacy `"positive"` → the byte-identical `text/cql-identifier` form the `when` single-ref
  * path emits: a BARE define name that `$apply` resolves directly against the
  * PlanDefinition's `library[]`. `"negated"` (`unless`) → an inline `text/cql-expression`
  * `not "<Lib>"."<name>"`: the MINIMAL structural negation of ONE atom. The
@@ -657,23 +743,22 @@ function atomKey(normalized: ReferenceName): string {
  * expression.) `<Lib>` is the PlanDefinition's `library[]` target — the Interface
  * re-export (or the name-keeping Root) that carries the concept define.
  *
- * ⚠ INVARIANT BOUNDARY — do NOT stretch this in iii.3. `text/cql-expression` is
- * permitted ONLY for `not <single-atom>`. ANY composition (`not (A and B)`, an `or`
- * of negated atoms, …) MUST De Morgan / DNF into arms FIRST — each arm then carries
- * positive/negated single-atom conditions. A decision boolean NEVER lowers to one
- * opaque CQL expression (the load-bearing #224 invariant).
+ * REFACTOR:grounded (#320): an admitted Record atom uses an explicit nullable value projection
+ * in `text/cql-expression`, under either polarity. Native apply supplies FHIR and FHIRHelpers
+ * to that synthetic library. Publication-reachable compounds preserve one condition evaluation;
+ * legacy compounds remain DNF. Action-menu uses of this publication are explicitly refused.
  *
  * ⚠ REFACTOR:grounded (#189 null/pause) — the `carrier` argument decides whether a NEGATED atom propagates
- * null, and the two carriers genuinely want OPPOSITE answers. Getting this wrong is not cosmetic: it was a
+ * null on the LEGACY path. Getting this wrong is not cosmetic: it was a
  * PROVEN lane divergence (`tmp/NOTES-apply-null-behavior.md` §10) in which `$apply` APPROVED a prior
  * authorization whose contraindication question was never answered, while the CRE paused on the same case.
  *
- * `"action-guard"` (per-action `unless` / `only when`) → `not Coalesce(<ref>, false)`, TWO-VALUED.
- * The CRE's `evalGuard` is deliberately two-valued for action guards (design §3.6): `unless: excluded = sat`,
+ * Legacy `"action-guard"` (per-action `unless` / `only when`) → `not Coalesce(<ref>, false)`, TWO-VALUED.
+ * The legacy CRE `evalGuard` is two-valued for action guards: `unless: excluded = sat`,
  * so a missing concept → sat=false → item INCLUDED. `not null` = null would make `$apply` EXCLUDE it instead.
  * The coalesce makes the negation two-valued for EVERY define shape — necessary because the guard slot admits
- * ANY concept (`CONCEPT_REF_KINDS`) and the Interface layer's "legacy plain re-export" shape (layeredEmit.ts)
- * is not `satisfied()`-wrapped and can be null. An action guard must never pause.
+ * legacy concepts (`CONCEPT_REF_KINDS`) and the Interface layer's "legacy plain re-export" shape (layeredEmit.ts)
+ * is not `satisfied()`-wrapped and can be null. This does not govern new selected Record publications.
  *
  * `"branch-guard"` (a `when` branch's DNF arm) → `not <ref>`, NULL-PROPAGATING.
  * A decision guard composes in strong Kleene (design §3.3): `not unknown = unknown`, and an unknown guard must
@@ -681,16 +766,24 @@ function atomKey(normalized: ReferenceName): string {
  * question as "no" and fires the arm — closed-world, the exact defect #189 exists to remove. (The `otherwise`
  * priority exclusion has always emitted this bare form, so the engine is known to handle it.)
  *
- * A POSITIVE atom needs no distinction: `text/cql-identifier` with a null value is already not-applicable, which
- * is the pause for a branch guard and matches CRE's missing → excluded for an action guard.
+ * A legacy POSITIVE atom uses `text/cql-identifier`; new Record atoms use their Boolean value projection.
  */
 function guardApplicabilityCondition(
   polarity: "positive" | "negated",
   conceptCqlId: string,
   qualifierLibraryName: string,
   carrier: "branch-guard" | "action-guard",
+  publication = false,
 ): Record<string, unknown> {
   const qualified = `${cqlQuotedIdentifier(qualifierLibraryName)}.${cqlQuotedIdentifier(conceptCqlId)}`;
+  // REFACTOR:grounded (#320): value access is explicit and preserves null through every polarity.
+  if (publication) return {
+    kind: "applicability",
+    expression: {
+      language: "text/cql-expression",
+      expression: `${polarity === "negated" ? "not " : ""}${publicationBooleanRead(qualified)}`,
+    },
+  };
   const expression =
     polarity === "negated"
       ? {
@@ -724,7 +817,7 @@ function guardApplicabilityCondition(
  * `$apply` compiles a `text/cql-expression` condition as an ISOLATED synthetic library that INCLUDES the
  * PlanDefinition's primary library under its NAME, so a bare ref fails to resolve.
  *
- * ONE condition per prior branch, never a composed expression: `$apply` ANDs multiple `condition[]`
+ * On the legacy path, `$apply` ANDs multiple `condition[]`
  * entries, so `not G1 and not G2` is emitted as two single-atom conditions. That respects the #224
  * invariant (`text/cql-expression` only ever wraps `not <single-atom>`; a decision boolean never lowers
  * to one opaque CQL expression) AND avoids the cross-product a structural `not (A and B)` would
@@ -733,7 +826,9 @@ function guardApplicabilityCondition(
 function priorityExclusionCondition(
   conceptCqlId: string,
   qualifierLibraryName: string,
+  publication = false,
 ): Record<string, unknown> {
+  if (publication) return guardApplicabilityCondition("negated", conceptCqlId, qualifierLibraryName, "branch-guard", true);
   return {
     kind: "applicability",
     expression: {
@@ -787,14 +882,18 @@ function priorityExclusions(
   // An ATOM is a concept ref OR a criterion ref. Both resolve to a bare CQL identifier naming a boolean
   // define, so both are ONE leaf for exclusion purposes (#236: a criterion ref is a first-class guard
   // literal, never its inline expansion) — the exclusion carrier does not care which kind it names.
-  const atomId = (c: BranchCondition): string | null => {
-    if (c.type === "BranchConditionRef") return ctx.conceptResolver(normalizeLocalRef(c.ref, ctx.libraryName));
-    if (c.type === "BranchConditionCriterionRef")
-      return ctx.criterionIndex.get(getRefName(c.ref))?.defineId ?? null;
+  const atomTarget = (c: BranchCondition): { libraryName: string; define: string } | null => {
+    if (c.type === "BranchConditionRef") return conceptGuardTarget(c.ref, ctx);
+    if (c.type === "BranchConditionCriterionRef") {
+      const define = ctx.criterionIndex.get(getRefName(c.ref))?.defineId;
+      return define === undefined ? null : { define, libraryName: ctx.guardQualifierLibraryName };
+    }
     return null;
   };
   const isAtom = (c: BranchCondition): boolean =>
     c.type === "BranchConditionRef" || c.type === "BranchConditionCriterionRef";
+  const isPublicationAtom = (c: BranchCondition): boolean =>
+    c.type === "BranchConditionRef" && publicationGuard(c.ref, ctx);
   // A WARNING (`FHIR_DEF_WARNING_KINDS`), never an `unmatched`: an under-excluded prior still emits a
   // valid artifact that is correct for every SETTLED case — what it loses is the pause on an unsettled
   // one. Routing it to `unmatched` would pin `success: false` and fail emit for a whole shape.
@@ -817,6 +916,15 @@ function priorityExclusions(
     if (p.type !== "WhenBlock") continue;
     const g = (p as unknown as WhenBlock).condition;
 
+    // #320: the prior's exclusion must have the SAME failure boundary as its positive guard.
+    // A split complement could bypass an error after an earlier false condition.
+    if (!isAtom(g) && readsPublication(g, ctx)) {
+      const condition = publicationCondition(g, ctx, true);
+      if (condition) conditions.push(condition);
+      else inexpressible(g, "a prior publication guard whose reference does not resolve in this library");
+      continue;
+    }
+
     // ¬(G) by shape. De Morgan holds in Kleene, so each case below is EXACT — never an approximation:
     //   atom           -> ¬atom                     : one negated condition
     //   not atom       -> atom                      : one POSITIVE condition (¬¬G = G)
@@ -829,23 +937,20 @@ function priorityExclusions(
     // that neither lowers directly NOR gets a define emits no exclusion at all, and no exclusion means the
     // later `otherwise` fires on unknown. There is deliberately no silent-skip arm.
     if (isAtom(g)) {
-      const id = atomId(g);
-      if (id !== null) conditions.push(priorityExclusionCondition(id, ctx.guardQualifierLibraryName));
+      const target = atomTarget(g);
+      if (target !== null) conditions.push(priorityExclusionCondition(target.define, target.libraryName, isPublicationAtom(g)));
       else inexpressible(g, "a prior branch guard whose reference does not resolve in this library");
     } else if (g.type === "BranchConditionNot" && g.operand !== undefined && isAtom(g.operand)) {
-      const id = atomId(g.operand);
+      const target = atomTarget(g.operand);
       // ¬¬G = G — the POSITIVE form, byte-identical to the `when` single-ref path.
-      if (id !== null)
-        conditions.push({
-          kind: "applicability",
-          expression: { language: "text/cql-identifier", expression: id },
-        });
+      if (target !== null)
+        conditions.push(guardApplicabilityCondition("positive", target.define, target.libraryName, "branch-guard", isPublicationAtom(g.operand)));
       else inexpressible(g, "a prior negated branch guard whose reference does not resolve in this library");
     } else if (g.type === "BranchConditionOr" && g.operands.every((o) => isAtom(o))) {
       let missing = 0;
       for (const o of g.operands) {
-        const id = isAtom(o) ? atomId(o) : null;
-        if (id !== null) conditions.push(priorityExclusionCondition(id, ctx.guardQualifierLibraryName));
+        const target = isAtom(o) ? atomTarget(o) : null;
+        if (target !== null) conditions.push(priorityExclusionCondition(target.define, target.libraryName, isPublicationAtom(o)));
         else missing++;
       }
       if (missing > 0)
@@ -874,7 +979,7 @@ function priorityExclusions(
 }
 
 /**
- * Prepend priority exclusions to every action a branch emitted. A compound `when` emits several DNF arms
+ * Prepend priority exclusions to every action a branch emitted. A legacy compound `when` emits several DNF arms
  * — they are ALTERNATIVES OF ONE BRANCH, so each carries the same exclusions. (Exclusions are computed
  * from prior BRANCHES, never from prior arms: negating between arms of one guard would pause on a
  * condition Kleene says is settled — `A or B` with `A` null and `B` true is TRUE. Round-2 panel, both arms.)
@@ -895,10 +1000,60 @@ function withPriorityExclusions(
 
 /**
  * Recursive WhenBlock → action emit. Returns the tri-state result (1..N actions).
- * A SINGLE-ref guard takes the byte-identical pre-#224 path; a COMPOUND guard
- * (`and`/`or`) lowers structurally via `emitCompoundWhenBlock`. Cascade rules per
+ * A single-ref guard uses its atomic carrier. A publication-reachable compound keeps one
+ * authored-condition evaluation; other compounds lower structurally via `emitCompoundWhenBlock`. Cascade rules per
  * plan v3.2 §"Cascade-suppression behavior".
  */
+// REFACTOR:grounded (#320, review 563): source locations belong to reference sites.
+// Expand each raw body once, but report each distinct invalid use before suppressing once.
+function checkDecisionCriteria(decision: Decision, ctx: EmitCtx): void {
+  const visited = new Set<string>();
+  const reported = new Set<string>();
+  const fail = (atom: BranchConditionCriterionRef, message: string): void => {
+    const diagnostic: CRLError = { type: "Validation", kind: "criterion-guard-unavailable", message,
+      line: atom.location?.start.line, column: atom.location?.start.column };
+    const key = JSON.stringify(diagnostic);
+    if (!reported.has(key)) { reported.add(key); ctx.errors.push(diagnostic); }
+  };
+  const check = (condition: BranchCondition): void => visitBranchCondition<void>(condition, {
+    ref: () => {}, and: () => {}, or: () => {}, not: () => {},
+    criterionRef: (atom) => {
+      const normalized = normalizeLocalRef(atom.ref, ctx.libraryName);
+      if (isQualifiedRef(normalized)) {
+        fail(atom, foreignCriterionMessage(refDisplay(atom.ref)));
+        return;
+      }
+      const entry = ctx.criterionIndex.get(normalized);
+      if (entry?.status === "cycle" || entry?.status === "undefined-dependency") {
+        fail(atom, `Criterion ${refDisplay(atom.ref)} has ${entry.status}; its complete guard dependencies cannot be established. Resolve the criterion dependency graph before emitting this decision.`);
+      }
+      // A missing direct name retains the established unresolved-criterion diagnostic.
+      // depth-exceeded is a complete closure and is not refused here.
+      if (entry && !visited.has(normalized)) { visited.add(normalized); check(entry.sourceCondition); }
+    },
+  });
+  const walk = (members: readonly BlockMember[]): void => {
+    for (const member of members) {
+      if (member.type === "WhenBlock") check(member.condition);
+      if ((member.type === "WhenBlock" || member.type === "OtherwiseBlock") && member.body.type === "BlockBody") walk(member.body.statements);
+    }
+  };
+  walk(decision.body.statements);
+}
+
+// REFACTOR:grounded (#320, review 563): dependencies follow surviving actions,
+// including their priority complements. Nested suppressed branches contribute none.
+function withPublicationDependencies(ctx: EmitCtx, emit: () => EmitActionResult): EmitActionResult {
+  const parent = ctx.publicationLibraries;
+  const dependencies = new Set<string>();
+  ctx.publicationLibraries = dependencies;
+  try {
+    const result = emit();
+    if (result.kind === "emitted") for (const canonical of dependencies) parent.add(canonical);
+    return result;
+  } finally { ctx.publicationLibraries = parent; }
+}
+
 function emitWhenBlock(
   wbRaw: WhenBlock,
   ctx: EmitCtx,
@@ -914,7 +1069,9 @@ function emitWhenBlock(
   const wb = wbRaw;
 
   const sole = soleRef(wb.condition);
-  if (!sole) return emitCompoundWhenBlock(wb, ctx, enclosingQualifier);
+  if (!sole) return readsPublication(wb.condition, ctx)
+    ? emitPublicationWhenBlock(wb, ctx)
+    : emitCompoundWhenBlock(wb, ctx, enclosingQualifier);
 
   // ── Single-ref path (byte-identical to pre-#224) ──
   // Normalize the condition ref ONCE (F5): a SAME-library qualified ref
@@ -927,8 +1084,8 @@ function emitWhenBlock(
   const refName = getRefName(normalizedRef);
 
   // 1. Resolve the condition concept. Suppressed when unresolved.
-  const conceptCqlId = ctx.conceptResolver(normalizedRef);
-  if (conceptCqlId === null) {
+  const target = conceptGuardTarget(normalizedRef, ctx);
+  if (target === null) {
     ctx.unmatched.push({
       kind: "unresolved-concept",
       text: refDisplay(guardRef),
@@ -946,20 +1103,20 @@ function emitWhenBlock(
     description: refName,
     code: guidelineCareCode(),
     condition: [
-      guardApplicabilityCondition("positive", conceptCqlId, ctx.guardQualifierLibraryName, "branch-guard"),
+      guardApplicabilityCondition("positive", target.define, target.libraryName, "branch-guard", publicationGuard(normalizedRef, ctx)),
     ],
   };
 
   // Action-level `input[]` — skip ONLY when the NORMALIZED ref is still qualified
   // (a genuine cross-library ref); a self-qualified eligible `when` gets its inputs.
-  const inputs = buildActionInputs(isQualifiedRef(normalizedRef) ? [] : [refName], ctx);
+  const inputs = buildActionInputs(!isQualifiedRef(normalizedRef) || publicationGuard(normalizedRef, ctx) ? [normalizedRef] : [], ctx);
   if (inputs) action.input = inputs;
 
   return fillBranchBody(action, wb.body, ctx);
 }
 
 /**
- * Compound WhenBlock (`and`/`or` guard) → structural FHIR emit (#224 i.3).
+ * Legacy compound WhenBlock (`and`/`or` guard) → structural FHIR emit (#224 i.3).
  *
  * The guard lowers to Disjunctive Normal Form — a list of ARMS, each a conjunction
  * of ref atoms → ONE action with N ANDed `condition[kind=applicability]` (cqf `$apply`
@@ -1120,19 +1277,20 @@ function emitCompoundWhenBlock(
         resolvedByKey.get(key)!,
         ctx.guardQualifierLibraryName,
         "branch-guard",
+        info.kind === "concept" && publicationGuard(info.atom.ref, ctx),
       );
     });
     // Arm-aware `input`: a CONCEPT atom contributes itself (non-qualified only); a CRITERION atom
     // contributes its RECURSIVE ATOM CLOSURE (the concepts under it, #236 step E) — DTR surfaces
     // the criterion's case features at the use-site. BOTH polarities. Deduped downstream by canonical.
-    const armInputNames: string[] = [];
+    const armInputNames: ReferenceName[] = [];
     for (const info of armLits) {
       if (info.kind === "concept") {
         const normalized = normalizeLocalRef(info.atom.ref, ctx.libraryName);
-        if (!isQualifiedRef(normalized)) armInputNames.push(getRefName(normalized));
+        if (!isQualifiedRef(normalized) || publicationGuard(normalized, ctx)) armInputNames.push(normalized);
       } else {
         const entry = ctx.criterionIndex.get(getRefName(info.atom.ref));
-        if (entry) for (const ref of entry.recursiveAtomClosure) armInputNames.push(getRefName(ref.ref));
+        if (entry) for (const ref of entry.recursiveAtomClosure) armInputNames.push(ref.ref);
       }
     }
     const inputs = buildActionInputs(armInputNames, ctx);
@@ -1214,10 +1372,10 @@ function fillBranchBody(
   // actions (a compound `or` child spliced under this block's `first:`), so flat-map;
   // the childResults stay 1:1 with statements for the cascade-diagnostic index loop.
   const childResults = body.statements.map((stmt, i) =>
-    withPriorityExclusions(
+    withPublicationDependencies(ctx, () => withPriorityExclusions(
       emitBlockStatement(stmt, ctx, body.qualifier),
       body.qualifier === "first" ? priorityExclusions(body.statements.slice(0, i), ctx) : [],
-    ),
+    )),
   );
   const survivingChildren = childResults
     .filter((r): r is { kind: "emitted"; actions: Record<string, unknown>[] } => r.kind === "emitted")
@@ -1311,6 +1469,18 @@ function emitBlockStatement(
   let guardCondition: Record<string, unknown> | undefined;
   let guardInputName: string | undefined;
   if (stmt.guard) {
+    // REFACTOR:grounded (#320, review 560 E8): making one menu item inapplicable cannot halt siblings.
+    // Until the action-menu pause contract is implemented, this use must fail explicitly on both lanes.
+    if (ctx.isPublication(stmt.guard.conceptName)) {
+      ctx.errors.push({
+        type: "Validation",
+        kind: "publication-action-guard-unsupported",
+        message: `Selected Record publication action guards require menu-wide pause handling, which is not implemented. Use an ordered decision branch for this determination.`,
+        line: stmt.guard.location?.start.line,
+        column: stmt.guard.location?.start.column,
+      });
+      unresolved = true;
+    }
     // Self-qualified `MyLib."C"` inside `MyLib` → bare `C`. A genuinely FOREIGN ref
     // (still qualified after normalization) is cross-library-unsupported (v0) →
     // suppress EXPLICITLY rather than leaning on the resolver to null it: a direct
@@ -1333,6 +1503,7 @@ function emitBlockStatement(
         cqlId,
         ctx.guardQualifierLibraryName,
         "action-guard",
+        publicationGuard(normalized, ctx),
       );
       // The guard concept is a case feature (its `code is` closure → an SD + input).
       // A still-qualified ref never reaches here (it resolved to null above), so no
@@ -1538,6 +1709,21 @@ export function emitDecisionPlanDefinitionsForLibrary(
   const resources: EmittedResource[] = [];
   const errors: CRLError[] = [];
   const unmatched: UnmatchedReference[] = [];
+
+  // REFACTOR:grounded (#320): this convenience entry has neither admission nor a physical CQL manifest.
+  // Refuse opt-ins explicitly rather than emitting a Record identifier where an applicability Boolean is needed.
+  const unprepared = concepts.filter((concept) => concept.shapeReduction !== undefined);
+  if (unprepared.length > 0) return {
+    resources,
+    unmatched,
+    errors: unprepared.map((concept) => ({
+      type: "Validation" as const,
+      kind: "publication-missing-preparation",
+      message: `Publication "${concept.name}" requires emitFhirDefFromPath or the prepared closure entry with its emitted CQL bindings.`,
+      line: concept.location?.start.line,
+      column: concept.location?.start.column,
+    })),
+  };
 
   // 1. Dependency-graph classification + cycle detection.
   const classification = classifyAndDetectCycles(decisions, libraryName);

@@ -25,6 +25,7 @@
 // covers it. This resolver NARROWS; it never widens.
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
+import { isLocalBooleanPublication } from "../emit/publicationProgram";
 import type { Concept, Representation } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import { resolveAgeConcept } from "./recencyProjectionOverride";
@@ -193,6 +194,8 @@ export function isMemberExistenceInterface(
  * cross-library same-named concept must NEVER activate it (disc 512, both arms).
  */
 export function isValueReadingBooleanConcept(concept: Concept, siblingConcepts: readonly Concept[]): boolean {
+  // REFACTOR:grounded (#320, review 560): the admitted Record exposes its nullable stored Boolean.
+  if (isLocalBooleanPublication(concept)) return true;
   // #189 null/pause — a PURE QUESTION is value-reading too: its determination IS its value (the emitted
   // Interface read is `answeredValue()`, which reads `.value as FHIR.boolean`). Joining the class is what
   // makes the CEL validator demand an explicit `value is true/false` on it and the CRE read the own value —
@@ -211,7 +214,7 @@ export function isValueReadingBooleanConcept(concept: Concept, siblingConcepts: 
  * source representation. There is no evidence to fall back on and no rule to evaluate, so it is **UNKNOWN
  * until a human answers it** — and it is the ONLY shape a `when` guard may gate on, because only a stored
  * boolean lets a user answer true / false / leave-unanswered (design of record
- * `tmp/DESIGN-apply-null-pause.md` §3.1).
+ * `tmp/_old/DESIGN-apply-null-pause.md` §3.1).
  *
  * ⚠ THIS PREDICATE DETECTS THE DEGENERATE ONE-ARM CASE. It is NOT the test for "can this pause", and must
  * never be used as one. Three-state-ness is a property of a determination's MERGE — a determination is

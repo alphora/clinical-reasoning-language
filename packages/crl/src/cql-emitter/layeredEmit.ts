@@ -80,12 +80,13 @@ import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex"
 import { narrativeReferenceRoles, spanKey } from "../template-match/referenceRoles";
 import type { RefRole } from "../template-match/referenceRoles";
 import { guardDefineNameCollisions, synthesizeGuardCriteria } from "../ast/guardDefines";
-import { branchConditionConceptRefsStrict } from "../ast/branchCondition";
+import { branchConditionConceptRefsStrict, branchConditionRefs, visitBranchCondition } from "../ast/branchCondition";
 import { pascalCaseNameForId } from "../fhir-emitter/slug";
 
 import type { CRLError } from "../types/errors";
 
 import { emitCQLFromAST } from "./emitCQL";
+import { foreignCriterionScopeErrors } from "./criterionScope";
 import type { EmitResult, EmitOptions } from "./emitCQL";
 import {
   emitsBareReExportableScalarBoolean,
@@ -160,11 +161,23 @@ export const LAYER_ORDER: readonly Layer[] = [
  *     source CRL library name — the source name stays the addressable identity
  *     for self-ref detection in `requalifyRef` (`lib`), while emitted names key
  *     off the policy id so they byte-match the FHIR lane's policy-id-based ids.
+ *
+ * Criterion bodies are not requalified across custom buckets. Emitted criterion
+ * dependencies must be co-located; custom partitions also co-locate their local
+ * concept leaves (only FULL synthesizes Interface facades). Unused declarations
+ * may be omitted. Already-qualified foreign concept bindings remain the caller's
+ * responsibility and are included by their supplied physical library name.
  */
 export interface Partition {
   classify: (stmt: Statement) => Layer | null;
   order: readonly Layer[];
   libraryNameFor: (policyId: string, value: Layer) => string;
+  /** REFACTOR:grounded (#320, review 563): explicit opt-in to the source-layer Interface contract. Decision surfaces are
+   * consumed even when Decision itself has no bucket; local facades classify to Interface,
+   * and qualified foreign dependencies materialize that namespace. Source concepts retain
+   * LocalPrimitives/ExternalPrimitives/Inferences classifications. Physical names always
+   * come from libraryNameFor. Omitted/false means a custom partition owns its own surface. */
+  synthesizesInterfaceFacades?: boolean;
 }
 
 /** The source-typed FULL split (R2-mechanism). */
@@ -172,6 +185,7 @@ export const FULL_PARTITION: Partition = {
   classify: classifyStatementLayer,
   order: LAYER_ORDER,
   libraryNameFor: layerLibraryName,
+  synthesizesInterfaceFacades: true,
 };
 
 /** Which declaration slot a reference resolves against. */
@@ -446,7 +460,8 @@ export function layerLibraryName(policyId: string, layer: Layer): string {
  * caller's collision preflight (`imports/emit.ts`) compares these against the
  * full emitted-name set to catch a generated name clashing with a real sibling
  * library. Interface re-exports are SYNTHESIZED at emit time (not in `ast`), so
- * the caller passes the interface concept names to include the Interface layer.
+ * the caller passes local interface concept names. Foreign decision references also require
+ * the Interface namespace even when there is no local facade to synthesize.
  */
 export function layerLibraryNamesFor(
   ast: CRL,
@@ -454,7 +469,7 @@ export function layerLibraryNamesFor(
   interfaceConcepts: readonly string[] = [],
 ): string[] {
   const present = layersPresent(ast);
-  if (interfaceConcepts.length > 0) present.add("Interface");
+  if (interfaceConcepts.length > 0 || foreignInterfaceLibraries(ast).length > 0) present.add("Interface");
   return LAYER_ORDER.filter((l) => present.has(l)).map((l) => layerLibraryName(policyId, l));
 }
 
@@ -563,6 +578,8 @@ function visitAllDefinitionRefs(
 ): void {
   for (const stmt of statements) {
     if (stmt.type !== "Concept") continue;
+    // REFACTOR:grounded (#320, review 564): source bindings are real CQL dependencies.
+    stmt.__publication?.sourceReferences?.forEach(visit);
     const def = stmt.definition;
     if (!def) continue; // representation/code-only concept: no refs to walk
     visitDefinitionRefs(def, visit);
@@ -911,7 +928,13 @@ function requalifyConcept(
   // bare-ref; `requalifyRef` leaves its genuinely-foreign `<policyId>-<layer>`
   // qualifier untouched, so re-qualifying it here is a safe no-op.)
   if (!c.definition) return { ...c };
-  return { ...c, definition: requalifyDefinition(c.definition, currentLayer, maps, lib, policyId, partition) };
+  return { ...c, definition: requalifyDefinition(c.definition, currentLayer, maps, lib, policyId, partition),
+    ...(c.__publication?.sourceReferences === undefined ? {} : { __publication: Object.freeze({
+      ...c.__publication,
+      sourceReferences: Object.freeze(c.__publication.sourceReferences.map((ref) =>
+        requalifyRef(ref, "concept", currentLayer, maps, lib, policyId, partition))),
+    }) }),
+  };
 }
 
 /**
@@ -931,10 +954,18 @@ function collectLayerIncludes(
   partition: Partition,
 ): string[] {
   const referenced = new Set<string>();
-  visitAllDefinitionRefs(requalifiedStatements, (ref) => {
+  const addReference = (ref: ReferenceName): void => {
     const refLib = getRefLibrary(ref);
     if (refLib !== null && refLib !== currentLibraryName) referenced.add(refLib);
-  });
+  };
+  visitAllDefinitionRefs(requalifiedStatements, addReference);
+  // Criteria emit their own CQL definitions. Their qualified concept leaves may read a
+  // foreign publication directly instead of a local Interface facade, so those physical
+  // library bindings must be included too. The partition preflight requires local criterion
+  // dependencies in this same bucket, so their own definitions contribute their direct
+  // concept refs here without expanding the criterion DAG again.
+  for (const statement of requalifiedStatements) if (statement.type === "Criterion")
+    for (const atom of branchConditionRefs(statement.condition)) addReference(atom.ref);
 
   // Both-representation SELF fold-in include. An Inferences twin folds in its OWN
   // LocalPrimitives retrieve (`LocalPrimitives."X"…`) via the `__bothRepFoldInLocalPrimitives`
@@ -1104,11 +1135,10 @@ export function interfaceConceptNames(ast: CRL): string[] {
  * consumer (e.g. the FHIR case-feature StructureDefinition emit) can never drift
  * from which concepts the Interface actually re-exports.
  *
- * Names are deduped in stable first-seen order; a QUALIFIED ref (`"OtherLib"."X"`)
- * is SKIPPED (F5 — v0-unsupported cross-library concept ref), matching the
- * re-export synthesis. This is the SINGLE source of truth for "which decision
- * concepts exist, and what source layer each is"; `interfaceConceptNames`
- * delegates to it (names only).
+ * Names are deduped in stable first-seen order. A foreign qualified reference is
+ * not a local facade; its actual library is retained by foreignInterfaceLibraries.
+ * Self-qualified references normalize to their local declaration. This is the local
+ * re-export surface; interfaceConceptNames delegates to it (names only).
  *
  * NOTE: pass the LOWERED ast (post-`lowerLocalCodes`). A raw `code is` concept
  * still carries `stmt.code`, so `classifyStatementLayer` returns `null` (out of
@@ -1117,6 +1147,33 @@ export function interfaceConceptNames(ast: CRL): string[] {
  */
 export function interfaceSurface(ast: CRL): { name: string; sourceLayer: Layer | undefined }[] {
   const maps = buildNameLayerMaps(ast, FULL_PARTITION);
+  const out: { name: string; sourceLayer: Layer | undefined }[] = [];
+  const seen = new Set<string>();
+  forEachInterfaceConceptRef(ast, (ref) => {
+    const normalized = normalizeLocalRef(ref, ast.library.name);
+    if (isQualifiedRef(normalized)) return;
+    const name = getRefName(normalized);
+    if (!seen.has(name)) {
+      seen.add(name);
+      out.push({ name, sourceLayer: maps.concept.get(name) });
+    }
+  });
+  return out;
+}
+
+// REFACTOR:grounded (#320, review 563): a decision that reads only foreign publications
+// still needs an actual CQL scope. Preserve those foreign owners as includes, never local
+// facades. Planning sees authored qualifiers; emission sees the proven physical bindings.
+function foreignInterfaceLibraries(ast: CRL): string[] {
+  const libraries = new Set<string>();
+  forEachInterfaceConceptRef(ast, (ref) => {
+    const normalized = normalizeLocalRef(ref, ast.library.name);
+    if (isQualifiedRef(normalized)) libraries.add(normalized.libraryName);
+  });
+  return [...libraries];
+}
+
+function forEachInterfaceConceptRef(ast: CRL, add: (ref: ReferenceName) => void): void {
   // #236 — a guard atom may reference a `criterion`. The Interface re-export surface must
   // include the concepts a criterion body references (recursively), so the emitted criterion
   // define's bare `"Cov"` leaf resolves to an Interface re-export rather than
@@ -1126,25 +1183,6 @@ export function interfaceSurface(ast: CRL): { name: string; sourceLayer: Layer |
   // omission would ship). Criteria survive lowering unchanged, so this index (from the lowered
   // `ast`) matches the FHIR lane's.
   const criterionIndex = buildCriterionIndex(ast.statements);
-  const out: { name: string; sourceLayer: Layer | undefined }[] = [];
-  const seen = new Set<string>();
-  const add = (ref: ReferenceName): void => {
-    // F5 — NORMALIZE a self-qualified ref (`ThisLib."X"` inside `ThisLib`) to bare `X`
-    // FIRST: it IS local and MUST get an Interface re-export, else the emitted decision's
-    // `text/cql-identifier` (positive) or negated `text/cql-expression` (`unless`, #224
-    // iii.1) condition references a define the Interface never published → dangles at
-    // `$apply`. Only a GENUINELY FOREIGN qualified ref (`OtherLib."X"`, still qualified
-    // after normalization — cross-library, v0-unsupported) is skipped: stripping it to
-    // bare would mis-look-up a same-named LOCAL concept. Parity with the FHIR lane's
-    // `normalizeLocalRef` (decision.ts) + `collectCaseFeatures` (closureOrchestrator.ts).
-    const normalized = normalizeLocalRef(ref, ast.library.name);
-    if (isQualifiedRef(normalized)) return;
-    const name = getRefName(normalized);
-    if (!seen.has(name)) {
-      seen.add(name);
-      out.push({ name, sourceLayer: maps.concept.get(name) });
-    }
-  };
   const walkBlock = (body: WhenBlockBody | BlockBody): void => {
     if (body.type === "BlockBody") {
       for (const member of body.statements) walkMember(member);
@@ -1171,7 +1209,6 @@ export function interfaceSurface(ast: CRL): { name: string; sourceLayer: Layer |
     if (stmt.type !== "Decision") continue;
     for (const branch of stmt.body.statements) walkMember(branch);
   }
-  return out;
 }
 
 /**
@@ -1194,6 +1231,7 @@ function buildInterfaceReexports(
   ast: CRL,
   policyId: string,
   maps: NameLayerMaps,
+  partition: Partition,
   totalitySvc?: CrossLibraryTotality,
 ): { reexports: Concept[]; errors: CRLError[] } {
   const reexports: Concept[] = [];
@@ -1267,6 +1305,25 @@ function buildInterfaceReexports(
       continue;
     }
     const src = sourceConceptByName.get(name);
+    // REFACTOR:grounded (#320): the Interface publishes the same selected Record.
+    // Boolean guards project its datum at the use site; this is not a Boolean facade.
+    if (src?.__publication?.role === "public") {
+      const qualified: QualifiedReference = {
+        type: "QualifiedReference", libraryName: partition.libraryNameFor(policyId, sourceLayer),
+        name, location: src.location,
+      };
+      reexports.push({
+        ...src,
+        definition: { type: "DefinedAsDefinition", body: {
+          type: "DefinedAsBareRef", ref: qualified, location: src.location,
+        }, location: src.location },
+        __loweringRole: "interface-facade",
+        __interfaceReexport: true,
+        __interfaceSourceLayer: sourceLayer,
+        __publication: Object.freeze({ descriptor: src.__publication.descriptor, role: "interface" }),
+      });
+      continue;
+    }
     // ⭐ #189 null/pause T5 step 2b — REFACTOR:grounded. A `__pureQuestion` source on the LocalPrimitives arm is
     // UNREACHABLE from the compiler (the lowering renames a question's retrieve to `"<X> Records"`, so the bare
     // name only ever resolves to Inferences), but `emitCQLFromAST`/`emitPartitioned` are validator-free public
@@ -1362,7 +1419,7 @@ function buildInterfaceReexports(
     // re-exportable bare (that is what propagates its null) but is NOT total; routing it by totality would
     // send it to the `.asTruths().satisfied()` collapse and re-manufacture the `false` O3 removed.
     const srcEmitsTotalBoolean = emitsBareReExportableScalarBoolean(src, srcTotalityResolvers);
-    const targetLib = layerLibraryName(policyId, sourceLayer);
+    const targetLib = partition.libraryNameFor(policyId, sourceLayer);
     const qualified: QualifiedReference = {
       type: "QualifiedReference",
       libraryName: targetLib,
@@ -1471,6 +1528,78 @@ export function emitLayered(
   return emitPartitioned(ast, lib, lib, FULL_PARTITION, baseOptions);
 }
 
+// REFACTOR:grounded (#320, review 563 r4): custom partitioning may intentionally omit
+// unused declarations, but cannot turn an emitted guard dependency into a dangling identifier.
+function criterionPartitionErrors(ast: CRL, lib: string, partition: Partition): CRLError[] {
+  const errors: CRLError[] = [];
+  const emittedLayer = (stmt: Statement): Layer | null => {
+    const layer = partition.classify(stmt);
+    return layer !== null && partition.order.includes(layer) ? layer : null;
+  };
+  const criteria = new Map(
+    ast.statements.filter((s) => s.type === "Criterion").map((s) => [s.name, emittedLayer(s)]),
+  );
+  const concepts = new Map<string, Set<Layer>>();
+  for (const stmt of ast.statements) if (stmt.type === "Concept") {
+    const layers = concepts.get(stmt.name) ?? new Set<Layer>();
+    const layer = emittedLayer(stmt);
+    if (layer !== null) layers.add(layer);
+    concepts.set(stmt.name, layers);
+  }
+  const check = (condition: BranchCondition, consumer: string, layer: Layer, decision = false): void => {
+    const fail = (node: BranchCondition, kind: "criterion" | "concept", name: string): void => {
+      errors.push({
+        type: "Validation",
+        kind: "emit-partition-criterion-dependency",
+        line: node.location.start.line,
+        column: node.location.start.column,
+        message: `${consumer} in partition "${layer}" references local ${kind} "${name}" outside that emitted partition. Criterion bodies require co-located dependencies; use FULL_PARTITION for Interface facade synthesis or co-locate the dependency.`,
+      });
+    };
+    visitBranchCondition<void>(condition, {
+      ref: (node) => {
+        if (decision || partition.synthesizesInterfaceFacades) return;
+        const ref = normalizeLocalRef(node.ref, lib);
+        if (isQualifiedRef(ref)) return; // Existing qualified physical binding; collectLayerIncludes owns it.
+        const layers = concepts.get(getRefName(ref));
+        if (layers !== undefined && !layers.has(layer)) fail(node, "concept", getRefName(ref));
+      },
+      criterionRef: (node) => {
+        const ref = normalizeLocalRef(node.ref, lib);
+        if (isQualifiedRef(ref)) return; // The shared source-scope preflight already refused it.
+        const name = getRefName(ref);
+        if (criteria.has(name) && (decision ? criteria.get(name) === null : criteria.get(name) !== layer)) {
+          fail(node, "criterion", name);
+        }
+      },
+      and: () => {},
+      or: () => {},
+      not: () => {},
+    });
+  };
+  for (const stmt of ast.statements) {
+    const layer = emittedLayer(stmt);
+    if (layer === null) continue;
+    if (stmt.type === "Criterion") check(stmt.condition, `Criterion "${stmt.name}"`, layer);
+    else if (stmt.type === "Decision") {
+      // A Decision emits no CQL definition. Its named criterion targets must exist,
+      // but only generated Criterion consumers impose a same-bucket requirement.
+      const walk = (members: readonly BlockMember[]): void => {
+        for (const member of members) {
+          if (member.type === "WhenBlock") {
+            check(member.condition, `Decision "${stmt.name}"`, layer, true);
+            if (member.body.type === "BlockBody") walk(member.body.statements);
+          } else if (member.type === "OtherwiseBlock" && member.body.type === "BlockBody") {
+            walk(member.body.statements);
+          }
+        }
+      };
+      walk(stmt.body.statements);
+    }
+  }
+  return errors;
+}
+
 /**
  * The generalized partition-driven emit. `emitLayered` is the thin FULL_PARTITION
  * wrapper. For each NON-EMPTY partition value (in dependency `order`), build a
@@ -1491,6 +1620,18 @@ export function emitPartitioned(
   partition: Partition,
   baseOptions: Omit<EmitOptions, "libraryName" | "crossLibraryIncludes"> = {},
 ): LayeredEmitResult {
+  // FULL consumes the Decision surface even though Decision statements do not enter a
+  // physical bucket. Check it before splitting; custom partial partitions check only
+  // their emitted consumers and may leave unused declarations outside their output.
+  const criterionScopeAst = partition.synthesizesInterfaceFacades ? ast : {
+    ...ast,
+    statements: ast.statements.filter((statement) => {
+      const layer = partition.classify(statement);
+      return layer !== null && partition.order.includes(layer);
+    }),
+  };
+  const criterionScopeErrors = foreignCriterionScopeErrors(criterionScopeAst);
+  if (criterionScopeErrors.length > 0) return { success: false, entries: [], errors: criterionScopeErrors };
   const maps = buildNameLayerMaps(ast, partition);
   // #189 Slice-C boundary 1 — the cross-layer reduction-operand shape map, computed
   // ONCE from the pre-split ast (all concepts + records twins visible) and threaded
@@ -1512,8 +1653,8 @@ export function emitPartitioned(
   // EXCLUDES `__interfaceReexport` concepts, and it was computed from the ORIGINAL
   // `ast` above, so the synthetics never pollute the name maps.
   const reexportResult =
-    partition === FULL_PARTITION
-      ? buildInterfaceReexports(ast, policyId, maps, baseOptions.crossLibraryTotality)
+    partition.synthesizesInterfaceFacades
+      ? buildInterfaceReexports(ast, policyId, maps, partition, baseOptions.crossLibraryTotality)
       : { reexports: [] as Concept[], errors: [] as CRLError[] };
   // F3 — a non-source-typed decision concept is a hard error; abort BEFORE
   // emitting any layer (a partial emit with a silently-empty Interface is exactly
@@ -1528,14 +1669,33 @@ export function emitPartitioned(
   // <define>` reference: a DANGLING condition, which `$apply` treats as not-applicable and which reproduces
   // the exact pause-killer the named-define form removes. Modelled as `Criterion`, they route to `Interface`
   // through the existing `classifyStatementLayer` — the same library the FHIR lane qualifies against.
-  const guardCollisions = guardDefineNameCollisions(ast);
+  const guardCollisions = guardDefineNameCollisions(criterionScopeAst);
   if (guardCollisions.length > 0) {
     return { success: false, entries: [], errors: guardCollisions };
   }
-  const guardCriteria = synthesizeGuardCriteria(ast);
+  const guardCriteria = synthesizeGuardCriteria(criterionScopeAst);
   const appended: Statement[] = [...reexports, ...guardCriteria];
   const workingAst: CRL =
     appended.length > 0 ? { ...ast, statements: [...ast.statements, ...appended] } : ast;
+
+  const partitionErrors = criterionPartitionErrors(workingAst, lib, partition);
+  for (const guard of guardCriteria) {
+    const layer = partition.classify(guard);
+    if (layer === null || !partition.order.includes(layer)) partitionErrors.push({
+      type: "Validation", kind: "emit-partition-criterion-dependency",
+      line: guard.location.start.line, column: guard.location.start.column,
+      message: `Required generated criterion "${guard.name}" is omitted by the partition. Assign it to an emitted bucket with its dependencies.`,
+    });
+  }
+  const foreignInterfaceIncludes = partition.synthesizesInterfaceFacades ? foreignInterfaceLibraries(ast) : [];
+  if ((reexports.length > 0 || foreignInterfaceIncludes.length > 0) &&
+    (!partition.order.includes("Interface") || reexports.some((facade) => partition.classify(facade) !== "Interface"))) {
+    partitionErrors.push({ type: "Validation", kind: "emit-partition-interface-capability",
+      line: ast.location.start.line, column: ast.location.start.column,
+      message: "synthesizesInterfaceFacades requires an emitted Interface bucket and Interface classification for its generated facades.",
+    });
+  }
+  if (partitionErrors.length > 0) return { success: false, entries: [], errors: partitionErrors };
 
   // The DISTINCT partition values actually present (order-independent).
   const present = new Set<Layer>();
@@ -1543,6 +1703,7 @@ export function emitPartitioned(
     const v = partition.classify(stmt);
     if (v !== null) present.add(v);
   }
+  if (foreignInterfaceIncludes.length > 0) present.add("Interface");
   // Case-feature truth-set gate (the LOCKED case-feature model). The truth-set
   // shape (`.asTruths()`/`.satisfied()`/CFH) is the LocalPrimitives/`code is` family's
   // CQL realization; a measure split (`coded from`/ExternalPrimitives, NO LocalPrimitives
@@ -1579,6 +1740,11 @@ export function emitPartitioned(
     const libraryName = partition.libraryNameFor(policyId, value);
     const { synthetic, requalified } = buildLayerAst(workingAst, value, maps, lib, policyId, partition);
     const crossLibraryIncludes = collectLayerIncludes(requalified, libraryName, value, policyId, partition);
+    if (value === "Interface") {
+      for (const dependency of foreignInterfaceIncludes) {
+        if (dependency !== libraryName && !crossLibraryIncludes.includes(dependency)) crossLibraryIncludes.push(dependency);
+      }
+    }
     // Per-layer case-feature mode: ONLY the Inferences + Interface layers emit the
     // truth-set shape (NOT LocalConcepts/LocalPrimitives). `kind` keys the emit:
     // `"inferred"` (set-op truth-sets) vs `"interface"` (`…satisfied()`).
@@ -1597,6 +1763,7 @@ export function emitPartitioned(
       crossLibraryIncludes,
       conceptShapesByName,
       inlineAnswerSetsByName,
+      partitionedGuardCriteria: guardCriteria,
       // #189 Slice 0c — augment the source-bound totality service with THIS source's rendered-layer names, so the
       // per-layer pivot/discharge classify a cross-layer operand as same-source (not misread as cross-library).
       ...(baseOptions.crossLibraryTotality !== undefined

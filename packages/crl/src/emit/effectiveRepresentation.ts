@@ -457,7 +457,7 @@ function computeLocalDatum(
       // ⭐ #189 null/pause — a PURE QUESTION: `code is` + `value type is boolean` with NO definition (and no
       // source rep). NOTHING can compute it, so it is UNKNOWN until a human answers it — and it is the ONLY
       // shape a `when` guard may gate on, because only a stored boolean lets a user answer true / false /
-      // leave-unanswered (design of record `tmp/DESIGN-apply-null-pause.md` §3.1).
+      // leave-unanswered (design of record `tmp/_old/DESIGN-apply-null-pause.md` §3.1).
       //
       // Its local record IS the answer slot: a boolean-valued Observation carrying its own identity code. So
       // it derives exactly the same boolean value datum as the `defined as exists` interface arm above — minus

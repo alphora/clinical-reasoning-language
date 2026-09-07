@@ -182,6 +182,8 @@ export function caseFeatureDifferential(
   sdUrl: string,
   // ⭐ The RESOLVED answer-option canonical, or `undefined` for no binding. See the call site's parameter doc.
   answerOptions?: { valueSetUrl: string },
+  // REFACTOR:grounded (#320): a selected answer may have neither value nor clinical validity.
+  nullablePublication = false,
 ): Array<Record<string, unknown>> {
   const rt = profile.resourceType;
   const codingIsChoice = profile.codingElementPath.endsWith("[x]");
@@ -197,7 +199,7 @@ export function caseFeatureDifferential(
       // already a CodeableConcept.
       ...(codingIsChoice ? { type: [{ code: "CodeableConcept" }] } : {}),
       patternCodeableConcept: {
-        coding: [{ system: coding.system, code: coding.code, display: coding.display }],
+        coding: [{ system: coding.system, code: coding.code, ...(nullablePublication ? {} : { display: coding.display }) }],
       },
     },
   ];
@@ -212,7 +214,7 @@ export function caseFeatureDifferential(
       // on the GROUP (from `cpg-input-text`), exactly as in `ccs-qualifying-age-casefeature`.
       short: coding.display,
       definition: coding.display,
-      min: 1,
+      min: nullablePublication ? 0 : 1,
       max: "1",
       mustSupport: true,
       type: [{ code: profile.value.typeCode }],
@@ -244,7 +246,7 @@ export function caseFeatureDifferential(
     extension: [sdcExtractValue(sdUrl, `${rt}.${profile.recencyElementPath}`, "%resource.authored")],
     id: `${rt}.${profile.recencyElementPath}`,
     path: `${rt}.${profile.recencyElementPath}`,
-    min: 1,
+    min: nullablePublication ? 0 : 1,
     max: "1",
     mustSupport: true,
     type: [{ code: "dateTime" }],
@@ -258,6 +260,18 @@ export function caseFeatureDifferential(
     ...(profile.value !== undefined ? [profile.value.elementPath] : []),
   ]);
   elements.push(...structuralRequiredElements(profile, emittedPaths));
+  // A publication profile also describes analytical producer records. Survey category and
+  // display are extraction conveniences, not authored facts that every candidate must carry.
+  // Keep the survey pattern for extraction, while allowing its absence on computed records.
+  if (nullablePublication) for (const element of elements)
+    if (element.path === "Observation.category") element.min = 0;
+  // REFACTOR:grounded (#320, native validation): differential elements must follow base Observation
+  // order. Keeping every category slice adjacent also allows the generated profile to form a valid snapshot.
+  if (nullablePublication) {
+    const order = new Map([rt, `${rt}.status`, `${rt}.category`, `${rt}.code`, `${rt}.subject`,
+      `${rt}.effective[x]`, `${rt}.value[x]`].map((path, index) => [path, index]));
+    elements.sort((left, right) => (order.get(String(left.path)) ?? 99) - (order.get(String(right.path)) ?? 99));
+  }
   return elements;
 }
 
@@ -371,6 +385,9 @@ export function emitCaseFeatureStructureDefinition(
   // `patternCodeableConcept.coding.system` byte-equals THAT sibling's local
   // CodeSystem url (not the primary's), matching the code the CQL lane lowered.
   localDomainId: string = metadata.name,
+  // REFACTOR:grounded (#320): optional answer/time applies only to the admitted publication form.
+  nullablePublication = false,
+  publicationIdentity?: { profileUrl: string; localCode: { system: string; code: string } },
 ): { resource: EmittedResource | null; errors: CRLError[] } {
   if (target !== undefined && target.librarySuffix === "") {
     throw new Error(
@@ -406,8 +423,8 @@ export function emitCaseFeatureStructureDefinition(
     });
   }
 
-  const id = caseFeatureId(metadata, conceptName);
-  const url = caseFeatureCanonicalUrl(metadata, conceptName);
+  const url = publicationIdentity?.profileUrl ?? caseFeatureCanonicalUrl(metadata, conceptName);
+  const id = publicationIdentity === undefined ? caseFeatureId(metadata, conceptName) : url.slice(url.lastIndexOf("/") + 1);
   const name = pascalCaseName(conceptName);
   // Per-concept identity for the human-facing fields (NOT the package title).
   // `description` is PER-CONCEPT — `metadata.description` is the PACKAGE blurb and
@@ -420,7 +437,7 @@ export function emitCaseFeatureStructureDefinition(
 
   // The `code` system byte-equals the local CodeSystem url + the CQL
   // `codesystem '<url>'` (one source of truth — the per-library local domain, #198).
-  const system = localCodeSystemSystemUrl(metadata, localDomainId);
+  const system = publicationIdentity?.localCode.system ?? localCodeSystemSystemUrl(metadata, localDomainId);
 
   // The featureExpression references the LocalPrimitives library by canonical (where the records-retrieve define
   // lives); its `expression` is the caller-supplied `recordsDefineId` (a `text/cql-identifier`) — the
@@ -498,7 +515,10 @@ export function emitCaseFeatureStructureDefinition(
     kind: "resource",
     abstract: false,
     type: caseFeatureProfile.resourceType,
-    baseDefinition: caseFeatureProfile.baseDefinition,
+    // REFACTOR:grounded (#320): the admitted declaration promises an R4 Observation. Inheriting QICore
+    // adds an unauthored us-core category slice that overlaps the extracted survey category.
+    ...(nullablePublication ? { fhirVersion: "4.0.1" } : {}),
+    baseDefinition: nullablePublication ? "http://hl7.org/fhir/StructureDefinition/Observation" : caseFeatureProfile.baseDefinition,
     derivation: "constraint",
     differential: {
       element: caseFeatureDifferential(
@@ -506,6 +526,7 @@ export function emitCaseFeatureStructureDefinition(
         { system, code, display: conceptName },
         url,
         answerOptions,
+        nullablePublication,
       ),
     },
   };
