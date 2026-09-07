@@ -3,50 +3,18 @@ name: crl-north-star
 description: "Load the CRL north star before any CRL language, emitter, representation, or #189/emit-cluster work — and hand it to reviewers. Invoke at the START of every such round so you (and the panel) measure against how CRL actually works, not CQL idioms or chart-matching assumptions."
 ---
 
-# CRL North Star — round-start protocol
+# CRL North Star - round-start protocol
 
-You are about to do CRL language / emitter / representation / emit-cluster work. Before designing, coding, or
-firing a review panel, **ground yourself (and the reviewers) in how CRL actually works.**
+1. Read `docs/CRL-NORTH-STAR.md` in full before CRL language, emitter, or representation work.
+   Current operator intent governs; the charter and old design decisions are revisable. Distinguish
+   behavioral requirements, proposals, measured implementation behavior, and unresolved interpretations.
+   Existing CRL/CEL, tests, and goldens are unverified inputs until their intended behavior is established.
+2. Give both reviewers the same current intent, actual proposal, before-state, and verification evidence.
+   Use the matching CRL-domain lens `crl-emit-v0.1.0` under the active orchestrator's panel protocol.
+   Discover callable reviewers and use the current client's runtime instructions; do not infer capability
+   or model identity from a historical tool name. Report unavailable coverage accurately.
+3. Keep the charter current when a decision changes. Follow stale-requirements to preserve before-state
+   and reconcile active copies. Do not duplicate semantic doctrine here or in reviewer prompts: cite the
+   current charter and flag conflicts explicitly. Reviewers may challenge it with a behavioral rationale.
 
-## Do this, in order
-
-1. **Read `docs/CRL-NORTH-STAR.md` in full.** It is the authoritative model. Do not proceed on memory of an
-   earlier version — the model has been gotten backwards before. The load-bearing points:
-   - **The local domain code is the CANONICAL, PRODUCTION representation** CRL logic runs on — NOT a testing
-     artifact. `source representation` + `coded from` is the OPTIONAL, ADDITIVE path (external data defaults
-     the local concept when available). "Won't match a real SNOMED chart" measures the optional path and is
-     usually irrelevant to local production-correctness.
-   - **⭐⭐ CRL IS ANALYTICS, NOT A MEDICAL RECORD — a user's answer OVERRIDES the chart** (charter §2,
-     operator QUOTED 2026-09-04): *"the reviewer is making a determination, not recording a clinical fact …
-     the reviewer's judgement is the output, and the chart is evidence feeding it. Software that discards
-     the reviewer's answer isn't neutral; it's asserting the chart outranks them."* External data SEEDS a
-     determination and never establishes one; where a user has answered, the answer wins. ⚠ Reviewers
-     import chart-authority by default — hand them this clause explicitly, and treat a finding that asserts
-     chart precedence without engaging it as a non-finding. It holds even when the chart is ACCURATE: the
-     question is never *is the record correct*, but *whose output is this*.
-   - **A concept is self-describing:** its declared **value type** decides whether a reduction is owed
-     (scalar ⇒ explicit reduction required; record/record-set ⇒ publishes its records); its **cardinality**
-     (`RecordSet | Record | Scalar`) is declared, not inferred from use; its CQL is **context-free**.
-   - **The emitter manufactures nothing** — every set→scalar reduction is explicit.
-   - **Absence follows what is read:** existence over records is false when no record matches; an unanswered
-     question is unknown. Explicit false is a stated boolean value, never an absence code. Boolean
-     composition must preserve unknown in the model; the current CRE's `defined as` composition still
-     collapses it, so a green CRE run does not prove that requirement. Per-action guards retain their
-     documented two-valued behavior (§4).
-   - **Maturity:** PA is the deep, correct use case; QM *artifacts* are a provisional smoke test (don't
-     anchor on them), but the *capabilities* they validated (`sem-and`/`sem-not`) are real.
-
-2. **Hand the reviewers the same ground truth.** When you fire the vibe panel on CRL work, pair the CRL-domain
-   lens so both arms are grounded by construction:
-   - External arm: `ask_gpt56` with `mode: "crl-emit-v0.1.0"`.
-   - Claude arm: `subagent_type: "vibe-reviewer-crl-emit"` (auto-generated from
-     `.vibe-tools/prompts/reviewer-system-prompt-crl-emit-v0.1.0.md`; if that agent isn't listed yet, the
-     workspace needs a restart — run the external arm alone on the lens and say the Claude arm was
-     unavailable for that lens, per the orchestrator rules). The lens itself instructs the reviewer to read
-     `docs/CRL-NORTH-STAR.md` first, so you do not need to paste the charter into the review message.
-   Without a CRL lens, an ungrounded reviewer measures CRL against CQL idioms and produces wrong conclusions
-   (this is why the lens exists — see the charter's efficacy note / disc 413 ROUND 2R).
-
-3. **Keep the charter current.** If a round establishes a new load-bearing fact about how CRL works, update
-   `docs/CRL-NORTH-STAR.md` (and the relevant memory) so the next round and the reviewers inherit it. The
-   charter is the single source; `tmp/DECISIONS-*.md` and discussion files are working logs subordinate to it.
+The charter expresses the target; only appropriately scoped execution evidence demonstrates conformance.

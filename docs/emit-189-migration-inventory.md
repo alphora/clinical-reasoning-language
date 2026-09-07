@@ -1,6 +1,6 @@
 # #189 emit-flip — migration inventory (this repo)
 
-Generated flip-safety inventory: every buildable in-repo site the #189 emit flip (design of record `docs/emit-consistency-189-design.md` §9 step 4) turns from a validation WARNING into a hard ERROR. This is the enumeration that keeps the flip from breaking anything silently. The census walks the WHOLE repo, skipping the `node_modules/ dist/ build/ tmp/ .git/ coverage/` directories and any hidden (dot-prefixed) directory; build-failed and excluded files are accounted for in their own sections below. Production content lives in separate repos and is each content KE's responsibility (see the external-content section).
+Generated flip-safety inventory: every buildable in-repo site the #189 emit flip (design of record `docs/_old/emit-consistency-189-design.md` §9 step 4) turns from a validation WARNING into a hard ERROR. This is the enumeration that keeps the flip from breaking anything silently. The census walks the WHOLE repo, skipping the `node_modules/ dist/ build/ tmp/ .git/ coverage/` directories and any hidden (dot-prefixed) directory; build-failed and excluded files are accounted for in their own sections below. Production content lives in separate repos and is each content KE's responsibility (see the external-content section).
 
 > **This is a generated artifact — do not hand-edit.** Re-run the scanner to refresh it.
 >

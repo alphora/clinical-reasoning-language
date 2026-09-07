@@ -86,7 +86,7 @@ in the shared `CRLCommon.cql` library. The emitter generates CQL calls:
   `exists(...)` + `and`/`or`/`not` when the result is boolean — NOT always boolean CQL. The
   emitter bridges the common cases (notably a refinement operand in a boolean result, via
   `exists(...)`); an unsupported boolean operand in a refinement result surfaces as a FIXME.
-  See `docs/defined-as-is-semantic-composition.md`.
+  See `docs/_old/defined-as-is-semantic-composition.md`.
 - Concept references resolve to their declared expression (a `defined as` / `definition is`
   concept body becomes a CQL `define` block; asserted `coded from` / `code is` concepts become
   valueset / local retrievals).

@@ -116,8 +116,10 @@ Syntax and rules:
   guard is deliberately **NOT** `Coalesce`-wrapped: coalescing it makes `$apply`
   approve a request whose contraindication question was never answered, while
   the CRE pauses on the same case.
-  A determination that is **absent but derivable** still reads `false`
-  closed-world; only a determination that *nothing can compute* is unknown.
+  A derivation may be unknown when required inputs are missing. False requires
+  an explicit negative value or a computation that establishes it. Inferring
+  a broader negative from an empty retrieve requires an authored completeness
+  assumption; see `CRL-NORTH-STAR.md` for the #320 target and current limitations.
   (`not` is the emit-capable way to author a single-determination `first:`
   exclusion; the per-action `unless` is a different, menu-member-only construct
   that DOES coalesce — see "Per-action guards".)

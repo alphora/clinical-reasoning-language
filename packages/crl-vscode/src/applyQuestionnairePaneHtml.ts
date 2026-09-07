@@ -7,7 +7,7 @@
 // and never reasons about which concepts became fields — that is all upstream, at build time.
 // Contract authority: the CRL emit side's `questionnaire-pane-api-contract.md`. ⚠ That file is UNTRACKED — it
 // exists on the author's disk only, in no commit and not in this worktree. The proposal it was assessed from is
-// docs/mv-questionnaire-pane-api.md here. Re-point this citation once the contract is committed.
+// docs/_old/mv-questionnaire-pane-api.md here. Re-point this citation once the contract is committed.
 //
 // ⚠ HOW THIS DIFFERS FROM THE OTHER PANE RENDERERS. flowPaneHtml/sourcePaneHtml/questionnairePaneHtml are
 // "CSP-safe by construction": they emit no <script>, no <style> and no inline `style=`, and export a *_STYLE

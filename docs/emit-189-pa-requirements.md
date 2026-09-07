@@ -1,7 +1,7 @@
 # #189 emit — Prior-Authorization (PA) data requirements
 
 **Status:** requirements capture (operator-directed, 2026-08-22). Authority: `docs/CRL-NORTH-STAR.md` (charter) +
-`docs/emit-consistency-189-design.md` (design of record). This doc records WHAT the PA use case requires of the
+`docs/_old/emit-consistency-189-design.md` (design of record). This doc records WHAT the PA use case requires of the
 emit round-trip so the #189 build serves PA correctly and does not paint us into a corner. It does not decide
 HOW — that is the design of record and the per-todo plans.
 

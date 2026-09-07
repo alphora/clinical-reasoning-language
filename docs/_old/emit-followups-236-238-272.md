@@ -207,7 +207,7 @@ the operator explicitly allowed reordering / fast-follow-ons.
 ---
 
 ## §5. Cross-refs
-- `project_emit189-cel-boolean-value` — the closed slice + emit design of record (`docs/emit-consistency-189-design.md`).
+- `project_emit189-cel-boolean-value` — the closed slice + emit design of record (`docs/_old/emit-consistency-189-design.md`).
 - `project_cel-emit-consistency-cluster` — the emit cluster + the reconciliation-pass discipline.
 - `docs/CRL-NORTH-STAR.md` §4 (emit principles) — where the §0 principle graduates once refined.
 - disc 415 — the #189 slice panel logs (through R4 full-slice).

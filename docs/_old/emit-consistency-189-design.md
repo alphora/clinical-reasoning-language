@@ -1,6 +1,6 @@
 # CRL emit-consistency (#189) — design of record
 
-**Superseded doctrine (2026-09-05):** every absence-code prescription in this historical document is superseded by [CRL-NORTH-STAR.md](CRL-NORTH-STAR.md), especially §3. There is no absence code. Record existence and an unanswered question are different; preserve an explicit false answer. Implementation-status statements below describe the dated design snapshot, not the current release's capability matrix.
+**Superseded doctrine (2026-09-05):** every absence-code prescription in this historical document is superseded by [CRL-NORTH-STAR.md](../CRL-NORTH-STAR.md), especially §3. There is no absence code. Record existence and an unanswered question are different; preserve an explicit false answer. Implementation-status statements below describe the dated design snapshot, not the current release's capability matrix.
 
 **Status:** design converged through four design-panel rounds (1, 2, 2R efficacy test, and a final round on
 the CRL-emit lens) plus operator decisions of 2026-08-11. **The grammar + validation slice (§8/§9 step 1) is
@@ -386,4 +386,4 @@ when picked up (memory is not backlog).**
 | B1 | descriptor gains a THIRD `source` arm (a `source representation:` coded external value-read), DESCRIBED-but-INERT until the flip; both-rep → `[local-exact, source]`; coding axis kept separate from datum axis; source-ONLY stays `status:"deferred"` (§10/#257); a LOCAL value-read of the coding element is rejected (`value-read-is-coding-element`, the disc-496 conflation on the local arm). Supersedes §0/§4 "two arms". disc 497. | 2026-08-23 |
 
 Full round history + per-point processing: `.vibe-tools/discussions/413-emit189-context-free-total-boolean.md`
-(ROUND 1, 2, 2R, FINAL). Companion working notes: `tmp/DECISIONS-concept-model-and-189.md`.
+(ROUND 1, 2, 2R, FINAL). Companion working notes: `tmp/_old/DECISIONS-concept-model-and-189.md`.
