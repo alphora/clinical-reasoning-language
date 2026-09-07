@@ -1,0 +1,20 @@
+{
+  "issues": [
+    {
+      "severity": "error",
+      "code": "exception",
+      "diagnostics": "Condition expression FHIRHelpers.ToBoolean((\"BmiPublicationInterface\".\"Obese\").value as FHIR.boolean) encountered exception: publication-bmi-nonpositive: BMI measurements must be positive\nnull"
+    },
+    {
+      "severity": "error",
+      "code": "exception",
+      "diagnostics": "Condition expression not FHIRHelpers.ToBoolean((\"BmiPublicationInterface\".\"Obese\").value as FHIR.boolean) encountered exception: publication-bmi-nonpositive: BMI measurements must be positive\nnull"
+    },
+    {
+      "severity": "error",
+      "code": "exception",
+      "diagnostics": "Error encountered evaluating expression (BMI) for item (1): publication-bmi-nonpositive: BMI measurements must be positive\nnull"
+    }
+  ],
+  "log": "[main] ERROR MessageEvaluator - publication-bmi-nonpositive: BMI measurements must be positive\n[main] ERROR CqlEngine - Exception for Library: expression, Message: publication-bmi-nonpositive: BMI measurements must be positive\n[main] ERROR org.opencds.cqf.fhir.cr.plandefinition.apply.ProcessAction - Condition expression FHIRHelpers.ToBoolean((\"BmiPublicationInterface\".\"Obese\").value as FHIR.boolean) encountered exception: publication-bmi-nonpositive: BMI measurements must be positive\n[main] ERROR MessageEvaluator - publication-bmi-nonpositive: BMI measurements must be positive\n[main] ERROR CqlEngine - Exception for Library: expression, Message: publication-bmi-nonpositive: BMI measurements must be positive\n[main] ERROR org.opencds.cqf.fhir.cr.plandefinition.apply.ProcessAction - Condition expression not FHIRHelpers.ToBoolean((\"BmiPublicationInterface\".\"Obese\").value as FHIR.boolean) encountered exception: publication-bmi-nonpositive: BMI measurements must be positive\n[main] ERROR MessageEvaluator - publication-bmi-nonpositive: BMI measurements must be positive\n[main] ERROR CqlEngine - Exception for Library: BmiPublicationInferences, Message: publication-bmi-nonpositive: BMI measurements must be positive\n[main] ERROR org.opencds.cqf.fhir.cr.questionnaire.populate.ItemProcessor - Error encountered evaluating expression (BMI) for item (1): publication-bmi-nonpositive: BMI measurements must be positive"
+}

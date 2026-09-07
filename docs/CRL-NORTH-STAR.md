@@ -170,7 +170,14 @@ An alternative request shape has a bounded native control: send the full returne
 only explicitly edited response items and their ancestors. Height repair/clear and direct BMI
 override/clear each pass this way. Untouched fields are absent from that response, while an explicitly
 cleared item is retained without its answer. This is distinct from full-response resubmission; it does
-not certify a rendered client, cumulative session-state management, or persistence reconciliation.
+not certify a rendered client or persistence reconciliation.
+A separate cumulative developer probe retains successful extracted singleton answers between requests,
+replaces only the edited session entry, and preserves earlier values and timestamps. Its invalid-input
+control retains the previous successful state. This is client-owned request construction, not automatic
+repository merging. Height edits do not renew Weight's authored validity or an existing BMI override;
+a later Weight edit can make the calculation newer because Weight is the explicit validity anchor.
+A BMI clear contributes a newer unknown and can pause the decision. It does not mean removing the
+override to restore calculation. See the [bounded BMI session probe](../packages/crl/test/acceptance/bmi/README.md).
 The measurement/comparison prerequisite retains CRE's explicit imported-publication limitation;
 cross-library emitted CQL and CRE imports require separate verification and are not interchangeable claims.
 
