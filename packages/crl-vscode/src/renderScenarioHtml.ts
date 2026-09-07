@@ -100,6 +100,9 @@ function esc(s: string): string {
 
 /** The run-state badge for a node (drives both the label text and the CSS class). */
 function nodeState(n: ViewNode): { cls: string; badge: string } {
+  // REFACTOR:grounded (#320): failure is neither a produced action nor a false condition.
+  if (n.invalidated) return { cls: "st-invalidated", badge: "invalidated by case error" };
+  if (n.publicationErrors?.length) return { cls: "st-invalidated", badge: "data evaluation error" };
   if (n.kind === "action") {
     if (!n.evaluated) return { cls: "st-skip", badge: "not reached" };
     if (n.guardedOut) return { cls: "st-guard", badge: "guarded out" };
@@ -245,7 +248,7 @@ ul.tree { padding-left: 4px; border-left: none; }
 .badge { font-size: .72em; text-transform: uppercase; opacity: .9; margin-right: 6px; padding: 0 4px; border-radius: 3px; border: 1px solid var(--vscode-panel-border); }
 .facts, .guard { opacity: .7; margin-left: 8px; font-size: .9em; }
 .st-sat > .row .badge, .st-produced > .row .badge { color: var(--vscode-testing-iconPassed, #3fb950); border-color: currentColor; }
-.st-unsat > .row .badge, .st-guard > .row .badge { color: var(--vscode-testing-iconFailed, #f85149); border-color: currentColor; }
+.st-unsat > .row .badge, .st-guard > .row .badge, .st-invalidated > .row .badge { color: var(--vscode-testing-iconFailed, #f85149); border-color: currentColor; }
 .st-preempt > .row, .st-skip > .row { opacity: .5; }
 .st-preempt > .row .badge { color: var(--vscode-charts-yellow, #d29922); border-color: currentColor; }
 .diags { color: var(--vscode-testing-iconFailed, #f85149); }

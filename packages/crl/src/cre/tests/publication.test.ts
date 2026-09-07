@@ -7,6 +7,7 @@ import * as celEmission from "../../cel/emitter/emitFhir";
 import { resolveCelImports } from "../../cel/imports";
 import { validateCEL } from "../../cel/validator";
 import { runCel } from "../run";
+import { renderScenario } from "../viewModel";
 import * as publicationProgramModule from "../../emit/publicationProgram";
 import { produceMembershipCandidate } from "../../emit/publicationProducer";
 
@@ -34,7 +35,7 @@ ${value === undefined ? "" : `- value is ${value}.`}
 ${date === undefined ? "" : `- date is "${date}".`}
 - defined by "Publication"."Answer".`;
 
-function evaluate(facts: string, references: string[], decision = DECISION, addition = "", expected = "Deny", extraCases = "", project: { policy?: string; coveredLibrary?: string; siblings?: string[]; installed?: string[]; packageName?: string; capturePublication?: boolean } = {}) {
+function evaluate(facts: string, references: string[], decision = DECISION, addition = "", expected = "Deny", extraCases = "", project: { policy?: string; coveredLibrary?: string; siblings?: string[]; installed?: string[]; packageName?: string; capturePublication?: boolean; captureView?: boolean } = {}) {
   const parent = path.resolve(os.tmpdir());
   const directory = mkdtempSync(path.join(parent, "crl-publication-"));
   if (path.dirname(directory) !== parent || !path.basename(directory).startsWith("crl-publication-")) throw new Error("Unexpected temporary directory");
@@ -65,7 +66,8 @@ ${extraCases}`);
     expect(graph.celParseErrors).toEqual([]);
     expect(graph.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
     const execution = runCel(graph);
-    return { run: execution.runs[0], runs: execution.runs, emission: emitCelToFhir(graph), validation: validateCEL(graph), preparedPublications: project.capturePublication ? prepareCelPublications(graph) : undefined };
+    return { run: execution.runs[0], runs: execution.runs, emission: emitCelToFhir(graph), validation: validateCEL(graph), preparedPublications: project.capturePublication ? prepareCelPublications(graph) : undefined,
+      view: project.captureView ? renderScenario(graph).scenarios[0] : undefined };
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -285,6 +287,259 @@ first:
     expect(run.diagnostics.join("\n")).toContain("publication-unsupported-scope");
   });
 
+  // REFACTOR:grounded (#320, review 570): leaf ownership does not change selected
+  // value truth or unknown pause. Resolve the typed activity slot, not expressions.
+  const sharedActivities = 'library "Shared".\n' + POLICY.slice(POLICY.indexOf('activity "Approve"'));
+  const sharedDecision = DECISION.replaceAll('activity "', 'activity "Shared"."');
+
+  it.each([true, false, undefined])("resolves sibling leaves with selected value %s", (value) => {
+    const { run } = evaluate(value === undefined ? "" : fact("A", String(value)), value === undefined ? [] : ["A"],
+      sharedDecision, "", value ? "Approve" : "Deny", "", { policy: POLICY.slice(0, POLICY.indexOf('activity "Approve"')), siblings: [sharedActivities] });
+    expect(run.status).toBe(value === undefined ? "fail" : "pass");
+    expect(run.produced.map((p) => p.recommendation)).toEqual(value === undefined ? [] : [value ? "Approve" : "Deny"]);
+    expect(run.trace[0].blockedUnknown === true).toBe(value === undefined);
+    expect(run.trace[0].nodeId).toBe("when[0]");
+    expect(run.diagnostics.some((d) => d.startsWith("publication-"))).toBe(false);
+  });
+
+  it.each(["missing library", "missing activity", "wrong kind", "package only", "local shadows package"])("refuses unresolved sibling activity: %s", (mode) => {
+    const empty = 'library "Shared".';
+    const wrong = empty + '\nconcept "Approve":\n- type is Observation.\n' + POLICY.slice(POLICY.indexOf('activity "Deny"'));
+    const siblings = mode === "missing library" || mode === "package only" ? [] : [mode === "wrong kind" ? wrong : empty];
+    const installed = mode === "package only" || mode === "local shadows package" ? [sharedActivities] : [];
+    const { run } = evaluate(fact("A", "true"), ["A"], sharedDecision, "", "Approve", "", {
+      policy: POLICY.slice(0, POLICY.indexOf('activity "Approve"')), siblings, installed,
+    });
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join("\n")).toContain(mode === "package only" ? "publication-unsupported-activity" : "publication-unresolved-activity");
+    if (mode === "wrong kind") expect(run.diagnostics.join("\n")).toContain('"Shared"."Approve"');
+    if (mode === "missing library") expect(run.diagnostics.join("\n")).toContain("target library is not available");
+    if (mode === "missing activity") expect(run.diagnostics.join("\n")).toContain("target library does not declare this activity");
+  });
+
+  it("uses the visible local activity without falling back to its installed namesake", () => {
+    const { run } = evaluate(fact("A", "true"), ["A"], sharedDecision, "", "Approve", "", {
+      policy: POLICY.slice(0, POLICY.indexOf('activity "Approve"')), siblings: [sharedActivities], installed: ['library "Shared".'],
+    });
+    expect(run.status).toBe("pass");
+    expect(run.produced.map((p) => p.recommendation)).toEqual(["Approve"]);
+  });
+
+  it.each(["sibling", "covered"])("refuses distinct %s activity targets with the same result label", (owner) => {
+    const other = owner === "sibling" ? '"Other"."Approve"' : '"Approve"';
+    const decision = sharedDecision.replace('"Shared"."Deny"', other);
+    const { run } = evaluate(fact("A", "true"), ["A"], decision, "", "Approve", "", {
+      policy: owner === "covered" ? POLICY : POLICY.slice(0, POLICY.indexOf('activity "Approve"')),
+      siblings: [sharedActivities, sharedActivities.replace('library "Shared".', 'library "Other".')],
+    });
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join("\n")).toContain("publication-ambiguous-activity");
+  });
+
+  it("allows repeated references to the same activity declaration", () => {
+    const { run } = evaluate(fact("A", "false"), ["A"], sharedDecision.replace('"Shared"."Deny"', '"Shared"."Approve"'),
+      "", "Approve", "", { policy: POLICY.slice(0, POLICY.indexOf('activity "Approve"')), siblings: [sharedActivities] });
+    expect(run.status).toBe("pass");
+    expect(run.produced.map((p) => p.recommendation)).toEqual(["Approve"]);
+  });
+
+  it.each(["guard", "delegation"])("does not exempt a foreign %s alongside a valid sibling leaf", (site) => {
+    const shared = sharedActivities + '\nconcept "Foreign":\n- type is Observation.\ndecision "Sub":\nfirst:\n- when "Foreign" then recommend activity "Approve".';
+    const decision = site === "guard" ? sharedDecision.replace('when "Answer"', 'when "Shared"."Foreign"')
+      : sharedDecision.replace('recommend activity "Shared"."Approve"', 'use decision "Shared"."Sub"');
+    const { run } = evaluate(fact("A", "true"), ["A"], decision, "", "Approve", "", { policy: POLICY.slice(0, POLICY.indexOf('activity "Approve"')), siblings: [shared] });
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join("\n")).toContain("publication-unsupported-scope");
+  });
+
+  it.each([false, true])("allows a sibling publication to exist but refuses its consumption (consumed=%s)", (consumed) => {
+    const shared = POLICY.replace('library "Publication".', 'library "Shared".');
+    const foreignFact = consumed ? fact("Foreign", "true").replace('"Publication"."Answer"', '"Shared"."Answer"') : "";
+    const { run } = evaluate(fact("A", "true") + foreignFact, consumed ? ["A", "Foreign"] : ["A"],
+      sharedDecision, "", "Approve", "", { policy: POLICY.slice(0, POLICY.indexOf('activity "Approve"')), siblings: [shared] });
+    expect(run.status).toBe(consumed ? "error" : "pass");
+    expect(run.produced.map((p) => p.recommendation)).toEqual(consumed ? [] : ["Approve"]);
+    if (consumed) expect(run.diagnostics.join("\n")).toContain("publication-unsupported-scope");
+  });
+
+  it("characterizes the unchecked legacy activity path without treating it as publication correctness", () => {
+    // REFACTOR:suspect (#320): the legacy evaluator reports unresolved leaf names;
+    // resolving them consistently is a separate legacy-lane correction.
+    const policy = POLICY.replace("- shape is Record.", "- shape is Scalar.").replace("- shape reduction is most recent.\n", "");
+    const { run } = evaluate(fact("A", "true"), ["A"], sharedDecision, "", "Approve", "", { policy });
+    expect(run.status).toBe("pass");
+    expect(run.produced.map((p) => p.recommendation)).toEqual(["Approve"]);
+  });
+
+  it("rejects an unused covered activity that collides with a sibling emission", () => {
+    const { run } = evaluate(fact("A", "true"), ["A"], sharedDecision, "", "Approve", "", { siblings: [sharedActivities] });
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join("\n")).toContain("publication-ambiguous-activity");
+  });
+
+  it.each(['"Missing"', '"Publication"."Missing"'])("refuses dangling bare/self-qualified leaf %s alongside a shared leaf", (ref) => {
+    const decision = sharedDecision.replace('"Shared"."Approve"', ref);
+    const { run } = evaluate(fact("A", "true"), ["A"], decision, "", "Missing", "", {
+      policy: POLICY.slice(0, POLICY.indexOf('activity "Approve"')), siblings: [sharedActivities],
+    });
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join("\n")).toContain('publication-unresolved-activity: activity "Publication"."Missing"');
+  });
+
+  it("retains every distinct unresolved activity diagnostic", () => {
+    const decision = DECISION.replace('"Approve"', '"Missing A"').replace('"Deny"', '"Missing B"');
+    const { run } = evaluate(fact("A", "true"), ["A"], decision);
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join("\n")).toContain('"Publication"."Missing A"');
+    expect(run.diagnostics.join("\n")).toContain('"Publication"."Missing B"');
+  });
+
+  it.each([
+    [false, true, true, "when[1]/action[0]"],
+    [true, true, true, "when[0]/when[0]/action[0]"],
+    [true, false, true, "when[0]/otherwise/action[0]"],
+    [true, undefined, true, "when[0]/when[0]"],
+  ] as const)("pins a shared disposition's route (gate=%s inner=%s)", (gate, inner, answer, nodeId) => {
+    const concept = POLICY.slice(POLICY.indexOf('concept "Answer"'), POLICY.indexOf('activity "Approve"'));
+    const policy = 'library "Publication".\n' + concept + concept.replaceAll('"Answer"', '"Gate"').replace('`answer`', '`gate`')
+      + concept.replaceAll('"Answer"', '"Inner"').replace('`answer`', '`inner`');
+    const decision = `decision "D":
+first:
+- when "Gate" then:
+  first:
+  - when "Inner" then recommend activity "Shared"."Approve".
+  - otherwise then recommend activity "Shared"."Approve".
+  end.
+- when "Answer" then recommend activity "Shared"."Approve".
+- otherwise then recommend activity "Shared"."Deny".`;
+    const facts = fact("A", String(answer)) + fact("G", String(gate)).replace('"Publication"."Answer"', '"Publication"."Gate"')
+      + (inner === undefined ? "" : fact("I", String(inner)).replace('"Publication"."Answer"', '"Publication"."Inner"'));
+    const { run } = evaluate(facts, inner === undefined ? ["A", "G"] : ["A", "G", "I"], decision, "", "Approve", "", { policy, siblings: [sharedActivities] });
+    const flatten = (nodes: typeof run.trace): typeof run.trace => nodes.flatMap((n) => [n, ...flatten(n.children ?? [])]);
+    const trace = flatten(run.trace);
+    expect(run.status).toBe(inner === undefined ? "fail" : "pass");
+    expect(run.produced.map((p) => p.recommendation)).toEqual(inner === undefined ? [] : ["Approve"]);
+    expect(trace.filter((n) => n.blockedUnknown || n.kind === "action" && n.evaluated).map((n) => n.nodeId)).toEqual([nodeId]);
+  });
+
+  it("supports a local delegated decision whose leaf is a sibling activity", () => {
+    const policy = POLICY.slice(0, POLICY.indexOf('activity "Approve"'));
+    const sub = sharedDecision.replace('decision "D"', 'decision "Sub"');
+    const decision = sharedDecision.replace('recommend activity "Shared"."Approve"', 'use decision "Sub"');
+    const { run } = evaluate(fact("A", "true"), ["A"], decision, sub, "Approve", "", { policy, siblings: [sharedActivities] });
+    expect(run.status).toBe("pass");
+    expect(run.produced.map((p) => p.recommendation)).toEqual(["Approve"]);
+    expect(run.trace[0].children?.[0].children?.[0].nodeId).toBe("when[0]/action[0]/when[0]");
+  });
+
+  it.each([true, false, undefined])("evaluates answered sibling menu guards and refuses unknown menu behavior (guard=%s)", (guard) => {
+    const policy = POLICY.slice(0, POLICY.indexOf('activity "Approve"')) + '\nconcept "Legacy":\n- type is Observation.\n- value type is boolean.\n- code is `legacy`.';
+    const decision = `decision "D":
+first:
+- when "Answer" then:
+  any:
+  - recommend activity "Shared"."Approve" only when "Legacy".
+  - recommend activity "Shared"."Deny" unless "Legacy".
+  end.`;
+    const facts = fact("A", "true") + (guard === undefined ? "" : fact("L", String(guard)).replace('"Publication"."Answer"', '"Publication"."Legacy"'));
+    const { run } = evaluate(facts, guard === undefined ? ["A"] : ["A", "L"], decision, "", guard ? "Approve" : "Deny", "", { policy, siblings: [sharedActivities] });
+    expect(run.status).toBe(guard === undefined ? "error" : "pass");
+    expect(run.produced.map((p) => p.recommendation)).toEqual(guard === undefined ? [] : [guard ? "Approve" : "Deny"]);
+    expect(run.trace[0].children?.map((n) => n.guardedOut === true)).toEqual(guard === undefined ? [false] : [!guard, guard]);
+    if (guard === undefined) {
+      expect(run.trace[0].children?.[0]).not.toHaveProperty("guardedOut");
+      expect(run.trace[0].children?.[0].evaluated).toBe(true);
+      expect(run.trace[0].children?.[0].invalidated).toBe(true);
+    }
+    if (guard === undefined) expect(run.diagnostics.join("\n")).toContain("publication-unsupported-context: an unanswered action guard");
+  });
+
+  it("distinguishes a typo in a package library from an existing unsupported package activity", () => {
+    const { run } = evaluate(fact("A", "true"), ["A"], sharedDecision.replaceAll('"Shared"."Approve"', '"Shared"."Typo"')
+      .replaceAll('"Shared"."Deny"', '"Shared"."Typo"'), "", "Typo", "", {
+      policy: POLICY.slice(0, POLICY.indexOf('activity "Approve"')), installed: [sharedActivities],
+    });
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join("\n")).toContain('publication-unresolved-activity: activity "Shared"."Typo"');
+    expect(run.diagnostics.join("\n")).not.toContain("publication-unsupported-activity");
+  });
+
+  it("does not produce an unless activity when its legacy answer is absent", () => {
+    const policy = POLICY.slice(0, POLICY.indexOf('activity "Approve"')) + '\nconcept "Legacy":\n- type is Observation.\n- value type is boolean.\n- code is `legacy`.';
+    const decision = 'decision "D":\nfirst:\n- when "Answer" then:\n  any:\n  - recommend activity "Shared"."Deny" unless "Legacy".\n  end.';
+    const { run } = evaluate(fact("A", "true"), ["A"], decision, "", "Deny", "", { policy, siblings: [sharedActivities] });
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join("\n")).toContain("publication-unsupported-context: an unanswered action guard");
+  });
+
+  it.each([false, true])("makes the same-library publication activation boundary explicit (publication=%s)", (publication) => {
+    // REFACTOR:suspect: without publications the legacy lane coerces missing to false.
+    // The publication lane refuses that context even if its first publication is unused.
+    const legacy = POLICY.replace("- shape is Record.\n", "").replace("- shape reduction is most recent.\n", "")
+      + '\nconcept "Legacy":\n- type is Observation.\n- value type is boolean.\n- code is `legacy`.';
+    const unused = '\nconcept "Unused":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is `unused`.\n- shape reduction is most recent.';
+    const decision = 'decision "D":\nfirst:\n- when "Answer" then:\n  any:\n  - recommend activity "Deny" unless "Legacy".\n  end.';
+    const { run } = evaluate(fact("A", "true"), ["A"], decision, "", "Deny", "", { policy: legacy + (publication ? unused : "") });
+    expect(run.status).toBe(publication ? "error" : "pass");
+    expect(run.produced.map((p) => p.recommendation)).toEqual(publication ? [] : ["Deny"]);
+    if (publication) expect(run.diagnostics.join("\n")).toContain("publication-unsupported-context: an unanswered action guard");
+  });
+
+  it("returns no partial activities for a case with an unsupported menu context", () => {
+    const policy = POLICY + '\nconcept "Legacy":\n- type is Observation.\n- value type is boolean.\n- code is `legacy`.';
+    const decision = 'decision "D":\nall:\n- when "Answer" then recommend activity "Approve".\n- when "Answer" then:\n  any:\n  - recommend activity "Deny" unless "Legacy".\n  end.';
+    const { run, view } = evaluate(fact("A", "true"), ["A"], decision, "", "Approve", "", { policy, captureView: true });
+    expect(run.status).toBe("error");
+    expect(run.trace[0].children?.[0].node).toBe("Approve");
+    expect(run.trace[0].children?.[0].evaluated).toBe(true);
+    expect(run.produced).toEqual([]);
+    expect(run.conceptTruth).toEqual([]);
+    expect(run.trace[0].children?.[0].invalidated).toBe(true);
+    expect(view?.produced).toEqual([]);
+    expect(view?.tree[0].children?.[0].action?.produced).toBe(false);
+    expect(view?.tree[0].children?.[0].invalidated).toBe(true);
+    expect(view?.tree[1].children?.[0].invalidated).toBe(true);
+  });
+
+  it.each([false, true])("preserves a dependent guard's real error without claiming missing data (twoHop=%s)", (twoHop) => {
+    const policy = POLICY + '\nconcept "Derived":\n- defined as "' + (twoHop ? 'Intermediate' : 'Answer') + '".'
+      + (twoHop ? '\nconcept "Intermediate":\n- defined as "Answer".' : '');
+    const decision = 'decision "D":\nfirst:\n- when "Answer" then:\n  any:\n  - recommend activity "Deny" unless "Derived".\n  end.';
+    const { run } = evaluate(fact("A", "true"), ["A"], decision, "", "Deny", "", { policy });
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join("\n")).toContain("publication-unsupported-context");
+    expect(run.diagnostics.join("\n")).not.toContain("an unanswered action guard");
+  });
+
+  // REFACTOR:grounded (#320, review 571): a faulting condition is not established false.
+  it("projects a dependent when failure as invalidated", () => {
+    const policy = POLICY + '\nconcept "Derived":\n- defined as "Answer".';
+    const { run, view } = evaluate(fact("A", "true"), ["A"], DECISION.replace('when "Answer"', 'when "Derived"'), "", "Approve", "", { policy, captureView: true });
+    expect(run.status).toBe("error");
+    expect(run.trace[0].invalidated).toBe(true);
+    expect(view?.tree[0].invalidated).toBe(true);
+    expect(view?.produced).toEqual([]);
+  });
+
+  it("projects delegation-cycle actions as invalidated", () => {
+    const decision = DECISION.replaceAll('recommend activity "Approve"', 'use decision "D"');
+    const { run, view } = evaluate(fact("A", "true"), ["A"], decision, "", "Approve", "", { captureView: true });
+    expect(run.status).toBe("error");
+    expect(run.diagnostics.join("\n")).toContain("cycle");
+    expect(view?.tree[0].children?.[0].action?.actionKind).toBe("use-decision");
+    expect(view?.tree[0].children?.[0].invalidated).toBe(true);
+    expect(view?.produced).toEqual([]);
+  });
+
   it.each(["CRL", "CEL"])("refuses a genuinely referenced foreign publication through %s", (site) => {
     const legacy = POLICY.replace("- shape is Record.", "- shape is Scalar.").replace("- shape reduction is most recent.\n", "");
     const foreign = POLICY.replace('library "Publication".', 'library "Foreign".') + DECISION;
@@ -494,7 +749,7 @@ describe("CRE selected-datum membership production", () => {
     const dependent = '- when ("Photo" or "Answer") then recommend activity "Approve".';
     const independent = '- when "Photo" then recommend activity "Deny".';
     const decision = `decision "D":\nall:\n${(independentFirst ? [independent, dependent] : [dependent, independent]).join("\n")}`;
-    const { run } = withConflictingProcedure(() => evaluate(photoAndVisual, ["Photo", "Visual"], decision, "", "Deny", "", { policy: photoPolicy }));
+    const { run, view } = withConflictingProcedure(() => evaluate(photoAndVisual, ["Photo", "Visual"], decision, "", "Deny", "", { policy: photoPolicy, captureView: true }));
     expect(run.status).toBe("error");
     expect(run.produced.map((item) => item.recommendation)).toEqual(["Deny"]);
     expect(run.trace).toHaveLength(2);
@@ -507,6 +762,10 @@ describe("CRE selected-datum membership production", () => {
     expect(run.trace[independentFirst ? 0 : 1].satisfied).toBe(true);
     expect(run.diagnostics.join("\n")).toContain("publication-ambiguous-coded-value");
     expect(run.conceptTruth).toEqual([]);
+    expect(view?.produced.map((item) => item.recommendation)).toEqual(["Deny"]);
+    expect(view?.tree[independentFirst ? 0 : 1].children?.[0].invalidated).not.toBe(true);
+    expect(view?.tree[independentFirst ? 1 : 0].publicationErrors?.map((error) => error.code)).toEqual(["publication-ambiguous-coded-value"]);
+    expect(view?.tree[independentFirst ? 1 : 0].invalidated).not.toBe(true);
   });
 
   it("does not replay a failed nested criterion as true, false, or unknown", () => {

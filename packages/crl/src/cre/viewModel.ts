@@ -151,6 +151,10 @@ export interface ViewNode {
   source: LsLocation;
   /** Was this node reached during the run. */
   evaluated: boolean;
+  /** REFACTOR:grounded (#320): attempted node invalidated by a case-wide evaluation error. */
+  invalidated?: boolean;
+  /** REFACTOR:grounded (#320): condition failed on data; independent results may remain valid. */
+  publicationErrors?: TraceNode["publicationErrors"];
   /** Only on an unreached BRANCH whose block had a prior matching sibling (first:-preemption). */
   unreachedReason?: "preempted";
   condition?: ConditionView; // kind "when"
@@ -504,6 +508,9 @@ function walkBranchesVM(
       condition,
       children: walkBodyVM(b.body, nodeId, traceIndex, filePath, resolve, currentLib, stack),
     };
+    // REFACTOR:grounded (#320, review 571): preserve failure channels before UI truth rendering.
+    if (t?.invalidated) node.invalidated = true;
+    if (t?.publicationErrors?.length) node.publicationErrors = t.publicationErrors;
     if (!t && priorMatch) node.unreachedReason = "preempted";
     if (t?.satisfied) priorMatch = true;
     out.push(node);
@@ -630,7 +637,9 @@ function buildActionVM(
     actionKind,
     target,
     ...(qualifier === "any" || qualifier === "all" ? { qualifier } : {}),
-    produced: actionKind === "use-decision" ? false : evaluated && !guardedOut,
+    // REFACTOR:grounded (#320, review 571): attempted work is not a valid production
+    // when the case-wide error channel has invalidated the trace's action results.
+    produced: actionKind === "use-decision" ? false : evaluated && !guardedOut && !t?.invalidated,
     ...(actionKind === "use-decision" ? { expanded: expanded! } : {}),
   };
   const node: ViewNode = {
@@ -643,6 +652,7 @@ function buildActionVM(
     ...(children ? { children } : {}),
   };
   if (guardedOut) node.guardedOut = true;
+  if (t?.invalidated) node.invalidated = true;
   if (t?.guard) {
     // Source the concept identity from the AST (it carries the library qualifier); the trace supplies
     // only satisfied/composition. (t.guard implies stmt.guard — the trace guard came from evaluating it.)

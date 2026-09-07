@@ -6,7 +6,12 @@
  * `result is` assertion (the oracle). It MIRRORS the FHIR/CQL engine at the
  * CRL/CEL level for fast authoring feedback — it is NOT the engine.
  *
- * SCOPE:
+ * REFACTOR:grounded (#320, review 570): explicit Record publications use selected
+ * nullable values; missing answerable evidence pauses before a leaf. Their CRE
+ * capability boundary is checked in runCel. The older presence/composition path
+ * described below is legacy implementation, not the target publication semantics.
+ *
+ * LEGACY SCOPE (unmarked implementation remains presumed-wrong under #320):
  *  - Concept satisfaction is ASSERTED + COMPOSED (REFACTOR:grounded — #189 Piece 2 + (a), disc 508/510/511):
  *      • asserted — a concept with a REPRESENTATION (a local `code is`, or a `coded from`/`source representation`
  *        binding) is satisfied when ≥1 of the case's (non-subject) facts is `defined by` it. For a LOCAL concept the
@@ -220,6 +225,8 @@ export interface TraceNode {
   concept?: string;
   satisfied?: boolean;
   evaluated: boolean;
+  /** REFACTOR:grounded (#320): attempted condition or action invalidated by a case-wide error. */
+  invalidated?: boolean;
   /**
    * #189 null/pause — this ordered branch's guard evaluated UNKNOWN (nothing established it and nothing
    * could compute it), so the walk HALTED here: no later sibling was evaluated and no disposition was
@@ -1582,9 +1589,24 @@ function evalGuard(
     return { excluded: true };
   }
   const { sat, composition } = conceptSatisfied(guard.conceptName, ctx, frame);
-  // #189 null/pause — an ACTION guard stays TWO-VALUED. Its emitted carrier is `not Coalesce(<ref>, false)`
-  // (decision.ts), deliberately total so `$apply` and the CRE agree; an unknown there reads FALSE and does
-  // NOT pause. Only DECISION guards (`when`) pause. Coerce here so the two lanes stay byte-aligned.
+  if (ctx.runtimeError) return { excluded: true }; // retain the actual dependent-context diagnostic
+  // REFACTOR:grounded (#320, review 571): an unknown legacy guard must not
+  // acquire a disposition through this newly admitted publication/menu path.
+  // Integrated menu pause remains unsupported; report that limit, not false.
+  // Admission is library-wide: even an unused first publication activates it.
+  // runtimeError is intentional for an unsupported context: the entire case is
+  // invalid, unlike per-condition publicationErrors from individual bad data.
+  if (ctx.publicationProgram !== undefined && sat === null) {
+    ctx.runtimeError = true;
+    ctx.diagnostics.push("publication-unsupported-context: an unanswered action guard requires integrated menu pause behavior, not available in this slice.");
+    return { excluded: true };
+  }
+  // Selected-publication operands are refused before evaluation, so this guard lane
+  // cannot currently receive per-datum publicationErrors. Revisit that boundary if
+  // publication guard support expands. A pre-existing context fault also stays invalid.
+  // REFACTOR:suspect (#320): legacy non-publication guards still coerce unknown to false.
+  // The emitter also retains this coercion; this CRE capability refusal does not fix
+  // emitted menu behavior. Integrated menu pause remains CRL developer work under #320.
   const satTotal = sat === true;
   const excluded = guard.polarity === "unless" ? satTotal : !satTotal;
   return {
@@ -1753,9 +1775,9 @@ function executeBody(
         nodeId,
         kind: "action",
         source: spanOf(stmt.location, frame),
+        // REFACTOR:grounded (#320, review 571): refusal is not a true/false guard result.
         evaluated: true,
-        guardedOut: true,
-        guard: g.info,
+        ...(g.info ? { guardedOut: true, guard: g.info } : {}),
       });
       continue;
     }
@@ -1852,6 +1874,8 @@ function walkBranches(
     }
     if (ctx.runtimeError) {
       node.satisfied = false;
+      // REFACTOR:grounded (#320, review 571): this is a fault, not established false.
+      node.invalidated = true;
       into.push(node);
       return;
     }
@@ -2364,6 +2388,15 @@ function runCase(
   if (ctx.runtimeError) {
     // A delegation cycle (or other runtime fault) makes the produced set unreliable — report `error`, not pass/fail,
     // and DISCARD produced (a partial set would otherwise leak into the view-model's scenario summary).
+    // REFACTOR:grounded (#320, review 571): consumers reconstruct produced actions
+    // from the trace. Preserve what was reached, but explicitly invalidate its result.
+    const invalidateActions = (nodes: TraceNode[]): void => {
+      for (const node of nodes) {
+        if (node.kind === "action" && node.evaluated) node.invalidated = true;
+        if (node.children) invalidateActions(node.children);
+      }
+    };
+    invalidateActions(ctx.trace);
     return {
       case: c.name,
       decision: decisionName,
@@ -2505,14 +2538,60 @@ export function runCel(graph: ResolvedCelGraph, opts?: { now?: Date }): CelRunRe
   const registry = graph.crlRegistry ?? { byNameLocal: new Map<string, RegistryEntry>(), byNamePackage: new Map<string, RegistryEntry>() };
   const entriesByPath = new Map(rawEntries.map((entry) => [entry.filePath, entry]));
   const scopes = buildLibraryScopes([...entriesByPath.values()], [], registry);
-  const qualifiedLibraries = (node: unknown, names = new Set<string>()): Set<string> => {
+  // REFACTOR:grounded (#320, review 570): a leaf in a local sibling does not
+  // evaluate a foreign publication. Resolve its actual declaration before allowing
+  // that typed slot; all other foreign references retain the preparation boundary.
+  // Delegated decisions evaluate their own guards, so they retain that boundary.
+  // Same-library delegation and menu leaves use this same activity admission;
+  // action guards retain their separate publication/foreign-expression checks.
+  // This is a one-hop activity-label check, not full FHIR closure validation.
+  // Transitive and other-resource identity collisions remain the emitter's checks;
+  // sharing its complete preflight with CRE is separate work (state file, #320).
+  // This admission check applies only to publications; the legacy emitAction path
+  // still reports unchecked leaf labels (separate legacy-lane correction).
+  const coveredScope = scopes.get(filePath);
+  const activityIdentities = new Map<string, string>();
+  const activityErrors = new Set<string>();
+  const registerActivityLibrary = (source: string, names: ReadonlySet<string>): void => {
+    // FHIR emits every activity in a participating library, including unused ones.
+    // Those declarations must not collide merely because CRE reaches one leaf.
+    for (const name of names) {
+      const previous = activityIdentities.get(name);
+      if (previous !== undefined && previous !== source) {
+        activityErrors.add(`publication-ambiguous-activity: activities named "${name}" in "${previous}" and "${source}" share a result label. Rename one declaration to keep activity labels and emitted identities distinct.`);
+      }
+      activityIdentities.set(name, source);
+    }
+  };
+  if (coveredScope !== undefined) registerActivityLibrary(filePath, coveredScope.localNames.activities);
+  const qualifiedLibraries = (node: unknown, allowLeafActivities: boolean, names = new Set<string>()): Set<string> => {
     if (node === null || typeof node !== "object") return names;
     if (Array.isArray(node)) {
-      for (const child of node) qualifiedLibraries(child, names);
+      for (const child of node) qualifiedLibraries(child, allowLeafActivities, names);
     } else {
       const value = node as Record<string, unknown>;
+      let resolvedActivity = false;
+      if (allowLeafActivities && value.type === "RecommendActivity" && coveredScope !== undefined) {
+        const ref = value.activityName as ReferenceName;
+        const name = getRefName(ref);
+        const qualifier = getRefLibrary(ref);
+        const target = !qualifier || qualifier === coveredLib
+          ? { filePath, origin: coveredScope.origin, names: coveredScope.localNames }
+          : lookupKnownLibrary(coveredScope, qualifier);
+        if (target !== undefined && (!qualifier || qualifier === coveredLib || target.origin !== "package") && target.names.activities.has(name)) {
+          resolvedActivity = true;
+          registerActivityLibrary(target.filePath, target.names.activities);
+        } else {
+          activityErrors.add(qualifier && qualifier !== coveredLib && target?.origin === "package" && target.names.activities.has(name)
+            ? `publication-unsupported-activity: package activity "${qualifier}"."${name}" is outside the local sibling evaluation scope.`
+            : `publication-unresolved-activity: activity "${qualifier ?? coveredLib}"."${name}" does not resolve: ${target === undefined ? "target library is not available" : "target library does not declare this activity"}.`);
+        }
+      }
       if (value.type === "QualifiedReference" && typeof value.libraryName === "string") names.add(value.libraryName);
-      for (const child of Object.values(value)) qualifiedLibraries(child, names);
+      for (const [key, child] of Object.entries(value)) {
+        if (resolvedActivity && key === "activityName") continue;
+        qualifiedLibraries(child, allowLeafActivities, names);
+      }
     }
     return names;
   };
@@ -2581,12 +2660,19 @@ export function runCel(graph: ResolvedCelGraph, opts?: { now?: Date }): CelRunRe
   let publicationError: string | undefined;
   let publicationEmission: ReturnType<typeof emitCelToFhir> | undefined;
   if (hasPublication) {
-    const hasForeignReference = (node: unknown): boolean => [...qualifiedLibraries(node)].some((name) => name !== coveredLib);
+    const hasForeignReference = (node: unknown, allowLeafActivities: boolean): boolean =>
+      [...qualifiedLibraries(node, allowLeafActivities)].some((name) => name !== coveredLib);
+    const foreignCrlReference = hasForeignReference(graph.coversTarget.ast, true);
     const unsupportedScope = graph.coversTarget.ast.includes.length > 0 ||
-      hasForeignReference(graph.coversTarget.ast) || hasForeignReference(graph.cel) ||
+      foreignCrlReference || hasForeignReference(graph.cel, false) ||
       [...publicationPaths].some((source) => source !== filePath);
-    if (unsupportedScope) {
-      publicationError = "publication-unsupported-scope: run_decision currently evaluates selected publications only in an unambiguous covered library without imports or foreign-qualified references. Use emitted artifacts for this scope.";
+    // Declaration admission is file-wide, not conditional on which case path runs.
+    if (graph.coversTarget.ast.includes.length > 0) {
+      publicationError = "publication-unsupported-scope: run_decision does not yet evaluate covered publication libraries with includes. Use emitted artifacts for this scope.";
+    } else if (activityErrors.size > 0) {
+      publicationError = [...activityErrors].join("\n");
+    } else if (unsupportedScope) {
+      publicationError = "publication-unsupported-scope: run_decision evaluates selected publications in the covered library without imports. Foreign references are supported only for resolved local sibling activities with distinct result labels. Use emitted artifacts for other scopes.";
     } else {
       try {
         const domain = makeLocalDomainContext(graph);

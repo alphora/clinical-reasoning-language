@@ -161,6 +161,33 @@ const resultOf = (sv) => ({ schemaVersion: 1, success: sv.status === "pass", sou
   caseCount: 1, passCount: sv.status === "pass" ? 1 : 0, failCount: sv.status === "fail" ? 1 : 0,
   errorCount: sv.status === "error" ? 1 : 0, scenarios: [sv], errors: [] });
 
+// REFACTOR:grounded (#320, review571): an attempted, invalidated action is not unreached or produced.
+t3b("render: invalidated actions show the case error instead of a production", () => {
+  const action = { ...vmAct("when[0]/action[0]", "Approve"), invalidated: true };
+  const html = renderScenarioHtml(resultOf(scenario("error", "Approve", [action]))).html;
+  assert.match(html, /invalidated by case error/);
+  assert.ok(!html.includes('>PRODUCED<'));
+  assert.ok(!html.includes('>not reached<'));
+  assert.ok(!html.includes('>guarded out<'));
+});
+
+// REFACTOR:grounded (#320): faulted conditions and data failures are not truth verdicts.
+for (const [flags, badge] of [
+  [{ invalidated: true }, "invalidated by case error"],
+  [{ publicationErrors: [{ code: "publication-ambiguous-coded-value" }] }, "data evaluation error"],
+]) t3b(`render: condition displays ${badge}`, () => {
+  const condition = { ...vmWhen("when[0]", false, "Answer"), ...flags };
+  const html = renderScenarioHtml(resultOf(scenario("error", "Approve", [condition]))).html;
+  assert.ok(html.includes(badge));
+  assert.ok(!html.includes('>not satisfied<'));
+});
+
+t3b("render: invalidated delegation retains its case-error badge", () => {
+  const action = { ...vmAct("when[0]/action[0]", "D"), invalidated: true,
+    action: { actionKind: "use-decision", produced: false, expanded: true } };
+  assert.match(renderScenarioHtml(resultOf(scenario("error", "Approve", [action]))).html, /invalidated by case error/);
+});
+
 t3b("failedCriterionMarks: a failing case marks the blocking unsatisfied-when (inBlocking + inAll)", () => {
   const sv = scenario("fail", "Approve", [vmWhen("when[0]", false, "Indication", [vmAct("when[0]/action[0]", "Approve")])]);
   const marks = failedCriterionMarks(sv);
@@ -272,4 +299,3 @@ t3b("render: All-mode marks survive on a PASS case's untaken-branch unsatisfied 
     "untaken false when is in All but not Blocking on a pass");
   assert.ok(renderScenarioHtml(resultOf(sv)).html.includes('data-fc-all="1"'), "stamped for All mode");
 });
-
